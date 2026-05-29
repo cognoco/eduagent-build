@@ -1,7 +1,8 @@
 # WI-224 safety filter routing
 
 `pnpm eval:llm` was run after changing `apps/api/src/services/llm/router.ts`
-to treat provider safety/content-filter blocks as terminal non-transient errors.
+and provider transport code to treat provider safety/content-filter blocks and
+non-429 HTTP 4xx responses as terminal non-transient errors.
 
 The change affects retry, failover, and circuit-breaker classification only. It
 does not alter prompt construction, model request payloads, or response text

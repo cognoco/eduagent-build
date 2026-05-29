@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { SafetyFilterError } from '../../../errors';
+import { createProviderHttpError } from './errors';
 
 // ---------------------------------------------------------------------------
 // Gemini Provider — ARCH-8, ARCH-9
@@ -225,8 +226,10 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
 
       if (!res.ok) {
         const errorBody = await res.text();
-        throw new Error(
+        throw createProviderHttpError(
           `Gemini API request failed (${res.status}): ${errorBody}`,
+          res.status,
+          errorBody,
         );
       }
 
@@ -263,8 +266,10 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
 
           if (!res.ok) {
             const errorBody = await res.text();
-            throw new Error(
+            throw createProviderHttpError(
               `Gemini API stream failed (${res.status}): ${errorBody}`,
+              res.status,
+              errorBody,
             );
           }
 

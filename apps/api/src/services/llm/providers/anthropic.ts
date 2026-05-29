@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
+import { createProviderHttpError } from './errors';
 
 const logger = createLogger();
 
@@ -163,8 +164,10 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
 
       if (!res.ok) {
         const errorBody = await res.text();
-        throw new Error(
+        throw createProviderHttpError(
           `Anthropic API request failed (${res.status}): ${errorBody}`,
+          res.status,
+          errorBody,
         );
       }
 
@@ -223,8 +226,10 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
 
           if (!res.ok) {
             const errorBody = await res.text();
-            throw new Error(
+            throw createProviderHttpError(
               `Anthropic API stream failed (${res.status}): ${errorBody}`,
+              res.status,
+              errorBody,
             );
           }
 

@@ -91,6 +91,31 @@ function createTransientFailProvider(
   };
 }
 
+/** Mock provider whose chat() fails with a structured HTTP status. */
+function createHttpStatusFailProvider(
+  id: string,
+  status: number,
+): LLMProvider & { callCount: number } {
+  const base = createMockProvider(id);
+  let calls = 0;
+  return {
+    ...base,
+    get callCount() {
+      return calls;
+    },
+    async chat(): Promise<ChatResult> {
+      calls++;
+      const err = new Error(`Provider HTTP ${status}`) as Error & {
+        status: number;
+        statusCode: number;
+      };
+      err.status = status;
+      err.statusCode = status;
+      throw err;
+    },
+  };
+}
+
 /** Mock provider whose chat() always throws a provider safety block. */
 function createSafetyFailProvider(
   id: string,
@@ -1046,6 +1071,37 @@ describe('LLM Router', () => {
         expect(recovered.fallbackUsed).toBe(false);
         expect(chunks.join('')).toContain('Mock streamed');
         expect(fallback.streamCallCount).toBe(0);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('treats non-429 provider 4xx errors as terminal: no retry, no fallback, no circuit failure', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const primary = createHttpStatusFailProvider('gemini', 403);
+      const fallback = createCountingProvider('openai');
+      registerProvider(primary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        await expect(
+          routeAndCall([{ role: 'user', content: 'test' }], 1),
+        ).rejects.toThrow('Provider HTTP 403');
+
+        expect(primary.callCount).toBe(1);
+        expect(fallback.chatCallCount).toBe(0);
+
+        const recoveredPrimary = createCountingProvider('gemini');
+        registerProvider(recoveredPrimary);
+        const recovered = await routeAndCall(
+          [{ role: 'user', content: 'safe follow-up' }],
+          1,
+        );
+
+        expect(recovered.provider).toBe('gemini');
+        expect(recoveredPrimary.chatCallCount).toBe(1);
       } finally {
         warnSpy.mockRestore();
       }
