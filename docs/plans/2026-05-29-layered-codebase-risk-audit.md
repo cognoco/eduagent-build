@@ -245,17 +245,81 @@ These areas get literal line-by-line review because bugs here can cross users, b
 - Mobile session, homework, subscription, onboarding, parent/family, navigation, native voice/camera, and API error boundary paths: T9.
 - Shared schema/database contracts, migrations, seed/test infrastructure, and CI release workflows: T10.
 
+## Agent Breakdown
+
+- **Coordinator** — owns T1-T4 and T11-T12: baseline, broad scans, dedupe rules, Notion creation, and final synthesis.
+- **Agent A: Auth/Profile/Data Isolation** — owns T5.
+- **Agent B: Billing/Webhooks/Subscriptions** — owns T6.
+- **Agent C: Inngest/Background Work** — owns T7.
+- **Agent D: LLM/Session State Machines** — owns T8.
+- **Agent E: Mobile Runtime** — owns T9.
+- **Agent F: Shared Contracts/CI/Scripts/Integration Infra** — owns T10.
+
 ## Execution Log
 
-Fill this during execution:
+Executed 2026-05-29 by Coordinator + Agents A-F. This audit used broad static
+sweeps plus targeted line-by-line review of Tier 0 slices; it was not a literal
+line-by-line read of every repo file.
 
-- Branch:
-- Dirty files present before audit:
-- Docs/memory loaded:
-- Notion database used:
-- T2 inventory counts:
+- Branch: `HEAD (no branch)` in `C:\Users\ZuzanaKopečná\.codex\worktrees\52f7\eduagent-build`.
+- Dirty files present before audit: none (`git status --short` empty). `node_modules` was absent at first; coordinator ran `pnpm install --frozen-lockfile` before final verification.
+- Docs/memory loaded: IDE-provided `AGENTS.md` instructions, local `AGENTS.md`, `docs/project_context.md`, `docs/architecture.md`, `.claude/memory/MEMORY.md`, `.claude/memory/reference_notion_workspace.md`, `.claude/memory/project_known_bug_patterns.md`, `.claude/memory/feedback_notion_rest_for_queries.md`, `.agents/skills/project-memory/SKILL.md`, `.agents/skills/deep-bugfixing/SKILL.md`, `.agents/skills/notion/SKILL.md`, Notion Patterns skill.
+- Notion database used: `Issue Tracker - Open` (`3598bce9-1f7c-8070-86eb-e012bd99f184`). Duplicate check used REST pagination over Open + Resolved trackers: 1,831 rows total (90 Open, 1,741 Resolved).
+- T2 inventory counts: 1,926 source/script files in scanned extensions; 644 API route/service/Inngest files; 801 mobile app/component/hook/lib files; 540 shared/test/script/workflow/e2e files. Sub-counts: 99 route files, 417 service files, 128 Inngest files, 288 mobile app files, 122 mobile hook files, 61 integration suites.
+- Tier 0 slices reviewed line-by-line:
+  - T5 auth/profile/data isolation: Agent A.
+  - T6 billing/webhooks/subscriptions: Agent B.
+  - T7 Inngest/background work: Agent C.
+  - T8 LLM/session state machines: Agent D.
+  - T9 mobile runtime: Agent E.
+  - T10 shared contracts/CI/scripts/integration infra: Agent F.
+- Broad sweep candidate counts: `safeSend` 55; async/fire-and-forget 496; `process.env` 286; route DB access 88; fetch/json/text 901; suppressions/casts/non-null 1,964; skipped/only tests 29; internal relative `jest.mock` 439; mobile routing/storage 1,083; TODO/fallback 4,176; hardcoded mobile copy candidates 501.
 - Commands run:
-- Commands skipped and reason:
-- New Notion issues:
+  - `pnpm install --frozen-lockfile` — passed.
+  - `pnpm exec tsc --build --pretty false` — first failed before dependencies existed; passed after install.
+  - `pnpm check:i18n:orphans` — passed.
+  - `pnpm check:i18n` — passed.
+  - `pnpm check:no-clinical-copy` — passed with note: 2 stale baseline entries no longer present.
+  - `pnpm exec tsx scripts/check-gc1-pattern-a.ts` — passed.
+  - `pnpm exec jest --config apps/api/jest.config.cjs apps/api/src/inngest/orphan-dispatcher.guard.test.ts --runInBand --no-coverage` — passed, with existing `DATABASE_URL` warning.
+  - `pnpm exec jest --config apps/api/jest.config.cjs apps/api/src/services/safe-non-core.guard.test.ts --runInBand --no-coverage` — passed, with existing `DATABASE_URL` warning.
+  - `pnpm exec jest --config apps/mobile/jest.config.cjs apps/mobile/src/app/screen-navigation.test.ts --runInBand --no-coverage` — passed.
+  - `pnpm exec jest --config apps/mobile/jest.config.cjs apps/mobile/src/lib/format-api-error.test.ts --runInBand --no-coverage` — passed.
+  - `bash scripts/check-prompt-markers.sh` — passed (Agent D).
+  - `pnpm eval:llm` — passed after install: 21 flows, 316 snapshots, 15 expected profile-scope skips (Agent D).
+  - Agent E focused tests: pronouns, mentor-language sync, child topic route-param tests — passed.
+  - `bash scripts/check-migration-rollback.sh` — passed (Agent F).
+  - `pnpm run check:github-workflow-security` — passed after install (Agent F).
+  - `node --test packages/database/scripts/verify-db-target.test.mjs` — failed; filed as a new issue.
+- Commands skipped or not green and reason:
+  - `pnpm eval:llm --live` — not run; no confirmed finding depended on live provider behavior.
+  - `pnpm exec nx test:integration api` — failed to start useful integration run because `DATABASE_URL` was unset; `.env.test.local` and `.env.development.local` absent, and Doppler-backed test env loading did not provide `DATABASE_URL`. Existing docs/memory already document the local integration secret requirement, so no new infra issue was created.
+  - `pnpm exec jest --config scripts/jest.config.cjs --runInBand --no-coverage` — failed with "No tests found" on this Windows worktree despite `scripts/*.test.ts` files existing; treated as Windows/Jest discovery quirk, not filed as a product/CI issue because GitHub CI runs on Ubuntu.
+- New Notion issues: 16.
+  - Auth/profile: non-owner profiles can re-open or redirect sibling consent requests — https://www.notion.so/Auth-profile-non-owner-profiles-can-re-open-or-redirect-sibling-consent-requests-36f8bce91f7c81fb9839d61343102d4f
+  - Billing: RevenueCat billing issues ignore app-store grace periods — https://www.notion.so/Billing-RevenueCat-billing-issues-ignore-app-store-grace-periods-36f8bce91f7c81c9b505fdeb042592c0
+  - Billing: RevenueCat top-up on locally-free tier returns 403 without recovery signal — https://www.notion.so/Billing-RevenueCat-top-up-on-locally-free-tier-returns-403-without-recovery-signal-36f8bce91f7c81389eddf3af2e6c4b2c
+  - Billing: webhook cache refresh silently skips missing KV or subscription rows — https://www.notion.so/Billing-webhook-cache-refresh-silently-skips-missing-KV-or-subscription-rows-36f8bce91f7c819cb9e5c5ce38136c44
+  - Inngest: dynamic memory-dedup events are orphaned and missed by the guard — https://www.notion.so/Inngest-dynamic-memory-dedup-events-are-orphaned-and-missed-by-the-guard-36f8bce91f7c8143bfdde889d7f0cbe6
+  - Inngest: empty-reply fallback handler has no production dispatcher — https://www.notion.so/Inngest-empty-reply-fallback-handler-has-no-production-dispatcher-36f8bce91f7c8136b399e7943a41175d
+  - Sessions: streaming fallback drops completion and UI signals from done frames — https://www.notion.so/Sessions-streaming-fallback-drops-completion-and-UI-signals-from-done-frames-36f8bce91f7c8103b809f5f72a726069
+  - LLM/source safety: missing private_sources can still show source-bound factual claims — https://www.notion.so/LLM-source-safety-missing-private_sources-can-still-show-source-bound-factual-claims-36f8bce91f7c817ea5dbc81280c76a92
+  - Mobile onboarding: existing pronouns can be cleared after delayed profile load — https://www.notion.so/Mobile-onboarding-existing-pronouns-can-be-cleared-after-delayed-profile-load-36f8bce91f7c81b889e8e3d517065934
+  - Mobile: mentor language sync suppresses retry after failed profile patch — https://www.notion.so/Mobile-mentor-language-sync-suppresses-retry-after-failed-profile-patch-36f8bce91f7c81468295e6edee73042a
+  - Mobile parent topic detail: malformed masteryScore route param renders NaN% — https://www.notion.so/Mobile-parent-topic-detail-malformed-masteryScore-route-param-renders-NaN-36f8bce91f7c817da7ebf41681ec5ebc
+  - Mobile i18n: audited billing/homework/session/notification copy bypasses localization — https://www.notion.so/Mobile-i18n-audited-billing-homework-session-notification-copy-bypasses-localization-36f8bce91f7c81c6bd94e9ab24d79042
+  - CI deploy: Worker deploy can publish before required Doppler secret sync succeeds — https://www.notion.so/CI-deploy-Worker-deploy-can-publish-before-required-Doppler-secret-sync-succeeds-36f8bce91f7c81ea917af7a07095df4d
+  - CI mobile: production EAS builds can bypass production approval and tests — https://www.notion.so/CI-mobile-production-EAS-builds-can-bypass-production-approval-and-tests-36f8bce91f7c816f9f37f5815920dadf
+  - Database scripts: migration deploy guard test expects obsolete baseline-migrations step — https://www.notion.so/Database-scripts-migration-deploy-guard-test-expects-obsolete-baseline-migrations-step-36f8bce91f7c81118df6fe1e96e0c013
+  - CI guard: test-only export scanner only covers mobile source — https://www.notion.so/CI-guard-test-only-export-scanner-only-covers-mobile-source-36f8bce91f7c81b4a1b5e87af147004e
 - Existing Notion duplicates linked:
+  - BUG-786 — Book topic generation fires pre-generation event via unawaited `safeSend` in request path.
+  - BUG-755 — session-exchange `void safeSend` fire-and-forget suppresses future regressions.
+  - BUG-785 — Legacy `KNOWN_PENDING_ORPHANS` contains operational events with no handlers.
+  - BUG-790 — Homework auto-create-subject error detail is guarded only by a skipped regression test.
+  - Related historical context, not treated as active duplicates: BUG-851 (`app/exchange.empty_reply_fallback` older handler issue), BUG-607 (partial hardcoded subscription/child paywall copy).
 - Follow-up slices recommended:
+  - Fix P1 release gates before next production deploy/mobile production build: Doppler secret sync ordering and production EAS approval.
+  - Sweep request-lifecycle `safeSend`/`step.sendEvent` patterns with a stronger static guard for dynamic event names and `waitUntil`.
+  - Add a focused i18n hardcoded-copy ratchet for audited mobile runtime paths; current scan still reports 501 candidates.
+  - Run `pnpm exec nx test:integration api` under a configured Doppler/`DATABASE_URL` environment before acting on data-isolation and billing fixes.
