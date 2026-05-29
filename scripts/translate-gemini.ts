@@ -171,6 +171,20 @@ export function commitTranslatedLocaleAndBaseline(args: {
   writeJsonAtomic(args.baselinePath, args.baselineFile);
 }
 
+export function commitPrunedLocaleAndBaseline(args: {
+  dryRun: boolean | undefined;
+  targetPath: string;
+  baselinePath: string;
+  baselineFile: SourceBaselineFile;
+  lang: string;
+  source: NestedStrings;
+  translated: NestedStrings;
+}): boolean {
+  if (args.dryRun) return false;
+  commitTranslatedLocaleAndBaseline(args);
+  return true;
+}
+
 function buildSystemPrompt(
   lang: string,
   glossary: Record<string, Record<string, string>>,
@@ -443,7 +457,8 @@ async function main(): Promise<void> {
             failed.push(lang);
             return;
           }
-          commitTranslatedLocaleAndBaseline({
+          const committed = commitPrunedLocaleAndBaseline({
+            dryRun: opts.dryRun,
             targetPath,
             baselinePath: SOURCE_BASELINE_PATH,
             baselineFile: sourceBaseline,
@@ -451,8 +466,9 @@ async function main(): Promise<void> {
             source,
             translated: pruned,
           });
+          const prefix = committed ? 'Pruned' : 'Dry run — would prune';
           console.log(
-            `[${lang}] Pruned ${removedKeys.length} removed key(s), no translation needed`,
+            `[${lang}] ${prefix} ${removedKeys.length} removed key(s), no translation needed`,
           );
           succeeded.push(lang);
           return;

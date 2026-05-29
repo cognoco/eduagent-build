@@ -4,6 +4,7 @@ import * as path from 'node:path';
 
 import {
   buildBaselineForKeys,
+  commitPrunedLocaleAndBaseline,
   commitTranslatedLocaleAndBaseline,
   hashSourceString,
   selectGeminiDiffKeys,
@@ -254,6 +255,28 @@ describe('commitTranslatedLocaleAndBaseline', () => {
       }),
     ).toThrow();
 
+    expect(fs.existsSync(baselinePath)).toBe(false);
+  });
+});
+
+describe('commitPrunedLocaleAndBaseline', () => {
+  it('does not write locale or baseline files during a dry run', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'translate-gemini-'));
+    const targetPath = path.join(dir, 'de.json');
+    const baselinePath = path.join(dir, 'source-baseline.json');
+
+    const committed = commitPrunedLocaleAndBaseline({
+      dryRun: true,
+      targetPath,
+      baselinePath,
+      baselineFile: {},
+      lang: 'de',
+      source: { common: { save: 'Save' } },
+      translated: { common: { save: 'Speichern' } },
+    });
+
+    expect(committed).toBe(false);
+    expect(fs.existsSync(targetPath)).toBe(false);
     expect(fs.existsSync(baselinePath)).toBe(false);
   });
 });
