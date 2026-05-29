@@ -1,6 +1,7 @@
 # Notion Bug Fix — Pick, Verify, Resolve
 
-Launch 10 subagents, give each subagent 3 bugs from the **Issue Tracker - Open** database (`3598bce9-1f7c-8070-86eb-e012bd99f184`). That is the single source of active work — `Issue Tracker - Resolved` (`b8ce802f-1126-4a2f-a123-be5f888cbb23`) is a frozen archive of Done bugs; never read or write from it for active fixes. When a bug is verified Done, you MUST move it from Open → Resolved (see "Archive Done bugs" below). The Open DB stays small only if every Done bug gets archived; leaving them in Open recreates the bloat that drove the split. Once you are done, create a pr and stay on it until all checks pass. 
+Launch 10 subagents, give each subagent 3 bugs from the **Issue Tracker - Open** database (`3598bce9-1f7c-8070-86eb-e012bd99f184`). That is the single source of active work — `Issue Tracker - Resolved` (`b8ce802f-1126-4a2f-a123-be5f888cbb23`) is a frozen archive of Done bugs; never read or write from it for active fixes. When a bug is verified Done, you MUST move it from Open → Resolved (see "Archive Done bugs" below). The Open DB stays small only if every Done bug gets archived; leaving them in Open recreates the bloat that drove the split. Once you are done, create a pr and stay on it until all checks pass. If  no bugs are open, move to this directlry: https://www.notion.so/cognix/c7d535d0ae1d4abfb7643d9a922e6e0b?v=594c8627356c404faff466e0a30b4884
+
 
 
 **Parallel agents:** when the batch is 3+ bugs that touch disjoint files, fan out via `/my:dispatch` — it owns the planning (one bug per track, file-conflict check), the agent contract, and the post-fan-out validation. Don't hand-roll parallel logic here.
