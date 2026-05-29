@@ -7,6 +7,11 @@ tags:
   - devclient
   - auth
 ---
+# Walk the pre-auth welcome flow to the sign-in screen (2026-05-27 refactor:
+# a pm-clear'd app lands on the audience chooser, not directly on sign-in).
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 # ── Verify sign-in screen ──────────────────────────────────────────
 # NOTE: Do NOT use `hideKeyboard` without a preceding input —
 # on Android it sends BACK which can exit the app (BUG-5).

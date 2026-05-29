@@ -9,7 +9,13 @@
 # the sign-in screen.
 appId: com.mentomate.app
 ---
-# 1. Wait for sign-in screen (testID stable across first-time / returning user)
+# 0. Walk the pre-auth welcome flow to the sign-in screen. Post 2026-05-27
+#    refactor, a pm-clear'd app lands on the audience chooser, not directly
+#    on sign-in. Ends with sign-in-button visible.
+- runFlow:
+    file: nav-welcome-to-sign-in.yaml
+
+# 1. Confirm sign-in screen (testID stable across first-time / returning user)
 - extendedWaitUntil:
     visible:
       id: "sign-in-button"

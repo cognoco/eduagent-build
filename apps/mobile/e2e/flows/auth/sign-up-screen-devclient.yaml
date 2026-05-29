@@ -6,6 +6,11 @@ tags:
   - devclient
   - auth
 ---
+# Walk the pre-auth welcome flow to the sign-in screen (2026-05-27 refactor:
+# a pm-clear'd app lands on the audience chooser, not directly on sign-in).
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 # ── Navigate to sign-up ─────────────────────────────────────────────
 # [BUG-959] sign-in-button can be below fold on 1080x1920; sign-up-link sits
 # even further down. Wait on the screen container, then scroll the link

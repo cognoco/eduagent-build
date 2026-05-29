@@ -20,6 +20,11 @@ tags:
 # 1. Launch from clean state via dev-client setup
 - runFlow: ../_setup/launch-devclient.yaml
 
+# Walk the pre-auth welcome flow to the sign-in screen (2026-05-27 refactor:
+# a pm-clear'd app lands on the audience chooser, not directly on sign-in).
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 # ── M02 regression: First-time user welcome text ─────────────────────
 # After clearState, SecureStore has no `hasSignedInBefore` key.
 # The sign-in screen MUST show first-time copy, not returning-user copy.

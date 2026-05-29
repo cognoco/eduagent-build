@@ -18,6 +18,11 @@ tags:
   - nightly
   - auth
 ---
+# Walk the pre-auth welcome flow to the sign-in screen (2026-05-27 refactor:
+# a pm-clear'd app lands on the audience chooser, not directly on sign-in).
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 # [BUG-959] sign-in-button can render below the fold on 1080x1920 — wait
 # on the always-above-fold screen container, then scroll the CTA into view.
 - extendedWaitUntil:

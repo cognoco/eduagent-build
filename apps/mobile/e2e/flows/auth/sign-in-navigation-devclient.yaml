@@ -6,6 +6,11 @@ tags:
   - devclient
   - auth
 ---
+# Walk the pre-auth welcome flow to the sign-in screen (2026-05-27 refactor:
+# a pm-clear'd app lands on the audience chooser, not directly on sign-in).
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 # ── Sign-in screen ──────────────────────────────────────────────────
 # [BUG-959] On 1080x1920 (~5.8" devices) the Sign in button + Sign up link
 # render below the fold once logo + Google SSO + form fields stack up. The

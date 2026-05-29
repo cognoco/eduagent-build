@@ -35,10 +35,16 @@
 # the calling flow's mandatory assertion will catch it with a clear error.
 appId: com.mentomate.app
 ---
-# ── Step 1: Wait for sign-in screen ──
-# seed-and-run.sh should have already navigated past the dev-client launcher
-# and "Continue" overlay via ADB. Allow extra time in case bundle loading is
-# still finishing or the app needs to settle.
+# ── Step 0: Walk the pre-auth welcome flow to the sign-in screen ──
+# Post 2026-05-27 refactor, a pm-clear'd app lands on the audience chooser,
+# not directly on sign-in. This sub-flow walks chooser → cards → bridge →
+# sign-in and ends with sign-in-button visible.
+- runFlow:
+    file: nav-welcome-to-sign-in.yaml
+
+# ── Step 1: Confirm sign-in screen ──
+# seed-and-run.sh navigates past the dev-client launcher and "Continue"
+# overlay via ADB; nav-welcome-to-sign-in.yaml above walks the welcome flow.
 # NOTE: Use sign-in-button testID (not heading text) — the heading changes
 # between "Welcome back" (returning) and "Welcome to MentoMate" (first-time)
 # depending on SecureStore state. pm clear wipes SecureStore, so after seed
