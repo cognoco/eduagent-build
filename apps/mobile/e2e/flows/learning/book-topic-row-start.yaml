@@ -10,7 +10,9 @@
 #
 # Seed note: topic-not-started creates a "Geography" subject + book + topics
 # (no sessions, no retention card). The first topic has no activity →
-# state = 'up-next' on the book-screen (upNextTopic, no continueId).
+# state = 'continue-now' on the book-screen. With no sessions, the resume-target
+# endpoint (next_topic fallback) points at the first unstarted topic, which sets
+# primaryContinueTopicId = topicIds[0] → that row groups as 'continue-now'.
 # Tapping the row calls handleTopicPress → pushes /topic/[topicId] (NOT a session).
 # From topic-detail, tapping study-cta launches a mode=learning session.
 #
@@ -23,8 +25,8 @@
 #     - book-card-${BOOK_ID}                -> pushes /shelf/[subjectId]/book/[bookId]
 #   apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx:
 #     - book-screen                         -> book detail root (line 1508)
-#     - up-next-row-${TOPIC_ID}             -> first unstarted topic row (line 1832,
-#                                             `${state}-row-${topic.id}`, state='up-next')
+#     - continue-now-row-${TOPIC_ID}             -> first unstarted topic row (line 1832,
+#                                             `${state}-row-${topic.id}`, state='continue-now')
 #   apps/mobile/src/app/(app)/topic/[topicId].tsx:
 #     - topic-detail-scroll                 -> ScrollView root on topic detail (line 731)
 #     - study-cta                           -> sticky CTA (line 1088)
@@ -85,11 +87,19 @@ tags:
 
 - takeScreenshot: book-topic-row-02-book-screen
 
-# ── Tap up-next topic row → topic-detail ────────────────────────────────
+# ── Tap continue-now topic row → topic-detail ───────────────────────────
+# Topic rows render below the book header + sticky CTA, so scroll down to the
+# row first — tapOn does not auto-scroll.
+- scrollUntilVisible:
+    element:
+      id: "continue-now-row-${TOPIC_ID}"
+    direction: DOWN
+    timeout: 10000
+
 # handleTopicPress(topic.id) in book/[bookId].tsx pushes
 # /topic/[topicId] (not a session). This verifies the intermediate screen.
 - tapOn:
-    id: "up-next-row-${TOPIC_ID}"
+    id: "continue-now-row-${TOPIC_ID}"
 
 - extendedWaitUntil:
     visible:

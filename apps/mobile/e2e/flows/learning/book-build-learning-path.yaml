@@ -91,6 +91,14 @@ tags:
 # ── Assert empty-state build CTA is visible ──────────────────────────────
 # books with topicsGenerated=true and no curriculumTopics rows render the
 # empty-state block (topics-empty-state) with the topics-empty-build Pressable.
+# The empty state sits below the book header, so scroll down to it first —
+# assertVisible / tapOn do not auto-scroll.
+- scrollUntilVisible:
+    element:
+      id: "topics-empty-build"
+    direction: DOWN
+    timeout: 10000
+
 - assertVisible:
     id: "topics-empty-build"
 

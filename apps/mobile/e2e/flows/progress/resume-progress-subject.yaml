@@ -49,13 +49,15 @@ tags:
 - takeScreenshot: resume-progress-subject-01-home-reached
 
 # ── Navigate to subject detail via home subject carousel ─────────────────────
-# The seed's SUBJECT_ID is the Geography subject. The home carousel renders
-# a tile per active subject; scroll horizontally until the seed subject tile
-# is visible, then tap it to push progress/[subjectId].
+# The seed's SUBJECT_ID is the only (Geography) subject, so the single tile sits
+# at the start of the horizontal carousel — no horizontal scroll is needed. The
+# carousel (home-subject-carousel) renders below the coach band / learning
+# actions on the vertically-scrolling home page, so scroll DOWN to bring it into
+# view, then tap the tile to push progress/[subjectId].
 - scrollUntilVisible:
     element:
       id: "home-subject-card-${SUBJECT_ID}"
-    direction: RIGHT
+    direction: DOWN
     timeout: 10000
 
 - takeScreenshot: resume-progress-subject-02-subject-tile-visible

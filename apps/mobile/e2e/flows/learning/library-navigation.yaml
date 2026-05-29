@@ -124,12 +124,15 @@ tags:
 - takeScreenshot: library-nav-04-session-started
 
 # Exchange 1: establishes exchangeCount > 0 so end-session-button appears.
-# BUG-35 fix: use hideKeyboard + tapOn send-button (pressKey: Enter does not
-# reliably fire onSubmitEditing in the dev-client WHPX build).
+# BUG-35: pressKey: Enter does not reliably fire onSubmitEditing in the
+# dev-client WHPX build, and send-button sits below the keyboard. Tap
+# chat-messages to dismiss the keyboard (no back-press, so the chat screen is
+# not popped — see first-session.yaml), then tap send-button.
 - tapOn:
     id: "chat-input"
 - inputText: "Explain the concept to me"
-- hideKeyboard
+- tapOn:
+    id: "chat-messages"
 - tapOn:
     id: "send-button"
 
@@ -142,7 +145,8 @@ tags:
 - tapOn:
     id: "chat-input"
 - inputText: "Can you give me an example?"
-- hideKeyboard
+- tapOn:
+    id: "chat-messages"
 - tapOn:
     id: "send-button"
 
