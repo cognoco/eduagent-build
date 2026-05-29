@@ -1,4 +1,26 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import {
+  renderScreen,
+  type RenderScreenResult,
+} from '../../../test-utils/screen-render';
+
+// ─── Boundary mocks (external / native runtime only) ────────────────────────
+//
+// CONVERTED in this file (now run for REAL against the routed mock fetch +
+// ProfileContext supplied by renderScreen): hooks/use-progress
+// (useReviewSummary → /progress/review-summary), hooks/use-quiz (useQuizStats
+// → /quiz/stats), hooks/use-subjects (useSubjects → /subjects), and
+// hooks/use-assessments (useAssessmentEligibleTopics →
+// /retention/assessment-eligible). Each is a fetch-only React Query hook; the
+// per-test fixtures move into the `routes` map.
+//
+// KEPT as boundaries: expo-router (native nav container + Redirect),
+// react-native-safe-area-context (native insets), lib/theme (native
+// ColorScheme), lib/navigation (imports expo-router Router type),
+// react-i18next (i18n boundary, real en.json strings via mock-i18n), and
+// hooks/use-navigation-contract — it composes useParentProxy (reads
+// SecureStore) and is the screen's parent-proxy gating control surface
+// (canEnter / isParentProxy are driven per-test here, not via fetch).
 
 jest.mock(
   'react-i18next',
@@ -7,10 +29,6 @@ jest.mock(
 
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
-const mockUseReviewSummary = jest.fn();
-const mockUseQuizStats = jest.fn();
-const mockUseSubjects = jest.fn();
-const mockUseAssessmentEligibleTopics = jest.fn();
 const mockCanEnterPractice = jest.fn();
 let mockCanEnterPracticeValue = true;
 let mockSearchParams: Record<string, string> = {};
@@ -27,8 +45,9 @@ jest.mock('expo-router', () => {
 });
 
 jest.mock(
-  '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins route-entry contract without the full app provider tree */,
+  '../../../hooks/use-navigation-contract' /* gc1-allow: composes useParentProxy (SecureStore); parent-proxy gating is the test's control surface. requireActual keeps useNavigationDataScopeContract (used by real use-progress) real; only useNavigationContract is overridden. */,
   () => ({
+    ...jest.requireActual('../../../hooks/use-navigation-contract'),
     useNavigationContract: () => ({
       // V0 fallback in the screen layouts reads `isParentProxy` when
       // MODE_NAV_V1_ENABLED is off — keep it congruent with mockCanEnterPracticeValue
@@ -60,7 +79,7 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
+  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
     homeHrefForReturnTo: (returnTo: unknown) =>
@@ -69,38 +88,70 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../../hooks/use-progress', // gc1-allow: pattern-a; screen unit-scope — requireActual keeps non-overridden exports real; targeted override isolates review summary return shape
-  () => ({
-    ...jest.requireActual('../../../hooks/use-progress'),
-    useReviewSummary: () => mockUseReviewSummary(),
-  }),
-);
-
-jest.mock(
-  '../../../hooks/use-quiz', // gc1-allow: pattern-a; screen unit-scope — requireActual keeps non-overridden exports real; targeted override isolates quiz stats return shape
-  () => ({
-    ...jest.requireActual('../../../hooks/use-quiz'),
-    useQuizStats: () => mockUseQuizStats(),
-  }),
-);
-
-jest.mock(
-  '../../../hooks/use-subjects' /* gc1-allow: hook requires QueryClientProvider; not runnable in unit env */,
-  () => ({
-    useSubjects: () => mockUseSubjects(),
-  }),
-);
-
-jest.mock(
-  '../../../hooks/use-assessments', // gc1-allow: pattern-a; screen unit-scope — requireActual keeps non-overridden exports real; targeted override isolates assessment eligibility return shape
-  () => ({
-    ...jest.requireActual('../../../hooks/use-assessments'),
-    useAssessmentEligibleTopics: () => mockUseAssessmentEligibleTopics(),
-  }),
-);
-
 const PracticeScreen = require('./index').default;
+
+// ─── Route fixtures ─────────────────────────────────────────────────────────
+//
+// Real hooks fetch from these endpoints:
+//   useReviewSummary            → /progress/review-summary  (ReviewSummary)
+//   useQuizStats                → /quiz/stats               (QuizStats[])
+//   useSubjects                 → /subjects                 ({ subjects: [] })
+//   useAssessmentEligibleTopics → /retention/assessment-eligible ({ topics: [] })
+
+interface PracticeRouteOptions {
+  reviewSummary?: unknown;
+  quizStats?: unknown[];
+  subjects?: unknown[];
+  assessmentTopics?: unknown[];
+}
+
+function buildRoutes(opts: PracticeRouteOptions = {}): Record<string, unknown> {
+  return {
+    '/progress/review-summary': opts.reviewSummary ?? {
+      totalOverdue: 2,
+      nextReviewTopic: {
+        topicId: 'topic-1',
+        subjectId: 'subject-1',
+        subjectName: 'Math',
+        topicTitle: 'Algebra',
+      },
+      nextUpcomingReviewAt: null,
+    },
+    '/quiz/stats': opts.quizStats ?? [],
+    '/subjects': {
+      subjects: opts.subjects ?? [
+        {
+          id: 'subject-it',
+          name: 'Italian',
+          pedagogyMode: 'four_strands',
+          languageCode: 'it',
+          status: 'active',
+        },
+      ],
+    },
+    '/retention/assessment-eligible': {
+      topics: opts.assessmentTopics ?? [
+        {
+          topicId: 'topic-1',
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          topicTitle: 'Algebra',
+          topicDescription: 'Variables, expressions, and equations',
+        },
+      ],
+    },
+  };
+}
+
+let active: RenderScreenResult | null = null;
+
+function mount(opts: PracticeRouteOptions = {}): RenderScreenResult {
+  active = renderScreen(<PracticeScreen />, {
+    profile: 'soloLearner',
+    routes: buildRoutes(opts),
+  });
+  return active;
+}
 
 describe('PracticeScreen', () => {
   beforeEach(() => {
@@ -111,53 +162,20 @@ describe('PracticeScreen', () => {
     jest
       .spyOn(Date, 'now')
       .mockReturnValue(new Date('2026-04-18T12:00:00.000Z').getTime());
-    mockUseReviewSummary.mockReturnValue({
-      data: {
-        totalOverdue: 2,
-        nextReviewTopic: {
-          topicId: 'topic-1',
-          subjectId: 'subject-1',
-          subjectName: 'Math',
-          topicTitle: 'Algebra',
-        },
-        nextUpcomingReviewAt: null,
-      },
-      isError: false,
-    });
-    mockUseQuizStats.mockReturnValue({ data: [], isError: false });
-    mockUseSubjects.mockReturnValue({
-      data: [
-        {
-          id: 'subject-it',
-          name: 'Italian',
-          pedagogyMode: 'four_strands',
-          languageCode: 'it',
-          status: 'active',
-        },
-      ],
-      isError: false,
-    });
-    mockUseAssessmentEligibleTopics.mockReturnValue({
-      data: [
-        {
-          topicId: 'topic-1',
-          subjectId: 'subject-1',
-          subjectName: 'Math',
-          topicTitle: 'Algebra',
-          topicDescription: 'Variables, expressions, and equations',
-        },
-      ],
-      isError: false,
-    });
   });
 
   afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
     jest.restoreAllMocks();
   });
 
-  it('frames the hub as a test-yourself surface', () => {
-    render(<PracticeScreen />);
+  it('frames the hub as a test-yourself surface', async () => {
+    mount();
 
+    await waitFor(() => {
+      screen.getByText('Italian basics');
+    });
     screen.getByText('Test yourself');
     screen.getByText('Pick a quick win. Every round helps your memory stick.');
     screen.getByText("Today's review");
@@ -165,15 +183,15 @@ describe('PracticeScreen', () => {
     screen.getByText('Quick quiz');
     screen.getByText('Capitals');
     screen.getByText("Who's who");
-    screen.getByText('Italian basics');
     screen.getByText('Recite from memory');
     screen.getByText('Beta');
     screen.getByText('Dictation');
     screen.getByText('Quiz history');
   });
 
-  it('routes the back button to home', () => {
-    render(<PracticeScreen />);
+  it('routes the back button to home', async () => {
+    mount();
+    await waitFor(() => screen.getByTestId('practice-back'));
 
     fireEvent.press(screen.getByTestId('practice-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
@@ -182,10 +200,11 @@ describe('PracticeScreen', () => {
     );
   });
 
-  it('routes the back button to the learner home view when launched from learner home', () => {
+  it('routes the back button to the learner home view when launched from learner home', async () => {
     mockSearchParams = { returnTo: 'learner-home' };
 
-    render(<PracticeScreen />);
+    mount();
+    await waitFor(() => screen.getByTestId('practice-back'));
 
     fireEvent.press(screen.getByTestId('practice-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
@@ -194,8 +213,9 @@ describe('PracticeScreen', () => {
     );
   });
 
-  it('navigates to the relearn picker when review topics are available', () => {
-    render(<PracticeScreen />);
+  it('navigates to the relearn picker when review topics are available', async () => {
+    mount();
+    await waitFor(() => screen.getByTestId('practice-review'));
 
     fireEvent.press(screen.getByTestId('practice-review'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -204,10 +224,11 @@ describe('PracticeScreen', () => {
     });
   });
 
-  it('marks practice as the return target when opening relearn from practice', () => {
+  it('marks practice as the return target when opening relearn from practice', async () => {
     mockSearchParams = { returnTo: 'learner-home' };
 
-    render(<PracticeScreen />);
+    mount();
+    await waitFor(() => screen.getByTestId('practice-review'));
 
     fireEvent.press(screen.getByTestId('practice-review'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -218,42 +239,40 @@ describe('PracticeScreen', () => {
     });
   });
 
-  it('shows the empty-state block without a tap when nothing is overdue', () => {
-    mockUseReviewSummary.mockReturnValue({
-      data: {
+  it('shows the empty-state block without a tap when nothing is overdue', async () => {
+    mount({
+      reviewSummary: {
         totalOverdue: 0,
         nextReviewTopic: null,
         nextUpcomingReviewAt: '2026-04-18T15:00:00.000Z',
       },
-      isError: false,
     });
 
-    render(<PracticeScreen />);
-
-    screen.getByTestId('review-empty-state');
+    await waitFor(() => {
+      screen.getByTestId('review-empty-state');
+    });
     screen.getAllByText('All caught up');
     screen.getByText('Your next review is in 3 hours');
   });
 
-  it('lets the learner browse topics from the empty state', () => {
-    mockUseReviewSummary.mockReturnValue({
-      data: {
+  it('lets the learner browse topics from the empty state', async () => {
+    mount({
+      reviewSummary: {
         totalOverdue: 0,
         nextReviewTopic: null,
         nextUpcomingReviewAt: null,
       },
-      isError: false,
     });
 
-    render(<PracticeScreen />);
-
+    await waitFor(() => screen.getByTestId('review-empty-browse'));
     fireEvent.press(screen.getByTestId('review-empty-browse'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('shows quiz XP in the header and quick quiz cue before any XP is earned', () => {
-    render(<PracticeScreen />);
+  it('shows quiz XP in the header and quick quiz cue before any XP is earned', async () => {
+    mount();
 
+    await waitFor(() => screen.getByTestId('practice-quiz-xp'));
     // XP appears in both the header pill and the quiz card; target by testID
     expect(
       screen
@@ -266,39 +285,30 @@ describe('PracticeScreen', () => {
     screen.getByText('Test yourself with multiple choice questions · 0 XP');
   });
 
-  it('navigates to the assessment picker when assessment topics are available', () => {
-    render(<PracticeScreen />);
+  it('navigates to the assessment picker when assessment topics are available', async () => {
+    mount();
+    await waitFor(() => screen.getByTestId('practice-assessment'));
 
     fireEvent.press(screen.getByTestId('practice-assessment'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/practice/assessment-picker');
   });
 
-  it('routes the assessment row to library when no topics are ready', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [],
-      isError: false,
-    });
-    mockUseAssessmentEligibleTopics.mockReturnValue({
-      data: [],
-      isError: false,
-    });
+  it('routes the assessment row to library when no topics are ready', async () => {
+    mount({ subjects: [], assessmentTopics: [] });
 
-    render(<PracticeScreen />);
-
-    screen.getByText('Available after you finish a topic');
+    await waitFor(() => {
+      screen.getByText('Available after you finish a topic');
+    });
     fireEvent.press(screen.getByTestId('practice-assessment'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('routes the assessment row to the active subject when a topic must be studied first', () => {
-    mockUseAssessmentEligibleTopics.mockReturnValue({
-      data: [],
-      isError: false,
+  it('routes the assessment row to the active subject when a topic must be studied first', async () => {
+    mount({ assessmentTopics: [] });
+
+    await waitFor(() => {
+      screen.getByText('Study Italian first to unlock this');
     });
-
-    render(<PracticeScreen />);
-
-    screen.getByText('Study Italian first to unlock this');
     fireEvent.press(screen.getByTestId('practice-assessment'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
@@ -306,8 +316,9 @@ describe('PracticeScreen', () => {
     });
   });
 
-  it('routes the quiz parent to index and nested options to direct launch', () => {
-    render(<PracticeScreen />);
+  it('routes the quiz parent to index and nested options to direct launch', async () => {
+    mount();
+    await waitFor(() => screen.getByTestId('practice-quiz'));
 
     fireEvent.press(screen.getByTestId('practice-quiz'));
     fireEvent.press(screen.getByTestId('practice-quiz-capitals'));
@@ -328,8 +339,9 @@ describe('PracticeScreen', () => {
     });
   });
 
-  it('routes vocabulary, recitation, dictation, and quiz history to their flows', () => {
-    render(<PracticeScreen />);
+  it('routes vocabulary, recitation, dictation, and quiz history to their flows', async () => {
+    mount();
+    await waitFor(() => screen.getByTestId('practice-vocabulary-subject-it'));
 
     fireEvent.press(screen.getByTestId('practice-vocabulary-subject-it'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -361,9 +373,9 @@ describe('PracticeScreen', () => {
     });
   });
 
-  it('renders and routes a vocabulary quiz for every active language subject', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
+  it('renders and routes a vocabulary quiz for every active language subject', async () => {
+    mount({
+      subjects: [
         {
           id: 'subject-it',
           name: 'Italian',
@@ -393,12 +405,11 @@ describe('PracticeScreen', () => {
           status: 'archived',
         },
       ],
-      isError: false,
     });
 
-    render(<PracticeScreen />);
-
-    screen.getByText('Italian basics');
+    await waitFor(() => {
+      screen.getByText('Italian basics');
+    });
     screen.getByText('Japanese basics');
     expect(
       screen.queryByTestId('practice-vocabulary-subject-history'),
@@ -430,9 +441,9 @@ describe('PracticeScreen', () => {
     });
   });
 
-  it('shows per-option quiz cues from activity stats', () => {
-    mockUseQuizStats.mockReturnValue({
-      data: [
+  it('shows per-option quiz cues from activity stats', async () => {
+    mount({
+      quizStats: [
         {
           activityType: 'capitals',
           languageCode: null,
@@ -450,12 +461,11 @@ describe('PracticeScreen', () => {
           totalXp: 80,
         },
       ],
-      isError: false,
     });
 
-    render(<PracticeScreen />);
-
-    screen.getByText('Best 4/5');
+    await waitFor(() => {
+      screen.getByText('Best 4/5');
+    });
     screen.getByText('Played 2');
     // 200 XP appears in both header pill and quiz card; target the quiz card chip
     expect(
@@ -465,14 +475,15 @@ describe('PracticeScreen', () => {
     ).toBeTruthy();
   });
 
-  it('places recitation and dictation after the main review and test actions', () => {
-    const view = render(<PracticeScreen />);
+  it('places recitation and dictation after the main review and test actions', async () => {
+    const view = mount();
+    await waitFor(() => screen.getByTestId('practice-vocabulary-subject-it'));
 
     // node is typed as ReactTestInstance (from react-test-renderer which ships no
     // .d.ts in v19), so the predicate parameter is effectively `any`. Explicit
     // structural annotation silences noImplicitAny without using `any` directly.
     type RNTestNode = { props?: Record<string, unknown> };
-    const cardOrder = view.UNSAFE_root.findAll(
+    const cardOrder = view.result.UNSAFE_root.findAll(
       (node: RNTestNode) =>
         typeof node.props?.testID === 'string' &&
         (node.props.testID as string).startsWith('practice-') &&
@@ -504,8 +515,9 @@ describe('PracticeScreen', () => {
     ]);
   });
 
-  it('renders quiz history as a quiet recent-progress row', () => {
-    render(<PracticeScreen />);
+  it('renders quiz history as a quiet recent-progress row', async () => {
+    mount();
+    await waitFor(() => screen.getByTestId('practice-quiz-history'));
 
     const quizHistoryRow = screen.getByTestId('practice-quiz-history');
     expect(quizHistoryRow.props.className).toContain('min-h-[56px]');
@@ -516,7 +528,7 @@ describe('PracticeScreen', () => {
     mockCanEnterPracticeValue = false;
     mockCanEnterPractice.mockReturnValue(false);
 
-    render(<PracticeScreen />);
+    mount();
 
     expect(screen.getByTestId('redirect').props.children).toBe('/(app)/home');
   });

@@ -293,7 +293,7 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import { Hono } from 'hono';
+import { Hono, type ExecutionContext } from 'hono';
 import { app } from '../index';
 import { bookRoutes } from './books';
 import {
@@ -1065,5 +1065,114 @@ describe('[WI-139 / DS-050] books proxy-mode guard', () => {
     );
     expect(res.status).toBe(403);
     expect(mockDeleteBook).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pre-generation dispatch lifetime guard
+//
+// Regression coverage for: "Book topic generation fires pre-generation event
+// via unawaited safeSend in request path". On Cloudflare Workers, background
+// work that is neither awaited nor registered via executionCtx.waitUntil can be
+// torn down once the response is sent — the `app/book.topics-generated`
+// dispatch (and safeSend's failure capture) would then be lost.
+//
+// The handler must register the safeSend promise with c.executionCtx.waitUntil
+// so the runtime keeps the worker alive until the dispatch settles, without
+// blocking the user response. Mounts bookRoutes on a mini-Hono app with an
+// owner profileMeta (mirrors the proxy-guard block above) so the real
+// claim → generate → persist → dispatch path runs against the existing
+// service mocks.
+// ---------------------------------------------------------------------------
+describe('POST generate-topics — pre-generation dispatch lifetime', () => {
+  function makeOwnerApp() {
+    const ownerApp = new Hono();
+    ownerApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'test-profile-id');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: true });
+      await next();
+    });
+    ownerApp.route('/', bookRoutes);
+    return ownerApp;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockClaimBookForGeneration.mockResolvedValue({
+      id: BOOK_ID,
+      title: 'Ancient Egypt',
+      description: 'Explore pyramids and pharaohs',
+    });
+  });
+
+  it('registers the topics-generated dispatch with executionCtx.waitUntil', async () => {
+    const waitUntil = jest.fn();
+    const executionCtx = {
+      waitUntil,
+      passThroughOnException: jest.fn(),
+    } as unknown as ExecutionContext;
+
+    const res = await makeOwnerApp().fetch(
+      new Request(
+        `http://local/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        },
+      ),
+      { ...TEST_ENV },
+      executionCtx,
+    );
+
+    expect(res.status).toBe(200);
+
+    // The dispatch promise must be handed to waitUntil so the Worker stays
+    // alive until safeSend settles — not left as an orphaned `void` promise.
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    const registered = waitUntil.mock.calls[0]![0] as unknown;
+    expect(registered).toBeInstanceOf(Promise);
+
+    // The registered promise drives the dispatch: awaiting it lets safeSend
+    // run inngest.send with the pre-generation event.
+    await registered;
+    expect(mockInngestSend).toHaveBeenCalledTimes(1);
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/book.topics-generated',
+      data: {
+        subjectId: SUBJECT_ID,
+        bookId: BOOK_ID,
+        profileId: 'test-profile-id',
+        timestamp: expect.any(String),
+      },
+    });
+  });
+
+  it('still dispatches (and does not 500) when executionCtx.waitUntil is unavailable', async () => {
+    // Some runtimes / test paths expose no usable executionCtx; accessing
+    // c.executionCtx then throws. The handler must fall back to discarding the
+    // never-rejecting safeSend handle rather than failing the request.
+    const res = await makeOwnerApp().fetch(
+      new Request(
+        `http://local/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        },
+      ),
+      { ...TEST_ENV },
+      // No executionCtx passed — Hono leaves c.executionCtx unset and accessing
+      // it throws, exercising the catch fallback.
+    );
+
+    expect(res.status).toBe(200);
+    // Dispatch still fires on the fallback path (microtask), just untracked.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/book.topics-generated' }),
+    );
   });
 });

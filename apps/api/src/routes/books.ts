@@ -155,11 +155,20 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
       const { subjectId, bookId } = c.req.valid('param');
       const { priorKnowledge, expandExisting } = c.req.valid('json');
       const enqueueTopicsGenerated = (): void => {
-        // Fire-and-forget: pre-generate next books in background.
+        // Background, best-effort: pre-generate next books after this response.
         // Pre-generation is an optimization, so dispatch failure must not
         // block the response — but it MUST be observable so we can see if
-        // the optimization silently stops working.
-        void safeSend(
+        // the optimization silently stops working. safeSend captures failures
+        // and stalls to Sentry and never throws.
+        //
+        // On Cloudflare Workers, background work that is neither awaited nor
+        // registered via executionCtx.waitUntil can be torn down once the
+        // response is sent — the dispatch (and safeSend's failure capture)
+        // would then be lost. Register the promise with waitUntil so the
+        // runtime keeps the worker alive until it settles, without delaying
+        // the user response. Mirrors the waitUntil + fallback pattern in
+        // middleware/database.ts:closeDatabaseWithFallback.
+        const dispatch = safeSend(
           () =>
             inngest.send({
               name: 'app/book.topics-generated',
@@ -178,6 +187,14 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
             event: 'app/book.topics-generated',
           },
         );
+        try {
+          c.executionCtx.waitUntil(dispatch);
+        } catch {
+          // No executionCtx (e.g. test environment / non-Worker runtime).
+          // safeSend never rejects, so discarding the handle is safe — there
+          // is no worker to keep alive in this case.
+          void dispatch;
+        }
       };
 
       try {

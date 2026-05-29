@@ -49,6 +49,15 @@ export interface RunOptions {
    */
   updateBaseline?: boolean;
   /**
+   * Structural validation of the checked-in baseline file. Unlike
+   * checkBaseline this makes NO live LLM calls — it parses `baseline.json`
+   * and asserts it is non-empty for every envelope-emitting flow. This is the
+   * deterministic guard CI can run on every PR: it catches a placebo
+   * `{ "flows": {} }` baseline (which silently makes envelope-signal drift
+   * invisible) without burning LLM credits or introducing non-determinism.
+   */
+  validateBaseline?: boolean;
+  /**
    * Allowed absolute percentage-point drift before the baseline guard
    * flags a shift. 0.05 = 5pp. Default 0.05 matches the ~30-sample matrix.
    */
@@ -136,6 +145,8 @@ export function parseCliArgs(argv: string[]): {
       options.checkBaseline = true;
     } else if (arg === '--update-baseline') {
       options.updateBaseline = true;
+    } else if (arg === '--validate-baseline') {
+      options.validateBaseline = true;
     } else if (arg === '--baseline-tolerance') {
       const next = argv[++i];
       const parsed = next ? Number.parseFloat(next) : NaN;

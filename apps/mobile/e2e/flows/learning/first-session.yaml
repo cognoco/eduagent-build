@@ -10,10 +10,9 @@ appId: com.mentomate.app
 tags:
   - smoke
   - learning
-# DEMOTED 2026-05-19: BUG-35 flake — `pressKey: Enter` is not reliably
-# triggering `onSubmitEditing` in the dev-client build on WHPX; the user
-# message bubble does not render after Enter. Re-promote after BUG-35 is
-# resolved on the test environment.
+# Re-promoted 2026-05-29: already uses hideKeyboard + tapOn send-button
+# (BUG-35 fix). home-subject-carousel and home-coach-band-continue testIDs
+# verified against LearnerScreen.tsx:629 and CoachBand.tsx:56.
 ---
 # 1. Seed & sign in
 - runFlow:

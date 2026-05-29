@@ -85,6 +85,11 @@ export async function lookupAssistantTurnState(params: {
     await safeSend(
       () =>
         inngest.send({
+          // orphan-allow: structured telemetry signal required by CLAUDE.md
+          // (silent recovery must emit a structured metric/Inngest event). The
+          // lookup failure recovers in-line (returns SAFE_ASSISTANT_TURN_STATE)
+          // and escalates via logger.warn + captureException(Sentry). The event
+          // is a dashboard-queryable failure-rate signal — no handler needed.
           name: 'app/idempotency.assistant_turn_lookup_failed',
           data: { profileId, flow },
         }),

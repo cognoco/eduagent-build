@@ -4,7 +4,12 @@
 
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createScreenWrapper,
+  createTestProfile,
+  createRoutedMockFetch,
+  type RoutedMockFetch,
+} from '../test-utils/screen-render';
 import {
   useGenerateRound,
   usePrefetchRound,
@@ -16,37 +21,17 @@ import {
   useQuizStats,
 } from './use-quiz';
 
-const mockFetch = jest.fn();
+// Real ProfileContext + real api-client (Clerk's useAuth is globally mocked in
+// test-setup), driven by a routed mock fetch installed as globalThis.fetch.
+// Per-call overrides via mockResolvedValueOnce take priority over the routed
+// default, preserving the original canned-response test flow.
+let mockFetch: RoutedMockFetch;
+let queryClient: QueryClient;
+let prevFetch: typeof globalThis.fetch;
 
-// prettier-ignore
-jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono client wired to controllable fetch
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-// prettier-ignore
-jest.mock('../lib/profile', () => ({ // gc1-allow: hook tests need a fixed active profile without provider setup
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
-
-// Sentry is used in usePrefetchRound's onError — mock the external SDK
+// Sentry is used in usePrefetchRound's onError — mock the external SDK.
+// Bare specifier = external boundary (test-setup also mocks it globally; this
+// local mock is kept as the per-file source of truth for the escalation spy).
 jest.mock('@sentry/react-native', () => ({
   captureMessage: jest.fn(),
   captureException: jest.fn(),
@@ -56,12 +41,33 @@ jest.mock('@sentry/react-native', () => ({
   getClient: jest.fn(),
 }));
 
-let queryClient: QueryClient;
+beforeEach(() => {
+  prevFetch = globalThis.fetch;
+  mockFetch = createRoutedMockFetch();
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    mockFetch as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+});
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createScreenWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+    profiles: [createTestProfile({ id: 'test-profile-id' })],
+  });
   queryClient = w.queryClient;
   return w.wrapper;
+}
+
+// Shared wrapper+queryClient pair for cache-isolation tests that mount two
+// hooks against the same QueryClient.
+function createSharedWrapper() {
+  return createScreenWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+    profiles: [createTestProfile({ id: 'test-profile-id' })],
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -602,7 +608,7 @@ describe('useRoundDetail', () => {
 
   it('serves cached data within the same QueryClient during staleTime (60s)', async () => {
     // Capture a single wrapper+queryClient pair so both hooks share the same cache.
-    const { wrapper, queryClient: sharedQc } = createQueryWrapper();
+    const { wrapper, queryClient: sharedQc } = createSharedWrapper();
 
     // Populate cache via first fetch
     mockFetch.mockResolvedValueOnce(
@@ -641,7 +647,7 @@ describe('useRoundDetail', () => {
   // Pre-fix: queryKey was ['quiz-round-detail', roundId] — two profiles sharing
   // a roundId (e.g. same curriculum) would receive each other's cached data.
   it('[break-test] queryKey includes activeProfile.id for profile isolation [BUG-528]', async () => {
-    const { wrapper, queryClient: sharedQc } = createQueryWrapper();
+    const { wrapper, queryClient: sharedQc } = createSharedWrapper();
 
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(mockRound), { status: 200 }),

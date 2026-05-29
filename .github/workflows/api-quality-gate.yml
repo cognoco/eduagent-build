@@ -54,3 +54,21 @@ jobs:
       - name: LLM eval harness — Tier 1 (prompt snapshots)
         if: steps.prompt-changes.outputs.prompts == 'true'
         run: pnpm eval:llm
+
+      # [FCR-2026-05-23-L15.MED6] Deterministic, key-free guard that the
+      # checked-in signal-distribution baseline (apps/api/eval-llm/baseline.json)
+      # is real — not the placebo `{ "flows": {} }` stub that silently makes
+      # envelope-signal drift invisible. Makes NO live LLM calls, so it needs no
+      # Doppler secrets and is never flaky. The aggregate drift comparison itself
+      # (--check-baseline --live) stays a manual/scheduled gate because it needs
+      # live, non-deterministic LLM output.
+      #
+      # continue-on-error until the baseline is seeded once with
+      #   doppler run -- pnpm eval:llm -- --live --update-baseline
+      # (committed afterward). The step logs the failure so the gap is visible
+      # on every PR; flip continue-on-error to false in the same PR that commits
+      # the seeded baseline to make this blocking. See apps/api/eval-llm/README.md.
+      - name: LLM eval harness — validate signal baseline (deterministic)
+        if: steps.prompt-changes.outputs.prompts == 'true'
+        continue-on-error: true
+        run: pnpm eval:llm -- --validate-baseline

@@ -1,5 +1,22 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import {
+  renderScreen,
+  type RenderScreenResult,
+} from '../../../test-utils/screen-render';
+import { fetchCallsMatching } from '../../../test-utils/mock-api-routes';
 import QuizHistoryScreen from './history';
+
+// ─── Boundary mocks (external / native runtime only) ────────────────────────
+//
+// CONVERTED in this file (now run for REAL against the routed mock fetch +
+// ProfileContext supplied by renderScreen): hooks/use-quiz (useRecentRounds
+// runs against the routed /quiz/rounds/recent endpoint) and
+// lib/extract-vocabulary-language (a pure utility — the real fn returns null
+// for the non-language theme used here, so no stub is needed).
+//
+// KEPT as boundaries: expo-router (native nav container), lib/navigation
+// (imports the expo-router Router type), react-i18next + i18n (i18n boundary),
+// lib/theme (native ColorScheme), lib/use-screen-top-inset (native SafeArea).
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -12,7 +29,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  '../../../lib/navigation' /* gc1-allow: unit test boundary */,
+  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   }),
@@ -38,17 +55,8 @@ jest.mock(
   }),
 );
 
-const mockUseRecentRounds = jest.fn();
-
 jest.mock(
-  '../../../hooks/use-quiz' /* gc1-allow: hook requires QueryClientProvider; not runnable in unit env */,
-  () => ({
-    useRecentRounds: () => mockUseRecentRounds(),
-  }),
-);
-
-jest.mock(
-  '../../../lib/theme' /* gc1-allow: useThemeColors requires ThemeContext provider; not runnable in unit env */,
+  '../../../lib/theme' /* gc1-allow: useThemeColors requires native ColorScheme unavailable in JSDOM */,
   () => ({
     useThemeColors: () => ({
       textPrimary: '#111111',
@@ -57,18 +65,13 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../lib/use-screen-top-inset' /* gc1-allow: uses native SafeAreaContext; not runnable in unit env */,
+  '../../../lib/use-screen-top-inset' /* gc1-allow: uses native SafeAreaContext unavailable in JSDOM */,
   () => ({
     useScreenTopInset: () => ({ top: 24 }),
   }),
 );
 
-jest.mock(
-  '../../../lib/extract-vocabulary-language' /* gc1-allow: pure utility stub for unit isolation */,
-  () => ({
-    extractLanguageFromTheme: () => null,
-  }),
-);
+const RECENT_ROUNDS_ROUTE = '/quiz/rounds/recent';
 
 const recentRounds = [
   {
@@ -82,24 +85,35 @@ const recentRounds = [
   },
 ];
 
+let active: RenderScreenResult | null = null;
+
+function mount(
+  routes: Record<string, unknown> = { [RECENT_ROUNDS_ROUTE]: recentRounds },
+): RenderScreenResult {
+  active = renderScreen(<QuizHistoryScreen />, {
+    profile: 'soloLearner',
+    routes,
+  });
+  return active;
+}
+
 describe('QuizHistoryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
-    mockUseRecentRounds.mockReturnValue({
-      data: recentRounds,
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
   });
 
   afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
     jest.useRealTimers();
   });
 
-  it('navigates back to quiz index via goBackOrReplace when no returnTo param', () => {
-    render(<QuizHistoryScreen />);
+  it('navigates back to quiz index via goBackOrReplace when no returnTo param', async () => {
+    mount();
+    await waitFor(() => {
+      screen.getByTestId('quiz-history-row-round-guess');
+    });
     fireEvent.press(screen.getByTestId('quiz-history-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.objectContaining({ push: mockPush }),
@@ -107,11 +121,14 @@ describe('QuizHistoryScreen', () => {
     );
   });
 
-  it('[QUIZ-09] honors returnTo=practice: loaded-list back button routes to /(app)/practice', () => {
+  it('[QUIZ-09] honors returnTo=practice: loaded-list back button routes to /(app)/practice', async () => {
     // Break test: before the fix, the loaded-list back button hardcoded '/(app)/quiz'
     // ignoring the returnTo param that loading/empty/error states already honored.
     mockSearchParams = { returnTo: 'practice' };
-    render(<QuizHistoryScreen />);
+    mount();
+    await waitFor(() => {
+      screen.getByTestId('quiz-history-row-round-guess');
+    });
     fireEvent.press(screen.getByTestId('quiz-history-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.objectContaining({ push: mockPush }),
@@ -124,8 +141,11 @@ describe('QuizHistoryScreen', () => {
     );
   });
 
-  it('navigates to round detail on row press', () => {
-    render(<QuizHistoryScreen />);
+  it('navigates to round detail on row press', async () => {
+    mount();
+    await waitFor(() => {
+      screen.getByTestId('quiz-history-row-round-guess');
+    });
     fireEvent.press(screen.getByTestId('quiz-history-row-round-guess'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/[roundId]',
@@ -134,50 +154,48 @@ describe('QuizHistoryScreen', () => {
   });
 
   it('shows loading state', () => {
-    mockUseRecentRounds.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    render(<QuizHistoryScreen />);
+    // A route handler that never resolves keeps the real useRecentRounds query
+    // in its loading state, exactly like a slow network.
+    mount({ [RECENT_ROUNDS_ROUTE]: () => new Promise<never>(() => undefined) });
     expect(screen.getByTestId('quiz-history-loading'));
     screen.getByText('quiz.history.loadingText');
     screen.getByTestId('quiz-history-loading-back');
   });
 
-  it('turns the loading state into retry and back actions after timeout', () => {
+  it('turns the loading state into retry and back actions after timeout', async () => {
     jest.useFakeTimers();
-    const refetch = jest.fn();
-    mockUseRecentRounds.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      refetch,
+    // Stay loading: the query never settles, so the TimeoutLoader's internal
+    // 15s timer flips it to the retry/back surface. Pressing retry calls the
+    // real refetch(), which re-invokes the queryFn → a second fetch (verified
+    // via fetchCallsMatching).
+    const view = mount({
+      [RECENT_ROUNDS_ROUTE]: () => new Promise<never>(() => undefined),
     });
-
-    render(<QuizHistoryScreen />);
 
     act(() => {
       jest.advanceTimersByTime(15_000);
     });
 
+    const callsBefore = fetchCallsMatching(
+      view.routedFetch,
+      RECENT_ROUNDS_ROUTE,
+    ).length;
     fireEvent.press(screen.getByTestId('quiz-history-timeout-retry'));
-    expect(refetch).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(view.routedFetch, RECENT_ROUNDS_ROUTE).length,
+      ).toBeGreaterThan(callsBefore);
+    });
 
     fireEvent.press(screen.getByTestId('quiz-history-timeout-go-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
-  it('shows empty state with try-quiz CTA', () => {
-    mockUseRecentRounds.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('shows empty state with try-quiz CTA', async () => {
+    mount({ [RECENT_ROUNDS_ROUTE]: [] });
+    await waitFor(() => {
+      screen.getByTestId('quiz-history-empty');
     });
-    render(<QuizHistoryScreen />);
-    expect(screen.getByTestId('quiz-history-empty'));
     fireEvent.press(screen.getByTestId('quiz-history-try-quiz'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz',
@@ -185,19 +203,27 @@ describe('QuizHistoryScreen', () => {
     });
   });
 
-  it('shows error state with retry and go-back actions', () => {
-    const refetch = jest.fn();
-    mockUseRecentRounds.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      refetch,
+  it('shows error state with retry and go-back actions', async () => {
+    // A throwing route handler makes the real query enter its error state.
+    let attempts = 0;
+    const view = mount({
+      [RECENT_ROUNDS_ROUTE]: () => {
+        attempts += 1;
+        throw new TypeError('Network request failed');
+      },
     });
-    render(<QuizHistoryScreen />);
-    expect(screen.getByTestId('quiz-history-error'));
+    await waitFor(() => {
+      screen.getByTestId('quiz-history-error');
+    });
 
+    const attemptsBefore = attempts;
     fireEvent.press(screen.getByTestId('quiz-history-retry'));
-    expect(refetch).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(view.routedFetch, RECENT_ROUNDS_ROUTE).length,
+      ).toBeGreaterThan(0);
+    });
+    expect(attempts).toBeGreaterThan(attemptsBefore);
 
     fireEvent.press(screen.getByTestId('quiz-history-go-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');

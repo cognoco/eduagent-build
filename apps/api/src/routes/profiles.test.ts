@@ -18,7 +18,7 @@ jest.mock(
       ...actual,
       listProfiles: jest.fn(),
       createProfileWithLimitCheck: jest.fn(),
-      countProfiles: jest.fn(),
+      assertProfileCreationAllowed: jest.fn(),
       getProfile: jest.fn(),
       updateProfile: jest.fn(),
       updateProfileAppContext: jest.fn(),
@@ -36,7 +36,7 @@ import type { Account } from '../services/account';
 import {
   listProfiles,
   createProfileWithLimitCheck,
-  countProfiles,
+  assertProfileCreationAllowed,
   getProfile,
   updateProfile,
   updateProfileAppContext,
@@ -115,7 +115,9 @@ const listProfilesMock = jest.mocked(listProfiles);
 const createProfileWithLimitCheckMock = jest.mocked(
   createProfileWithLimitCheck,
 );
-const countProfilesMock = jest.mocked(countProfiles);
+const assertProfileCreationAllowedMock = jest.mocked(
+  assertProfileCreationAllowed,
+);
 const getProfileMock = jest.mocked(getProfile);
 const updateProfileMock = jest.mocked(updateProfile);
 const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
@@ -123,6 +125,8 @@ const switchProfileMock = jest.mocked(switchProfile);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Default: authorization passes. Deny-path tests override per-case.
+  assertProfileCreationAllowedMock.mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -196,8 +200,10 @@ describe('POST /v1/profiles', () => {
       isOwner: true,
     });
     createProfileWithLimitCheckMock.mockResolvedValue(profile);
-    // [BUG-407] profileMeta absent + count=0 → first-profile path, always allowed.
-    countProfilesMock.mockResolvedValue(0);
+    // [BUG-407] profileMeta absent + count=0 → first-profile path, always
+    // allowed. The route delegates that decision to assertProfileCreationAllowed
+    // (mocked to resolve by default); the real count logic is covered in
+    // services/profile.test.ts.
 
     const res = await makeApp({ profileMeta: null }).request('/v1/profiles', {
       method: 'POST',
@@ -210,6 +216,13 @@ describe('POST /v1/profiles', () => {
     });
 
     expect(res.status).toBe(201);
+    // Route delegated the authorization decision to the service helper with
+    // the (absent) profileMeta it read off the context.
+    expect(assertProfileCreationAllowedMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT_ID,
+      undefined,
+    );
     expect(createProfileWithLimitCheckMock).toHaveBeenCalledWith(
       expect.anything(),
       ACCOUNT_ID,
@@ -312,8 +325,18 @@ describe('POST /v1/profiles', () => {
     expect(res.status).toBe(500);
   });
 
-  // [CR-2026-05-19-H1] Break test — non-owner profile must not create profiles.
-  it('[BREAK][CR-2026-05-19-H1] returns 403 when active profile is not the account owner', async () => {
+  // [CR-2026-05-19-H1] HTTP-translation test — when the service-owned gate
+  // (assertProfileCreationAllowed) throws ForbiddenError (non-owner case), the
+  // route must return 403 and never call createProfileWithLimitCheck. The
+  // allow/deny/fail-closed *decision* logic itself is unit-tested directly
+  // against the real helper in services/profile.test.ts.
+  it('[CR-2026-05-19-H1] returns 403 when assertProfileCreationAllowed throws ForbiddenError (non-owner)', async () => {
+    assertProfileCreationAllowedMock.mockRejectedValue(
+      new ForbiddenError(
+        'Only the account owner can create additional profiles.',
+      ),
+    );
+
     const res = await makeApp({ isOwner: false }).request('/v1/profiles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -327,17 +350,25 @@ describe('POST /v1/profiles', () => {
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
-    // Service must not be called — the gate fired at route entry.
+    // Creation service must not run when the gate rejects.
     expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
+    // Route passed the active profileMeta straight through to the gate.
+    expect(assertProfileCreationAllowedMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT_ID,
+      expect.objectContaining({ isOwner: false }),
+    );
   });
 
-  // [BUG-407] Break test — profileMeta absent + account already has profiles → 403.
-  // Old behaviour: absent meta was treated as "first profile, allow". A non-owner
-  // with an established profile context (meta resolution failed) could POST /profiles.
-  // New behaviour: do a real DB count; if count > 0, reject 403 (fail closed).
-  it('[BREAK][BUG-407] returns 403 when profileMeta is absent but account already has profiles', async () => {
-    // Simulate: meta absent (e.g. no owner row in DB, edge state), but 1 profile exists.
-    countProfilesMock.mockResolvedValue(1);
+  // [BUG-407] HTTP-translation test — fail-closed (meta absent + existing
+  // profiles) surfaces as a ForbiddenError from the gate, which the route maps
+  // to 403. The real DB-count fail-closed logic lives in services/profile.test.ts.
+  it('[BUG-407] returns 403 when assertProfileCreationAllowed throws ForbiddenError (fail-closed)', async () => {
+    assertProfileCreationAllowedMock.mockRejectedValue(
+      new ForbiddenError(
+        'Only the account owner can create additional profiles.',
+      ),
+    );
 
     const res = await makeApp({ profileMeta: null }).request('/v1/profiles', {
       method: 'POST',
@@ -352,7 +383,6 @@ describe('POST /v1/profiles', () => {
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
-    // Service must not be called — gate fired before service invocation.
     expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
   });
 });
