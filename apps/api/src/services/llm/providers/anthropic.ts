@@ -171,7 +171,11 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       const data = (await res.json()) as AnthropicResponse;
 
       if (data.error) {
-        throw new Error(`Anthropic API error: ${data.error.message}`);
+        // [FCR-2026-05-23-L11.F11] Preserve structured error as cause so Sentry
+        // captures type/code fields for grouping (rate-limit, auth, content-filter).
+        throw new Error(`Anthropic API error: ${data.error.message}`, {
+          cause: data.error,
+        });
       }
 
       const text = data.content?.find((b) => b.type === 'text')?.text;

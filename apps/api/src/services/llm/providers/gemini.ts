@@ -187,7 +187,11 @@ function extractResponseText(data: GeminiResponse): string {
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
     if (data.error) {
-      throw new Error(`Gemini API error: ${data.error.message}`);
+      // [FCR-2026-05-23-L11.F11] Preserve structured error as cause so Sentry
+      // captures code/message fields for grouping (rate-limit, auth, quota).
+      throw new Error(`Gemini API error: ${data.error.message}`, {
+        cause: data.error,
+      });
     }
     throw new Error('Gemini returned empty response');
   }

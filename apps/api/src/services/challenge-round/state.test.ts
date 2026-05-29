@@ -237,6 +237,87 @@ describe('transitionChallengeState — answer_complete', () => {
       ),
     ).toThrow(/illegal/i);
   });
+
+  // [FCR-2026-05-23-L1.C1.15] A partially deserialized `active` state (one of
+  // questionIndex/totalQuestions missing) must fail safe to a terminal-ward
+  // state rather than loop in `active` forever via divergent `??` fallbacks.
+  describe('partial deserialization fails safe (no infinite loop)', () => {
+    it('active with totalQuestions missing terminates to drafting', () => {
+      const next = transitionChallengeState(
+        {
+          ...baseState,
+          state: 'active',
+          questionIndex: 1,
+          // totalQuestions omitted — partially deserialized blob
+          evaluations: [],
+        } as ChallengeRoundSessionState,
+        { type: 'answer_complete', evaluation: [evalItem()] },
+      );
+      expect(next?.state).toBe('drafting');
+      // total is resolved to a coherent, capped value, never left undefined.
+      expect(next?.totalQuestions).toBe(3);
+    });
+
+    it('active with questionIndex missing terminates to drafting', () => {
+      const next = transitionChallengeState(
+        {
+          ...baseState,
+          state: 'active',
+          totalQuestions: 3,
+          // questionIndex omitted — partially deserialized blob
+          evaluations: [],
+        } as ChallengeRoundSessionState,
+        { type: 'answer_complete', evaluation: [evalItem()] },
+      );
+      expect(next?.state).toBe('drafting');
+      expect(next?.totalQuestions).toBe(3);
+    });
+
+    it('active with both index/total missing terminates to drafting', () => {
+      const next = transitionChallengeState(
+        {
+          ...baseState,
+          state: 'active',
+          evaluations: [],
+        } as ChallengeRoundSessionState,
+        { type: 'answer_complete', evaluation: [evalItem()] },
+      );
+      expect(next?.state).toBe('drafting');
+    });
+
+    it('active with index already past an over-cap total cannot loop', () => {
+      // A corrupt persisted state where totalQuestions exceeds the hard cap
+      // and the index sits beyond the real cap must not keep asking forever —
+      // it terminates on the next answer_complete.
+      const next = transitionChallengeState(
+        {
+          ...baseState,
+          state: 'active',
+          questionIndex: 9,
+          totalQuestions: 9,
+          evaluations: [],
+        } as ChallengeRoundSessionState,
+        { type: 'answer_complete', evaluation: [evalItem()] },
+      );
+      expect(next?.state).toBe('drafting');
+      expect(next?.totalQuestions).toBe(3);
+    });
+
+    it('a well-formed active state still advances normally', () => {
+      const next = transitionChallengeState(
+        {
+          ...baseState,
+          state: 'active',
+          questionIndex: 0,
+          totalQuestions: 3,
+          evaluations: [],
+        },
+        { type: 'answer_complete', evaluation: [evalItem()] },
+      );
+      expect(next?.state).toBe('active');
+      expect(next?.questionIndex).toBe(1);
+    });
+  });
 });
 
 describe('transitionChallengeState — draft_ready / complete / abort', () => {

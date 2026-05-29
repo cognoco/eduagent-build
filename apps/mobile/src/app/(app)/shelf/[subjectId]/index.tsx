@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
@@ -114,6 +114,50 @@ export default function ShelfScreen() {
   // disorienting. The shelf screen always shows, even with one book.
   // See spec flag: "if the auto-skip feels disorienting, revert."
 
+  // Status is now server-computed and returned in the book object itself.
+  // Fall back to topicsGenerated heuristic only if status is absent (old cache).
+  // NOTE: these hooks MUST live before any early-return guards (rules-of-hooks).
+  const getBookStatus = useCallback(
+    (bookId: string): BookProgressStatus => {
+      const book = books.find((b) => b.id === bookId);
+      if (!book) return 'NOT_STARTED';
+      if (book.status) return book.status;
+      if (!book.topicsGenerated) return 'NOT_STARTED';
+      return 'IN_PROGRESS';
+    },
+    [books],
+  );
+
+  const suggestedBookId = useMemo(() => {
+    const reviewDue = books.find((b) => getBookStatus(b.id) === 'REVIEW_DUE');
+    if (reviewDue) return reviewDue.id;
+    const inProgress = books.find((b) => getBookStatus(b.id) === 'IN_PROGRESS');
+    if (inProgress) return inProgress.id;
+    const notStarted = books.find((b) => getBookStatus(b.id) === 'NOT_STARTED');
+    if (notStarted) return notStarted.id;
+    return null;
+  }, [books, getBookStatus]);
+
+  const bookKeyExtractor = useCallback((item: { id: string }) => item.id, []);
+
+  const bookRenderItem = useCallback(
+    ({ item }: { item: (typeof books)[number] }) => (
+      <BookCard
+        book={item}
+        status={getBookStatus(item.id)}
+        highlighted={item.id === suggestedBookId}
+        tint={shelfTint}
+        onPress={() =>
+          router.push({
+            pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+            params: { subjectId, bookId: item.id },
+          } as Href)
+        }
+      />
+    ),
+    [getBookStatus, suggestedBookId, shelfTint, router, subjectId],
+  );
+
   // Guard: param must exist
   if (!subjectId) {
     return (
@@ -153,26 +197,6 @@ export default function ShelfScreen() {
     void subjectsQuery.refetch();
   };
 
-  // Status is now server-computed and returned in the book object itself.
-  // Fall back to topicsGenerated heuristic only if status is absent (old cache).
-  const getBookStatus = (bookId: string): BookProgressStatus => {
-    const book = books.find((b) => b.id === bookId);
-    if (!book) return 'NOT_STARTED';
-    if (book.status) return book.status;
-    if (!book.topicsGenerated) return 'NOT_STARTED';
-    return 'IN_PROGRESS';
-  };
-
-  const suggestedBookId = (() => {
-    const reviewDue = books.find((b) => getBookStatus(b.id) === 'REVIEW_DUE');
-    if (reviewDue) return reviewDue.id;
-    const inProgress = books.find((b) => getBookStatus(b.id) === 'IN_PROGRESS');
-    if (inProgress) return inProgress.id;
-    const notStarted = books.find((b) => getBookStatus(b.id) === 'NOT_STARTED');
-    if (notStarted) return notStarted.id;
-    return null;
-  })();
-
   // Aggregate progress from all books on this shelf
   const totalTopics = books.reduce((sum, b) => sum + (b.topicCount ?? 0), 0);
   const completedTopics = books.reduce(
@@ -181,6 +205,7 @@ export default function ShelfScreen() {
   );
   const showProgress = totalTopics > 0;
   const showBrowseAllSuggestions = bookSuggestions.length > 2;
+
   const showAddBookFooter = bookSuggestions.length === 0 && books.length > 0;
   const chooseBookButtonLabel = showBrowseAllSuggestions
     ? t('library.shelf.browseAll')
@@ -374,25 +399,12 @@ export default function ShelfScreen() {
       {/* Book list */}
       <FlatList
         data={books}
-        keyExtractor={(item) => item.id}
+        keyExtractor={bookKeyExtractor}
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingBottom: insets.bottom + 80,
         }}
-        renderItem={({ item }) => (
-          <BookCard
-            book={item}
-            status={getBookStatus(item.id)}
-            highlighted={item.id === suggestedBookId}
-            tint={shelfTint}
-            onPress={() =>
-              router.push({
-                pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-                params: { subjectId, bookId: item.id },
-              } as Href)
-            }
-          />
-        )}
+        renderItem={bookRenderItem}
         ListFooterComponent={
           showAddBookFooter ? (
             <View className="pt-1">

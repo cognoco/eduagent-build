@@ -1,5 +1,17 @@
 const path = require('path');
 
+// When jest is run from inside a git worktree (.worktrees/<branch>/), the
+// worktree-guard ignore patterns below would match the worktree's own test
+// paths and silently yield "No tests found". Detect that case (the config's
+// own __dirname sits under .worktrees/) and drop the .worktrees guards. The
+// main-checkout run is unaffected: a worktree's rootDir never contains a
+// sibling worktree, so there is no haste-map collision risk to guard against.
+const RUNNING_INSIDE_WORKTREE = __dirname.includes('.worktrees');
+const dropWorktreeGuards = (patterns) =>
+  RUNNING_INSIDE_WORKTREE
+    ? patterns.filter((p) => !/worktrees/i.test(p))
+    : patterns;
+
 // CI-only readability defaults — silence captured console output from passing
 // tests + custom reporter for GitHub Actions annotations and end-of-log
 // summary. See docs/superpowers/specs/2026-05-14-ci-failure-readability-design.md.
@@ -27,17 +39,17 @@ module.exports = {
   // Keep focused waits narrow in individual tests; this cap prevents the
   // receipt/pre-push full-suite run from failing unrelated long mobile suites.
   testTimeout: 30000,
-  modulePathIgnorePatterns: [
+  modulePathIgnorePatterns: dropWorktreeGuards([
     '\\.claude/worktrees',
     '<rootDir>/.worktrees/',
     '<rootDir>/.tmp/',
     '[/\\\\]\\.tmp',
-  ],
-  testPathIgnorePatterns: [
+  ]),
+  testPathIgnorePatterns: dropWorktreeGuards([
     '<rootDir>/.worktrees/',
     '<rootDir>/.tmp/',
     '[/\\\\]\\.tmp',
-  ],
+  ]),
   moduleNameMapper: {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',

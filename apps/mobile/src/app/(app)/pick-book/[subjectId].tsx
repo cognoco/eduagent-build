@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,6 +84,7 @@ function isRetriableTopupOutcome(
 }
 
 export default function PickBookScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -611,7 +613,9 @@ export default function PickBookScreen(): React.ReactElement {
                 className="px-4 py-3 min-h-[48px] justify-center"
                 testID="pick-book-custom-cancel"
               >
-                <Text className="text-body text-text-secondary">Cancel</Text>
+                <Text className="text-body text-text-secondary">
+                  {t('common.cancel')}
+                </Text>
               </Pressable>
             </View>
           </View>

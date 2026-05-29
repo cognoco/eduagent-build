@@ -311,6 +311,11 @@ jobs:
           EXPO_PUBLIC_API_URL: 'https://api-stg.mentomate.com'
           EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
           EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
+          # [FCR-2026-05-23-L14.F12] Wire the commit SHA so contract-drift-check.ts
+          # can compare the mobile bundle's origin against the deployed API SHA.
+          # Without this, checkContractDrift() always exits early at the
+          # "Set EXPO_PUBLIC_GIT_SHA in your env" branch and drift goes undetected.
+          EXPO_PUBLIC_GIT_SHA: ${{ github.sha }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B | head -1 | tr -cd '[:print:]' | cut -c1-200)
           printf 'Publishing OTA update: %s\n' "$COMMIT_MSG"

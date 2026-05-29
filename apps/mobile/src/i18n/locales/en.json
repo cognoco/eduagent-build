@@ -712,6 +712,9 @@
         "guessWho": "Guess Who",
         "vocabulary": "Vocabulary"
       }
+    },
+    "results": {
+      "viewHistory": "View History"
     }
   },
   "practiceHub": {

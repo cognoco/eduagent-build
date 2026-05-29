@@ -75,6 +75,52 @@ describe('buildLibraryIndex', () => {
     expect(index.shelves[0]!.books[0]!.name).toBe('Europe');
     expect(index.shelves[0]!.books[0]!.chapters).toHaveLength(2);
   });
+
+  it('[FCR-2026-05-23-L1.C1.9] never emits a chapter with zero topics after proportional truncation', async () => {
+    // 60 topics across two chapters of one book on a single shelf. The shelf
+    // budget resolves to MAX_TOPIC_SUMMARIES (50) because it owns 100% of the
+    // topics; the first chapter consumes the entire budget, leaving the second
+    // chapter to be sliced down to zero topics by the truncation loop.
+    const riversTopics = Array.from({ length: 50 }, (_, i) => ({
+      id: `river-${i}`,
+      bookId: 'book-1',
+      title: `River ${i}`,
+      chapter: 'Rivers',
+    }));
+    const mountainTopics = Array.from({ length: 10 }, (_, i) => ({
+      id: `mountain-${i}`,
+      bookId: 'book-1',
+      title: `Peak ${i}`,
+      chapter: 'Mountains',
+    }));
+
+    const db = createMockDb({
+      subjects: [{ id: 'subj-1', name: 'Geography', status: 'active' }],
+      curriculumBooks: [
+        { id: 'book-1', subjectId: 'subj-1', title: 'Europe', sortOrder: 0 },
+      ],
+      // findMany orders by createdAt desc; insertion order here puts Rivers
+      // first so it wins the budget and Mountains is the one truncated to zero.
+      curriculumTopics: [...riversTopics, ...mountainTopics],
+    });
+
+    const index = await buildLibraryIndex(db, 'profile-1');
+
+    // No surviving chapter is allowed to be empty.
+    for (const shelf of index.shelves) {
+      for (const book of shelf.books) {
+        for (const chapter of book.chapters) {
+          expect(chapter.topics.length).toBeGreaterThan(0);
+        }
+        // A book whose chapters were all truncated to empty must not survive.
+        expect(book.chapters.length).toBeGreaterThan(0);
+      }
+    }
+
+    // The kept chapter is still present; the zero-topic one was dropped.
+    const chapters = index.shelves[0]!.books[0]!.chapters;
+    expect(chapters.map((c) => c.name)).toEqual(['Rivers']);
+  });
 });
 
 // ---------------------------------------------------------------------------

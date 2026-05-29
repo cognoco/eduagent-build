@@ -1952,6 +1952,35 @@ describe('analyzeSessionTranscript', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [FCR-2026-05-23-L15.LOW3] analyzeSessionTranscript — flow label in routeAndCall
+// ---------------------------------------------------------------------------
+
+describe('analyzeSessionTranscript — flow label (FCR-2026-05-23-L15.LOW3)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRouteAndCall.mockResolvedValue({ response: null });
+  });
+
+  it('passes flow: learner-profile-analysis to routeAndCall', async () => {
+    const events = [
+      { eventType: 'user_message', content: 'How do I solve this?' },
+      { eventType: 'ai_response', content: 'Let me explain step by step.' },
+      { eventType: 'user_message', content: 'That makes sense now.' },
+    ];
+
+    await analyzeSessionTranscript(events, 'Math', 'Algebra', null);
+
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+    const [, , options] = mockRouteAndCall.mock.calls[0] as [
+      unknown,
+      unknown,
+      { flow?: string },
+    ];
+    expect(options?.flow).toBe('learner-profile-analysis');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // applyAnalysis — GDPR consent gate (WI-221)
 // ---------------------------------------------------------------------------
 

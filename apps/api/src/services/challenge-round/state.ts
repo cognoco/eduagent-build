@@ -106,12 +106,43 @@ export function transitionChallengeState(
         );
       }
       const evaluations = [...prev.evaluations, ...event.evaluation];
-      const nextIndex = (prev.questionIndex ?? 0) + 1;
-      const total = prev.totalQuestions ?? MAX_CHALLENGE_QUESTIONS;
-      if (nextIndex >= total) {
-        return { ...prev, state: 'drafting', evaluations };
+      // [FCR-2026-05-23-L1.C1.15] questionIndex and totalQuestions are set
+      // together by the `start` transition, so a live `active` state always
+      // has both. If one is missing, the state was partially deserialized
+      // (e.g. a metadata blob persisted before `start` wrote both fields, or a
+      // truncated/legacy row). Two independent `??` fallbacks on these fields
+      // can diverge — one defaults while the other is a real value — so the
+      // `nextIndex >= total` terminal condition may never be reached and the
+      // round loops in `active` forever. Resolve both atomically and fail
+      // safe: derive a coherent (index, total) pair, clamp the total to the
+      // hard cap, and guarantee the terminal condition is reachable by routing
+      // a corrupt/over-cap state straight to `drafting` rather than looping.
+      const total = enforceChallengeQuestionCap(
+        prev.totalQuestions ?? MAX_CHALLENGE_QUESTIONS,
+      );
+      const currentIndex = prev.questionIndex ?? total;
+      const nextIndex = currentIndex + 1;
+      // A partially deserialized state where either field was absent (or the
+      // index already met/exceeded the total) must terminate, not continue:
+      // there is no trustworthy remaining-question count to keep asking from.
+      const stateIsConsistent =
+        prev.questionIndex !== undefined &&
+        prev.totalQuestions !== undefined &&
+        currentIndex < total;
+      if (!stateIsConsistent || nextIndex >= total) {
+        return {
+          ...prev,
+          state: 'drafting',
+          totalQuestions: total,
+          evaluations,
+        };
       }
-      return { ...prev, questionIndex: nextIndex, evaluations };
+      return {
+        ...prev,
+        questionIndex: nextIndex,
+        totalQuestions: total,
+        evaluations,
+      };
     }
 
     case 'draft_ready': {

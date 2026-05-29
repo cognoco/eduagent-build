@@ -1,6 +1,7 @@
 import { Path } from 'react-native-svg';
 import { CelestialCelebration } from './CelestialCelebration';
 
+// Brand colors — fixed per design spec (celestial celebration palette)
 export function PolarStar({
   onComplete,
   testID = 'celebration-polar-star',

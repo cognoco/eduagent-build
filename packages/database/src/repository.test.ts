@@ -733,4 +733,79 @@ describe('createScopedRepository', () => {
       expect(whereCalls).toHaveLength(1);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // [CR-2026-05-21-168] memoryFacts.findCascadeAncestry — typed column names
+  //
+  // Before the fix:
+  //   - The recursive CTE arm used raw string literals `m.superseded_by` and
+  //     `m.profile_id` — a column rename silently returns wrong/empty rows.
+  //   - `db.execute()` result was returned as-is (untyped), callers downcast freely.
+  //
+  // After the fix:
+  //   - Column names are derived from `memoryFacts.supersededBy.name` and
+  //     `memoryFacts.profileId.name` so renames propagate to the CTE.
+  //   - Returned rows are cast to `MemoryFactRow[]` (compile-time type derived
+  //     from `typeof memoryFacts.$inferSelect`) — no runtime dependency added.
+  // ---------------------------------------------------------------------------
+
+  describe('[CR-2026-05-21-168] memoryFacts.findCascadeAncestry — typed column names', () => {
+    it('returns rows from db.execute as an array', async () => {
+      const now = new Date().toISOString();
+      const row = {
+        id: '01933b3c-0000-7000-8000-000000000001',
+        profile_id: TEST_PROFILE_ID,
+        category: 'preference',
+        text: 'Likes mathematics',
+        text_normalized: 'likes mathematics',
+        metadata: {},
+        source_session_ids: [],
+        source_event_ids: [],
+        observed_at: now,
+        superseded_by: null,
+        superseded_at: null,
+        embedding: null,
+        confidence: 'medium' as const,
+        created_at: now,
+        updated_at: now,
+      };
+
+      const executeFn = jest.fn().mockResolvedValue({ rows: [row] });
+      const db = {
+        query: new Proxy(
+          {},
+          { get: () => ({ findFirst: jest.fn(), findMany: jest.fn() }) },
+        ),
+        execute: executeFn,
+      } as unknown as Database;
+
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const result = await repo.memoryFacts.findCascadeAncestry('fact-1');
+
+      expect(executeFn).toHaveBeenCalledTimes(1);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: row.id,
+        profile_id: TEST_PROFILE_ID,
+        category: 'preference',
+        text: 'Likes mathematics',
+      });
+    });
+
+    it('returns an empty array when the CTE finds no rows', async () => {
+      const executeFn = jest.fn().mockResolvedValue({ rows: [] });
+      const db = {
+        query: new Proxy(
+          {},
+          { get: () => ({ findFirst: jest.fn(), findMany: jest.fn() }) },
+        ),
+        execute: executeFn,
+      } as unknown as Database;
+
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const result = await repo.memoryFacts.findCascadeAncestry('fact-1');
+
+      expect(result).toEqual([]);
+    });
+  });
 });

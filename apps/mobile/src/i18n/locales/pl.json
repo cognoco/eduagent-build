@@ -737,6 +737,9 @@
       "disputeLabel": "Zakwestionuj tę odpowiedź",
       "dismissLabel": "Zamknij",
       "saveAndFinishLabel": "Zapisz postęp i zakończ rundę"
+    },
+    "results": {
+      "viewHistory": "Zobacz historię"
     }
   },
   "dictation": {

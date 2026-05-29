@@ -165,3 +165,42 @@ describe('createAnthropicProvider — responseFormat json in fetch payload', () 
     expect(body.system).not.toContain(JSON_DIRECTIVE);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [FCR-2026-05-23-L11.F11] data.error preserves structured cause chain
+// ---------------------------------------------------------------------------
+
+describe('createAnthropicProvider — data.error preserves cause', () => {
+  it('throws with cause set to the structured error object', async () => {
+    const structuredError = {
+      type: 'rate_limit_error',
+      message: 'Too many requests',
+    };
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ error: structuredError }),
+      text: () => Promise.resolve(JSON.stringify({ error: structuredError })),
+    } as unknown as Response);
+
+    const provider = createAnthropicProvider('test-api-key');
+    const messages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
+
+    let caughtError: unknown;
+    try {
+      await provider.chat(messages, {
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5',
+        maxTokens: 100,
+      });
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toContain('Too many requests');
+    // [FCR-2026-05-23-L11.F11] structured error fields must be preserved as cause
+    expect((caughtError as Error & { cause: unknown }).cause).toEqual(
+      structuredError,
+    );
+  });
+});

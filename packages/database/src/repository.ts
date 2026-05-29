@@ -57,6 +57,7 @@ import {
   quizMissedItems,
   quizMasteryItems,
   memoryFacts,
+  type MemoryFactRow,
   practiceActivityEvents,
   celebrationEvents,
 } from './schema/index';
@@ -450,19 +451,37 @@ export function createScopedRepository(db: Database, profileId: string) {
           orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
         });
       },
-      async findCascadeAncestry(factId: string) {
-        return db.execute(sql`
+      async findCascadeAncestry(factId: string): Promise<MemoryFactRow[]> {
+        // CR-2026-05-21-168: The recursive arm previously used raw snake_case
+        // string literals (`m.superseded_by`, `m.profile_id`). These strings
+        // survive column renames silently — drizzle's typed sites get a compile
+        // error but the raw string would return wrong/empty rows at runtime.
+        //
+        // Fix: derive column names from the typed drizzle schema at runtime via
+        // `.name` — if a future migration renames the column, the schema is
+        // updated in one place and this CTE also picks up the new name.
+        // `${memoryFacts.X}` cannot be used directly in the recursive arm
+        // because drizzle expands it to `"table_name"."col"` (table-qualified),
+        // which is invalid SQL when the table is aliased as `m`.
+        // `sql.raw(memoryFacts.X.name)` emits the bare column name only.
+        //
+        // The return type is pinned to `MemoryFactRow[]` (derived from
+        // `typeof memoryFacts.$inferSelect`) so callers receive a typed array
+        // without a runtime dependency. This follows the same idiom as other
+        // raw-query methods in this file that cast `result.rows`.
+        const result = await db.execute(sql`
           WITH RECURSIVE ancestry AS (
             SELECT * FROM ${memoryFacts}
               WHERE ${memoryFacts.id} = ${factId}
                 AND ${memoryFacts.profileId} = ${profileId}
             UNION
             SELECT m.* FROM ${memoryFacts} m
-              INNER JOIN ancestry a ON m.superseded_by = a.id
-              WHERE m.profile_id = ${profileId}
+              INNER JOIN ancestry a ON m.${sql.raw(memoryFacts.supersededBy.name)} = a.id
+              WHERE m.${sql.raw(memoryFacts.profileId.name)} = ${profileId}
           )
           SELECT * FROM ancestry
         `);
+        return result.rows as MemoryFactRow[];
       },
       async findRelevant(
         queryEmbedding: number[],

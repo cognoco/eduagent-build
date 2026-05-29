@@ -91,9 +91,14 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
           ? 'Suggestion'
           : 'Feedback';
 
+    // FCR-2026-05-23-L2.L2.4: Truncate pseudonymous identifiers to first 8 chars
+    // before including them in the email body sent to Resend (data minimisation
+    // under GDPR — full UUIDs are persistent identifiers that do not need to be
+    // in third-party email provider logs). The Inngest retry payload below still
+    // carries full IDs so the delivery-failed consumer can look up the record.
     const metaLines = [
-      `Profile ID: ${profileId}`,
-      `User ID: ${userId}`,
+      `Profile ID: ${profileId.slice(0, 8)}…`,
+      `User ID: ${userId.slice(0, 8)}…`,
       body.appVersion ? `App Version: ${body.appVersion}` : null,
       body.platform ? `Platform: ${body.platform}` : null,
       body.osVersion ? `OS Version: ${body.osVersion}` : null,

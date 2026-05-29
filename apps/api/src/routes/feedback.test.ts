@@ -126,6 +126,7 @@ describe('POST /feedback', () => {
       to: string[];
       subject: string;
       from: string;
+      text: string;
     };
     expect(sentBody.to).toEqual(['support@mentomate.com']);
     expect(sentBody.subject).toContain('Bug');
@@ -135,6 +136,48 @@ describe('POST /feedback', () => {
         Authorization: `Bearer ${TEST_API_KEY}`,
       }),
     );
+  });
+
+  // FCR-2026-05-23-L2.L2.4: email body must NOT contain full UUIDs — identifiers
+  // are truncated to first 8 chars for data-minimisation (GDPR).
+  it('[FCR-L2.L2.4] email body contains truncated identifiers, not full UUIDs', async () => {
+    const FULL_PROFILE_ID = 'prof-1234-5678-abcd-ef00-000000000001';
+    const FULL_USER_ID = 'user-1234-5678-abcd-ef00-000000000002';
+    const app = createTestApp(undefined, {
+      userId: FULL_USER_ID,
+      profileId: FULL_PROFILE_ID,
+    });
+
+    await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: 'bug',
+        message: 'Test data minimisation',
+      }),
+    });
+
+    const resendCalls = fetchSpy.mock.calls.filter(([input]) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : (input as Request).url;
+      return url === RESEND_API_URL;
+    });
+    expect(resendCalls).toHaveLength(1);
+    const [, init] = resendCalls[0]!;
+    const sentBody = JSON.parse(init?.body as string) as { text: string };
+    const emailText = sentBody.text ?? '';
+
+    // Must NOT contain the full identifiers
+    expect(emailText).not.toContain(FULL_PROFILE_ID);
+    expect(emailText).not.toContain(FULL_USER_ID);
+
+    // Must contain the truncated 8-char prefix
+    expect(emailText).toContain(FULL_PROFILE_ID.slice(0, 8));
+    expect(emailText).toContain(FULL_USER_ID.slice(0, 8));
   });
 
   it('rejects empty message', async () => {
@@ -219,7 +262,11 @@ describe('POST /feedback', () => {
         category: 'bug',
         message: 'Crash on launch',
         supportTo: 'support@mentomate.com',
-        metaLines: expect.stringContaining('Profile ID: profile-bug767-fail'),
+        // FCR-2026-05-23-L2.L2.4: metaLines now contains truncated identifiers
+        // (first 8 chars + ellipsis) for data-minimisation. The Inngest event
+        // still carries the full profileId/userId at the top level so the
+        // delivery-failed consumer can look up the record.
+        metaLines: expect.stringContaining('Profile ID: profile-…'),
         appVersion: '1.2.3',
         platform: 'ios',
         osVersion: '17.5',

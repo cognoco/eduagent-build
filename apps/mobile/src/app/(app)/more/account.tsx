@@ -84,6 +84,12 @@ export default function AccountScreen(): React.ReactElement {
             testID="settings-app-language"
           />
         ) : null}
+        {/* [FCR-2026-05-23-L2.M2.6] Client-side gating via navigationContract.gates.showBilling
+            (and showAccountSecurity above) is intentional defence-in-depth UI hardening.
+            The server enforces the same isOwner constraint on every billing/subscription
+            API route (apps/api/src/routes/billing.ts), so a non-owner who bypasses this
+            UI gate still receives a 403 from the API. Never remove client-side gating
+            on the grounds that "the server already checks it" — both layers must stay. */}
         {navigationContract.gates.showBilling ? (
           <SettingsRow
             label={t('more.account.subscription')}
