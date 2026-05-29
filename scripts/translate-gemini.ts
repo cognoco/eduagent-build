@@ -6,10 +6,17 @@ import { validateTranslation } from './translate';
 type NestedStrings = { [k: string]: string | NestedStrings };
 type SourceBaseline = Record<string, string>;
 type SourceBaselineFile = Record<string, SourceBaseline>;
+type CompactSourceBaselineLocale =
+  | 'allSourceKeys'
+  | string[]
+  | {
+      keys: 'allSourceKeys' | string[];
+      sourceHashes?: SourceBaseline;
+    };
 interface CompactSourceBaselineFile {
   version: 1;
   sourceHashes: SourceBaseline;
-  locales: Record<string, 'allSourceKeys' | string[]>;
+  locales: Record<string, CompactSourceBaselineLocale>;
 }
 
 const TARGET_LANGUAGES = ['nb', 'de', 'es', 'pt', 'pl', 'ja'] as const;
@@ -93,13 +100,29 @@ export function expandSourceBaselineFile(input: unknown): SourceBaselineFile {
   ) {
     const allSourceKeys = Object.keys(sourceHashes);
     const baselineFile: SourceBaselineFile = {};
-    for (const [lang, keys] of Object.entries(compact.locales)) {
+    for (const [lang, localeSpec] of Object.entries(compact.locales)) {
+      const localeOverrides =
+        localeSpec &&
+        typeof localeSpec === 'object' &&
+        !Array.isArray(localeSpec)
+          ? normalizeSourceBaseline(
+              (localeSpec as { sourceHashes?: unknown }).sourceHashes,
+            )
+          : {};
+      const keys =
+        localeSpec &&
+        typeof localeSpec === 'object' &&
+        !Array.isArray(localeSpec)
+          ? (localeSpec as { keys?: unknown }).keys
+          : localeSpec;
       const localeKeys = keys === 'allSourceKeys' ? allSourceKeys : keys;
       if (!Array.isArray(localeKeys)) continue;
       baselineFile[lang] = {};
       for (const key of localeKeys) {
-        if (typeof key === 'string' && typeof sourceHashes[key] === 'string') {
-          baselineFile[lang][key] = sourceHashes[key];
+        if (typeof key !== 'string') continue;
+        const hash = localeOverrides[key] ?? sourceHashes[key];
+        if (typeof hash === 'string') {
+          baselineFile[lang][key] = hash;
         }
       }
     }
@@ -127,26 +150,53 @@ function readSourceBaselineFile(filePath: string): SourceBaselineFile {
 function compactSourceBaselineFile(
   baselineFile: SourceBaselineFile,
 ): CompactSourceBaselineFile {
-  const sourceHashes: SourceBaseline = {};
-  const locales: Record<string, 'allSourceKeys' | string[]> = {};
+  const hashCountsByKey = new Map<string, Map<string, number>>();
   for (const lang of Object.keys(baselineFile).sort()) {
     const keys = Object.keys(baselineFile[lang]).sort();
     for (const key of keys) {
-      sourceHashes[key] = baselineFile[lang][key];
+      const hashCounts = hashCountsByKey.get(key) ?? new Map<string, number>();
+      const hash = baselineFile[lang][key];
+      hashCounts.set(hash, (hashCounts.get(hash) ?? 0) + 1);
+      hashCountsByKey.set(key, hashCounts);
     }
   }
-  const sourceKeys = Object.keys(sourceHashes).sort();
+
+  const sourceHashes = Object.fromEntries(
+    [...hashCountsByKey.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, hashCounts]) => {
+        const [hash] = [...hashCounts.entries()].sort(
+          ([leftHash, leftCount], [rightHash, rightCount]) =>
+            rightCount - leftCount || leftHash.localeCompare(rightHash),
+        )[0];
+        return [key, hash];
+      }),
+  );
+  const sourceKeys = Object.keys(sourceHashes);
+  const locales: Record<string, CompactSourceBaselineLocale> = {};
   for (const lang of Object.keys(baselineFile).sort()) {
     const keys = Object.keys(baselineFile[lang]).sort();
-    locales[lang] =
+    const keySpec: 'allSourceKeys' | string[] =
       keys.length === sourceKeys.length &&
       keys.every((key, index) => key === sourceKeys[index])
         ? 'allSourceKeys'
         : keys;
+    const sourceHashOverrides = Object.fromEntries(
+      keys
+        .filter((key) => baselineFile[lang][key] !== sourceHashes[key])
+        .map((key) => [key, baselineFile[lang][key]]),
+    );
+    locales[lang] =
+      Object.keys(sourceHashOverrides).length === 0
+        ? keySpec
+        : {
+            keys: keySpec,
+            sourceHashes: sourceHashOverrides,
+          };
   }
   return {
     version: 1,
-    sourceHashes: Object.fromEntries(Object.entries(sourceHashes).sort()),
+    sourceHashes,
     locales,
   };
 }

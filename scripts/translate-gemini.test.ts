@@ -247,6 +247,51 @@ describe('commitTranslatedLocaleAndBaseline', () => {
     });
   });
 
+  it('preserves stale per-locale hashes when committing one updated locale', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'translate-gemini-'));
+    const targetPath = path.join(dir, 'pt.json');
+    const baselinePath = path.join(dir, 'source-baseline.json');
+    const oldHash = hashSourceString('Save');
+    const source = { common: { save: 'Save now' } };
+    const translated = { common: { save: 'Salvar agora' } };
+
+    commitTranslatedLocaleAndBaseline({
+      targetPath,
+      baselinePath,
+      baselineFile: {
+        de: { 'common.save': oldHash },
+        pt: { 'common.save': oldHash },
+      },
+      lang: 'pt',
+      source,
+      translated,
+    });
+
+    const baselineJson = JSON.parse(fs.readFileSync(baselinePath, 'utf-8'));
+    const expandedBaseline = expandSourceBaselineFile(baselineJson);
+
+    expect(expandedBaseline.de).toEqual({ 'common.save': oldHash });
+    expect(expandedBaseline.pt).toEqual({
+      'common.save': hashSourceString('Save now'),
+    });
+    expect(
+      selectGeminiDiffKeys({
+        source,
+        target: { common: { save: 'Speichern' } },
+        baseline: expandedBaseline.de,
+        full: false,
+      }).translateKeys,
+    ).toEqual(['common.save']);
+    expect(
+      selectGeminiDiffKeys({
+        source,
+        target: translated,
+        baseline: expandedBaseline.pt,
+        full: false,
+      }).translateKeys,
+    ).toEqual([]);
+  });
+
   it('does not write the sidecar baseline when the locale write fails', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'translate-gemini-'));
     const targetPath = path.join(dir, 'missing-dir', 'de.json');
