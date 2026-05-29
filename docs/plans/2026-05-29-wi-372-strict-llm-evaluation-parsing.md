@@ -61,7 +61,12 @@ T4:
 - Red tests were observed before implementation in schema, summary, and assessment parser tests.
 - Targeted API tests passed:
   - `NX_DAEMON=false rtk pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/services/summaries.test.ts apps/api/src/services/assessments.test.ts apps/api/src/services/evaluate.test.ts --no-coverage`
+- Review loop 2 targeted API tests passed after tightening assessment state booleans and blank summary feedback:
+  - `NX_DAEMON=false rtk pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/services/assessments.test.ts apps/api/src/services/summaries.test.ts --no-coverage`
+  - `NX_DAEMON=false rtk pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/services/summaries.test.ts apps/api/src/services/assessments.test.ts apps/api/src/services/evaluate.test.ts --no-coverage`
 - Targeted schema tests passed with `.worktrees` ignore override:
+  - `NX_DAEMON=false rtk pnpm exec jest --config packages/schemas/jest.config.cjs --testPathIgnorePatterns '/node_modules/' --testMatch '<rootDir>/src/**/*.test.ts' --runTestsByPath packages/schemas/src/llm-envelope.test.ts --no-coverage`
+- Review loop 2 targeted schema tests passed after tightening assessment state booleans and blank summary feedback:
   - `NX_DAEMON=false rtk pnpm exec jest --config packages/schemas/jest.config.cjs --testPathIgnorePatterns '/node_modules/' --testMatch '<rootDir>/src/**/*.test.ts' --runTestsByPath packages/schemas/src/llm-envelope.test.ts --no-coverage`
 - API lint passed:
   - `NX_DAEMON=false rtk pnpm exec nx run api:lint`
@@ -70,6 +75,8 @@ T4:
 - Schema package lint/typecheck passed:
   - `NX_DAEMON=false rtk pnpm exec nx run @eduagent/schemas:lint`
   - `NX_DAEMON=false rtk pnpm exec nx run @eduagent/schemas:typecheck`
+- Review loop 2 Prettier check passed for the files modified in that loop:
+  - `rtk pnpm exec prettier --check packages/schemas/src/llm-envelope.ts packages/schemas/src/llm-envelope.test.ts apps/api/src/services/assessments.test.ts apps/api/src/services/summaries.test.ts`
 - Targeted Prettier check passed for all modified files:
   - `rtk pnpm exec prettier --check docs/plans/2026-05-29-wi-372-strict-llm-evaluation-parsing.md packages/schemas/src/llm-envelope.ts packages/schemas/src/llm-envelope.test.ts apps/api/src/services/summaries.ts apps/api/src/services/summaries.test.ts apps/api/src/services/assessments.ts apps/api/src/services/assessments.test.ts apps/api/src/services/evaluate.test.ts`
 - Full API unit target passed:
@@ -86,3 +93,5 @@ T4:
 
 - Review loop 1 found a valid must-fix issue: assessment payloads with high scores but no learner-visible `feedback` or `reply` could still drive pass/escalation state. Fixed by requiring nonblank `feedback` or `reply` in `llmAssessmentEvaluationSchema`, with schema and service fallback tests.
 - Review loop 1 found a valid should-fix issue: decimal `qualityRating` values could pass parser validation even though downstream assessment contracts use integer quality ratings. Fixed by requiring `qualityRating` to be an integer, with schema and service fallback tests.
+- Review loop 2 found a valid must-fix issue: assessment payloads could omit `passed` and `shouldEscalateDepth`, then still drive state through server-side defaults derived from high `rawScore` and `forceDepthProgression`. Fixed by requiring both state booleans in `llmAssessmentEvaluationSchema`, with schema and service fallback tests.
+- Review loop 2 included a consider-level finding that blank summary feedback passed `z.string().min(1)`. Because loop 2 already required a must-fix commit, fixed it by trimming summary feedback before the nonblank check, with schema and service fallback tests.

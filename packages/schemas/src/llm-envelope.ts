@@ -87,7 +87,7 @@ const privateSourcesSchema = z.preprocess(
 
 export const llmSummaryEvaluationSchema = z
   .object({
-    feedback: z.string().min(1).max(2000),
+    feedback: z.string().trim().min(1).max(2000),
     hasUnderstandingGaps: z.boolean(),
     gapAreas: z.array(z.string().min(1).max(200)).max(12).optional(),
     isAccepted: z.boolean(),
@@ -101,8 +101,8 @@ export const llmAssessmentEvaluationSchema = z
     reply: z.string().trim().min(1).max(2000).optional(),
     rawScore: z.number().min(0).max(1),
     qualityRating: z.number().int().min(0).max(5),
-    passed: z.boolean().optional(),
-    shouldEscalateDepth: z.boolean().optional(),
+    passed: z.boolean(),
+    shouldEscalateDepth: z.boolean(),
     weakAreas: z.array(z.string().min(1).max(200)).max(8).optional(),
   })
   .strict()

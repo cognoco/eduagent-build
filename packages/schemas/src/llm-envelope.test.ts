@@ -356,6 +356,17 @@ describe('discrete LLM evaluation schemas', () => {
 
       expect(result.success).toBe(false);
     });
+
+    it('[WI-372] rejects blank learner-visible feedback', () => {
+      const result = llmSummaryEvaluationSchema.safeParse({
+        feedback: '   ',
+        hasUnderstandingGaps: false,
+        gapAreas: [],
+        isAccepted: true,
+      });
+
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('llmAssessmentEvaluationSchema', () => {
@@ -370,6 +381,25 @@ describe('discrete LLM evaluation schemas', () => {
       });
 
       expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] rejects missing state booleans', () => {
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          feedback: 'Good recall.',
+          rawScore: 0.95,
+          qualityRating: 5,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          feedback: 'Good recall.',
+          rawScore: 0.95,
+          qualityRating: 5,
+          passed: true,
+        }).success,
+      ).toBe(false);
     });
 
     it('[WI-372] rejects missing or blank learner-visible feedback', () => {
