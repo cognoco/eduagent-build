@@ -1,5 +1,5 @@
 // @inngest-admin: cross-profile
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   consentStates,
@@ -14,7 +14,10 @@ import {
   listEligibleSelfReportProfileIdsAtLocalHour9,
 } from '../../services/solo-progress-reports';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
-import { getLatestSnapshotOnOrBefore } from '../../services/snapshot-aggregation';
+import {
+  filterProgressMetricsToActiveSubjects,
+  getLatestSnapshotOnOrBefore,
+} from '../../services/snapshot-aggregation';
 import { generateWeeklyReportData } from '../../services/weekly-report';
 import { captureException } from '../../services/sentry';
 import { isoDate, subtractDays } from '../../services/progress-helpers';
@@ -232,7 +235,7 @@ export const weeklySelfReportGenerate = inngest.createFunction(
         }
 
         const profile = await db.query.profiles.findFirst({
-          where: eq(profiles.id, profileId),
+          where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
           columns: { displayName: true },
         });
         if (!profile) {
@@ -272,6 +275,11 @@ export const weeklySelfReportGenerate = inngest.createFunction(
             profileId,
           };
         }
+        const latestMetrics = await filterProgressMetricsToActiveSubjects(
+          db,
+          profileId,
+          latest.metrics,
+        );
 
         const previous = await getLatestSnapshotOnOrBefore(
           db,
@@ -287,6 +295,13 @@ export const weeklySelfReportGenerate = inngest.createFunction(
             : 0;
         const cappedPrevious =
           snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+        const cappedPreviousMetrics = cappedPrevious
+          ? await filterProgressMetricsToActiveSubjects(
+              db,
+              profileId,
+              cappedPrevious.metrics,
+            )
+          : null;
 
         const practiceSummary = await getPracticeActivitySummary(db, {
           profileId,
@@ -303,8 +318,8 @@ export const weeklySelfReportGenerate = inngest.createFunction(
         const reportData = generateWeeklyReportData(
           profile.displayName,
           reportWeekStart,
-          latest.metrics,
-          cappedPrevious?.metrics ?? null,
+          latestMetrics,
+          cappedPreviousMetrics,
           practiceSummary,
         );
 

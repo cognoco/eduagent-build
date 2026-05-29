@@ -16,7 +16,17 @@
 // local ~8 AM, then fans out per-profile events for independent delivery.
 // ---------------------------------------------------------------------------
 
-import { sql, eq, lt, and, or, exists, notExists } from 'drizzle-orm';
+import {
+  sql,
+  eq,
+  lt,
+  and,
+  or,
+  exists,
+  notExists,
+  isNull,
+  ne,
+} from 'drizzle-orm';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -77,6 +87,7 @@ export const recallNudge = inngest.createFunction(
             eq(subjects.id, curriculumBooks.subjectId),
             eq(subjects.id, curricula.subjectId),
             eq(subjects.profileId, profiles.id),
+            ne(subjects.status, 'archived'),
           ),
         )
         .innerJoin(
@@ -88,6 +99,7 @@ export const recallNudge = inngest.createFunction(
         )
         .where(
           and(
+            isNull(profiles.archivedAt),
             // Consent: at least one CONSENTED record, or no consent records at all (adults).
             // Uses EXISTS/NOT EXISTS instead of LEFT JOIN to avoid row multiplication
             // when a profile has multiple consent_states rows (different consentType).

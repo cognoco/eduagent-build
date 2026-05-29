@@ -837,6 +837,65 @@ export interface LatestSnapshot {
   updatedAt: Date;
 }
 
+export function filterProgressMetricsToLiveSubjects(
+  metrics: ProgressMetrics,
+  liveSubjectIds: ReadonlySet<string>,
+): ProgressMetrics {
+  const filteredSubjects = metrics.subjects.filter((subject) =>
+    liveSubjectIds.has(subject.subjectId),
+  );
+
+  const totals = filteredSubjects.reduce(
+    (acc, subject) => ({
+      totalSessions: acc.totalSessions + subject.sessionsCount,
+      totalActiveMinutes: acc.totalActiveMinutes + subject.activeMinutes,
+      totalWallClockMinutes:
+        acc.totalWallClockMinutes + subject.wallClockMinutes,
+      topicsAttempted: acc.topicsAttempted + subject.topicsAttempted,
+      topicsMastered: acc.topicsMastered + subject.topicsMastered,
+      vocabularyTotal: acc.vocabularyTotal + subject.vocabularyTotal,
+      vocabularyMastered: acc.vocabularyMastered + subject.vocabularyMastered,
+    }),
+    {
+      totalSessions: 0,
+      totalActiveMinutes: 0,
+      totalWallClockMinutes: 0,
+      topicsAttempted: 0,
+      topicsMastered: 0,
+      vocabularyTotal: 0,
+      vocabularyMastered: 0,
+    },
+  );
+
+  return progressMetricsSchema.parse({
+    ...metrics,
+    ...totals,
+    topicsInProgress: Math.max(
+      0,
+      totals.topicsAttempted - totals.topicsMastered,
+    ),
+    subjects: filteredSubjects,
+  });
+}
+
+export async function filterProgressMetricsToActiveSubjects(
+  db: Database,
+  profileId: string,
+  metrics: ProgressMetrics,
+): Promise<ProgressMetrics> {
+  const subjectRows = await db.query.subjects.findMany({
+    where: eq(subjects.profileId, profileId),
+    columns: { id: true, status: true },
+  });
+  const liveSubjectIds = new Set(
+    subjectRows
+      .filter((subject) => subject.status !== 'archived')
+      .map((subject) => subject.id),
+  );
+
+  return filterProgressMetricsToLiveSubjects(metrics, liveSubjectIds);
+}
+
 function snapshotRowToLatestSnapshot(
   row: typeof progressSnapshots.$inferSelect,
 ): LatestSnapshot {

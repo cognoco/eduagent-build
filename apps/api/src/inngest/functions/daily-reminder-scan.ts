@@ -16,7 +16,7 @@
 // at their local ~9 AM, then fans out per-profile events for daily nudges.
 // ---------------------------------------------------------------------------
 
-import { sql, eq, gt, and, or, exists, notExists } from 'drizzle-orm';
+import { sql, eq, gt, and, or, exists, notExists, isNull } from 'drizzle-orm';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -45,18 +45,19 @@ export const dailyReminderScan = inngest.createFunction(
         .innerJoin(accounts, eq(profiles.accountId, accounts.id))
         .innerJoin(
           streaks,
-          and(eq(streaks.profileId, profiles.id), gt(streaks.currentStreak, 0))
+          and(eq(streaks.profileId, profiles.id), gt(streaks.currentStreak, 0)),
         )
         .innerJoin(
           notificationPreferences,
           and(
             eq(notificationPreferences.profileId, profiles.id),
             eq(notificationPreferences.pushEnabled, true),
-            eq(notificationPreferences.dailyReminders, true)
-          )
+            eq(notificationPreferences.dailyReminders, true),
+          ),
         )
         .where(
           and(
+            isNull(profiles.archivedAt),
             // Consent: CONSENTED record exists, or no consent records at all (adults)
             or(
               exists(
@@ -66,16 +67,16 @@ export const dailyReminderScan = inngest.createFunction(
                   .where(
                     and(
                       eq(consentStates.profileId, profiles.id),
-                      eq(consentStates.status, 'CONSENTED')
-                    )
-                  )
+                      eq(consentStates.status, 'CONSENTED'),
+                    ),
+                  ),
               ),
               notExists(
                 db
                   .select({ _: sql`1` })
                   .from(consentStates)
-                  .where(eq(consentStates.profileId, profiles.id))
-              )
+                  .where(eq(consentStates.profileId, profiles.id)),
+              ),
             ),
             // Timezone bucketing: local time within 08:30–09:30
             // One hour after the recall-nudge window to avoid notification clustering
@@ -90,11 +91,11 @@ export const dailyReminderScan = inngest.createFunction(
                   and(
                     eq(notificationLog.profileId, profiles.id),
                     eq(notificationLog.type, 'daily_reminder'),
-                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
-                  )
-                )
-            )
-          )
+                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`,
+                  ),
+                ),
+            ),
+          ),
         );
 
       return results.map((r) => ({
@@ -120,7 +121,7 @@ export const dailyReminderScan = inngest.createFunction(
             profileId: profile.profileId,
             streakDays: profile.streakDays,
           },
-        }))
+        })),
       );
       sentEvents += chunk.length;
     }
@@ -130,5 +131,5 @@ export const dailyReminderScan = inngest.createFunction(
       eligibleCount: eligible.length,
       sentEvents,
     };
-  }
+  },
 );

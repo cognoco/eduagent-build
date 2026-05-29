@@ -21,15 +21,17 @@ const mockSnapshotDb = createTransactionalMockDb({
 /**
  * Sets up the selectDistinct chain on mockSnapshotDb to resolve with the
  * given rows. The production code calls:
- *   db.selectDistinct({ profileId }).from(learningSessions).where(gte(...))
- * so we mock: selectDistinct → { from: { where: Promise<rows> } }
+ *   db.selectDistinct({ profileId }).from(learningSessions).innerJoin(...).where(...)
+ * so we mock: selectDistinct → { from: { innerJoin: { where: Promise<rows> } } }
  */
 function mockSelectDistinctRows(rows: { profileId: string }[]): void {
   (
     mockSnapshotDb as unknown as { selectDistinct: jest.Mock }
   ).selectDistinct.mockReturnValue({
     from: jest.fn().mockReturnValue({
-      where: jest.fn().mockResolvedValue(rows),
+      innerJoin: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(rows),
+      }),
     }),
   });
 }
@@ -43,6 +45,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
     },
     profiles: {
       id: col('id'),
+      archivedAt: col('archivedAt'),
     },
   },
 });

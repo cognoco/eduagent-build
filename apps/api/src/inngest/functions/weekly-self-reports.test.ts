@@ -87,6 +87,11 @@ jest.mock(
     ) as typeof import('../../services/snapshot-aggregation');
     return {
       ...actual,
+      filterProgressMetricsToActiveSubjects: async (
+        _db: unknown,
+        _profileId: unknown,
+        metrics: unknown,
+      ) => metrics,
       getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
         mockGetLatestSnapshotOnOrBefore(...args),
     };

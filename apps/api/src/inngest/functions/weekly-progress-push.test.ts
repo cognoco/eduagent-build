@@ -108,6 +108,11 @@ const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
 jest.mock(
   '../../services/snapshot-aggregation' /* gc1-allow: drives the CURRENT/PREVIOUS snapshot pair into the handler under fake-timer dates so the test can assert (a) the 14-day MAX_SNAPSHOT_GAP_MS clamp branch, (b) the self-report two-call ordering (mockResolvedValueOnce x2), and (c) the precise reportData persisted to weeklyReports. Hitting real progress_snapshots from this DB-less suite would require time-traveling rows that the sibling weekly-progress-push.integration.test.ts already exercises end-to-end. */,
   () => ({
+    filterProgressMetricsToActiveSubjects: async (
+      _db: unknown,
+      _profileId: unknown,
+      metrics: unknown,
+    ) => metrics,
     getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
     getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
       mockGetLatestSnapshotOnOrBefore(...args),

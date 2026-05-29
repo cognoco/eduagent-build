@@ -17,7 +17,7 @@
 // recommendations). When in doubt, scope by profileId at the leaf even
 // when scanning broadly.
 
-import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import {
   accounts,
   familyLinks,
@@ -35,7 +35,10 @@ import {
 } from '../../services/monthly-report';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { listEligibleSelfReportProfileIds } from '../../services/solo-progress-reports';
-import { getSnapshotsInRange } from '../../services/snapshot-aggregation';
+import {
+  filterProgressMetricsToActiveSubjects,
+  getSnapshotsInRange,
+} from '../../services/snapshot-aggregation';
 import {
   sendPushNotification,
   sendEmail,
@@ -154,9 +157,36 @@ export const monthlyReportCron = inngest.createFunction(
         endExclusive: lastMonthEndExclusive,
       });
 
+      const candidateProfileIds = Array.from(
+        new Set([
+          ...linkedPairs.flatMap((pair) => [pair.parentId, pair.childId]),
+          ...selfProfileIds,
+        ]),
+      );
+      if (candidateProfileIds.length === 0) return [];
+
+      const activeProfileRows = await db.query.profiles.findMany({
+        where: and(
+          inArray(profiles.id, candidateProfileIds),
+          isNull(profiles.archivedAt),
+        ),
+        columns: { id: true },
+      });
+      const activeProfileIds = new Set(
+        activeProfileRows.map((profile) => profile.id),
+      );
+      const activeLinkedPairs = linkedPairs.filter(
+        (pair) =>
+          activeProfileIds.has(pair.parentId) &&
+          activeProfileIds.has(pair.childId),
+      );
+      const activeSelfProfileIds = selfProfileIds.filter((profileId) =>
+        activeProfileIds.has(profileId),
+      );
+
       return [
-        ...linkedPairs,
-        ...selfProfileIds.map((profileId) => ({
+        ...activeLinkedPairs,
+        ...activeSelfProfileIds.map((profileId) => ({
           parentId: profileId,
           childId: profileId,
         })),
@@ -243,11 +273,23 @@ export const monthlyReportGenerate = inngest.createFunction(
         }
 
         const child = await db.query.profiles.findFirst({
-          where: eq(profiles.id, childId),
+          where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
           columns: { displayName: true },
         });
         if (!child) {
           return { status: 'skipped' as const, reason: 'child_missing' };
+        }
+        const parent = isSelfReport
+          ? child
+          : await db.query.profiles.findFirst({
+              where: and(
+                eq(profiles.id, parentId),
+                isNull(profiles.archivedAt),
+              ),
+              columns: { id: true },
+            });
+        if (!parent) {
+          return { status: 'skipped' as const, reason: 'parent_missing' };
         }
         if (
           isSelfReport &&
@@ -291,10 +333,10 @@ export const monthlyReportGenerate = inngest.createFunction(
           isoDate(previousMonthEnd),
         );
 
-        const thisMonthMetrics = safeParseMetrics(
+        const rawThisMonthMetrics = safeParseMetrics(
           currentSnapshots.at(-1)?.metrics,
         );
-        if (!thisMonthMetrics) {
+        if (!rawThisMonthMetrics) {
           // Either no snapshot at all, or the snapshot row is from older
           // code and no longer matches the schema. Either way we cannot
           // generate a useful report — skip with a structured reason so on-
@@ -319,10 +361,22 @@ export const monthlyReportGenerate = inngest.createFunction(
           }
           return { status: 'skipped' as const, reason: 'no_snapshot' };
         }
+        const thisMonthMetrics = await filterProgressMetricsToActiveSubjects(
+          db,
+          childId,
+          rawThisMonthMetrics,
+        );
 
-        const previousMetrics = safeParseMetrics(
+        const rawPreviousMetrics = safeParseMetrics(
           previousSnapshots.at(-1)?.metrics,
         );
+        const previousMetrics = rawPreviousMetrics
+          ? await filterProgressMetricsToActiveSubjects(
+              db,
+              childId,
+              rawPreviousMetrics,
+            )
+          : null;
 
         const childDisplayName = isSelfReport
           ? child.displayName
@@ -364,7 +418,7 @@ export const monthlyReportGenerate = inngest.createFunction(
         const [reportTargetProfile] = await db
           .select({ conversationLanguage: profiles.conversationLanguage })
           .from(profiles)
-          .where(eq(profiles.id, parentId))
+          .where(and(eq(profiles.id, parentId), isNull(profiles.archivedAt)))
           .limit(1);
         const llmContent = await generateReportHighlights(reportData, {
           // DB returns string | null; parse to union before passing to LLM call.
@@ -524,7 +578,7 @@ export const monthlyReportGenerate = inngest.createFunction(
           return { sent: false, reason: 'email_pref_off' };
         }
         const parentProfile = await db.query.profiles.findFirst({
-          where: eq(profiles.id, parentId),
+          where: and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
           columns: { accountId: true },
         });
         const parentAccount = parentProfile?.accountId

@@ -17,7 +17,7 @@
 // recommendations). When in doubt, scope by profileId at the leaf even
 // when scanning broadly.
 
-import { eq, gte } from 'drizzle-orm';
+import { and, eq, gte, isNull } from 'drizzle-orm';
 import { learningSessions, profiles } from '@eduagent/database';
 // [BUG-248] Use the same canonical step-database helper everywhere else in
 // the file does — no new import needed for the SQL-side dedup; drizzle's
@@ -48,7 +48,13 @@ export const dailySnapshotCron = inngest.createFunction(
         const rows = await db
           .selectDistinct({ profileId: learningSessions.profileId })
           .from(learningSessions)
-          .where(gte(learningSessions.startedAt, since));
+          .innerJoin(profiles, eq(learningSessions.profileId, profiles.id))
+          .where(
+            and(
+              gte(learningSessions.startedAt, since),
+              isNull(profiles.archivedAt),
+            ),
+          );
 
         return rows.map((row) => row.profileId);
       },
@@ -113,7 +119,7 @@ export const dailySnapshotRefresh = inngest.createFunction(
       // captureException + re-throw lets Inngest retry while still reporting to Sentry.
       const db = getStepDatabase();
       const profile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
+        where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
         columns: { id: true },
       });
       if (!profile) {
