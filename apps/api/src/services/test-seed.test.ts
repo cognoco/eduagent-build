@@ -110,6 +110,11 @@ describe('VALID_SCENARIOS', () => {
       'review-empty',
       'dictation-with-mistakes',
       'dictation-perfect-score',
+      // E2E chat/book entry-path coverage seeds.
+      'topic-not-started',
+      'topic-overdue-review',
+      'book-no-curriculum',
+      'subject-with-book-suggestions',
       // Mentor Chrome audit seed pack
       // (docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md).
       'mentor-audit-empty-adult',

@@ -1,9 +1,11 @@
 # Trial preview onboarding — self learner path.
+# Covers chat-entry track 18: save-wizard self-branch → chat-input.
+# Promoted from manual to nightly 2026-05-29 — confirmed correct against source.
 # Run with run-without-seed.sh or seed-and-run.sh --no-seed so the app starts
 # signed out on the sign-in screen.
 appId: com.mentomate.app
 tags:
-  - manual
+  - nightly
   - onboarding
   - preview
 ---

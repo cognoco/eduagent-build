@@ -988,6 +988,136 @@ describe('assessment review handoff', () => {
 });
 
 // ---------------------------------------------------------------------------
+// resolveAssessmentStatus — deterministic decision logic (Tracks 16/17)
+// ---------------------------------------------------------------------------
+// These tests replace Maestro flows 16 (borderline result card) and 17
+// (failed_exhausted result card), which cannot be driven deterministically via
+// E2E because terminalResult is set only from the live submitAnswer LLM
+// response. The server decision logic is the correct coverage boundary.
+//
+// The E2E entry-button tap
+// (assessment-gap-fill / assessment-start-session → session screen) remains
+// uncovered by design: it requires a flaky live LLM grade to reach a terminal
+// state, and the decision under test is purely the server-side status resolver.
+// ---------------------------------------------------------------------------
+
+const baseEval: AssessmentEvaluation = {
+  feedback: 'Good effort.',
+  passed: false,
+  shouldEscalateDepth: false,
+  masteryScore: 0.3,
+  qualityRating: 2,
+};
+
+describe('resolveAssessmentStatus — terminal and non-terminal states', () => {
+  it('returns "passed" when evaluation.passed is true and cap is not reached', () => {
+    const status = resolveAssessmentStatus({
+      evaluation: { ...baseEval, passed: true, masteryScore: 0.9 },
+      answerCount: 1,
+      forceReview: false,
+    });
+    expect(status).toBe('passed');
+  });
+
+  it('returns "in_progress" when not passed, no escalation, and cap not reached', () => {
+    const status = resolveAssessmentStatus({
+      evaluation: { ...baseEval, passed: false, masteryScore: 0.3 },
+      answerCount: 1,
+      forceReview: false,
+    });
+    expect(status).toBe('in_progress');
+  });
+
+  it('returns "borderline" when masteryScore >= 0.6 and cap reached without escalation', () => {
+    // capReached (answerCount >= MAX_ASSESSMENT_EXCHANGES=4) AND passed=false
+    // AND masteryScore >= 0.6 AND !shouldEscalateDepth → borderline
+    const status = resolveAssessmentStatus({
+      evaluation: {
+        ...baseEval,
+        passed: false,
+        shouldEscalateDepth: false,
+        masteryScore: 0.65,
+      },
+      answerCount: 4, // MAX_ASSESSMENT_EXCHANGES
+      forceReview: false,
+    });
+    expect(status).toBe('borderline');
+  });
+
+  it('returns "borderline" when masteryScore >= 0.6 and no escalation path (no nextDepth)', () => {
+    // Not at cap, but !shouldEscalateDepth AND masteryScore >= 0.6 → borderline
+    const status = resolveAssessmentStatus({
+      evaluation: {
+        ...baseEval,
+        passed: false,
+        shouldEscalateDepth: false,
+        masteryScore: 0.7,
+      },
+      answerCount: 2,
+      forceReview: false,
+    });
+    expect(status).toBe('borderline');
+  });
+
+  it('does NOT return "borderline" when masteryScore is below 0.6 (failed_exhausted at cap)', () => {
+    // masteryScore < 0.6 at cap → skips borderline → failed_exhausted
+    const status = resolveAssessmentStatus({
+      evaluation: {
+        ...baseEval,
+        passed: false,
+        shouldEscalateDepth: false,
+        masteryScore: 0.4,
+      },
+      answerCount: 4,
+      forceReview: false,
+    });
+    expect(status).toBe('failed_exhausted');
+  });
+
+  it('returns "failed_exhausted" when forceReview is true regardless of other inputs', () => {
+    const status = resolveAssessmentStatus({
+      evaluation: {
+        ...baseEval,
+        passed: true,
+        masteryScore: 1.0,
+      },
+      answerCount: 1,
+      forceReview: true,
+    });
+    expect(status).toBe('failed_exhausted');
+  });
+
+  it('returns "failed_exhausted" when cap is reached with masteryScore below 0.6', () => {
+    const status = resolveAssessmentStatus({
+      evaluation: {
+        ...baseEval,
+        passed: false,
+        shouldEscalateDepth: false,
+        masteryScore: 0.2,
+      },
+      answerCount: 4,
+      forceReview: false,
+    });
+    expect(status).toBe('failed_exhausted');
+  });
+
+  it('returns "in_progress" when passed and shouldEscalateDepth and cap not reached', () => {
+    const status = resolveAssessmentStatus({
+      evaluation: {
+        ...baseEval,
+        passed: true,
+        shouldEscalateDepth: true,
+        nextDepth: 'explain',
+        masteryScore: 0.5,
+      },
+      answerCount: 1,
+      forceReview: false,
+    });
+    expect(status).toBe('in_progress');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // CRUD persistence — createAssessment, getAssessment, updateAssessment
 // ---------------------------------------------------------------------------
 

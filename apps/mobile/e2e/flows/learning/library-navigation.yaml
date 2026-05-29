@@ -42,8 +42,8 @@ appId: com.mentomate.app
 tags:
   - nightly
   - learning
-# DEMOTED 2026-05-19: flow re-routed to push-to-shelf model. Awaiting 2x green
-# WHPX Pixel API 34 verification before re-tagging to pr-blocking.
+# Re-promoted 2026-05-29: BUG-35 fixed — replaced pressKey: Enter with
+# hideKeyboard + tapOn send-button (same pattern as first-session.yaml).
 ---
 # ── Setup ──────────────────────────────────────────────────────────────
 - runFlow:
@@ -124,11 +124,14 @@ tags:
 - takeScreenshot: library-nav-04-session-started
 
 # Exchange 1: establishes exchangeCount > 0 so end-session-button appears.
+# BUG-35 fix: use hideKeyboard + tapOn send-button (pressKey: Enter does not
+# reliably fire onSubmitEditing in the dev-client WHPX build).
 - tapOn:
     id: "chat-input"
 - inputText: "Explain the concept to me"
-# BUG-35: keyboard covers send button on Android — use Enter key.
-- pressKey: Enter
+- hideKeyboard
+- tapOn:
+    id: "send-button"
 
 - extendedWaitUntil:
     visible:
@@ -139,7 +142,9 @@ tags:
 - tapOn:
     id: "chat-input"
 - inputText: "Can you give me an example?"
-- pressKey: Enter
+- hideKeyboard
+- tapOn:
+    id: "send-button"
 
 - extendedWaitUntil:
     visible:

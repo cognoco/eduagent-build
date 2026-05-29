@@ -20,6 +20,7 @@ import {
   curricula,
   curriculumTopics,
   curriculumBooks,
+  bookSuggestions,
   learningSessions,
   sessionEvents,
   sessionSummaries,
@@ -115,6 +116,12 @@ export type SeedScenario =
   | 'dictation-with-mistakes'
   | 'dictation-perfect-score'
   | 'review-empty'
+  // E2E chat/book entry-path coverage seeds
+  // (docs/plans/2026-05-29-chat-book-entry-coverage.md).
+  | 'topic-not-started'
+  | 'topic-overdue-review'
+  | 'book-no-curriculum'
+  | 'subject-with-book-suggestions'
   // Mentor Chrome audit seed pack (docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md).
   // Stable registry names used by the audit re-run. Many are aliases of existing
   // scenarios — the alias preserves the audit's naming contract so blocked rows
@@ -1170,6 +1177,205 @@ async function seedFailedRecall3x(
     email,
     password,
     ids: { subjectId, topicId: targetTopicId },
+  };
+}
+
+// E2E coverage seed: a topic in the `not_started` state (no sessions, no
+// retention card, no assessment). computeCompletionStatus (progress.ts) returns
+// 'not_started', so the topic-detail StudyCTA renders "Start studying" and
+// pushes a mode=learning session. Exports bookId + topicId so the flow can
+// navigate Library → shelf → book → topic without scraping titles.
+async function seedTopicNotStarted(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Fresh Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Geography',
+  );
+
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
+  return {
+    scenario: 'topic-not-started',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, bookId, topicId: firstTopicId },
+  };
+}
+
+// E2E coverage seed: a topic in the `verified` + overdue state. A retention
+// card with xpStatus='verified' makes computeCompletionStatus return 'verified',
+// and nextReviewAt in the past makes it overdue. The topic-detail StudyCTA
+// renders "Review this topic" and handleStudyPress pushes a mode=review session
+// (topic/[topicId].tsx overdue branch). Exports bookId + topicId.
+async function seedTopicOverdueReview(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Review Due Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Astronomy',
+  );
+
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
+
+  await db.insert(retentionCards).values({
+    id: generateUUIDv7(),
+    profileId,
+    topicId: firstTopicId,
+    easeFactor: 2.5,
+    intervalDays: 7,
+    repetitions: 3,
+    consecutiveSuccesses: 3,
+    failureCount: 0,
+    xpStatus: 'verified',
+    nextReviewAt: pastDate(1), // overdue → "Review this topic" → mode=review
+    lastReviewedAt: pastDate(8),
+  });
+
+  return {
+    scenario: 'topic-overdue-review',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, bookId, topicId: firstTopicId },
+  };
+}
+
+// E2E coverage seed: a book whose curriculum has been marked generated but has
+// ZERO topics, so the book-detail screen renders the empty-state
+// "Build learning path" CTA (topics-empty-build). handleBuildLearningPath calls
+// startFirstCurriculumSession (sessionCount===0, no resume target) and lands in
+// a mode=learning session. Exports bookId.
+async function seedBookNoCurriculum(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'New Book Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  const subjectId = generateUUIDv7();
+  await db.insert(subjects).values({
+    id: subjectId,
+    profileId,
+    name: 'Economics',
+    status: 'active',
+  });
+
+  const curriculumId = generateUUIDv7();
+  await db.insert(curricula).values({
+    id: curriculumId,
+    subjectId,
+    version: 1,
+  });
+
+  // Book exists and is marked generated, but no curriculumTopics rows are
+  // inserted — this drives the empty-state build-learning-path CTA.
+  const bookId = generateUUIDv7();
+  await db.insert(curriculumBooks).values({
+    id: bookId,
+    subjectId,
+    title: 'Economics',
+    sortOrder: 0,
+    topicsGenerated: true,
+  });
+
+  return {
+    scenario: 'book-no-curriculum',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, bookId },
+  };
+}
+
+// E2E coverage seed: a subject with pre-generated book suggestions but no books
+// yet. Drives the shelf suggestion cards (shelf-suggestion-${id}) and the
+// pick-book screen's flat suggestion grid (pick-book-suggestion-${id}), which
+// file a chosen suggestion into a new book. Exports the first suggestionId.
+async function seedSubjectWithBookSuggestions(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Suggestion Picker',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  const subjectId = generateUUIDv7();
+  await db.insert(subjects).values({
+    id: subjectId,
+    profileId,
+    name: 'Philosophy',
+    status: 'active',
+  });
+
+  const curriculumId = generateUUIDv7();
+  await db.insert(curricula).values({
+    id: curriculumId,
+    subjectId,
+    version: 1,
+  });
+
+  const suggestionValues = [
+    { title: 'Ancient Greek Philosophy', emoji: '🏛️' },
+    { title: 'Ethics and Morality', emoji: '⚖️' },
+    { title: 'Philosophy of Mind', emoji: '🧠' },
+  ].map((s, i) => ({
+    id: generateUUIDv7(),
+    subjectId,
+    title: s.title,
+    emoji: s.emoji,
+    description: `An introduction to ${s.title}`,
+    createdAt: new Date(Date.now() + i), // stable ordering
+    pickedAt: null,
+  }));
+
+  await db.insert(bookSuggestions).values(suggestionValues);
+
+  const firstSuggestion = suggestionValues[0];
+  if (!firstSuggestion) throw new Error('No book suggestions created');
+  return {
+    scenario: 'subject-with-book-suggestions',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, suggestionId: firstSuggestion.id },
   };
 }
 
@@ -5152,6 +5358,11 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'review-empty': seedReviewEmpty,
   'dictation-with-mistakes': seedDictationWithMistakes,
   'dictation-perfect-score': seedDictationPerfectScore,
+  // E2E chat/book entry-path coverage seeds.
+  'topic-not-started': seedTopicNotStarted,
+  'topic-overdue-review': seedTopicOverdueReview,
+  'book-no-curriculum': seedBookNoCurriculum,
+  'subject-with-book-suggestions': seedSubjectWithBookSuggestions,
   // Mentor Chrome audit seed pack — aliases of existing scenarios where the
   // audit state matches a current seeder, and dedicated seeders where it doesn't.
   'mentor-audit-empty-adult': aliasSeeder(
