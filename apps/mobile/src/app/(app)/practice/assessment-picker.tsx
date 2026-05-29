@@ -9,16 +9,7 @@ import { Button } from '../../../components/common/Button';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace, PRACTICE_HREF } from '../../../lib/navigation';
-import type { Translate } from '../../../i18n';
-
-function formatStudiedAt(isoDate: string, t: Translate): string {
-  const diffDays = Math.floor(
-    (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24),
-  );
-  if (diffDays <= 0) return t('assessment.studiedToday');
-  if (diffDays === 1) return t('assessment.studiedYesterday');
-  return t('assessment.studiedDaysAgo', { count: diffDays });
-}
+import { useRelativeDate } from '../../../hooks/use-time-format';
 
 type AssessmentTopic = ReturnType<
   typeof useAssessmentEligibleTopics
@@ -31,6 +22,7 @@ const ASSESSMENT_PICKER_CONTENT_STYLE_BASE = { paddingHorizontal: 20 } as const;
 export default function AssessmentPickerScreen(): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
+  const relativeDate = useRelativeDate();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const {
@@ -106,13 +98,16 @@ export default function AssessmentPickerScreen(): React.ReactElement {
             {topic.topicDescription}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            {topic.subjectName} - {formatStudiedAt(topic.lastStudiedAt, t)}
+            {topic.subjectName} -{' '}
+            {t('assessment.studiedWhen', {
+              when: relativeDate(topic.lastStudiedAt),
+            })}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={22} color={colors.primary} />
       </Pressable>
     ),
-    [colors.primary, router, t],
+    [colors.primary, router, t, relativeDate],
   );
 
   const keyExtractor = useCallback(

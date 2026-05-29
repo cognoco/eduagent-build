@@ -207,9 +207,11 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    // 5 min — not 30 min — must be shown.
-    screen.getByText('5 min');
-    expect(screen.queryByText('30 min')).toBeNull();
+    // 5 min (active) — not 30 min (wall-clock) — must be shown. This file's
+    // react-i18next mock echoes the key + opts, so the duration count (5 vs 30)
+    // proves which source was used.
+    screen.getByText('time.duration.minutes:{"count":5}');
+    expect(screen.queryByText('time.duration.minutes:{"count":30}')).toBeNull();
   });
 
   // BUG-902 break test: when active time is missing, fall back to wall-clock
@@ -226,7 +228,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    screen.getByText('12 min');
+    screen.getByText('time.duration.minutes:{"count":12}');
   });
 
   it('shows homework summary when present', () => {

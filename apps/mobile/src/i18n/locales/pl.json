@@ -676,8 +676,6 @@
       "emptyTitle": "Nie rozegrano jeszcze żadnych rund",
       "emptyMessage": "Spróbuj quizu, aby zobaczyć tutaj swoją historię!",
       "tryQuiz": "Spróbuj quizu",
-      "dateToday": "Dzisiaj",
-      "dateYesterday": "Wczoraj",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "Runda {{label}} — {{theme}} — {{score}} na {{total}}. Otwórz szczegóły.",
       "activityLabels": {
@@ -1205,9 +1203,6 @@
     "pickerEmptyBody": "Najpierw rozpocznij sesję, potem wróć, aby sprawdzić, co zapamiętałeś.",
     "pickerBrowseTopics": "Przeglądaj tematy",
     "pickerStartForTopic": "Rozpocznij sprawdzanie dla {{title}}",
-    "studiedToday": "Uczono się dzisiaj",
-    "studiedYesterday": "Uczono się wczoraj",
-    "studiedDaysAgo": "Uczono się {{count}} dni temu",
     "topicPassedNote": "Dobra robota - ten temat jest oznaczony jako zaliczony, a słabsze miejsca wrócą w powtórce, gdy będą wymagały uwagi.",
     "pickerLoadingBody": "Sprawdzamy, które tematy są gotowe do sprawiedliwego testu.",
     "pickerLoadTimeoutTitle": "Ładowanie tematów do oceny trwa zbyt długo",
@@ -1228,7 +1223,8 @@
     "pickerInProgress": "W toku",
     "qualityRating": "Jakość: {{rating}}/5",
     "depthTransfer": "Zastosowane rozumienie",
-    "depthExplain": "Wyjaśnione własnymi słowami"
+    "depthExplain": "Wyjaśnione własnymi słowami",
+    "studiedWhen": "Uczono się {{when}}"
   },
   "homework": {
     "permissionTitle": "Wymagany dostęp do aparatu",
@@ -1421,10 +1417,6 @@
       "bookmarkLabel": "Zapisana zakładka z {{subject}}",
       "removeBookmark": "Usuń zakładkę",
       "tapToExpand": "Stuknij, aby rozwinąć",
-      "dateToday": "Dzisiaj",
-      "dateYesterday": "Wczoraj",
-      "dateDaysAgo": "{{count}} dni temu",
-      "dateWeeksAgo": "{{count}} tygodni temu",
       "deleteTitle": "Usunąć zakładkę?",
       "deleteMessage": "To zapisane wyjaśnienie zostanie usunięte.",
       "deleteConfirm": "Usuń",
@@ -2500,5 +2492,21 @@
   },
   "profiles": {
     "title": "Profile"
+  },
+  "time": {
+    "relative": {
+      "today": "Dzisiaj",
+      "yesterday": "Wczoraj",
+      "daysAgo": "{{count}} dni temu",
+      "lastWeek": "w zeszłym tygodniu",
+      "weeksAgo": "{{count}} tygodni temu"
+    },
+    "duration": {
+      "under1": "<1 min",
+      "minutes": "{{count}} min",
+      "minutesOne": "1 min",
+      "hoursMinutes": "{{hours}}h {{minutes}}m",
+      "none": "—"
+    }
   }
 }

@@ -651,8 +651,6 @@
       "emptyTitle": "Ingen runder spilt ennå",
       "emptyMessage": "Prøv en quiz for å se historikken din her!",
       "tryQuiz": "Prøv en quiz",
-      "dateToday": "I dag",
-      "dateYesterday": "I går",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "{{label}}-runde – {{theme}} – {{score}} av {{total}}. Åpne detaljer.",
       "activityLabels": {
@@ -1180,9 +1178,6 @@
     "pickerEmptyBody": "Start en økt først, og kom tilbake for å sjekke hva som sitter.",
     "pickerBrowseTopics": "Bla i temaer",
     "pickerStartForTopic": "Start vurdering for {{title}}",
-    "studiedToday": "Studert i dag",
-    "studiedYesterday": "Studert i går",
-    "studiedDaysAgo": "Studert for {{count}} dager siden",
     "topicPassedNote": "Bra jobbet - dette emnet er markert som bestått, og svake punkter kommer tilbake i repetisjon når de trenger oppmerksomhet.",
     "pickerLoadingBody": "Vi sjekker hvilke emner som er klare for en rettferdig test.",
     "pickerLoadTimeoutTitle": "Vurderingsemner tar for lang tid å laste",
@@ -1203,7 +1198,8 @@
     "pickerInProgress": "Pågår",
     "qualityRating": "Kvalitet: {{rating}}/5",
     "depthTransfer": "Anvendt forståelse",
-    "depthExplain": "Forklart med egne ord"
+    "depthExplain": "Forklart med egne ord",
+    "studiedWhen": "Studert {{when}}"
   },
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",
@@ -1396,10 +1392,6 @@
       "bookmarkLabel": "Lagret bokmerke fra {{subject}}",
       "removeBookmark": "Fjern bokmerke",
       "tapToExpand": "Trykk for å utvide",
-      "dateToday": "I dag",
-      "dateYesterday": "I går",
-      "dateDaysAgo": "For {{count}} dager siden",
-      "dateWeeksAgo": "For {{count}} uker siden",
       "deleteTitle": "Fjerne bokmerke?",
       "deleteMessage": "Denne lagrede forklaringen vil bli fjernet.",
       "deleteConfirm": "Fjern",
@@ -2500,5 +2492,21 @@
   },
   "profiles": {
     "title": "Profiler"
+  },
+  "time": {
+    "relative": {
+      "today": "I dag",
+      "yesterday": "I går",
+      "daysAgo": "{{count}} dager siden",
+      "lastWeek": "forrige uke",
+      "weeksAgo": "{{count}} uker siden"
+    },
+    "duration": {
+      "under1": "<1 min",
+      "minutes": "{{count}} min",
+      "minutesOne": "1 min",
+      "hoursMinutes": "{{hours}} t {{minutes}} m",
+      "none": "—"
+    }
   }
 }

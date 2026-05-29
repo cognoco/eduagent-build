@@ -3,7 +3,6 @@ import { View, Text, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { i18next } from '../../../i18n';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 import { useRecentRounds } from '../../../hooks/use-quiz';
@@ -11,28 +10,11 @@ import { extractLanguageFromTheme } from '../../../lib/extract-vocabulary-langua
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useScreenTopInset } from '../../../lib/use-screen-top-inset';
-
-// [F-037] Friendly date label — "Today" / "Yesterday" / locale long date.
-function formatDateHeader(isoDate: string): string {
-  const d = new Date(`${isoDate}T00:00:00`);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diffDays = Math.round(
-    (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
-  );
-
-  if (diffDays === 0) return i18next.t('quiz.history.dateToday');
-  if (diffDays === 1) return i18next.t('quiz.history.dateYesterday');
-
-  return d.toLocaleDateString(undefined, {
-    month: 'long',
-    day: 'numeric',
-    year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-  });
-}
+import { useRelativeDate } from '../../../hooks/use-time-format';
 
 export default function QuizHistoryScreen() {
   const { t } = useTranslation();
+  const relativeDate = useRelativeDate();
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const colors = useThemeColors();
@@ -58,7 +40,7 @@ export default function QuizHistoryScreen() {
     }) => (
       <View className="mb-4">
         <Text className="text-on-surface-muted px-4 py-2 text-sm font-medium">
-          {formatDateHeader(section.date)}
+          {relativeDate(`${section.date}T00:00:00`)}
         </Text>
         {section.items.map((round) => {
           const activityLabelMap: Record<string, string> = {
@@ -117,7 +99,7 @@ export default function QuizHistoryScreen() {
         })}
       </View>
     ),
-    [t, router],
+    [t, router, relativeDate],
   );
 
   if (isLoading) {
