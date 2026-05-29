@@ -129,10 +129,48 @@ describe('resolveEffectiveAccessTier', () => {
     });
   });
 
-  it('falls past-due paid subscriptions back to effective Free', () => {
+  it('falls past-due paid subscriptions back to effective Free when no grace remains', () => {
     expect(
       resolveEffectiveAccessTier(
         { ...baseSubscription, status: 'past_due' },
+        now,
+      ),
+    ).toEqual({
+      effectiveAccessTier: 'free',
+      billingAccess: 'free_fallback',
+    });
+  });
+
+  // [BUG-792] App-store grace period. When Apple/Google grant a billing grace
+  // window, the RevenueCat BILLING_ISSUE handler marks the sub past_due AND
+  // writes the grace expiry into currentPeriodEnd. A FUTURE grace expiry must
+  // preserve paid access — downgrading mid-grace strands a paying customer.
+  it('[BUG-792] keeps past_due paid subscriptions entitled during a FUTURE app-store grace window', () => {
+    expect(
+      resolveEffectiveAccessTier(
+        {
+          ...baseSubscription,
+          status: 'past_due',
+          currentPeriodEnd: '2026-05-27T00:00:00.000Z', // after `now`
+        },
+        now,
+      ),
+    ).toEqual({
+      effectiveAccessTier: 'plus',
+      billingAccess: 'current',
+    });
+  });
+
+  // [BUG-792] An ALREADY-EXPIRED grace window provides no protection — the
+  // platform has stopped extending access, so fall back to Free.
+  it('[BUG-792] falls past_due back to Free once the app-store grace window has expired', () => {
+    expect(
+      resolveEffectiveAccessTier(
+        {
+          ...baseSubscription,
+          status: 'past_due',
+          currentPeriodEnd: '2026-05-25T00:00:00.000Z', // before `now`
+        },
         now,
       ),
     ).toEqual({

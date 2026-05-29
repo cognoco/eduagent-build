@@ -66,6 +66,11 @@ async function sendMaintenanceBackfillOrError(
   eventName: string,
 ): Promise<Response> {
   try {
+    // orphan-allow: generic relay — callers pass string-literal event names
+    // (admin/memory-facts-backfill.requested, admin/progress-self-reports-backfill.requested),
+    // both of which have registered handlers (memory-facts-backfill.ts:45,
+    // weekly-self-reports.ts:362). The `name: eventName` indirection is a shared
+    // helper, not an orphan; the literal names are caught by the harvest above.
     // core-send: maintenance backfill endpoints must report real dispatch status.
     await inngest.send({
       name: eventName,

@@ -28,11 +28,21 @@ export function useMentorLanguageSync(): void {
         last.language === parsed.data
       )
         return;
-      lastSyncedRef.current = {
+      // [BUG-800] Set lastSyncedRef only on success, not before the call.
+      // Setting it eagerly caused a failed patch to permanently suppress retry
+      // for the same (profileId, language) pair until another change occurred.
+      const syncKey: SyncKey = {
         profileId: activeProfile.id,
         language: parsed.data,
       };
-      mutate({ conversationLanguage: parsed.data });
+      mutate(
+        { conversationLanguage: parsed.data },
+        {
+          onSuccess: () => {
+            lastSyncedRef.current = syncKey;
+          },
+        },
+      );
     };
 
     sync();

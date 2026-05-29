@@ -33,7 +33,7 @@ export interface RevenuecatWebhookUpdate {
   tier?: SubscriptionTier;
   status?: SubscriptionStatus;
   currentPeriodStart?: string;
-  currentPeriodEnd?: string;
+  currentPeriodEnd?: string | null;
   cancelledAt?: string | null;
   trialEndsAt?: string | null;
 }
@@ -217,7 +217,9 @@ async function applySubscriptionUpdateFromRevenuecat(
     setValues.currentPeriodStart = new Date(updates.currentPeriodStart);
   }
   if (updates.currentPeriodEnd !== undefined) {
-    setValues.currentPeriodEnd = new Date(updates.currentPeriodEnd);
+    setValues.currentPeriodEnd = updates.currentPeriodEnd
+      ? new Date(updates.currentPeriodEnd)
+      : null;
   }
   if (updates.cancelledAt !== undefined) {
     setValues.cancelledAt = updates.cancelledAt

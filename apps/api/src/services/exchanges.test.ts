@@ -15,6 +15,7 @@ import {
   buildExchangeSourceEvidence,
   classifyExchangeOutcome,
   inferObviousReliableSourceForAudit,
+  isProceduralOrNonFactualReply,
   parseExchangeEnvelope,
   processExchange,
   sanitizeUserContent,
@@ -2512,6 +2513,213 @@ describe('source provenance audit', () => {
 
     expect(audit.status).toBe('unsupported_sources');
     expect(audit.unsupportedSourceIds).toContain('general_knowledge');
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-798] missing_private_sources must NOT show unsupported factual
+  // claims that fall outside the SOURCE_BOUND_SENTENCE_TERMS scrub list.
+  //
+  // Break scenario: the model returns usable reply text but NO private_sources
+  // (plain prose / malformed JSON recovery). The audit marks
+  // `missing_private_sources` and, before the fix, the safety fallback only
+  // hard-fell-back for the no-reliable-source / general-knowledge cases —
+  // otherwise it relied on limited phrase scrubbing. A factual claim outside
+  // the scrub list ("first published in 1545 by Cardano") was shown and
+  // persisted with zero provenance.
+  //
+  // RED-GREEN: with the `missing_private_sources` branch reverted, the
+  // assertions on `.not.toMatch(/1545|Cardano/)` and `status` fail because the
+  // unsupported claim survives unchanged.
+  // -------------------------------------------------------------------------
+  describe('[BUG-798] missing_private_sources factual safety', () => {
+    it('classifies declarative source-bound claims as NOT procedural/non-factual', () => {
+      expect(
+        isProceduralOrNonFactualReply(
+          'The quadratic formula was first published in 1545 by Cardano.',
+        ),
+      ).toBe(false);
+    });
+
+    it('classifies pure understanding-check / prompt replies as procedural', () => {
+      expect(
+        isProceduralOrNonFactualReply(
+          'What do you think the first step is? Can you try factoring it?',
+        ),
+      ).toBe(true);
+      expect(isProceduralOrNonFactualReply('Okay. Want to keep going?')).toBe(
+        true,
+      );
+    });
+
+    it('hard-fallbacks an unsupported factual claim with no private_sources (current-topic evidence present)', () => {
+      const sourceEvidence = buildExchangeSourceEvidence(
+        baseContext,
+        'When was the quadratic formula discovered?',
+      );
+      // current_topic is reliableForFacts, so reliable evidence IS available —
+      // this is exactly the path the bug let slip through.
+      expect(sourceEvidence.some((s) => s.id === 'current_topic')).toBe(true);
+
+      // Model recovered reply text but emitted NO private_sources.
+      const audit = auditExchangeSources(undefined, sourceEvidence);
+      expect(audit.status).toBe('missing_private_sources');
+
+      const unsupportedClaim =
+        'The quadratic formula was first published in 1545 by Cardano.';
+      const safe = applySourceAuditSafetyFallback(unsupportedClaim, audit);
+
+      // The unsupported claim must NOT survive — replaced by the no-source
+      // safety fallback.
+      expect(safe.response).not.toMatch(/1545|Cardano|first published/i);
+      expect(safe.response).toMatch(/reliable source material|source-check/i);
+      expect(safe.sourceAudit.insufficient).toBe(true);
+      expect(safe.sourceAudit.reason).toMatch(/missing_private_sources/);
+    });
+
+    it('lets a procedural reply through unchanged even without private_sources', () => {
+      const sourceEvidence = buildExchangeSourceEvidence(
+        baseContext,
+        'I am ready.',
+      );
+      const audit = auditExchangeSources(undefined, sourceEvidence);
+      expect(audit.status).toBe('missing_private_sources');
+
+      const proceduralReply =
+        'Great — what do you think the first step is? Can you try factoring it?';
+      const safe = applySourceAuditSafetyFallback(proceduralReply, audit);
+
+      expect(safe.response).toBe(proceduralReply);
+      expect(safe.sourceAudit.status).toBe('missing_private_sources');
+    });
+
+    it('hard-fallbacks an unsupported factual claim recovered from MALFORMED JSON with no private_sources (parse_failed)', () => {
+      const sourceEvidence = buildExchangeSourceEvidence(
+        baseContext,
+        'When was the quadratic formula discovered?',
+      );
+      const audit = auditExchangeSources(undefined, sourceEvidence, {
+        envelopeParseFailed: true,
+      });
+      expect(audit.status).toBe('parse_failed');
+
+      const unsupportedClaim =
+        'The quadratic formula was first published in 1545 by Cardano.';
+      const safe = applySourceAuditSafetyFallback(unsupportedClaim, audit);
+
+      expect(safe.response).not.toMatch(/1545|Cardano|first published/i);
+      expect(safe.response).toMatch(/reliable source material|source-check/i);
+      expect(safe.sourceAudit.insufficient).toBe(true);
+      expect(safe.sourceAudit.reason).toMatch(/parse_failed/);
+    });
+
+    it('[non-streaming] processExchange never persists an unsupported factual claim from a no-private_sources prose reply', async () => {
+      const unsupportedClaim =
+        'The quadratic formula was first written down in 1545 by Cardano in his book Ars Magna.';
+      const provider: LLMProvider = {
+        id: 'gemini',
+        // Plain prose (not a valid envelope, no private_sources) — the model
+        // returns usable text on the parse-recovery path the bug targets.
+        async chat(_messages: ChatMessage[], _config: ModelConfig) {
+          return {
+            content: unsupportedClaim,
+            stopReason: 'stop' as StopReason,
+          };
+        },
+        chatStream() {
+          const s = (async function* () {
+            yield unsupportedClaim;
+          })();
+          return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+        },
+      };
+      registerProvider(provider);
+
+      try {
+        const result = await processExchange(
+          baseContext,
+          'When was the quadratic formula discovered?',
+        );
+
+        // Plain prose fails envelope parse → parse_failed, the un-provenanced
+        // recovery path. result.response is what session-exchange persists.
+        expect(result.sourceAudit?.status).toBe('parse_failed');
+        expect(result.response).not.toMatch(/1545|Cardano|Ars Magna/i);
+        expect(result.response).toMatch(
+          /reliable source material|source-check/i,
+        );
+      } finally {
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
+
+    it('[streaming] the streamed-reply audit pipeline hard-fallbacks an unsupported factual claim with a valid envelope but no private_sources', async () => {
+      // A well-formed envelope that omits private_sources → missing_private_sources.
+      // Streamed across chunk boundaries, then run through the SAME chain
+      // session-exchange.ts streaming onComplete uses: rawResponsePromise →
+      // classifyExchangeOutcome → inferObviousReliableSourceForAudit →
+      // auditExchangeSources → applySourceAuditSafetyFallback.
+      const envelopeJson = JSON.stringify({
+        reply: 'The quadratic formula was first published in 1545 by Cardano.',
+        signals: { understanding_check: false },
+        // intentionally NO private_sources
+      });
+      const chunkSize = 11;
+      const provider: LLMProvider = {
+        id: 'gemini',
+        async chat(_messages: ChatMessage[], _config: ModelConfig) {
+          return { content: envelopeJson, stopReason: 'stop' as StopReason };
+        },
+        chatStream() {
+          const s = (async function* () {
+            for (let i = 0; i < envelopeJson.length; i += chunkSize) {
+              yield envelopeJson.slice(i, i + chunkSize);
+            }
+          })();
+          return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+        },
+      };
+      registerProvider(provider);
+
+      try {
+        const result = await streamExchange(
+          baseContext,
+          'When was the quadratic formula discovered?',
+        );
+
+        // Drain the visible stream so rawResponsePromise settles.
+        const visibleChunks: string[] = [];
+        for await (const chunk of result.stream) visibleChunks.push(chunk);
+        const raw = await result.rawResponsePromise;
+
+        const outcome = classifyExchangeOutcome(raw, {
+          sessionId: baseContext.sessionId,
+          profileId: baseContext.profileId,
+          flow: 'streamMessage',
+        });
+        const privateSourcesForAudit = inferObviousReliableSourceForAudit(
+          outcome.parsed.privateSources,
+          result.sourceEvidence,
+          outcome.parsed.cleanResponse,
+        );
+        const audit = auditExchangeSources(
+          privateSourcesForAudit,
+          result.sourceEvidence,
+          { envelopeParseFailed: outcome.parsed.envelopeParseFailed },
+        );
+        expect(audit.status).toBe('missing_private_sources');
+
+        const safe = applySourceAuditSafetyFallback(
+          outcome.parsed.cleanResponse,
+          audit,
+        );
+
+        expect(safe.response).not.toMatch(/1545|Cardano|first published/i);
+        expect(safe.response).toMatch(/reliable source material|source-check/i);
+        expect(safe.sourceAudit.insufficient).toBe(true);
+      } finally {
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
   });
 });
 
