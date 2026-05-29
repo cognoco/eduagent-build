@@ -511,7 +511,43 @@
       "switchToVoiceMode": "Switch to voice mode",
       "voiceMode": "Voice mode",
       "screenReaderVoiceNote": "Screen reader is on. Voice input is not available. Use text input below.",
-      "stepProgress": "Step {{current}} of {{total}}"
+      "stepProgress": "Step {{current}} of {{total}}",
+      "voicePermissionErrorTitle": "Voice input error",
+      "voicePermissionErrorMessage": "Microphone access is needed for voice input. Please enable it in Settings.",
+      "voicePermissionOpenSettings": "Open Settings"
+    },
+    "messageBubble": {
+      "thinking": "Thinking",
+      "guidedResponse": "Guided response",
+      "pendingSync": "Message pending sync",
+      "sending": "Sending…",
+      "escalation": {
+        "stepByStep": "Step-by-step",
+        "letMeShowYou": "Let me show you",
+        "teachingMode": "Teaching mode"
+      },
+      "verificationBadge": {
+        "evaluate": "THINK-DEEPER CLEARED",
+        "teachBack": "TEACH-BACK CLEARED"
+      }
+    },
+    "noteInput": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "noteText": "Note text",
+      "startRecording": "Start recording",
+      "stopRecording": "Stop recording",
+      "listening": "Listening...",
+      "noteTooLong": "Your note is getting long! ({{length}}/{{max}})"
+    },
+    "voiceInput": {
+      "send": "Send",
+      "sendVoiceMessage": "Send voice message",
+      "reRecord": "Re-record",
+      "discardRecording": "Discard recording",
+      "transcriptLabel": "Voice transcript — tap to edit",
+      "startRecording": "Start recording",
+      "stopRecording": "Stop recording"
     },
     "filingFailed": {
       "retryInProgress": "A retry is already in progress.",
@@ -600,6 +636,16 @@
       "vocabPersonalisedTitle": "Vocabulary: {{language}}",
       "vocabStarterSubtitle": "Stock starter words — record {{threshold}} of your own to unlock personalised rounds",
       "vocabPlayedSubtitleDefault": "Practice new words and phrases"
+    },
+    "guessWhoQuestion": {
+      "typeAName": "Type a name",
+      "answerLabel": "Guess who answer",
+      "submitGuess": "Submit guess",
+      "submitGuessLabel": "Submit guess",
+      "revealNextClue": "Reveal next clue",
+      "revealNextClueLabel": "Reveal next clue",
+      "iDontKnow": "I don't know",
+      "iDontKnowLabel": "I don't know the answer"
     },
     "launch": {
       "loadingShuffling": "Shuffling questions...",
@@ -2500,5 +2546,24 @@
   },
   "profiles": {
     "title": "Profiles"
+  },
+  "feedbackSheet": {
+    "title": "Give us feedback",
+    "shakeHint": "Or shake your phone anytime to contact us.",
+    "thankYouTitle": "Thank you!",
+    "thankYouMessage": "We've received your feedback and will look into it.",
+    "categoryLabel": "What kind of feedback?",
+    "messageLabel": "Tell us what happened",
+    "messagePlaceholder": "Describe the issue or your idea...",
+    "deviceInfoNote": "We'll also include your app version and device info to help us investigate.",
+    "sendButton": "Send Feedback",
+    "sendButtonLabel": "Send feedback",
+    "cancelButton": "Cancel",
+    "closeLabel": "Close",
+    "category": {
+      "bug": "Bug",
+      "suggestion": "Suggestion",
+      "other": "Other"
+    }
   }
 }

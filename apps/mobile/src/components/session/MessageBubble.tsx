@@ -11,6 +11,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import type { TranslateKey } from '../../i18n/types';
 import { formatMathContent } from '../../lib/math-format';
 import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
@@ -86,11 +88,12 @@ function PencilTapIcon(): React.ReactElement {
 }
 
 function ThinkingIndicator(): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <View
       className="flex-row gap-1.5 py-2 px-1 items-center"
       testID="thinking-indicator"
-      accessibilityLabel="Thinking"
+      accessibilityLabel={t('session.messageBubble.thinking')}
     >
       <PencilTapIcon />
       {[0, 1, 2].map((i) => (
@@ -125,21 +128,18 @@ function BlinkingCursor(): React.ReactElement {
   );
 }
 
-const ESCALATION_STYLES: Partial<
-  Record<
-    number,
-    {
-      label: string;
-      bg: string;
-      border: string;
-      icon: keyof typeof Ionicons.glyphMap;
-      colorKey: 'primary' | 'info' | 'success';
-      textClass: string;
-    }
-  >
-> = {
+type EscalationStyle = {
+  labelKey: TranslateKey;
+  bg: string;
+  border: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  colorKey: 'primary' | 'info' | 'success';
+  textClass: string;
+};
+
+const ESCALATION_STYLES: Partial<Record<number, EscalationStyle>> = {
   3: {
-    label: 'Step-by-step',
+    labelKey: 'session.messageBubble.escalation.stepByStep',
     bg: 'bg-primary-soft',
     border: 'border-l-2 border-primary',
     icon: 'bulb-outline',
@@ -147,7 +147,7 @@ const ESCALATION_STYLES: Partial<
     textClass: 'text-primary',
   },
   4: {
-    label: 'Let me show you',
+    labelKey: 'session.messageBubble.escalation.letMeShowYou',
     bg: 'bg-info/10',
     border: 'border-l-[3px] border-info',
     icon: 'search-outline',
@@ -155,7 +155,7 @@ const ESCALATION_STYLES: Partial<
     textClass: 'text-info',
   },
   5: {
-    label: 'Teaching mode',
+    labelKey: 'session.messageBubble.escalation.teachingMode',
     bg: 'bg-success/10',
     // Bug #5 fix: border-l-4 rendered as a full-width green line artifact
     // on some devices. Using border-l-[3px] matches level 4 pattern and
@@ -167,11 +167,10 @@ const ESCALATION_STYLES: Partial<
   },
 };
 
-const VERIFICATION_BADGE_CONFIG: Record<VerificationBadge, { label: string }> =
-  {
-    evaluate: { label: 'THINK-DEEPER CLEARED' },
-    teach_back: { label: 'TEACH-BACK CLEARED' },
-  };
+const VERIFICATION_BADGE_KEY: Record<VerificationBadge, TranslateKey> = {
+  evaluate: 'session.messageBubble.verificationBadge.evaluate',
+  teach_back: 'session.messageBubble.verificationBadge.teachBack',
+};
 
 // Custom comparator: re-render only when props that affect output change.
 // Deliberately excludes `actions` from the stable-reference check because
@@ -205,6 +204,7 @@ export const MessageBubble = memo(function MessageBubble({
   actions,
   testID,
 }: MessageBubbleProps): React.ReactElement {
+  const { t } = useTranslation();
   const isAI = sender === 'assistant';
   const colors = useThemeColors();
   // [BUG-941] Render-boundary defense: any AI message whose content arrived
@@ -239,7 +239,7 @@ export const MessageBubble = memo(function MessageBubble({
         {escalation && (
           <View
             className="flex-row items-center mb-1"
-            accessibilityLabel="Guided response"
+            accessibilityLabel={t('session.messageBubble.guidedResponse')}
           >
             <Ionicons
               name={escalation.icon}
@@ -250,7 +250,7 @@ export const MessageBubble = memo(function MessageBubble({
             <Text
               className={`text-caption font-semibold ${escalation.textClass}`}
             >
-              {escalation.label}
+              {t(escalation.labelKey)}
             </Text>
           </View>
         )}
@@ -270,18 +270,20 @@ export const MessageBubble = memo(function MessageBubble({
       </View>
       {isAI &&
         verificationBadge &&
-        VERIFICATION_BADGE_CONFIG[verificationBadge] && (
+        VERIFICATION_BADGE_KEY[verificationBadge] && (
           <Text className="text-[10px] font-bold uppercase tracking-wide text-success mt-1 ml-1">
-            ✓ {VERIFICATION_BADGE_CONFIG[verificationBadge].label}
+            ✓ {t(VERIFICATION_BADGE_KEY[verificationBadge])}
           </Text>
         )}
       {!isAI && outboxStatus === 'pending' ? (
         <View
           className="self-end mt-1"
           testID="outbox-pending-indicator"
-          accessibilityLabel="Message pending sync"
+          accessibilityLabel={t('session.messageBubble.pendingSync')}
         >
-          <Text className="text-caption text-text-secondary">Sending…</Text>
+          <Text className="text-caption text-text-secondary">
+            {t('session.messageBubble.sending')}
+          </Text>
         </View>
       ) : null}
     </Animated.View>

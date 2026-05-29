@@ -511,7 +511,10 @@
       "switchToVoiceMode": "Cambiar a modo de voz",
       "voiceMode": "Modo de voz",
       "screenReaderVoiceNote": "El lector de pantalla está activado. La entrada de voz no está disponible. Usa la entrada de texto de abajo.",
-      "stepProgress": "Paso {{current}} de {{total}}"
+      "stepProgress": "Paso {{current}} de {{total}}",
+      "voicePermissionErrorTitle": "Error de entrada de voz",
+      "voicePermissionErrorMessage": "Se necesita acceso al micrófono para la entrada de voz. Actívalo en Ajustes.",
+      "voicePermissionOpenSettings": "Abrir Ajustes"
     },
     "filingFailed": {
       "retryInProgress": "Ya hay un reintento en curso.",
@@ -577,6 +580,39 @@
       "currentTopic": "Tema:",
       "changeTopicLabel": "Cambiar tema de {{topic}}",
       "changeTopic": "Cambiar"
+    },
+    "messageBubble": {
+      "thinking": "Pensando",
+      "guidedResponse": "Respuesta guiada",
+      "pendingSync": "Mensaje pendiente de sincronizar",
+      "sending": "Enviando…",
+      "escalation": {
+        "stepByStep": "Paso a paso",
+        "letMeShowYou": "Déjame mostrarte",
+        "teachingMode": "Modo enseñanza"
+      },
+      "verificationBadge": {
+        "evaluate": "PIENSA-MÁS-ALLÁ SUPERADO",
+        "teachBack": "ENSEÑA-DE-VUELTA SUPERADO"
+      }
+    },
+    "noteInput": {
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "noteText": "Texto de la nota",
+      "startRecording": "Iniciar grabación",
+      "stopRecording": "Detener grabación",
+      "listening": "Escuchando...",
+      "noteTooLong": "¡Tu nota se está alargando! ({{length}}/{{max}})"
+    },
+    "voiceInput": {
+      "send": "Enviar",
+      "sendVoiceMessage": "Enviar mensaje de voz",
+      "reRecord": "Volver a grabar",
+      "discardRecording": "Descartar grabación",
+      "transcriptLabel": "Transcripción de voz: toca para editar",
+      "startRecording": "Iniciar grabación",
+      "stopRecording": "Detener grabación"
     }
   },
   "quiz": {
@@ -715,6 +751,16 @@
     },
     "results": {
       "viewHistory": "Ver historial"
+    },
+    "guessWhoQuestion": {
+      "typeAName": "Escribe un nombre",
+      "answerLabel": "Respuesta de Adivina quién",
+      "submitGuess": "Enviar respuesta",
+      "submitGuessLabel": "Enviar respuesta",
+      "revealNextClue": "Revelar siguiente pista",
+      "revealNextClueLabel": "Revelar siguiente pista",
+      "iDontKnow": "No lo sé",
+      "iDontKnowLabel": "No sé la respuesta"
     }
   },
   "dictation": {
@@ -2500,5 +2546,24 @@
   },
   "profiles": {
     "title": "Perfiles"
+  },
+  "feedbackSheet": {
+    "title": "Danos tu opinión",
+    "shakeHint": "O agita tu teléfono en cualquier momento para contactarnos.",
+    "thankYouTitle": "¡Gracias!",
+    "thankYouMessage": "Hemos recibido tus comentarios y los revisaremos.",
+    "categoryLabel": "¿Qué tipo de comentario?",
+    "messageLabel": "Cuéntanos qué pasó",
+    "messagePlaceholder": "Describe el problema o tu idea...",
+    "deviceInfoNote": "También incluiremos la versión de la app y la información de tu dispositivo para ayudarnos a investigar.",
+    "sendButton": "Enviar comentarios",
+    "sendButtonLabel": "Enviar comentarios",
+    "cancelButton": "Cancelar",
+    "closeLabel": "Cerrar",
+    "category": {
+      "bug": "Error",
+      "suggestion": "Sugerencia",
+      "other": "Otro"
+    }
   }
 }

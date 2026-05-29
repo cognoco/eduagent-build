@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import type { ClientQuizQuestion, QuestionCheckInput } from '@eduagent/schemas';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 type ClientGuessWhoQuestion = Extract<
@@ -69,6 +70,7 @@ export function GuessWhoQuestion({
   onCheckAnswer,
   onResolved,
 }: GuessWhoQuestionProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const [guess, setGuess] = useState('');
   const [visibleClueCount, setVisibleClueCount] = useState(1);
@@ -222,14 +224,14 @@ export function GuessWhoQuestion({
           <TextInput
             value={guess}
             onChangeText={setGuess}
-            placeholder="Type a name"
+            placeholder={t('quiz.guessWhoQuestion.typeAName')}
             placeholderTextColor={colors.muted}
             className="py-3 text-body text-text-primary"
             autoCapitalize="words"
             autoCorrect={false}
             returnKeyType="done"
             onSubmitEditing={handleSubmitGuess}
-            accessibilityLabel="Guess who answer"
+            accessibilityLabel={t('quiz.guessWhoQuestion.answerLabel')}
             testID="guess-who-input"
           />
         </View>
@@ -242,7 +244,7 @@ export function GuessWhoQuestion({
               canSubmit ? 'bg-primary' : 'bg-surface-elevated opacity-60'
             }`}
             accessibilityRole="button"
-            accessibilityLabel="Submit guess"
+            accessibilityLabel={t('quiz.guessWhoQuestion.submitGuessLabel')}
             testID="guess-who-submit"
           >
             {isChecking ? (
@@ -253,7 +255,7 @@ export function GuessWhoQuestion({
                   canSubmit ? 'text-text-inverse' : 'text-text-secondary'
                 }`}
               >
-                Submit guess
+                {t('quiz.guessWhoQuestion.submitGuess')}
               </Text>
             )}
           </Pressable>
@@ -262,12 +264,16 @@ export function GuessWhoQuestion({
             className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-3"
             accessibilityRole="button"
             accessibilityLabel={
-              isFinalClue ? "I don't know" : 'Reveal next clue'
+              isFinalClue
+                ? t('quiz.guessWhoQuestion.iDontKnowLabel')
+                : t('quiz.guessWhoQuestion.revealNextClueLabel')
             }
             testID="guess-who-next-clue"
           >
             <Text className="text-body-sm font-semibold text-text-primary">
-              {isFinalClue ? "I don't know" : 'Reveal next clue'}
+              {isFinalClue
+                ? t('quiz.guessWhoQuestion.iDontKnow')
+                : t('quiz.guessWhoQuestion.revealNextClue')}
             </Text>
           </Pressable>
         </View>

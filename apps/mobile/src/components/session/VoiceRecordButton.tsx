@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { hapticLight, hapticMedium, hapticSuccess } from '../../lib/haptics';
 
@@ -28,6 +29,7 @@ export function VoiceRecordButton({
   onPress,
   disabled = false,
 }: VoiceRecordButtonProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const pulseScale = useSharedValue(1);
 
@@ -65,7 +67,11 @@ export function VoiceRecordButton({
         className={`h-[52px] w-[52px] rounded-input items-center justify-center ${
           isListening ? 'bg-danger' : 'bg-surface-elevated'
         }`}
-        accessibilityLabel={isListening ? 'Stop recording' : 'Start recording'}
+        accessibilityLabel={
+          isListening
+            ? t('session.voiceInput.stopRecording')
+            : t('session.voiceInput.startRecording')
+        }
         accessibilityRole="button"
         accessibilityState={{ disabled }}
         testID="voice-record-button"
@@ -107,6 +113,7 @@ export function VoiceTranscriptPreview({
   onReRecord,
   onTranscriptChange,
 }: VoiceTranscriptPreviewProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   if (!transcript) return null;
 
@@ -130,7 +137,7 @@ export function VoiceTranscriptPreview({
         multiline
         maxLength={5000}
         placeholderTextColor={colors.textSecondary}
-        accessibilityLabel="Voice transcript — tap to edit"
+        accessibilityLabel={t('session.voiceInput.transcriptLabel')}
         testID="voice-transcript-input"
       />
       {/* [BUG-715 / ACC-12] Secondary buttons collapse to icon-only on the 360pt-budget row. accessibilityLabel preserved for screen readers; Send keeps text + flex-1 prominence. */}
@@ -138,16 +145,18 @@ export function VoiceTranscriptPreview({
         <Pressable
           onPress={handleSend}
           className="flex-1 bg-primary rounded-button py-2 items-center min-h-[44px] justify-center"
-          accessibilityLabel="Send voice message"
+          accessibilityLabel={t('session.voiceInput.sendVoiceMessage')}
           accessibilityRole="button"
           testID="voice-send-button"
         >
-          <Text className="text-text-inverse font-semibold">Send</Text>
+          <Text className="text-text-inverse font-semibold">
+            {t('session.voiceInput.send')}
+          </Text>
         </Pressable>
         <Pressable
           onPress={onReRecord}
           className="bg-surface rounded-button items-center justify-center min-h-[44px] min-w-[44px]"
-          accessibilityLabel="Re-record"
+          accessibilityLabel={t('session.voiceInput.reRecord')}
           accessibilityRole="button"
           testID="voice-rerecord-button"
         >
@@ -160,7 +169,7 @@ export function VoiceTranscriptPreview({
         <Pressable
           onPress={handleDiscard}
           className="bg-surface rounded-button items-center justify-center min-h-[44px] min-w-[44px]"
-          accessibilityLabel="Discard recording"
+          accessibilityLabel={t('session.voiceInput.discardRecording')}
           accessibilityRole="button"
           testID="voice-discard-button"
         >

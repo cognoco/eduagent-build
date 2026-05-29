@@ -12,16 +12,13 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import type { FeedbackCategory } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 import { useFeedbackSubmit } from '../../hooks/use-feedback';
 import { formatApiError } from '../../lib/format-api-error';
 
-const CATEGORIES: { value: FeedbackCategory; label: string }[] = [
-  { value: 'bug', label: 'Bug' },
-  { value: 'suggestion', label: 'Suggestion' },
-  { value: 'other', label: 'Other' },
-];
+const CATEGORY_VALUES: FeedbackCategory[] = ['bug', 'suggestion', 'other'];
 
 interface FeedbackSheetProps {
   visible: boolean;
@@ -32,6 +29,7 @@ export function FeedbackSheet({
   visible,
   onClose,
 }: FeedbackSheetProps): React.ReactElement {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const submit = useFeedbackSubmit();
@@ -98,13 +96,15 @@ export function FeedbackSheet({
             onPress={handleClose}
             className="min-w-[44px] min-h-[44px] justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('feedbackSheet.closeLabel')}
             testID="feedback-close"
           >
-            <Text className="text-primary text-body font-semibold">Cancel</Text>
+            <Text className="text-primary text-body font-semibold">
+              {t('feedbackSheet.cancelButton')}
+            </Text>
           </Pressable>
           <Text className="text-h2 font-bold text-text-primary">
-            Give us feedback now!
+            {t('feedbackSheet.title')}
           </Text>
           <View style={{ minWidth: 44 }} />
         </View>
@@ -113,17 +113,17 @@ export function FeedbackSheet({
             className="text-body-sm font-bold text-secondary text-center px-5 pb-2"
             testID="feedback-shake-hint"
           >
-            Or shake your phone anytime to contact us.
+            {t('feedbackSheet.shakeHint')}
           </Text>
         )}
 
         {submitted ? (
           <View className="flex-1 items-center justify-center px-5">
             <Text className="text-h2 font-bold text-text-primary mb-2">
-              Thank you!
+              {t('feedbackSheet.thankYouTitle')}
             </Text>
             <Text className="text-body text-text-secondary text-center mb-6">
-              We&apos;ve received your feedback and will look into it.
+              {t('feedbackSheet.thankYouMessage')}
             </Text>
             <Pressable
               onPress={handleClose}
@@ -132,7 +132,7 @@ export function FeedbackSheet({
               testID="feedback-done"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Done
+                {t('common.done')}
               </Text>
             </Pressable>
           </View>
@@ -144,44 +144,44 @@ export function FeedbackSheet({
               keyboardShouldPersistTaps="handled"
             >
               <Text className="text-body-sm font-semibold text-text-secondary mb-2">
-                What kind of feedback?
+                {t('feedbackSheet.categoryLabel')}
               </Text>
               <View className="flex-row gap-2 mb-5">
-                {CATEGORIES.map((cat) => (
+                {CATEGORY_VALUES.map((value) => (
                   <Pressable
-                    key={cat.value}
-                    onPress={() => setCategory(cat.value)}
+                    key={value}
+                    onPress={() => setCategory(value)}
                     className={`flex-1 py-2.5 rounded-button items-center px-1 ${
-                      category === cat.value
+                      category === value
                         ? 'bg-primary'
                         : 'bg-surface border border-border'
                     }`}
                     accessibilityRole="radio"
-                    accessibilityState={{ selected: category === cat.value }}
-                    testID={`feedback-category-${cat.value}`}
+                    accessibilityState={{ selected: category === value }}
+                    testID={`feedback-category-${value}`}
                   >
                     {/* [BUG-506] numberOfLines prevents clipping on narrow viewports */}
                     <Text
                       numberOfLines={1}
                       className={`text-body-sm font-semibold ${
-                        category === cat.value
+                        category === value
                           ? 'text-text-inverse'
                           : 'text-text-primary'
                       }`}
                     >
-                      {cat.label}
+                      {t(`feedbackSheet.category.${value}`)}
                     </Text>
                   </Pressable>
                 ))}
               </View>
 
               <Text className="text-body-sm font-semibold text-text-secondary mb-2">
-                Tell us what happened
+                {t('feedbackSheet.messageLabel')}
               </Text>
               <TextInput
                 className="bg-surface text-text-primary text-body rounded-card px-4 py-3 min-h-[140px]"
                 style={{ textAlignVertical: 'top' }}
-                placeholder="Describe the issue or your idea..."
+                placeholder={t('feedbackSheet.messagePlaceholder')}
                 placeholderTextColor={colors.muted}
                 value={message}
                 onChangeText={setMessage}
@@ -196,8 +196,7 @@ export function FeedbackSheet({
               </Text>
 
               <Text className="text-caption text-text-muted mt-4">
-                We&apos;ll also include your app version and device info to help
-                us investigate.
+                {t('feedbackSheet.deviceInfoNote')}
               </Text>
             </ScrollView>
 
@@ -214,14 +213,14 @@ export function FeedbackSheet({
                   canSubmit ? 'bg-primary' : 'bg-primary/40'
                 }`}
                 accessibilityRole="button"
-                accessibilityLabel="Send feedback"
+                accessibilityLabel={t('feedbackSheet.sendButtonLabel')}
                 testID="feedback-submit"
               >
                 {submit.isPending ? (
                   <ActivityIndicator color={colors.textInverse} />
                 ) : (
                   <Text className="text-body font-semibold text-text-inverse">
-                    Send Feedback
+                    {t('feedbackSheet.sendButton')}
                   </Text>
                 )}
               </Pressable>

@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import type { Translate, TranslateKey } from '../../../../../i18n';
 import { useProfileSessions } from '../../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../../lib/navigation';
+import { classifyApiError } from '../../../../../lib/format-api-error';
 import {
   getParentRetentionInfo,
   getReconciliationLine,
@@ -122,8 +123,13 @@ export default function TopicDetailScreen() {
       : null;
   const masteryPercent = mastery !== null ? Math.round(mastery * 100) : null;
 
-  const { data: sessions, isLoading: sessionsLoading } =
-    useProfileSessions(profileId);
+  const {
+    data: sessions,
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+    error: sessionsErrorObj,
+    refetch: refetchSessions,
+  } = useProfileSessions(profileId);
   const topicSessions = sessions?.filter((s) => s.topicId === topicId) ?? [];
 
   // Most recent fluency-drill outcomes for this topic. Flat-mapped across
@@ -304,6 +310,29 @@ export default function TopicDetailScreen() {
         {sessionsLoading ? (
           <View className="py-4 items-center" testID="sessions-loading">
             <ActivityIndicator />
+          </View>
+        ) : sessionsError && !sessions ? (
+          // [UX-DE] Distinguish a session-fetch failure from a genuinely empty
+          // history. Without this branch the screen falls through to
+          // "No sessions yet", misleading a parent into thinking their child
+          // has not studied when the request actually failed — and leaving
+          // them with no retry. Mirrors the established error/empty split in
+          // progress/[subjectId]/sessions.tsx and quiz/history.tsx.
+          <View className="py-6 items-center" testID="sessions-error">
+            <Text className="text-body text-text-secondary text-center mb-3">
+              {classifyApiError(sessionsErrorObj).message}
+            </Text>
+            <Pressable
+              onPress={() => void refetchSessions()}
+              className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
+              testID="sessions-error-retry"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                {t('common.retry')}
+              </Text>
+            </Pressable>
           </View>
         ) : topicSessions.length > 0 ? (
           topicSessions.map((session) => (
