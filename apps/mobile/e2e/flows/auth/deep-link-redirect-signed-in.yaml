@@ -27,11 +27,11 @@ tags:
   - auth
 ---
 # ── Step 1: Sign in to a clean home ──
-- extendedWaitUntil:
-    visible:
-      id: "sign-in-screen"
-    timeout: 120000
-
+# Post 2026-05-27 pre-auth welcome refactor, pm clear lands on welcome-chooser
+# (not sign-in-screen). sign-in-only.yaml already handles welcome navigation
+# internally, so we just run it directly. No separate extendedWaitUntil for
+# sign-in-screen needed — sign-in-only.yaml's nav-welcome-to-sign-in sub-flow
+# handles the welcome → sign-in bridge and ends with sign-in-button visible.
 - runFlow:
     file: ../_setup/sign-in-only.yaml
 

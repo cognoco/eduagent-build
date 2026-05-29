@@ -45,6 +45,16 @@ tags:
 
 - takeScreenshot: dictation-01-practice
 
+# practice-dictation is in the "Other practice" horizontal slider at
+# practice/index.tsx:795-949, which is section 4 of the practice screen.
+# The practice ScrollView requires vertical scrolling to reach it on small
+# screens (e.g. Galaxy S10e 5.8"). Scroll down until the slider is visible.
+- scrollUntilVisible:
+    element:
+      id: "practice-dictation"
+    direction: DOWN
+    timeout: 5000
+
 - tapOn:
     id: "practice-dictation"
 

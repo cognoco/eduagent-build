@@ -35,11 +35,19 @@ tags:
   - nightly
   - auth
 ---
-# ── Step 1: Confirm we are on the sign-in screen ──
+# ── Step 1: Navigate from welcome chooser to sign-in screen ──
+# Post 2026-05-27 pre-auth welcome refactor, pm clear lands on welcome-chooser,
+# not directly on sign-in-screen. Walk the welcome flow first so we reach the
+# sign-in screen before firing the deep link.
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
+# Confirm we are on the sign-in screen (nav-welcome-to-sign-in ends with
+# sign-in-button visible; sign-in-screen wraps it at sign-in.tsx:1220)
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
-    timeout: 120000
+    timeout: 10000
 
 - takeScreenshot: deep-link-signed-out-01-sign-in-screen
 
@@ -55,12 +63,25 @@ tags:
 
 - takeScreenshot: deep-link-signed-out-02-after-open-link
 
-# ── Step 3: Sign in via canonical sign-in flow ──
-# sign-in-only.yaml uses the correct testIDs (sign-in-email/password/button)
-# and the hideKeyboard pattern. It has NO post-auth return-to-home recovery,
-# so the pending-redirect replace will not be defeated.
-- runFlow:
-    file: ../_setup/sign-in-only.yaml
+# ── Step 3: Sign in — inline steps (already past welcome) ──
+# We are already on sign-in-screen after nav-welcome-to-sign-in + openLink.
+# Cannot call sign-in-only.yaml here because it unconditionally re-runs
+# nav-welcome-to-sign-in.yaml, which would fail (welcome-chooser not visible).
+# Inline the sign-in steps directly. Same testIDs as sign-in-only.yaml.
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+- hideKeyboard
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+- tapOn:
+    id: "sign-in-button"
 
 - takeScreenshot: deep-link-signed-out-03-after-sign-in
 

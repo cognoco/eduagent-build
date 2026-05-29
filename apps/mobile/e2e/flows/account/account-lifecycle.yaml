@@ -56,15 +56,16 @@ tags:
 - tapOn:
     id: "more-row-profile"
 
-# 8. Wait for profile detail screen
+# 8. Wait for profiles list screen (more-row-profile routes to /profiles,
+#    which shows the profile list — testID "profiles-screen" at profiles.tsx:228)
 - extendedWaitUntil:
     visible:
-      text: "Display name"
+      id: "profiles-screen"
     timeout: 10000
 
-# 9. Verify profile info is displayed
+# 9. Verify profiles screen is displayed (heading "Profiles" from t('profiles.title'))
 - assertVisible:
-    text: "Display name"
+    text: "Profiles"
 
 # 10. Screenshot
 - takeScreenshot: account-lifecycle-complete
