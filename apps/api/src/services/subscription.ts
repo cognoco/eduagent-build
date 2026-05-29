@@ -188,6 +188,28 @@ export function resolveEffectiveAccessTier(
     };
   }
 
+  // [BUG-792] App-store grace period. When Apple/Google grant a billing grace
+  // window after a renewal failure, the RevenueCat BILLING_ISSUE handler marks
+  // the subscription `past_due` AND writes the grace expiry into
+  // `currentPeriodEnd` (see services/billing/revenuecat-webhook-handler.ts →
+  // handleBillingIssue). Preserve paid access until that platform-managed grace
+  // window expires — the learner is still entitled while the store retries the
+  // charge. We mirror the `cancelled` branch above (access capped by
+  // currentPeriodEnd) rather than introducing a parallel status so the
+  // entitlement read stays single-sourced. Without a *future* currentPeriodEnd
+  // (no grace remaining, or grace already expired) past_due falls through to the
+  // free fallback below — the conservative default.
+  if (
+    subscription.status === 'past_due' &&
+    subscription.currentPeriodEnd &&
+    new Date(subscription.currentPeriodEnd) > now
+  ) {
+    return {
+      effectiveAccessTier: subscription.tier,
+      billingAccess: 'current',
+    };
+  }
+
   return { effectiveAccessTier: 'free', billingAccess: 'free_fallback' };
 }
 

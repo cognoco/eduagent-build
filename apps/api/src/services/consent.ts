@@ -478,14 +478,40 @@ export async function requestConsent(
       // (NULL) → always allowed, this is the initial assignment; (3) real
       // recipient change → recipient-change cap. Caps are enforced here
       // atomically so concurrent requests cannot exceed them.
-      setWhere: sql`(${consentStates.parentEmail} IS NOT DISTINCT FROM ${input.parentEmail} AND ${consentStates.resendCount} < ${MAX_CONSENT_RESENDS}) OR ${consentStates.parentEmail} IS NULL OR (${consentStates.parentEmail} IS NOT NULL AND ${consentStates.parentEmail} IS DISTINCT FROM ${input.parentEmail} AND ${consentStates.recipientChangeCount} < ${MAX_RECIPIENT_CHANGES})`,
+      //
+      // [BUG-791] Terminal-status guard: a CONSENTED or WITHDRAWN row is an
+      // already-decided consent and must NEVER be revived back to
+      // PARENTAL_CONSENT_REQUESTED by this upsert. Without this guard a
+      // parent-created child (whose row is CONSENTED with parentEmail = NULL)
+      // would match the `parentEmail IS NULL` branch and get flipped back to
+      // "requested", letting a same-account sibling disrupt a decided consent
+      // and re-email an arbitrary address. resendConsent already enforces the
+      // same guard via its WHERE clause; this closes the request-upsert path.
+      setWhere: sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN') AND ((${consentStates.parentEmail} IS NOT DISTINCT FROM ${input.parentEmail} AND ${consentStates.resendCount} < ${MAX_CONSENT_RESENDS}) OR ${consentStates.parentEmail} IS NULL OR (${consentStates.parentEmail} IS NOT NULL AND ${consentStates.parentEmail} IS DISTINCT FROM ${input.parentEmail} AND ${consentStates.recipientChangeCount} < ${MAX_RECIPIENT_CHANGES}))`,
     })
     .returning();
 
   // If no row returned, the conflict existed but the setWhere prevented the
-  // update — a cap was reached. Classify by intent: a same-email resend hit
-  // the resend cap; a recipient change hit the recipient-change cap.
+  // update — either a terminal (CONSENTED/WITHDRAWN) row blocked revival, or a
+  // cap was reached. Disambiguate by re-reading the row: an already-decided
+  // consent surfaces as "no pending request" rather than a misleading cap
+  // error.
   if (!row) {
+    const existingRow = await db.query.consentStates.findFirst({
+      where: and(
+        eq(consentStates.profileId, input.childProfileId),
+        eq(consentStates.consentType, input.consentType),
+      ),
+      columns: { status: true },
+    });
+    if (
+      existingRow != null &&
+      (existingRow.status === 'CONSENTED' || existingRow.status === 'WITHDRAWN')
+    ) {
+      throw new ConsentRequestNotFoundError();
+    }
+    // Otherwise a cap was reached. Classify by intent: a same-email resend hit
+    // the resend cap; a recipient change hit the recipient-change cap.
     throw isRecipientChange
       ? new ConsentRecipientChangeLimitError()
       : new ConsentResendLimitError();

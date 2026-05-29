@@ -1946,6 +1946,101 @@ describe('session routes', () => {
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });
 
+    // [BUG-797] The non-streaming fallback paths must forward the SAME
+    // completion/UI signals the normal streaming done frame sends. Before the
+    // fix, the two fallback done frames only emitted counts/rung/aiEventId/
+    // challenge fields, silently dropping readyToFinish, notePrompt,
+    // notePromptPostSession, fluencyDrill, and confidence — so interview/
+    // onboarding closure and UI hints failed ONLY on degradation paths.
+    it('[BUG-797] mid-stream fallback done frame includes completion/UI signals from processMessage', async () => {
+      mockSafeRefundQuota.mockClear();
+      (processMessage as jest.Mock).mockResolvedValueOnce({
+        response: 'Recovered non-streaming lesson response',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 1,
+        expectedResponseMinutes: 3,
+        aiEventId: EVENT_ID,
+        // Completion/UI signals the normal done frame forwards.
+        readyToFinish: true,
+        notePrompt: true,
+        notePromptPostSession: true,
+        fluencyDrill: { kind: 'vocabulary' },
+        confidence: 'high',
+      });
+
+      const failingStream = (async function* (): AsyncGenerator<string> {
+        yield 'Hello ';
+        throw new Error('streamExchange threw after visible text');
+      })();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: failingStream,
+        onComplete: jest.fn(),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'ok' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain('"readyToFinish":true');
+      expect(body).toContain('"notePrompt":true');
+      expect(body).toContain('"notePromptPostSession":true');
+      expect(body).toContain('"confidence":"high"');
+      expect(body).toContain('"fluencyDrill"');
+      expect(body).toContain('"kind":"vocabulary"');
+    });
+
+    it('[BUG-797] pre-stream fallback done frame includes completion/UI signals from processMessage', async () => {
+      mockSafeRefundQuota.mockClear();
+      (streamMessage as jest.Mock).mockRejectedValueOnce(
+        new Error('streamExchange threw'),
+      );
+      (processMessage as jest.Mock).mockResolvedValueOnce({
+        response: 'Pre-stream fallback lesson response',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 1,
+        expectedResponseMinutes: 3,
+        aiEventId: EVENT_ID,
+        // Completion/UI signals the normal done frame forwards.
+        readyToFinish: true,
+        notePrompt: true,
+        notePromptPostSession: true,
+        fluencyDrill: { kind: 'vocabulary' },
+        confidence: 'medium',
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'ok' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain('"readyToFinish":true');
+      expect(body).toContain('"notePrompt":true');
+      expect(body).toContain('"notePromptPostSession":true');
+      expect(body).toContain('"confidence":"medium"');
+      expect(body).toContain('"fluencyDrill"');
+      expect(body).toContain('"kind":"vocabulary"');
+    });
+
     it('returns 400 with empty message', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/stream`,

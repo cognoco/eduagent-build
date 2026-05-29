@@ -1,10 +1,15 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createScreenWrapper,
   createTestProfile,
 } from '../../../test-utils/screen-render';
-import type { Profile } from '../../../lib/profile';
+import {
+  ProfileContext,
+  type Profile,
+  type ProfileContextValue,
+} from '../../../lib/profile';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -153,6 +158,48 @@ function renderPronouns() {
     isLoading: mockProfileIsLoading,
   });
   return render(<PronounsScreen />, { wrapper });
+}
+
+// Like `renderPronouns`, but the ProfileContext value is recomputed from the
+// `mockActiveProfile` / `mockProfileIsLoading` holders on EVERY render. This
+// lets a test mutate the holders then call `rerender(...)` to simulate the
+// profile resolving after the initial (loading) render — the real
+// late-profile-resolve race that BUG-799 fixes. (`renderPronouns` freezes the
+// context value at call time, so its `rerender` cannot model a profile change.)
+function renderPronounsLive() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
+  });
+  function LiveWrapper({ children }: { children: React.ReactNode }) {
+    const activeProfile: Profile | null = mockActiveProfile
+      ? createTestProfile({
+          id: mockActiveProfile.id,
+          birthYear: mockActiveProfile.birthYear,
+          pronouns: mockActiveProfile.pronouns ?? null,
+        })
+      : null;
+    const value: ProfileContextValue = {
+      profiles: activeProfile ? [activeProfile] : [],
+      activeProfile,
+      isExplicitProxyMode: false,
+      switchProfile: async () => ({ success: true }),
+      isLoading: mockProfileIsLoading,
+      profileLoadError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: () => undefined,
+    };
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ProfileContext.Provider value={value}>
+          {children}
+        </ProfileContext.Provider>
+      </QueryClientProvider>
+    );
+  }
+  return render(<PronounsScreen />, { wrapper: LiveWrapper });
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +398,95 @@ describe('PronounsScreen', () => {
     const { queryByTestId, getByTestId } = renderPronouns();
     getByTestId('pronouns-loading');
     expect(queryByTestId('pronouns-option-she-her')).toBeNull();
+  });
+
+  // [BUG-799] Delayed profile load must not silently clear existing pronouns.
+  // The screen can first render while the profile is still loading
+  // (activeProfile undefined). When the profile later resolves with stored
+  // pronouns, local `choice` must adopt them so pressing Continue PRESERVES
+  // the value rather than submitting `pronouns: null` (data loss).
+  it('[BUG-799] preserves existing pronouns when the profile resolves after the initial render', () => {
+    // First render: profile still loading, no activeProfile.
+    mockProfileIsLoading = true;
+    mockActiveProfile = undefined;
+    const { rerender, getByTestId } = renderPronounsLive();
+    getByTestId('pronouns-loading');
+
+    // Profile resolves with existing pronouns = "he/him".
+    mockProfileIsLoading = false;
+    mockActiveProfile = {
+      id: 'profile-1',
+      birthYear: 2005,
+      pronouns: 'he/him',
+    };
+    // Re-render through the real ProfileContext with the resolved profile.
+    rerender(<PronounsScreen />);
+
+    // The resolved pronoun must be reflected as selected and Continue enabled.
+    const heHim = getByTestId('pronouns-option-he-him');
+    expect(heHim.props.accessibilityState?.selected).toBe(true);
+    expect(
+      getByTestId('pronouns-continue').props.accessibilityState?.disabled,
+    ).toBeFalsy();
+
+    // Pressing Continue must PRESERVE "he/him", never send null.
+    fireEvent.press(getByTestId('pronouns-continue'));
+    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith(
+      { pronouns: 'he/him' },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(mockUpdatePronounsMutate).not.toHaveBeenCalledWith(
+      { pronouns: null },
+      expect.anything(),
+    );
+  });
+
+  it('[BUG-799] Continue is disabled until an explicit pronoun choice is made (no accidental null clear)', () => {
+    // Profile already loaded but has no stored pronouns and the user has not
+    // chosen anything: Continue must not be pressable to avoid writing null.
+    mockActiveProfile = {
+      id: 'profile-1',
+      birthYear: 2005,
+      pronouns: null,
+    };
+    const { getByTestId } = renderPronouns();
+    expect(
+      getByTestId('pronouns-continue').props.accessibilityState?.disabled,
+    ).toBeTruthy();
+    // Skip remains the explicit-clear / skip path.
+    fireEvent.press(getByTestId('pronouns-skip'));
+    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith({ pronouns: null });
+  });
+
+  it('[BUG-799] an explicit user change wins over a late profile resolve', () => {
+    // Render while loading, user picks they/them, THEN profile resolves with
+    // a different stored value. The user's explicit choice must not be clobbered.
+    mockProfileIsLoading = true;
+    mockActiveProfile = undefined;
+    const { rerender, getByTestId } = renderPronounsLive();
+
+    // Profile resolves WITHOUT pronouns first so the form renders.
+    mockProfileIsLoading = false;
+    mockActiveProfile = { id: 'profile-1', birthYear: 2005, pronouns: null };
+    rerender(<PronounsScreen />);
+
+    // User explicitly chooses they/them.
+    fireEvent.press(getByTestId('pronouns-option-they-them'));
+
+    // A subsequent profile resolve carrying "he/him" must NOT overwrite the
+    // user's explicit they/them selection (dirty guard).
+    mockActiveProfile = {
+      id: 'profile-1',
+      birthYear: 2005,
+      pronouns: 'he/him',
+    };
+    rerender(<PronounsScreen />);
+
+    fireEvent.press(getByTestId('pronouns-continue'));
+    expect(mockUpdatePronounsMutate).toHaveBeenLastCalledWith(
+      { pronouns: 'they/them' },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   // [#6a] The age-gate effect calls navigateForward, which fires
