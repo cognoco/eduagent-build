@@ -52,8 +52,13 @@ export function sm2(input: SM2Input): SM2Result {
     // Failed: reset repetitions, short interval
     newReps = 0;
     newInterval = 1;
-  } else if (prevReps === 0 || !card) {
-    // First successful recall
+  } else if (card == null || prevReps === 0) {
+    // First successful recall — either a brand-new card (card is undefined/null)
+    // or a card whose previous recalls all failed (repetitions reset to 0).
+    // Note: `card == null` (null/undefined) is the only falsy case reachable here
+    // because `SM2Input.card` is typed `RetentionCard | undefined`; checking it
+    // explicitly (rather than `!card`) prevents future contributors from
+    // accidentally extending the branch to other falsy values if the type widens.
     newReps = 1;
     newInterval = 1;
   } else if (prevReps === 1) {

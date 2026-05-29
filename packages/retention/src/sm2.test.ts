@@ -211,4 +211,46 @@ describe('sm2', () => {
     expect(Number.isFinite(result.card.easeFactor)).toBe(true);
     expect(result.card.easeFactor).toBeGreaterThanOrEqual(1.3);
   });
+
+  // FCR-2026-05-23-L1.C1.10: Pin the OR-branch behavior explicitly.
+  // The condition `card == null || prevReps === 0` must treat both the
+  // undefined-card path (new card) and the reps=0 path (reset card) identically:
+  // newReps=1, newInterval=1. These two cases are the only ways to enter the
+  // "first successful recall" branch; a card with reps>0 must NOT enter it.
+  it('[FCR-L1.C1.10] new card (card=undefined, quality=5): first-recall branch — reps=1, interval=1', () => {
+    const result = sm2({ quality: 5, card: undefined });
+    expect(result.card.repetitions).toBe(1);
+    expect(result.card.interval).toBe(1);
+    expect(result.wasSuccessful).toBe(true);
+  });
+
+  it('[FCR-L1.C1.10] reset card (reps=0, quality=5): first-recall branch — reps=1, interval=1', () => {
+    const resetCard: RetentionCard = {
+      easeFactor: 2.5,
+      interval: 1,
+      repetitions: 0,
+      lastReviewedAt: new Date().toISOString(),
+      nextReviewAt: new Date().toISOString(),
+    };
+    const result = sm2({ quality: 5, card: resetCard });
+    // card != null but repetitions=0 — must still enter first-recall branch
+    expect(result.card.repetitions).toBe(1);
+    expect(result.card.interval).toBe(1);
+    expect(result.wasSuccessful).toBe(true);
+  });
+
+  it('[FCR-L1.C1.10] card with reps=2 (quality=5): must NOT enter first-recall branch — advances to subsequent-recall', () => {
+    const establishedCard: RetentionCard = {
+      easeFactor: 2.5,
+      interval: 6,
+      repetitions: 2,
+      lastReviewedAt: new Date().toISOString(),
+      nextReviewAt: new Date().toISOString(),
+    };
+    const result = sm2({ quality: 5, card: establishedCard });
+    // reps=2, so it enters the "subsequent successful recalls" path
+    expect(result.card.repetitions).toBe(3);
+    expect(result.card.interval).toBeGreaterThan(6);
+    expect(result.wasSuccessful).toBe(true);
+  });
 });
