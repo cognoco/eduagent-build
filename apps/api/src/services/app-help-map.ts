@@ -34,7 +34,7 @@ Destinations:
 - Homework: Home > Help with an assignment.
 - Practice / reviews: Home > Test yourself.
 - Viewing a child's progress (parent): Open Progress, then pick the child you want to view.
-- Changing a child's preferences (parent): Open Progress, pick the child, then open their learning preferences row.
+- Changing a child's preferences (parent): Open Progress, pick the child, then open the "<child name>'s learning preferences" row.
 
 If you do not know a destination, say so and suggest "More > Help & feedback".
 Do not output internal route paths, Expo routes, markdown links, or URLs.`;
