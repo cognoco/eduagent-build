@@ -748,6 +748,54 @@ describe('evaluateAssessmentAnswer', () => {
     expect(result.masteryScore).toBe(0);
     expect(result.qualityRating).toBe(0);
   });
+
+  it('[WI-372] falls back closed when high-score output has no learner feedback', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        passed: true,
+        shouldEscalateDepth: true,
+        rawScore: 0.95,
+        qualityRating: 5,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      { ...assessmentContext, currentDepth: 'recall' },
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.shouldEscalateDepth).toBe(false);
+    expect(result.nextDepth).toBeUndefined();
+    expect(result.masteryScore).toBe(0);
+  });
+
+  it('[WI-372] falls back closed when quality rating is decimal', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Looks passing.',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 0.9,
+        qualityRating: 4.5,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.masteryScore).toBe(0);
+    expect(result.qualityRating).toBe(0);
+  });
 });
 
 describe('buildAssessmentAppHelpEvaluation', () => {

@@ -372,6 +372,39 @@ describe('discrete LLM evaluation schemas', () => {
       expect(result.success).toBe(false);
     });
 
+    it('[WI-372] rejects missing or blank learner-visible feedback', () => {
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          rawScore: 0.95,
+          qualityRating: 5,
+          passed: true,
+          shouldEscalateDepth: true,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          feedback: '   ',
+          rawScore: 0.95,
+          qualityRating: 5,
+          passed: true,
+          shouldEscalateDepth: true,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('[WI-372] rejects decimal quality ratings', () => {
+      const result = llmAssessmentEvaluationSchema.safeParse({
+        reply: 'Good enough.',
+        rawScore: 0.8,
+        qualityRating: 4.5,
+        passed: true,
+        shouldEscalateDepth: false,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
     it('[WI-372] accepts the strict discrete assessment shape', () => {
       const parsed = llmAssessmentEvaluationSchema.parse({
         reply: 'Good enough.',

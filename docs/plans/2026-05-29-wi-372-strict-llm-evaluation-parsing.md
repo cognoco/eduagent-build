@@ -81,3 +81,8 @@ T4:
 - Residual coercion grep passed with no matches:
   - `rtk rg -n "Boolean\\(parsed\\.(isAccepted|hasUnderstandingGaps|passed|shouldEscalateDepth)|Number\\(parsed\\.(rawScore|qualityRating)" apps/api/src/services/summaries.ts apps/api/src/services/assessments.ts`
 - Envelope evidence grep found no legacy free-text parser path in `evaluate.ts`; `teach-back.ts` still contains envelope metadata helper references, not state-driving prose regex parsing.
+
+## Adversarial Review Fixes
+
+- Review loop 1 found a valid must-fix issue: assessment payloads with high scores but no learner-visible `feedback` or `reply` could still drive pass/escalation state. Fixed by requiring nonblank `feedback` or `reply` in `llmAssessmentEvaluationSchema`, with schema and service fallback tests.
+- Review loop 1 found a valid should-fix issue: decimal `qualityRating` values could pass parser validation even though downstream assessment contracts use integer quality ratings. Fixed by requiring `qualityRating` to be an integer, with schema and service fallback tests.

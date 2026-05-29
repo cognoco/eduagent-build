@@ -97,15 +97,19 @@ export type LlmSummaryEvaluation = z.infer<typeof llmSummaryEvaluationSchema>;
 
 export const llmAssessmentEvaluationSchema = z
   .object({
-    feedback: z.string().min(1).max(2000).optional(),
-    reply: z.string().min(1).max(2000).optional(),
+    feedback: z.string().trim().min(1).max(2000).optional(),
+    reply: z.string().trim().min(1).max(2000).optional(),
     rawScore: z.number().min(0).max(1),
-    qualityRating: z.number().min(0).max(5),
+    qualityRating: z.number().int().min(0).max(5),
     passed: z.boolean().optional(),
     shouldEscalateDepth: z.boolean().optional(),
     weakAreas: z.array(z.string().min(1).max(200)).max(8).optional(),
   })
-  .strict();
+  .strict()
+  .refine((evaluation) => evaluation.feedback ?? evaluation.reply, {
+    message: 'Assessment evaluation requires feedback or reply',
+    path: ['feedback'],
+  });
 export type LlmAssessmentEvaluation = z.infer<
   typeof llmAssessmentEvaluationSchema
 >;
