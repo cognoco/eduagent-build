@@ -1,12 +1,10 @@
+import { screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-} from '@testing-library/react-native';
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+  renderScreen,
+  cleanupScreen,
+  createTestProfile,
+} from '../test-utils/screen-render';
+import type { Profile } from '../lib/profile';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -63,22 +61,12 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-// WI-295: Controllable profile list so the profileId ownership check can be tested.
-// Default includes the profileId used by useLocalSearchParams mock above so existing
-// tests are unaffected.
+// WI-295: profile list drives the profileId ownership check. The real
+// ProfileContext is supplied by renderScreen — we vary `profiles` per test
+// via the helper below (no lib/profile mock needed). The profileId from the
+// useLocalSearchParams mock above is the active profile's id by default so
+// existing tests are unaffected.
 const TEST_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
-const mockUseProfile = jest.fn(() => ({
-  activeProfile: { id: TEST_PROFILE_ID, birthYear: 2010, isOwner: false },
-  profiles: [{ id: TEST_PROFILE_ID, isOwner: false }],
-  isExplicitProxyMode: false,
-  isLoading: false,
-}));
-jest.mock(
-  '../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
-  () => ({
-    useProfile: () => mockUseProfile(),
-  }),
-);
 
 const mockMutateAsync = jest.fn();
 
@@ -145,17 +133,23 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false, gcTime: 0 } },
+const ConsentScreen = require('./consent').default;
+
+const activeProfile = createTestProfile({
+  id: TEST_PROFILE_ID,
+  birthYear: 2010,
+  isOwner: false,
 });
 
-function Wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-}
+let active: ReturnType<typeof renderScreen> | null = null;
 
-const ConsentScreen = require('./consent').default;
+function renderConsent(profiles: Profile[] = [activeProfile]) {
+  active = renderScreen(<ConsentScreen />, {
+    profile: activeProfile,
+    profiles,
+  });
+  return active;
+}
 
 /** Drain all pending timers (fade-out + fade-in animations). */
 function flushFadeAnimation(): void {
@@ -170,12 +164,6 @@ describe('ConsentScreen', () => {
     jest.useFakeTimers();
     mockChildEmail = undefined;
     mockCanGoBack.mockReturnValue(true);
-    mockUseProfile.mockReturnValue({
-      activeProfile: { id: TEST_PROFILE_ID, birthYear: 2010, isOwner: false },
-      profiles: [{ id: TEST_PROFILE_ID, isOwner: false }],
-      isExplicitProxyMode: false,
-      isLoading: false,
-    });
     mockUseNetworkStatus.mockReturnValue({ isOffline: false, isReady: true });
     // Restore default: Clerk hydrated, user present.
     mockUseAuth.mockReturnValue({
@@ -193,14 +181,16 @@ describe('ConsentScreen', () => {
   });
 
   afterEach(() => {
-    queryClient.clear();
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
     jest.useRealTimers();
   });
 
   // ── Phase 1: Child view ──────────────────────────────────────────
 
   it('renders child view by default with hand-off message and button', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     screen.getByTestId('consent-child-view');
     screen.getByText('Almost there!');
@@ -211,7 +201,7 @@ describe('ConsentScreen', () => {
   });
 
   it('shows email input, submit button, and parent escape hatch in child view', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     // Child can now enter parent email directly — no phone handoff required.
     screen.getByTestId('consent-email');
@@ -224,7 +214,7 @@ describe('ConsentScreen', () => {
   // ── Child view email validation ──────────────────────────────────
 
   it('disables submit button in child view when email is empty', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     const button = screen.getByTestId('consent-submit');
     expect(
@@ -233,7 +223,7 @@ describe('ConsentScreen', () => {
   });
 
   it('disables submit button in child view for invalid email', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.changeText(screen.getByTestId('consent-email'), 'not-an-email');
 
@@ -244,7 +234,7 @@ describe('ConsentScreen', () => {
   });
 
   it('enables submit button in child view for valid email', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
@@ -259,7 +249,7 @@ describe('ConsentScreen', () => {
 
   it('shows same-email warning in child phase and disables submit', () => {
     mockChildEmail = 'child@example.com';
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
@@ -280,7 +270,7 @@ describe('ConsentScreen', () => {
       emailStatus: 'sent',
     });
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
@@ -310,7 +300,7 @@ describe('ConsentScreen', () => {
       emailStatus: 'sent',
     });
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
@@ -335,7 +325,7 @@ describe('ConsentScreen', () => {
       emailStatus: 'sent',
     });
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
@@ -370,7 +360,7 @@ describe('ConsentScreen', () => {
     });
 
     it('disables the submit button when Clerk has not hydrated', () => {
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent();
 
       fireEvent.changeText(
         screen.getByTestId('consent-email'),
@@ -384,7 +374,7 @@ describe('ConsentScreen', () => {
     });
 
     it('does not fire the API when submit is pressed during Clerk hydration window', () => {
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent();
 
       fireEvent.changeText(
         screen.getByTestId('consent-email'),
@@ -399,7 +389,7 @@ describe('ConsentScreen', () => {
   // ── Phase 2: Parent view ─────────────────────────────────────────
 
   it('transitions to parent view when hand-off button is pressed', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -409,7 +399,7 @@ describe('ConsentScreen', () => {
   });
 
   it('parent view shows email input, regulation text, spam warning, and submit button', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -425,7 +415,7 @@ describe('ConsentScreen', () => {
   });
 
   it('shows professional (non-learner) regulation text for the parent', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -437,7 +427,7 @@ describe('ConsentScreen', () => {
   // ── Email validation ─────────────────────────────────────────────
 
   it('disables submit button when email is empty', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -449,7 +439,7 @@ describe('ConsentScreen', () => {
   });
 
   it('disables submit button for invalid email', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -462,7 +452,7 @@ describe('ConsentScreen', () => {
   });
 
   it('enables submit button for valid email', () => {
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -486,7 +476,7 @@ describe('ConsentScreen', () => {
       emailStatus: 'sent',
     });
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     // Go to parent view
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
@@ -525,7 +515,7 @@ describe('ConsentScreen', () => {
       emailStatus: 'sent',
     });
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -552,7 +542,7 @@ describe('ConsentScreen', () => {
       emailStatus: 'sent',
     });
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -582,7 +572,7 @@ describe('ConsentScreen', () => {
       emailStatus: 'sent',
     });
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
@@ -608,7 +598,7 @@ describe('ConsentScreen', () => {
   it('displays error on submission failure', async () => {
     mockMutateAsync.mockRejectedValue(new Error('API error: 500'));
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -634,7 +624,7 @@ describe('ConsentScreen', () => {
       emailStatus: 'failed',
     });
 
-    render(<ConsentScreen />, { wrapper: Wrapper });
+    renderConsent();
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
@@ -677,7 +667,7 @@ describe('ConsentScreen', () => {
     });
 
     it('transitions immediately to parent view without fade animation when reduced motion is enabled', () => {
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent();
 
       fireEvent.press(screen.getByTestId('consent-handoff-button'));
       // No flushFadeAnimation() needed — reduced motion skips the animation
@@ -693,7 +683,7 @@ describe('ConsentScreen', () => {
         emailStatus: 'sent',
       });
 
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent();
 
       // Go to parent view (instant, no animation)
       fireEvent.press(screen.getByTestId('consent-handoff-button'));
@@ -717,7 +707,7 @@ describe('ConsentScreen', () => {
     });
 
     it('keeps fadeAnim opacity at 1 when reduced motion is enabled', () => {
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent();
 
       // The Animated.View wrapping phase content should have opacity 1
       // because reduced motion skips the fade-out/fade-in sequence
@@ -739,7 +729,7 @@ describe('ConsentScreen', () => {
     });
 
     it('disables submit button in child phase when offline', () => {
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent();
       fireEvent.changeText(
         screen.getByTestId('consent-email'),
         'parent@example.com',
@@ -752,7 +742,7 @@ describe('ConsentScreen', () => {
     });
 
     it('disables submit button in parent phase when offline', () => {
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent();
       fireEvent.press(screen.getByTestId('consent-handoff-button'));
       flushFadeAnimation();
       fireEvent.changeText(
@@ -767,7 +757,7 @@ describe('ConsentScreen', () => {
     });
 
     it('does not call the API when submit is pressed while offline', () => {
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent();
       fireEvent.changeText(
         screen.getByTestId('consent-email'),
         'parent@example.com',
@@ -784,15 +774,15 @@ describe('ConsentScreen', () => {
     });
 
     it('[B-616] redirects to /sign-in when not authenticated', () => {
-      mockUseAuth.mockReturnValueOnce({ isLoaded: true, isSignedIn: false });
-      render(<ConsentScreen />);
+      mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: false });
+      renderConsent();
       expect(screen.getByTestId('mock-redirect-/sign-in')).toBeTruthy();
       expect(screen.queryByText('Almost there!')).toBeNull();
     });
 
     it('[B-616] shows loading spinner while Clerk is hydrating', () => {
-      mockUseAuth.mockReturnValueOnce({ isLoaded: false, isSignedIn: false });
-      render(<ConsentScreen />);
+      mockUseAuth.mockReturnValue({ isLoaded: false, isSignedIn: false });
+      renderConsent();
       expect(screen.getByTestId('consent-auth-loading')).toBeTruthy();
       expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
     });
@@ -804,14 +794,7 @@ describe('ConsentScreen', () => {
     it('shows an error and blocks submit when profileId is not in profiles', () => {
       // Remove the test profile from the account profiles list.
       // isLoading: false means profiles have loaded — the check is authoritative.
-      mockUseProfile.mockReturnValue({
-        activeProfile: { id: TEST_PROFILE_ID, birthYear: 2010, isOwner: false },
-        profiles: [],
-        isLoading: false,
-        isExplicitProxyMode: false,
-      });
-
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      renderConsent([]);
 
       screen.getByTestId('consent-profile-not-found');
       screen.getByTestId('consent-profile-not-found-error');
@@ -819,22 +802,15 @@ describe('ConsentScreen', () => {
       expect(screen.queryByTestId('consent-child-view')).toBeNull();
     });
 
-    it('does not call mutateAsync when profileId is not in profiles', async () => {
-      mockUseProfile.mockReturnValue({
-        activeProfile: { id: TEST_PROFILE_ID, birthYear: 2010, isOwner: false },
-        profiles: [],
-        isLoading: false,
-        isExplicitProxyMode: false,
-      });
-
-      render(<ConsentScreen />, { wrapper: Wrapper });
+    it('does not call mutateAsync when profileId is not in profiles', () => {
+      renderConsent([]);
 
       expect(mockMutateAsync).not.toHaveBeenCalled();
     });
 
     it('renders the consent form normally when profileId is in profiles', () => {
-      // Default: mockUseProfile includes TEST_PROFILE_ID — form should render
-      render(<ConsentScreen />, { wrapper: Wrapper });
+      // Default: active profile id === TEST_PROFILE_ID — form should render
+      renderConsent();
 
       screen.getByTestId('consent-child-view');
       expect(screen.queryByTestId('consent-profile-not-found')).toBeNull();

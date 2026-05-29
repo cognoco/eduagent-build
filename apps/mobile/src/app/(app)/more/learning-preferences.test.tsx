@@ -1,24 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent } from '@testing-library/react-native';
+import {
+  renderScreen,
+  cleanupScreen,
+  createTestProfile,
+} from '../../../test-utils/screen-render';
 
 const mockPush = jest.fn();
 
-let mockActiveProfile = {
-  id: 'profile-1',
-  displayName: 'Alex',
-  isOwner: true,
-  birthYear: 1990,
-};
-let mockProfiles: Array<{
-  id: string;
-  displayName: string;
-  isOwner: boolean;
-  birthYear: number;
-}> = [];
-let mockLearnerProfile: { accommodationMode?: string } | null = {
-  accommodationMode: 'none',
-};
 let mockSearchParams: Record<string, string | undefined> = {};
 
 jest.mock('expo-router', () => ({
@@ -41,105 +29,99 @@ jest.mock('../../../lib/theme' /* gc1-allow: unit test boundary */, () => ({
   useThemeColors: () => ({ textSecondary: '#777', primary: '#6366f1' }),
 }));
 
-jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
-  ...jest.requireActual('../../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: mockActiveProfile,
-    profiles: mockProfiles,
-  }),
-}));
-
-jest.mock(
-  '../../../hooks/use-learner-profile' /* gc1-allow: unit test boundary */,
-  () => ({
-    useLearnerProfile: () => ({
-      data: mockLearnerProfile,
-      isError: false,
-      refetch: jest.fn(),
-    }),
-    useUpdateAccommodationMode: () => ({
-      mutate: jest.fn(),
-      isPending: false,
-    }),
-  }),
-);
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      children,
-    );
-  };
-}
-
 const LearningPreferencesScreen = require('./learning-preferences').default;
 
+const activeProfile = createTestProfile({
+  id: 'profile-1',
+  displayName: 'Alex',
+  isOwner: true,
+  birthYear: 1990,
+});
+
+const childProfile = createTestProfile({
+  id: 'child-1',
+  displayName: 'Emma',
+  isOwner: false,
+  birthYear: 2015,
+});
+
+function learnerProfileRoute(accommodationMode = 'none') {
+  return { '/learner-profile': { profile: { accommodationMode } } };
+}
+
 describe('LearningPreferencesScreen', () => {
+  let active: ReturnType<typeof renderScreen> | null = null;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockActiveProfile = {
-      id: 'profile-1',
-      displayName: 'Alex',
-      isOwner: true,
-      birthYear: 1990,
-    };
-    mockProfiles = [mockActiveProfile];
-    mockLearnerProfile = { accommodationMode: 'none' };
     mockSearchParams = {};
   });
 
-  it('renders accommodation as the preferences nav row', () => {
-    render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
+  });
 
-    screen.getByTestId('learning-accommodation-section-header');
-    screen.getByTestId('accommodation-link');
-    expect(screen.queryByTestId('mentor-memory-section-header')).toBeNull();
-    expect(screen.queryByTestId('mentor-memory-link')).toBeNull();
+  it('renders accommodation as the preferences nav row', () => {
+    active = renderScreen(<LearningPreferencesScreen />, {
+      profile: activeProfile,
+      routes: learnerProfileRoute(),
+    });
+
+    active.result.getByTestId('learning-accommodation-section-header');
+    active.result.getByTestId('accommodation-link');
+    expect(
+      active.result.queryByTestId('mentor-memory-section-header'),
+    ).toBeNull();
+    expect(active.result.queryByTestId('mentor-memory-link')).toBeNull();
   });
 
   it('navigates to accommodation screen when row is pressed', () => {
-    render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
+    active = renderScreen(<LearningPreferencesScreen />, {
+      profile: activeProfile,
+      routes: learnerProfileRoute(),
+    });
 
-    fireEvent.press(screen.getByTestId('accommodation-link'));
+    fireEvent.press(active.result.getByTestId('accommodation-link'));
 
     expect(mockPush).toHaveBeenCalledWith('/(app)/more/accommodation');
   });
 
-  it('shows the active accommodation mode name on the row', () => {
-    mockLearnerProfile = { accommodationMode: 'short-burst' };
-    render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
+  it('shows the active accommodation mode name on the row', async () => {
+    active = renderScreen(<LearningPreferencesScreen />, {
+      profile: activeProfile,
+      routes: learnerProfileRoute('short-burst'),
+    });
 
-    expect(screen.getByText('Short-Burst'));
+    await active.result.findByText('Short-Burst');
   });
 
   describe('child mode (childProfileId query param)', () => {
-    const childProfile = {
-      id: 'child-1',
-      displayName: 'Emma',
-      isOwner: false,
-      birthYear: 2015,
-    };
-
     beforeEach(() => {
       mockSearchParams = { childProfileId: 'child-1' };
-      mockProfiles = [mockActiveProfile, childProfile];
     });
 
     it("shows the child's name in the screen title", () => {
-      render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
+      active = renderScreen(<LearningPreferencesScreen />, {
+        profile: activeProfile,
+        profiles: [activeProfile, childProfile],
+        routes: learnerProfileRoute(),
+      });
 
-      expect(screen.getByText("Emma's learning preferences")).toBeTruthy();
+      expect(
+        active.result.getByText("Emma's learning preferences"),
+      ).toBeTruthy();
     });
 
     it('navigates to accommodation screen with childProfileId when row is pressed', () => {
-      render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
+      active = renderScreen(<LearningPreferencesScreen />, {
+        profile: activeProfile,
+        profiles: [activeProfile, childProfile],
+        routes: learnerProfileRoute(),
+      });
 
-      fireEvent.press(screen.getByTestId('accommodation-link'));
+      fireEvent.press(active.result.getByTestId('accommodation-link'));
 
       expect(mockPush).toHaveBeenCalledWith(
         '/(app)/more/accommodation?childProfileId=child-1',

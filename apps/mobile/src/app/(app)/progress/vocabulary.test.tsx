@@ -1,5 +1,9 @@
-import { render, screen } from '@testing-library/react-native';
-import { useProgressInventory } from '../../../hooks/use-progress';
+import { waitFor } from '@testing-library/react-native';
+import {
+  renderScreen,
+  cleanupScreen,
+  ERROR_RESPONSES,
+} from '../../../test-utils/screen-render';
 import VocabularyBrowserScreen from './vocabulary';
 
 const mockReplace = jest.fn();
@@ -51,18 +55,19 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock('../../../hooks/use-progress', () => ({
-  // gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests
-  ...jest.requireActual('../../../hooks/use-progress'),
-  useProgressInventory: jest.fn(),
-}));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: mockReplace }),
 }));
 jest.mock(
-  '../../../hooks/use-navigation-contract' /* gc1-allow: hook depends on full app provider tree; stub pins canEnter for deterministic tests */,
+  '../../../hooks/use-navigation-contract' /* gc1-allow: control surface — test toggles canEnter() to assert the redirect gate; real hook depends on the full app provider tree + native useParentProxy */,
   () => ({
     useNavigationContract: () => mockUseNavigationContract(),
+    // The real useProgressInventory (now run unmocked) imports
+    // useNavigationDataScopeContract from this same module. Under the test
+    // default MODE_NAV_V1_ENABLED=false its return value is never read
+    // (the scope falls back to activeProfile.id / legacy mode), so an empty
+    // contract is sufficient to satisfy the import.
+    useNavigationDataScopeContract: () => ({}),
   }),
 );
 jest.mock('react-native-safe-area-context', () => ({
@@ -110,17 +115,24 @@ const mockInventory = {
   ],
 };
 
+function inventoryRoute(data: unknown) {
+  return { '/progress/inventory': data };
+}
+
 describe('VocabularyBrowserScreen', () => {
+  let active: ReturnType<typeof renderScreen> | null = null;
+
   beforeEach(() => {
     mockReplace.mockClear();
     mockUseNavigationContract.mockReturnValue({
       canEnter: jest.fn<boolean, [string]>(() => true),
     });
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: mockInventory,
-      isLoading: false,
-      isError: false,
-    });
+  });
+
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
   });
 
   it('redirects to /(app)/progress when contract.canEnter("progress/vocabulary") is false', () => {
@@ -130,21 +142,25 @@ describe('VocabularyBrowserScreen', () => {
     mockUseNavigationContract.mockReturnValue({
       canEnter: canEnterFalse,
     });
-    render(<VocabularyBrowserScreen />);
+    active = renderScreen(<VocabularyBrowserScreen />, {
+      routes: inventoryRoute(mockInventory),
+    });
     expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
   });
 
-  it('renders subject section and CEFR breakdown', () => {
-    render(<VocabularyBrowserScreen />);
-    screen.getByText('Spanish');
-    screen.getByText('A1');
-    screen.getByText('6 words');
-    screen.getByTestId('vocab-browser-back');
+  it('renders subject section and CEFR breakdown', async () => {
+    active = renderScreen(<VocabularyBrowserScreen />, {
+      routes: inventoryRoute(mockInventory),
+    });
+    await active.result.findByText('Spanish');
+    active.result.getByText('A1');
+    active.result.getByText('6 words');
+    active.result.getByTestId('vocab-browser-back');
   });
 
-  it('shows empty state when no vocabulary but has language subject', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: {
+  it('shows empty state when no vocabulary but has language subject', async () => {
+    active = renderScreen(<VocabularyBrowserScreen />, {
+      routes: inventoryRoute({
         ...mockInventory,
         global: { ...mockInventory.global, vocabularyTotal: 0 },
         subjects: [
@@ -159,43 +175,36 @@ describe('VocabularyBrowserScreen', () => {
             },
           },
         ],
-      },
-      isLoading: false,
-      isError: false,
+      }),
     });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-empty');
+    await active.result.findByTestId('vocab-browser-empty');
   });
 
-  it('shows no-language gate when no language subjects', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: {
+  it('shows no-language gate when no language subjects', async () => {
+    active = renderScreen(<VocabularyBrowserScreen />, {
+      routes: inventoryRoute({
         ...mockInventory,
         global: { ...mockInventory.global, vocabularyTotal: 0 },
         subjects: [],
+      }),
+    });
+    await active.result.findByTestId('vocab-browser-no-language');
+  });
+
+  it('shows error state with retry and back buttons', async () => {
+    active = renderScreen(<VocabularyBrowserScreen />, {
+      routes: {
+        '/progress/inventory': () => ERROR_RESPONSES.forbidden('Network error'),
       },
-      isLoading: false,
-      isError: false,
     });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-no-language');
+    await waitFor(() => {
+      active!.result.getByTestId('vocab-browser-error');
+    });
   });
 
-  it('shows error state with retry and back buttons', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Network error'),
-      refetch: jest.fn(),
-    });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-error');
-  });
-
-  it('shows new learner empty state when no vocab and < 4 sessions', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: {
+  it('shows new learner empty state when no vocab and < 4 sessions', async () => {
+    active = renderScreen(<VocabularyBrowserScreen />, {
+      routes: inventoryRoute({
         ...mockInventory,
         global: {
           ...mockInventory.global,
@@ -214,18 +223,15 @@ describe('VocabularyBrowserScreen', () => {
             },
           },
         ],
-      },
-      isLoading: false,
-      isError: false,
+      }),
     });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-new-learner');
-    screen.getByText('Your vocabulary will grow here');
+    await active.result.findByTestId('vocab-browser-new-learner');
+    active.result.getByText('Your vocabulary will grow here');
   });
 
-  it('shows standard empty state when no vocab and >= 4 sessions', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: {
+  it('shows standard empty state when no vocab and >= 4 sessions', async () => {
+    active = renderScreen(<VocabularyBrowserScreen />, {
+      routes: inventoryRoute({
         ...mockInventory,
         global: {
           ...mockInventory.global,
@@ -244,12 +250,9 @@ describe('VocabularyBrowserScreen', () => {
             },
           },
         ],
-      },
-      isLoading: false,
-      isError: false,
+      }),
     });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-empty');
-    expect(screen.queryByTestId('vocab-browser-new-learner')).toBeNull();
+    await active.result.findByTestId('vocab-browser-empty');
+    expect(active.result.queryByTestId('vocab-browser-new-learner')).toBeNull();
   });
 });
