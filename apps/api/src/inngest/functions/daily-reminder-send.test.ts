@@ -64,6 +64,22 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
 
+jest.mock(
+  '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
+  () => ({
+    profiles: { id: 'profiles.id', archivedAt: 'profiles.archivedAt' },
+  }),
+);
+
+jest.mock(
+  'drizzle-orm' /* gc1-allow: isolates drizzle-orm from unit test */,
+  () => ({
+    and: jest.fn(),
+    eq: jest.fn(),
+    isNull: jest.fn(),
+  }),
+);
+
 import { dailyReminderSend } from './daily-reminder-send';
 
 async function executeHandler(
@@ -81,12 +97,19 @@ async function executeHandler(
 }
 
 describe('dailyReminderSend', () => {
-  const mockDb = { query: {} };
+  const mockDb = {
+    query: {
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
+    },
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
     mockSendPushNotification.mockResolvedValue({
       sent: true,
@@ -181,6 +204,24 @@ describe('dailyReminderSend', () => {
       });
     });
   });
+
+  it('[WI-86] skips stale send events for archived profiles', async () => {
+    mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
+
+    const { result } = await executeHandler({
+      profileId: 'p-archived',
+      streakDays: 3,
+    });
+
+    expect(mockGetRecentNotificationCount).not.toHaveBeenCalled();
+    expect(mockFormatDailyReminderBody).not.toHaveBeenCalled();
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 'skipped',
+      reason: 'profile_archived',
+      profileId: 'p-archived',
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -204,12 +245,19 @@ describe('[FIX-INNGEST-4] daily-reminder-send idempotency', () => {
 // ---------------------------------------------------------------------------
 
 describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
-  const mockDb = { query: {} };
+  const mockDb = {
+    query: {
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
+    },
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
 
@@ -266,12 +314,19 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
 // ---------------------------------------------------------------------------
 
 describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure — fail closed', () => {
-  const mockDb = { query: {} };
+  const mockDb = {
+    query: {
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
+    },
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
 

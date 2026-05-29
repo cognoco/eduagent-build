@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (profileId comes from the send event; handler only revalidates active profile state before pushing)
 // ---------------------------------------------------------------------------
 // Daily Reminder Send — Handles a single app/daily-reminder.send event,
 // formats a streak-based message, and sends a push notification.
@@ -5,6 +6,8 @@
 
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+import { profiles } from '@eduagent/database';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   formatDailyReminderBody,
   sendPushNotification,
@@ -33,6 +36,18 @@ export const dailyReminderSend = inngest.createFunction(
 
     const result = await step.run('send-daily-reminder', async () => {
       const db = getStepDatabase();
+
+      const activeProfile = await db.query.profiles.findFirst({
+        where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
+        columns: { id: true },
+      });
+      if (!activeProfile) {
+        return {
+          status: 'skipped' as const,
+          reason: 'profile_archived',
+          profileId,
+        };
+      }
 
       // [BUG-699-FOLLOWUP] 24h notification-log dedup. Inngest's idempotency
       // key (event.id) covers exact-duplicate events within 24h, but an

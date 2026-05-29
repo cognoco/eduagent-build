@@ -235,6 +235,9 @@ jest.mock(
 );
 
 const mockGetSnapshotsInRange = jest.fn().mockResolvedValue([]);
+const mockFilterProgressMetricsToActiveSubjects = jest.fn(
+  async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
+);
 
 jest.mock(
   '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion — drives CURRENT/PREVIOUS snapshot pair via mockResolvedValueOnce ordering; integration sibling covers real DB path */,
@@ -244,11 +247,11 @@ jest.mock(
     ) as typeof import('../../services/snapshot-aggregation');
     return {
       ...actual,
-      filterProgressMetricsToActiveSubjects: async (
-        _db: unknown,
-        _profileId: unknown,
+      filterProgressMetricsToActiveSubjects: (
+        db: unknown,
+        profileId: unknown,
         metrics: unknown,
-      ) => metrics,
+      ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
       getSnapshotsInRange: (...args: unknown[]) =>
         mockGetSnapshotsInRange(...args),
     };
@@ -510,6 +513,9 @@ beforeEach(() => {
     null,
   );
   mockGetSnapshotsInRange.mockResolvedValue([]);
+  mockFilterProgressMetricsToActiveSubjects.mockImplementation(
+    async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
+  );
   mockOnConflictDoNothing.mockResolvedValue(undefined);
   mockListEligibleSelfReportProfileIds.mockResolvedValue([]);
 });
@@ -898,6 +904,44 @@ describe('monthlyReportGenerate', () => {
         expect.objectContaining({
           totals: expect.objectContaining({ activitiesCompleted: 0 }),
         }),
+      );
+    });
+
+    it('[WI-86] generates monthly reports from active-subject-filtered cached metrics', async () => {
+      const filteredCurrentMetrics = {
+        ...SAMPLE_METRICS,
+        totalSessions: 1,
+        subjects: [],
+      };
+      const filteredPreviousMetrics = {
+        ...SAMPLE_METRICS,
+        totalSessions: 0,
+        subjects: [],
+      };
+      mockFilterProgressMetricsToActiveSubjects
+        .mockResolvedValueOnce(filteredCurrentMetrics)
+        .mockResolvedValueOnce(filteredPreviousMetrics);
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenNthCalledWith(
+        1,
+        mockMonthlyReportDb,
+        'child-001',
+        SAMPLE_METRICS,
+      );
+      expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenNthCalledWith(
+        2,
+        mockMonthlyReportDb,
+        'child-001',
+        SAMPLE_METRICS,
+      );
+      expect(mockGenerateMonthlyReportData).toHaveBeenCalledWith(
+        'Emma',
+        expect.any(String),
+        filteredCurrentMetrics,
+        filteredPreviousMetrics,
+        expect.anything(),
       );
     });
 

@@ -105,14 +105,17 @@ jest.mock(
 
 const mockGetLatestSnapshot = jest.fn().mockResolvedValue(null);
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
+const mockFilterProgressMetricsToActiveSubjects = jest.fn(
+  async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
+);
 jest.mock(
   '../../services/snapshot-aggregation' /* gc1-allow: drives the CURRENT/PREVIOUS snapshot pair into the handler under fake-timer dates so the test can assert (a) the 14-day MAX_SNAPSHOT_GAP_MS clamp branch, (b) the self-report two-call ordering (mockResolvedValueOnce x2), and (c) the precise reportData persisted to weeklyReports. Hitting real progress_snapshots from this DB-less suite would require time-traveling rows that the sibling weekly-progress-push.integration.test.ts already exercises end-to-end. */,
   () => ({
-    filterProgressMetricsToActiveSubjects: async (
-      _db: unknown,
-      _profileId: unknown,
+    filterProgressMetricsToActiveSubjects: (
+      db: unknown,
+      profileId: unknown,
       metrics: unknown,
-    ) => metrics,
+    ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
     getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
     getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
       mockGetLatestSnapshotOnOrBefore(...args),
@@ -299,6 +302,9 @@ beforeEach(() => {
   mockWeeklyReportOnConflictDoNothing.mockResolvedValue(undefined);
   mockGetPracticeActivitySummary.mockResolvedValue(
     emptyPracticeActivitySummary,
+  );
+  mockFilterProgressMetricsToActiveSubjects.mockImplementation(
+    async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
   );
   mockGetLatestSnapshot.mockResolvedValue(null);
   mockGetLatestSnapshotOnOrBefore.mockResolvedValue(null);
@@ -672,6 +678,67 @@ describe('weekly progress generate practice summary', () => {
           practiceSummary: emptyPracticeActivitySummary,
         }),
       }),
+    );
+  });
+
+  it('[WI-86] generates weekly child reports from active-subject-filtered cached metrics', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+    const filteredCurrent = {
+      ...CURRENT_METRICS,
+      totalSessions: 1,
+      topicsMastered: 1,
+      vocabularyTotal: 7,
+      subjects: CURRENT_METRICS.subjects.slice(0, 1),
+    };
+    const filteredPrevious = {
+      ...PREVIOUS_METRICS,
+      totalSessions: 0,
+      topicsMastered: 0,
+      vocabularyTotal: 2,
+      subjects: [],
+    };
+    mockDb.query.familyLinks.findMany.mockResolvedValue([
+      { childProfileId: CHILD_ID },
+    ]);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ displayName: 'Alex' });
+    mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
+      pushEnabled: true,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: false,
+    });
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-13',
+      metrics: CURRENT_METRICS,
+    });
+    mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+      snapshotDate: '2026-05-06',
+      metrics: PREVIOUS_METRICS,
+    });
+    mockFilterProgressMetricsToActiveSubjects
+      .mockResolvedValueOnce(filteredCurrent)
+      .mockResolvedValueOnce(filteredPrevious);
+
+    const result = await executeGenerateSteps({ parentId: PARENT_ID });
+
+    expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
+    expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenNthCalledWith(
+      1,
+      mockDb,
+      CHILD_ID,
+      CURRENT_METRICS,
+    );
+    expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenNthCalledWith(
+      2,
+      mockDb,
+      CHILD_ID,
+      PREVIOUS_METRICS,
+    );
+    expect(mockGenerateWeeklyReportData).toHaveBeenCalledWith(
+      'Alex',
+      '2026-05-11',
+      filteredCurrent,
+      filteredPrevious,
+      emptyPracticeActivitySummary,
     );
   });
 
