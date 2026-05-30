@@ -171,19 +171,14 @@
         "withSessions_one": "{{memberNames}} · 今週{{count}}回",
         "withSessions_other": "{{memberNames}} · 今週{{count}}回",
         "noActivity": "{{memberNames}} · 今週のセッションなし",
-        "attentionChild": "{{childName}}さんに少し注意が必要かもしれません",
+        "attentionChild": "{{childName}}さんには今日、少し働きかけが必要かもしれません",
         "profileLimit": "{{max}}プロフィール中{{count}}使用中",
         "addProfileAction": "プロフィールを追加",
-        "addProfileAccessibilityLabel": "ファミリープロフィールを追加"
+        "addProfileAccessibilityLabel": "ファミリープロフィールを追加",
+        "whoNeedsYouHeader": "今日のサポートが必要なのは？"
       },
       "transitionNoticeTitle": "{{childNames}}のメンターになりました",
-      "snapshot": {
-        "noActivity": "今週の活動はありません",
-        "sessions_one": "今週 {{count}} セッション",
-        "sessions_other": "今週 {{count}} セッション"
-      },
       "tonight": {
-        "titleEvening": "会話のきっかけ",
         "promptWithTopic": "今週、{{topic}}で前よりわかりやすくなったことは何？",
         "promptNoActivity": "今週始めやすくするには何があったらいい？",
         "promptFallback": "前回より今週のほうが楽に感じたことは何？",
@@ -200,13 +195,53 @@
       "childrenHeader": "Children",
       "familyManagementHeader": "ファミリー管理",
       "childCard": {
-        "minutesThisWeek_one": "{{count}} min this week",
-        "minutesThisWeek_other": "{{count}} min this week",
-        "readyToStart": "Ready to start",
         "statusPending": "Checking in",
-        "progressAction": "Progress",
         "reportsAction": "レポート",
-        "nudgeAction": "Nudge"
+        "nudgeAction": "Nudge",
+        "learnTogetherAction": "一緒に学ぶ"
+      },
+      "card": {
+        "statusQuietWeek": "静かな1週間",
+        "statusJustStarting": "始めたばかり",
+        "statusActive": "今週はアクティブ",
+        "statusStreak": "{{count}}日連続ストリーク中",
+        "quietWithFocus": "{{name}}さんは静かな1週間でした。前回の重点分野は{{focus}}でした。",
+        "quietNew": "{{name}}さんの準備は万端です。選択した科目：{{subjects}}。学習を始めるためのヒントはこちら。",
+        "quietPlain": "{{name}}さんは静かな1週間でした。",
+        "headlineFromWeekly": "{{label}}: {{value}} ({{comparison}})",
+        "activePlain": "{{name}}さんは{{focus}}で順調に進めています。",
+        "activePlainNoFocus": "{{name}}さんは今週、順調に進めています。",
+        "momentumStreak": "{{count}}日連続ストリーク",
+        "momentumTopics": "+{{count}}トピック",
+        "momentumWords": "+{{count}}単語",
+        "solid": "順調：{{subjects}}",
+        "comingUp": "次の学習：{{topic}}",
+        "tryTonight": "今夜挑戦"
+      },
+      "pulse": {
+        "multiAllActive": "学習者{{count}}人、全員が今週アクティブです。",
+        "multiSomeActive": "学習者{{count}}人中、{{activeCount}}人が今週アクティブです。",
+        "multiNoneActive": "学習者{{count}}人 — 今のところ静かな1週間です。",
+        "oneActive": "{{name}}さんは今週アクティブです。",
+        "oneQuiet": "{{name}}さんにとっては静かな1週間でした。"
+      },
+      "mentorSlot": {
+        "celebrationStreak": "{{name}}さんは今週絶好調です。このストリークが習慣になりつつあります。",
+        "celebrationTopics": "{{name}}さんにとって大きな1週間でした。たくさんの新しい分野を学習しました。",
+        "worksFor": "{{name}}さんに合った学習法"
+      },
+      "learnTogether": {
+        "title": "一緒に学ぶ",
+        "subtitle": "{{name}}さんと一緒に学ぶ2つの方法",
+        "learnItYourselfHeader": "自分で学んでみる",
+        "tryTogetherHeader": "今週一緒に挑戦",
+        "emptyBody": "まだ追加する項目はありません。{{name}}さんのライブラリを閲覧して、一緒に探求する内容を選びましょう。",
+        "openLibrary": "{{name}}さんのライブラリを開く",
+        "close": "閉じる"
+      },
+      "addLearner": {
+        "title": "学習者を追加",
+        "accessibilityLabel": "家族に学習者を追加する"
       }
     },
     "goToProgress": "Go to Progress",
@@ -1716,7 +1751,7 @@
       "childProfileJoined": "{{date}}に追加",
       "learningAccommodationTitle": "{{name}}さんのための学習サポート",
       "noLearningPreferenceSet": "学習設定はまだありません",
-      "childProfileScopeHint": "進捗とレポートはそれぞれのタブにあるため、このページにはお子様固有の設定だけが表示されます。",
+      "childProfileScopeHint": "最近のセッション、科目、チューターのメモはこちらにあります。完全な進捗チャートとレポートには、それぞれ専用のタブがあります。",
       "consentTitle": "同意",
       "consentDescription": "{{name}}の保護者同意を管理します。",
       "consentStatusError": "同意ステータスを読み込めませんでした。もう一度お試しください。",

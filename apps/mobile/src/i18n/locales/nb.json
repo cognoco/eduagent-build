@@ -171,19 +171,14 @@
         "withSessions_one": "{{memberNames}} · {{count}} økt denne uken",
         "withSessions_other": "{{memberNames}} · {{count}} økter denne uken",
         "noActivity": "{{memberNames}} · ingen økter denne uken",
-        "attentionChild": "{{childName}} kan trenge oppmerksomhet",
+        "attentionChild": "{{childName}} kan trenge et lite dytt i dag",
         "profileLimit": "{{count}} av {{max}} profiler brukt",
         "addProfileAction": "Legg til profil",
-        "addProfileAccessibilityLabel": "Legg til familieprofil"
+        "addProfileAccessibilityLabel": "Legg til familieprofil",
+        "whoNeedsYouHeader": "Hvem trenger deg i dag"
       },
       "transitionNoticeTitle": "Du veileder nå {{childNames}}",
-      "snapshot": {
-        "noActivity": "Ingen aktivitet denne uken",
-        "sessions_one": "{{count}} økt denne uken",
-        "sessions_other": "{{count}} økter denne uken"
-      },
       "tonight": {
-        "titleEvening": "Samtalestartere",
         "promptWithTopic": "Hva ble tydeligere i {{topic}} denne uken?",
         "promptNoActivity": "Hva ville gjort det lett å starte denne uken?",
         "promptFallback": "Hva føltes lettere denne uken enn sist?",
@@ -200,13 +195,53 @@
       "childrenHeader": "Children",
       "familyManagementHeader": "Familieadministrasjon",
       "childCard": {
-        "minutesThisWeek_one": "{{count}} min this week",
-        "minutesThisWeek_other": "{{count}} min this week",
-        "readyToStart": "Ready to start",
         "statusPending": "Checking in",
-        "progressAction": "Progress",
         "reportsAction": "Rapporter",
-        "nudgeAction": "Nudge"
+        "nudgeAction": "Nudge",
+        "learnTogetherAction": "Lær sammen"
+      },
+      "card": {
+        "statusQuietWeek": "Rolig uke",
+        "statusJustStarting": "Har akkurat startet",
+        "statusActive": "Aktiv denne uken",
+        "statusStreak": "{{count}}-dagers streak",
+        "quietWithFocus": "{{name}} hadde en roligere uke – forrige gang var fokuset {{focus}}.",
+        "quietNew": "{{name}} er klar – valgte emner: {{subjects}}. Slik kan du hjelpe til med å komme i gang.",
+        "quietPlain": "{{name}} hadde en roligere uke.",
+        "headlineFromWeekly": "{{label}}: {{value}} ({{comparison}})",
+        "activePlain": "{{name}} holdt det gående i {{focus}}.",
+        "activePlainNoFocus": "{{name}} holdt det gående denne uken.",
+        "momentumStreak": "{{count}}-dagers streak",
+        "momentumTopics": "+{{count}} emner",
+        "momentumWords": "+{{count}} ord",
+        "solid": "Solid: {{subjects}}",
+        "comingUp": "Neste: {{topic}}",
+        "tryTonight": "Prøv i kveld"
+      },
+      "pulse": {
+        "multiAllActive": "{{count}} elever, alle aktive denne uken.",
+        "multiSomeActive": "{{count}} elever, {{activeCount}} aktive denne uken.",
+        "multiNoneActive": "{{count}} elever – en roligere uke så langt.",
+        "oneActive": "{{name}} har vært aktiv denne uken.",
+        "oneQuiet": "En roligere uke for {{name}}."
+      },
+      "mentorSlot": {
+        "celebrationStreak": "{{name}} er i skikkelig siget denne uken – den streaken er i ferd med å bli en vane.",
+        "celebrationTopics": "Stor uke for {{name}} – mye nytt terreng er dekket.",
+        "worksFor": "Hva som fungerer for {{name}}"
+      },
+      "learnTogether": {
+        "title": "Lær sammen",
+        "subtitle": "To måter å lære på sammen med {{name}}",
+        "learnItYourselfHeader": "Lær det selv",
+        "tryTogetherHeader": "Prøv sammen denne uken",
+        "emptyBody": "Ingenting å legge til ennå. Bla gjennom {{name}}s bibliotek for å velge noe å utforske sammen.",
+        "openLibrary": "Åpne {{name}}s bibliotek",
+        "close": "Lukk"
+      },
+      "addLearner": {
+        "title": "Legg til elev",
+        "accessibilityLabel": "Legg til en elev i familien din"
       }
     },
     "goToProgress": "Go to Progress",
@@ -1716,7 +1751,7 @@
       "childProfileJoined": "Lagt til {{date}}",
       "learningAccommodationTitle": "Læringstilpasning for {{name}}",
       "noLearningPreferenceSet": "Ingen læringspreferanse er satt",
-      "childProfileScopeHint": "Fremgang og rapporter ligger i egne faner, så denne siden viser bare barnespesifikke innstillinger.",
+      "childProfileScopeHint": "Nylige økter, emner og veilederens notater finner du her. Fullstendige fremdriftsdiagrammer og rapporter har egne faner.",
       "consentTitle": "Samtykke",
       "consentDescription": "Administrer foreldresamtykke for {{name}}.",
       "consentStatusError": "Kunne ikke laste samtykkestatus. Prøv igjen.",

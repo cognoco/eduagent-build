@@ -171,19 +171,14 @@
         "withSessions_one": "{{memberNames}} · {{count}} Sitzung diese Woche",
         "withSessions_other": "{{memberNames}} · {{count}} Sitzungen diese Woche",
         "noActivity": "{{memberNames}} · keine Sitzungen diese Woche",
-        "attentionChild": "{{childName}} braucht vielleicht Aufmerksamkeit",
+        "attentionChild": "{{childName}} könnte heute einen Anstoß gebrauchen",
         "profileLimit": "{{count}} von {{max}} Profilen verwendet",
         "addProfileAction": "Profil hinzufügen",
-        "addProfileAccessibilityLabel": "Familienprofil hinzufügen"
+        "addProfileAccessibilityLabel": "Familienprofil hinzufügen",
+        "whoNeedsYouHeader": "Wer braucht dich heute"
       },
       "transitionNoticeTitle": "Du begleitest jetzt {{childNames}}",
-      "snapshot": {
-        "noActivity": "Keine Aktivität diese Woche",
-        "sessions_one": "{{count}} Sitzung diese Woche",
-        "sessions_other": "{{count}} Sitzungen diese Woche"
-      },
       "tonight": {
-        "titleEvening": "Gesprächseinstiege",
         "promptWithTopic": "Was wurde bei {{topic}} diese Woche klarer?",
         "promptNoActivity": "Was würde es diese Woche leichter machen, anzufangen?",
         "promptFallback": "Was hat sich diese Woche leichter angefühlt als beim letzten Mal?",
@@ -200,13 +195,53 @@
       "childrenHeader": "Children",
       "familyManagementHeader": "Familienverwaltung",
       "childCard": {
-        "minutesThisWeek_one": "{{count}} min this week",
-        "minutesThisWeek_other": "{{count}} min this week",
-        "readyToStart": "Ready to start",
         "statusPending": "Checking in",
-        "progressAction": "Progress",
         "reportsAction": "Berichte",
-        "nudgeAction": "Nudge"
+        "nudgeAction": "Nudge",
+        "learnTogetherAction": "Gemeinsam lernen"
+      },
+      "card": {
+        "statusQuietWeek": "Ruhige Woche",
+        "statusJustStarting": "Fängt gerade erst an",
+        "statusActive": "Diese Woche aktiv",
+        "statusStreak": "{{count}}-Tage-Streak",
+        "quietWithFocus": "{{name}} hatte eine ruhigere Woche – zuletzt lag der Fokus auf {{focus}}.",
+        "quietNew": "{{name}} ist startklar – gewählte Fächer: {{subjects}}. So kannst du beim Einstieg helfen.",
+        "quietPlain": "{{name}} hatte eine ruhigere Woche.",
+        "headlineFromWeekly": "{{label}}: {{value}} ({{comparison}})",
+        "activePlain": "{{name}} hat bei {{focus}} Fortschritte gemacht.",
+        "activePlainNoFocus": "{{name}} war diese Woche fleißig.",
+        "momentumStreak": "{{count}}-Tage-Streak",
+        "momentumTopics": "+{{count}} Themen",
+        "momentumWords": "+{{count}} Wörter",
+        "solid": "Solide: {{subjects}}",
+        "comingUp": "Als Nächstes: {{topic}}",
+        "tryTonight": "Heute Abend testen"
+      },
+      "pulse": {
+        "multiAllActive": "{{count}} Lernende, alle diese Woche aktiv.",
+        "multiSomeActive": "{{count}} Lernende, {{activeCount}} diese Woche aktiv.",
+        "multiNoneActive": "{{count}} Lernende – bisher eine ruhigere Woche.",
+        "oneActive": "{{name}} war diese Woche aktiv.",
+        "oneQuiet": "Eine ruhigere Woche für {{name}}."
+      },
+      "mentorSlot": {
+        "celebrationStreak": "{{name}} hat diese Woche einen echten Lauf – dieser Streak wird zur Gewohnheit.",
+        "celebrationTopics": "Große Woche für {{name}} – viele neue Themen behandelt.",
+        "worksFor": "Was für {{name}} funktioniert"
+      },
+      "learnTogether": {
+        "title": "Gemeinsam lernen",
+        "subtitle": "Zwei Wege, um gemeinsam mit {{name}} zu lernen",
+        "learnItYourselfHeader": "Lerne es selbst",
+        "tryTogetherHeader": "Diese Woche gemeinsam testen",
+        "emptyBody": "Noch nichts hinzuzufügen. Durchsuche die Bibliothek von {{name}}, um etwas zum gemeinsamen Entdecken auszuwählen.",
+        "openLibrary": "Bibliothek von {{name}} öffnen",
+        "close": "Schließen"
+      },
+      "addLearner": {
+        "title": "Lernenden hinzufügen",
+        "accessibilityLabel": "Lernenden zu deiner Familie hinzufügen"
       }
     },
     "goToProgress": "Go to Progress",
@@ -1716,7 +1751,7 @@
       "childProfileJoined": "Hinzugefügt {{date}}",
       "learningAccommodationTitle": "Lernanpassung für {{name}}",
       "noLearningPreferenceSet": "Keine Lernpräferenz festgelegt",
-      "childProfileScopeHint": "Fortschritt und Berichte befinden sich in eigenen Tabs, daher enthält diese Seite nur kindbezogene Einstellungen.",
+      "childProfileScopeHint": "Hier findest du die letzten Sitzungen, Fächer und die Notizen des Tutors. Vollständige Fortschrittsdiagramme und Berichte haben eigene Tabs.",
       "consentTitle": "Zustimmung",
       "consentDescription": "Verwalte die elterliche Zustimmung für {{name}}.",
       "consentStatusError": "Zustimmungsstatus konnte nicht geladen werden. Bitte versuche es erneut.",

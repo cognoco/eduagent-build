@@ -124,6 +124,7 @@ interface RouteOptions {
   subscriptionTier?: 'free' | 'plus' | 'family' | 'pro';
   family?: { profileCount: number; maxProfiles: number } | null;
   childCapNotifications?: ChildCapNotificationFixture[];
+  recaps?: unknown[];
 }
 
 /**
@@ -168,6 +169,8 @@ function buildRoutes(opts: RouteOptions = {}) {
         ? new Response(JSON.stringify({ message: 'none' }), { status: 404 })
         : { family },
     '/subscription': subscriptionResponse(opts.subscriptionTier ?? 'family'),
+    // useRecaps fires for the parent feed; default to an empty list.
+    '/recaps': { recaps: opts.recaps ?? [] },
   };
 }
 
@@ -261,11 +264,16 @@ describe('ParentHomeScreen', () => {
 
     result.getByTestId('parent-home-check-child-child-a');
     result.getByTestId('parent-home-check-child-child-b');
-    result.getByTestId('parent-home-child-progress-child-a');
+    result.getByTestId('parent-home-learn-together-child-a');
+    result.getByTestId('parent-home-learn-together-child-b');
     result.getByTestId('parent-home-weekly-report-child-a');
     result.getByTestId('parent-home-weekly-report-child-b');
     result.getByTestId('parent-home-send-nudge-child-a');
     result.getByTestId('parent-home-send-nudge-child-b');
+    // The Progress button is gone — Progress lives on the overview + tab now.
+    expect(
+      result.queryByTestId('parent-home-child-progress-child-a'),
+    ).toBeNull();
     result.getByText('Children');
     result.getByText('Your family');
     result.getByTestId('parent-home-family-summary');
@@ -278,14 +286,12 @@ describe('ParentHomeScreen', () => {
     expect(result.queryByTestId('child-accommodation-row-child-b')).toBeNull();
   });
 
-  it('routes the child card header to the child quick progress screen', async () => {
+  it('routes the child card header to the child overview (no mode)', async () => {
     const { result } = mount([PARENT, CHILD_A]);
     await waitForParentTransitionNotice(result);
 
     fireEvent.press(result.getByTestId('parent-home-check-child-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith(
-      '/(app)/child/child-a?mode=progress',
-    );
+    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a');
   });
 
   it('routes the child initial to child profile settings', async () => {
@@ -298,14 +304,36 @@ describe('ParentHomeScreen', () => {
     );
   });
 
-  it('routes the progress action to the child quick progress screen', async () => {
-    const { result } = mount([PARENT, CHILD_A]);
+  it('opens the Learn-together sheet from the card action (no Progress button)', async () => {
+    const { result } = mount([PARENT, CHILD_A], {
+      dashboard: {
+        children: [
+          dashboardChild({
+            profileId: 'child-a',
+            displayName: 'Emma',
+            sessionsThisWeek: 2,
+            currentlyWorkingOn: ['Fractions'],
+            totalSessions: 4,
+          }),
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
+    });
     await waitForParentTransitionNotice(result);
 
-    fireEvent.press(result.getByTestId('parent-home-child-progress-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith(
-      '/(app)/child/child-a?mode=progress',
-    );
+    expect(
+      result.queryByTestId('parent-home-child-progress-child-a'),
+    ).toBeNull();
+    result.getByTestId('parent-home-learn-together-child-a');
+    expect(result.queryByTestId('learn-together-sheet')).toBeNull();
+
+    fireEvent.press(result.getByTestId('parent-home-learn-together-child-a'));
+
+    await waitFor(() => {
+      result.getByTestId('learn-together-sheet');
+    });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('does not render duplicate recent activity or own learning actions', async () => {
@@ -372,7 +400,7 @@ describe('ParentHomeScreen', () => {
     });
   });
 
-  it('shows conversation prompts inside the child card with compact status from dashboard data', async () => {
+  it('renders the mentor-briefing card body (headline, solid line, one starter) from dashboard data', async () => {
     const { result } = mount([PARENT, CHILD_A], {
       dashboard: {
         children: [
@@ -406,82 +434,39 @@ describe('ParentHomeScreen', () => {
     });
     await waitForParentTransitionNotice(result);
 
+    // Mentor-voice headline replaces the old "focus · activity" snapshot.
     await waitFor(() => {
-      result.getByTestId('parent-home-child-prompts-child-a');
+      result.getByTestId('parent-home-child-headline-child-a');
     });
+    expect(
+      result.getByTestId('parent-home-child-headline-child-a').props.children,
+    ).toBe('Emma kept things moving in Fractions.');
+    // Right-aligned status word.
+    expect(
+      result.getByTestId('parent-home-child-status-child-a').props.children,
+    ).toBe('Active this week');
+    // Positive-only "Solid" line — Math is strong.
+    expect(
+      result.getByTestId('parent-home-child-solid-child-a').props.children,
+    ).toBe('Solid: Math');
 
-    expect(result.queryByTestId('parent-home-tonight-section')).toBeNull();
-    result.getByText('Conversation starters');
-    result.getByText('What felt clearer in Fractions this week?');
-    result.getByText("What's the trickiest part of Fractions right now?");
-    result.getByText('Want to pick one small Fractions goal for this week?');
+    // Exactly ONE starter — the old three-prompt block is gone.
     expect(
-      result.queryByText('Emma: What felt clearer in Fractions this week?'),
+      result.queryByTestId('parent-home-child-prompts-child-a'),
     ).toBeNull();
-    expect(result.queryByText('What made Fractions click today?')).toBeNull();
-    expect(result.queryByText('What should we focus on tomorrow?')).toBeNull();
-    const promptCardStyles = [
-      resolvedStyle(result, 'parent-home-tonight-child-a-active-focus'),
-      resolvedStyle(result, 'parent-home-tonight-child-a-trickiest'),
-      resolvedStyle(result, 'parent-home-tonight-child-a-next-goal'),
-    ];
-    promptCardStyles.forEach((style) => {
-      expect(style).toEqual(
-        expect.objectContaining({
-          backgroundColor: expect.any(String),
-          borderColor: expect.any(String),
-          borderRadius: 16,
-          borderWidth: 1,
-          minHeight: 48,
-        }),
-      );
-      expect(style.borderColor).toMatch(/^#[0-9a-f]{8}$/i);
-      expect(style.elevation).toBeUndefined();
-    });
+    result.getByTestId('parent-home-tonight-child-a-starter');
     expect(
-      new Set(promptCardStyles.map((style) => style.backgroundColor)).size,
-    ).toBe(1);
-    expect(resolvedStyle(result, 'parent-home-check-child-child-a')).toEqual(
-      expect.objectContaining({
-        shadowColor: expect.any(String),
-      }),
-    );
-    const childAccent = resolvedStyle(result, 'parent-home-check-child-child-a')
-      .shadowColor as string;
-    const promptBorder = resolvedStyle(
-      result,
-      'parent-home-tonight-child-a-active-focus',
-    ).borderColor as string;
-    expect(promptBorder.toLowerCase()).toMatch(
-      new RegExp(`^${childAccent.toLowerCase()}`),
-    );
+      result.queryByTestId('parent-home-tonight-child-a-trickiest'),
+    ).toBeNull();
     expect(
-      result.getByTestId('parent-home-tonight-child-a-active-focus').props
-        .accessibilityRole,
-    ).toBeUndefined();
-    expect(
-      resolvedStyle(result, 'parent-home-tonight-icon-child-a-active-focus'),
-    ).toEqual(
-      expect.objectContaining({
-        backgroundColor: expect.any(String),
-        borderColor: expect.any(String),
-        borderWidth: 1,
-        height: 28,
-        width: 28,
-      }),
-    );
-    const promptTextStyle = resolvedStyle(
-      result,
-      'parent-home-tonight-text-child-a-active-focus',
-    );
-    expect(promptTextStyle).toEqual(
-      expect.objectContaining({
-        fontSize: 14,
-        fontWeight: '400',
-        lineHeight: 20,
-      }),
-    );
-    expect(promptTextStyle.backgroundColor).toBeUndefined();
+      result.queryByTestId('parent-home-tonight-child-a-next-goal'),
+    ).toBeNull();
+    result.getByText('What felt clearer in Fractions this week?');
+
+    // The old compact "focus · activity" snapshot is no longer rendered.
+    expect(result.queryByText('Fractions · 18 min this week')).toBeNull();
+
+    // Card border style preserved (per-child accent).
     expect(resolvedStyle(result, 'parent-home-child-card-child-a')).toEqual(
       expect.objectContaining({
         borderColor: expect.any(String),
@@ -491,14 +476,33 @@ describe('ParentHomeScreen', () => {
     expect(
       resolvedStyle(result, 'parent-home-child-card-child-a').borderColor,
     ).toMatch(/^#[0-9a-f]{8}$/i);
-    expect(
-      result.getAllByText('Fractions · 18 min this week').length,
-    ).toBeGreaterThan(0);
-    result.getByText('Emma · 18 min this week');
-    result.getByText('2 of 5 profiles used');
   });
 
-  it('uses restart prompts when a child has a focus but no activity this week', async () => {
+  it('shows the household pulse subtitle when children are active', async () => {
+    const { result } = mount([PARENT, CHILD_A, CHILD_B], {
+      dashboard: {
+        children: [
+          dashboardChild({ profileId: 'child-a', sessionsThisWeek: 3 }),
+          dashboardChild({ profileId: 'child-b', sessionsThisWeek: 1 }),
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
+    });
+    await waitForParentTransitionNotice(result);
+
+    await waitFor(() => {
+      result.getByText('2 learners, all active this week.');
+    });
+  });
+
+  it('falls back to the greeting subtitle when there are no children', () => {
+    const { result } = mount([PARENT]);
+    const pulse = result.getByTestId('parent-home-pulse').props.children;
+    expect(String(pulse)).not.toMatch(/active this week|learners/i);
+  });
+
+  it('shows a quiet-state card with one restart starter when a child has a focus but no activity', async () => {
     const { result } = mount([PARENT, CHILD_A], {
       dashboard: {
         children: [
@@ -531,45 +535,52 @@ describe('ParentHomeScreen', () => {
     });
     await waitForParentTransitionNotice(result);
 
+    // Quiet headline + status word.
     await waitFor(() => {
-      result.getByText(
-        'Want to pick one small Programming goal for this week?',
-      );
+      result.getByTestId('parent-home-child-headline-child-a');
     });
-    result.getByText("What's the trickiest part of Programming right now?");
-    result.getByText('Should we make Programming easier to restart?');
-    expect(result.queryByText('What made Programming click today?')).toBeNull();
     expect(
-      result.queryByText('What felt clearer in Programming this week?'),
+      result.getByTestId('parent-home-child-headline-child-a').props.children,
+    ).toBe('Emma had a quieter week — last time the focus was Programming.');
+    expect(
+      result.getByTestId('parent-home-child-status-child-a').props.children,
+    ).toBe('Quiet week');
+
+    // Exactly one restart starter — not the three-prompt fan-out.
+    result.getByText('Want to pick one small Programming goal for this week?');
+    expect(
+      result.queryByText("What's the trickiest part of Programming right now?"),
+    ).toBeNull();
+    expect(
+      result.queryByText('Should we make Programming easier to restart?'),
+    ).toBeNull();
+    // Quiet state hides the Solid / Coming-up block.
+    expect(result.queryByTestId('parent-home-child-solid-child-a')).toBeNull();
+    expect(
+      result.queryByTestId('parent-home-child-comingup-child-a'),
     ).toBeNull();
   });
 
-  it('keeps the family summary focused on child activity', async () => {
+  it('replaces the family panel with a mentor slot + add-learner row for a single child', async () => {
     const { result } = mount([PARENT, CHILD_A], {
       dashboard: {
         children: [
           dashboardChild({
             profileId: 'child-a',
             displayName: 'Emma',
-            summary: 'Emma is building confidence.',
             sessionsThisWeek: 2,
-            sessionsLastWeek: 1,
-            totalTimeThisWeek: 18,
-            totalTimeLastWeek: 8,
-            exchangesThisWeek: 10,
-            exchangesLastWeek: 5,
-            trend: 'up',
-            subjects: [
-              {
-                subjectId: 'subject-a',
-                name: 'Math',
-                retentionStatus: 'strong',
-              },
-            ],
-            guidedVsImmediateRatio: 0.5,
-            retentionTrend: 'improving',
             totalSessions: 4,
-            currentlyWorkingOn: ['Fractions'],
+            progress: {
+              snapshotDate: '2026-05-29',
+              topicsMastered: 4,
+              vocabularyTotal: 20,
+              minutesThisWeek: 30,
+              weeklyDeltaTopicsMastered: 1,
+              weeklyDeltaVocabularyTotal: 2,
+              weeklyDeltaTopicsExplored: 1,
+              engagementTrend: 'increasing',
+              guidance: 'Short sessions land best for Emma.',
+            },
           }),
         ],
         pendingNotices: [],
@@ -578,13 +589,16 @@ describe('ParentHomeScreen', () => {
     });
     await waitForParentTransitionNotice(result);
 
+    // One child: no family summary panel.
+    expect(result.queryByTestId('parent-home-family-summary')).toBeNull();
+    // Mentor slot surfaces the dashboard guidance; add-learner row is present.
     await waitFor(() => {
-      result.getByText('Emma · 18 min this week');
+      result.getByTestId('parent-home-mentor-slot-guidance');
     });
-    result.getByText('2 of 5 profiles used');
-    expect(result.queryByText('You + Emma')).toBeNull();
+    result.getByText('Short sessions land best for Emma.');
+    result.getByTestId('parent-home-add-child');
+    // No parent-learning leak.
     expect(result.queryByText('You: Fractions in Math')).toBeNull();
-    expect(result.queryByText('You lead by example.')).toBeNull();
   });
 
   it('shows one activity-based prompt inside each child card when multiple children are linked', async () => {
@@ -623,35 +637,28 @@ describe('ParentHomeScreen', () => {
     await waitForParentTransitionNotice(result);
 
     await waitFor(() => {
-      result.getByTestId('parent-home-tonight-child-a-active-focus');
+      result.getByTestId('parent-home-tonight-child-a-starter');
     });
+    // Each card carries exactly one starter (testID `${childId}-starter`).
     const emmaPrompt = result.getByTestId(
-      'parent-home-tonight-child-a-active-focus',
+      'parent-home-tonight-child-a-starter',
     );
     const liamPrompt = result.getByTestId(
-      'parent-home-tonight-child-b-restart',
+      'parent-home-tonight-child-b-starter',
     );
-    result.getByTestId('parent-home-child-prompts-child-a');
-    result.getByTestId('parent-home-child-prompts-child-b');
     result.getByText('What felt clearer in Math this week?');
     result.getByText('What would make starting feel easy this week?');
+    // The old 3-prompt block testIDs no longer exist.
     expect(
-      result.queryByTestId('parent-home-tonight-child-a-trickiest'),
-    ).toBeNull();
-    expect(
-      result.queryByTestId('parent-home-tonight-child-b-restart-easier'),
+      result.queryByTestId('parent-home-child-prompts-child-a'),
     ).toBeNull();
     expect(
       result.queryByText('Emma: What felt clearer in Math this week?'),
     ).toBeNull();
     expect(
-      result.queryByText('Liam: What would make starting feel easy this week?'),
-    ).toBeNull();
-    expect(
-      resolvedStyle(result, 'parent-home-tonight-child-a-active-focus')
-        .borderColor,
+      resolvedStyle(result, 'parent-home-tonight-child-a-starter').borderColor,
     ).not.toBe(
-      resolvedStyle(result, 'parent-home-tonight-child-b-restart').borderColor,
+      resolvedStyle(result, 'parent-home-tonight-child-b-starter').borderColor,
     );
     expect(
       resolvedStyle(result, 'parent-home-check-child-child-a').shadowColor,
@@ -660,7 +667,10 @@ describe('ParentHomeScreen', () => {
     );
     expect(emmaPrompt).toBeTruthy();
     expect(liamPrompt).toBeTruthy();
-    result.getByText('Liam may need attention');
+    // Attention row is reworded to positive framing under a "who needs you" header.
+    result.getByText('Who needs you today');
+    result.getByText('Liam could use a nudge today');
+    expect(result.queryByText('Liam may need attention')).toBeNull();
   });
 
   it('shows ParentTransitionNotice after at least one child is linked', async () => {

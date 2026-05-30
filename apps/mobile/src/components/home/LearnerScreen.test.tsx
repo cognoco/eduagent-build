@@ -560,9 +560,7 @@ describe('LearnerScreen', () => {
       screen.getByTestId('parent-home-screen');
       screen.getByTestId('parent-home-check-child-child-id');
       screen.getByText('Children');
-      expect(
-        screen.getAllByText('Ready to start · 24 min this week').length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText('Active this week').length).toBeGreaterThan(0);
     });
   });
 
