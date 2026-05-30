@@ -25,6 +25,8 @@
 
 | File | Date | Scope |
 |---|---|---|
+| [2026-05-29-improve-codebase-architecture.md](2026-05-29-improve-codebase-architecture.md) | 2026-05-29 | Deepening opportunities (shallow→deep module consolidation for testability & AI-navigability). 11 candidates across API tutoring engine, mobile navigation, route/schema seams. Recommended start: #1–#3, #5, #6. Companion to the mined root `CONTEXT.md`. |
+| [2026-05-29-improve-codebase-architecture.md](2026-05-29-improve-codebase-architecture.md) | 2026-05-29 | Deepening opportunities (shallow→deep module consolidation for testability & AI-navigability). 11 candidates across API tutoring engine, mobile navigation, route/schema seams. Recommended start: #1–#3, #5, #6. Companion to the mined root `CONTEXT.md`. |
 | [2026-05-29-architecture-audit.md](2026-05-29-architecture-audit.md) | 2026-05-29 | Whole-monorepo architecture review (module complexity, silent failures, type-safety gaps, test-coverage holes, LLM-friendliness). Headline: untested billing/quota tier. |
 | [2026-05-08-web-e2e-full-suite-bug-ledger.md](2026-05-08-web-e2e-full-suite-bug-ledger.md) | 2026-05-08 | Web E2E full-suite bug ledger. |
 | [2026-05-11-end-user-playwright-bug-pass.md](2026-05-11-end-user-playwright-bug-pass.md) | 2026-05-11 | Seeded end-user Playwright bug pass. |
