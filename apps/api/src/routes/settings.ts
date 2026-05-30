@@ -158,18 +158,12 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   )
 
   .get('/settings/withdrawal-archive', async (c) => {
+    // [audit-2026-05-30] Use the same gate helper as the PUT below + the
+    // sibling /settings/celebration-level branch to avoid drift if the
+    // owner predicate ever changes (an inline isOwner read could be quietly
+    // removed by a future refactor thinking it's duplicative).
+    assertOwnerProfile(c);
     const { db, profileId } = withProfile(c);
-
-    // I5: mirror the PUT endpoint's owner gate — only account owners may read
-    // the withdrawal-archive preference.
-    const profile = await db.query.profiles.findFirst({
-      where: (t, { eq: eqFn }) => eqFn(t.id, profileId),
-      columns: { isOwner: true },
-    });
-    if (!profile?.isOwner) {
-      return forbidden(c);
-    }
-
     const value = await getWithdrawalArchivePreference(db, profileId);
     return c.json(
       getWithdrawalArchivePreferenceResponseSchema.parse({ value }),

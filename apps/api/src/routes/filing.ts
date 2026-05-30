@@ -91,7 +91,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       if (!claimed) {
         const fresh = await getSession(db, profileId, sessionId);
         if (!fresh) return notFound(c, 'Session not found');
-        if (fresh.filingRetryCount >= 3) {
+        if ((fresh.filingRetryCount ?? 0) >= 3) {
           throw new RateLimitedError(
             'Retry limit reached for this session.',
             ERROR_CODES.RATE_LIMITED,
