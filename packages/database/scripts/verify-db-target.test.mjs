@@ -133,12 +133,13 @@ test('deploy.yml passes DATABASE_URL_STAGING_HOST and DATABASE_URL_PRODUCTION_HO
   );
 });
 
-test('deploy.yml runs verify-db-target before migrations in the api-deploy job', () => {
-  // Order matters: the verification step must precede baseline-migrations.mjs
-  // and drizzle-kit migrate inside the api-deploy job, otherwise it would log
-  // mismatches AFTER the damage is already done. (The api-quality-gate job
-  // also runs drizzle-kit migrate, but against an ephemeral PG service — that
-  // ordering is irrelevant to BUG-782.)
+test('deploy.yml runs verify-db-target before drizzle-kit migrate in the api-deploy job', () => {
+  // Order matters: the verification step must precede drizzle-kit migrate
+  // inside the api-deploy job, otherwise it would log mismatches AFTER the
+  // damage is already done. baseline-migrations.mjs is intentionally NOT in
+  // the normal deploy workflow (see deploy-baseline-guard.test.ts WI-84/DS-008).
+  // (The api-quality-gate job also runs drizzle-kit migrate, but against an
+  // ephemeral PG service — that ordering is irrelevant to BUG-782.)
   const yml = readFileSync(DEPLOY_YML, 'utf8');
   const apiDeployStart = yml.indexOf('\n  api-deploy:');
   assert.ok(apiDeployStart >= 0, 'api-deploy job not found in deploy.yml');
@@ -148,11 +149,13 @@ test('deploy.yml runs verify-db-target before migrations in the api-deploy job',
   const apiDeployBlock = yml.slice(apiDeployStart, apiDeployEnd);
 
   const verifyIdx = apiDeployBlock.indexOf('verify-db-target.mjs');
-  const baselineIdx = apiDeployBlock.indexOf('baseline-migrations.mjs');
   const migrateIdx = apiDeployBlock.indexOf('drizzle-kit migrate');
   assert.ok(verifyIdx >= 0, 'verify-db-target.mjs step missing from api-deploy job');
-  assert.ok(baselineIdx >= 0, 'baseline-migrations.mjs step missing from api-deploy job');
   assert.ok(migrateIdx >= 0, 'drizzle-kit migrate step missing from api-deploy job');
-  assert.ok(verifyIdx < baselineIdx, 'verify-db-target must run before baseline-migrations');
   assert.ok(verifyIdx < migrateIdx, 'verify-db-target must run before drizzle-kit migrate');
+  assert.equal(
+    apiDeployBlock.indexOf('baseline-migrations.mjs'),
+    -1,
+    'baseline-migrations.mjs must not be in the normal deploy workflow (DS-008)',
+  );
 });
