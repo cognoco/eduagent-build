@@ -594,6 +594,45 @@ describe('bookGenerationResultSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('rejects broad type with duplicate book titles (case/whitespace-insensitive)', () => {
+    const books = Array.from(
+      { length: MIN_GENERATED_SUBJECT_BOOKS },
+      (_, i) => ({
+        title: `Book ${i + 1}`,
+        description: 'A textbook description without dates or stats',
+        emoji: '📖',
+        sortOrder: i + 1,
+      }),
+    );
+    // Make the second book a normalized duplicate of the first.
+    books[1] = { ...books[1]!, title: '  book 1 ' };
+
+    const result = bookGenerationResultSchema.safeParse({
+      type: 'broad',
+      books,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects narrow type with duplicate topic titles (case/whitespace-insensitive)', () => {
+    const topics = Array.from(
+      { length: MIN_GENERATED_SUBJECT_TOPICS },
+      (_, i) => ({
+        title: `Topic ${i + 1}`,
+        description: 'A topic description without dates or stats',
+        relevance: 'core' as const,
+        estimatedMinutes: 30,
+      }),
+    );
+    topics[1] = { ...topics[1]!, title: 'TOPIC 1' };
+
+    const result = bookGenerationResultSchema.safeParse({
+      type: 'narrow',
+      topics,
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
