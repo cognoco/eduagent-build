@@ -967,7 +967,9 @@
       "errorTitle": "Noe gikk galt",
       "timeoutTitle": "Venter fortsatt…",
       "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen."
-    }
+    },
+    "lastStudied": "Sist studert {{when}}",
+    "neverStudied": "Aldri studert"
   },
   "subject": {
     "settings": {

@@ -161,7 +161,7 @@ describe('test-keys', () => {
       const jwk = TEST_JWKS.keys[0];
 
       await expect(
-        verifyJWT(token, jwk, { issuer: 'https://clerk.test' })
+        verifyJWT(token, jwk, { issuer: 'https://clerk.test' }),
       ).rejects.toThrow('token has expired');
     });
 
@@ -170,7 +170,7 @@ describe('test-keys', () => {
       const jwk = TEST_JWKS.keys[0];
 
       await expect(
-        verifyJWT(token, jwk, { issuer: 'https://clerk.test' })
+        verifyJWT(token, jwk, { issuer: 'https://clerk.test' }),
       ).rejects.toThrow('issuer mismatch');
     });
 
@@ -213,7 +213,7 @@ describe('fetch-interceptor', () => {
 
   it('throws on unmatched URLs', async () => {
     await expect(fetch('https://unknown-service.com/api')).rejects.toThrow(
-      '[fetch-interceptor] Unexpected fetch to: GET https://unknown-service.com/api'
+      '[fetch-interceptor] Unexpected fetch to: GET https://unknown-service.com/api',
     );
   });
 
@@ -236,7 +236,7 @@ describe('fetch-interceptor', () => {
   it('first matching handler wins', async () => {
     addFetchHandler('api.test', () => jsonResponse({ match: 'first' }));
     addFetchHandler('api.test/specific', () =>
-      jsonResponse({ match: 'second' })
+      jsonResponse({ match: 'second' }),
     );
 
     const res = await fetch('https://api.test/specific/path');
@@ -278,7 +278,7 @@ describe('fetch-interceptor', () => {
     clearFetchHandlers();
 
     await expect(fetch('https://willclear.test/api')).rejects.toThrow(
-      'Unexpected fetch'
+      'Unexpected fetch',
     );
   });
 
@@ -302,6 +302,31 @@ describe('fetch-interceptor', () => {
     const calls = getFetchCalls('no-handler.test');
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('https://no-handler.test/path');
+  });
+
+  // BUG-396: a per-suite afterAll calling restoreFetch() used to wipe handlers
+  // registered by setup.ts (Neon passthrough, Clerk JWKS), silently breaking
+  // later suites that re-installed expecting those base handlers to still be
+  // wired. install/restore are now refcounted: a nested restoreFetch() only
+  // decrements; the interceptor and its handlers persist until the OUTERMOST
+  // restore.
+  it('restoreFetch is refcounted — nested restore preserves shared handlers (BUG-396)', async () => {
+    // Outer install (representing the setup.ts-level interceptor).
+    installFetchInterceptor();
+    addFetchHandler('shared.test', () => jsonResponse({ scope: 'outer' }));
+
+    // Inner suite installs again, registers its own handler, then tears down.
+    installFetchInterceptor();
+    addFetchHandler('inner.test', () => jsonResponse({ scope: 'inner' }));
+    restoreFetch();
+
+    // After the nested restore, the OUTER handler must still be reachable.
+    const res = await fetch('https://shared.test/x');
+    expect(await res.json()).toEqual({ scope: 'outer' });
+
+    // Balance the outer install with a final restore so we leave the suite
+    // back at the depth this describe inherited (1, from describe.beforeAll).
+    restoreFetch();
   });
 });
 
@@ -403,7 +428,7 @@ describe('external-mocks', () => {
     it('setDefault permanently changes the response', async () => {
       const handle = mockVoyageAI();
       handle.setDefault(() =>
-        jsonResponse({ data: [{ embedding: [1, 2, 3] }], model: 'custom' })
+        jsonResponse({ data: [{ embedding: [1, 2, 3] }], model: 'custom' }),
       );
 
       const res1 = await fetch('https://api.voyageai.com/v1/embeddings');
@@ -429,7 +454,7 @@ describe('external-mocks', () => {
         fetch('https://api.voyageai.com/v1/embeddings', { method: 'POST' }),
         fetch(
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=test',
-          { method: 'POST' }
+          { method: 'POST' },
         ),
       ]);
 
@@ -473,7 +498,7 @@ describe('external-mocks', () => {
       } = require('../../apps/api/src/middleware/jwt');
 
       const jwks = await realFetchJWKS(
-        'https://clerk.test/.well-known/jwks.json'
+        'https://clerk.test/.well-known/jwks.json',
       );
       expect(jwks.keys).toHaveLength(1);
 

@@ -31,6 +31,12 @@ function isNeonUrl(url: string): boolean {
 
 let _pool: InstanceType<typeof import('pg').Pool> | null = null;
 
+// gc1-allow: CI pg-driver shim — @eduagent/database's createDatabase() returns
+// a Neon HTTP driver client that cannot speak to the local PostgreSQL container
+// CI runs. There is no production code path we could exercise instead; the
+// Neon HTTP driver is fundamentally unavailable in the Node test environment.
+// We jest.requireActual() the rest of the module and only override
+// createDatabase() to swap in a standard `pg` client for non-Neon URLs.
 jest.mock('@eduagent/database', () => {
   const actual = jest.requireActual('@eduagent/database');
   let driverLogged = false;

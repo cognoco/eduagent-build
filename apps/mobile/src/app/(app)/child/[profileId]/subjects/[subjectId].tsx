@@ -317,7 +317,7 @@ export default function SubjectTopicsScreen() {
             </Text>
             {subjectSessions.slice(0, 5).map((session) => {
               const durationSeconds =
-                session.wallClockSeconds ?? session.durationSeconds;
+                session.durationSeconds ?? session.wallClockSeconds;
               const duration =
                 getDurationParts(durationSeconds).unit === 'none'
                   ? null

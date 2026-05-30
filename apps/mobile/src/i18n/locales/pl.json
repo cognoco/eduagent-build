@@ -992,7 +992,9 @@
       "errorTitle": "Coś poszło nie tak",
       "timeoutTitle": "Wciąż czekam…",
       "timeoutMessage": "Wysłanie odpowiedzi trwa dłużej niż zwykle. Sprawdź połączenie i spróbuj ponownie."
-    }
+    },
+    "lastStudied": "Ostatnia nauka {{when}}",
+    "neverStudied": "Nigdy nie studiowano"
   },
   "subject": {
     "settings": {

@@ -142,7 +142,7 @@ export function RecentSessionsList({
             ) : null}
             <Text className="text-caption text-text-secondary">
               {durationLabel(
-                session.wallClockSeconds ?? session.durationSeconds,
+                session.durationSeconds ?? session.wallClockSeconds,
               )}
             </Text>
           </Pressable>

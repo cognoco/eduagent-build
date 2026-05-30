@@ -1032,6 +1032,8 @@
     }
   },
   "topic": {
+    "lastStudied": "Last studied {{when}}",
+    "neverStudied": "Never studied",
     "relevance": {
       "recommended": "Recommended",
       "contemporary": "Contemporary",

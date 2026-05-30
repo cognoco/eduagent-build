@@ -364,7 +364,13 @@ describe('PickBookScreen', () => {
     result.getByTestId('pick-book-custom-input');
   });
 
-  it('keeps blocking error state for not-found suggestions errors', async () => {
+  it('keeps manual entry available when suggestions return 404', async () => {
+    // Previously this case dead-ended the screen on the assumption that a
+    // 404 always meant the subject itself was gone. In practice the topup
+    // route can return 404 / "no longer exists" for transient LLM failures,
+    // and even when the subject is genuinely missing the filing call will
+    // surface its own per-attempt alert. Falling through to inline error +
+    // manual entry matches the UX-Resilience rule: never strand the user.
     mockFetch.setRoute('/book-suggestions', () =>
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Subject not found' }), {
@@ -376,10 +382,12 @@ describe('PickBookScreen', () => {
     const { result } = renderPickBook();
 
     await waitFor(() => {
-      result.getByTestId('pick-book-error');
+      result.getByTestId('pick-book-suggestions-inline-error');
     });
-    result.getByText('Go Back');
-    result.getByTestId('pick-book-back-button');
+    expect(result.queryByTestId('pick-book-error')).toBeNull();
+    result.getByText('Suggestions did not load');
+    result.getByTestId('pick-book-inline-retry');
+    result.getByTestId('pick-book-custom-input');
   });
 
   it('auto-opens custom input when suggestions are empty', async () => {

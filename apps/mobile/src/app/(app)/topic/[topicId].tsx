@@ -391,8 +391,8 @@ export default function TopicDetailScreen() {
     getMostRecentSessionCreatedAt(topicSessions) ??
     null;
   const lastStudiedText = lastReviewedAt
-    ? `Last studied ${relativeDate(lastReviewedAt)}`
-    : 'Never studied';
+    ? t('topic.lastStudied', { when: relativeDate(lastReviewedAt) })
+    : t('topic.neverStudied');
   const sessionsSummary = formatSessionsSummary(topicSessions);
   const topicBookmarks = useMemo(
     () =>

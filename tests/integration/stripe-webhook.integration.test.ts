@@ -23,7 +23,14 @@ import { clearFetchCalls } from './fetch-interceptor';
 const mockVerifyWebhookSignature = jest.fn();
 
 jest.mock(
-  '../../apps/api/src/services/stripe' /* gc1-allow: pattern-a conversion */,
+  // gc1-allow: verifyWebhookSignature wraps Stripe's constructEvent() which
+  // requires a real STRIPE_WEBHOOK_SECRET and signing-key cryptography to
+  // accept a payload — neither is available in the test environment. We
+  // jest.requireActual() the rest of the wrapper and only swap
+  // verifyWebhookSignature so tests can drive the route with synthetic
+  // events. TODO: evaluate Stripe.createFetchHttpClient() once we hand-roll
+  // an HMAC fixture that constructEvent() will accept.
+  '../../apps/api/src/services/stripe',
   () => {
     const actual = jest.requireActual(
       '../../apps/api/src/services/stripe',

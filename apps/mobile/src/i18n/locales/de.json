@@ -967,7 +967,9 @@
       "errorTitle": "Etwas ist schiefgelaufen",
       "timeoutTitle": "Noch am Warten…",
       "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal."
-    }
+    },
+    "lastStudied": "Zuletzt gelernt {{when}}",
+    "neverStudied": "Nie gelernt"
   },
   "subject": {
     "settings": {

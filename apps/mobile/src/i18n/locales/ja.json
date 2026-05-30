@@ -967,7 +967,9 @@
       "errorTitle": "問題が発生しました",
       "timeoutTitle": "まだ待機中…",
       "timeoutMessage": "回答の送信に時間がかかっています。接続を確認してもう一度お試しください。"
-    }
+    },
+    "lastStudied": "最終学習：{{when}}",
+    "neverStudied": "未学習"
   },
   "subject": {
     "settings": {
