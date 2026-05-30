@@ -182,6 +182,7 @@ export const retentionCardSchema = z.object({
   lastReviewedAt: isoDateField.nullable(),
   daysSinceLastReview: z.number().int().min(0).nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']),
+  masteredAt: isoDateField.nullable().optional(),
   failureCount: z.number().int(),
   evaluateDifficultyRung: z.number().int().min(1).max(4).nullable().optional(),
 });

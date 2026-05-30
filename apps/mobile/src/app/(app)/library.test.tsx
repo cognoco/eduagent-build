@@ -174,12 +174,16 @@ type OverallProgress = {
     topicsTotal?: number;
     topicsCompleted?: number;
     topicsVerified?: number;
+    topicsMastered?: number;
+    topicsLearning?: number;
     urgencyScore?: number;
     retentionStatus?: string;
     lastSessionAt?: string | null;
   }>;
   totalTopicsCompleted?: number;
   totalTopicsVerified?: number;
+  totalTopicsMastered?: number;
+  totalTopicsLearning?: number;
 };
 
 type RetentionPayload = {
@@ -245,6 +249,8 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
     subjects: [],
     totalTopicsCompleted: 0,
     totalTopicsVerified: 0,
+    totalTopicsMastered: 0,
+    totalTopicsLearning: 0,
   };
   const retentionBody = opts.retention ?? { subjects: [] };
 
@@ -560,6 +566,8 @@ describe('LibraryScreen', () => {
             topicsTotal: 12,
             topicsCompleted: 3,
             topicsVerified: 1,
+            topicsMastered: 1,
+            topicsLearning: 2,
             urgencyScore: 0,
             retentionStatus: 'fading',
             lastSessionAt: null,
@@ -588,6 +596,8 @@ describe('LibraryScreen', () => {
               topicsTotal: 12,
               topicsCompleted: 3,
               topicsVerified: 1,
+              topicsMastered: 1,
+              topicsLearning: 2,
             },
           ],
         },
@@ -611,6 +621,8 @@ describe('LibraryScreen', () => {
               topicsTotal: 0,
               topicsCompleted: 0,
               topicsVerified: 0,
+              topicsMastered: 0,
+              topicsLearning: 0,
             },
           ],
         },
@@ -633,6 +645,8 @@ describe('LibraryScreen', () => {
               topicsTotal: 8,
               topicsCompleted: 8,
               topicsVerified: 8,
+              topicsMastered: 8,
+              topicsLearning: 0,
             },
           ],
         },
@@ -660,12 +674,16 @@ describe('LibraryScreen', () => {
               topicsTotal: 5,
               topicsCompleted: 0,
               topicsVerified: 0,
+              topicsMastered: 0,
+              topicsLearning: 0,
             },
             {
               subjectId: 'sub-mid',
               topicsTotal: 10,
               topicsCompleted: 4,
               topicsVerified: 2,
+              topicsMastered: 2,
+              topicsLearning: 2,
             },
           ],
         },
@@ -1118,6 +1136,8 @@ describe('LibraryScreen', () => {
               topicsTotal: 5,
               topicsCompleted: 2,
               topicsVerified: 2,
+              topicsMastered: 2,
+              topicsLearning: 0,
             },
           ],
         },

@@ -68,6 +68,8 @@ function makeOverviewResponse(totalTopicsCompleted: number) {
     subjects: [],
     totalTopicsCompleted,
     totalTopicsVerified: 0,
+    totalTopicsMastered: 0,
+    totalTopicsLearning: 0,
   };
 }
 

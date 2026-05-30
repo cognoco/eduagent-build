@@ -435,6 +435,15 @@ const validBook = {
 };
 
 describe('curriculumBookSchema', () => {
+  it('accepts only schedule states for book progress status', () => {
+    for (const status of ['NOT_STARTED', 'IN_PROGRESS', 'REVIEW_DUE']) {
+      expect(bookProgressStatusSchema.parse(status)).toBe(status);
+    }
+
+    expect(bookProgressStatusSchema.safeParse('COMPLETED').success).toBe(false);
+    expect(bookProgressStatusSchema.safeParse('UNKNOWN').success).toBe(false);
+  });
+
   it('accepts a valid book', () => {
     const parsed = curriculumBookSchema.parse(validBook);
     expect(parsed.title).toBe('Algebra Book');
@@ -452,8 +461,12 @@ describe('curriculumBookSchema', () => {
       status: 'IN_PROGRESS',
       topicCount: 10,
       completedTopicCount: 3,
+      masteredTopicCount: 2,
+      masteredAt: ISO,
     });
     expect(parsed.status).toBe('IN_PROGRESS');
+    expect(parsed.masteredTopicCount).toBe(2);
+    expect(parsed.masteredAt).toBe(ISO);
   });
 
   it('rejects invalid bookProgressStatus', () => {

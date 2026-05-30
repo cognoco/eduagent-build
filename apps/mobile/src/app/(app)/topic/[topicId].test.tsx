@@ -119,6 +119,9 @@ const DEFAULT_TOPIC_PROGRESS = {
   summaryExcerpt: null,
   xpStatus: null,
   retentionStatus: null,
+  masteredAt: null,
+  strongReviews: 0,
+  strongReviewsTarget: 5,
 };
 
 const DEFAULT_RETENTION_CARD = {
@@ -128,6 +131,7 @@ const DEFAULT_RETENTION_CARD = {
   easeFactor: 2.5,
   nextReviewAt: null,
   lastReviewedAt: null,
+  masteredAt: null,
   intervalDays: 1,
   xpStatus: 'pending',
 };

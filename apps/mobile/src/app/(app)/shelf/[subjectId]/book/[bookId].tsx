@@ -628,6 +628,18 @@ export default function BookScreen() {
     retentionTopicsQuery.data,
   ]);
 
+  const masteredTopicIds = useMemo((): Set<string> => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const bookTopicIds = new Set(activeTopics.map((topic) => topic.id));
+    const ids = new Set<string>();
+    for (const rt of retentionTopics) {
+      if (rt.masteredAt != null && bookTopicIds.has(rt.topicId)) {
+        ids.add(rt.topicId);
+      }
+    }
+    return ids;
+  }, [activeTopics, retentionTopicsQuery.data]);
+
   // --- Book-level retention status (derived from completed topics) ---
   const bookRetentionStatus = useMemo((): RetentionStatus | null => {
     const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
@@ -665,6 +677,27 @@ export default function BookScreen() {
     }
     return ids;
   }, [sessions, topicStudiedIds]);
+
+  const learningTopicIds = useMemo((): Set<string> => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const ids = new Set<string>(topicStudiedIds);
+    for (const session of sessions) {
+      if (session.topicId) ids.add(session.topicId);
+    }
+    for (const rt of retentionTopics) {
+      if (activeTopicIds.has(rt.topicId)) ids.add(rt.topicId);
+    }
+    for (const id of masteredTopicIds) {
+      ids.delete(id);
+    }
+    return ids;
+  }, [
+    activeTopicIds,
+    masteredTopicIds,
+    retentionTopicsQuery.data,
+    sessions,
+    topicStudiedIds,
+  ]);
 
   const continueNowTopicId = useMemo((): string | null => {
     const candidates = [...sessions]
@@ -1603,17 +1636,44 @@ export default function BookScreen() {
             <View className="mt-3">
               <View className="h-1.5 overflow-hidden rounded-full bg-surface-elevated">
                 <View
-                  className="h-full rounded-full bg-success"
+                  className="h-full rounded-full"
                   style={{
+                    position: 'absolute',
+                    left: 0,
+                    backgroundColor: themeColors.success,
                     width: `${Math.min(
                       100,
-                      (doneTopics.length / activeTopics.length) * 100,
+                      (masteredTopicIds.size / activeTopics.length) * 100,
                     )}%`,
                   }}
+                  testID="book-progress-mastered-bar"
+                />
+                <View
+                  className="h-full rounded-full"
+                  style={{
+                    position: 'absolute',
+                    left: `${Math.min(
+                      100,
+                      (masteredTopicIds.size / activeTopics.length) * 100,
+                    )}%`,
+                    backgroundColor: withOpacity(themeColors.success, 0.38),
+                    width: `${Math.min(
+                      100,
+                      (learningTopicIds.size / activeTopics.length) * 100,
+                    )}%`,
+                  }}
+                  testID="book-progress-learning-bar"
                 />
               </View>
-              <Text className="mt-1 text-caption text-text-secondary">
-                {doneTopics.length} of {activeTopics.length} topics finished
+              <Text
+                className="mt-1 text-caption text-text-secondary"
+                testID="book-topic-progress-text"
+              >
+                {t('library.book.topicProgressThreeState', {
+                  mastered: masteredTopicIds.size,
+                  learning: learningTopicIds.size,
+                  total: activeTopics.length,
+                })}
               </Text>
             </View>
           ) : null}

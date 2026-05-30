@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react-native';
 import { TopicHeader } from './TopicHeader';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock,
+);
+
 describe('TopicHeader', () => {
   it('renders the topic name', () => {
     render(
@@ -103,6 +108,38 @@ describe('TopicHeader', () => {
     );
     screen.getByText('This topic covers');
     screen.getByText('Chlorophyll, sunlight, carbon dioxide, and glucose.');
+  });
+
+  it('renders strong review progress when a retention card exists', () => {
+    render(
+      <TopicHeader
+        name="Photosynthesis"
+        chapter={null}
+        retentionStatus="strong"
+        strongReviews={3}
+        strongReviewsTarget={5}
+        lastStudiedText="Last studied 3 days ago"
+      />,
+    );
+
+    screen.getByTestId('topic-strong-reviews');
+    screen.getByText('3/5 strong reviews');
+  });
+
+  it('renders mastered when the topic has sticky mastery', () => {
+    render(
+      <TopicHeader
+        name="Photosynthesis"
+        chapter={null}
+        retentionStatus="strong"
+        strongReviews={5}
+        strongReviewsTarget={5}
+        masteredAt="2026-05-30T00:00:00.000Z"
+        lastStudiedText="Last studied 3 days ago"
+      />,
+    );
+
+    screen.getByText('Mastered');
   });
 
   it('does not render the topic coverage card when description is empty', () => {

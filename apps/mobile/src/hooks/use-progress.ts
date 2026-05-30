@@ -138,12 +138,16 @@ export interface OverallProgressResponse {
     topicsTotal: number;
     topicsCompleted: number;
     topicsVerified: number;
+    topicsMastered: number;
+    topicsLearning: number;
     urgencyScore: number;
     retentionStatus: 'strong' | 'fading' | 'weak' | 'forgotten';
     lastSessionAt: string | null;
   }[];
   totalTopicsCompleted: number;
   totalTopicsVerified: number;
+  totalTopicsMastered: number;
+  totalTopicsLearning: number;
   practiceActivityCount?: number;
   practiceSummary?: ReportPracticeSummary;
 }

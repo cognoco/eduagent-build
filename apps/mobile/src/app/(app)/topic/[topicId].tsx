@@ -723,6 +723,9 @@ export default function TopicDetailScreen() {
               retentionStatus={topicProgress.retentionStatus ?? null}
               daysSinceLastReview={topicProgress.daysSinceLastReview}
               lastStudiedText={lastStudiedText}
+              strongReviews={topicProgress.strongReviews}
+              strongReviewsTarget={topicProgress.strongReviewsTarget}
+              masteredAt={topicProgress.masteredAt}
             />
 
             {/* Signal 2: Challenge-verified badge */}

@@ -257,6 +257,7 @@ function mapBookRow(row: typeof curriculumBooks.$inferSelect): CurriculumBook {
     emoji: row.emoji ?? null,
     sortOrder: row.sortOrder,
     topicsGenerated: row.topicsGenerated,
+    masteredAt: row.masteredAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -423,18 +424,23 @@ export async function ensureCurriculum(
 interface BookProgress {
   status: BookProgressStatus;
   completedTopicCount: number;
+  masteredTopicCount: number;
+  masteredAt: string | null;
   completedTopicIds: string[];
 }
 
 async function computeBookStatus(
   db: Database,
   profileId: string,
+  book: { id: string; masteredAt: Date | null },
   topicIds: string[],
 ): Promise<BookProgress> {
   if (topicIds.length === 0) {
     return {
       status: 'NOT_STARTED',
       completedTopicCount: 0,
+      masteredTopicCount: 0,
+      masteredAt: book.masteredAt?.toISOString() ?? null,
       completedTopicIds: [],
     };
   }
@@ -487,6 +493,7 @@ async function computeBookStatus(
 
   const completedTopicIds = new Set<string>();
   const startedTopicIds = new Set<string>();
+  const masteredTopicIds = new Set<string>();
   for (const row of sessionRows) {
     addTopicCompletion(startedTopicIds, row.topicId);
     if (isMeaningfulCompletedSession(row)) {
@@ -495,42 +502,40 @@ async function computeBookStatus(
   }
   for (const assessment of assessmentRows) {
     addTopicCompletion(completedTopicIds, assessment.topicId);
+    addTopicCompletion(startedTopicIds, assessment.topicId);
   }
   for (const card of retentionRows) {
+    addTopicCompletion(startedTopicIds, card.topicId);
     if (card.xpStatus === 'verified') {
       addTopicCompletion(completedTopicIds, card.topicId);
+    }
+    if (card.masteredAt != null) {
+      addTopicCompletion(masteredTopicIds, card.topicId);
     }
   }
   for (const row of acceptedSummaryRows) {
     if (isAcceptedSummaryStatus(row.summaryStatus)) {
       addTopicCompletion(completedTopicIds, row.topicId);
+      addTopicCompletion(startedTopicIds, row.topicId);
     }
-  }
-
-  if (completedTopicIds.size === 0) {
-    return {
-      status: startedTopicIds.size > 0 ? 'IN_PROGRESS' : 'NOT_STARTED',
-      completedTopicCount: 0,
-      completedTopicIds: [],
-    };
-  }
-
-  if (completedTopicIds.size < topicIds.length) {
-    return {
-      status: 'IN_PROGRESS',
-      completedTopicCount: completedTopicIds.size,
-      completedTopicIds: [...completedTopicIds],
-    };
   }
 
   const now = Date.now();
   const hasReviewDue = retentionRows.some(
     (row) => row.nextReviewAt && row.nextReviewAt.getTime() <= now,
   );
+  const hasTouchedTopic =
+    startedTopicIds.size > 0 || completedTopicIds.size > 0;
 
   return {
-    status: hasReviewDue ? 'REVIEW_DUE' : 'COMPLETED',
+    status: hasReviewDue
+      ? 'REVIEW_DUE'
+      : hasTouchedTopic
+        ? 'IN_PROGRESS'
+        : 'NOT_STARTED',
     completedTopicCount: completedTopicIds.size,
+    masteredTopicCount: masteredTopicIds.size,
+    masteredAt: book.masteredAt?.toISOString() ?? null,
     completedTopicIds: [...completedTopicIds],
   };
 }
@@ -543,6 +548,7 @@ async function computeBookStatusesBatch(
   db: Database,
   profileId: string,
   topicsByBook: Map<string, string[]>,
+  bookMasteredAtById: Map<string, Date | null>,
 ): Promise<Map<string, BookProgress>> {
   const results = new Map<string, BookProgress>();
 
@@ -554,6 +560,8 @@ async function computeBookStatusesBatch(
       results.set(bookId, {
         status: 'NOT_STARTED',
         completedTopicCount: 0,
+        masteredTopicCount: 0,
+        masteredAt: bookMasteredAtById.get(bookId)?.toISOString() ?? null,
         completedTopicIds: [],
       });
       continue;
@@ -620,6 +628,7 @@ async function computeBookStatusesBatch(
   // Group started/completed topic IDs by book
   const startedByBook = new Map<string, Set<string>>();
   const completedByBook = new Map<string, Set<string>>();
+  const masteredByBook = new Map<string, Set<string>>();
   const addStartedByBook = (topicId: string | null | undefined) => {
     if (!topicId) return;
     const bookId = topicToBook.get(topicId);
@@ -636,6 +645,14 @@ async function computeBookStatusesBatch(
     set.add(topicId);
     completedByBook.set(bookId, set);
   };
+  const addMasteredByBook = (topicId: string | null | undefined) => {
+    if (!topicId) return;
+    const bookId = topicToBook.get(topicId);
+    if (!bookId) return;
+    const set = masteredByBook.get(bookId) ?? new Set<string>();
+    set.add(topicId);
+    masteredByBook.set(bookId, set);
+  };
 
   for (const row of sessionRows) {
     addStartedByBook(row.topicId);
@@ -643,59 +660,45 @@ async function computeBookStatusesBatch(
   }
   for (const assessment of assessmentRows) {
     addCompletedByBook(assessment.topicId);
+    addStartedByBook(assessment.topicId);
   }
   for (const card of retentionRows) {
+    addStartedByBook(card.topicId);
     if (card.xpStatus === 'verified') addCompletedByBook(card.topicId);
+    if (card.masteredAt != null) addMasteredByBook(card.topicId);
   }
   for (const row of acceptedSummaryRows) {
     if (isAcceptedSummaryStatus(row.summaryStatus)) {
       addCompletedByBook(row.topicId);
+      addStartedByBook(row.topicId);
     }
   }
-
-  // Classify books: NOT_STARTED, IN_PROGRESS, or fully-completed (needs retention check)
-  const fullyCompletedTopicIds: string[] = [];
-  const fullyCompletedBooks = new Set<string>();
-  for (const [bookId, topicIds] of topicsByBook) {
-    if (results.has(bookId)) continue; // already set (empty topics)
-    const completed = completedByBook.get(bookId);
-    if (!completed || completed.size === 0) {
-      const started = startedByBook.get(bookId);
-      results.set(bookId, {
-        status: started && started.size > 0 ? 'IN_PROGRESS' : 'NOT_STARTED',
-        completedTopicCount: 0,
-        completedTopicIds: [],
-      });
-    } else if (completed.size < topicIds.length) {
-      results.set(bookId, {
-        status: 'IN_PROGRESS',
-        completedTopicCount: completed.size,
-        completedTopicIds: [...completed],
-      });
-    } else {
-      fullyCompletedBooks.add(bookId);
-      for (const tid of topicIds) fullyCompletedTopicIds.push(tid);
-    }
-  }
-
-  if (fullyCompletedBooks.size === 0) return results;
 
   const now = Date.now();
   const reviewDueByBook = new Set<string>();
   for (const row of retentionRows) {
-    if (!fullyCompletedTopicIds.includes(row.topicId)) continue;
     if (row.topicId && row.nextReviewAt && row.nextReviewAt.getTime() <= now) {
-      const bookId = topicToBook.get(row.topicId as string);
+      const bookId = topicToBook.get(row.topicId);
       if (bookId) reviewDueByBook.add(bookId);
     }
   }
 
-  for (const bookId of fullyCompletedBooks) {
-    const topicIds = topicsByBook.get(bookId) ?? [];
+  for (const bookId of topicsByBook.keys()) {
+    if (results.has(bookId)) continue; // already set (empty topics)
+    const completed = completedByBook.get(bookId) ?? new Set<string>();
+    const mastered = masteredByBook.get(bookId) ?? new Set<string>();
+    const started = startedByBook.get(bookId) ?? new Set<string>();
+    const hasTouchedTopic = started.size > 0 || completed.size > 0;
     results.set(bookId, {
-      status: reviewDueByBook.has(bookId) ? 'REVIEW_DUE' : 'COMPLETED',
-      completedTopicCount: topicIds.length,
-      completedTopicIds: [...(completedByBook.get(bookId) ?? [])],
+      status: reviewDueByBook.has(bookId)
+        ? 'REVIEW_DUE'
+        : hasTouchedTopic
+          ? 'IN_PROGRESS'
+          : 'NOT_STARTED',
+      completedTopicCount: completed.size,
+      masteredTopicCount: mastered.size,
+      masteredAt: bookMasteredAtById.get(bookId)?.toISOString() ?? null,
+      completedTopicIds: [...completed],
     });
   }
 
@@ -960,6 +963,7 @@ export async function getBooks(
       status: 'NOT_STARTED' as const,
       topicCount: 0,
       completedTopicCount: 0,
+      masteredTopicCount: 0,
     }));
   }
 
@@ -985,12 +989,22 @@ export async function getBooks(
     topicsByBook.set(t.bookId, existing);
   }
 
-  const statusMap = await computeBookStatusesBatch(db, profileId, topicsByBook);
+  const bookMasteredAtById = new Map(
+    rows.map((book) => [book.id, book.masteredAt] as const),
+  );
+  const statusMap = await computeBookStatusesBatch(
+    db,
+    profileId,
+    topicsByBook,
+    bookMasteredAtById,
+  );
 
   return rows.map((book) => {
     const progress = statusMap.get(book.id) ?? {
       status: 'NOT_STARTED' as const,
       completedTopicCount: 0,
+      masteredTopicCount: 0,
+      masteredAt: book.masteredAt?.toISOString() ?? null,
       completedTopicIds: [],
     };
     return {
@@ -998,6 +1012,8 @@ export async function getBooks(
       status: progress.status,
       topicCount: (topicsByBook.get(book.id) ?? []).length,
       completedTopicCount: progress.completedTopicCount,
+      masteredTopicCount: progress.masteredTopicCount,
+      masteredAt: progress.masteredAt,
     };
   });
 }
@@ -1206,7 +1222,15 @@ export async function getAllProfileBooks(
   // 3. Reuse the existing batch-status helper — it already operates over a
   // pre-grouped Map<bookId, topicIds>, so passing the cross-subject map gives
   // us the same one-shot retention join that getBooks() does per subject.
-  const statusMap = await computeBookStatusesBatch(db, profileId, topicsByBook);
+  const bookMasteredAtById = new Map(
+    bookRows.map((book) => [book.id, book.masteredAt] as const),
+  );
+  const statusMap = await computeBookStatusesBatch(
+    db,
+    profileId,
+    topicsByBook,
+    bookMasteredAtById,
+  );
 
   // Group books back by subjectId, preserving original order from the SQL
   // ORDER BY clause (sortOrder, createdAt).
@@ -1220,6 +1244,8 @@ export async function getAllProfileBooks(
     const progress = statusMap.get(book.id) ?? {
       status: 'NOT_STARTED' as const,
       completedTopicCount: 0,
+      masteredTopicCount: 0,
+      masteredAt: book.masteredAt?.toISOString() ?? null,
       completedTopicIds: [],
     };
     list.push({
@@ -1227,6 +1253,8 @@ export async function getAllProfileBooks(
       status: progress.status,
       topicCount: (topicsByBook.get(book.id) ?? []).length,
       completedTopicCount: progress.completedTopicCount,
+      masteredTopicCount: progress.masteredTopicCount,
+      masteredAt: progress.masteredAt,
     });
   }
 
@@ -1294,6 +1322,7 @@ export async function getBookWithTopics(
   const progress = await computeBookStatus(
     db,
     profileId,
+    { id: book.id, masteredAt: book.masteredAt },
     topicRows.filter((topic) => !topic.skipped).map((topic) => topic.id),
   );
 
@@ -1307,6 +1336,8 @@ export async function getBookWithTopics(
     })),
     status: progress.status,
     completedTopicCount: progress.completedTopicCount,
+    masteredTopicCount: progress.masteredTopicCount,
+    masteredAt: progress.masteredAt,
     completedTopicIds: progress.completedTopicIds,
   };
 }

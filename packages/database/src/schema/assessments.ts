@@ -128,6 +128,7 @@ export const retentionCards = pgTable(
     repetitions: integer('repetitions').notNull().default(0),
     lastReviewedAt: timestamp('last_reviewed_at', { withTimezone: true }),
     nextReviewAt: timestamp('next_review_at', { withTimezone: true }),
+    masteredAt: timestamp('mastered_at', { withTimezone: true }),
     failureCount: integer('failure_count').notNull().default(0),
     consecutiveSuccesses: integer('consecutive_successes').notNull().default(0),
     xpStatus: xpStatusEnum('xp_status').notNull().default('pending'),
