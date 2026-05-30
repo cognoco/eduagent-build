@@ -236,6 +236,30 @@ export const stripeWebhookRoute = new Hono<{
         event.id,
       );
       break;
+
+    default:
+      // [audit-2026-05-30] Future Stripe event types (e.g. dispute.created,
+      // invoice.created) that get enabled on the webhook endpoint configuration
+      // must surface — falling through silently would acknowledge with 200 and
+      // Stripe would never retry, hiding the gap. Silent recovery is banned
+      // (CLAUDE.md); escalate via logger + Sentry so the unhandled type is
+      // queryable. Still ack with 200 because hard-failing would loop Stripe
+      // forever on a known-additive event.
+      logger.warn(
+        '[stripe-webhook] unhandled event type — acknowledged, no handler',
+        { eventType: event.type, eventId: event.id },
+      );
+      captureException(
+        new Error(`Unhandled Stripe webhook event type: ${event.type}`),
+        {
+          extra: {
+            context: 'stripe.webhook.unhandled_event_type',
+            eventType: event.type,
+            eventId: event.id,
+          },
+        },
+      );
+      break;
   }
 
   return c.json({ received: true });

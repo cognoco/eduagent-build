@@ -46,6 +46,10 @@ import {
   NotFoundError,
   TopicNotSkippedError,
 } from '../errors';
+import { captureException } from '../services/sentry';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type CurriculumRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -72,7 +76,23 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         const result = await cloneTopicFromChild(db, profileId, input);
         return c.json(cloneFromChildResponseSchema.parse(result));
       } catch (error) {
-        if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, 'Topic not found');
+        }
+        if (error instanceof ForbiddenError) {
+          // [audit-2026-05-30] 404 is deliberate (don't leak existence of
+          // another account's topics — mirrors filing.ts:75-77). But the
+          // authorization failure must remain observable for IDOR audit.
+          logger.warn(
+            '[curriculum.clone-from-child] ForbiddenError → 404 (IDOR-safe)',
+            { profileId, error: error.message },
+          );
+          captureException(error, {
+            extra: {
+              context: 'curriculum.clone-from-child.forbidden',
+              profileId,
+            },
+          });
           return notFound(c, 'Topic not found');
         }
         throw error;
