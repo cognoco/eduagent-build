@@ -994,7 +994,6 @@
       "deleteMessage": "このメモを削除してもよろしいですか？"
     },
     "row": {
-      "review": "復習",
       "finished": "完了",
       "paused": "一時停止中",
       "archived": "アーカイブ済み",
@@ -1007,7 +1006,9 @@
       "shelfReviewSuffix": "、復習が必要",
       "shelfFinishedSuffix": "、完了",
       "shelfActionOpen": "開く",
-      "urgencyBadge": "もうすぐ: {{reason}}"
+      "urgencyBadge": "もうすぐ: {{reason}}",
+      "review_one": "復習が{{count}}件",
+      "review_other": "復習が{{count}}件"
     },
     "nextAction": {
       "title": "{{subject}}を続ける",

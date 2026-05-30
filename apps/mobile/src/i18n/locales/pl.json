@@ -987,7 +987,6 @@
       "updateErrorTitle": "Nie można zaktualizować przedmiotu"
     },
     "row": {
-      "review": "Powtórz",
       "finished": "Ukończone",
       "paused": "Wstrzymany",
       "archived": "Zarchiwizowany",
@@ -1000,7 +999,9 @@
       "shelfReviewSuffix": ", wymaga powtórki",
       "shelfFinishedSuffix": ", ukończone",
       "shelfActionOpen": "otworzyć",
-      "urgencyBadge": "Wkrótce: {{reason}}"
+      "urgencyBadge": "Wkrótce: {{reason}}",
+      "review_one": "{{count}} do powtórzenia",
+      "review_other": "{{count}} do powtórzenia"
     },
     "shelf": {
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",

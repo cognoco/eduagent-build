@@ -1056,7 +1056,8 @@
       "updateErrorTitle": "Could not update subject"
     },
     "row": {
-      "review": "Keep it fresh",
+      "review_one": "{{count}} to review",
+      "review_other": "{{count}} to review",
       "finished": "Finished",
       "paused": "Paused",
       "archived": "Archived",

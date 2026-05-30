@@ -994,7 +994,6 @@
       "deleteMessage": "Er du sikker på at du vil slette dette notatet?"
     },
     "row": {
-      "review": "Gjennomgå",
       "finished": "Ferdig",
       "paused": "Pauset",
       "archived": "Arkivert",
@@ -1007,7 +1006,9 @@
       "shelfReviewSuffix": ", gjennomgang nødvendig",
       "shelfFinishedSuffix": ", ferdig",
       "shelfActionOpen": "åpne",
-      "urgencyBadge": "Snart: {{reason}}"
+      "urgencyBadge": "Snart: {{reason}}",
+      "review_one": "{{count}} til repetisjon",
+      "review_other": "{{count}} til repetisjon"
     },
     "nextAction": {
       "title": "Fortsett med {{subject}}",

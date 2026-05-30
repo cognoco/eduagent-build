@@ -962,7 +962,6 @@
       "updateErrorTitle": "Fach konnte nicht aktualisiert werden"
     },
     "row": {
-      "review": "Wiederholen",
       "finished": "Fertig",
       "paused": "Pausiert",
       "archived": "Archiviert",
@@ -975,7 +974,9 @@
       "shelfReviewSuffix": ", Wiederholung erforderlich",
       "shelfFinishedSuffix": ", fertig",
       "shelfActionOpen": "Öffnen",
-      "urgencyBadge": "Bald: {{reason}}"
+      "urgencyBadge": "Bald: {{reason}}",
+      "review_one": "{{count}} zum Wiederholen",
+      "review_other": "{{count}} zum Wiederholen"
     },
     "shelf": {
       "missingParam": "Fehlendes Fach. Bitte gehe zurück und versuche es erneut.",

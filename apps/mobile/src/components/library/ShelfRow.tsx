@@ -425,7 +425,7 @@ export function ShelfRow({
                         color: colors.retentionWeak,
                       }}
                     >
-                      {t('library.row.review')}
+                      {t('library.row.review', { count: reviewDueCount })}
                     </Text>
                   </View>
                 ) : null}

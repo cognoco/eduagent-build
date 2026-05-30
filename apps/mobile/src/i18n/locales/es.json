@@ -962,7 +962,6 @@
       "updateErrorTitle": "No se pudo actualizar la materia"
     },
     "row": {
-      "review": "Repasar",
       "finished": "Terminado",
       "paused": "En pausa",
       "archived": "Archivado",
@@ -975,7 +974,9 @@
       "shelfReviewSuffix": ", necesita repaso",
       "shelfFinishedSuffix": ", terminado",
       "shelfActionOpen": "abrir",
-      "urgencyBadge": "Pronto: {{reason}}"
+      "urgencyBadge": "Pronto: {{reason}}",
+      "review_one": "{{count}} para repasar",
+      "review_other": "{{count}} para repasar"
     },
     "shelf": {
       "missingParam": "Falta la materia. Vuelve e inténtalo de nuevo.",

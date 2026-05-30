@@ -987,7 +987,6 @@
       "updateErrorTitle": "Não foi possível atualizar a matéria"
     },
     "row": {
-      "review": "Revisar",
       "finished": "Concluído",
       "paused": "Pausado",
       "archived": "Arquivado",
@@ -1000,7 +999,9 @@
       "shelfReviewSuffix": ", revisão necessária",
       "shelfFinishedSuffix": ", concluído",
       "shelfActionOpen": "abrir",
-      "urgencyBadge": "Em breve: {{reason}}"
+      "urgencyBadge": "Em breve: {{reason}}",
+      "review_one": "{{count}} para rever",
+      "review_other": "{{count}} para rever"
     },
     "shelf": {
       "missingParam": "Matéria ausente. Volte e tente novamente.",
