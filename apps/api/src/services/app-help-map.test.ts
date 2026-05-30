@@ -26,8 +26,10 @@ interface EnglishLocale {
     mentorMemory: { sectionHeader: string };
     notifications: { sectionHeader: string };
     privacy: { privacyAndData: string };
-    account: { profile: string };
+    account: { profile: string; subscription: string; mentorLanguage: string };
+    family: { addChild: string };
   };
+  settings: { appLanguage: string };
 }
 
 // Cross-package read: ensures the map's user-visible labels stay in sync with
@@ -157,6 +159,35 @@ describe('buildAppHelpPromptBlock', () => {
     expect(block).toContain(en.more.account.profile);
   });
 
+  it('uses exact i18n labels for account/family/billing/language destinations', () => {
+    expect(en.more.family.addChild).toBe('Add a child');
+    expect(en.more.account.subscription).toBe('Subscription');
+    expect(en.settings.appLanguage).toBe('App Language');
+
+    expect(block).toContain(en.more.family.addChild);
+    expect(block).toContain(en.more.account.subscription);
+    expect(block).toContain(en.settings.appLanguage);
+  });
+
+  it('forbids quoting prices, limits, or "free/unlimited" claims', () => {
+    expect(block).toMatch(/never state prices/i);
+    expect(block).toMatch(/free or unlimited/i);
+    expect(block).toMatch(/without quoting any numbers/i);
+  });
+
+  it('describes the library hierarchy and review cadence concept', () => {
+    // Library structure entry: subjects > books > topics > chapters.
+    expect(block).toMatch(/how the library is organised/i);
+    expect(block).toMatch(/subjects/i);
+    expect(block).toMatch(/books/i);
+    expect(block).toMatch(/topics/i);
+    expect(block).toMatch(/chapters?/i);
+    // Review-cadence entry: adaptive, no fixed "every N days".
+    expect(block).toMatch(/review cadence|how often to review/i);
+    expect(block).toMatch(/adaptive/i);
+    expect(block).toMatch(/do not promise a specific number of days/i);
+  });
+
   it('keeps destination labels exact in non-English conversations', () => {
     expect(block).toContain('Use visible labels only.');
     expect(block).toContain(
@@ -214,6 +245,29 @@ describe('isAppHelpQuery', () => {
     'How do I get to the progress screen?',
     'Where do I find the app settings?',
     'Where is the Help & feedback section?',
+    "How do I see my child's progress?",
+    'How do I upgrade to get more questions?',
+    'Where do I change the app language?',
+    'How do I add a child?',
+    'How do I add my child to my account?',
+    'How do I change my subscription?',
+    'How is the library organised?',
+    'How are topics structured?',
+    'What are topics in the app?',
+    'What are chapters in the library?',
+    'What is a topic in the app?',
+    'What is the library?',
+    'How often do I need to do a review?',
+    'How often should I review?',
+    'When should I review?',
+    'How does spaced repetition work here?',
+    'What are topics and chapters in the app?',
+    'What is the difference between a book and a topic?',
+    "What's the difference between a book and a topic?",
+    'Is this app free?',
+    'Is the app free?',
+    'Do I have to pay to use this app?',
+    'How much does the app cost?',
   ])('classifies "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(true);
   });
@@ -255,6 +309,21 @@ describe('isAppHelpQuery', () => {
     'Where can I see progress on this topic?',
     'Where can I see my progress in the textbook?',
     'Where can I find help with this calculus problem?',
+    // Library/review terms used in a genuine learning sense must NOT match —
+    // these are the false positives that an over-broad app-help regex creates.
+    'Can you do a review of my essay?',
+    'Should I do a review of chapter 5 for my exam?',
+    'Can you review my answer?',
+    'How often should I practice the piano?',
+    'Explain the book Romeo and Juliet',
+    'What is a book report?',
+    'Tell me about the chapter on the French Revolution',
+    // Cost/pricing phrasing in a genuine learning sense must NOT match — these
+    // are the false positives the tightened cost detection guards against.
+    'How much does it cost to build a pyramid?',
+    'How much does it cost?',
+    'Is the answer free of errors?',
+    'Do I have to pay attention to the sign?',
   ])('does NOT classify "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(false);
   });
@@ -279,6 +348,31 @@ describe('buildAppHelpDirectReply', () => {
     expect(reply).toContain('Yes - I can answer questions');
     expect(reply).toContain('MentoMate');
     expect(reply).not.toMatch(/off-topic|cannot help/i);
+  });
+
+  it('routes add-child questions to More > Add a child (never Progress)', () => {
+    const reply = buildAppHelpDirectReply(
+      'How do I add my child to my account?',
+    );
+    expect(reply).toContain('More > Add a child');
+    expect(reply).not.toMatch(/progress/i);
+  });
+
+  it('routes billing/upgrade questions to Subscription without quoting prices', () => {
+    const reply = buildAppHelpDirectReply(
+      'How do I upgrade to get more questions?',
+    );
+    expect(reply).toContain('More > Profile');
+    expect(reply).toContain('Subscription');
+    expect(reply).not.toMatch(/free|unlimited|\$\d/i);
+  });
+
+  it('routes app-language questions to More > Profile, then App Language', () => {
+    const reply = buildAppHelpDirectReply(
+      'Where do I change the app language?',
+    );
+    expect(reply).toContain('App Language');
+    expect(reply).toContain('More > Profile');
   });
 });
 

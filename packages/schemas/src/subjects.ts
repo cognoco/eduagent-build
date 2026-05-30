@@ -258,34 +258,57 @@ export const MAX_GENERATED_SUBJECT_BOOKS = 20;
 export const MIN_GENERATED_SUBJECT_TOPICS = 8;
 export const MAX_GENERATED_SUBJECT_TOPICS = 15;
 
-export const bookGenerationResultSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('broad'),
-    books: z
-      .array(generatedBookSchema)
-      .min(MIN_GENERATED_SUBJECT_BOOKS)
-      .max(MAX_GENERATED_SUBJECT_BOOKS),
-  }),
-  z.object({
-    type: z.literal('narrow'),
-    topics: z
-      .array(generatedTopicSchema)
-      .min(MIN_GENERATED_SUBJECT_TOPICS)
-      .max(MAX_GENERATED_SUBJECT_TOPICS),
-  }),
-]);
-export type BookGenerationResult = z.infer<typeof bookGenerationResultSchema>;
-
-export const MIN_GENERATED_BOOK_TOPICS = 5;
-export const MAX_GENERATED_BOOK_TOPICS = 15;
-export const MIN_GENERATED_BOOK_CHAPTERS = 2;
-
 // Canonical topic-title normalizer. Used both here (generation-schema dedup)
 // and by the API persistence/dedup path (re-exported as `normalizeTopicTitle`
 // from services/curriculum.ts). Collapses internal whitespace so "A  B" and
 // "A B" dedupe identically across both paths.
 export const normalizeGeneratedTopicTitle = (title: string): string =>
   title.trim().toLowerCase().replace(/\s+/g, ' ');
+
+export const bookGenerationResultSchema = z
+  .discriminatedUnion('type', [
+    z.object({
+      type: z.literal('broad'),
+      books: z
+        .array(generatedBookSchema)
+        .min(MIN_GENERATED_SUBJECT_BOOKS)
+        .max(MAX_GENERATED_SUBJECT_BOOKS),
+    }),
+    z.object({
+      type: z.literal('narrow'),
+      topics: z
+        .array(generatedTopicSchema)
+        .min(MIN_GENERATED_SUBJECT_TOPICS)
+        .max(MAX_GENERATED_SUBJECT_TOPICS),
+    }),
+  ])
+  .superRefine((value, ctx) => {
+    // Siblings must have distinct titles. Mirrors the distinct-title check on
+    // bookTopicGenerationResultSchema, one level up (books/topics under a
+    // subject). The orphan case — an item that restates the SUBJECT name — is
+    // not checkable here because the schema does not know the subject name; it
+    // is enforced deterministically in the persistence layer (subject.ts /
+    // persistNarrowTopics) via stripOrphanTitles.
+    const key = value.type === 'broad' ? 'books' : 'topics';
+    const items = value.type === 'broad' ? value.books : value.topics;
+    const seen = new Set<string>();
+    items.forEach((item, index) => {
+      const title = normalizeGeneratedTopicTitle(item.title);
+      if (seen.has(title)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key, index, 'title'],
+          message: `Generated subject ${key} need distinct titles.`,
+        });
+      }
+      seen.add(title);
+    });
+  });
+export type BookGenerationResult = z.infer<typeof bookGenerationResultSchema>;
+
+export const MIN_GENERATED_BOOK_TOPICS = 5;
+export const MAX_GENERATED_BOOK_TOPICS = 15;
+export const MIN_GENERATED_BOOK_CHAPTERS = 2;
 
 export const bookTopicGenerationResultSchema = z
   .object({
