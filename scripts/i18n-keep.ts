@@ -220,6 +220,13 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/app/(app)/child/[profileId]/index.tsx:266',
   },
   {
+    pattern: 'notifications.tap.*',
+    reason:
+      'titleKey/messageKey selected from NotificationTapDecision (prompt kind) ' +
+      'and passed to t() at ' +
+      'apps/mobile/src/hooks/use-notification-response-handler.ts:93',
+  },
+  {
     pattern: 'session.messageBubble.escalation.*',
     reason:
       'selected via escalation.labelKey from ESCALATION_STYLES[escalationRung] at ' +
