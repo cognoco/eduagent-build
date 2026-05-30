@@ -1571,7 +1571,7 @@ export default function BookScreen() {
           {book?.emoji ? (
             <Text style={{ fontSize: 56, lineHeight: 68 }}>{book.emoji}</Text>
           ) : null}
-          <Text className="text-caption font-semibold uppercase text-text-tertiary mt-2 mb-1">
+          <Text className="text-caption font-semibold text-text-tertiary mt-2 mb-1">
             {t('library.shelf.levelBook')}
           </Text>
           <Text

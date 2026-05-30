@@ -317,7 +317,7 @@ export default function ShelfScreen() {
         </Pressable>
 
         <View className="flex-1">
-          <Text className="text-caption font-semibold uppercase text-text-tertiary mb-1">
+          <Text className="text-caption font-semibold text-text-tertiary mb-1">
             {t('library.shelf.levelSubject')}
           </Text>
           <Text

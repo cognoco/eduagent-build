@@ -142,6 +142,8 @@ const RECAP_LIST_ITEM = {
   narrative: 'Emma had a great session on fractions.',
   conversationPrompt: null,
   engagementSignal: null,
+  nextTopicTitle: null,
+  nextTopicReason: null,
 };
 
 const READY_SUBSCRIPTION_STATUS = {
