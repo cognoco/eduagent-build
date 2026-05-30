@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 // ---------------------------------------------------------------------------
-// render-wrangler-kv.mjs — inject KV namespace IDs from env into wrangler.toml
+// render-wrangler-kv.mjs — inject Cloudflare identifiers into wrangler.toml
 //
-// Why: Cloudflare KV namespace IDs are infrastructure identifiers that reveal
-// production KV topology when committed in plaintext. The bug
-// [FCR-2026-05-23-L14.F8] requires them moved out of the committed file and
-// injected at deploy time from Doppler-managed GitHub Actions secrets.
+// Why: Cloudflare KV namespace IDs AND the CF account_id are infrastructure
+// identifiers that reveal production topology when committed in plaintext.
+// [FCR-2026-05-23-L14.F8 / BUG-720] moved KV IDs out of the committed file;
+// [FCR-2026-05-23-L14.F7 / BUG-721] does the same for the top-level
+// `account_id` (which combined with a leaked CF API token would form a
+// complete targeting pair).
 //
-// Pattern: wrangler.toml carries `id = "__SUBSCRIPTION_KV_DEV__"` style
+// Pattern: wrangler.toml carries `__CF_ACCOUNT_ID__` and `__<BINDING>_<ENV>__`
 // placeholders. This script substitutes each placeholder with the matching
 // environment variable. A missing required env var is a HARD FAIL — silent
 // recovery is banned in deploy paths.
 //
 // Required env vars (set as GitHub Actions secrets, sourced from Doppler):
+//   CF_ACCOUNT_ID                                  (single value, all envs)
 //   CF_KV_SUBSCRIPTION_ID_DEV / _STG / _PRD
 //   CF_KV_COACHING_ID_DEV    / _STG / _PRD
 //
@@ -25,6 +28,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const PLACEHOLDERS = {
+  __CF_ACCOUNT_ID__: 'CF_ACCOUNT_ID',
   __SUBSCRIPTION_KV_DEV__: 'CF_KV_SUBSCRIPTION_ID_DEV',
   __SUBSCRIPTION_KV_STG__: 'CF_KV_SUBSCRIPTION_ID_STG',
   __SUBSCRIPTION_KV_PRD__: 'CF_KV_SUBSCRIPTION_ID_PRD',
@@ -33,7 +37,8 @@ const PLACEHOLDERS = {
   __COACHING_KV_PRD__: 'CF_KV_COACHING_ID_PRD',
 };
 
-// A real Cloudflare KV namespace ID is a 32-char lowercase hex string.
+// Real Cloudflare KV namespace IDs and CF account_ids are 32-char lowercase
+// hex strings — same shape, same guard.
 const REAL_KV_ID_PATTERN = /^[0-9a-f]{32}$/;
 
 function main() {
@@ -46,11 +51,18 @@ function main() {
   const original = readFileSync(path, 'utf8');
 
   if (checkOnly) {
-    // Verify no real KV ID slipped back into the committed file.
-    // Match `id = "..."` only inside [[kv_namespaces]] blocks (not env vars,
-    // not [vars] table). Simple heuristic: scan for `id = "<32-hex>"` lines
-    // that follow a `binding = "..."` line within the same block.
+    // Verify no real Cloudflare identifier slipped back into the committed
+    // file — both top-level `account_id` and `[[kv_namespaces]]` block IDs.
     const failures = [];
+
+    // Top-level `account_id = "<32-hex>"` (CF account ID).
+    const accountIdMatch = original.match(/^account_id\s*=\s*"([^"]+)"/m);
+    if (accountIdMatch && REAL_KV_ID_PATTERN.test(accountIdMatch[1])) {
+      failures.push(`account_id: real CF account ID committed (${accountIdMatch[1]})`);
+    }
+
+    // KV namespace blocks: match `id = "..."` lines that follow a
+    // `binding = "..."` line within the same block.
     const blockRegex =
       /\[\[(?:env\.[a-z]+\.)?kv_namespaces\]\]([\s\S]*?)(?=^\[|$)/gm;
     let match;
@@ -67,15 +79,15 @@ function main() {
     }
     if (failures.length > 0) {
       console.error(
-        '✗ render-wrangler-kv --check: real KV namespace IDs found in committed wrangler.toml:',
+        '✗ render-wrangler-kv --check: real Cloudflare identifiers found in committed wrangler.toml:',
       );
       for (const f of failures) console.error(`    ${f}`);
       console.error(
-        '  Replace with __<BINDING>_<ENV>__ placeholders and inject via render-wrangler-kv at deploy time.',
+        '  Replace with __CF_ACCOUNT_ID__ / __<BINDING>_<ENV>__ placeholders and inject via render-wrangler-kv at deploy time.',
       );
       process.exit(1);
     }
-    console.log('✓ no real KV namespace IDs committed in', path);
+    console.log('✓ no real Cloudflare identifiers committed in', path);
     return;
   }
 
@@ -92,7 +104,7 @@ function main() {
       }
       if (!REAL_KV_ID_PATTERN.test(value)) {
         console.error(
-          `✗ ${envVar} value does not look like a Cloudflare KV namespace ID (expected 32-char hex): ${value}`,
+          `✗ ${envVar} value does not look like a Cloudflare identifier (expected 32-char hex): ${value}`,
         );
         process.exit(1);
       }

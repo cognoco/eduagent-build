@@ -3,8 +3,15 @@
 # =============================================================================
 #
 # Account: Zwizzly (shared team account)
-# Hardcoded to prevent deploys landing on the wrong account when developers
-# have access to multiple Cloudflare accounts.
+# The account_id is bound to a `__CF_ACCOUNT_ID__` placeholder so the literal
+# does not live in the committed file — the matched pair of (committed CF
+# account_id + leaked CF API token) would otherwise hand a targeted attacker
+# a complete deploy lane. The placeholder is substituted at deploy time by
+# `scripts/render-wrangler-kv.mjs` using the `CF_ACCOUNT_ID` secret
+# (Doppler-managed, exposed to GitHub Actions). Pinning the account_id is
+# still the policy — it prevents deploys landing on the wrong account when
+# developers have access to multiple Cloudflare accounts — the pin just
+# moved out of plaintext. [FCR-2026-05-23-L14.F7 / BUG-721]
 #
 # Secrets: Managed in Doppler (project: mentomate, configs: prd/stg/dev)
 #          Synced to GitHub Actions via Doppler-GitHub integration.
@@ -21,7 +28,7 @@
 # =============================================================================
 
 name = "mentomate-api-dev"
-account_id = "0bcf2a3befee2c8b247aad5a94b2354c"
+account_id = "__CF_ACCOUNT_ID__"
 main = "src/index.ts"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]

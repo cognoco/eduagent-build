@@ -15,6 +15,10 @@ import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
 import { safeSend } from '../services/safe-non-core';
 import { captureException } from '../services/sentry';
+import {
+  resendWebhookPayloadSchema,
+  type ResendEmailEventData,
+} from '../services/notifications/resend-types';
 
 const logger = createLogger();
 
@@ -250,33 +254,6 @@ function handleEmailDelivered(data: ResendEmailEventData): void {
     emailId: data.email_id,
   });
 }
-
-// ---------------------------------------------------------------------------
-// Payload types
-// ---------------------------------------------------------------------------
-
-// Minimal shape validation (parity with the RevenueCat route's Zod gate).
-// We only assert the fields the handlers actually read so a malformed payload
-// — e.g. `data` missing entirely — is rejected at the boundary instead of
-// throwing inside handleEmailBounced (`data.email_id` on `undefined`) and
-// 500ing, which would make Svix retry the bad payload for ~3 days.
-const resendEmailEventDataSchema = z
-  .object({
-    email_id: z.string().optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    subject: z.string().optional(),
-  })
-  .passthrough();
-
-const resendWebhookPayloadSchema = z
-  .object({
-    type: z.string(),
-    data: resendEmailEventDataSchema,
-  })
-  .passthrough();
-
-type ResendEmailEventData = z.infer<typeof resendEmailEventDataSchema>;
 
 // ---------------------------------------------------------------------------
 // Route

@@ -41,6 +41,7 @@ import {
   getFamilyPoolStatus,
   getEffectiveAccessForSubscription,
   getOrProvisionProfileQuotaUsage,
+  getStartOfTodayInTimeZone,
 } from '../services/billing';
 import {
   resolveWarningLevel,
@@ -83,58 +84,6 @@ type BillingRouteEnv = {
     profileMeta: ProfileMeta | undefined;
   };
 };
-
-function getTimeZoneOffsetMs(instant: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(instant);
-  const values = Object.fromEntries(
-    parts
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value]),
-  );
-  const localAsUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-    Number(values.hour),
-    Number(values.minute),
-    Number(values.second),
-  );
-  return localAsUtc - instant.getTime();
-}
-
-function getStartOfTodayInTimeZone(now: Date, timeZone: string): Date {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
-  const values = Object.fromEntries(
-    parts
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value]),
-  );
-  const localMidnightAsUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-  );
-  let start = new Date(
-    localMidnightAsUtc -
-      getTimeZoneOffsetMs(new Date(localMidnightAsUtc), timeZone),
-  );
-  start = new Date(localMidnightAsUtc - getTimeZoneOffsetMs(start, timeZone));
-  return start;
-}
 
 export const billingRoutes = new Hono<BillingRouteEnv>()
   // Get current subscription status

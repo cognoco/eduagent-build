@@ -81,6 +81,9 @@ export type {
 } from './tier';
 export { handleTierChange, getUpgradePrompt, getTopUpPriceCents } from './tier';
 
+// Time-zone helpers (per-account day-window resolution)
+export { getTimeZoneOffsetMs, getStartOfTodayInTimeZone } from './timezone';
+
 // Family billing (Story 5.5)
 export type { FamilyMember } from './family';
 export {
