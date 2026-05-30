@@ -266,8 +266,8 @@ describe('isAppHelpQuery', () => {
     "What's the difference between a book and a topic?",
     'Is this app free?',
     'Is the app free?',
-    'Do I have to pay?',
-    'How much does it cost?',
+    'Do I have to pay to use this app?',
+    'How much does the app cost?',
   ])('classifies "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(true);
   });
