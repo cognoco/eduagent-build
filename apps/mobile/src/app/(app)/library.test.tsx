@@ -577,6 +577,108 @@ describe('LibraryScreen', () => {
     active.result.getByText('History');
   });
 
+  describe('next-action coach card [coach-card]', () => {
+    it('says "Continue" and targets an in-progress subject', async () => {
+      active = mount({
+        subjects: [{ id: 'sub-1', name: 'History', status: 'active' }],
+        progress: {
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              topicsTotal: 12,
+              topicsCompleted: 3,
+              topicsVerified: 1,
+            },
+          ],
+        },
+      });
+
+      await waitFor(() => {
+        active!.result.getByTestId('library-next-action');
+      });
+      active.result.getByText('Continue History');
+    });
+
+    it('says "Start" for a brand-new 0/0 subject instead of "Continue"', async () => {
+      // Regression: the card used to blindly pick the first active subject and
+      // call it "Continue <name>" even when nothing had ever been studied.
+      active = mount({
+        subjects: [{ id: 'sub-1', name: 'Philosophy', status: 'active' }],
+        progress: {
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              topicsTotal: 0,
+              topicsCompleted: 0,
+              topicsVerified: 0,
+            },
+          ],
+        },
+      });
+
+      await waitFor(() => {
+        active!.result.getByTestId('library-next-action');
+      });
+      active.result.getByText('Start Philosophy');
+      expect(active.result.queryByText('Continue Philosophy')).toBeNull();
+    });
+
+    it('says "Revisit" when a finished subject has topics due for review', async () => {
+      active = mount({
+        subjects: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
+        progress: {
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              topicsTotal: 8,
+              topicsCompleted: 8,
+              topicsVerified: 8,
+            },
+          ],
+        },
+        retention: {
+          subjects: [{ subjectId: 'sub-1', topics: [], reviewDueCount: 2 }],
+        },
+      });
+
+      await waitFor(() => {
+        active!.result.getByTestId('library-next-action');
+      });
+      active.result.getByText('Revisit Biology');
+    });
+
+    it('prefers an in-progress subject over an earlier unstarted one', async () => {
+      active = mount({
+        subjects: [
+          { id: 'sub-new', name: 'Philosophy', status: 'active' },
+          { id: 'sub-mid', name: 'History', status: 'active' },
+        ],
+        progress: {
+          subjects: [
+            {
+              subjectId: 'sub-new',
+              topicsTotal: 5,
+              topicsCompleted: 0,
+              topicsVerified: 0,
+            },
+            {
+              subjectId: 'sub-mid',
+              topicsTotal: 10,
+              topicsCompleted: 4,
+              topicsVerified: 2,
+            },
+          ],
+        },
+      });
+
+      await waitFor(() => {
+        active!.result.getByTestId('library-next-action');
+      });
+      active.result.getByText('Continue History');
+      expect(active.result.queryByText('Start Philosophy')).toBeNull();
+    });
+  });
+
   it('orders active subjects first, then paused, then archived', async () => {
     active = mount({
       subjects: [

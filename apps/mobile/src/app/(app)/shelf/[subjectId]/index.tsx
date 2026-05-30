@@ -317,6 +317,9 @@ export default function ShelfScreen() {
         </Pressable>
 
         <View className="flex-1">
+          <Text className="text-caption font-semibold uppercase text-text-tertiary mb-1">
+            {t('library.shelf.levelSubject')}
+          </Text>
           <Text
             className="text-h1 font-bold text-text-primary"
             numberOfLines={1}
@@ -386,6 +389,7 @@ export default function ShelfScreen() {
                 emoji={suggestion.emoji}
                 description={suggestion.description}
                 tint={shelfTint}
+                addLabel={t('library.shelf.suggestionAdd')}
                 onPress={() => void handlePickBookSuggestion(suggestion)}
                 testID={`shelf-suggestion-${suggestion.id}`}
               />

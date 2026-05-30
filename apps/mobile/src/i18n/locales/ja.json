@@ -930,7 +930,6 @@
       "missingParam": "科目がありません。戻って、もう一度お試しください。",
       "errorTitle": "この棚を読み込めませんでした",
       "fallbackTitle": "棚",
-      "bookCount": "{{count}}冊の本",
       "topicProgress": "{{completed}}/{{total}}トピック",
       "settingsAccessibilityLabel": "科目の設定",
       "studyNext": "次に学習する",
@@ -945,7 +944,13 @@
       "skipAccessibilityLabel": "スキップしてとにかく学習を開始",
       "filingErrorTitle": "その本を追加できませんでした",
       "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject."
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "bookCount_one": "{{count}}冊の本",
+      "bookCount_other": "{{count}}冊の本",
+      "suggestionAdd": "本棚に追加",
+      "levelSubject": "科目",
+      "levelBook": "本",
+      "levelTopic": "トピック"
     },
     "noteMenu": {
       "title": "メモのオプション",
@@ -973,7 +978,9 @@
       "title": "{{subject}}を続ける",
       "message": "本棚を開いて次の本を選ぶか、復習が必要な項目を再確認しましょう。",
       "cta": "開く",
-      "accessibilityLabel": "{{subject}}を続ける"
+      "accessibilityLabel": "{{subject}}を開く",
+      "revisitTitle": "{{subject}}を復習",
+      "startTitle": "{{subject}}を始める"
     },
     "bookmarkCard": {
       "accessibilityLabel": "保存したブックマークを開く: {{title}}"

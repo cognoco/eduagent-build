@@ -946,7 +946,6 @@
       "missingParam": "Falta la materia. Vuelve e inténtalo de nuevo.",
       "errorTitle": "No se pudo cargar este estante",
       "fallbackTitle": "Estante",
-      "bookCount": "{{count}} libro",
       "topicProgress": "{{completed}}/{{total}} temas",
       "settingsAccessibilityLabel": "Ajustes de la materia",
       "studyNext": "Próximo estudio",
@@ -961,7 +960,13 @@
       "skipAccessibilityLabel": "Omitir y empezar a aprender de todos modos",
       "filingErrorTitle": "No se pudo añadir ese libro",
       "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject."
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "bookCount_one": "{{count}} libro",
+      "bookCount_other": "{{count}} libros",
+      "suggestionAdd": "Añadir a la estantería",
+      "levelSubject": "Materia",
+      "levelBook": "Libro",
+      "levelTopic": "Tema"
     },
     "noteMenu": {
       "title": "Opciones de nota",
@@ -973,7 +978,9 @@
       "title": "Continuar {{subject}}",
       "message": "Abre la estantería, elige el siguiente libro o repasa lo que tienes pendiente.",
       "cta": "Abrir",
-      "accessibilityLabel": "Continuar {{subject}}"
+      "accessibilityLabel": "Abrir {{subject}}",
+      "revisitTitle": "Repasar {{subject}}",
+      "startTitle": "Empezar {{subject}}"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Abrir marcador guardado: {{title}}"

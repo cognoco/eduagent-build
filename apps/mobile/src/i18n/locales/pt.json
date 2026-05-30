@@ -971,7 +971,6 @@
       "missingParam": "Matéria ausente. Volte e tente novamente.",
       "errorTitle": "Não foi possível carregar esta prateleira",
       "fallbackTitle": "Prateleira",
-      "bookCount": "{{count}} livro",
       "topicProgress": "{{completed}}/{{total}} tópicos",
       "settingsAccessibilityLabel": "Configurações da matéria",
       "studyNext": "Estudar a seguir",
@@ -986,7 +985,13 @@
       "skipAccessibilityLabel": "Pular e começar a aprender mesmo assim",
       "filingErrorTitle": "Não foi possível adicionar esse livro",
       "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject."
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "bookCount_one": "{{count}} livro",
+      "bookCount_other": "{{count}} livros",
+      "suggestionAdd": "Adicionar à estante",
+      "levelSubject": "Disciplina",
+      "levelBook": "Livro",
+      "levelTopic": "Tema"
     },
     "noteMenu": {
       "title": "Opções de nota",
@@ -998,7 +1003,9 @@
       "title": "Continuar {{subject}}",
       "message": "Abra a estante, escolha o próximo livro ou reveja o que está pendente.",
       "cta": "Abrir",
-      "accessibilityLabel": "Continuar {{subject}}"
+      "accessibilityLabel": "Abrir {{subject}}",
+      "revisitTitle": "Revisar {{subject}}",
+      "startTitle": "Começar {{subject}}"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Abrir marcador salvo: {{title}}"

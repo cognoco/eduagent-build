@@ -440,9 +440,11 @@ export function buildFallbackFilingResponse(
     book: {
       name: bookName,
       emoji: isSpecific ? '📚' : '📂',
-      description: isSpecific
-        ? `Learn about ${bookName}`
-        : 'Topics to be organized',
+      // No real summary is available on the fallback path. Echoing the title
+      // back ("Learn about <title>") renders a redundant line in the UI, so
+      // leave the specific book's description empty and let the title stand
+      // alone. The non-specific bucket keeps its genuinely informative copy.
+      description: isSpecific ? '' : 'Topics to be organized',
     },
     chapter: { name: isSpecific ? bookName : 'General' },
     topic: {

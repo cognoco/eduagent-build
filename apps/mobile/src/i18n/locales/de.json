@@ -946,7 +946,6 @@
       "missingParam": "Fehlendes Fach. Bitte gehe zurück und versuche es erneut.",
       "errorTitle": "Dieses Regal konnte nicht geladen werden",
       "fallbackTitle": "Regal",
-      "bookCount": "{{count}} Buch",
       "topicProgress": "{{completed}}/{{total}} Themen",
       "settingsAccessibilityLabel": "Facheinstellungen",
       "studyNext": "Als Nächstes lernen",
@@ -961,7 +960,13 @@
       "skipAccessibilityLabel": "Überspringen und trotzdem lernen",
       "filingErrorTitle": "Dieses Buch konnte nicht hinzugefügt werden",
       "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject."
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "bookCount_one": "{{count}} Buch",
+      "bookCount_other": "{{count}} Bücher",
+      "suggestionAdd": "Zur Ablage hinzufügen",
+      "levelSubject": "Fach",
+      "levelBook": "Buch",
+      "levelTopic": "Thema"
     },
     "noteMenu": {
       "title": "Notizoptionen",
@@ -973,7 +978,9 @@
       "title": "Mit {{subject}} weitermachen",
       "message": "Öffne das Regal, wähle das nächste Buch oder wiederhole, was fällig ist.",
       "cta": "Öffnen",
-      "accessibilityLabel": "Mit {{subject}} weitermachen"
+      "accessibilityLabel": "{{subject}} öffnen",
+      "revisitTitle": "{{subject}} wiederholen",
+      "startTitle": "Mit {{subject}} starten"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Gespeichertes Lesezeichen öffnen: {{title}}"

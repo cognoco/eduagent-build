@@ -981,9 +981,11 @@
     },
     "nextAction": {
       "title": "Continue {{subject}}",
+      "revisitTitle": "Revisit {{subject}}",
+      "startTitle": "Start {{subject}}",
       "message": "Open the shelf, pick the next book, or revisit what is due.",
       "cta": "Open",
-      "accessibilityLabel": "Continue {{subject}}"
+      "accessibilityLabel": "Open {{subject}}"
     },
     "curriculumComplete": {
       "title": "You've covered everything here!",
@@ -1040,10 +1042,15 @@
       "loadingMessage": "We're finding the books and next steps saved for this subject.",
       "errorTitle": "Couldn't load this shelf",
       "fallbackTitle": "Shelf",
-      "bookCount": "{{count}} book",
+      "bookCount_one": "{{count}} book",
+      "bookCount_other": "{{count}} books",
       "topicProgress": "{{completed}}/{{total}} topics",
       "settingsAccessibilityLabel": "Subject settings",
       "studyNext": "Study next",
+      "suggestionAdd": "Add to shelf",
+      "levelSubject": "Subject",
+      "levelBook": "Book",
+      "levelTopic": "Topic",
       "addAnotherBook": "Add another book",
       "browseAll": "Browse all suggestions",
       "emptyPickTitle": "Pick a book to start",

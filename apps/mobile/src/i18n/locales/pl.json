@@ -971,7 +971,6 @@
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",
       "errorTitle": "Nie można załadować tej półki",
       "fallbackTitle": "Półka",
-      "bookCount": "{{count}} książka",
       "topicProgress": "{{completed}}/{{total}} tematów",
       "settingsAccessibilityLabel": "Ustawienia przedmiotu",
       "studyNext": "Ucz się dalej",
@@ -986,7 +985,13 @@
       "skipAccessibilityLabel": "Pomiń i tak zacznij się uczyć",
       "filingErrorTitle": "Nie można dodać tej książki",
       "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject."
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "bookCount_one": "{{count}} książka",
+      "bookCount_other": "{{count}} książek",
+      "suggestionAdd": "Dodaj do półki",
+      "levelSubject": "Przedmiot",
+      "levelBook": "Książka",
+      "levelTopic": "Temat"
     },
     "noteMenu": {
       "title": "Opcje notatki",
@@ -998,7 +1003,9 @@
       "title": "Kontynuuj {{subject}}",
       "message": "Otwórz półkę, wybierz następną książkę lub powtórz zaległy materiał.",
       "cta": "Otwórz",
-      "accessibilityLabel": "Kontynuuj {{subject}}"
+      "accessibilityLabel": "Otwórz {{subject}}",
+      "revisitTitle": "Powtórz {{subject}}",
+      "startTitle": "Zacznij {{subject}}"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Otwórz zapisany zakładkę: {{title}}"

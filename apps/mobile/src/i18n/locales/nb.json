@@ -930,7 +930,6 @@
       "missingParam": "Mangler emne. Gå tilbake og prøv igjen.",
       "errorTitle": "Kunne ikke laste denne hyllen",
       "fallbackTitle": "Hylle",
-      "bookCount": "{{count}} bok",
       "topicProgress": "{{completed}}/{{total}} temaer",
       "settingsAccessibilityLabel": "Emneinnstillinger",
       "studyNext": "Studer neste",
@@ -945,7 +944,13 @@
       "skipAccessibilityLabel": "Hopp over og start læringen uansett",
       "filingErrorTitle": "Kunne ikke legge til den boken",
       "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject."
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "bookCount_one": "{{count}} bok",
+      "bookCount_other": "{{count}} bøker",
+      "suggestionAdd": "Legg til i hyllen",
+      "levelSubject": "Fag",
+      "levelBook": "Bok",
+      "levelTopic": "Emne"
     },
     "noteMenu": {
       "title": "Notatalternativer",
@@ -973,7 +978,9 @@
       "title": "Fortsett med {{subject}}",
       "message": "Åpne hyllen, velg neste bok, eller repeter det som er forfalt.",
       "cta": "Åpne",
-      "accessibilityLabel": "Fortsett med {{subject}}"
+      "accessibilityLabel": "Åpne {{subject}}",
+      "revisitTitle": "Repeter {{subject}}",
+      "startTitle": "Start {{subject}}"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Åpne lagret bokmerke: {{title}}"

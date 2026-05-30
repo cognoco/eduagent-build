@@ -472,9 +472,12 @@ describe('buildFallbackFilingResponse [BUG-871]', () => {
       throw new Error('expected book to be a name-form ref');
     }
     expect(result.book.name).toBe('Geometry Foundations');
-    // Specific book gets a non-default emoji + meaningful description
+    // Specific book gets a non-default emoji. The fallback no longer echoes the
+    // title back as the description ("Learn about <title>") — that just rendered
+    // a redundant line in the UI — so the description is intentionally empty and
+    // the title stands alone.
     expect(result.book.emoji).not.toBe('📂');
-    expect(result.book.description).toContain('Geometry Foundations');
+    expect(result.book.description).toBe('');
     if ('id' in result.chapter) {
       throw new Error('expected chapter to be a name-form ref');
     }
