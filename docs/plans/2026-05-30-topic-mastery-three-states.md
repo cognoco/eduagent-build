@@ -36,7 +36,9 @@ These are the decisions the implementer must not re-litigate.
      see #2). Once Mastered, always Mastered.
 
 2. **Mastered is a sticky flag (Option 1).** `xpStatus` is reversible today
-   (`verified → decayed`, `retention-data.ts:975`), so it cannot back a monotonic
+   (`verified → decayed`, computed in `processRecallResult` and persisted at
+   `retention-data.ts:906` **and** `review-calibration-grade.ts:111` — note the two
+   write sites, see T2), so it cannot back a monotonic
    count. We add `retention_cards.mastered_at timestamp` (nullable), set **once**
    the first time a card transitions to `xpStatus='verified'`, and **never**
    cleared. `topicsMastered = count(cards WHERE mastered_at IS NOT NULL)`. The
@@ -146,8 +148,15 @@ These are the decisions the implementer must not re-litigate.
      **any topic verifying**, re-evaluate the book's *entire* non-skipped sibling set
      and stamp `curriculum_books.mastered_at` only if that verify made the **last**
      remaining topic Mastered. This lives in the same verify path as T2 (see T2's
-     book-stamp step), reading all siblings — it cannot live in the topic's own
-     single-card stamp.
+     book-stamp step). It must be expressed as a **single conditional `UPDATE … WHERE
+     NOT EXISTS (an unmastered non-skipped topic)`** — never a JS
+     read-all-siblings-then-write. There is no open DB transaction at the stamp point
+     (`processRecallTest`'s only transaction closes at `retention-data.ts:806`, before
+     the persist; the calibration path uses separate Inngest `step.run` boundaries), so
+     a JS read-then-write races: two sibling topics verifying concurrently each read the
+     other as still-unmastered and the book is **permanently** never stamped. The atomic
+     `NOT EXISTS` statement (T2 spells it out) is immune to this. It cannot live in the
+     topic's own single-card stamp.
 
    - **Chapters stay display-only** — `chapter` is a `text` column
      (`subjects.ts:188`), not an entity. No chapter state, **no chapter
@@ -173,6 +182,10 @@ In scope:
 - `apps/mobile/src/components/library/BookCard.tsx` — Mastered badge (from flag) +
   schedule label + review overlay + 3-segment book bar (1.5)
 - `apps/api/src/services/retention-data.ts` — set `mastered_at` on first verify
+  (via a shared stamp helper; see T2)
+- `apps/api/src/inngest/functions/review-calibration-grade.ts` — **second live
+  verify-entry path**; must call the same shared stamp helper as `retention-data.ts`
+  (see T2). Without this, topics mastered via calibration never get stamped.
 - `apps/api/src/services/progress.ts` — compute `topicsMastered` / `topicsLearning`
 - `packages/schemas/src/progress.ts` — extend `subjectProgressSchema` + overview
 - `apps/mobile/src/hooks/use-progress.ts` — extend `OverallProgressResponse`
@@ -259,30 +272,75 @@ Out of scope (must not change):
   both untouched. The test must prove ordering: a book whose topics are only stamped
   by the topic UPDATE still qualifies (topic backfill ran first).
 
-- [ ] **T2: Stamp `mastered_at` on *entry* into verified (sticky). ⚠ load-bearing.**
+- [ ] **T2: Stamp `mastered_at` on *entry* into verified (sticky), at EVERY verify-entry
+  write site. ⚠ load-bearing.**
   This task is the single point of failure for the whole feature's monotonicity
-  guarantee — implement the trigger precisely, not loosely.
-  In `apps/api/src/services/retention-data.ts`, at the recall-test write path where
-  the new card state is persisted (~line 903-907, where `xpStatus` is written) and
-  the xp-ledger sync fires for `result.xpChange === 'verified'` (~line 975):
+  guarantee — implement the trigger precisely, not loosely, and at **every** site that
+  writes `xpStatus = 'verified'`, not just one.
+
+  **There are TWO live verify-entry write paths — both must stamp:**
+  1. `apps/api/src/services/retention-data.ts` `processRecallTest` — the SM-2 persist
+     at ~line 898-924 (the `db.update(retentionCards).set({ … xpStatus … })`), with the
+     xp-ledger sync gated on `result.xpChange === 'verified'` at ~line 975.
+  2. `apps/api/src/inngest/functions/review-calibration-grade.ts`
+     `handleReviewCalibrationGrade` — the persist at line 101-128 (same
+     `xpStatus: result.newState.xpStatus` write), xp sync at 135-138. This path is
+     **live in production**, dispatched from
+     `apps/api/src/services/session/session-exchange.ts:1103`
+     (`app/review.calibration.requested`) during normal session exchanges. A topic can
+     reach `verified` entirely through this path, **never** touching `processRecallTest`
+     — so instrumenting only path 1 silently undercounts Mastered and never fires the
+     book stamp for those topics.
+
+  **Extract a shared stamp helper so both sites are covered by construction.** Both call
+  sites already share `processRecallResult` (from `services/retention`) but duplicate the
+  `db.update(retentionCards).set({...})` block. Add one helper (e.g.
+  `stampMasteryOnVerify(db, { profileId, topicId, cardId, xpChange })`) and call it from
+  both, rather than copy-pasting stamp logic twice.
+
   - Stamp on the **transition into** verified — drive it off `result.xpChange ===
     'verified'` (the *entry* event), **not** off observing `xpStatus === 'verified'`
     on an arbitrary write.
-  - Apply the stamp with an explicit **`WHERE mastered_at IS NULL`** guard (a
-    conditional `UPDATE` / a null-check before set), so a card cycling
-    `verified → decayed → verified` re-enters verified but **does not overwrite** the
-    original `mastered_at`. The guard is the only thing protecting the original
-    timestamp — without it, the second entry rewrites it.
+  - The topic stamp is a **SEPARATE conditional `UPDATE`**, issued after (and independent
+    of) the SM-2 persist:
+    ```sql
+    UPDATE retention_cards SET mastered_at = <now>
+     WHERE id = :cardId AND profile_id = :profileId AND mastered_at IS NULL
+    ```
+    **Do NOT fold `mastered_at IS NULL` into the existing SM-2 persist's `WHERE`**
+    (`retention-data.ts:912-923`, gated on `updatedAt = claimNow`). Adding the guard
+    there would make every re-verify of an already-mastered card fail the predicate and
+    **drop the entire SM-2 update** (ease/interval/nextReviewAt) — corrupting the
+    schedule. The `mastered_at IS NULL` clause is the only thing protecting the original
+    timestamp against a `verified → decayed → verified` cycle; it belongs on its own
+    write.
   - Never write `mastered_at` back to null on `decayed` / failure paths.
-  - **Book whole-set re-evaluation (the book stamp lives here, not in T14).** In the
-    same verify-entry path, after stamping the topic, re-evaluate the topic's parent
-    **book**: load all its non-skipped sibling topics (`skipped = false`) and their
-    cards; if **every** one now has `mastered_at != null` **and** the book's
-    `curriculum_books.mastered_at IS NULL`, stamp the book `mastered_at = new Date()`
-    (same write-once `WHERE mastered_at IS NULL` guard). This only fires when *this*
-    verify completed the **last** remaining topic — verifying topic 7 of 8 reads all
-    8, finds one unmastered, and does nothing. Do this read+stamp inside the existing
-    transaction so it is atomic with the topic stamp.
+
+  - **Book whole-set stamp — a single race-immune atomic statement (the book stamp lives
+    here, not in T14).** Do **NOT** read all siblings in JS and then conditionally write.
+    There is no open DB transaction at this point in either path
+    (`processRecallTest`'s only `db.transaction(...)` closes at `retention-data.ts:806`,
+    *before* the persist; the calibration path uses separate Inngest `step.run`
+    boundaries), so a JS read-then-write genuinely races: the last two unmastered sibling
+    topics verifying concurrently each read the other as still-unmastered (neither stamp
+    committed yet) and the book ends up **permanently** never stamped. Instead, after the
+    topic stamp, issue **one conditional `UPDATE`** that re-evaluates the whole non-skipped
+    set inside the database:
+    ```sql
+    UPDATE curriculum_books b SET mastered_at = <now>
+     WHERE b.id = :bookId
+       AND b.mastered_at IS NULL
+       AND EXISTS (SELECT 1 FROM curriculum_topics t
+                    WHERE t.book_id = b.id AND t.skipped = false)
+       AND NOT EXISTS (
+         SELECT 1 FROM curriculum_topics t
+          LEFT JOIN retention_cards rc ON rc.topic_id = t.id
+          WHERE t.book_id = b.id AND t.skipped = false AND rc.mastered_at IS NULL)
+    ```
+    This is idempotent and immune to concurrent sibling verifies: whichever verify commits
+    last sees all siblings mastered and stamps; earlier ones no-op via the `NOT EXISTS`.
+    (`:bookId` = the verified topic's parent book.) It mirrors the T1b book backfill
+    exactly, so the runtime stamp and the backfill share one definition of "book mastered."
   **done when:** a new test in `retention-data.test.ts` proves, for one card cycled
   `verified → decayed → verified`: (a) `mastered_at` is set (and equals the time of
   the **first** verify) on the first entry; (b) after the second entry, the stored
@@ -293,7 +351,16 @@ Out of scope (must not change):
   (b) fail (proving the guard, not luck, preserves the value). **Plus** a book-stamp
   test: a 2-topic book where verifying topic 1 leaves `book.mastered_at` null, and
   verifying topic 2 stamps it; and that re-verifying topic 2 later does **not**
-  overwrite the book's `mastered_at` value.
+  overwrite the book's `mastered_at` value. **Plus** a concurrency test: the last two
+  unmastered sibling topics verify in two interleaved calls and the book still ends with
+  `mastered_at` set (proving the atomic `NOT EXISTS` stamp, not a JS read-then-write, is
+  used). **Plus** a calibration-path test: a topic driven to `verified` through
+  `handleReviewCalibrationGrade` (not `processRecallTest`) gets `mastered_at` stamped.
+  **Plus** a sweep gate: `grep` every `xpStatus … 'verified'` card write across
+  `apps/api/src` and confirm each routes through the shared stamp helper (per CLAUDE.md
+  "sweep when you fix" / "end-to-end feature tracing"); confirm challenge-round
+  verification writes `assessments.mastery_challenge_verified_at` only and does **not**
+  write `retention_cards.xpStatus = 'verified'`.
 
 - [ ] **T3: Compute three-state buckets in `progress.ts`.**
   In `getSubjectProgress` (and the batch variant) at
@@ -394,7 +461,10 @@ Out of scope (must not change):
     `status: 'COMPLETED'` / `'COMPLETED'` reference in `curriculum.test.ts`,
     `books.test.ts`, `subjects.test.ts`, the inngest book fixtures, and
     `test-seed.ts`. Grep `'COMPLETED'` across the repo; none may remain referencing
-    book status.
+    book status. **Caution:** `'COMPLETED'` is also used by unrelated enums
+    (learning-session / quiz status in `repository.ts` and `quiz/queries.ts`) — the
+    sweep targets **only** `BookProgressStatus` consumers; do **not** remove the
+    session/quiz `COMPLETED` references.
   **done when:** `subjects.test.ts` accepts the three-value enum + a `masteredAt`
   field and rejects `'COMPLETED'` and `'UNKNOWN'`; `grep -r "'COMPLETED'"` returns no
   book-status sites; `pnpm exec nx run api:typecheck` passes.
@@ -412,8 +482,15 @@ Out of scope (must not change):
   In `apps/api/src/services/curriculum.ts:404-511` (and the batch variant
   `computeBookStatusesBatch`). This function is now a **pure reader** — it does NOT
   stamp (stamping moved to T2):
-  - Select `curriculumBooks.masteredAt` and add `masteredAt` to the `retentionRows`
-    select (line 441) so the per-topic mastered set is available.
+  - **Signature change required — the function has no book identity today.**
+    `computeBookStatus(db, profileId, topicIds)` (line 404-408) receives only topic IDs
+    and never queries `curriculum_books`, so it cannot "pass through" `masteredAt` as-is.
+    Pass `bookId` (and/or the loaded `curriculum_books.masteredAt`) into the function and
+    update its caller(s). The batch variant `computeBookStatusesBatch` already has
+    `bookId` via the `topicsByBook` keys (line 527), so add one `curriculum_books.masteredAt`
+    select keyed by those bookIds. Without this the function has no `masteredAt` to return.
+  - Add `masteredAt` to the `retentionRows` select (line 441) so the per-topic mastered
+    set is available.
   - `masteredTopicCount` = count of non-skipped topics whose card has
     `masteredAt != null` → return it for the bar.
   - **Schedule status (single enum slot), precedence:** `REVIEW_DUE` if the book has
