@@ -16,6 +16,7 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { combinedSignal } from '../lib/query-timeout';
 
 export function useDeleteAccount(): UseMutationResult<
   AccountDeletionResponse,
@@ -65,10 +66,20 @@ export function useDeletionStatus(): UseQueryResult<
     staleTime: 30_000,
     retry: 1,
     retryDelay: 250,
-    queryFn: async (): Promise<AccountDeletionStatusResponse> => {
-      const res = await client.account['deletion-status'].$get();
-      await assertOk(res);
-      return accountDeletionStatusResponseSchema.parse(await res.json());
+    queryFn: async ({
+      signal: querySignal,
+    }): Promise<AccountDeletionStatusResponse> => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.account['deletion-status'].$get(
+          {},
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return accountDeletionStatusResponseSchema.parse(await res.json());
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!isSignedIn,
   });

@@ -13,6 +13,10 @@ import {
 import { consentStatusSchema } from './consent';
 import { struggleStatusSchema } from './struggle-status';
 import { isoDateField } from './common';
+// [SC-04] Canonical session-type and engagement-signal enums — import instead of redefining inline.
+// Imported from the ./session-enums.ts leaf (not ./sessions) to avoid a circular
+// import: sessions.ts imports celebration schemas from this file.
+import { sessionTypeSchema, engagementSignalSchema } from './session-enums.ts';
 
 export const celebrationNameSchema = z.enum([
   'polar_star',
@@ -823,7 +827,8 @@ export const childSessionSchema = z.object({
   subjectName: z.string().nullable(),
   topicId: z.string().uuid().nullable(),
   topicTitle: z.string().nullable(),
-  sessionType: z.enum(['learning', 'homework', 'interleaved']),
+  // [SC-04] Use canonical sessionTypeSchema from sessions.ts (not inline enum).
+  sessionType: sessionTypeSchema,
   startedAt: isoDateField,
   endedAt: isoDateField.nullable(),
   exchangeCount: z.number().int(),
@@ -836,9 +841,8 @@ export const childSessionSchema = z.object({
   highlight: z.string().nullable(),
   narrative: z.string().nullable(),
   conversationPrompt: z.string().nullable(),
-  engagementSignal: z
-    .enum(['curious', 'stuck', 'breezing', 'focused', 'scattered'])
-    .nullable(),
+  // [SC-04] Use canonical engagementSignalSchema from sessions.ts (not inline enum).
+  engagementSignal: engagementSignalSchema.nullable(),
   drills: z.array(childSessionDrillScoreSchema),
 });
 export type ChildSession = z.infer<typeof childSessionSchema>;

@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 
@@ -28,6 +29,7 @@ export function NoteInput({
   placeholder = 'Write your note...',
   saving = false,
 }: NoteInputProps): React.ReactElement {
+  const { t } = useTranslation();
   const themeColors = useThemeColors();
   const [text, setText] = useState(initialValue);
   const { isListening, transcript, startListening, stopListening } =
@@ -70,12 +72,15 @@ export function NoteInput({
         multiline
         maxLength={MAX_CHARS}
         className="text-body text-text-primary min-h-24 mb-2"
-        accessibilityLabel="Note text"
+        accessibilityLabel={t('session.noteInput.noteText')}
       />
 
       {isNearLimit && (
         <Text className="text-caption text-warning mb-2">
-          {`Your note is getting long! (${text.length}/${MAX_CHARS})`}
+          {t('session.noteInput.noteTooLong', {
+            length: text.length,
+            max: MAX_CHARS,
+          })}
         </Text>
       )}
 
@@ -83,7 +88,7 @@ export function NoteInput({
         <View className="flex-row items-center mb-2">
           <ActivityIndicator size="small" color={themeColors.primary} />
           <Text className="text-caption text-text-secondary ms-2">
-            Listening...
+            {t('session.noteInput.listening')}
           </Text>
         </View>
       )}
@@ -94,7 +99,9 @@ export function NoteInput({
           onPress={handleMicPress}
           className="p-2"
           accessibilityLabel={
-            isListening ? 'Stop recording' : 'Start recording'
+            isListening
+              ? t('session.noteInput.stopRecording')
+              : t('session.noteInput.startRecording')
           }
         >
           <Ionicons
@@ -110,21 +117,25 @@ export function NoteInput({
           <Pressable
             onPress={onCancel}
             className="px-4 py-2"
-            accessibilityLabel="Cancel"
+            accessibilityLabel={t('session.noteInput.cancel')}
           >
-            <Text className="text-body text-text-secondary">Cancel</Text>
+            <Text className="text-body text-text-secondary">
+              {t('session.noteInput.cancel')}
+            </Text>
           </Pressable>
 
           <Pressable
             onPress={() => onSave(text)}
             disabled={isEmpty || saving}
             className="px-4 py-2 bg-primary rounded-md"
-            accessibilityLabel="Save note"
+            accessibilityLabel={t('session.noteInput.save')}
           >
             {saving ? (
               <ActivityIndicator size="small" color={themeColors.textInverse} />
             ) : (
-              <Text className="text-body text-text-primary">Save</Text>
+              <Text className="text-body text-text-primary">
+                {t('session.noteInput.save')}
+              </Text>
             )}
           </Pressable>
         </View>

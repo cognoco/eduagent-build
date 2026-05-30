@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { QuotaExceeded } from './billing';
+// [SC-05] isoDateField — canonical date field for neon-serverless compat (BUG-205).
+import { isoDateField } from './common';
 
 /**
  * Shared typed error class hierarchy.
@@ -346,6 +348,53 @@ export function classifyOrphanError(
   return 'unknown_post_stream';
 }
 
+/**
+ * [SC-06 / UX Resilience Rules] Client-transport error classes.
+ *
+ * These represent failure modes that occur BEFORE or OUTSIDE an HTTP response:
+ *   - `NetworkError`: `fetch` itself rejected (no response received) — offline,
+ *     DNS failure, timeout, abort, etc.
+ *   - `UpstreamError`: HTTP 5xx response received — server returned an error
+ *     status so the API client could not surface a typed API error body.
+ *
+ * Hosting them here (alongside the HTTP-layer errors) means mobile's
+ * `instanceof` checks work across the package boundary with a single class
+ * definition, matching the pattern established for `ForbiddenError` et al. in
+ * [BUG-644].
+ *
+ * Note: `fetchOrThrowNetworkError` (the thin `globalThis.fetch` wrapper) stays
+ * in `apps/mobile/src/lib/api-errors.ts` because it depends on a browser/RN
+ * runtime and belongs at the application boundary, not in the schema package.
+ */
+export class NetworkError extends Error {
+  readonly errorCode = 'NETWORK_ERROR' as const;
+  override readonly cause: unknown;
+
+  constructor(
+    message = "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
+    cause?: unknown,
+  ) {
+    super(message);
+    this.name = 'NetworkError';
+    this.cause = cause;
+    Object.setPrototypeOf(this, NetworkError.prototype);
+  }
+}
+
+export class UpstreamError extends Error {
+  readonly errorCode = 'UPSTREAM_ERROR' as const;
+  readonly code: string;
+  readonly status: number;
+
+  constructor(message: string, code: string, status = 500) {
+    super(message);
+    this.name = 'UpstreamError';
+    this.code = code;
+    this.status = status;
+    Object.setPrototypeOf(this, UpstreamError.prototype);
+  }
+}
+
 // Common error codes — single source of truth
 export const ERROR_CODES = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',
@@ -381,6 +430,8 @@ export const ERROR_CODES = {
   // [WI-150 / WI-206] Returned when a dictation review payload (or other
   // size-capped request body) exceeds its server-side budget. HTTP 413.
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
+  // [SC-06] Client-transport error: fetch rejected before any HTTP response.
+  NETWORK_ERROR: 'NETWORK_ERROR',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
@@ -409,7 +460,9 @@ const quotaExceededDetailsSchema = z.object({
   quotaModel: z.enum(['per-profile', 'shared-pool']),
   profileRole: z.enum(['owner', 'child']).nullable(),
   reason: z.enum(['monthly', 'daily']),
-  resetsAt: z.string().datetime({ offset: true }),
+  // [SC-05] isoDateField — mirrors billing.ts quotaExceededSchema which also uses isoDateField.
+  // Previously z.string().datetime({ offset: true }) diverged from the billing canonical schema.
+  resetsAt: isoDateField,
   monthlyLimit: z.number().int(),
   usedThisMonth: z.number().int(),
   dailyLimit: z.number().int().nullable(),

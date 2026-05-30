@@ -207,6 +207,18 @@ const raw: readonly KeepPattern[] = [
       'titleKey/subtitleKey recency ternary consumed at ' +
       'apps/mobile/src/app/(app)/child/[profileId]/index.tsx:266',
   },
+  {
+    pattern: 'session.messageBubble.escalation.*',
+    reason:
+      'selected via escalation.labelKey from ESCALATION_STYLES[escalationRung] at ' +
+      'apps/mobile/src/components/session/MessageBubble.tsx:244',
+  },
+  {
+    pattern: 'session.messageBubble.verificationBadge.*',
+    reason:
+      'selected via VERIFICATION_BADGE_KEY[verificationBadge] at ' +
+      'apps/mobile/src/components/session/MessageBubble.tsx:274',
+  },
 ];
 
 export const KEEP_PATTERNS: readonly KeepPattern[] = raw.map((p) =>

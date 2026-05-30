@@ -90,10 +90,10 @@ export function useCelebration(options?: {
 
   // Keep a ref to the latest options so callbacks (e.g. onAllComplete) are
   // always current without re-creating flushNext on every render.
+  // Assign during render (not in a post-render effect) so the ref is
+  // immediately up-to-date if flushNext fires synchronously in the same cycle.
   const optionsRef = useRef(options);
-  useEffect(() => {
-    optionsRef.current = options;
-  });
+  optionsRef.current = options;
 
   const flushNext = useCallback(() => {
     setPendingQueue((current) => {

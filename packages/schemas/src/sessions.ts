@@ -67,29 +67,23 @@ export type ExtractedInterviewSignals = z.infer<
   typeof extractedInterviewSignalsSchema
 >;
 
-// Engagement signal — parent-facing session recap classification
-// Canonical source for all engagement signal values used by API (session-highlights)
-// and mobile (EngagementChip). Do not redefine these locally.
+// Engagement signal + session type enums live in the dependency-free
+// ./session-enums.ts leaf module to avoid a circular import with progress.ts
+// (sessions.ts imports celebration schemas from progress.ts). Re-export them
+// here so existing `from './sessions'` consumers and the package barrel are
+// unaffected.
+import {
+  ENGAGEMENT_SIGNALS,
+  engagementSignalSchema,
+  sessionTypeSchema,
+  type EngagementSignal,
+  type SessionType,
+} from './session-enums.ts';
 
-export const ENGAGEMENT_SIGNALS = [
-  'curious',
-  'stuck',
-  'breezing',
-  'focused',
-  'scattered',
-] as const;
-
-export const engagementSignalSchema = z.enum(ENGAGEMENT_SIGNALS);
-export type EngagementSignal = z.infer<typeof engagementSignalSchema>;
+export { ENGAGEMENT_SIGNALS, engagementSignalSchema, sessionTypeSchema };
+export type { EngagementSignal, SessionType };
 
 // Session schemas
-
-export const sessionTypeSchema = z.enum([
-  'learning',
-  'homework',
-  'interleaved',
-]);
-export type SessionType = z.infer<typeof sessionTypeSchema>;
 
 export const inputModeSchema = z.enum(['text', 'voice']);
 export type InputMode = z.infer<typeof inputModeSchema>;

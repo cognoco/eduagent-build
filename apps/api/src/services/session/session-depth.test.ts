@@ -11,7 +11,7 @@ import type { LLMProvider } from '../llm';
 import { evaluateSessionDepth } from './session-depth';
 
 function makeTranscript(
-  pairs: Array<{ user: string; assistant: string }>
+  pairs: Array<{ user: string; assistant: string }>,
 ): SessionTranscript {
   const startedAt = new Date('2026-04-19T10:00:00.000Z').toISOString();
   return {
@@ -32,14 +32,14 @@ function makeTranscript(
         role: 'user' as const,
         content: pair.user,
         timestamp: new Date(
-          `2026-04-19T10:00:${String(index).padStart(2, '0')}.000Z`
+          `2026-04-19T10:00:${String(index).padStart(2, '0')}.000Z`,
         ).toISOString(),
       },
       {
         role: 'assistant' as const,
         content: pair.assistant,
         timestamp: new Date(
-          `2026-04-19T10:01:${String(index).padStart(2, '0')}.000Z`
+          `2026-04-19T10:01:${String(index).padStart(2, '0')}.000Z`,
         ).toISOString(),
       },
     ]),
@@ -244,5 +244,55 @@ describe('evaluateSessionDepth', () => {
     expect(result.method).toBe('llm_gate');
     expect(result.meaningful).toBe(true);
     expect(result.reason).toBe('deep follow-ups about fractions');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Break test — the timeout race in callWithTimeout must clear its setTimeout
+  // when the LLM call wins. Pre-fix the dangling timer (a) keeps the worker
+  // event loop alive for up to timeoutMs after the request resolved and (b)
+  // later rejects a handler-less Promise<never> -> unhandled rejection.
+  // ---------------------------------------------------------------------------
+  it('clears the timeout timer when the LLM call wins the race (no dangling timer)', async () => {
+    jest.useFakeTimers();
+    try {
+      const rawResponse = JSON.stringify({
+        meaningful: true,
+        reason: 'Deep session',
+        topics: [{ summary: 'Photosynthesis basics', depth: 'substantial' }],
+      });
+      const provider: LLMProvider = {
+        ...createMockProvider('gemini'),
+        // Resolve synchronously so the llmPromise wins the race deterministically.
+        chat: jest.fn().mockResolvedValue(rawResponse),
+      };
+      _clearProviders();
+      registerProvider(provider);
+
+      // 5-exchange "deep heuristic" session routes through detectTopicsOnly ->
+      // callWithTimeout, exercising the timeout race.
+      const transcript = makeTranscript([
+        {
+          user: 'Tell me about photosynthesis.',
+          assistant: 'Plants use light.',
+        },
+        { user: 'What does chlorophyll do?', assistant: 'It absorbs light.' },
+        {
+          user: 'Why are leaves green then?',
+          assistant: 'They reflect green.',
+        },
+        { user: 'Which colors absorb most?', assistant: 'Red and blue.' },
+        { user: 'Does that change under water?', assistant: 'Other pigments.' },
+      ]);
+
+      const result = await evaluateSessionDepth(transcript);
+
+      expect(result.method).toBe('heuristic_deep');
+      // Core assertion: the timeout timer must be cleared on the happy path.
+      // Pre-fix this is 1 (the uncleared setTimeout); post-fix 0.
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
   });
 });

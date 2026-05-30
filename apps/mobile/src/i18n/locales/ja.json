@@ -511,7 +511,10 @@
       "switchToVoiceMode": "音声モードに切り替え",
       "voiceMode": "音声モード",
       "screenReaderVoiceNote": "スクリーンリーダーがオンです。音声入力は利用できません。下のテキスト入力を使用してください。",
-      "stepProgress": "ステップ{{current}}/{{total}}"
+      "stepProgress": "ステップ{{current}}/{{total}}",
+      "voicePermissionErrorTitle": "音声入力エラー",
+      "voicePermissionErrorMessage": "音声入力にはマイクへのアクセスが必要です。設定で有効にしてください。",
+      "voicePermissionOpenSettings": "設定を開く"
     },
     "filingFailed": {
       "retryInProgress": "再試行はすでに進行中です。",
@@ -577,6 +580,39 @@
       "currentTopic": "トピック：",
       "changeTopicLabel": "トピックを{{topic}}から変更",
       "changeTopic": "変更"
+    },
+    "messageBubble": {
+      "thinking": "考え中",
+      "guidedResponse": "ガイド付き応答",
+      "pendingSync": "メッセージは同期待ちです",
+      "sending": "送信中…",
+      "escalation": {
+        "stepByStep": "ステップバイステップ",
+        "letMeShowYou": "やってみせます",
+        "teachingMode": "ティーチングモード"
+      },
+      "verificationBadge": {
+        "evaluate": "思考力アップクリア",
+        "teachBack": "ティーチバッククリア"
+      }
+    },
+    "noteInput": {
+      "cancel": "キャンセル",
+      "save": "保存",
+      "noteText": "メモのテキスト",
+      "startRecording": "録音開始",
+      "stopRecording": "録音停止",
+      "listening": "聞き取り中...",
+      "noteTooLong": "メモが長くなっています！({{length}}/{{max}})"
+    },
+    "voiceInput": {
+      "send": "送信",
+      "sendVoiceMessage": "音声メッセージを送信",
+      "reRecord": "再録音",
+      "discardRecording": "録音を破棄",
+      "transcriptLabel": "音声テキスト - タップして編集",
+      "startRecording": "録音開始",
+      "stopRecording": "録音停止"
     }
   },
   "quiz": {
@@ -713,6 +749,16 @@
     },
     "results": {
       "viewHistory": "履歴を見る"
+    },
+    "guessWhoQuestion": {
+      "typeAName": "名前を入力",
+      "answerLabel": "だれでしょう？の答え",
+      "submitGuess": "回答を送信",
+      "submitGuessLabel": "回答を送信",
+      "revealNextClue": "次のヒントを見る",
+      "revealNextClueLabel": "次のヒントを見る",
+      "iDontKnow": "わかりません",
+      "iDontKnowLabel": "答えがわかりません"
     }
   },
   "dictation": {
@@ -2507,6 +2553,25 @@
       "minutesOne": "1分",
       "hoursMinutes": "{{hours}}時間{{minutes}}分",
       "none": "—"
+    }
+  },
+  "feedbackSheet": {
+    "title": "フィードバックを送信",
+    "shakeHint": "または、いつでもスマホを振ってご連絡ください。",
+    "thankYouTitle": "ありがとうございます！",
+    "thankYouMessage": "フィードバックを受け取りました。内容を確認いたします。",
+    "categoryLabel": "フィードバックの種類は？",
+    "messageLabel": "何が起きましたか？",
+    "messagePlaceholder": "問題やアイデアについてご記入ください…",
+    "deviceInfoNote": "調査のため、アプリのバージョンとデバイス情報も送信されます。",
+    "sendButton": "フィードバックを送信",
+    "sendButtonLabel": "フィードバックを送信",
+    "cancelButton": "キャンセル",
+    "closeLabel": "閉じる",
+    "category": {
+      "bug": "バグ",
+      "suggestion": "提案",
+      "other": "その他"
     }
   }
 }

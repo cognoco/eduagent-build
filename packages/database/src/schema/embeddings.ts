@@ -38,6 +38,11 @@ export const sessionEmbeddings = pgTable(
       table.sessionId,
       table.profileId,
     ),
+    // [BUG-393 / migration 0086] Standalone profile_id FK index. NOT covered by
+    // session_embeddings_session_profile_uq (profile_id is the second column
+    // there). Created in the database by migration 0086_bug393_fk_indexes.sql;
+    // declared here to keep the schema in sync with the applied migration.
+    index('session_embeddings_profile_id_idx').on(table.profileId),
     index('embeddings_hnsw_idx').using(
       'hnsw',
       table.embedding.op('vector_cosine_ops'),
