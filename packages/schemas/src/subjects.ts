@@ -280,7 +280,11 @@ export const MIN_GENERATED_BOOK_TOPICS = 5;
 export const MAX_GENERATED_BOOK_TOPICS = 15;
 export const MIN_GENERATED_BOOK_CHAPTERS = 2;
 
-const normalizeGeneratedTopicTitle = (title: string): string =>
+// Canonical topic-title normalizer. Used both here (generation-schema dedup)
+// and by the API persistence/dedup path (re-exported as `normalizeTopicTitle`
+// from services/curriculum.ts). Collapses internal whitespace so "A  B" and
+// "A B" dedupe identically across both paths.
+export const normalizeGeneratedTopicTitle = (title: string): string =>
   title.trim().toLowerCase().replace(/\s+/g, ' ');
 
 export const bookTopicGenerationResultSchema = z
