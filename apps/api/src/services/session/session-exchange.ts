@@ -546,28 +546,41 @@ async function applyContinuationScore(
   retrievalScore?: number,
 ): Promise<void> {
   if (typeof retrievalScore !== 'number') return;
-  // Re-read session metadata so we layer on top of any updates
-  // prepareExchangeContext / persistExchangeResult wrote during this turn.
+  // [CR-2026-05-19-M3]: Wrap SELECT + UPDATE in a transaction with FOR UPDATE
+  // so concurrent exchanges cannot clobber each other's continuationDepth write.
   // The previously-passed `session.metadata` snapshot was captured at request
   // start, before `updateSessionMetadata` set `continuationOpenerActive: true`,
   // so spreading that snapshot here clobbered the freshly-written flag.
-  const [fresh] = await db
-    .select({ metadata: learningSessions.metadata })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-      ),
-    )
-    .limit(1);
-  const nextMetadata = {
-    ...((fresh?.metadata as Record<string, unknown> | null) ?? {}),
-  };
-  delete nextMetadata['continuationOpenerActive'];
-  delete nextMetadata['continuationOpenerStartedExchange'];
-  nextMetadata['continuationDepth'] = mapRetrievalScoreToDepth(retrievalScore);
-  await updateSessionMetadata(db, profileId, sessionId, nextMetadata);
+  await db.transaction(async (tx) => {
+    const [fresh] = await tx
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+    if (!fresh) return; // session not found — skip silently
+    const nextMetadata = {
+      ...((fresh.metadata as Record<string, unknown> | null) ?? {}),
+    };
+    delete nextMetadata['continuationOpenerActive'];
+    delete nextMetadata['continuationOpenerStartedExchange'];
+    nextMetadata['continuationDepth'] =
+      mapRetrievalScoreToDepth(retrievalScore);
+    await tx
+      .update(learningSessions)
+      .set({ metadata: nextMetadata, updatedAt: new Date() })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      );
+  });
 }
 
 async function persistChallengeRoundState(

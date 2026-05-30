@@ -640,13 +640,18 @@ export default function PracticeScreen(): React.ReactElement {
                   className="mr-3"
                   style={[
                     styles.smallIconCircle,
-                    { backgroundColor: colors.mint },
+                    {
+                      backgroundColor:
+                        assessmentCount > 0 ? colors.mint : colors.surface,
+                    },
                   ]}
                 >
                   <Ionicons
-                    name="checkmark"
-                    size={24}
-                    color={colors.chipStrongText}
+                    name={assessmentCount > 0 ? 'checkmark' : 'lock-closed'}
+                    size={assessmentCount > 0 ? 24 : 18}
+                    color={
+                      assessmentCount > 0 ? colors.chipStrongText : colors.muted
+                    }
                   />
                 </View>
                 <View className="flex-1">

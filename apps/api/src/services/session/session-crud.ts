@@ -1086,32 +1086,49 @@ export async function closeSession(
       ? 'auto_closed'
       : 'completed';
 
-  // BD-05: Compare-and-swap — only close if the session is still active.
-  // Between the initial read and this write, the learner could resume the
-  // session, so we guard the UPDATE with `status = 'active'` to prevent
-  // closing a session that has already been resumed or closed.
-  const [updated] = await db
-    .update(learningSessions)
-    .set({
-      status: nextStatus,
-      endedAt: now,
-      durationSeconds,
-      wallClockSeconds,
-      metadata: {
-        ...(((session.metadata as Record<string, unknown> | undefined) ??
-          {}) as Record<string, unknown>),
-        milestonesReached: input.milestonesReached ?? [],
-      },
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-        eq(learningSessions.status, 'active'),
-      ),
-    )
-    .returning({ id: learningSessions.id });
+  // BD-05 + [CR-2026-05-19-M3]: Wrap the session close UPDATE and summary
+  // INSERT in a single transaction so a crash between them cannot leave the
+  // session in 'completed' with no summary row. The compare-and-swap guard
+  // (status = 'active') still prevents double-close; the transaction just
+  // makes the write pair atomic.
+  const updated = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    const [row] = await txDb
+      .update(learningSessions)
+      .set({
+        status: nextStatus,
+        endedAt: now,
+        durationSeconds,
+        wallClockSeconds,
+        metadata: {
+          ...(((session.metadata as Record<string, unknown> | undefined) ??
+            {}) as Record<string, unknown>),
+          milestonesReached: input.milestonesReached ?? [],
+        },
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+          eq(learningSessions.status, 'active'),
+        ),
+      )
+      .returning({ id: learningSessions.id });
+
+    if (!row) return null;
+
+    await createPendingSessionSummary(
+      txDb,
+      sessionId,
+      profileId,
+      session.topicId ?? null,
+      effectiveSummaryStatus,
+    );
+
+    return row;
+  });
 
   // Session was already closed or resumed — skip side-effects
   if (!updated) {
@@ -1130,14 +1147,6 @@ export async function closeSession(
   }
 
   clearSessionStaticContext(profileId, sessionId);
-
-  await createPendingSessionSummary(
-    db,
-    sessionId,
-    profileId,
-    session.topicId ?? null,
-    effectiveSummaryStatus,
-  );
 
   // FR92: Extract interleaved topic IDs from session metadata
   const interleavedTopicIds = await resolveInterleavedTopicIds(

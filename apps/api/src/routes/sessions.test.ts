@@ -2693,7 +2693,7 @@ describe('session routes', () => {
 
       expect(res.status).toBe(201);
       expect(mockStartInterleavedSession).toHaveBeenCalledWith(
-        expect.anything(), // db
+        mockDatabaseModule.db, // exact scoped db handle — guards against wrong-db injection
         expect.any(String), // profileId
         expect.objectContaining({
           subjectId: SUBJECT_ID,

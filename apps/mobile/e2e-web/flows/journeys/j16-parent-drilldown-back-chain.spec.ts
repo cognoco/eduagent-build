@@ -18,7 +18,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
   await page.goto('/home', { waitUntil: 'commit' });
   await pressFamilyHomeAction(
     page,
-    page.getByTestId(`parent-home-child-progress-${childProfileId}`),
+    page.getByTestId(`parent-home-check-child-${childProfileId}`),
     { timeout: 60_000 },
   );
   await waitForAppScreen(page, 'child-detail-scroll', {
@@ -26,7 +26,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
     familyRouteRecovery: async () => {
       await pressFamilyHomeAction(
         page,
-        page.getByTestId(`parent-home-child-progress-${childProfileId}`),
+        page.getByTestId(`parent-home-check-child-${childProfileId}`),
         { timeout: 30_000 },
       );
     },

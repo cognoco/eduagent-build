@@ -54,7 +54,6 @@ import {
 } from '../../../lib/navigation';
 import { copyRegisterFor } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
-import { isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
 import { getSubjectTintMap } from '../../../lib/subject-tints';
 import { useAppContext } from '../../../lib/app-context';
@@ -329,19 +328,6 @@ export default function ProgressScreen(): React.ReactElement {
     () => getLatestReport(weeklyReportsQuery.data, monthlyReportsQuery.data),
     [monthlyReportsQuery.data, weeklyReportsQuery.data],
   );
-  const sessionCount =
-    profileSessionsQuery.data?.length ?? inventory?.global.totalSessions ?? 0;
-  const lastSessionAt =
-    profileSessionsQuery.data?.[0]?.startedAt ??
-    inventory?.subjects
-      ?.map((subject) => subject.lastSessionAt)
-      .filter((value): value is string => typeof value === 'string')
-      .sort((a, b) => b.localeCompare(a))[0] ??
-    null;
-  const isStale =
-    !!inventory &&
-    !profileSessionsQuery.isLoading &&
-    isProfileStale({ sessionCount, lastSessionAt });
   const isParentProxyView = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.isParentProxy
     : role === 'impersonated-child';
@@ -352,7 +338,7 @@ export default function ProgressScreen(): React.ReactElement {
   // the inventory/session queries resolve to an empty or stale shell.
   const progressSurfaceState: 'empty' | 'awaiting' | 'ready' = hasAnyReports
     ? 'ready'
-    : isEmpty || (isViewingSelf && isStale)
+    : isEmpty
       ? 'empty'
       : 'awaiting';
 
