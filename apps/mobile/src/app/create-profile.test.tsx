@@ -169,7 +169,8 @@ describe('CreateProfileScreen', () => {
     expect(
       screen.getByText(/your mentor talks to you the right way/),
     ).toBeTruthy();
-    // Persona picker buttons are hidden (auto-detected from birth date)
+    // [EPIC-12] Age-bracket picker buttons (removed in EPIC-12) must not reappear.
+    // These testIDs belonged to the old persona-picker UI; asserting null prevents regression.
     expect(screen.queryByTestId('persona-teen')).toBeNull();
     expect(screen.queryByTestId('persona-learner')).toBeNull();
     expect(screen.queryByTestId('persona-parent')).toBeNull();

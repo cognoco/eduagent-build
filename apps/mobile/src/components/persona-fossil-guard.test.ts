@@ -8,9 +8,11 @@ import { resolve } from 'node:path';
 // @eduagent/schemas. This guard prevents NEW fossils from appearing.
 // Remove entries from KNOWN_SITES as P7 migrates each file.
 
-const KNOWN_SITES = new Set<string>([
-  'apps/mobile/src/app/create-profile.test.tsx',
-]);
+// [GC6-sweep 2026-05-30] create-profile.test.tsx removed: the only remaining
+// /\bPersona\b/ match was a comment ("Persona picker buttons...") which was
+// reworded during this review sweep. The testID assertions (persona-teen, etc.)
+// use lowercase and do not match /\bPersona\b/.
+const KNOWN_SITES = new Set<string>([]);
 
 const FOSSIL_PATTERNS: RegExp[] = [
   /\bpersonaFromBirthYear\b/,

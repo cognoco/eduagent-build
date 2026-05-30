@@ -1,11 +1,13 @@
 import { useCallback } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
   useNotificationSettings,
   useUpdateNotificationSettings,
 } from '../../../hooks/use-settings';
 import { platformAlert } from '../../../lib/platform-alert';
+import { goBackOrReplace } from '../../../lib/navigation';
 import {
   SectionHeader,
   ToggleRow,
@@ -13,10 +15,12 @@ import {
 
 export default function NotificationsScreen(): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const {
     data: notifPrefs,
     isLoading: notifLoading,
     isError: notifError,
+    refetch: refetchNotifPrefs,
   } = useNotificationSettings();
   const updateNotifications = useUpdateNotificationSettings();
   const settingsUnavailable = notifError || !notifPrefs;
@@ -131,6 +135,40 @@ export default function NotificationsScreen(): React.ReactElement {
         <SectionHeader testID="notifications-section-header">
           {t('more.notifications.sectionHeader')}
         </SectionHeader>
+        {notifError && !notifLoading ? (
+          <View
+            className="bg-surface rounded-card px-4 py-4 mb-2"
+            testID="notifications-error-banner"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              {t('more.notifications.updateErrorTitle')}
+            </Text>
+            <View className="flex-row gap-3 mt-3">
+              <Pressable
+                onPress={() => void refetchNotifPrefs()}
+                className="self-start"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.retry')}
+                testID="notifications-error-retry"
+              >
+                <Text className="text-caption font-semibold text-primary">
+                  {t('common.retry')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => goBackOrReplace(router, '/(app)/more')}
+                className="self-start"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
+                testID="notifications-error-back"
+              >
+                <Text className="text-caption font-semibold text-text-secondary">
+                  {t('common.back')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         <ToggleRow
           label={t('more.notifications.pushTitle')}
           value={notifPrefs?.pushEnabled ?? false}

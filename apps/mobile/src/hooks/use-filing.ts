@@ -408,19 +408,22 @@ export function useMultiTopicFiling() {
       sessionId: string;
       topics: DetectedTopic[];
     }) => {
-      const results: FilingResult[] = [];
-      for (const topic of input.topics) {
-        const res = await client.filing.$post({
-          json: {
-            sessionId: input.sessionId,
-            sessionMode: 'freeform',
-            selectedSuggestion: topic.summary,
-          },
-        });
-        await assertOk(res);
-        results.push((await res.json()) as FilingResult);
-      }
-      return results;
+      // [PERF-F7.1] Parallelise filing calls — previous sequential for-await
+      // added one full RTT per topic (3–5 topics = 3–5× latency). Each filing
+      // call is independent so Promise.all is safe here.
+      return Promise.all(
+        input.topics.map(async (topic) => {
+          const res = await client.filing.$post({
+            json: {
+              sessionId: input.sessionId,
+              sessionMode: 'freeform',
+              selectedSuggestion: topic.summary,
+            },
+          });
+          await assertOk(res);
+          return (await res.json()) as FilingResult;
+        }),
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });

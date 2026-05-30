@@ -309,10 +309,9 @@ describe('Surface ownership: barrel map', () => {
 
     if (homeBarrel) {
       expect(homeBarrel.has('useProgressInventory')).toBe(false);
-    } else {
-      // Barrel file doesn't exist yet — that's fine, nothing to check.
-      expect(true).toBe(true);
     }
+    // If the barrel doesn't exist there's nothing to check — no assertion needed.
+    // The 'loaded at least one barrel' test above guarantees KNOWN_BARRELS still works.
   });
 });
 

@@ -650,8 +650,18 @@ export function useFailedFreeformLibraryFilingSessions(): UseQueryResult<
           await sessionsRes.json(),
         );
 
+        // [PERF-F7.2] Pre-filter: sessions that already have a topicId are
+        // successfully filed and cannot have filingStatus === 'filing_failed'.
+        // Skipping them reduces detail-fetch fan-out without changing results.
+        // Full fix requires adding filingStatus to childSessionSchema (backend
+        // API change — escalated to lens 1/backend so the list response carries
+        // filingStatus and eliminates the fan-out entirely; tracked as PERF-F7.2).
+        const candidateSessions = sessionsPage.sessions.filter(
+          (s) => !s.topicId,
+        );
+
         const detailedSessions = await Promise.all(
-          sessionsPage.sessions.map(async (session) => {
+          candidateSessions.map(async (session) => {
             const detailRes = await client.sessions[':sessionId'].$get(
               { param: { sessionId: session.sessionId } },
               { init: { signal } },

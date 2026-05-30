@@ -9,6 +9,7 @@ import { useProfile } from '../../../lib/profile';
 import { signOutWithCleanup } from '../../../lib/sign-out';
 import { platformAlert } from '../../../lib/platform-alert';
 import { GateContent, LightBulbAnimation } from '../../../components/common';
+import * as Sentry from '@sentry/react-native';
 
 /**
  * Gate shown when no profile exists yet (first-time user after sign-up).
@@ -35,6 +36,14 @@ export function CreateProfileGate(): React.ReactElement {
       });
     } catch (err: unknown) {
       console.error('signOut failed:', err);
+      // Auth-adjacent failure — escalate to Sentry. console.error alone is
+      // device-local and invisible in production observability.
+      Sentry.captureException(err, {
+        tags: {
+          surface: 'consent_gate_sign_out',
+          component: 'CreateProfileGate',
+        },
+      });
       platformAlert(
         t('tabs.createProfile.signOutFailedTitle'),
         t('tabs.createProfile.signOutFailedMessage'),

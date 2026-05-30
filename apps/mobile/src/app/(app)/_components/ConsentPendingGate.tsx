@@ -16,6 +16,7 @@ import { computeAgeBracket } from '@eduagent/schemas';
 import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
 import { signOutWithCleanup } from '../../../lib/sign-out';
+import * as Sentry from '@sentry/react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { formatApiError } from '../../../lib/format-api-error';
 import { GateContent } from '../../../components/common';
@@ -53,6 +54,15 @@ export function ConsentPendingGate(): React.ReactElement {
       });
     } catch (err: unknown) {
       console.error('signOut failed:', err);
+      // Auth-adjacent failure — escalate to Sentry so we can query "how
+      // many users got stuck in a partial sign-out state in 24h". `console.error`
+      // alone is device-local and invisible in production observability.
+      Sentry.captureException(err, {
+        tags: {
+          surface: 'consent_gate_sign_out',
+          component: 'ConsentPendingGate',
+        },
+      });
       platformAlert(
         t('tabs.createProfile.signOutFailedTitle'),
         t('tabs.createProfile.signOutFailedMessage'),
