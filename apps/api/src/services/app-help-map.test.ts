@@ -261,6 +261,13 @@ describe('isAppHelpQuery', () => {
     'How often should I review?',
     'When should I review?',
     'How does spaced repetition work here?',
+    'What are topics and chapters in the app?',
+    'What is the difference between a book and a topic?',
+    "What's the difference between a book and a topic?",
+    'Is this app free?',
+    'Is the app free?',
+    'Do I have to pay?',
+    'How much does it cost?',
   ])('classifies "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(true);
   });
@@ -310,7 +317,6 @@ describe('isAppHelpQuery', () => {
     'How often should I practice the piano?',
     'Explain the book Romeo and Juliet',
     'What is a book report?',
-    'What is the difference between a book and a topic?',
     'Tell me about the chapter on the French Revolution',
   ])('does NOT classify "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(false);

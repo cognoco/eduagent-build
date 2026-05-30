@@ -69,7 +69,7 @@ const APP_HELP_GENERAL =
 // ("what is a topic in the app", "how is the library organised", "how often
 // should i review in the app").
 const APP_HELP_ACCOUNT =
-  /\b(add (a |my |another )?(child|kid|son|daughter)|create (a |another )?(child|kid)('?s)? (profile|account)|(child|children|kid|son|daughter)'?s progress|progress (tab|page|screen|section|view|dashboard)|upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit|app language|mentor language|(change|switch|set) (the )?(app |mentor |ui )?language)\b/i;
+  /\b(add (a |my |another )?(child|kid|son|daughter)|create (a |another )?(child|kid)('?s)? (profile|account)|(child|children|kid|son|daughter)'?s progress|progress (tab|page|screen|section|view|dashboard)|upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit|app language|mentor language|(change|switch|set) (the )?(app |mentor |ui )?language|is (this |the )?(app|it|mentomate) free|is it free|do i (have to |need to )?pay|does (it|this|the app|mentomate) cost|how much (does|is) (it|this|the app|mentomate))\b/i;
 
 // Library-structure and review-cadence concept questions. Each clause is tight:
 // "book"/"topic"/"chapter" are also ordinary study words, so structure clauses
@@ -79,7 +79,7 @@ const APP_HELP_ACCOUNT =
 // request) and "how often should I practice the piano" do NOT match, while
 // "how often do I need to do a review" does.
 const APP_HELP_LIBRARY =
-  /\bspaced repetition\b|\breviews? (schedule|cadence|frequency|interval)\b|\bhow (often|frequently|much)[^.?!]{0,25}\breviews?\b|\bwhen (is|will|do|does|should)[^.?!]{0,20}\b(next review|review due|i review)\b|\bhow (is|are) (the |my )?(library|subjects?|books?|topics?|chapters?) (organi[sz]ed|structured|arranged|laid out|set up)\b|\b(what is|what are|what'?s) (a |the )?(topics?|chapters?|books?|subjects?|shelf|shelves) (in|on) (the |this )?(app|mentomate|library)\b|\b(what is|how does) (the )?(library|shelf)\b/i;
+  /\bspaced repetition\b|\breviews? (schedule|cadence|frequency|interval)\b|\bhow (often|frequently|much)[^.?!]{0,25}\breviews?\b|\bwhen (is|will|do|does|should)[^.?!]{0,20}\b(next review|review due|i review)\b|\bhow (is|are) (the |my )?(library|subjects?|books?|topics?|chapters?) (organi[sz]ed|structured|arranged|laid out|set up)\b|\b(what is|what are|what'?s) (a |the )?(topics?|chapters?|books?|subjects?|shelf|shelves)( and (a |the )?(topics?|chapters?|books?|subjects?))? (in|on) (the |this )?(app|mentomate|library)\b|\b(what'?s the )?difference between (a |the )?(book|topic|chapter|subject)s? and (a |the )?(book|topic|chapter|subject)s?\b|\b(what is|how does) (the )?(library|shelf)\b/i;
 
 export function isAppHelpQuery(userMessage: string): boolean {
   if (!userMessage || userMessage.length < 5) return false;
@@ -104,7 +104,7 @@ export function buildAppHelpDirectReply(userMessage: string): string {
   }
 
   if (
-    /\b(upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit)\b/.test(
+    /\b(upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit|is (this |the )?(app|it|mentomate) free|is it free|do i (have to |need to )?pay|does (it|this|the app|mentomate) cost|how much (does|is) (it|this|the app|mentomate))\b/.test(
       text,
     )
   ) {
