@@ -678,13 +678,13 @@ function SessionScreenInner() {
       {
         id: 'session-expired',
         role: 'assistant',
-        content: 'Session expired. Start a new one to keep going.',
+        content: t('session.expiredSystemMessage'),
         isSystemPrompt: true,
         kind: 'session_expired',
       },
     ]);
     setResumedBanner(false);
-  }, [sessionExpired]);
+  }, [sessionExpired, t]);
 
   useSessionRecovery({
     activeProfileId: activeProfile?.id,

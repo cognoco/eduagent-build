@@ -67,10 +67,21 @@ tags:
 #   = "Daily limit reached" (en.json:465)
 # The old plain-text "daily question limit" copy was replaced by the structured
 # QuotaExceededCard component in the session streaming refactor.
+#
+# Timeout raised from 15000 → 30000 (TIMING fix, not a weakening):
+# The session send uses streamSSEViaXHR (use-sessions.ts:491), which has a
+# two-phase XHR response path — readyState=2 sets a placeholder error, then
+# onloadend (sse.ts:525-531) enriches it via classifyXhrError and wakes the
+# generator. On a cold WHPX emulator with simultaneous transcript-hydration
+# queries in flight (useSessionTranscript fires on session screen mount),
+# the XHR stack can be slower than the plain-fetch REST path used by quiz.
+# 30000 matches the learner-screen wait (step 2) and matches the margin
+# quiz-error-quota.yaml implicitly assumes for a similar 402 assertion.
+# The card assertion is mandatory — no optional:true, no id→text downgrade.
 - extendedWaitUntil:
     visible:
       id: "quota-exceeded-card"
-    timeout: 15000
+    timeout: 30000
 
 # 7b. Verify the daily-limit heading text is present inside the card
 - assertVisible:
@@ -79,6 +90,12 @@ tags:
 # 8. Screenshot of quota exceeded state
 - takeScreenshot: daily-quota-exceeded-chat
 
-# 9. Verify the chat input is still present (session screen didn't crash)
+# 9. Verify the disabled-input banner is present (quota error replaces the
+#    composer with input-disabled-banner; chat-input is unmounted when
+#    inputDisabled=true and showDisabledBanner=true).
+#    Source: ChatShell.tsx:938-949 — inputDisabled&&showDisabledBanner renders
+#    testID="input-disabled-banner"; the chat-input TextInput is in the
+#    else-branch and is therefore not rendered.
+#    Confirmed by unit test: index.test.tsx:1786
 - assertVisible:
-    id: "chat-input"
+    id: "input-disabled-banner"

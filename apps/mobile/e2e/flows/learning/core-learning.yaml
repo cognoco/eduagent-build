@@ -95,11 +95,15 @@ tags:
 - tapOn:
     id: "home-coach-band-continue"
 
-# 4. Session active — chat input present
+# 4. Session active — chat input present.
+#    The coach band tap calls pushLearningResumeTarget (navigation.ts:120-135)
+#    which pushes /(app)/home then /(app)/session. The session screen fetches
+#    existing events for the active sessionId before rendering ChatShell.
+#    10s was too tight on a cold emulator — bumped to 20s (FIXED-timing).
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 10000
+    timeout: 20000
 
 # 5. Exchange 1: user question
 - tapOn:

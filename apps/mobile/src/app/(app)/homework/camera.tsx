@@ -194,7 +194,7 @@ export default function CameraScreen(): React.ReactNode {
 
   useEffect(() => {
     if (!speech.error) return;
-    platformAlert('Microphone unavailable', speech.error);
+    platformAlert(t('homework.microphoneUnavailableTitle'), speech.error);
   }, [speech.error]);
 
   // Sync OCR hook status into reducer

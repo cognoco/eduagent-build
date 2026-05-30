@@ -63,7 +63,16 @@ tags:
 
 - takeScreenshot: subscription-screen-family-pool
 
-# 7. Scroll to the family pool section
+# 7. Wait for the family pool section — rendered only after a secondary
+#    useFamilySubscription() query resolves (cascade: subscription query →
+#    enabled family query → data populated → section renders). On a cold
+#    emulator the cascade can take well beyond a scroll timeout alone.
+- extendedWaitUntil:
+    visible:
+      id: "family-pool-section"
+    timeout: 30000
+
+# 7b. Now scroll to it (it may be below the fold)
 - scrollUntilVisible:
     element:
       id: "family-pool-section"
