@@ -381,54 +381,72 @@ Out of scope (must not change):
 
 ### Phase 1.5 — Book Mastered (strict + sticky; builds on Phase 1)
 
-- [ ] **T12: Add `MASTERED` to the book status enum.**
-  In `packages/schemas/src/subjects.ts:150-156`, add `'MASTERED'` to
-  `bookProgressStatusSchema`. `REVIEW_DUE` remains a separate overlay value.
-  **done when:** `subjects.test.ts` accepts `status: 'MASTERED'` and still rejects
-  `'UNKNOWN'`; `pnpm exec nx run api:typecheck` passes.
+- [ ] **T12: Retire `COMPLETED`; carry mastery as a separate flag on the contract.**
+  Mastery is NOT an enum value (decision #7). In `packages/schemas/src/subjects.ts`:
+  - Reduce `bookProgressStatusSchema` (line 150-156) to
+    **`['NOT_STARTED', 'IN_PROGRESS', 'REVIEW_DUE']`** — remove `'COMPLETED'`.
+  - Add to `curriculumBookSchema` (line 158-171) and `bookWithTopicsSchema`
+    (line 181-188): `masteredAt: isoDateField.nullable().optional()` (the sticky
+    flag) and `masteredTopicCount: z.number().int().optional()` (drives the bar's
+    mastered segment, alongside the existing `topicCount` / `completedTopicCount`).
+  - **Sweep all `COMPLETED` consumers** (forward-only, per the sweep rule): the BookCard
+    `STATUS_STYLES`/`STATUS_LABELS` maps (T15), `curriculum.ts` (T14), and every
+    `status: 'COMPLETED'` / `'COMPLETED'` reference in `curriculum.test.ts`,
+    `books.test.ts`, `subjects.test.ts`, the inngest book fixtures, and
+    `test-seed.ts`. Grep `'COMPLETED'` across the repo; none may remain referencing
+    book status.
+  **done when:** `subjects.test.ts` accepts the three-value enum + a `masteredAt`
+  field and rejects `'COMPLETED'` and `'UNKNOWN'`; `grep -r "'COMPLETED'"` returns no
+  book-status sites; `pnpm exec nx run api:typecheck` passes.
 
 - [ ] **T13: Add the sticky `mastered_at` column to books.**
   Add `masteredAt: timestamp('mastered_at', { withTimezone: true })` (nullable) to
   `curriculumBooks` in `packages/database/src/schema/subjects.ts` (~line 130-152).
-  Append it to the **same** migration file as T1/T1b. No historical backfill of book
-  data is needed (book mastery is re-derived from topic state on first compute), but
-  the stamp is written forward by T14.
+  Append it to the **same** migration file as T1/T1b (the T1b book backfill populates
+  history; the runtime stamp is written by **T2's** whole-set re-evaluation, not by
+  `computeBookStatus`).
   **done when:** `pnpm run db:push:dev` applies clean and the Drizzle row type
-  exposes `curriculumBooks.masteredAt: Date | null`. Rollback: same shape as T1
-  (nullable, additive, drop-column reversible) — see **Rollback**.
+  exposes `curriculumBooks.masteredAt: Date | null`. Rollback: see **Rollback**.
 
-- [ ] **T14: `computeBookStatus` returns `MASTERED` (strict) + stamps the sticky flag.**
+- [ ] **T14: `computeBookStatus` reads the flag + emits the 3-value schedule status.**
   In `apps/api/src/services/curriculum.ts:404-511` (and the batch variant
-  `computeBookStatusesBatch`):
-  - Build a `masteredTopicIds` set = topics whose retention card has
-    `masteredAt != null` (reuse the `retentionRows` already fetched at line 441 —
-    add `masteredAt` to that select).
-  - When **every non-skipped topic** is in `masteredTopicIds`: if the book's stored
-    `curriculum_books.mastered_at` is null, stamp it `new Date()` (sticky, write-once,
-    `WHERE mastered_at IS NULL` guard — same discipline as T2); return status
-    `MASTERED` (with the `REVIEW_DUE` overlay still taking precedence in the UI badge
-    if a card is due — keep returning `REVIEW_DUE` when `hasReviewDue`, and surface
-    Mastered via the persisted `mastered_at`, so the two never fight).
-  - Once `curriculum_books.mastered_at` is set, the book reports Mastered **even if a
-    newly-filed topic later makes `masteredTopicIds` incomplete** (sticky badge); the
-    incomplete topics still show as Learning inside the book bar (T9/T15).
-  - "Non-skipped" = `curriculum_topics.skipped = false` (`subjects.ts:189`).
-  **done when:** `curriculum.test.ts` proves: (a) a book with all topics
-  sticky-mastered returns `MASTERED` and stamps `mastered_at`; (b) adding a fresh
-  untouched topic afterwards keeps the book `MASTERED` (badge sticky) while the topic
-  counts as not-mastered in the bar; (c) a book with all topics merely loose-completed
-  but **not** verified does **not** return `MASTERED` (strict); (d) `REVIEW_DUE` still
-  wins the overlay when a mastered book has a due card.
+  `computeBookStatusesBatch`). This function is now a **pure reader** — it does NOT
+  stamp (stamping moved to T2):
+  - Select `curriculumBooks.masteredAt` and add `masteredAt` to the `retentionRows`
+    select (line 441) so the per-topic mastered set is available.
+  - `masteredTopicCount` = count of non-skipped topics whose card has
+    `masteredAt != null` → return it for the bar.
+  - **Schedule status (single enum slot), precedence:** `REVIEW_DUE` if the book has
+    ≥1 due retention card (`nextReviewAt <= now` across **all** its cards, not gated
+    on full completion — refinement per decision #7); else `IN_PROGRESS` if any topic
+    is touched (started/has a card/completed); else `NOT_STARTED`. **Never** emit a
+    mastery value here.
+  - Return `masteredAt` (the book's sticky flag, pass-through from the column) so the
+    view composes the Mastered badge independently of the schedule status. A book with
+    `masteredAt` set AND a due card returns `{ status: 'REVIEW_DUE', masteredAt: <ts> }`
+    — both signals present, neither hidden.
+  - "Non-skipped" = `curriculum_topics.skipped = false` (`subjects.ts:189`), resolved
+    at read time.
+  **done when:** `curriculum.test.ts` proves: (a) a book with `masteredAt` set returns
+  it pass-through with `status` reflecting the schedule (`IN_PROGRESS`/`REVIEW_DUE`),
+  never a mastery status value; (b) a book with all topics loose-completed but **not**
+  verified returns `masteredAt: null` (strict — it is Learning); (c) a book with
+  `masteredAt` set **and** a due card returns `status: 'REVIEW_DUE'` AND non-null
+  `masteredAt` simultaneously (orthogonality preserved); (d) a partially-done book with
+  a due card now returns `REVIEW_DUE` (refinement — no longer hidden).
 
-- [ ] **T15: BookCard renders the `MASTERED` label + three-segment book bar.**
-  In `apps/mobile/src/components/library/BookCard.tsx`, add a `MASTERED` entry to
-  `STATUS_STYLES` / `STATUS_LABELS` (lines 14-26; route the label through i18n in T10
-  rather than the existing hardcoded English) and render the same three-segment bar
-  pattern as ShelfRow (mastered solid / learning lighter / untouched track) using the
-  book's `completedTopicCount` + a new mastered count on the book payload.
-  **done when:** a BookCard test asserts the `MASTERED` label + the three-segment bar
-  for a fully-mastered book, and the `REVIEW_DUE` overlay still renders on a mastered
-  book with a due card.
+- [ ] **T15: BookCard composes Mastered badge + schedule label + review overlay + bar.**
+  In `apps/mobile/src/components/library/BookCard.tsx`:
+  - Remove `COMPLETED` from `STATUS_STYLES`/`STATUS_LABELS` (lines 14-26); the maps
+    now cover only `NOT_STARTED`/`IN_PROGRESS`/`REVIEW_DUE`, routed through i18n (T10).
+  - Render the **Mastered badge from `book.masteredAt != null`**, independently of the
+    schedule label — so a Mastered book with `status: 'REVIEW_DUE'` shows **both** the
+    Mastered badge and the review overlay (the orthogonality the model is built on).
+  - Render the same three-segment bar as ShelfRow (mastered solid / learning lighter /
+    untouched track) from `masteredTopicCount` / `completedTopicCount` / `topicCount`.
+  **done when:** a BookCard test asserts: a fully-mastered book shows the Mastered
+  badge + 3-segment bar; a mastered book with a due card shows the Mastered badge AND
+  the review overlay **together**; and no code path references a `COMPLETED` label.
 
 ### Phase 2 — Make the climb legible (follow-on; not required to ship P1)
 
