@@ -37,6 +37,7 @@ Decide whether a subject is BROAD or NARROW.
 If the subject is BROAD:
 - Return 5-20 books
 - Each book needs: title, description, emoji, sortOrder
+- Every book must be distinct: never repeat or restate another book, even with different wording, and never create a book whose title merely restates the subject name (a subject named "History" must not contain a book called "History").
 - Use descriptions as source-neutral learning objectives, not factual mini-lessons
 - Do not include precise dates, percentages, statistics, or unsupported factual specifics
 - Do not write years like "1914", decade labels like "1940s", date phrases like "summer of 1914", or percentage claims
@@ -45,6 +46,7 @@ If the subject is NARROW:
 - Return 8-15 direct topics
 - Each topic needs: title, description, relevance, estimatedMinutes
 - relevance must be exactly one of: "core", "recommended", "contemporary", "emerging"
+- Every topic must be distinct: never repeat or restate another topic, even with different wording, and never create a topic whose title merely restates the subject name (a subject named "Fractions" must not contain a topic called "Fractions").
 - Use descriptions as source-neutral learning objectives, not factual mini-lessons
 - Do not include precise dates, percentages, statistics, or unsupported factual specifics
 - Do not write years like "1914", decade labels like "1940s", date phrases like "summer of 1914", or percentage claims
@@ -59,6 +61,10 @@ ${AGE_STYLE_GUIDANCE}
 
 Generate 5-15 topics for the book, grouped into at least 2 chapters.
 Keep each chapter contiguous in sortOrder: once you start a new chapter, do not return to an earlier chapter label later.
+
+Every topic must be a distinct sub-part of the book:
+- Never repeat or restate another topic. No two topics may cover the same concept, even with different wording. "Role of the Church in Medieval Society" and "The Church's Role in the Middle Ages" are the same topic — keep only one.
+- Never restate the book itself. No topic title may repeat or paraphrase the book title. A topic is one part of the book, not the whole book; a book titled "Life" must not contain a topic called "Life".
 
 For each topic provide:
 - title

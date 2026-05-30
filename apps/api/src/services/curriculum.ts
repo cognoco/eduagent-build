@@ -315,6 +315,31 @@ export function areEquivalentBookTitles(left: string, right: string): boolean {
   return hasSingleEditDistance(normalizedLeft, normalizedRight);
 }
 
+/**
+ * Drop "orphan" items whose title merely restates the PARENT they belong to —
+ * a topic that restates its book ("Life" book → "Life" topic), a topic that
+ * restates its subject ("Fractions" subject → "Fractions" topic), or a book
+ * suggestion that restates its subject ("History" subject → "History" book).
+ * Reuses the title-equivalence matcher, so exact, case-, whitespace-, and
+ * diacritic-level restatements are removed. This is the deterministic backstop
+ * behind the prompt instructions that forbid the same restatement;
+ * paraphrase-level overlap ("Photosynthesis" book → "How plants make food"
+ * topic) is not string-detectable and is handled by the prompt alone.
+ *
+ * Connections referencing a dropped topic are left to the caller's existing
+ * connection-mapping step, which already skips connections whose endpoints no
+ * longer resolve to a persisted topic.
+ */
+export function stripOrphanTitles<T extends { title: string }>(
+  items: T[],
+  parentTitle: string,
+): T[] {
+  if (!parentTitle.trim()) return items;
+  return items.filter(
+    (item) => !areEquivalentBookTitles(item.title, parentTitle),
+  );
+}
+
 function preferBookRow(
   current: typeof curriculumBooks.$inferSelect,
   candidate: typeof curriculumBooks.$inferSelect,
@@ -795,12 +820,21 @@ export async function persistNarrowTopics(
 ): Promise<void> {
   if (topics.length === 0) return;
 
+  // Deterministic backstop: never persist a narrow topic that merely restates
+  // the subject it sits under (orphan topic). Sibling duplicates are already
+  // rejected at generation by bookGenerationResultSchema's distinct-title
+  // refine; this guards the parent-restatement case the schema cannot see.
+  const cleanedTopics = subjectName
+    ? stripOrphanTitles(topics, subjectName)
+    : topics;
+  if (cleanedTopics.length === 0) return;
+
   const curriculum = await ensureCurriculum(db, subjectId);
   const bookId = await ensureDefaultBook(db, subjectId, subjectName);
   await db
     .insert(curriculumTopics)
     .values(
-      topics.map((topic, index) => ({
+      cleanedTopics.map((topic, index) => ({
         curriculumId: curriculum.id,
         bookId,
         title: topic.title,
@@ -1277,7 +1311,10 @@ export async function getBookWithTopics(
 }
 
 export function normalizeTopicTitle(title: string): string {
-  return title.trim().toLowerCase();
+  // Mirror normalizeGeneratedTopicTitle in @eduagent/schemas (collapse internal
+  // whitespace too) so persistence-layer dedup keys match the schema's
+  // distinct-title check rather than catching strictly fewer duplicates.
+  return title.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 const BOOK_GENERATION_STALE_MS = 15 * 60 * 1000;
@@ -1525,6 +1562,12 @@ export async function persistBookTopics(
     throw new NotFoundError('Book');
   }
 
+  // Deterministic backstop: never persist a topic that merely restates the
+  // book title (orphan topic). The BOOK_TOPICS_PROMPT forbids it; this makes
+  // it a guarantee. If stripping drops the active set below the minimum, the
+  // existing count guards throw and the caller regenerates.
+  const cleanedTopics = stripOrphanTitles(topics, book.title);
+
   const curriculum = await ensureCurriculum(db, subjectId);
   const existingTopics = await db.query.curriculumTopics.findMany({
     where: and(
@@ -1538,7 +1581,7 @@ export async function persistBookTopics(
   if (existingTopics.length > 0) {
     if (options.appendToExisting) {
       const validatedGenerated = bookTopicGenerationResultSchema.safeParse({
-        topics,
+        topics: cleanedTopics,
         connections,
       });
       if (!validatedGenerated.success) {
@@ -1552,7 +1595,7 @@ export async function persistBookTopics(
           .filter((topic) => !topic.skipped)
           .map((topic) => normalizeTopicTitle(topic.title)),
       );
-      const topicsToInsert = topics.filter((topic) => {
+      const topicsToInsert = cleanedTopics.filter((topic) => {
         const key = normalizeTopicTitle(topic.title);
         if (existingTitleKeys.has(key)) return false;
         existingTitleKeys.add(key);
@@ -1690,7 +1733,7 @@ export async function persistBookTopics(
   }
 
   const validatedGenerated = bookTopicGenerationResultSchema.safeParse({
-    topics,
+    topics: cleanedTopics,
     connections,
   });
   if (!validatedGenerated.success) {
@@ -1707,11 +1750,11 @@ export async function persistBookTopics(
       ? Math.max(...existingTopics.map((topic) => topic.sortOrder))
       : 0;
   const topicsToInsert = shouldAppendGeneratedTopics
-    ? topics.map((topic, index) => ({
+    ? cleanedTopics.map((topic, index) => ({
         ...topic,
         sortOrder: maxExistingSortOrder + index + 1,
       }))
-    : topics;
+    : cleanedTopics;
 
   // Wrap topic + connection inserts + flag update in a transaction
   // so a partial failure doesn't leave a half-generated book.

@@ -30,6 +30,7 @@ import {
   areEquivalentBookTitles,
   ensureCurriculum,
   persistNarrowTopics,
+  stripOrphanTitles,
 } from './curriculum';
 import { buildFallbackSubjectStructure } from './book-generation-fallbacks';
 import { detectLanguageSubject } from './language-detect';
@@ -275,9 +276,17 @@ async function persistBroadBookSuggestions(
     emoji: string;
     description: string;
   }>,
+  subjectName?: string,
 ): Promise<number> {
   await ensureCurriculum(db, subjectId);
-  const suggestionValues = books.map((book) => ({
+  // Deterministic backstop: never suggest a book that merely restates the
+  // subject it sits under (orphan suggestion). Sibling duplicates are already
+  // rejected at generation by bookGenerationResultSchema's distinct-title
+  // refine; this guards the parent-restatement case the schema cannot see.
+  const cleanedBooks = subjectName
+    ? stripOrphanTitles(books, subjectName)
+    : books;
+  const suggestionValues = cleanedBooks.map((book) => ({
     subjectId,
     title: book.title,
     emoji: book.emoji,
@@ -459,6 +468,7 @@ export async function createSubjectWithStructure(
         db,
         subject.id,
         fallbackStructure.books,
+        subject.name,
       );
       return {
         subject,
@@ -495,6 +505,7 @@ export async function createSubjectWithStructure(
       db,
       subject.id,
       narrowFallbackStructure.books,
+      subject.name,
     );
     return {
       subject,
