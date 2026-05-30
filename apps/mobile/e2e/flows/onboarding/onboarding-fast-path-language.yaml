@@ -11,16 +11,17 @@ tags:
       SEED_SCENARIO: "onboarding-complete"
       API_URL: ${API_URL}
 
-# The carousel sits below the intent-action chips on the current LearnerScreen
-# layout — scroll it into view before asserting (same pattern as create-subject.yaml).
+# scrollUntilVisible UP acts as a combined scroll + wait-for-tree-commit guard —
+# the chip sits ABOVE the carousel; scrolling DOWN to the carousel pushes the chip
+# off-screen on small devices (Galaxy S10e). Mirror the pattern from
+# create-subject-resolve.yaml: scroll UP toward the chip, then tap it.
 - scrollUntilVisible:
     element:
-      id: "home-subject-carousel"
-    direction: DOWN
+      id: "home-action-study-new"
+    direction: UP
     timeout: 15000
-
-- assertVisible:
-    id: "home-subject-carousel"
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
     id: "home-action-study-new"

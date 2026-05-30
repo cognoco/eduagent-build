@@ -13,7 +13,7 @@ test('J-05 parent opens a linked child progress detail from home', async ({
 
   await pressFamilyHomeAction(
     page,
-    page.getByTestId(`parent-home-child-progress-${childProfileId}`),
+    page.getByTestId(`parent-home-check-child-${childProfileId}`),
     { timeout: 60_000 },
   );
   await waitForAppScreen(page, 'child-detail-scroll', {
@@ -21,7 +21,7 @@ test('J-05 parent opens a linked child progress detail from home', async ({
     familyRouteRecovery: async () => {
       await pressFamilyHomeAction(
         page,
-        page.getByTestId(`parent-home-child-progress-${childProfileId}`),
+        page.getByTestId(`parent-home-check-child-${childProfileId}`),
         { timeout: 30_000 },
       );
     },

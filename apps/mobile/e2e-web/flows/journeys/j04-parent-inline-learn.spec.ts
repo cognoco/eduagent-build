@@ -7,16 +7,14 @@ test('J-04 parent opens child progress detail from child action', async ({
 }) => {
   await page.goto('/home', { waitUntil: 'commit' });
 
-  const progressAction = page
-    .getByTestId(/^parent-home-child-progress-/)
-    .first();
+  const progressAction = page.getByTestId(/^parent-home-check-child-/).first();
   await pressFamilyHomeAction(page, progressAction, { timeout: 60_000 });
   await waitForAppScreen(page, 'child-detail-scroll', {
     timeout: 30_000,
     familyRouteRecovery: async () => {
       await pressFamilyHomeAction(
         page,
-        page.getByTestId(/^parent-home-child-progress-/).first(),
+        page.getByTestId(/^parent-home-check-child-/).first(),
         { timeout: 30_000 },
       );
     },
