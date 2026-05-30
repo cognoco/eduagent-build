@@ -630,8 +630,20 @@ describe('book routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.book).toEqual(expect.objectContaining({}));
+      // Assert concrete fields from bookWithTopicsSchema so the test actually
+      // catches a regression if the route stops returning the persisted data.
+      expect(body.book).toEqual(
+        expect.objectContaining({
+          id: mockBook.id,
+          title: 'Ancient Egypt',
+          topicsGenerated: true,
+        }),
+      );
       expect(Array.isArray(body.topics)).toBe(true);
+      expect(body.topics).toHaveLength(5);
+      expect(body.topics[0]).toEqual(
+        expect.objectContaining({ title: 'Timeline of Egypt' }),
+      );
     });
 
     it('returns existing topics for already-generated book', async () => {

@@ -127,6 +127,7 @@ import {
 import { validateNoteDraft } from '../challenge-round/note-draft';
 import { transitionChallengeState } from '../challenge-round/state';
 import { evaluateChallengeReadiness } from '../challenge-round/trigger';
+import { NotFoundError } from '../../errors';
 
 /**
  * [BUG-92 / CR-2026-05-19-C4] Decide whether the interview / onboarding loop
@@ -1272,7 +1273,7 @@ export async function checkExchangeLimit(
   const repo = createScopedRepository(db, profileId);
   const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
   if (!row) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
   if (row.status === 'completed' || row.status === 'auto_closed') {
     throw new ConflictError('Session is closed and cannot accept exchanges');
@@ -1423,7 +1424,7 @@ export async function prepareExchangeContext(
   // 1. Load session
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   const sessionMeta = ((session.metadata as

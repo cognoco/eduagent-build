@@ -1,4 +1,5 @@
 import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
+import { createLogger } from './logger';
 import {
   accounts,
   consentStates,
@@ -8,6 +9,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import { MINIMUM_AGE, calculateAge } from './consent';
+
+const logger = createLogger();
 
 type SelfReportWindow = {
   start: Date;
@@ -26,7 +29,17 @@ export function isLocalHour9ForTimezone(
       hour12: false,
     });
     return parseInt(localTimeStr, 10) === 9;
-  } catch {
+  } catch (err) {
+    // [BUG-689 sweep] Bad IANA timezone → silent UTC fallback would fire reports
+    // at the wrong local hour for affected users. Mirror the structured-log
+    // pattern from services/billing/family.ts:172 per CLAUDE.md silent-recovery
+    // ban.
+    logger.warn('[reports] isLocalHour9ForTimezone fell back to UTC', {
+      event: 'reports.timezone_fallback',
+      surface: 'solo-progress-reports',
+      requestedTimezone: timezone,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return nowUtc.getUTCHours() === 9;
   }
 }

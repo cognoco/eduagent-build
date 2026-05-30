@@ -10,6 +10,7 @@ import {
   type SessionSummary,
   type SummarySubmitInput,
 } from '@eduagent/schemas';
+import { NotFoundError } from '../../errors';
 import { createPendingSessionSummary, evaluateSummary } from '../summaries';
 import { getSubject } from '../subject';
 import { applyReflectionMultiplier, getSessionXpEntry } from '../xp';
@@ -69,7 +70,7 @@ export async function skipSummary(
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   const existing = await findSessionSummaryRow(db, profileId, sessionId);
@@ -135,7 +136,7 @@ export async function submitSummary(
   // Fetch session for topicId and subject name
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   // [WI-247] Idempotent short-circuit: if a summary already exists in

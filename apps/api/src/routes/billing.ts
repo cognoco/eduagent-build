@@ -531,7 +531,18 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           new Date(),
           account.timezone ?? 'UTC',
         ).toISOString();
-      } catch {
+      } catch (err) {
+        // [BUG-689 sweep] Mirror the timezone-fallback observability pattern
+        // from services/billing/family.ts:172 — silent UTC fallback in billing
+        // is banned per CLAUDE.md "Silent recovery without escalation is
+        // banned". A bad account.timezone column would otherwise scope today's
+        // per-profile usage to the wrong day with no audit trail.
+        logger.warn('[billing] route dayStartAt timezone fell back to UTC', {
+          event: 'billing.route.day_start.timezone_fallback',
+          accountId: account.id,
+          requestedTimezone: account.timezone ?? 'UTC',
+          error: err instanceof Error ? err.message : String(err),
+        });
         const now = new Date();
         return new Date(
           Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),

@@ -191,7 +191,7 @@ export async function startSession(
   // Verify subject belongs to this profile (horizontal privilege guard)
   const subject = await getSubject(db, profileId, subjectId);
   if (!subject) {
-    throw new Error('Subject not found');
+    throw new NotFoundError('Subject');
   }
 
   // Enforce subject lifecycle — only active subjects may start sessions
@@ -1053,7 +1053,7 @@ export async function closeSession(
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   const now = new Date();
@@ -1254,7 +1254,7 @@ export async function getSessionCompletionContext(
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   // [BUG-913 sweep] Tie-break by id when created_at collides — see
@@ -1472,7 +1472,7 @@ export async function recordSystemPrompt(
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {
@@ -1492,7 +1492,7 @@ export async function recordSessionEvent(
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {
@@ -1513,7 +1513,7 @@ export async function flagContent(
   // Look up the session to get its subjectId
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {

@@ -18,6 +18,7 @@ import type {
   VerificationType,
   SessionMetadata,
 } from '@eduagent/schemas';
+import { NotFoundError } from '../../errors';
 
 // ---------------------------------------------------------------------------
 // Mappers — Drizzle Date → API ISO string
@@ -149,7 +150,7 @@ export async function setSessionInputMode(
   const repo = createScopedRepository(db, profileId);
   const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
   if (!row) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   const existingMetadata =
@@ -178,7 +179,7 @@ export async function setSessionInputMode(
     .returning();
 
   if (!updated) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   return mapSessionRow(updated);

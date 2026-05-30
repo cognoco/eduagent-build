@@ -13,6 +13,7 @@ import type {
   HomeworkSessionMetadata,
   SessionMetadata,
 } from '@eduagent/schemas';
+import { NotFoundError } from '../../errors';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,7 +71,7 @@ export async function syncHomeworkState(
       .limit(1);
 
     if (!row) {
-      throw new Error('Session not found');
+      throw new NotFoundError('Session');
     }
     if (row.sessionType !== 'homework') {
       throw new Error(

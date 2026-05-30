@@ -48,6 +48,7 @@ import {
 import { generateWeeklyReportData } from '../../services/weekly-report';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { captureException } from '../../services/sentry';
+import { createLogger } from '../../services/logger';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
 import {
   listEligibleSelfReportProfileIds,
@@ -59,6 +60,8 @@ import {
   subtractDays,
   sumTopicsExplored,
 } from '../../services/progress-helpers';
+
+const logger = createLogger();
 
 const weeklyProgressPushEventSchema = z.object({
   parentId: z.string().uuid(),
@@ -120,7 +123,17 @@ export function isLocalHour9(timezone: string | null, nowUtc: Date): boolean {
       hour12: false,
     });
     return parseInt(localTimeStr, 10) === 9;
-  } catch {
+  } catch (err) {
+    // [BUG-689 sweep] Bad IANA timezone → silent UTC fallback would fire weekly
+    // pushes at the wrong local hour for affected parents. Mirror the
+    // structured-log pattern from services/billing/family.ts:172 per CLAUDE.md
+    // silent-recovery ban.
+    logger.warn('[weekly-progress-push] isLocalHour9 fell back to UTC', {
+      event: 'reports.timezone_fallback',
+      surface: 'weekly-progress-push',
+      requestedTimezone: timezone,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return nowUtc.getUTCHours() === 9;
   }
 }
