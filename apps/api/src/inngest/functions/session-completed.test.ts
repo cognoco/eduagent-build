@@ -724,7 +724,7 @@ describe('sessionCompleted', () => {
       await executeSteps(createEventData({ qualityRating: 4 }));
 
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         PROFILE_ID,
         TOPIC_ID,
         4,
@@ -911,7 +911,7 @@ describe('sessionCompleted', () => {
       await executeSteps(createEventData({ qualityRating: 4 }));
 
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         PROFILE_ID,
         TOPIC_ID,
         4,
@@ -1135,7 +1135,7 @@ describe('sessionCompleted', () => {
       await executeSteps(createEventData({ qualityRating: 4 }));
 
       expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         PROFILE_ID,
         SUBJECT_ID,
         expect.arrayContaining([
@@ -1270,7 +1270,7 @@ describe('sessionCompleted', () => {
 
       // getCurrentLanguageProgress is called at least twice (before and after upsert)
       expect(mockGetCurrentLanguageProgress).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         PROFILE_ID,
         SUBJECT_ID,
       );
@@ -1329,7 +1329,7 @@ describe('sessionCompleted', () => {
       await executeSteps(createEventData());
 
       expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         SESSION_ID,
         PROFILE_ID,
         TOPIC_ID,
@@ -1357,7 +1357,7 @@ describe('sessionCompleted', () => {
       await executeSteps(createEventData({ qualityRating: 3 }));
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         PROFILE_ID,
         '2026-02-17',
       );
@@ -1403,7 +1403,7 @@ describe('sessionCompleted', () => {
       await executeSteps(createEventData());
 
       expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         PROFILE_ID,
         TOPIC_ID,
         SUBJECT_ID,
@@ -1553,7 +1553,7 @@ describe('sessionCompleted', () => {
       )) as any;
 
       expect(mockProcessEvaluateCompletion).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         PROFILE_ID,
         SESSION_ID,
         TOPIC_ID,
@@ -1571,7 +1571,7 @@ describe('sessionCompleted', () => {
       )) as any;
 
       expect(mockProcessTeachBackCompletion).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.any(Object), // db handle (may be a transaction sub-db — exact ref not assertable here)
         PROFILE_ID,
         SESSION_ID,
       );

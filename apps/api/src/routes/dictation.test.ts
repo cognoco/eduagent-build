@@ -373,7 +373,7 @@ describe('POST /v1/dictation/result', () => {
     const body = await res.json();
     expect(body.result).toEqual(expect.objectContaining({}));
     expect(recordDictationResult).toHaveBeenCalledWith(
-      expect.anything(), // db
+      mockDatabaseModule.db, // exact scoped db handle — guards against wrong-db injection
       'test-profile-id',
       expect.objectContaining({
         completionKey: COMPLETION_KEY,
@@ -601,7 +601,7 @@ describe('GET /v1/dictation/streak', () => {
     );
 
     expect(getDictationStreak).toHaveBeenCalledWith(
-      expect.anything(), // db
+      mockDatabaseModule.db, // exact scoped db handle — guards against wrong-db injection
       'test-profile-id',
     );
   });
