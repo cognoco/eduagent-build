@@ -1,6 +1,13 @@
 // ---------------------------------------------------------------------------
 // Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
+//
+// GC6 deferred: 6 internal mocks (gc1-allow annotated) — ../services/sentry,
+// ../services/account, ../services/profile, ../services/billing,
+// ../services/session, ../inngest/client. Burn-down is out of scope here
+// (2000+ line route test spanning multiple service layers); tracked in
+// docs/plans/2026-05-12-internal-mock-cleanup-inventory.md alongside the
+// broader sessions-route harness work.
 
 import {
   installTestJwksInterceptor,
