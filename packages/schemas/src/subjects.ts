@@ -5,6 +5,9 @@ import {
   languageCodeSchema,
   pedagogyModeSchema,
 } from './language.ts';
+// [SC-04] Canonical session-type enum — import from the leaf module to avoid
+// circular imports (session-enums.ts has no dependencies on subjects.ts).
+import { sessionTypeSchema } from './session-enums.ts';
 
 // Enums
 
@@ -890,7 +893,9 @@ export const subjectSessionSchema = z.object({
   bookId: z.string().uuid().nullable(),
   bookTitle: z.string().nullable(),
   chapter: z.string().nullable(),
-  sessionType: z.string(),
+  // [SC-04] Use canonical sessionTypeSchema instead of bare z.string() —
+  // prevents any string from passing validation at the API boundary.
+  sessionType: sessionTypeSchema,
   durationSeconds: z.number().int().nullable(),
   createdAt: isoDateField,
 });

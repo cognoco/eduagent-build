@@ -29,6 +29,7 @@ export const notificationTypeSchema = z.enum([
   // that this route piggybacks on so we don't need a parallel rate-limit store.
   'support_outbox_spillover',
 ]);
+export type NotificationType = z.infer<typeof notificationTypeSchema>;
 
 export const nudgeTemplateSchema = z.enum([
   'you_got_this',
@@ -103,16 +104,19 @@ export type Nudge = z.infer<typeof nudgeSchema>;
 export const nudgeListResponseSchema = z.object({
   nudges: z.array(nudgeSchema),
 });
+export type NudgeListResponse = z.infer<typeof nudgeListResponseSchema>;
 
 export const nudgeCreateResponseSchema = z.object({
   nudge: nudgeSchema,
   pushSent: z.boolean(),
 });
+export type NudgeCreateResponse = z.infer<typeof nudgeCreateResponseSchema>;
 
 export const nudgeMarkReadResponseSchema = z.object({
   success: z.literal(true),
   count: z.number().int().nonnegative(),
 });
+export type NudgeMarkReadResponse = z.infer<typeof nudgeMarkReadResponseSchema>;
 
 export const childCapNotificationKindSchema = z.enum([
   'daily_exceeded',
@@ -137,10 +141,16 @@ export type ChildCapNotification = z.infer<typeof childCapNotificationSchema>;
 export const childCapNotificationsResponseSchema = z.object({
   notifications: z.array(childCapNotificationSchema),
 });
+export type ChildCapNotificationsResponse = z.infer<
+  typeof childCapNotificationsResponseSchema
+>;
 
 export const childCapNotificationDismissResponseSchema = z.object({
   success: z.literal(true),
 });
+export type ChildCapNotificationDismissResponse = z.infer<
+  typeof childCapNotificationDismissResponseSchema
+>;
 
 export const childCapNotifyParentInputSchema = z
   .object({
@@ -155,3 +165,6 @@ export type ChildCapNotifyParentInput = z.infer<
 export const childCapNotifyParentResponseSchema = z.object({
   sent: z.boolean(),
 });
+export type ChildCapNotifyParentResponse = z.infer<
+  typeof childCapNotifyParentResponseSchema
+>;
