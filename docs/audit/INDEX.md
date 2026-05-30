@@ -25,6 +25,7 @@
 
 | File | Date | Scope |
 |---|---|---|
+| [2026-05-29-architecture-audit.md](2026-05-29-architecture-audit.md) | 2026-05-29 | Whole-monorepo architecture review (module complexity, silent failures, type-safety gaps, test-coverage holes, LLM-friendliness). Headline: untested billing/quota tier. |
 | [2026-05-08-web-e2e-full-suite-bug-ledger.md](2026-05-08-web-e2e-full-suite-bug-ledger.md) | 2026-05-08 | Web E2E full-suite bug ledger. |
 | [2026-05-11-end-user-playwright-bug-pass.md](2026-05-11-end-user-playwright-bug-pass.md) | 2026-05-11 | Seeded end-user Playwright bug pass. |
 | [2026-05-11-parent-home-end-user-audit.md](2026-05-11-parent-home-end-user-audit.md) | 2026-05-11 | Parent home end-user audit. |
