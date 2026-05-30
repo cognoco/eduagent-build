@@ -96,6 +96,7 @@ describe('VALID_SCENARIOS', () => {
       'parent-with-weekly-report',
       'parent-session-with-recap',
       'parent-session-recap-empty',
+      'parent-with-children-no-sessions',
       'parent-subject-with-retention',
       'parent-subject-no-retention',
       'subscription-family-active',

@@ -64,6 +64,13 @@ tags:
 # "World" matches the seeded "World History" book title.
 - inputText: "World"
 
+# Dismiss the keyboard before interacting with results: an open keyboard covers
+# the lower-screen book-row (taps land on the keyboard instead of the row) and
+# its autocorrect can mutate the committed query (e.g. "World" → "Works"),
+# clearing the match. Hiding it lets the debounced query settle and the row tap
+# land. (Same pattern as the auth sub-flow after each text input.)
+- hideKeyboard
+
 - takeScreenshot: search-book-03-typed
 
 # ── Wait for book result to appear ──────────────────────────────────────

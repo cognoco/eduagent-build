@@ -51,9 +51,18 @@ tags:
 # ── Deep-link to session-summary with filed params ───────────────────────────
 # Expo Router resolves mentomate:///session-summary/${SESSION_ID} to
 # apps/mobile/src/app/session-summary/[sessionId].tsx.
-# The query params filedSubjectId and filedBookId are passed as search params
-# so useLocalSearchParams picks them up at runtime.
-- openLink: "mentomate:///session-summary/${SESSION_ID}?filedSubjectId=${SUBJECT_ID}&filedBookId=${BOOK_ID}"
+# The query params are read via useLocalSearchParams ([sessionId].tsx:84-99).
+#
+# exchangeCount + wallClockSeconds are REQUIRED here, matching the real in-app
+# navigation (use-session-actions.ts:247-268 always passes them). The screen's
+# loading guard ([sessionId].tsx:492-526) only renders the summary once
+# exchangeCount/wallClockSeconds are present OR the transcript query resolves.
+# On a root-level deep link the transcript query can stay pending (the route
+# sits outside (app)/ — see the BUG-134 note at [sessionId].tsx:107), so without
+# these params the screen hangs on "Loading your session summary..." forever.
+# Passing them replicates the real session-close params and bypasses the guard.
+# The exact numbers are display-only and don't affect this flow's assertions.
+- openLink: "mentomate:///session-summary/${SESSION_ID}?filedSubjectId=${SUBJECT_ID}&filedBookId=${BOOK_ID}&exchangeCount=5&wallClockSeconds=600"
 
 # ── Wait for session-summary screen ──────────────────────────────────────────
 - extendedWaitUntil:

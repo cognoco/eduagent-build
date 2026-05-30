@@ -1,8 +1,27 @@
-# Flow TRACK-2: Resume via Crash-Recovery Marker — EXPERIMENTAL
-# Validates: after entering a session, backgrounding the app (which triggers
-#            the AppState 'background' listener writing the recovery marker),
-#            then foregrounding, the home coach-band shows the recovery Continue
-#            arm and tapping it re-enters the chat session.
+# Flow TRACK-2: Resume via Crash-Recovery Marker — PARKED (blocked)
+#
+# PARKED 2026-05-29: this flow exercises its documented fallback (see the
+# EXPERIMENTAL note below). On the WHPX emulator the background→foreground path
+# does not reproduce the intended cold-start recovery:
+#   - `launchApp stopApp:false` is a WARM resume — the app returns to the chat
+#     screen it was backgrounded on, so `learner-screen` never appears after
+#     foregrounding (the home/recovery-band model this flow asserts is a
+#     COLD-start behavior, where a freshly-booted app reads the SecureStore
+#     marker and renders the recovery arm on home).
+#   - A `stopApp:true` cold relaunch would exercise the marker read but is
+#     unreliable here: the dev-client bundle reload intermittently stalls on
+#     this emulator (observed repeatedly 2026-05-29), so a cold relaunch mid-
+#     flow is not deterministic.
+# The crash-recovery marker logic (30-min freshness, SecureStore key, the
+# AppState 'background' write) is covered by unit tests in
+# lib/session-recovery.ts / use-session-recovery.ts. Re-enable this E2E flow
+# only once a deterministic cold-start foreground path exists on the emulator,
+# or a server-side recovery marker is introduced.
+#
+# Validates (intended): after entering a session, backgrounding the app (which
+#            triggers the AppState 'background' listener writing the recovery
+#            marker), then foregrounding, the home coach-band shows the recovery
+#            Continue arm and tapping it re-enters the chat session.
 #
 # EXPERIMENTAL — this flow relies on device-local SecureStore state:
 #   The crash-recovery marker is written by the AppState 'background' listener
@@ -45,9 +64,8 @@
 #     - home-coach-band-continue  -> "Continue" tap target on the coach-band
 appId: com.mentomate.app
 tags:
-  - nightly
+  - blocked
   - learning
-  - experimental
 ---
 # ── Setup ──────────────────────────────────────────────────────────────────
 - runFlow:

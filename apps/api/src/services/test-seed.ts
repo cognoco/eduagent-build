@@ -102,6 +102,7 @@ export type SeedScenario =
   | 'parent-with-weekly-report'
   | 'parent-session-with-recap'
   | 'parent-session-recap-empty'
+  | 'parent-with-children-no-sessions'
   | 'parent-subject-with-retention'
   | 'parent-subject-no-retention'
   | 'subscription-family-active'
@@ -1080,7 +1081,7 @@ async function seedRetentionDue(
     birthYear: LEARNER_BIRTH_YEAR,
   });
 
-  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
     'Biology',
@@ -1108,7 +1109,7 @@ async function seedRetentionDue(
     profileId,
     email,
     password,
-    ids: { subjectId, retentionCardId: firstCard.id },
+    ids: { subjectId, bookId, retentionCardId: firstCard.id },
   };
 }
 
@@ -1351,10 +1352,17 @@ async function seedSubjectWithBookSuggestions(
     version: 1,
   });
 
+  // The pick-book screen's `useBookSuggestions(subjectId, { topup: true })`
+  // POSTs to the topup endpoint, which triggers an LLM call whenever
+  // `unpicked.length < 4` (services/suggestions.ts:207). Seeding 4 unpicked
+  // suggestions skips the topup path so the screen renders deterministically
+  // without depending on an LLM round-trip. The shelf screen's plain GET path
+  // is unaffected (it doesn't touch the topup branch).
   const suggestionValues = [
     { title: 'Ancient Greek Philosophy', emoji: '🏛️' },
     { title: 'Ethics and Morality', emoji: '⚖️' },
     { title: 'Philosophy of Mind', emoji: '🧠' },
+    { title: 'Logic and Reasoning', emoji: '🔍' },
   ].map((s, i) => ({
     id: generateUUIDv7(),
     subjectId,
@@ -3089,6 +3097,84 @@ async function seedParentSessionRecapEmpty(
       ...base.ids,
       childId: childProfileId,
       sessionId: existingSessionId,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: parent-with-children-no-sessions
+// Parent owner with defaultAppContext='family' + linked child + consent, but
+// the child has ZERO learningSessions rows. listRecapsForParent returns [],
+// so the V1 Recaps tab renders the `recaps-empty` branch with the
+// "start a session" CTA.
+//
+// Distinct from parent-session-recap-empty: that scenario has a session whose
+// summary is null (pre-backfill state). This one has no session at all, which
+// is the only seed shape that produces an empty recaps list.
+// ---------------------------------------------------------------------------
+
+async function seedParentWithChildrenNoSessions(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Parent profile — direct insert to set defaultAppContext='family' (see
+  // seedParentWithChildren rationale: V1 guardian shape requires this).
+  const parentProfileId = generateUUIDv7();
+  await db.insert(profiles).values({
+    id: parentProfileId,
+    accountId,
+    displayName: 'Test Parent',
+    birthYear: 1990,
+    isOwner: true,
+    defaultAppContext: 'family',
+  });
+
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Test Teen',
+    birthYear: 2014,
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  // Subject + curriculum WITHOUT any learningSessions row. Keeps the child
+  // dashboard renderable (subject card visible) but produces zero recaps.
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    childProfileId,
+    'Mathematics',
+    'active',
+    3,
+    'fractions homework',
+  );
+
+  return {
+    scenario: 'parent-with-children-no-sessions',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: {
+      parentProfileId,
+      childProfileId,
+      subjectId,
     },
   };
 }
@@ -5344,6 +5430,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'parent-with-weekly-report': seedParentWithWeeklyReport,
   'parent-session-with-recap': seedParentSessionWithRecap,
   'parent-session-recap-empty': seedParentSessionRecapEmpty,
+  'parent-with-children-no-sessions': seedParentWithChildrenNoSessions,
   'parent-subject-with-retention': seedParentSubjectWithRetention,
   'parent-subject-no-retention': seedParentSubjectNoRetention,
   'subscription-family-active': seedSubscriptionFamilyActive,

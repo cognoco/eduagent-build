@@ -119,6 +119,7 @@ Tag tokens below are wrapped in backticks so the validator's parser can extract 
 | `visual` | Primarily screenshot-based verification |
 | `local` | Runs against local Expo Go / dev tooling only |
 | `slow-net` | Exercises throttled-network or offline paths |
+| `blocked` | Parked flow — not executed in CI; documents an intended scenario blocked by emulator, tooling, or infra limits, with the gating condition recorded in the flow header |
 
 ### Pending review
 

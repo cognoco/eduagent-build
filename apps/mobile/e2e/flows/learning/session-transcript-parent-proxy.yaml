@@ -1,7 +1,20 @@
-# PARKED (2026-05-29): Asserts the isParentProxy=true gate, but no UI entry currently
-# reaches parent-proxy mode (see [ACCOUNT-04]; proxy returns with a redesigned entry).
-# Proxy logic is unit-tested. This flow stays here, OUT of the run manifest, until the
-# new proxy entry ships — then re-point the switch-to-child setup at it.
+# PARKED (audit re-verified 2026-05-29): Asserts the isParentProxy=true gate, but no
+# user-facing UI entry currently reaches parent-proxy mode after the [ACCOUNT-04] /
+# BUG-774 refactor. `apps/mobile/src/app/profiles.tsx:185-202` now routes
+# owner-taps-child to `childProfileHref(...'settings')` (child-detail-scroll), and
+# proxy mode is reachable only via `switchProfile(id, { proxyMode: true })` from
+# internal/test code (see apps/mobile/src/lib/profile.ts:71,84,373 and
+# apps/mobile/src/hooks/use-parent-proxy.ts:15). Proxy logic + transcript-hidden
+# gate remain unit-tested (session-summary/[sessionId].test.tsx:1998, 2054).
+# This flow stays OUT of the run manifest until the new proxy entry ships —
+# then re-point _setup/switch-to-child.yaml at it.
+#
+# UNBLOCK CONDITION: when a user-facing affordance invokes
+# `switchProfile(id, { proxyMode: true })` (currently zero call sites in
+# `apps/mobile/src/` outside of tests), update _setup/switch-to-child.yaml to
+# drive it (or add a new _setup/enter-proxy.yaml) and re-add this flow to the
+# run manifest. ModeSwitcher.tsx's `mode-switcher-study`/`mode-switcher-family`
+# testIDs are study↔family toggles, NOT child impersonation.
 #
 # Flow LEARN-23 (Step 2): Session transcript — parent-proxy privacy gate.
 # Validates: [CR-PR129-M5] view-transcript-cta is hidden when isParentProxy=true.
@@ -9,14 +22,36 @@
 # Tags: nightly, learning, parent
 #
 # Prerequisite: parent-proxy seed — parent account + child profile + completed session.
-# Env vars: CHILD_PROFILE_ID, SESSION_ID, SUBJECT_ID, BOOK_ID
+#   apps/api/src/services/test-seed.ts:5427 → seedParentProxy at line 2766.
+#   Child displayName "Proxy Child" (line 2781); returns CHILD_PROFILE_ID,
+#   SESSION_ID, SUBJECT_ID, BOOK_ID, TOPIC_ID (lines 2887-2901).
 #
-# testIDs verified against:
-#   - apps/mobile/src/app/session-summary/[sessionId].tsx (summary-title, view-transcript-cta)
-#       view-transcript-cta is rendered only when !isParentProxy (line 922).
-#   - apps/mobile/src/components/library/ShelfRow.tsx (shelf-row-header-${SUBJECT_ID})
-#   - apps/mobile/src/components/library/BookRow.tsx (book-row-${BOOK_ID})
-#   - apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx (session-${SESSION_ID})
+# testIDs verified 2026-05-29 against current source:
+#   - summary-title ............ apps/mobile/src/app/session-summary/[sessionId].tsx:816
+#   - view-transcript-cta ...... apps/mobile/src/app/session-summary/[sessionId].tsx:968
+#       Rendered only when `!isProxyMode` (gate at line 933;
+#       isProxyMode = !navigationGates.showLearningActions, defined line 152).
+#   - shelf-row-header-${SUBJECT_ID} ... apps/mobile/src/components/library/ShelfRow.tsx:219
+#   - shelves-list ............. apps/mobile/src/app/(app)/library.tsx:761 (also 975)
+#   - tab-library .............. apps/mobile/src/app/(app)/_layout.tsx:695
+#   - book-screen .............. apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx:1508
+#   - book-sessions-section .... shelf/[subjectId]/book/[bookId].tsx:1941
+#   - book-sessions-toggle ..... shelf/[subjectId]/book/[bookId].tsx:1945
+#   - session-${SESSION_ID} .... shelf/[subjectId]/book/[bookId].tsx:2008 (and 2028)
+#   - child-detail-scroll ...... apps/mobile/src/app/(app)/child/[profileId]/index.tsx:868
+#
+# REMOVED / RENAMED since flow was written:
+#   - `book-row-${BOOK_ID}` is NOT in a standalone BookRow.tsx — there is no
+#     `apps/mobile/src/components/library/BookRow.tsx` file. The testID exists
+#     only inside the BookRow component defined in
+#     apps/mobile/src/components/library/LibrarySearchResults.tsx:210, which
+#     only renders inside the library SEARCH results path. Tapping the shelf
+#     header in step 5 navigates to the pick-book screen (which uses
+#     `pick-book-suggestion-${id}`, NOT `book-row-${id}`) — so step 6's
+#     `book-row-${BOOK_ID}` will never appear on the post-shelf-tap path.
+#     When re-enabling, either (a) rewrite steps 5-7 to navigate via the
+#     pick-book → book detail screen, or (b) replace shelf-tap with a
+#     library search to trigger the LibrarySearchResults code path.
 appId: com.mentomate.app
 tags:
   - nightly

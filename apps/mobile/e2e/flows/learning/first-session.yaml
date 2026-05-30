@@ -63,11 +63,19 @@ tags:
     id: "chat-input"
 - inputText: "I want to learn the basics"
 
-# 8. Tap send
-# BUG-267 / BUG-35: pressKey: Enter does not reliably fire onSubmitEditing
-# in the WHPX dev-client build. send-button is covered by the keyboard on
-# Android — same hideKeyboard + tapOn pattern that seed-and-sign-in.yaml uses.
-- hideKeyboard
+# 8. Dismiss the keyboard, then tap send
+# BUG-267 / BUG-35: pressKey: Enter does not reliably fire onSubmitEditing in
+# the WHPX dev-client build, and send-button sits below the keyboard on Android.
+# We must dismiss the keyboard first, but `hideKeyboard` on this Android client
+# is a KEYCODE_BACK press, which in the chat screen races between "dismiss
+# keyboard" and "pop the screen" — when it pops, the flow lands back on home and
+# send-button is gone (observed 2026-05-29). Tapping the chat-messages list
+# instead blurs the TextInput (FlatList default keyboardShouldPersistTaps='never'
+# swallows the first outside tap to dismiss the keyboard) with no back-press, so
+# the chat screen is never popped. The list is empty on a fresh session, so the
+# tap lands on empty space, not a message bubble.
+- tapOn:
+    id: "chat-messages"
 - tapOn:
     id: "send-button"
 

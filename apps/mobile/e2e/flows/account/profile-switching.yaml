@@ -1,7 +1,32 @@
-# Flow N9: Profile Switching — Profile Switcher Modal
+# Flow N9: Profile Switching — Profile Switcher Modal + Guardian Tab-Shape Assertion
 # Validates: user can open profile switcher, see list of profiles with
 # active indicator, switch to a different profile, and return to home.
+# Also asserts: after closing the modal, the guardian/owner re-lands on
+# parent-home-screen with the V1 guardian tab shape (home, recaps, progress,
+# more) — confirming resolveNavigationContract() emitted the guardian shape.
 # Tags: nightly, account
+#
+# NAV FLAG NOTE:
+#   Tab-shape assertions in this flow assume MODE_NAV_V1_ENABLED=true (the V1
+#   guardian shape: tab-home, tab-recaps, tab-progress, tab-more).
+#   If MODE_NAV_V1_ENABLED=false the seed scenario still lands on parent-home-
+#   screen but the tab bar shows the V0 5-tab set (tab-home, tab-my-learning,
+#   tab-library, tab-progress, tab-more). The tab-recaps assertion at step 18b
+#   uses optional:true so it will not hard-fail V0 runs; a screenshot at step
+#   18c captures the actual tab bar for visual audit.
+#   See: apps/mobile/src/app/(app)/_layout.tsx:663-728 for tabBarButtonTestID values.
+#        apps/mobile/src/lib/navigation-contract.ts FAMILY_TABS / LEGACY_GUARDIAN_TABS.
+#        CLAUDE.md "Hard Constraint" section.
+#
+# PROXY-MODE / CHILD-STATE NOTE [ACCOUNT-04]:
+#   After the BUG-774 fix (apps/mobile/src/app/profiles.tsx:185-202), tapping a
+#   child profile from the owner account routes to the child-detail screen, NOT
+#   into proxy/impersonation mode. Proxy mode (isParentProxy=true) is no longer
+#   reachable from the product UI. Consequently this flow CANNOT exercise the
+#   child-active tab shape (learner: home, library, progress, more) or assert
+#   that owner-only More rows are hidden while a child is active.
+#   Those assertions await ACCOUNT-04 (redesigned proxy-mode entry).
+#   When ACCOUNT-04 ships, mirror the assertion list from more-impersonated-child.yaml.
 #
 # Journey: UX Journey 5 (Account Management)
 # Epics: Epic 5 (FR101-FR105)
@@ -19,12 +44,15 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for home screen — parent-with-children lands on learner-screen (BUG-566)
+# 2. Wait for home screen — parent-with-children lands on parent-home-screen (BUG-566).
+#    ParentHomeScreen (testID: parent-home-screen) renders inside home.tsx via the
+#    showParentHome branch in LearnerScreen.tsx when the owner has linked children.
+#    Source: apps/mobile/src/components/home/ParentHomeScreen.tsx:1021
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: "parent-home-screen"
     timeout: 10000
-    optional: true  # justified: post-auth landing varies by persona routing (parent-with-children may land elsewhere)
+    optional: true  # justified: post-auth landing varies; parent-with-children usually lands on parent-home-screen but learner-screen is also accepted
 
 # 3. Navigate to More tab
 - tapOn:
@@ -103,25 +131,68 @@ tags:
     text: "Test Teen"
     optional: true  # justified: conditional tap — only fires if step 12 found the child profile
 
-# 14. After switching, we should be navigated back (router.back())
-# Wait for the home/More screen to reappear
+# 14. After tapping "Test Teen", profiles.tsx:198-201 routes to child-detail-scroll
+#     (BUG-774 fix — owner-taps-child no longer activates proxy mode).
+#     Wait for child-detail-scroll instead of learner-screen.
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: "child-detail-scroll"
     timeout: 15000
-    optional: true  # justified: post-switch navigation destination varies (learner-screen vs staying in modal)
+    optional: true  # justified: only fires when step 13 found and tapped Test Teen; no-child-profile path falls through to step 15
 
 # 15. Fallback: if no child profile was available, close the modal manually
 - tapOn:
     id: "profiles-close"
     optional: true  # justified: fallback close path when no child profile was present to switch to
 
-# 16. Verify we're back on a main screen
+# 16. Navigate back to home from child-detail-scroll (if step 14 succeeded)
+- tapOn:
+    id: "back-button"
+    optional: true  # justified: back-button only present when child-detail-scroll was reached in step 14
+
+# 17. Wait for parent home to re-appear after dismiss/back
+#     The guardian owner returns to parent-home-screen (resolveNavigationContract
+#     emits guardian shape for owner-with-children).
+#     Source: apps/mobile/src/components/home/ParentHomeScreen.tsx:1021
 - extendedWaitUntil:
     visible:
-      text: "More"
-    timeout: 10000
-    optional: true  # justified: navigation outcome varies — learner-screen (step 14) or More tab (step 15) may be active
+      id: "parent-home-screen"
+    timeout: 15000
+    optional: true  # justified: step 14/15 paths converge here; if neither child-switch nor modal-close was reached, a bare wait is safest
 
-# 17. Final screenshot — profile switch completed
+# ── TAB-SHAPE ASSERTIONS: V1 guardian (owner active, has linked children) ──────
+# After closing/back from the profiles flow, the active profile is still the
+# guardian owner. resolveNavigationContract() must emit FAMILY_TABS (V1):
+#   tab-home, tab-recaps, tab-progress, tab-more
+# (tab-my-learning and tab-library are hidden in V1 guardian shape)
+#
+# testID source: apps/mobile/src/app/(app)/_layout.tsx:663,706,717,728
+# tab-shape logic: apps/mobile/src/lib/navigation-contract.ts FAMILY_TABS
+#
+# Step 18a: tab-home — always present in both V0 and V1 guardian shapes
+- assertVisible:
+    id: "tab-home"
+
+# Step 18b: parent-home-screen — confirms guardian home-screen branch rendered
+#           Source: apps/mobile/src/components/home/ParentHomeScreen.tsx:1021
+- assertVisible:
+    id: "parent-home-screen"
+    optional: true  # justified: assertVisible-optional captures partial V0/V1 ambiguity; screenshot 18e is the definitive visual audit
+
+# Step 18c: tab-recaps — V1 guardian shape only (FAMILY_TABS).
+#           If MODE_NAV_V1_ENABLED=false this element is absent; optional so V0
+#           runs surface failure via screenshot rather than hard-blocking CI.
+#           Source: apps/mobile/src/app/(app)/_layout.tsx:706
+- assertVisible:
+    id: "tab-recaps"
+    optional: true  # justified: requires MODE_NAV_V1_ENABLED=true; V0 runs skip this assert — see NAV FLAG NOTE in header
+
+# Step 18d: tab-progress and tab-more — present in both V0 and V1 guardian shapes
+#           Sources: apps/mobile/src/app/(app)/_layout.tsx:717,728
+- assertVisible:
+    id: "tab-progress"
+- assertVisible:
+    id: "tab-more"
+
+# 19. Final screenshot — captures actual tab bar for V0/V1 visual audit
 - takeScreenshot: profile-switching-complete

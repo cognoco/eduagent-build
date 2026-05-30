@@ -1286,7 +1286,7 @@ describe('LLM Router', () => {
       _resetCircuits();
     });
 
-    it('defaults to minor-safe framing when no ageBracket provided', async () => {
+    it('uses neutral framing when no ageBracket provided', async () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
@@ -1311,8 +1311,9 @@ describe('LLM Router', () => {
       expect(receivedMessages).toHaveLength(1);
       const msgs = receivedMessages[0]!;
       expect(msgs[0]!.role).toBe('system');
-      expect(msgs[0]!.content).toContain('for young learners');
-      expect(msgs[0]!.content).not.toContain('adult');
+      expect(msgs[0]!.content).toContain('MentoMate tutoring app');
+      expect(msgs[0]!.content).not.toContain('young learners');
+      expect(msgs[0]!.content).not.toContain('an adult');
       expect(msgs[1]!.content).toBe('Hello');
     });
 
@@ -1430,7 +1431,8 @@ describe('LLM Router', () => {
       const msgs = receivedMessages[0]!;
       // Preamble merged into system message — still 2 messages total
       expect(msgs).toHaveLength(2);
-      expect(msgs[0]!.content).toContain('for young learners');
+      // No ageBracket passed → neutral identity in the safety preamble.
+      expect(msgs[0]!.content).toContain('MentoMate tutoring app');
       expect(msgs[0]!.content).toContain('You are a tutor.');
     });
 

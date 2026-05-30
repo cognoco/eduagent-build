@@ -192,10 +192,11 @@ export function getWorkedExampleGuidance(
   }
 }
 
-// Default tone — lifted verbatim from the pre-sunset 'casual' branch of the
-// removed getLearningModeGuidance(). All sessions use this single tone now.
+// Default tone — single tone for all sessions. The persistent learningMode
+// toggle was removed in Phase 0; rigor is now offered per-Challenge-Round
+// instead of as a global mode the learner switches into.
 export const DEFAULT_TONE_GUIDANCE =
-  'Learning mode: CASUAL EXPLORER\n' +
+  'Default tone:\n' +
   'Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.\n' +
   'Tone: Warm and encouraging. Use everyday language. Light humor is fine.\n' +
   'Assessment: Low-pressure. Frame checks as curiosity, not tests.\n' +

@@ -639,7 +639,8 @@ describe('buildSystemPrompt', () => {
 
   it('always injects the default tone guidance (single-tone post-sunset)', () => {
     const prompt = buildSystemPrompt(baseContext);
-    expect(prompt).toContain('CASUAL EXPLORER');
+    expect(prompt).toContain('Default tone:');
+    expect(prompt).not.toContain('CASUAL EXPLORER');
     expect(prompt).toContain('Relaxed');
     expect(prompt).toContain('Warm and encouraging');
     expect(prompt).toContain('Low-pressure');

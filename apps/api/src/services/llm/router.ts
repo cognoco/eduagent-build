@@ -170,9 +170,11 @@ function normalizeStreamResult(
 // Applied at the router layer so it covers ALL providers uniformly,
 // including fallback paths through the circuit breaker.
 //
-// The identity statement ("for young learners" vs "adult learner") prevents
-// the LLM from anchoring to a minor-tutor persona when the user is an adult.
-// Safety RULES are identical for all ages — only the framing changes.
+// The identity statement ("for young learners" vs "adult learner" vs neutral)
+// prevents the LLM from anchoring to a minor-tutor persona when the user is
+// an adult, and avoids defaulting to a child-coded persona when the caller
+// didn't thread ageBracket. Safety RULES are identical for all ages — only
+// the framing changes.
 //
 // BKT-C.1 — Personalization preamble lines are prepended to the safety
 // preamble when present:
@@ -203,9 +205,13 @@ const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
 };
 
 function getSafetyPreamble(ageBracket?: AgeBracket): string {
-  // Defence-in-depth: undefined (unknown age) takes the minor-safe path.
+  // Unknown age: stay neutral on identity and let per-flow prompts handle
+  // age-voice. Defaulting to "for young learners" mis-frames flows whose
+  // callers don't thread ageBracket (subject classification, language
+  // detection, learner input, etc.) and is wrong for adult guardians
+  // using own-learning. Safety rules below are identical for every age.
   if (ageBracket === undefined) {
-    return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
+    return `You are an educational AI assistant for the MentoMate tutoring app. ${SAFETY_RULES}`;
   }
   switch (ageBracket) {
     case 'adult':

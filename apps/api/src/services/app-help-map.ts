@@ -10,9 +10,9 @@ import type {
 // and assert important hardcoded labels explicitly.
 // If a screen is renamed, update the map and the tests together.
 //
-// Map version: 2026-05-18
+// Map version: 2026-05-29
 
-const APP_HELP_MAP = `APP HELP (map version 2026-05-18):
+const APP_HELP_MAP = `APP HELP (map version 2026-05-29):
 This section means the current learner message is an internal MentoMate app question. You DO have access to the app map below, and you are allowed and expected to answer internal app-navigation questions from it. Do not say you cannot help with the app. Do not treat app questions as off-topic. Do not treat app questions as assessment answers. Answer in plain chat text using the visible destination labels below.
 
 Use this map only for internal MentoMate app questions: where to find things, how to change settings, what app modes mean, or how to use app features. Do not invent screens, buttons, routes, links, or capabilities. Use visible labels only. Keep the answer to one or two sentences, then return to the learning thread if one was active. When answering in a non-English conversation, keep destination labels exactly as shown in this map; translate only the surrounding explanation.
@@ -25,9 +25,7 @@ Destinations:
 - Saved explanations / bookmarks: Home > My Notes > Bookmarks. They can also use Progress > tap Saved.
 - Preferences: More > Preferences (under "Your learning").
 - Learning accommodation: More > Preferences > Your learning accommodation.
-- Explorer mode: Relaxed, flexible learning. The mentor is more encouraging, and the learner can move at their own pace.
-- Challenge mode: More focused learning. The mentor keeps the learner on track and asks for stronger proof of understanding.
-- Changing Explorer / Challenge: In a session, tap the mode button in the session header. Outside a session, use More > Preferences.
+- Challenge Round: An optional in-session check the mentor offers when the learner shows mastery. The learner accepts or declines per round; there is no global "mode" to toggle.
 - Mentor memory: More > Mentor memory.
 - Profile / account: More > Profile.
 - Notifications: More > Notifications.
@@ -35,8 +33,8 @@ Destinations:
 - Help & feedback: More > Help & feedback.
 - Homework: Home > Help with an assignment.
 - Practice / reviews: Home > Test yourself.
-- Viewing a child's progress (parent): Home > tap the child's card.
-- Changing a child's preferences (parent): Home > tap the child's card > the "<child name>'s learning preferences" row.
+- Viewing a child's progress (parent): Open Progress, then pick the child you want to view.
+- Changing a child's preferences (parent): Open Progress, pick the child, then open the "<child name>'s learning preferences" row.
 
 If you do not know a destination, say so and suggest "More > Help & feedback".
 Do not output internal route paths, Expo routes, markdown links, or URLs.`;
@@ -85,8 +83,8 @@ export function buildAppHelpDirectReply(userMessage: string): string {
     return 'Preferences are in More > Preferences. Your learning accommodation is in More > Preferences > Your learning accommodation.';
   }
 
-  if (/\b(explorer|challenge|mode)\b/.test(text)) {
-    return 'In a session, tap the mode button in the session header to change Explorer or Challenge mode. Outside a session, use More > Preferences.';
+  if (/\b(challenge round)\b/.test(text)) {
+    return 'A Challenge Round is an optional check the mentor offers in a session when you show mastery. You accept or decline each one — there is no global mode to switch on or off.';
   }
 
   if (/\b(memory|remember)\b/.test(text)) {
@@ -118,7 +116,7 @@ export function buildAppHelpDirectReply(userMessage: string): string {
   }
 
   if (/\b(progress|child|parent)\b/.test(text)) {
-    return "A child's progress is on Home > tap the child's card.";
+    return 'Open Progress, then pick the child you want to view.';
   }
 
   if (APP_HELP_GENERAL.test(userMessage)) {
