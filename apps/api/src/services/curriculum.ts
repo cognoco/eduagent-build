@@ -18,6 +18,7 @@ import {
 import {
   TopicNotSkippedError,
   bookTopicGenerationResultSchema,
+  normalizeGeneratedTopicTitle,
   MAX_GENERATED_BOOK_TOPICS,
   MIN_GENERATED_BOOK_TOPICS,
   type BookProgressStatus,
@@ -1276,9 +1277,12 @@ export async function getBookWithTopics(
   };
 }
 
-export function normalizeTopicTitle(title: string): string {
-  return title.trim().toLowerCase();
-}
+// Canonical normalizer lives in @eduagent/schemas so the persistence/dedup
+// path here and the generation-schema validation path collapse titles
+// identically (trim + lowercase + collapse internal whitespace). This path
+// previously used a weaker trim+lowercase that missed double-space duplicates
+// the schema already merged. Re-exported under the historical name.
+export const normalizeTopicTitle = normalizeGeneratedTopicTitle;
 
 const BOOK_GENERATION_STALE_MS = 15 * 60 * 1000;
 
