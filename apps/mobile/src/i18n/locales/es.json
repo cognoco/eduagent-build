@@ -171,19 +171,14 @@
         "withSessions_one": "{{memberNames}} · {{count}} sesión esta semana",
         "withSessions_other": "{{memberNames}} · {{count}} sesiones esta semana",
         "noActivity": "{{memberNames}} · sin sesiones esta semana",
-        "attentionChild": "{{childName}} quizá necesita atención",
+        "attentionChild": "A {{childName}} le vendría bien un empujoncito hoy",
         "profileLimit": "{{count}} de {{max}} perfiles usados",
         "addProfileAction": "Agregar perfil",
-        "addProfileAccessibilityLabel": "Agregar un perfil familiar"
+        "addProfileAccessibilityLabel": "Agregar un perfil familiar",
+        "whoNeedsYouHeader": "¿Quién te necesita hoy?"
       },
       "transitionNoticeTitle": "Ahora guías a {{childNames}}",
-      "snapshot": {
-        "noActivity": "Sin actividad esta semana",
-        "sessions_one": "{{count}} sesión esta semana",
-        "sessions_other": "{{count}} sesiones esta semana"
-      },
       "tonight": {
-        "titleEvening": "Ideas para conversar",
         "promptWithTopic": "¿Qué se sintió más claro en {{topic}} esta semana?",
         "promptNoActivity": "¿Qué haría que empezar fuera fácil esta semana?",
         "promptFallback": "¿Qué se sintió más fácil esta semana que la vez anterior?",
@@ -200,13 +195,53 @@
       "childrenHeader": "Children",
       "familyManagementHeader": "Gestión familiar",
       "childCard": {
-        "minutesThisWeek_one": "{{count}} min this week",
-        "minutesThisWeek_other": "{{count}} min this week",
-        "readyToStart": "Ready to start",
         "statusPending": "Checking in",
-        "progressAction": "Progress",
         "reportsAction": "Informes",
-        "nudgeAction": "Nudge"
+        "nudgeAction": "Nudge",
+        "learnTogetherAction": "Aprender juntos"
+      },
+      "card": {
+        "statusQuietWeek": "Semana tranquila",
+        "statusJustStarting": "Recién empezando",
+        "statusActive": "Activo/a esta semana",
+        "statusStreak": "En una racha de {{count}} días",
+        "quietWithFocus": "{{name}} tuvo una semana más tranquila. La última vez se centró en {{focus}}.",
+        "quietNew": "{{name}} ya está listo/a. Materias elegidas: {{subjects}}. Así puedes ayudarle a empezar.",
+        "quietPlain": "{{name}} tuvo una semana más tranquila.",
+        "headlineFromWeekly": "{{label}}: {{value}} ({{comparison}})",
+        "activePlain": "{{name}} siguió avanzando en {{focus}}.",
+        "activePlainNoFocus": "{{name}} siguió avanzando esta semana.",
+        "momentumStreak": "Racha de {{count}} días",
+        "momentumTopics": "+{{count}} temas",
+        "momentumWords": "+{{count}} palabras",
+        "solid": "Sólido: {{subjects}}",
+        "comingUp": "Próximamente: {{topic}}",
+        "tryTonight": "Probar esta noche"
+      },
+      "pulse": {
+        "multiAllActive": "{{count}} estudiantes, todos activos esta semana.",
+        "multiSomeActive": "{{count}} estudiantes, {{activeCount}} activos esta semana.",
+        "multiNoneActive": "{{count}} estudiantes: una semana tranquila por ahora.",
+        "oneActive": "{{name}} ha estado activo/a esta semana.",
+        "oneQuiet": "Una semana más tranquila para {{name}}."
+      },
+      "mentorSlot": {
+        "celebrationStreak": "{{name}} lleva una buena racha esta semana. ¡Esa racha se está convirtiendo en un hábito!",
+        "celebrationTopics": "Gran semana para {{name}}: ha cubierto mucho terreno nuevo.",
+        "worksFor": "Lo que le funciona a {{name}}"
+      },
+      "learnTogether": {
+        "title": "Aprender juntos",
+        "subtitle": "Dos formas de aprender junto a {{name}}",
+        "learnItYourselfHeader": "Aprende por tu cuenta",
+        "tryTogetherHeader": "Probar juntos esta semana",
+        "emptyBody": "Nada que añadir por ahora. Explora la biblioteca de {{name}} para elegir algo que explorar juntos.",
+        "openLibrary": "Abrir la biblioteca de {{name}}",
+        "close": "Cerrar"
+      },
+      "addLearner": {
+        "title": "Añadir estudiante",
+        "accessibilityLabel": "Añadir un estudiante a tu familia"
       }
     },
     "goToProgress": "Go to Progress",
@@ -927,7 +962,6 @@
       "updateErrorTitle": "No se pudo actualizar la materia"
     },
     "row": {
-      "review": "Repasar",
       "finished": "Terminado",
       "paused": "En pausa",
       "archived": "Archivado",
@@ -940,13 +974,14 @@
       "shelfReviewSuffix": ", necesita repaso",
       "shelfFinishedSuffix": ", terminado",
       "shelfActionOpen": "abrir",
-      "urgencyBadge": "Pronto: {{reason}}"
+      "urgencyBadge": "Pronto: {{reason}}",
+      "review_one": "{{count}} para repasar",
+      "review_other": "{{count}} para repasar"
     },
     "shelf": {
       "missingParam": "Falta la materia. Vuelve e inténtalo de nuevo.",
       "errorTitle": "No se pudo cargar este estante",
       "fallbackTitle": "Estante",
-      "bookCount": "{{count}} libro",
       "topicProgress": "{{completed}}/{{total}} temas",
       "settingsAccessibilityLabel": "Ajustes de la materia",
       "studyNext": "Próximo estudio",
@@ -961,7 +996,13 @@
       "skipAccessibilityLabel": "Omitir y empezar a aprender de todos modos",
       "filingErrorTitle": "No se pudo añadir ese libro",
       "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject."
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "bookCount_one": "{{count}} libro",
+      "bookCount_other": "{{count}} libros",
+      "suggestionAdd": "Añadir a la estantería",
+      "levelSubject": "Materia",
+      "levelBook": "Libro",
+      "levelTopic": "Tema"
     },
     "noteMenu": {
       "title": "Opciones de nota",
@@ -973,7 +1014,9 @@
       "title": "Continuar {{subject}}",
       "message": "Abre la estantería, elige el siguiente libro o repasa lo que tienes pendiente.",
       "cta": "Abrir",
-      "accessibilityLabel": "Continuar {{subject}}"
+      "accessibilityLabel": "Abrir {{subject}}",
+      "revisitTitle": "Repasar {{subject}}",
+      "startTitle": "Empezar {{subject}}"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Abrir marcador guardado: {{title}}"
@@ -1709,7 +1752,7 @@
       "childProfileJoined": "Añadido {{date}}",
       "learningAccommodationTitle": "Adaptación de aprendizaje para {{name}}",
       "noLearningPreferenceSet": "No se ha establecido preferencia de aprendizaje",
-      "childProfileScopeHint": "El progreso y los informes viven en sus propias pestañas, así que esta página solo mantiene ajustes específicos del menor.",
+      "childProfileScopeHint": "Aquí se encuentran las sesiones recientes, las materias y las notas del tutor. Los gráficos e informes de progreso completos tienen sus propias pestañas.",
       "consentTitle": "Consentimiento",
       "consentDescription": "Gestiona el consentimiento parental de {{name}}.",
       "consentStatusError": "No se pudo cargar el estado del consentimiento. Inténtalo de nuevo.",

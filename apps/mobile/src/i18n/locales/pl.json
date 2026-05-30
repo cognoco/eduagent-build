@@ -171,19 +171,14 @@
         "withSessions_one": "{{memberNames}} · {{count}} sesja w tym tygodniu",
         "withSessions_other": "{{memberNames}} · {{count}} sesje w tym tygodniu",
         "noActivity": "{{memberNames}} · brak sesji w tym tygodniu",
-        "attentionChild": "{{childName}} może potrzebować uwagi",
+        "attentionChild": "{{childName}} przydałaby się dziś zachęta",
         "profileLimit": "{{count}} z {{max}} profili użytych",
         "addProfileAction": "Dodaj profil",
-        "addProfileAccessibilityLabel": "Dodaj profil rodzinny"
+        "addProfileAccessibilityLabel": "Dodaj profil rodzinny",
+        "whoNeedsYouHeader": "Kto Cię dziś potrzebuje"
       },
       "transitionNoticeTitle": "Teraz mentorujesz {{childNames}}",
-      "snapshot": {
-        "noActivity": "Brak aktywności w tym tygodniu",
-        "sessions_one": "{{count}} sesja w tym tygodniu",
-        "sessions_other": "{{count}} sesji w tym tygodniu"
-      },
       "tonight": {
-        "titleEvening": "Pomysły na rozmowę",
         "promptWithTopic": "Co w {{topic}} stało się jaśniejsze w tym tygodniu?",
         "promptNoActivity": "Co ułatwiłoby rozpoczęcie nauki w tym tygodniu?",
         "promptFallback": "Co było łatwiejsze w tym tygodniu niż ostatnim razem?",
@@ -200,13 +195,53 @@
       "childrenHeader": "Children",
       "familyManagementHeader": "Zarządzanie rodziną",
       "childCard": {
-        "minutesThisWeek_one": "{{count}} min this week",
-        "minutesThisWeek_other": "{{count}} min this week",
-        "readyToStart": "Ready to start",
         "statusPending": "Checking in",
-        "progressAction": "Progress",
         "reportsAction": "Raporty",
-        "nudgeAction": "Nudge"
+        "nudgeAction": "Nudge",
+        "learnTogetherAction": "Uczcie się razem"
+      },
+      "card": {
+        "statusQuietWeek": "Spokojny tydzień",
+        "statusJustStarting": "Dopiero zaczyna",
+        "statusActive": "Aktywność w tym tygodniu",
+        "statusStreak": "{{count}}-dniowa seria",
+        "quietWithFocus": "{{name}} ma za sobą spokojniejszy tydzień — ostatnio skupiał(a) się na {{focus}}.",
+        "quietNew": "{{name}} ma już wszystko gotowe — wybrane przedmioty: {{subjects}}. Oto jak pomóc zacząć.",
+        "quietPlain": "{{name}} ma za sobą spokojniejszy tydzień.",
+        "headlineFromWeekly": "{{label}}: {{value}} ({{comparison}})",
+        "activePlain": "{{name}} nie próżnował(a) w temacie {{focus}}.",
+        "activePlainNoFocus": "{{name}} nie próżnował(a) w tym tygodniu.",
+        "momentumStreak": "{{count}}-dniowa seria",
+        "momentumTopics": "+{{count}} tematów",
+        "momentumWords": "+{{count}} słów",
+        "solid": "Solidnie: {{subjects}}",
+        "comingUp": "Wkrótce: {{topic}}",
+        "tryTonight": "Spróbuj dziś"
+      },
+      "pulse": {
+        "multiAllActive": "{{count}} uczniów, wszyscy aktywni w tym tygodniu.",
+        "multiSomeActive": "{{count}} uczniów, {{activeCount}} aktywnych w tym tygodniu.",
+        "multiNoneActive": "{{count}} uczniów — jak na razie spokojniejszy tydzień.",
+        "oneActive": "{{name}} był(a) aktywny/a w tym tygodniu.",
+        "oneQuiet": "Spokojniejszy tydzień dla {{name}}."
+      },
+      "mentorSlot": {
+        "celebrationStreak": "{{name}} ma w tym tygodniu świetną passę — ta seria staje się nawykiem.",
+        "celebrationTopics": "Wielki tydzień dla {{name}} — udało się opanować dużo nowego materiału.",
+        "worksFor": "Co działa w przypadku {{name}}"
+      },
+      "learnTogether": {
+        "title": "Uczcie się razem",
+        "subtitle": "Dwa sposoby na naukę razem z {{name}}",
+        "learnItYourselfHeader": "Naucz się samodzielnie",
+        "tryTogetherHeader": "Spróbujcie razem w tym tygodniu",
+        "emptyBody": "Na razie nic do dodania. Przejrzyj bibliotekę {{name}}, aby wybrać coś do wspólnej nauki.",
+        "openLibrary": "Otwórz bibliotekę {{name}}",
+        "close": "Zamknij"
+      },
+      "addLearner": {
+        "title": "Dodaj ucznia",
+        "accessibilityLabel": "Dodaj ucznia do swojej rodziny"
       }
     },
     "goToProgress": "Go to Progress",
@@ -952,7 +987,6 @@
       "updateErrorTitle": "Nie można zaktualizować przedmiotu"
     },
     "row": {
-      "review": "Powtórz",
       "finished": "Ukończone",
       "paused": "Wstrzymany",
       "archived": "Zarchiwizowany",
@@ -965,13 +999,14 @@
       "shelfReviewSuffix": ", wymaga powtórki",
       "shelfFinishedSuffix": ", ukończone",
       "shelfActionOpen": "otworzyć",
-      "urgencyBadge": "Wkrótce: {{reason}}"
+      "urgencyBadge": "Wkrótce: {{reason}}",
+      "review_one": "{{count}} do powtórzenia",
+      "review_other": "{{count}} do powtórzenia"
     },
     "shelf": {
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",
       "errorTitle": "Nie można załadować tej półki",
       "fallbackTitle": "Półka",
-      "bookCount": "{{count}} książka",
       "topicProgress": "{{completed}}/{{total}} tematów",
       "settingsAccessibilityLabel": "Ustawienia przedmiotu",
       "studyNext": "Ucz się dalej",
@@ -986,7 +1021,13 @@
       "skipAccessibilityLabel": "Pomiń i tak zacznij się uczyć",
       "filingErrorTitle": "Nie można dodać tej książki",
       "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject."
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "bookCount_one": "{{count}} książka",
+      "bookCount_other": "{{count}} książek",
+      "suggestionAdd": "Dodaj do półki",
+      "levelSubject": "Przedmiot",
+      "levelBook": "Książka",
+      "levelTopic": "Temat"
     },
     "noteMenu": {
       "title": "Opcje notatki",
@@ -998,7 +1039,9 @@
       "title": "Kontynuuj {{subject}}",
       "message": "Otwórz półkę, wybierz następną książkę lub powtórz zaległy materiał.",
       "cta": "Otwórz",
-      "accessibilityLabel": "Kontynuuj {{subject}}"
+      "accessibilityLabel": "Otwórz {{subject}}",
+      "revisitTitle": "Powtórz {{subject}}",
+      "startTitle": "Zacznij {{subject}}"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Otwórz zapisany zakładkę: {{title}}"
@@ -1734,7 +1777,7 @@
       "childProfileJoined": "Dodano {{date}}",
       "learningAccommodationTitle": "Dostosowanie nauki dla {{name}}",
       "noLearningPreferenceSet": "Nie ustawiono preferencji nauki",
-      "childProfileScopeHint": "Postępy i raporty znajdują się na osobnych kartach, więc ta strona przechowuje tylko ustawienia dotyczące dziecka.",
+      "childProfileScopeHint": "Tutaj znajdziesz ostatnie sesje, przedmioty i notatki mentora. Pełne wykresy postępów i raporty mają osobne zakładki.",
       "consentTitle": "Zgoda",
       "consentDescription": "Zarządzaj zgodą rodzica dla {{name}}.",
       "consentStatusError": "Nie można wczytać statusu zgody. Spróbuj ponownie.",

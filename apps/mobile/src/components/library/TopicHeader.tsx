@@ -11,6 +11,9 @@ interface TopicHeaderProps {
   daysSinceLastReview?: number | null;
   lastStudiedText: string;
   description?: string | null;
+  /** Localized level label ("Topic") shown as an eyebrow above the name so the
+   *  user always knows which library level they are on. */
+  levelLabel?: string;
 }
 
 export function TopicHeader({
@@ -20,6 +23,7 @@ export function TopicHeader({
   daysSinceLastReview,
   lastStudiedText,
   description,
+  levelLabel,
 }: TopicHeaderProps) {
   const colors = useThemeColors();
   const trimmedDescription = description?.trim();
@@ -32,6 +36,21 @@ export function TopicHeader({
         paddingBottom: 12,
       }}
     >
+      {levelLabel ? (
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: '700',
+            color: colors.textSecondary,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+            marginBottom: 4,
+          }}
+        >
+          {levelLabel}
+        </Text>
+      ) : null}
+
       <Text
         style={{
           fontSize: 22,

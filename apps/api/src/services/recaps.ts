@@ -1,4 +1,10 @@
-import type { Database } from '@eduagent/database';
+import { and, eq, inArray } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import {
+  curriculumTopics,
+  sessionSummaries,
+  type Database,
+} from '@eduagent/database';
 import type { RecapListItem } from '@eduagent/schemas';
 import { ForbiddenError } from '../errors';
 
@@ -12,9 +18,20 @@ type DashboardChildSummary = Awaited<
   ReturnType<typeof getChildrenForParent>
 >[number];
 
+interface NextTopic {
+  nextTopicTitle: string | null;
+  nextTopicReason: string | null;
+}
+
+const NO_NEXT_TOPIC: NextTopic = {
+  nextTopicTitle: null,
+  nextTopicReason: null,
+};
+
 function toRecapItem(
   child: DashboardChildSummary,
   session: Awaited<ReturnType<typeof getChildSessions>>[number],
+  nextTopic: NextTopic = NO_NEXT_TOPIC,
 ): RecapListItem {
   return {
     recapId: session.sessionId,
@@ -35,7 +52,59 @@ function toRecapItem(
     narrative: session.narrative,
     conversationPrompt: session.conversationPrompt,
     engagementSignal: session.engagementSignal,
+    nextTopicTitle: nextTopic.nextTopicTitle,
+    nextTopicReason: nextTopic.nextTopicReason,
   };
+}
+
+/**
+ * One targeted lookup for the next-topic the mentor lined up on each recap
+ * session. Reads `session_summaries.next_topic_id` / `.next_topic_reason`
+ * (already stored — no generation change, no migration) and resolves the
+ * topic title through an ALIASED `curriculum_topics` join so it never collides
+ * with the current-topic title resolution elsewhere in the recap pipeline.
+ *
+ * Scoped to the caller's already-access-checked child profile ids AND the
+ * specific recap session ids — it cannot widen access beyond what
+ * `listRecapsForParent` already enforces. Deliberately NOT folded into the
+ * shared `hydrateChildSessions` projection: that query also backs child-overview
+ * history/progress and has a far wider blast radius than this feature needs
+ * (plan T10 / Challenge HIGH-2).
+ */
+async function loadNextTopicMap(
+  db: Database,
+  childProfileIds: string[],
+  sessionIds: string[],
+): Promise<Map<string, NextTopic>> {
+  if (childProfileIds.length === 0 || sessionIds.length === 0) {
+    return new Map();
+  }
+
+  const nextTopic = alias(curriculumTopics, 'recap_next_topic');
+  const rows = await db
+    .select({
+      sessionId: sessionSummaries.sessionId,
+      nextTopicTitle: nextTopic.title,
+      nextTopicReason: sessionSummaries.nextTopicReason,
+    })
+    .from(sessionSummaries)
+    .leftJoin(nextTopic, eq(sessionSummaries.nextTopicId, nextTopic.id))
+    .where(
+      and(
+        inArray(sessionSummaries.profileId, childProfileIds),
+        inArray(sessionSummaries.sessionId, sessionIds),
+      ),
+    );
+
+  return new Map(
+    rows.map((row) => [
+      row.sessionId,
+      {
+        nextTopicTitle: row.nextTopicTitle ?? null,
+        nextTopicReason: row.nextTopicReason ?? null,
+      },
+    ]),
+  );
 }
 
 export async function listRecapsForParent(
@@ -81,9 +150,30 @@ export async function listRecapsForParent(
     }),
   );
 
+  // Next-topic enrichment. One targeted, access-scoped lookup over the recap
+  // session ids, then merge each result in by sessionId. Non-fatal by design
+  // (plan Failure Modes): a lookup failure must never fail the whole recap
+  // list — the cards simply render without a "Coming up" line.
+  const sessionIds = sessionsByChild.flatMap(({ sessions }) =>
+    sessions.map((session) => session.sessionId),
+  );
+  const childProfileIds = selectedChildren.map((child) => child.profileId);
+  let nextTopicBySession: Map<string, NextTopic>;
+  try {
+    nextTopicBySession = await loadNextTopicMap(
+      db,
+      childProfileIds,
+      sessionIds,
+    );
+  } catch {
+    nextTopicBySession = new Map();
+  }
+
   return sessionsByChild
     .flatMap(({ child, sessions }) =>
-      sessions.map((session) => toRecapItem(child, session)),
+      sessions.map((session) =>
+        toRecapItem(child, session, nextTopicBySession.get(session.sessionId)),
+      ),
     )
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
     .slice(0, Math.min(Math.max(options.limit ?? 20, 1), 50));

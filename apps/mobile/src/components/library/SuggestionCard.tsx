@@ -8,6 +8,14 @@ interface SuggestionCardProps {
   tint?: SubjectTint;
   onPress: () => void;
   testID?: string;
+  /**
+   * Localized "Add to shelf" label. When provided, the card shows an explicit
+   * add affordance. These cards surface books the learner does NOT own yet, so
+   * the affordance keeps them visually distinct from owned BookCards (which
+   * show "In progress" / "Not started" status). Passed from the parent so this
+   * component stays presentational (no i18n/theme hooks).
+   */
+  addLabel?: string;
 }
 
 export function SuggestionCard({
@@ -17,6 +25,7 @@ export function SuggestionCard({
   tint,
   onPress,
   testID,
+  addLabel,
 }: SuggestionCardProps): React.ReactElement {
   return (
     <Pressable
@@ -33,12 +42,18 @@ export function SuggestionCard({
           : {}),
       })}
       accessibilityRole="button"
-      accessibilityLabel={description ? `${title}: ${description}` : title}
+      accessibilityLabel={
+        addLabel
+          ? `${addLabel}: ${title}${description ? `. ${description}` : ''}`
+          : description
+            ? `${title}: ${description}`
+            : title
+      }
     >
       {emoji ? <Text className="text-2xl mb-2">{emoji}</Text> : null}
       <Text
         className="text-body-sm font-semibold text-text-primary"
-        numberOfLines={2}
+        numberOfLines={3}
       >
         {title}
       </Text>
@@ -48,6 +63,11 @@ export function SuggestionCard({
           numberOfLines={2}
         >
           {description}
+        </Text>
+      ) : null}
+      {addLabel ? (
+        <Text className="text-caption font-semibold text-primary mt-3">
+          + {addLabel}
         </Text>
       ) : null}
     </Pressable>

@@ -716,6 +716,7 @@ export default function TopicDetailScreen() {
           >
             {/* Topic header: name, chapter, retention pill, last studied */}
             <TopicHeader
+              levelLabel={t('library.shelf.levelTopic')}
               name={topicProgress.title}
               chapter={paramChapter ?? null}
               description={topicProgress.description}

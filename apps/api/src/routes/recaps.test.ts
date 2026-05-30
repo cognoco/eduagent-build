@@ -119,6 +119,8 @@ function makeRecapItem(overrides: Partial<{ recapId: string }> = {}) {
     narrative: null,
     conversationPrompt: null,
     engagementSignal: null,
+    nextTopicTitle: null,
+    nextTopicReason: null,
   };
 }
 

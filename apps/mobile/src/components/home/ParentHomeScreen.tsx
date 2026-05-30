@@ -46,10 +46,20 @@ import {
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
 import { BaseCoachingCard } from '../coaching/BaseCoachingCard';
+import { LearnTogetherSheet } from '../family/LearnTogetherSheet';
 import { childProfileHref } from '../../lib/navigation';
-
-const SINGLE_CHILD_PROMPT_COUNT = 3;
-const MULTI_CHILD_PROMPT_COUNT = 1;
+import { useRecaps } from '../../hooks/use-recaps';
+import type { RecapListItem } from '@eduagent/schemas';
+import {
+  ConversationStarterCard,
+  firstNameOf,
+  type TonightPrompt,
+} from './parent-card-prompts';
+import {
+  resolveHouseholdPulse,
+  resolveParentCardCopy,
+} from './parent-card-copy';
+import { MentorSlot } from './MentorSlot';
 
 function initialOf(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
@@ -65,11 +75,6 @@ function findDashboardChild(
   childId: string,
 ): DashboardChild | undefined {
   return dashboard?.children.find((entry) => entry.profileId === childId);
-}
-
-function firstNameOf(name: string): string {
-  const trimmed = name.trim();
-  return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
 // [#11] Delegates to the Hermes-safe formatter so a missing-ICU throw cannot
@@ -144,42 +149,6 @@ function ChildCapNotificationBanner({
       </View>
     </View>
   );
-}
-
-function formatActivityLabel(
-  dashboardChild: DashboardChild | undefined,
-  t: Translate,
-): string {
-  if (!dashboardChild) return t('home.parent.childCard.statusPending');
-  if (dashboardChild.totalTimeThisWeek > 0) {
-    return t('home.parent.childCard.minutesThisWeek', {
-      count: dashboardChild.totalTimeThisWeek,
-    });
-  }
-  if (dashboardChild.sessionsThisWeek > 0) {
-    return t('home.parent.snapshot.sessions', {
-      count: dashboardChild.sessionsThisWeek,
-    });
-  }
-  return t('home.parent.snapshot.noActivity');
-}
-
-function formatFocusLabel(
-  dashboardChild: DashboardChild | undefined,
-  t: Translate,
-): string {
-  const focus =
-    dashboardChild?.currentlyWorkingOn[0] ?? dashboardChild?.subjects[0]?.name;
-  return focus ?? t('home.parent.childCard.readyToStart');
-}
-
-function formatChildSnapshot(
-  dashboardChild: DashboardChild | undefined,
-  t: Translate,
-): string {
-  const focus = formatFocusLabel(dashboardChild, t);
-  const activity = formatActivityLabel(dashboardChild, t);
-  return `${focus} · ${activity}`;
 }
 
 function formatFamilyNameList(profiles: Profile[], t: Translate): string {
@@ -298,277 +267,6 @@ function formatFamilyAttentionSummary(
   });
 }
 
-interface TonightPrompt {
-  key: string;
-  childId: string;
-  text: string;
-}
-
-function promptText(
-  childName: string,
-  body: string,
-  includeChildName: boolean,
-): string {
-  return includeChildName ? `${childName}: ${body}` : body;
-}
-
-function childHasCurrentActivity(
-  dashboardChild: DashboardChild | undefined,
-): boolean {
-  return (
-    (dashboardChild?.sessionsThisWeek ?? 0) > 0 ||
-    (dashboardChild?.totalTimeThisWeek ?? 0) > 0 ||
-    (dashboardChild?.exchangesThisWeek ?? 0) > 0
-  );
-}
-
-function childHasAnySignal(
-  dashboardChild: DashboardChild | undefined,
-): boolean {
-  if (!dashboardChild) return false;
-
-  return (
-    childHasCurrentActivity(dashboardChild) ||
-    dashboardChild.totalSessions > 0 ||
-    dashboardChild.subjects.length > 0 ||
-    dashboardChild.currentlyWorkingOn.length > 0
-  );
-}
-
-function addPrompt(
-  prompts: TonightPrompt[],
-  child: Profile,
-  key: string,
-  body: string,
-  includeChildName: boolean,
-): void {
-  prompts.push({
-    key: `${child.id}-${key}`,
-    childId: child.id,
-    text: promptText(firstNameOf(child.displayName), body, includeChildName),
-  });
-}
-
-function buildSingleChildPrompts(
-  child: Profile,
-  dashboardChild: DashboardChild | undefined,
-  t: Translate,
-  includeChildName: boolean,
-  maxPrompts: number,
-): TonightPrompt[] {
-  const focus =
-    dashboardChild?.currentlyWorkingOn[0] ?? dashboardChild?.subjects[0]?.name;
-  const prompts: TonightPrompt[] = [];
-
-  if (!childHasAnySignal(dashboardChild)) {
-    return prompts;
-  }
-
-  if (focus && childHasCurrentActivity(dashboardChild)) {
-    addPrompt(
-      prompts,
-      child,
-      'active-focus',
-      t('home.parent.tonight.promptWithTopic', { topic: focus }),
-      includeChildName,
-    );
-    addPrompt(
-      prompts,
-      child,
-      'trickiest',
-      t('home.parent.tonight.promptTrickiestWithTopic', {
-        topic: focus,
-      }),
-      includeChildName,
-    );
-    addPrompt(
-      prompts,
-      child,
-      'next-goal',
-      t('home.parent.tonight.promptNextGoalWithTopic', { topic: focus }),
-      includeChildName,
-    );
-    return prompts.slice(0, maxPrompts);
-  }
-
-  if (focus) {
-    addPrompt(
-      prompts,
-      child,
-      'restart-focus',
-      t('home.parent.tonight.promptRestartWithTopic', { topic: focus }),
-      includeChildName,
-    );
-    addPrompt(
-      prompts,
-      child,
-      'trickiest',
-      t('home.parent.tonight.promptTrickiestWithTopic', {
-        topic: focus,
-      }),
-      includeChildName,
-    );
-    addPrompt(
-      prompts,
-      child,
-      'restart-easier',
-      t('home.parent.tonight.promptRestartEasierWithTopic', { topic: focus }),
-      includeChildName,
-    );
-    return prompts.slice(0, maxPrompts);
-  }
-
-  if (childHasCurrentActivity(dashboardChild)) {
-    addPrompt(
-      prompts,
-      child,
-      'weekly-easier',
-      t('home.parent.tonight.promptFallback'),
-      includeChildName,
-    );
-  } else {
-    addPrompt(
-      prompts,
-      child,
-      'restart',
-      t('home.parent.tonight.promptNoActivity'),
-      includeChildName,
-    );
-  }
-
-  return prompts.slice(0, maxPrompts);
-}
-
-function buildChildPromptMap(
-  children: Profile[],
-  dashboard: DashboardData | undefined,
-  t: Translate,
-): Map<string, TonightPrompt[]> {
-  const maxPrompts =
-    children.length === 1
-      ? SINGLE_CHILD_PROMPT_COUNT
-      : MULTI_CHILD_PROMPT_COUNT;
-  return new Map(
-    children.map((child) => [
-      child.id,
-      buildSingleChildPrompts(
-        child,
-        findDashboardChild(dashboard, child.id),
-        t,
-        false,
-        maxPrompts,
-      ),
-    ]),
-  );
-}
-
-function ConversationStarterCard({
-  prompt,
-  tint,
-}: {
-  prompt: TonightPrompt;
-  tint: SubjectTint | undefined;
-}): React.ReactElement {
-  const colors = useThemeColors();
-  const accent = tint?.solid ?? colors.primary;
-  const bubbleBorderColor = withOpacity(accent, 0.26);
-
-  return (
-    <View
-      testID={`parent-home-tonight-${prompt.key}`}
-      style={{
-        backgroundColor: withOpacity(accent, 0.06),
-        borderColor: bubbleBorderColor,
-        borderRadius: 16,
-        borderWidth: 1,
-        minHeight: 48,
-      }}
-    >
-      <View
-        style={{
-          alignItems: 'center',
-          flexDirection: 'row',
-          paddingHorizontal: 10,
-          paddingVertical: 9,
-        }}
-      >
-        <View
-          testID={`parent-home-tonight-icon-${prompt.key}`}
-          style={{
-            alignItems: 'center',
-            backgroundColor: colors.surface,
-            borderColor: bubbleBorderColor,
-            borderWidth: 1,
-            borderRadius: 999,
-            height: 28,
-            justifyContent: 'center',
-            width: 28,
-          }}
-        >
-          <Ionicons name="chatbubble-outline" size={16} color={accent} />
-        </View>
-        <Text
-          testID={`parent-home-tonight-text-${prompt.key}`}
-          style={{
-            color: colors.textPrimary,
-            flex: 1,
-            fontSize: 14,
-            fontWeight: '400',
-            includeFontPadding: false,
-            lineHeight: 20,
-            marginLeft: 9,
-          }}
-        >
-          {prompt.text}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function ChildConversationStarters({
-  child,
-  prompts,
-  tint,
-  t,
-}: {
-  child: Profile;
-  prompts: TonightPrompt[];
-  tint: SubjectTint | undefined;
-  t: Translate;
-}): React.ReactElement | null {
-  const colors = useThemeColors();
-  if (prompts.length === 0) return null;
-
-  return (
-    <View
-      className="mt-4 border-t border-border pt-3"
-      testID={`parent-home-child-prompts-${child.id}`}
-    >
-      <View className="flex-row items-center mb-2">
-        <Ionicons
-          name="chatbubbles-outline"
-          size={16}
-          color={tint?.solid ?? colors.primary}
-          className="me-2"
-        />
-        <Text className="text-caption font-bold uppercase text-text-secondary">
-          {t('home.parent.tonight.titleEvening')}
-        </Text>
-      </View>
-      <View style={{ gap: 6 }}>
-        {prompts.map((prompt) => (
-          <ConversationStarterCard
-            key={`tonight-${prompt.key}`}
-            prompt={prompt}
-            tint={tint}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
 function ChildActionButton({
   accentColor,
   icon,
@@ -614,25 +312,27 @@ function ChildActionButton({
 // are stable useCallback refs created by the parent, so shallow-equal holds.
 const ChildCommandCard = memo(function ChildCommandCard({
   child,
-  conversationPrompts,
   dashboardChild,
+  latestRecap,
   tint,
   onNavigateToProfile,
-  onNavigateToProgress,
+  onNavigateToOverview,
   onNavigateToReports,
   onOpenNudge,
+  onOpenLearnTogether,
   t,
 }: {
   child: Profile;
-  conversationPrompts: TonightPrompt[];
   dashboardChild: DashboardChild | undefined;
+  latestRecap: RecapListItem | null;
   tint: SubjectTint | undefined;
   // Stable dispatch callbacks — each receives childId so the parent can
   // define them once as useCallback without creating per-child closures.
   onNavigateToProfile: (childId: string) => void;
-  onNavigateToProgress: (childId: string) => void;
+  onNavigateToOverview: (childId: string) => void;
   onNavigateToReports: (childId: string) => void;
   onOpenNudge: (childId: string) => void;
+  onOpenLearnTogether: (childId: string) => void;
   t: Translate;
 }): React.ReactElement {
   const colors = useThemeColors();
@@ -647,9 +347,9 @@ const ChildCommandCard = memo(function ChildCommandCard({
     },
     [child.id, onNavigateToProfile],
   );
-  const handleOpenProgress = useCallback(
-    () => onNavigateToProgress(child.id),
-    [child.id, onNavigateToProgress],
+  const handleOpenOverview = useCallback(
+    () => onNavigateToOverview(child.id),
+    [child.id, onNavigateToOverview],
   );
   const handleOpenReports = useCallback(
     () => onNavigateToReports(child.id),
@@ -659,6 +359,21 @@ const ChildCommandCard = memo(function ChildCommandCard({
     () => onOpenNudge(child.id),
     [child.id, onOpenNudge],
   );
+  const handleOpenLearnTogether = useCallback(
+    () => onOpenLearnTogether(child.id),
+    [child.id, onOpenLearnTogether],
+  );
+
+  // Mentor-briefing copy. When the dashboard row hasn't loaded yet we fall
+  // back to a calm "checking in" status and skip the rich body.
+  const copy = dashboardChild
+    ? resolveParentCardCopy(dashboardChild, latestRecap, t)
+    : null;
+  const statusWord =
+    copy?.statusWord ?? t('home.parent.childCard.statusPending');
+  const starterPrompt: TonightPrompt | null = copy?.starter
+    ? { key: `${child.id}-starter`, childId: child.id, text: copy.starter }
+    : null;
 
   return (
     <View
@@ -669,8 +384,9 @@ const ChildCommandCard = memo(function ChildCommandCard({
       }}
       testID={`parent-home-child-card-${child.id}`}
     >
+      {/* Identity row — taps through to the child overview (no mode). */}
       <Pressable
-        onPress={handleOpenProgress}
+        onPress={handleOpenOverview}
         className="flex-row items-center bg-background rounded-button px-3 py-3"
         style={{
           borderColor: accent + '24',
@@ -707,15 +423,17 @@ const ChildCommandCard = memo(function ChildCommandCard({
           <Text className="text-h3 font-bold text-text-primary">
             {child.displayName}
           </Text>
-          <Text
-            className="text-body-sm text-text-secondary mt-1"
-            numberOfLines={2}
-          >
-            {formatChildSnapshot(dashboardChild, t)}
-          </Text>
         </View>
+        <Text
+          className="text-caption font-semibold text-text-secondary ms-2 text-right"
+          style={{ maxWidth: 120 }}
+          numberOfLines={1}
+          testID={`parent-home-child-status-${child.id}`}
+        >
+          {statusWord}
+        </Text>
         <View
-          className="w-9 h-9 rounded-full items-center justify-center ms-3"
+          className="w-9 h-9 rounded-full items-center justify-center ms-2"
           style={{ backgroundColor: softAccent }}
           accessibilityElementsHidden
         >
@@ -723,13 +441,77 @@ const ChildCommandCard = memo(function ChildCommandCard({
         </View>
       </Pressable>
 
+      {/* Mentor-voice headline. */}
+      {copy ? (
+        <Text
+          className="text-body-sm text-text-primary mt-3"
+          testID={`parent-home-child-headline-${child.id}`}
+        >
+          {copy.headline}
+        </Text>
+      ) : null}
+
+      {/* Positive momentum strip — hidden when there is nothing to celebrate. */}
+      {copy && copy.momentum.length > 0 ? (
+        <View
+          className="flex-row flex-wrap mt-3"
+          style={{ gap: 6 }}
+          testID={`parent-home-child-momentum-${child.id}`}
+        >
+          {copy.momentum.map((chip) => (
+            <View
+              key={chip.label}
+              className="flex-row items-center rounded-full px-2.5 py-1"
+              style={{ backgroundColor: softAccent }}
+            >
+              <Text style={{ fontSize: 12 }}>{chip.icon}</Text>
+              <Text
+                className="text-caption font-semibold ms-1"
+                style={{ color: accent }}
+              >
+                {chip.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {/* Condensed Solid / Coming-up — each line hidden when its field is null. */}
+      {copy?.solid ? (
+        <Text
+          className="text-caption text-text-secondary mt-3"
+          testID={`parent-home-child-solid-${child.id}`}
+        >
+          {copy.solid}
+        </Text>
+      ) : null}
+      {copy?.comingUp ? (
+        <Text
+          className="text-caption text-text-secondary mt-1"
+          testID={`parent-home-child-comingup-${child.id}`}
+        >
+          {copy.comingUp}
+        </Text>
+      ) : null}
+
+      {/* Exactly one starter. */}
+      {starterPrompt ? (
+        <View className="mt-3" testID={`parent-home-child-starter-${child.id}`}>
+          <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
+            {t('home.parent.card.tryTonight')}
+          </Text>
+          <ConversationStarterCard prompt={starterPrompt} tint={tint} />
+        </View>
+      ) : null}
+
+      {/* Demoted action row: Learn together · Reports · Nudge. */}
       <View className="flex-row gap-2 mt-4">
         <ChildActionButton
           accentColor={accent}
-          icon="stats-chart-outline"
-          label={t('home.parent.childCard.progressAction')}
-          onPress={handleOpenProgress}
-          testID={`parent-home-child-progress-${child.id}`}
+          icon="school-outline"
+          label={t('home.parent.childCard.learnTogetherAction')}
+          onPress={handleOpenLearnTogether}
+          testID={`parent-home-learn-together-${child.id}`}
         />
         <ChildActionButton
           accentColor={accent}
@@ -746,12 +528,6 @@ const ChildCommandCard = memo(function ChildCommandCard({
           testID={`parent-home-send-nudge-${child.id}`}
         />
       </View>
-      <ChildConversationStarters
-        child={child}
-        prompts={conversationPrompts}
-        tint={tint}
-        t={t}
-      />
     </View>
   );
 });
@@ -766,6 +542,7 @@ interface FamilySummaryRow {
 function FamilySummaryPanel({
   summary,
   rows,
+  attentionHeader,
   showAddProfile,
   addProfileLabel,
   addProfileAccessibilityLabel,
@@ -773,6 +550,7 @@ function FamilySummaryPanel({
 }: {
   summary: string;
   rows: FamilySummaryRow[];
+  attentionHeader: string | null;
   showAddProfile: boolean;
   addProfileLabel: string;
   addProfileAccessibilityLabel: string;
@@ -810,6 +588,12 @@ function FamilySummaryPanel({
           </Text>
         </View>
       </View>
+
+      {attentionHeader ? (
+        <Text className="text-caption font-bold uppercase text-text-secondary px-4 pb-2">
+          {attentionHeader}
+        </Text>
+      ) : null}
 
       {rows.length > 0 ? (
         <View className="px-4 pb-2">
@@ -883,6 +667,7 @@ export function ParentHomeScreen({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colorScheme } = useTheme();
+  const colors = useThemeColors();
   const role = useActiveProfileRole();
   const linkedChildren = useLinkedChildren();
   const { data: dashboard } = useDashboard();
@@ -892,7 +677,21 @@ export function ParentHomeScreen({
   );
   const childCapNotifications = useChildCapNotifications();
   const dismissChildCapNotification = useDismissChildCapNotification();
+  const { data: recaps } = useRecaps();
   const [sheetChildId, setSheetChildId] = useState<string | null>(null);
+  const [learnTogetherChildId, setLearnTogetherChildId] = useState<
+    string | null
+  >(null);
+  // First recap per child = latest, since listRecapsForParent sorts newest-first.
+  const latestRecapByChild = useMemo(() => {
+    const map = new Map<string, RecapListItem>();
+    for (const recap of recaps ?? []) {
+      if (!map.has(recap.childProfileId)) {
+        map.set(recap.childProfileId, recap);
+      }
+    }
+    return map;
+  }, [recaps]);
   const childrenInGracePeriod = useMemo((): ChildInGracePeriod[] => {
     return (dashboard?.children ?? []).flatMap((child) => {
       if (
@@ -912,10 +711,19 @@ export function ParentHomeScreen({
     });
   }, [dashboard]);
   const { subtitle } = getGreeting(activeProfile?.displayName ?? '', now);
+  // Household pulse replaces the generic greeting subtitle when there's a real
+  // activity roll-up; falls back to the greeting when there are no children.
+  const householdPulse = useMemo(
+    () => resolveHouseholdPulse(dashboard?.children ?? [], t),
+    [dashboard, t],
+  );
   const firstName = activeProfile
     ? firstNameOf(activeProfile.displayName)
     : 'there';
   const sheetChild = linkedChildren.find((child) => child.id === sheetChildId);
+  const learnTogetherChild = linkedChildren.find(
+    (child) => child.id === learnTogetherChildId,
+  );
   const childNames = useMemo(() => {
     return formatFamilyNameList(linkedChildren, t);
   }, [linkedChildren, t]);
@@ -960,10 +768,6 @@ export function ParentHomeScreen({
       ),
     [colorScheme, linkedChildren],
   );
-  const childPromptsById = useMemo(
-    () => buildChildPromptMap(linkedChildren, dashboard, t),
-    [linkedChildren, dashboard, t],
-  );
 
   const navigateToCreateChildProfile = useCallback(() => {
     if (Platform.OS === 'web') {
@@ -994,9 +798,11 @@ export function ParentHomeScreen({
     [router],
   );
 
-  const pushChildProgress = useCallback(
+  // Row arrow now opens the child OVERVIEW (no mode), not Progress charts.
+  // Progress stays reachable from the overview page and the Progress tab.
+  const pushChildOverview = useCallback(
     (childProfileId: string): void => {
-      router.push(childProfileHref(childProfileId, 'progress'));
+      router.push(childProfileHref(childProfileId));
     },
     [router],
   );
@@ -1012,6 +818,11 @@ export function ParentHomeScreen({
   // on every render, which would defeat ChildCommandCard's React.memo.
   const handleOpenNudge = useCallback(
     (childId: string): void => setSheetChildId(childId),
+    [],
+  );
+
+  const handleOpenLearnTogether = useCallback(
+    (childId: string): void => setLearnTogetherChildId(childId),
     [],
   );
 
@@ -1040,8 +851,11 @@ export function ParentHomeScreen({
         <Text className="text-h2 font-bold text-text-primary leading-tight">
           {t('home.parent.greeting', { displayName: firstName })}
         </Text>
-        <Text className="text-body-sm text-text-secondary mt-0.5">
-          {subtitle}
+        <Text
+          className="text-body-sm text-text-secondary mt-0.5"
+          testID="parent-home-pulse"
+        >
+          {householdPulse ?? subtitle}
         </Text>
       </View>
 
@@ -1105,40 +919,104 @@ export function ParentHomeScreen({
             <ChildCommandCard
               key={child.id}
               child={child}
-              conversationPrompts={childPromptsById.get(child.id) ?? []}
               dashboardChild={findDashboardChild(dashboard, child.id)}
+              latestRecap={latestRecapByChild.get(child.id) ?? null}
               tint={childTintsById.get(child.id)}
               onNavigateToProfile={pushChildProfile}
-              onNavigateToProgress={pushChildProgress}
+              onNavigateToOverview={pushChildOverview}
               onNavigateToReports={pushChildReports}
               onOpenNudge={handleOpenNudge}
+              onOpenLearnTogether={handleOpenLearnTogether}
               t={t}
             />
           ))}
         </View>
 
-        <Text className="text-h3 font-bold text-text-primary mt-5 mb-3">
-          {t('home.parent.familyManagementHeader')}
-        </Text>
-
-        <View style={{ gap: 10 }}>
-          <FamilySummaryPanel
-            summary={familyActivitySummary}
-            rows={familySummaryRows}
-            showAddProfile={showAddChild}
-            addProfileLabel={t('home.parent.familySummary.addProfileAction')}
-            addProfileAccessibilityLabel={t(
-              'home.parent.familySummary.addProfileAccessibilityLabel',
-            )}
-            onAddProfile={handleAddChild}
-          />
-        </View>
+        {/* Bottom region. One child: a calm mentor slot + a quiet "Add a
+            learner" row (the family panel would just restate the one child).
+            Two-plus children: the real family summary, attention row first. */}
+        {linkedChildren.length >= 2 ? (
+          <>
+            <Text className="text-h3 font-bold text-text-primary mt-5 mb-3">
+              {t('home.parent.familyManagementHeader')}
+            </Text>
+            <View style={{ gap: 10 }}>
+              <FamilySummaryPanel
+                summary={familyActivitySummary}
+                rows={familySummaryRows}
+                attentionHeader={
+                  attentionSummary
+                    ? t('home.parent.familySummary.whoNeedsYouHeader')
+                    : null
+                }
+                showAddProfile={showAddChild}
+                addProfileLabel={t(
+                  'home.parent.familySummary.addProfileAction',
+                )}
+                addProfileAccessibilityLabel={t(
+                  'home.parent.familySummary.addProfileAccessibilityLabel',
+                )}
+                onAddProfile={handleAddChild}
+              />
+            </View>
+          </>
+        ) : linkedChildren.length === 1 ? (
+          <View className="mt-5" style={{ gap: 10 }}>
+            {(() => {
+              const onlyProfile = linkedChildren[0];
+              const onlyChild = onlyProfile
+                ? findDashboardChild(dashboard, onlyProfile.id)
+                : undefined;
+              return onlyChild ? <MentorSlot child={onlyChild} t={t} /> : null;
+            })()}
+            {showAddChild ? (
+              <Pressable
+                onPress={handleAddChild}
+                className="flex-row items-center bg-surface border border-border rounded-card px-4 py-3.5"
+                style={
+                  Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
+                }
+                accessibilityRole="button"
+                accessibilityLabel={t(
+                  'home.parent.addLearner.accessibilityLabel',
+                )}
+                testID="parent-home-add-child"
+              >
+                <Ionicons
+                  name="person-add-outline"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+                <Text className="text-body font-semibold text-text-primary ms-3 flex-1">
+                  {t('home.parent.addLearner.title')}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         {sheetChild ? (
           <NudgeActionSheet
             childName={sheetChild.displayName}
             childProfileId={sheetChild.id}
             onClose={() => setSheetChildId(null)}
+          />
+        ) : null}
+
+        {learnTogetherChild ? (
+          <LearnTogetherSheet
+            child={learnTogetherChild}
+            dashboardChild={findDashboardChild(
+              dashboard,
+              learnTogetherChild.id,
+            )}
+            latestRecap={latestRecapByChild.get(learnTogetherChild.id) ?? null}
+            onClose={() => setLearnTogetherChildId(null)}
           />
         ) : null}
       </ScrollView>

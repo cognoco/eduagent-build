@@ -57,6 +57,7 @@ import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { formatSourceLine } from '../../../../../lib/format-note-source';
 import { withOpacity } from '../../../../../lib/color-opacity';
+import { displayBookDescription } from '../../../../../lib/book-display';
 import { resolveLoadingMotionPreset } from '../../../../../lib/motion-presets';
 import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
@@ -415,6 +416,12 @@ export default function BookScreen() {
   } | null>(null);
 
   const book = bookQuery.data?.book ?? null;
+  // Suppress a description that merely echoes the title (legacy filing-fallback
+  // books stored "Learn about <title>"). See lib/book-display.
+  const shownBookDescription = displayBookDescription(
+    book?.title ?? '',
+    book?.description,
+  );
   const hasBookData = bookQuery.data != null;
   const topics = useMemo(
     () => bookQuery.data?.topics ?? [],
@@ -1427,9 +1434,9 @@ export default function BookScreen() {
         <Text className="text-h2 font-bold text-text-primary mt-3 text-center">
           {book?.title ?? 'Writing your book...'}
         </Text>
-        {book?.description && (
+        {shownBookDescription && (
           <Text className="text-body-sm text-text-secondary mt-2 text-center px-4">
-            {book.description}
+            {shownBookDescription}
           </Text>
         )}
         <Text className="text-body-sm text-text-secondary mt-4">
@@ -1564,19 +1571,22 @@ export default function BookScreen() {
           {book?.emoji ? (
             <Text style={{ fontSize: 56, lineHeight: 68 }}>{book.emoji}</Text>
           ) : null}
+          <Text className="text-caption font-semibold text-text-tertiary mt-2 mb-1">
+            {t('library.shelf.levelBook')}
+          </Text>
           <Text
-            className="text-h2 font-bold text-text-primary mt-2"
+            className="text-h2 font-bold text-text-primary"
             numberOfLines={3}
             testID="book-hero-title"
           >
             {book?.title ?? 'Book'}
           </Text>
-          {book?.description ? (
+          {shownBookDescription ? (
             <Text
               className="mt-1 text-body-sm text-text-secondary"
               numberOfLines={3}
             >
-              {book.description}
+              {shownBookDescription}
             </Text>
           ) : null}
           {bookRetentionStatus !== null ? (

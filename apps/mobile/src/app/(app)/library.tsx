@@ -455,10 +455,78 @@ function LibraryScreenContent({
     });
   }, [sortedSubjects, debouncedQuery, serverMatchSubjectIds]);
 
-  const nextLearningSubject = useMemo(
-    () => visibleSubjects.find((subject) => subject.status === 'active'),
-    [visibleSubjects],
-  );
+  // [coach-card] Pick the single most useful "next action" subject instead of
+  // blindly the first active one (which made the card say "Continue X" for a
+  // brand-new 0/0 subject while ignoring the subject actually due for review).
+  // Priority: a subject already in progress (resume it) → a subject with topics
+  // due for review (revisit) → an unstarted subject (start). Returns null when
+  // every active subject is finished and nothing is due — the
+  // curriculum-complete banner covers that case.
+  const nextLearningSubject = useMemo<{
+    subject: Subject;
+    intent: 'continue' | 'revisit' | 'start';
+  } | null>(() => {
+    const actives = visibleSubjects.filter((s) => s.status === 'active');
+    if (actives.length === 0) return null;
+
+    const inProgress = actives.find((s) => {
+      const p = progressBySubjectId.get(s.id);
+      const done = p?.topicsCompleted ?? 0;
+      const total = p?.topicsTotal ?? 0;
+      return done > 0 && done < total;
+    });
+    if (inProgress) return { subject: inProgress, intent: 'continue' };
+
+    const due = actives.find(
+      (s) => (retentionDataBySubjectId.get(s.id)?.reviewDueCount ?? 0) > 0,
+    );
+    if (due) return { subject: due, intent: 'revisit' };
+
+    const unstarted = actives.find(
+      (s) => (progressBySubjectId.get(s.id)?.topicsCompleted ?? 0) === 0,
+    );
+    if (unstarted) return { subject: unstarted, intent: 'start' };
+
+    return null;
+  }, [visibleSubjects, progressBySubjectId, retentionDataBySubjectId]);
+
+  // Shared renderer for the "next action" coach card. Extracted so the two
+  // render paths (search/empty ScrollView and the virtualized SectionList
+  // header) can never diverge.
+  const renderNextActionCard = (): React.ReactElement | null => {
+    if (!nextLearningSubject) return null;
+    const { subject, intent } = nextLearningSubject;
+    const titleKey =
+      intent === 'continue'
+        ? 'library.nextAction.title'
+        : intent === 'revisit'
+          ? 'library.nextAction.revisitTitle'
+          : 'library.nextAction.startTitle';
+    const title = t(titleKey, { subject: subject.name });
+    return (
+      <Pressable
+        onPress={() => handleShelfPress(subject.id)}
+        className="bg-primary-soft rounded-card px-4 py-4 mb-3 flex-row items-center"
+        accessibilityRole="button"
+        accessibilityLabel={t('library.nextAction.accessibilityLabel', {
+          subject: subject.name,
+        })}
+        testID="library-next-action"
+      >
+        <View className="flex-1 pr-3">
+          <Text className="text-body font-semibold text-text-primary">
+            {title}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {t('library.nextAction.message')}
+          </Text>
+        </View>
+        <Text className="text-body-sm font-semibold text-primary">
+          {t('library.nextAction.cta')}
+        </Text>
+      </Pressable>
+    );
+  };
 
   // ---- Shimmer skeleton ---------------------------------------------------
 
@@ -759,31 +827,7 @@ function LibraryScreenContent({
         {/* Subject list (hidden when searching) */}
         {!isSearching && (
           <View testID="shelves-list">
-            {nextLearningSubject ? (
-              <Pressable
-                onPress={() => handleShelfPress(nextLearningSubject.id)}
-                className="bg-primary-soft rounded-card px-4 py-4 mb-3 flex-row items-center"
-                accessibilityRole="button"
-                accessibilityLabel={t('library.nextAction.accessibilityLabel', {
-                  subject: nextLearningSubject.name,
-                })}
-                testID="library-next-action"
-              >
-                <View className="flex-1 pr-3">
-                  <Text className="text-body font-semibold text-text-primary">
-                    {t('library.nextAction.title', {
-                      subject: nextLearningSubject.name,
-                    })}
-                  </Text>
-                  <Text className="text-body-sm text-text-secondary mt-1">
-                    {t('library.nextAction.message')}
-                  </Text>
-                </View>
-                <Text className="text-body-sm font-semibold text-primary">
-                  {t('library.nextAction.cta')}
-                </Text>
-              </Pressable>
-            ) : null}
+            {renderNextActionCard()}
             {shelfGroups.map((group) => (
               <View key={group.status}>
                 {showShelfGroupLabels ? (
@@ -1027,32 +1071,7 @@ function LibraryScreenContent({
                   </View>
                 )}
 
-                {nextLearningSubject ? (
-                  <Pressable
-                    onPress={() => handleShelfPress(nextLearningSubject.id)}
-                    className="bg-primary-soft rounded-card px-4 py-4 mb-3 flex-row items-center"
-                    accessibilityRole="button"
-                    accessibilityLabel={t(
-                      'library.nextAction.accessibilityLabel',
-                      { subject: nextLearningSubject.name },
-                    )}
-                    testID="library-next-action"
-                  >
-                    <View className="flex-1 pr-3">
-                      <Text className="text-body font-semibold text-text-primary">
-                        {t('library.nextAction.title', {
-                          subject: nextLearningSubject.name,
-                        })}
-                      </Text>
-                      <Text className="text-body-sm text-text-secondary mt-1">
-                        {t('library.nextAction.message')}
-                      </Text>
-                    </View>
-                    <Text className="text-body-sm font-semibold text-primary">
-                      {t('library.nextAction.cta')}
-                    </Text>
-                  </Pressable>
-                ) : null}
+                {renderNextActionCard()}
               </>
             }
             renderSectionHeader={({ section }) =>

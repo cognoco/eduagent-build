@@ -179,7 +179,6 @@
       "greeting": "Hey {{displayName}}",
       "accountLink": "Open account",
       "tonight": {
-        "titleEvening": "Conversation starters",
         "promptWithTopic": "What felt clearer in {{topic}} this week?",
         "promptNoActivity": "What would make starting feel easy this week?",
         "promptFallback": "What felt easier this week than last time?",
@@ -204,25 +203,61 @@
         "withSessions_one": "{{memberNames}} · {{count}} session this week",
         "withSessions_other": "{{memberNames}} · {{count}} sessions this week",
         "noActivity": "{{memberNames}} · no sessions this week",
-        "attentionChild": "{{childName}} may need attention",
+        "whoNeedsYouHeader": "Who needs you today",
+        "attentionChild": "{{childName}} could use a nudge today",
         "profileLimit": "{{count}} of {{max}} profiles used",
         "addProfileAction": "Add profile",
         "addProfileAccessibilityLabel": "Add a family profile"
       },
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
-      "snapshot": {
-        "noActivity": "No activity this week",
-        "sessions_one": "{{count}} session this week",
-        "sessions_other": "{{count}} sessions this week"
-      },
       "childCard": {
-        "minutesThisWeek_one": "{{count}} min this week",
-        "minutesThisWeek_other": "{{count}} min this week",
-        "readyToStart": "Ready to start",
         "statusPending": "Checking in",
-        "progressAction": "Progress",
         "reportsAction": "Reports",
-        "nudgeAction": "Nudge"
+        "nudgeAction": "Nudge",
+        "learnTogetherAction": "Learn together"
+      },
+      "card": {
+        "statusQuietWeek": "Quiet week",
+        "statusJustStarting": "Just getting started",
+        "statusActive": "Active this week",
+        "statusStreak": "On a {{count}}-day streak",
+        "quietWithFocus": "{{name}} had a quieter week — last time the focus was {{focus}}.",
+        "quietNew": "{{name}} is all set up — chosen subjects: {{subjects}}. Here's how to help them begin.",
+        "quietPlain": "{{name}} had a quieter week.",
+        "headlineFromWeekly": "{{label}}: {{value}} ({{comparison}})",
+        "activePlain": "{{name}} kept things moving in {{focus}}.",
+        "activePlainNoFocus": "{{name}} kept things moving this week.",
+        "momentumStreak": "{{count}}-day streak",
+        "momentumTopics": "+{{count}} topics",
+        "momentumWords": "+{{count}} words",
+        "solid": "Solid: {{subjects}}",
+        "comingUp": "Coming up: {{topic}}",
+        "tryTonight": "Try tonight"
+      },
+      "pulse": {
+        "multiAllActive": "{{count}} learners, all active this week.",
+        "multiSomeActive": "{{count}} learners, {{activeCount}} active this week.",
+        "multiNoneActive": "{{count}} learners — a quieter week so far.",
+        "oneActive": "{{name}} has been active this week.",
+        "oneQuiet": "A quieter week for {{name}}."
+      },
+      "mentorSlot": {
+        "celebrationStreak": "{{name}} is on a real roll this week — that streak is becoming a habit.",
+        "celebrationTopics": "Big week for {{name}} — lots of new ground covered.",
+        "worksFor": "What works for {{name}}"
+      },
+      "learnTogether": {
+        "title": "Learn together",
+        "subtitle": "Two ways to learn alongside {{name}}",
+        "learnItYourselfHeader": "Learn it yourself",
+        "tryTogetherHeader": "Try together this week",
+        "emptyBody": "Nothing to add just yet. Browse {{name}}'s library to pick something to explore together.",
+        "openLibrary": "Open {{name}}'s library",
+        "close": "Close"
+      },
+      "addLearner": {
+        "title": "Add a learner",
+        "accessibilityLabel": "Add a learner to your family"
       }
     },
     "goToProgress": "Go to Progress",
@@ -981,9 +1016,11 @@
     },
     "nextAction": {
       "title": "Continue {{subject}}",
+      "revisitTitle": "Revisit {{subject}}",
+      "startTitle": "Start {{subject}}",
       "message": "Open the shelf, pick the next book, or revisit what is due.",
       "cta": "Open",
-      "accessibilityLabel": "Continue {{subject}}"
+      "accessibilityLabel": "Open {{subject}}"
     },
     "curriculumComplete": {
       "title": "You've covered everything here!",
@@ -1019,7 +1056,8 @@
       "updateErrorTitle": "Could not update subject"
     },
     "row": {
-      "review": "Keep it fresh",
+      "review_one": "{{count}} to review",
+      "review_other": "{{count}} to review",
       "finished": "Finished",
       "paused": "Paused",
       "archived": "Archived",
@@ -1040,10 +1078,15 @@
       "loadingMessage": "We're finding the books and next steps saved for this subject.",
       "errorTitle": "Couldn't load this shelf",
       "fallbackTitle": "Shelf",
-      "bookCount": "{{count}} book",
+      "bookCount_one": "{{count}} book",
+      "bookCount_other": "{{count}} books",
       "topicProgress": "{{completed}}/{{total}} topics",
       "settingsAccessibilityLabel": "Subject settings",
       "studyNext": "Study next",
+      "suggestionAdd": "Add to shelf",
+      "levelSubject": "Subject",
+      "levelBook": "Book",
+      "levelTopic": "Topic",
       "addAnotherBook": "Add another book",
       "browseAll": "Browse all suggestions",
       "emptyPickTitle": "Pick a book to start",
@@ -1806,7 +1849,7 @@
       "childProfileJoined": "Added {{date}}",
       "learningAccommodationTitle": "Learning accommodation for {{name}}",
       "noLearningPreferenceSet": "No learning preference set",
-      "childProfileScopeHint": "Progress and reports live in their own tabs, so this page only keeps child-specific settings.",
+      "childProfileScopeHint": "Recent sessions, subjects, and the mentor's notes live here. Full progress charts and reports have their own tabs.",
       "consentTitle": "Consent",
       "consentDescription": "Manage parental consent for {{name}}.",
       "consentStatusError": "Could not load consent status. Please try again.",

@@ -155,18 +155,28 @@ describe('ShelfRow', () => {
     expect(screen.queryByText(/books/)).toBeNull();
   });
 
-  it('renders Review pill when reviewDueCount is positive', () => {
+  it('renders the review pill as a discrete count ("1 to review")', () => {
+    // The badge reframes the due reviews as an actionable count rather than a
+    // whole-subject status, so it never reads as a contradiction next to a
+    // "0/N topics" completion subtitle.
     render(<ShelfRow {...defaultProps} reviewDueCount={1} />);
 
     screen.getByTestId('shelf-row-review-sub-math');
-    screen.getByText('Keep it fresh');
+    screen.getByText('1 to review');
+  });
+
+  it('pluralizes the review count ("3 to review")', () => {
+    render(<ShelfRow {...defaultProps} reviewDueCount={3} />);
+
+    screen.getByTestId('shelf-row-review-sub-math');
+    screen.getByText('3 to review');
   });
 
   it('does not render Review pill when no topics are overdue', () => {
     render(<ShelfRow {...defaultProps} reviewDueCount={0} />);
 
     expect(screen.queryByTestId('shelf-row-review-sub-math')).toBeNull();
-    expect(screen.queryByText('Keep it fresh')).toBeNull();
+    expect(screen.queryByText(/to review/i)).toBeNull();
   });
 
   it('renders Finished pill when the shelf is finished and no topics are overdue', () => {

@@ -119,6 +119,7 @@ jest.mock(
 );
 
 const mockCaptureException = jest.fn();
+const mockCaptureMessage = jest.fn();
 
 jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -127,6 +128,7 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   return {
     ...actual,
     captureException: (...args: unknown[]) => mockCaptureException(...args),
+    captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
   };
 });
 
@@ -1762,7 +1764,15 @@ describe('NON_RENEWING_PURCHASE', () => {
     );
   });
 
-  it('rejects top-up on free tier with 403', async () => {
+  // [BUG-793] A top-up for an account with no paid local subscription is a
+  // PERMANENT business-state rejection. It used to return 403, but a non-2xx
+  // makes RevenueCat retry the same event for ~72h while the store may have
+  // already charged the user and credits are never granted — with no
+  // structured signal for ops. The fix acks with 200 (RC stops retrying), does
+  // NOT grant credits, and emits a queryable Sentry message for reconciliation.
+  // Mirrors the BUG-451 missing-transaction-id 200-ack-and-skip pattern below.
+  it('acks (200) and skips top-up on free tier, escalating to Sentry [BUG-793]', async () => {
+    mockCaptureMessage.mockClear();
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
       mockSubscriptionRow({ tier: 'free', status: 'active' }),
     );
@@ -1773,11 +1783,25 @@ describe('NON_RENEWING_PURCHASE', () => {
     });
 
     const res = await makeRequest(payload);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(body.error).toContain('free tier');
+    expect(body.received).toBe(true);
+    expect(body.skipped).toBe('topup_requires_paid_subscription');
+    // Credits must never be granted on the free tier.
     expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+
+    // Ops must get a queryable signal to reconcile a possible store charge.
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('NON_RENEWING_PURCHASE rejected'),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          category: 'revenuecat.topup_rejected_free_tier',
+          localTier: 'free',
+          productId: 'com.eduagent.topup.500',
+        }),
+      }),
+    );
   });
 
   it('is idempotent — duplicate transaction ID does not double-grant (BS-02)', async () => {

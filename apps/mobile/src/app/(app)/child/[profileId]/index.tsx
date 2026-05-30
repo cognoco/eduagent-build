@@ -1016,7 +1016,7 @@ export default function ChildDetailScreen(): React.ReactElement {
                 <Text className="text-caption text-text-secondary ms-2 flex-1">
                   {t('parentView.index.childProfileScopeHint', {
                     defaultValue:
-                      'Progress and reports live in their own tabs, so this page only keeps child-specific settings.',
+                      "Recent sessions, subjects, and the mentor's notes live here. Full progress charts and reports have their own tabs.",
                   })}
                 </Text>
               </View>

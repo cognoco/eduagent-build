@@ -916,10 +916,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             // recovery prompt instead of raw envelope JSON. Refund quota because
             // the exchange was not persisted.
             if (result.fallback) {
+              // Capture into a const so TS narrowing survives into the async
+              // safeSend closure below (property narrowing on `result.fallback`
+              // is otherwise reset inside a nested function).
+              const fallbackInfo = result.fallback;
               const frame = streamFallbackFrameSchema.parse({
                 type: 'fallback',
-                reason: result.fallback.reason,
-                fallbackText: result.fallback.fallbackText,
+                reason: fallbackInfo.reason,
+                fallbackText: fallbackInfo.fallbackText,
               });
               // Refund quota before emitting frames. safeRefundQuota escalates
               // internally, but if it throws we must still emit the SSE frames
@@ -963,6 +967,34 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   expectedResponseMinutes: 0,
                 }),
               });
+              // [BUG-796] Dispatch the observability terminus event so the rate
+              // of empty-reply / unparseable-envelope fallbacks is queryable via
+              // the exchange-empty-reply-fallback Inngest handler. Without this
+              // the handler is wired-but-untriggered (worse than dead code per
+              // CLAUDE.md). Non-core observability: safeSend captures dispatch
+              // failure to Sentry without breaking the SSE stream the client has
+              // already received. Frames are flushed above, so this only delays
+              // stream close by the dispatch round-trip (bounded by safeSend's
+              // 2s timeout).
+              await safeSend(
+                () =>
+                  inngest.send({
+                    name: 'app/exchange.empty_reply_fallback',
+                    data: {
+                      sessionId,
+                      profileId,
+                      flow: 'session',
+                      exchangeCount: session.exchangeCount,
+                      reason: fallbackInfo.reason,
+                    },
+                  }),
+                'sessions.stream.empty_reply_fallback',
+                {
+                  sessionId,
+                  profileId,
+                  reason: fallbackInfo.reason,
+                },
+              );
               return;
             }
 

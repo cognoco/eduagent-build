@@ -254,6 +254,29 @@ function updateEasJson() {
 
       // Set all managed vars from Doppler
       for (const [key, value] of Object.entries(managedVars)) {
+        // Guard: production routes through the custom domain — wrangler.toml
+        // production has workers_dev=false (apps/api/wrangler.toml), so the
+        // *.workers.dev URL is NOT served in production and a build pointing
+        // at it would be dead. Doppler prd has historically drifted to that
+        // dead URL; refuse to propagate it into the committed eas.json and
+        // keep the existing custom-domain value. Fix the source by setting
+        // Doppler prd EXPO_PUBLIC_API_URL to the api.* custom domain.
+        if (
+          profileName === 'production' &&
+          key === 'EXPO_PUBLIC_API_URL' &&
+          value.includes('.workers.dev')
+        ) {
+          console.log(
+            `\x1b[31m[Doppler]\x1b[0m   REFUSING to write workers.dev URL to ` +
+              `production EXPO_PUBLIC_API_URL ("${value}"). Production uses ` +
+              `the custom domain (workers_dev=false). Keeping the committed ` +
+              `value. Fix Doppler prd: set it to the api.* custom domain.`,
+          );
+          if (existingEnv[key] !== undefined) {
+            mergedEnv[key] = existingEnv[key];
+          }
+          continue;
+        }
         mergedEnv[key] = value;
       }
 

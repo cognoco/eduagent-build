@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import type { BookProgressStatus, CurriculumBook } from '@eduagent/schemas';
+import { displayBookDescription } from '../../lib/book-display';
 import type { SubjectTint } from '../../lib/design-tokens';
 
 interface BookCardProps {
@@ -34,6 +35,7 @@ export function BookCard({
   const progressLabel = book.topicsGenerated
     ? 'Ready to open'
     : 'Build this book';
+  const shownDescription = displayBookDescription(book.title, book.description);
 
   return (
     <Pressable
@@ -80,9 +82,9 @@ export function BookCard({
             </Text>
           </View>
 
-          {book.description && (
+          {shownDescription && (
             <Text className="text-body-sm text-text-secondary mt-1">
-              {book.description}
+              {shownDescription}
             </Text>
           )}
 

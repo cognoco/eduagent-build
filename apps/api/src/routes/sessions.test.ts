@@ -2152,6 +2152,99 @@ describe('session routes', () => {
       expect(body).not.toContain('"exchangeCount":1');
     });
 
+    // [BUG-796] The fallback path MUST dispatch app/exchange.empty_reply_fallback
+    // so the observability terminus (exchange-empty-reply-fallback Inngest
+    // handler) actually runs. Before this fix the handler was registered but no
+    // production code dispatched the event — the wired-but-untriggered
+    // anti-pattern. The orphan-handler.guard.test.ts inverse-orphan ratchet is
+    // the structural guard (red-green: removing the dispatcher fails it); this
+    // asserts the dispatch happens with the right payload on the real path.
+    it('[BUG-796] dispatches app/exchange.empty_reply_fallback when onComplete returns a fallback', async () => {
+      mockInngestSend.mockClear();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield* [];
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 0,
+          escalationRung: 1,
+          expectedResponseMinutes: 0,
+          fallback: {
+            reason: 'empty_reply',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      // Drain the stream so safeSend (awaited before the route returns) has run.
+      await res.text();
+
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/exchange.empty_reply_fallback',
+          data: expect.objectContaining({
+            sessionId: SESSION_ID,
+            reason: 'empty_reply',
+            flow: 'session',
+          }),
+        }),
+      );
+    });
+
+    // [BUG-796] The same observability dispatch must carry the actual fallback
+    // reason — not hardcode 'empty_reply' — so malformed_envelope / orphan_marker
+    // fallbacks are bucketed correctly in the handler's rate log.
+    it('[BUG-796] forwards the real fallback reason in the dispatched event', async () => {
+      mockInngestSend.mockClear();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield* [];
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 0,
+          escalationRung: 1,
+          expectedResponseMinutes: 0,
+          fallback: {
+            reason: 'malformed_envelope',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await res.text();
+
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/exchange.empty_reply_fallback',
+          data: expect.objectContaining({ reason: 'malformed_envelope' }),
+        }),
+      );
+    });
+
     // [M-3] If safeRefundQuota itself throws in the BUG-941 fallback path,
     // the fallback frame and done frame must still be emitted so the client
     // is never left with a truncated stream.

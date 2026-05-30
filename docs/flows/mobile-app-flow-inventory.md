@@ -1,11 +1,22 @@
-> **STATUS: ACTIVE** — canonical mobile flow inventory. Updated 2026-05-23.
+> **STATUS: ACTIVE** — mobile route/E2E inventory refreshed against the current filesystem on 2026-05-30. Coverage entries mean a Maestro flow file exists unless the row explicitly says a flow was freshly re-run.
 
 # Mobile App Flow Inventory
 
-Current-state flow map for the Expo mobile app as of 2026-05-23.
-Please walk every single flow on the list from end uers persepective using Playwrithe Chromium. Always rebase to the latest "main". After each phase you complete, check if you are still on the latest phase. If you find a blocker of the type that the flow is impossible to run (missing seed) or a blocker that blocks more than 3 flows address them directly, do not create notion bugs. Do not worry about i18n bugs, this will be a separate clean up. If a flow that is documented in the document is not accurate, missing something, is obsolete or if you find a flow that is not yet documented, amend this document directly. 
+Current flow map for the Expo mobile app, refreshed from the route tree and Maestro flow tree on 2026-05-30.
 
-Source of truth used for this inventory:
+When refreshing this inventory, walk every single flow on the list from the end-user perspective using Playwright Chromium. Always rebase to the latest "main". After each phase you complete, check if you are still on the latest phase. If you find a blocker of the type that the flow is impossible to run (missing seed) or a blocker that blocks more than 3 flows, address it directly instead of creating Notion bugs. Do not worry about i18n bugs; those are a separate cleanup. If a documented flow is inaccurate, missing something, obsolete, or if you find a flow that is not yet documented, amend this document directly.
+
+## 2026-05-30 refresh note
+
+This pass reconciled the inventory against `apps/mobile/src/app/**` and `apps/mobile/e2e/flows/**`. It did not run every flow; use the row coverage as a map of implemented Maestro coverage and follow the E2E runbook for pass/fail evidence.
+
+- The Family Recaps surface is now a nested route group at `/(app)/recaps/` with `index.tsx` and `[recapId].tsx`; the old flat Recaps file reference was removed.
+- Auth coverage now includes MFA variants, SSO fallback/cancel paths, and deep-link redirect preservation flows.
+- Parent/family coverage now includes V1 Recaps tab/list/detail, Learn This Too bridge entry from Recaps and child topic surfaces, send-nudge happy path and rate-limit flow, child memory consent prompt, and the childless-family-owner add-first-child gate.
+- Learning coverage now includes My Notes archive, library search-to-book, shelf-suggestion-to-book, book sticky CTA, book topic row start, topic back-to-book, session-summary-to-book, progress resume routes, and SSE reconnect banner.
+- Routes still requiring deeper manual review or dedicated happy-path E2E are collected near the bottom under "Current gaps and next candidates."
+
+Source of truth to use when refreshing this inventory:
 - `apps/mobile/src/app/**`
 - `apps/mobile/src/components/**`
 - `apps/mobile/e2e/flows/**`
@@ -15,8 +26,8 @@ Notes:
 - `Coverage` refers to whether a dedicated Maestro/E2E flow already exists.
 - `Code-only` means the flow is clearly present in the app code but does not have its own explicit flow file yet.
 - E2E paths in the Coverage column are relative to `apps/mobile/`.
-- Coverage claims are being revalidated after the More-tab and onboarding changes. When the Coverage column says an existing YAML must be re-run, the Flow column still describes the current intended user journey.
-- E2E coverage gaps, stale-flow counts, and the More-tab repair queue are tracked in `docs/flows/e2e-flow-coverage-audit-2026-05-13.md`.
+- Coverage claims reflect flow files present in the current tree; run the named flows for pass/fail evidence.
+- Historical E2E drift context lives in `docs/flows/e2e-flow-coverage-audit-2026-05-13.md`; the current gap list is at the bottom of this file.
 
 ## What changed since 2026-04-10
 
@@ -52,6 +63,15 @@ Two large changes reshape the inventory:
 19. **Quiz robustness fixes.** BUG-929 / CR-PR129-M4 reset `answerState`, `selectedAnswer`, `freeTextAnswer`, `guessWhoCluesUsed`, and the per-question timer in the same React batch on advance. BUG-932 shows the first clue (truncated) as the Guess Who row prompt in round detail. BUG-891 labels the vocab quiz card as "<lang> basics" when the learner has fewer than 5 personal words. BUG-892 replaces the web `window.confirm` quit with an in-app Modal. BUG-941 stripping is applied at the chat-bubble render boundary.
 20. **Navigation contract V1 shell slice.** The in-progress V1 Study/Family contract adds a Family `recaps` tab and a minimal Recaps feed backed by existing child session recap fields. V0 guardian fallback remains a supported five-tab shell (`home`, `own-learning`, `library`, `progress`, `more`) when both mode-navigation flags are off.
 
+## What changed through the 2026-05-30 refresh
+
+21. **Family Recaps route group and detail flow.** Recaps is now `/(app)/recaps/index.tsx` plus `/(app)/recaps/[recapId].tsx`; V1 guardian tab shape, populated list, empty state, detail back behavior, and Recaps-to-bridge journeys all have dedicated Maestro files.
+22. **Learn This Too family bridge.** `AddToMyLearningButton` lets a parent clone a child topic into their own learning from child-topic detail or Recaps detail, opens the relearn surface with child provenance, and preserves the correct return target after the session.
+23. **My Notes archive.** Learner home now exposes a My Notes hub with Sessions, Notes, and Bookmarks archive lists at `/(app)/my-notes/`.
+24. **Auth hardening coverage expanded.** MFA sign-in variants, deep-link redirect preservation for signed-in/signed-out/expired redirects, SSO fallback, OpenAI fallback, cancel, and button-rendering checks now have explicit flow files.
+25. **Practice and progress surfaces expanded.** Practice has its own hub, recitation, all-caught-up state, assessment picker, and assessment chat; progress gained self report routes, weekly-report detail, subject session archive, and global/subject resume entry flows.
+26. **Parent home operational flows.** Parent nudge send and nudge-rate-limit flows exist; childless family/pro owners now land on their own learner home with a family setup CTA instead of an unreachable parent-home zero state.
+
 ## Status legend
 
 Each row describes prod-active behavior unless tagged. When a row says **Production behavior** / **Dev/staging behavior**, it is calling out a flag-gated split where the user-facing experience differs by environment. Other tags used inline:
@@ -71,16 +91,17 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 | AUTH-02 | Sign up with email and password | `/(auth)/sign-up` | `e2e/flows/onboarding/sign-up-flow.yaml`, `e2e/flows/auth/sign-up-screen-devclient.yaml` |
 | AUTH-03 | Sign-up email verification code | `/(auth)/sign-up` verification state | Partial: covered inside `e2e/flows/onboarding/sign-up-flow.yaml` |
 | AUTH-04 | Sign in with email and password | `/(auth)/sign-in` | `e2e/flows/auth/sign-in-navigation.yaml`, `e2e/flows/auth/sign-in-validation-devclient.yaml` |
-| AUTH-05 | Additional sign-in verification | `/(auth)/sign-in` email code / phone code / TOTP / backup-code branches | Code-only |
+| AUTH-05 | Additional sign-in verification | `/(auth)/sign-in` email code / phone code / TOTP / backup-code branches | `e2e/flows/auth/sign-in-mfa-email-code.yaml`, `e2e/flows/auth/sign-in-mfa-phone.yaml`, `e2e/flows/auth/sign-in-mfa-totp.yaml`, `e2e/flows/auth/sign-in-mfa-backup-code.yaml` |
 | AUTH-06 | Forgot password and reset password | `/(auth)/forgot-password` | `e2e/flows/auth/forgot-password.yaml`, `e2e/flows/auth/forgot-password-devclient.yaml` |
 | AUTH-07 | Auth screen navigation | Sign in -> sign up -> forgot password -> back to sign in | `e2e/flows/auth/sign-in-navigation.yaml`, `e2e/flows/auth/sign-in-navigation-devclient.yaml` |
-| AUTH-08 | OAuth sign in / sign up — platform-conditional: Google on Android/web, Apple on iOS only, OpenAI if Clerk strategy registered | `/(auth)/sign-in`, `/(auth)/sign-up`, `sso-callback.tsx` | Partial: `e2e/flows/auth/sso-buttons.yaml` (Android/Google button rendering only) |
-| AUTH-09 | SSO callback completion and fallback return to sign in | `/sso-callback` | Code-only — i18n via `t()`; 10s timeout reveals a Back-to-sign-in fallback button (testID `sso-fallback-back`) |
-| AUTH-10 | Sign out | More screen sign-out button, consent gates sign-out buttons | Partial: setup uses `e2e/flows/_setup/sign-out.yaml`; no dedicated user-facing sign-out flow |
+| AUTH-08 | OAuth sign in / sign up — platform-conditional: Google on Android/web, Apple on iOS only, OpenAI if Clerk strategy registered | `/(auth)/sign-in`, `/(auth)/sign-up`, `sso-callback.tsx` | Partial: `e2e/flows/auth/sso-buttons.yaml`, `e2e/flows/auth/sso-buttons-render.yaml` cover rendering; provider happy path still depends on Clerk test hooks |
+| AUTH-09 | SSO callback completion, fallback return to sign in, OpenAI-provider fallback, and user-cancel path | `/sso-callback` | `e2e/flows/auth/sso-callback-fallback.yaml`, `e2e/flows/auth/sso-callback-fallback-openai.yaml`, `e2e/flows/auth/sso-user-cancel.yaml` |
+| AUTH-10 | Sign out and sign-in/out loop | More screen sign-out button, consent gates sign-out buttons | `e2e/flows/auth/sign-in-out-loop.yaml`; setup helper `e2e/flows/_setup/sign-out.yaml` remains shared infrastructure |
 | AUTH-11 | Session-expired forced sign-out and re-entry banner | Root app auth-expiry handler in `_layout.tsx`; banner consumed by `/(auth)/sign-in` via `consumeSessionExpiredNotice` | Code-only |
 | AUTH-12 | First-time vs returning sign-in copy | `/(auth)/sign-in` welcome state | `e2e/flows/auth/welcome-text-first-time.yaml` |
-| AUTH-13 | Deep-link auth redirect preservation: unauthenticated deep links are stored in `pending-auth-redirect.ts` (5-minute TTL, sessionStorage on web) and restored after sign-in (BUG-530, commit 6f75c488) | `/(auth)/_layout.tsx`, `/(auth)/sign-in.tsx`, `pending-auth-redirect.ts`, `normalize-redirect-path.ts` | Code-only |
+| AUTH-13 | Deep-link auth redirect preservation: unauthenticated deep links are stored in `pending-auth-redirect.ts` (5-minute TTL, sessionStorage on web) and restored after sign-in; signed-in and expired-link branches redirect safely | `/(auth)/_layout.tsx`, `/(auth)/sign-in.tsx`, `pending-auth-redirect.ts`, `normalize-redirect-path.ts`, `dev-only/seed-pending-redirect.tsx` | `e2e/flows/auth/deep-link-redirect-signed-in.yaml`, `e2e/flows/auth/deep-link-redirect-signed-out.yaml`, `e2e/flows/auth/deep-link-redirect-ttl-expired.yaml` |
 | AUTH-14 | Sign-in transition spinner and stuck-state recovery: after `setActive()` succeeds, sign-in shows a "Signing you in…" spinner; if the auth-layout redirect doesn't fire within `SESSION_TRANSITION_MS`, an `ErrorFallback` renders with a Try-again button and a Sign-up escape; phase-2 timeout (+15 s) resets the form with an inline error | `/(auth)/sign-in.tsx` (`isTransitioning`, `transitionStuck` states; `auth-transition.ts`) | Code-only — testIDs `sign-in-transitioning`, `sign-in-transitioning-stuck`, `sign-in-stuck-retry`, `sign-in-stuck-signup` |
+| AUTH-15 | Welcome intro and sign-up preview routes, including self, parent, both-child-first, expired preview, and override-target branches | `/(auth)/welcome`, `/preview`, `/preview/intent`, `/preview/value-prop`, `/preview/topic`, `/preview/both`, `dev-only/seed-preview-state.tsx` | `e2e/flows/onboarding/welcome-intro.yaml`, `e2e/flows/onboarding/welcome-intro-parent.yaml`, `e2e/flows/onboarding/preview-self.yaml`, `e2e/flows/onboarding/preview-parent.yaml`, `e2e/flows/onboarding/preview-both-child-first.yaml`, `e2e/flows/onboarding/preview-expired-state.yaml`, `e2e/flows/onboarding/preview-override-target.yaml` |
 
 ## Profiles, Family, Consent, and Account
 
@@ -102,8 +123,8 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 | ACCOUNT-14 | Terms of service | `/(app)/more/privacy` -> `/terms` | Partial: exercised in account lifecycle and More navigation flows |
 | ACCOUNT-15 | Self mentor memory (BUG-918: 'Set by your parent' badge copy hidden for owner profiles) | `/(app)/mentor-memory` | `e2e/flows/account/learner-mentor-memory.yaml`, `e2e/flows/account/learner-mentor-memory-populated.yaml` |
 | ACCOUNT-16 | Child mentor memory | `/(app)/child/[profileId]/mentor-memory` | `e2e/flows/parent/child-mentor-memory.yaml`, `e2e/flows/parent/child-mentor-memory-populated.yaml` |
-| ACCOUNT-17 | Child memory consent prompt | Child mentor-memory and child detail surfaces | Code-only |
-| ACCOUNT-18 | Subject analogy preference after setup (hidden on language subjects per BUG-939) | `/(app)/subject/[subjectId]` | Code-only |
+| ACCOUNT-17 | Child memory consent prompt | Child mentor-memory and child detail surfaces | `e2e/flows/parent/child-memory-consent-prompt.yaml` |
+| ACCOUNT-18 | Subject analogy preference after setup (hidden on language subjects per BUG-939) | `/(app)/subject/[subjectId]` | `e2e/flows/account/subject-analogy-preference.yaml`, `e2e/flows/account/subject-analogy-preference-language.yaml` |
 | ACCOUNT-19 | Consent request during underage profile creation | `/create-profile` -> `/consent` | Partial: profile creation and consent flows both exist in E2E |
 | ACCOUNT-20 | Child handoff to parent consent request | `/consent` | `e2e/flows/consent/hand-to-parent-consent.yaml` |
 | ACCOUNT-21 | Parent email entry, send consent link, resend, and change email. Validates child cannot enter own email as parent (server-side rejection with inline error) | `/consent`, consent pending gate in `/(app)/_layout.tsx` | `e2e/flows/consent/consent-pending-gate.yaml` (parent email entry covered by `consent-coppa-under13.yaml` / `consent-gdpr-under16.yaml`) |
@@ -116,19 +137,21 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 | ACCOUNT-28 | User opens More, taps Account/Profile, then taps App language. A bottom-sheet language picker opens; selecting a locale updates `i18next`, persists the language to SecureStore, and closes the sheet. | `/(app)/more` -> `/(app)/more/account` (`settings-app-language`) | `e2e/flows/account/app-language-edit.yaml` — exists, but must enter through Account/Profile |
 | ACCOUNT-29 | User opens More and taps Mentor language. Today that row opens Account/Profile rather than a separate tutor-language setup screen; there is no distinct current save flow beyond the account/language controls already listed in ACCOUNT-28. | `/(app)/more` -> `/(app)/more/account` | Code-only — no current dedicated tutor/mentor-language YAML exists |
 | ACCOUNT-30 | When a parent is viewing as a child, More still shows safe child-context rows, but account-level actions are hidden. Sign out is hidden on the hub; Subscription is hidden on Account/Profile; Export my data and Delete account are hidden on Privacy & Data. | `/(app)/more`, `/(app)/more/account`, `/(app)/more/privacy` under `impersonated-child` role | `e2e/flows/account/more-impersonated-child.yaml` — exists, but must cover the hub plus nested Account/Profile and Privacy & Data screens |
+| ACCOUNT-31 | Celebration-level preferences for self and editable child preferences. Self path updates the active profile; child path is gated by navigation contract and `childProfileId`, then returns to accommodation settings. | `/(app)/more/celebrations`, optionally `/(app)/more/celebrations?childProfileId=...` | Code-only — no dedicated current celebrations settings YAML exists |
 
 ## Home, Navigation, and Subject Setup
 
 | ID | Flow | Primary routes / entry points | Coverage |
 | --- | --- | --- | --- |
-| HOME-01 | Learner home — redesigned (commit 435a7b89): subject-tint carousel (`home-subject-carousel`, `home-subject-card-{id}`), add-subject tile (`home-add-subject-tile`), empty-subjects state (`home-empty-subjects`, `home-add-first-subject`), Ask Anything bar (`home-ask-anything`), quick-action row (`home-action-study-new`, `home-action-homework`, `home-action-practice`), CoachBand (gated by `FEATURE_FLAGS.COACH_BAND_ENABLED`). Replaces the previous IntentCard pattern | `/(app)/home` via `LearnerScreen` | Covered indirectly by many learning and subject flows |
+| HOME-01 | Learner home — redesigned (commit 435a7b89): subject-tint carousel (`home-subject-carousel`, `home-subject-card-{id}`), add-subject tile (`home-add-subject-tile`), empty-subjects state (`home-empty-subjects`, `home-add-first-subject`), Ask Anything bar (`home-ask-anything`), quick-action row (`home-action-study-new`, `home-action-homework`, `home-action-practice`), CoachBand (gated by `FEATURE_FLAGS.COACH_BAND_ENABLED`). Replaces the previous IntentCard pattern | `/(app)/home` via `LearnerScreen` | `e2e/flows/learning/home-layout.yaml`, plus indirect coverage from many learning and subject flows |
 | HOME-02 | Parent gateway home | `/(app)/home` via `ParentHomeScreen` / Family home contract | `e2e/flows/parent/parent-tabs.yaml`, `e2e/flows/parent/parent-dashboard.yaml` |
-| HOME-03 | Parent tabs and parent-mode navigation | V1 Family shell: `/(app)/home`, `/(app)/recaps`, `/(app)/progress`, `/(app)/more`; V0 guardian fallback still includes `/(app)/own-learning` and `/(app)/library` | `e2e/flows/parent/parent-tabs.yaml` — needs re-run/repair for the V1 Recaps tab |
+| HOME-03 | Parent tabs and parent-mode navigation | V1 Family shell: `/(app)/home`, `/(app)/recaps`, `/(app)/progress`, `/(app)/more`; V0 guardian fallback still includes `/(app)/own-learning` and `/(app)/library` | `e2e/flows/parent/parent-tabs.yaml`, `e2e/flows/parent/recaps-tab-list.yaml`, `e2e/flows/parent/v0-guardian-tab-shape.yaml` |
 | HOME-04 | Animated splash and initial shell | root `_layout.tsx` splash / launch experience | `e2e/flows/edge/animated-splash.yaml` |
 | HOME-05 | Empty first-user state (no subjects yet) — surfaced through the learner home action set; CTA `home-action-study-new` is the primary entry; `home-add-subject-tile` / `home-add-first-subject` IDs remain in the empty-subjects branch | `LearnerScreen` empty-subjects branch | `e2e/flows/edge/empty-first-user.yaml` |
-| HOME-06 | Resume interrupted session (driven by SecureStore session-recovery marker + `useContinueSuggestion`; surfaced as the active-subject card or a recovery affordance on the home carousel) | `LearnerScreen` continue affordance | Code-only |
-| HOME-07 | Add-first-child gate for parent owners on family/pro plans without a child profile yet — "Add a child to get started" branch on parent home; CTA navigates to `/create-profile` | `/(app)/home` parent branch | Code-only |
-| HOME-08 | Home loading-timeout fallback | `/(app)/home` after 10s of profile load | Code-only — testIDs `home-loading-timeout`, `home-loading-retry`, `timeout-library-button`, `timeout-more-button` |
+| HOME-06 | Resume interrupted session (driven by SecureStore session-recovery marker + `useContinueSuggestion`; surfaced as the active-subject card, progress keep-learning button, or crash-recovery affordance) | `LearnerScreen` continue affordance, `/(app)/progress`, `/(app)/progress/[subjectId]` | `e2e/flows/learning/resume-home-banner.yaml`, `e2e/flows/learning/resume-crash-recovery.yaml`, `e2e/flows/progress/resume-progress-global.yaml`, `e2e/flows/progress/resume-progress-subject.yaml` |
+| HOME-07 | Add-first-child setup for childless family/pro owners. Childless owners land on learner home with `home-family-setup-cta-button`; tapping routes to More, then Add child opens `/create-profile?for=child`. Parent-home family hub only lights once the first child is linked. | `/(app)/home` learner branch -> `/(app)/more` -> `/create-profile?for=child` | `e2e/flows/parent/add-first-child-gate.yaml` |
+| HOME-08 | Home loading-timeout fallback | `/(app)/home` after 10s of profile load | `e2e/flows/home/home-loading-timeout.yaml` — testIDs `home-loading-timeout`, `home-loading-retry`, `timeout-library-button`, `timeout-more-button` |
+| HOME-09 | Guardian "Own Learning" bridge tab for V0 family navigation. Family-capable guardians entering study mode render `LearnerScreen` with `returnToTab=own-learning`; direct pushes by non-guardian learner shapes redirect to Home. | `/(app)/own-learning` | `e2e/flows/learning/solo-owner-tab-shape.yaml`, `e2e/flows/parent/v0-guardian-tab-shape.yaml` |
 | SUBJECT-01 | Create subject from learner home | `/(app)/home` Add-subject tile / "Study new" quick action -> `/create-subject` | Covered by subject onboarding flows |
 | SUBJECT-02 | Create subject from library empty state | `/(app)/library` -> `/create-subject` | Partial: library flows cover it indirectly |
 | SUBJECT-03 | Create subject from chat when classifier cannot match an existing subject | session screen -> `/create-subject?returnTo=chat` | `e2e/flows/regression/bug-234-chat-subject-picker.yaml`, `e2e/flows/regression/bug-236-subject-returns-to-chat.yaml` |
@@ -138,7 +161,7 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 | SUBJECT-07 | Focused subject or focused-book flow | `/create-subject` -> first learning session | `e2e/flows/onboarding/create-subject.yaml` |
 | SUBJECT-08 | Per-subject native-language setup for language-learning subjects (four-strands pedagogy). Distinct from the profile-wide `conversationLanguage` set in SUBJECT-16 | `/(app)/onboarding/language-setup` | Covered by onboarding flows; language branch is route-backed |
 | SUBJECT-12 | View curriculum without committing to a learning session | curriculum screen and library/book entry routes | `e2e/flows/onboarding/view-curriculum.yaml` |
-| SUBJECT-14 | Placement / knowledge assessment | `/(app)/practice/assessment` | `e2e/flows/assessment/assessment-cycle.yaml` |
+| SUBJECT-14 | Placement / knowledge assessment. The picker lists eligible topics and active assessments, then opens the assessment chat with scoped topic/language metadata. | `/(app)/practice/assessment-picker` -> `/(app)/practice/assessment` | `e2e/flows/assessment/assessment-cycle.yaml` |
 | SUBJECT-16 | Conversation-language picker (mandatory, profile-wide). Sets `conversationLanguage`. First entry: post-create-profile onboarding before pronouns | `/(app)/onboarding/language-setup` | `e2e/flows/onboarding/onboarding-fast-path-language.yaml` |
 | SUBJECT-17 | After conversation-language setup, learners at or above `PRONOUNS_PROMPT_MIN_AGE` see a pronouns picker with preset options and a free-text Other path. Learners below the age gate skip this screen automatically and continue onboarding. | `/(app)/onboarding/pronouns` | Partial: covered when onboarding fast-path coverage reaches the pronouns stage; no dedicated current pronouns YAML exists |
 
@@ -153,25 +176,28 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 | LEARN-05 | Coach bubble visual variants | live session persona/theme variants | `e2e/flows/learning/coach-bubble-light.yaml`, `e2e/flows/learning/coach-bubble-dark.yaml` |
 | LEARN-06 | Voice input and voice-speed controls | live session voice toggle / controls | `e2e/flows/learning/voice-mode-controls.yaml` |
 | LEARN-07 | Session summary: submit summary or skip summary; "View full transcript" CTA navigates to LEARN-23. Includes `session-next-topic-card` (LLM-generated `nextTopicTitle` + `nextTopicReason` + "Continue learning" CTA → opens a guided session at `nextTopicId`); applies to all tutoring paths (freeform, guided, homework, practice, relearn, recitation). `nextTopicReason` is fed into the next session's system prompt via `session-context-builders.ts:324`. Audit Section E + Slice 2 wire `topicOrder` ordered-list rendering and the second-session-open home teaser, both of which are missing today | `/session-summary/[sessionId]` | `e2e/flows/learning/session-summary.yaml` |
-| LEARN-08 | Library v3 — subject-first shelf list with retention pills and an inline search bar (LEARN-25). Tapping a subject opens the subject shelf, where books and suggestions live. Replaces the previous shelves/books/topics tab architecture (PR #144) | `/(app)/library` | `e2e/flows/learning/library-navigation.yaml` |
-| LEARN-09 | Subject shelf -> book selection. Distinguishes empty-shelf (no books yet) from unstarted-topics (books exist, no progress) per BUG-920 | `/(app)/shelf/[subjectId]`, `/(app)/pick-book/[subjectId]` | `e2e/flows/subjects/practice-subject-picker.yaml`, `e2e/flows/subjects/multi-subject.yaml` |
-| LEARN-10 | Book detail and start learning from a book | `/(app)/shelf/[subjectId]/book/[bookId]` | `e2e/flows/learning/book-detail.yaml` |
+| LEARN-08 | Library v3 — subject-first shelf list with retention pills and an inline search bar (LEARN-25). Tapping a subject opens the subject shelf, where books and suggestions live. Replaces the previous shelves/books/topics tab architecture (PR #144) | `/(app)/library` | `e2e/flows/learning/library-navigation.yaml`, `e2e/flows/library/library-loading-timeout.yaml` |
+| LEARN-09 | Subject shelf -> book selection. Distinguishes empty-shelf (no books yet) from unstarted-topics (books exist, no progress) per BUG-920; shelf suggestions can create/open a book | `/(app)/shelf/[subjectId]`, `/(app)/pick-book/[subjectId]` | `e2e/flows/subjects/practice-subject-picker.yaml`, `e2e/flows/subjects/multi-subject.yaml`, `e2e/flows/learning/pick-book-suggestion.yaml`, `e2e/flows/learning/pick-book-custom-text.yaml`, `e2e/flows/learning/shelf-suggestion-to-book.yaml` |
+| LEARN-10 | Book detail and start learning from a book. Covers sticky CTA behavior, topic-row start, topic-back-to-book, and session-summary return to book. | `/(app)/shelf/[subjectId]/book/[bookId]` | `e2e/flows/learning/book-detail.yaml`, `e2e/flows/learning/book-sticky-cta.yaml`, `e2e/flows/learning/book-topic-row-start.yaml`, `e2e/flows/learning/topic-back-to-book.yaml`, `e2e/flows/learning/session-summary-to-book.yaml` |
 | LEARN-11 | Manage subject status: active, paused, archived | library manage-subject modal | `e2e/flows/learning/manage-subject-status.yaml` |
-| LEARN-12 | Topic detail (redesigned in commit 855a632f) | `/(app)/topic/[topicId]` | `e2e/flows/retention/topic-detail.yaml`, `e2e/flows/retention/topic-detail-adaptive-buttons.yaml` |
+| LEARN-12 | Topic detail (redesigned in commit 855a632f), including fresh-topic start, overdue review, in-progress resume, adaptive buttons, and back-to-book behavior | `/(app)/topic/[topicId]` | `e2e/flows/retention/topic-detail.yaml`, `e2e/flows/retention/topic-detail-adaptive-buttons.yaml`, `e2e/flows/retention/topic-start-studying.yaml`, `e2e/flows/retention/topic-review-overdue.yaml`, `e2e/flows/retention/topic-resume-in-progress.yaml`, `e2e/flows/learning/topic-back-to-book.yaml` |
 | LEARN-13 | Recall check | `/(app)/topic/recall-test` | `e2e/flows/retention/recall-review.yaml` |
 | LEARN-14 | Failed recall remediation | recall flow -> remediation card | `e2e/flows/retention/failed-recall.yaml` |
 | LEARN-15 | Relearn flow: same method or different method. **Data-layer anomaly:** does not flow through the canonical `startSession` service — `apps/api/src/services/retention-data.ts:858-873` inserts directly into `learning_sessions` with `metadata: { effectiveMode: 'relearn' }`. Any session-start logic added centrally (e.g., topic-intent matching from audit Section J / Slice 1 PR 5i) needs to be extended here too, or relearn sessions will silently miss it | `/(app)/topic/relearn` | `e2e/flows/retention/relearn-flow.yaml`, `e2e/flows/retention/relearn-child-friendly.yaml` |
 | LEARN-16 | Retention review from library or review surfaces | library / retention routes | `e2e/flows/retention/retention-review.yaml`, `e2e/flows/retention/library.yaml` |
-| LEARN-17 | Progress overview (top-level tab) | `/(app)/progress` | `e2e/flows/progress/progress-analytics.yaml` |
-| LEARN-18 | Subject progress detail | `/(app)/progress/[subjectId]` | Partial: `e2e/flows/progress/progress-analytics.yaml` |
+| LEARN-17 | Progress overview (top-level tab), including stats, latest report card, keep-learning CTA, and global resume target | `/(app)/progress` | `e2e/flows/progress/progress-analytics.yaml`, `e2e/flows/progress/resume-progress-global.yaml` |
+| LEARN-18 | Subject progress detail, including subject resume / choose-next CTA | `/(app)/progress/[subjectId]` | `e2e/flows/progress/progress-analytics.yaml`, `e2e/flows/progress/resume-progress-subject.yaml` |
 | LEARN-19 | Streak display | progress / reward surfaces | `e2e/flows/edge/streak-display.yaml` |
 | LEARN-20 | Milestones list | `/(app)/progress/milestones` | Partial: `e2e/flows/progress/progress-analytics.yaml` covers empty state; `ErrorFallback` paths still Code-only |
 | LEARN-21 | Cross-subject vocabulary browser | `/(app)/progress/vocabulary` | `e2e/flows/progress/vocabulary-browser.yaml` |
 | LEARN-22 | Per-subject vocabulary list (delete words, view CEFR + word/phrase badges; vocab quiz card label per BUG-891) | `/(app)/vocabulary/[subjectId]` | `e2e/flows/learning/vocabulary-flow.yaml` |
 | LEARN-23 | Read-only session transcript view (BUG-889). Renders exchange history from `GET /sessions/:sessionId/transcript`, filters out `isSystemPrompt` rows, applies `stripEnvelopeJson` per bubble (BUG-941). Registered as `fullScreenModal` in root `_layout.tsx`. `goBackOrReplace` back navigation. Gated for parent-proxy mode at the LEARN-07 link | `session-transcript/[sessionId]` (top-level, not under `(app)`) | `e2e/flows/learning/session-transcript.yaml`, `e2e/flows/learning/session-transcript-parent-proxy.yaml` |
 | LEARN-24 | Saved bookmarks screen — paginated list of bookmarked chat messages with subject name, optional topic title, relative date, and truncated content with expand-on-tap; swipe/trash delete with confirm; parent-proxy mode disables delete | `/(app)/progress/saved` (driven by `useBookmarks` infinite query + `useDeleteBookmark`) | `e2e/flows/progress/saved-bookmarks.yaml`, `e2e/flows/progress/saved-bookmarks-parent-proxy.yaml` |
-| LEARN-25 | Library inline search — `LibrarySearchBar` with 300 ms debounce drives `useLibrarySearch`; nested book / topic / note matches keep their parent subject visible, then the subject shelf handles the next level (PR #144) | `/(app)/library` search bar | `e2e/flows/learning/library-search.yaml` |
-| LEARN-26 | First-curriculum session entry (the post-onboarding wall — see "Path 0" in `docs/flows/learning-path-flows.md`). `POST /subjects/:subjectId/sessions/first-curriculum` waits for the first materialized topic before creating a `learning_sessions` row. Server picks the first topic by `sortOrder` (`findFirstAvailableTopicId` in `apps/api/src/services/session/session-crud.ts`), so topic-grain learner intent is dropped here. **Audit Section A (pre-warm, PR 5d) shrinks the wait; Section J (topic matching, PR 5i) closes the intent-drop**. Entry comes from create-subject, book detail, and language setup after submit. Error path on topic timeout returns a 504-style "still preparing your subject" error to the screen | API-driven from `/create-subject`, book detail, and `/(app)/onboarding/language-setup` | Code-only — covered indirectly by `onboarding/create-subject.yaml`; no dedicated flow asserts the polling behavior or the topic-grain drop |
+| LEARN-25 | Library inline search — `LibrarySearchBar` with 300 ms debounce drives `useLibrarySearch`; nested book / topic / note matches keep their parent subject visible, then the subject shelf handles the next level (PR #144) | `/(app)/library` search bar | `e2e/flows/learning/library-search.yaml`, `e2e/flows/learning/library-search-to-book.yaml` |
+| LEARN-26 | First-curriculum session entry (the post-onboarding wall — see "Path 0" in `docs/flows/learning-path-flows.md`). `POST /subjects/:subjectId/sessions/first-curriculum` waits for the first materialized topic before creating a `learning_sessions` row. Server picks the first topic by `sortOrder` (`findFirstAvailableTopicId` in `apps/api/src/services/session/session-crud.ts`). Entry comes from create-subject, book detail, language setup after submit, or a no-topics book empty state. Error path on topic timeout returns a 504-style "still preparing your subject" error to the screen. | API-driven from `/create-subject`, book detail, `/(app)/onboarding/language-setup`, and `topics-empty-build` on book detail | Partial: `e2e/flows/onboarding/create-subject.yaml`, `e2e/flows/learning/book-build-learning-path.yaml`; `e2e/flows/learning/first-curriculum-polling-timeout.yaml` exists but is marked DRAFT/blocked on seed + testID |
+| LEARN-27 | My Notes archive hub and lists. Learner home opens a hub for Sessions, Notes, and Bookmarks; each list supports grouping, search, and row navigation back to session detail when a session is available. | `/(app)/my-notes`, `/(app)/my-notes/[kind]` | `e2e/flows/learning/my-notes-archive.yaml` |
+| LEARN-28 | Subject session archive from progress. Subject detail opens a chronological session list; tapping a row builds the correct learner or parent-proxy session detail href. | `/(app)/progress/[subjectId]/sessions` | Code-only — no dedicated current subject-sessions archive YAML exists |
+| LEARN-29 | Self progress reports list and self weekly report detail. The reports list merges monthly and weekly report rows; weekly detail marks viewed on mount and shows practice summary metrics. | `/(app)/progress/reports`, `/(app)/progress/reports/[reportId]`, `/(app)/progress/weekly-report/[weeklyReportId]` | Code-only for self-report route; parent child-report/weekly-report routes are covered under PARENT-06/PARENT-13 |
 
 ## Practice Hub and Practice Activities
 
@@ -242,15 +268,19 @@ Dictation is a five-screen flow under `/(app)/dictation` with its own React cont
 | PARENT-08 | Subject raw-input audit for parents | parent drill-down / raw input review surfaces | `e2e/flows/parent/subject-raw-input-audit.yaml` |
 | PARENT-09 | Guided label tooltip | parent dashboard or parent report surfaces | `e2e/flows/parent/guided-label-tooltip.yaml` |
 | PARENT-10 | Parent child-topic "Understanding" card (plain-English mastery label) with data-gated Retention card | `/(app)/child/[profileId]/topic/[topicId]` | Code-only — testIDs `topic-understanding-card` (replaces `topic-mastery-card`), `topic-retention-card`; labels from `getUnderstandingLabel` and `getParentRetentionInfo` in `apps/mobile/src/lib/parent-vocab.ts` |
-| PARENT-11 | Parent child-session recap: narrative block, highlight block, Conversation prompt with copy-to-clipboard (Copied! / Copy failed states), and `EngagementChip` (curious / stuck / breezing / focused / scattered). The V1 Family Recaps feed reuses these session recap fields and opens the existing parent-native child session detail route. | `/(app)/recaps`, `/(app)/child/[profileId]/session/[sessionId]` | `e2e/flows/parent/child-session-recap.yaml` (populated), `e2e/flows/parent/child-session-recap-empty.yaml`; dedicated Recaps tab flow not yet added |
+| PARENT-11 | Parent child-session recap: narrative block, highlight block, Conversation prompt with copy-to-clipboard (Copied! / Copy failed states), and `EngagementChip` (curious / stuck / breezing / focused / scattered). The V1 Family Recaps feed reuses these session recap fields and opens the existing parent-native child session detail route. | `/(app)/recaps`, `/(app)/recaps/[recapId]`, `/(app)/child/[profileId]/session/[sessionId]` | `e2e/flows/parent/child-session-recap.yaml` (populated), `e2e/flows/parent/child-session-recap-empty.yaml`, `e2e/flows/parent/recaps-tab-list.yaml`, `e2e/flows/parent/recaps-empty-state.yaml`, `e2e/flows/parent/recap-detail-navigation.yaml` |
 | PARENT-12 | Parent child-subject detail retention badges gated on data presence | `/(app)/child/[profileId]/subjects/[subjectId]` | `e2e/flows/parent/child-subject-retention.yaml` (badges present), `e2e/flows/parent/child-subject-no-retention.yaml` (suppressed) |
 | PARENT-13 | Child weekly report detail — push-notification-driven weekly progress screen (sessions, time on app, topics-mastered metrics for a given week); marks report viewed on mount | `/(app)/child/[profileId]/weekly-report/[weeklyReportId]` | `e2e/flows/parent/child-weekly-report.yaml` |
+| PARENT-14 | Learn This Too family bridge from a child topic or Recaps detail. Parent taps Add to my learning, sees toast, opens relearn with child provenance, starts a parent-owned session, and back navigation returns to the originating family surface. | `/(app)/child/[profileId]/topic/[topicId]`, `/(app)/recaps/[recapId]`, `/(app)/topic/relearn`, `/(app)/session` | `e2e/flows/parent/family-bridge-clone.yaml`, `e2e/flows/parent/family-bridge-from-recaps.yaml` |
+| PARENT-15 | Parent send-nudge action sheet: opens from child card on parent home, offers four encouragement templates, sends via API, and auto-closes on success. | `/(app)/home` parent branch / `ParentHomeScreen` | `e2e/flows/parent/send-nudge.yaml` |
+| PARENT-16 | Parent nudge rate limit: after four nudges to the same child in the rolling 24h window, the fifth attempt stays in the sheet and shows inline rate-limit copy instead of a success alert. | `/(app)/home` parent branch / `ParentHomeScreen` nudge sheet | `e2e/flows/parent/nudge-rate-limit.yaml` |
+| PARENT-17 | Parent child curriculum overview. Parent opens a linked child's curriculum, sees subjects with raw-input audit and retention status, and can drill into child subject progress. Non-linked child access renders a not-available state. | `/(app)/child/[profileId]/curriculum` | Code-only for the dedicated curriculum route; related child-subject drilldown remains covered by `e2e/flows/parent/child-drill-down.yaml` |
 
 ## Billing and Monetization
 
 | ID | Flow | Primary routes / entry points | Coverage |
 | --- | --- | --- | --- |
-| BILLING-01 | Owner opens More, taps Account/Profile, then taps Subscription. The subscription screen shows current plan, status badge, optional trial banner, usage meter with daily sub-meter for free tier, and any cancellation notice. | `/(app)/more` -> `/(app)/more/account` -> `/(app)/subscription` | `e2e/flows/billing/subscription-details.yaml` — exists, but must enter through Account/Profile |
+| BILLING-01 | Owner opens More, taps Account/Profile, then taps Subscription. The subscription screen shows current plan, status badge, optional trial banner, usage meter with daily sub-meter for free tier, and any cancellation notice. | `/(app)/more` -> `/(app)/more/account` -> `/(app)/subscription` | `e2e/flows/billing/subscription.yaml`, `e2e/flows/billing/subscription-details.yaml` — details flow must enter through Account/Profile |
 | BILLING-02 | Owner opens Subscription from Account/Profile, selects an upgrade, and RevenueCat purchase starts. While webhook confirmation is pending, the screen shows `purchase-polling-indicator`; if the plan is already purchased, the user is prompted to Restore. | `/(app)/more` -> `/(app)/more/account` -> `/(app)/subscription` -> RevenueCat purchase | `e2e/flows/billing/upgrade-pending-state.yaml` (polling), `e2e/flows/billing/upgrade-confirmed-state.yaml` (post-webhook); RevenueCat IAP happy path remains Code-only |
 | BILLING-03 | Trial, plan usage, and family-pool states all render on the same subscription screen after the Account/Profile entry. Trial users see the trial banner and Trial status; family users can see family-pool usage when family data is available. | `/(app)/more` -> `/(app)/more/account` -> `/(app)/subscription` | `e2e/flows/billing/subscription-details.yaml` (seeds `trial-active` and asserts `trial-banner` per BUG-966); family-pool state also covered by BILLING-08 |
 | BILLING-04 | Owner opens Subscription from Account/Profile and taps Restore purchases. The subscription screen invokes the restore action and handles already-purchased or restore result states inline. | `/(app)/more` -> `/(app)/more/account` -> `/(app)/subscription` restore action | `e2e/flows/billing/subscription-details.yaml` |
@@ -281,6 +311,9 @@ These are not always standalone product flows, but they are already tracked as e
 | QA-10 | Dictation full flow regression: choice -> playback -> complete (incl. timeout / cancel branches) | `/(app)/dictation/**` | `e2e/flows/dictation/dictation-full-flow.yaml` |
 | QA-11 | Quiz full flow regression: index -> launch -> play -> results, including Play Again with prefetched round | `/(app)/quiz/**` | `e2e/flows/quiz/quiz-full-flow.yaml` |
 | QA-12 | Consent deny-confirmation regression: parent deny path with confirmation gate | `/consent` deny path | `e2e/flows/consent/consent-deny-confirmation.yaml` |
+| QA-13 | Sign-in/out loop regression | auth -> app shell -> More sign-out -> auth | `e2e/flows/auth/sign-in-out-loop.yaml` |
+| QA-14 | SSE reconnect banner regression | live tutoring session stream interruption and reconnect UI | `e2e/flows/session/sse-reconnect-banner.yaml` |
+| QA-15 | Preview/onboarding regression cluster | `/preview/**`, `/(auth)/welcome`, onboarding fast path | `e2e/flows/onboarding/preview-self.yaml`, `e2e/flows/onboarding/preview-parent.yaml`, `e2e/flows/onboarding/preview-both-child-first.yaml`, `e2e/flows/onboarding/preview-expired-state.yaml`, `e2e/flows/onboarding/preview-override-target.yaml`, `e2e/flows/onboarding/onboarding-fast-path.yaml` |
 
 ## Cross-Cutting Behaviors Worth Calling Out
 
@@ -306,38 +339,44 @@ These are not single-screen flows, but they shape user experience across multipl
 | CC-16 | HMR-safe error type guards in `format-api-error.ts` (BUG-947) | All `instanceof` checks for typed API errors (`ForbiddenError`, `QuotaExceededError`, `UpstreamError`, etc.) are replaced with `.name` string + property-shape guards so Metro HMR module reloads do not break class identity. |
 | CC-17 | Profile-as-lens navigation pattern (commit a72ebfac) | Profile-scoped screens receive the active profile via a navigation lens (`/(app)/child/[profileId]` and equivalent) rather than re-fetching at the screen level. `(app)/_layout.tsx` is the authority. `useActiveProfileRole()` gates destructive More actions for impersonated-child sessions (ACCOUNT-30). |
 | CC-18 | Stable FlatList refs (PERF-10, commit 088640c8) | Hoisted `keyExtractor` / `renderItem` references prevent virtualisation from being defeated by re-render churn. Applied to library, vocabulary, history, and bookmarks lists. |
+| CC-19 | Mode-navigation contract controls tab shape and route access | `useNavigationContract()` and legacy shape resolution gate V1 family Recaps, V0 guardian Own Learning/Library, parent proxy restrictions, Recaps detail access, and child curriculum access. Covered by parent tab-shape and recaps flows. |
+| CC-20 | Parent bridge provenance and return targets | Family bridge routes carry return tokens (`family-recaps`, `family-children`) through Recaps/child-topic -> relearn -> session so back navigation returns to the correct family surface. |
 
-## Recently Shipped Routes — Pending Flow IDs
+## Current Gaps and Next Candidates
 
-The following routes exist in `apps/mobile/src/app/(app)/` but have not yet been assigned canonical flow IDs in this inventory. They should be added in the next inventory pass.
+This inventory is current against the route/E2E file tree as of 2026-05-30, but the following gaps remain. Treat `dev-only/*`, `_setup/*`, and route helper files as non-product infrastructure unless they are named by a row above.
 
-| Route | Status | Notes |
+| Area | Current state | Next inventory / E2E action |
 | --- | --- | --- |
-| `/(app)/progress/reports/` (`reports/index.tsx` + `reports/[reportId].tsx`) | Shipped | Child-reports list and report detail; referenced as an entry point in PARENT-06 but not registered as its own flow row |
-| `/(app)/progress/weekly-report/[weeklyReportId]` (`weekly-report/_layout.tsx` + `[weeklyReportId].tsx`) | Shipped | Push-driven weekly report detail; referenced in PARENT-13 but shares entry point with `/(app)/child/[profileId]/weekly-report/[weeklyReportId]` — confirm canonical route |
-| `/(app)/more/celebrations.tsx` | Shipped | Celebration / reward screen reachable from More; no flow row exists |
-| `/(app)/vocabulary/` (`vocabulary/index.tsx` + `vocabulary/[subjectId].tsx`) | Shipped | Cross-subject vocabulary browser index + per-subject vocabulary list; LEARN-21 covers `/(app)/progress/vocabulary` separately |
-| `/(app)/recaps.tsx` | Shipped (flag-gated) | Family Recaps tab surface; V1 Family shell only (`MODE_NAV_V1_ENABLED=true`); not yet a flow row in this inventory |
-| `/(app)/own-learning.tsx` | Shipped | Guardian bridge tab for the V0 5-tab shape; LEARN-08 in the V0 `own-learning` slot; no standalone flow row |
+| First-curriculum polling timeout | `e2e/flows/learning/first-curriculum-polling-timeout.yaml` exists, but its header marks it DRAFT and blocked on a deterministic seed plus a real polling-banner testID. | Add the seed/testID, then promote LEARN-26 coverage from partial to dedicated. |
+| Self progress reports | `/(app)/progress/reports/*` and `/(app)/progress/weekly-report/[weeklyReportId]` are mapped as LEARN-29 but have no dedicated self-report Maestro flow. | Add a self-progress reports list/detail flow or explicitly fold it into `progress-analytics.yaml`. |
+| Subject sessions archive | `/(app)/progress/[subjectId]/sessions` is mapped as LEARN-28 but remains code-only. | Add a route-level archive flow that opens a session row and verifies learner vs parent-proxy href behavior. |
+| More celebrations settings | `/(app)/more/celebrations` is mapped as ACCOUNT-31 but remains code-only. | Add self and child-editor settings coverage if celebration preferences become release-critical. |
+| Quiz history and round detail | QUIZ-09 and QUIZ-10 are shipped code-only surfaces. | Add history list and completed-round detail Maestro coverage. |
+| Session-expired forced sign-out | AUTH-11 remains code-only. | Requires Clerk/session expiry hook or deterministic test seam. |
+| Sign-in transition stuck-state | AUTH-14 remains code-only. | Requires controlled slow-network or auth-layout redirect stall. |
+| BYOK waitlist | BILLING-10 UI remains commented out. | Keep out of flow coverage until the UI is active. |
 
 ## Best Next Candidates for Dedicated Flow Docs or E2E Coverage
 
-The 2026-05-13 E2E coverage audit found that this inventory still has stale coverage claims and missing test coverage. The following gaps remain as of 2026-05-14; see `docs/flows/e2e-flow-coverage-audit-2026-05-13.md` and `docs/flows/plans/2026-05-01-flow-revision-plan.md` for the active re-test plan:
+The 2026-05-30 filesystem refresh folded the shipped Recaps, parent bridge, nudge, My Notes, MFA, deep-link auth, and practice/progress coverage into the canonical rows above. Remaining next candidates:
 
 **Deferred (infrastructure / API blockers):**
-- OAuth happy-path beyond button rendering — requires `CLERK_TESTING_TOKEN` (AUTH-08, AUTH-09)
+- OAuth happy-path beyond button rendering/fallback/cancel — requires Clerk provider test hooks (AUTH-08, AUTH-09)
 - Session-expired forced sign-out + banner — requires Clerk token expiry hook (AUTH-11)
-- Deep-link auth redirect preservation — ADB deep-link unreliable on Maestro 2.2.0 (AUTH-13)
-- Sign-in transition stuck-state recovery — controlled slow-network required (AUTH-14)
+- Sign-in transition stuck-state recovery — controlled slow-network or redirect-stall hook required (AUTH-14)
 - Change password full-auth path — requires Clerk testing hooks (ACCOUNT-09)
-- Resume interrupted session via Continue — SecureStore manipulation unreliable (HOME-06)
-- Home loading-timeout fallback — 10s timeout hard to trigger reliably (HOME-08)
+- First-curriculum polling timeout — blocked by seed + testID, as documented in the draft YAML (LEARN-26)
 - BYOK waitlist — UI commented out in source (BILLING-10)
 
 **Low-priority code-only surfaces:**
 - Milestones `ErrorFallback` paths (LEARN-20) — no seed for that error state
+- Subject sessions archive (LEARN-28)
+- Self progress reports and self weekly report detail (LEARN-29)
+- More celebrations settings (ACCOUNT-31)
+- Quiz history + round detail (QUIZ-09, QUIZ-10)
 - Shake-to-feedback on gate screens (CC-12) — shake gesture not supported in emulator
 - i18n live-switch smoke (CC-11) — deferred per architecture decision
-- Streaming error recovery (CC-13) — requires mid-stream failure injection
+- Streaming error recovery (CC-13) — route-level SSE reconnect has `e2e/flows/session/sse-reconnect-banner.yaml`; deeper mid-stream failure injection remains a lower-level test need
 - Envelope-strip regression (CC-14) — covered by `ChatShell.test.tsx` unit tests
 - Profile-as-lens transition (CC-17) — complex multi-profile state; lower risk than session-level flows

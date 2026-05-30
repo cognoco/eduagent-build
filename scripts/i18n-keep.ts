@@ -139,6 +139,18 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/components/home/LearnerScreen.tsx:576',
   },
   {
+    pattern: 'library.nextAction.*Title',
+    reason:
+      'next-action titleKey selected by subject intent at ' +
+      'apps/mobile/src/app/(app)/library.tsx:505',
+  },
+  {
+    pattern: 'library.nextAction.title',
+    reason:
+      'next-action titleKey selected by subject intent at ' +
+      'apps/mobile/src/app/(app)/library.tsx:505',
+  },
+  {
     pattern: 'quota.parent.childCapHit.dailyMessage',
     reason:
       'messageKey ternary (daily_exceeded) consumed at ' +

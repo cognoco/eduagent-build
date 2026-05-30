@@ -80,26 +80,16 @@ const INNGEST_BUILTIN_PREFIXES = ['inngest/'];
  * inverse-orphan event not in this set fails CI immediately. DO NOT add to this
  * list without a written rationale + a tracked owner for re-wiring or removal.
  *
- *   - app/exchange.empty_reply_fallback — handler
- *     inngest/functions/exchange-empty-reply-fallback.ts is registered in the
- *     serve registry (apps/api/src/inngest/index.ts) but its dispatcher was
- *     removed when the interview empty-reply path was refactored into
- *     services/exchanges.ts:classifyExchangeOutcome (now a local SSE `fallback`
- *     frame, deliberately "without parsing Inngest event names"). The handler
- *     was the intended server-side observability terminus for the *rate* of
- *     empty-reply / malformed-envelope responses; that signal is currently
- *     dead. Resolution is a cross-lens product/architecture call (L1 services):
- *     either (a) re-dispatch `app/exchange.empty_reply_fallback` via safeSend()
- *     from classifyExchangeOutcome's empty_reply / malformed_envelope buckets,
- *     or (b) delete the handler + its registration if the local SSE fallback is
- *     accepted as the only behavior. Left pending — its presence here is the
- *     signal that the wiring decision is still owed. Do NOT silently delete the
- *     handler to make the orphan-dispatcher guard happy; that would erase the
- *     observability intent without a decision.
+ * Currently empty. The original entry — `app/exchange.empty_reply_fallback` —
+ * was resolved in [BUG-796]: the dispatcher was re-wired via safeSend() from
+ * the streaming fallback path in routes/sessions.ts (option (a) of the
+ * resolution noted below), so the observability terminus
+ * (inngest/functions/exchange-empty-reply-fallback.ts) now actually runs on
+ * every empty-reply / unparseable-envelope fallback. With a live dispatcher the
+ * `every event-triggered handler has a production dispatcher` test below passes
+ * directly and the entry was removed from this set.
  */
-const KNOWN_PENDING_INVERSE_ORPHANS = new Set<string>([
-  'app/exchange.empty_reply_fallback',
-]);
+const KNOWN_PENDING_INVERSE_ORPHANS = new Set<string>([]);
 
 function shouldScanFile(absPath: string): boolean {
   const rel = path.relative(REPO_ROOT, absPath).replace(/\\/g, '/');
