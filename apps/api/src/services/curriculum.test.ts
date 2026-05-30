@@ -25,6 +25,8 @@ import {
   isStaleBookGenerationClaim,
   repairIncompleteBookGenerationClaim,
   prepareTopicExpansion,
+  stripOrphanTitles,
+  persistNarrowTopics,
   deleteTopicIfSafe,
   deleteBook,
 } from './curriculum';
@@ -33,6 +35,7 @@ import type {
   CurriculumAdaptRequest,
   GeneratedBookTopic,
   GeneratedConnection,
+  GeneratedTopic,
   BookTopicGenerationResult,
   BookWithTopics,
 } from '@eduagent/schemas';
@@ -3084,5 +3087,124 @@ describe('generateBookTopicsWithFallback', () => {
       'Explore pyramids',
     );
     expect(result).toEqual(fallbackOutput());
+  });
+});
+
+describe('stripOrphanTitles', () => {
+  it('drops a topic whose title is identical to the book title', () => {
+    const topics = [
+      { title: 'Life', sortOrder: 1 },
+      { title: 'Cells and organisms', sortOrder: 2 },
+      { title: 'Growth and reproduction', sortOrder: 3 },
+    ];
+
+    const result = stripOrphanTitles(topics, 'Life');
+
+    expect(result.map((topic) => topic.title)).toEqual([
+      'Cells and organisms',
+      'Growth and reproduction',
+    ]);
+  });
+
+  it('matches case, surrounding whitespace, and a leading "The" on the book title', () => {
+    const topics = [
+      { title: '  renaissance ' }, // differs only by case + surrounding space
+      { title: 'Renaissance art' }, // genuinely distinct sub-part
+    ];
+
+    // Book title carries a leading "The"; the matcher strips it before comparing.
+    expect(stripOrphanTitles(topics, 'The Renaissance')).toEqual([
+      { title: 'Renaissance art' },
+    ]);
+  });
+
+  it('keeps topics that are genuinely distinct sub-parts of the book', () => {
+    const topics = [
+      { title: 'Light-dependent reactions' },
+      { title: 'The Calvin cycle' },
+      { title: 'Chloroplast structure' },
+    ];
+
+    expect(stripOrphanTitles(topics, 'Photosynthesis')).toEqual(topics);
+  });
+
+  it('returns topics unchanged when the book title is empty or whitespace', () => {
+    const topics = [{ title: 'Anything' }, { title: '   ' }];
+
+    expect(stripOrphanTitles(topics, '   ')).toBe(topics);
+  });
+
+  it('preserves order and all fields of the kept topics', () => {
+    const topics = [
+      { title: 'Roman Empire', description: 'restates book', sortOrder: 1 },
+      { title: 'The Republic', description: 'keep', sortOrder: 2 },
+      { title: 'Daily life in Rome', description: 'keep', sortOrder: 3 },
+    ];
+
+    const result = stripOrphanTitles(topics, 'Roman Empire');
+
+    expect(result).toEqual([
+      { title: 'The Republic', description: 'keep', sortOrder: 2 },
+      { title: 'Daily life in Rome', description: 'keep', sortOrder: 3 },
+    ]);
+  });
+
+  it('works for any parent title — e.g. a subject restated by a topic', () => {
+    const topics = [
+      { title: 'Fractions' }, // restates the subject
+      { title: 'Equivalent fractions' },
+      { title: 'Adding fractions' },
+    ];
+
+    expect(stripOrphanTitles(topics, 'Fractions')).toEqual([
+      { title: 'Equivalent fractions' },
+      { title: 'Adding fractions' },
+    ]);
+  });
+});
+
+describe('persistNarrowTopics orphan strip', () => {
+  const narrowTopics: GeneratedTopic[] = [
+    {
+      title: 'Fractions', // restates the subject — must be stripped
+      description: 'restates subject',
+      relevance: 'core',
+      estimatedMinutes: 20,
+    },
+    {
+      title: 'Numerator and denominator',
+      description: 'parts of a fraction',
+      relevance: 'core',
+      estimatedMinutes: 20,
+    },
+    {
+      title: 'Equivalent fractions',
+      description: 'same value, different form',
+      relevance: 'core',
+      estimatedMinutes: 25,
+    },
+  ];
+
+  it('does not persist a narrow topic that restates the subject name', async () => {
+    const db = createMockDb({ curriculumFindFirst: mockCurriculumRow() });
+
+    await persistNarrowTopics(db, 'subject-1', narrowTopics, 'Fractions');
+
+    const insertedTopics = (db.insert as jest.Mock).mock.results[0]!.value
+      .values.mock.calls[0]![0] as Array<{ title: string }>;
+    expect(insertedTopics.map((topic) => topic.title)).toEqual([
+      'Numerator and denominator',
+      'Equivalent fractions',
+    ]);
+  });
+
+  it('persists every topic when none restates the subject name', async () => {
+    const db = createMockDb({ curriculumFindFirst: mockCurriculumRow() });
+
+    await persistNarrowTopics(db, 'subject-1', narrowTopics, 'Mathematics');
+
+    const insertedTopics = (db.insert as jest.Mock).mock.results[0]!.value
+      .values.mock.calls[0]![0] as Array<{ title: string }>;
+    expect(insertedTopics).toHaveLength(3);
   });
 });

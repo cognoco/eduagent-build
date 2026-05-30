@@ -15,6 +15,7 @@ import {
   detectSubjectType,
   generateBookTopics,
 } from '../apps/api/src/services/book-generation';
+import { areEquivalentBookTitles } from '../apps/api/src/services/curriculum';
 import {
   _clearProviders,
   createAnthropicProvider,
@@ -763,6 +764,25 @@ function analyzeBookTopics(
     ...analyzeConnections(testCase, result.topics, result.connections),
     ...analyzeChapterContinuity(testCase, result.topics),
   ];
+
+  // Orphan topic: a topic whose title merely restates the book it belongs to.
+  // Uses the same equivalence matcher as the persistBookTopics backstop, so the
+  // eval flags exactly what production would strip.
+  const orphanTopics = result.topics.filter((topic) =>
+    areEquivalentBookTitles(topic.title, testCase.bookTitle),
+  );
+  if (orphanTopics.length > 0) {
+    issues.push(
+      makeIssue(
+        'fail',
+        'quality',
+        'orphan_topic_restates_book',
+        'A generated topic merely restates the book title instead of covering a distinct sub-part of it.',
+        testCase.id,
+        orphanTopics.map((topic) => topic.title).join(', '),
+      ),
+    );
+  }
 
   const totalMinutes = result.topics.reduce(
     (sum, topic) => sum + topic.estimatedMinutes,
