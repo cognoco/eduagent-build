@@ -28,6 +28,12 @@ export const recapListItemSchema = z.object({
   narrative: z.string().nullable(),
   conversationPrompt: z.string().nullable(),
   engagementSignal: engagementSignalSchema.nullable(),
+  // Next-topic the mentor lined up at session end. Additive + nullable: both
+  // null when the stored summary has no `next_topic_id`. Surfaced on the parent
+  // recap list only (see services/recaps.ts → listRecapsForParent); the recap
+  // *generation* path is unchanged. Powers the home card's "Coming up" line.
+  nextTopicTitle: z.string().nullable(),
+  nextTopicReason: z.string().nullable(),
 });
 export type RecapListItem = z.infer<typeof recapListItemSchema>;
 
