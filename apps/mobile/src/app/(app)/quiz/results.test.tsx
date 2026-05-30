@@ -483,6 +483,36 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
     mockCanGoBack = false;
   });
 
+  // -------------------------------------------------------------------------
+  // [BUG-893] Break test — null-context safety guard must NEVER router.back()
+  // -------------------------------------------------------------------------
+  // Reported: on RN Web after a Guess Who round, tapping Done landed on a
+  // previously-mounted /quiz/<old-quiz-id> review screen instead of Practice.
+  // Root cause: the safety useEffect used goBackOrReplace, which calls
+  // router.back() when canGoBack() is true. On web, stale prior /quiz/<id>
+  // screens are still in the back-stack — router.back() popped to one of
+  // them. Fix: always router.replace('/(app)/practice') from the guard;
+  // there is no back destination we actually want from null-context results.
+  // Reverting the fix (re-introducing goBackOrReplace) must turn this red.
+  it('[BUG-893] null-context safety guard calls router.replace, never router.back, even with canGoBack=true', () => {
+    mockCanGoBack = true; // simulate RN Web with prior /quiz/<id> screens beneath
+
+    // Mount with QuizFlowProvider in its INITIAL_STATE — completionResult
+    // is null, so the safety useEffect fires. No Seed component this time.
+    render(
+      <QuizFlowProvider>
+        <QuizResultsScreen />
+      </QuizFlowProvider>,
+    );
+
+    // The guard must take the user to Practice via replace. router.back()
+    // is forbidden because it would pop to a stale /quiz/<id> on web.
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockRouterBack).not.toHaveBeenCalled();
+
+    mockCanGoBack = false;
+  });
+
   it('skips cards with missing correctAnswer rather than crashing', () => {
     renderWithFlow({
       round: buildCapitalsRound(),

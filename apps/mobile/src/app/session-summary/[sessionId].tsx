@@ -211,14 +211,44 @@ export default function SessionSummaryScreen() {
     setLoadingTimedOut(false);
   }, [sessionId]);
 
+  // [BUG-890] When the 15s recap-loading window elapses without a recap,
+  // do NOT silently fall through to a manual "Tap to retry" affordance —
+  // per CLAUDE.md UX Resilience Rules and "Silent recovery without
+  // escalation is banned", we must (a) escalate the failure to Sentry so
+  // ops can see how often this fires, and (b) trigger one automatic
+  // refetch attempt before the user has to discover the manual retry.
+  // The manual retry UI remains as a last-resort affordance (the user
+  // saw "still loading" + the auto-retry didn't produce a recap either).
   useEffect(() => {
     if (recapTimedOut || exchangeCountForRecap < 3 || persisted?.learnerRecap) {
       return;
     }
 
-    const timer = setTimeout(() => setRecapTimedOut(true), 15_000);
+    const timer = setTimeout(() => {
+      Sentry.captureMessage('session-summary recap load timed out', {
+        level: 'warning',
+        tags: { surface: 'session-summary', failure: 'recap-timeout' },
+        extra: {
+          sessionId,
+          exchangeCount: exchangeCountForRecap,
+          ageBracket,
+        },
+      });
+      // One auto-retry: if the recap arrives on this refetch, the user
+      // never sees the manual fallback. If it still doesn't arrive, the
+      // manual "Tap to retry" affordance shows below as a last resort.
+      void persistedSummary.refetch();
+      setRecapTimedOut(true);
+    }, 15_000);
     return () => clearTimeout(timer);
-  }, [exchangeCountForRecap, persisted?.learnerRecap, recapTimedOut]);
+  }, [
+    exchangeCountForRecap,
+    persisted?.learnerRecap,
+    recapTimedOut,
+    sessionId,
+    ageBracket,
+    persistedSummary,
+  ]);
 
   // UX-DE-M2: escape from the initial loading spinner. The previous
   // 15s timer rearmed on every `isLoading` transition, so a flicker

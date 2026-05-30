@@ -6,7 +6,6 @@ import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RewardBurst } from '../../../components/common/RewardBurst';
 import { useFetchRound } from '../../../hooks/use-quiz';
-import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 import { rewardVariantForActivity } from './_quiz-utils';
@@ -48,14 +47,22 @@ export default function QuizResultsScreen(): React.ReactElement {
   // the Play Again press would add a perceptible wait on the hot path.
   const prefetchedRound = useFetchRound(prefetchedRoundId);
 
-  // [MIN-6] Guard against direct navigation with cleared context — redirect
-  // to practice rather than rendering a meaningless "0/0" screen. Only fires
-  // on a cold mount with empty state (deep-link / refreshed tab on web); the
-  // Play Again / Done handlers below never null completionResult themselves,
-  // so this guard cannot race with intentional navigation.
+  // [MIN-6 / BUG-893] Guard against direct navigation with cleared context —
+  // redirect to practice rather than rendering a meaningless "0/0" screen.
+  // Only fires on a cold mount with empty state (deep-link / refreshed tab
+  // on web). The Play Again / Done handlers below never null completionResult
+  // themselves, so this guard cannot race with intentional navigation.
+  //
+  // [BUG-893] Use router.replace, NOT goBackOrReplace. On RN Web the back-
+  // stack can contain a stale /quiz/<old-id> review screen from a prior
+  // session that was never unmounted; calling router.back() pops to that
+  // foreign screen instead of taking the user to Practice. router.replace
+  // is deterministic and matches the safety intent — there is no back
+  // destination we actually want to land on from a null-context results
+  // screen. (Cluster 4 Finding 2, mobile-screen-audit 2026-05-31.)
   useEffect(() => {
     if (!completionResult) {
-      goBackOrReplace(router, '/(app)/practice');
+      router.replace('/(app)/practice' as Href);
     }
   }, [completionResult, router]);
 
