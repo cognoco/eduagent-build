@@ -27,6 +27,7 @@
  */
 
 const { execSync, spawnSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 
 // Map Doppler configs to Wrangler environments
@@ -77,11 +78,28 @@ function isWranglerAuthenticated() {
   return result.status === 0;
 }
 
+// The committed wrangler.toml carries an `__CF_ACCOUNT_ID__` placeholder that
+// is only substituted at deploy time by apps/api/scripts/render-wrangler-kv.mjs
+// (using the CF_ACCOUNT_ID GitHub secret). Locally the placeholder is still in
+// place, so `wrangler secret bulk` would POST to /accounts/__CF_ACCOUNT_ID__/…
+// and fail with a cryptic "could not route" error. Detect that and skip
+// cleanly — Worker secrets are a CI/deploy concern, not a local-setup one.
+function isWranglerConfigRendered() {
+  try {
+    const toml = fs.readFileSync(path.join(API_DIR, 'wrangler.toml'), 'utf-8');
+    return !toml.includes('__CF_ACCOUNT_ID__');
+  } catch {
+    // If we can't read the config, don't block — let wrangler surface its own
+    // error rather than silently skipping for the wrong reason.
+    return true;
+  }
+}
+
 function downloadSecrets(config) {
   try {
     const raw = execSync(
       `"${DOPPLER_CLI}" secrets download --config ${config} --no-file --format json`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
     );
     return JSON.parse(raw);
   } catch {
@@ -130,7 +148,7 @@ function syncEnvironment(envKey) {
   const env = ENV_MAP[envKey];
   if (!env) {
     console.error(
-      `\x1b[31m[sync]\x1b[0m Unknown environment: "${envKey}". Use: dev, stg, prd`
+      `\x1b[31m[sync]\x1b[0m Unknown environment: "${envKey}". Use: dev, stg, prd`,
     );
     return false;
   }
@@ -142,7 +160,7 @@ function syncEnvironment(envKey) {
   const secrets = downloadSecrets(env.dopplerConfig);
   if (!secrets) {
     console.error(
-      `\x1b[31m[sync]\x1b[0m Failed to download from Doppler config "${env.dopplerConfig}"`
+      `\x1b[31m[sync]\x1b[0m Failed to download from Doppler config "${env.dopplerConfig}"`,
     );
     return false;
   }
@@ -152,7 +170,7 @@ function syncEnvironment(envKey) {
   const syncCount = Object.keys(filtered).length;
 
   console.log(
-    `  Downloaded: ${totalCount} keys, syncing: ${syncCount}, excluded: ${excluded.length}`
+    `  Downloaded: ${totalCount} keys, syncing: ${syncCount}, excluded: ${excluded.length}`,
   );
   if (excluded.length > 0) {
     console.log(`  \x1b[90mExcluded: ${excluded.join(', ')}\x1b[0m`);
@@ -161,7 +179,7 @@ function syncEnvironment(envKey) {
   const result = pushToWorker(filtered, env.wranglerEnv);
   if (result.success) {
     console.log(
-      `  \x1b[32m✓ Synced ${syncCount} secrets to ${env.workerName}\x1b[0m`
+      `  \x1b[32m✓ Synced ${syncCount} secrets to ${env.workerName}\x1b[0m`,
     );
     return true;
   }
@@ -180,12 +198,31 @@ function syncSecrets(targets) {
   const envs = targets && targets.length > 0 ? targets : ['dev', 'stg', 'prd'];
 
   console.log(
-    '\x1b[36m\x1b[1m[Doppler → Cloudflare Workers] Secret Sync\x1b[0m'
+    '\x1b[36m\x1b[1m[Doppler → Cloudflare Workers] Secret Sync\x1b[0m',
   );
+
+  if (!isWranglerConfigRendered()) {
+    console.log(
+      '\x1b[33m[sync]\x1b[0m wrangler.toml account_id is an unrendered ' +
+        'placeholder (__CF_ACCOUNT_ID__) — skipping Cloudflare Worker secret sync.',
+    );
+    console.log(
+      '   Worker secrets are synced by CI at deploy time ' +
+        '(Doppler → GitHub → render-wrangler-kv.mjs); this step is not needed ' +
+        'for local development.',
+    );
+    console.log(
+      '   To sync manually: render the config first ' +
+        '(cd apps/api && CF_ACCOUNT_ID=<id> node scripts/render-wrangler-kv.mjs ' +
+        'wrangler.toml), then run pnpm secrets:sync.\n',
+    );
+    // Clean, intentional skip — not a failure.
+    return { ok: true, results: {} };
+  }
 
   if (!isWranglerAuthenticated()) {
     console.log(
-      '\x1b[33m[sync]\x1b[0m Wrangler not authenticated — skipping Cloudflare sync.'
+      '\x1b[33m[sync]\x1b[0m Wrangler not authenticated — skipping Cloudflare sync.',
     );
     console.log('   Run: pnpm exec wrangler login');
     console.log('   Then: pnpm secrets:sync\n');
