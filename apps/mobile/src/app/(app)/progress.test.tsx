@@ -756,6 +756,35 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
+  // [BUG-816] Stale returning user (1–2 sessions, last > 14 days ago) must NOT
+  // see the new-user empty state — they should see 'awaiting' (no report yet),
+  // not the first-timer "Progress appears after the first study session" copy.
+  // Root cause: progressSurfaceState previously included `(isViewingSelf && isStale)`
+  // in the 'empty' condition, mapping stale learners to the wrong copy.
+  it('stale returning user with sessions does not see new-user empty copy [BUG-816]', async () => {
+    const staleSessionAt = new Date(Date.now() - 20 * 86_400_000).toISOString(); // 20 days ago → isProfileStale
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 1, topicsMastered: 2 },
+          subjects: [fullSubject],
+        },
+        sessions: [
+          makeSession({ sessionId: 'old-session', startedAt: staleSessionAt }),
+        ],
+      }),
+    });
+
+    // Must NOT show the new-user empty copy
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Progress appears after the first study session'),
+      ).toBeNull();
+    });
+    expect(screen.queryByTestId('progress-start-learning')).toBeNull();
+  });
+
   it('shows empty state (not teaser) when totalSessions is 0 and no subjects', async () => {
     mount({
       profile: makeOwner(),
