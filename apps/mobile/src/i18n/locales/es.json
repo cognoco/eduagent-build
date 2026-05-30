@@ -1013,7 +1013,9 @@
       "errorTitle": "Algo salió mal",
       "timeoutTitle": "Sigue esperando…",
       "timeoutMessage": "Tu respuesta está tardando más de lo habitual en enviarse. Comprueba tu conexión e inténtalo de nuevo."
-    }
+    },
+    "lastStudied": "Estudiado por última vez {{when}}",
+    "neverStudied": "Nunca estudiado"
   },
   "subject": {
     "settings": {

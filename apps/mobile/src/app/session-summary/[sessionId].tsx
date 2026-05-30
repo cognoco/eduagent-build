@@ -119,8 +119,12 @@ export default function SessionSummaryScreen() {
     reflectionBonusXp: number | null;
   } | null>(null);
   const [recapTimedOut, setRecapTimedOut] = useState(false);
-  // UX-DE-M2: timeout guard — escape from unbounded loading spinner
+  // UX-DE-M2: timeout guard — escape from unbounded loading spinner.
+  // `loadingStartedAtRef` anchors the deadline to the first frame where
+  // the loading state appeared for this sessionId, so the 10s escape is
+  // measured against wall-clock time, not React's isLoading transitions.
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  const loadingStartedAtRef = useRef<number | null>(null);
   // Bulletproof drafting — until this flips true, the autosave effect is
   // gated off so it can't clobber a draft we're about to rehydrate.
   const [draftRehydrated, setDraftRehydrated] = useState(false);
@@ -200,6 +204,11 @@ export default function SessionSummaryScreen() {
 
   useEffect(() => {
     setRecapTimedOut(false);
+    // A new session id resets the loading-escape anchor — otherwise an
+    // in-flight 10s timer from a previous session would continue ticking
+    // against the new session's load.
+    loadingStartedAtRef.current = null;
+    setLoadingTimedOut(false);
   }, [sessionId]);
 
   useEffect(() => {
@@ -211,15 +220,34 @@ export default function SessionSummaryScreen() {
     return () => clearTimeout(timer);
   }, [exchangeCountForRecap, persisted?.learnerRecap, recapTimedOut]);
 
-  // UX-DE-M2: 15s escape from the initial loading spinner
+  // UX-DE-M2: escape from the initial loading spinner. The previous
+  // 15s timer rearmed on every `isLoading` transition, so a flicker
+  // (auth/profile rehydration toggling the query's enabled state,
+  // refetchOnWindowFocus, etc.) could indefinitely defer the fallback —
+  // QA observed a 15s+ spinner with no escape. Anchor the deadline to a
+  // sessionId-scoped wall-clock timestamp so flickers cannot reset it,
+  // and tighten the threshold to 10s.
   useEffect(() => {
-    if (!transcript.isLoading) {
+    if (transcript.data || transcript.isError) {
+      loadingStartedAtRef.current = null;
       setLoadingTimedOut(false);
       return;
     }
-    const t = setTimeout(() => setLoadingTimedOut(true), 15_000);
+    if (!transcript.isLoading) {
+      return;
+    }
+    if (loadingStartedAtRef.current === null) {
+      loadingStartedAtRef.current = Date.now();
+    }
+    const elapsed = Date.now() - loadingStartedAtRef.current;
+    const remaining = Math.max(0, 10_000 - elapsed);
+    if (remaining === 0) {
+      setLoadingTimedOut(true);
+      return;
+    }
+    const t = setTimeout(() => setLoadingTimedOut(true), remaining);
     return () => clearTimeout(t);
-  }, [transcript.isLoading]);
+  }, [transcript.data, transcript.isError, transcript.isLoading]);
 
   // Bulletproof drafting — rehydrate any persisted reflection text from
   // SecureStore exactly once on mount. Never overwrite what the user has

@@ -32,7 +32,14 @@ const mockPaymentIntentsCreate = jest.fn();
 const mockPortalCreate = jest.fn();
 
 jest.mock(
-  '../../apps/api/src/services/stripe' /* gc1-allow: pattern-a conversion */,
+  // gc1-allow: stripe SDK has no test-time HTTP interception path without real
+  // credentials — the Node SDK constructs its own internal fetch and ignores
+  // our top-level fetch interceptor. We jest.requireActual() the wrapper and
+  // only replace createStripeClient() with a fake whose method tables forward
+  // to the per-test mock fns above. TODO: evaluate
+  // Stripe.createFetchHttpClient() so the SDK reuses our interceptor; would
+  // collapse the mock fns into ordinary route assertions.
+  '../../apps/api/src/services/stripe',
   () => {
     const actual = jest.requireActual(
       '../../apps/api/src/services/stripe',

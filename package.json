@@ -89,7 +89,7 @@
     "babel-preset-expo": "~54.0.7",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^11.0.0",
-    "esbuild": "^0.19.2",
+    "esbuild": "^0.25.0",
     "eslint": "9.37.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-import": "2.31.0",

@@ -28,6 +28,9 @@ jest.mock('react-i18next', () => ({
         return `View session from ${String(opts?.date ?? '')}`;
       if (key === 'parentView.index.yourChild') return 'your child';
       if (key === 'common.goHome') return 'Go Home';
+      if (key === 'time.duration.minutesOne') return '1m';
+      if (key === 'time.duration.minutes')
+        return `${String(opts?.count ?? 0)}m`;
       return key;
     },
   }),
@@ -114,6 +117,45 @@ describe('RecentSessionsList', () => {
       pathname: '/(app)/child/[profileId]/curriculum',
       params: { profileId: 'child-profile' },
     });
+  });
+
+  it('shows active time, not wall-clock, when both are present', () => {
+    useProfile.mockReturnValue({
+      activeProfile: {
+        id: 'child-profile',
+        displayName: 'Sam',
+      },
+    });
+
+    render(
+      <RecentSessionsList
+        profileId="child-profile"
+        sessionsQuery={
+          makeQuery({
+            data: [
+              {
+                sessionId: 'sess-1',
+                subjectId: 'subj-1',
+                subjectName: 'Math',
+                topicId: 'topic-1',
+                topicTitle: 'Fractions',
+                sessionType: 'practice',
+                startedAt: '2026-05-29T10:00:00Z',
+                durationSeconds: 60,
+                wallClockSeconds: 600,
+                displaySummary: null,
+                highlight: null,
+              },
+            ],
+          }) as never
+        }
+      />,
+    );
+
+    // Active time = 60s → "1m". Wall-clock = 600s → "10m".
+    // Asserting "1m" proves we prefer durationSeconds, not wallClockSeconds.
+    screen.getByText('1m');
+    expect(screen.queryByText('10m')).toBeNull();
   });
 
   it('offers an escape hatch alongside retry when loading recent sessions fails', () => {

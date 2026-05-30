@@ -54,10 +54,17 @@ jest.mock(
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockRedirect = jest.fn();
 jest.mock(
   'expo-router' /* gc1-allow: expo-router requires a native navigation container not available in JSDOM */,
   () => ({
     useRouter: () => ({ push: mockPush, replace: mockReplace }),
+    // Records the href so canEnter-guard tests can assert where the guard
+    // redirected to. Returning null prevents a JSDOM mount of the real route.
+    Redirect: (props: { href: string }) => {
+      mockRedirect(props);
+      return null;
+    },
   }),
 );
 
@@ -1359,6 +1366,108 @@ describe('LibraryScreen', () => {
 
       expect(result.getByTestId('archive-subject-sub-1')).toBeDisabled();
       expect(result.getByTestId('pause-subject-sub-1')).toBeDisabled();
+    });
+  });
+
+  // [BUG-814] LibraryScreen wraps the real content in a navigation-contract
+  // canEnter guard. Without these tests, a future contract change can
+  // silently flip canEnter('library') for V0 5-tab guardians (a supported
+  // production mode per CLAUDE.md "Profile Shapes" → "Hard constraint")
+  // and route the whole library to /home, with no test catching the regression.
+  describe('canEnter guard [BUG-814]', () => {
+    function renderWith(opts: {
+      activeProfile: Profile | null;
+      profiles: Profile[];
+    }): { cleanup: () => void } {
+      const routedFetch = buildRoutes();
+      const prevFetch = globalThis.fetch;
+      (globalThis as unknown as { fetch: typeof fetch }).fetch =
+        routedFetch as unknown as typeof fetch;
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, gcTime: 0 },
+          mutations: { retry: false, gcTime: 0 },
+        },
+      });
+      const profileValue: ProfileContextValue = {
+        profiles: opts.profiles,
+        activeProfile: opts.activeProfile,
+        isExplicitProxyMode: false,
+        switchProfile: async () => ({ success: true }),
+        isLoading: false,
+        profileLoadError: null,
+        profileWasRemoved: false,
+        acknowledgeProfileRemoval: () => undefined,
+      };
+      render(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(
+            ProfileContext.Provider,
+            { value: profileValue },
+            createElement(AppContextProvider, null, <LibraryScreen />),
+          ),
+        ),
+      );
+      return {
+        cleanup: () => {
+          (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+          queryClient.clear();
+        },
+      };
+    }
+
+    it('redirects to /(app)/home when canEnter("library") is false', () => {
+      // Drive canEnter('library')=false via the no-active-profile branch
+      // (navigation-contract.ts: `if (!context.activeProfile) return route === 'home'`).
+      // With no active profile every route except 'home' is closed.
+      const { cleanup } = renderWith({ activeProfile: null, profiles: [] });
+      try {
+        expect(mockRedirect).toHaveBeenCalledTimes(1);
+        expect(mockRedirect).toHaveBeenCalledWith(
+          expect.objectContaining({ href: '/(app)/home' }),
+        );
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('renders LibraryScreenContent in V0 5-tab guardian mode (legacy fallback)', async () => {
+      // V0 5-tab production mode is a hard constraint per CLAUDE.md.
+      // With both flag envs unset (test default: V0=false + V1=false), a
+      // guardian with at least one linked child hits the
+      // `legacy-v0-flags-off` branch in resolveNavigationContract
+      // (navigation-contract.ts ~L274-283), shape stays 'study', and
+      // canEnter('library') returns true via `!familyShape` at L423.
+      // The screen must render LibraryScreenContent, not redirect.
+      const guardianProfile = createTestProfile({
+        id: 'guardian-1',
+        accountId: 'account-family',
+        displayName: 'Parent',
+        isOwner: true,
+        birthYear: 1985,
+      });
+      const childProfile = createTestProfile({
+        id: 'child-1',
+        accountId: 'account-family',
+        displayName: 'Emma',
+        isOwner: false,
+        birthYear: 2014,
+      });
+      const { cleanup } = renderWith({
+        activeProfile: guardianProfile,
+        profiles: [guardianProfile, childProfile],
+      });
+      try {
+        // Flush effects so the contract resolves before asserting.
+        await act(async () => {
+          await Promise.resolve();
+        });
+        expect(mockRedirect).not.toHaveBeenCalled();
+      } finally {
+        cleanup();
+      }
     });
   });
 });

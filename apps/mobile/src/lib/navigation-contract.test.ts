@@ -954,6 +954,30 @@ describe('resolveNavigationContract snapshot surface', () => {
     expect(contract.gates.showAddChild).toBe(true);
     expect(contract.home.screen).toBe('LearnerHome');
   });
+
+  it('hides Add child for owner with null birthYear (regression #807: null-guard)', () => {
+    // Before the fix, the local isAdultOwner helper called
+    // computeAgeBracket(profile.birthYear) without a null guard. A null
+    // birthYear arithmetics to (currentYear - 0) = currentYear, so the
+    // helper returned 'adult' and surfaced "Add child" for owners whose
+    // birth year was unknown, bypassing the 18+ gate.
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: makeProfile({
+          id: 'owner-unknown-age',
+          isOwner: true,
+          birthYear: null as unknown as number,
+          hasFamilyLinks: false,
+          defaultAppContext: null,
+        }),
+        profiles: [],
+        role: 'owner',
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    expect(contract.gates.showAddChild).toBe(false);
+  });
 });
 
 describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint)', () => {

@@ -1038,7 +1038,9 @@
       "errorTitle": "Algo deu errado",
       "timeoutTitle": "Ainda aguardando…",
       "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente."
-    }
+    },
+    "lastStudied": "Estudado pela última vez {{when}}",
+    "neverStudied": "Nunca estudado"
   },
   "subject": {
     "settings": {

@@ -12,6 +12,14 @@
  * Then compose per-boundary mocks:
  *   mockClerkJWKS();   // from external-mocks.ts
  *   mockVoyageAI();
+ *
+ * Reference counting (BUG-396): install/restore are refcounted so nested
+ * installFetchInterceptor() + restoreFetch() pairs do not nuke the
+ * setup.ts-registered base handlers (Clerk JWKS, Neon passthrough). The
+ * interceptor is uninstalled only when the outermost restoreFetch() runs,
+ * which fixes the silent leak where a per-suite afterAll() removed shared
+ * handlers and broke later suites that re-installed under the assumption
+ * the JWKS/Neon handlers were still wired.
  */
 
 // ---------------------------------------------------------------------------
@@ -20,7 +28,7 @@
 
 export type FetchHandler = (
   url: string,
-  init: RequestInit | undefined
+  init: RequestInit | undefined,
 ) => Response | Promise<Response>;
 
 interface FetchCall {
@@ -44,6 +52,7 @@ let originalFetch: typeof globalThis.fetch | null = null;
 let handlers: RegisteredHandler[] = [];
 let calls: FetchCall[] = [];
 let installed = false;
+let installDepth = 0;
 
 // ---------------------------------------------------------------------------
 // URL matching
@@ -64,7 +73,7 @@ function extractUrl(input: RequestInfo | URL): string {
 
 function extractMethod(
   input: RequestInfo | URL,
-  init: RequestInit | undefined
+  init: RequestInit | undefined,
 ): string {
   if (init?.method) return init.method;
   if (typeof input !== 'string' && !(input instanceof URL)) {
@@ -89,7 +98,7 @@ function extractHeaders(init: RequestInit | undefined): Record<string, string> {
 }
 
 async function extractBody(
-  init: RequestInit | undefined
+  init: RequestInit | undefined,
 ): Promise<string | null> {
   if (!init?.body) return null;
   if (typeof init.body === 'string') return init.body;
@@ -114,10 +123,11 @@ export interface InterceptorOptions {
 }
 
 /**
- * Installs the fetch interceptor. Call once in `beforeAll` or setup.
- * Safe to call multiple times — only installs once.
+ * Installs the fetch interceptor. Call in `beforeAll` or setup.
+ * Reference-counted: nested install/restore pairs are safe (BUG-396).
  */
 export function installFetchInterceptor(options?: InterceptorOptions): void {
+  installDepth += 1;
   if (installed) return;
 
   const passthrough = options?.passthrough ?? false;
@@ -126,7 +136,7 @@ export function installFetchInterceptor(options?: InterceptorOptions): void {
 
   globalThis.fetch = (async (
     input: RequestInfo | URL,
-    init?: RequestInit
+    init?: RequestInit,
   ): Promise<Response> => {
     const url = extractUrl(input);
     const method = extractMethod(input, init);
@@ -155,15 +165,21 @@ export function installFetchInterceptor(options?: InterceptorOptions): void {
 
     throw new Error(
       `[fetch-interceptor] Unexpected fetch to: ${method} ${url}\n` +
-        'Register a handler with addFetchHandler() or use a per-boundary mock.'
+        'Register a handler with addFetchHandler() or use a per-boundary mock.',
     );
   }) as typeof globalThis.fetch;
 }
 
 /**
  * Restores the original `globalThis.fetch`. Call in `afterAll`.
+ * Reference-counted: only the outermost call actually uninstalls and clears
+ * the shared handler list, so a per-suite afterAll cannot wipe the
+ * setup.ts-registered base handlers used by sibling suites (BUG-396).
  */
 export function restoreFetch(): void {
+  if (installDepth > 0) installDepth -= 1;
+  if (installDepth > 0 || !installed) return;
+
   if (originalFetch) {
     globalThis.fetch = originalFetch;
     originalFetch = null;
@@ -181,7 +197,7 @@ export function restoreFetch(): void {
  */
 export function addFetchHandler(
   pattern: string | RegExp,
-  handler: FetchHandler
+  handler: FetchHandler,
 ): void {
   handlers.push({ pattern, handler });
 }
@@ -230,7 +246,7 @@ export function getFetchCalls(pattern?: string | RegExp): FetchCall[] {
 export function jsonResponse(
   body: unknown,
   status = 200,
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
 ): Response {
   return new Response(JSON.stringify(body), {
     status,

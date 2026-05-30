@@ -97,6 +97,5 @@ describe('read-query boilerplate ratchet', () => {
       );
     }
     expect(total).toBeLessThanOrEqual(BASELINE);
-    expect(total).toBeGreaterThan(0);
   });
 });

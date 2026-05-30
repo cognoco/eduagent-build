@@ -8,6 +8,11 @@
  *
  * Mirrors GC1's structure: scan source for forbidden patterns, fail CI if any
  * new violation appears. Existing allowlist sites are explicitly enumerated.
+ *
+ * Scans every production source root — mobile, api, and each shared package
+ * (apps/mobile/src, apps/api/src, packages/<name>/src) — so a test-only
+ * import slipped into API or shared-package code is caught the same as one
+ * in mobile. (Notion bug #806: previously scanned mobile only.)
  */
 
 import { readFileSync } from 'node:fs';
@@ -15,7 +20,17 @@ import { join, relative, sep } from 'node:path';
 import { sync as globSync } from 'glob';
 
 const REPO_ROOT = join(__dirname, '..');
-const MOBILE_SRC = join(REPO_ROOT, 'apps', 'mobile', 'src');
+
+// Production source roots scanned for forbidden test-only imports. Covers
+// mobile, API, and every shared package — anything that can ship to a runtime
+// needs to be guarded. Co-located test files are excluded by `isAllowed`;
+// `packages/*/src` is enumerated via glob so a newly added package is picked
+// up automatically without editing this file.
+const PRODUCTION_ROOTS: string[] = [
+  join(REPO_ROOT, 'apps', 'mobile', 'src'),
+  join(REPO_ROOT, 'apps', 'api', 'src'),
+  ...globSync('packages/*/src', { cwd: REPO_ROOT, absolute: true }),
+];
 
 const TEST_ONLY_IMPORT_RE =
   /import\s+[^;]*?(?:\b__test\w+|\b\w+ForTesting)\b[^;]*?from/gs;
@@ -45,18 +60,23 @@ function isAllowed(relPath: string): boolean {
   return ALLOWLIST.has(relPath);
 }
 
-describe('test-only exports ratchet (D-TTL-6)', () => {
-  it('production source files do not import __test* / *ForTesting symbols', () => {
+interface Violation {
+  file: string;
+  line: number;
+  snippet: string;
+}
+
+function scanRoots(roots: string[], repoRoot: string): Violation[] {
+  const violations: Violation[] = [];
+  for (const root of roots) {
     const files = globSync('**/*.{ts,tsx}', {
-      cwd: MOBILE_SRC,
+      cwd: root,
       absolute: true,
       ignore: ['**/node_modules/**'],
     });
 
-    const violations: { file: string; line: number; snippet: string }[] = [];
-
     for (const absPath of files) {
-      const relPath = relative(REPO_ROOT, absPath);
+      const relPath = relative(repoRoot, absPath);
       if (isAllowed(relPath)) continue;
 
       const content = readFileSync(absPath, 'utf8');
@@ -72,6 +92,13 @@ describe('test-only exports ratchet (D-TTL-6)', () => {
         });
       }
     }
+  }
+  return violations;
+}
+
+describe('test-only exports ratchet (D-TTL-6)', () => {
+  it('production source files do not import __test* / *ForTesting symbols', () => {
+    const violations = scanRoots(PRODUCTION_ROOTS, REPO_ROOT);
 
     if (violations.length > 0) {
       const msg = violations
@@ -96,5 +123,36 @@ describe('test-only exports ratchet (D-TTL-6)', () => {
     const sample = `import { peekPendingAuthRedirect } from '../lib/pending-auth-redirect';`;
     TEST_ONLY_IMPORT_RE.lastIndex = 0;
     expect(TEST_ONLY_IMPORT_RE.exec(sample)).toBeNull();
+  });
+
+  it('regex matches an API-style import of a *ForTesting symbol', () => {
+    // Confirms the regex (not just the file walk) flags the exact import
+    // pattern that would appear in API production code, e.g. a route handler
+    // pulling `_setOpenAIAdvancedModelForTesting` from the LLM router. The
+    // scan-the-tree assertion above relies on this same regex against every
+    // file in PRODUCTION_ROOTS, which now includes `apps/api/src`.
+    const sample = `import { _setOpenAIAdvancedModelForTesting } from '../services/llm/router';`;
+    TEST_ONLY_IMPORT_RE.lastIndex = 0;
+    expect(TEST_ONLY_IMPORT_RE.exec(sample)).not.toBeNull();
+  });
+
+  it('regex matches a __test prefixed import (alternative naming)', () => {
+    const sample = `import { __testResetCircuits } from '@eduagent/api/llm';`;
+    TEST_ONLY_IMPORT_RE.lastIndex = 0;
+    expect(TEST_ONLY_IMPORT_RE.exec(sample)).not.toBeNull();
+  });
+
+  it('PRODUCTION_ROOTS covers mobile, api, and packages', () => {
+    // Proves the scanner is wired to all the right roots — guards against a
+    // future refactor silently dropping API or packages coverage (the original
+    // Notion bug #806 was exactly that: mobile-only scan).
+    const rels = PRODUCTION_ROOTS.map((r) => relative(REPO_ROOT, r));
+    expect(rels).toEqual(
+      expect.arrayContaining([
+        join('apps', 'mobile', 'src'),
+        join('apps', 'api', 'src'),
+      ]),
+    );
+    expect(rels.some((r) => r.startsWith(`packages${sep}`))).toBe(true);
   });
 });

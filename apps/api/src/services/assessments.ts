@@ -8,7 +8,6 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
-  LLM_ASSESSMENT_PASS_THRESHOLD,
   llmAssessmentEvaluationSchema,
   parseAssessmentExchangeHistory,
   type VerificationDepth,
@@ -447,9 +446,7 @@ export async function evaluateQuickCheckAnswer(
     flow: 'assessment.evaluate',
     conversationLanguage: options?.conversationLanguage,
   });
-  return parseAssessmentEvaluation(result.response, context.currentDepth, {
-    passMode: 'llm',
-  });
+  return parseAssessmentEvaluation(result.response, context.currentDepth);
 }
 
 /**
@@ -569,7 +566,6 @@ function parseAssessmentEvaluation(
   response: string,
   depth: VerificationDepth,
   options: {
-    passMode?: 'mastery' | 'llm';
     forceDepthProgression?: boolean;
   } = {},
 ): AssessmentEvaluation {
@@ -614,10 +610,10 @@ function parseAssessmentEvaluation(
       const rawScore = evaluation.rawScore;
       const masteryScore = calculateMasteryScore(depth, rawScore);
       const qualityRating = evaluation.qualityRating;
-      const passed =
-        options.passMode === 'llm'
-          ? evaluation.passed === true
-          : rawScore >= LLM_ASSESSMENT_PASS_THRESHOLD;
+      // Schema refinement in llmAssessmentEvaluationSchema enforces
+      // passed === (rawScore >= LLM_ASSESSMENT_PASS_THRESHOLD), so the
+      // boolean is authoritative once parse succeeds.
+      const passed = evaluation.passed;
       const availableNextDepth = getNextVerificationDepth(depth) ?? undefined;
       const shouldEscalateDepth =
         passed &&

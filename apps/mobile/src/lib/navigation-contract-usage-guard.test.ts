@@ -72,7 +72,7 @@ const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
     reason:
       'boundary: resolveNavigationContract is the sole owner of raw owner/proxy decisions.',
     expectedFindings: {
-      'profile-owner-read': 4,
+      'profile-owner-read': 3,
       'proxy-state-read': 24,
     },
   },

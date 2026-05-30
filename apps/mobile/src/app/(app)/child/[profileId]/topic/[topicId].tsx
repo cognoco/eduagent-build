@@ -376,7 +376,7 @@ export default function TopicDetailScreen() {
               </View>
               <Text className="text-caption text-text-secondary">
                 {formatTimeOnApp(
-                  session.wallClockSeconds ?? session.durationSeconds,
+                  session.durationSeconds ?? session.wallClockSeconds,
                   t,
                   durationLabel,
                 )}

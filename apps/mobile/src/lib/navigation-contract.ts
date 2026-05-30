@@ -1,5 +1,5 @@
 import {
-  computeAgeBracket,
+  isAdultOwner as isAdultOwnerSchema,
   type BillingAccess,
   type Profile,
   type SubscriptionTier,
@@ -198,11 +198,7 @@ function getLinkedChildIds(
 }
 
 function isAdultOwner(profile: NavigationProfile | null): boolean {
-  return (
-    !!profile &&
-    profile.isOwner &&
-    computeAgeBracket(profile.birthYear) === 'adult'
-  );
+  return isAdultOwnerSchema(profile);
 }
 
 function isFamilyCapable(activeProfile: NavigationProfile | null): boolean {

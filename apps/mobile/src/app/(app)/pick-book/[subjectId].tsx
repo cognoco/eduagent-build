@@ -180,8 +180,15 @@ export default function PickBookScreen(): React.ReactElement {
     suggestionsQuery.isError && !suggestionsQuery.data
       ? classifyApiError(suggestionsQuery.error)
       : null;
+  // Pick-book always offers manual topic entry on a suggestions failure —
+  // the filing call uses a different endpoint and may succeed even when
+  // the topup is gated (quota, 404 on the suggestions resource, etc.).
+  // Only auth-category failures dead-end the screen, because the API
+  // client has already initiated sign-out and a manual-entry attempt will
+  // race that flow. If filing itself then fails, the in-handler
+  // platformAlert surfaces a per-action Try Again / Go Back pair.
   const canContinueWithoutSuggestions =
-    suggestionsError !== null && !suggestionsError.blocksManualEntry;
+    suggestionsError !== null && suggestionsError.category !== 'auth';
 
   // BUG-318: Auto-open custom input when suggestions load empty — the user
   // shouldn't have to find and tap "Something else..." when there's nothing to pick.
