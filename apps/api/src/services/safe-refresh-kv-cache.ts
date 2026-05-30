@@ -19,7 +19,7 @@ import {
   getQuotaPool,
 } from './billing';
 import { writeSubscriptionStatus, type CachedSubscriptionStatus } from './kv';
-import { captureException } from './sentry';
+import { captureException, captureMessage } from './sentry';
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -44,11 +44,52 @@ export async function safeRefreshKvCache(
   surface: string,
   context?: Record<string, unknown>,
 ): Promise<void> {
-  if (!kv) return;
+  if (!kv) {
+    // [BUG-794] The KV binding is legitimately absent in dev/test, but a
+    // missing binding in staging/production means the subscription-status
+    // cache silently stops refreshing while the DB-fallback path masks the
+    // drift — a "silent recovery without escalation" the billing rules forbid.
+    // captureMessage no-ops without a Sentry DSN (so this stays silent in
+    // dev/test where there is no DSN) but in deployed envs it produces a
+    // queryable signal so the missing-binding rate is visible within 24h.
+    captureMessage(
+      '[safe-refresh-kv-cache] SUBSCRIPTION_KV not bound — cache refresh skipped',
+      {
+        level: 'warning',
+        extra: {
+          surface,
+          accountId,
+          kind: 'kv-cache-refresh.missing-kv',
+          ...context,
+        },
+        tags: { surface: 'billing.kv' },
+      },
+    );
+    return;
+  }
 
   try {
     const sub = await getSubscriptionByAccountId(db, accountId);
-    if (!sub) return;
+    if (!sub) {
+      // [BUG-794] A refresh requested for an account with no subscription row
+      // (e.g. a handler passing an unexpected account id after a mutation)
+      // would otherwise no-op invisibly. Emit a queryable signal so the
+      // caller-surface + account id are recoverable for triage, then skip.
+      captureMessage(
+        '[safe-refresh-kv-cache] no subscription row for account — cache refresh skipped',
+        {
+          level: 'warning',
+          extra: {
+            surface,
+            accountId,
+            kind: 'kv-cache-refresh.missing-subscription',
+            ...context,
+          },
+          tags: { surface: 'billing.kv' },
+        },
+      );
+      return;
+    }
 
     const quota = await getQuotaPool(db, sub.id);
     const access = await getEffectiveAccessForSubscription(db, sub.id);
