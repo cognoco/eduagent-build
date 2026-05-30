@@ -32,7 +32,7 @@ import {
 import { findAccountByClerkId } from '../account';
 import { getTierConfig } from '../subscription';
 import { safeRefreshKvCache } from '../safe-refresh-kv-cache';
-import { captureException } from '../sentry';
+import { captureException, captureMessage } from '../sentry';
 import { createLogger } from '../logger';
 import { safeSend } from '../safe-non-core';
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../trial';
@@ -674,11 +674,36 @@ export async function handleNonRenewingPurchase(
   // Look up the account's subscription to verify tier eligibility
   const sub = await getSubscriptionByAccountId(db, accountId);
   if (!sub || sub.tier === 'free') {
+    // [BUG-793] A consumable top-up for an account with no paid local
+    // subscription is a PERMANENT business-state rejection, not a transient
+    // failure. Returning 403 (non-2xx) makes RevenueCat retry the same event
+    // for ~72h while the store may have already charged the user and credits
+    // are never granted — and ops received no structured signal to action a
+    // refund / manual review (the "silent recovery without escalation" rule).
+    // Ack with 200 so RC stops retrying, do NOT grant credits, and emit a
+    // queryable Sentry message (no-ops without a DSN, so silent in dev/test)
+    // carrying every field ops needs to reconcile the charge. Mirrors the
+    // BUG-451 missing-transaction-id branch above.
+    captureMessage(
+      '[revenuecat] NON_RENEWING_PURCHASE rejected — top-up on account without a paid local subscription',
+      {
+        level: 'warning',
+        extra: {
+          eventId: event.id,
+          transactionId,
+          accountId,
+          productId: event.product_id,
+          localTier: sub?.tier ?? null,
+          category: 'revenuecat.topup_rejected_free_tier',
+        },
+        tags: { surface: 'billing.revenuecat.topup' },
+      },
+    );
     return {
-      status: 403,
+      status: 200,
       body: {
         received: true,
-        error: 'Top-ups are not available on the free tier',
+        skipped: 'topup_requires_paid_subscription',
       },
     };
   }

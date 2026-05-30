@@ -24,18 +24,33 @@ jest.mock(
   },
 );
 
-jest.mock(
-  '../account' /* gc1-allow: mirrors route-level test pattern */,
-  () => ({
+// [GC6] requireActual + targeted override — the only seam this suite needs is
+// findAccountByClerkId; everything else in ../account runs real.
+jest.mock('../account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../account',
+  ) as typeof import('../account');
+  return {
+    ...actual,
     findAccountByClerkId: jest.fn(),
-  }),
-);
+  };
+});
 
+// [GC6] requireActual + targeted override. The real safeRefreshKvCache reaches
+// KV + the DB, neither of which is wired in these handler unit tests (mockDb is
+// `{}`), so the dispatch is overridden — but via the canonical requireActual
+// seam rather than a blanket internal mock.
 jest.mock(
-  '../safe-refresh-kv-cache' /* gc1-allow: mirrors route-level test pattern */,
-  () => ({
-    safeRefreshKvCache: jest.fn().mockResolvedValue(undefined),
-  }),
+  '../safe-refresh-kv-cache' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../safe-refresh-kv-cache',
+    ) as typeof import('../safe-refresh-kv-cache');
+    return {
+      ...actual,
+      safeRefreshKvCache: jest.fn().mockResolvedValue(undefined),
+    };
+  },
 );
 
 jest.mock('../safe-non-core' /* gc1-allow: external boundary */, () => ({
@@ -48,6 +63,7 @@ jest.mock('../../inngest/client' /* gc1-allow: external boundary */, () => ({
 
 jest.mock('../sentry' /* gc1-allow: external boundary */, () => ({
   captureException: jest.fn(),
+  captureMessage: jest.fn(),
 }));
 
 import {
@@ -55,15 +71,18 @@ import {
   handleRenewal,
   handleCancellation,
   handleBillingIssue,
+  handleNonRenewingPurchase,
 } from './revenuecat-webhook-handler';
 import {
   getSubscriptionByAccountId,
   updateSubscriptionFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
+  purchaseTopUpCredits,
 } from '../billing';
 import { findAccountByClerkId } from '../account';
 import { safeRefreshKvCache } from '../safe-refresh-kv-cache';
 import { inngest } from '../../inngest/client';
+import { captureMessage } from '../sentry';
 
 const mockDb = {} as any;
 const mockKv = { put: jest.fn(), get: jest.fn() } as any;
@@ -301,5 +320,120 @@ describe('handleBillingIssue', () => {
         }),
       );
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-793] NON_RENEWING_PURCHASE (consumable top-up) on an account without a
+// paid local subscription. The old behavior returned 403 (non-2xx), which made
+// RevenueCat retry the same event for ~72h while the store may already have
+// charged the user — and emitted NO structured signal for ops to action a
+// refund / manual review (the "silent recovery without escalation" rule). The
+// fix acks with 200 (RC stops retrying), does NOT grant credits, and emits a
+// queryable Sentry message. These tests are the red-green guard: assert 200 +
+// no credit grant + structured signal.
+// ---------------------------------------------------------------------------
+describe('[BUG-793] handleNonRenewingPurchase free-tier rejection', () => {
+  function topUpEvent(overrides: Partial<Record<string, unknown>> = {}) {
+    return baseEvent({
+      type: 'NON_RENEWING_PURCHASE',
+      product_id: 'com.eduagent.topup.500',
+      store_transaction_id: 'store-txn-793',
+      ...overrides,
+    });
+  }
+
+  it('returns 200 (NOT 403) and does NOT grant credits when the account is on the free tier', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue({
+      id: 'sub-free-1',
+      tier: 'free',
+      status: 'active',
+    });
+
+    const result = await handleNonRenewingPurchase(
+      mockDb,
+      mockKv,
+      topUpEvent(),
+    );
+
+    // Ack so RevenueCat stops the 72h retry storm against a permanent business
+    // rejection — must NOT be the old 403.
+    expect(result).toEqual({
+      status: 200,
+      body: expect.objectContaining({
+        received: true,
+        skipped: 'topup_requires_paid_subscription',
+      }),
+    });
+    // Credits must never be granted on the free tier.
+    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 and does NOT grant credits when there is no local subscription row at all', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(null);
+
+    const result = await handleNonRenewingPurchase(
+      mockDb,
+      mockKv,
+      topUpEvent(),
+    );
+
+    expect(result).toEqual({
+      status: 200,
+      body: expect.objectContaining({
+        skipped: 'topup_requires_paid_subscription',
+      }),
+    });
+    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+  });
+
+  it('emits a structured Sentry message carrying eventId/transactionId/accountId/productId/localTier for ops reconciliation', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue({
+      id: 'sub-free-1',
+      tier: 'free',
+      status: 'active',
+    });
+
+    await handleNonRenewingPurchase(mockDb, mockKv, topUpEvent());
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('NON_RENEWING_PURCHASE rejected'),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          eventId: 'evt_rc_1',
+          transactionId: 'store-txn-793',
+          accountId: 'acc-1',
+          productId: 'com.eduagent.topup.500',
+          localTier: 'free',
+          category: 'revenuecat.topup_rejected_free_tier',
+        }),
+      }),
+    );
+  });
+
+  it('grants credits and does NOT emit the rejection signal on a paid tier (control)', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue({
+      id: 'sub-plus-1',
+      tier: 'plus',
+      status: 'active',
+    });
+    (purchaseTopUpCredits as jest.Mock).mockResolvedValue({ id: 'credit-1' });
+
+    const result = await handleNonRenewingPurchase(
+      mockDb,
+      mockKv,
+      topUpEvent(),
+    );
+
+    expect(purchaseTopUpCredits).toHaveBeenCalledWith(
+      mockDb,
+      'sub-plus-1',
+      500,
+      expect.any(Date),
+      'store-txn-793',
+    );
+    // handleNonRenewingPurchase returns null on the granted/idempotent paths.
+    expect(result).toBeNull();
+    expect(captureMessage).not.toHaveBeenCalled();
   });
 });
