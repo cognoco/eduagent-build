@@ -10,7 +10,7 @@ import * as ts from 'typescript';
 // grows. Mutation callbacks (`mutationFn`) are intentionally excluded — they
 // are not migratable to useApiQuery. The long tail burns down via the
 // B-followup sweep; the baseline only ever decreases.
-const BASELINE = 91;
+const BASELINE = 93;
 
 const EXCLUDED = new Set([
   'apps/mobile/src/hooks/use-api-query.ts',

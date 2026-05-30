@@ -420,6 +420,17 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/accommodation-mode',
     zValidator('json', updateAccommodationModeSchema),
     async (c) => {
+      // [SEC-L2-ACCMODE] Server-derived proxy-mode write guard. Every sibling
+      // self-route in this file gates proxy callers (assertNotProxyMode on
+      // /tell, /unsuppress, /item; assertCanManageOwnConsent on the consent
+      // toggles) — this route was the lone unguarded self-write. Accommodation
+      // mode is not metered, so the metering middleware's assertNotProxyMode
+      // does not cover it. Without this guard a parent acting as a child
+      // (isOwner === false) could mutate the child's accommodation mode through
+      // the self route, bypassing the owner + parent-link verification on the
+      // /:profileId/accommodation-mode route. A proxy caller must use that
+      // owner-gated route instead.
+      assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;

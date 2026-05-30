@@ -536,7 +536,10 @@
       "switchToVoiceMode": "Mudar para modo de voz",
       "voiceMode": "Modo de voz",
       "screenReaderVoiceNote": "O leitor de tela está ativado. A entrada de voz não está disponível. Use a entrada de texto abaixo.",
-      "stepProgress": "Passo {{current}} de {{total}}"
+      "stepProgress": "Passo {{current}} de {{total}}",
+      "voicePermissionErrorTitle": "Erro na entrada de voz",
+      "voicePermissionErrorMessage": "É necessário acesso ao microfone para a entrada de voz. Ative-o nas Configurações.",
+      "voicePermissionOpenSettings": "Abrir Configurações"
     },
     "filingFailed": {
       "retryInProgress": "Uma nova tentativa já está em andamento.",
@@ -602,6 +605,39 @@
       "currentTopic": "Tópico:",
       "changeTopicLabel": "Mudar o tópico de {{topic}}",
       "changeTopic": "Mudar"
+    },
+    "messageBubble": {
+      "thinking": "A pensar",
+      "guidedResponse": "Resposta guiada",
+      "pendingSync": "Mensagem pendente de sincronização",
+      "sending": "A enviar…",
+      "escalation": {
+        "stepByStep": "Passo a passo",
+        "letMeShowYou": "Deixa-me mostrar",
+        "teachingMode": "Modo de ensino"
+      },
+      "verificationBadge": {
+        "evaluate": "PENSAMENTO APROFUNDADO CONCLUÍDO",
+        "teachBack": "RECAPITULAÇÃO CONCLUÍDA"
+      }
+    },
+    "noteInput": {
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "noteText": "Texto da nota",
+      "startRecording": "Começar a gravar",
+      "stopRecording": "Parar de gravar",
+      "listening": "A ouvir...",
+      "noteTooLong": "A tua nota está a ficar longa! ({{length}}/{{max}})"
+    },
+    "voiceInput": {
+      "send": "Enviar",
+      "sendVoiceMessage": "Enviar mensagem de voz",
+      "reRecord": "Gravar novamente",
+      "discardRecording": "Descartar gravação",
+      "transcriptLabel": "Transcrição de voz — toque para editar",
+      "startRecording": "Começar a gravar",
+      "stopRecording": "Parar de gravar"
     }
   },
   "quiz": {
@@ -738,6 +774,16 @@
     },
     "results": {
       "viewHistory": "Ver Histórico"
+    },
+    "guessWhoQuestion": {
+      "typeAName": "Escreve um nome",
+      "answerLabel": "Resposta do Adivinha Quem",
+      "submitGuess": "Enviar palpite",
+      "submitGuessLabel": "Enviar palpite",
+      "revealNextClue": "Revelar próxima pista",
+      "revealNextClueLabel": "Revelar próxima pista",
+      "iDontKnow": "Não sei",
+      "iDontKnowLabel": "Não sei a resposta"
     }
   },
   "dictation": {
@@ -2509,6 +2555,25 @@
       "minutesOne": "1 min",
       "hoursMinutes": "{{hours}}h {{minutes}}m",
       "none": "—"
+    }
+  },
+  "feedbackSheet": {
+    "title": "Dê-nos o seu feedback",
+    "shakeHint": "Ou abane o telemóvel a qualquer momento para nos contactar.",
+    "thankYouTitle": "Obrigado!",
+    "thankYouMessage": "Recebemos o seu feedback e vamos analisá-lo.",
+    "categoryLabel": "Que tipo de feedback?",
+    "messageLabel": "Diga-nos o que aconteceu",
+    "messagePlaceholder": "Descreva o problema ou a sua ideia...",
+    "deviceInfoNote": "Também incluiremos a versão da sua aplicação e as informações do dispositivo para nos ajudar a investigar.",
+    "sendButton": "Enviar Feedback",
+    "sendButtonLabel": "Enviar feedback",
+    "cancelButton": "Cancelar",
+    "closeLabel": "Fechar",
+    "category": {
+      "bug": "Bug",
+      "suggestion": "Sugestão",
+      "other": "Outro"
     }
   }
 }

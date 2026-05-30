@@ -511,7 +511,10 @@
       "switchToVoiceMode": "Bytt til talemodus",
       "voiceMode": "Talemodus",
       "screenReaderVoiceNote": "Skjermleser er på. Taleinndata er ikke tilgjengelig. Bruk tekstinndata nedenfor.",
-      "stepProgress": "Steg {{current}} av {{total}}"
+      "stepProgress": "Steg {{current}} av {{total}}",
+      "voicePermissionErrorTitle": "Feil med taleinndata",
+      "voicePermissionErrorMessage": "Tilgang til mikrofonen er nødvendig for taleinndata. Aktiver den i Innstillinger.",
+      "voicePermissionOpenSettings": "Åpne Innstillinger"
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",
@@ -577,6 +580,39 @@
       "currentTopic": "Emne:",
       "changeTopicLabel": "Endre emne fra {{topic}}",
       "changeTopic": "Endre"
+    },
+    "messageBubble": {
+      "thinking": "Tenker",
+      "guidedResponse": "Veiledet svar",
+      "pendingSync": "Melding venter på synkronisering",
+      "sending": "Sender …",
+      "escalation": {
+        "stepByStep": "Steg-for-steg",
+        "letMeShowYou": "La meg vise deg",
+        "teachingMode": "Undervisningsmodus"
+      },
+      "verificationBadge": {
+        "evaluate": "TENK-DYPERE GODKJENT",
+        "teachBack": "GJENFORTALT GODKJENT"
+      }
+    },
+    "noteInput": {
+      "cancel": "Avbryt",
+      "save": "Lagre",
+      "noteText": "Notattekst",
+      "startRecording": "Start opptak",
+      "stopRecording": "Stopp opptak",
+      "listening": "Lytter ...",
+      "noteTooLong": "Notatet ditt begynner å bli langt! ({{length}}/{{max}})"
+    },
+    "voiceInput": {
+      "send": "Send",
+      "sendVoiceMessage": "Send talemelding",
+      "reRecord": "Ta opp på nytt",
+      "discardRecording": "Forkast opptak",
+      "transcriptLabel": "Taletranskripsjon – trykk for å redigere",
+      "startRecording": "Start opptak",
+      "stopRecording": "Stopp opptak"
     }
   },
   "quiz": {
@@ -713,6 +749,16 @@
     },
     "results": {
       "viewHistory": "Vis historikk"
+    },
+    "guessWhoQuestion": {
+      "typeAName": "Skriv et navn",
+      "answerLabel": "Gjett hvem-svar",
+      "submitGuess": "Send inn gjetning",
+      "submitGuessLabel": "Send inn gjetning",
+      "revealNextClue": "Vis neste hint",
+      "revealNextClueLabel": "Vis neste hint",
+      "iDontKnow": "Jeg vet ikke",
+      "iDontKnowLabel": "Jeg vet ikke svaret"
     }
   },
   "dictation": {
@@ -2509,6 +2555,25 @@
       "minutesOne": "1 min",
       "hoursMinutes": "{{hours}} t {{minutes}} m",
       "none": "—"
+    }
+  },
+  "feedbackSheet": {
+    "title": "Gi oss tilbakemelding",
+    "shakeHint": "Eller rist telefonen når som helst for å kontakte oss.",
+    "thankYouTitle": "Tusen takk!",
+    "thankYouMessage": "Vi har mottatt tilbakemeldingen din og vil se på den.",
+    "categoryLabel": "Hva slags tilbakemelding?",
+    "messageLabel": "Fortell oss hva som skjedde",
+    "messagePlaceholder": "Beskriv problemet eller ideen din ...",
+    "deviceInfoNote": "Vi inkluderer også appversjonen og enhetsinformasjonen din for å hjelpe oss med å undersøke.",
+    "sendButton": "Send tilbakemelding",
+    "sendButtonLabel": "Send tilbakemelding",
+    "cancelButton": "Avbryt",
+    "closeLabel": "Lukk",
+    "category": {
+      "bug": "Feil",
+      "suggestion": "Forslag",
+      "other": "Annet"
     }
   }
 }

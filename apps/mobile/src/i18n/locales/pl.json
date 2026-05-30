@@ -536,7 +536,10 @@
       "switchToVoiceMode": "Przełącz na tryb głosowy",
       "voiceMode": "Tryb głosowy",
       "screenReaderVoiceNote": "Czytnik ekranu jest włączony. Wprowadzanie głosowe jest niedostępne. Użyj wprowadzania tekstowego poniżej.",
-      "stepProgress": "Krok {{current}} z {{total}}"
+      "stepProgress": "Krok {{current}} z {{total}}",
+      "voicePermissionErrorTitle": "Błąd wprowadzania głosowego",
+      "voicePermissionErrorMessage": "Dostęp do mikrofonu jest potrzebny do wprowadzania głosowego. Włącz go w Ustawieniach.",
+      "voicePermissionOpenSettings": "Otwórz Ustawienia"
     },
     "filingFailed": {
       "retryInProgress": "Ponowna próba jest już w toku.",
@@ -602,6 +605,39 @@
       "currentTopic": "Temat:",
       "changeTopicLabel": "Zmień temat z {{topic}}",
       "changeTopic": "Zmień"
+    },
+    "messageBubble": {
+      "thinking": "Myślę...",
+      "guidedResponse": "Odpowiedź z podpowiedzią",
+      "pendingSync": "Wiadomość czeka na synchronizację",
+      "sending": "Wysyłanie…",
+      "escalation": {
+        "stepByStep": "Krok po kroku",
+        "letMeShowYou": "Pokażę ci",
+        "teachingMode": "Tryb nauki"
+      },
+      "verificationBadge": {
+        "evaluate": "GŁĘBSZE MYŚLENIE ZALICZONE",
+        "teachBack": "ODPYTYWANIE ZALICZONE"
+      }
+    },
+    "noteInput": {
+      "cancel": "Anuluj",
+      "save": "Zapisz",
+      "noteText": "Treść notatki",
+      "startRecording": "Rozpocznij nagrywanie",
+      "stopRecording": "Zatrzymaj nagrywanie",
+      "listening": "Słucham...",
+      "noteTooLong": "Twoja notatka robi się długa! ({{length}}/{{max}})"
+    },
+    "voiceInput": {
+      "send": "Wyślij",
+      "sendVoiceMessage": "Wyślij wiadomość głosową",
+      "reRecord": "Nagraj ponownie",
+      "discardRecording": "Odrzuć nagranie",
+      "transcriptLabel": "Transkrypcja głosowa — dotknij, by edytować",
+      "startRecording": "Rozpocznij nagrywanie",
+      "stopRecording": "Zatrzymaj nagrywanie"
     }
   },
   "quiz": {
@@ -738,6 +774,16 @@
     },
     "results": {
       "viewHistory": "Zobacz historię"
+    },
+    "guessWhoQuestion": {
+      "typeAName": "Wpisz imię",
+      "answerLabel": "Odpowiedź do „Zgadnij kto”",
+      "submitGuess": "Zatwierdź odpowiedź",
+      "submitGuessLabel": "Zatwierdź odpowiedź",
+      "revealNextClue": "Odkryj kolejną wskazówkę",
+      "revealNextClueLabel": "Odkryj kolejną wskazówkę",
+      "iDontKnow": "Nie wiem",
+      "iDontKnowLabel": "Nie znam odpowiedzi"
     }
   },
   "dictation": {
@@ -2509,6 +2555,25 @@
       "minutesOne": "1 min",
       "hoursMinutes": "{{hours}}h {{minutes}}m",
       "none": "—"
+    }
+  },
+  "feedbackSheet": {
+    "title": "Prześlij nam opinię",
+    "shakeHint": "Potrząśnij telefonem, aby się z nami skontaktować.",
+    "thankYouTitle": "Dziękujemy!",
+    "thankYouMessage": "Otrzymaliśmy Twoją opinię i przyjrzymy się jej.",
+    "categoryLabel": "Jaki to rodzaj opinii?",
+    "messageLabel": "Opisz, co się stało",
+    "messagePlaceholder": "Opisz problem lub swój pomysł...",
+    "deviceInfoNote": "Dołączymy też wersję aplikacji i informacje o urządzeniu, aby pomóc nam w analizie.",
+    "sendButton": "Wyślij opinię",
+    "sendButtonLabel": "Wyślij opinię",
+    "cancelButton": "Anuluj",
+    "closeLabel": "Zamknij",
+    "category": {
+      "bug": "Błąd",
+      "suggestion": "Sugestia",
+      "other": "Inne"
     }
   }
 }

@@ -511,7 +511,10 @@
       "switchToVoiceMode": "In den Sprachmodus wechseln",
       "voiceMode": "Sprachmodus",
       "screenReaderVoiceNote": "Bildschirmleser ist an. Spracheingabe ist nicht verfügbar. Nutze die Texteingabe unten.",
-      "stepProgress": "Schritt {{current}} von {{total}}"
+      "stepProgress": "Schritt {{current}} von {{total}}",
+      "voicePermissionErrorTitle": "Fehler bei der Spracheingabe",
+      "voicePermissionErrorMessage": "Für die Spracheingabe ist Mikrofonzugriff erforderlich. Bitte in den Einstellungen aktivieren.",
+      "voicePermissionOpenSettings": "Einstellungen öffnen"
     },
     "filingFailed": {
       "retryInProgress": "Ein Wiederholungsversuch läuft bereits.",
@@ -577,6 +580,39 @@
       "currentTopic": "Thema:",
       "changeTopicLabel": "Thema von {{topic}} ändern",
       "changeTopic": "Ändern"
+    },
+    "messageBubble": {
+      "thinking": "Denkt nach ...",
+      "guidedResponse": "Geführte Antwort",
+      "pendingSync": "Nachricht wird synchronisiert",
+      "sending": "Senden...",
+      "escalation": {
+        "stepByStep": "Schritt für Schritt",
+        "letMeShowYou": "Ich zeig's dir",
+        "teachingMode": "Lehrmodus"
+      },
+      "verificationBadge": {
+        "evaluate": "THINK-DEEPER BESTANDEN",
+        "teachBack": "TEACH-BACK BESTANDEN"
+      }
+    },
+    "noteInput": {
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "noteText": "Notiztext",
+      "startRecording": "Aufnahme starten",
+      "stopRecording": "Aufnahme stoppen",
+      "listening": "Höre zu...",
+      "noteTooLong": "Deine Notiz wird lang! ({{length}}/{{max}})"
+    },
+    "voiceInput": {
+      "send": "Senden",
+      "sendVoiceMessage": "Sprachnachricht senden",
+      "reRecord": "Neu aufnehmen",
+      "discardRecording": "Aufnahme verwerfen",
+      "transcriptLabel": "Sprachtranskript – zum Bearbeiten tippen",
+      "startRecording": "Aufnahme starten",
+      "stopRecording": "Aufnahme stoppen"
     }
   },
   "quiz": {
@@ -713,6 +749,16 @@
     },
     "results": {
       "viewHistory": "Verlauf ansehen"
+    },
+    "guessWhoQuestion": {
+      "typeAName": "Gib einen Namen ein",
+      "answerLabel": "Antwort für „Wer bin ich?“",
+      "submitGuess": "Antwort senden",
+      "submitGuessLabel": "Antwort senden",
+      "revealNextClue": "Nächsten Hinweis zeigen",
+      "revealNextClueLabel": "Nächsten Hinweis zeigen",
+      "iDontKnow": "Ich weiß nicht",
+      "iDontKnowLabel": "Ich kenne die Antwort nicht"
     }
   },
   "dictation": {
@@ -2509,6 +2555,25 @@
       "minutesOne": "1 Min.",
       "hoursMinutes": "{{hours}} h {{minutes}} m",
       "none": "—"
+    }
+  },
+  "feedbackSheet": {
+    "title": "Gib uns Feedback",
+    "shakeHint": "Oder schüttle dein Handy, um uns zu kontaktieren.",
+    "thankYouTitle": "Vielen Dank!",
+    "thankYouMessage": "Wir haben dein Feedback erhalten und sehen es uns an.",
+    "categoryLabel": "Welche Art von Feedback?",
+    "messageLabel": "Erzähl uns, was passiert ist",
+    "messagePlaceholder": "Beschreibe das Problem oder deine Idee ...",
+    "deviceInfoNote": "Wir fügen auch deine App-Version und Geräteinfos hinzu, um das Problem zu untersuchen.",
+    "sendButton": "Feedback senden",
+    "sendButtonLabel": "Feedback senden",
+    "cancelButton": "Abbrechen",
+    "closeLabel": "Schließen",
+    "category": {
+      "bug": "Bug",
+      "suggestion": "Vorschlag",
+      "other": "Anderes"
     }
   }
 }

@@ -8,6 +8,10 @@
 
 import { webhookIdempotencyKeys } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
+import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 /**
  * Attempt to atomically claim a webhook id. Returns:
@@ -18,6 +22,11 @@ import type { Database } from '@eduagent/database';
  * Uses `INSERT ... ON CONFLICT DO NOTHING RETURNING webhook_id`. Postgres
  * evaluates the unique constraint atomically: two concurrent inserts with the
  * same (source, webhook_id) cannot both return a row.
+ *
+ * Per CLAUDE.md "Silent recovery without escalation is banned": DB failures
+ * are escalated to Sentry + structured log so on-call can query frequency and
+ * distinguish transient connection errors from schema/auth regressions.
+ * The caller still decides the fallback behaviour on 'unavailable'.
  */
 export async function claimWebhookId(
   db: Database,
@@ -36,7 +45,26 @@ export async function claimWebhookId(
       })
       .returning({ webhookId: webhookIdempotencyKeys.webhookId });
     return rows.length === 0 ? 'replay' : 'claimed';
-  } catch {
+  } catch (err) {
+    // [OBS-WI-01] DB dedup unavailable — escalate so on-call can distinguish
+    // a transient connection error from a schema/auth regression. The caller
+    // handles fallback behaviour; this layer's job is observability only.
+    logger.warn(
+      '[webhook-idempotency] DB claim failed — returning unavailable',
+      {
+        event: 'webhook_idempotency.db_claim_failed',
+        source,
+        webhookId,
+        error: err instanceof Error ? err.message : String(err),
+      },
+    );
+    captureException(err, {
+      extra: {
+        context: 'webhook_idempotency.claim_failed',
+        source,
+        webhookId,
+      },
+    });
     return 'unavailable';
   }
 }

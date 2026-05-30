@@ -118,6 +118,60 @@ export default [
       ],
     },
   },
+  // -------------------------------------------------------------------------
+  // G8 — mobile may only TYPE-import from @eduagent/api. A runtime import
+  // (`import { x } from '@eduagent/api'`) pulls the entire API server —
+  // Hono, drizzle, every service — into the mobile bundle. The convention
+  // was previously honored by discipline alone: @eduagent/api is whitelisted
+  // in @nx/enforce-module-boundaries above (so the RPC `import type { AppType }`
+  // resolves), which means the boundaries rule does NOT catch a runtime
+  // import. This closes that gap.
+  //
+  // Uses @typescript-eslint/no-restricted-imports (not the base rule) so
+  // `allowTypeImports: true` lets `import type { AppType }` through while
+  // banning value imports. Mirrors the route-level @eduagent/database guard
+  // (G5 gap, BUG-676). Test files share the production bundle constraint —
+  // a runtime import in a test would still mean the symbol is importable —
+  // but tests are not bundled into the app, so they are not excluded here;
+  // no mobile test imports @eduagent/api at runtime today and the ban is
+  // harmless to them.
+  //
+  // See CLAUDE.md > Known Exceptions to Engineering Rules
+  // ("Type-only imports from @eduagent/api are accepted; runtime imports
+  // remain forbidden").
+  // -------------------------------------------------------------------------
+  // NOTE on globs: the mobile project has its own apps/mobile/eslint.config.mjs
+  // which imports this baseConfig. When ESLint runs from the apps/mobile cwd it
+  // loads THAT config, so `files` globs in this spread-in base are matched
+  // relative to apps/mobile/ — i.e. `apps/mobile/**` never matches (the path is
+  // just `src/...`). We therefore list BOTH the repo-root form (`apps/mobile/**`,
+  // used when ESLint runs from the workspace root) and the mobile-relative form
+  // (`src/**`). The bare `src/**` form can also match api/packages when ESLint
+  // runs from their cwd, but that is harmless: only the @eduagent/api specifier
+  // is restricted, and no api/packages code imports it (verified 2026-05-29).
+  {
+    files: [
+      'apps/mobile/**/*.ts',
+      'apps/mobile/**/*.tsx',
+      'src/**/*.ts',
+      'src/**/*.tsx',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@eduagent/api',
+              message:
+                'Mobile may only type-import from @eduagent/api (`import type { AppType } from "@eduagent/api"`). A runtime/value import bundles the entire API server (Hono, drizzle, services) into the mobile app. See CLAUDE.md > Known Exceptions to Engineering Rules.',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     files: [
       '**/*.test.ts',
@@ -452,10 +506,16 @@ export default [
   // GC5 — Inngest functions that bypass createScopedRepository must declare
   // their profile-scoping intent via a file-level `// @inngest-admin: <reason>`
   // annotation. The annotation forces conscious review whenever a function
-  // touches the DB without scoped-repo isolation. Severity `warn` until the
-  // existing untagged backlog (17 files) is reviewed individually — each
-  // one needs an accurate reason (cross-profile vs. parent-chain) or a
-  // refactor to use createScopedRepository.
+  // touches the DB without scoped-repo isolation.
+  //
+  // Promoted from `warn` to `error` on 2026-05-29 after verifying the backlog
+  // is fully burned down: `pnpm exec eslint 'src/inngest/functions/**/*.ts'
+  // --max-warnings 0` from apps/api reports 0 violations across all 121
+  // function files (every function now either imports createScopedRepository
+  // or carries an accurate `// @inngest-admin: <reason>` preamble). This is
+  // the promotion condition the governance audit (item GC5) gated on. As an
+  // `error` it is now a forward-only ratchet: a NEW Inngest function that
+  // reaches for raw db.X without scoped-repo or the annotation fails CI.
   // See docs/_archive/plans/done/2026-05-03-governance-audit.md (item GC5).
   // -------------------------------------------------------------------------
   {
@@ -466,7 +526,7 @@ export default [
     ],
     plugins: { gov: govPlugin },
     rules: {
-      'gov/inngest-admin-tag': 'warn',
+      'gov/inngest-admin-tag': 'error',
     },
   },
 ];

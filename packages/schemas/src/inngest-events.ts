@@ -156,7 +156,8 @@ export const sessionSummaryFailedEventSchema = z.object({
   profileId: z.string().uuid(),
   sessionId: z.string().uuid(),
   sessionSummaryId: z.string().uuid().nullable(),
-  timestamp: z.string(),
+  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  timestamp: isoDateField,
 });
 export type SessionSummaryFailedEvent = z.infer<
   typeof sessionSummaryFailedEventSchema
@@ -169,7 +170,8 @@ export const sessionTranscriptPurgedEventSchema = z.object({
   sessionSummaryId: z.string().uuid().nullable(),
   eventsDeleted: z.number().int().nonnegative(),
   embeddingRowsReplaced: z.number().int().nonnegative(),
-  purgedAt: z.string().optional(),
+  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  purgedAt: isoDateField.optional(),
 });
 export type SessionTranscriptPurgedEvent = z.infer<
   typeof sessionTranscriptPurgedEventSchema
@@ -180,7 +182,8 @@ export const sessionPurgeDelayedEventSchema = z.object({
   delayedCount: z.number().int().positive(),
   sessionIds: z.array(z.string().uuid()),
   missingPreconditionCount: z.number().int().nonnegative(),
-  timestamp: z.string(),
+  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  timestamp: isoDateField,
 });
 export type SessionPurgeDelayedEvent = z.infer<
   typeof sessionPurgeDelayedEventSchema
@@ -192,7 +195,8 @@ export const summaryReconciliationRequeuedEventSchema = z.object({
   queryBRequeued: z.number().int().nonnegative(),
   queryCRequeued: z.number().int().nonnegative(),
   totalRequeued: z.number().int().positive(),
-  timestamp: z.string(),
+  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  timestamp: isoDateField,
 });
 export type SummaryReconciliationRequeuedEvent = z.infer<
   typeof summaryReconciliationRequeuedEventSchema
@@ -285,7 +289,8 @@ export const sessionSummaryGeneratedEventSchema = z.object({
   sessionState: z.string().optional(),
   topicsCount: z.number().optional(),
   narrativeLength: z.number().optional(),
-  timestamp: z.string(),
+  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  timestamp: isoDateField,
 });
 export type SessionSummaryGeneratedEvent = z.infer<
   typeof sessionSummaryGeneratedEventSchema
@@ -301,7 +306,8 @@ export const sessionCompletedWithErrorsEventSchema = z.object({
       error: z.string().nullable(),
     }),
   ),
-  timestamp: z.string(),
+  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  timestamp: isoDateField,
 });
 export type SessionCompletedWithErrorsEvent = z.infer<
   typeof sessionCompletedWithErrorsEventSchema
@@ -316,7 +322,8 @@ export const filingAutoRetryAttemptedEventSchema = z.object({
   sessionId: z.string().uuid(),
   profileId: z.string().uuid(),
   attemptNumber: z.number().int().positive(),
-  timestamp: z.string(),
+  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  timestamp: isoDateField,
 });
 export type FilingAutoRetryAttemptedEvent = z.infer<
   typeof filingAutoRetryAttemptedEventSchema
@@ -332,7 +339,8 @@ export const summaryReconciliationScannedEventSchema = z.object({
   queryBCount: z.number().int().nonnegative(),
   queryCCount: z.number().int().nonnegative(),
   totalScanned: z.number().int().nonnegative(),
-  timestamp: z.string(),
+  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  timestamp: isoDateField,
 });
 export type SummaryReconciliationScannedEvent = z.infer<
   typeof summaryReconciliationScannedEventSchema

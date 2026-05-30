@@ -222,6 +222,12 @@ export const sessionEvents = pgTable(
       table.eventType,
       table.createdAt,
     ),
+    // [BUG-393 / migration 0086] Standalone profile_id FK index. Redundant with
+    // the leftmost prefix of session_events_profile_event_created_idx for
+    // profile-only predicates, but it exists in the database (created by
+    // migration 0086_bug393_fk_indexes.sql) so the schema must declare it to
+    // stay in sync — otherwise `drizzle-kit generate`/`push` would emit a DROP.
+    index('session_events_profile_id_idx').on(table.profileId),
     uniqueIndex('session_events_session_client_id_uniq')
       .on(table.sessionId, table.clientId)
       .where(sql`${table.clientId} IS NOT NULL`),
@@ -284,28 +290,47 @@ export const sessionSummaries = pgTable(
       table.sessionId,
       table.profileId,
     ),
+    // [BUG-393 / migration 0086] Standalone profile_id FK index. NOT covered by
+    // session_summaries_session_profile_idx (profile_id is the second column
+    // there, so it cannot serve a profile-only predicate or speed up the
+    // ON DELETE CASCADE probe from profiles). Created in the database by
+    // migration 0086_bug393_fk_indexes.sql; declared here to keep schema in
+    // sync with the applied migration.
+    index('session_summaries_profile_id_idx').on(table.profileId),
     index('session_summaries_purge_eligible_idx')
       .on(table.summaryGeneratedAt)
       .where(sql`${table.purgedAt} IS NULL`),
   ],
 );
 
-export const parkingLotItems = pgTable('parking_lot_items', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  sessionId: uuid('session_id')
-    .notNull()
-    .references(() => learningSessions.id, { onDelete: 'cascade' }),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id').references(() => curriculumTopics.id, {
-    onDelete: 'cascade',
-  }),
-  question: text('question').notNull(),
-  explored: boolean('explored').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const parkingLotItems = pgTable(
+  'parking_lot_items',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => learningSessions.id, { onDelete: 'cascade' }),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id').references(() => curriculumTopics.id, {
+      onDelete: 'cascade',
+    }),
+    question: text('question').notNull(),
+    explored: boolean('explored').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // [BUG-393 / migration 0086] Standalone profile_id FK index. Created in the
+  // database by migration 0086_bug393_fk_indexes.sql but never declared here,
+  // so the schema drifted from the applied migration (a `drizzle-kit
+  // generate`/`push` would have emitted a DROP for this index). The index is
+  // the only one on this table; every parking-lot read filters on profile_id
+  // (services/parking-lot-data.ts: by (sessionId, profileId), (topicId,
+  // profileId), and export.ts: inArray(profileId)), so without it those reads
+  // and the ON DELETE CASCADE probe from profiles do sequential scans.
+  (table) => [index('parking_lot_items_profile_id_idx').on(table.profileId)],
+);

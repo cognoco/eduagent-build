@@ -283,9 +283,7 @@ describe('SessionDetailScreen (summary-only)', () => {
     // 5 min (active) — not 30 min (wall-clock) — must be shown. This file's
     // react-i18next mock echoes the key + opts, so the duration count (5 vs 30)
     // proves which source was used.
-    await waitFor(() =>
-      screen.getByText('time.duration.minutes:{"count":5}'),
-    );
+    await waitFor(() => screen.getByText('time.duration.minutes:{"count":5}'));
     expect(screen.queryByText('time.duration.minutes:{"count":30}')).toBeNull();
 
     cleanup();
@@ -304,9 +302,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     const { cleanup } = renderSessionDetail();
 
-    await waitFor(() =>
-      screen.getByText('time.duration.minutes:{"count":12}'),
-    );
+    await waitFor(() => screen.getByText('time.duration.minutes:{"count":12}'));
 
     cleanup();
   });

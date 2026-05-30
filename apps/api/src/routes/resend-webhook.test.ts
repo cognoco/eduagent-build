@@ -1061,6 +1061,44 @@ describe('[BUG-319] atomic DB-based webhook idempotency', () => {
     );
   });
 
+  // [OBS-WI-01] DB failure must escalate to logger.warn + Sentry so on-call
+  // can distinguish transient connection errors from schema/auth regressions.
+  // Previously the catch was bare (no binding, no logging) — only the return
+  // value was observable. This test locks in the escalation contract.
+  it('[OBS-WI-01] claimWebhookId: escalates logger.warn + captureException when DB throws', async () => {
+    const sentryMock = require('../services/sentry') as {
+      captureException: jest.Mock;
+    };
+    sentryMock.captureException.mockClear();
+    mockLoggerWarn.mockClear();
+
+    const dbError = new Error('db connection refused');
+    const db = makeFakeDb({ failWith: dbError });
+    await claimWebhookId(asDb(db), 'resend', 'msg_obs_wi_01');
+
+    // Structured log must fire with the queryable event key
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('DB claim failed'),
+      expect.objectContaining({
+        event: 'webhook_idempotency.db_claim_failed',
+        source: 'resend',
+        webhookId: 'msg_obs_wi_01',
+      }),
+    );
+
+    // Sentry escalation must fire with the raw error + context
+    expect(sentryMock.captureException).toHaveBeenCalledWith(
+      dbError,
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'webhook_idempotency.claim_failed',
+          source: 'resend',
+          webhookId: 'msg_obs_wi_01',
+        }),
+      }),
+    );
+  });
+
   it('CONCURRENT: 3 parallel claims for same id — exactly ONE claimed', async () => {
     const db = makeFakeDb();
     const results = await Promise.all([

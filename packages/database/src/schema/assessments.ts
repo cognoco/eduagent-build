@@ -96,6 +96,12 @@ export const assessments = pgTable(
   (table) => [
     index('assessments_profile_topic_idx').on(table.profileId, table.topicId),
     index('assessments_topic_id_idx').on(table.topicId),
+    // [BUG-393 / migration 0086] Standalone profile_id FK index. Redundant with
+    // the leftmost prefix of assessments_profile_topic_idx for query planning,
+    // but it exists in the database (migration 0086_bug393_fk_indexes.sql) so
+    // the schema must declare it to stay in sync — otherwise a `drizzle-kit
+    // generate`/`push` would emit a DROP.
+    index('assessments_profile_id_idx').on(table.profileId),
     check(
       'assessments_mastery_score_range',
       sql`${table.masteryScore} IS NULL OR (${table.masteryScore} >= 0 AND ${table.masteryScore} <= 1)`,
@@ -139,6 +145,13 @@ export const retentionCards = pgTable(
       table.topicId,
     ),
     index('retention_cards_review_idx').on(table.profileId, table.nextReviewAt),
+    // [BUG-393 / migration 0086] Standalone profile_id FK index. Redundant with
+    // the leftmost prefix of retention_cards_profile_topic_unique /
+    // retention_cards_review_idx for query planning, but it exists in the
+    // database (migration 0086_bug393_fk_indexes.sql) so the schema must declare
+    // it to stay in sync — otherwise a `drizzle-kit generate`/`push` would emit
+    // a DROP.
+    index('retention_cards_profile_id_idx').on(table.profileId),
     check(
       'retention_cards_interval_days_positive',
       sql`${table.intervalDays} >= 1`,
@@ -183,6 +196,12 @@ export const needsDeepeningTopics = pgTable(
       table.topicId,
     ),
     index('needs_deepening_topic_id_idx').on(table.topicId),
+    // [BUG-393 / migration 0086] Standalone profile_id FK index. Redundant with
+    // the leftmost prefix of needs_deepening_profile_topic_idx for query
+    // planning, but it exists in the database (migration
+    // 0086_bug393_fk_indexes.sql) so the schema must declare it to stay in sync
+    // — otherwise a `drizzle-kit generate`/`push` would emit a DROP.
+    index('needs_deepening_topics_profile_id_idx').on(table.profileId),
   ],
 );
 
@@ -222,5 +241,11 @@ export const teachingPreferences = pgTable(
       table.profileId,
       table.subjectId,
     ),
+    // [BUG-393 / migration 0086] Standalone profile_id FK index. Redundant with
+    // the leftmost prefix of teaching_preferences_profile_subject_unique for
+    // query planning, but it exists in the database (migration
+    // 0086_bug393_fk_indexes.sql) so the schema must declare it to stay in sync
+    // — otherwise a `drizzle-kit generate`/`push` would emit a DROP.
+    index('teaching_preferences_profile_id_idx').on(table.profileId),
   ],
 );

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { isoDateField } from './common.ts';
+// [SC-04] Canonical session-type enum — import instead of redefining inline.
+// From the ./session-enums.ts leaf to keep notes.ts off the sessions.ts import graph.
+import { sessionTypeSchema } from './session-enums.ts';
 
 /**
  * [BUG-212] Canonical client-facing note shape. The previously-duplicated
@@ -126,7 +129,8 @@ export type AllNotesResponse = z.infer<typeof allNotesResponseSchema>;
 /** GET /topics/:topicId/sessions — one session entry associated with a topic. */
 export const topicSessionSchema = z.object({
   id: z.string().uuid(),
-  sessionType: z.enum(['learning', 'homework', 'interleaved']),
+  // [SC-04] Use canonical sessionTypeSchema from sessions.ts (not inline enum).
+  sessionType: sessionTypeSchema,
   durationSeconds: z.number().nullable(),
   createdAt: isoDateField,
 });

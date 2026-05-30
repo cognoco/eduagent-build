@@ -573,11 +573,18 @@ async function loadMaterializedTopicsForIntentMatch(
     .orderBy(asc(curriculumTopics.sortOrder), asc(curriculumTopics.id));
 }
 
-async function runTopicIntentMatcher(
+export async function runTopicIntentMatcher(
   rawInput: string,
   topics: TopicIntentMatcherTopic[],
 ): Promise<z.infer<typeof topicIntentMatcherResponseSchema> | null> {
   const messages = buildTopicIntentMatcherMessages({ rawInput, topics });
+  // Clear the timeout when the race settles. Without this, the happy path
+  // (routeAndCall wins) leaves a dangling timer that later rejects a
+  // handler-less Promise<never> -> unhandled rejection + a timer keeping the
+  // worker event loop alive for up to MATCHER_TIMEOUT_MS after the request
+  // resolved. The timeout branch still rejects with MatcherTimeoutError so the
+  // `instanceof MatcherTimeoutError` classification in matchTopicByIntent holds.
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const response = await Promise.race([
     // conversationLanguage not threaded: topic-intent matcher; JSON classification
     routeAndCall(messages, 1, {
@@ -585,9 +592,14 @@ async function runTopicIntentMatcher(
       llmTier: 'flash',
     }).then((result) => result.response),
     new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new MatcherTimeoutError()), MATCHER_TIMEOUT_MS);
+      timeoutId = setTimeout(
+        () => reject(new MatcherTimeoutError()),
+        MATCHER_TIMEOUT_MS,
+      );
     }),
-  ]);
+  ]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
   return parseTopicIntentMatcherResponse(response);
 }
 

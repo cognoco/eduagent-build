@@ -545,14 +545,17 @@ export function ChatShell({
       }
       if (cancelled) return;
       platformAlert(
-        'Voice input error',
+        t('session.chatShell.voicePermissionErrorTitle'),
         isPermissionError
-          ? 'Microphone access is needed for voice input. Please enable it in Settings.'
+          ? t('session.chatShell.voicePermissionErrorMessage')
           : sttError,
         isPermissionError
           ? [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              { text: t('common.cancel'), style: 'cancel' },
+              {
+                text: t('session.chatShell.voicePermissionOpenSettings'),
+                onPress: () => Linking.openSettings(),
+              },
             ]
           : undefined,
       );

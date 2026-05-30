@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { chatExchangeSchema, isoDateField } from './common.ts';
 import { languageCodeSchema, pedagogyModeSchema } from './language.ts';
+// [SC-02] Import canonical retention enum instead of bare z.string().
+import { retentionStatusSchema } from './retention-status.ts';
 
 // Verification depth
 
@@ -378,7 +380,8 @@ const recallRemediationSchema = z.object({
   action: z.literal('redirect_to_library'),
   topicId: z.string().uuid(),
   topicTitle: z.string(),
-  retentionStatus: z.string(),
+  // [SC-02] Use canonical enum (retentionStatusSchema) instead of bare z.string().
+  retentionStatus: retentionStatusSchema,
   failureCount: z.number().int(),
   cooldownEndsAt: isoDateField,
   options: z.array(z.enum(['review_and_retest', 'relearn_topic'])),
