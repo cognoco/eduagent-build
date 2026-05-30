@@ -69,7 +69,7 @@ const APP_HELP_GENERAL =
 // ("what is a topic in the app", "how is the library organised", "how often
 // should i review in the app").
 const APP_HELP_ACCOUNT =
-  /\b(add (a |my |another )?(child|kid|son|daughter)|create (a |another )?(child|kid)('?s)? (profile|account)|(child|children|kid|son|daughter)'?s progress|progress (tab|page|screen|section|view|dashboard)|upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit|app language|mentor language|(change|switch|set) (the )?(app |mentor |ui )?language|is (this |the )?(app|it|mentomate) free|is it free|do i (have to |need to )?pay|does (it|this|the app|mentomate) cost|how much (does|is) (it|this|the app|mentomate))\b/i;
+  /\b(add (a |my |another )?(child|kid|son|daughter)|create (a |another )?(child|kid)('?s)? (profile|account)|(child|children|kid|son|daughter)'?s progress|progress (tab|page|screen|section|view|dashboard)|upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit|app language|mentor language|(change|switch|set) (the )?(app |mentor |ui )?language|is (this |the )?(app|it|mentomate) free|is it free|do i (have to |need to )?pay (for|to use)|does (the app|this app|mentomate) cost|how much (does|is) (the app|this app|mentomate))\b/i;
 
 // Library-structure and review-cadence concept questions. Each clause is tight:
 // "book"/"topic"/"chapter" are also ordinary study words, so structure clauses
@@ -104,7 +104,7 @@ export function buildAppHelpDirectReply(userMessage: string): string {
   }
 
   if (
-    /\b(upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit|is (this |the )?(app|it|mentomate) free|is it free|do i (have to |need to )?pay|does (it|this|the app|mentomate) cost|how much (does|is) (it|this|the app|mentomate))\b/.test(
+    /\b(upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit|is (this |the )?(app|it|mentomate) free|is it free|do i (have to |need to )?pay (for|to use)|does (the app|this app|mentomate) cost|how much (does|is) (the app|this app|mentomate))\b/.test(
       text,
     )
   ) {

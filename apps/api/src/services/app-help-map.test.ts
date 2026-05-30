@@ -266,8 +266,8 @@ describe('isAppHelpQuery', () => {
     "What's the difference between a book and a topic?",
     'Is this app free?',
     'Is the app free?',
-    'Do I have to pay?',
-    'How much does it cost?',
+    'Do I have to pay to use this app?',
+    'How much does the app cost?',
   ])('classifies "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(true);
   });
@@ -318,6 +318,12 @@ describe('isAppHelpQuery', () => {
     'Explain the book Romeo and Juliet',
     'What is a book report?',
     'Tell me about the chapter on the French Revolution',
+    // Cost/pricing phrasing in a genuine learning sense must NOT match — these
+    // are the false positives the tightened cost detection guards against.
+    'How much does it cost to build a pyramid?',
+    'How much does it cost?',
+    'Is the answer free of errors?',
+    'Do I have to pay attention to the sign?',
   ])('does NOT classify "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(false);
   });
