@@ -109,6 +109,111 @@ describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
   });
 });
 
+/**
+ * Minimal drizzle query-builder stand-in for the next-topic lookup. The real
+ * `./dashboard` functions are mocked (they need a DB), but the next-topic
+ * enrichment in listRecapsForParent issues a direct `db.select(...).from(...)
+ * .leftJoin(...).where(...)` — this fake resolves that chain to `rows` so we can
+ * assert the enrichment behavior without a live database.
+ */
+function fakeDbReturning(rows: unknown[]): Database {
+  const chain: Record<string, unknown> = {};
+  chain['select'] = jest.fn(() => chain);
+  chain['from'] = jest.fn(() => chain);
+  chain['leftJoin'] = jest.fn(() => chain);
+  chain['where'] = jest.fn(async () => rows);
+  return chain as unknown as Database;
+}
+
+describe('listRecapsForParent — next-topic enrichment', () => {
+  it('surfaces the stored next-topic title and reason on the recap', async () => {
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessions.mockResolvedValue([sessionRow(RECAP_ID)]);
+
+    const enrichedDb = fakeDbReturning([
+      {
+        sessionId: RECAP_ID,
+        nextTopicTitle: 'Comparing fractions',
+        nextTopicReason: 'Build on equivalent fractions',
+      },
+    ]);
+
+    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+
+    expect(recaps).toHaveLength(1);
+    expect(recaps[0]).toMatchObject({
+      recapId: RECAP_ID,
+      nextTopicTitle: 'Comparing fractions',
+      nextTopicReason: 'Build on equivalent fractions',
+    });
+  });
+
+  it('returns null next-topic for a recap with no stored next topic', async () => {
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessions.mockResolvedValue([sessionRow(RECAP_ID)]);
+
+    // DB returns no next-topic row for this session.
+    const enrichedDb = fakeDbReturning([]);
+
+    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+
+    expect(recaps).toHaveLength(1);
+    expect(recaps[0]?.nextTopicTitle).toBeNull();
+    expect(recaps[0]?.nextTopicReason).toBeNull();
+  });
+
+  it('only merges next-topic onto its own session — a foreign row never leaks', async () => {
+    const FOREIGN_SESSION = 'b0000000-0000-4000-8000-000000000999';
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessions.mockResolvedValue([sessionRow(RECAP_ID)]);
+
+    // Even if the lookup returned an extra row for a session outside the
+    // parent's recap set, it must not surface on any returned recap — the
+    // merge is keyed strictly by the recap's own sessionId.
+    const enrichedDb = fakeDbReturning([
+      {
+        sessionId: RECAP_ID,
+        nextTopicTitle: 'Comparing fractions',
+        nextTopicReason: 'On topic',
+      },
+      {
+        sessionId: FOREIGN_SESSION,
+        nextTopicTitle: 'Another family secret',
+        nextTopicReason: 'Should never appear',
+      },
+    ]);
+
+    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+
+    expect(recaps).toHaveLength(1);
+    expect(recaps[0]?.nextTopicTitle).toBe('Comparing fractions');
+    expect(
+      recaps.some((recap) => recap.nextTopicTitle === 'Another family secret'),
+    ).toBe(false);
+  });
+
+  it('is non-fatal: a lookup failure still returns recaps without a next-topic', async () => {
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessions.mockResolvedValue([sessionRow(RECAP_ID)]);
+
+    // db.select is undefined on this bare object → the lookup throws and the
+    // try/catch defaults next-topic to null without failing the recap list.
+    const recaps = await listRecapsForParent({} as Database, PARENT_ID);
+
+    expect(recaps).toHaveLength(1);
+    expect(recaps[0]?.nextTopicTitle).toBeNull();
+    expect(recaps[0]?.nextTopicReason).toBeNull();
+  });
+});
+
 describe('getRecapForParent — per-child ForbiddenError isolation', () => {
   it('returns the recap from a visible child when a sibling has hidden consent', async () => {
     mockGetChildrenForParent.mockResolvedValue([
