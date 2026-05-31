@@ -184,8 +184,7 @@ function formatDateLabel(
       locale,
       error: err instanceof Error ? err.message : String(err),
     });
-    // [L11-CR-2026-05-31] CLAUDE.md: "console.warn alone is never sufficient"
-    // in billing recovery paths — must be queryable as a rate via Sentry.
+    // Sentry, not just console.warn, so the billing fallback rate is queryable.
     captureException(err, {
       extra: {
         context: 'billing.formatDateLabel.timezone_fallback',

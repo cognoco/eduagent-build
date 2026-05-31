@@ -137,7 +137,7 @@ const mockExtractSessionContent = jest
   .mockResolvedValue('User: What is algebra?\n\nAI: Algebra is...');
 
 jest.mock(
-  '../../services/embeddings' /* gc1-allow: pattern-a conversion */,
+  '../../services/embeddings' /* gc1-allow: storeSessionEmbedding runs an LLM embedding + pgvector write; extractSessionContent reads Neon — no LLM/DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/embeddings',
@@ -156,7 +156,7 @@ const mockUpdateRetentionFromSession = jest.fn().mockResolvedValue(undefined);
 const mockUpdateNeedsDeepeningProgress = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/retention-data' /* gc1-allow: pattern-a conversion */,
+  '../../services/retention-data' /* gc1-allow: persists retention rows to Neon — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/retention-data',
@@ -174,7 +174,7 @@ jest.mock(
 const mockGetCurrentLanguageProgress = jest.fn().mockResolvedValue(null);
 
 jest.mock(
-  '../../services/language-curriculum' /* gc1-allow: pattern-a conversion */,
+  '../../services/language-curriculum' /* gc1-allow: reads language progress from Neon — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/language-curriculum',
@@ -190,7 +190,7 @@ jest.mock(
 const mockExtractVocabularyFromTranscript = jest.fn().mockResolvedValue([]);
 
 jest.mock(
-  '../../services/vocabulary-extract' /* gc1-allow: pattern-a conversion */,
+  '../../services/vocabulary-extract' /* gc1-allow: extractVocabularyFromTranscript issues an LLM call — unavailable in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/vocabulary-extract',
@@ -206,7 +206,7 @@ jest.mock(
 const mockUpsertExtractedVocabulary = jest.fn().mockResolvedValue([]);
 
 jest.mock(
-  '../../services/vocabulary' /* gc1-allow: pattern-a conversion */,
+  '../../services/vocabulary' /* gc1-allow: upsertExtractedVocabulary writes Neon — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/vocabulary',
@@ -222,7 +222,7 @@ jest.mock(
 const mockCreatePendingSessionSummary = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/summaries' /* gc1-allow: pattern-a conversion */,
+  '../../services/summaries' /* gc1-allow: createPendingSessionSummary writes Neon — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/summaries',
@@ -251,7 +251,7 @@ const mockPrecomputeCoachingCard = jest.fn().mockResolvedValue({
 const mockWriteCoachingCardCache = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/coaching-cards' /* gc1-allow: pattern-a conversion */,
+  '../../services/coaching-cards' /* gc1-allow: precomputeCoachingCard + writeCoachingCardCache run Neon queries/writes — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/coaching-cards',
@@ -269,7 +269,7 @@ jest.mock(
 const mockRecordSessionActivity = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/streaks' /* gc1-allow: pattern-a conversion */,
+  '../../services/streaks' /* gc1-allow: recordSessionActivity writes Neon — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/streaks',
@@ -284,23 +284,26 @@ jest.mock(
 
 const mockInsertSessionXpEntry = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/xp' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../../services/xp',
-  ) as typeof import('../../services/xp');
-  return {
-    ...actual,
-    insertSessionXpEntry: (...args: unknown[]) =>
-      mockInsertSessionXpEntry(...args),
-  };
-});
+jest.mock(
+  '../../services/xp' /* gc1-allow: insertSessionXpEntry writes Neon — no DB in the unit runtime */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/xp',
+    ) as typeof import('../../services/xp');
+    return {
+      ...actual,
+      insertSessionXpEntry: (...args: unknown[]) =>
+        mockInsertSessionXpEntry(...args),
+    };
+  },
+);
 
 const mockExtractAndStoreHomeworkSummary = jest
   .fn()
   .mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/homework-summary' /* gc1-allow: pattern-a conversion */,
+  '../../services/homework-summary' /* gc1-allow: extractAndStoreHomeworkSummary issues an LLM call + Neon writes — neither runs in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/homework-summary',
@@ -316,7 +319,7 @@ jest.mock(
 const mockUpdateMedianResponseSeconds = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion */,
+  '../../services/settings' /* gc1-allow: updateMedianResponseSeconds writes Neon — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/settings',
@@ -332,7 +335,7 @@ jest.mock(
 const mockQueueCelebration = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/celebrations' /* gc1-allow: pattern-a conversion */,
+  '../../services/celebrations' /* gc1-allow: queueCelebration writes Neon — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/celebrations',
@@ -348,7 +351,7 @@ const mockProcessEvaluateCompletion = jest.fn().mockResolvedValue(undefined);
 const mockProcessTeachBackCompletion = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/verification-completion' /* gc1-allow: pattern-a conversion */,
+  '../../services/verification-completion' /* gc1-allow: processEvaluate/TeachBackCompletion run Neon writes — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/verification-completion',
@@ -366,7 +369,7 @@ jest.mock(
 const mockRefreshProgressSnapshot = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion */,
+  '../../services/snapshot-aggregation' /* gc1-allow: refreshProgressSnapshot runs aggregate Neon queries — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/snapshot-aggregation',
@@ -395,7 +398,7 @@ const mockGenerateAndStoreLlmSummary = jest.fn().mockResolvedValue({
 });
 
 jest.mock(
-  '../../services/session-highlights' /* gc1-allow: pattern-a conversion */,
+  '../../services/session-highlights' /* gc1-allow: generateSessionInsights issues an LLM call — unavailable in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/session-highlights',
@@ -411,7 +414,7 @@ jest.mock(
 );
 
 jest.mock(
-  '../../services/session-llm-summary' /* gc1-allow: pattern-a conversion */,
+  '../../services/session-llm-summary' /* gc1-allow: generateAndStoreLlmSummary issues an LLM call + Neon write — neither runs in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/session-llm-summary',
@@ -426,22 +429,25 @@ jest.mock(
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../../services/sentry',
-  ) as typeof import('../../services/sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  };
-});
+jest.mock(
+  '../../services/sentry' /* gc1-allow: captureException is the @sentry/node external boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
 
 // [CR-2026-05-19-M1] safeSend mock — embed.skipped counter dispatch must be
 // observable. Pattern-a spy: real module imported via requireActual, only
 // safeSend swapped to capture call args.
 const mockSafeSend = jest.fn().mockResolvedValue(undefined);
 jest.mock(
-  '../../services/safe-non-core' /* gc1-allow: pattern-a conversion */,
+  '../../services/safe-non-core' /* gc1-allow: safeSend dispatches Inngest events — real call hits the Inngest API */,
   () => {
     const actual = jest.requireActual(
       '../../services/safe-non-core',
@@ -462,7 +468,7 @@ const mockAnalyzeSessionTranscript = jest.fn();
 const mockApplyAnalysis = jest.fn();
 
 jest.mock(
-  '../../services/learner-profile' /* gc1-allow: pattern-a conversion */,
+  '../../services/learner-profile' /* gc1-allow: reads learner profile rows from Neon — no DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/learner-profile',

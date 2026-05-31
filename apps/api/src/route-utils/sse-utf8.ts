@@ -70,9 +70,8 @@ export function streamSSEUtf8(
         try {
           await onError(error, stream);
         } catch (onErrorCaught) {
-          // [L11-CR-2026-05-31] Surface the secondary fault to Sentry — without
-          // this, double-faulting onError callbacks are invisible in production
-          // and we can't query how often the SSE error handler itself throws.
+          // Without Sentry here, a double-faulting onError callback is invisible
+          // in production — we can't query how often the SSE handler itself throws.
           logger.error('[sse-utf8] onError callback threw', {
             event: 'sse_utf8.on_error.threw',
             error:
