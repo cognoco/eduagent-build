@@ -1,5 +1,5 @@
 # Flow PARENT-13: Child Weekly Report Detail
-# Validates: parent navigates from child detail → reports → weekly report detail,
+# Validates: parent navigates from child card Reports action → reports → weekly report detail,
 #             sees hero card and all three metric cards, then returns to reports list.
 # Tags: nightly, parent
 # Seed: parent-with-weekly-report
@@ -31,28 +31,11 @@ tags:
 - runFlow:
     file: ../_setup/open-family-dashboard.yaml
 
-# 3. Tap primary action on the seeded child card to open child detail
+# 3. Tap the Reports action on the seeded child card
 - tapOn:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: "parent-home-weekly-report-${CHILD_PROFILE_ID}"
 
-# 4. Wait for child detail scroll view
-- extendedWaitUntil:
-    visible:
-      id: "child-detail-scroll"
-    timeout: 10000
-
-# 5. Scroll down to reveal the reports link (it may be below the fold)
-- scrollUntilVisible:
-    element:
-      id: "child-reports-link"
-    direction: DOWN
-    timeout: 10000
-
-# 6. Tap the reports link
-- tapOn:
-    id: "child-reports-link"
-
-# 7. Wait for the reports screen back button (screen-level indicator)
+# 4. Wait for the reports screen back button (screen-level indicator)
 - extendedWaitUntil:
     visible:
       id: "child-reports-back"
@@ -60,18 +43,18 @@ tags:
 
 - takeScreenshot: 01-reports-list
 
-# 8. Tap the seeded weekly report card
+# 5. Tap the seeded weekly report card
 #    weekly-report-card-${WEEKLY_REPORT_ID} is injected by seed-and-run.sh
 - tapOn:
     id: "weekly-report-card-${WEEKLY_REPORT_ID}"
 
-# 9. Wait for the weekly report detail hero card
+# 6. Wait for the weekly report detail hero card
 - extendedWaitUntil:
     visible:
       id: "child-weekly-report-hero"
     timeout: 10000
 
-# 10. Assert metric cards
+# 7. Assert metric cards
 - assertVisible:
     id: "child-weekly-report-metric-sessions"
 
@@ -83,11 +66,11 @@ tags:
 
 - takeScreenshot: 02-weekly-report-detail
 
-# 11. Navigate back to reports list via the back button
+# 8. Navigate back to reports list via the back button
 - tapOn:
     id: "child-weekly-report-back"
 
-# 12. Confirm we are back on the reports list
+# 9. Confirm we are back on the reports list
 - extendedWaitUntil:
     visible:
       id: "child-reports-back"
