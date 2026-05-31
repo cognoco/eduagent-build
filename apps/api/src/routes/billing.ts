@@ -455,12 +455,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const access = await getEffectiveAccessForSubscription(db, subscription.id);
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscription.tier;
-    // [BUG-826] Both per-profile and shared-pool-with-breakdown tiers
-    // require an active profile context. Without it we would fall through
-    // to getQuotaPool and leak family-wide aggregates to a non-owner
-    // caller. supportsProfileBreakdown lives on TierConfig so a new tier
-    // is added by editing services/subscription.ts alone (CLAUDE.md G1:
-    // business logic in services, not routes).
+    // Both per-profile and shared-pool-with-breakdown tiers require an
+    // active profile context before aggregate quota reads; otherwise
+    // family-wide usage can leak to a non-owner caller.
     const tierConfig = getTierConfig(effectiveAccessTier);
     const { quotaModel, supportsProfileBreakdown } = tierConfig;
     const requiresProfileForBreakdown =
@@ -547,8 +544,6 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         ).toISOString();
       }
     })();
-    // supportsProfileBreakdown hoisted to the requiresProfileForBreakdown
-    // block above; reused here for the breakdown fetch decision.
     const usageBreakdown =
       activeProfileId && supportsProfileBreakdown
         ? await getUsageBreakdownForProfile(db, {

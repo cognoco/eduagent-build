@@ -791,7 +791,7 @@ describe('billing routes', () => {
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
 
-    // [BUG-826] family/pro are shared-pool but support per-profile breakdown.
+    // Family/pro are shared-pool but support per-profile breakdown.
     // Without an active profile the route would otherwise leak family-wide
     // aggregates via getQuotaPool to a caller with no profile context.
     it.each(['family', 'pro'] as const)(
