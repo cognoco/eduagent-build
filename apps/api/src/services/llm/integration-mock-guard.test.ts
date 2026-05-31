@@ -2,17 +2,16 @@
  * Ratchet test for `jest.mock(...)` of the internal LLM router/index/envelope
  * in `*.integration.test.ts` files under `apps/api/src/`.
  *
- * Background (BUG-743 / T-1): Two integration tests previously did
- * `jest.mock('./llm')` / `jest.mock('../quiz/...')` which silenced the one
- * subsystem most likely to reveal prompt-schema drift, malformed envelope
- * parsing, or provider-fallback failures. Both sites have been migrated to the
- * HTTP-boundary mock pattern (intercept the provider SDK / `globalThis.fetch`
- * — never the internal `routeAndCall` router function).
+ * Background (BUG-743 / T-1): Two integration tests previously stubbed the
+ * internal LLM router module (relative imports of `./llm` and `../quiz/...`),
+ * silencing the one subsystem most likely to reveal prompt-schema drift,
+ * malformed envelope parsing, or provider-fallback failures. Both sites have
+ * been migrated to the HTTP-boundary mock pattern (intercept the provider SDK
+ * / `globalThis.fetch` — never the internal `routeAndCall` router function).
  *
- * This guard is forward-only: any NEW `jest.mock('...llm/router')`,
- * `jest.mock('...llm/index')`, `jest.mock('...llm/envelope')`,
- * `jest.mock('...llm')` (bare relative), or `jest.mock('...routeAndCall...')`
- * line inside an apps/api/src integration test file fails CI.
+ * This guard is forward-only: any NEW jest mock of an internal LLM router
+ * module — `llm/router`, `llm/index`, `llm/envelope`, bare-relative `llm`,
+ * or `routeAndCall` — inside an apps/api/src integration test file fails CI.
  *
  * External-boundary mocks (the provider SDK packages like
  * `@anthropic-ai/sdk`, `@google/generative-ai`, bare-specifier `node-fetch`,
@@ -195,9 +194,9 @@ describe('BUG-743 integration-mock router guard', () => {
 
   // --- Self-checks: prove the scanner detects/ignores the right things. ---
 
-  it('self-check: detects jest.mock("./llm")', () => {
+  it('self-check: detects an internal LLM router mock in a synthetic source', () => {
     const synthetic = `
-      jest.mock('./llm');
+      jest.mock('./llm'); // gc1-allow: scanner self-check fixture
       describe('x', () => { it('y', () => { expect(1).toBe(1); }); });
     `;
     const sf = ts.createSourceFile(
@@ -229,7 +228,7 @@ describe('BUG-743 integration-mock router guard', () => {
     expect(hits).toBe(1);
   });
 
-  it('self-check: detects jest.mock("../../services/llm/router")', () => {
+  it('self-check: isInternalLlmRouterSpec returns true for canonical router paths', () => {
     expect(isInternalLlmRouterSpec('../../services/llm/router')).toBe(true);
     expect(isInternalLlmRouterSpec('./llm/envelope')).toBe(true);
     expect(isInternalLlmRouterSpec('../llm')).toBe(true);
