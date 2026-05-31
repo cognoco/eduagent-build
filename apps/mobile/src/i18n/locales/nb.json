@@ -216,7 +216,8 @@
         "momentumWords": "+{{count}} ord",
         "solid": "Solid: {{subjects}}",
         "comingUp": "Neste: {{topic}}",
-        "tryTonight": "Prøv i kveld"
+        "tryTonight": "Prøv i kveld",
+        "quietStarterWithFocus": "Spør {{name}} hva som ville gjort det enkelt å starte på nytt med {{focus}}."
       },
       "pulse": {
         "multiAllActive": "{{count}} elever, alle aktive denne uken.",
@@ -228,7 +229,8 @@
       "mentorSlot": {
         "celebrationStreak": "{{name}} er i skikkelig siget denne uken – den streaken er i ferd med å bli en vane.",
         "celebrationTopics": "Stor uke for {{name}} – mye nytt terreng er dekket.",
-        "worksFor": "Hva som fungerer for {{name}}"
+        "worksFor": "Hva som fungerer for {{name}}",
+        "mentorRead": "Veileders syn på {{name}}"
       },
       "learnTogether": {
         "title": "Lær sammen",
@@ -1738,7 +1740,6 @@
       "yourChild": "Ditt barn",
       "lastSessionAgo": "Siste økt {{time}}",
       "noSessionsYet": "Ingen økter ennå",
-      "reportsSubtitle": "Ukentlige og månedlige oppdateringer for {{name}}",
       "profileNotFound": "Profil ikke funnet",
       "unableToLoadChildDetails": "Kunne ikke laste barnedetaljer",
       "profileNoLongerAvailable": "Denne profilen er ikke lenger tilgjengelig",
@@ -1771,7 +1772,6 @@
       "childProfileJoined": "Lagt til {{date}}",
       "learningAccommodationTitle": "Læringstilpasning for {{name}}",
       "noLearningPreferenceSet": "Ingen læringspreferanse er satt",
-      "childProfileScopeHint": "Nylige økter, emner og veilederens notater finner du her. Fullstendige fremdriftsdiagrammer og rapporter har egne faner.",
       "consentTitle": "Samtykke",
       "consentDescription": "Administrer foreldresamtykke for {{name}}.",
       "consentStatusError": "Kunne ikke laste samtykkestatus. Prøv igjen.",

@@ -1,9 +1,13 @@
 import { render, screen } from '@testing-library/react-native';
-import type { DashboardChild } from '@eduagent/schemas';
+import type {
+  CuratedMemoryView,
+  DashboardChild,
+  ProgressSummary,
+} from '@eduagent/schemas';
 
 import { translate } from '../../test-utils/mock-i18n';
 import type { Translate } from '../../i18n';
-import { MentorSlot } from './MentorSlot';
+import { MentorSlot, resolveMentorSlotInsight } from './MentorSlot';
 
 const t = translate as unknown as Translate;
 
@@ -50,6 +54,68 @@ function progress(
   };
 }
 
+function progressSummary(
+  overrides: Partial<ProgressSummary> = {},
+): ProgressSummary {
+  return {
+    summary: null,
+    generatedAt: null,
+    basedOnLastSessionAt: null,
+    latestSessionId: null,
+    activityState: 'fresh',
+    nudgeRecommended: false,
+    ...overrides,
+  };
+}
+
+describe('resolveMentorSlotInsight', () => {
+  it('prefers durable memory notes over progress summary copy', () => {
+    const memory: CuratedMemoryView = {
+      categories: [
+        {
+          label: 'Learning pace & notes',
+          items: [
+            {
+              category: 'communicationNotes',
+              value: 'visual-first',
+              statement: 'Short visual examples help Lilly get started.',
+            },
+          ],
+        },
+      ],
+      parentContributions: [],
+      settings: {
+        memoryEnabled: true,
+        collectionEnabled: true,
+        injectionEnabled: true,
+        accommodationMode: null,
+      },
+    };
+
+    expect(
+      resolveMentorSlotInsight(
+        memory,
+        progressSummary({ summary: 'Lilly is active in Programming.' }),
+      ),
+    ).toEqual({
+      kind: 'works',
+      text: 'Short visual examples help Lilly get started.',
+    });
+  });
+
+  it('falls back to the generated progress summary when memory has no durable note', () => {
+    expect(
+      resolveMentorSlotInsight(
+        null,
+        progressSummary({ summary: 'Lilly is active in Programming.' }),
+      ),
+    ).toEqual({
+      kind: 'read',
+      text: 'Lilly is active in Programming.',
+    });
+  });
+});
+
 describe('MentorSlot', () => {
   it('shows a celebration when the streak reaches the threshold', () => {
     render(<MentorSlot child={makeChild({ currentStreak: 7 })} t={t} />);
@@ -77,21 +143,44 @@ describe('MentorSlot', () => {
     ).toBeTruthy();
   });
 
-  it('shows the guidance line when no celebration fires', () => {
+  it('shows a durable mentor insight when no celebration fires', () => {
     render(
       <MentorSlot
         child={makeChild({
           currentStreak: 2,
           progress: progress({
-            guidance: 'Short sessions land best for Lilly.',
+            guidance: 'Quiet week — maybe suggest a quick session on Math?',
+          }),
+        })}
+        insight={{
+          kind: 'works',
+          text: 'Short visual examples help Lilly get started.',
+        }}
+        t={t}
+      />,
+    );
+
+    const guidance = screen.getByTestId('parent-home-mentor-slot-guidance');
+    expect(guidance.props.children).toBe(
+      'Short visual examples help Lilly get started.',
+    );
+    screen.getByText('What works for Lilly');
+  });
+
+  it('does not render the shallow dashboard guidance as a mentor insight', () => {
+    render(
+      <MentorSlot
+        child={makeChild({
+          currentStreak: 2,
+          progress: progress({
+            guidance: 'Quiet week — maybe suggest a quick session on Math?',
           }),
         })}
         t={t}
       />,
     );
 
-    const guidance = screen.getByTestId('parent-home-mentor-slot-guidance');
-    expect(guidance.props.children).toBe('Short sessions land best for Lilly.');
+    expect(screen.queryByTestId('parent-home-mentor-slot')).toBeNull();
   });
 
   it('renders nothing when there is no celebration and no guidance', () => {

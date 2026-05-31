@@ -224,6 +224,7 @@
         "quietWithFocus": "{{name}} had a quieter week — last time the focus was {{focus}}.",
         "quietNew": "{{name}} is all set up — chosen subjects: {{subjects}}. Here's how to help them begin.",
         "quietPlain": "{{name}} had a quieter week.",
+        "quietStarterWithFocus": "Ask {{name}} what would make {{focus}} easy to restart.",
         "headlineFromWeekly": "{{label}}: {{value}} ({{comparison}})",
         "activePlain": "{{name}} kept things moving in {{focus}}.",
         "activePlainNoFocus": "{{name}} kept things moving this week.",
@@ -244,6 +245,7 @@
       "mentorSlot": {
         "celebrationStreak": "{{name}} is on a real roll this week — that streak is becoming a habit.",
         "celebrationTopics": "Big week for {{name}} — lots of new ground covered.",
+        "mentorRead": "Mentor's read on {{name}}",
         "worksFor": "What works for {{name}}"
       },
       "learnTogether": {
@@ -1831,7 +1833,6 @@
       "yourChild": "Your child",
       "lastSessionAgo": "Last session {{time}}",
       "noSessionsYet": "No sessions yet",
-      "reportsSubtitle": "Weekly and monthly updates for {{name}}",
       "curriculumTitle": "Curriculum",
       "curriculumSubtitle": "Browse {{name}}'s subjects and topics",
       "curriculumNotAvailableTitle": "This child's curriculum is not available",
@@ -1868,7 +1869,6 @@
       "childProfileJoined": "Added {{date}}",
       "learningAccommodationTitle": "Learning accommodation for {{name}}",
       "noLearningPreferenceSet": "No learning preference set",
-      "childProfileScopeHint": "Recent sessions, subjects, and the mentor's notes live here. Full progress charts and reports have their own tabs.",
       "consentTitle": "Consent",
       "consentDescription": "Manage parental consent for {{name}}.",
       "consentStatusError": "Could not load consent status. Please try again.",

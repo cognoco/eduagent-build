@@ -1,6 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
-import type { DashboardChild } from '@eduagent/schemas';
+import type {
+  CuratedMemoryView,
+  DashboardChild,
+  ProgressSummary,
+} from '@eduagent/schemas';
 
 import { useThemeColors } from '../../lib/theme';
 import { withOpacity } from '../../lib/color-opacity';
@@ -18,11 +22,54 @@ import { firstNameOf } from './parent-card-prompts';
 const STREAK_CELEBRATION_THRESHOLD = 7;
 const TOPICS_CELEBRATION_THRESHOLD = 3;
 
+export interface MentorSlotInsight {
+  kind: 'works' | 'read';
+  text: string;
+}
+
+const MEMORY_INSIGHT_PRIORITY: Array<
+  CuratedMemoryView['categories'][number]['items'][number]['category']
+> = ['communicationNotes', 'learningStyle'];
+
+function firstDurableMemoryInsight(
+  memory: CuratedMemoryView | null | undefined,
+): string | null {
+  const items = memory?.categories.flatMap((category) => category.items) ?? [];
+
+  for (const category of MEMORY_INSIGHT_PRIORITY) {
+    const match = items.find(
+      (item) => item.category === category && item.statement.trim().length > 0,
+    );
+    if (match) return match.statement.trim();
+  }
+
+  return null;
+}
+
+export function resolveMentorSlotInsight(
+  memory: CuratedMemoryView | null | undefined,
+  progressSummary: ProgressSummary | null | undefined,
+): MentorSlotInsight | null {
+  const durableMemory = firstDurableMemoryInsight(memory);
+  if (durableMemory) {
+    return { kind: 'works', text: durableMemory };
+  }
+
+  const summary = progressSummary?.summary?.trim();
+  if (summary) {
+    return { kind: 'read', text: summary };
+  }
+
+  return null;
+}
+
 export function MentorSlot({
   child,
+  insight,
   t,
 }: {
   child: DashboardChild;
+  insight?: MentorSlotInsight | null;
   t: Translate;
 }): React.ReactElement | null {
   const colors = useThemeColors();
@@ -32,7 +79,7 @@ export function MentorSlot({
   const topicsCelebration =
     (child.progress?.weeklyDeltaTopicsMastered ?? 0) >=
     TOPICS_CELEBRATION_THRESHOLD;
-  const guidance = child.progress?.guidance ?? null;
+  const guidance = insight?.text.trim() || null;
 
   if (streakCelebration || topicsCelebration) {
     const text = streakCelebration
@@ -82,7 +129,9 @@ export function MentorSlot({
             color={colors.primary}
           />
           <Text className="text-caption font-bold uppercase text-text-secondary ms-2">
-            {t('home.parent.mentorSlot.worksFor', { name })}
+            {insight?.kind === 'read'
+              ? t('home.parent.mentorSlot.mentorRead', { name })
+              : t('home.parent.mentorSlot.worksFor', { name })}
           </Text>
         </View>
         <Text

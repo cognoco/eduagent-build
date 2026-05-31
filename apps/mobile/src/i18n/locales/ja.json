@@ -216,7 +216,8 @@
         "momentumWords": "+{{count}}単語",
         "solid": "順調：{{subjects}}",
         "comingUp": "次の学習：{{topic}}",
-        "tryTonight": "今夜挑戦"
+        "tryTonight": "今夜挑戦",
+        "quietStarterWithFocus": "{{name}}に、どうすれば{{focus}}を再開しやすくなるか聞いてみましょう。"
       },
       "pulse": {
         "multiAllActive": "学習者{{count}}人、全員が今週アクティブです。",
@@ -228,7 +229,8 @@
       "mentorSlot": {
         "celebrationStreak": "{{name}}さんは今週絶好調です。このストリークが習慣になりつつあります。",
         "celebrationTopics": "{{name}}さんにとって大きな1週間でした。たくさんの新しい分野を学習しました。",
-        "worksFor": "{{name}}さんに合った学習法"
+        "worksFor": "{{name}}さんに合った学習法",
+        "mentorRead": "メンターから見た{{name}}"
       },
       "learnTogether": {
         "title": "一緒に学ぶ",
@@ -1738,7 +1740,6 @@
       "yourChild": "あなたのお子様",
       "lastSessionAgo": "前回のセッション {{time}}",
       "noSessionsYet": "まだセッションがありません",
-      "reportsSubtitle": "{{name}}の週次・月次アップデート",
       "profileNotFound": "プロフィールが見つかりません",
       "unableToLoadChildDetails": "お子様の詳細を読み込めません",
       "profileNoLongerAvailable": "このプロフィールは利用できなくなりました",
@@ -1771,7 +1772,6 @@
       "childProfileJoined": "{{date}}に追加",
       "learningAccommodationTitle": "{{name}}さんのための学習サポート",
       "noLearningPreferenceSet": "学習設定はまだありません",
-      "childProfileScopeHint": "最近のセッション、科目、チューターのメモはこちらにあります。完全な進捗チャートとレポートには、それぞれ専用のタブがあります。",
       "consentTitle": "同意",
       "consentDescription": "{{name}}の保護者同意を管理します。",
       "consentStatusError": "同意ステータスを読み込めませんでした。もう一度お試しください。",

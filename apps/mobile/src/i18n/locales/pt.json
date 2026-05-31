@@ -216,7 +216,8 @@
         "momentumWords": "+{{count}} palavras",
         "solid": "Sólido: {{subjects}}",
         "comingUp": "A seguir: {{topic}}",
-        "tryTonight": "Experimente hoje"
+        "tryTonight": "Experimente hoje",
+        "quietStarterWithFocus": "Pergunte a {{name}} o que facilitaria recomeçar {{focus}}."
       },
       "pulse": {
         "multiAllActive": "{{count}} alunos, todos ativos esta semana.",
@@ -228,7 +229,8 @@
       "mentorSlot": {
         "celebrationStreak": "{{name}} está com tudo esta semana — essa sequência está a tornar-se um hábito.",
         "celebrationTopics": "Grande semana para {{name}} — muita matéria nova abordada.",
-        "worksFor": "O que funciona para {{name}}"
+        "worksFor": "O que funciona para {{name}}",
+        "mentorRead": "Análise do mentor sobre {{name}}"
       },
       "learnTogether": {
         "title": "Aprender juntos",
@@ -1763,7 +1765,6 @@
       "yourChild": "Seu filho",
       "lastSessionAgo": "Última sessão {{time}}",
       "noSessionsYet": "Nenhuma sessão ainda",
-      "reportsSubtitle": "Atualizações semanais e mensais de {{name}}",
       "profileNotFound": "Perfil não encontrado",
       "unableToLoadChildDetails": "Não foi possível carregar os detalhes da criança",
       "profileNoLongerAvailable": "Este perfil não está mais disponível",
@@ -1796,7 +1797,6 @@
       "childProfileJoined": "Adicionado {{date}}",
       "learningAccommodationTitle": "Acomodação de aprendizado para {{name}}",
       "noLearningPreferenceSet": "Nenhuma preferência de aprendizagem definida",
-      "childProfileScopeHint": "Sessões recentes, disciplinas e notas do tutor estão aqui. Gráficos de progresso e relatórios completos têm os seus próprios separadores.",
       "consentTitle": "Consentimento",
       "consentDescription": "Gerencie o consentimento dos pais para {{name}}.",
       "consentStatusError": "Não foi possível carregar o status do consentimento. Tente novamente.",

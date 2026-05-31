@@ -16,7 +16,6 @@ import { ErrorFallback } from '../../../../components/common';
 import { RecentSessionsList } from '../../../../components/progress';
 import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
-import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import { useProfileSessions } from '../../../../hooks/use-progress';
 import {
   useChildConsentStatus,
@@ -607,9 +606,7 @@ export default function ChildDetailScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const colors = useThemeColors();
   const { profiles, isLoading: isProfileLoading } = useProfile();
-  const navigationContract = useNavigationContract();
   const { profileId: rawProfileId, mode: rawMode } = useLocalSearchParams<{
     profileId: string;
     mode?: string;
@@ -652,7 +649,9 @@ export default function ChildDetailScreen(): React.ReactElement {
   // (before consent loads, when `consentWithdrawn` is false) and leak a read in
   // the withdrawn state this guard exists to block.
   const { data: learnerProfile } = useChildLearnerProfile(
-    consentResolved && !consentWithdrawn ? profileId : undefined,
+    showSettingsOnly && consentResolved && !consentWithdrawn
+      ? profileId
+      : undefined,
   );
   const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt);
@@ -677,10 +676,6 @@ export default function ChildDetailScreen(): React.ReactElement {
     [child?.subjects, sessionsQuery.data],
   );
   const showSubjectRetentionBadges = !isNewLearner(child?.totalSessions);
-  const showCurriculumLink = navigationContract.isSurfaced(
-    'child/[profileId]/curriculum',
-    { profileId },
-  );
   const openProgressNudgeAction = (): void => {
     if (!progressNudgeAction) return;
 
@@ -875,47 +870,6 @@ export default function ChildDetailScreen(): React.ReactElement {
           />
         ) : null}
 
-        {!showSettingsOnly && !showProgressOnly ? (
-          <>
-            {showCurriculumLink ? (
-              <RowLink
-                icon="book-outline"
-                title={t('parentView.index.curriculumTitle', {
-                  defaultValue: 'Curriculum',
-                })}
-                subtitle={t('parentView.index.curriculumSubtitle', {
-                  name: childName,
-                  defaultValue: `Browse ${childName}'s subjects and topics`,
-                })}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/child/[profileId]/curriculum',
-                    params: { profileId },
-                  } as Href)
-                }
-                testID="child-curriculum-link"
-              />
-            ) : null}
-            <RowLink
-              icon="document-text-outline"
-              title={t('parentView.reports.title', {
-                defaultValue: 'Reports',
-              })}
-              subtitle={t('parentView.index.reportsSubtitle', {
-                name: childName,
-                defaultValue: `Weekly and monthly updates for ${childName}`,
-              })}
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/child/[profileId]/reports',
-                  params: { profileId },
-                } as Href)
-              }
-              testID="child-reports-link"
-            />
-          </>
-        ) : null}
-
         {!showSettingsOnly && sortedSubjects.length > 0 ? (
           <View className="mt-6" testID="child-subjects-section">
             <Text className="text-h3 font-semibold text-text-primary mb-1">
@@ -948,7 +902,7 @@ export default function ChildDetailScreen(): React.ReactElement {
           />
         ) : null}
 
-        {!showProgressOnly ? (
+        {showSettingsOnly ? (
           <>
             {profileId && child?.displayName ? (
               <RowLink
@@ -1005,22 +959,6 @@ export default function ChildDetailScreen(): React.ReactElement {
               childProfileId={profileId}
               childName={childName}
             />
-
-            <View className="mt-5 rounded-card bg-primary-soft px-4 py-3">
-              <View className="flex-row items-start">
-                <Ionicons
-                  name="information-circle-outline"
-                  size={18}
-                  color={colors.primary}
-                />
-                <Text className="text-caption text-text-secondary ms-2 flex-1">
-                  {t('parentView.index.childProfileScopeHint', {
-                    defaultValue:
-                      "Recent sessions, subjects, and the mentor's notes live here. Full progress charts and reports have their own tabs.",
-                  })}
-                </Text>
-              </View>
-            </View>
           </>
         ) : null}
       </ScrollView>

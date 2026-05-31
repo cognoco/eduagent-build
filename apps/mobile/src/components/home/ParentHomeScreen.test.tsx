@@ -125,6 +125,8 @@ interface RouteOptions {
   family?: { profileCount: number; maxProfiles: number } | null;
   childCapNotifications?: ChildCapNotificationFixture[];
   recaps?: unknown[];
+  childMemory?: unknown;
+  progressSummary?: unknown;
 }
 
 /**
@@ -158,6 +160,26 @@ function buildRoutes(opts: RouteOptions = {}) {
     '/dismiss': { success: true },
     '/notifications/child-cap': {
       notifications: opts.childCapNotifications ?? [],
+    },
+    '/memory': {
+      memory: opts.childMemory ?? {
+        categories: [],
+        parentContributions: [],
+        settings: {
+          memoryEnabled: true,
+          collectionEnabled: true,
+          injectionEnabled: true,
+          accommodationMode: null,
+        },
+      },
+    },
+    '/progress-summary': opts.progressSummary ?? {
+      summary: null,
+      generatedAt: null,
+      basedOnLastSessionAt: null,
+      latestSessionId: null,
+      activityState: 'no_recent_activity',
+      nudgeRecommended: false,
     },
     // The real useDashboard falls through to /dashboard/demo when the primary
     // response has zero children — route both so the fallback never returns
@@ -334,6 +356,41 @@ describe('ParentHomeScreen', () => {
       result.getByTestId('learn-together-sheet');
     });
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('does not repeat the card starter inside the Learn-together sheet', async () => {
+    const { result } = mount([PARENT, CHILD_A], {
+      dashboard: {
+        children: [
+          dashboardChild({
+            profileId: 'child-a',
+            displayName: 'Emma',
+            sessionsThisWeek: 2,
+            currentlyWorkingOn: ['Fractions'],
+            totalSessions: 4,
+          }),
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
+    });
+    await waitForParentTransitionNotice(result);
+
+    await waitFor(() => {
+      expect(
+        result.getAllByText('What felt clearer in Fractions this week?'),
+      ).toHaveLength(1);
+    });
+
+    fireEvent.press(result.getByTestId('parent-home-learn-together-child-a'));
+
+    await waitFor(() => {
+      result.getByTestId('learn-together-sheet');
+    });
+    expect(
+      result.getAllByText('What felt clearer in Fractions this week?'),
+    ).toHaveLength(1);
+    result.getByText("What's the trickiest part of Fractions right now?");
   });
 
   it('does not render duplicate recent activity or own learning actions', async () => {
@@ -547,7 +604,7 @@ describe('ParentHomeScreen', () => {
     ).toBe('Quiet week');
 
     // Exactly one restart starter — not the three-prompt fan-out.
-    result.getByText('Want to pick one small Programming goal for this week?');
+    result.getByText('Ask Emma what would make Programming easy to restart.');
     expect(
       result.queryByText("What's the trickiest part of Programming right now?"),
     ).toBeNull();
@@ -561,7 +618,7 @@ describe('ParentHomeScreen', () => {
     ).toBeNull();
   });
 
-  it('replaces the family panel with a mentor slot + add-learner row for a single child', async () => {
+  it('replaces the family panel with durable mentor insight + add-learner row for a single child', async () => {
     const { result } = mount([PARENT, CHILD_A], {
       dashboard: {
         children: [
@@ -579,23 +636,49 @@ describe('ParentHomeScreen', () => {
               weeklyDeltaVocabularyTotal: 2,
               weeklyDeltaTopicsExplored: 1,
               engagementTrend: 'increasing',
-              guidance: 'Short sessions land best for Emma.',
+              guidance: 'Quiet week — maybe suggest a quick session on Math?',
             },
           }),
         ],
         pendingNotices: [],
         demoMode: false,
       },
+      childMemory: {
+        categories: [
+          {
+            label: 'Learning pace & notes',
+            items: [
+              {
+                category: 'communicationNotes',
+                value: 'short-visual-start',
+                statement: 'Short visual examples help Emma get started.',
+              },
+            ],
+          },
+        ],
+        parentContributions: [],
+        settings: {
+          memoryEnabled: true,
+          collectionEnabled: true,
+          injectionEnabled: true,
+          accommodationMode: null,
+        },
+      },
     });
     await waitForParentTransitionNotice(result);
 
     // One child: no family summary panel.
     expect(result.queryByTestId('parent-home-family-summary')).toBeNull();
-    // Mentor slot surfaces the dashboard guidance; add-learner row is present.
+    // Mentor slot surfaces durable mentor memory, not shallow dashboard guidance.
     await waitFor(() => {
       result.getByTestId('parent-home-mentor-slot-guidance');
     });
-    result.getByText('Short sessions land best for Emma.');
+    result.getByText('What works for Emma');
+    result.getByText('Short visual examples help Emma get started.');
+    expect(
+      result.queryByText('Quiet week — maybe suggest a quick session on Math?'),
+    ).toBeNull();
+    // Add-learner row is present.
     result.getByTestId('parent-home-add-child');
     // No parent-learning leak.
     expect(result.queryByText('You: Fractions in Math')).toBeNull();

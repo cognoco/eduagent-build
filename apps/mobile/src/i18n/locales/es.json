@@ -216,7 +216,8 @@
         "momentumWords": "+{{count}} palabras",
         "solid": "Sólido: {{subjects}}",
         "comingUp": "Próximamente: {{topic}}",
-        "tryTonight": "Probar esta noche"
+        "tryTonight": "Probar esta noche",
+        "quietStarterWithFocus": "Pregúntale a {{name}} qué facilitaría reiniciar {{focus}}."
       },
       "pulse": {
         "multiAllActive": "{{count}} estudiantes, todos activos esta semana.",
@@ -228,7 +229,8 @@
       "mentorSlot": {
         "celebrationStreak": "{{name}} lleva una buena racha esta semana. ¡Esa racha se está convirtiendo en un hábito!",
         "celebrationTopics": "Gran semana para {{name}}: ha cubierto mucho terreno nuevo.",
-        "worksFor": "Lo que le funciona a {{name}}"
+        "worksFor": "Lo que le funciona a {{name}}",
+        "mentorRead": "Análisis del mentor sobre {{name}}"
       },
       "learnTogether": {
         "title": "Aprender juntos",
@@ -1738,7 +1740,6 @@
       "yourChild": "Tu hijo",
       "lastSessionAgo": "Última sesión {{time}}",
       "noSessionsYet": "Aún no hay sesiones",
-      "reportsSubtitle": "Actualizaciones semanales y mensuales de {{name}}",
       "profileNotFound": "Perfil no encontrado",
       "unableToLoadChildDetails": "No se pueden cargar los detalles del niño",
       "profileNoLongerAvailable": "Este perfil ya no está disponible",
@@ -1771,7 +1772,6 @@
       "childProfileJoined": "Añadido {{date}}",
       "learningAccommodationTitle": "Adaptación de aprendizaje para {{name}}",
       "noLearningPreferenceSet": "No se ha establecido preferencia de aprendizaje",
-      "childProfileScopeHint": "Aquí se encuentran las sesiones recientes, las materias y las notas del tutor. Los gráficos e informes de progreso completos tienen sus propias pestañas.",
       "consentTitle": "Consentimiento",
       "consentDescription": "Gestiona el consentimiento parental de {{name}}.",
       "consentStatusError": "No se pudo cargar el estado del consentimiento. Inténtalo de nuevo.",

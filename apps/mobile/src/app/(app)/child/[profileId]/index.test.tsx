@@ -90,34 +90,6 @@ jest.mock(
   }),
 );
 
-// Navigation-contract isolation. `useNavigationContract` resolves the whole
-// app navigation contract from feature flags + family shape; under the test
-// default flags (MODE_NAV_V0/V1 off) the real contract would set shape='study'
-// and `isSurfaced('child/[profileId]/curriculum')` would be false — the inverse
-// of what this screen's curriculum behavior asserts. Surfacing is owned by the
-// navigation-contract's own unit tests; here we isolate it behind a spy so the
-// screen's USE of `isSurfaced` (call args + show/hide) stays directly
-// assertable without flipping production flags into V1.
-//
-// IMPORTANT: only `useNavigationContract` is overridden. The data hooks
-// (useDashboard / useProfileSessions / useChildDetail) call the sibling export
-// `useNavigationDataScopeContract`, which must keep its REAL implementation so
-// those hooks scope correctly — hence requireActual + targeted override.
-const mockIsSurfaced = jest.fn(() => true);
-
-jest.mock(
-  '../../../../hooks/use-navigation-contract' /* gc1-allow: isolate screen-facing nav contract; keep useNavigationDataScopeContract real */,
-  () => {
-    const actual = jest.requireActual(
-      '../../../../hooks/use-navigation-contract',
-    );
-    return {
-      ...actual,
-      useNavigationContract: () => ({ isSurfaced: mockIsSurfaced }),
-    };
-  },
-);
-
 // Common components barrel (includes Reanimated animations — cannot render in
 // JSDOM). We keep a thin ErrorFallback shim so the data-absent fallback testIDs
 // stay assertable.
@@ -387,7 +359,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockFetch.mockClear();
   mockLocalSearchParams = { profileId: 'child-001' };
-  mockIsSurfaced.mockReturnValue(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -396,6 +367,7 @@ beforeEach(() => {
 
 describe('ChildDetailScreen — accommodation nav row', () => {
   beforeEach(() => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
     setRoutes();
   });
 
@@ -487,6 +459,8 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('links to the child mentor memory management screen', async () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+
     const { result, cleanup } = renderChildDetail();
 
     fireEvent.press(
@@ -502,6 +476,8 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('shows profile details when the profile already has a created date', async () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
@@ -511,7 +487,7 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('shows parent data surfaces for reports, subjects, raw input, and recent sessions', async () => {
+  it('shows a lean overview with subjects, raw input, and recent sessions', async () => {
     setRoutes({
       childDetail: {
         displayName: 'Emma',
@@ -549,7 +525,7 @@ describe('ChildDetailScreen — profile overview', () => {
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
-      result.getByTestId('child-reports-link');
+      result.getByTestId('child-subjects-section');
     });
     result.getByTestId('child-subjects-section');
     result.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
@@ -563,8 +539,18 @@ describe('ChildDetailScreen — profile overview', () => {
     });
     expect(result.queryByTestId('child-weekly-headline-card')).toBeNull();
     expect(result.queryByTestId('child-reports-button')).toBeNull();
+    expect(result.queryByTestId('child-reports-link')).toBeNull();
+    expect(result.queryByTestId('child-curriculum-link')).toBeNull();
     expect(result.queryByTestId('growth-teaser')).toBeNull();
-    result.getByTestId('consent-section');
+    expect(
+      result.queryByTestId('child-accommodation-row-child-001'),
+    ).toBeNull();
+    expect(result.queryByTestId('mentor-memory-link')).toBeNull();
+    expect(result.queryByTestId('child-profile-details')).toBeNull();
+    expect(result.queryByTestId('consent-section')).toBeNull();
+    expect(
+      result.queryByText(/parentView\.index\.childProfileScopeHint/),
+    ).toBeNull();
 
     cleanup();
   });
@@ -850,32 +836,15 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('routes subject and report surfaces from child detail', async () => {
+  it('routes subject surfaces from the child overview', async () => {
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
-      result.getByTestId('child-curriculum-link');
-    });
-    expect(mockIsSurfaced).toHaveBeenCalledWith(
-      'child/[profileId]/curriculum',
-      { profileId: 'child-001' },
-    );
-    fireEvent.press(result.getByTestId('child-curriculum-link'));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/child/[profileId]/curriculum',
-      params: { profileId: 'child-001' },
-    });
-
-    fireEvent.press(result.getByTestId('child-reports-link'));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/child/[profileId]/reports',
-      params: { profileId: 'child-001' },
+      result.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
     });
 
     fireEvent.press(
-      await waitFor(() =>
-        result.getByTestId('subject-card-11111111-1111-7111-8111-111111111111'),
-      ),
+      result.getByTestId('subject-card-11111111-1111-7111-8111-111111111111'),
     );
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
@@ -890,20 +859,9 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('hides curriculum when the navigation contract does not surface it', async () => {
-    mockIsSurfaced.mockReturnValue(false);
-
-    const { result, cleanup } = renderChildDetail();
-
-    await waitFor(() => {
-      result.getByTestId('child-reports-link');
-    });
-    expect(result.queryByTestId('child-curriculum-link')).toBeNull();
-
-    cleanup();
-  });
-
   it('renders parent consent management for a consented child', async () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
@@ -916,6 +874,8 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('invokes consent revocation from the withdraw confirmation', async () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+
     const { result, cleanup } = renderChildDetail();
 
     fireEvent.press(
@@ -962,6 +922,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('keeps consent management visible and retryable when consent status fails to load', async () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
     setRoutes({ consentError: 500 });
 
     const { result, cleanup } = renderChildDetail();
@@ -1190,7 +1151,8 @@ describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
 
   it('[WI-263] positive control — fetches the learner-profile with the real childProfileId when consent is CONSENTED', async () => {
     // When consented the gate opens and the screen must fetch the real
-    // child learner-profile endpoint.
+    // child learner-profile endpoint for the settings-only rows that use it.
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
     setRoutes({ consent: consentedStatus });
 
     const { result, cleanup } = renderChildDetail();

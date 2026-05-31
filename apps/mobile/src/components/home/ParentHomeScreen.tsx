@@ -27,7 +27,8 @@ import {
   useChildCapNotifications,
   useDismissChildCapNotification,
 } from '../../hooks/use-child-cap-notifications';
-import { useDashboard } from '../../hooks/use-dashboard';
+import { useChildMemory, useDashboard } from '../../hooks/use-dashboard';
+import { useChildProgressSummary } from '../../hooks/use-progress';
 import {
   useFamilySubscription,
   useSubscription,
@@ -59,7 +60,7 @@ import {
   resolveHouseholdPulse,
   resolveParentCardCopy,
 } from './parent-card-copy';
-import { MentorSlot } from './MentorSlot';
+import { MentorSlot, resolveMentorSlotInsight } from './MentorSlot';
 
 function initialOf(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
@@ -81,6 +82,27 @@ function findDashboardChild(
 // crash the child-cap banner subtree. See lib/format-datetime.ts.
 function formatChildCapResetAt(resetsAt: string): string {
   return formatMediumDateTime(resetsAt) || resetsAt;
+}
+
+function SingleChildMentorSlot({
+  child,
+  t,
+}: {
+  child: DashboardChild;
+  t: Translate;
+}): React.ReactElement | null {
+  const memory = useChildMemory(child.profileId);
+  const progressSummary = useChildProgressSummary(child.profileId);
+  const insight = useMemo(
+    () =>
+      resolveMentorSlotInsight(
+        memory.data ?? null,
+        progressSummary.data ?? null,
+      ),
+    [memory.data, progressSummary.data],
+  );
+
+  return <MentorSlot child={child} insight={insight} t={t} />;
 }
 
 function ChildCapNotificationBanner({
@@ -724,6 +746,23 @@ export function ParentHomeScreen({
   const learnTogetherChild = linkedChildren.find(
     (child) => child.id === learnTogetherChildId,
   );
+  const learnTogetherDashboardChild = learnTogetherChild
+    ? findDashboardChild(dashboard, learnTogetherChild.id)
+    : undefined;
+  const learnTogetherLatestRecap = learnTogetherChild
+    ? (latestRecapByChild.get(learnTogetherChild.id) ?? null)
+    : null;
+  const hiddenLearnTogetherPrompt = useMemo(
+    () =>
+      learnTogetherDashboardChild
+        ? resolveParentCardCopy(
+            learnTogetherDashboardChild,
+            learnTogetherLatestRecap,
+            t,
+          ).starter
+        : null,
+    [learnTogetherDashboardChild, learnTogetherLatestRecap, t],
+  );
   const childNames = useMemo(() => {
     return formatFamilyNameList(linkedChildren, t);
   }, [linkedChildren, t]);
@@ -967,7 +1006,9 @@ export function ParentHomeScreen({
               const onlyChild = onlyProfile
                 ? findDashboardChild(dashboard, onlyProfile.id)
                 : undefined;
-              return onlyChild ? <MentorSlot child={onlyChild} t={t} /> : null;
+              return onlyChild ? (
+                <SingleChildMentorSlot child={onlyChild} t={t} />
+              ) : null;
             })()}
             {showAddChild ? (
               <Pressable
@@ -1011,11 +1052,9 @@ export function ParentHomeScreen({
         {learnTogetherChild ? (
           <LearnTogetherSheet
             child={learnTogetherChild}
-            dashboardChild={findDashboardChild(
-              dashboard,
-              learnTogetherChild.id,
-            )}
-            latestRecap={latestRecapByChild.get(learnTogetherChild.id) ?? null}
+            dashboardChild={learnTogetherDashboardChild}
+            latestRecap={learnTogetherLatestRecap}
+            hiddenPromptText={hiddenLearnTogetherPrompt}
             onClose={() => setLearnTogetherChildId(null)}
           />
         ) : null}

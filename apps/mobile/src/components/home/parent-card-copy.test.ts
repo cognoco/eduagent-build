@@ -105,7 +105,9 @@ describe('resolveParentCardCopy', () => {
     expect(copy.headline).toBe(
       'Lilly had a quieter week — last time the focus was Programming.',
     );
-    expect(copy.starter).not.toBeNull();
+    expect(copy.starter).toBe(
+      'Ask Lilly what would make Programming easy to restart.',
+    );
     expect(copy.momentum).toEqual([]);
   });
 
