@@ -64,8 +64,17 @@ tags:
 
 - takeScreenshot: subscription-screen-pro
 
-# 7. Scroll to the static tier comparison section
-#    (visible when RevenueCat returns no packages — always true in emulator)
+# 7. Wait for the no-offerings section to render before scrolling.
+#    The static comparison only mounts after RevenueCat offerings resolve
+#    (subscriptionPackages.length === 0 && !offeringsLoading) — subscription.tsx:1028.
+#    Without this guard, assertNotVisible below can race against a still-loading screen.
+- extendedWaitUntil:
+    visible:
+      id: "no-offerings"
+    timeout: 20000
+
+# 7b. Scroll to the static tier comparison section
+#     (visible when RevenueCat returns no packages — always true in emulator)
 - scrollUntilVisible:
     element:
       id: "static-tier-pro"
@@ -78,7 +87,9 @@ tags:
 
 - takeScreenshot: static-tier-pro-visible
 
-# 9. Family card must NOT be present — only shown for family-tier users
+# 9. Family card must NOT be present — only shown for family-tier users.
+#    getTiersToCompare('pro') returns [free, plus, pro] — no family entry.
+#    Source: tier-helpers.ts:17-19, constants.ts:45-48.
 - assertNotVisible:
     id: "static-tier-family"
 

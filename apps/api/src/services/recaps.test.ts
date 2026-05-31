@@ -7,6 +7,14 @@
  *
  * Pattern: mocks `./dashboard` via requireActual + targeted overrides (gc1-allow:
  * pattern-a conversion). Real `./dashboard` cannot run without a database.
+ *
+ * GC6 deferred: 1 internal mock (`./dashboard`, gc1-allow annotated). Burn-down
+ * would require fakeDbReturning to stub db.query.familyLinks/subjects/profiles/
+ * learningSessions.findMany chains used by getChildrenForParent /
+ * getChildSessions / getChildSessionDetail — a multi-table relational-API stub
+ * substantially larger than this test file. Tracked with the broader
+ * services/dashboard burn-down (see docs/plans/2026-05-12-internal-mock-cleanup-
+ * inventory.md).
  */
 
 const mockGetChildrenForParent = jest.fn();

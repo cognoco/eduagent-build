@@ -1929,6 +1929,34 @@ describe('unknown event types', () => {
     expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
   });
+
+  // [BREAK BUG-834] Silent recovery without escalation is banned for billing
+  // code (CLAUDE.md). An unhandled RC event type must surface to Sentry with
+  // a structured tag and the eventType/eventId so ops can detect when RC
+  // ships a new event we haven't implemented. Without the default-arm
+  // escalation in revenuecat-webhook.ts, this test fails — the silent 200
+  // ack would let real entitlement changes (a hypothetical
+  // FAMILY_SHARE_REVOKED, GRACE_PERIOD_ENDED, TRANSFER, etc.) go unhandled
+  // with zero observability.
+  it('[BREAK BUG-834] captures unhandled event type to Sentry with event metadata', async () => {
+    mockCaptureException.mockClear();
+
+    const res = await makeRequest(makeWebhookPayload('TRANSFER'));
+    expect(res.status).toBe(200);
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [err, ctx] = mockCaptureException.mock.calls[0];
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain('TRANSFER');
+    expect(ctx).toEqual(
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'revenuecat.webhook.unhandled_event_type',
+          eventType: 'TRANSFER',
+        }),
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

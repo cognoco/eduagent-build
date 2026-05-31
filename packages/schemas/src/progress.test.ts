@@ -540,6 +540,8 @@ describe('subjectProgressSchema', () => {
       topicsTotal: 20,
       topicsCompleted: 10,
       topicsVerified: 8,
+      topicsMastered: 6,
+      topicsLearning: 4,
       urgencyScore: 0.7,
       retentionStatus: 'fading',
       lastSessionAt: '2025-01-01T00:00:00.000Z',
@@ -555,6 +557,8 @@ describe('subjectProgressSchema', () => {
         topicsTotal: 10,
         topicsCompleted: 0,
         topicsVerified: 0,
+        topicsMastered: 0,
+        topicsLearning: 0,
         urgencyScore: 0.0,
         retentionStatus: 'strong',
         lastSessionAt: null,
@@ -570,6 +574,8 @@ describe('subjectProgressSchema', () => {
         topicsTotal: 10,
         topicsCompleted: 0,
         topicsVerified: 0,
+        topicsMastered: 0,
+        topicsLearning: 0,
         urgencyScore: 0.0,
         retentionStatus: 'excellent',
         lastSessionAt: null,
@@ -589,6 +595,9 @@ describe('topicProgressSchema', () => {
       daysSinceLastReview: 3,
       struggleStatus: 'normal',
       masteryScore: 0.85,
+      masteredAt: '2025-01-02T00:00:00.000Z',
+      strongReviews: 2,
+      strongReviewsTarget: 5,
       summaryExcerpt: null,
       xpStatus: 'verified',
       totalSessions: 5,
@@ -606,6 +615,9 @@ describe('topicProgressSchema', () => {
       daysSinceLastReview: null,
       struggleStatus: 'normal',
       masteryScore: null,
+      masteredAt: null,
+      strongReviews: 0,
+      strongReviewsTarget: 5,
       summaryExcerpt: null,
       xpStatus: null,
       totalSessions: 0,
@@ -624,6 +636,9 @@ describe('topicProgressSchema', () => {
         daysSinceLastReview: null,
         struggleStatus: 'normal',
         masteryScore: null,
+        masteredAt: null,
+        strongReviews: 0,
+        strongReviewsTarget: 5,
         summaryExcerpt: null,
         xpStatus: null,
         totalSessions: 0,
@@ -1223,6 +1238,8 @@ describe('subjectProgressEndpointResponseSchema', () => {
         topicsTotal: 10,
         topicsCompleted: 5,
         topicsVerified: 4,
+        topicsMastered: 3,
+        topicsLearning: 2,
         urgencyScore: 0.5,
         retentionStatus: 'strong',
         lastSessionAt: null,
@@ -1244,6 +1261,9 @@ describe('topicProgressEndpointResponseSchema', () => {
         daysSinceLastReview: null,
         struggleStatus: 'normal',
         masteryScore: null,
+        masteredAt: null,
+        strongReviews: 0,
+        strongReviewsTarget: 5,
         summaryExcerpt: null,
         xpStatus: null,
         totalSessions: 3,
@@ -1765,10 +1785,38 @@ describe('progressOverviewResponseSchema', () => {
       subjects: [],
       totalTopicsCompleted: 0,
       totalTopicsVerified: 0,
+      totalTopicsMastered: 0,
+      totalTopicsLearning: 0,
     });
 
     expect(parsed.practiceActivityCount).toBe(0);
     expect(parsed.practiceSummary.totals.activitiesCompleted).toBe(0);
     expect(parsed.practiceSummary.byType).toEqual([]);
+  });
+
+  it('accepts three-state overview totals', () => {
+    const parsed = progressOverviewResponseSchema.parse({
+      subjects: [
+        {
+          subjectId: TEST_UUID,
+          name: 'Math',
+          topicsTotal: 8,
+          topicsCompleted: 5,
+          topicsVerified: 4,
+          topicsMastered: 3,
+          topicsLearning: 2,
+          urgencyScore: 0,
+          retentionStatus: 'strong',
+          lastSessionAt: null,
+        },
+      ],
+      totalTopicsCompleted: 5,
+      totalTopicsVerified: 4,
+      totalTopicsMastered: 3,
+      totalTopicsLearning: 2,
+    });
+
+    expect(parsed.totalTopicsMastered).toBe(3);
+    expect(parsed.totalTopicsLearning).toBe(2);
   });
 });

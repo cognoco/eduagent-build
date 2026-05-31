@@ -673,7 +673,8 @@
       "transcriptLabel": "Transkrypcja głosowa — dotknij, by edytować",
       "startRecording": "Rozpocznij nagrywanie",
       "stopRecording": "Zatrzymaj nagrywanie"
-    }
+    },
+    "expiredSystemMessage": "Sesja wygasła. Rozpocznij nową, aby kontynuować."
   },
   "quiz": {
     "index": {
@@ -990,8 +991,6 @@
       "finished": "Ukończone",
       "paused": "Wstrzymany",
       "archived": "Zarchiwizowany",
-      "shelfSubtitle_one": "{{count}} książka · {{progress}} tematów",
-      "shelfSubtitle_other": "{{count}} książek · {{progress}} tematów",
       "shelfSubtitleUnstarted": "Rozpocznij naukę",
       "shelfAccessibilityLabel": "Półka {{name}}, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Stuknij, aby {{action}}.",
       "shelfPausedSuffix": ", wstrzymany",
@@ -1001,13 +1000,17 @@
       "shelfActionOpen": "otworzyć",
       "urgencyBadge": "Wkrótce: {{reason}}",
       "review_one": "{{count}} do powtórzenia",
-      "review_other": "{{count}} do powtórzenia"
+      "review_other": "{{count}} do powtórzenia",
+      "shelfSubtitleMastered_one": "{{count}} książka · {{mastered}} opanowane · {{learning}} w nauce",
+      "shelfSubtitleMastered_other": "{{count}} książek · {{mastered}} opanowane · {{learning}} w nauce",
+      "shelfSubtitleLearningOnly_one": "{{count}} książka · {{learning}} w nauce",
+      "shelfSubtitleLearningOnly_other": "{{count}} książek · {{learning}} w nauce"
     },
     "shelf": {
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",
       "errorTitle": "Nie można załadować tej półki",
       "fallbackTitle": "Półka",
-      "topicProgress": "{{completed}}/{{total}} tematów",
+      "topicProgress": "{{mastered}} opanowane · {{learning}} w nauce",
       "settingsAccessibilityLabel": "Ustawienia przedmiotu",
       "studyNext": "Ucz się dalej",
       "addAnotherBook": "Dodaj inną książkę",
@@ -1056,7 +1059,22 @@
       "practicedOftenHint": "Często ćwiczysz ten temat — tak trzymaj!",
       "relatedRail": {
         "label": "Powiązane tematy"
-      }
+      },
+      "covers": "Ten temat obejmuje",
+      "mastered": "Opanowane",
+      "strongReviewProgress": "{{strong}}/{{total}} mocnych powtórek"
+    },
+    "book": {
+      "readyToOpen": "Gotowe do otwarcia",
+      "buildThisBook": "Przygotowujemy tę książkę",
+      "status": {
+        "NOT_STARTED": "Nie rozpoczęto",
+        "IN_PROGRESS": "W nauce",
+        "REVIEW_DUE": "Powtórka wymagana"
+      },
+      "mastered": "Opanowane",
+      "reviewDue": "Powtórka gotowa",
+      "topicProgressThreeState": "{{mastered}} opanowane · {{learning}} w nauce · {{total}} razem"
     }
   },
   "topic": {
@@ -1398,7 +1416,8 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "microphoneUnavailableTitle": "Mikrofon niedostępny"
   },
   "progress": {
     "pageTitleMine": "Moje postępy",
@@ -2211,6 +2230,10 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "loadError": {
+      "message": "Nie można wczytać szczegółów subskrypcji. Spróbuj ponownie.",
+      "retryAccessibility": "Spróbuj ponownie wczytać subskrypcję"
     }
   },
   "sessionSummary": {
@@ -2617,6 +2640,14 @@
       "bug": "Błąd",
       "suggestion": "Sugestia",
       "other": "Inne"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "Otworzyć aktualizację?",
+      "crossContextPromptMessage": "Jesteś w trakcie sesji. Najpierw ją ukończ lub otwórz aktualizację i opuść bieżącą aktywność.",
+      "stayHere": "Zostań tutaj",
+      "openUpdate": "Otwórz aktualizację"
     }
   }
 }

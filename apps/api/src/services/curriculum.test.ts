@@ -1164,6 +1164,7 @@ describe('persistBookTopics', () => {
       emoji: overrides?.emoji ?? '🏛️',
       sortOrder: overrides?.sortOrder ?? 1,
       topicsGenerated: overrides?.topicsGenerated ?? false,
+      masteredAt: overrides?.masteredAt ?? null,
       createdAt: NOW,
       updatedAt: NOW,
     };
@@ -1836,6 +1837,16 @@ describe('getBooks (BUG-884)', () => {
       status: string;
       exchangeCount: number;
     }>;
+    assessmentRowsForStatus?: Array<{
+      topicId: string;
+      status: string;
+    }>;
+    retentionRowsForStatus?: Array<{
+      topicId: string;
+      xpStatus: string;
+      masteredAt: Date | null;
+      nextReviewAt: Date | null;
+    }>;
     acceptedSummaryRowsForStatus?: Array<{
       topicId: string;
       summaryStatus: string;
@@ -1868,10 +1879,14 @@ describe('getBooks (BUG-884)', () => {
           findMany: jest.fn().mockResolvedValue(opts.bookRows),
         },
         assessments: {
-          findMany: jest.fn().mockResolvedValue([]),
+          findMany: jest
+            .fn()
+            .mockResolvedValue(opts.assessmentRowsForStatus ?? []),
         },
         retentionCards: {
-          findMany: jest.fn().mockResolvedValue([]),
+          findMany: jest
+            .fn()
+            .mockResolvedValue(opts.retentionRowsForStatus ?? []),
         },
         sessionSummaries: {
           findMany: jest.fn().mockResolvedValue([]),
@@ -1999,6 +2014,144 @@ describe('getBooks (BUG-884)', () => {
     expect(result[0]!.topicCount).toBe(1);
     expect(result[0]!.status).toBe('IN_PROGRESS');
     expect(result[0]!.completedTopicCount).toBe(0);
+  });
+
+  it('keeps mastered books reviewable by composing masteredAt with REVIEW_DUE status', async () => {
+    const masteredAt = new Date('2026-05-30T12:00:00.000Z');
+    const latestCurriculum = mockCurriculumRow({
+      id: 'curriculum-latest',
+      version: 2,
+    });
+    const { db } = mockDbForGetBooks({
+      subject: mockSubjectRow(),
+      bookRows: [
+        {
+          id: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          sortOrder: 0,
+          title: 'Test Book',
+          description: '',
+          topicsGenerated: true,
+          masteredAt,
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as unknown as { id: string; subjectId: string; sortOrder: number },
+      ],
+      curriculumFindFirst: latestCurriculum,
+      topicRowsForLatestCurriculum: [
+        { id: 'topic-1', bookId: BOOK_ID },
+        { id: 'topic-2', bookId: BOOK_ID },
+      ],
+      retentionRowsForStatus: [
+        {
+          topicId: 'topic-1',
+          xpStatus: 'verified',
+          masteredAt,
+          nextReviewAt: new Date('2020-01-01T00:00:00.000Z'),
+        },
+        {
+          topicId: 'topic-2',
+          xpStatus: 'verified',
+          masteredAt,
+          nextReviewAt: new Date('2099-01-01T00:00:00.000Z'),
+        },
+      ],
+    });
+
+    const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result[0]).toMatchObject({
+      status: 'REVIEW_DUE',
+      completedTopicCount: 2,
+      masteredTopicCount: 2,
+      masteredAt: masteredAt.toISOString(),
+    });
+  });
+
+  it('keeps loosely completed books in progress until topics are verified-mastered', async () => {
+    const latestCurriculum = mockCurriculumRow({
+      id: 'curriculum-latest',
+      version: 2,
+    });
+    const { db } = mockDbForGetBooks({
+      subject: mockSubjectRow(),
+      bookRows: [
+        {
+          id: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          sortOrder: 0,
+          title: 'Test Book',
+          description: '',
+          topicsGenerated: true,
+          masteredAt: null,
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as unknown as { id: string; subjectId: string; sortOrder: number },
+      ],
+      curriculumFindFirst: latestCurriculum,
+      topicRowsForLatestCurriculum: [
+        { id: 'topic-1', bookId: BOOK_ID },
+        { id: 'topic-2', bookId: BOOK_ID },
+      ],
+      assessmentRowsForStatus: [
+        { topicId: 'topic-1', status: 'passed' },
+        { topicId: 'topic-2', status: 'passed' },
+      ],
+    });
+
+    const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result[0]).toMatchObject({
+      status: 'IN_PROGRESS',
+      completedTopicCount: 2,
+      masteredTopicCount: 0,
+      masteredAt: null,
+    });
+  });
+
+  it('marks partially done books as review due when any card is due', async () => {
+    const latestCurriculum = mockCurriculumRow({
+      id: 'curriculum-latest',
+      version: 2,
+    });
+    const { db } = mockDbForGetBooks({
+      subject: mockSubjectRow(),
+      bookRows: [
+        {
+          id: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          sortOrder: 0,
+          title: 'Test Book',
+          description: '',
+          topicsGenerated: true,
+          masteredAt: null,
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as unknown as { id: string; subjectId: string; sortOrder: number },
+      ],
+      curriculumFindFirst: latestCurriculum,
+      topicRowsForLatestCurriculum: [
+        { id: 'topic-1', bookId: BOOK_ID },
+        { id: 'topic-2', bookId: BOOK_ID },
+      ],
+      retentionRowsForStatus: [
+        {
+          topicId: 'topic-1',
+          xpStatus: 'pending',
+          masteredAt: null,
+          nextReviewAt: new Date('2020-01-01T00:00:00.000Z'),
+        },
+      ],
+    });
+
+    const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result[0]).toMatchObject({
+      status: 'REVIEW_DUE',
+      completedTopicCount: 0,
+      masteredTopicCount: 0,
+      masteredAt: null,
+    });
   });
 
   // BUG-884 break test: orphan curriculum_topics rows from prior curriculum

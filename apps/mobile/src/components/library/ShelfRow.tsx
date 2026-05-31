@@ -12,7 +12,9 @@ interface ShelfRowProps {
   subjectId: string;
   name: string;
   bookCount: number;
-  topicProgress: string; // "18/32"
+  topicsMastered: number;
+  topicsLearning: number;
+  topicsTotal: number;
   reviewDueCount: number;
   isFinished: boolean;
   isPaused?: boolean;
@@ -24,18 +26,6 @@ interface ShelfRowProps {
   urgencyBoostReason?: string | null;
   onPress: (subjectId: string) => void;
   testID?: string;
-}
-
-function getProgressRatio(topicProgress: string): number {
-  const [completedRaw, totalRaw] = topicProgress.split('/');
-  const completed = Number(completedRaw);
-  const total = Number(totalRaw);
-
-  if (!Number.isFinite(completed) || !Number.isFinite(total) || total <= 0) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(1, completed / total));
 }
 
 function ShelfBooksMotif({
@@ -145,7 +135,9 @@ export function ShelfRow({
   subjectId,
   name,
   bookCount,
-  topicProgress,
+  topicsMastered,
+  topicsLearning,
+  topicsTotal,
   reviewDueCount,
   isFinished,
   isPaused = false,
@@ -196,18 +188,35 @@ export function ShelfRow({
       }
     : null;
 
-  const isUnstarted = bookCount === 0;
+  const safeTotal = Math.max(0, topicsTotal);
+  const safeMastered = Math.max(0, Math.min(topicsMastered, safeTotal));
+  const safeLearning = Math.max(
+    0,
+    Math.min(topicsLearning, Math.max(0, safeTotal - safeMastered)),
+  );
+  const topicProgress = `${safeMastered}/${safeTotal}`;
+  const isUnstarted = safeMastered === 0 && safeLearning === 0;
   const subtitle = isUnstarted
     ? t('library.row.shelfSubtitleUnstarted')
-    : t('library.row.shelfSubtitle', {
-        count: bookCount,
-        progress: topicProgress,
-      });
+    : safeMastered > 0
+      ? t('library.row.shelfSubtitleMastered', {
+          count: bookCount,
+          mastered: safeMastered,
+          learning: safeLearning,
+        })
+      : t('library.row.shelfSubtitleLearningOnly', {
+          count: bookCount,
+          learning: safeLearning,
+        });
 
   const needsReview = reviewDueCount > 0;
   const showFinished = isFinished && !needsReview;
   const hasChips = needsReview || showFinished || !!statusChip || !!urgencyChip;
-  const progressRatio = getProgressRatio(topicProgress);
+  const masteredWidth =
+    safeTotal > 0 ? Math.round((safeMastered / safeTotal) * 100) : 0;
+  const learningWidth =
+    safeTotal > 0 ? Math.round((safeLearning / safeTotal) * 100) : 0;
+  const learningColor = withOpacity(tint.solid, 0.38);
   return (
     <View
       style={{
@@ -463,7 +472,7 @@ export function ShelfRow({
             </View>
 
             <View
-              testID={`shelf-row-rail-${subjectId}`}
+              testID={`shelf-row-progress-${subjectId}`}
               style={{
                 height: 3,
                 borderRadius: 999,
@@ -474,12 +483,25 @@ export function ShelfRow({
               }}
             >
               <View
-                testID={`shelf-row-progress-${subjectId}`}
+                testID={`shelf-row-progress-mastered-${subjectId}`}
                 style={{
+                  position: 'absolute',
+                  left: 0,
                   height: '100%',
-                  width: `${Math.round(progressRatio * 100)}%`,
+                  width: `${masteredWidth}%`,
                   borderRadius: 999,
                   backgroundColor: tint.solid,
+                }}
+              />
+              <View
+                testID={`shelf-row-progress-learning-${subjectId}`}
+                style={{
+                  position: 'absolute',
+                  left: `${masteredWidth}%`,
+                  height: '100%',
+                  width: `${learningWidth}%`,
+                  borderRadius: 999,
+                  backgroundColor: learningColor,
                 }}
               />
             </View>

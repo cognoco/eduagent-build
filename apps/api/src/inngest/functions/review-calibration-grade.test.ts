@@ -32,6 +32,7 @@ function makeFreshCard() {
     xpStatus: 'pending',
     nextReviewAt: null,
     lastReviewedAt: null,
+    masteredAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     evaluateDifficultyRung: null,
@@ -106,6 +107,7 @@ describe('reviewCalibrationGrade', () => {
         'load-retention-card': makeFreshCard(),
         'grade-recall-quality': 4,
         'persist-retention-update': [{ id: CARD_ID }],
+        'stamp-mastery-on-verify': undefined,
         'sync-xp-ledger': undefined,
       },
     );
@@ -116,11 +118,12 @@ describe('reviewCalibrationGrade', () => {
       quality: 4,
       passed: true,
     });
-    expect(runCalls).toHaveLength(4);
+    expect(runCalls).toHaveLength(5);
     expect(runCalls.map((c) => c.name)).toEqual([
       'load-retention-card',
       'grade-recall-quality',
       'persist-retention-update',
+      'stamp-mastery-on-verify',
       'sync-xp-ledger',
     ]);
   });

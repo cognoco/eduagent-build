@@ -468,7 +468,17 @@ export async function completeQuizRound(
     // directly extend Database — see feedback_drizzle_transaction_cast.md.
     const txRepo = createScopedRepository(tx as unknown as Database, profileId);
 
-    const round = await txRepo.quizRounds.findById(roundId);
+    // [BUG-851] Row-lock the round at the top of the transaction so a
+    // concurrent /quiz/check (`appendRecordedAttempt`) call cannot commit a
+    // jsonb append between our read and the completion UPDATE below. Under
+    // READ COMMITTED the bare findById would see a snapshot, the check call
+    // would append and commit, and our subsequent `completeActive` would
+    // overwrite results with the stale snapshot. FOR UPDATE blocks the
+    // check call until this transaction commits — at which point its
+    // `status='active'` WHERE guard fails and the late append is rejected
+    // with the standard ConflictError path, surfacing the race to the client
+    // instead of silently dropping the appended attempt.
+    const round = await txRepo.quizRounds.findByIdForUpdate(roundId);
 
     if (!round) {
       throw new NotFoundError('Round');

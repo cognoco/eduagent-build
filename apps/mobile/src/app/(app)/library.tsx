@@ -324,12 +324,14 @@ function LibraryScreenContent({
         id: s.id,
         name: s.name,
         bookCount: books.length,
-        topicProgress: `${progress?.topicsCompleted ?? 0}/${progress?.topicsTotal ?? 0}`,
+        topicsMastered: progress?.topicsMastered ?? 0,
+        topicsLearning: progress?.topicsLearning ?? 0,
+        topicsTotal: progress?.topicsTotal ?? 0,
         retentionStatus,
         reviewDueCount: retData?.reviewDueCount ?? 0,
         isFinished:
           (progress?.topicsTotal ?? 0) > 0 &&
-          (progress?.topicsVerified ?? 0) >= (progress?.topicsTotal ?? 0),
+          (progress?.topicsMastered ?? 0) >= (progress?.topicsTotal ?? 0),
         isPaused: subject?.status !== 'active',
         status: subject?.status ?? 'active',
       };
@@ -471,9 +473,10 @@ function LibraryScreenContent({
 
     const inProgress = actives.find((s) => {
       const p = progressBySubjectId.get(s.id);
-      const done = p?.topicsCompleted ?? 0;
+      const mastered = p?.topicsMastered ?? 0;
+      const learning = p?.topicsLearning ?? 0;
       const total = p?.topicsTotal ?? 0;
-      return done > 0 && done < total;
+      return learning > 0 || (mastered > 0 && mastered < total);
     });
     if (inProgress) return { subject: inProgress, intent: 'continue' };
 
@@ -482,9 +485,11 @@ function LibraryScreenContent({
     );
     if (due) return { subject: due, intent: 'revisit' };
 
-    const unstarted = actives.find(
-      (s) => (progressBySubjectId.get(s.id)?.topicsCompleted ?? 0) === 0,
-    );
+    const unstarted = actives.find((s) => {
+      const p = progressBySubjectId.get(s.id);
+      if (!p) return true;
+      return (p.topicsMastered ?? 0) === 0 && (p.topicsLearning ?? 0) === 0;
+    });
     if (unstarted) return { subject: unstarted, intent: 'start' };
 
     return null;
@@ -754,7 +759,7 @@ function LibraryScreenContent({
           progressQuery.data.subjects.every(
             (subject) =>
               subject.topicsTotal > 0 &&
-              subject.topicsVerified >= subject.topicsTotal,
+              subject.topicsMastered >= subject.topicsTotal,
           ) && (
             <View
               className="bg-surface rounded-card px-4 py-5 mb-3"
@@ -841,11 +846,10 @@ function LibraryScreenContent({
                   const bookCount = books.length;
                   const progress = progressBySubjectId.get(subject.id);
                   const topicsTotal = progress?.topicsTotal ?? 0;
-                  const topicsCompleted = progress?.topicsCompleted ?? 0;
-                  const topicProgress = `${topicsCompleted}/${topicsTotal}`;
+                  const topicsMastered = progress?.topicsMastered ?? 0;
+                  const topicsLearning = progress?.topicsLearning ?? 0;
                   const isFinished =
-                    topicsTotal > 0 &&
-                    (progress?.topicsVerified ?? 0) >= topicsTotal;
+                    topicsTotal > 0 && topicsMastered >= topicsTotal;
 
                   return (
                     <ShelfRow
@@ -853,7 +857,9 @@ function LibraryScreenContent({
                       subjectId={subject.id}
                       name={subject.name}
                       bookCount={bookCount}
-                      topicProgress={topicProgress}
+                      topicsMastered={topicsMastered}
+                      topicsLearning={topicsLearning}
+                      topicsTotal={topicsTotal}
                       reviewDueCount={retData?.reviewDueCount ?? 0}
                       isFinished={isFinished}
                       status={subject.status}
@@ -994,7 +1000,7 @@ function LibraryScreenContent({
           progressQuery.data.subjects.every(
             (subject) =>
               subject.topicsTotal > 0 &&
-              subject.topicsVerified >= subject.topicsTotal,
+              subject.topicsMastered >= subject.topicsTotal,
           );
 
         const sections = shelfGroups.map((group) => ({
@@ -1087,17 +1093,18 @@ function LibraryScreenContent({
               const bookCount = books.length;
               const progress = progressBySubjectId.get(subject.id);
               const topicsTotal = progress?.topicsTotal ?? 0;
-              const topicsCompleted = progress?.topicsCompleted ?? 0;
-              const topicProgress = `${topicsCompleted}/${topicsTotal}`;
+              const topicsMastered = progress?.topicsMastered ?? 0;
+              const topicsLearning = progress?.topicsLearning ?? 0;
               const isFinished =
-                topicsTotal > 0 &&
-                (progress?.topicsVerified ?? 0) >= topicsTotal;
+                topicsTotal > 0 && topicsMastered >= topicsTotal;
               return (
                 <ShelfRow
                   subjectId={subject.id}
                   name={subject.name}
                   bookCount={bookCount}
-                  topicProgress={topicProgress}
+                  topicsMastered={topicsMastered}
+                  topicsLearning={topicsLearning}
+                  topicsTotal={topicsTotal}
                   reviewDueCount={retData?.reviewDueCount ?? 0}
                   isFinished={isFinished}
                   status={subject.status}

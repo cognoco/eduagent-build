@@ -891,6 +891,26 @@ export function createScopedRepository(db: Database, profileId: string) {
           where: scopedWhere(quizRounds, eq(quizRounds.id, roundId)),
         });
       },
+      /**
+       * [BUG-851] Lock-and-read a round row inside a transaction. Used by
+       * `completeQuizRound` to serialize the read-then-write window against
+       * concurrent `appendRecordedAttempt` writes from `/quiz/check`. Without
+       * `FOR UPDATE`, READ COMMITTED lets a check-call append (jsonb || UPDATE)
+       * between this SELECT and the subsequent completion UPDATE — that
+       * in-flight attempt is then overwritten by the stale snapshot. The
+       * status='active' guard prevents double-completion but not lost writes.
+       * Caller must be inside a transaction (otherwise `FOR UPDATE` is a
+       * no-op release-on-statement-end). Returns null when no row matches.
+       */
+      async findByIdForUpdate(roundId: string) {
+        const rows = await db
+          .select()
+          .from(quizRounds)
+          .where(scopedWhere(quizRounds, eq(quizRounds.id, roundId)))
+          .for('update')
+          .limit(1);
+        return rows[0] ?? null;
+      },
       async findRecentByActivity(
         activityType: (typeof quizRounds.$inferSelect)['activityType'],
         limit: number,

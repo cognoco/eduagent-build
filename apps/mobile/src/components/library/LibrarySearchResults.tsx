@@ -16,7 +16,9 @@ export interface EnrichedSubjectResult {
   id: string;
   name: string;
   bookCount: number;
-  topicProgress: string;
+  topicsMastered: number;
+  topicsLearning: number;
+  topicsTotal: number;
   retentionStatus: RetentionStatus | null;
   reviewDueCount: number;
   isFinished: boolean;
@@ -415,7 +417,9 @@ export function LibrarySearchResults({
               subjectId={subject.id}
               name={subject.name}
               bookCount={subject.bookCount}
-              topicProgress={subject.topicProgress}
+              topicsMastered={subject.topicsMastered}
+              topicsLearning={subject.topicsLearning}
+              topicsTotal={subject.topicsTotal}
               reviewDueCount={subject.reviewDueCount}
               isFinished={subject.isFinished}
               status={

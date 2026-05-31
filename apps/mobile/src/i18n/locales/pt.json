@@ -673,7 +673,8 @@
       "transcriptLabel": "Transcrição de voz — toque para editar",
       "startRecording": "Começar a gravar",
       "stopRecording": "Parar de gravar"
-    }
+    },
+    "expiredSystemMessage": "Sessão expirada. Comece uma nova para continuar."
   },
   "quiz": {
     "index": {
@@ -990,8 +991,6 @@
       "finished": "Concluído",
       "paused": "Pausado",
       "archived": "Arquivado",
-      "shelfSubtitle_one": "{{count}} livro · {{progress}} tópicos",
-      "shelfSubtitle_other": "{{count}} livros · {{progress}} tópicos",
       "shelfSubtitleUnstarted": "Começar a aprender",
       "shelfAccessibilityLabel": "Prateleira {{name}}, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Toque para {{action}}.",
       "shelfPausedSuffix": ", pausado",
@@ -1001,13 +1000,17 @@
       "shelfActionOpen": "abrir",
       "urgencyBadge": "Em breve: {{reason}}",
       "review_one": "{{count}} para rever",
-      "review_other": "{{count}} para rever"
+      "review_other": "{{count}} para rever",
+      "shelfSubtitleMastered_one": "{{count}} livro · {{mastered}} dominados · {{learning}} em aprendizagem",
+      "shelfSubtitleMastered_other": "{{count}} livros · {{mastered}} dominados · {{learning}} em aprendizagem",
+      "shelfSubtitleLearningOnly_one": "{{count}} livro · {{learning}} em aprendizagem",
+      "shelfSubtitleLearningOnly_other": "{{count}} livros · {{learning}} em aprendizagem"
     },
     "shelf": {
       "missingParam": "Matéria ausente. Volte e tente novamente.",
       "errorTitle": "Não foi possível carregar esta prateleira",
       "fallbackTitle": "Prateleira",
-      "topicProgress": "{{completed}}/{{total}} tópicos",
+      "topicProgress": "{{mastered}} dominados · {{learning}} em aprendizagem",
       "settingsAccessibilityLabel": "Configurações da matéria",
       "studyNext": "Estudar a seguir",
       "addAnotherBook": "Adicionar outro livro",
@@ -1056,7 +1059,22 @@
       "practicedOftenHint": "Você pratica muito este tópico — continue assim!",
       "relatedRail": {
         "label": "Tópicos relacionados"
-      }
+      },
+      "covers": "Este tópico aborda",
+      "mastered": "Dominado",
+      "strongReviewProgress": "{{strong}}/{{total}} revisões fortes"
+    },
+    "book": {
+      "readyToOpen": "Pronto para abrir",
+      "buildThisBook": "Preparando este livro",
+      "status": {
+        "NOT_STARTED": "Não iniciado",
+        "IN_PROGRESS": "Em aprendizagem",
+        "REVIEW_DUE": "Revisão pendente"
+      },
+      "mastered": "Dominado",
+      "reviewDue": "Revisão pronta",
+      "topicProgressThreeState": "{{mastered}} dominados · {{learning}} em aprendizagem · {{total}} no total"
     }
   },
   "topic": {
@@ -1398,7 +1416,8 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "microphoneUnavailableTitle": "Microfone indisponível"
   },
   "progress": {
     "pageTitleMine": "Meu progresso",
@@ -2211,6 +2230,10 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "loadError": {
+      "message": "Não foi possível carregar os detalhes da assinatura. Tente novamente.",
+      "retryAccessibility": "Tentar carregar assinatura novamente"
     }
   },
   "sessionSummary": {
@@ -2617,6 +2640,14 @@
       "bug": "Bug",
       "suggestion": "Sugestão",
       "other": "Outro"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "Abrir atualização de aprendizado?",
+      "crossContextPromptMessage": "Você está em uma sessão. Termine-a primeiro ou abra a atualização e saia do fluxo atual.",
+      "stayHere": "Ficar aqui",
+      "openUpdate": "Abrir atualização"
     }
   }
 }

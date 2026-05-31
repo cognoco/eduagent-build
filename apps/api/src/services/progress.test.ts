@@ -122,6 +122,7 @@ function mockRetentionCard(
     xpStatus: string;
     nextReviewAt: Date | null;
     failureCount: number;
+    masteredAt: Date | null;
   }>,
 ) {
   return {
@@ -137,6 +138,7 @@ function mockRetentionCard(
     failureCount: overrides?.failureCount ?? 0,
     consecutiveSuccesses: 2,
     xpStatus: overrides?.xpStatus ?? 'pending',
+    masteredAt: overrides?.masteredAt ?? null,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -377,6 +379,65 @@ describe('getSubjectProgress', () => {
     expect(result!.topicsCompleted).toBe(2); // 1 verified + 1 passed
     expect(result!.topicsVerified).toBe(1);
     expect(result!.name).toBe('Mathematics');
+  });
+
+  it('partitions topics into mastered, learning, and untouched states', async () => {
+    const topics = [
+      mockTopicRow({ id: 'topic-mastered', sortOrder: 1 }),
+      mockTopicRow({ id: 'topic-assessment', sortOrder: 2 }),
+      mockTopicRow({ id: 'topic-session', sortOrder: 3 }),
+      mockTopicRow({ id: 'topic-summary', sortOrder: 4 }),
+      mockTopicRow({ id: 'topic-card-only', sortOrder: 5 }),
+      mockTopicRow({ id: 'topic-untouched', sortOrder: 6 }),
+    ];
+
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardsFindMany: [
+        mockRetentionCard({
+          topicId: 'topic-mastered',
+          xpStatus: 'verified',
+          masteredAt: NOW,
+        }),
+        mockRetentionCard({
+          topicId: 'topic-card-only',
+          xpStatus: 'pending',
+        }),
+      ],
+      assessmentsFindMany: [
+        mockAssessmentRow({ topicId: 'topic-assessment', status: 'passed' }),
+      ],
+      sessionsFindMany: [
+        mockSessionRow({ id: 'session-complete', topicId: 'topic-session' }),
+        mockSessionRow({
+          id: 'session-summary',
+          topicId: 'topic-summary',
+          exchangeCount: 1,
+        }),
+      ],
+      sessionSummariesFindMany: [
+        { sessionId: 'session-summary', status: 'accepted' },
+      ],
+    });
+    const db = createMockDb({
+      curriculumFindFirst: { id: curriculumId, subjectId },
+      topicsFindMany: topics,
+    });
+
+    const result = await getSubjectProgress(db, profileId, subjectId);
+
+    expect(result).toMatchObject({
+      topicsTotal: 6,
+      topicsCompleted: 4,
+      topicsVerified: 1,
+      topicsMastered: 1,
+      topicsLearning: 4,
+    });
+    expect(
+      result!.topicsMastered +
+        result!.topicsLearning +
+        (result!.topicsTotal - result!.topicsMastered - result!.topicsLearning),
+    ).toBe(result!.topicsTotal);
   });
 
   it('[WI-80] excludes mixed-parent topics from subject progress totals', async () => {

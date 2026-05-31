@@ -1,6 +1,6 @@
 {
-  "id": "6886a619-af19-4b89-8791-4780c4db5241",
-  "prevId": "b8fa1560-f377-42eb-a08c-9200ca49cbfa",
+  "id": "78475354-7485-4ac2-a393-9ceab11ead3a",
+  "prevId": "6886a619-af19-4b89-8791-4780c4db5241",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -121,6 +121,21 @@
           "columns": [
             {
               "expression": "topic_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "assessments_profile_id_idx": {
+          "name": "assessments_profile_id_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -306,6 +321,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "needs_deepening_topics_profile_id_idx": {
+          "name": "needs_deepening_topics_profile_id_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -398,6 +428,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "mastered_at": {
+          "name": "mastered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "failure_count": {
           "name": "failure_count",
           "type": "integer",
@@ -439,12 +475,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "mastered_at": {
-          "name": "mastered_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -459,6 +489,21 @@
             },
             {
               "expression": "next_review_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "retention_cards_profile_id_idx": {
+          "name": "retention_cards_profile_id_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -564,7 +609,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "teaching_preferences_profile_id_idx": {
+          "name": "teaching_preferences_profile_id_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "teaching_preferences_profile_id_profiles_id_fk": {
           "name": "teaching_preferences_profile_id_profiles_id_fk",
@@ -1773,6 +1834,21 @@
           "method": "btree",
           "with": {}
         },
+        "session_embeddings_profile_id_idx": {
+          "name": "session_embeddings_profile_id_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "embeddings_hnsw_idx": {
           "name": "embeddings_hnsw_idx",
           "columns": [
@@ -1974,6 +2050,24 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "policy_version": {
+          "name": "policy_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request_ip": {
+          "name": "request_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2904,6 +2998,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "mastered_at": {
+          "name": "mastered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2917,12 +3017,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "mastered_at": {
-          "name": "mastered_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -3878,7 +3972,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "parking_lot_items_profile_id_idx": {
+          "name": "parking_lot_items_profile_id_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "parking_lot_items_session_id_learning_sessions_id_fk": {
           "name": "parking_lot_items_session_id_learning_sessions_id_fk",
@@ -4039,6 +4149,21 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "session_events_profile_id_idx": {
+          "name": "session_events_profile_id_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4255,6 +4380,21 @@
               "asc": true,
               "nulls": "last"
             },
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "session_summaries_profile_id_idx": {
+          "name": "session_summaries_profile_id_idx",
+          "columns": [
             {
               "expression": "profile_id",
               "isExpression": false,
@@ -6391,6 +6531,21 @@
               "asc": true,
               "nulls": "last"
             },
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "topic_notes_profile_id_idx": {
+          "name": "topic_notes_profile_id_idx",
+          "columns": [
             {
               "expression": "profile_id",
               "isExpression": false,

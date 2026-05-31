@@ -8,3 +8,6 @@
 
 # Husky hooks must always use LF line endings (not CRLF) for Git Bash compatibility
 .husky/* text eol=lf
+
+# Drizzle snapshots are generated migration metadata; keep PR diffs focused on migration SQL.
+apps/api/drizzle/meta/*_snapshot.json linguist-generated -diff

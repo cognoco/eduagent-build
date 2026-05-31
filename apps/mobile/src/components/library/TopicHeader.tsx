@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { RetentionStatus } from '@eduagent/schemas';
 import { withOpacity } from '../../lib/color-opacity';
 import { useThemeColors } from '../../lib/theme';
@@ -11,6 +12,9 @@ interface TopicHeaderProps {
   daysSinceLastReview?: number | null;
   lastStudiedText: string;
   description?: string | null;
+  strongReviews?: number;
+  strongReviewsTarget?: number;
+  masteredAt?: string | null;
   /** Localized level label ("Topic") shown as an eyebrow above the name so the
    *  user always knows which library level they are on. */
   levelLabel?: string;
@@ -23,10 +27,20 @@ export function TopicHeader({
   daysSinceLastReview,
   lastStudiedText,
   description,
+  strongReviews = 0,
+  strongReviewsTarget = 1,
+  masteredAt = null,
   levelLabel,
 }: TopicHeaderProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const trimmedDescription = description?.trim();
+  const safeStrongReviewsTarget = Math.max(1, strongReviewsTarget);
+  const strongReviewsClamped = Math.max(
+    0,
+    Math.min(strongReviews, safeStrongReviewsTarget),
+  );
+  const strongReviewRatio = strongReviewsClamped / safeStrongReviewsTarget;
 
   return (
     <View
@@ -75,12 +89,68 @@ export function TopicHeader({
       ) : null}
 
       {retentionStatus != null ? (
-        <View style={{ marginTop: 8 }}>
+        <View
+          style={{
+            marginTop: 8,
+            flexDirection: 'row',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 8,
+          }}
+        >
           <RetentionPill
             status={retentionStatus}
             daysSinceLastReview={daysSinceLastReview}
             size="large"
           />
+          <View
+            testID="topic-strong-reviews"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: withOpacity(colors.success, 0.28),
+              backgroundColor: withOpacity(colors.success, 0.08),
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+            }}
+          >
+            <View
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 999,
+                borderWidth: 2,
+                borderColor: withOpacity(colors.success, 0.32),
+                overflow: 'hidden',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <View
+                testID="topic-strong-reviews-fill"
+                style={{
+                  height: `${Math.round(strongReviewRatio * 100)}%`,
+                  backgroundColor: colors.success,
+                }}
+              />
+            </View>
+            <Text
+              style={{
+                color: colors.success,
+                fontSize: 12,
+                fontWeight: '700',
+              }}
+            >
+              {masteredAt != null
+                ? t('library.topic.mastered')
+                : t('library.topic.strongReviewProgress', {
+                    strong: strongReviewsClamped,
+                    total: safeStrongReviewsTarget,
+                  })}
+            </Text>
+          </View>
         </View>
       ) : null}
 
@@ -118,7 +188,7 @@ export function TopicHeader({
               textTransform: 'uppercase',
             }}
           >
-            This topic covers
+            {t('library.topic.covers')}
           </Text>
           <Text
             style={{

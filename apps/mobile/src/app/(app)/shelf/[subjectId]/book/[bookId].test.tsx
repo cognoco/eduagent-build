@@ -162,6 +162,7 @@ function makeRetentionTopic(overrides: Partial<any> = {}) {
     repetitions: 1,
     easeFactor: 2.5,
     xpStatus: 'verified',
+    masteredAt: null,
     failureCount: 0,
     nextReviewAt: null,
     daysSinceLastReview: null,
@@ -395,7 +396,7 @@ describe('BookScreen', () => {
     // removed during the Library v3 redesign.
     getByTestId('book-screen');
     getByText('Algebra');
-    getByText('0 of 2 topics finished');
+    getByText('0 mastered · 0 learning · 2 total');
   });
 
   it('mirrors the topic notes strip and keeps book notes collapsed by default', () => {
@@ -456,7 +457,7 @@ describe('BookScreen', () => {
 
     const { getByText } = render(<BookScreen />);
 
-    getByText('2 of 3 topics finished');
+    getByText('0 mastered · 2 learning · 3 total');
   });
 
   it('ignores verified retention topics from other books', () => {
@@ -485,7 +486,7 @@ describe('BookScreen', () => {
 
     const { getByText, queryByTestId } = render(<BookScreen />);
 
-    getByText('1 of 2 topics finished');
+    getByText('0 mastered · 1 learning · 2 total');
     expect(queryByTestId('book-complete-card')).toBeNull();
   });
 
@@ -514,7 +515,7 @@ describe('BookScreen', () => {
 
     const { getByText, queryByTestId } = render(<BookScreen />);
 
-    getByText('0 of 2 topics finished');
+    getByText('0 mastered · 1 learning · 2 total');
     expect(queryByTestId('done-row-topic-1')).toBeNull();
   });
 

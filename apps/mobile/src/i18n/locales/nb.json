@@ -648,7 +648,8 @@
       "transcriptLabel": "Taletranskripsjon – trykk for å redigere",
       "startRecording": "Start opptak",
       "stopRecording": "Stopp opptak"
-    }
+    },
+    "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette."
   },
   "quiz": {
     "index": {
@@ -965,7 +966,7 @@
       "missingParam": "Mangler emne. Gå tilbake og prøv igjen.",
       "errorTitle": "Kunne ikke laste denne hyllen",
       "fallbackTitle": "Hylle",
-      "topicProgress": "{{completed}}/{{total}} temaer",
+      "topicProgress": "{{mastered}} mestret · {{learning}} lærer",
       "settingsAccessibilityLabel": "Emneinnstillinger",
       "studyNext": "Studer neste",
       "addAnotherBook": "Legg til en annen bok",
@@ -997,8 +998,6 @@
       "finished": "Ferdig",
       "paused": "Pauset",
       "archived": "Arkivert",
-      "shelfSubtitle_one": "{{count}} bok · {{progress}} temaer",
-      "shelfSubtitle_other": "{{count}} bøker · {{progress}} temaer",
       "shelfSubtitleUnstarted": "Start å lære",
       "shelfAccessibilityLabel": "{{name}}-hylle, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Trykk for å {{action}}.",
       "shelfPausedSuffix": ", pauset",
@@ -1008,7 +1007,11 @@
       "shelfActionOpen": "åpne",
       "urgencyBadge": "Snart: {{reason}}",
       "review_one": "{{count}} til repetisjon",
-      "review_other": "{{count}} til repetisjon"
+      "review_other": "{{count}} til repetisjon",
+      "shelfSubtitleMastered_one": "{{count}} bok · {{mastered}} mestret · {{learning}} lærer",
+      "shelfSubtitleMastered_other": "{{count}} bøker · {{mastered}} mestret · {{learning}} lærer",
+      "shelfSubtitleLearningOnly_one": "{{count}} bok · {{learning}} lærer",
+      "shelfSubtitleLearningOnly_other": "{{count}} bøker · {{learning}} lærer"
     },
     "nextAction": {
       "title": "Fortsett med {{subject}}",
@@ -1031,7 +1034,22 @@
       "practicedOftenHint": "Du øver ofte på dette emnet — fortsett slik!",
       "relatedRail": {
         "label": "Relaterte emner"
-      }
+      },
+      "covers": "Dette emnet dekker",
+      "mastered": "Mestret",
+      "strongReviewProgress": "{{strong}}/{{total}} sterke repetisjoner"
+    },
+    "book": {
+      "readyToOpen": "Klar til å åpne",
+      "buildThisBook": "Bygger denne boka",
+      "status": {
+        "NOT_STARTED": "Ikke startet",
+        "IN_PROGRESS": "Lærer",
+        "REVIEW_DUE": "Repetisjon klar"
+      },
+      "mastered": "Mestret",
+      "reviewDue": "Klar for repetisjon",
+      "topicProgressThreeState": "{{mastered}} mestret · {{learning}} lærer · {{total}} totalt"
     }
   },
   "topic": {
@@ -1373,7 +1391,8 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "microphoneUnavailableTitle": "Mikrofon utilgjengelig"
   },
   "progress": {
     "pageTitleMine": "Min fremgang",
@@ -2186,6 +2205,10 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "loadError": {
+      "message": "Kunne ikke laste abonnementsdetaljer. Prøv igjen.",
+      "retryAccessibility": "Prøv å laste abonnementet på nytt"
     }
   },
   "sessionSummary": {
@@ -2617,6 +2640,14 @@
       "bug": "Feil",
       "suggestion": "Forslag",
       "other": "Annet"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "Åpne læringsoppdatering?",
+      "crossContextPromptMessage": "Du er i en økt. Fullfør denne først, eller åpne oppdateringen og forlat det du holder på med.",
+      "stayHere": "Bli her",
+      "openUpdate": "Åpne oppdatering"
     }
   }
 }

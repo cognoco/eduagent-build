@@ -732,7 +732,7 @@ function SubscriptionContent(): React.ReactElement | null {
           testID="subscription-error"
         >
           <Text className="text-body text-text-secondary text-center mb-4">
-            Unable to load subscription details. Please try again.
+            {t('subscription.loadError.message')}
           </Text>
           <Pressable
             onPress={() => {
@@ -742,7 +742,7 @@ function SubscriptionContent(): React.ReactElement | null {
             disabled={subRefetching || usageRefetching}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
             testID="subscription-retry-button"
-            accessibilityLabel="Retry loading subscription"
+            accessibilityLabel={t('subscription.loadError.retryAccessibility')}
             accessibilityRole="button"
           >
             {subRefetching || usageRefetching ? (
@@ -753,7 +753,7 @@ function SubscriptionContent(): React.ReactElement | null {
               />
             ) : (
               <Text className="text-text-inverse text-body font-semibold">
-                Retry
+                {t('common.retry')}
               </Text>
             )}
           </Pressable>

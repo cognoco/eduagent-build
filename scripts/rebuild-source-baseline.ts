@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildBaselineForKeys } from './translate-gemini';
+import {
+  buildBaselineForKeys,
+  compactSourceBaselineFile,
+} from './translate-gemini';
 
 const REAL_I18N_DIR = path.resolve(__dirname, '../apps/mobile/src/i18n');
 const LOCALES_DIR = path.join(REAL_I18N_DIR, 'locales');
@@ -37,7 +40,7 @@ for (const lang of [...LANGS].sort()) {
 
 fs.writeFileSync(
   BASELINE_PATH,
-  JSON.stringify(baseline, null, 2) + '\n',
+  JSON.stringify(compactSourceBaselineFile(baseline), null, 2) + '\n',
   'utf-8',
 );
 console.log(`Wrote ${BASELINE_PATH}`);

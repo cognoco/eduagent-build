@@ -147,7 +147,7 @@ function readSourceBaselineFile(filePath: string): SourceBaselineFile {
   }
 }
 
-function compactSourceBaselineFile(
+export function compactSourceBaselineFile(
   baselineFile: SourceBaselineFile,
 ): CompactSourceBaselineFile {
   const hashCountsByKey = new Map<string, Map<string, number>>();

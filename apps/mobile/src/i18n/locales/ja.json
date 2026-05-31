@@ -648,7 +648,8 @@
       "transcriptLabel": "音声テキスト - タップして編集",
       "startRecording": "録音開始",
       "stopRecording": "録音停止"
-    }
+    },
+    "expiredSystemMessage": "セッションが期限切れです。新しいセッションを開始して続けてください。"
   },
   "quiz": {
     "index": {
@@ -965,7 +966,7 @@
       "missingParam": "科目がありません。戻って、もう一度お試しください。",
       "errorTitle": "この棚を読み込めませんでした",
       "fallbackTitle": "棚",
-      "topicProgress": "{{completed}}/{{total}}トピック",
+      "topicProgress": "習得{{mastered}}・学習中{{learning}}",
       "settingsAccessibilityLabel": "科目の設定",
       "studyNext": "次に学習する",
       "addAnotherBook": "別の本を追加",
@@ -997,8 +998,6 @@
       "finished": "完了",
       "paused": "一時停止中",
       "archived": "アーカイブ済み",
-      "shelfSubtitle_one": "{{count}}冊の本・{{progress}}トピック",
-      "shelfSubtitle_other": "{{count}}冊の本・{{progress}}トピック",
       "shelfSubtitleUnstarted": "学習を始める",
       "shelfAccessibilityLabel": "{{name}}の棚、{{subtitle}}{{pausedSuffix}}{{reviewSuffix}}。タップして{{action}}。",
       "shelfPausedSuffix": "、一時停止中",
@@ -1008,7 +1007,11 @@
       "shelfActionOpen": "開く",
       "urgencyBadge": "もうすぐ: {{reason}}",
       "review_one": "復習が{{count}}件",
-      "review_other": "復習が{{count}}件"
+      "review_other": "復習が{{count}}件",
+      "shelfSubtitleMastered_one": "{{count}}冊・習得{{mastered}}・学習中{{learning}}",
+      "shelfSubtitleMastered_other": "{{count}}冊・習得{{mastered}}・学習中{{learning}}",
+      "shelfSubtitleLearningOnly_one": "{{count}}冊・学習中{{learning}}",
+      "shelfSubtitleLearningOnly_other": "{{count}}冊・学習中{{learning}}"
     },
     "nextAction": {
       "title": "{{subject}}を続ける",
@@ -1031,7 +1034,22 @@
       "practicedOftenHint": "このトピックをよく練習しています — 続けましょう！",
       "relatedRail": {
         "label": "関連トピック"
-      }
+      },
+      "covers": "このトピックの内容",
+      "mastered": "習得済み",
+      "strongReviewProgress": "{{strong}}/{{total}}回の強い復習"
+    },
+    "book": {
+      "readyToOpen": "開けます",
+      "buildThisBook": "この本を準備中",
+      "status": {
+        "NOT_STARTED": "未開始",
+        "IN_PROGRESS": "学習中",
+        "REVIEW_DUE": "復習が必要"
+      },
+      "mastered": "習得済み",
+      "reviewDue": "復習できます",
+      "topicProgressThreeState": "習得{{mastered}}・学習中{{learning}}・全{{total}}"
     }
   },
   "topic": {
@@ -1373,7 +1391,8 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "microphoneUnavailableTitle": "マイクが利用できません"
   },
   "progress": {
     "pageTitleMine": "自分の進捗",
@@ -2186,6 +2205,10 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "loadError": {
+      "message": "サブスクリプションの詳細を読み込めませんでした。もう一度お試しください。",
+      "retryAccessibility": "サブスクリプションの読み込みを再試行"
     }
   },
   "sessionSummary": {
@@ -2617,6 +2640,14 @@
       "bug": "バグ",
       "suggestion": "提案",
       "other": "その他"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "学習のアップデートを開きますか？",
+      "crossContextPromptMessage": "現在セッション中です。先にこちらを完了するか、アップデートを開いて現在のセッションを終了してください。",
+      "stayHere": "このままにする",
+      "openUpdate": "アップデートを開く"
     }
   }
 }

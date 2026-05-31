@@ -36,6 +36,7 @@ import {
   isMeaningfulCompletedSession,
 } from './topic-completion';
 import { resolveMasteryVerificationState } from './challenge-round/verification';
+import { STABILITY_THRESHOLD } from './retention';
 import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
@@ -125,6 +126,27 @@ function computeCompletionStatus(
   return 'not_started';
 }
 
+function computeThreeStateTopicSets(
+  cards: Array<{ topicId: string; masteredAt: Date | null }>,
+  completedTopics: Set<string>,
+): { masteredTopics: Set<string>; learningTopics: Set<string> } {
+  const masteredTopics = new Set<string>();
+  const learningTopics = new Set<string>(completedTopics);
+
+  for (const card of cards) {
+    learningTopics.add(card.topicId);
+    if (card.masteredAt != null) {
+      masteredTopics.add(card.topicId);
+    }
+  }
+
+  for (const topicId of masteredTopics) {
+    learningTopics.delete(topicId);
+  }
+
+  return { masteredTopics, learningTopics };
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
@@ -152,6 +174,8 @@ export async function getSubjectProgress(
       topicsTotal: 0,
       topicsCompleted: 0,
       topicsVerified: 0,
+      topicsMastered: 0,
+      topicsLearning: 0,
       urgencyScore: 0,
       retentionStatus: 'strong',
       lastSessionAt: null,
@@ -270,6 +294,10 @@ export async function getSubjectProgress(
   const overdueCount = topicCards.filter(
     (c) => c.nextReviewAt && c.nextReviewAt.getTime() < now.getTime(),
   ).length;
+  const { masteredTopics, learningTopics } = computeThreeStateTopicSets(
+    topicCards,
+    completedTopics,
+  );
 
   return {
     subjectId: subject.id,
@@ -277,6 +305,8 @@ export async function getSubjectProgress(
     topicsTotal: scopedTopics.length,
     topicsCompleted: completedTopics.size,
     topicsVerified: verifiedTopics.size,
+    topicsMastered: masteredTopics.size,
+    topicsLearning: learningTopics.size,
     urgencyScore: overdueCount,
     retentionStatus,
     lastSessionAt: lastSession?.lastActivityAt.toISOString() ?? null,
@@ -420,6 +450,9 @@ export async function getTopicProgress(
     masteryScore: latestAssessment?.masteryScore
       ? Number(latestAssessment.masteryScore)
       : null,
+    masteredAt: retentionCard?.masteredAt?.toISOString() ?? null,
+    strongReviews: retentionCard?.consecutiveSuccesses ?? 0,
+    strongReviewsTarget: STABILITY_THRESHOLD,
     // Phase 5: server-resolved verification state. Raw
     // `masteryChallengeVerifiedAt` is intentionally NOT included on the wire
     // anymore — mobile reads `masteryVerificationState` instead so the
@@ -442,6 +475,8 @@ export async function getOverallProgress(
   subjects: SubjectProgress[];
   totalTopicsCompleted: number;
   totalTopicsVerified: number;
+  totalTopicsMastered: number;
+  totalTopicsLearning: number;
   practiceActivityCount: number;
   practiceSummary: ReportPracticeSummary;
 }> {
@@ -473,6 +508,8 @@ export async function getOverallProgress(
       subjects: [],
       totalTopicsCompleted: 0,
       totalTopicsVerified: 0,
+      totalTopicsMastered: 0,
+      totalTopicsLearning: 0,
       practiceActivityCount: practiceSummary.totals.activitiesCompleted,
       practiceSummary,
     };
@@ -587,6 +624,8 @@ export async function getOverallProgress(
   const subjectProgressList: SubjectProgress[] = [];
   let totalCompleted = 0;
   let totalVerified = 0;
+  let totalMastered = 0;
+  let totalLearning = 0;
 
   for (const subject of allSubjects) {
     const curriculum = curriculumBySubject.get(subject.id);
@@ -598,6 +637,8 @@ export async function getOverallProgress(
         topicsTotal: 0,
         topicsCompleted: 0,
         topicsVerified: 0,
+        topicsMastered: 0,
+        topicsLearning: 0,
         urgencyScore: 0,
         retentionStatus: 'strong',
         lastSessionAt: null,
@@ -654,6 +695,10 @@ export async function getOverallProgress(
     // Retention status from all cards for this subject's topics
     const subjectTopicIds = new Set(topics.map((t) => t.id));
     const subjectCards = allCards.filter((c) => subjectTopicIds.has(c.topicId));
+    const { masteredTopics, learningTopics } = computeThreeStateTopicSets(
+      subjectCards,
+      completedTopics,
+    );
     const retentionStatuses = subjectCards.map((c) =>
       computeRetentionStatus(c.nextReviewAt),
     );
@@ -671,6 +716,8 @@ export async function getOverallProgress(
       topicsTotal: topics.length,
       topicsCompleted: completedTopics.size,
       topicsVerified: verifiedTopics.size,
+      topicsMastered: masteredTopics.size,
+      topicsLearning: learningTopics.size,
       urgencyScore: overdueCount,
       retentionStatus,
       lastSessionAt: lastSession?.lastActivityAt.toISOString() ?? null,
@@ -679,12 +726,16 @@ export async function getOverallProgress(
     subjectProgressList.push(progress);
     totalCompleted += completedTopics.size;
     totalVerified += verifiedTopics.size;
+    totalMastered += masteredTopics.size;
+    totalLearning += learningTopics.size;
   }
 
   return {
     subjects: subjectProgressList,
     totalTopicsCompleted: totalCompleted,
     totalTopicsVerified: totalVerified,
+    totalTopicsMastered: totalMastered,
+    totalTopicsLearning: totalLearning,
     practiceActivityCount: practiceSummary.totals.activitiesCompleted,
     practiceSummary,
   };
@@ -738,6 +789,8 @@ export async function getOverallProgressBatch(
         subjects: [],
         totalTopicsCompleted: 0,
         totalTopicsVerified: 0,
+        totalTopicsMastered: 0,
+        totalTopicsLearning: 0,
         practiceActivityCount: ps.totals.activitiesCompleted,
         practiceSummary: ps,
       });
@@ -964,6 +1017,8 @@ export async function getOverallProgressBatch(
         subjects: [],
         totalTopicsCompleted: 0,
         totalTopicsVerified: 0,
+        totalTopicsMastered: 0,
+        totalTopicsLearning: 0,
         practiceActivityCount: emptyPractice.totals.activitiesCompleted,
         practiceSummary: emptyPractice,
       });
@@ -982,6 +1037,8 @@ export async function getOverallProgressBatch(
     const subjectProgressList: SubjectProgress[] = [];
     let totalCompleted = 0;
     let totalVerified = 0;
+    let totalMastered = 0;
+    let totalLearning = 0;
 
     for (const subject of profileSubjects) {
       const curriculum = curriculumBySubject.get(subject.id);
@@ -993,6 +1050,8 @@ export async function getOverallProgressBatch(
           topicsTotal: 0,
           topicsCompleted: 0,
           topicsVerified: 0,
+          topicsMastered: 0,
+          topicsLearning: 0,
           urgencyScore: 0,
           retentionStatus: 'strong',
           lastSessionAt: null,
@@ -1051,6 +1110,10 @@ export async function getOverallProgressBatch(
       const subjectCards = profileCards.filter((c) =>
         subjectTopicIds.has(c.topicId),
       );
+      const { masteredTopics, learningTopics } = computeThreeStateTopicSets(
+        subjectCards,
+        completedTopics,
+      );
       const retentionStatuses = subjectCards.map((c) =>
         computeRetentionStatus(c.nextReviewAt),
       );
@@ -1069,6 +1132,8 @@ export async function getOverallProgressBatch(
         topicsTotal: topics.length,
         topicsCompleted: completedTopics.size,
         topicsVerified: verifiedTopics.size,
+        topicsMastered: masteredTopics.size,
+        topicsLearning: learningTopics.size,
         urgencyScore: overdueCount,
         retentionStatus,
         lastSessionAt: lastSession?.lastActivityAt.toISOString() ?? null,
@@ -1077,6 +1142,8 @@ export async function getOverallProgressBatch(
       subjectProgressList.push(progress);
       totalCompleted += completedTopics.size;
       totalVerified += verifiedTopics.size;
+      totalMastered += masteredTopics.size;
+      totalLearning += learningTopics.size;
     }
 
     const ps = practiceSummary ?? {
@@ -1103,6 +1170,8 @@ export async function getOverallProgressBatch(
       subjects: subjectProgressList,
       totalTopicsCompleted: totalCompleted,
       totalTopicsVerified: totalVerified,
+      totalTopicsMastered: totalMastered,
+      totalTopicsLearning: totalLearning,
       practiceActivityCount: ps.totals.activitiesCompleted,
       practiceSummary: ps,
     });
@@ -1321,6 +1390,9 @@ export async function getTopicProgressBatch(
       masteryScore: latestAssessment?.masteryScore
         ? Number(latestAssessment.masteryScore)
         : null,
+      masteredAt: retentionCard?.masteredAt?.toISOString() ?? null,
+      strongReviews: retentionCard?.consecutiveSuccesses ?? 0,
+      strongReviewsTarget: STABILITY_THRESHOLD,
       masteryVerificationState: resolveMasteryVerificationState({
         verifiedAt: latestVerifiedAt,
         newWeakSpotRows: deepeningTopics,

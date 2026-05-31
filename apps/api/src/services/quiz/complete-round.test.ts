@@ -779,6 +779,9 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
     return {
       quizRounds: {
         findById: jest.fn().mockResolvedValue(mockRound),
+        // [BUG-851] completeQuizRound now uses findByIdForUpdate to row-lock
+        // the round inside the transaction. Stub returns the same mockRound.
+        findByIdForUpdate: jest.fn().mockResolvedValue(mockRound),
         completeActive: jest.fn().mockResolvedValue(true),
         findRecentByActivity: jest.fn().mockResolvedValue([]),
         findRecentCompletedByActivity: jest.fn().mockResolvedValue([]),
