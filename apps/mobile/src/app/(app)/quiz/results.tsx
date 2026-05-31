@@ -62,7 +62,7 @@ export default function QuizResultsScreen(): React.ReactElement {
   // screen. (Cluster 4 Finding 2, mobile-screen-audit 2026-05-31.)
   useEffect(() => {
     if (!completionResult) {
-      router.replace('/(app)/practice' as Href);
+      router.replace('/(app)/practice');
     }
   }, [completionResult, router]);
 
