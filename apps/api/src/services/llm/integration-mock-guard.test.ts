@@ -83,7 +83,26 @@ function isInternalLlmRouterSpec(spec: string): boolean {
   // Provider sub-paths are the HTTP boundary; allow them.
   if (/\/llm\/providers(\/|$)/.test(s)) return false;
   // Data-only helpers in the llm/ dir that are not the router are allowed.
-  // The router-class modules:
+  //
+  // The router-class modules listed below are guarded because mocking any
+  // of them in an integration test silences the LLM-response contract:
+  //   - `llm` / `llm/router` / `llm/index`: the dispatch entry — mocking
+  //     these bypasses provider routing, retry/fallback, and metering.
+  //   - `llm/envelope`: parses `llmResponseEnvelopeSchema` (signals/markers
+  //     that drive state-machine decisions). Mocking it hides envelope
+  //     schema drift between prompts and consumers.
+  //   - `llm/extract-json`: pulls structured payloads out of mixed-text
+  //     LLM responses. Mocking it hides malformed-JSON regressions and
+  //     the salvage-parse heuristics for real provider quirks.
+  //   - `llm/stream-envelope`: SSE stream → envelope reducer. Mocking it
+  //     hides chunk-boundary and partial-JSON edge cases that only show
+  //     up against the real router's streaming path.
+  //   - `routeAndCall`: legacy convenience re-export of the dispatch.
+  //
+  // If a future integration test legitimately needs to stub one of these
+  // (e.g. a focused malformed-JSON edge case), add the file to
+  // KNOWN_OFFENDERS below with a citation explaining why the targeted
+  // HTTP-boundary mock is insufficient.
   const ROUTER_MODULES = [
     /(^|\/)llm$/, //                 …/llm
     /(^|\/)llm\/router$/, //         …/llm/router
