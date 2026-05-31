@@ -161,7 +161,7 @@ jobs:
         - Do not post inline comments or use any other output mechanism.
         - Do not output review text as conversation messages.
       CLAUDE_REVIEW_ARGS: >-
-        --max-turns 30
+        --max-turns 10
         --allowedTools "Write,Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
 
     steps:
