@@ -87,7 +87,7 @@ Out of scope (Non-goals):
 - **Merging two pre-existing separate persons/accounts** into one (data
   reconciliation, "which subscription wins"). Multiple *logins on one person* is
   in scope; merging two *persons* is a separate project.
-- The **13 independent audit gaps** (see "Independent backlog") — they survive
+- The **17 independent audit gaps** (see "Independent backlog") — they survive
   the redesign unchanged and are tracked separately.
 - Multiple roles *scoped to specific people* (person-specific mentor). v1 ships
   **org-wide mentor** only; per-person mentor scoping is a deliberate later
@@ -153,13 +153,19 @@ scoping estimates, not exhaustive file lists.
   `status: approved`. **DONE 2026-05-31 — all 6 decisions resolved (D6 added
   during T1 adversarial review).**
 
-- [ ] **T1 — Data model.** Add `persons`, `organizations`, `memberships`
+- [x] **T1 — Data model.** Add `persons`, `organizations`, `memberships`
   (role set), and a credential link to Clerk identities; move `subscriptions`
   to reference `organizationId`. New tables alongside old; no drops yet.
   *Files:* `packages/database/src/schema/{profiles,billing}.ts` + new schema
   files; migration SQL. *Done when:* schema compiles, `drizzle-kit generate`
   produces a clean migration, new tables seed in dev, and a unit test asserts a
   person can hold ≥2 memberships with different role sets.
+  **DONE 2026-05-31** — `profiles` IS the person (no `persons` table; profile.id
+  stays the scoping key). Migration `0106_identity_t1_org_membership` (additive,
+  no drops) + canonical idempotent backfill. Verified: database `tsc` + full
+  jest (26 suites / 285 tests) green against real dev Neon; api `tsc` clean;
+  CHECK break test red-verified (array_length→cardinality); the ≥2-memberships
+  capability test passes. See `docs/plans/2026-05-31-identity-t1-data-model.md`.
 
 - [ ] **T2 — Identity / auth.** Clerk session → person+org resolution (not
   account); managed vs credentialed persons; multi-email/OAuth on one person;
@@ -242,14 +248,20 @@ scoping estimates, not exhaustive file lists.
 
 ## Independent backlog (NOT closed by this redesign — separate track)
 
-17 audit gaps survive the redesign and need their own fixes; the launch-relevant
-ones: `onboard-1/4` (onboarding steps not wired into first-run), `notif-1`
-(guardian who never runs a session is never asked for OS push permission),
-`notif-3` (child "notify parent" never sends a push), `billing-3` (silent
-payment failure), `auth-2` (no email-change UI), `auth-4` (no session/device
-management), `auth-3` (SSO-only user can't add a password), plus `billing-4`,
-`notif-2/4`, `onboard-2/3`, `learn-3`, `practice-1/2/4`. Full set (17):
-`auth-2`, `auth-3`, `auth-4`, `billing-3`, `billing-4`, `learn-3`, `notif-1`,
-`notif-2`, `notif-3`, `notif-4`, `onboard-1`, `onboard-2`, `onboard-3`,
-`onboard-4`, `practice-1`, `practice-2`, `practice-4`. Track these on the
-pre-launch backlog, not here.
+17 audit gaps survive the redesign and need their own fixes. They are grouped
+into sibling plans by missing product primitive:
+
+- [Account Security Self-Service](2026-05-31-account-security-self-service.md)
+  covers `auth-2`, `auth-3`, `auth-4`.
+- [Profile Setup, Personalization, and Corrections](2026-05-31-profile-setup-personalization-corrections.md)
+  covers `onboard-1`, `onboard-2`, `onboard-3`, `onboard-4`.
+- [Billing Recovery and Learner Capacity](2026-05-31-billing-recovery-learner-capacity.md)
+  covers `billing-3`, `billing-4`, `notif-3`.
+- [Notification Reachability and Nudges](2026-05-31-notification-reachability-nudges.md)
+  covers `notif-1`, `notif-2`, `notif-4`.
+- [Learning Library Cleanup](2026-05-31-learning-library-cleanup.md)
+  covers `learn-3`.
+- [Resumable Practice State](2026-05-31-resumable-practice-state.md)
+  covers `practice-1`, `practice-2`, `practice-4`.
+
+Track those on the pre-launch backlog, not inside this identity redesign.
