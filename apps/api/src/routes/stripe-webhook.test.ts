@@ -203,6 +203,11 @@ function makeCheckoutSession(
     id: 'cs_test_123',
     subscription: 'sub_stripe_123',
     metadata: { accountId: 'acc-1', tier: 'plus' },
+    // [audit-2026-05-31 #829] handleCheckoutCompleted now gates entitlement
+    // activation on session.payment_status. The synchronous (card) flow
+    // defaults to 'paid'. Tests that need to exercise the async-payment-
+    // pending path can override to 'unpaid'.
+    payment_status: 'paid',
     ...overrides,
   };
 }

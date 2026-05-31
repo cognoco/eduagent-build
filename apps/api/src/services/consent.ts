@@ -130,6 +130,31 @@ export class ConsentRequestNotFoundError extends Error {
   }
 }
 
+/**
+ * [audit-2026-05-31 #871] Thrown when restoreConsent is called more than
+ * CONSENT_RESTORE_GRACE_PERIOD_MS after consent was revoked. The 7-day grace
+ * period exists so the archive-cleanup Inngest function can run after the
+ * window has elapsed and hard-delete child data with confidence that no
+ * restore can race in afterwards. Route layer maps to 410 GONE.
+ */
+export class ConsentRestoreGracePeriodExpiredError extends Error {
+  constructor(public readonly revokedAt: string) {
+    super(
+      'Consent restore window has expired. Child data has been (or is being) permanently deleted.',
+    );
+    this.name = 'ConsentRestoreGracePeriodExpiredError';
+  }
+}
+
+/**
+ * [audit-2026-05-31 #871] 7-day grace window after a consent revocation,
+ * after which restoreConsent must reject. The archive-cleanup Inngest
+ * function (see inngest/functions/archive-cleanup.ts) keys off the same
+ * window; any change here MUST be mirrored there so the schedule of
+ * "restore-allowed" and "cleanup-may-run" never overlap.
+ */
+export const CONSENT_RESTORE_GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -1251,6 +1276,28 @@ export async function restoreConsent(
   }
   if (existing.status !== 'WITHDRAWN') {
     return mapConsentRow(existing);
+  }
+
+  // [audit-2026-05-31 #871] Enforce 7-day grace period. The route copy and
+  // service docstring both promised a window, but the prior implementation
+  // performed no temporal check — meaning if the archive-cleanup job had
+  // already started hard-deleting child data (after day 7), a late restore
+  // would resurrect the consent row + clear archivedAt while data was gone,
+  // leaving CONSENTED state attached to an effectively-empty profile with
+  // no audit trail. The 410 GONE error is final: child data is being
+  // permanently deleted, the parent must request a fresh consent flow.
+  const respondedAt = existing.respondedAt;
+  if (respondedAt) {
+    const respondedAtMs =
+      respondedAt instanceof Date
+        ? respondedAt.getTime()
+        : new Date(respondedAt).getTime();
+    const elapsedMs = Date.now() - respondedAtMs;
+    if (elapsedMs > CONSENT_RESTORE_GRACE_PERIOD_MS) {
+      throw new ConsentRestoreGracePeriodExpiredError(
+        new Date(respondedAtMs).toISOString(),
+      );
+    }
   }
 
   const now = new Date();

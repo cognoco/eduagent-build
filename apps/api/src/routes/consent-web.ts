@@ -293,6 +293,24 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       );
     }
 
+    // [audit-2026-05-31 #868] Require strict 'true' or 'false'. The previous
+    // `approvedParam === 'true'` coerced ANY other value to false, which
+    // triggered cascade-delete of the child profile in processConsentResponse.
+    // A link prefetcher, malformed retry, or future typo of the form value
+    // would silently DELETE the child's account and all learning data with
+    // no audit trail. Destructive defaults are banned for unauthenticated
+    // surfaces — require a positive assertion of intent.
+    if (approvedParam !== 'true' && approvedParam !== 'false') {
+      return c.html(
+        pageLayout(
+          'Invalid Link',
+          `<h1 class="error">Invalid response</h1>
+           <p>This link could not be processed. Open the link from your email again, or ask your child to resend the consent request.</p>`,
+        ),
+        400,
+      );
+    }
+
     const approved = approvedParam === 'true';
     const db = c.get('db');
 

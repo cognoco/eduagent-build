@@ -36,6 +36,7 @@ import {
   ConsentTokenExpiredError,
   ConsentNotAuthorizedError,
   ConsentRecordNotFoundError,
+  ConsentRestoreGracePeriodExpiredError,
 } from '../services/consent';
 import { notFound, forbidden, apiError } from '../errors';
 import {
@@ -564,6 +565,22 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
       if (error instanceof ConsentRecordNotFoundError) {
         return notFound(c, error.message);
+      }
+      // [audit-2026-05-31 #871] 410 GONE — the grace window has elapsed and
+      // the archive-cleanup job has either started or completed; restore is
+      // no longer possible. The parent must initiate a fresh consent flow
+      // (which creates a new profile, not resurrect the old one).
+      if (error instanceof ConsentRestoreGracePeriodExpiredError) {
+        return c.json(
+          {
+            error: {
+              code: 'CONSENT_RESTORE_WINDOW_EXPIRED',
+              message: error.message,
+              details: { revokedAt: error.revokedAt },
+            },
+          },
+          410,
+        );
       }
       throw error;
     }

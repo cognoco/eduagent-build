@@ -166,7 +166,7 @@ describe('handleSubscriptionDeleted', () => {
 });
 
 describe('handleCheckoutCompleted', () => {
-  it('activates a subscription with the metadata tier and refreshes KV', async () => {
+  it('activates a subscription with the metadata tier and refreshes KV when payment_status=paid', async () => {
     (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
       mockUpdatedSub(),
     );
@@ -175,6 +175,9 @@ describe('handleCheckoutCompleted', () => {
       id: 'cs_test_123',
       subscription: 'sub_stripe_123',
       metadata: { accountId: 'acc-1', tier: 'plus' },
+      // [audit-2026-05-31 #829] Synchronous payment methods (card) settle
+      // immediately; payment_status='paid' is the entitlement-grant signal.
+      payment_status: 'paid',
     } as unknown as Stripe.Checkout.Session;
 
     await handleCheckoutCompleted(
@@ -192,6 +195,57 @@ describe('handleCheckoutCompleted', () => {
       '2026-01-01T00:00:00.000Z',
     );
     expect(safeRefreshKvCache).toHaveBeenCalledTimes(1);
+  });
+
+  it('[audit-2026-05-31 #829 BREAK] defers entitlement and escalates when payment_status=unpaid (async payment)', async () => {
+    // SEPA Direct Debit / Bacs / BLIK / bank transfer fire
+    // checkout.session.completed with payment_status='unpaid' while the
+    // charge is still settling. Granting paid tier here would let the user
+    // consume higher quota before money clears, and if the payment fails the
+    // only correction is the eventual past_due event. Verify the handler
+    // does NOT call activateSubscriptionFromCheckout in that state.
+    (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
+      mockUpdatedSub(),
+    );
+
+    const session = {
+      id: 'cs_async_456',
+      subscription: 'sub_stripe_456',
+      metadata: { accountId: 'acc-1', tier: 'plus' },
+      payment_status: 'unpaid',
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(
+      mockDb,
+      mockKv,
+      session,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+    expect(safeRefreshKvCache).not.toHaveBeenCalled();
+  });
+
+  it('activates when payment_status=no_payment_required (zero-amount session)', async () => {
+    (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
+      mockUpdatedSub(),
+    );
+
+    const session = {
+      id: 'cs_zero_789',
+      subscription: 'sub_stripe_789',
+      metadata: { accountId: 'acc-1', tier: 'plus' },
+      payment_status: 'no_payment_required',
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(
+      mockDb,
+      mockKv,
+      session,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalled();
   });
 });
 

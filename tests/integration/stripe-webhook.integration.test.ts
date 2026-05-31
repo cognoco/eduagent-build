@@ -319,6 +319,11 @@ describe('Integration: Stripe Webhook event handling', () => {
       id: 'cs_checkout_completed',
       subscription: stripeSubscriptionId,
       metadata: { accountId: account.id, tier: 'plus' },
+      // [audit-2026-05-31 #829] payment_status='paid' is the entitlement-
+      // grant signal for synchronous (card) checkout. Async payment methods
+      // (SEPA, Bacs, BLIK) fire 'unpaid' and must wait for
+      // checkout.session.async_payment_succeeded.
+      payment_status: 'paid',
     });
 
     mockVerifyWebhookSignature.mockResolvedValueOnce(event);

@@ -173,7 +173,19 @@ export const revenuecatWebhookRoute = new Hono<{
   }
 
   // Parse and validate webhook payload
-  const rawBody = await c.req.json();
+  // [audit-2026-05-31 #835] Wrap JSON parse in try/catch — a SyntaxError
+  // from a malformed body would otherwise propagate to the global error
+  // handler as a 500, which RevenueCat treats as transient and retries for
+  // ~72 hours, producing a sustained log/CPU storm. 400 stops the retry.
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch (err) {
+    logger.warn('[revenuecat] webhook body is not valid JSON — rejecting 400', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, 'Invalid JSON body');
+  }
   const parsed = revenuecatWebhookSchema.safeParse(rawBody);
 
   if (!parsed.success) {

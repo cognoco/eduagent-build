@@ -296,6 +296,30 @@ export async function handleRenewal(
   }
 }
 
+/**
+ * [audit-2026-05-31 #832] cancel_reason values that indicate the user no
+ * longer holds the entitlement (refund, billing-error revocation, customer-
+ * support voiding the purchase). These must immediately downgrade tier to
+ * free and mark status='expired' — keeping the user on a paid tier until
+ * currentPeriodEnd would let them keep entitlement they no longer paid for.
+ *
+ * Reasons NOT in this set (UNSUBSCRIBE, EXPIRATION, BILLING_ERROR-without-
+ * revocation) follow the legacy soft-cancel path: entitlement stays active
+ * until currentPeriodEnd so the user gets what they paid for.
+ *
+ * Source: RevenueCat docs https://www.revenuecat.com/docs/integrations/webhooks
+ * — cancel_reason taxonomy. Add new revoke-equivalent reasons here as RC
+ * documents them; the default switch arm in routes/revenuecat-webhook.ts
+ * already surfaces unhandled event types, so a new revoke-class reason on
+ * an existing CANCELLATION event will fall through this set and stay on the
+ * soft-cancel path — captureMessage in else branch makes that observable.
+ */
+const REVOKE_CANCEL_REASONS = new Set<string>([
+  'CUSTOMER_SUPPORT', // CS-initiated refund
+  'BILLING_ERROR_REFUND', // store refunded after billing-error retry exhausted
+  'DEVELOPER_INITIATED', // server-side revocation (e.g., abuse)
+]);
+
 export async function handleCancellation(
   db: Database,
   kv: KVNamespace | undefined,
@@ -303,6 +327,74 @@ export async function handleCancellation(
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
+
+  // [audit-2026-05-31 #832] Refund / revocation path. When RevenueCat signals
+  // the entitlement has been pulled (refund via CS, server-side revoke), the
+  // user no longer paid for paid tier. The legacy soft-cancel path below
+  // would keep them on paid tier until currentPeriodEnd — letting them
+  // consume the higher quota for days after the refund cleared.
+  if (event.cancel_reason && REVOKE_CANCEL_REASONS.has(event.cancel_reason)) {
+    const freeConfig = getTierConfig('free');
+    const updated = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      db,
+      accountId,
+      {
+        eventId: event.id,
+        eventTimestampMs: event.event_timestamp_ms,
+        status: 'expired',
+        tier: 'free',
+        cancelledAt: new Date().toISOString(),
+        currentPeriodEnd: new Date().toISOString(),
+      },
+      {
+        monthlyQuota: freeConfig.monthlyQuota,
+        dailyLimit: freeConfig.dailyLimit,
+      },
+    );
+
+    if (shouldRefreshRevenuecatKv(updated, event.id)) {
+      await safeRefreshKvCache(
+        kv,
+        db,
+        updated.accountId,
+        'revenuecat.webhook.handleCancellation.revoked',
+        { eventId: event.id, cancelReason: event.cancel_reason },
+      );
+    }
+
+    logger.info(
+      '[revenuecat] CANCELLATION revoked entitlement — downgraded to free',
+      {
+        eventId: event.id,
+        accountId,
+        cancelReason: event.cancel_reason,
+      },
+    );
+    return;
+  }
+
+  // Unknown cancel_reason — surface so we can decide whether to add it to
+  // REVOKE_CANCEL_REASONS or document the soft-cancel intent. Not a failure;
+  // we continue with the soft-cancel path to preserve current behaviour.
+  if (
+    event.cancel_reason &&
+    !['UNSUBSCRIBE', 'EXPIRATION', 'BILLING_ERROR'].includes(
+      event.cancel_reason,
+    )
+  ) {
+    captureMessage(
+      `RevenueCat CANCELLATION with unknown cancel_reason='${event.cancel_reason}' — treating as soft-cancel`,
+      {
+        level: 'warning',
+        extra: {
+          context: 'revenuecat.cancellation.unknown_cancel_reason',
+          cancelReason: event.cancel_reason,
+          eventId: event.id,
+          accountId,
+        },
+      },
+    );
+  }
 
   // [BUG-445] If the sub was already past_due when the user cancelled, DO NOT
   // flip it back to 'active' — that would erase the payment-failure signal.
@@ -542,6 +634,76 @@ export async function handleSubscriberAlias(
         },
       );
 
+      // [audit-2026-05-31 #833] DEAUTHORIZE the from-side immediately. The
+      // legacy "no merge" hold-pattern was the source of the duplicate-
+      // entitlement risk: both fromAccount and toAccount retained status=
+      // 'active' paid subscriptions locally even though RevenueCat had moved
+      // the entitlement to toAccount. If the user (or anyone) re-signed into
+      // the old Clerk identity, they got paid entitlement for free.
+      //
+      // The deauth is a strict DOWNGRADE — fromAccount loses paid access,
+      // toAccount keeps whatever it had. This cannot grant entitlement to
+      // anyone who did not already have it, so it is safe to run automatically
+      // even before the full merge worker exists. The supersede pointer +
+      // top-up reconciliation still happen by hand from the Sentry alert
+      // (see comment above), but the cross-account leak is closed today.
+      const freeConfig = getTierConfig('free');
+      try {
+        const deauthed = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+          db,
+          fromAccount.id,
+          {
+            // Use a per-from-account synthetic event id so the timestamp
+            // watermark on the toAccount side is not advanced by this
+            // unrelated downgrade write.
+            eventId: `${event.id}:deauth:${fromAccount.id}`,
+            eventTimestampMs: event.event_timestamp_ms,
+            status: 'expired',
+            tier: 'free',
+            cancelledAt: new Date().toISOString(),
+            currentPeriodEnd: new Date().toISOString(),
+          },
+          {
+            monthlyQuota: freeConfig.monthlyQuota,
+            dailyLimit: freeConfig.dailyLimit,
+          },
+        );
+        if (shouldRefreshRevenuecatKv(deauthed, event.id)) {
+          await safeRefreshKvCache(
+            _kv,
+            db,
+            deauthed.accountId,
+            'revenuecat.webhook.handleSubscriberAlias.deauth',
+            { eventId: event.id, fromAppUserId: fromUserId },
+          );
+        }
+        logger.info(
+          '[revenuecat] SUBSCRIBER_ALIAS deauthorized from-account subscription',
+          {
+            eventId: event.id,
+            fromAccountId: fromAccount.id,
+            fromAppUserId: fromUserId,
+            toAppUserId: event.app_user_id,
+            previousTier: fromSub.tier,
+            previousStatus: fromSub.status,
+          },
+        );
+      } catch (err) {
+        // Deauth failure is high-severity — capture but don't throw so the
+        // alias_received dispatch below still happens. The Sentry alert from
+        // the original capture above (revenuecat.alias.unhandled) plus this
+        // capture give ops two signals to act on.
+        captureException(err, {
+          extra: {
+            context: 'revenuecat.alias.deauth_failed',
+            eventId: event.id,
+            fromAccountId: fromAccount.id,
+            fromAppUserId: fromUserId,
+            toAppUserId: event.app_user_id,
+          },
+        });
+      }
+
       // Dispatch alias_received so a future migration worker can consume it.
       //
       // MANUAL REMEDIATION POLICY (no automated worker by design — see below).
@@ -552,6 +714,11 @@ export async function handleSubscriberAlias(
       //   - Subscription: keep the more valuable of the two — higher tier
       //     (free < plus < family < pro), tiebreak by latest currentPeriodEnd.
       //     Never downgrade a paying user as a merge side effect.
+      //     ([audit-2026-05-31 #833] note: the from-side has already been
+      //     deauthed above; the manual reconciliation now compares the
+      //     toAccount's current state against the captured fromSub snapshot
+      //     in this event's Sentry breadcrumb to decide whether to promote
+      //     the to-side. Never grant new entitlement automatically.)
       //   - Top-up credits: take the MAX of the two balances, not the sum
       //     (summing invites abuse via deliberate re-aliasing).
       //   - Quota counters: reset to the more generous cycle; don't carry "used".

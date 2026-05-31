@@ -309,6 +309,37 @@ export async function handleSubscriptionEvent(
       },
     );
   }
+
+  // [audit-2026-05-31 #828] Out-of-order escalation. Stripe does NOT guarantee
+  // event ordering — customer.subscription.created/updated can arrive before
+  // checkout.session.completed has created the local subscription row, in
+  // which case updateSubscriptionFromWebhook returns null. CLAUDE.md: silent
+  // recovery in billing is banned. Capture so on-call can correlate to a
+  // pending checkout and decide whether to backfill from Stripe state.
+  if (updated === null) {
+    logger.warn(
+      '[stripe-webhook] handleSubscriptionEvent: no local subscription row — out-of-order or unknown subscription',
+      {
+        stripeSubscriptionId: stripeSubscription.id,
+        stripeEventId,
+        stripeStatus: stripeSubscription.status,
+      },
+    );
+    captureException(
+      new Error(
+        'Stripe subscription event references unknown local subscription (out-of-order delivery?)',
+      ),
+      {
+        extra: {
+          context:
+            'stripe.webhook.handleSubscriptionEvent.subscription_not_found',
+          stripeSubscriptionId: stripeSubscription.id,
+          stripeEventId,
+          stripeStatus: stripeSubscription.status,
+        },
+      },
+    );
+  }
 }
 
 export async function handleSubscriptionDeleted(
@@ -365,6 +396,30 @@ export async function handleSubscriptionDeleted(
       },
     );
   }
+
+  // [audit-2026-05-31 #828] See sibling handler. customer.subscription.deleted
+  // arriving for an unknown local subscription is high-signal — either an
+  // out-of-order delivery or a webhook for a Stripe customer the local DB
+  // never linked. Escalate so on-call can investigate.
+  if (updated === null) {
+    logger.warn(
+      '[stripe-webhook] handleSubscriptionDeleted: no local subscription row',
+      { stripeSubscriptionId: stripeSubscription.id, stripeEventId },
+    );
+    captureException(
+      new Error(
+        'Stripe subscription.deleted references unknown local subscription',
+      ),
+      {
+        extra: {
+          context:
+            'stripe.webhook.handleSubscriptionDeleted.subscription_not_found',
+          stripeSubscriptionId: stripeSubscription.id,
+          stripeEventId,
+        },
+      },
+    );
+  }
 }
 
 export async function handleCheckoutCompleted(
@@ -415,6 +470,48 @@ export async function handleCheckoutCompleted(
         },
       },
     );
+    return;
+  }
+
+  // [audit-2026-05-31 #829] Gate on payment_status. For async payment methods
+  // (SEPA Direct Debit, Bacs, BLIK, bank transfer) Stripe fires
+  // checkout.session.completed with payment_status='unpaid' while the
+  // charge is still settling — resolution arrives later via
+  // checkout.session.async_payment_succeeded / async_payment_failed. Granting
+  // paid tier on 'unpaid' lets a user consume the higher quota before money
+  // clears; if the payment ultimately fails the only correction is the
+  // eventual past_due event. Treat 'paid' and 'no_payment_required' (zero-
+  // amount/trial sessions) as the only entitlement-granting states.
+  const paymentStatus = session.payment_status;
+  if (paymentStatus !== 'paid' && paymentStatus !== 'no_payment_required') {
+    logger.warn(
+      '[stripe-webhook] checkout.session.completed deferred — payment not settled',
+      {
+        stripeSessionId: session.id,
+        stripeSubscriptionId,
+        paymentStatus,
+      },
+    );
+    captureException(
+      new Error(
+        `Stripe checkout.session.completed with payment_status='${paymentStatus}' — entitlement deferred until async_payment_succeeded`,
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.checkout.completed.async_payment_pending',
+          stripeSessionId: session.id,
+          stripeSubscriptionId,
+          paymentStatus,
+          accountId,
+          tier,
+        },
+      },
+    );
+    // Ack to Stripe so it does not retry. Entitlement activation must wait
+    // for checkout.session.async_payment_succeeded (or be explicit no-op on
+    // async_payment_failed). Both are additive event types — the unhandled-
+    // event default arm in routes/stripe-webhook.ts will surface them via
+    // Sentry until they are wired here.
     return;
   }
 
@@ -508,7 +605,30 @@ export async function handlePaymentFailed(
     );
   }
 
-  if (!updated) return;
+  if (!updated) {
+    // [audit-2026-05-31 #828] Out-of-order escalation. payment_failed for an
+    // unknown local subscription means the user cannot be moved to past_due
+    // and won't receive the payment-failed alert. CLAUDE.md billing silent-
+    // recovery rule applies.
+    logger.warn(
+      '[stripe-webhook] handlePaymentFailed: no local subscription row',
+      { stripeSubscriptionId, stripeEventId, invoiceId: invoice.id },
+    );
+    captureException(
+      new Error(
+        'Stripe invoice.payment_failed references unknown local subscription',
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.handlePaymentFailed.subscription_not_found',
+          stripeSubscriptionId,
+          stripeEventId,
+          invoiceId: invoice.id,
+        },
+      },
+    );
+    return;
+  }
 
   if (shouldDispatchPaymentFailed) {
     // core-send: payment-failed alert — observed by payment-failed-observe.ts.
@@ -592,6 +712,31 @@ export async function handlePaymentSucceeded(
       {
         stripeSubscriptionId,
         invoiceId: invoice.id,
+      },
+    );
+  }
+
+  // [audit-2026-05-31 #828] Out-of-order escalation. payment_succeeded for an
+  // unknown local subscription leaves the user stuck in their prior status
+  // (commonly past_due) with no observability. CLAUDE.md billing silent-
+  // recovery rule applies.
+  if (updated === null) {
+    logger.warn(
+      '[stripe-webhook] handlePaymentSucceeded: no local subscription row',
+      { stripeSubscriptionId, stripeEventId, invoiceId: invoice.id },
+    );
+    captureException(
+      new Error(
+        'Stripe invoice.payment_succeeded references unknown local subscription',
+      ),
+      {
+        extra: {
+          context:
+            'stripe.webhook.handlePaymentSucceeded.subscription_not_found',
+          stripeSubscriptionId,
+          stripeEventId,
+          invoiceId: invoice.id,
+        },
       },
     );
   }

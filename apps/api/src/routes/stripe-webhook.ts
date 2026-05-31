@@ -102,6 +102,23 @@ export const stripeWebhookRoute = new Hono<{
       eventType: event.type,
       eventId: event.id,
     });
+    // [audit-2026-05-31 #830] Escalate to Sentry. A test-mode event reaching
+    // prod with a valid production-signature is a high-signal security event
+    // (leaked webhook secret, secret reuse, misconfiguration). CLAUDE.md:
+    // billing fallbacks must emit a structured signal; logger.warn alone is
+    // explicitly insufficient. Mirrors the stale-event escalation pattern
+    // ten lines below.
+    captureException(
+      new Error('Stripe test-mode event received in production environment'),
+      {
+        extra: {
+          context: 'stripe.webhook.test_mode_in_production',
+          eventId: event.id,
+          eventType: event.type,
+          livemode: event.livemode,
+        },
+      },
+    );
     return c.json({ received: true, skipped: true });
   }
 
