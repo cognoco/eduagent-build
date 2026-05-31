@@ -30,7 +30,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { RateLimitedError } from '@eduagent/schemas';
+import { ForbiddenError, RateLimitedError } from '@eduagent/schemas';
 
 import {
   clearFetchCalls,
@@ -39,7 +39,12 @@ import {
   restoreFetch,
 } from '../../../../tests/integration/fetch-interceptor';
 import { mockExpoPush } from '../../../../tests/integration/external-mocks';
-import { createNudge, markNudgeRead, markAllNudgesRead } from './nudge';
+import {
+  createNudge,
+  listUnreadNudges,
+  markNudgeRead,
+  markAllNudgesRead,
+} from './nudge';
 
 // ---------------------------------------------------------------------------
 // DB setup
@@ -204,6 +209,7 @@ describeIfDb('nudge service (integration)', () => {
     await seedConsent(childXProfileId);
     await seedConsent(childYProfileId);
     await seedPushToken(childXProfileId);
+    await seedPushToken(parentAProfileId);
   });
 
   afterAll(async () => {
@@ -215,7 +221,14 @@ describeIfDb('nudge service (integration)', () => {
     clearFetchCalls();
     await db
       .delete(nudges)
-      .where(inArray(nudges.toProfileId, [childXProfileId, childYProfileId]));
+      .where(
+        inArray(nudges.toProfileId, [
+          parentAProfileId,
+          parentBProfileId,
+          childXProfileId,
+          childYProfileId,
+        ]),
+      );
   });
 
   // ── 1. Happy path ──────────────────────────────────────────────────────────
@@ -245,6 +258,88 @@ describeIfDb('nudge service (integration)', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.fromProfileId).toBe(parentAProfileId);
     expect(getFetchCalls('exp.host/--/api/v2/push/send')).toHaveLength(1);
+  });
+
+  it('creates a learner-to-guardian nudge row and emits template-key-only push data', async () => {
+    const midDayUtc = new Date();
+    midDayUtc.setUTCHours(14, 0, 0, 0);
+
+    const result = await createNudge(db, {
+      fromProfileId: childXProfileId,
+      toProfileId: parentAProfileId,
+      direction: 'learner_to_guardian',
+      template: 'thanks',
+      now: midDayUtc,
+    });
+
+    expect(result.nudge.fromProfileId).toBe(childXProfileId);
+    expect(result.nudge.toProfileId).toBe(parentAProfileId);
+    expect(result.nudge.direction).toBe('learner_to_guardian');
+    expect(result.nudge.template).toBe('thanks');
+    expect(result.pushSent).toBe(true);
+
+    const rows = await db.query.nudges.findMany({
+      where: eq(nudges.id, result.nudge.id),
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.direction).toBe('learner_to_guardian');
+
+    const pushCalls = getFetchCalls('exp.host/--/api/v2/push/send');
+    expect(pushCalls).toHaveLength(1);
+    const pushBody = JSON.parse(pushCalls[0]!.body ?? '{}') as {
+      data: Record<string, unknown>;
+    };
+    expect(pushBody.data).toEqual({
+      type: 'nudge',
+      nudgeId: result.nudge.id,
+      fromProfileId: childXProfileId,
+      toProfileId: parentAProfileId,
+      direction: 'learner_to_guardian',
+      templateKey: 'thanks',
+    });
+    expect(pushBody.data).not.toHaveProperty('fromDisplayName');
+    expect(pushBody.data).not.toHaveProperty('childMessage');
+  });
+
+  it('lists unread learner-to-guardian nudges for the guardian recipient', async () => {
+    const { nudge } = await createNudge(db, {
+      fromProfileId: childXProfileId,
+      toProfileId: parentAProfileId,
+      direction: 'learner_to_guardian',
+      template: 'need_help',
+    });
+
+    const unread = await listUnreadNudges(db, parentAProfileId);
+
+    expect(unread.map((row) => row.id)).toContain(nudge.id);
+    expect(unread.find((row) => row.id === nudge.id)).toMatchObject({
+      fromProfileId: childXProfileId,
+      toProfileId: parentAProfileId,
+      direction: 'learner_to_guardian',
+      template: 'need_help',
+    });
+  });
+
+  it('[BREAK] denies learner-to-guardian nudge to an unrelated guardian', async () => {
+    await expect(
+      createNudge(db, {
+        fromProfileId: childYProfileId,
+        toProfileId: parentBProfileId,
+        direction: 'learner_to_guardian',
+        template: 'proud_moment',
+      }),
+    ).rejects.toThrow(ForbiddenError);
+
+    const rows = await db
+      .select()
+      .from(nudges)
+      .where(
+        and(
+          eq(nudges.fromProfileId, childYProfileId),
+          eq(nudges.toProfileId, parentBProfileId),
+        ),
+      );
+    expect(rows).toHaveLength(0);
   });
 
   // ── 2. Rate-limit BREAK test ───────────────────────────────────────────────

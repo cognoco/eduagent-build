@@ -11,6 +11,7 @@
 
 import type { Database } from '@eduagent/database';
 import {
+  BadRequestError,
   ConsentRequiredError,
   RateLimitedError,
   ForbiddenError,
@@ -79,6 +80,7 @@ function makeInsertedRow(
     fromProfileId: string;
     toProfileId: string;
     template: string;
+    direction: string;
     createdAt: Date;
     readAt: Date | null;
   }>,
@@ -88,6 +90,7 @@ function makeInsertedRow(
     fromProfileId: overrides?.fromProfileId ?? FROM_PROFILE_ID,
     toProfileId: overrides?.toProfileId ?? TO_PROFILE_ID,
     template: (overrides?.template ?? 'you_got_this') as NudgeTemplate,
+    direction: overrides?.direction ?? 'guardian_to_learner',
     createdAt: overrides?.createdAt ?? BASE_NOW,
     readAt: overrides?.readAt ?? null,
   };
@@ -297,14 +300,99 @@ describe('createNudge', () => {
           title: 'Parent Name sent you a nudge',
           body: 'Proud of you',
           type: 'nudge',
-          data: expect.objectContaining({
+          data: {
             nudgeId: NUDGE_ID,
-            fromDisplayName: 'Parent Name',
+            fromProfileId: FROM_PROFILE_ID,
+            toProfileId: TO_PROFILE_ID,
+            direction: 'guardian_to_learner',
             templateKey: 'proud_of_you',
-          }),
+          },
         }),
         { skipDailyCap: true },
       );
+    });
+
+    it('creates learner-to-guardian nudges through the same delivery path without daily-cap bypass', async () => {
+      const db = makeDb({
+        insertedRow: makeInsertedRow({
+          fromProfileId: TO_PROFILE_ID,
+          toProfileId: FROM_PROFILE_ID,
+          template: 'need_help',
+          direction: 'learner_to_guardian',
+        }),
+        fromProfile: { displayName: 'Learner Name', accountId: ACCOUNT_ID },
+        toProfile: { displayName: 'Guardian Name', accountId: ACCOUNT_ID },
+      });
+
+      const result = await createNudge(db, {
+        fromProfileId: TO_PROFILE_ID,
+        toProfileId: FROM_PROFILE_ID,
+        direction: 'learner_to_guardian',
+        template: 'need_help',
+        now: BASE_NOW,
+      });
+
+      expect(result.nudge).toMatchObject({
+        fromProfileId: TO_PROFILE_ID,
+        toProfileId: FROM_PROFILE_ID,
+        direction: 'learner_to_guardian',
+        template: 'need_help',
+        fromDisplayName: 'Learner Name',
+      });
+      expect(mockAssertParentAccess).toHaveBeenCalledWith(
+        db,
+        FROM_PROFILE_ID,
+        TO_PROFILE_ID,
+      );
+      expect(mockGetConsentStatus).toHaveBeenCalledWith(db, TO_PROFILE_ID);
+      expect(mockSendPushNotification).toHaveBeenCalledWith(db, {
+        profileId: FROM_PROFILE_ID,
+        title: 'Your learner sent you a nudge',
+        body: 'I need help',
+        type: 'nudge',
+        data: {
+          nudgeId: NUDGE_ID,
+          fromProfileId: TO_PROFILE_ID,
+          toProfileId: FROM_PROFILE_ID,
+          direction: 'learner_to_guardian',
+          templateKey: 'need_help',
+        },
+      });
+    });
+
+    it('does not include display names or child free text in learner-to-guardian push data', async () => {
+      const db = makeDb({
+        insertedRow: makeInsertedRow({
+          fromProfileId: TO_PROFILE_ID,
+          toProfileId: FROM_PROFILE_ID,
+          template: 'proud_moment',
+          direction: 'learner_to_guardian',
+        }),
+        fromProfile: { displayName: 'Learner Name', accountId: ACCOUNT_ID },
+        toProfile: { displayName: 'Guardian Name', accountId: ACCOUNT_ID },
+      });
+
+      await createNudge(db, {
+        fromProfileId: TO_PROFILE_ID,
+        toProfileId: FROM_PROFILE_ID,
+        direction: 'learner_to_guardian',
+        template: 'proud_moment',
+        now: BASE_NOW,
+      });
+
+      const payload = mockSendPushNotification.mock.calls[0]?.[1] as {
+        data: Record<string, unknown>;
+      };
+      expect(payload.data).toEqual({
+        nudgeId: NUDGE_ID,
+        fromProfileId: TO_PROFILE_ID,
+        toProfileId: FROM_PROFILE_ID,
+        direction: 'learner_to_guardian',
+        templateKey: 'proud_moment',
+      });
+      expect(payload.data).not.toHaveProperty('fromDisplayName');
+      expect(payload.data).not.toHaveProperty('childMessage');
+      expect(payload.data).not.toHaveProperty('body');
     });
 
     it('falls back to "Your parent" when fromProfile has no displayName', async () => {
@@ -469,6 +557,67 @@ describe('createNudge', () => {
         }),
       ).rejects.toThrow(ConsentRequiredError);
 
+      expect(db.insert as jest.Mock).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] checks learner sender consent for learner-to-guardian nudges', async () => {
+      mockGetConsentStatus.mockResolvedValue('PENDING');
+      const db = makeDb({
+        insertedRow: makeInsertedRow({
+          fromProfileId: TO_PROFILE_ID,
+          toProfileId: FROM_PROFILE_ID,
+          template: 'thanks',
+          direction: 'learner_to_guardian',
+        }),
+      });
+
+      await expect(
+        createNudge(db, {
+          fromProfileId: TO_PROFILE_ID,
+          toProfileId: FROM_PROFILE_ID,
+          direction: 'learner_to_guardian',
+          template: 'thanks',
+          now: BASE_NOW,
+        }),
+      ).rejects.toThrow(ConsentRequiredError);
+
+      expect(mockGetConsentStatus).toHaveBeenCalledWith(db, TO_PROFILE_ID);
+      expect(db.insert as jest.Mock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('template direction validation', () => {
+    it('throws BadRequestError when learner-to-guardian uses a guardian-only template', async () => {
+      const db = makeDb();
+
+      await expect(
+        createNudge(db, {
+          fromProfileId: TO_PROFILE_ID,
+          toProfileId: FROM_PROFILE_ID,
+          direction: 'learner_to_guardian',
+          template: 'you_got_this',
+          now: BASE_NOW,
+        }),
+      ).rejects.toThrow(BadRequestError);
+
+      expect(mockAssertParentAccess).not.toHaveBeenCalled();
+      expect(db.insert as jest.Mock).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestError when guardian-to-learner uses a learner-only template', async () => {
+      const db = makeDb();
+
+      await expect(
+        createNudge(db, {
+          fromProfileId: FROM_PROFILE_ID,
+          toProfileId: TO_PROFILE_ID,
+          direction: 'guardian_to_learner',
+          template: 'thanks',
+          now: BASE_NOW,
+        }),
+      ).rejects.toThrow(BadRequestError);
+
+      expect(mockAssertParentAccess).not.toHaveBeenCalled();
       expect(db.insert as jest.Mock).not.toHaveBeenCalled();
     });
   });
@@ -755,6 +904,7 @@ describe('listUnreadNudges', () => {
       id: 'nudge-aaa',
       fromProfileId: FROM_PROFILE_ID,
       toProfileId: TO_PROFILE_ID,
+      direction: 'guardian_to_learner',
       template: 'you_got_this',
       readAt: null,
     });
@@ -781,6 +931,28 @@ describe('listUnreadNudges', () => {
     expect(result).toHaveLength(2);
     expect(result[0]?.id).toBe('nudge-1');
     expect(result[1]?.id).toBe('nudge-2');
+  });
+
+  it('returns inbound learner-to-guardian nudges for the guardian recipient', async () => {
+    const row = makeInsertedRow({
+      id: 'learner-nudge-1',
+      fromProfileId: TO_PROFILE_ID,
+      toProfileId: FROM_PROFILE_ID,
+      direction: 'learner_to_guardian',
+      template: 'need_help',
+    });
+    const db = makeDb({ listRows: [row] });
+
+    const result = await listUnreadNudges(db, FROM_PROFILE_ID);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: 'learner-nudge-1',
+      fromProfileId: TO_PROFILE_ID,
+      toProfileId: FROM_PROFILE_ID,
+      direction: 'learner_to_guardian',
+      template: 'need_help',
+    });
   });
 });
 

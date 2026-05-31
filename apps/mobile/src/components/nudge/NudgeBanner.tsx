@@ -9,7 +9,13 @@ import { useProfile } from '../../lib/profile';
 import { useThemeColors } from '../../lib/theme';
 import { NudgeUnreadModal } from './NudgeUnreadModal';
 
-export function NudgeBanner(): React.ReactElement | null {
+interface NudgeBannerProps {
+  containerClassName?: string;
+}
+
+export function NudgeBanner({
+  containerClassName = 'mx-5 mt-4 rounded-card bg-primary-soft border border-primary/30 px-4 py-3 flex-row items-center',
+}: NudgeBannerProps = {}): React.ReactElement | null {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
@@ -44,7 +50,7 @@ export function NudgeBanner(): React.ReactElement | null {
     <>
       <Pressable
         onPress={() => setModalOpen(true)}
-        className="mx-5 mt-4 rounded-card bg-primary-soft border border-primary/30 px-4 py-3 flex-row items-center"
+        className={containerClassName}
         accessibilityRole="button"
         testID="nudge-banner"
       >

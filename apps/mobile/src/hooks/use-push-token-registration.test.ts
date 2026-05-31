@@ -198,6 +198,42 @@ describe('usePushTokenRegistration', () => {
     });
   });
 
+  it('exposes a manual retry trigger for settings permission changes', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'denied',
+    });
+
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current).toMatchObject({
+        status: 'failed',
+        reason: 'permission_denied',
+      });
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+    });
+
+    await act(async () => {
+      await result.current.registerIfAllowed();
+    });
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        profileId: 'profile-1',
+        token: 'ExponentPushToken[mock-token]',
+      });
+    });
+    await waitFor(() => {
+      expect(result.current.status).toBe('registered');
+    });
+  });
+
   it('registers again when the active profile changes', async () => {
     const { rerender } = renderHook(() => usePushTokenRegistration(), {
       wrapper: createProfileWrapper(),

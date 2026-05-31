@@ -44,6 +44,7 @@ import {
   WithdrawalCountdownBanner,
   type ChildInGracePeriod,
 } from '../family/WithdrawalCountdownBanner';
+import { LearnerGuardianNudgeCard } from '../nudge/LearnerGuardianNudgeCard';
 import { NudgeBanner } from '../nudge/NudgeBanner';
 import { CoachBand } from './CoachBand';
 import { ChildQuotaLine } from './ChildQuotaLine';
@@ -125,7 +126,7 @@ export function LearnerScreen({
   const { data: progressInventory } = useProgressInventory();
   const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
-  const { switchProfile } = useProfile();
+  const { profiles, switchProfile } = useProfile();
   const hasLinkedChildren = useHasLinkedChildren();
   const ensureStudyMode = useEnsureStudyMode();
   const navigationHome = useNavigationHomeContract();
@@ -488,6 +489,10 @@ export function LearnerScreen({
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
   const showLearningActions = navigationContract.gates.showLearningActions;
+  const guardianProfile =
+    activeProfile && !activeProfile.isOwner && !navigationProxy.active
+      ? (profiles.find((profile) => profile.isOwner) ?? null)
+      : null;
 
   if (showParentHome && navigationContract.gates.showFamilyHome) {
     return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
@@ -544,6 +549,12 @@ export function LearnerScreen({
       >
         <EarlyAdopterCard totalSessions={totalSessions} />
         {showLearningActions ? <NudgeBanner /> : null}
+        {showLearningActions && guardianProfile ? (
+          <LearnerGuardianNudgeCard
+            guardianName={guardianProfile.displayName}
+            guardianProfileId={guardianProfile.id}
+          />
+        ) : null}
 
         {showCoachBand && (
           <View>

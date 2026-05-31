@@ -18,6 +18,7 @@ const NUDGE_A = {
   fromProfileId: '00000000-0000-0000-0000-000000000001',
   toProfileId: '00000000-0000-0000-0000-000000000002',
   fromDisplayName: 'Dad',
+  direction: 'guardian_to_learner' as const,
   template: 'you_got_this' as const,
   createdAt: '2024-01-01T10:00:00.000Z',
   readAt: null,
@@ -28,6 +29,7 @@ const NUDGE_B = {
   fromProfileId: '00000000-0000-0000-0000-000000000003',
   toProfileId: '00000000-0000-0000-0000-000000000002',
   fromDisplayName: 'Mum',
+  direction: 'guardian_to_learner' as const,
   template: 'proud_of_you' as const,
   createdAt: '2024-01-01T11:00:00.000Z',
   readAt: null,
@@ -81,12 +83,30 @@ describe('NudgeUnreadModal', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('renders all four template types with correct localised text', () => {
+  it('renders all template types with correct localised text', () => {
     const allTemplateNudges = [
       { ...NUDGE_A, id: 'n1', template: 'you_got_this' as const },
       { ...NUDGE_A, id: 'n2', template: 'proud_of_you' as const },
       { ...NUDGE_A, id: 'n3', template: 'quick_session' as const },
       { ...NUDGE_A, id: 'n4', template: 'thinking_of_you' as const },
+      {
+        ...NUDGE_A,
+        id: 'n5',
+        direction: 'learner_to_guardian' as const,
+        template: 'thanks' as const,
+      },
+      {
+        ...NUDGE_A,
+        id: 'n6',
+        direction: 'learner_to_guardian' as const,
+        template: 'need_help' as const,
+      },
+      {
+        ...NUDGE_A,
+        id: 'n7',
+        direction: 'learner_to_guardian' as const,
+        template: 'proud_moment' as const,
+      },
     ];
 
     render(
@@ -95,10 +115,11 @@ describe('NudgeUnreadModal', () => {
 
     screen.getByText('You got this');
     screen.getByText('Proud of you');
-    // en.json nudge.templates.quick_session = "Want to do a quick session?"
     screen.getByText('Want to do a quick session?');
-    // en.json nudge.templates.thinking_of_you = "Just thinking of you"
     screen.getByText('Just thinking of you');
+    screen.getByText('Thank you');
+    screen.getByText('I need help');
+    screen.getByText("I'm proud of what I did");
   });
 
   it('renders an empty list without crashing when nudges is empty', () => {

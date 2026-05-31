@@ -317,7 +317,12 @@
       "weeklyEmailDigestTitle": "Wöchentliche Fortschritts-E-Mail",
       "monthlyEmailDigestTitle": "Monatliche Fortschritts-E-Mail",
       "emailDigestDescription": "Wird an die E-Mail-Adresse deines Kontos gesendet.",
-      "updateErrorTitle": "Benachrichtigungseinstellungen konnten nicht aktualisiert werden"
+      "updateErrorTitle": "Benachrichtigungseinstellungen konnten nicht aktualisiert werden",
+      "pushMissingPermission": "Benachrichtigungen von deinem Gerät zulassen.",
+      "pushMissingServer": "Push-Benachrichtigungen hier aktivieren.",
+      "pushMissingToken": "Dieses Gerät für Push-Benachrichtigungen registrieren.",
+      "openSettingsTitle": "Einstellungen öffnen",
+      "openSettingsDescription": "Benachrichtigungen für diese App sind blockiert. Aktiviere sie in den Systemeinstellungen."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -2254,7 +2259,10 @@
       "you_got_this": "Du schaffst das",
       "proud_of_you": "Ich bin stolz auf dich",
       "quick_session": "Lust auf eine kurze Sitzung?",
-      "thinking_of_you": "Ich denke an dich"
+      "thinking_of_you": "Ich denke an dich",
+      "thanks": "Danke",
+      "need_help": "Ich brauche Hilfe",
+      "proud_moment": "Ich bin stolz auf mich"
     },
     "toast": {
       "sent": "Nudge gesendet"
@@ -2268,6 +2276,16 @@
       "title": "{{fromDisplayName}} hat dir einen Nudge gesendet",
       "unreadCount": "{{count}} neu",
       "modalTitle": "Neue Nudges"
+    },
+    "learnerSignal": {
+      "title": "Sende ein kurzes Signal",
+      "subtitle": "Lass {{guardianName}} wissen, was du brauchst, ohne eine Nachricht zu tippen.",
+      "toast": "Signal gesendet",
+      "error": {
+        "rateLimit": "Versuche es später noch einmal.",
+        "consentPending": "Signale funktionieren, sobald dein Konto vollständig eingerichtet ist.",
+        "forbidden": "Wir konnten diese Verbindung nicht bestätigen."
+      }
     }
   },
   "practiceHub": {
@@ -2653,6 +2671,12 @@
       "crossContextPromptMessage": "Du bist in einer Sitzung. Beende sie zuerst oder öffne das Update und verlasse den aktuellen Vorgang.",
       "stayHere": "Hier bleiben",
       "openUpdate": "Update öffnen"
+    },
+    "guardianPrimer": {
+      "title": "Auf dem Laufenden bleiben?",
+      "message": "Wir können dich benachrichtigen, wenn ein Kind deine Aufmerksamkeit braucht. Du kannst das jederzeit in den Einstellungen ändern.",
+      "allow": "Zulassen",
+      "notNow": "Nicht jetzt"
     }
   }
 }

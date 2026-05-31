@@ -38,6 +38,14 @@ jest.mock(
   }),
 );
 
+const mockUseGuardianNotificationAsk = jest.fn();
+jest.mock(
+  '../../hooks/use-guardian-notification-ask' /* gc1-allow: hook behavior is covered in its colocated test; this screen spec only verifies the parent-home mount trigger */,
+  () => ({
+    useGuardianNotificationAsk: () => mockUseGuardianNotificationAsk(),
+  }),
+);
+
 jest.mock(
   '../../lib/platform-alert' /* gc1-allow: wraps Alert.alert which is unavailable in JSDOM */,
   () => ({ platformAlert: jest.fn() }),
@@ -124,6 +132,7 @@ interface RouteOptions {
   subscriptionTier?: 'free' | 'plus' | 'family' | 'pro';
   family?: { profileCount: number; maxProfiles: number } | null;
   childCapNotifications?: ChildCapNotificationFixture[];
+  nudges?: unknown[];
   recaps?: unknown[];
   childMemory?: unknown;
   progressSummary?: unknown;
@@ -161,6 +170,7 @@ function buildRoutes(opts: RouteOptions = {}) {
     '/notifications/child-cap': {
       notifications: opts.childCapNotifications ?? [],
     },
+    '/nudges': { nudges: opts.nudges ?? [] },
     '/memory': {
       memory: opts.childMemory ?? {
         categories: [],
@@ -278,6 +288,37 @@ describe('ParentHomeScreen', () => {
     );
 
     result.getByText('Hey Alex');
+  });
+
+  it('mounts the guardian notification ask from the parent-home surface', async () => {
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
+
+    expect(mockUseGuardianNotificationAsk).toHaveBeenCalled();
+  });
+
+  it('renders inbound learner nudges on the parent home', async () => {
+    const { result } = mount([PARENT, CHILD_A], {
+      nudges: [
+        {
+          id: '01914d6a-0000-7000-8000-000000000030',
+          fromProfileId: '01914d6a-0000-7000-8000-000000000002',
+          toProfileId: '01914d6a-0000-7000-8000-000000000001',
+          fromDisplayName: 'Emma',
+          direction: 'learner_to_guardian',
+          template: 'need_help',
+          createdAt: '2026-05-31T12:00:00.000Z',
+          readAt: null,
+        },
+      ],
+    });
+    await waitForParentTransitionNotice(result);
+
+    await waitFor(() => {
+      result.getByTestId('nudge-banner');
+      result.getByText('Emma sent you a nudge');
+      result.getByText('I need help');
+    });
   });
 
   it('renders one command card per linked child with actions inside it', async () => {

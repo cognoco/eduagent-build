@@ -28,6 +28,7 @@ import {
   useDismissChildCapNotification,
 } from '../../hooks/use-child-cap-notifications';
 import { useChildMemory, useDashboard } from '../../hooks/use-dashboard';
+import { useGuardianNotificationAsk } from '../../hooks/use-guardian-notification-ask';
 import { useChildProgressSummary } from '../../hooks/use-progress';
 import {
   useFamilySubscription,
@@ -45,6 +46,7 @@ import {
   type ChildInGracePeriod,
 } from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
+import { NudgeBanner } from '../nudge/NudgeBanner';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
 import { BaseCoachingCard } from '../coaching/BaseCoachingCard';
 import { LearnTogetherSheet } from '../family/LearnTogetherSheet';
@@ -692,6 +694,7 @@ export function ParentHomeScreen({
   const colors = useThemeColors();
   const role = useActiveProfileRole();
   const linkedChildren = useLinkedChildren();
+  useGuardianNotificationAsk();
   const { data: dashboard } = useDashboard();
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
@@ -929,6 +932,8 @@ export function ParentHomeScreen({
             ))}
           </View>
         ) : null}
+
+        <NudgeBanner containerClassName="mt-3 rounded-card bg-primary-soft border border-primary/30 px-4 py-3 flex-row items-center" />
 
         {linkedChildren.length > 0 ? (
           <View className="mt-4">

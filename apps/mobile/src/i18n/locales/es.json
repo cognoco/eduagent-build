@@ -313,7 +313,12 @@
       "weeklyEmailDigestTitle": "Correo semanal de progreso",
       "monthlyEmailDigestTitle": "Correo mensual de progreso",
       "emailDigestDescription": "Se envía al correo electrónico de tu cuenta.",
-      "updateErrorTitle": "No se pudo actualizar la configuración de notificaciones"
+      "updateErrorTitle": "No se pudo actualizar la configuración de notificaciones",
+      "pushMissingPermission": "Permite las notificaciones de tu dispositivo.",
+      "pushMissingServer": "Activa las notificaciones push aquí.",
+      "pushMissingToken": "Registra este dispositivo para notificaciones push.",
+      "openSettingsTitle": "Abrir Ajustes",
+      "openSettingsDescription": "Las notificaciones están bloqueadas para esta app. Actívalas en los ajustes del sistema."
     },
     "account": {
       "sectionHeader": "Cuenta",
@@ -2254,7 +2259,10 @@
       "you_got_this": "Tu puedes",
       "proud_of_you": "Estoy orgulloso/a de ti",
       "quick_session": "Quieres hacer una sesion rapida?",
-      "thinking_of_you": "Estoy pensando en ti"
+      "thinking_of_you": "Estoy pensando en ti",
+      "thanks": "Gracias",
+      "need_help": "Necesito ayuda",
+      "proud_moment": "Estoy orgulloso de lo que hice"
     },
     "toast": {
       "sent": "Nudge enviado"
@@ -2268,6 +2276,16 @@
       "title": "{{fromDisplayName}} te envio un nudge",
       "unreadCount": "{{count}} nuevos",
       "modalTitle": "Nuevos nudges"
+    },
+    "learnerSignal": {
+      "title": "Envía una señal rápida",
+      "subtitle": "Hazle saber a {{guardianName}} lo que necesitas sin escribir un mensaje.",
+      "toast": "Señal enviada",
+      "error": {
+        "rateLimit": "Inténtalo de nuevo más tarde.",
+        "consentPending": "Las señales funcionarán cuando tu cuenta esté configurada.",
+        "forbidden": "No pudimos confirmar el vínculo con el tutor."
+      }
     }
   },
   "practiceHub": {
@@ -2653,6 +2671,12 @@
       "crossContextPromptMessage": "Estás en una sesión. Termínala primero o abre la actualización y sal del flujo actual.",
       "stayHere": "Quedarse aquí",
       "openUpdate": "Abrir actualización"
+    },
+    "guardianPrimer": {
+      "title": "¿Quieres estar al día?",
+      "message": "Podemos enviarte un aviso cuando un niño necesite tu atención. Puedes cambiarlo cuando quieras en Ajustes.",
+      "allow": "Permitir",
+      "notNow": "Ahora no"
     }
   }
 }

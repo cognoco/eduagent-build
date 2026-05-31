@@ -259,7 +259,10 @@
       "you_got_this": "Dasz radę",
       "proud_of_you": "Jestem z ciebie dumny/a",
       "quick_session": "Może szybka sesja?",
-      "thinking_of_you": "Myślę o tobie"
+      "thinking_of_you": "Myślę o tobie",
+      "thanks": "Dziękuję",
+      "need_help": "Potrzebuję pomocy",
+      "proud_moment": "Jestem z siebie dumny/dumna"
     },
     "toast": {
       "sent": "Zachęta wysłana"
@@ -273,6 +276,16 @@
       "title": "{{fromDisplayName}} wysłał(a) ci zachętę",
       "unreadCount": "{{count}} nowe",
       "modalTitle": "Nowe zachęty"
+    },
+    "learnerSignal": {
+      "title": "Wyślij szybki sygnał",
+      "subtitle": "Daj znać {{guardianName}}, czego potrzebujesz, bez pisania wiadomości.",
+      "toast": "Sygnał wysłany",
+      "error": {
+        "rateLimit": "Spróbuj ponownie trochę później.",
+        "consentPending": "Sygnały działają po pełnej konfiguracji konta.",
+        "forbidden": "Nie mogliśmy potwierdzić tego połączenia z opiekunem."
+      }
     }
   },
   "family": {
@@ -338,7 +351,12 @@
       "weeklyEmailDigestTitle": "Tygodniowy e-mail z postępami",
       "monthlyEmailDigestTitle": "Miesięczny e-mail z postępami",
       "emailDigestDescription": "Wysyłane na adres e-mail Twojego konta.",
-      "updateErrorTitle": "Nie można zaktualizować ustawień powiadomień"
+      "updateErrorTitle": "Nie można zaktualizować ustawień powiadomień",
+      "pushMissingPermission": "Zezwól na powiadomienia z tego urządzenia.",
+      "pushMissingServer": "Włącz tutaj powiadomienia push.",
+      "pushMissingToken": "Zarejestruj urządzenie dla powiadomień push.",
+      "openSettingsTitle": "Otwórz Ustawienia",
+      "openSettingsDescription": "Powiadomienia dla tej aplikacji są zablokowane. Włącz je w ustawieniach systemowych."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -2653,6 +2671,12 @@
       "crossContextPromptMessage": "Jesteś w trakcie sesji. Najpierw ją ukończ lub otwórz aktualizację i opuść bieżącą aktywność.",
       "stayHere": "Zostań tutaj",
       "openUpdate": "Otwórz aktualizację"
+    },
+    "guardianPrimer": {
+      "title": "Chcesz być na bieżąco?",
+      "message": "Możemy wysłać delikatne przypomnienie, gdy dziecko będzie potrzebować Twojej uwagi. Możesz to zmienić w dowolnym momencie w Ustawieniach.",
+      "allow": "Zezwól",
+      "notNow": "Nie teraz"
     }
   }
 }

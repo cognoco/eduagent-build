@@ -87,9 +87,19 @@ const SAMPLE_NUDGE = {
   fromProfileId: PARENT_ID,
   toProfileId: CHILD_ID,
   fromDisplayName: 'Parent',
+  direction: 'guardian_to_learner' as const,
   template: 'you_got_this' as const,
   createdAt: '2026-05-10T12:00:00.000Z',
   readAt: null,
+};
+
+const SAMPLE_LEARNER_NUDGE = {
+  ...SAMPLE_NUDGE,
+  fromProfileId: CHILD_ID,
+  toProfileId: PARENT_ID,
+  fromDisplayName: 'Alex',
+  direction: 'learner_to_guardian' as const,
+  template: 'thanks' as const,
 };
 
 beforeAll(() => {
@@ -161,6 +171,76 @@ describe('POST /v1/nudges', () => {
       TEST_ENV,
     );
     expect(res.status).toBe(400);
+  });
+
+  it('creates a learner-to-guardian nudge and passes the explicit direction', async () => {
+    mockProfileFindFirst.mockResolvedValue({
+      id: CHILD_ID,
+      accountId: 'test-account-id',
+      displayName: 'Alex',
+      avatarUrl: null,
+      birthYear: 2012,
+      location: null,
+      isOwner: false,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      pronouns: null,
+      createdAt: new Date('2026-01-02T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+      archivedAt: null,
+    });
+    mockCreateNudge.mockResolvedValue({
+      nudge: SAMPLE_LEARNER_NUDGE,
+      pushSent: true,
+    });
+
+    const res = await app.request(
+      '/v1/nudges',
+      {
+        method: 'POST',
+        headers: CHILD_HEADERS,
+        body: JSON.stringify({
+          toProfileId: PARENT_ID,
+          direction: 'learner_to_guardian',
+          template: 'thanks',
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      nudge: SAMPLE_LEARNER_NUDGE,
+      pushSent: true,
+    });
+    expect(mockCreateNudge).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        fromProfileId: CHILD_ID,
+        toProfileId: PARENT_ID,
+        direction: 'learner_to_guardian',
+        template: 'thanks',
+      }),
+    );
+  });
+
+  it('returns 400 when a learner-to-guardian request uses a guardian-only template', async () => {
+    const res = await app.request(
+      '/v1/nudges',
+      {
+        method: 'POST',
+        headers: CHILD_HEADERS,
+        body: JSON.stringify({
+          toProfileId: PARENT_ID,
+          direction: 'learner_to_guardian',
+          template: 'you_got_this',
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockCreateNudge).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing toProfileId', async () => {

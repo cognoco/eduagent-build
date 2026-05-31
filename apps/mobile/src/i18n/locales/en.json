@@ -333,6 +333,11 @@
       "weeklyEmailDigestTitle": "Weekly progress email",
       "monthlyEmailDigestTitle": "Monthly progress email",
       "emailDigestDescription": "Sent to your account email.",
+      "pushMissingPermission": "Allow notifications from your device.",
+      "pushMissingServer": "Turn on push notifications here.",
+      "pushMissingToken": "Register this device for push notifications.",
+      "openSettingsTitle": "Open Settings",
+      "openSettingsDescription": "Notifications are blocked for this app. Turn them on in system settings.",
       "updateErrorTitle": "Could not update notification settings"
     },
     "privacy": {
@@ -2373,6 +2378,12 @@
       "crossContextPromptMessage": "You are in a session. Finish this first, or open the update and leave the current flow.",
       "stayHere": "Stay here",
       "openUpdate": "Open update"
+    },
+    "guardianPrimer": {
+      "title": "Stay in the loop?",
+      "message": "We can send a gentle nudge when a child needs your attention. You can change this anytime in Settings.",
+      "allow": "Allow",
+      "notNow": "Not now"
     }
   },
   "nudge": {
@@ -2384,7 +2395,20 @@
       "you_got_this": "You got this",
       "proud_of_you": "Proud of you",
       "quick_session": "Want to do a quick session?",
-      "thinking_of_you": "Just thinking of you"
+      "thinking_of_you": "Just thinking of you",
+      "thanks": "Thank you",
+      "need_help": "I need help",
+      "proud_moment": "I'm proud of what I did"
+    },
+    "learnerSignal": {
+      "title": "Send a quick signal",
+      "subtitle": "Let {{guardianName}} know what you need without typing a message.",
+      "toast": "Signal sent",
+      "error": {
+        "rateLimit": "Try again a little later.",
+        "consentPending": "Signals work once your account is fully set up.",
+        "forbidden": "We couldn't confirm that guardian link."
+      }
     },
     "toast": {
       "sent": "Nudge sent"

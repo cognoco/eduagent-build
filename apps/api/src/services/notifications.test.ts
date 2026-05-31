@@ -156,8 +156,10 @@ describe('sendPushNotification', () => {
       ...payload,
       type: 'nudge',
       data: {
-        nudgeId: 'nudge-1',
-        fromDisplayName: 'Parent',
+        nudgeId: '01914d6a-0000-7000-8000-000000000010',
+        fromProfileId: '01914d6a-0000-7000-8000-000000000001',
+        toProfileId: '01914d6a-0000-7000-8000-000000000002',
+        direction: 'guardian_to_learner',
         templateKey: 'you_got_this',
       },
     });
@@ -167,8 +169,10 @@ describe('sendPushNotification', () => {
     };
     expect(body.data).toEqual({
       type: 'nudge',
-      nudgeId: 'nudge-1',
-      fromDisplayName: 'Parent',
+      nudgeId: '01914d6a-0000-7000-8000-000000000010',
+      fromProfileId: '01914d6a-0000-7000-8000-000000000001',
+      toProfileId: '01914d6a-0000-7000-8000-000000000002',
+      direction: 'guardian_to_learner',
       templateKey: 'you_got_this',
     });
   });

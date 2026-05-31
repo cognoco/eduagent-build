@@ -1,6 +1,8 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { Linking, Platform } from 'react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as Notifications from 'expo-notifications';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -13,6 +15,7 @@ interface NotifPrefs {
   weeklyProgressEmail: boolean;
   monthlyProgressEmail: boolean;
   pushEnabled: boolean;
+  pushTokenRegistered: boolean;
 }
 
 let mockNotifPrefs: NotifPrefs | undefined = {
@@ -22,11 +25,14 @@ let mockNotifPrefs: NotifPrefs | undefined = {
   weeklyProgressEmail: true,
   monthlyProgressEmail: true,
   pushEnabled: false,
+  pushTokenRegistered: false,
 };
 let mockNotifLoading = false;
 let mockNotifError = false;
 const mockUpdateMutate = jest.fn();
 let mockUpdateIsPending = false;
+const mockRegisterIfAllowed = jest.fn().mockResolvedValue(undefined);
+const mockRefetchNotificationSettings = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
   '../../../hooks/use-settings' /* gc1-allow: settings hooks fetch from API via React Query */,
@@ -35,10 +41,21 @@ jest.mock(
       data: mockNotifPrefs,
       isLoading: mockNotifLoading,
       isError: mockNotifError,
+      refetch: mockRefetchNotificationSettings,
     }),
     useUpdateNotificationSettings: () => ({
       mutate: mockUpdateMutate,
       isPending: mockUpdateIsPending,
+    }),
+  }),
+);
+
+jest.mock(
+  '../../../hooks/use-push-token-registration' /* gc1-allow: screen test controls the native push registration boundary */,
+  () => ({
+    usePushTokenRegistration: () => ({
+      status: 'idle',
+      registerIfAllowed: mockRegisterIfAllowed,
     }),
   }),
 );
@@ -55,7 +72,7 @@ jest.mock(
 jest.mock(
   '../../../components/more/settings-rows' /* gc1-allow: isolates settings rows from NativeWind styling in screen test */,
   () => {
-    const { Switch, Text, View } = require('react-native');
+    const { Pressable, Switch, Text, View } = require('react-native');
     return {
       SectionHeader: ({
         children,
@@ -70,6 +87,7 @@ jest.mock(
       ),
       ToggleRow: ({
         label,
+        description,
         value,
         onToggle,
         disabled,
@@ -84,6 +102,7 @@ jest.mock(
       }) => (
         <View testID={testID ? `row-${testID}` : undefined}>
           <Text>{label}</Text>
+          {description ? <Text>{description}</Text> : null}
           <Switch
             value={value}
             onValueChange={onToggle}
@@ -91,6 +110,22 @@ jest.mock(
             testID={testID}
           />
         </View>
+      ),
+      SettingsRow: ({
+        label,
+        description,
+        onPress,
+        testID,
+      }: {
+        label: string;
+        description?: string;
+        onPress?: () => void;
+        testID?: string;
+      }) => (
+        <Pressable onPress={onPress} testID={testID}>
+          <Text>{label}</Text>
+          {description ? <Text>{description}</Text> : null}
+        </Pressable>
       ),
     };
   },
@@ -129,7 +164,27 @@ describe('NotificationsScreen', () => {
       weeklyProgressEmail: true,
       monthlyProgressEmail: true,
       pushEnabled: false,
+      pushTokenRegistered: false,
     };
+    mockRegisterIfAllowed.mockResolvedValue(undefined);
+    mockRefetchNotificationSettings.mockResolvedValue(undefined);
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+      canAskAgain: true,
+      granted: true,
+      expires: 'never',
+    });
+    (Notifications.requestPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+      canAskAgain: true,
+      granted: true,
+      expires: 'never',
+    });
+    jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'ios',
+    });
   });
 
   it('renders all toggle rows', () => {
@@ -151,6 +206,73 @@ describe('NotificationsScreen', () => {
     expect(toggle.props.value).toBe(false);
   });
 
+  it('renders push as on only when OS permission, server flag, and token are present', async () => {
+    mockNotifPrefs = {
+      reviewReminders: false,
+      dailyReminders: false,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: true,
+      pushEnabled: true,
+      pushTokenRegistered: true,
+    };
+
+    const { getByTestId } = render(<NotificationsScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(getByTestId('push-notifications-toggle').props.value).toBe(true);
+    });
+  });
+
+  it.each([
+    {
+      name: 'OS permission missing',
+      permission: { status: 'denied', canAskAgain: true },
+      prefs: { pushEnabled: true, pushTokenRegistered: true },
+      description: 'Allow notifications from your device.',
+    },
+    {
+      name: 'server switch missing',
+      permission: { status: 'granted', canAskAgain: true },
+      prefs: { pushEnabled: false, pushTokenRegistered: true },
+      description: 'Turn on push notifications here.',
+    },
+    {
+      name: 'token missing',
+      permission: { status: 'granted', canAskAgain: true },
+      prefs: { pushEnabled: true, pushTokenRegistered: false },
+      description: 'Register this device for push notifications.',
+    },
+  ])(
+    'renders push as off and explains the missing signal: $name',
+    async ({ permission, prefs, description }) => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue(
+        permission,
+      );
+      mockNotifPrefs = {
+        reviewReminders: false,
+        dailyReminders: false,
+        weeklyProgressPush: true,
+        weeklyProgressEmail: true,
+        monthlyProgressEmail: true,
+        ...prefs,
+      };
+
+      const { getByTestId, getByText } = render(<NotificationsScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(getByTestId('push-notifications-toggle').props.value).toBe(
+          false,
+        );
+      });
+      getByText(description);
+    },
+  );
+
   it('reflects weeklyProgressPush=true from prefs', () => {
     const { getByTestId } = render(<NotificationsScreen />, {
       wrapper: createWrapper(),
@@ -159,15 +281,78 @@ describe('NotificationsScreen', () => {
     expect(toggle.props.value).toBe(true);
   });
 
-  it('calls updateNotifications.mutate with updated pushEnabled when push toggle pressed', () => {
+  it('requests OS permission and registers a token when enabling from an undetermined state', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'undetermined',
+      canAskAgain: true,
+    });
+    mockUpdateMutate.mockImplementation((_input, options) => {
+      options?.onSuccess?.();
+    });
+
     const { getByTestId } = render(<NotificationsScreen />, {
       wrapper: createWrapper(),
     });
     fireEvent(getByTestId('push-notifications-toggle'), 'valueChange', true);
+
+    await waitFor(() => {
+      expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    });
     expect(mockUpdateMutate).toHaveBeenCalledWith(
       expect.objectContaining({ pushEnabled: true }),
       expect.objectContaining({ onError: expect.any(Function) }),
     );
+    await waitFor(() => {
+      expect(mockRegisterIfAllowed).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('requests Android POST_NOTIFICATIONS when Android can still ask', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'denied',
+      canAskAgain: true,
+    });
+    mockUpdateMutate.mockImplementation((_input, options) => {
+      options?.onSuccess?.();
+    });
+
+    const { getByTestId } = render(<NotificationsScreen />, {
+      wrapper: createWrapper(),
+    });
+    fireEvent(getByTestId('push-notifications-toggle'), 'valueChange', true);
+
+    await waitFor(() => {
+      expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(mockRegisterIfAllowed).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('renders an Open Settings action when OS permission cannot be requested again', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'denied',
+      canAskAgain: false,
+    });
+
+    const { getByTestId, findByTestId } = render(<NotificationsScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    const settingsAction = await findByTestId(
+      'push-notifications-open-settings',
+    );
+
+    fireEvent(getByTestId('push-notifications-toggle'), 'valueChange', true);
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockUpdateMutate).not.toHaveBeenCalled();
+
+    fireEvent.press(settingsAction);
+    expect(Linking.openSettings).toHaveBeenCalledTimes(1);
   });
 
   it('calls updateNotifications.mutate with updated weeklyProgressPush when digest toggle pressed', () => {
@@ -203,12 +388,15 @@ describe('NotificationsScreen', () => {
     );
   });
 
-  it('shows error alert when update fails (via onError callback)', () => {
+  it('shows error alert when update fails (via onError callback)', async () => {
     const { getByTestId } = render(<NotificationsScreen />, {
       wrapper: createWrapper(),
     });
     // Capture the onError callback from the last mutate call
     fireEvent(getByTestId('push-notifications-toggle'), 'valueChange', true);
+    await waitFor(() => {
+      expect(mockUpdateMutate).toHaveBeenCalled();
+    });
     const mutateCall = mockUpdateMutate.mock.calls[0];
     const { onError } = mutateCall[1];
     onError();

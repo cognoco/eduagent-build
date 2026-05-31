@@ -28,6 +28,7 @@ interface NotificationPrefs {
   weeklyProgressEmail: boolean;
   monthlyProgressEmail: boolean;
   pushEnabled: boolean;
+  pushTokenRegistered: boolean;
   maxDailyPush: number;
 }
 

@@ -313,7 +313,12 @@
       "weeklyEmailDigestTitle": "Ukentlig fremdrifts-e-post",
       "monthlyEmailDigestTitle": "Månedlig fremdrifts-e-post",
       "emailDigestDescription": "Sendes til e-postadressen på kontoen din.",
-      "updateErrorTitle": "Kunne ikke oppdatere varslingsinnstillinger"
+      "updateErrorTitle": "Kunne ikke oppdatere varslingsinnstillinger",
+      "pushMissingPermission": "Tillat varsler fra enheten din.",
+      "pushMissingServer": "Slå på push-varsler her.",
+      "pushMissingToken": "Registrer denne enheten for push-varsler.",
+      "openSettingsTitle": "Åpne innstillinger",
+      "openSettingsDescription": "Varsler er blokkert for denne appen. Slå dem på i systeminnstillingene."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -2254,7 +2259,10 @@
       "you_got_this": "Dette klarer du",
       "proud_of_you": "Jeg er stolt av deg",
       "quick_session": "Vil du ta en kort økt?",
-      "thinking_of_you": "Tenker på deg"
+      "thinking_of_you": "Tenker på deg",
+      "thanks": "Takk",
+      "need_help": "Jeg trenger hjelp",
+      "proud_moment": "Jeg er stolt av det jeg gjorde"
     },
     "toast": {
       "sent": "Nudge sendt"
@@ -2268,6 +2276,16 @@
       "title": "{{fromDisplayName}} sendte deg en nudge",
       "unreadCount": "{{count}} nye",
       "modalTitle": "Nye nudger"
+    },
+    "learnerSignal": {
+      "title": "Send et raskt signal",
+      "subtitle": "La {{guardianName}} vite hva du trenger uten å skrive en melding.",
+      "toast": "Signal sendt",
+      "error": {
+        "rateLimit": "Prøv igjen litt senere.",
+        "consentPending": "Signaler fungerer når kontoen din er ferdig konfigurert.",
+        "forbidden": "Vi kunne ikke bekrefte den foresattes kobling."
+      }
     }
   },
   "practiceHub": {
@@ -2653,6 +2671,12 @@
       "crossContextPromptMessage": "Du er i en økt. Fullfør denne først, eller åpne oppdateringen og forlat det du holder på med.",
       "stayHere": "Bli her",
       "openUpdate": "Åpne oppdatering"
+    },
+    "guardianPrimer": {
+      "title": "Holde deg oppdatert?",
+      "message": "Vi kan sende et lite varsel når et barn trenger din oppmerksomhet. Du kan endre dette når som helst i Innstillinger.",
+      "allow": "Tillat",
+      "notNow": "Ikke nå"
     }
   }
 }

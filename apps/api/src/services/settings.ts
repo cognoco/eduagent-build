@@ -35,6 +35,7 @@ export interface NotificationPrefs {
   weeklyProgressEmail: boolean;
   monthlyProgressEmail: boolean;
   pushEnabled: boolean;
+  pushTokenRegistered: boolean;
   maxDailyPush: number;
 }
 
@@ -54,6 +55,7 @@ const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   weeklyProgressEmail: true,
   monthlyProgressEmail: true,
   pushEnabled: false,
+  pushTokenRegistered: false,
   maxDailyPush: 3,
 };
 
@@ -101,6 +103,7 @@ export async function getNotificationPrefs(
     weeklyProgressEmail: row.weeklyProgressEmail ?? true,
     monthlyProgressEmail: row.monthlyProgressEmail ?? true,
     pushEnabled: row.pushEnabled,
+    pushTokenRegistered: Boolean(row.expoPushToken),
     maxDailyPush: row.maxDailyPush,
   };
 }
@@ -205,6 +208,7 @@ export async function upsertNotificationPrefs(
     weeklyProgressEmail,
     monthlyProgressEmail,
     pushEnabled: input.pushEnabled,
+    pushTokenRegistered: Boolean(existing?.expoPushToken),
     maxDailyPush,
   };
 }

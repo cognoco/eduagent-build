@@ -7,6 +7,14 @@ export const nudgeTemplateEnum = pgEnum('nudge_template', [
   'proud_of_you',
   'quick_session',
   'thinking_of_you',
+  'thanks',
+  'need_help',
+  'proud_moment',
+]);
+
+export const nudgeDirectionEnum = pgEnum('nudge_direction', [
+  'guardian_to_learner',
+  'learner_to_guardian',
 ]);
 
 export const nudges = pgTable(
@@ -21,6 +29,9 @@ export const nudges = pgTable(
     toProfileId: uuid('to_profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
+    direction: nudgeDirectionEnum('direction')
+      .notNull()
+      .default('guardian_to_learner'),
     template: nudgeTemplateEnum('template').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

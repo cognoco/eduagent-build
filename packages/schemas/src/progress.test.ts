@@ -405,6 +405,7 @@ describe('notificationPrefsResponseSchema', () => {
       weeklyProgressEmail: false,
       monthlyProgressEmail: true,
       pushEnabled: true,
+      pushTokenRegistered: true,
       maxDailyPush: 3,
     });
     expect(result.success).toBe(true);
@@ -421,6 +422,7 @@ describe('getNotificationsResponseSchema', () => {
         weeklyProgressEmail: false,
         monthlyProgressEmail: true,
         pushEnabled: true,
+        pushTokenRegistered: true,
         maxDailyPush: 3,
       },
     });

@@ -30,19 +30,39 @@ export const notificationTypeSchema = z.enum([
   'support_outbox_spillover',
 ]);
 
-export const nudgeTemplateSchema = z.enum([
+export const guardianToLearnerNudgeTemplates = [
   'you_got_this',
   'proud_of_you',
   'quick_session',
   'thinking_of_you',
+] as const;
+
+export const learnerToGuardianNudgeTemplates = [
+  'thanks',
+  'need_help',
+  'proud_moment',
+] as const;
+
+export const nudgeTemplateSchema = z.enum([
+  ...guardianToLearnerNudgeTemplates,
+  ...learnerToGuardianNudgeTemplates,
 ]);
 export type NudgeTemplate = z.infer<typeof nudgeTemplateSchema>;
+
+export const nudgeDirectionSchema = z.enum([
+  'guardian_to_learner',
+  'learner_to_guardian',
+]);
+export type NudgeDirection = z.infer<typeof nudgeDirectionSchema>;
+
+const guardianTemplateSet = new Set<string>(guardianToLearnerNudgeTemplates);
+const learnerTemplateSet = new Set<string>(learnerToGuardianNudgeTemplates);
 
 // ---------------------------------------------------------------------------
 // [CR-178] Typed notification data shapes — discriminated union by type.
 //
 // `nudge` is the only type that currently carries a structured data payload
-// (nudgeId, fromDisplayName, templateKey — forwarded to the mobile
+// (nudgeId, profile IDs, direction, templateKey — forwarded to the mobile
 // deep-link handler in nudge.ts). All other types confirmed to pass no
 // `data` at current call sites (grep apps/api/src/**/*.ts, 2026-05-22).
 //
@@ -59,9 +79,11 @@ const notificationBaseSchema = z.object({
 /** nudge: carries structured data forwarded to the mobile deep-link handler */
 const nudgePayloadSchema = notificationBaseSchema.extend({
   type: z.literal('nudge'),
-  data: z.object({
+  data: z.strictObject({
     nudgeId: z.string().uuid(),
-    fromDisplayName: z.string(),
+    fromProfileId: z.string().uuid(),
+    toProfileId: z.string().uuid(),
+    direction: nudgeDirectionSchema,
     templateKey: nudgeTemplateSchema,
   }),
 });
@@ -82,18 +104,33 @@ export const notificationPayloadSchema = z.union([
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
 export const nudgeCreateSchema = z
-  .object({
+  .strictObject({
     toProfileId: z.string().uuid(),
+    direction: nudgeDirectionSchema.default('guardian_to_learner'),
     template: nudgeTemplateSchema,
   })
-  .strict();
-export type NudgeCreateInput = z.infer<typeof nudgeCreateSchema>;
+  .superRefine((value, ctx) => {
+    const allowed =
+      value.direction === 'guardian_to_learner'
+        ? guardianTemplateSet
+        : learnerTemplateSet;
+    if (!allowed.has(value.template)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['template'],
+        message: `Template ${value.template} is not allowed for ${value.direction}.`,
+      });
+    }
+  });
+export type NudgeCreateInput = z.input<typeof nudgeCreateSchema>;
+export type NudgeCreate = z.infer<typeof nudgeCreateSchema>;
 
 export const nudgeSchema = z.object({
   id: z.string().uuid(),
   fromProfileId: z.string().uuid(),
   toProfileId: z.string().uuid(),
   fromDisplayName: z.string(),
+  direction: nudgeDirectionSchema,
   template: nudgeTemplateSchema,
   createdAt: isoDateField,
   readAt: isoDateField.nullable(),

@@ -105,6 +105,7 @@ const mockFetch = createRoutedMockFetch({
     profile: { accommodationMode: 'none' },
   },
   '/subjects': { subjects: [] },
+  '/nudges': { nudges: [] },
   '/usage': {
     usage: {
       monthlyLimit: 100,
@@ -333,6 +334,7 @@ describe('LearnerScreen', () => {
       profile: { accommodationMode: 'none' },
     });
     mockFetch.setRoute('/subjects', { subjects: [] });
+    mockFetch.setRoute('/nudges', { nudges: [] });
     mockFetch.setRoute('/usage', {
       usage: {
         monthlyLimit: 100,
@@ -742,9 +744,96 @@ describe('LearnerScreen', () => {
       screen.getByTestId('home-action-study-new');
       screen.getByTestId('home-add-subject-tile');
       screen.getByTestId('home-my-notes');
+      screen.getByTestId('learner-guardian-nudge-card');
       // Proxy-specific elements must be absent.
       expect(screen.queryByTestId('intent-proxy-placeholder')).toBeNull();
     });
+  });
+
+  it('shows learner-to-guardian signal actions when a guardian profile exists', async () => {
+    const nudgeBodies: unknown[] = [];
+    mockFetch.setRoute('/nudges', (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        nudgeBodies.push(extractJsonBody(init));
+        return {
+          nudge: {
+            id: '01914d6a-0000-7000-8000-000000000030',
+            fromProfileId: '01914d6a-0000-7000-8000-000000000002',
+            toProfileId: '01914d6a-0000-7000-8000-000000000001',
+            fromDisplayName: 'Alex',
+            direction: 'learner_to_guardian',
+            template: 'need_help',
+            createdAt: '2026-05-31T12:00:00.000Z',
+            readAt: null,
+          },
+          pushSent: true,
+        };
+      }
+      return { nudges: [] };
+    });
+
+    renderLearner({
+      profiles: [
+        {
+          id: '01914d6a-0000-7000-8000-000000000001',
+          displayName: 'Parent',
+          isOwner: true,
+        },
+        {
+          id: '01914d6a-0000-7000-8000-000000000002',
+          displayName: 'Alex',
+          isOwner: false,
+        },
+      ],
+      activeProfile: {
+        id: '01914d6a-0000-7000-8000-000000000002',
+        displayName: 'Alex',
+        isOwner: false,
+      },
+    });
+
+    await waitFor(() => {
+      screen.getByTestId('learner-guardian-nudge-card');
+    });
+    fireEvent.press(
+      screen.getByTestId('learner-guardian-nudge-template-need_help'),
+    );
+
+    await waitFor(() => {
+      expect(nudgeBodies).toEqual([
+        {
+          toProfileId: '01914d6a-0000-7000-8000-000000000001',
+          direction: 'learner_to_guardian',
+          template: 'need_help',
+        },
+      ]);
+    });
+    const payload = nudgeBodies[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('message');
+    expect(payload).not.toHaveProperty('body');
+    expect(payload).not.toHaveProperty('freeText');
+  });
+
+  it('hides learner-to-guardian signal actions when no guardian profile exists', async () => {
+    renderLearner({
+      profiles: [
+        {
+          id: '01914d6a-0000-7000-8000-000000000002',
+          displayName: 'Alex',
+          isOwner: false,
+        },
+      ],
+      activeProfile: {
+        id: '01914d6a-0000-7000-8000-000000000002',
+        displayName: 'Alex',
+        isOwner: false,
+      },
+    });
+
+    await waitFor(() => {
+      screen.getByTestId('learner-screen');
+    });
+    expect(screen.queryByTestId('learner-guardian-nudge-card')).toBeNull();
   });
 
   it('switches back to parent view before opening child session summaries', async () => {

@@ -64,6 +64,8 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   (id) => sanitizeSecureStoreKey(`permissionSetupSeen_${id}`),
   // use-post-session-notification-ask.ts — one-shot post-session notification primer flag.
   (id) => sanitizeSecureStoreKey(`notificationFirstAskShown_${id}`),
+  // use-guardian-notification-ask.ts — one-shot parent-home notification primer flag.
+  (id) => sanitizeSecureStoreKey(`guardianNotificationAskShown_${id}`),
   // session-types.ts — getInputModeKey, sanitized
   (id) => sanitizeSecureStoreKey(`voice-input-mode-${id}`),
   // [CR-PR129-M6] (app)/_layout.tsx — ACCENT_STORE_PREFIX: accent preset per profile, sanitized.

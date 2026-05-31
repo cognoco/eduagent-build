@@ -88,6 +88,7 @@ describe('getNotificationPrefs', () => {
       reviewReminders: false,
       dailyReminders: false,
       pushEnabled: false,
+      pushTokenRegistered: false,
       maxDailyPush: 3,
       weeklyProgressPush: true,
       weeklyProgressEmail: true,
@@ -105,6 +106,7 @@ describe('getNotificationPrefs', () => {
         weeklyProgressPush: false,
         weeklyProgressEmail: false,
         monthlyProgressEmail: true,
+        expoPushToken: 'ExponentPushToken[abc]',
       },
     });
     const result = await getNotificationPrefs(db, profileId);
@@ -117,6 +119,7 @@ describe('getNotificationPrefs', () => {
       weeklyProgressPush: false,
       weeklyProgressEmail: false,
       monthlyProgressEmail: true,
+      pushTokenRegistered: true,
     });
   });
 });
@@ -140,6 +143,7 @@ describe('upsertNotificationPrefs', () => {
       reviewReminders: true,
       dailyReminders: false,
       pushEnabled: true,
+      pushTokenRegistered: false,
       maxDailyPush: 7,
       weeklyProgressPush: true,
       weeklyProgressEmail: true,
@@ -159,6 +163,7 @@ describe('upsertNotificationPrefs', () => {
         weeklyProgressPush: false,
         weeklyProgressEmail: false,
         monthlyProgressEmail: false,
+        expoPushToken: 'ExponentPushToken[existing]',
       },
     });
     const result = await upsertNotificationPrefs(
@@ -176,6 +181,7 @@ describe('upsertNotificationPrefs', () => {
       reviewReminders: true,
       dailyReminders: true,
       pushEnabled: true,
+      pushTokenRegistered: true,
       maxDailyPush: 3,
       weeklyProgressPush: false,
       weeklyProgressEmail: false,

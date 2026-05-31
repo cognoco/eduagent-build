@@ -1,6 +1,12 @@
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
-import type { Nudge, NudgeTemplate } from '@eduagent/schemas';
-import { ConsentRequiredError, RateLimitedError } from '@eduagent/schemas';
+import { and, desc, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import type { Nudge, NudgeDirection, NudgeTemplate } from '@eduagent/schemas';
+import {
+  BadRequestError,
+  ConsentRequiredError,
+  RateLimitedError,
+  guardianToLearnerNudgeTemplates,
+  learnerToGuardianNudgeTemplates,
+} from '@eduagent/schemas';
 import {
   accounts,
   familyLinks,
@@ -26,6 +32,14 @@ const TEMPLATE_COPY: Record<NudgeTemplate, string> = {
   proud_of_you: 'Proud of you',
   quick_session: 'Want to do a quick session?',
   thinking_of_you: 'Just thinking of you',
+  thanks: 'Thank you',
+  need_help: 'I need help',
+  proud_moment: "I'm proud of what I did",
+};
+
+const TEMPLATES_BY_DIRECTION: Record<NudgeDirection, ReadonlySet<string>> = {
+  guardian_to_learner: new Set(guardianToLearnerNudgeTemplates),
+  learner_to_guardian: new Set(learnerToGuardianNudgeTemplates),
 };
 
 function mapNudgeRow(row: {
@@ -33,6 +47,7 @@ function mapNudgeRow(row: {
   fromProfileId: string;
   toProfileId: string;
   fromDisplayName: string;
+  direction: NudgeDirection;
   template: NudgeTemplate;
   createdAt: Date;
   readAt: Date | null;
@@ -42,10 +57,22 @@ function mapNudgeRow(row: {
     fromProfileId: row.fromProfileId,
     toProfileId: row.toProfileId,
     fromDisplayName: row.fromDisplayName,
+    direction: row.direction,
     template: row.template,
     createdAt: row.createdAt.toISOString(),
     readAt: row.readAt?.toISOString() ?? null,
   };
+}
+
+function assertTemplateAllowed(
+  direction: NudgeDirection,
+  template: NudgeTemplate,
+): void {
+  if (!TEMPLATES_BY_DIRECTION[direction].has(template)) {
+    throw new BadRequestError(
+      `Template ${template} is not allowed for ${direction}.`,
+    );
+  }
 }
 
 function isQuietHours(now: Date, timezone: string | null | undefined): boolean {
@@ -79,24 +106,38 @@ export async function createNudge(
   params: {
     fromProfileId: string;
     toProfileId: string;
+    direction?: NudgeDirection;
     template: NudgeTemplate;
     now?: Date;
   },
 ): Promise<{ nudge: Nudge; pushSent: boolean }> {
   const now = params.now ?? new Date();
-  await assertParentAccess(db, params.fromProfileId, params.toProfileId);
+  const direction = params.direction ?? 'guardian_to_learner';
+  assertTemplateAllowed(direction, params.template);
+
+  const guardianProfileId =
+    direction === 'guardian_to_learner'
+      ? params.fromProfileId
+      : params.toProfileId;
+  const learnerProfileId =
+    direction === 'guardian_to_learner'
+      ? params.toProfileId
+      : params.fromProfileId;
+
+  await assertParentAccess(db, guardianProfileId, learnerProfileId);
 
   // null means no consent_states row exists — which for the post-profile-create
   // state happens when consent isn't required for this profile's age (17+).
   // See checkConsentRequired in consent.ts: ages 17+ return required:false, and
   // createProfile skips createPendingConsentState / createGrantedConsentState
   // in that case, so getConsentStatus resolves null. Treating null the same as
-  // 'CONSENTED' here lets parents nudge their 17+ linked children. The block
-  // still rejects PENDING / WITHDRAWN / PARENTAL_CONSENT_REQUESTED.
-  const consentStatus = await getConsentStatus(db, params.toProfileId);
+  // 'CONSENTED' here lets guardians and learners nudge when the learner is 17+
+  // or otherwise has no consent row. The block still rejects PENDING /
+  // WITHDRAWN / PARENTAL_CONSENT_REQUESTED.
+  const consentStatus = await getConsentStatus(db, learnerProfileId);
   if (consentStatus !== null && consentStatus !== 'CONSENTED') {
     throw new ConsentRequiredError(
-      "This child can't receive nudges until consent is active.",
+      "This learner can't send or receive nudges until consent is active.",
       'CONSENT_REQUIRED',
     );
   }
@@ -132,6 +173,7 @@ export async function createNudge(
       .values({
         fromProfileId: params.fromProfileId,
         toProfileId: params.toProfileId,
+        direction,
         template: params.template,
         createdAt: now,
       })
@@ -150,13 +192,15 @@ export async function createNudge(
       columns: { displayName: true, accountId: true },
     }),
   ]);
-  const parentName = fromProfile?.displayName ?? 'Your parent';
+  const fromDisplayName =
+    fromProfile?.displayName ??
+    (direction === 'guardian_to_learner' ? 'Your parent' : 'Your learner');
 
-  // Quiet hours follow the recipient's (child's) local time only — sending
-  // parents may be in a different zone, but it's the recipient we don't want
-  // to ping at 23:00. If the child has no timezone on file, isQuietHours
+  // Quiet hours follow the recipient's local time only — senders may be in a
+  // different zone, but it's the recipient we don't want to ping at 23:00.
+  // If the recipient has no timezone on file, isQuietHours
   // defaults to UTC.
-  const childAccount = toProfile?.accountId
+  const recipientAccount = toProfile?.accountId
     ? await db.query.accounts.findFirst({
         where: eq(accounts.id, toProfile.accountId),
         columns: { timezone: true },
@@ -164,34 +208,40 @@ export async function createNudge(
     : null;
 
   let pushSent = false;
-  if (isQuietHours(now, childAccount?.timezone)) {
+  if (isQuietHours(now, recipientAccount?.timezone)) {
     logger.info('Nudge push suppressed by quiet hours', {
       event: 'notification.nudge.quiet_hours_suppressed',
       toProfileId: params.toProfileId,
     });
   } else {
-    const push = await sendPushNotification(
-      db,
-      {
-        profileId: params.toProfileId,
-        title: `${parentName} sent you a nudge`,
-        body: TEMPLATE_COPY[params.template],
-        type: 'nudge',
-        data: {
-          nudgeId: inserted.id,
-          fromDisplayName: parentName,
-          templateKey: params.template,
-        },
+    const payload = {
+      profileId: params.toProfileId,
+      title:
+        direction === 'guardian_to_learner'
+          ? `${fromDisplayName} sent you a nudge`
+          : 'Your learner sent you a nudge',
+      body: TEMPLATE_COPY[params.template],
+      type: 'nudge' as const,
+      data: {
+        nudgeId: inserted.id,
+        fromProfileId: params.fromProfileId,
+        toProfileId: params.toProfileId,
+        direction,
+        templateKey: params.template,
       },
-      { skipDailyCap: true },
-    );
+    };
+    const push =
+      direction === 'guardian_to_learner'
+        ? await sendPushNotification(db, payload, { skipDailyCap: true })
+        : await sendPushNotification(db, payload);
     pushSent = push.sent;
   }
 
   return {
     nudge: mapNudgeRow({
       ...inserted,
-      fromDisplayName: parentName,
+      direction,
+      fromDisplayName,
     }),
     pushSent,
   };
@@ -207,6 +257,7 @@ export async function listUnreadNudges(
       fromProfileId: nudges.fromProfileId,
       toProfileId: nudges.toProfileId,
       fromDisplayName: profiles.displayName,
+      direction: nudges.direction,
       template: nudges.template,
       createdAt: nudges.createdAt,
       readAt: nudges.readAt,
@@ -215,9 +266,17 @@ export async function listUnreadNudges(
     .innerJoin(profiles, eq(profiles.id, nudges.fromProfileId))
     .innerJoin(
       familyLinks,
-      and(
-        eq(familyLinks.parentProfileId, nudges.fromProfileId),
-        eq(familyLinks.childProfileId, nudges.toProfileId),
+      or(
+        and(
+          eq(nudges.direction, 'guardian_to_learner'),
+          eq(familyLinks.parentProfileId, nudges.fromProfileId),
+          eq(familyLinks.childProfileId, nudges.toProfileId),
+        ),
+        and(
+          eq(nudges.direction, 'learner_to_guardian'),
+          eq(familyLinks.parentProfileId, nudges.toProfileId),
+          eq(familyLinks.childProfileId, nudges.fromProfileId),
+        ),
       ),
     )
     .where(and(eq(nudges.toProfileId, profileId), isNull(nudges.readAt)))

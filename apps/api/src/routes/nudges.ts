@@ -32,14 +32,23 @@ type NudgeRouteEnv = {
 
 export const nudgeRoutes = new Hono<NudgeRouteEnv>()
   .post('/nudges', zValidator('json', nudgeCreateSchema), async (c) => {
-    // [WI-159 / DS-070] Server-derived proxy-mode write guard.
-    assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const input = c.req.valid('json');
+    // [WI-159 / DS-070] Guardian-to-learner sends remain owner-only writes.
+    // Learner-to-guardian sends are the one nudge write initiated by a
+    // non-owner learner profile; service-layer family-link authorization still
+    // proves the sender/recipient pair before any row is written.
+    if (
+      input.direction === 'guardian_to_learner' ||
+      c.req.header('X-Proxy-Mode') === 'true'
+    ) {
+      assertNotProxyMode(c);
+    }
     const result = await createNudge(db, {
       fromProfileId: profileId,
       toProfileId: input.toProfileId,
+      direction: input.direction,
       template: input.template,
     });
     return c.json(nudgeCreateResponseSchema.parse(result));

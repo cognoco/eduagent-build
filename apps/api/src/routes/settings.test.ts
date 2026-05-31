@@ -122,6 +122,7 @@ beforeEach(() => {
     weeklyProgressEmail: true,
     monthlyProgressEmail: true,
     pushEnabled: false,
+    pushTokenRegistered: false,
     maxDailyPush: 3,
   });
   mockUpsertNotificationPrefs.mockResolvedValue({
@@ -131,6 +132,7 @@ beforeEach(() => {
     weeklyProgressEmail: true,
     monthlyProgressEmail: true,
     pushEnabled: false,
+    pushTokenRegistered: false,
     maxDailyPush: 3,
   });
   mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
