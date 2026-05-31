@@ -87,7 +87,7 @@ Out of scope (Non-goals):
 - **Merging two pre-existing separate persons/accounts** into one (data
   reconciliation, "which subscription wins"). Multiple *logins on one person* is
   in scope; merging two *persons* is a separate project.
-- The **13 independent audit gaps** (see "Independent backlog") — they survive
+- The **17 independent audit gaps** (see "Independent backlog") — they survive
   the redesign unchanged and are tracked separately.
 - Multiple roles *scoped to specific people* (person-specific mentor). v1 ships
   **org-wide mentor** only; per-person mentor scoping is a deliberate later
@@ -153,13 +153,19 @@ scoping estimates, not exhaustive file lists.
   `status: approved`. **DONE 2026-05-31 — all 6 decisions resolved (D6 added
   during T1 adversarial review).**
 
-- [ ] **T1 — Data model.** Add `persons`, `organizations`, `memberships`
+- [x] **T1 — Data model.** Add `persons`, `organizations`, `memberships`
   (role set), and a credential link to Clerk identities; move `subscriptions`
   to reference `organizationId`. New tables alongside old; no drops yet.
   *Files:* `packages/database/src/schema/{profiles,billing}.ts` + new schema
   files; migration SQL. *Done when:* schema compiles, `drizzle-kit generate`
   produces a clean migration, new tables seed in dev, and a unit test asserts a
   person can hold ≥2 memberships with different role sets.
+  **DONE 2026-05-31** — `profiles` IS the person (no `persons` table; profile.id
+  stays the scoping key). Migration `0106_identity_t1_org_membership` (additive,
+  no drops) + canonical idempotent backfill. Verified: database `tsc` + full
+  jest (26 suites / 285 tests) green against real dev Neon; api `tsc` clean;
+  CHECK break test red-verified (array_length→cardinality); the ≥2-memberships
+  capability test passes. See `docs/plans/2026-05-31-identity-t1-data-model.md`.
 
 - [ ] **T2 — Identity / auth.** Clerk session → person+org resolution (not
   account); managed vs credentialed persons; multi-email/OAuth on one person;
@@ -240,16 +246,62 @@ scoping estimates, not exhaustive file lists.
   performed (the legacy tables are dropped only in T7, after the new model is
   proven, and there is no production data to lose).
 
+## Migration & environment hygiene (established during T1, 2026-05-31)
+
+The migration ledgers on the shared DBs had drifted badly. **All three were
+rebuilt/aligned on 2026-05-31; all now carry a consistent 107-row ledger.**
+
+**Root cause (verified): NOT the CI/deploy pipeline.** `ci.yml` and `deploy.yml`
+already do the right things — ephemeral Postgres, `CREATE EXTENSION vector`, then
+`drizzle-kit migrate` (CFG-12 replaced push with migrate), with separate
+`DATABASE_URL_STAGING`/`PRODUCTION` secrets behind a hard-fail guard. The drift
+came from **outside** the pipeline:
+1. **Migration history was rewritten after deploy applied the originals** →
+   "phantom" ledger rows (29 on staging, 8 on prod) whose hashes match no current
+   file. (`0056_schema_drift_repair` shows this has happened before.)
+2. **Manual `drizzle-kit push` / ad-hoc DDL against shared DBs**, advancing schema
+   without recording it in the ledger.
+
+Resolution + standing rules for T2–T7:
+
+- **Extensions:** only `vector` needs external pre-creation (no migration creates
+  it); `pg_trgm` is self-created in migration `0047`. CI/deploy already pre-create
+  `vector`. Any from-scratch replay (T7 prod cutover, scratch validation) must run
+  `CREATE EXTENSION IF NOT EXISTS vector;` first or it fails `type "vector" does
+  not exist`. (Validated: 0000→0106 replays clean to a 107-row ledger.)
+- **Dev:** managed via `db:push:dev` (ledger unrecoverably drifted — 22 rows,
+  hashes don't reproduce; do NOT hand-reconcile). Per phase: edit schema →
+  `db:generate:dev` (the committed migration is the deliverable) → `db:push:dev`
+  (materialize on dev to test). The migration FILE is validated via migrate on a
+  clean DB (CI), not on drifted dev.
+- **Staging + Prod:** REBUILT CLEAN 2026-05-31 via drop-schema + `migrate`
+  (staging ledger was 114 rows/29 phantom; prod 96/8). Data on both was disposable
+  (staging = synthetic fixtures; prod = 0 real users, one owner test login).
+  Both now consistent 107-row ledgers; `migrate` applies forward cleanly. `push`
+  remains BANNED on staging/prod.
+- **Prevention — the missing guard:** add a **migration-immutability CI check**
+  (append-only enforcement): fail CI if any committed migration `.sql` content
+  changes or a journal entry is removed/reordered. New migrations append freely.
+  This closes hole #1 (history rewrites) — the actual cause, since the pipeline is
+  otherwise sound. Hole #2 (manual push/DDL) is process: never use staging/prod
+  URLs locally; all schema changes flow through generate→commit→deploy-migrate.
+
 ## Independent backlog (NOT closed by this redesign — separate track)
 
-17 audit gaps survive the redesign and need their own fixes; the launch-relevant
-ones: `onboard-1/4` (onboarding steps not wired into first-run), `notif-1`
-(guardian who never runs a session is never asked for OS push permission),
-`notif-3` (child "notify parent" never sends a push), `billing-3` (silent
-payment failure), `auth-2` (no email-change UI), `auth-4` (no session/device
-management), `auth-3` (SSO-only user can't add a password), plus `billing-4`,
-`notif-2/4`, `onboard-2/3`, `learn-3`, `practice-1/2/4`. Full set (17):
-`auth-2`, `auth-3`, `auth-4`, `billing-3`, `billing-4`, `learn-3`, `notif-1`,
-`notif-2`, `notif-3`, `notif-4`, `onboard-1`, `onboard-2`, `onboard-3`,
-`onboard-4`, `practice-1`, `practice-2`, `practice-4`. Track these on the
-pre-launch backlog, not here.
+17 audit gaps survive the redesign and need their own fixes. They are grouped
+into sibling plans by missing product primitive:
+
+- [Account Security Self-Service](2026-05-31-account-security-self-service.md)
+  covers `auth-2`, `auth-3`, `auth-4`.
+- [Profile Setup, Personalization, and Corrections](2026-05-31-profile-setup-personalization-corrections.md)
+  covers `onboard-1`, `onboard-2`, `onboard-3`, `onboard-4`.
+- [Billing Recovery and Learner Capacity](2026-05-31-billing-recovery-learner-capacity.md)
+  covers `billing-3`, `billing-4`, `notif-3`.
+- [Notification Reachability and Nudges](2026-05-31-notification-reachability-nudges.md)
+  covers `notif-1`, `notif-2`, `notif-4`.
+- [Learning Library Cleanup](2026-05-31-learning-library-cleanup.md)
+  covers `learn-3`.
+- [Resumable Practice State](2026-05-31-resumable-practice-state.md)
+  covers `practice-1`, `practice-2`, `practice-4`.
+
+Track those on the pre-launch backlog, not inside this identity redesign.
