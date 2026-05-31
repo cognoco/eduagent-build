@@ -248,31 +248,43 @@ scoping estimates, not exhaustive file lists.
 
 ## Migration & environment hygiene (established during T1, 2026-05-31)
 
-The migration ledgers on the shared DBs had drifted badly (DBs advanced via
-`drizzle-kit push`, ledgers frozen far behind), so `drizzle-kit migrate` collided
-on already-present objects. Resolution and standing rules for T2–T7:
+The migration ledgers on the shared DBs had drifted badly. **All three were
+rebuilt/aligned on 2026-05-31; all now carry a consistent 107-row ledger.**
 
-- **CRITICAL prerequisite for any from-scratch `migrate` (staging/prod/CI):** the
-  migration chain uses the `vector` (pgvector) and `pg_trgm` types but **no
-  migration runs `CREATE EXTENSION`** — they were enabled out-of-band on the live
-  DBs. A migrate-from-empty therefore FAILS with `type "vector" does not exist`
-  unless you first run `CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION
-  IF NOT EXISTS vector;`. The T7 production cutover and any CI replay job MUST do
-  this before `migrate`. (Validated: with the extensions pre-created, 0000→0106
-  replays clean to a 107-row ledger.)
-- **Dev:** managed via `db:push:dev`. Its ledger is unrecoverably drifted (22
-  rows, hashes don't reproduce) — do NOT hand-reconcile. Per phase: edit schema →
+**Root cause (verified): NOT the CI/deploy pipeline.** `ci.yml` and `deploy.yml`
+already do the right things — ephemeral Postgres, `CREATE EXTENSION vector`, then
+`drizzle-kit migrate` (CFG-12 replaced push with migrate), with separate
+`DATABASE_URL_STAGING`/`PRODUCTION` secrets behind a hard-fail guard. The drift
+came from **outside** the pipeline:
+1. **Migration history was rewritten after deploy applied the originals** →
+   "phantom" ledger rows (29 on staging, 8 on prod) whose hashes match no current
+   file. (`0056_schema_drift_repair` shows this has happened before.)
+2. **Manual `drizzle-kit push` / ad-hoc DDL against shared DBs**, advancing schema
+   without recording it in the ledger.
+
+Resolution + standing rules for T2–T7:
+
+- **Extensions:** only `vector` needs external pre-creation (no migration creates
+  it); `pg_trgm` is self-created in migration `0047`. CI/deploy already pre-create
+  `vector`. Any from-scratch replay (T7 prod cutover, scratch validation) must run
+  `CREATE EXTENSION IF NOT EXISTS vector;` first or it fails `type "vector" does
+  not exist`. (Validated: 0000→0106 replays clean to a 107-row ledger.)
+- **Dev:** managed via `db:push:dev` (ledger unrecoverably drifted — 22 rows,
+  hashes don't reproduce; do NOT hand-reconcile). Per phase: edit schema →
   `db:generate:dev` (the committed migration is the deliverable) → `db:push:dev`
   (materialize on dev to test). The migration FILE is validated via migrate on a
-  clean DB, not on drifted dev.
-- **Staging:** REBUILT CLEAN on 2026-05-31 via drop-schema + `migrate` (ledger
-  was 114 rows with 29 phantom entries from rewritten history; data was 100%
-  synthetic test fixtures). It is now a consistent 107-row ledger and `migrate`
-  applies forward cleanly. `push` remains banned on staging/prod.
-- **Recommended (pre-launch checklist):** add a CI job that runs the full
-  migrate-from-scratch (extensions first) on an ephemeral Postgres, so every
-  phase's migration is proven replayable before it reaches staging — the missing
-  gate that let these ledgers drift in the first place.
+  clean DB (CI), not on drifted dev.
+- **Staging + Prod:** REBUILT CLEAN 2026-05-31 via drop-schema + `migrate`
+  (staging ledger was 114 rows/29 phantom; prod 96/8). Data on both was disposable
+  (staging = synthetic fixtures; prod = 0 real users, one owner test login).
+  Both now consistent 107-row ledgers; `migrate` applies forward cleanly. `push`
+  remains BANNED on staging/prod.
+- **Prevention — the missing guard:** add a **migration-immutability CI check**
+  (append-only enforcement): fail CI if any committed migration `.sql` content
+  changes or a journal entry is removed/reordered. New migrations append freely.
+  This closes hole #1 (history rewrites) — the actual cause, since the pipeline is
+  otherwise sound. Hole #2 (manual push/DDL) is process: never use staging/prod
+  URLs locally; all schema changes flow through generate→commit→deploy-migrate.
 
 ## Independent backlog (NOT closed by this redesign — separate track)
 
