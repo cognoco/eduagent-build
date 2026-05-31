@@ -21,6 +21,11 @@ export interface TierConfig {
   maxProfiles: number;
   llmTier: LLMTier;
   quotaModel: 'per-profile' | 'shared-pool';
+  // Shared-pool tiers can still expose profile-level usage views.
+  // Profile-context gates must cover those tiers before aggregate quota
+  // reads so children cannot receive family-wide usage.
+  // New shared-pool tiers with breakdown support should flip this flag here.
+  supportsProfileBreakdown: boolean;
   ownerMonthlyQuota: number | null;
   ownerDailyQuota: number | null;
   childMonthlyQuota: number | null;
@@ -42,6 +47,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     maxProfiles: 2,
     llmTier: 'flash',
     quotaModel: 'per-profile',
+    supportsProfileBreakdown: false,
     ownerMonthlyQuota: 100,
     ownerDailyQuota: 10,
     childMonthlyQuota: 100,
@@ -68,6 +74,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     maxProfiles: 2,
     llmTier: 'standard',
     quotaModel: 'per-profile',
+    supportsProfileBreakdown: false,
     ownerMonthlyQuota: 700,
     ownerDailyQuota: null,
     childMonthlyQuota: 100,
@@ -83,6 +90,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     maxProfiles: 4,
     llmTier: 'standard',
     quotaModel: 'shared-pool',
+    supportsProfileBreakdown: true,
     ownerMonthlyQuota: null,
     ownerDailyQuota: null,
     childMonthlyQuota: null,
@@ -98,6 +106,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     maxProfiles: 6,
     llmTier: 'standard',
     quotaModel: 'shared-pool',
+    supportsProfileBreakdown: true,
     ownerMonthlyQuota: null,
     ownerDailyQuota: null,
     childMonthlyQuota: null,
@@ -157,6 +166,13 @@ const VALID_TRANSITIONS = new Set([
 /** Returns the configuration for a given subscription tier */
 export function getTierConfig(tier: SubscriptionState['tier']): TierConfig {
   return TIER_CONFIGS[tier];
+}
+
+export function tierRequiresProfileContext(
+  tier: SubscriptionState['tier'],
+): boolean {
+  const { quotaModel, supportsProfileBreakdown } = getTierConfig(tier);
+  return quotaModel === 'per-profile' || supportsProfileBreakdown;
 }
 
 export function resolveEffectiveAccessTier(

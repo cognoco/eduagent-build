@@ -81,6 +81,8 @@ When writing or editing skills:
 
 `.claude/skills/<name>/` is generated from `.agents/skills/<name>/` by `scripts/sync-skills.mjs`. Edit the master in `.agents/skills/`, then run `pnpm sync-skills` (or rely on the pre-commit hook). Direct edits to `.claude/skills/` will be overwritten on next sync.
 
+Skills under a **group directory** (currently `tech/`) are an exception to the 1:1 mirror: each child `.agents/skills/tech/<skill>/` is flattened to `.claude/skills/tech-<skill>/`. Codex reads the nested master directly; Claude Code reads the flattened copy because it does not reliably discover skills nested two levels deep under `.claude/skills/`. Add a new tech skill by creating `.agents/skills/tech/<skill>/SKILL.md` and running `pnpm sync-skills`. Group dirs are configured in `GROUP_DIRS` in `scripts/sync-skills.mjs`.
+
 `CLAUDE.md` and `AGENTS.md` are currently maintained by hand and may diverge. A future work item will unify them — see `.claude/memory/project_agent_doc_and_memory_architecture_revisit.md` for the pending design discussion. For now, mirror any change that should reach both runtimes to both files manually.
 
 ## Languages

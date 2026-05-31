@@ -4,6 +4,14 @@
 // Master:    .agents/skills/<name>/        (canonical; may include agents/ adapter dir)
 // Generated: .claude/skills/<name>/        (excludes agents/ subdir — Codex-specific)
 //
+// Group dirs (GROUP_DIRS, e.g. tech/): an exception to the 1:1 mirror. Each
+// child <c> of a group dir <g> flattens to .claude/skills/<g>-<c>/. The master
+// stays nested (.agents/skills/<g>/<c>/) so Codex — which discovers skills at any
+// nesting depth — reads it directly; the generated Claude copy is flat with a
+// "<g>-" prefix because Claude Code does not reliably discover skills nested two
+// levels deep under .claude/skills/. A group dir is a pure container: a SKILL.md
+// placed directly at .agents/skills/<g>/SKILL.md is ignored (only subdirs sync).
+//
 // Semantics: ADDITIVE sync. We copy/update files from .agents/ to .claude/,
 // but we NEVER delete content from .claude/ that lacks a master. This keeps
 // Claude-only skills (e.g. .claude/skills/my/, .claude/skills/archon/) safe
@@ -45,6 +53,12 @@ const TARGET_ROOT = join(REPO_ROOT, '.claude', 'skills');
 // files (e.g. openai.yaml) that Claude Code does not consume.
 const SKIP_DIRS = new Set(['agents']);
 
+// Group directories: their immediate children are FLATTENED into prefixed
+// targets. A child <c> of group <g> at .agents/skills/<g>/<c>/ syncs to
+// .claude/skills/<g>-<c>/. See the header comment for the rationale (Codex
+// reads nested masters; Claude Code needs flat, one-level-deep dirs).
+const GROUP_DIRS = new Set(['tech']);
+
 // Skills excluded from sync — their .claude/ and .agents/ versions are
 // allowed to diverge. Add a comment explaining why each is here. When the
 // content can be unified, remove from this set and run sync; the .agents/
@@ -81,15 +95,41 @@ async function listFiles(dir, base = dir) {
   return files.sort();
 }
 
-async function listSkills() {
+/**
+ * Enumerate sync units. Each unit maps a source skill dir (relative to
+ * SOURCE_ROOT) to a target dir name under TARGET_ROOT.
+ *   - normal skill "foo"     -> { sourceRel: 'foo',        targetName: 'foo' }
+ *   - group child tech/bar   -> { sourceRel: 'tech/bar',   targetName: 'tech-bar' }
+ */
+async function listUnits() {
   if (!existsSync(SOURCE_ROOT)) return [];
-  const entries = await readdir(SOURCE_ROOT, { withFileTypes: true });
-  return entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const top = (await readdir(SOURCE_ROOT, { withFileTypes: true }))
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort();
+  const units = [];
+  for (const name of top) {
+    if (GROUP_DIRS.has(name)) {
+      const children = (await readdir(join(SOURCE_ROOT, name), { withFileTypes: true }))
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+        .sort();
+      for (const child of children) {
+        units.push({ sourceRel: `${name}/${child}`, targetName: `${name}-${child}` });
+      }
+    } else {
+      units.push({ sourceRel: name, targetName: name });
+    }
+  }
+  return units;
 }
 
+// Returns a Buffer (not a string). Reading without an encoding keeps binary
+// files (e.g. PNG images shipped in a skill's references/) byte-exact — a utf8
+// round-trip silently corrupts any non-text bytes.
 async function readIfExists(path) {
   try {
-    return await readFile(path, 'utf8');
+    return await readFile(path);
   } catch (err) {
     if (err.code === 'ENOENT') return null;
     throw err;
@@ -103,9 +143,9 @@ const stats = { created: 0, updated: 0, identical: 0, removed: 0 };
 // touched, instead of staging every modified file under .claude/skills/.
 const changedPaths = [];
 
-async function syncSkill(name) {
-  const sourceDir = join(SOURCE_ROOT, name);
-  const targetDir = join(TARGET_ROOT, name);
+async function syncSkill({ sourceRel, targetName }) {
+  const sourceDir = join(SOURCE_ROOT, sourceRel);
+  const targetDir = join(TARGET_ROOT, targetName);
   const sourceFiles = await listFiles(sourceDir);
 
   // Additive: copy/update each source file. Do NOT touch target files that
@@ -114,18 +154,20 @@ async function syncSkill(name) {
   for (const rel of sourceFiles) {
     const src = join(sourceDir, rel);
     const dst = join(targetDir, rel);
-    const source = await readFile(src, 'utf8');
+    // Read as Buffer (no encoding) and compare with Buffer.equals so binary
+    // assets sync byte-for-byte; writeFile(dst, Buffer) preserves them exactly.
+    const source = await readFile(src);
     const target = await readIfExists(dst);
     if (target === null) {
-      drift.push(`${name}/${rel} (missing in .claude/)`);
+      drift.push(`${targetName}/${rel} (missing in .claude/)`);
       stats.created++;
       if (mode === 'sync') {
         await mkdir(dirname(dst), { recursive: true });
         await writeFile(dst, source);
         changedPaths.push(relative(REPO_ROOT, dst));
       }
-    } else if (target !== source) {
-      drift.push(`${name}/${rel} (content differs)`);
+    } else if (!source.equals(target)) {
+      drift.push(`${targetName}/${rel} (content differs)`);
       stats.updated++;
       if (mode === 'sync') {
         await writeFile(dst, source);
@@ -138,8 +180,8 @@ async function syncSkill(name) {
 }
 
 async function main() {
-  const skills = (await listSkills()).filter((name) => !SKIP_SKILLS.has(name));
-  for (const name of skills) await syncSkill(name);
+  const units = (await listUnits()).filter((u) => !SKIP_SKILLS.has(u.targetName));
+  for (const unit of units) await syncSkill(unit);
 
   // Note: we do NOT sweep stale skill directories or stale files in .claude/.
   // See the header comment — additive semantics preserve Claude-only content

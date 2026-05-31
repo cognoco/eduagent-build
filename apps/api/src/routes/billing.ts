@@ -47,7 +47,10 @@ import {
   resolveWarningLevel,
   calculateRemainingQuestions,
 } from '../services/metering';
-import { getTierConfig } from '../services/subscription';
+import {
+  getTierConfig,
+  tierRequiresProfileContext,
+} from '../services/subscription';
 import { createStripeClient } from '../services/stripe';
 import { resolvePriceId } from '../services/billing-pricing';
 import { readSubscriptionStatus } from '../services/kv';
@@ -455,13 +458,17 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const access = await getEffectiveAccessForSubscription(db, subscription.id);
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscription.tier;
-    const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
-    if (quotaModel === 'per-profile' && !activeProfileId) {
+    // Profile-scoped quota views require active profile context before
+    // aggregate quota reads; otherwise shared-pool usage can expose
+    // family-wide activity to non-owner viewers.
+    const tierConfig = getTierConfig(effectiveAccessTier);
+    const { quotaModel, supportsProfileBreakdown } = tierConfig;
+    if (tierRequiresProfileContext(effectiveAccessTier) && !activeProfileId) {
       return apiError(
         c,
         400,
         ERROR_CODES.VALIDATION_ERROR,
-        'Profile required for per-profile quota status.',
+        'Active profile required to view usage.',
       );
     }
     const profileQuota =
@@ -538,8 +545,6 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         ).toISOString();
       }
     })();
-    const supportsProfileBreakdown =
-      effectiveAccessTier === 'family' || effectiveAccessTier === 'pro';
     const usageBreakdown =
       activeProfileId && supportsProfileBreakdown
         ? await getUsageBreakdownForProfile(db, {

@@ -2,6 +2,7 @@ import {
   getTierConfig,
   isValidTransition,
   resolveEffectiveAccessTier,
+  tierRequiresProfileContext,
 } from './subscription';
 
 // ---------------------------------------------------------------------------
@@ -17,6 +18,7 @@ describe('getTierConfig', () => {
     expect(config.maxProfiles).toBe(2);
     expect(config).toMatchObject({
       quotaModel: 'per-profile',
+      supportsProfileBreakdown: false,
       ownerMonthlyQuota: 100,
       ownerDailyQuota: 10,
       childMonthlyQuota: 100,
@@ -37,6 +39,7 @@ describe('getTierConfig', () => {
     expect(config.maxProfiles).toBe(2);
     expect(config).toMatchObject({
       quotaModel: 'per-profile',
+      supportsProfileBreakdown: false,
       ownerMonthlyQuota: 700,
       ownerDailyQuota: null,
       childMonthlyQuota: 100,
@@ -56,6 +59,7 @@ describe('getTierConfig', () => {
     expect(config.maxProfiles).toBe(4);
     expect(config).toMatchObject({
       quotaModel: 'shared-pool',
+      supportsProfileBreakdown: true,
       ownerMonthlyQuota: null,
       ownerDailyQuota: null,
       childMonthlyQuota: null,
@@ -75,6 +79,7 @@ describe('getTierConfig', () => {
     expect(config.maxProfiles).toBe(6);
     expect(config).toMatchObject({
       quotaModel: 'shared-pool',
+      supportsProfileBreakdown: true,
       ownerMonthlyQuota: null,
       ownerDailyQuota: null,
       childMonthlyQuota: null,
@@ -85,6 +90,20 @@ describe('getTierConfig', () => {
     expect(config.priceYearly).toBe(432);
     expect(config.topUpPrice).toBe(5);
     expect(config.topUpAmount).toBe(500);
+  });
+
+  it('marks only shared-pool tiers with per-profile views as supporting profile breakdown', () => {
+    expect(getTierConfig('free').supportsProfileBreakdown).toBe(false);
+    expect(getTierConfig('plus').supportsProfileBreakdown).toBe(false);
+    expect(getTierConfig('family').supportsProfileBreakdown).toBe(true);
+    expect(getTierConfig('pro').supportsProfileBreakdown).toBe(true);
+  });
+
+  it('requires profile context for tiers with profile-scoped usage views', () => {
+    expect(tierRequiresProfileContext('free')).toBe(true);
+    expect(tierRequiresProfileContext('plus')).toBe(true);
+    expect(tierRequiresProfileContext('family')).toBe(true);
+    expect(tierRequiresProfileContext('pro')).toBe(true);
   });
 });
 
