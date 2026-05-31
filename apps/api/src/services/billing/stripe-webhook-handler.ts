@@ -512,6 +512,13 @@ export async function handleCheckoutCompleted(
     // async_payment_failed). Both are additive event types — the unhandled-
     // event default arm in routes/stripe-webhook.ts will surface them via
     // Sentry until they are wired here.
+    //
+    // TODO(#876-followup): wire `checkout.session.async_payment_succeeded`
+    // and `checkout.session.async_payment_failed` once Stripe IAP is taken
+    // out of dormant mode (mobile uses RevenueCat; Stripe is the future-web
+    // path). Until then async-payment customers are surfaced via Sentry and
+    // reconciled manually. Tracked in the deferred-items section of the
+    // PR #637 description (audit-2026-05-31 follow-ups).
     return;
   }
 

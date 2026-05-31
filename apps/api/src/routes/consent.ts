@@ -570,17 +570,13 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       // the archive-cleanup job has either started or completed; restore is
       // no longer possible. The parent must initiate a fresh consent flow
       // (which creates a new profile, not resurrect the old one).
+      // Uses ERROR_CODES.GONE (the shared contract code) via apiError so the
+      // mobile error classifier matches it the same way it matches other
+      // 410 responses (see packages/schemas/src/errors.ts).
       if (error instanceof ConsentRestoreGracePeriodExpiredError) {
-        return c.json(
-          {
-            error: {
-              code: 'CONSENT_RESTORE_WINDOW_EXPIRED',
-              message: error.message,
-              details: { revokedAt: error.revokedAt },
-            },
-          },
-          410,
-        );
+        return apiError(c, 410, ERROR_CODES.GONE, error.message, {
+          revokedAt: error.revokedAt,
+        });
       }
       throw error;
     }

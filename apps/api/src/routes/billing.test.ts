@@ -791,6 +791,47 @@ describe('billing routes', () => {
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
 
+    // -----------------------------------------------------------------
+    // [audit-2026-05-31 #826 REGRESSION] family + pro shared-pool tiers
+    // must ALSO require activeProfileId. Without the breakdown a
+    // non-owner viewer would see the family-aggregate usedThisMonth /
+    // usedToday in the response — leaking siblings' activity. The
+    // requiresProfileForBreakdown gate covers all three quotaModels;
+    // these tests fail if the family/pro branches are dropped from it.
+    // -----------------------------------------------------------------
+    it.each(['family', 'pro'] as const)(
+      '[audit-2026-05-31 #826] %s tier without activeProfileId returns 400 (no shared-pool fallback)',
+      async (tier) => {
+        mockFindOwnerProfile.mockResolvedValueOnce(null);
+        mockGetSubscriptionByAccountId.mockResolvedValue(
+          mockSubscription({ tier }),
+        );
+        mockGetEffectiveAccessForSubscription.mockResolvedValue(
+          mockEffectiveAccess({
+            subscription: mockSubscription({ tier }),
+            effectiveAccessTier: tier,
+          }),
+        );
+        mockGetQuotaPool.mockResolvedValue(
+          mockQuotaPool({ usedThisMonth: 999 }),
+        );
+
+        const res = await app.request(
+          '/v1/usage',
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(400);
+        expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
+        expect(mockGetUsageBreakdownForProfile).not.toHaveBeenCalled();
+        // Critically: the family-aggregate quota pool MUST NOT be read
+        // in this code path — that read would land in the response and
+        // leak siblings' activity to the caller.
+        expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      },
+    );
+
     it('returns child-visible usage from their profile breakdown', async () => {
       const childProfileId = '550e8400-e29b-41d4-a716-446655440000';
       mockProfileFindFirst.mockResolvedValue({

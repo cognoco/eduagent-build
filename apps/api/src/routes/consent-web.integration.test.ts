@@ -352,6 +352,49 @@ describe('POST /v1/consent-page/confirm', () => {
     expect(html).toContain('Invalid link');
   });
 
+  // ------------------------------------------------------------------
+  // [audit-2026-05-31 #868 BREAK] Strict 'true'/'false' validation on
+  // the approved param. Previously any non-'true' value silently became
+  // a denial → cascade-delete of the child profile (destructive default
+  // on an unauthenticated surface). Per CLAUDE.md, every HIGH security/
+  // data-integrity fix needs a negative-path test that attempts the
+  // exact behaviour being prevented. These tests fail without the
+  // strict-validation gate.
+  // ------------------------------------------------------------------
+  describe('[audit-2026-05-31 #868] invalid approved values must NOT trigger consent processing', () => {
+    const INVALID_VALUES = ['maybe', '', '1', 'yes', 'True', 'TRUE', ' true '];
+
+    it.each(INVALID_VALUES)(
+      'approved=%j returns 400 and does NOT delete the child profile',
+      async (invalidValue) => {
+        const db = createIntegrationDb();
+        const { accountId, profileId, token } = await seedConsentToken({
+          displayName: 'Quinn',
+        });
+        seededAccountIds.push(accountId);
+
+        const res = await postForm('/v1/consent-page/confirm', {
+          token,
+          approved: invalidValue,
+        });
+
+        // The route must reject with 400 BEFORE reaching
+        // processConsentResponse (which cascade-deletes on denial).
+        expect(res.status).toBe(400);
+        const html = await responseHtml(res);
+        expect(html).toContain('Invalid response');
+
+        // Verify the child profile still exists — the destructive path
+        // was NOT taken.
+        const stillExists = await db.query.profiles.findFirst({
+          where: eq(profiles.id, profileId),
+        });
+        expect(stillExists).toBeDefined();
+        expect(stillExists?.archivedAt).toBeNull();
+      },
+    );
+  });
+
   it('returns 404 "Link Expired" when token does not exist', async () => {
     const res = await postForm('/v1/consent-page/confirm', {
       token: 'does-not-exist-in-db',

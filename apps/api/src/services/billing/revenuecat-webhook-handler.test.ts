@@ -199,6 +199,215 @@ describe('handleCancellation', () => {
       }),
     );
   });
+
+  // ---------------------------------------------------------------------
+  // [audit-2026-05-31 #832 BREAK] Revoke-class cancel_reason values must
+  // immediately downgrade entitlement to free. The legacy soft-cancel path
+  // (keep status=active until currentPeriodEnd) was leaving refunded users
+  // with paid entitlement they no longer paid for. Per CLAUDE.md, every
+  // CRITICAL fix needs a negative-path test. These tests fail without the
+  // REVOKE_CANCEL_REASONS branch.
+  // ---------------------------------------------------------------------
+  describe('[audit-2026-05-31 #832] revoke-class cancel_reason immediately expires entitlement', () => {
+    const REVOKE_CASES = [
+      'CUSTOMER_SUPPORT',
+      'BILLING_ERROR',
+      'DEVELOPER_INITIATED',
+    ] as const;
+
+    it.each(REVOKE_CASES)(
+      'cancel_reason=%s downgrades to free + status=expired and refreshes KV',
+      async (cancelReason) => {
+        (
+          require('../billing')
+            .updateSubscriptionAndQuotaFromRevenuecatWebhook as jest.Mock
+        ).mockResolvedValue({
+          id: 'sub-internal-1',
+          accountId: 'acc-1',
+          webhookApplied: true,
+          lastRevenuecatEventId: 'evt_rc_1',
+        });
+
+        await handleCancellation(
+          mockDb,
+          mockKv,
+          baseEvent({ type: 'CANCELLATION', cancel_reason: cancelReason }),
+        );
+
+        // The revoke path uses the quota-mutating variant so monthly/daily
+        // limits are reset to the free-tier ceiling in the same write.
+        expect(
+          require('../billing').updateSubscriptionAndQuotaFromRevenuecatWebhook,
+        ).toHaveBeenCalledWith(
+          mockDb,
+          'acc-1',
+          expect.objectContaining({
+            status: 'expired',
+            tier: 'free',
+            currentPeriodEnd: expect.any(String),
+            cancelledAt: expect.any(String),
+          }),
+          expect.objectContaining({
+            monthlyQuota: expect.any(Number),
+            dailyLimit: expect.any(Number),
+          }),
+        );
+        // The soft-cancel path MUST NOT run alongside the revoke path —
+        // double-write would corrupt the audit trail.
+        expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+      },
+    );
+
+    it('soft-cancel cancel_reason=UNSUBSCRIBE still takes the legacy "stays active until period end" path', async () => {
+      // Control test: confirms the revoke path is gated and not a blanket
+      // change of behaviour for normal user-initiated cancellations.
+      (getSubscriptionByAccountId as jest.Mock).mockResolvedValue({
+        id: 'sub-internal-1',
+        tier: 'plus',
+        status: 'active',
+      });
+      (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue({
+        id: 'sub-internal-1',
+        accountId: 'acc-1',
+        webhookApplied: true,
+        lastRevenuecatEventId: 'evt_rc_1',
+      });
+
+      await handleCancellation(
+        mockDb,
+        mockKv,
+        baseEvent({ type: 'CANCELLATION', cancel_reason: 'UNSUBSCRIBE' }),
+      );
+
+      expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+        mockDb,
+        'acc-1',
+        expect.objectContaining({
+          status: 'active',
+          cancelledAt: expect.any(String),
+        }),
+      );
+      expect(
+        require('../billing').updateSubscriptionAndQuotaFromRevenuecatWebhook,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('unknown cancel_reason captures a warning message but still falls through to soft-cancel', async () => {
+      (getSubscriptionByAccountId as jest.Mock).mockResolvedValue({
+        id: 'sub-internal-1',
+        tier: 'plus',
+        status: 'active',
+      });
+      (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue({
+        id: 'sub-internal-1',
+        accountId: 'acc-1',
+        webhookApplied: true,
+        lastRevenuecatEventId: 'evt_rc_1',
+      });
+
+      await handleCancellation(
+        mockDb,
+        mockKv,
+        baseEvent({
+          type: 'CANCELLATION',
+          cancel_reason: 'SOMETHING_NEW_FROM_RC',
+        }),
+      );
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('SOMETHING_NEW_FROM_RC'),
+        expect.objectContaining({
+          level: 'warning',
+          extra: expect.objectContaining({
+            context: 'revenuecat.cancellation.unknown_cancel_reason',
+          }),
+        }),
+      );
+    });
+  });
+});
+
+// -------------------------------------------------------------------------
+// [audit-2026-05-31 #833 BREAK] SUBSCRIBER_ALIAS must deauthorize the
+// from-account's paid subscription so a re-sign-in to the old Clerk
+// identity does not retain free paid entitlement. Per CLAUDE.md, every
+// CRITICAL fix needs a negative-path test. Removing the deauth call from
+// the SUBSCRIBER_ALIAS transferred_from loop must fail these tests.
+// -------------------------------------------------------------------------
+describe('handleSubscriberAlias [audit-2026-05-31 #833]', () => {
+  const { handleSubscriberAlias } = require('./revenuecat-webhook-handler');
+
+  it('deauthorizes from-account paid subscription on transferred_from', async () => {
+    // transferred_from references an existing Clerk identity that holds a
+    // paid local subscription.
+    (findAccountByClerkId as jest.Mock).mockImplementation(
+      async (_db: unknown, id: string) => {
+        if (id === 'user_clerk_from') return { id: 'acc-from' };
+        return { id: 'acc-to' };
+      },
+    );
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue({
+      id: 'sub-from-internal',
+      tier: 'plus',
+      status: 'active',
+    });
+    (
+      require('../billing')
+        .updateSubscriptionAndQuotaFromRevenuecatWebhook as jest.Mock
+    ).mockResolvedValue({
+      id: 'sub-from-internal',
+      accountId: 'acc-from',
+      webhookApplied: true,
+      lastRevenuecatEventId: 'evt_rc_alias:deauth:acc-from',
+    });
+
+    await handleSubscriberAlias(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'SUBSCRIBER_ALIAS',
+        app_user_id: 'user_clerk_to',
+        transferred_from: ['user_clerk_from'],
+      }),
+    );
+
+    // Core assertion: the from-side is downgraded with the quota-resetting
+    // variant. The test FAILS if the deauth call is removed from the loop.
+    expect(
+      require('../billing').updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'acc-from',
+      expect.objectContaining({
+        status: 'expired',
+        tier: 'free',
+        currentPeriodEnd: expect.any(String),
+        cancelledAt: expect.any(String),
+      }),
+      expect.objectContaining({
+        monthlyQuota: expect.any(Number),
+        dailyLimit: expect.any(Number),
+      }),
+    );
+  });
+
+  it('skips deauth for anonymous transferred_from ids (no Clerk account)', async () => {
+    // RevenueCat anonymous ids start with "$" and never have a Clerk
+    // account behind them — they are the normal anon→identified alias.
+    await handleSubscriberAlias(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'SUBSCRIBER_ALIAS',
+        app_user_id: 'user_clerk_to',
+        transferred_from: ['$RCAnonymousID:abc123'],
+      }),
+    );
+
+    expect(
+      require('../billing').updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).not.toHaveBeenCalled();
+  });
 });
 
 describe('handleBillingIssue', () => {

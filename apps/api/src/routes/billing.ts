@@ -456,7 +456,18 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscription.tier;
     const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
-    if (quotaModel === 'per-profile' && !activeProfileId) {
+    // [audit-2026-05-31 #826] Require activeProfileId for any tier that
+    // supports the per-profile breakdown (per-profile quotaModel OR shared
+    // family/pro pools). Without activeProfileId, usageBreakdown computes to
+    // null below and the response falls through to the raw family-aggregate
+    // `usedThisMonth` / `usedToday`, which non-owner viewers must never see
+    // (lets a child infer siblings' activity). The non-owner clamp lives in
+    // the breakdown helper, so the breakdown MUST run for paid tiers.
+    const requiresProfileForBreakdown =
+      quotaModel === 'per-profile' ||
+      effectiveAccessTier === 'family' ||
+      effectiveAccessTier === 'pro';
+    if (requiresProfileForBreakdown && !activeProfileId) {
       return apiError(
         c,
         400,

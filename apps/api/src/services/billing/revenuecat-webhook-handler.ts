@@ -298,26 +298,48 @@ export async function handleRenewal(
 
 /**
  * [audit-2026-05-31 #832] cancel_reason values that indicate the user no
- * longer holds the entitlement (refund, billing-error revocation, customer-
+ * longer holds the entitlement (refund, server-side revocation, customer-
  * support voiding the purchase). These must immediately downgrade tier to
  * free and mark status='expired' — keeping the user on a paid tier until
  * currentPeriodEnd would let them keep entitlement they no longer paid for.
  *
- * Reasons NOT in this set (UNSUBSCRIBE, EXPIRATION, BILLING_ERROR-without-
- * revocation) follow the legacy soft-cancel path: entitlement stays active
- * until currentPeriodEnd so the user gets what they paid for.
- *
  * Source: RevenueCat docs https://www.revenuecat.com/docs/integrations/webhooks
- * — cancel_reason taxonomy. Add new revoke-equivalent reasons here as RC
- * documents them; the default switch arm in routes/revenuecat-webhook.ts
- * already surfaces unhandled event types, so a new revoke-class reason on
- * an existing CANCELLATION event will fall through this set and stay on the
- * soft-cancel path — captureMessage in else branch makes that observable.
+ * — official cancel_reason taxonomy is:
+ *   UNSUBSCRIBE       — user-initiated cancel; entitlement stays until period end (soft-cancel)
+ *   EXPIRATION        — subscription naturally expired (soft-cancel; EXPIRATION event is the
+ *                       authoritative downgrade path for this reason)
+ *   BILLING_ERROR     — store could not collect payment after retries; entitlement is gone (REVOKE)
+ *   DEVELOPER_INITIATED — server/operator-side revocation (REVOKE)
+ *   PRICE_INCREASE    — user declined a price-increase consent; entitlement stays until period end (soft-cancel)
+ *   CUSTOMER_SUPPORT  — refund/grant-back via RC or store support (REVOKE)
+ *   UNKNOWN           — RC could not classify; treat as soft-cancel (conservative — never auto-revoke
+ *                       paid access without an authoritative signal)
+ *
+ * Soft-cancel reasons are NOT in this set: UNSUBSCRIBE, EXPIRATION,
+ * PRICE_INCREASE, UNKNOWN. They fall through to the legacy "Cancelling"
+ * path: status stays active (or past_due), cancelledAt records the intent,
+ * EXPIRATION events later downgrade.
+ *
+ * Add new revoke-equivalent reasons here as RC documents them; the
+ * captureMessage in the else branch below surfaces any unknown value so
+ * we can classify it.
  */
 const REVOKE_CANCEL_REASONS = new Set<string>([
-  'CUSTOMER_SUPPORT', // CS-initiated refund
-  'BILLING_ERROR_REFUND', // store refunded after billing-error retry exhausted
-  'DEVELOPER_INITIATED', // server-side revocation (e.g., abuse)
+  'BILLING_ERROR', // store could not collect payment — entitlement revoked
+  'CUSTOMER_SUPPORT', // refund / grant-back via support
+  'DEVELOPER_INITIATED', // server-side revocation (e.g., abuse, refund grant)
+]);
+
+/**
+ * [audit-2026-05-31 #832] Known soft-cancel reasons — entitlement stays
+ * active until currentPeriodEnd. Used to suppress the "unknown" Sentry
+ * alert below for legitimate prod values.
+ */
+const SOFT_CANCEL_REASONS = new Set<string>([
+  'UNSUBSCRIBE',
+  'EXPIRATION',
+  'PRICE_INCREASE',
+  'UNKNOWN',
 ]);
 
 export async function handleCancellation(
@@ -376,12 +398,8 @@ export async function handleCancellation(
   // Unknown cancel_reason — surface so we can decide whether to add it to
   // REVOKE_CANCEL_REASONS or document the soft-cancel intent. Not a failure;
   // we continue with the soft-cancel path to preserve current behaviour.
-  if (
-    event.cancel_reason &&
-    !['UNSUBSCRIBE', 'EXPIRATION', 'BILLING_ERROR'].includes(
-      event.cancel_reason,
-    )
-  ) {
+  // (REVOKE_CANCEL_REASONS already handled and returned above.)
+  if (event.cancel_reason && !SOFT_CANCEL_REASONS.has(event.cancel_reason)) {
     captureMessage(
       `RevenueCat CANCELLATION with unknown cancel_reason='${event.cancel_reason}' — treating as soft-cancel`,
       {

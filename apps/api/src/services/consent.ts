@@ -35,6 +35,7 @@ import {
   type EmailOptions,
 } from './notifications';
 import { createLogger } from './logger';
+import { captureMessage } from './sentry';
 
 const logger = createLogger();
 
@@ -1286,18 +1287,43 @@ export async function restoreConsent(
   // leaving CONSENTED state attached to an effectively-empty profile with
   // no audit trail. The 410 GONE error is final: child data is being
   // permanently deleted, the parent must request a fresh consent flow.
+  //
+  // Fail-closed on null respondedAt: a WITHDRAWN row with no respondedAt is
+  // anomalous (pre-migration data, concurrent-write edge case). Treat it as
+  // expired rather than silently skipping the check — silent recovery in
+  // data-integrity paths is banned (CLAUDE.md). captureMessage surfaces the
+  // anomaly so we can backfill if it's a real prod pattern.
   const respondedAt = existing.respondedAt;
-  if (respondedAt) {
-    const respondedAtMs =
-      respondedAt instanceof Date
-        ? respondedAt.getTime()
-        : new Date(respondedAt).getTime();
-    const elapsedMs = Date.now() - respondedAtMs;
-    if (elapsedMs > CONSENT_RESTORE_GRACE_PERIOD_MS) {
-      throw new ConsentRestoreGracePeriodExpiredError(
-        new Date(respondedAtMs).toISOString(),
-      );
-    }
+  if (!respondedAt) {
+    captureMessage(
+      'restoreConsent: WITHDRAWN record has null respondedAt — treating as expired',
+      {
+        level: 'warning',
+        extra: {
+          context: 'consent.restore.null_responded_at',
+          childProfileId,
+          consentStateId: existing.id,
+        },
+      },
+    );
+    throw new ConsentRestoreGracePeriodExpiredError(
+      // Use updatedAt as a conservative timestamp fallback for the error
+      // payload; the actual decision is "expired" regardless.
+      (existing.updatedAt instanceof Date
+        ? existing.updatedAt
+        : new Date(existing.updatedAt)
+      ).toISOString(),
+    );
+  }
+  const respondedAtMs =
+    respondedAt instanceof Date
+      ? respondedAt.getTime()
+      : new Date(respondedAt).getTime();
+  const elapsedMs = Date.now() - respondedAtMs;
+  if (elapsedMs > CONSENT_RESTORE_GRACE_PERIOD_MS) {
+    throw new ConsentRestoreGracePeriodExpiredError(
+      new Date(respondedAtMs).toISOString(),
+    );
   }
 
   const now = new Date();
