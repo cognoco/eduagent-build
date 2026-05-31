@@ -26,12 +26,21 @@ jest.mock(
   }),
 );
 
+// [BUG-839] review-due-send was migrated from getRecentNotificationCount →
+// checkAndLogRateLimitInternal to close the read-then-write dedup race.
+// Mock both so legacy assertions stay readable (the count mock is unused
+// after migration but retained to keep history easy to read).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+// `false` = not rate-limited → handler proceeds to send. Each test that
+// wants to simulate "already sent in 24h" overrides this with `true`.
+const mockCheckAndLogRateLimitInternal = jest.fn().mockResolvedValue(false);
 jest.mock(
   '../../services/settings' /* gc1-allow: isolates notification settings service */,
   () => ({
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
+    checkAndLogRateLimitInternal: (...args: unknown[]) =>
+      mockCheckAndLogRateLimitInternal(...args),
   }),
 );
 
@@ -186,7 +195,7 @@ describe('reviewDueSend', () => {
         topTopicIds: [],
       });
 
-      expect(mockGetRecentNotificationCount).not.toHaveBeenCalled();
+      expect(mockCheckAndLogRateLimitInternal).not.toHaveBeenCalled();
       expect(mockFormatReviewReminderBody).not.toHaveBeenCalled();
       expect(mockSendPushNotification).not.toHaveBeenCalled();
       expect(result).toEqual({
@@ -257,7 +266,10 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
   });
 
   it('skips sendPushNotification and returns dedup_24h when a review_reminder was sent in last 24h', async () => {
-    mockGetRecentNotificationCount.mockResolvedValueOnce(1);
+    // [BUG-839] Migrated from getRecentNotificationCount→checkAndLogRateLimitInternal.
+    // `true` = already rate-limited (the helper found a recent log row and
+    // refused to insert a new one); handler must skip the push.
+    mockCheckAndLogRateLimitInternal.mockResolvedValueOnce(true);
 
     const { result } = await executeHandler({
       profileId: 'p-dup',
@@ -265,11 +277,11 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
       topTopicIds: [],
     });
 
-    expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
+    expect(mockCheckAndLogRateLimitInternal).toHaveBeenCalledWith(
       mockDb,
       'p-dup',
       'review_reminder',
-      24,
+      { hours: 24, maxCount: 1 },
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -280,7 +292,10 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
   });
 
   it('still sends when no recent review_reminder notification exists', async () => {
-    mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+    // [BUG-839] `false` = the helper inserted a fresh log row inside its
+    // transaction; handler proceeds with the push and must pass
+    // skipRateLimitLog so sendPushNotification does not double-log.
+    mockCheckAndLogRateLimitInternal.mockResolvedValueOnce(false);
     mockSendPushNotification.mockResolvedValueOnce({
       sent: true,
       ticketId: 'ticket-new',
@@ -310,7 +325,7 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
 // function returns skipped:dedup_check_failed so retries are bounded.
 // ---------------------------------------------------------------------------
 
-describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fail closed', () => {
+describe('[BUG-976 / BUG-839] review-due-send checkAndLogRateLimitInternal DB failure — fail closed', () => {
   const mockDb = {
     query: {
       profiles: {
@@ -335,9 +350,9 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
 
-  it('[BREAK] calls captureException and returns skipped:dedup_check_failed when getRecentNotificationCount throws', async () => {
+  it('[BREAK] calls captureException and returns skipped:dedup_check_failed when checkAndLogRateLimitInternal throws', async () => {
     const dbError = new Error('connection timeout');
-    mockGetRecentNotificationCount.mockRejectedValueOnce(dbError);
+    mockCheckAndLogRateLimitInternal.mockRejectedValueOnce(dbError);
 
     const { result, sendEventCalls } = await executeHandler({
       profileId: 'p-err',
@@ -350,7 +365,7 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
       expect.objectContaining({
         profileId: 'p-err',
         extra: expect.objectContaining({
-          context: 'review-due-send:getRecentNotificationCount',
+          context: 'review-due-send:checkAndLogRateLimitInternal',
         }),
       }),
     );
@@ -377,7 +392,7 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
   });
 
   it('does NOT call captureException on the happy path', async () => {
-    mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+    mockCheckAndLogRateLimitInternal.mockResolvedValueOnce(false);
     mockSendPushNotification.mockResolvedValueOnce({
       sent: true,
       ticketId: 'ticket-ok',
