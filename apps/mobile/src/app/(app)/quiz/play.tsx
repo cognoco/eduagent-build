@@ -382,7 +382,7 @@ export default function QuizPlayScreen(): React.ReactElement {
       if (currentIndex + 1 >= totalQuestions) {
         submitRound({
           results: nextResults,
-          navigateOnSuccess: false,
+          navigateOnSuccess: true,
         });
       }
       // [F-Q-07] If the answer was wrong and we don't already have the
@@ -623,7 +623,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     if (questionIndex + 1 >= totalQuestions) {
       submitRound({
         results: nextResults,
-        navigateOnSuccess: false,
+        navigateOnSuccess: true,
       });
     }
   }

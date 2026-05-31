@@ -457,7 +457,7 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     };
   });
 
-  it('hides dispute button after a correct answer', async () => {
+  it('hides dispute button and opens results after a correct final answer', async () => {
     mockCheckAnswer.mockResolvedValueOnce({ correct: true });
     render(<QuizPlayScreen />);
 
@@ -471,9 +471,9 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     expect(screen.getByTestId('quiz-revealed-answer').props.children).toBe(
       'Bratislava',
     );
-    screen.getByText('Saved. Ready when you are.');
-    screen.getByTestId('quiz-final-see-results');
-    screen.getByText('Wait, just one more!');
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/results');
+    });
     expect(screen.queryByTestId('quiz-dispute-button')).toBeNull();
     expect(screen.queryByText('Not quite right?')).toBeNull();
   });
@@ -524,7 +524,7 @@ describe('QuizPlayScreen — Guess Who finish autosave', () => {
     };
   });
 
-  it('celebrates and autosaves when a person guess finishes the round', async () => {
+  it('celebrates, autosaves, and opens results when a person guess finishes the round', async () => {
     render(<QuizPlayScreen />);
 
     fireEvent.press(screen.getByTestId('guess-who-resolve-correct'));
@@ -533,10 +533,6 @@ describe('QuizPlayScreen — Guess Who finish autosave', () => {
       screen.getByTestId('quiz-correct-celebration');
     });
     screen.getByText('You found them in 3 clues!');
-    screen.getByText('Saved. Ready when you are.');
-    screen.getByTestId('quiz-final-see-results');
-    screen.getByText('Wait, just one more!');
-
     expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
       {
         roundId: 'round-guess-who',
@@ -556,7 +552,9 @@ describe('QuizPlayScreen — Guess Who finish autosave', () => {
       }),
     );
     expect(mockSetCompletionResult).toHaveBeenCalled();
-    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/quiz/results');
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/results');
+    });
   });
 
   it('[BREAK/WI-282] does not submit duplicate results when Guess Who resolves twice', async () => {
@@ -612,18 +610,6 @@ describe('QuizPlayScreen — Guess Who finish autosave', () => {
         return result.questionIndex;
       }),
     ).toEqual([0, 1]);
-  });
-
-  it('can start one more round after the final autosave', async () => {
-    render(<QuizPlayScreen />);
-
-    fireEvent.press(screen.getByTestId('guess-who-resolve-correct'));
-    await waitFor(() => screen.getByTestId('quiz-final-one-more'));
-
-    fireEvent.press(screen.getByTestId('quiz-final-one-more'));
-
-    expect(mockSetRound).toHaveBeenCalledWith(null);
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/launch');
   });
 });
 
@@ -1473,7 +1459,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     render(<QuizPlayScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-option-0'));
-    await waitFor(() => screen.getByText('Saving your round...'));
+    await waitFor(() => screen.getByText('Saving your result...'));
 
     // Open the quit modal and tap Save-and-quit while submission is in-flight.
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
