@@ -472,7 +472,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         c,
         400,
         ERROR_CODES.VALIDATION_ERROR,
-        'Profile required for per-profile quota status.',
+        'Active profile required to view usage.',
       );
     }
     const profileQuota =
