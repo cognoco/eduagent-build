@@ -378,6 +378,7 @@
     "subscreens": {
       "notifications": "Notifications",
       "account": "Account",
+      "securitySessions": "Devices",
       "privacy": "Privacy & data",
       "help": "Help & feedback"
     },
@@ -2505,8 +2506,56 @@
     "requirementsHint": "At least 8 characters"
   },
   "accountSecurity": {
+    "providerFallback": "your provider",
+    "signedInWith": "Signed in with {{provider}}",
     "securedVia": "Secured via {{provider}}",
-    "changePasswordLabel": "Change Password"
+    "changePasswordLabel": "Change Password",
+    "addPasswordLabel": "Add password",
+    "changeEmailLabel": "Change email",
+    "manageDevicesLabel": "Manage devices",
+    "timeoutMessage": "The security service did not respond in time. Check your connection and try again."
+  },
+  "addPassword": {
+    "providerContext": "Add a password so you can also sign in without {{provider}}.",
+    "errorNotReady": "Account security is still loading.",
+    "submitLabel": "Add password",
+    "submitting": "Adding...",
+    "submitButton": "Add password"
+  },
+  "changeEmail": {
+    "description": "We'll send a code before switching your login email.",
+    "emailPlaceholder": "new@example.com",
+    "sendCodeLabel": "Send email code",
+    "sendingCode": "Sending...",
+    "sendCodeButton": "Send code",
+    "codeLabel": "Verification code",
+    "codePlaceholder": "Enter 6-digit code",
+    "verifyLabel": "Verify email",
+    "verifying": "Updating...",
+    "verifyButton": "Verify and update",
+    "errorNotReady": "Account security is still loading.",
+    "errorEmailRequired": "Enter your new email",
+    "errorSendCodeFirst": "Send a code to your new email first.",
+    "errorCodeRequired": "Enter the verification code",
+    "errorSyncFailed": "Your login email changed, but the account record was not updated. {{message}}",
+    "warningOldEmailStillActive": "Email updated, but your old email is still active.",
+    "successMessage": "Email updated"
+  },
+  "securitySessions": {
+    "description": "Review devices signed in to your account. You can revoke any session except this one.",
+    "deviceFallback": "Device",
+    "loading": "Loading devices...",
+    "loadErrorTitle": "We couldn't load your devices",
+    "errorNotReady": "Account security is still loading.",
+    "retryLabel": "Retry loading devices",
+    "retryButton": "Try again",
+    "emptyTitle": "No other devices",
+    "emptyDescription": "Only this session is active right now.",
+    "lastActive": "Last active: {{value}}",
+    "currentBadge": "This device",
+    "revokeLabel": "Revoke session",
+    "revoking": "Revoking...",
+    "revokeButton": "Revoke"
   },
   "changePassword": {
     "errorCurrentRequired": "Enter your current password",

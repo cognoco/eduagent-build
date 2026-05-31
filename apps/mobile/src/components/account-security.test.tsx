@@ -5,14 +5,15 @@ import { renderScreen, cleanupScreen } from '../test-utils/screen-render';
 import { AccountSecurity } from './account-security';
 
 let mockUser: Record<string, unknown> = {};
+const mockPush = jest.fn();
 
 jest.mock('@clerk/clerk-expo', () => ({
   useUser: () => ({ user: mockUser }),
-  useAuth: () => ({ signOut: jest.fn() }),
+  useAuth: () => ({ getToken: jest.fn(), signOut: jest.fn() }),
 }));
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
 }));
 
 // prettier-ignore
@@ -48,13 +49,22 @@ describe('AccountSecurity', () => {
     screen.getByText('Change Password');
   });
 
-  it('shows SSO message when passwordEnabled is false', () => {
+  it('renders email and device rows for password users', () => {
+    active = renderWithProviders(<AccountSecurity visible />);
+
+    screen.getByTestId('change-email-row');
+    screen.getByTestId('manage-devices-row');
+  });
+
+  it('[auth-3] shows Add password row for SSO users instead of only a provider note', () => {
     mockUser = {
       passwordEnabled: false,
       externalAccounts: [{ provider: 'google' }],
     };
     active = renderWithProviders(<AccountSecurity visible />);
-    screen.getByText(/Secured via Google/);
+
+    screen.getByText(/Signed in with Google/);
+    screen.getByTestId('add-password-row');
     expect(screen.queryByText('Change Password')).toBeNull();
   });
 
@@ -71,6 +81,18 @@ describe('AccountSecurity', () => {
     active = renderWithProviders(<AccountSecurity visible />);
     fireEvent.press(screen.getByText('Change Password'));
     screen.getByTestId('current-password');
+  });
+
+  it('expands email form when Change email is tapped', () => {
+    active = renderWithProviders(<AccountSecurity visible />);
+    fireEvent.press(screen.getByTestId('change-email-row'));
+    screen.getByTestId('change-email-input');
+  });
+
+  it('navigates to device sessions when Manage devices is tapped', () => {
+    active = renderWithProviders(<AccountSecurity visible />);
+    fireEvent.press(screen.getByTestId('manage-devices-row'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/security-sessions');
   });
 
   it('does not render when visible is false', () => {

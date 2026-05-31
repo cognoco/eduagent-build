@@ -364,6 +364,7 @@
     "subscreens": {
       "notifications": "Notificaciones",
       "account": "Cuenta",
+      "securitySessions": "Dispositivos",
       "privacy": "Privacidad y datos",
       "help": "Ayuda y comentarios"
     },
@@ -2474,8 +2475,56 @@
     "requirementsHint": "Al menos 8 caracteres"
   },
   "accountSecurity": {
+    "providerFallback": "tu proveedor",
+    "signedInWith": "Sesión iniciada con {{provider}}",
     "securedVia": "Protegido mediante {{provider}}",
-    "changePasswordLabel": "Cambiar contraseña"
+    "changePasswordLabel": "Cambiar contraseña",
+    "addPasswordLabel": "Añadir contraseña",
+    "changeEmailLabel": "Cambiar correo electrónico",
+    "manageDevicesLabel": "Administrar dispositivos",
+    "timeoutMessage": "El servicio de seguridad no respondió a tiempo. Revisa tu conexión e inténtalo de nuevo."
+  },
+  "addPassword": {
+    "providerContext": "Añade una contraseña para poder iniciar sesión también sin {{provider}}.",
+    "errorNotReady": "La seguridad de la cuenta todavía se está cargando.",
+    "submitLabel": "Añadir contraseña",
+    "submitting": "Añadiendo...",
+    "submitButton": "Añadir contraseña"
+  },
+  "changeEmail": {
+    "description": "Enviaremos un código antes de cambiar tu correo de inicio de sesión.",
+    "emailPlaceholder": "nuevo@example.com",
+    "sendCodeLabel": "Enviar código por correo",
+    "sendingCode": "Enviando...",
+    "sendCodeButton": "Enviar código",
+    "codeLabel": "Código de verificación",
+    "codePlaceholder": "Introduce el código de 6 dígitos",
+    "verifyLabel": "Verificar correo",
+    "verifying": "Actualizando...",
+    "verifyButton": "Verificar y actualizar",
+    "errorNotReady": "La seguridad de la cuenta todavía se está cargando.",
+    "errorEmailRequired": "Introduce tu nuevo correo",
+    "errorSendCodeFirst": "Primero envía un código a tu nuevo correo.",
+    "errorCodeRequired": "Introduce el código de verificación",
+    "errorSyncFailed": "Tu correo de inicio de sesión cambió, pero el registro de la cuenta no se actualizó. {{message}}",
+    "warningOldEmailStillActive": "Correo actualizado, pero tu correo anterior sigue activo.",
+    "successMessage": "Correo actualizado"
+  },
+  "securitySessions": {
+    "description": "Revisa los dispositivos con sesión iniciada en tu cuenta. Puedes revocar cualquier sesión excepto esta.",
+    "deviceFallback": "Dispositivo",
+    "loading": "Cargando dispositivos...",
+    "loadErrorTitle": "No pudimos cargar tus dispositivos",
+    "errorNotReady": "La seguridad de la cuenta todavía se está cargando.",
+    "retryLabel": "Volver a cargar dispositivos",
+    "retryButton": "Intentar de nuevo",
+    "emptyTitle": "No hay otros dispositivos",
+    "emptyDescription": "Ahora mismo solo esta sesión está activa.",
+    "lastActive": "Última actividad: {{value}}",
+    "currentBadge": "Este dispositivo",
+    "revokeLabel": "Revocar sesión",
+    "revoking": "Revocando...",
+    "revokeButton": "Revocar"
   },
   "changePassword": {
     "errorCurrentRequired": "Introduce tu contraseña actual",

@@ -51,6 +51,7 @@ const EXEMPT_SCREENS: string[] = [
   '(app)/more/index.tsx',
   '(app)/more/notifications.tsx', // Native Stack header provides back
   '(app)/more/account.tsx', // Native Stack header provides back
+  '(app)/more/security-sessions.tsx', // Native Stack header provides back
   '(app)/more/privacy.tsx', // Native Stack header provides back
   '(app)/more/help.tsx', // Native Stack header provides back
   '(app)/progress/index.tsx', // Visible bottom tab (see (app)/_layout.tsx VISIBLE_TABS)

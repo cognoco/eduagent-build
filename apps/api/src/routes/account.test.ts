@@ -65,6 +65,15 @@ jest.mock(
 // Mock account, deletion, and export services — no DB interaction
 // ---------------------------------------------------------------------------
 
+const mockUpdateAccountEmailFromClerk = jest.fn().mockResolvedValue({
+  id: 'test-account-id',
+  clerkUserId: 'user_test',
+  email: 'new@example.com',
+  timezone: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
 jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/account',
@@ -78,6 +87,8 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }),
+    updateAccountEmailFromClerk: (...args: unknown[]) =>
+      mockUpdateAccountEmailFromClerk(...args),
   };
 });
 
@@ -160,6 +171,7 @@ import { ERROR_CODES } from '@eduagent/schemas';
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
   DATABASE_URL: 'postgresql://test:test@localhost/test',
+  CLERK_SECRET_KEY: 'sk_test',
 };
 
 describe('account routes', () => {
@@ -476,6 +488,87 @@ describe('account routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // PATCH /v1/account/email
+  // -------------------------------------------------------------------------
+
+  describe('PATCH /v1/account/email', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockUpdateAccountEmailFromClerk.mockResolvedValue({
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'new@example.com',
+        timezone: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('syncs the authenticated account email after Clerk primary email changes', async () => {
+      const res = await app.request(
+        '/v1/account/email',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ email: 'new@example.com' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        email: 'new@example.com',
+      });
+      expect(mockUpdateAccountEmailFromClerk).toHaveBeenCalledWith(
+        expect.anything(),
+        {
+          clerkSecretKey: 'sk_test',
+          clerkUserId: 'user_test',
+          requestedEmail: 'new@example.com',
+        },
+      );
+    });
+
+    it('returns 400 for invalid email input', async () => {
+      const res = await app.request(
+        '/v1/account/email',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ email: 'not-an-email' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockUpdateAccountEmailFromClerk).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when the service reports an email conflict', async () => {
+      const { ConflictError } = jest.requireActual('@eduagent/schemas') as {
+        ConflictError: new (message: string) => Error;
+      };
+      mockUpdateAccountEmailFromClerk.mockRejectedValueOnce(
+        new ConflictError('An account with this email already exists.'),
+      );
+
+      const res = await app.request(
+        '/v1/account/email',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ email: 'new@example.com' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.CONFLICT });
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // [CR-2026-05-19-H1] Break tests — non-owner profile must be rejected from
   // all owner-gated account routes. Uses X-Profile-Id to exercise the explicit
   // path in profileScopeMiddleware (which reads isOwner from DB / mock).
@@ -485,6 +578,7 @@ describe('account routes', () => {
     const NON_OWNER_PROFILE_ID = 'b0000000-0000-4000-b000-000000000001';
 
     beforeEach(() => {
+      mockUpdateAccountEmailFromClerk.mockClear();
       // Override getProfile so X-Profile-Id resolves to a non-owner profile.
       (findOwnerProfile as jest.Mock).mockResolvedValue(null);
       // Also override via getProfile path for X-Profile-Id header.
@@ -555,6 +649,26 @@ describe('account routes', () => {
         code: ERROR_CODES.FORBIDDEN,
         message: 'Only the account owner can export account data.',
       });
+    });
+
+    it('[BREAK auth-2] PATCH /v1/account/email returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/account/email',
+        {
+          method: 'PATCH',
+          headers: nonOwnerHeaders,
+          body: JSON.stringify({ email: 'new@example.com' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can change account email.',
+      });
+      expect(mockUpdateAccountEmailFromClerk).not.toHaveBeenCalled();
     });
   });
 });

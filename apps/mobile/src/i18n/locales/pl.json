@@ -389,6 +389,7 @@
     "subscreens": {
       "notifications": "Powiadomienia",
       "account": "Konto",
+      "securitySessions": "Urządzenia",
       "privacy": "Prywatność i dane",
       "help": "Pomoc i opinie"
     },
@@ -2474,8 +2475,56 @@
     "requirementsHint": "Co najmniej 8 znaków"
   },
   "accountSecurity": {
+    "providerFallback": "dostawcę",
+    "signedInWith": "Zalogowano przez {{provider}}",
     "securedVia": "Zabezpieczono przez {{provider}}",
-    "changePasswordLabel": "Zmień hasło"
+    "changePasswordLabel": "Zmień hasło",
+    "addPasswordLabel": "Dodaj hasło",
+    "changeEmailLabel": "Zmień e-mail",
+    "manageDevicesLabel": "Zarządzaj urządzeniami",
+    "timeoutMessage": "Usługa zabezpieczeń nie odpowiedziała na czas. Sprawdź połączenie i spróbuj ponownie."
+  },
+  "addPassword": {
+    "providerContext": "Dodaj hasło, aby móc logować się także bez {{provider}}.",
+    "errorNotReady": "Zabezpieczenia konta nadal się ładują.",
+    "submitLabel": "Dodaj hasło",
+    "submitting": "Dodawanie...",
+    "submitButton": "Dodaj hasło"
+  },
+  "changeEmail": {
+    "description": "Wyślemy kod przed zmianą e-maila logowania.",
+    "emailPlaceholder": "nowy@example.com",
+    "sendCodeLabel": "Wyślij kod e-mail",
+    "sendingCode": "Wysyłanie...",
+    "sendCodeButton": "Wyślij kod",
+    "codeLabel": "Kod weryfikacyjny",
+    "codePlaceholder": "Wpisz 6-cyfrowy kod",
+    "verifyLabel": "Zweryfikuj e-mail",
+    "verifying": "Aktualizowanie...",
+    "verifyButton": "Zweryfikuj i zaktualizuj",
+    "errorNotReady": "Zabezpieczenia konta nadal się ładują.",
+    "errorEmailRequired": "Wpisz nowy e-mail",
+    "errorSendCodeFirst": "Najpierw wyślij kod na nowy e-mail.",
+    "errorCodeRequired": "Wpisz kod weryfikacyjny",
+    "errorSyncFailed": "E-mail logowania został zmieniony, ale rekord konta nie został zaktualizowany. {{message}}",
+    "warningOldEmailStillActive": "E-mail zaktualizowany, ale stary e-mail nadal jest aktywny.",
+    "successMessage": "E-mail zaktualizowany"
+  },
+  "securitySessions": {
+    "description": "Sprawdź urządzenia zalogowane na Twoje konto. Możesz unieważnić każdą sesję oprócz tej.",
+    "deviceFallback": "Urządzenie",
+    "loading": "Ładowanie urządzeń...",
+    "loadErrorTitle": "Nie udało się wczytać Twoich urządzeń",
+    "errorNotReady": "Zabezpieczenia konta nadal się ładują.",
+    "retryLabel": "Ponownie wczytaj urządzenia",
+    "retryButton": "Spróbuj ponownie",
+    "emptyTitle": "Brak innych urządzeń",
+    "emptyDescription": "W tej chwili aktywna jest tylko ta sesja.",
+    "lastActive": "Ostatnia aktywność: {{value}}",
+    "currentBadge": "To urządzenie",
+    "revokeLabel": "Unieważnij sesję",
+    "revoking": "Unieważnianie...",
+    "revokeButton": "Unieważnij"
   },
   "changePassword": {
     "errorCurrentRequired": "Wprowadź aktualne hasło",

@@ -364,6 +364,7 @@
     "subscreens": {
       "notifications": "Varsler",
       "account": "Konto",
+      "securitySessions": "Enheter",
       "privacy": "Personvern og data",
       "help": "Hjelp og tilbakemeldinger"
     },
@@ -2474,8 +2475,56 @@
     "requirementsHint": "Minst 8 tegn"
   },
   "accountSecurity": {
+    "providerFallback": "leverandøren din",
+    "signedInWith": "Logget inn med {{provider}}",
     "securedVia": "Sikret via {{provider}}",
-    "changePasswordLabel": "Endre passord"
+    "changePasswordLabel": "Endre passord",
+    "addPasswordLabel": "Legg til passord",
+    "changeEmailLabel": "Endre e-post",
+    "manageDevicesLabel": "Administrer enheter",
+    "timeoutMessage": "Sikkerhetstjenesten svarte ikke i tide. Sjekk tilkoblingen og prøv igjen."
+  },
+  "addPassword": {
+    "providerContext": "Legg til et passord så du også kan logge inn uten {{provider}}.",
+    "errorNotReady": "Kontosikkerhet lastes fortsatt.",
+    "submitLabel": "Legg til passord",
+    "submitting": "Legger til...",
+    "submitButton": "Legg til passord"
+  },
+  "changeEmail": {
+    "description": "Vi sender en kode før vi bytter innloggings-e-posten din.",
+    "emailPlaceholder": "ny@example.com",
+    "sendCodeLabel": "Send e-postkode",
+    "sendingCode": "Sender...",
+    "sendCodeButton": "Send kode",
+    "codeLabel": "Bekreftelseskode",
+    "codePlaceholder": "Skriv inn 6-sifret kode",
+    "verifyLabel": "Bekreft e-post",
+    "verifying": "Oppdaterer...",
+    "verifyButton": "Bekreft og oppdater",
+    "errorNotReady": "Kontosikkerhet lastes fortsatt.",
+    "errorEmailRequired": "Skriv inn den nye e-posten din",
+    "errorSendCodeFirst": "Send først en kode til den nye e-posten din.",
+    "errorCodeRequired": "Skriv inn bekreftelseskoden",
+    "errorSyncFailed": "Innloggings-e-posten ble endret, men kontoposten ble ikke oppdatert. {{message}}",
+    "warningOldEmailStillActive": "E-post oppdatert, men den gamle e-posten er fortsatt aktiv.",
+    "successMessage": "E-post oppdatert"
+  },
+  "securitySessions": {
+    "description": "Se gjennom enheter som er logget inn på kontoen din. Du kan trekke tilbake alle økter unntatt denne.",
+    "deviceFallback": "Enhet",
+    "loading": "Laster enheter...",
+    "loadErrorTitle": "Vi kunne ikke laste enhetene dine",
+    "errorNotReady": "Kontosikkerhet lastes fortsatt.",
+    "retryLabel": "Prøv å laste enheter igjen",
+    "retryButton": "Prøv igjen",
+    "emptyTitle": "Ingen andre enheter",
+    "emptyDescription": "Bare denne økten er aktiv akkurat nå.",
+    "lastActive": "Sist aktiv: {{value}}",
+    "currentBadge": "Denne enheten",
+    "revokeLabel": "Trekk tilbake økt",
+    "revoking": "Trekker tilbake...",
+    "revokeButton": "Trekk tilbake"
   },
   "changePassword": {
     "errorCurrentRequired": "Skriv inn ditt nåværende passord",

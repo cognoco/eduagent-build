@@ -389,6 +389,7 @@
     "subscreens": {
       "notifications": "Notificações",
       "account": "Conta",
+      "securitySessions": "Dispositivos",
       "privacy": "Privacidade e dados",
       "help": "Ajuda e feedback"
     },
@@ -2474,8 +2475,56 @@
     "requirementsHint": "Pelo menos 8 caracteres"
   },
   "accountSecurity": {
+    "providerFallback": "seu provedor",
+    "signedInWith": "Conectado com {{provider}}",
     "securedVia": "Protegido via {{provider}}",
-    "changePasswordLabel": "Alterar senha"
+    "changePasswordLabel": "Alterar senha",
+    "addPasswordLabel": "Adicionar senha",
+    "changeEmailLabel": "Alterar e-mail",
+    "manageDevicesLabel": "Gerenciar dispositivos",
+    "timeoutMessage": "O serviço de segurança não respondeu a tempo. Verifique sua conexão e tente novamente."
+  },
+  "addPassword": {
+    "providerContext": "Adicione uma senha para também entrar sem {{provider}}.",
+    "errorNotReady": "A segurança da conta ainda está carregando.",
+    "submitLabel": "Adicionar senha",
+    "submitting": "Adicionando...",
+    "submitButton": "Adicionar senha"
+  },
+  "changeEmail": {
+    "description": "Vamos enviar um código antes de trocar seu e-mail de login.",
+    "emailPlaceholder": "novo@example.com",
+    "sendCodeLabel": "Enviar código por e-mail",
+    "sendingCode": "Enviando...",
+    "sendCodeButton": "Enviar código",
+    "codeLabel": "Código de verificação",
+    "codePlaceholder": "Digite o código de 6 dígitos",
+    "verifyLabel": "Verificar e-mail",
+    "verifying": "Atualizando...",
+    "verifyButton": "Verificar e atualizar",
+    "errorNotReady": "A segurança da conta ainda está carregando.",
+    "errorEmailRequired": "Digite seu novo e-mail",
+    "errorSendCodeFirst": "Envie primeiro um código para seu novo e-mail.",
+    "errorCodeRequired": "Digite o código de verificação",
+    "errorSyncFailed": "Seu e-mail de login mudou, mas o registro da conta não foi atualizado. {{message}}",
+    "warningOldEmailStillActive": "E-mail atualizado, mas seu e-mail antigo ainda está ativo.",
+    "successMessage": "E-mail atualizado"
+  },
+  "securitySessions": {
+    "description": "Revise os dispositivos conectados à sua conta. Você pode revogar qualquer sessão, exceto esta.",
+    "deviceFallback": "Dispositivo",
+    "loading": "Carregando dispositivos...",
+    "loadErrorTitle": "Não foi possível carregar seus dispositivos",
+    "errorNotReady": "A segurança da conta ainda está carregando.",
+    "retryLabel": "Tentar carregar dispositivos novamente",
+    "retryButton": "Tentar novamente",
+    "emptyTitle": "Nenhum outro dispositivo",
+    "emptyDescription": "Só esta sessão está ativa agora.",
+    "lastActive": "Última atividade: {{value}}",
+    "currentBadge": "Este dispositivo",
+    "revokeLabel": "Revogar sessão",
+    "revoking": "Revogando...",
+    "revokeButton": "Revogar"
   },
   "changePassword": {
     "errorCurrentRequired": "Insira sua senha atual",

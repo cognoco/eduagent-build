@@ -7,13 +7,17 @@ import { createHash } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { accounts, type Database } from '@eduagent/database';
 import { createSubscription, getSubscriptionByAccountId } from './billing';
+import {
+  invalidateVerifiedClerkEmailCache,
+  resolveVerifiedClerkEmail,
+} from './clerk-user';
 import { computeTrialEndDate } from './trial';
 import { getTierConfig } from './subscription';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { safeSend } from './safe-non-core';
 import { inngest } from '../inngest/client';
-import { ConflictError } from '../errors';
+import { BadRequestError, ConflictError, NotFoundError } from '../errors';
 
 const logger = createLogger();
 
@@ -68,6 +72,19 @@ export async function findAccountByClerkId(
  */
 function hashEmail(email: string): string {
   return createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '23505'
+  );
 }
 
 /**
@@ -300,4 +317,72 @@ export async function findOrCreateAccount(
   }
 
   return mapAccountRow(row);
+}
+
+export async function updateAccountEmailFromClerk(
+  db: Database,
+  args: {
+    clerkUserId: string;
+    requestedEmail: string;
+    clerkSecretKey?: string;
+    fetchImpl?: typeof fetch;
+  },
+): Promise<Account> {
+  const requestedEmail = normalizeEmail(args.requestedEmail);
+
+  // The caller may still hold a JWT with the old email claim immediately after
+  // Clerk promotion. Force a Clerk API lookup by omitting token claims, and
+  // drop any stale cache entry before and after the sync.
+  invalidateVerifiedClerkEmailCache(args.clerkUserId);
+  const verified = await resolveVerifiedClerkEmail({
+    userId: args.clerkUserId,
+    clerkSecretKey: args.clerkSecretKey,
+    fetchImpl: args.fetchImpl,
+  });
+
+  if (!verified.ok) {
+    throw new BadRequestError(verified.message);
+  }
+
+  if (normalizeEmail(verified.email) !== requestedEmail) {
+    throw new BadRequestError(
+      'Requested email does not match the verified Clerk primary email.',
+    );
+  }
+
+  try {
+    const updated = await db.transaction(async (tx) => {
+      const existingByEmail = await tx.query.accounts.findFirst({
+        where: eq(accounts.email, requestedEmail),
+      });
+
+      if (existingByEmail && existingByEmail.clerkUserId !== args.clerkUserId) {
+        throw new ConflictError(
+          'An account with this email already exists. Contact support to recover access.',
+        );
+      }
+
+      const [row] = await tx
+        .update(accounts)
+        .set({ email: requestedEmail, updatedAt: new Date() })
+        .where(eq(accounts.clerkUserId, args.clerkUserId))
+        .returning();
+
+      if (!row) {
+        throw new NotFoundError('Account');
+      }
+
+      return mapAccountRow(row);
+    });
+
+    invalidateVerifiedClerkEmailCache(args.clerkUserId);
+    return updated;
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new ConflictError(
+        'An account with this email already exists. Contact support to recover access.',
+      );
+    }
+    throw error;
+  }
 }

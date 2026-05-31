@@ -74,6 +74,22 @@ export type AccountDeletionStatusResponse = z.infer<
   typeof accountDeletionStatusResponseSchema
 >;
 
+export const accountEmailUpdateRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+});
+
+export type AccountEmailUpdateRequest = z.infer<
+  typeof accountEmailUpdateRequestSchema
+>;
+
+export const accountEmailUpdateResponseSchema = z.object({
+  email: z.string().email(),
+});
+
+export type AccountEmailUpdateResponse = z.infer<
+  typeof accountEmailUpdateResponseSchema
+>;
+
 export const dataExportConsentSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
