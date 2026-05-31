@@ -23,7 +23,8 @@ import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
 import { deriveRetentionStatus, RETENTION_ORDER } from '../lib/retention-utils';
-import type { RetentionStatus } from '@eduagent/schemas';
+import type { KnowledgeInventory, RetentionStatus } from '@eduagent/schemas';
+import { useProgressInventory } from './use-progress';
 
 // ---------------------------------------------------------------------------
 // Retention API shape
@@ -93,6 +94,18 @@ export function useLibraryRetention(): UseQueryResult<LibraryRetentionResponse> 
     enabled: !!activeProfile,
     retry: false,
   });
+}
+
+/**
+ * Library-surface facade over the broad progress inventory query.
+ *
+ * The library manage sheet needs per-subject delete-scope counts before the
+ * dedicated payload-narrow library endpoint exists. Keep the direct progress
+ * hook dependency here so `library.tsx` stays inside the surface-ownership
+ * import boundary.
+ */
+export function useLibraryProgressInventory(): UseQueryResult<KnowledgeInventory> {
+  return useProgressInventory();
 }
 
 // ---------------------------------------------------------------------------

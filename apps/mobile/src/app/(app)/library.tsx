@@ -27,11 +27,9 @@ import {
   useSubjects,
   useUpdateSubject,
 } from '../../hooks/use-subjects';
+import { useOverallProgress } from '../../hooks/use-progress';
 import {
-  useOverallProgress,
-  useProgressInventory,
-} from '../../hooks/use-progress';
-import {
+  useLibraryProgressInventory,
   useLibraryRetention,
   type LibraryRetentionTopic,
 } from '../../hooks/use-library-context';
@@ -281,7 +279,7 @@ function LibraryScreenContent({
     [progressQuery.data?.subjects],
   );
 
-  const progressInventoryQuery = useProgressInventory();
+  const progressInventoryQuery = useLibraryProgressInventory();
   const inventoryBySubjectId = useMemo(
     () =>
       new Map(
