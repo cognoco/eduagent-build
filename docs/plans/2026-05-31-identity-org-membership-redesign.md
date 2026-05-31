@@ -95,27 +95,41 @@ Out of scope (Non-goals):
 
 ## Acceptance criteria
 
-Sourced from `docs/audits/2026-05-31-logical-gap-audit.md` (36 confirmed gaps).
-The redesign must close the **23 identity-model gaps** (6 structural + 17
-flow-enabled). Tracked per gap ID:
+Sourced from `docs/audits/2026-05-31-logical-gap-audit.md` (36 confirmed gaps —
+2 HIGH + 28 MEDIUM + 6 LOW). The redesign closes **19 identity-model gaps**; the
+remaining **17 are independent** and survive the redesign unchanged (see
+"Independent backlog"). `19 + 17 = 36` — the full audit reconciles. Tracked per
+gap ID:
 
-- **Structural (close with the model alone):** `learn-1` (HIGH), `learn-2`,
-  `identity-1`, `consent-3`, `consent-4`, `consent-7`.
-- **Flow-enabled (close via the 7 flows):** `consent-1` (HIGH), `consent-2`,
-  `family-2`, `family-3`, `family-4`, `family-5`, `auth-1`, `identity-3`,
-  `identity-4`, `identity-5`, `identity-6`, `billing-2`, `notif-1`, `progress-1`.
+- **Access-model-enabled (closed by the T2 auth + T3 access-control rewrite, no
+  new lifecycle flow — 2):** `learn-1` (HIGH), `learn-2`. Both trace to the
+  proxy guard equating `isOwner===false` with proxy mode
+  (`proxy-guard.ts:57-63`); the membership model authorizes self-writes by the
+  *student* role on the member's own person and mentee-writes by the *mentor*
+  role, independent of ownership. `learn-1` additionally turns on the product
+  call recorded as **D6** below.
+- **Flow-enabled (closed by the 7 lifecycle flows — 17):** `consent-1` (HIGH),
+  `consent-2`, `consent-3`, `consent-4`, `consent-7`, `auth-1`, `billing-2`,
+  `family-2`, `family-3`, `family-4`, `family-5`, `identity-1`, `identity-3`,
+  `identity-4`, `identity-5`, `identity-6`, `progress-1`.
+
+> There is no "structural, closed by the model alone" bucket: every identity gap
+> needs either the access-control rewrite (T2–T3) or a lifecycle flow (T5). The
+> schema (T1) is necessary but closes no gap on its own.
 
 ### The 7 lifecycle flows (in scope — the redesign is incomplete without these)
 
 1. **Cross-account invite / claim** — link a pre-existing person to an org
-   (teen, tutor, co-parent). Closes `family-2/3`, `consent-1/2`, `identity-5`,
-   `billing-2`. **Design rule:** must attach to an *existing* person when one
-   exists — never create a parallel managed duplicate. This is what keeps the
-   merge tool (D5) out of scope.
+   (teen, tutor, co-parent). Closes `family-2`, `family-3`, `consent-2`,
+   `identity-5`, `billing-2`. **Design rule:** must attach to an *existing*
+   person when one exists — never create a parallel managed duplicate. This is
+   what keeps the merge tool (D5) out of scope.
 2. **Managed → credentialed graduation** — managed person claims own login,
-   keeps history. Closes `family-4`, `identity-3/4`.
-3. **Leave-org with data preserved** — member exits without data loss or nuking
-   others. Closes `auth-1`, `consent-4`, `family-5`, `identity-6`.
+   keeps history. Closes `family-4`, `identity-3`.
+3. **Leave-org / remove-member with data preserved** — a membership is revoked
+   (by the member themselves *or* by an owner removing a child) without data
+   loss or nuking others; the person + their learning data persist. Closes
+   `auth-1`, `consent-4`, `family-5`, `identity-1`, `identity-6`.
 4. **Per-person data export** — export my data, not the whole account's. Closes
    `consent-3`.
 5. **Self-service consent revoke** for the email-only consenting parent
@@ -125,6 +139,9 @@ flow-enabled). Tracked per gap ID:
 7. **Per-member progress generation** decoupled from the owner's notification
    prefs. Closes `progress-1`.
 
+Coverage check: flows close the 17 flow-enabled IDs exactly (no gap appears
+twice, none is unmapped); `learn-1`/`learn-2` are closed by T2–T3, not a flow.
+
 ## Tasks (phases — each becomes its own detailed plan)
 
 Surface sizes are from the 2026-05-31 four-agent surface map; treat them as
@@ -133,7 +150,8 @@ scoping estimates, not exhaustive file lists.
 - [x] **T0 — Design spec sign-off.** Ratify this model + acceptance criteria as
   the source of truth; resolve the open decisions below.
   *Done when:* open-decisions table has no unresolved rows; this doc moves to
-  `status: approved`. **DONE 2026-05-31 — all 5 decisions resolved.**
+  `status: approved`. **DONE 2026-05-31 — all 6 decisions resolved (D6 added
+  during T1 adversarial review).**
 
 - [ ] **T1 — Data model.** Add `persons`, `organizations`, `memberships`
   (role set), and a credential link to Clerk identities; move `subscriptions`
@@ -157,10 +175,15 @@ scoping estimates, not exhaustive file lists.
   "membership grants visibility." Largest phase.
   *Files (~150 with scoping WHERE clauses; 62 use `createScopedRepository`;
   RLS in `packages/database/src/rls.ts` + 7 migrations + coverage tests; guards
-  in `services/family-access.ts` used by ~19 routes).* *Done when:* RLS
-  coverage test still passes against the membership-scoped policies; IDOR break
-  tests (cross-org access denied) pass; `learn-2` (mentor writes to mentee
-  learning via role) passes.
+  in `services/family-access.ts` used by ~19 routes).* This phase also lands the
+  **D3 org-context stamp**: add a nullable `organization_id` to each
+  profile-owned learning root this phase already enumerates, backfilled from the
+  member's org, written on create going forward (whole-person visibility stays
+  the read default; the column only enables per-org slicing later without a
+  post-launch migration). *Done when:* RLS coverage test still passes against the
+  membership-scoped policies; IDOR break tests (cross-org access denied) pass;
+  `learn-2` (mentor writes to mentee learning via role) passes; new learning
+  records carry a non-null `organization_id`.
 
 - [ ] **T4 — Billing.** `accountId` → `organizationId` across subscriptions,
   quota pools, usage, webhooks, KV cache keys; drop `subscriptions.accountId`
@@ -201,9 +224,10 @@ scoping estimates, not exhaustive file lists.
 |---|---|---|
 | D1 | Org for a solo person — auto-created at signup? | Yes — always an org of one (decided). |
 | D2 | Mentor scope — org-wide or per-person? | Org-wide for v1 (decided); per-person deferred. |
-| D3 | Multi-org learning visibility — whole-person or per-org slice? | **DECIDED:** whole-person now; **stamp each learning record with its org context from day one** so per-org scoping is possible later without migration. |
+| D3 | Multi-org learning visibility — whole-person or per-org slice? | **DECIDED:** whole-person now. The org-context stamp lands in **T3** (the access-control phase that already enumerates every profile-owned learning root), **not T1** — adding a column with no reader/writer four phases early is dead schema. Because pre-launch dev data is re-seeded at T7, the stamp column exists before any production write, so the "no post-launch backfill" intent of D3 still holds. T1 deliberately omits learning-table changes (see T1 plan §Scope). |
 | D4 | Credential default thresholds (age/device) | Under ~13 → managed default; 13+ → own-login default; own device leans credentialed; always overridable. |
 | D5 | Merge two pre-existing persons | **DECIDED:** out of scope for v1. Only dev/test accounts exist today; the in-scope flows (multi-login, graduation-in-place, link-to-existing-person) are designed to prevent duplication so merge is not needed. |
+| D6 | Does a *student*-role member write to their OWN learning data? | **DECIDED: yes.** A student role on a member's own person authorizes read+write to that person's own sessions/subjects/messages, regardless of `isOwner` — this is the product's core loop (a child on a parent's account must be able to study). `learn-1` exists because `proxy-guard.ts:57-63` wrongly treats `isOwner===false` as proxy mode; under the membership model self-writes are role-authorized, and genuine proxy (acting *as* another person) stays an explicit, separate switch. Consistent with the never-lock-topics / human-override-everywhere philosophy. |
 
 ## Risks & rollback
 
@@ -218,9 +242,14 @@ scoping estimates, not exhaustive file lists.
 
 ## Independent backlog (NOT closed by this redesign — separate track)
 
-13 audit gaps survive the redesign and need their own fixes; the launch-relevant
-ones: `onboard-1/4` (onboarding steps not wired into first-run), `notif-3`
-(child "notify parent" never sends a push), `billing-3` (silent payment
-failure), `auth-2` (no email-change UI), `auth-4` (no session/device
-management), plus `billing-4`, `notif-2/4`, `onboard-2/3`, `learn-3`,
-`practice-1/2/4`. Track these on the pre-launch backlog, not here.
+17 audit gaps survive the redesign and need their own fixes; the launch-relevant
+ones: `onboard-1/4` (onboarding steps not wired into first-run), `notif-1`
+(guardian who never runs a session is never asked for OS push permission),
+`notif-3` (child "notify parent" never sends a push), `billing-3` (silent
+payment failure), `auth-2` (no email-change UI), `auth-4` (no session/device
+management), `auth-3` (SSO-only user can't add a password), plus `billing-4`,
+`notif-2/4`, `onboard-2/3`, `learn-3`, `practice-1/2/4`. Full set (17):
+`auth-2`, `auth-3`, `auth-4`, `billing-3`, `billing-4`, `learn-3`, `notif-1`,
+`notif-2`, `notif-3`, `notif-4`, `onboard-1`, `onboard-2`, `onboard-3`,
+`onboard-4`, `practice-1`, `practice-2`, `practice-4`. Track these on the
+pre-launch backlog, not here.

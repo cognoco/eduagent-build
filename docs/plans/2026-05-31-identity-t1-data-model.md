@@ -34,6 +34,13 @@ Out of scope (later phases):
   `createScopedRepository` scoping column (T2–T6).
 - Dropping `accounts.clerkUserId`/`email`, `profiles.accountId`, `family_links`,
   `isOwner`, or `subscriptions.accountId` (T7).
+- **The D3 org-context stamp on learning records is deliberately NOT in T1.**
+  Adding a nullable `organization_id` to learning roots now — four phases before
+  any reader or writer exists — is dead schema. It lands in **T3**, which already
+  enumerates every profile-owned learning root for the scoping rewrite, written
+  on create from then on. Pre-launch dev data is re-seeded at T7, so the column
+  still exists before any production write and D3's "no post-launch backfill"
+  intent holds. See D3 in the program plan.
 
 ## Schema decisions (made — technical, not deferred)
 
@@ -82,7 +89,11 @@ export const memberships = pgTable('memberships', {
 }, (t) => [
   unique('memberships_person_org_unique').on(t.personId, t.organizationId),
   index('memberships_organization_id_idx').on(t.organizationId),
-  check('memberships_roles_non_empty', sql`array_length(${t.roles}, 1) >= 1`),
+  // NOTE: must be cardinality(), NOT array_length(roles, 1). array_length on an
+  // empty array returns NULL, so `NULL >= 1` is UNKNOWN and a CHECK passes on
+  // anything but FALSE — an empty `'{}'` array would slip through. cardinality()
+  // returns 0 for '{}', so `0 >= 1` is FALSE and the row is rejected.
+  check('memberships_roles_non_empty', sql`cardinality(${t.roles}) >= 1`),
 ]);
 ```
 
@@ -100,20 +111,39 @@ organizationId: uuid('organization_id')        // nullable in T1; made the key i
 ## Backfill (in the same migration, after DDL)
 
 For each `accounts` row A:
-1. INSERT one `organizations` row O — `name` = display name of A's owner
-   profile (the `isOwner=true` profile under A), `timezone` = A.timezone,
-   deletion fields copied from A.
-2. For each non-archived `profiles` row P with `P.account_id = A.id`:
+1. INSERT one `organizations` row O — `name = COALESCE(owner.display_name,
+   split_part(A.email,'@',1), 'My Organization')`, where `owner` is A's
+   `is_owner=true` profile **including if archived** (the lookup must not inherit
+   step 2's non-archived filter — an account mid-deletion can have an archived
+   owner, and `organizations.name` is NOT NULL so a missing name would fail the
+   INSERT). `timezone` = A.timezone; deletion fields copied from A.
+2. For **every** `profiles` row P with `P.account_id = A.id` — **including
+   archived profiles** (a seat-removed child is `archivedAt`-marked with its data
+   preserved per billing-2/identity-6; excluding it would orphan that person from
+   the only scoping model once T7 drops `accountId`):
    - INSERT a `memberships` row: `person_id = P.id`, `organization_id = O.id`,
      `roles` = derived set:
      - `owner` if `P.is_owner`;
      - `mentor` if P appears as `parent_profile_id` in any `family_links` row;
      - `student` always (every person learns).
    - Guarantee non-empty: a non-owner, non-parent profile gets `{student}`.
+   - Archival state is NOT copied onto the membership — it stays on
+     `profiles.archived_at` (unchanged in T1). The membership exists so the
+     archived person has org linkage; restore/leave semantics are T5's job.
 3. Copy the Clerk credential down: set `profiles.clerk_user_id = A.clerk_user_id`
    for A's owner profile only (the only profile that has a login today).
 4. Set `subscriptions.organization_id = O.id` where
    `subscriptions.account_id = A.id`.
+
+> **Migration-regeneration guard.** T1.3 generates the DDL via
+> `db:generate:dev`; T1.4 then hand-appends the backfill `INSERT`/`UPDATE` SQL to
+> that same migration file. `drizzle-kit` regenerates from the *schema diff* and
+> will NOT reproduce hand-written DML — a later routine `db:generate:dev` would
+> silently drop the backfill (this repo has prior push→migrate-skips-DML pain,
+> `project_schema_drift_pattern`). Rule: once the backfill SQL is added, that
+> migration file is frozen — never regenerate it; any further schema change is a
+> new migration. The DDL and the backfill DML live in one file so they apply
+> atomically in dependency order (tables before inserts).
 
 ## Tasks
 - [ ] **T1.1: Add the `membership_role` enum + `organizations` and
@@ -138,18 +168,31 @@ For each `accounts` row A:
 - [ ] **T1.4: Add the backfill SQL to the migration and prove the mapping.**
   *Done when:* integration test `backfill maps accounts→orgs and
   profiles→memberships` (`packages/database/src/identity-backfill.integration.test.ts`)
-  seeds: one account with an owner+child (linked) and one solo account; runs the
-  migration; asserts (a) one organization per account, (b) one membership per
-  profile, (c) owner profile's membership roles == `{owner, mentor, student}`,
-  child's == `{student}`, solo's == `{owner, student}`, (d) owner profile's
-  `clerk_user_id` copied, child's still null, (e) each subscription's
-  `organization_id` set to its account's org.
+  seeds: one account with an owner **plus a linked child where the `family_links`
+  row is `parent_profile_id = owner.id, child_profile_id = child.id`** (this
+  direction is load-bearing — the `mentor` role derives from the owner appearing
+  as `parent_profile_id`), one solo account, **and one account with an archived
+  child** (`archivedAt` set, e.g. a seat-removed child); runs the migration;
+  asserts (a) one organization per account, (b) one membership per profile
+  **including the archived one**, (c) owner profile's membership roles ==
+  `{owner, mentor, student}`, child's == `{student}`, solo's ==
+  `{owner, student}`, (d) owner profile's `clerk_user_id` copied, child's still
+  null, (e) each subscription's `organization_id` set to its account's org,
+  (f) the archived child has a `{student}` membership and its `archived_at` is
+  untouched.
 
-- [ ] **T1.5: Add a forward invariant test that every membership has a non-empty
-  role set and every person has ≥1 membership after backfill.**
-  *Done when:* test `every person has at least one membership with a non-empty
-  role set` passes against seeded data; it fails (red) if the backfill skips a
-  profile — verify by temporarily commenting the child-membership insert.
+- [ ] **T1.5: Add forward invariant + negative-path tests.**
+  *Done when:* three tests pass:
+  - `every person has at least one membership` — counts memberships per profile
+    (archived included) after backfill; fails (red) if the backfill skips a
+    profile — verify red by temporarily commenting the child-membership insert.
+  - `every membership has a non-empty role set` — asserts `cardinality(roles) >=
+    1` holds for all rows.
+  - `empty roles array is rejected by the CHECK constraint` (the break test for
+    CRITICAL-1) — attempts `INSERT … roles = '{}'::membership_role[]` and asserts
+    it throws a check-constraint violation. This test fails (no error thrown) if
+    the constraint is written with `array_length(roles, 1)` instead of
+    `cardinality(roles)`, which is exactly the regression it guards.
 
 ## Verification (whole phase)
 - `pnpm --filter @eduagent/database test` green (new schema + backfill tests).
