@@ -15,7 +15,7 @@ import {
   formatRecallNudge,
   sendPushNotification,
 } from '../../services/notifications';
-import { getRecentNotificationCount } from '../../services/settings';
+import { checkAndLogRateLimitInternal } from '../../services/settings';
 import { captureException } from '../../services/sentry';
 
 export const recallNudgeSend = inngest.createFunction(
@@ -45,25 +45,38 @@ export const recallNudgeSend = inngest.createFunction(
         };
       }
 
-      // [BUG-699-FOLLOWUP] 24h notification-log dedup. Same pattern as the
-      // other cron-driven push paths: idempotency covers same-event.id
-      // replays; this covers new events for the same recipient within 24h.
+      // [BUG-699-FOLLOWUP / BUG-840] Atomic dedup. Inngest's idempotency
+      // key (event.id) covers exact-duplicate events within 24h, but an
+      // operator replay or a re-fire with a *new* event.id would bypass it
+      // and push the same recipient again — and the prior implementation
+      // (getRecentNotificationCount → conditional send) was a read-then-write
+      // pair: two concurrent step.run invocations could both observe
+      // count===0 and both fire the push.
+      //
+      // checkAndLogRateLimitInternal wraps the count check and the log
+      // insert in a single transaction with a pg_advisory_xact_lock keyed
+      // on ('rate-limit:<profileId>:recall_nudge'); concurrent callers
+      // serialize on the lock and the second caller observes the first's
+      // row. Mirrors the BUG-838 fix in daily-reminder-send.ts.
+      //
       // Fail closed on DB error: skip this nudge cycle rather than risk
-      // exceeding the rate-limit ceiling (spam). The next scheduled fire
-      // will re-evaluate. captureException makes the failure queryable in
-      // Sentry so we can measure transient DB hiccup frequency.
-      let recentCount: number;
+      // exceeding the rate-limit ceiling (spam). captureException makes the
+      // failure queryable in Sentry so we can measure transient DB hiccup
+      // frequency.
+      let limited: boolean;
       try {
-        recentCount = await getRecentNotificationCount(
+        limited = await checkAndLogRateLimitInternal(
           db,
           profileId,
           'recall_nudge',
-          24,
+          { hours: 24, maxCount: 1 },
         );
       } catch (err) {
         captureException(err, {
           profileId,
-          extra: { context: 'recall-nudge-send:getRecentNotificationCount' },
+          extra: {
+            context: 'recall-nudge-send:checkAndLogRateLimitInternal',
+          },
         });
         return {
           status: 'skipped' as const,
@@ -71,7 +84,7 @@ export const recallNudgeSend = inngest.createFunction(
           profileId,
         };
       }
-      if (recentCount > 0) {
+      if (limited) {
         return { status: 'skipped' as const, reason: 'dedup_24h', profileId };
       }
 
@@ -139,13 +152,20 @@ export const recallNudgeSend = inngest.createFunction(
         childName,
       );
 
-      // Send push notification
-      const sendResult = await sendPushNotification(db, {
-        profileId,
-        title,
-        body,
-        type: 'recall_nudge',
-      });
+      // [BUG-840] checkAndLogRateLimitInternal already inserted the
+      // notificationLog row in the same transaction that gated us — pass
+      // skipRateLimitLog so sendPushNotification does not double-log this
+      // push toward the daily cap.
+      const sendResult = await sendPushNotification(
+        db,
+        {
+          profileId,
+          title,
+          body,
+          type: 'recall_nudge',
+        },
+        { skipRateLimitLog: true },
+      );
 
       if (sendResult.sent) {
         return {
