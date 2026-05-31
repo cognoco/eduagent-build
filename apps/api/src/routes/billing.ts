@@ -47,7 +47,10 @@ import {
   resolveWarningLevel,
   calculateRemainingQuestions,
 } from '../services/metering';
-import { getTierConfig } from '../services/subscription';
+import {
+  getTierConfig,
+  tierRequiresProfileContext,
+} from '../services/subscription';
 import { createStripeClient } from '../services/stripe';
 import { resolvePriceId } from '../services/billing-pricing';
 import { readSubscriptionStatus } from '../services/kv';
@@ -455,14 +458,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const access = await getEffectiveAccessForSubscription(db, subscription.id);
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscription.tier;
-    // Both per-profile and shared-pool-with-breakdown tiers require an
-    // active profile context before aggregate quota reads; otherwise
-    // family-wide usage can leak to a non-owner caller.
+    // Profile-scoped quota views require active profile context before
+    // aggregate quota reads; otherwise shared-pool usage can expose
+    // family-wide activity to non-owner viewers.
     const tierConfig = getTierConfig(effectiveAccessTier);
     const { quotaModel, supportsProfileBreakdown } = tierConfig;
-    const requiresProfileForBreakdown =
-      quotaModel === 'per-profile' || supportsProfileBreakdown;
-    if (requiresProfileForBreakdown && !activeProfileId) {
+    if (tierRequiresProfileContext(effectiveAccessTier) && !activeProfileId) {
       return apiError(
         c,
         400,

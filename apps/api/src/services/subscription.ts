@@ -21,11 +21,10 @@ export interface TierConfig {
   maxProfiles: number;
   llmTier: LLMTier;
   quotaModel: 'per-profile' | 'shared-pool';
-  // Shared-pool tiers can still expose per-profile breakdown views.
-  // Gate aggregate quota reads on profile context for those tiers so a
-  // child caller cannot receive family-wide usage without a profileId.
-  // Adding a new shared-pool tier with breakdown support means flipping
-  // this flag here; routes read it via getTierConfig.
+  // Shared-pool tiers can still expose profile-level usage views.
+  // Profile-context gates must cover those tiers before aggregate quota
+  // reads so children cannot receive family-wide usage.
+  // New shared-pool tiers with breakdown support should flip this flag here.
   supportsProfileBreakdown: boolean;
   ownerMonthlyQuota: number | null;
   ownerDailyQuota: number | null;
@@ -167,6 +166,13 @@ const VALID_TRANSITIONS = new Set([
 /** Returns the configuration for a given subscription tier */
 export function getTierConfig(tier: SubscriptionState['tier']): TierConfig {
   return TIER_CONFIGS[tier];
+}
+
+export function tierRequiresProfileContext(
+  tier: SubscriptionState['tier'],
+): boolean {
+  const { quotaModel, supportsProfileBreakdown } = getTierConfig(tier);
+  return quotaModel === 'per-profile' || supportsProfileBreakdown;
 }
 
 export function resolveEffectiveAccessTier(

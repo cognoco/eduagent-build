@@ -791,9 +791,8 @@ describe('billing routes', () => {
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
 
-    // Family/pro are shared-pool but support per-profile breakdown.
-    // Without an active profile the route would otherwise leak family-wide
-    // aggregates via getQuotaPool to a caller with no profile context.
+    // Shared-pool tiers with profile breakdowns need profile context.
+    // Otherwise the fallback quota-pool read exposes family-wide aggregates.
     it.each(['family', 'pro'] as const)(
       '%s tier requires active profile and does not leak shared-pool aggregates',
       async (tier) => {

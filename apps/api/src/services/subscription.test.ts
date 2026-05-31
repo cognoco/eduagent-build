@@ -2,6 +2,7 @@ import {
   getTierConfig,
   isValidTransition,
   resolveEffectiveAccessTier,
+  tierRequiresProfileContext,
 } from './subscription';
 
 // ---------------------------------------------------------------------------
@@ -96,6 +97,13 @@ describe('getTierConfig', () => {
     expect(getTierConfig('plus').supportsProfileBreakdown).toBe(false);
     expect(getTierConfig('family').supportsProfileBreakdown).toBe(true);
     expect(getTierConfig('pro').supportsProfileBreakdown).toBe(true);
+  });
+
+  it('requires profile context for tiers with profile-scoped usage views', () => {
+    expect(tierRequiresProfileContext('free')).toBe(true);
+    expect(tierRequiresProfileContext('plus')).toBe(true);
+    expect(tierRequiresProfileContext('family')).toBe(true);
+    expect(tierRequiresProfileContext('pro')).toBe(true);
   });
 });
 
