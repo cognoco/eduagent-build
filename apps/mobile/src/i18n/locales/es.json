@@ -230,7 +230,8 @@
         "celebrationStreak": "{{name}} lleva una buena racha esta semana. ¡Esa racha se está convirtiendo en un hábito!",
         "celebrationTopics": "Gran semana para {{name}}: ha cubierto mucho terreno nuevo.",
         "worksFor": "Lo que le funciona a {{name}}",
-        "mentorRead": "Análisis del mentor sobre {{name}}"
+        "mentorRead": "Análisis del mentor sobre {{name}}",
+        "impatientAdvice": "Los comienzos breves y los logros rápidos pueden ayudar a {{name}} a seguir."
       },
       "learnTogether": {
         "title": "Aprender juntos",
@@ -2124,8 +2125,8 @@
     "progressLabel": "Progreso",
     "more": "Más",
     "moreLabel": "Más",
-    "children": "Hijos",
-    "childrenLabel": "Hijos",
+    "children": "Familia",
+    "childrenLabel": "Familia",
     "recaps": "Resúmenes",
     "recapsLabel": "Resúmenes"
   },

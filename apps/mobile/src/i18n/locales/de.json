@@ -230,7 +230,8 @@
         "celebrationStreak": "{{name}} hat diese Woche einen echten Lauf – dieser Streak wird zur Gewohnheit.",
         "celebrationTopics": "Große Woche für {{name}} – viele neue Themen behandelt.",
         "worksFor": "Was für {{name}} funktioniert",
-        "mentorRead": "Tutors Einschätzung zu {{name}}"
+        "mentorRead": "Tutors Einschätzung zu {{name}}",
+        "impatientAdvice": "Kurze Einstiege und schnelle Erfolgserlebnisse können {{name}} helfen, dranzubleiben."
       },
       "learnTogether": {
         "title": "Gemeinsam lernen",
@@ -2124,8 +2125,8 @@
     "progressLabel": "Fortschritt",
     "more": "Mehr",
     "moreLabel": "Mehr",
-    "children": "Kinder",
-    "childrenLabel": "Kinder",
+    "children": "Familie",
+    "childrenLabel": "Familie",
     "recaps": "Zusammenfassungen",
     "recapsLabel": "Zusammenfassungen"
   },

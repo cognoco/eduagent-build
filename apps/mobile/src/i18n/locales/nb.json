@@ -230,7 +230,8 @@
         "celebrationStreak": "{{name}} er i skikkelig siget denne uken – den streaken er i ferd med å bli en vane.",
         "celebrationTopics": "Stor uke for {{name}} – mye nytt terreng er dekket.",
         "worksFor": "Hva som fungerer for {{name}}",
-        "mentorRead": "Veileders syn på {{name}}"
+        "mentorRead": "Veileders syn på {{name}}",
+        "impatientAdvice": "Korte starter og raske mestringsopplevelser kan hjelpe {{name}} å holde ut."
       },
       "learnTogether": {
         "title": "Lær sammen",
@@ -2124,8 +2125,8 @@
     "progressLabel": "Fremgang",
     "more": "Mer",
     "moreLabel": "Mer",
-    "children": "Barn",
-    "childrenLabel": "Barn",
+    "children": "Familie",
+    "childrenLabel": "Familie",
     "recaps": "Sammendrag",
     "recapsLabel": "Sammendrag"
   },

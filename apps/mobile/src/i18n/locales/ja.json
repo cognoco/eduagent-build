@@ -230,7 +230,8 @@
         "celebrationStreak": "{{name}}さんは今週絶好調です。このストリークが習慣になりつつあります。",
         "celebrationTopics": "{{name}}さんにとって大きな1週間でした。たくさんの新しい分野を学習しました。",
         "worksFor": "{{name}}さんに合った学習法",
-        "mentorRead": "メンターから見た{{name}}"
+        "mentorRead": "メンターから見た{{name}}",
+        "impatientAdvice": "短い始め方と小さな成功体験が、{{name}}さんが続ける助けになります。"
       },
       "learnTogether": {
         "title": "一緒に学ぶ",
@@ -2124,8 +2125,8 @@
     "progressLabel": "進捗",
     "more": "その他",
     "moreLabel": "その他",
-    "children": "お子様",
-    "childrenLabel": "お子様",
+    "children": "家族",
+    "childrenLabel": "家族",
     "recaps": "ふりかえり",
     "recapsLabel": "ふりかえり"
   },

@@ -246,7 +246,8 @@
         "celebrationStreak": "{{name}} is on a real roll this week — that streak is becoming a habit.",
         "celebrationTopics": "Big week for {{name}} — lots of new ground covered.",
         "mentorRead": "Mentor's read on {{name}}",
-        "worksFor": "What works for {{name}}"
+        "worksFor": "What works for {{name}}",
+        "impatientAdvice": "Short starts and quick wins may help {{name}} stay with it."
       },
       "learnTogether": {
         "title": "Learn together",
@@ -2211,8 +2212,8 @@
     "familyHubLabel": "Family Hub",
     "myLearning": "My Learning",
     "myLearningLabel": "My Learning",
-    "children": "Children",
-    "childrenLabel": "Children",
+    "children": "Family",
+    "childrenLabel": "Family",
     "library": "Library",
     "libraryLabel": "Library",
     "recaps": "Recaps",
