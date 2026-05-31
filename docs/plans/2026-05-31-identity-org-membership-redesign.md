@@ -246,6 +246,34 @@ scoping estimates, not exhaustive file lists.
   performed (the legacy tables are dropped only in T7, after the new model is
   proven, and there is no production data to lose).
 
+## Migration & environment hygiene (established during T1, 2026-05-31)
+
+The migration ledgers on the shared DBs had drifted badly (DBs advanced via
+`drizzle-kit push`, ledgers frozen far behind), so `drizzle-kit migrate` collided
+on already-present objects. Resolution and standing rules for T2–T7:
+
+- **CRITICAL prerequisite for any from-scratch `migrate` (staging/prod/CI):** the
+  migration chain uses the `vector` (pgvector) and `pg_trgm` types but **no
+  migration runs `CREATE EXTENSION`** — they were enabled out-of-band on the live
+  DBs. A migrate-from-empty therefore FAILS with `type "vector" does not exist`
+  unless you first run `CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION
+  IF NOT EXISTS vector;`. The T7 production cutover and any CI replay job MUST do
+  this before `migrate`. (Validated: with the extensions pre-created, 0000→0106
+  replays clean to a 107-row ledger.)
+- **Dev:** managed via `db:push:dev`. Its ledger is unrecoverably drifted (22
+  rows, hashes don't reproduce) — do NOT hand-reconcile. Per phase: edit schema →
+  `db:generate:dev` (the committed migration is the deliverable) → `db:push:dev`
+  (materialize on dev to test). The migration FILE is validated via migrate on a
+  clean DB, not on drifted dev.
+- **Staging:** REBUILT CLEAN on 2026-05-31 via drop-schema + `migrate` (ledger
+  was 114 rows with 29 phantom entries from rewritten history; data was 100%
+  synthetic test fixtures). It is now a consistent 107-row ledger and `migrate`
+  applies forward cleanly. `push` remains banned on staging/prod.
+- **Recommended (pre-launch checklist):** add a CI job that runs the full
+  migrate-from-scratch (extensions first) on an ephemeral Postgres, so every
+  phase's migration is proven replayable before it reaches staging — the missing
+  gate that let these ledgers drift in the first place.
+
 ## Independent backlog (NOT closed by this redesign — separate track)
 
 17 audit gaps survive the redesign and need their own fixes. They are grouped

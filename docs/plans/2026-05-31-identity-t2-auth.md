@@ -4,6 +4,7 @@ date: 2026-05-31
 profile: change
 spec: docs/plans/2026-05-31-identity-org-membership-redesign.md
 status: draft
+revision: v2 — hardened against adversarial review (chain-interaction findings CRITICAL-1, HIGH-1/2, MEDIUM-1/2/3, LOW-1)
 ---
 
 # Identity Redesign — T2 Identity / Auth
@@ -86,7 +87,15 @@ Out of scope (later phases):
    via `findOrCreateAccount(sub)` would wrongly mint a new empty account. So
    flag-on resolution is **person-first**: `person = profiles WHERE clerk_user_id
    = sub`; `account = accounts WHERE id = person.account_id`. `findOrCreateAccount`
-   is used flag-on **only** to provision a genuinely new credentialed person.
+   is used flag-on **only** to provision the *account* (billing) for a genuinely
+   new credentialed sub. The owner **profile**, its `clerk_user_id`, and its
+   membership are created later by onboarding's `POST /profiles` first-profile
+   path (T2.7), **not** in middleware — eagerly creating the owner profile in
+   `accountMiddleware` would race that path and corrupt its `isFirstProfile`
+   count. So flag-on, a brand-new sub gets an account on first request and
+   `personId` stays `undefined` until onboarding writes the credential onto the
+   owner profile (mirrors today's flag-off "account exists, no profile yet"
+   pre-onboarding window).
 
 3. **Email is not an identity key in V1.** "Two providers / two emails, same
    identity" is satisfied because resolution keys on `sub` (one Clerk user = one
@@ -97,9 +106,10 @@ Out of scope (later phases):
 
 4. **Home org reuses `account.id`.** Per the T1 backfill, `organizations.id ===
    accounts.id`. T2's `organizationId` context value = `account.id`. This keeps
-   "same account" ≡ "same home org" so the profile-scope authority check
-   (`getProfile(db, profileId, account.id)`) is correct in T2 without a
-   membership-join rewrite (that rewrite is T3).
+   "same account" ≡ "same home org" so the profile-scope authority check for the
+   **explicit-header path** (`getProfile(db, profileId, account.id)`) is correct
+   in T2 without a membership-join rewrite (that rewrite is T3). Note this only
+   validates the *explicit header* case; the headerless default is decision #8.
 
 5. **Proxy-guard fix for `learn-1` (D6).** Flag-on, `assertNotProxyMode`
    authorizes the active profile's **self-write to its own learning data** when
@@ -109,8 +119,15 @@ Out of scope (later phases):
    (mentor acting *as* a mentee — `learn-2`) stays a T3 concern; the client
    `X-Proxy-Mode: true` read-only switch still tightens. Owner-only routes are
    **independently** gated by `assertOwnerProfile`/`assertOwnerAndParentAccess`
-   (not by `assertNotProxyMode`) — T2.6 verifies this so loosening the guard
-   cannot open billing.
+   (not by `assertNotProxyMode`) — T2.6 verifies this across all **89 route call
+   sites (23 files) + the global call in `metering.ts:549`** so loosening the
+   guard cannot open billing. The fail-closed branch (403 when `activeRoles` is
+   empty) is reachable from `metering.ts:549` on a metered route where a profile
+   resolved but had no membership row (e.g. created during flag-off); to avoid a
+   spurious 403 on a previously-working route, `resolveActiveMembershipRoles`
+   **self-heals** a missing membership (decision in T2.3/§Code) so `activeRoles`
+   is non-empty whenever a real profile resolves — fail-closed then fires only
+   when there is genuinely no profile.
 
 6. **One table for both flows.** `organization_invitations` carries
    `kind ∈ {'invite','claim'}`:
@@ -121,13 +138,39 @@ Out of scope (later phases):
      `clerk_user_id` to the redeemer's `sub`, preserving all history (same
      `profiles.id`). `target_profile_id` is set only for `kind='claim'`.
 
-7. **Provision-exemption.** The graduation redeem endpoint must NOT trigger
-   account/person provisioning (that would create the duplicate it exists to
-   avoid). `ACCOUNT_PROVISION_EXEMPT_PATHS = ['/invitations/claims/redeem']`;
-   flag-on `accountMiddleware` skips provisioning on these paths and lets the
-   route operate on the verified `sub` (`user.userId`) alone. Invite-accept is
-   **not** exempt — the accepter is provisioned their own home org-of-one, then
-   the accept endpoint adds a *second* membership into the inviting org.
+7. **Provision-exemption — consumed by BOTH account middlewares.** The
+   graduation redeem endpoint must NOT trigger account/person provisioning (that
+   would create the duplicate it exists to avoid), and it runs for a sub with no
+   account yet. The global chain is `accountMiddleware → requireAccountMiddleware
+   → profileScopeMiddleware` (all `api.use('*')`, index.ts:225-233).
+   **`requireAccountMiddleware` (account.ts:110-133) returns 401 whenever `user`
+   is set but `account` is not** — so exempting only `accountMiddleware` leaves
+   the redeem path 401'd before the route. Therefore a single exported
+   `ACCOUNT_PROVISION_EXEMPT_PATHS = new Set(['/invitations/claims/redeem'])` is
+   consulted by **both**: `accountMiddleware` skips provisioning, and
+   `requireAccountMiddleware` skips its 401, on these paths. `profileScopeMiddleware`
+   already no-ops cleanly with no account (headerless path guards on `db &&
+   account`, profile-scope.ts:116) and `meteringMiddleware` early-returns for the
+   non-LLM redeem route (metering.ts:515), so the redeem handler operates on the
+   verified `sub` (`user.userId`) alone. Invite-accept is **not** exempt — the
+   accepter is provisioned their own home org-of-one, then the accept endpoint
+   adds a *second* membership into the inviting org.
+
+8. **Headerless active profile = the logged-in person, not the account owner
+   (`HIGH-1` fix).** Flag-on, the headerless auto-resolve in `profileScopeMiddleware`
+   must set `profileId = c.get('personId')` (the profile whose `clerk_user_id`
+   matched the sub) — **not** `findOwnerProfile(account.id)`. For a graduated
+   child, `account_id` points at the parent, so `findOwnerProfile(account.id)`
+   returns the *parent's* owner profile; with the legacy logic the child's
+   headerless writes would resolve and authorize against the **parent's** learning
+   data. Keying the default on `personId` makes a logged-in person's own profile
+   the default scope. For an account owner, `personId` === the owner profile, so
+   behavior is unchanged. When `personId` is `undefined` (brand-new sub
+   mid-onboarding, decision #2), fall through with no profile — identical to
+   today's flag-off pre-onboarding window. The explicit-header path is unchanged
+   (decision #4) and still rejects a parent header-proxying into a credentialed
+   teen whose profile lives in a different account (correct — cross-org
+   *visibility* is T3 read-scoping, never header proxy).
 
 ## Surface map (file → responsibility)
 
@@ -137,11 +180,12 @@ Out of scope (later phases):
 | `services/identity.ts` | new | `resolvePersonByClerkId`, `ensureIdentityV1`, `resolveActiveMembershipRoles` |
 | `services/invitation.ts` | new | `createInvitation`, `acceptInvitation`, `createClaim`, `redeemClaim` |
 | `routes/invitations.ts` | new | 4 routes (create invite, accept, create claim, redeem) |
-| `middleware/account.ts` | changed | flag-on person-first resolution + provision-exempt paths; sets `account`, `personId`, `organizationId` |
-| `middleware/profile-scope.ts` | changed | flag-on: set `activeRoles` (+ keep `organizationId`) for the active profile |
+| `middleware/account.ts` | changed | flag-on person-first resolution + `ACCOUNT_PROVISION_EXEMPT_PATHS` (exported); `findAccountById` helper; **`requireAccountMiddleware` consults the same exempt set** (CRITICAL-1); sets `account`, `personId`, `organizationId` |
+| `middleware/profile-scope.ts` | changed | flag-on: headerless `profileId = personId` (HIGH-1); set `activeRoles` for the active profile |
 | `middleware/proxy-guard.ts` | changed | flag-on: student-role self-write authorization |
-| `services/profile.ts` | changed | `createProfileWithLimitCheck` creates `{student}` membership for new managed profiles (flag-on) |
-| `index.ts` | changed | register invitations route; extend `Variables` type |
+| `services/profile.ts` | changed | `createProfileWithLimitCheck` (flag-on): sets `clerk_user_id` on the first/owner profile, inserts the new profile's membership inside the txn |
+| `schema/profiles.ts` | changed | export `type MembershipRole` (MEDIUM-1) |
+| `index.ts` | changed | register invitations route; extend `Variables` type (`personId`, `organizationId`, `activeRoles`) |
 | `packages/database/src/schema/invitations.ts` | new | `organization_invitations` table |
 | `packages/database/src/schema/index.ts` | changed | export new table |
 | `apps/api/drizzle/0107_*.sql` | new | additive migration (one table) |
@@ -158,12 +202,21 @@ Out of scope (later phases):
   `isIdentityV1Enabled('true') === true` / `isIdentityV1Enabled(undefined) ===
   false`; `pnpm exec nx run api:typecheck` passes.
 
-- [ ] **T2.2 — `organization_invitations` schema + migration.** Add the table in
-  a new `packages/database/src/schema/invitations.ts` (exact shape in
-  §Schema below), export it from `packages/database/src/schema/index.ts`, run
-  `pnpm run db:generate:dev` to produce `0107_identity_t2_invitations.sql`
-  (CREATE TABLE only — no DROP), and apply with `pnpm run db:migrate:dev`.
-  *Done when:* a co-located `schema/invitations.test.ts` asserts the columns,
+- [ ] **T2.2 — `organization_invitations` schema + migration + `MembershipRole`
+  type.** (a) **Export the role union type** (MEDIUM-1): no `MembershipRole` TS
+  type exists today (only the runtime `membershipRoleEnum` pgEnum). Add
+  `export type MembershipRole = (typeof membershipRoleEnum.enumValues)[number];`
+  to `packages/database/src/schema/profiles.ts` (the project idiom — see
+  `dictationModeEnum` usage at `repository.ts:849`) and re-export it from the
+  barrel `packages/database/src/index.ts`. Every §Code import of
+  `type MembershipRole from '@eduagent/database'` depends on this. (b) Add the
+  table in a new `packages/database/src/schema/invitations.ts` (exact shape in
+  §Schema below — note the `'../utils/uuid'` import path), export it from
+  `packages/database/src/schema/index.ts`, run `pnpm run db:generate:dev` to
+  produce `0107_identity_t2_invitations.sql` (CREATE TABLE only — no DROP), and
+  apply with `pnpm run db:migrate:dev`.
+  *Done when:* `pnpm exec tsc --noEmit` inside `packages/database` resolves
+  `MembershipRole`; a co-located `schema/invitations.test.ts` asserts the columns,
   the `kind`/`status` CHECKs, the `invited_roles` non-empty CHECK, the unique
   `token_hash`, and the two FKs (`organization_id`, `target_profile_id`); the
   generated migration contains only additive DDL; `db:migrate:dev` applies clean
@@ -172,81 +225,141 @@ Out of scope (later phases):
 - [ ] **T2.3 — Identity service.** Create `services/identity.ts` with the three
   functions in §Code (`resolvePersonByClerkId`, `ensureIdentityV1`,
   `resolveActiveMembershipRoles`). `ensureIdentityV1` is idempotent and
-  short-circuits when `organizations WHERE id = account.id` already exists.
+  short-circuits when `organizations WHERE id = account.id` already exists (it
+  is the *org-creation* heal, used at provisioning). **`resolveActiveMembershipRoles`
+  self-heals per-profile** (MEDIUM-3): if no membership row exists for
+  `(profileId, organizationId)`, it inserts a default membership derived from the
+  profile's `is_owner` (`{owner, student}` if owner else `{student}`; `+ mentor`
+  if the profile is a `parent_profile_id` in `family_links`), `logger.warn`s
+  `membership.self_heal` (queryable, per the no-silent-recovery ethos), then
+  returns those roles. This guarantees `activeRoles` is non-empty for any real
+  profile — including profiles created during flag-off that `ensureIdentityV1`'s
+  org-existence short-circuit would otherwise skip — so the proxy-guard
+  fail-closed (T2.6) fires only when there is genuinely no profile.
   *Done when:* `services/identity.integration.test.ts` (DB-backed, `describeIfDb`)
   proves: (a) `resolvePersonByClerkId` returns the profile whose
   `clerk_user_id` matches and `null` otherwise; (b) `ensureIdentityV1` on a fresh
   account creates exactly one org (`id = account.id`), copies `clerk_user_id` to
   the owner profile, and creates one `{owner,student}` (+`mentor` if the owner is
   a parent in `family_links`) membership, and is a **no-op on second call**;
-  (c) `resolveActiveMembershipRoles(db, profileId, orgId)` returns the role array.
+  (c) `resolveActiveMembershipRoles` returns the existing role array when a
+  membership exists; (d) **self-heal:** for a profile with *no* membership row it
+  inserts and returns `{student}` (non-owner) / `{owner,student}` (owner) and a
+  second call is a no-op (idempotent).
 
-- [ ] **T2.4 — Account middleware V1 branch.** In `account.ts`, when
-  `isIdentityV1Enabled`, replace the `findOrCreateAccount(sub)` path with
-  person-first resolution (§Code): resolve `person` by `sub`; if found, set
-  `account` from `person.accountId`, set `personId` + `organizationId`
-  (`= account.id`); if not found and the path is **not** provision-exempt,
-  provision a new credentialed person (`findOrCreateAccount` → `createProfile`
-  owner → `ensureIdentityV1`); if not found and the path **is** provision-exempt,
-  set nothing and continue. Flag-off path is untouched. Add
-  `ACCOUNT_PROVISION_EXEMPT_PATHS = new Set(['/invitations/claims/redeem'])`.
-  Extend `AccountEnv.Variables` and `index.ts` `Variables` with
-  `personId: string | undefined` and `organizationId: string | undefined`.
-  *Done when:* `account.test.ts` adds flag-on cases proving: a `sub` already on
-  a `profiles.clerk_user_id` resolves `account = profile.account_id` **without
-  calling `findOrCreateAccount`** (assert via a graduated-kid fixture whose
-  `account.clerk_user_id !== sub`); a brand-new `sub` on a non-exempt path
-  provisions account+owner+org+membership; a brand-new `sub` on
-  `/invitations/claims/redeem` leaves `account`/`personId` unset and proceeds;
-  the flag-off path is byte-identical (existing `account.test.ts` cases stay
-  green unchanged).
+- [ ] **T2.4 — Account middleware V1 branch + provision-exempt chain
+  (CRITICAL-1).** In `account.ts`, when `isIdentityV1Enabled`, replace the
+  `findOrCreateAccount(sub)` path with person-first resolution (§Code): resolve
+  `person` by `sub`; **if found** → set `account` via a new thin
+  `findAccountById(db, person.accountId)` helper, set `personId` + `organizationId`
+  (`= account.id`), call `ensureIdentityV1(db, account)` (cheap org-exists
+  short-circuit); **if not found and the path is provision-exempt** → set nothing
+  and `next()`; **if not found and not exempt** → `findOrCreateAccount(sub,email)`
+  for the *account only* (billing + trial, exactly as flag-off), set `account` +
+  `organizationId`, leave `personId` undefined (the owner profile + its
+  `clerk_user_id` + membership are written later by onboarding T2.7 — decision
+  #2; do **not** create a profile here, it would race `POST /profiles`). Add and
+  **export** `ACCOUNT_PROVISION_EXEMPT_PATHS = new Set(['/invitations/claims/redeem'])`.
+  **`requireAccountMiddleware` must consult the same set** (CRITICAL-1): flag-on,
+  when `user` is set but `account` is not, skip the 401 if the request path is in
+  `ACCOUNT_PROVISION_EXEMPT_PATHS` (else its existing 401 makes the redeem route
+  unreachable). Flag-off path of both middlewares is untouched. Extend
+  `AccountEnv.Variables` and `index.ts` `Variables` with `personId: string |
+  undefined` and `organizationId: string | undefined`.
+  *Done when:* `account.test.ts` adds flag-on cases proving: (a) a `sub` already
+  on a `profiles.clerk_user_id` resolves `account = profile.account_id` **without
+  calling `findOrCreateAccount`** (graduated-kid fixture whose `account.clerk_user_id
+  !== sub`); (b) a brand-new `sub` on a non-exempt path creates the account +
+  trial and leaves `personId` undefined (no profile created); (c) **the full
+  chain test**: a brand-new `sub` `POST /invitations/claims/redeem` passes
+  **both** `accountMiddleware` and `requireAccountMiddleware` with `account`
+  unset and reaches the handler (this is the regression for CRITICAL-1 and is the
+  same assertion T2.9 references); (d) the flag-off path is byte-identical
+  (existing `account.test.ts` cases stay green unchanged).
 
-- [ ] **T2.5 — Profile-scope V1 branch.** In `profile-scope.ts`, when
-  `isIdentityV1Enabled` and a profile is resolved (both the auto-resolve and the
-  explicit-header paths), additionally resolve and set
-  `c.set('activeRoles', roles)` via `resolveActiveMembershipRoles(db,
-  resolvedProfileId, c.get('organizationId'))`. The account-based ownership
-  check (`getProfile(db, profileIdHeader, account.id)`) is **unchanged** in T2
-  (correct because home `organization_id === account.id` — decision #4). Add
-  `activeRoles: MembershipRole[] | undefined` to `ProfileScopeEnv.Variables` and
-  the `index.ts` `Variables` type.
-  *Done when:* `profile-scope.test.ts` adds flag-on cases: auto-resolved owner
-  gets `activeRoles` containing `owner`+`student`; an explicit `X-Profile-Id`
-  for a managed child gets `activeRoles` containing `student`; flag-off leaves
-  `activeRoles` undefined and all existing cases stay green.
+- [ ] **T2.5 — Profile-scope V1 branch (incl. HIGH-1 headerless fix).** In
+  `profile-scope.ts`, flag-on:
+  - **Headerless path (HIGH-1):** set `profileId = c.get('personId')` — the
+    logged-in person's own profile — **not** `findOwnerProfile(account.id)`
+    (which returns the *parent* for a graduated child, mis-scoping the child's
+    writes onto parent data; see decision #8). Load that profile row for
+    `profileMeta`. If `personId` is undefined (brand-new sub mid-onboarding), fall
+    through with no profile (same as flag-off no-owner). Do **not** call
+    `findOwnerProfile` flag-on.
+  - **Explicit-header path:** unchanged ownership check `getProfile(db,
+    profileIdHeader, account.id)` (correct because home `organization_id ===
+    account.id` — decision #4).
+  - Both paths, after a profile is resolved: set `c.set('activeRoles',
+    roles)` via `resolveActiveMembershipRoles(db, resolvedProfileId,
+    c.get('organizationId'))` (self-healing — T2.3).
+  Add `activeRoles: MembershipRole[] | undefined` to `ProfileScopeEnv.Variables`
+  and the `index.ts` `Variables` type.
+  *Done when:* `profile-scope.test.ts` adds flag-on cases: (a) auto-resolved
+  **owner** (no header) → `profileId === personId` (the owner) with `activeRoles`
+  ⊇ `{owner, student}`; (b) **graduated credentialed child, no header** (the
+  HIGH-1 regression — `account_id` points at the parent) → `profileId ===
+  personId` (the *child's* own profile, **not** the parent owner) with
+  `activeRoles` ⊇ `{student}`, and a write resolves to the child's own rows; (c)
+  explicit `X-Profile-Id` for a managed child (parent session) → `activeRoles` ⊇
+  `{student}`; (d) flag-off leaves `activeRoles` undefined and all existing cases
+  stay green.
 
 - [ ] **T2.6 — Proxy-guard self-write fix (`learn-1`).** In `proxy-guard.ts`,
   branch `assertNotProxyMode` on the flag (§Code): flag-on, allow the write when
   `c.get('activeRoles')` includes `'student'` (still rejecting an explicit
   `X-Proxy-Mode: true`), and fail closed (403) when `activeRoles` is
-  absent/empty; flag-off keeps the exact `isOwner === false` logic. **Before
-  loosening, verify owner-only routes are independently owner-gated:** grep every
-  `assertNotProxyMode` call site that performs an owner-only mutation (billing,
-  account settings) and confirm it also calls `assertOwnerProfile` /
-  `assertOwnerAndParentAccess`; if any relies on `assertNotProxyMode` alone, add
-  the owner guard in this task.
+  absent/empty; flag-off keeps the exact `isOwner === false` logic.
+  **Before loosening, audit owner-only mutations across the *real* call-site set
+  (HIGH-2):** the guard is invoked **89 times across 23 route files** plus the
+  global call in `metering.ts:549` — **not 34**. Enumerate, per file, the calls
+  that guard an **owner-only mutation** (the dense files are `sessions.ts` ×17,
+  `settings.ts` ×8, `billing.ts` ×7, `subjects.ts` ×6, `curriculum.ts`/`quiz.ts`/
+  `retention.ts` ×5 each, `learner-profile.ts`/`notes.ts` ×4) and confirm each
+  such site **also** calls `assertOwnerProfile` / `assertOwnerAndParentAccess`.
+  Spot-check flagged by review: `billing.ts:198` calls `assertNotProxyMode` while
+  the next `assertOwnerProfile` is not until `:296` — confirm they are the **same
+  handler** (and add the owner guard if not). If any owner-only site relies on
+  `assertNotProxyMode` alone, add the owner guard in this task.
   *Done when:* the `learn-1` regression test in `proxy-guard.test.ts`
   (`child runs own session — write authorized under V1`) seeds a non-owner
   student-role active profile and asserts a write **passes** flag-on but is
   **403** flag-off (red-green: this is the exact behavior change); a second test
   asserts `X-Proxy-Mode: true` still 403s flag-on; a third asserts absent
-  `activeRoles` → 403 flag-on (fail-closed); the owner-only-route audit is
-  recorded in the task's commit message with the grep evidence.
+  `activeRoles` → 403 flag-on (fail-closed); and the owner-only-mutation audit is
+  recorded in the commit message as a **per-site table** (file:line of each
+  owner-only `assertNotProxyMode` call → its paired owner-guard file:line), not a
+  raw count.
 
-- [ ] **T2.7 — Managed-person membership on creation.** In
-  `createProfileWithLimitCheck` (`profile.ts`), when `isIdentityV1Enabled` (pass
-  the resolved boolean in `opts`, mirroring `adultOwnerGateEnabled`), create the
-  new profile's membership inside the existing transaction: `{owner}`+`{student}`
-  for the first profile, `{student}` for a non-first (managed child), in the home
-  org (`organization_id === account.id`, ensured via `ensureIdentityV1` first).
-  The managed child's `profiles.clerk_user_id` stays `null` (no login). Plumb the
-  flag from `routes/profiles.ts` the same way `ADULT_OWNER_GATE_ENABLED` is read
-  (`c.env?.MODE_IDENTITY_V1_ENABLED`).
-  *Done when:* `profile.test.ts` (or `profile.integration.test.ts`) proves
-  flag-on: creating the first profile yields `clerk_user_id` set on the owner +
-  an `{owner,student}` membership; creating a second profile yields
-  `clerk_user_id === null` + a `{student}` membership in the same org; flag-off
-  creates no membership (existing cases stay green).
+- [ ] **T2.7 — Owner credential + membership on creation (MEDIUM-2 txn
+  ordering).** In `createProfileWithLimitCheck` (`profile.ts`), when
+  `isIdentityV1Enabled` (pass the resolved boolean in `opts`, mirroring
+  `adultOwnerGateEnabled`; plumb from `routes/profiles.ts` via
+  `c.env?.MODE_IDENTITY_V1_ENABLED`):
+  - **Owner credential:** when `isFirstProfile`, thread the caller's `sub`
+    (`user.userId`, new optional `opts.clerkUserId`) into `createProfile` so the
+    owner profile is created with `clerk_user_id = sub`. Non-first (managed child)
+    profiles keep `clerk_user_id = null`.
+  - **Membership — exact handle + ordering:** all new work uses **`txDb`** (the
+    `tx as unknown as Database` cast at `profile.ts:447`), **never the outer
+    `db`** (the outer handle would open a separate transaction outside the
+    per-account `pg_advisory_xact_lock` at `:451` — a concurrency hole). The
+    sequence runs **after** `createProfile` returns at `:526` (the owner profile
+    must exist before its credential can be copied / its membership created):
+    (1) `await ensureIdentityV1(txDb, account)` — guarantees the org row exists
+    (for the first-profile case) and is a no-op short-circuit when it already
+    does; (2) explicit `INSERT` of the **created profile's** membership into the
+    home org (`organization_id === account.id`) with roles `{owner, student}` when
+    `created.isOwner` else `{student}`, `ON CONFLICT (person_id, organization_id)
+    DO NOTHING` (the non-first child is **not** covered by `ensureIdentityV1`'s
+    org-existence short-circuit, so it must be inserted here explicitly). The
+    membership therefore commits/rolls back atomically with the profile row.
+  *Done when:* `profile.integration.test.ts` (DB-backed) proves flag-on: creating
+  the first profile yields `clerk_user_id` set on the owner + an `{owner,student}`
+  membership in the home org; creating a second profile yields `clerk_user_id ===
+  null` + a `{student}` membership in the **same** org; a forced failure after the
+  profile `INSERT` but before commit rolls back **both** the profile and its
+  membership (atomicity); flag-off creates no membership and sets no
+  `clerk_user_id` (existing cases stay green).
 
 - [ ] **T2.8 — Invitation service (flows #1 and #2).** Create
   `services/invitation.ts` with the four functions in §Code. Tokens are opaque
@@ -276,12 +389,18 @@ Out of scope (later phases):
   + assert `target` is managed and in the caller's org), `POST
   /invitations/claims/redeem` (flow #2 — body `{token}`, provision-exempt, reads
   `user.userId`). Register the route group in `index.ts` after the existing route
-  chain. Confirm `/invitations/claims/redeem` is in
-  `ACCOUNT_PROVISION_EXEMPT_PATHS`.
+  chain. Confirm the redeem path string in `ACCOUNT_PROVISION_EXEMPT_PATHS`
+  **exactly matches** what `new URL(c.req.url).pathname` yields for the mounted
+  route (no `basePath` — the API is a flat Hono instance, index.ts:145 — so the
+  pathname is `/invitations/claims/redeem`).
   *Done when:* `routes/invitations.test.ts` proves each route's authz (create
-  endpoints 403 for non-owners; redeem reachable without a provisioned account)
-  and the happy path for invite-accept and claim-redeem returns 200 with the
-  expected membership/credential side effects asserted via DB read.
+  endpoints 403 for non-owners) and the happy path for invite-accept and
+  claim-redeem returns 200 with the expected membership/credential side effects
+  asserted via DB read; **and a full-chain reachability test** drives a brand-new
+  `sub` (no profile, no account) through the mounted middleware stack to
+  `POST /invitations/claims/redeem` and asserts it reaches the handler (proves the
+  request survives both `accountMiddleware` *and* `requireAccountMiddleware` with
+  `account` unset — the CRITICAL-1 regression; shares the T2.4(c) assertion).
 
 - [ ] **T2.10 — Phase verification (multi-email + no-regress).** Add the
   multi-email identity test and run the full flag-off regression sweep.
@@ -306,7 +425,7 @@ import {
   pgTable, uuid, text, timestamp, check, unique,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { generateUUIDv7 } from '../uuid'; // same source createId helper the other tables use
+import { generateUUIDv7 } from '../utils/uuid'; // exact path used by schema/profiles.ts:16 (LOW-1)
 import { organizations, profiles, membershipRoleEnum } from './profiles';
 
 export const organizationInvitations = pgTable(
@@ -392,6 +511,13 @@ export async function ensureIdentityV1(
   // (Full INSERT…SELECT bodies mirror 0106 steps 1-3; one txn.)
 }
 
+/**
+ * Self-healing (MEDIUM-3): if the active profile has no membership in this org
+ * (e.g. it was created during flag-off, which ensureIdentityV1's org-existence
+ * short-circuit would skip), insert a default membership derived from is_owner so
+ * activeRoles is never spuriously empty → the proxy-guard fail-closed (T2.6) only
+ * fires when there is genuinely no profile. Logged for queryability.
+ */
 export async function resolveActiveMembershipRoles(
   db: Database, profileId: string, organizationId: string,
 ): Promise<MembershipRole[]> {
@@ -401,35 +527,86 @@ export async function resolveActiveMembershipRoles(
       eq(memberships.organizationId, organizationId),
     ),
   });
-  return row?.roles ?? [];
+  if (row) return row.roles;
+
+  // No membership — self-heal. Derive roles from the profile's is_owner (+ mentor
+  // if it is a parent in family_links). Insert ON CONFLICT DO NOTHING and re-read.
+  const profile = await db.query.profiles.findFirst({ where: eq(profiles.id, profileId) });
+  if (!profile) return []; // genuinely no profile → caller (proxy-guard) fails closed
+  const roles: MembershipRole[] = profile.isOwner ? ['owner', 'student'] : ['student'];
+  // (+ 'mentor' if profile.id appears as parent_profile_id in family_links)
+  logger.warn('membership.self_heal', { profileId, organizationId, roles });
+  await db.insert(memberships)
+    .values({ personId: profileId, organizationId, roles })
+    .onConflictDoNothing({ target: [memberships.personId, memberships.organizationId] });
+  return roles;
 }
 ```
 
 ```ts
-// middleware/account.ts — flag-on branch (flag-off path unchanged)
-const ACCOUNT_PROVISION_EXEMPT_PATHS = new Set(['/invitations/claims/redeem']);
+// middleware/account.ts — flag-on branch (flag-off path unchanged).
+// Exported so requireAccountMiddleware consults the SAME set (CRITICAL-1).
+export const ACCOUNT_PROVISION_EXEMPT_PATHS = new Set(['/invitations/claims/redeem']);
 
 if (isIdentityV1Enabled(c.env?.MODE_IDENTITY_V1_ENABLED)) {
   const person = await resolvePersonByClerkId(db, user.userId);
   if (person) {
     const acct = await findAccountById(db, person.accountId); // new thin helper in account.ts
+    await ensureIdentityV1(db, acct);                         // cheap org-exists short-circuit
     c.set('account', acct);
     c.set('personId', person.id);
     c.set('organizationId', acct.id); // home org === account.id (decision #4)
     return next();
   }
   if (ACCOUNT_PROVISION_EXEMPT_PATHS.has(new URL(c.req.url).pathname)) {
-    return next(); // redeem operates on user.userId alone; no provisioning
+    return next(); // redeem operates on user.userId alone; no provisioning, no account
   }
-  // genuinely new credentialed person: account+trial, owner profile, org, membership
+  // Genuinely new credentialed sub: provision the ACCOUNT only (billing + trial),
+  // exactly as flag-off. Do NOT create the owner profile here — that races the
+  // POST /profiles first-profile path (decision #2). personId stays undefined
+  // until onboarding (T2.7) writes clerk_user_id onto the owner profile.
   const acct = await findOrCreateAccount(db, user.userId, verifiedEmail.email);
-  await ensureNewCredentialedPerson(db, acct, user.userId, verifiedEmail.email); // wraps createProfile(owner) + ensureIdentityV1
   c.set('account', acct);
-  c.set('personId', /* owner profile id */);
   c.set('organizationId', acct.id);
+  // personId intentionally left unset (no profile yet)
   return next();
 }
 // ...existing flag-off findOrCreateAccount path below, untouched...
+```
+
+```ts
+// middleware/account.ts — requireAccountMiddleware must skip its 401 on exempt
+// paths flag-on, else the redeem route is unreachable (CRITICAL-1).
+// Inside requireAccountMiddleware, replacing the bare `if (!account)` 401:
+if (!account) {
+  if (
+    isIdentityV1Enabled(c.env?.MODE_IDENTITY_V1_ENABLED) &&
+    ACCOUNT_PROVISION_EXEMPT_PATHS.has(new URL(c.req.url).pathname)
+  ) {
+    return next(); // graduating sub: no account yet, by design
+  }
+  return c.json({ code: ERROR_CODES.UNAUTHORIZED, message: /* unchanged */ '' }, 401);
+}
+```
+
+```ts
+// middleware/profile-scope.ts — flag-on headerless branch (HIGH-1)
+// Replaces the findOwnerProfile(account.id) auto-resolve when flag-on:
+if (!profileIdHeader && isIdentityV1Enabled(c.env?.MODE_IDENTITY_V1_ENABLED)) {
+  const personId = c.get('personId');
+  if (personId) {
+    const self = await getProfile(db, personId, c.get('account').id); // own profile
+    if (self) {
+      c.set('profileId', self.id);
+      c.set('profileMeta', { /* birthYear, location, consentStatus, hasPremiumLlm, conversationLanguage, isOwner */ });
+      c.set('activeRoles', await resolveActiveMembershipRoles(db, self.id, c.get('organizationId')));
+    }
+  }
+  await next();
+  return; // never calls findOwnerProfile flag-on
+}
+// ...flag-off headerless path (findOwnerProfile) + explicit-header path below, the
+// latter additionally sets activeRoles after the unchanged getProfile ownership check...
 ```
 
 ```ts
@@ -480,10 +657,20 @@ export async function redeemClaim(                 // flow #2 — graduate
 ## Risks & rollback
 
 - **Loosening `assertNotProxyMode` could open owner-only mutations** if any
-  owner-only route relied on the guard alone. T2.6 audits all 34 call sites and
-  confirms `assertOwnerProfile`/`assertOwnerAndParentAccess` independently gates
-  every owner-only mutation before the loosening ships. The flag (default off)
-  contains any miss to dev/staging.
+  owner-only route relied on the guard alone. T2.6 audits the **real** call-site
+  set — **89 invocations across 23 route files + the global call at
+  `metering.ts:549`** (not 34) — and confirms `assertOwnerProfile` /
+  `assertOwnerAndParentAccess` independently gates every owner-only mutation,
+  recorded as a per-site table, before the loosening ships. The flag (default
+  off) contains any miss to dev/staging.
+- **Headerless mis-scoping (HIGH-1).** Keying the headerless default on
+  `findOwnerProfile(account.id)` instead of `personId` would route a graduated
+  child's writes onto the parent's data. Mitigation: decision #8 + the T2.5(b)
+  regression (graduated child, no header, write lands on own rows).
+- **Unreachable redeem path (CRITICAL-1).** `requireAccountMiddleware` would 401
+  the provision-exempt path. Mitigation: both account middlewares consult the
+  exported `ACCOUNT_PROVISION_EXEMPT_PATHS`; the T2.4(c)/T2.9 full-chain test is
+  the regression.
 - **Person-first account resolution is the highest-risk change.** A bug that
   mis-resolves `account` flag-on would mis-scope every downstream query. Mitigation:
   the graduated-kid fixture (`account.clerk_user_id !== sub`) in T2.4 is the
