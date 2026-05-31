@@ -33,6 +33,10 @@ const MEMORY_INSIGHT_PRIORITY: Array<
   CuratedMemoryView['categories'][number]['items'][number]['category']
 > = ['communicationNotes', 'learningStyle'];
 
+// Deliberately narrow: matches only the canonical bare phrase so we never
+// over-suppress real guidance. Adjacent LLM variants ("seems impatient") are
+// left to surface rather than risk swallowing a legitimate note — do not widen
+// without extending the co-located test coverage.
 const BARE_IMPATIENCE_NOTE_PATTERN =
   /^(?:the\s+)?(?:learner|child)\s+is\s+impatient\.?$/i;
 

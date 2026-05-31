@@ -3,14 +3,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../components/common/ErrorFallback';
 
-/**
- * Expo Router catch-all for unknown routes. Without this file, navigating to a
- * malformed or removed route renders Expo's built-in fallback (a stack trace in
- * dev, blank in prod) with no actionable escape — a UX dead-end.
- *
- * Default exports are reserved for Expo Router page components — this is one of
- * them (CLAUDE.md "Repo-Specific Guardrails").
- */
+// Expo Router catch-all — gives unknown routes an actionable escape instead of a dead-end.
 export default function NotFoundScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
