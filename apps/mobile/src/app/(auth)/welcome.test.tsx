@@ -77,16 +77,22 @@ jest.mock(
 );
 
 // Pattern A - preserve the real carrier surface while spying on the write.
-jest.mock('../../lib/pre-auth-audience', () => ({
-  ...jest.requireActual('../../lib/pre-auth-audience'),
-  markPreAuthAudienceSync: (...args: unknown[]) => mockMarkAudience(...args),
-}));
+jest.mock(
+  '../../lib/pre-auth-audience' /* gc1-allow: pattern-a conversion; pre-auth-audience reads SecureStore which is a native storage boundary */,
+  () => ({
+    ...jest.requireActual('../../lib/pre-auth-audience'),
+    markPreAuthAudienceSync: (...args: unknown[]) => mockMarkAudience(...args),
+  }),
+);
 
 // Pattern A - preserve the real analytics surface while spying on `track`.
-jest.mock('../../lib/analytics', () => ({
-  ...jest.requireActual('../../lib/analytics'),
-  track: (...args: unknown[]) => mockTrack(...args),
-}));
+jest.mock(
+  '../../lib/analytics' /* gc1-allow: pattern-a conversion; analytics is a side-effect boundary — real calls hit external telemetry */,
+  () => ({
+    ...jest.requireActual('../../lib/analytics'),
+    track: (...args: unknown[]) => mockTrack(...args),
+  }),
+);
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),

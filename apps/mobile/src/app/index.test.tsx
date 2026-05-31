@@ -116,10 +116,13 @@ jest.mock(
 // Track helper from analytics shouldn't be invoked by the routing tests, but
 // import-time evaluation requires it to be defined. Pattern A — preserve the
 // rest of the analytics surface so any future indirect consumer doesn't trip.
-jest.mock('../lib/analytics', () => ({
-  ...jest.requireActual('../lib/analytics'),
-  track: jest.fn(),
-}));
+jest.mock(
+  '../lib/analytics' /* gc1-allow: pattern-a conversion; analytics is a side-effect boundary — real calls hit external telemetry; pattern-a preserves other exports */,
+  () => ({
+    ...jest.requireActual('../lib/analytics'),
+    track: jest.fn(),
+  }),
+);
 
 const Index = require('./index').default;
 const SecureStoreMock = require('../lib/secure-storage');

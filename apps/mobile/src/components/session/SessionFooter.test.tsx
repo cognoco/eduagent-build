@@ -7,23 +7,27 @@ import {
 import { Alert } from 'react-native';
 import { SessionFooter } from './SessionFooter';
 
-jest.mock('../session', () => ({
-  // gc1-allow: footer tests isolate prompt/button behavior from sibling session components
-  QuestionCounter: () => null,
-  LibraryPrompt: () => null,
-}));
-
-jest.mock('../../hooks/use-speech-recognition', () => ({
-  // gc1-allow: native speech recognition is an external device boundary for NoteInput rendering
-  useSpeechRecognition: () => ({
-    status: 'idle',
-    transcript: '',
-    isListening: false,
-    startListening: jest.fn(),
-    stopListening: jest.fn(),
-    clearTranscript: jest.fn(),
+jest.mock(
+  '../session' /* gc1-allow: footer tests isolate prompt/button behavior from sibling session components */,
+  () => ({
+    QuestionCounter: () => null,
+    LibraryPrompt: () => null,
   }),
-}));
+);
+
+jest.mock(
+  '../../hooks/use-speech-recognition' /* gc1-allow: native speech recognition is an external device boundary for NoteInput rendering */,
+  () => ({
+    useSpeechRecognition: () => ({
+      status: 'idle',
+      transcript: '',
+      isListening: false,
+      startListening: jest.fn(),
+      stopListening: jest.fn(),
+      clearTranscript: jest.fn(),
+    }),
+  }),
+);
 
 function createProps(overrides: Record<string, unknown> = {}) {
   return {

@@ -23,15 +23,18 @@ jest.mock('@clerk/clerk-expo', () => ({
 }));
 
 const mockFetch = jest.fn();
-jest.mock('./api-client', () => ({
-  ...jest.requireActual('./api-client'),
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
-  },
-  setActiveProfileId: jest.fn(),
-  setProxyMode: jest.fn(),
-}));
+jest.mock(
+  './api-client' /* gc1-allow: pattern-a conversion; real api-client requires a live Hono server; mockFetch lets tests drive profile CRUD responses */,
+  () => ({
+    ...jest.requireActual('./api-client'),
+    useApiClient: () => {
+      const { hc } = require('hono/client');
+      return hc('http://localhost', { fetch: mockFetch });
+    },
+    setActiveProfileId: jest.fn(),
+    setProxyMode: jest.fn(),
+  }),
+);
 
 const mockProfiles: Profile[] = [
   {

@@ -308,13 +308,16 @@ const mockMilestoneTracker = {
   hydrate: mockHydrate,
   reset: mockResetMilestones,
 };
-jest.mock('../../../hooks/use-milestone-tracker', () => {
-  const actual = jest.requireActual('../../../hooks/use-milestone-tracker');
-  return {
-    ...actual,
-    useMilestoneTracker: () => mockMilestoneTracker,
-  };
-});
+jest.mock(
+  '../../../hooks/use-milestone-tracker' /* gc1-allow: pattern-a conversion; wiring the full milestone step/animation chain in a session screen test would duplicate milestone-tracker.test.ts scope */,
+  () => {
+    const actual = jest.requireActual('../../../hooks/use-milestone-tracker');
+    return {
+      ...actual,
+      useMilestoneTracker: () => mockMilestoneTracker,
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // External / rendering mocks

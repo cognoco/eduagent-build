@@ -24,11 +24,13 @@ let mockProfiles: Profile[] | null = null;
 // test case since useParentProxy no longer derives from profile shape.
 let mockIsExplicitProxyMode = false;
 
-jest.mock('./use-settings', () => ({
-  // gc1-allow: useRegisterPushToken fires network mutations; override isolates registration side-effects from actual API calls
-  ...jest.requireActual('./use-settings'),
-  useRegisterPushToken: () => ({ mutateAsync: mockMutateAsync }),
-}));
+jest.mock(
+  './use-settings' /* gc1-allow: useRegisterPushToken fires network mutations; override isolates registration side-effects from actual API calls */,
+  () => ({
+    ...jest.requireActual('./use-settings'),
+    useRegisterPushToken: () => ({ mutateAsync: mockMutateAsync }),
+  }),
+);
 
 jest.mock('expo-constants', () => {
   const constants = {

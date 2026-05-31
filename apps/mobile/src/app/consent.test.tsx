@@ -70,13 +70,16 @@ const TEST_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 const mockMutateAsync = jest.fn();
 
-jest.mock('../hooks/use-consent', () => ({
-  ...jest.requireActual('../hooks/use-consent'),
-  useRequestConsent: () => ({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
+jest.mock(
+  '../hooks/use-consent' /* gc1-allow: pattern-a conversion; useRequestConsent fires a network mutation — override isolates consent-screen behavior from actual API calls */,
+  () => ({
+    ...jest.requireActual('../hooks/use-consent'),
+    useRequestConsent: () => ({
+      mutateAsync: mockMutateAsync,
+      isPending: false,
+    }),
   }),
-}));
+);
 
 const mockUseNetworkStatus = jest.fn(() => ({
   isOffline: false,

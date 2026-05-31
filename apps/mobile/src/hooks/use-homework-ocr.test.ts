@@ -38,20 +38,23 @@ jest.mock('@clerk/clerk-expo', () => ({
 // jest.fn() so assertions can verify they were called with the correct payload.
 // Sentry.addBreadcrumb is globally stubbed in test-setup.ts, so the real
 // implementations run safely without any network or native dependency.
-jest.mock('../lib/analytics', () => {
-  const actual = jest.requireActual(
-    '../lib/analytics',
-  ) as typeof import('../lib/analytics');
-  return {
-    ...actual,
-    trackHomeworkOcrGateAccepted: (...args: unknown[]) =>
-      mockTrackHomeworkOcrGateAccepted(...args),
-    trackHomeworkOcrGateRejected: (...args: unknown[]) =>
-      mockTrackHomeworkOcrGateRejected(...args),
-    trackHomeworkOcrGateShortcircuit: (...args: unknown[]) =>
-      mockTrackHomeworkOcrGateShortcircuit(...args),
-  };
-});
+jest.mock(
+  '../lib/analytics' /* gc1-allow: pattern-a conversion; analytics is a side-effect boundary — real calls hit external telemetry */,
+  () => {
+    const actual = jest.requireActual(
+      '../lib/analytics',
+    ) as typeof import('../lib/analytics');
+    return {
+      ...actual,
+      trackHomeworkOcrGateAccepted: (...args: unknown[]) =>
+        mockTrackHomeworkOcrGateAccepted(...args),
+      trackHomeworkOcrGateRejected: (...args: unknown[]) =>
+        mockTrackHomeworkOcrGateRejected(...args),
+      trackHomeworkOcrGateShortcircuit: (...args: unknown[]) =>
+        mockTrackHomeworkOcrGateShortcircuit(...args),
+    };
+  },
+);
 
 // ML Kit TextRecognition requires a native module (JNI / ObjC) that is not
 // available in the Jest runtime — shim the default export so recognizeText()

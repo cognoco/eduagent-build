@@ -11,10 +11,13 @@ import {
 import * as SecureStore from './secure-storage';
 import { track } from './analytics';
 
-jest.mock('./analytics', () => ({
-  ...jest.requireActual('./analytics'),
-  track: jest.fn(),
-}));
+jest.mock(
+  './analytics' /* gc1-allow: pattern-a conversion; analytics is a side-effect boundary — real calls hit external telemetry */,
+  () => ({
+    ...jest.requireActual('./analytics'),
+    track: jest.fn(),
+  }),
+);
 
 const setItemSpy = jest.spyOn(SecureStore, 'setItemAsync');
 const getItemSpy = jest.spyOn(SecureStore, 'getItemAsync');

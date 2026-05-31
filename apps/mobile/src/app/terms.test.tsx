@@ -16,10 +16,12 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({ textPrimary: '#111111' }),
-}));
+jest.mock(
+  '../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({ textPrimary: '#111111' }),
+  }),
+);
 
 const TermsOfServiceScreen = require('./terms').default;
 

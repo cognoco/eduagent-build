@@ -152,10 +152,13 @@ jest.mock(
   }),
 );
 
-jest.mock('../../../hooks/use-quiz', () => ({
-  ...jest.requireActual('../../../hooks/use-quiz'),
-  useGenerateRound: () => mockGenerateRound,
-}));
+jest.mock(
+  '../../../hooks/use-quiz' /* gc1-allow: pattern-a conversion; useGenerateRound fires a network mutation; pattern-a spy overrides only the round-generation hook under test */,
+  () => ({
+    ...jest.requireActual('../../../hooks/use-quiz'),
+    useGenerateRound: () => mockGenerateRound,
+  }),
+);
 
 jest.mock(
   './_layout' /* gc1-allow: native-boundary; _layout transitively loads native-only router/i18n modules in JSDOM */,
