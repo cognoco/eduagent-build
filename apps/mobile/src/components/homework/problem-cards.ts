@@ -20,6 +20,10 @@ export interface SplitHomeworkProblemsResult {
   droppedProblems: HomeworkProblem[];
 }
 
+export interface SplitHomeworkProblemsOptions {
+  skipFilter?: boolean;
+}
+
 function nextHomeworkProblemId(): string {
   homeworkProblemCounter += 1;
   return `homework-problem-${homeworkProblemCounter}`;
@@ -135,6 +139,7 @@ export function filterHomeworkProblems(
 export function splitHomeworkProblems(
   rawText: string,
   blockConfidence?: number,
+  options?: SplitHomeworkProblemsOptions,
 ): SplitHomeworkProblemsResult {
   const normalizedText = rawText.replace(/\r\n/g, '\n').trim();
   if (!normalizedText) {
@@ -183,6 +188,14 @@ export function splitHomeworkProblems(
             originalText: group,
           }),
         );
+
+  if (options?.skipFilter) {
+    return {
+      problems,
+      dropped: 0,
+      droppedProblems: [],
+    };
+  }
 
   return filterHomeworkProblems(problems, blockConfidence);
 }

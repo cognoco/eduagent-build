@@ -510,6 +510,32 @@ describe('useSessionStreaming', () => {
       expect(imageMimeTypeRef.current).toBeNull();
     });
 
+    it('does not attach a queued homework image outside homework mode even when requested', async () => {
+      const imageBase64Ref = { current: 'homework-image-base64' };
+      const imageMimeTypeRef = {
+        current: 'image/jpeg' as const,
+      };
+      const opts = makeOpts({
+        effectiveMode: 'learning',
+        imageBase64Ref,
+        imageMimeTypeRef,
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('hi', {
+          attachImage: true,
+        });
+      });
+
+      const streamOptions = (opts.streamMessage as jest.Mock).mock
+        .calls[0]?.[4];
+      expect(streamOptions).not.toHaveProperty('imageBase64');
+      expect(streamOptions).not.toHaveProperty('imageMimeType');
+      expect(imageBase64Ref.current).toBe('homework-image-base64');
+      expect(imageMimeTypeRef.current).toBe('image/jpeg');
+    });
+
     it('keeps the session input locked until the low-level stream settles', async () => {
       let releaseStream!: () => void;
       let markDoneHandlerComplete!: () => void;

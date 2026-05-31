@@ -1384,7 +1384,6 @@
     "stopDictatingProblemLabel": "Dejar de dictar el problema",
     "dictateProblemLabel": "Dictar problema",
     "ocrError": {
-      "NOT_HOMEWORK": "No encontramos un problema de tarea claro en esta foto. Intenta acercarte más o escríbelo.",
       "LOW_QUALITY": "No pudimos leer esta foto con claridad. Intenta con mejor iluminación o manteniendo el teléfono más firme.",
       "NO_TEXT": "No encontramos ningún texto en esta foto. Asegúrate de que la tarea esté visible y bien iluminada.",
       "ML_KIT_UNAVAILABLE": "La lectura de fotos no está disponible en esta versión. Una actualización rápida de la app lo traerá de vuelta.",

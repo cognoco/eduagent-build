@@ -1384,7 +1384,6 @@
     "stopDictatingProblemLabel": "Stopp diktering av oppgaven",
     "dictateProblemLabel": "Dikter oppgave",
     "ocrError": {
-      "NOT_HOMEWORK": "Vi fant ingen tydelig lekseoppgave i dette bildet. Prøv et nærmere bilde eller skriv den inn.",
       "LOW_QUALITY": "Vi klarte ikke å lese bildet tydelig. Prøv med bedre belysning eller et stødigere grep.",
       "NO_TEXT": "Vi fant ingen tekst i dette bildet. Sørg for at leksene er synlige og godt opplyst.",
       "ML_KIT_UNAVAILABLE": "Bildelesing er ikke tilgjengelig i denne versjonen. En rask app-oppdatering fikser det.",

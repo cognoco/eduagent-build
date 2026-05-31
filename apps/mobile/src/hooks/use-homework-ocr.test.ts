@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { NativeModules } from 'react-native';
-import { useHomeworkOcr, NON_HOMEWORK_ERROR_MESSAGE } from './use-homework-ocr';
+import { useHomeworkOcr } from './use-homework-ocr';
 import {
   createHookWrapper,
   createTestProfile,
@@ -116,6 +116,7 @@ describe('useHomeworkOcr', () => {
 
     expect(result.current.status).toBe('idle');
     expect(result.current.text).toBeNull();
+    expect(result.current.source).toBeNull();
     expect(result.current.error).toBeNull();
     expect(result.current.failCount).toBe(0);
   });
@@ -133,6 +134,7 @@ describe('useHomeworkOcr', () => {
 
     expect(result.current.status).toBe('done');
     expect(result.current.text).toBe('Solve for x: 2x + 5 = 13');
+    expect(result.current.source).toBe('local');
     expect(result.current.failCount).toBe(0);
     expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -205,6 +207,7 @@ describe('useHomeworkOcr', () => {
     expect(result.current.text).toBe(
       '1. What is chasing you?\n2. What are you avoiding?',
     );
+    expect(result.current.source).toBe('server');
     expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'server',
@@ -263,8 +266,61 @@ describe('useHomeworkOcr', () => {
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.status).toBe('done');
     expect(result.current.text).toContain('What is chasing you');
+    expect(result.current.source).toBe('server');
     expect(result.current.text).not.toContain('Shob608rgg');
     expect(result.current.text).not.toContain('RADISSON');
+  });
+
+  it('escalates handwriting garble to the server and accepts the LLM read', async () => {
+    mockRecognize.mockResolvedValue({ text: 'how Rad meol 5 bs Homo mino' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          text: 'Translate: "I like to learn."',
+          confidence: 0.9,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.process('file:///tmp/note.jpg');
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toBe('Translate: "I like to learn."');
+    expect(result.current.source).toBe('server');
+  });
+
+  it('accepts a short server read of free-form notes without the old homework-gate rejection', async () => {
+    mockRecognize.mockResolvedValue({ text: '' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          text: 'Photosynthesis notes.',
+          confidence: 0.9,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.process('file:///tmp/note.jpg');
+    });
+
+    expect(result.current.status).toBe('done');
+    expect(result.current.errorCode).toBeUndefined();
+    expect(result.current.text).toBe('Photosynthesis notes.');
+    expect(result.current.source).toBe('server');
   });
 
   it('escalates short cue-less OCR fragments instead of accepting them as problems', async () => {
@@ -300,6 +356,7 @@ describe('useHomeworkOcr', () => {
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.status).toBe('done');
     expect(result.current.text).toContain('1. What is chasing you');
+    expect(result.current.source).toBe('server');
     expect(result.current.text).not.toContain('Radissen');
     expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -342,6 +399,7 @@ describe('useHomeworkOcr', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(result.current.status).toBe('done');
     expect(result.current.text).toContain('1. What is chasing you');
+    expect(result.current.source).toBe('server');
     expect(result.current.text).not.toContain('Radissen');
     expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -404,6 +462,7 @@ describe('useHomeworkOcr', () => {
 
     expect(result.current.status).toBe('done');
     expect(result.current.text).toBe('Solve for x: 2x + 5 = 13');
+    expect(result.current.source).toBe('local');
     expect(mockRecognize).toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
@@ -429,6 +488,7 @@ describe('useHomeworkOcr', () => {
 
     expect(result.current.status).toBe('done');
     expect(result.current.text).toBe('What is chasing you');
+    expect(result.current.source).toBe('local');
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -459,6 +519,7 @@ describe('useHomeworkOcr', () => {
 
     expect(result.current.status).toBe('done');
     expect(result.current.text).toBe('Server-side OCR rescue text');
+    expect(result.current.source).toBe('server');
     expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'server',
@@ -467,7 +528,7 @@ describe('useHomeworkOcr', () => {
     );
   });
 
-  it('gate-reject on server OCR raises error phase', async () => {
+  it('accepts low-confidence server OCR instead of re-running the homework gate', async () => {
     mockRecognize.mockResolvedValue({ text: '' });
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -487,14 +548,16 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
 
-    expect(result.current.status).toBe('error');
-    expect(result.current.error).toBe(NON_HOMEWORK_ERROR_MESSAGE);
-    expect(mockTrackHomeworkOcrGateRejected).toHaveBeenCalledWith(
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toBe('Solve 2x + 5 = 13');
+    expect(result.current.source).toBe('server');
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'server',
         confidence: 0.2,
       }),
     );
+    expect(mockTrackHomeworkOcrGateRejected).not.toHaveBeenCalled();
     expect(mockTrackHomeworkOcrGateShortcircuit).not.toHaveBeenCalled();
   });
 
@@ -521,6 +584,7 @@ describe('useHomeworkOcr', () => {
 
       expect(result.current.status).toBe('done');
       expect(result.current.text).toBe('Uploaded OCR text');
+      expect(result.current.source).toBe('server');
     } finally {
       NativeModules.TextRecognition = originalTextRecognition;
     }

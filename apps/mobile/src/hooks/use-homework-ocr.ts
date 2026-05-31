@@ -16,6 +16,7 @@ import {
   isLikelyHomework,
   splitHomeworkProblems,
 } from '../components/homework/problem-cards';
+import { isCleanPrintedLocalRead } from './ocr-read-quality';
 import {
   trackHomeworkOcrGateAccepted,
   trackHomeworkOcrGateRejected,
@@ -35,7 +36,6 @@ function isTextRecognitionAvailable(): boolean {
 export type OcrStatus = 'idle' | 'processing' | 'done' | 'error';
 
 export type OcrErrorCode =
-  | 'NOT_HOMEWORK'
   | 'LOW_QUALITY'
   | 'NO_TEXT'
   | 'ML_KIT_UNAVAILABLE'
@@ -51,6 +51,7 @@ export interface UseHomeworkOcrResult {
   status: OcrStatus;
   error: string | null;
   errorCode: OcrErrorCode | undefined;
+  source: HomeworkOcrGateSource | null;
   failCount: number;
   process: (uri: string) => Promise<void>;
   retry: () => Promise<void>;
@@ -96,9 +97,6 @@ function classifyUpstreamStatus(status: number): {
   };
 }
 
-export const NON_HOMEWORK_ERROR_MESSAGE =
-  "We couldn't find a clear homework problem in this photo. Try again or type it in.";
-
 async function copyToCache(tempUri: string): Promise<string> {
   const stableUri = `${FileSystem.cacheDirectory}homework-${Date.now()}.jpg`;
   await FileSystem.copyAsync({ from: tempUri, to: stableUri });
@@ -141,110 +139,6 @@ function buildGateMetrics(
     words: getWordCount(text),
     ...(confidence == null ? {} : { confidence }),
   };
-}
-
-function stripListMarkers(text: string): string {
-  return text
-    .split('\n')
-    .map((line) => line.replace(/^\s*(?:\d+|[A-Z])[.)]?\s+/, ''))
-    .join('\n');
-}
-
-// Real homework math has digits/operators in STANDALONE tokens (e.g., "5",
-// "+", "x²", "12.5"). ML Kit garble like "Shob608rgg" has a digit run buried
-// inside a letter run — that should NOT count as a math cue, otherwise any
-// confidently-misread handwriting passes the gate as long as it contains a
-// stray digit. Require ≥2 math-like tokens AND at least one operator or
-// algebra-shaped token — two bare digit tokens like "5 5" or "12 15"
-// (page numbers, prices stripped of currency, dates) are NOT a math
-// expression and would otherwise let receipt/calendar photos skip server
-// escalation.
-function hasMathExpression(text: string): boolean {
-  const tokens = text.split(/\s+/).filter(Boolean);
-  let mathCount = 0;
-  let hasOperatorOrAlgebra = false;
-  for (const rawToken of tokens) {
-    const token = rawToken.replace(/[.,;]+$/, '');
-    if (!token) continue;
-    // Pure digit run (with optional decimal)
-    if (/^\d+(?:\.\d+)?$/.test(token)) {
-      mathCount++;
-      continue;
-    }
-    // Pure operator run
-    if (/^[+\-−×*·÷/=<>≤≥±²³]+$/.test(token)) {
-      mathCount++;
-      hasOperatorOrAlgebra = true;
-      continue;
-    }
-    // Algebra-shaped token: only letters, digits, and math symbols, with at
-    // least one digit AND no run of letters longer than 2 chars (rules out
-    // garble like "Shob608rgg" while admitting "5x", "2y²", "x=10", "3a+b").
-    if (
-      /^[\p{L}\d+\-−×*·÷/=<>≤≥±²³.()]+$/u.test(token) &&
-      /\d/.test(token) &&
-      !/\p{L}{3,}/u.test(token)
-    ) {
-      mathCount++;
-      hasOperatorOrAlgebra = true;
-    }
-  }
-  return mathCount >= 2 && hasOperatorOrAlgebra;
-}
-
-function hasStrongHomeworkCue(text: string): boolean {
-  const contentText = stripListMarkers(text);
-
-  if (hasMathExpression(contentText)) {
-    return true;
-  }
-
-  if (/[?!:]/.test(contentText)) {
-    return true;
-  }
-
-  return /\b(?:answer|calculate|choose|circle|compare|complete|conjugate|contrast|correct|define|describe|draw|evaluate|explain|factor|fill|find|graph|how|identify|label|prove|read|select|show|simplify|solve|translate|underline|what|when|where|which|who|why|write)\b/iu.test(
-    contentText,
-  );
-}
-
-// Detect ML Kit OCR garble that the homework-cue gate would otherwise wave
-// through. Handwritten math frequently comes back as something like
-// "S - 3+ z" — passes hasStrongHomeworkCue (contains a digit) and squeaks
-// past isLikelyHomework (only 2 letter-runs, so the avg-letter-run-length
-// guard at letterRuns.length >= 3 doesn't fire). The result: noisy local
-// text is accepted and the LLM is never consulted, even though the LLM
-// would read the original photo correctly. Heuristic: when the text has
-// letters but the average letter-run length is below 2 characters, those
-// "letters" are almost certainly noise rather than words — escalate to the
-// server LLM. Pure math/symbol input (no letter runs) is unaffected.
-function looksLikeOcrGarble(text: string): boolean {
-  const contentText = stripListMarkers(text);
-  const letterRuns = contentText.match(/\p{L}+/gu) ?? [];
-  if (letterRuns.length === 0) return false;
-  const avgLetterRunLength =
-    letterRuns.reduce((sum, run) => sum + run.length, 0) / letterRuns.length;
-  return avgLetterRunLength < 2;
-}
-
-function shouldEscalateLocalOcr(text: string, confidence?: number): boolean {
-  if (confidence != null && confidence < 0.75) {
-    return true;
-  }
-
-  if (looksLikeOcrGarble(text)) {
-    return true;
-  }
-
-  // If the text has NO strong homework cue (no standalone math tokens, no
-  // question/colon punctuation, no homework verb), the ML Kit output isn't
-  // recognisably homework. Escalate to the server LLM regardless of length —
-  // previously this only escalated for short results (≤8 words / ≤5 lines),
-  // which let long confident-but-garbled outputs through (e.g., handwriting
-  // misread as "Rad / meol bs / Homo mino Shob608rgg / ..." passes only
-  // because of the embedded digit; with hasMathExpression that no longer
-  // counts as a cue, and now the length gate doesn't either).
-  return !hasStrongHomeworkCue(text);
 }
 
 function getLocalConfidence(result: unknown): number | undefined {
@@ -379,6 +273,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   const [errorCode, setErrorCode] = useState<OcrErrorCode | undefined>(
     undefined,
   );
+  const [source, setSource] = useState<HomeworkOcrGateSource | null>(null);
   const [failCount, setFailCount] = useState(0);
   const currentUriRef = useRef<string | null>(null);
   const cancelRef = useRef<AbortController | null>(null);
@@ -400,6 +295,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     setFailCount((prev) => prev + 1);
     setError(message);
     setErrorCode(code);
+    setSource(null);
     setStatus('error');
   }, []);
 
@@ -410,6 +306,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     setStatus('idle');
     setError(null);
     setErrorCode(undefined);
+    setSource(null);
   }, []);
 
   const resolveSuccess = useCallback(
@@ -437,12 +334,31 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
 
       setText(recognized.text);
       setError(null);
+      setErrorCode(undefined);
+      setSource(source);
       setStatus('done');
       trackHomeworkOcrGateAccepted({ source, ...metrics });
       return true;
     },
     [],
   );
+
+  const acceptServerRead = useCallback((recognized: RecognizedTextResult) => {
+    if (!recognized.text || countMeaningfulTokens(recognized.text) < 1) {
+      return false;
+    }
+
+    setText(recognized.text);
+    setError(null);
+    setErrorCode(undefined);
+    setSource('server');
+    setStatus('done');
+    trackHomeworkOcrGateAccepted({
+      source: 'server',
+      ...buildGateMetrics(recognized.text, recognized.confidence),
+    });
+    return true;
+  }, []);
 
   const tryServerFallback = useCallback(
     async (
@@ -507,6 +423,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       setStatus('processing');
       setError(null);
       setErrorCode(undefined);
+      setSource(null);
       if (!isRetry) {
         setText(null);
         setFailCount(0);
@@ -531,11 +448,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           return;
         }
         const serverResult = outcome.recognized;
-        if (resolveSuccess(serverResult, 'server')) return;
-        if (serverResult.text) {
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
-          return;
-        }
+        if (acceptServerRead(serverResult)) return;
         finishAsError(
           Platform.OS === 'android'
             ? 'Text recognition is not available in this build. A new app build is required.'
@@ -551,10 +464,15 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         // defense is to drop its result if the user cancelled while it ran.
         if (controller.signal.aborted) return;
         if (recognized.text) {
-          if (shouldEscalateLocalOcr(recognized.text, recognized.confidence)) {
-            trackHomeworkOcrGateShortcircuit(
-              buildGateMetrics(recognized.text, recognized.confidence),
+          if (isCleanPrintedLocalRead(recognized.text)) {
+            if (resolveSuccess(recognized, 'local')) {
+              return;
+            }
+            const rejectedMetrics = buildGateMetrics(
+              recognized.text,
+              recognized.confidence,
             );
+            trackHomeworkOcrGateShortcircuit(rejectedMetrics);
             const outcome = await tryServerFallback(uri, controller.signal);
             if (controller.signal.aborted || outcome.kind === 'aborted') return;
             if (outcome.kind === 'failed') {
@@ -562,26 +480,14 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
               return;
             }
             const serverResult = outcome.recognized;
-            if (resolveSuccess(serverResult, 'server')) return;
-            if (serverResult.text) {
-              finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
-              return;
-            }
-            finishAsError(
-              "We couldn't read that clearly. Try taking the photo again with better lighting.",
-              'LOW_QUALITY',
-            );
+            if (acceptServerRead(serverResult)) return;
+            finishAsError("Couldn't read any text from the image", 'NO_TEXT');
             return;
           }
 
-          if (resolveSuccess(recognized, 'local')) {
-            return;
-          }
-          const rejectedMetrics = buildGateMetrics(
-            recognized.text,
-            recognized.confidence,
+          trackHomeworkOcrGateShortcircuit(
+            buildGateMetrics(recognized.text, recognized.confidence),
           );
-          trackHomeworkOcrGateShortcircuit(rejectedMetrics);
           const outcome = await tryServerFallback(uri, controller.signal);
           if (controller.signal.aborted || outcome.kind === 'aborted') return;
           if (outcome.kind === 'failed') {
@@ -589,8 +495,11 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
             return;
           }
           const serverResult = outcome.recognized;
-          if (resolveSuccess(serverResult, 'server')) return;
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
+          if (acceptServerRead(serverResult)) return;
+          finishAsError(
+            "We couldn't read that clearly. Try taking the photo again with better lighting.",
+            'LOW_QUALITY',
+          );
           return;
         }
         const outcome = await tryServerFallback(uri, controller.signal);
@@ -600,11 +509,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           return;
         }
         const serverResult = outcome.recognized;
-        if (resolveSuccess(serverResult, 'server')) return;
-        if (serverResult.text) {
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
-          return;
-        }
+        if (acceptServerRead(serverResult)) return;
         finishAsError("Couldn't read any text from the image", 'NO_TEXT');
       } catch (err) {
         // [BUG-681] If recognizeText threw because we aborted (rare — the
@@ -619,18 +524,14 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           return;
         }
         const serverResult = outcome.recognized;
-        if (resolveSuccess(serverResult, 'server')) return;
-        if (serverResult.text) {
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
-          return;
-        }
+        if (acceptServerRead(serverResult)) return;
         finishAsError(
           "We couldn't read that clearly. Try taking the photo again with better lighting.",
           'LOW_QUALITY',
         );
       }
     },
-    [finishAsError, resolveSuccess, tryServerFallback],
+    [acceptServerRead, finishAsError, resolveSuccess, tryServerFallback],
   );
 
   const process = useCallback(
@@ -643,6 +544,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         setStatus('error');
         setError(e instanceof Error ? e.message : 'Failed to cache image');
         setErrorCode('CACHE_FAILED');
+        setSource(null);
         setFailCount((prev) => prev + 1);
         return;
       }
@@ -657,5 +559,15 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     await runOcr(currentUriRef.current, true);
   }, [runOcr]);
 
-  return { text, status, error, errorCode, failCount, process, retry, cancel };
+  return {
+    text,
+    status,
+    error,
+    errorCode,
+    source,
+    failCount,
+    process,
+    retry,
+    cancel,
+  };
 }
