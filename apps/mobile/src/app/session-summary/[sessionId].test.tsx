@@ -63,11 +63,16 @@ jest.mock('../../lib/theme', /* gc1-allow: theme hook requires native ColorSchem
   }),
 }));
 
+const mockSentryCaptureMessage = jest.fn();
+const mockSentryCaptureException = jest.fn();
 jest.mock(
   '../../lib/sentry',
   /* gc1-allow: external-boundary: @sentry/react-native native crash handlers */ () => ({
     Sentry: {
       addBreadcrumb: jest.fn(),
+      captureMessage: (...args: unknown[]) => mockSentryCaptureMessage(...args),
+      captureException: (...args: unknown[]) =>
+        mockSentryCaptureException(...args),
     },
   }),
 );
@@ -2052,6 +2057,133 @@ describe('SessionSummaryScreen', () => {
 
       expect(screen.queryByTestId('transcript-purged-badge')).toBeNull();
       expect(screen.queryByTestId('view-transcript-cta')).toBeNull();
+    });
+  });
+
+  describe('[BUG-890] learner recap loading failure', () => {
+    beforeEach(() => {
+      mockSentryCaptureMessage.mockClear();
+      mockSentryCaptureException.mockClear();
+      // Sessions ≥3 exchanges trigger the recap rail; default exchangeCount=5.
+      mockTranscriptData = validTranscriptData as never;
+    });
+
+    it('escalates the recap-load timeout to Sentry and auto-refetches before showing manual retry', async () => {
+      jest.useFakeTimers();
+      try {
+        // Override the sessions route so /summary returns NO learnerRecap —
+        // this is the failure mode the bug describes (initial fetch silently
+        // produces an empty recap). The screen's polling interval should run,
+        // the 15s recap-timeout fires, Sentry is notified, an auto-refetch
+        // is triggered, and only then does the manual "Tap to retry" surface.
+        let summaryCallCount = 0;
+        mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+          if (url.includes('/summary') && init?.method === 'POST') {
+            return new Response(JSON.stringify({}), { status: 500 });
+          }
+          if (url.includes('/summary')) {
+            summaryCallCount += 1;
+            return { summary: { learnerRecap: null } };
+          }
+          return { session: mockSessionData };
+        });
+
+        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+        // Initial fetch settles with no recap; skeleton renders.
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+        await waitFor(() => {
+          screen.getByTestId('session-recap-skeleton');
+        });
+        const callsBeforeTimeout = summaryCallCount;
+
+        // Advance past the 15s timeout deadline.
+        await act(async () => {
+          jest.advanceTimersByTime(16_000);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        // Sentry MUST be notified — silent recovery is banned.
+        await waitFor(() => {
+          expect(mockSentryCaptureMessage).toHaveBeenCalledWith(
+            'session-summary recap load timed out',
+            expect.objectContaining({
+              level: 'warning',
+              tags: expect.objectContaining({
+                surface: 'session-summary',
+                failure: 'recap-timeout',
+              }),
+              extra: expect.objectContaining({
+                sessionId: expect.any(String),
+                exchangeCount: 5,
+              }),
+            }),
+          );
+        });
+
+        // Auto-refetch MUST have fired (at least one summary call after the
+        // timeout) — the user shouldn't have to discover the manual retry.
+        await waitFor(() => {
+          expect(summaryCallCount).toBeGreaterThan(callsBeforeTimeout);
+        });
+
+        // Manual fallback still surfaces after timeout for last-resort retry.
+        await waitFor(() => {
+          screen.getByTestId('session-recap-timeout');
+        });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('manual "Tap to retry" triggers a refetch when pressed', async () => {
+      jest.useFakeTimers();
+      try {
+        let summaryCallCount = 0;
+        mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+          if (url.includes('/summary') && init?.method === 'POST') {
+            return new Response(JSON.stringify({}), { status: 500 });
+          }
+          if (url.includes('/summary')) {
+            summaryCallCount += 1;
+            return { summary: { learnerRecap: null } };
+          }
+          return { session: mockSessionData };
+        });
+
+        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        // Force the timeout fallback to render.
+        await act(async () => {
+          jest.advanceTimersByTime(16_000);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        const retryButton = await screen.findByTestId('session-recap-retry');
+        const callsBeforePress = summaryCallCount;
+
+        await act(async () => {
+          fireEvent.press(retryButton);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        await waitFor(() => {
+          expect(summaryCallCount).toBeGreaterThan(callsBeforePress);
+        });
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });
