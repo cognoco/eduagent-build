@@ -38,6 +38,13 @@ const envSchema = z.object({
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().default('noreply@mentomate.com'),
 
+  // [Bug #872] Parental consent policy version. Stored alongside each
+  // consent_states row so we can answer "which policy version did the parent
+  // consent to" without depending on Cloudflare access logs (which roll over).
+  // Bump this in Doppler whenever the GDPR/COPPA consent copy or terms
+  // change. Format is freeform; suggest ISO date or semver.
+  CONSENT_POLICY_VERSION: z.string().min(1).default('2026-05-31'),
+
   // Sentry — error tracking
   SENTRY_DSN: z.string().url().optional(),
 

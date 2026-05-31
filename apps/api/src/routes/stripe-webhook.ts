@@ -98,10 +98,26 @@ export const stripeWebhookRoute = new Hono<{
   // could otherwise activate or cancel real subscriptions. Matches the
   // RevenueCat SANDBOX guard pattern (rca-webhook.ts:687).
   if (!event.livemode && c.env.ENVIRONMENT === 'production') {
+    // [#830] A test-mode event reaching production with a valid production
+    // webhook secret is a high-signal security event — likely production
+    // webhook-secret leak, secret reuse, or webhook-endpoint misconfiguration.
+    // CLAUDE.md "Silent recovery without escalation is banned in billing" —
+    // logger.warn alone is explicitly insufficient. Mirror the stale-event
+    // branch and escalate to Sentry so the rate is queryable.
     logger.warn('[stripe] Rejected test-mode webhook event in production', {
       eventType: event.type,
       eventId: event.id,
     });
+    captureException(
+      new Error('Stripe test-mode event received in production'),
+      {
+        extra: {
+          context: 'stripe.webhook.test_mode_in_production',
+          eventId: event.id,
+          eventType: event.type,
+        },
+      },
+    );
     return c.json({ received: true, skipped: true });
   }
 

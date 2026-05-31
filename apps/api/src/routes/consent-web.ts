@@ -18,6 +18,7 @@ import { BRAND_COLOR_PRIMARY } from '../services/brand';
 type ConsentWebEnv = {
   Bindings: {
     DATABASE_URL: string;
+    CONSENT_POLICY_VERSION: string;
   };
   Variables: { db: Database };
 };
@@ -293,6 +294,25 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       );
     }
 
+    // [Bug #868] Strict enum validation. Previously `const approved =
+    // approvedParam === 'true'` silently coerced ANY non-'true' value (e.g.
+    // 'True', '1', 'on', a corrupted/typoed form body, a misbehaving link
+    // prefetcher) into a DENIAL, which cascade-deletes the child profile
+    // (processConsentResponse + consent.ts:837-840). Require the literal
+    // strings 'true' or 'false'; reject anything else with 400 BEFORE
+    // processConsentResponse runs. This is a data-loss guard, not just
+    // hygiene.
+    if (approvedParam !== 'true' && approvedParam !== 'false') {
+      return c.html(
+        pageLayout(
+          'Invalid Link',
+          `<h1 class="error">Invalid link</h1>
+           <p>This link is missing required information.</p>`,
+        ),
+        400,
+      );
+    }
+
     const approved = approvedParam === 'true';
     const db = c.get('db');
 
@@ -323,7 +343,15 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     try {
       // Fetch child name BEFORE processing — denial deletes the profile
       const childName = (await getChildNameByToken(db, token)) ?? 'Your child';
-      await processConsentResponse(db, token, approved);
+      // [Bug #872] Audit metadata captured at response time.
+      await processConsentResponse(db, token, approved, {
+        policyVersion: c.env.CONSENT_POLICY_VERSION,
+        requestIp:
+          c.req.header('cf-connecting-ip') ??
+          c.req.header('x-forwarded-for') ??
+          undefined,
+        userAgent: c.req.header('user-agent') ?? undefined,
+      });
 
       if (approved) {
         // Approval landing — per UX spec: celebratory page with next steps

@@ -296,6 +296,21 @@ export async function handleRenewal(
   }
 }
 
+/**
+ * [BUG-832] RevenueCat cancel_reason values that indicate the underlying
+ * charge was reversed (refund, chargeback, store-side payment error). When
+ * any of these arrive — or when RevenueCat fires the dedicated REFUND event —
+ * the entitlement must be revoked immediately, not held until
+ * currentPeriodEnd. Otherwise the user keeps paid access after Apple/Google
+ * have already reversed the charge.
+ *
+ * Reference: RevenueCat webhooks docs — cancel_reason enum.
+ */
+const REFUND_CANCEL_REASONS: ReadonlySet<string> = new Set([
+  'CUSTOMER_SUPPORT',
+  'BILLING_ERROR',
+]);
+
 export async function handleCancellation(
   db: Database,
   kv: KVNamespace | undefined,
@@ -303,6 +318,68 @@ export async function handleCancellation(
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
+
+  // [BUG-832] Refund / chargeback / billing-error cancel reasons mean the
+  // charge was reversed by Apple/Google or RC support. Revoke entitlement
+  // immediately (downgrade tier='free', status='expired') rather than letting
+  // the subscription ride out the original currentPeriodEnd. Log + Sentry
+  // breadcrumb so ops can audit the revocation.
+  if (event.cancel_reason && REFUND_CANCEL_REASONS.has(event.cancel_reason)) {
+    logger.warn(
+      '[revenuecat] CANCELLATION with refund-class cancel_reason — revoking entitlement immediately',
+      {
+        eventId: event.id,
+        accountId,
+        cancelReason: event.cancel_reason,
+      },
+    );
+    captureMessage(
+      '[revenuecat] entitlement revoked due to refund/chargeback',
+      {
+        level: 'warning',
+        extra: {
+          eventId: event.id,
+          accountId,
+          cancelReason: event.cancel_reason,
+          category: 'revenuecat.refund_revocation',
+        },
+        tags: { surface: 'billing.revenuecat.refund' },
+      },
+    );
+
+    const nowIso = new Date().toISOString();
+    const freeConfig = getTierConfig('free');
+    const updatedRefund = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      db,
+      accountId,
+      {
+        eventId: event.id,
+        eventTimestampMs: event.event_timestamp_ms,
+        status: 'expired',
+        tier: 'free',
+        cancelledAt: nowIso,
+        currentPeriodEnd: nowIso,
+      },
+      {
+        monthlyQuota: freeConfig.monthlyQuota,
+        dailyLimit: freeConfig.dailyLimit,
+      },
+    );
+
+    if (shouldRefreshRevenuecatKv(updatedRefund, event.id)) {
+      await safeRefreshKvCache(
+        kv,
+        db,
+        updatedRefund.accountId,
+        'revenuecat.webhook.handleCancellation.refund',
+        {
+          eventId: event.id,
+          cancelReason: event.cancel_reason,
+        },
+      );
+    }
+    return;
+  }
 
   // [BUG-445] If the sub was already past_due when the user cancelled, DO NOT
   // flip it back to 'active' — that would erase the payment-failure signal.
@@ -486,7 +563,7 @@ export async function handleBillingIssue(
 
 export async function handleSubscriberAlias(
   db: Database,
-  _kv: KVNamespace | undefined,
+  kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
   // SUBSCRIBER_ALIAS: RevenueCat merged two subscriber records.
@@ -521,6 +598,47 @@ export async function handleSubscriberAlias(
 
       const fromSub = await getSubscriptionByAccountId(db, fromAccount.id);
       if (!fromSub) continue;
+
+      // [BUG-833] Strict downgrade of the transferred_from subscription.
+      // Without this, after RC merges two subscriber records, the
+      // transferred_from account still has status='active' + a paid tier
+      // locally. If the original user signs back into the old Clerk identity
+      // (recovery, household transfer, account re-link), they continue to
+      // receive paid entitlement for free. Force the from-side row to
+      // status='expired' / tier='free' / currentPeriodEnd=now and refresh its
+      // KV cache. The transferred_to side keeps its existing entitlement —
+      // this is a one-sided revocation, not a merge.
+      const nowIso = new Date().toISOString();
+      const freeConfig = getTierConfig('free');
+      const downgraded = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+        db,
+        fromAccount.id,
+        {
+          eventId: event.id,
+          eventTimestampMs: event.event_timestamp_ms,
+          status: 'expired',
+          tier: 'free',
+          cancelledAt: nowIso,
+          currentPeriodEnd: nowIso,
+        },
+        {
+          monthlyQuota: freeConfig.monthlyQuota,
+          dailyLimit: freeConfig.dailyLimit,
+        },
+      );
+
+      if (shouldRefreshRevenuecatKv(downgraded, event.id)) {
+        await safeRefreshKvCache(
+          kv,
+          db,
+          downgraded.accountId,
+          'revenuecat.webhook.handleSubscriberAlias.fromDowngrade',
+          {
+            eventId: event.id,
+            fromAppUserId: fromUserId,
+          },
+        );
+      }
 
       // A subscription exists on the transferred_from identity — this is the
       // revenue-loss scenario. Escalate immediately.

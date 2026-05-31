@@ -120,6 +120,7 @@ type Bindings = {
   REVENUECAT_WEBHOOK_SECRET?: string;
   SUPPORT_EMAIL?: string;
   DEPLOY_SHA?: string;
+  CONSENT_POLICY_VERSION?: string;
 };
 
 type Variables = {

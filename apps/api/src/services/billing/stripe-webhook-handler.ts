@@ -120,6 +120,50 @@ export function mapStripeStatus(
 }
 
 // ---------------------------------------------------------------------------
+// [#828] Out-of-order event escalation
+// ---------------------------------------------------------------------------
+// Stripe explicitly does NOT guarantee event ordering — `customer.subscription.created`,
+// `customer.subscription.updated`, or `invoice.payment_*` events can arrive
+// before `checkout.session.completed` has created the local subscriptions row.
+// `updateSubscriptionFromWebhook` returns null when no row matches the Stripe
+// subscription ID. Previously the handlers returned silently — the event's
+// state (period dates, cancelled_at, past_due transitions) was lost forever
+// because Stripe will not re-deliver after a 200. CLAUDE.md "Silent recovery
+// without escalation is banned in billing" — escalate so the rate is
+// queryable in Sentry.
+function escalateSubscriptionNotFound(
+  handlerContext: string,
+  stripeSubscriptionId: string,
+  stripeEventId: string,
+  eventTimestamp: string,
+  extra: Record<string, unknown> = {},
+): void {
+  logger.warn(
+    `[stripe-webhook] ${handlerContext}: local subscription row not found for stripeSubscriptionId — event dropped (possible out-of-order delivery before checkout.session.completed)`,
+    {
+      stripeSubscriptionId,
+      stripeEventId,
+      eventTimestamp,
+      ...extra,
+    },
+  );
+  captureException(
+    new Error(
+      `Stripe webhook event references unknown subscription (handler=${handlerContext}, stripeSubscriptionId=${stripeSubscriptionId})`,
+    ),
+    {
+      extra: {
+        context: `stripe.webhook.${handlerContext}.subscription_not_found`,
+        stripeSubscriptionId,
+        stripeEventId,
+        eventTimestamp,
+        ...extra,
+      },
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Webhook event handlers
 // ---------------------------------------------------------------------------
 
@@ -308,6 +352,17 @@ export async function handleSubscriptionEvent(
         stripeSubscriptionId: stripeSubscription.id,
       },
     );
+  } else if (updated === null) {
+    // [#828] Out-of-order delivery: subscription event arrived before
+    // checkout.session.completed created the local row. Escalate (don't drop
+    // silently) so the rate is queryable.
+    escalateSubscriptionNotFound(
+      'handleSubscriptionEvent',
+      stripeSubscription.id,
+      stripeEventId,
+      eventTimestamp,
+      { stripeStatus: stripeSubscription.status, mappedStatus: status },
+    );
   }
 }
 
@@ -364,6 +419,14 @@ export async function handleSubscriptionDeleted(
         stripeSubscriptionId: stripeSubscription.id,
       },
     );
+  } else if (updated === null) {
+    // [#828] Out-of-order: subscription.deleted before checkout.completed.
+    escalateSubscriptionNotFound(
+      'handleSubscriptionDeleted',
+      stripeSubscription.id,
+      stripeEventId,
+      eventTimestamp,
+    );
   }
 }
 
@@ -412,6 +475,42 @@ export async function handleCheckoutCompleted(
             typeof session.customer === 'string'
               ? session.customer
               : session.customer?.id,
+        },
+      },
+    );
+    return;
+  }
+
+  // [#829] For async payment methods (SEPA Direct Debit, Bacs, BLIK, bank
+  // transfer), Stripe fires checkout.session.completed with
+  // payment_status='unpaid' while the actual payment is still pending. The
+  // real resolution arrives later via checkout.session.async_payment_succeeded
+  // or checkout.session.async_payment_failed. If we activate the paid tier on
+  // 'unpaid' we grant entitlements + quota before money has cleared; a
+  // subsequent async_payment_failed would leave the user already having
+  // consumed paid-tier quota. Gate activation on the two terminal-success
+  // states only ('paid' for card/most methods, 'no_payment_required' for
+  // setup/100%-discount flows). For 'unpaid', escalate and wait — the async
+  // success event will route through this handler again with payment_status
+  // flipped to 'paid'.
+  const paymentStatus = session.payment_status;
+  if (paymentStatus !== 'paid' && paymentStatus !== 'no_payment_required') {
+    logger.warn(
+      `[stripe-webhook] checkout.completed deferred — payment_status='${paymentStatus}', awaiting async_payment_succeeded (sessionId=${session.id})`,
+    );
+    captureException(
+      new Error(
+        `Stripe checkout.session.completed with non-terminal payment_status='${paymentStatus}' — activation deferred`,
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.checkout.completed.payment_pending',
+          stripeSessionId: session.id,
+          stripeSubscriptionId,
+          accountId,
+          tier,
+          paymentStatus,
+          paymentMethodTypes: session.payment_method_types,
         },
       },
     );
@@ -506,6 +605,15 @@ export async function handlePaymentFailed(
         invoiceId: invoice.id,
       },
     );
+  } else if (updated === null) {
+    // [#828] Out-of-order: invoice.payment_failed before checkout.completed.
+    escalateSubscriptionNotFound(
+      'handlePaymentFailed',
+      stripeSubscriptionId,
+      stripeEventId,
+      eventTimestamp,
+      { invoiceId: invoice.id, attempt: invoice.attempt_count ?? 1 },
+    );
   }
 
   if (!updated) return;
@@ -593,6 +701,15 @@ export async function handlePaymentSucceeded(
         stripeSubscriptionId,
         invoiceId: invoice.id,
       },
+    );
+  } else if (updated === null) {
+    // [#828] Out-of-order: invoice.payment_succeeded before checkout.completed.
+    escalateSubscriptionNotFound(
+      'handlePaymentSucceeded',
+      stripeSubscriptionId,
+      stripeEventId,
+      eventTimestamp,
+      { invoiceId: invoice.id },
     );
   }
 }

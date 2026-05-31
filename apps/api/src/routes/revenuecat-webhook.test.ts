@@ -439,6 +439,39 @@ describe('payload validation', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  // [BUG-835] BREAK TEST: malformed JSON body must return 400, not 500.
+  // RevenueCat treats any non-2xx as transient and retries for ~72h. A
+  // SyntaxError thrown from c.req.json() previously surfaced as 500 and
+  // produced a 3-day retry storm. Post-fix, the route catches the parse
+  // failure and acks with 400 (VALIDATION_ERROR) so RC stops retrying.
+  // Reverting the try/catch makes this test fail with status 500.
+  it('[BUG-835] returns 400 for malformed JSON body (no retry storm)', async () => {
+    const res = await app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${TEST_ENV.REVENUECAT_WEBHOOK_SECRET}`,
+        },
+        body: '{ this is not valid JSON ',
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe('VALIDATION_ERROR');
+    // Sentry capture must fire so ops can audit the malformed delivery
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'revenuecat.webhook.malformed_json',
+        }),
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1053,6 +1086,98 @@ describe('CANCELLATION', () => {
       .calls[0];
     expect(callArgs[2].status).not.toBe('active');
   });
+
+  // [BUG-832] BREAK TEST: a CANCELLATION carrying a refund-class cancel_reason
+  // (CUSTOMER_SUPPORT, BILLING_ERROR) means Apple/Google or RC support
+  // reversed the charge. The entitlement MUST be revoked immediately —
+  // downgrade tier='free', status='expired', cancelledAt=now,
+  // currentPeriodEnd=now — not held until the original period end. Pre-fix,
+  // handleCancellation ignored cancel_reason and kept status='active' until
+  // the original period end, granting paid entitlement after the charge was
+  // reversed.
+  it('[BUG-832] CUSTOMER_SUPPORT cancel_reason revokes entitlement immediately (downgrade to free)', async () => {
+    const res = await makeRequest(
+      makeWebhookPayload('CANCELLATION', {
+        cancel_reason: 'CUSTOMER_SUPPORT',
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // Must go through the quota-updating write path (downgrade to free
+    // quota), not the period-end path.
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        status: 'expired',
+        tier: 'free',
+        cancelledAt: expect.any(String),
+        currentPeriodEnd: expect.any(String),
+      }),
+      expect.objectContaining({
+        monthlyQuota: expect.any(Number),
+      }),
+    );
+    // Must NOT take the period-end-cancel branch
+    expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+    // Sentry breadcrumb must fire so ops can audit the revocation
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('refund'),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          category: 'revenuecat.refund_revocation',
+          cancelReason: 'CUSTOMER_SUPPORT',
+        }),
+      }),
+    );
+  });
+
+  it('[BUG-832] BILLING_ERROR cancel_reason revokes entitlement immediately', async () => {
+    const res = await makeRequest(
+      makeWebhookPayload('CANCELLATION', {
+        cancel_reason: 'BILLING_ERROR',
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        status: 'expired',
+        tier: 'free',
+      }),
+      expect.anything(),
+    );
+    expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-832] benign cancel_reason (UNSUBSCRIBE) does NOT revoke entitlement — keeps active until period end', async () => {
+    const res = await makeRequest(
+      makeWebhookPayload('CANCELLATION', {
+        cancel_reason: 'UNSUBSCRIBE',
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // Goes through the existing period-end branch
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        status: 'active',
+        cancelledAt: expect.any(String),
+      }),
+    );
+    // Must NOT take the refund branch
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1548,6 +1673,82 @@ describe('SUBSCRIBER_ALIAS', () => {
         extra: expect.objectContaining({ tag: 'revenuecat.alias.unhandled' }),
       }),
     );
+  });
+
+  // [BUG-833] BREAK TEST: when SUBSCRIBER_ALIAS arrives and transferred_from
+  // has an active paid subscription, the from-side subscription MUST be
+  // forced to status='expired' / tier='free' / cancelledAt=now /
+  // currentPeriodEnd=now so the original Clerk identity cannot keep paid
+  // entitlement. Pre-fix, handleSubscriberAlias only logged + dispatched an
+  // Inngest event; both identities remained active='Plus' locally. Reverting
+  // the downgrade write makes this test fail.
+  it('[BUG-833] downgrades transferred_from subscription to free + expired immediately', async () => {
+    (findAccountByClerkId as jest.Mock).mockImplementation(
+      (_db: unknown, userId: string) => {
+        if (userId === 'old_clerk_user') {
+          return Promise.resolve({
+            id: 'acc-old',
+            clerkUserId: 'old_clerk_user',
+          });
+        }
+        return Promise.resolve({ id: 'acc-1', clerkUserId: userId });
+      },
+    );
+    (getSubscriptionByAccountId as jest.Mock).mockImplementation(
+      (_db: unknown, accountId: string) => {
+        if (accountId === 'acc-old') {
+          return Promise.resolve(
+            mockSubscriptionRow({
+              id: 'sub-old',
+              accountId: 'acc-old',
+              tier: 'plus',
+              status: 'active',
+            }),
+          );
+        }
+        return Promise.resolve(mockSubscriptionRow());
+      },
+    );
+    (
+      updateSubscriptionAndQuotaFromRevenuecatWebhook as jest.Mock
+    ).mockResolvedValue(
+      mockSubscriptionRow({
+        id: 'sub-old',
+        accountId: 'acc-old',
+        tier: 'free',
+        status: 'expired',
+      }),
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('SUBSCRIBER_ALIAS', {
+        app_user_id: 'new_clerk_user',
+        transferred_from: ['old_clerk_user'],
+        transferred_to: ['new_clerk_user'],
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // The transferred_from subscription must be force-downgraded.
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'acc-old',
+      expect.objectContaining({
+        status: 'expired',
+        tier: 'free',
+        cancelledAt: expect.any(String),
+        currentPeriodEnd: expect.any(String),
+      }),
+      expect.objectContaining({
+        monthlyQuota: expect.any(Number),
+      }),
+    );
+
+    // KV cache for the from-side account must be refreshed so cached
+    // entitlement doesn't satisfy a paid read after the downgrade.
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 });
 

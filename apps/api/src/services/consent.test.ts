@@ -14,6 +14,7 @@ import {
   isConsentRevocationGenerationCurrent,
   isGdprProcessingAllowed,
   revokeConsent,
+  restoreConsent,
   refreshConsentToken,
   refreshConsentTokenForRequest,
   EmailDeliveryError,
@@ -21,6 +22,8 @@ import {
   ConsentRecordNotFoundError,
   ConsentResendLimitError,
   ConsentRequestNotFoundError,
+  ConsentGracePeriodExpiredError,
+  RESTORE_CONSENT_GRACE_PERIOD_MS,
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -1291,5 +1294,167 @@ describe('checkConsentRequiredFromDate', () => {
     expect(result.belowMinimumAge).toBeUndefined();
     expect(result.required).toBe(true);
     expect(result.age).toBe(11);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [Bug #871] restoreConsent — 7-day grace period enforcement
+// ---------------------------------------------------------------------------
+
+describe('restoreConsent — 7-day grace period [Bug #871]', () => {
+  const CHILD_ID = '550e8400-e29b-41d4-a716-000000000001';
+  const PARENT_ID = '550e8400-e29b-41d4-a716-000000000002';
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('[BREAK] throws ConsentGracePeriodExpiredError when respondedAt is older than 7 days', async () => {
+    // Revoked 8 days ago — past the grace period, archive-cleanup may have
+    // already hard-deleted child data. Restore must be refused.
+    const revokedAt = new Date('2026-05-15T10:00:00.000Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-23T10:00:01.000Z')); // > 8 days later
+    const withdrawnRow = mockConsentRow({
+      status: 'WITHDRAWN',
+      profileId: CHILD_ID,
+      respondedAt: revokedAt,
+    });
+    const { db } = createRevokeConsentMockDb({ consentRow: withdrawnRow });
+
+    await expect(restoreConsent(db, CHILD_ID, PARENT_ID)).rejects.toThrow(
+      ConsentGracePeriodExpiredError,
+    );
+    // The flip + archivedAt clear must NOT have occurred.
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('allows restore when respondedAt is within the 7-day grace period', async () => {
+    // Revoked 3 days ago — well inside grace period.
+    const revokedAt = new Date('2026-05-20T10:00:00.000Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-23T10:00:00.000Z'));
+    const withdrawnRow = mockConsentRow({
+      status: 'WITHDRAWN',
+      profileId: CHILD_ID,
+      respondedAt: revokedAt,
+    });
+    const consentedAfterRestore = mockConsentRow({
+      status: 'CONSENTED',
+      profileId: CHILD_ID,
+    });
+    // tx.update().set().where().returning() should return the post-restore row.
+    const { db } = createRevokeConsentMockDb({
+      consentRow: withdrawnRow,
+    });
+    // Override the tx update returning to yield the restored row.
+    (db.transaction as jest.Mock).mockImplementation(
+      async (callback: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          update: jest.fn().mockReturnValue({
+            set: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                returning: jest.fn().mockResolvedValue([consentedAfterRestore]),
+              }),
+            }),
+          }),
+        };
+        return callback(tx);
+      },
+    );
+
+    const result = await restoreConsent(db, CHILD_ID, PARENT_ID);
+    expect(result.status).toBe('CONSENTED');
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes RESTORE_CONSENT_GRACE_PERIOD_MS as the documented 7 days', () => {
+    expect(RESTORE_CONSENT_GRACE_PERIOD_MS).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [Bug #872] Consent audit metadata persistence
+// ---------------------------------------------------------------------------
+
+describe('consent audit metadata [Bug #872]', () => {
+  it('persists policy_version / request_ip / user_agent on requestConsent', async () => {
+    const insertedRow = mockConsentRow({
+      status: 'PARENTAL_CONSENT_REQUESTED',
+    });
+    const db = createMockDb({ insertReturning: [insertedRow] });
+    const valuesSpy = jest.fn().mockReturnValue({
+      onConflictDoUpdate: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([insertedRow]),
+      }),
+    });
+    (db.insert as jest.Mock).mockReturnValue({ values: valuesSpy });
+
+    await requestConsent(
+      db,
+      {
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+      'https://api.example.com',
+      EMAIL_OPTIONS,
+      undefined,
+      {
+        policyVersion: '2026-05-31',
+        requestIp: '203.0.113.42',
+        userAgent: 'Mozilla/5.0 audit-test',
+      },
+    );
+
+    expect(valuesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyVersion: '2026-05-31',
+        requestIp: '203.0.113.42',
+        userAgent: 'Mozilla/5.0 audit-test',
+      }),
+    );
+  });
+
+  it('persists audit metadata on processConsentResponse approval update', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+    const setSpy = jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([row]),
+      }),
+    });
+    (db.update as jest.Mock).mockReturnValue({ set: setSpy });
+
+    await processConsentResponse(db, 'valid-token', true, {
+      policyVersion: '2026-05-31',
+      requestIp: '198.51.100.7',
+      userAgent: 'consent-test-ua',
+    });
+
+    expect(setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyVersion: '2026-05-31',
+        requestIp: '198.51.100.7',
+        userAgent: 'consent-test-ua',
+      }),
+    );
+  });
+
+  it('omits audit fields when called without metadata (back-compat)', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+    const setSpy = jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([row]),
+      }),
+    });
+    (db.update as jest.Mock).mockReturnValue({ set: setSpy });
+
+    await processConsentResponse(db, 'valid-token', true);
+
+    const call = setSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(call).toBeDefined();
+    expect(call).not.toHaveProperty('policyVersion');
+    expect(call).not.toHaveProperty('requestIp');
+    expect(call).not.toHaveProperty('userAgent');
   });
 });

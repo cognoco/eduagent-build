@@ -130,6 +130,23 @@ export class ConsentRequestNotFoundError extends Error {
   }
 }
 
+/**
+ * [Bug #871] Thrown when restoreConsent is called more than 7 days after the
+ * revocation timestamp. After the grace period the archive-cleanup Inngest
+ * function may have already hard-deleted child data; resurrecting the consent
+ * row would attach CONSENTED state to an empty profile with no audit trail.
+ * Route layer maps to 410 GONE.
+ */
+export const RESTORE_CONSENT_GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+export class ConsentGracePeriodExpiredError extends Error {
+  constructor() {
+    super(
+      'Restore window has expired. The 7-day grace period to restore consent has passed and the data may have already been deleted.',
+    );
+    this.name = 'ConsentGracePeriodExpiredError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -389,12 +406,29 @@ export interface ConsentRequestResult {
   emailDelivered: boolean;
 }
 
+/**
+ * [Bug #872] Audit metadata captured at the route boundary and persisted on
+ * each consent_states row so consent records remain re-derivable after
+ * Cloudflare access logs roll over. `policyVersion` is the value of
+ * `env.CONSENT_POLICY_VERSION` at the moment of the request/response.
+ * `requestIp` is the parent's IP (cf-connecting-ip with x-forwarded-for
+ * fallback). `userAgent` is the parent's User-Agent header. Any field may be
+ * undefined in test/dev environments where the header is unavailable; the
+ * column accepts NULL.
+ */
+export interface ConsentAuditMetadata {
+  policyVersion?: string;
+  requestIp?: string;
+  userAgent?: string;
+}
+
 export async function requestConsent(
   db: Database,
   input: ConsentRequest,
   appUrl: string,
   emailOptions?: EmailOptions,
   accountId?: string,
+  audit?: ConsentAuditMetadata,
 ): Promise<ConsentRequestResult> {
   // Verify childProfileId belongs to the calling account when accountId is provided.
   // Defense-in-depth: the route layer also enforces this via getProfile() before calling here.
@@ -458,6 +492,10 @@ export async function requestConsent(
       expiresAt,
       resendCount: 0,
       recipientChangeCount: 0,
+      // [Bug #872] Capture audit metadata at request time.
+      policyVersion: audit?.policyVersion ?? null,
+      requestIp: audit?.requestIp ?? null,
+      userAgent: audit?.userAgent ?? null,
     })
     .onConflictDoUpdate({
       target: [consentStates.profileId, consentStates.consentType],
@@ -466,6 +504,12 @@ export async function requestConsent(
         parentEmail: input.parentEmail,
         consentToken: token,
         expiresAt,
+        // [Bug #872] Refresh audit metadata on each request — a re-request
+        // (e.g. recipient correction) is itself a parent action that should
+        // be auditable.
+        policyVersion: audit?.policyVersion ?? null,
+        requestIp: audit?.requestIp ?? null,
+        userAgent: audit?.userAgent ?? null,
         resendCount: sql`CASE WHEN ${consentStates.parentEmail} IS NOT DISTINCT FROM ${input.parentEmail} THEN ${consentStates.resendCount} + 1 ELSE 0 END`,
         // Only a change BETWEEN two real recipients consumes a change slot. A
         // null→email first assignment (IS NULL) is the initial request.
@@ -774,6 +818,7 @@ export async function processConsentResponse(
   db: Database,
   token: string,
   approved: boolean,
+  audit?: ConsentAuditMetadata,
 ): Promise<ConsentState> {
   // 1. Look up consent record by token
   const row = await db.query.consentStates.findFirst({
@@ -811,6 +856,22 @@ export async function processConsentResponse(
         status: newStatus,
         respondedAt: now,
         updatedAt: now,
+        // [Bug #872] Capture the IP/UA/policy version at the moment the
+        // parent clicked approve or deny — distinct from the request-time
+        // metadata captured by requestConsent (e.g. the request was issued
+        // from the mobile app on cellular, the response was clicked from the
+        // parent's laptop on home WiFi). Only overwrite when supplied so a
+        // call from a code path that doesn't yet plumb audit context (tests,
+        // batch reprocessing) leaves the prior values intact.
+        ...(audit?.policyVersion !== undefined
+          ? { policyVersion: audit.policyVersion }
+          : {}),
+        ...(audit?.requestIp !== undefined
+          ? { requestIp: audit.requestIp }
+          : {}),
+        ...(audit?.userAgent !== undefined
+          ? { userAgent: audit.userAgent }
+          : {}),
       })
       .where(
         and(
@@ -1251,6 +1312,21 @@ export async function restoreConsent(
   }
   if (existing.status !== 'WITHDRAWN') {
     return mapConsentRow(existing);
+  }
+
+  // [Bug #871] Enforce the 7-day grace period referenced by the revoke route
+  // copy ("Data will be deleted after 7-day grace period.") and this function's
+  // docstring. Without this check restoreConsent would silently flip
+  // WITHDRAWN→CONSENTED and clear profiles.archivedAt even after the
+  // archive-cleanup Inngest function has already hard-deleted child data,
+  // leaving a CONSENTED row attached to an effectively-empty profile.
+  // existing.respondedAt is the revocation timestamp (revokeConsent sets it).
+  if (
+    existing.respondedAt &&
+    Date.now() - existing.respondedAt.getTime() >
+      RESTORE_CONSENT_GRACE_PERIOD_MS
+  ) {
+    throw new ConsentGracePeriodExpiredError();
   }
 
   const now = new Date();

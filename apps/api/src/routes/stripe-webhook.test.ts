@@ -203,6 +203,10 @@ function makeCheckoutSession(
     id: 'cs_test_123',
     subscription: 'sub_stripe_123',
     metadata: { accountId: 'acc-1', tier: 'plus' },
+    // [#829] Default to terminal-success payment_status so existing tests
+    // exercise the activation path. Tests covering async-payment deferrals
+    // override this to 'unpaid' explicitly.
+    payment_status: 'paid',
     ...overrides,
   };
 }
@@ -428,6 +432,42 @@ describe('test-mode event guard', () => {
       skipped: true,
     });
     expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+  });
+
+  it('escalates test-mode-in-production to Sentry [#830 break test]', async () => {
+    // [#830] A test-mode event reaching production with a valid production
+    // webhook signature is high-signal: likely secret leak/reuse or endpoint
+    // misconfiguration. logger.warn alone is insufficient — CLAUDE.md mandates
+    // captureException for billing fallback paths so the rate is queryable.
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue({
+      ...makeStripeEvent('customer.subscription.updated', makeSubscription()),
+      id: 'evt_test_in_prod',
+      livemode: false,
+    });
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      { ...TEST_ENV, ENVIRONMENT: 'production' },
+    );
+
+    expect(res.status).toBe(200);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Stripe test-mode event received in production',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.test_mode_in_production',
+          eventId: 'evt_test_in_prod',
+          eventType: 'customer.subscription.updated',
+        }),
+      }),
+    );
   });
 
   it('accepts test-mode events outside production so local and QA flows work', async () => {

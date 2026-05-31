@@ -352,6 +352,53 @@ describe('POST /v1/consent-page/confirm', () => {
     expect(html).toContain('Invalid link');
   });
 
+  // [Bug #868 — BREAK TEST] The pre-fix code did `approved = approvedParam === 'true'`
+  // which silently coerced ANY non-'true' value (including unknown values
+  // like 'TRUE', '1', 'on', a corrupted form body, or a link-prefetcher echo)
+  // into a DENIAL. Denial cascade-deletes the child profile, so this is a
+  // data-loss bug, not just hygiene. The fix requires approvedParam to be
+  // exactly 'true' or 'false'; anything else must 400 BEFORE
+  // processConsentResponse runs.
+  it.each([
+    ['TRUE'],
+    ['True'],
+    ['1'],
+    ['on'],
+    ['yes'],
+    ['approved'],
+    ['garbage'],
+  ])(
+    '[BREAK #868] rejects approved="%s" with 400 and does NOT delete the child profile',
+    async (badValue) => {
+      const { accountId, profileId, token } = await seedConsentToken({
+        displayName: 'BugProof',
+      });
+      seededAccountIds.push(accountId);
+
+      const res = await postForm('/v1/consent-page/confirm', {
+        token,
+        approved: badValue,
+      });
+      expect(res.status).toBe(400);
+      const html = await responseHtml(res);
+      expect(html).toContain('Invalid link');
+
+      // Critical: profile must still exist. Pre-fix the route silently
+      // treated this as denial and cascade-deleted the profile.
+      const db = createIntegrationDb();
+      const profile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, profileId),
+      });
+      expect(profile).toBeDefined();
+
+      // Consent row must still be PARENTAL_CONSENT_REQUESTED (not WITHDRAWN).
+      const consent = await db.query.consentStates.findFirst({
+        where: eq(consentStates.profileId, profileId),
+      });
+      expect(consent?.status).toBe('PARENTAL_CONSENT_REQUESTED');
+    },
+  );
+
   it('returns 404 "Link Expired" when token does not exist', async () => {
     const res = await postForm('/v1/consent-page/confirm', {
       token: 'does-not-exist-in-db',
