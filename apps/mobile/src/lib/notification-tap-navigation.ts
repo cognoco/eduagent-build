@@ -1,5 +1,6 @@
 import type { Href } from 'expo-router';
 
+import type { TranslateKey } from '../i18n';
 import type { NavigationAppContext } from './navigation-contract';
 
 type NotificationData = Record<string, unknown>;
@@ -15,8 +16,8 @@ export type NotificationTapDecision =
       context: NavigationAppContext;
       kind: 'prompt';
       href: Href;
-      message: string;
-      title: string;
+      messageKey: TranslateKey;
+      titleKey: TranslateKey;
     }
   | { context: NavigationAppContext; kind: 'push'; href: Href }
   | { context: NavigationAppContext; kind: 'replace'; href: Href };
@@ -72,9 +73,8 @@ export function decideNotificationTapNavigation({
       context: target.context,
       kind: 'prompt',
       href: target.href,
-      title: 'Open learning update?',
-      message:
-        'You are in a session. Finish this first, or open the update and leave the current flow.',
+      titleKey: 'notifications.tap.crossContextPromptTitle',
+      messageKey: 'notifications.tap.crossContextPromptMessage',
     };
   }
 

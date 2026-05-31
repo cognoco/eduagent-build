@@ -386,6 +386,7 @@
     "appVersion": "MentoMate v1.0.0"
   },
   "session": {
+    "expiredSystemMessage": "Session expired. Start a new one to keep going.",
     "challenge": {
       "offerTitle": "Up for a challenge round?",
       "tryIt": "Try it",
@@ -1386,6 +1387,7 @@
     "depthExplain": "Explained in own words"
   },
   "homework": {
+    "microphoneUnavailableTitle": "Microphone unavailable",
     "permissionTitle": "Camera Access Needed",
     "permissionPrompt": "Snap a picture of your homework and I'll help you solve it step by step.",
     "permissionDenied": "Camera access was turned off. Your phone won't let us ask again — tap Open Settings, then turn the camera on for this app.",
@@ -2228,6 +2230,10 @@
     "privacyNote": "Private to your learning"
   },
   "subscription": {
+    "loadError": {
+      "message": "Unable to load subscription details. Please try again.",
+      "retryAccessibility": "Retry loading subscription"
+    },
     "trial": {
       "active": "Trial active",
       "endsAt": "Trial ends {{date}}"
@@ -2337,6 +2343,14 @@
       "title": "This conversation was archived on {{date}}.",
       "intro": "Here's what you covered:",
       "continueCta": "Continue this topic"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "Open learning update?",
+      "crossContextPromptMessage": "You are in a session. Finish this first, or open the update and leave the current flow.",
+      "stayHere": "Stay here",
+      "openUpdate": "Open update"
     }
   },
   "nudge": {

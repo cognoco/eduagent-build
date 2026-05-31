@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import { usePathname, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { useAppContext } from '../lib/app-context';
 import { decideNotificationTapNavigation } from '../lib/notification-tap-navigation';
@@ -33,6 +34,9 @@ export function useNotificationResponseHandler(): void {
   const { setMode } = useAppContext();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationDataScopeContract();
+  const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const activeProfileRef = useRef(activeProfile);
   const pathnameRef = useRef(pathname);
   const appContextRef = useRef(navigationContract.effectiveAppContext);
@@ -86,10 +90,21 @@ export function useNotificationResponseHandler(): void {
         };
 
         if (decision.kind === 'prompt') {
-          platformAlert(decision.title, decision.message, [
-            { text: 'Stay here', style: 'cancel' },
-            { text: 'Open update', onPress: navigateInTargetContext },
-          ]);
+          const translate = tRef.current;
+          platformAlert(
+            translate(decision.titleKey),
+            translate(decision.messageKey),
+            [
+              {
+                text: translate('notifications.tap.stayHere'),
+                style: 'cancel',
+              },
+              {
+                text: translate('notifications.tap.openUpdate'),
+                onPress: navigateInTargetContext,
+              },
+            ],
+          );
           return;
         }
 

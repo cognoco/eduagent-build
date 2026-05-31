@@ -648,7 +648,8 @@
       "transcriptLabel": "音声テキスト - タップして編集",
       "startRecording": "録音開始",
       "stopRecording": "録音停止"
-    }
+    },
+    "expiredSystemMessage": "セッションが期限切れです。新しいセッションを開始して続けてください。"
   },
   "quiz": {
     "index": {
@@ -1373,7 +1374,8 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "microphoneUnavailableTitle": "マイクが利用できません"
   },
   "progress": {
     "pageTitleMine": "自分の進捗",
@@ -2186,6 +2188,10 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "loadError": {
+      "message": "サブスクリプションの詳細を読み込めませんでした。もう一度お試しください。",
+      "retryAccessibility": "サブスクリプションの読み込みを再試行"
     }
   },
   "sessionSummary": {
@@ -2617,6 +2623,14 @@
       "bug": "バグ",
       "suggestion": "提案",
       "other": "その他"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "学習のアップデートを開きますか？",
+      "crossContextPromptMessage": "現在セッション中です。先にこちらを完了するか、アップデートを開いて現在のセッションを終了してください。",
+      "stayHere": "このままにする",
+      "openUpdate": "アップデートを開く"
     }
   }
 }

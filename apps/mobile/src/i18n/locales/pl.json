@@ -673,7 +673,8 @@
       "transcriptLabel": "Transkrypcja głosowa — dotknij, by edytować",
       "startRecording": "Rozpocznij nagrywanie",
       "stopRecording": "Zatrzymaj nagrywanie"
-    }
+    },
+    "expiredSystemMessage": "Sesja wygasła. Rozpocznij nową, aby kontynuować."
   },
   "quiz": {
     "index": {
@@ -1398,7 +1399,8 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "microphoneUnavailableTitle": "Mikrofon niedostępny"
   },
   "progress": {
     "pageTitleMine": "Moje postępy",
@@ -2211,6 +2213,10 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "loadError": {
+      "message": "Nie można wczytać szczegółów subskrypcji. Spróbuj ponownie.",
+      "retryAccessibility": "Spróbuj ponownie wczytać subskrypcję"
     }
   },
   "sessionSummary": {
@@ -2617,6 +2623,14 @@
       "bug": "Błąd",
       "suggestion": "Sugestia",
       "other": "Inne"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "Otworzyć aktualizację?",
+      "crossContextPromptMessage": "Jesteś w trakcie sesji. Najpierw ją ukończ lub otwórz aktualizację i opuść bieżącą aktywność.",
+      "stayHere": "Zostań tutaj",
+      "openUpdate": "Otwórz aktualizację"
     }
   }
 }

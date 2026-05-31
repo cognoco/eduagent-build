@@ -673,7 +673,8 @@
       "transcriptLabel": "Transcrição de voz — toque para editar",
       "startRecording": "Começar a gravar",
       "stopRecording": "Parar de gravar"
-    }
+    },
+    "expiredSystemMessage": "Sessão expirada. Comece uma nova para continuar."
   },
   "quiz": {
     "index": {
@@ -1398,7 +1399,8 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "microphoneUnavailableTitle": "Microfone indisponível"
   },
   "progress": {
     "pageTitleMine": "Meu progresso",
@@ -2211,6 +2213,10 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "loadError": {
+      "message": "Não foi possível carregar os detalhes da assinatura. Tente novamente.",
+      "retryAccessibility": "Tentar carregar assinatura novamente"
     }
   },
   "sessionSummary": {
@@ -2617,6 +2623,14 @@
       "bug": "Bug",
       "suggestion": "Sugestão",
       "other": "Outro"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "Abrir atualização de aprendizado?",
+      "crossContextPromptMessage": "Você está em uma sessão. Termine-a primeiro ou abra a atualização e saia do fluxo atual.",
+      "stayHere": "Ficar aqui",
+      "openUpdate": "Abrir atualização"
     }
   }
 }

@@ -46,9 +46,8 @@ describe('decideNotificationTapNavigation', () => {
       context: 'family',
       kind: 'prompt',
       href: '/(app)/recaps',
-      title: 'Open learning update?',
-      message:
-        'You are in a session. Finish this first, or open the update and leave the current flow.',
+      titleKey: 'notifications.tap.crossContextPromptTitle',
+      messageKey: 'notifications.tap.crossContextPromptMessage',
     });
   });
 
@@ -77,9 +76,8 @@ describe('decideNotificationTapNavigation', () => {
       context: 'family',
       kind: 'prompt',
       href: '/(app)/recaps',
-      title: 'Open learning update?',
-      message:
-        'You are in a session. Finish this first, or open the update and leave the current flow.',
+      titleKey: 'notifications.tap.crossContextPromptTitle',
+      messageKey: 'notifications.tap.crossContextPromptMessage',
     });
   });
 

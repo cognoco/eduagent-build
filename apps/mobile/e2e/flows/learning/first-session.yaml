@@ -27,9 +27,17 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Coach band continue visible above the fold (learning-active seed has an active subject)
-- assertVisible:
-    id: "home-coach-band-continue"
+# 3. Wait for coach band continue — the coach band renders only after
+#    useLearningResumeTarget (use-progress.ts:228) resolves. The query
+#    starts as undefined (loading), so showCoachBand (LearnerScreen.tsx:489)
+#    is false until the API call returns. learner-screen visible ≠ query done.
+#    assertVisible fired before the query could resolve — replaced with a
+#    20s extendedWaitUntil. (FIXED-timing; learning-active seed DOES produce
+#    a resumeTarget: status='active', exchangeCount=3 ≥ 1, test-seed.ts:1025-1033)
+- extendedWaitUntil:
+    visible:
+      id: "home-coach-band-continue"
+    timeout: 20000
 
 # 4. Subject carousel sits below the action chips on the current LearnerScreen
 #    layout — scroll down to bring it on-screen, then assert.

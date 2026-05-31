@@ -648,7 +648,8 @@
       "transcriptLabel": "Taletranskripsjon – trykk for å redigere",
       "startRecording": "Start opptak",
       "stopRecording": "Stopp opptak"
-    }
+    },
+    "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette."
   },
   "quiz": {
     "index": {
@@ -1373,7 +1374,8 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "microphoneUnavailableTitle": "Mikrofon utilgjengelig"
   },
   "progress": {
     "pageTitleMine": "Min fremgang",
@@ -2186,6 +2188,10 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "loadError": {
+      "message": "Kunne ikke laste abonnementsdetaljer. Prøv igjen.",
+      "retryAccessibility": "Prøv å laste abonnementet på nytt"
     }
   },
   "sessionSummary": {
@@ -2617,6 +2623,14 @@
       "bug": "Feil",
       "suggestion": "Forslag",
       "other": "Annet"
+    }
+  },
+  "notifications": {
+    "tap": {
+      "crossContextPromptTitle": "Åpne læringsoppdatering?",
+      "crossContextPromptMessage": "Du er i en økt. Fullfør denne først, eller åpne oppdateringen og forlat det du holder på med.",
+      "stayHere": "Bli her",
+      "openUpdate": "Åpne oppdatering"
     }
   }
 }
