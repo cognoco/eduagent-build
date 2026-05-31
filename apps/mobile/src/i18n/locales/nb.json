@@ -1787,7 +1787,12 @@
       "curriculumTitle": "Læreplan",
       "curriculumSubtitle": "Utforsk {{name}}s fag og emner",
       "curriculumNotAvailableTitle": "Dette barnets læreplan er ikke tilgjengelig",
-      "curriculumNotAvailableBody": "Du kan bare se læreplanen for barn som er knyttet til familiekontoen din."
+      "curriculumNotAvailableBody": "Du kan bare se læreplanen for barn som er knyttet til familiekontoen din.",
+      "subjectSessionNextStep": "En kort oppfølging i {{subject}} vil hjelpe {{name}} med å komme i gang igjen.",
+      "subjectRawMentorSummary": "Dette startet fra «{{rawInput}}», så {{name}} prøver kanskje fortsatt å finne den rette formen for {{subject}}.",
+      "subjectRawNextStep": "Én liten økt kan gjøre den brede interessen om til et konkret emne.",
+      "subjectQuietSummary": "{{subject}} er klar når {{name}} vil vende tilbake til det.",
+      "subjectQuietNextStep": "Start med ett enkelt spørsmål eller emne, så omstarten føles lett."
     },
     "mentorMemory": {
       "title": "Mentorens minne",
@@ -2491,10 +2496,10 @@
   "welcomeIntro": {
     "chooser": {
       "question": "Hva fører deg hit?",
-      "learnerCta": "Jeg vil lære",
-      "learnerHint": "Fag, leksehjelp og en mentor som er din.",
-      "parentCta": "Jeg er lei av leksekrangler",
-      "parentHint": "En mentor for barna dine — og kveldene dine tilbake."
+      "learnerCta": "Lær med en veileder",
+      "learnerHint": "Din personlige mentor til en brøkdel av prisen.",
+      "parentCta": "Stopp leksekranglingen",
+      "parentHint": "Få kveldene dine tilbake."
     },
     "learner": {
       "card1": {

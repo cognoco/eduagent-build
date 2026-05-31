@@ -1787,7 +1787,12 @@
       "curriculumTitle": "カリキュラム",
       "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧",
       "curriculumNotAvailableTitle": "このお子さまのカリキュラムは利用できません",
-      "curriculumNotAvailableBody": "ご家族アカウントに紐づいているお子さまのカリキュラムのみ確認できます。"
+      "curriculumNotAvailableBody": "ご家族アカウントに紐づいているお子さまのカリキュラムのみ確認できます。",
+      "subjectSessionNextStep": "{{subject}}について短いセッションを行うと、{{name}}さんが再び集中しやすくなります。",
+      "subjectRawMentorSummary": "これは「{{rawInput}}」から始まったので、{{name}}さんはまだ{{subject}}の学習の方向性を探っている段階かもしれません。",
+      "subjectRawNextStep": "1回の短いセッションで、その漠然とした興味を具体的なトピックに変えることができます。",
+      "subjectQuietSummary": "{{subject}}は、{{name}}さんが再開したいときにいつでも始められます。",
+      "subjectQuietNextStep": "簡単な質問やトピックから始めると、気軽に再開できます。"
     },
     "mentorMemory": {
       "title": "メンターの記憶",
@@ -2491,10 +2496,10 @@
   "welcomeIntro": {
     "chooser": {
       "question": "What brings you here?",
-      "learnerCta": "I want to learn",
-      "learnerHint": "Study, homework help, and a mentor that's yours.",
-      "parentCta": "I'm done fighting over homework",
-      "parentHint": "A mentor for your kids — and your evenings back."
+      "learnerCta": "メンターと学ぶ",
+      "learnerHint": "低価格であなただけの専属メンターを。",
+      "parentCta": "宿題での親子ゲンカはもうおしまい",
+      "parentHint": "夜の時間を自分のものに。"
     },
     "learner": {
       "card1": {

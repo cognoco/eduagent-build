@@ -529,10 +529,16 @@ describe('ChildDetailScreen — profile overview', () => {
     });
     result.getByTestId('child-subjects-section');
     result.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
-    await waitFor(() => {
+    const subjectSummary = await waitFor(() =>
       result.getByTestId(
-        'subject-raw-input-11111111-1111-7111-8111-111111111111',
-      );
+        'subject-mentor-summary-11111111-1111-7111-8111-111111111111',
+      ),
+    );
+    expect(subjectSummary).toHaveTextContent(
+      'Used a number line to compare fractions.',
+    );
+    await waitFor(() => {
+      result.getByText(/parentView\.index\.subjectSessionNextStep/);
     });
     await waitFor(() => {
       result.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
@@ -551,6 +557,51 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(
       result.queryByText(/parentView\.index\.childProfileScopeHint/),
     ).toBeNull();
+
+    cleanup();
+  });
+
+  it('uses a raw-input mentor note when a subject has no session recap yet', async () => {
+    setRoutes({
+      childDetail: {
+        displayName: 'Emma',
+        summary: 'Year 6',
+        currentStreak: 0,
+        totalXp: 0,
+        progress: null,
+        subjects: [
+          {
+            subjectId: '11111111-1111-7111-8111-111111111111',
+            name: 'Mathematics',
+            retentionStatus: 'strong',
+            rawInput: null,
+          },
+          {
+            subjectId: '33333333-3333-7333-8333-333333333333',
+            name: 'Biology',
+            retentionStatus: 'unknown',
+            rawInput: 'Science',
+          },
+        ],
+      },
+      sessions: [
+        makeSession({
+          subjectId: '11111111-1111-7111-8111-111111111111',
+          subjectName: 'Mathematics',
+        }),
+      ],
+    });
+
+    const { result, cleanup } = renderChildDetail();
+
+    await waitFor(() => {
+      result.getByTestId('subject-card-33333333-3333-7333-8333-333333333333');
+    });
+    result.getByTestId(
+      'subject-mentor-summary-33333333-3333-7333-8333-333333333333',
+    );
+    result.getByText(/parentView\.index\.subjectRawMentorSummary/);
+    result.getByText(/parentView\.index\.subjectRawNextStep/);
 
     cleanup();
   });

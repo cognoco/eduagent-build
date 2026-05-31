@@ -1855,6 +1855,11 @@
       "openProgressNudgeAction": "Open {{subject}}",
       "subjects": "Subjects",
       "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectSessionNextStep": "A short follow-up in {{subject}} would help {{name}} reconnect with it.",
+      "subjectRawMentorSummary": "This started from \"{{rawInput}}\", so {{name}} may still be finding the right shape for {{subject}}.",
+      "subjectRawNextStep": "One small session can turn that broad interest into a concrete topic.",
+      "subjectQuietSummary": "{{subject}} is ready when {{name}} wants to return to it.",
+      "subjectQuietNextStep": "Start with one easy question or topic so the restart feels light.",
       "subjectRawInputAudit": "Your child searched for \"{{rawInput}}\"",
       "openSubjectProgress": "Open {{subject}} progress",
       "recentSessions": "Recent sessions",
@@ -2522,10 +2527,10 @@
   "welcomeIntro": {
     "chooser": {
       "question": "What brings you here?",
-      "learnerCta": "I want to learn",
-      "learnerHint": "Study, homework help, and a mentor that's yours.",
-      "parentCta": "I'm done fighting over homework",
-      "parentHint": "A mentor for your kids — and your evenings back."
+      "learnerCta": "Learn with a mentor",
+      "learnerHint": "Your personal mentor for a fraction of the price.",
+      "parentCta": "End homework fights",
+      "parentHint": "Get your evenings back."
     },
     "learner": {
       "card1": {

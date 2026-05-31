@@ -1812,7 +1812,12 @@
       "curriculumTitle": "Currículo",
       "curriculumSubtitle": "Explore as disciplinas e os tópicos de {{name}}",
       "curriculumNotAvailableTitle": "O currículo desta criança não está disponível",
-      "curriculumNotAvailableBody": "Você só pode visualizar o currículo de crianças vinculadas à sua conta familiar."
+      "curriculumNotAvailableBody": "Você só pode visualizar o currículo de crianças vinculadas à sua conta familiar.",
+      "subjectSessionNextStep": "Uma breve continuação em {{subject}} ajudaria {{name}} a se reconectar com o assunto.",
+      "subjectRawMentorSummary": "Isso começou com \"{{rawInput}}\", então {{name}} ainda pode estar encontrando o formato certo para {{subject}}.",
+      "subjectRawNextStep": "Uma pequena sessão pode transformar esse interesse geral em um tópico concreto.",
+      "subjectQuietSummary": "{{subject}} está pronto para quando {{name}} quiser retornar.",
+      "subjectQuietNextStep": "Comece com uma pergunta ou tópico fácil para que o recomeço seja leve."
     },
     "mentorMemory": {
       "title": "Memória do mentor",
@@ -2491,10 +2496,10 @@
   "welcomeIntro": {
     "chooser": {
       "question": "What brings you here?",
-      "learnerCta": "I want to learn",
-      "learnerHint": "Study, homework help, and a mentor that's yours.",
-      "parentCta": "I'm done fighting over homework",
-      "parentHint": "A mentor for your kids — and your evenings back."
+      "learnerCta": "Aprenda com um mentor",
+      "learnerHint": "O teu mentor pessoal por uma fração do preço.",
+      "parentCta": "Chega de brigas por dever de casa",
+      "parentHint": "Recupere as suas noites."
     },
     "learner": {
       "card1": {
