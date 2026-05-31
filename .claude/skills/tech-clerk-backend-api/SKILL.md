@@ -14,11 +14,12 @@ User Prompt: $ARGUMENTS
 
 Before ANY POST / PATCH / PUT / DELETE, you MUST do ALL of the following in your response:
 
-1. **Check CLERK_SECRET_KEY** — verify it is set:
+1. **Check CLERK_SECRET_KEY** — verify it is set **without printing the value**:
    ```bash
-   echo $CLERK_SECRET_KEY | head -c 10
+   [ -n "$CLERK_SECRET_KEY" ] && echo "CLERK_SECRET_KEY: set" || echo "CLERK_SECRET_KEY: missing"
    ```
-   If empty, stop and ask the user. Do not proceed without a valid key.
+   If missing, stop and ask the user. Do not proceed without a valid key. Never echo the
+   key or any prefix of it — it is secret material and would leak into logs/transcripts.
 
 2. **Check CLERK_BAPI_SCOPES** — run:
    ```bash
@@ -234,7 +235,7 @@ curl -s -X DELETE "https://api.clerk.com/v1${PATH}" \
 
 Before doing anything outside the FAST PATH, fetch the available spec versions and tags by running:
 ```bash
-bash scripts/api-specs-context.sh
+bash {baseDir}/scripts/api-specs-context.sh
 ```
 
 Use the output to determine the latest version and available tags.
@@ -351,7 +352,7 @@ Stop here.
 
 If using a non-latest version, fetch tags for that version:
 ```bash
-curl -s https://raw.githubusercontent.com/clerk/openapi-specs/main/bapi/${version_name} | node scripts/extract-tags.js
+curl -s https://raw.githubusercontent.com/clerk/openapi-specs/main/bapi/${version_name} | node {baseDir}/scripts/extract-tags.js
 ```
 Otherwise, use the **TAGS** already in [API specs context](#api-specs-context).
 
@@ -365,7 +366,7 @@ Share tags in a table and prompt the user to select a query.
 
 Fetch all endpoints for the identified tag:
 ```bash
-curl -s https://raw.githubusercontent.com/clerk/openapi-specs/main/bapi/${version_name} | bash scripts/extract-tag-endpoints.sh "${tag_name}"
+curl -s https://raw.githubusercontent.com/clerk/openapi-specs/main/bapi/${version_name} | bash {baseDir}/scripts/extract-tag-endpoints.sh "${tag_name}"
 ```
 
 Share the results (endpoints, schemas, parameters) with the user.
@@ -382,7 +383,7 @@ For other endpoints, identify the matching endpoint by searching the tags in con
 
 Extract the full endpoint definition:
 ```bash
-curl -s https://raw.githubusercontent.com/clerk/openapi-specs/main/bapi/${version_name} | bash scripts/extract-endpoint-detail.sh "${path}" "${method}"
+curl -s https://raw.githubusercontent.com/clerk/openapi-specs/main/bapi/${version_name} | bash {baseDir}/scripts/extract-endpoint-detail.sh "${path}" "${method}"
 ```
 - `${path}` — e.g. `/users/{user_id}`
 - `${method}` — lowercase, e.g. `get`
