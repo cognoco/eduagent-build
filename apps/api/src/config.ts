@@ -138,6 +138,11 @@ const envSchema = z.object({
   //     / draftedNote fields, so mobile has nothing to render.
   // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
   CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Identity V1 T2-T7 development flag. Default off keeps the production
+  // account-based auth/profile path unchanged while the person/org membership
+  // model is layered in and verified.
+  MODE_IDENTITY_V1_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -197,6 +202,10 @@ export function isTopicIntentMatcherEnabled(
 export function isChallengeRoundRuntimeEnabled(
   value: string | undefined,
 ): boolean {
+  return value === 'true';
+}
+
+export function isIdentityV1Enabled(value: string | undefined): boolean {
   return value === 'true';
 }
 

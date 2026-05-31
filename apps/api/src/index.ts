@@ -9,7 +9,7 @@ import {
   LlmStreamError,
   type SubscriptionTier,
 } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import type { Database, MembershipRole } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
 import { CircuitOpenError } from './services/llm';
@@ -89,6 +89,7 @@ import { supportRoutes } from './routes/support';
 import { librarySearchRoutes } from './routes/library-search';
 import { maintenanceRoutes } from './routes/maintenance';
 import { challengeRoundRoutes } from './routes/challenge-round';
+import { invitationRoutes } from './routes/invitations';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -121,14 +122,18 @@ type Bindings = {
   SUPPORT_EMAIL?: string;
   DEPLOY_SHA?: string;
   CONSENT_POLICY_VERSION?: string;
+  MODE_IDENTITY_V1_ENABLED?: string;
 };
 
 type Variables = {
   user: AuthUser;
   db: Database;
   account: Account;
+  personId: string | undefined;
+  organizationId: string | undefined;
   profileId: string;
   profileMeta: ProfileMeta | undefined;
+  activeRoles: MembershipRole[] | undefined;
   subscriptionId: string;
   subscriptionTier: SubscriptionTier | undefined;
   llmTier: LLMTier;
@@ -290,7 +295,8 @@ const routes = api
   .route('/', feedbackRoutes)
   .route('/support', supportRoutes)
   .route('/', librarySearchRoutes)
-  .route('/', challengeRoundRoutes);
+  .route('/', challengeRoundRoutes)
+  .route('/', invitationRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.

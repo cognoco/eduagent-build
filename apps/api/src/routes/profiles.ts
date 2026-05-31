@@ -16,6 +16,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireAccount } from '../middleware/profile-scope';
+import { isIdentityV1Enabled } from '../config';
 
 import { notFound, forbidden, validationError, apiError } from '../errors';
 import {
@@ -37,6 +38,7 @@ type ProfileEnv = {
     // [OPT-C] Kill switch for the server-side adult-owner rule. Set to 'false'
     // in Doppler to disable the gate (emergency rollback). Default 'true'.
     ADULT_OWNER_GATE_ENABLED?: string;
+    MODE_IDENTITY_V1_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -70,6 +72,8 @@ export const profileRoutes = new Hono<ProfileEnv>()
       const profile = await createProfileWithLimitCheck(db, account.id, input, {
         // [OPT-C] Default 'true' when binding missing (safe default; matches config default).
         adultOwnerGateEnabled: c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
+        identityV1Enabled: isIdentityV1Enabled(c.env?.MODE_IDENTITY_V1_ENABLED),
+        clerkUserId: c.get('user')?.userId,
       });
 
       return c.json(profileResponseSchema.parse({ profile }), 201);

@@ -3,6 +3,13 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "packages/database/src",
   "projectType": "library",
+  "namedInputs": {
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals",
+      "{workspaceRoot}/apps/api/drizzle/**/*"
+    ]
+  },
   "targets": {
     "format:check": {}
   }

@@ -1,6 +1,8 @@
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ProfileMeta, ProfileScopeEnv } from './profile-scope';
+import type { MembershipRole } from '@eduagent/database';
+import { isIdentityV1Enabled } from '../config';
 
 const PROXY_MODE_MESSAGE = 'Not available in proxy mode';
 const PROXY_MODE_CODE = 'PROXY_MODE';
@@ -34,6 +36,25 @@ const proxyModeBody = {
 export function assertNotProxyMode(
   c: Context<ProfileScopeEnv> | Context,
 ): void {
+  if (isIdentityV1Enabled((c as Context).env?.MODE_IDENTITY_V1_ENABLED)) {
+    const roles = (
+      c as Context<{ Variables: { activeRoles?: MembershipRole[] } }>
+    ).get('activeRoles');
+    if (!roles || roles.length === 0) {
+      throw new HTTPException(403, {
+        message: PROXY_MODE_MESSAGE,
+        res: c.json(proxyModeBody, 403),
+      });
+    }
+    if (roles.includes('student') && c.req.header('X-Proxy-Mode') !== 'true') {
+      return;
+    }
+    throw new HTTPException(403, {
+      message: PROXY_MODE_MESSAGE,
+      res: c.json(proxyModeBody, 403),
+    });
+  }
+
   const profileMeta = (c as Context<ProfileScopeEnv>).get('profileMeta') as
     | ProfileMeta
     | undefined;

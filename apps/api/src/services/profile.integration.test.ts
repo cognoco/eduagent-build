@@ -19,8 +19,14 @@
  * No mocks of internal services or database.
  */
 
-import { eq, inArray, count } from 'drizzle-orm';
-import { accounts, profiles, createDatabase } from '@eduagent/database';
+import { eq, inArray, count, and } from 'drizzle-orm';
+import {
+  accounts,
+  profiles,
+  memberships,
+  organizations,
+  createDatabase,
+} from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
@@ -62,6 +68,14 @@ const ACCOUNT = {
 const FIRST_PROFILE_ACCOUNT = {
   clerkUserId: `${PREFIX}-first-profile-user`,
   email: `${PREFIX}-first-profile@integration.test`,
+};
+const IDENTITY_V1_ACCOUNT = {
+  clerkUserId: `${PREFIX}-identity-v1-user`,
+  email: `${PREFIX}-identity-v1@integration.test`,
+};
+const IDENTITY_V1_FLAG_OFF_ACCOUNT = {
+  clerkUserId: `${PREFIX}-identity-v1-flag-off-user`,
+  email: `${PREFIX}-identity-v1-flag-off@integration.test`,
 };
 
 // [OPT-C] Adult-owner gate break-test accounts
@@ -154,6 +168,8 @@ async function cleanup() {
     where: inArray(accounts.email, [
       ACCOUNT.email,
       FIRST_PROFILE_ACCOUNT.email,
+      IDENTITY_V1_ACCOUNT.email,
+      IDENTITY_V1_FLAG_OFF_ACCOUNT.email,
       OPT_C_UNDERAGE_EMAIL,
       OPT_C_ADULT18_EMAIL,
       OPT_C_FLAG_OFF_EMAIL,
@@ -396,5 +412,100 @@ describe('[OPT-C] createProfileWithLimitCheck adult-owner gate (integration)', (
         { adultOwnerGateEnabled: false },
       ),
     ).resolves.toMatchObject({ id: expect.any(String) });
+  });
+});
+
+describe('[Identity T2] createProfileWithLimitCheck identity V1 writes (integration)', () => {
+  it('flag-on creates owner credential plus owner/student membership, then student membership for managed child', async () => {
+    const db = createIntegrationDb();
+    const [account] = await db
+      .insert(accounts)
+      .values(IDENTITY_V1_ACCOUNT)
+      .returning();
+
+    const owner = await createProfileWithLimitCheck(
+      db,
+      account!.id,
+      {
+        displayName: 'Identity Owner',
+        birthYear: 1990,
+      },
+      {
+        identityV1Enabled: true,
+        clerkUserId: IDENTITY_V1_ACCOUNT.clerkUserId,
+      },
+    );
+    const child = await createProfileWithLimitCheck(
+      db,
+      account!.id,
+      {
+        displayName: 'Managed Child',
+        birthYear: 2014,
+      },
+      {
+        identityV1Enabled: true,
+        clerkUserId: IDENTITY_V1_ACCOUNT.clerkUserId,
+      },
+    );
+
+    const storedOwner = await db.query.profiles.findFirst({
+      where: eq(profiles.id, owner.id),
+      columns: { clerkUserId: true },
+    });
+    const storedChild = await db.query.profiles.findFirst({
+      where: eq(profiles.id, child.id),
+      columns: { clerkUserId: true },
+    });
+    expect(storedOwner?.clerkUserId).toBe(IDENTITY_V1_ACCOUNT.clerkUserId);
+    expect(storedChild?.clerkUserId).toBeNull();
+
+    const org = await db.query.organizations.findFirst({
+      where: eq(organizations.id, account!.id),
+    });
+    expect(org).toBeDefined();
+
+    const rows = await db
+      .select({ personId: memberships.personId, roles: memberships.roles })
+      .from(memberships)
+      .where(eq(memberships.organizationId, account!.id));
+    const byPerson = Object.fromEntries(
+      rows.map((row) => [row.personId, row.roles.slice().sort()]),
+    );
+    expect(byPerson[owner.id]).toEqual(['owner', 'student']);
+    expect(byPerson[child.id]).toEqual(['student']);
+  });
+
+  it('flag-off leaves the T1 identity tables untouched for newly-created profiles', async () => {
+    const db = createIntegrationDb();
+    const [account] = await db
+      .insert(accounts)
+      .values(IDENTITY_V1_FLAG_OFF_ACCOUNT)
+      .returning();
+
+    const profile = await createProfileWithLimitCheck(
+      db,
+      account!.id,
+      {
+        displayName: 'Legacy Owner',
+        birthYear: 1990,
+      },
+      {
+        identityV1Enabled: false,
+        clerkUserId: IDENTITY_V1_FLAG_OFF_ACCOUNT.clerkUserId,
+      },
+    );
+
+    const stored = await db.query.profiles.findFirst({
+      where: eq(profiles.id, profile.id),
+      columns: { clerkUserId: true },
+    });
+    const membership = await db.query.memberships.findFirst({
+      where: and(
+        eq(memberships.personId, profile.id),
+        eq(memberships.organizationId, account!.id),
+      ),
+    });
+    expect(stored?.clerkUserId).toBeNull();
+    expect(membership).toBeUndefined();
   });
 });

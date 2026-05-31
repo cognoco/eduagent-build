@@ -14,16 +14,34 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
       id: 'test-account-id',
       clerkUserId: 'user_test',
       email: 'test@example.com',
+      timezone: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    findAccountById: jest.fn().mockResolvedValue({
+      id: 'parent-account-id',
+      clerkUserId: 'parent_clerk',
+      email: 'parent@example.com',
+      timezone: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }),
   };
 });
 
-import { findOrCreateAccount } from '../services/account';
+jest.mock(
+  '../services/identity' /* gc1-allow: identity service unit boundary */,
+  () => ({
+    resolvePersonByClerkId: jest.fn().mockResolvedValue(null),
+    ensureIdentityV1: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+
+import { findAccountById, findOrCreateAccount } from '../services/account';
+import { ensureIdentityV1, resolvePersonByClerkId } from '../services/identity';
 
 type TestEnv = {
-  Bindings: { CLERK_SECRET_KEY?: string };
+  Bindings: { CLERK_SECRET_KEY?: string; MODE_IDENTITY_V1_ENABLED?: string };
   Variables: AppVariables;
 };
 
@@ -241,6 +259,133 @@ describe('accountMiddleware', () => {
       'clerk_verified',
       'user@example.com',
     );
+  });
+
+  it('[T2] flag-on resolves a graduated person by profiles.clerkUserId without creating an account', async () => {
+    (resolvePersonByClerkId as jest.Mock).mockResolvedValueOnce({
+      id: 'child-profile-id',
+      accountId: 'parent-account-id',
+      clerkUserId: 'graduated_child_sub',
+    });
+
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('user', {
+        userId: 'graduated_child_sub',
+        email: 'child@example.com',
+        emailVerified: true,
+      } as AppVariables['user']);
+      c.set('db', {} as AppVariables['db']);
+      await next();
+    });
+    app.use('*', accountMiddleware);
+    app.get('/test', (c) =>
+      c.json({
+        accountId: c.get('account')?.id ?? null,
+        personId: c.get('personId') ?? null,
+        organizationId: c.get('organizationId') ?? null,
+      }),
+    );
+
+    const res = await app.request(
+      '/test',
+      {},
+      { MODE_IDENTITY_V1_ENABLED: 'true' },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({
+      accountId: 'parent-account-id',
+      personId: 'child-profile-id',
+      organizationId: 'parent-account-id',
+    });
+    expect(resolvePersonByClerkId).toHaveBeenCalledWith(
+      {},
+      'graduated_child_sub',
+    );
+    expect(findAccountById).toHaveBeenCalledWith({}, 'parent-account-id');
+    expect(ensureIdentityV1).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ id: 'parent-account-id' }),
+    );
+    expect(findOrCreateAccount).not.toHaveBeenCalled();
+  });
+
+  it('[T2] flag-on provisions only an account for a brand-new non-exempt sub', async () => {
+    (resolvePersonByClerkId as jest.Mock).mockResolvedValueOnce(null);
+
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('user', {
+        userId: 'brand_new_sub',
+        email: 'new@example.com',
+        emailVerified: true,
+      } as AppVariables['user']);
+      c.set('db', {} as AppVariables['db']);
+      await next();
+    });
+    app.use('*', accountMiddleware);
+    app.get('/profiles', (c) =>
+      c.json({
+        accountId: c.get('account')?.id ?? null,
+        personId: c.get('personId') ?? null,
+        organizationId: c.get('organizationId') ?? null,
+      }),
+    );
+
+    const res = await app.request(
+      '/profiles',
+      {},
+      { MODE_IDENTITY_V1_ENABLED: 'true' },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(findOrCreateAccount).toHaveBeenCalledWith(
+      {},
+      'brand_new_sub',
+      'new@example.com',
+    );
+    expect(body).toEqual({
+      accountId: 'test-account-id',
+      personId: null,
+      organizationId: 'test-account-id',
+    });
+  });
+
+  it('[T2][CRITICAL-1] full account chain lets claim redeem through without provisioning', async () => {
+    (resolvePersonByClerkId as jest.Mock).mockResolvedValueOnce(null);
+
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('user', {
+        userId: 'redeemer_without_account',
+        email: 'redeemer@example.com',
+        emailVerified: true,
+      } as AppVariables['user']);
+      c.set('db', {} as AppVariables['db']);
+      await next();
+    });
+    app.use('*', accountMiddleware);
+    app.use('*', requireAccountMiddleware);
+    app.post('/v1/invitations/claims/redeem', (c) =>
+      c.json({
+        reached: true,
+        hasAccount: !!c.get('account'),
+      }),
+    );
+
+    const res = await app.request(
+      '/v1/invitations/claims/redeem',
+      { method: 'POST' },
+      { MODE_IDENTITY_V1_ENABLED: 'true' },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ reached: true, hasAccount: false });
+    expect(findOrCreateAccount).not.toHaveBeenCalled();
   });
 });
 

@@ -279,12 +279,18 @@ Resolution + standing rules for T2–T7:
   (staging = synthetic fixtures; prod = 0 real users, one owner test login).
   Both now consistent 107-row ledgers; `migrate` applies forward cleanly. `push`
   remains BANNED on staging/prod.
-- **Prevention — the missing guard:** add a **migration-immutability CI check**
-  (append-only enforcement): fail CI if any committed migration `.sql` content
-  changes or a journal entry is removed/reordered. New migrations append freely.
-  This closes hole #1 (history rewrites) — the actual cause, since the pipeline is
-  otherwise sound. Hole #2 (manual push/DDL) is process: never use staging/prod
-  URLs locally; all schema changes flow through generate→commit→deploy-migrate.
+- **Prevention — the migration-immutability guard (BUILT 2026-05-31):** closes
+  hole #1 (history rewrites). A committed sha256 manifest of every migration
+  (`packages/database/src/migration-immutability-manifest.json`) is enforced by
+  `migration-immutability.test.ts` (runs in CI with the other DB guards, no DB
+  needed): CI fails if any committed migration `.sql` content changes, a file is
+  deleted, a new migration isn't registered, or a journal entry is removed.
+  Workflow for a new migration: `db:generate:dev` → `pnpm migrations:manifest`
+  (append-only; the updater REFUSES to rewrite an existing hash without
+  `--force`) → commit. Red/green verified (edit-applied-migration, unregistered,
+  and updater-refuses-to-launder all fail correctly). Hole #2 (manual push/DDL)
+  stays process: never use staging/prod URLs locally; all schema changes flow
+  generate→commit→deploy-migrate.
 
 ## Independent backlog (NOT closed by this redesign — separate track)
 

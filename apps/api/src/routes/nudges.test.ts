@@ -6,6 +6,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockProfileFindFirst = jest.fn();
+const mockFamilyLinkFindFirst = jest.fn();
 
 const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
@@ -15,7 +16,9 @@ const mockDatabaseModule = createDatabaseModuleMock({
         findFirst: (...args: unknown[]) => mockProfileFindFirst(...args),
       },
       consentStates: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      familyLinks: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      familyLinks: {
+        findFirst: (...args: unknown[]) => mockFamilyLinkFindFirst(...args),
+      },
     },
   },
 });
@@ -65,11 +68,7 @@ import { Hono } from 'hono';
 import { app } from '../index';
 import { nudgeRoutes } from './nudges';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
-import {
-  ConsentRequiredError,
-  ForbiddenError,
-  RateLimitedError,
-} from '@eduagent/schemas';
+import { ConsentRequiredError, RateLimitedError } from '@eduagent/schemas';
 
 const PARENT_ID = '01914d6a-0000-7000-8000-000000000001';
 const CHILD_ID = '01914d6a-0000-7000-8000-000000000002';
@@ -102,6 +101,18 @@ afterAll(() => {
 beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
+  mockCreateNudge.mockReset();
+  mockListUnreadNudges.mockReset();
+  mockMarkNudgeRead.mockReset();
+  mockMarkAllNudgesRead.mockReset();
+  mockProfileFindFirst.mockReset();
+  mockFamilyLinkFindFirst.mockReset();
+  mockFamilyLinkFindFirst.mockResolvedValue({
+    id: '01914d6a-0000-7000-8000-000000000003',
+    parentProfileId: PARENT_ID,
+    childProfileId: CHILD_ID,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  });
   mockProfileFindFirst.mockResolvedValue({
     id: PARENT_ID,
     accountId: 'test-account-id',
@@ -177,9 +188,14 @@ describe('POST /v1/nudges', () => {
   });
 
   it('returns 403 when parent access is denied', async () => {
-    mockCreateNudge.mockRejectedValue(
-      new ForbiddenError('Not a parent of this child'),
-    );
+    mockFamilyLinkFindFirst
+      .mockResolvedValueOnce({
+        id: '01914d6a-0000-7000-8000-000000000003',
+        parentProfileId: PARENT_ID,
+        childProfileId: CHILD_ID,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      })
+      .mockResolvedValueOnce(undefined);
     const res = await app.request(
       '/v1/nudges',
       {
@@ -193,6 +209,7 @@ describe('POST /v1/nudges', () => {
       TEST_ENV,
     );
     expect(res.status).toBe(403);
+    expect(mockCreateNudge).not.toHaveBeenCalled();
   });
 
   it('returns 403 when consent is not active', async () => {

@@ -7,10 +7,12 @@ import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
 import type { Account } from '../services/account';
 import { getProfile, findOwnerProfile } from '../services/profile';
-import type { Database } from '@eduagent/database';
+import type { Database, MembershipRole } from '@eduagent/database';
 import { forbidden } from '../errors';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
+import { isIdentityV1Enabled } from '../config';
+import { resolveActiveMembershipRoles } from '../services/identity';
 
 const logger = createLogger();
 
@@ -45,11 +47,17 @@ export interface ProfileMeta {
 }
 
 export type ProfileScopeEnv = {
+  Bindings: {
+    MODE_IDENTITY_V1_ENABLED?: string;
+  };
   Variables: {
     db: Database;
     account: Account;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    personId: string | undefined;
+    organizationId: string | undefined;
+    activeRoles: MembershipRole[] | undefined;
     /**
      * [BUG-502 / BUG-487] Set when the auto-resolve path throws a transient
      * error (DB outage). Downstream middleware (consent.ts) reads this sentinel
@@ -94,6 +102,29 @@ export function requireAccount<T extends { id: string }>(
   return account;
 }
 
+function mapProfileMeta(profile: {
+  birthYear: number;
+  location: 'EU' | 'US' | 'OTHER' | null;
+  consentStatus:
+    | 'PENDING'
+    | 'PARENTAL_CONSENT_REQUESTED'
+    | 'CONSENTED'
+    | 'WITHDRAWN'
+    | null;
+  hasPremiumLlm?: boolean | null;
+  conversationLanguage?: string | null;
+  isOwner: boolean;
+}): ProfileMeta {
+  return {
+    birthYear: profile.birthYear,
+    location: profile.location,
+    consentStatus: profile.consentStatus,
+    hasPremiumLlm: profile.hasPremiumLlm ?? false,
+    conversationLanguage: profile.conversationLanguage,
+    isOwner: profile.isOwner,
+  };
+}
+
 export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
   async (c, next) => {
     const profileIdHeader = c.req.header('X-Profile-Id');
@@ -110,6 +141,54 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     // will also fail on their own queries (producing 500). The structured log +
     // Sentry capture below escalate per the "no silent recovery without escalation"
     // rule for auth-scoping code (CR-SILENT-RECOVERY-1).
+    if (
+      !profileIdHeader &&
+      isIdentityV1Enabled(c.env?.MODE_IDENTITY_V1_ENABLED)
+    ) {
+      const db = c.get('db');
+      const account = c.get('account');
+      const personId = c.get('personId');
+      const organizationId = c.get('organizationId');
+      if (db && account && personId) {
+        try {
+          const self = await getProfile(db, personId, account.id);
+          if (self) {
+            c.set('profileId', self.id);
+            c.set('profileMeta', mapProfileMeta(self));
+            if (organizationId) {
+              c.set(
+                'activeRoles',
+                await resolveActiveMembershipRoles(db, self.id, organizationId),
+              );
+            }
+          }
+        } catch (err) {
+          logger.error('profile_scope.auto_resolve_failed', {
+            accountId: account.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          captureException(err, {
+            tags: { surface: 'profile_scope.auto_resolve_failure' },
+            extra: {
+              context: 'profile-scope.auto_resolve_person',
+              accountId: account.id,
+              personId,
+            },
+          });
+          c.set(
+            'profileScopeError',
+            err instanceof Error ? err : new Error(String(err)),
+          );
+          throw new HTTPException(503, {
+            message:
+              'Profile resolution temporarily unavailable — please retry',
+          });
+        }
+      }
+      await next();
+      return;
+    }
+
     if (!profileIdHeader) {
       const db = c.get('db');
       const account = c.get('account');
@@ -118,19 +197,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
           const owner = await findOwnerProfile(db, account.id);
           if (owner) {
             c.set('profileId', owner.id);
-            c.set('profileMeta', {
-              birthYear: owner.birthYear,
-              location: owner.location,
-              consentStatus: owner.consentStatus,
-              hasPremiumLlm: owner.hasPremiumLlm ?? false,
-              conversationLanguage: owner.conversationLanguage,
-              // [BUG-410] Propagate the actual isOwner flag from the DB row.
-              // Previously hardcoded to true, which silently granted owner
-              // privileges when findOwnerProfile fell back to a non-owner row
-              // (no is_owner=true row in DB). The service now returns the real
-              // flag; the caller must not override it.
-              isOwner: owner.isOwner,
-            });
+            c.set('profileMeta', mapProfileMeta(owner));
           }
         } catch (err) {
           logger.error('profile_scope.auto_resolve_failed', {
@@ -191,14 +258,17 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       return forbidden(c, 'Profile does not belong to this account');
     }
     c.set('profileId', profile.id);
-    c.set('profileMeta', {
-      birthYear: profile.birthYear,
-      location: profile.location,
-      consentStatus: profile.consentStatus,
-      hasPremiumLlm: profile.hasPremiumLlm ?? false,
-      conversationLanguage: profile.conversationLanguage,
-      isOwner: profile.isOwner,
-    });
+    c.set('profileMeta', mapProfileMeta(profile));
+    const organizationId = c.get('organizationId');
+    if (
+      isIdentityV1Enabled(c.env?.MODE_IDENTITY_V1_ENABLED) &&
+      organizationId
+    ) {
+      c.set(
+        'activeRoles',
+        await resolveActiveMembershipRoles(db, profile.id, organizationId),
+      );
+    }
     await next();
     return;
   },

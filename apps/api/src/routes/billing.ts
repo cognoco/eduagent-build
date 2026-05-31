@@ -196,6 +196,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       // account-level; a parent-proxy session must not initiate them on a
       // child profile context.
       assertNotProxyMode(c);
+      assertOwnerProfile(
+        c,
+        'Only the account owner can create a checkout session.',
+      );
       const { tier, interval } = c.req.valid('json');
       const db = c.get('db');
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -947,6 +951,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {
     // [WI-137 / DS-048] Owner-profile authorization for waitlist signup.
     assertNotProxyMode(c);
+    assertOwnerProfile(c, 'Only the account owner can join the BYOK waitlist.');
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));

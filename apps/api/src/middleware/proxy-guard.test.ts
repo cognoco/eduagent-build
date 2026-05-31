@@ -141,6 +141,66 @@ describe('assertNotProxyMode — fail-closed when profileMeta is absent [BUG-975
   });
 });
 
+describe('assertNotProxyMode — identity V1 student self-write semantics', () => {
+  function createIdentityV1App(input: {
+    activeRoles?: string[];
+    isOwner?: boolean;
+  }) {
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      if (input.activeRoles) {
+        c.set('activeRoles' as never, input.activeRoles);
+      }
+      c.set('profileMeta' as never, { isOwner: input.isOwner ?? false });
+      await next();
+    });
+    app.post('/test', (c) => {
+      assertNotProxyMode(c);
+      return c.json({ ok: true });
+    });
+    return app;
+  }
+
+  it('[T2][learn-1] allows a non-owner student-role member to write their own data flag-on', async () => {
+    const app = createIdentityV1App({ activeRoles: ['student'] });
+
+    const res = await app.request(
+      '/test',
+      { method: 'POST' },
+      { MODE_IDENTITY_V1_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it('[T2] still rejects X-Proxy-Mode:true for student-role members flag-on', async () => {
+    const app = createIdentityV1App({ activeRoles: ['student'] });
+
+    const res = await app.request(
+      '/test',
+      {
+        method: 'POST',
+        headers: { 'X-Proxy-Mode': 'true' },
+      },
+      { MODE_IDENTITY_V1_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it('[T2] fails closed when identity roles are absent flag-on', async () => {
+    const app = createIdentityV1App({});
+
+    const res = await app.request(
+      '/test',
+      { method: 'POST' },
+      { MODE_IDENTITY_V1_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('assertNotProxyMode - real route integration', () => {
   it('returns 403 from bookmarks DELETE when X-Proxy-Mode: true, without touching the DB', async () => {
     const app = new Hono();
@@ -159,7 +219,7 @@ describe('assertNotProxyMode - real route integration', () => {
       {
         method: 'DELETE',
         headers: { 'X-Proxy-Mode': 'true' },
-      }
+      },
     );
 
     expect(res.status).toBe(403);
@@ -188,7 +248,7 @@ describe('assertNotProxyMode - real route integration', () => {
       '/bookmarks/00000000-0000-4000-8000-000000000000',
       {
         method: 'DELETE',
-      }
+      },
     );
 
     expect(res.status).toBe(403);
@@ -268,7 +328,7 @@ describe('assertNotProxyMode - real route integration', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'note text' }),
-      }
+      },
     );
 
     expect(res.status).toBe(403);
@@ -293,7 +353,7 @@ describe('assertNotProxyMode - real route integration', () => {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'updated text' }),
-      }
+      },
     );
 
     expect(res.status).toBe(403);
@@ -314,7 +374,7 @@ describe('assertNotProxyMode - real route integration', () => {
 
     const res = await app.request(
       '/notes/00000000-0000-4000-8000-000000000001',
-      { method: 'DELETE' }
+      { method: 'DELETE' },
     );
 
     expect(res.status).toBe(403);

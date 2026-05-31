@@ -10,6 +10,7 @@
 
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import { subscriptions } from './billing.js';
+import { organizations } from './profiles.js';
 
 describe('subscriptions has nullable organizationId', () => {
   it('exposes organizationId alongside the legacy accountId', () => {
@@ -30,6 +31,11 @@ describe('subscriptions has nullable organizationId', () => {
       fk.reference().columns.some((c) => c.name === 'organization_id'),
     );
     expect(orgFk).toBeDefined();
-    expect(orgFk!.reference().foreignTable).toBeDefined();
+    // Pin the FK target: a bare toBeDefined() passes even if it points at the
+    // wrong table. Assert it resolves to organizations.id specifically.
+    expect(orgFk!.reference().foreignTable).toBe(organizations);
+    expect(orgFk!.reference().foreignColumns.map((c) => c.name)).toEqual([
+      'id',
+    ]);
   });
 });

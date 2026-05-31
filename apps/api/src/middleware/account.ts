@@ -5,7 +5,13 @@
 
 import { createMiddleware } from 'hono/factory';
 import { ERROR_CODES } from '@eduagent/schemas';
-import { findOrCreateAccount, type Account } from '../services/account';
+import {
+  findAccountById,
+  findOrCreateAccount,
+  type Account,
+} from '../services/account';
+import { isIdentityV1Enabled } from '../config';
+import { ensureIdentityV1, resolvePersonByClerkId } from '../services/identity';
 import { resolveVerifiedClerkEmail } from '../services/clerk-user';
 import { withTransientDatabaseRetry } from '../services/transient-db-retry';
 import { createLogger } from '../services/logger';
@@ -15,9 +21,29 @@ import type { Database } from '@eduagent/database';
 const logger = createLogger();
 
 export type AccountEnv = {
-  Bindings: { CLERK_SECRET_KEY?: string };
-  Variables: { user: AuthUser; db: Database; account: Account };
+  Bindings: { CLERK_SECRET_KEY?: string; MODE_IDENTITY_V1_ENABLED?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    personId: string | undefined;
+    organizationId: string | undefined;
+  };
 };
+
+export const ACCOUNT_PROVISION_EXEMPT_PATHS = new Set([
+  '/invitations/claims/redeem',
+]);
+
+export function isAccountProvisionExemptPath(pathname: string): boolean {
+  if (ACCOUNT_PROVISION_EXEMPT_PATHS.has(pathname)) {
+    return true;
+  }
+  if (pathname.startsWith('/v1/')) {
+    return ACCOUNT_PROVISION_EXEMPT_PATHS.has(pathname.slice(3));
+  }
+  return false;
+}
 
 export const accountMiddleware = createMiddleware<AccountEnv>(
   async (c, next) => {
@@ -76,6 +102,43 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
       });
     }
 
+    if (isIdentityV1Enabled(c.env?.MODE_IDENTITY_V1_ENABLED)) {
+      const person = await withTransientDatabaseRetry(
+        'accountMiddleware.resolvePersonByClerkId',
+        () => resolvePersonByClerkId(db, user.userId),
+        { idempotent: true },
+      );
+      if (person) {
+        const account = await withTransientDatabaseRetry(
+          'accountMiddleware.findAccountById',
+          () => findAccountById(db, person.accountId),
+          { idempotent: true },
+        );
+        await withTransientDatabaseRetry(
+          'accountMiddleware.ensureIdentityV1',
+          () => ensureIdentityV1(db, account),
+          { idempotent: true },
+        );
+        c.set('account', account);
+        c.set('personId', person.id);
+        c.set('organizationId', account.id);
+        return next();
+      }
+
+      if (isAccountProvisionExemptPath(new URL(c.req.url).pathname)) {
+        return next();
+      }
+
+      const account = await withTransientDatabaseRetry(
+        'accountMiddleware.findOrCreateAccount.identityV1',
+        () => findOrCreateAccount(db, user.userId, verifiedEmail.email),
+        { idempotent: true },
+      );
+      c.set('account', account);
+      c.set('organizationId', account.id);
+      return next();
+    }
+
     const account = await withTransientDatabaseRetry(
       'accountMiddleware.findOrCreateAccount',
       () => findOrCreateAccount(db, user.userId, verifiedEmail.email),
@@ -119,6 +182,12 @@ export const requireAccountMiddleware = createMiddleware<AccountEnv>(
     // 401 rather than letting the route handler crash with TypeError → 500.
     const account = c.get('account');
     if (!account) {
+      if (
+        isIdentityV1Enabled(c.env?.MODE_IDENTITY_V1_ENABLED) &&
+        isAccountProvisionExemptPath(new URL(c.req.url).pathname)
+      ) {
+        return next();
+      }
       return c.json(
         {
           code: ERROR_CODES.UNAUTHORIZED,

@@ -24,7 +24,8 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js'],
   testMatch: ['**/tests/integration/**/*.integration.test.ts'],
-  testPathIgnorePatterns: ['node_modules'],
+  testPathIgnorePatterns: ['node_modules', '<rootDir>/.worktrees/'],
+  modulePathIgnorePatterns: ['<rootDir>/.worktrees/'],
   // Integration tests share a Neon database. Global-scope operations like
   // quota-reset and concurrent session writes race across parallel workers,
   // so serial execution is required for deterministic runs.

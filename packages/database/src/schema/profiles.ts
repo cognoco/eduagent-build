@@ -46,6 +46,7 @@ export const membershipRoleEnum = pgEnum('membership_role', [
   'mentor',
   'student',
 ]);
+export type MembershipRole = (typeof membershipRoleEnum.enumValues)[number];
 
 export const accounts = pgTable('accounts', {
   id: uuid('id')
@@ -196,6 +197,14 @@ export const memberships = pgTable(
     // on anything but FALSE — an empty '{}' would slip through. cardinality()
     // returns 0 for '{}', so `0 >= 1` is FALSE and the row is rejected.
     check('memberships_roles_non_empty', sql`cardinality(${table.roles}) >= 1`),
+    // cardinality(ARRAY[NULL]) is 1, so the non-empty CHECK alone would admit a
+    // row whose only "role" is NULL — a membership with no actual role. Reject
+    // any NULL array element: array_position returns the index of the first
+    // NULL (a non-NULL result) when one is present, and NULL when none is.
+    check(
+      'memberships_roles_no_null',
+      sql`array_position(${table.roles}, NULL::"public"."membership_role") IS NULL`,
+    ),
   ],
 );
 

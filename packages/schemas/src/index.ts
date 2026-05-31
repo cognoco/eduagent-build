@@ -9,6 +9,7 @@ export * from './health';
 export * from './profiles';
 export * from './consent';
 export * from './account';
+export * from './invitations';
 
 // Onboarding & Curriculum (Epic 1)
 export * from './subjects';

@@ -5,10 +5,13 @@
 
 import { eq, and, asc, desc, inArray, sql, isNull } from 'drizzle-orm';
 import {
+  accounts,
   profiles,
   familyLinks,
   consentStates,
+  memberships,
   type Database,
+  type MembershipRole,
 } from '@eduagent/database';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
@@ -49,6 +52,7 @@ import {
   getSubscriptionByAccountId,
   provisionProfileQuotaUsage,
 } from './billing';
+import { ensureIdentityV1 } from './identity';
 
 export class ProfileLimitError extends Error {
   constructor() {
@@ -337,6 +341,7 @@ export async function createProfile(
   input: ProfileCreateInput,
   isOwner?: boolean,
   parentProfileId?: string,
+  clerkUserId?: string,
 ): Promise<Profile> {
   const birthYear = input.birthYear;
 
@@ -367,6 +372,7 @@ export async function createProfile(
       birthYear,
       location: input.location ?? null,
       isOwner: isOwner ?? false,
+      clerkUserId: clerkUserId ?? null,
       // i18n Phase 1 — close the first-render race. When omitted, Drizzle
       // skips the column and the DB default 'en' applies. When the mobile
       // client forwards i18next.language, the very first LLM call on the new
@@ -440,9 +446,12 @@ export async function createProfileWithLimitCheck(
      * and pass the result here. Defaults to true (safe default — gate ON when unset).
      */
     adultOwnerGateEnabled?: boolean;
+    identityV1Enabled?: boolean;
+    clerkUserId?: string;
   },
 ): Promise<Profile> {
   const adultOwnerGateEnabled = opts?.adultOwnerGateEnabled ?? true;
+  const identityV1Enabled = opts?.identityV1Enabled ?? false;
   return db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
 
@@ -529,7 +538,30 @@ export async function createProfileWithLimitCheck(
       input,
       isFirstProfile,
       parentProfileId,
+      identityV1Enabled && isFirstProfile ? opts?.clerkUserId : undefined,
     );
+
+    if (identityV1Enabled) {
+      const account = await txDb.query.accounts.findFirst({
+        where: eq(accounts.id, accountId),
+      });
+      if (!account) throw new Error(`Account not found: ${accountId}`);
+
+      await ensureIdentityV1(txDb, account);
+      const roles: MembershipRole[] = created.isOwner
+        ? ['owner', 'student']
+        : ['student'];
+      await txDb
+        .insert(memberships)
+        .values({
+          personId: created.id,
+          organizationId: account.id,
+          roles,
+        })
+        .onConflictDoNothing({
+          target: [memberships.personId, memberships.organizationId],
+        });
+    }
 
     subscription ??= await ensureFreeSubscription(txDb, accountId);
     await provisionProfileQuotaUsage(

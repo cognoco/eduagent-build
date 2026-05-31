@@ -39,6 +39,21 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
           isOwner: true,
         });
       }
+      if (
+        profileId === 'person-profile-id' &&
+        accountId === 'test-account-id'
+      ) {
+        return Promise.resolve({
+          id: 'person-profile-id',
+          accountId: 'test-account-id',
+          displayName: 'Logged In Person',
+          birthYear: 2011,
+          location: 'EU',
+          consentStatus: 'CONSENTED',
+          conversationLanguage: 'en',
+          isOwner: false,
+        });
+      }
       return Promise.resolve(null);
     }),
     findOwnerProfile: jest.fn().mockImplementation((_db, accountId) => {
@@ -58,6 +73,15 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+jest.mock(
+  '../services/identity' /* gc1-allow: identity service unit boundary */,
+  () => ({
+    resolveActiveMembershipRoles: jest.fn().mockResolvedValue(['student']),
+  }),
+);
+
+import { resolveActiveMembershipRoles } from '../services/identity';
+
 describe('profileScopeMiddleware', () => {
   function createApp(): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
@@ -71,7 +95,8 @@ describe('profileScopeMiddleware', () => {
     app.get('/test', (c) => {
       const profileId = c.get('profileId');
       const profileMeta = c.get('profileMeta') ?? null;
-      return c.json({ profileId: profileId ?? null, profileMeta });
+      const activeRoles = c.get('activeRoles') ?? null;
+      return c.json({ profileId: profileId ?? null, profileMeta, activeRoles });
     });
     return app;
   }
@@ -230,6 +255,58 @@ describe('profileScopeMiddleware', () => {
     expect(res.status).toBe(200);
     expect(body.profileId).toBeNull();
     expect(body.profileMeta).toBeNull();
+  });
+
+  it('[T2][HIGH-1] flag-on headerless scope resolves to personId, not account owner', async () => {
+    const { findOwnerProfile, getProfile } = jest.requireMock(
+      '../services/profile',
+    );
+    findOwnerProfile.mockClear();
+    getProfile.mockClear();
+    (resolveActiveMembershipRoles as jest.Mock).mockClear();
+
+    const app = new Hono<{ Variables: AppVariables }>();
+    app.use('*', async (c, next) => {
+      c.set('account', { id: 'test-account-id' } as AppVariables['account']);
+      c.set('personId', 'person-profile-id');
+      c.set('organizationId', 'test-account-id');
+      c.set('db', {} as AppVariables['db']);
+      await next();
+    });
+    app.use('*', profileScopeMiddleware);
+    app.get('/test', (c) =>
+      c.json({
+        profileId: c.get('profileId') ?? null,
+        profileMeta: c.get('profileMeta') ?? null,
+        activeRoles: c.get('activeRoles') ?? null,
+      }),
+    );
+
+    const res = await app.request(
+      '/test',
+      {},
+      { MODE_IDENTITY_V1_ENABLED: 'true' },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.profileId).toBe('person-profile-id');
+    expect(body.profileMeta).toMatchObject({
+      birthYear: 2011,
+      isOwner: false,
+    });
+    expect(body.activeRoles).toEqual(['student']);
+    expect(findOwnerProfile).not.toHaveBeenCalled();
+    expect(getProfile).toHaveBeenCalledWith(
+      {},
+      'person-profile-id',
+      'test-account-id',
+    );
+    expect(resolveActiveMembershipRoles).toHaveBeenCalledWith(
+      {},
+      'person-profile-id',
+      'test-account-id',
+    );
   });
 
   it('skips auto-resolution and calls next when db or account is missing', async () => {

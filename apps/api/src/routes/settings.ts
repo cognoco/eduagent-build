@@ -176,6 +176,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
+      assertOwnerProfile(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -228,6 +229,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
+      assertOwnerProfile(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;

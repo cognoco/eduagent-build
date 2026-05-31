@@ -62,6 +62,17 @@ export async function findAccountByClerkId(
   return row ? mapAccountRow(row) : null;
 }
 
+export async function findAccountById(
+  db: Database,
+  accountId: string,
+): Promise<Account> {
+  const row = await db.query.accounts.findFirst({
+    where: eq(accounts.id, accountId),
+  });
+  if (!row) throw new Error(`Account not found: ${accountId}`);
+  return mapAccountRow(row);
+}
+
 /**
  * One-way SHA-256 of an email address, safe to include in logs and Sentry
  * extra fields. The full email is never stored outside the accounts table.

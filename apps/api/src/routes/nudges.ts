@@ -12,7 +12,9 @@ import type { Database } from '@eduagent/database';
 import type { Account } from '../services/account';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import type { ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertOwnerAndParentAccess } from '../services/family-access';
 import {
   createNudge,
   listUnreadNudges,
@@ -27,6 +29,7 @@ type NudgeRouteEnv = {
     db: Database;
     account: Account;
     profileId: string;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -37,6 +40,7 @@ export const nudgeRoutes = new Hono<NudgeRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const input = c.req.valid('json');
+    await assertOwnerAndParentAccess(c, db, profileId, input.toProfileId);
     const result = await createNudge(db, {
       fromProfileId: profileId,
       toProfileId: input.toProfileId,
