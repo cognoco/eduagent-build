@@ -791,6 +791,37 @@ describe('billing routes', () => {
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
 
+    // Shared-pool tiers with profile breakdowns need profile context.
+    // Otherwise the fallback quota-pool read exposes family-wide aggregates.
+    it.each(['family', 'pro'] as const)(
+      '%s tier requires active profile and does not leak shared-pool aggregates',
+      async (tier) => {
+        mockFindOwnerProfile.mockResolvedValueOnce(null);
+        mockGetSubscriptionByAccountId.mockResolvedValue(
+          mockSubscription({ tier }),
+        );
+        mockGetEffectiveAccessForSubscription.mockResolvedValue(
+          mockEffectiveAccess({
+            subscription: mockSubscription({ tier }),
+            effectiveAccessTier: tier,
+          }),
+        );
+        mockGetQuotaPool.mockResolvedValue(
+          mockQuotaPool({ usedThisMonth: 999 }),
+        );
+
+        const res = await app.request(
+          '/v1/usage',
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(400);
+        expect(mockGetQuotaPool).not.toHaveBeenCalled();
+        expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
+      },
+    );
+
     it('returns child-visible usage from their profile breakdown', async () => {
       const childProfileId = '550e8400-e29b-41d4-a716-446655440000';
       mockProfileFindFirst.mockResolvedValue({
