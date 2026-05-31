@@ -197,6 +197,15 @@ export default function SessionSummaryScreen() {
   });
   const sessionBookmarks = useSessionBookmarks(sessionId ?? undefined);
   const persisted = persistedSummary.data ?? null;
+  // Destructure `refetch` once: TanStack Query produces a new top-level
+  // result object reference on every state slice change (isFetching, isStale,
+  // dataUpdatedAt, background polling tick). If we depended on the whole
+  // `persistedSummary` object in the 15s timeout effect, each polling tick
+  // would clear and re-arm the timer — so `recapTimedOut` would never flip,
+  // Sentry would never fire, and the manual retry UI would never appear
+  // (the exact silent-failure BUG-890 is meant to fix). `refetch` is
+  // referentially stable per-observer, so it's safe in deps.
+  const { refetch: refetchPersistedSummary } = persistedSummary;
   const isPersistedSubmitted =
     persisted?.status === 'submitted' || persisted?.status === 'accepted';
   const isPersistedSkipped = persisted?.status === 'skipped';
@@ -237,7 +246,7 @@ export default function SessionSummaryScreen() {
       // One auto-retry: if the recap arrives on this refetch, the user
       // never sees the manual fallback. If it still doesn't arrive, the
       // manual "Tap to retry" affordance shows below as a last resort.
-      void persistedSummary.refetch();
+      void refetchPersistedSummary();
       setRecapTimedOut(true);
     }, 15_000);
     return () => clearTimeout(timer);
@@ -247,7 +256,7 @@ export default function SessionSummaryScreen() {
     recapTimedOut,
     sessionId,
     ageBracket,
-    persistedSummary,
+    refetchPersistedSummary,
   ]);
 
   // UX-DE-M2: escape from the initial loading spinner. The previous
@@ -1068,7 +1077,7 @@ export default function SessionSummaryScreen() {
             <Pressable
               onPress={() => {
                 setRecapTimedOut(false);
-                void persistedSummary.refetch();
+                void refetchPersistedSummary();
               }}
               className="mt-3 items-center"
               accessibilityRole="button"
