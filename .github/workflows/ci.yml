@@ -318,6 +318,8 @@ jobs:
           # Without this, checkContractDrift() always exits early at the
           # "Set EXPO_PUBLIC_GIT_SHA in your env" branch and drift goes undetected.
           EXPO_PUBLIC_GIT_SHA: ${{ github.sha }}
+          EXPO_PUBLIC_ENABLE_MODE_NAV: 'true'
+          EXPO_PUBLIC_ENABLE_MODE_NAV_V1: 'true'
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B | head -1 | tr -cd '[:print:]' | cut -c1-200)
           printf 'Publishing OTA update: %s\n' "$COMMIT_MSG"
