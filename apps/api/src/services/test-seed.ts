@@ -3943,6 +3943,23 @@ async function seedDailyLimitReached(
     cycleResetAt: futureDate(30),
   });
 
+  // [per-profile metering] The owner profile also needs a profile_quota_usage
+  // row so the per-profile read path sees the exhausted daily cap. The shared
+  // quotaPools row above is for legacy/shared-pool reads; the free tier reads
+  // per-profile, so without this the middleware auto-provisions a fresh row with
+  // usedToday=0 and the daily cap never triggers.
+  await db.insert(profileQuotaUsage).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    profileId,
+    role: 'owner',
+    monthlyLimit: freeTier.ownerMonthlyQuota ?? freeTier.monthlyQuota,
+    usedThisMonth: 10,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: 10,
+    cycleResetAt: futureDate(30),
+  });
+
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
