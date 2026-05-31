@@ -648,6 +648,18 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
+
+    // [BUG-825] Mirror the owner gate on GET /subscription (line 100). Without
+    // this, a non-owner child profile (mode=family, isOwner=false) can read
+    // tier, effectiveAccessTier, billingAccess, status, monthlyLimit,
+    // usedThisMonth, dailyLimit, usedToday from the parent's account — the
+    // exact account-level billing-state leak BUG-644 added owner-gating for
+    // on /subscription. CLAUDE.md billing rules forbid this class of leak.
+    assertOwnerProfile(
+      c,
+      'Only the account owner can view subscription status.',
+    );
+
     const kv = c.env.SUBSCRIPTION_KV;
     const freeTier = getTierConfig('free');
 
