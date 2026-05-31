@@ -318,6 +318,7 @@ describe('Integration: Stripe Webhook event handling', () => {
     const event = buildStripeEvent('checkout.session.completed', {
       id: 'cs_checkout_completed',
       subscription: stripeSubscriptionId,
+      payment_status: 'paid',
       metadata: { accountId: account.id, tier: 'plus' },
     });
 
