@@ -963,7 +963,19 @@
       "archive": "Archivar",
       "resume": "Reanudar",
       "restore": "Restaurar",
-      "updateErrorTitle": "No se pudo actualizar la materia"
+      "updateErrorTitle": "No se pudo actualizar la materia",
+      "delete": "Eliminar",
+      "deleting": "Eliminando...",
+      "deleteConfirmTitle": "¿Eliminar {{subject}}?",
+      "deleteConfirmMessage": "Esto elimina permanentemente {{subject}}, incluyendo {{books}}, {{startedTopics}} y {{sessions}} con el historial de aprendizaje. Esta acción no se puede deshacer.",
+      "deleteConfirmAction": "Eliminar",
+      "deleteScopeBooks_one": "{{count}} libro",
+      "deleteScopeBooks_other": "{{count}} libros",
+      "deleteScopeStartedTopics_one": "{{count}} tema iniciado",
+      "deleteScopeStartedTopics_other": "{{count}} temas iniciados",
+      "deleteScopeSessions_one": "{{count}} sesión",
+      "deleteScopeSessions_other": "{{count}} sesiones",
+      "deleteErrorTitle": "No se pudo eliminar el tema"
     },
     "row": {
       "finished": "Terminado",

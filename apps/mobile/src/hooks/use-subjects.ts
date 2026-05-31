@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import type {
   CefrLevel,
+  DeleteSubjectResponse,
   PedagogyMode,
   Subject,
   SubjectStatus,
@@ -35,6 +36,10 @@ interface UpdateSubjectInput {
   status?: SubjectStatus;
   pedagogyMode?: PedagogyMode;
   languageCode?: string | null;
+}
+
+interface DeleteSubjectInput {
+  subjectId: string;
 }
 
 function isTransientSubjectUpdateError(error: unknown): boolean {
@@ -165,6 +170,30 @@ export function useUpdateSubject(): UseMutationResult<
     retry: (failureCount, error) =>
       failureCount < 2 && isTransientSubjectUpdateError(error),
     retryDelay: subjectUpdateRetryDelay,
+  });
+}
+
+export function useDeleteSubject(): UseMutationResult<
+  DeleteSubjectResponse,
+  Error,
+  DeleteSubjectInput
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation<DeleteSubjectResponse, Error, DeleteSubjectInput>({
+    mutationFn: async ({ subjectId }) => {
+      const res = await client.subjects[':id'].$delete({
+        param: { id: subjectId },
+      });
+      await assertOk(res);
+      return (await res.json()) as DeleteSubjectResponse;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      void queryClient.invalidateQueries({ queryKey: ['curriculum'] });
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
+    },
   });
 }
 

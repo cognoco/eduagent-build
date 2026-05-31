@@ -988,7 +988,19 @@
       "archive": "Arquivar",
       "resume": "Retomar",
       "restore": "Restaurar",
-      "updateErrorTitle": "Não foi possível atualizar a matéria"
+      "updateErrorTitle": "Não foi possível atualizar a matéria",
+      "delete": "Excluir",
+      "deleting": "Excluindo...",
+      "deleteConfirmTitle": "Excluir {{subject}}?",
+      "deleteConfirmMessage": "Isto exclui permanentemente {{subject}}, incluindo {{books}}, {{startedTopics}} e {{sessions}} com o histórico de aprendizagem. Esta ação não pode ser desfeita.",
+      "deleteConfirmAction": "Excluir",
+      "deleteScopeBooks_one": "{{count}} livro",
+      "deleteScopeBooks_other": "{{count}} livros",
+      "deleteScopeStartedTopics_one": "{{count}} tópico iniciado",
+      "deleteScopeStartedTopics_other": "{{count}} tópicos iniciados",
+      "deleteScopeSessions_one": "{{count}} sessão",
+      "deleteScopeSessions_other": "{{count}} sessões",
+      "deleteErrorTitle": "Não foi possível excluir o assunto"
     },
     "row": {
       "finished": "Concluído",

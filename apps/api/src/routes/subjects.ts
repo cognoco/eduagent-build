@@ -7,10 +7,12 @@ import {
   subjectClassifyInputSchema,
   languageSetupSchema,
   ERROR_CODES,
+  subjectIdParamSchema,
   subjectResolveResultSchema,
   subjectClassifyResultSchema,
   subjectListResponseSchema,
   subjectResponseSchema,
+  deleteSubjectResponseSchema,
   createSubjectWithStructureResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -25,6 +27,7 @@ import {
   configureLanguageSubject,
   getSubject,
   updateSubject,
+  deleteSubject,
   retryCurriculumForSubject,
   SubjectNotLanguageLearningError,
 } from '../services/subject';
@@ -163,6 +166,27 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     if (!subject) return notFound(c, 'Subject not found');
     return c.json(subjectResponseSchema.parse({ subject }));
   })
+  .delete(
+    '/subjects/:id',
+    zValidator('param', subjectIdParamSchema),
+    async (c) => {
+      // [learn-3] Server-derived proxy-mode write guard; subject delete is
+      // irreversible and must never be available from parent proxy sessions.
+      assertNotProxyMode(c);
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { id } = c.req.valid('param');
+      try {
+        const result = await deleteSubject(db, profileId, id);
+        return c.json(deleteSubjectResponseSchema.parse(result));
+      } catch (err) {
+        if (err instanceof SubjectNotFoundError) {
+          return notFound(c, err.message);
+        }
+        throw err;
+      }
+    },
+  )
   .patch(
     '/subjects/:id',
     zValidator('json', subjectUpdateSchema),

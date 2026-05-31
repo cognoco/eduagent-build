@@ -14,11 +14,13 @@ jest.mock(
 
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
+import { SubjectNotFoundError } from '@eduagent/schemas';
 import {
   listSubjects,
   createSubject,
   getSubject,
   updateSubject,
+  deleteSubject,
   archiveInactiveSubjects,
   createSubjectWithStructure,
 } from './subject';
@@ -824,6 +826,70 @@ describe('updateSubject', () => {
 
     expect(result).not.toBeNull();
     expect(result!.name).toBe('Updated Name');
+  });
+});
+
+describe('deleteSubject', () => {
+  function createDeleteMockDb(): Database & {
+    delete: jest.Mock;
+    deleteWhere: jest.Mock;
+  } {
+    const deleteWhere = jest.fn().mockResolvedValue(undefined);
+    const db = {
+      delete: jest.fn().mockReturnValue({
+        where: deleteWhere,
+      }),
+    } as unknown as Database & {
+      delete: jest.Mock;
+      deleteWhere: jest.Mock;
+    };
+    db.deleteWhere = deleteWhere;
+    return db;
+  }
+
+  it('throws SubjectNotFoundError and does not delete when the subject is absent', async () => {
+    setupScopedRepo({ findFirstResult: undefined });
+    const db = createDeleteMockDb();
+
+    await expect(
+      deleteSubject(db, profileId, uuidSubjectId),
+    ).rejects.toBeInstanceOf(SubjectNotFoundError);
+
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('hard-deletes only the active profile subject and returns a typed success envelope', async () => {
+    setupScopedRepo({
+      findFirstResult: mockSubjectRow({
+        id: uuidSubjectId,
+        profileId: uuidProfileId,
+      }),
+    });
+    const db = createDeleteMockDb();
+
+    await expect(
+      deleteSubject(db, uuidProfileId, uuidSubjectId),
+    ).resolves.toEqual({
+      deleted: true,
+      subjectId: uuidSubjectId,
+    });
+
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db.deleteWhere).toHaveBeenCalledTimes(1);
+    const whereValues = extractSqlTextAndValues(
+      db.deleteWhere.mock.calls[0]![0],
+    );
+    expect(whereValues).toContain(uuidSubjectId.toLowerCase());
+    expect(whereValues).toContain(uuidProfileId.toLowerCase());
+  });
+
+  it('repeat delete returns not-found semantics instead of a second success', async () => {
+    setupScopedRepo({ findFirstResult: undefined });
+    const db = createDeleteMockDb();
+
+    await expect(
+      deleteSubject(db, uuidProfileId, uuidSubjectId),
+    ).rejects.toBeInstanceOf(SubjectNotFoundError);
   });
 });
 

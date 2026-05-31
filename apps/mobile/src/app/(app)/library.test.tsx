@@ -26,6 +26,7 @@ import {
 } from '../../test-utils/mock-api-routes';
 
 import LibraryScreen from './library';
+import { platformAlert } from '../../lib/platform-alert';
 
 // ─── Boundary mocks (external/native runtime only) ──────────────────────
 //
@@ -79,6 +80,25 @@ jest.mock(
   '../../lib/platform-alert' /* gc1-allow: wraps Alert.alert which is unavailable in JSDOM */,
   () => ({ platformAlert: jest.fn() }),
 );
+
+const platformAlertMock = jest.mocked(platformAlert);
+
+type MockAlertButton = {
+  text?: string;
+  onPress?: () => void | Promise<void>;
+  style?: 'default' | 'cancel' | 'destructive';
+};
+
+function getAlertButtons(callIndex = 0): MockAlertButton[] {
+  return (platformAlertMock.mock.calls[callIndex]?.[2] ??
+    []) as MockAlertButton[];
+}
+
+async function pressAsync(
+  element: Parameters<typeof fireEvent.press>[0],
+): Promise<void> {
+  await (fireEvent.press(element) as unknown as Promise<void> | undefined);
+}
 
 // SectionList native virtualization shim. The populated-subject path renders a
 // SectionList; in JSDOM the real VirtualizedList does not lay out, so we forward
@@ -194,6 +214,24 @@ type RetentionPayload = {
   }>;
 };
 
+type LibraryBooksPayload = {
+  subjects: Array<{
+    subjectId: string;
+    subjectName: string;
+    books: Array<{
+      id: string;
+      subjectId: string;
+      title: string;
+      description: string | null;
+      emoji: string | null;
+      sortOrder: number;
+      topicsGenerated: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }>;
+};
+
 interface RouteOptions {
   /** Value returned by GET /v1/subjects?includeInactive=true. */
   subjects?: SubjectFixture[] | unknown;
@@ -208,6 +246,8 @@ interface RouteOptions {
   progress?: OverallProgress | undefined;
   progressError?: boolean;
   retention?: RetentionPayload;
+  inventory?: unknown;
+  allBooks?: LibraryBooksPayload;
   allBooksError?: boolean;
   search?: unknown;
   /** Sessions surfaced by useFailedFreeformLibraryFilingSessions. */
@@ -238,6 +278,8 @@ function errorResponse(status = 503): Response {
  *   useLibraryRetention                 → GET /library/retention             → { subjects }
  *   useLibrarySearch                    → GET /library/search?q=             → LibrarySearchResult
  *   useUpdateSubject                    → PATCH /subjects/:id                → { subject }
+ *   useDeleteSubject                    → DELETE /subjects/:id               → { deleted, subjectId }
+ *   useProgressInventory                → GET /progress/inventory            → KnowledgeInventory
  *   useFailedFreeformLibraryFilingSessions
  *        → GET /progress/sessions?limit=50  → { sessions, nextCursor }
  *          then GET /sessions/:id            → { session } (LearningSession)
@@ -253,6 +295,28 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
     totalTopicsLearning: 0,
   };
   const retentionBody = opts.retention ?? { subjects: [] };
+  const inventoryBody = opts.inventory ?? {
+    profileId: ACTIVE_PROFILE_ID,
+    snapshotDate: '2026-05-31',
+    currentlyWorkingOn: [],
+    thisWeekMini: { sessions: 0, wordsLearned: 0, topicsTouched: 0 },
+    global: {
+      topicsAttempted: 0,
+      topicsMastered: 0,
+      vocabularyTotal: 0,
+      vocabularyMastered: 0,
+      weeklyDeltaTopicsMastered: null,
+      weeklyDeltaVocabularyTotal: null,
+      weeklyDeltaTopicsExplored: null,
+      totalSessions: 0,
+      totalActiveMinutes: 0,
+      totalWallClockMinutes: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+    },
+    subjects: [],
+  };
+  const allBooksBody = opts.allBooks ?? { subjects: [] };
 
   // Failed-filing detail: each session id resolves to a freeform,
   // filing_failed LearningSession so the real hook surfaces it.
@@ -272,6 +336,10 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
         // PATCH /subjects/:id — echo back an updated subject.
         const id = url.split('/subjects/')[1]?.split('?')[0] ?? 'sub-x';
         return { subject: { id, name: 'Subject', status: 'archived' } };
+      }
+      if (method === 'DELETE') {
+        const id = url.split('/subjects/')[1]?.split('?')[0] ?? 'sub-x';
+        return { deleted: true, subjectId: id };
       }
       if (url.includes('includeInactive=true')) {
         if (opts.subjectsLoading) return NEVER();
@@ -311,6 +379,7 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
     '/progress/overview': opts.progressError
       ? () => errorResponse()
       : progressBody,
+    '/progress/inventory': inventoryBody,
     '/sessions/': (url: string) => {
       const id = url.split('/sessions/')[1]?.split(/[?/]/)[0] ?? '';
       const meta = failedById.get(id);
@@ -339,9 +408,7 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
       };
     },
     '/library/retention': retentionBody,
-    '/library/books': opts.allBooksError
-      ? () => errorResponse()
-      : { subjects: [] },
+    '/library/books': opts.allBooksError ? () => errorResponse() : allBooksBody,
     '/library/search': opts.search ?? {
       subjects: [],
       books: [],
@@ -885,6 +952,111 @@ describe('LibraryScreen', () => {
       { id: 'sub-1', name: 'Math', status: 'active' },
     ];
 
+    function deleteScopeOptions(): RouteOptions {
+      return {
+        subjects: ONE_SUBJECT,
+        allBooks: {
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              subjectName: 'Math',
+              books: [
+                {
+                  id: 'book-1',
+                  subjectId: 'sub-1',
+                  title: 'Algebra',
+                  description: null,
+                  emoji: null,
+                  sortOrder: 1,
+                  topicsGenerated: true,
+                  createdAt: '2026-05-31T00:00:00.000Z',
+                  updatedAt: '2026-05-31T00:00:00.000Z',
+                },
+                {
+                  id: 'book-2',
+                  subjectId: 'sub-1',
+                  title: 'Geometry',
+                  description: null,
+                  emoji: null,
+                  sortOrder: 2,
+                  topicsGenerated: true,
+                  createdAt: '2026-05-31T00:00:00.000Z',
+                  updatedAt: '2026-05-31T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+        progress: {
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              name: 'Math',
+              topicsTotal: 6,
+              topicsCompleted: 2,
+              topicsVerified: 1,
+              topicsMastered: 1,
+              topicsLearning: 2,
+              urgencyScore: 0,
+              retentionStatus: 'strong',
+              lastSessionAt: '2026-05-30T09:00:00.000Z',
+            },
+          ],
+          totalTopicsCompleted: 2,
+          totalTopicsVerified: 1,
+          totalTopicsMastered: 1,
+          totalTopicsLearning: 2,
+        },
+        inventory: {
+          profileId: ACTIVE_PROFILE_ID,
+          snapshotDate: '2026-05-31',
+          currentlyWorkingOn: ['Math'],
+          thisWeekMini: { sessions: 2, wordsLearned: 0, topicsTouched: 3 },
+          global: {
+            topicsAttempted: 3,
+            topicsMastered: 1,
+            vocabularyTotal: 0,
+            vocabularyMastered: 0,
+            weeklyDeltaTopicsMastered: null,
+            weeklyDeltaVocabularyTotal: null,
+            weeklyDeltaTopicsExplored: null,
+            totalSessions: 4,
+            totalActiveMinutes: 80,
+            totalWallClockMinutes: 90,
+            currentStreak: 1,
+            longestStreak: 2,
+          },
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              subjectName: 'Math',
+              pedagogyMode: 'socratic',
+              topics: {
+                total: 6,
+                explored: 3,
+                mastered: 1,
+                inProgress: 2,
+                notStarted: 3,
+              },
+              vocabulary: {
+                total: 0,
+                mastered: 0,
+                learning: 0,
+                new: 0,
+                byCefrLevel: {},
+              },
+              estimatedProficiency: null,
+              estimatedProficiencyLabel: null,
+              lastSessionAt: '2026-05-30T09:00:00.000Z',
+              activeMinutes: 80,
+              wallClockMinutes: 90,
+              sessionsCount: 4,
+            },
+          ],
+        },
+      };
+    }
+
     it('closes when the backdrop (outside the sheet) is tapped [BUG-510]', async () => {
       // Repro: on web the Close button sits behind the bottom tab bar so
       // pointer events never reach it; the modal had no other dismiss path
@@ -935,7 +1107,7 @@ describe('LibraryScreen', () => {
 
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
       await act(async () => {
-        fireEvent.press(active!.result.getByTestId('archive-subject-sub-1'));
+        await pressAsync(active!.result.getByTestId('archive-subject-sub-1'));
       });
 
       // The real useUpdateSubject mutation fires PATCH /subjects/:id with the
@@ -951,6 +1123,136 @@ describe('LibraryScreen', () => {
           status: 'archived',
         });
       });
+    });
+
+    it('shows a destructive confirmation with the subject name and deletion scope', async () => {
+      active = mount(deleteScopeOptions());
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
+      });
+
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+      fireEvent.press(active.result.getByTestId('delete-subject-sub-1'));
+
+      expect(platformAlertMock).toHaveBeenCalledWith(
+        'Delete Math?',
+        'This permanently deletes Math, including 2 books, 3 started topics, and 4 sessions with learning history. This cannot be undone.',
+        expect.arrayContaining([
+          expect.objectContaining({ style: 'cancel' }),
+          expect.objectContaining({ style: 'destructive' }),
+        ]),
+        { cancelable: true },
+      );
+    });
+
+    it('does not call delete when the confirmation is cancelled', async () => {
+      active = mount(deleteScopeOptions());
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
+      });
+
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+      fireEvent.press(active.result.getByTestId('delete-subject-sub-1'));
+      const cancelButton = getAlertButtons().find(
+        (button) => button.style === 'cancel',
+      );
+
+      act(() => {
+        cancelButton?.onPress?.();
+      });
+
+      const deleteCalls = fetchCallsMatching(
+        active.routedFetch,
+        '/subjects/sub-1',
+      ).filter((call) => call.init?.method === 'DELETE');
+      expect(deleteCalls).toHaveLength(0);
+    });
+
+    it('deletes the subject after confirmation and removes it after refetch', async () => {
+      let subjects: SubjectFixture[] = [...ONE_SUBJECT];
+      const routedFetch = buildRoutes(deleteScopeOptions());
+      routedFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (method === 'DELETE') {
+          subjects = [];
+          return { deleted: true, subjectId: 'sub-1' };
+        }
+        if (url.includes('includeInactive=true')) {
+          return { subjects };
+        }
+        return {
+          subjects: subjects.filter((subject) => subject.status === 'active'),
+        };
+      });
+      active = renderScreen(<LibraryScreen />, {
+        profile: OWNER,
+        profiles: [OWNER],
+        routedFetch,
+      });
+
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
+      });
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+      fireEvent.press(active.result.getByTestId('delete-subject-sub-1'));
+
+      const deleteButton = getAlertButtons().find(
+        (button) => button.style === 'destructive',
+      );
+      await act(async () => {
+        await deleteButton?.onPress?.();
+      });
+
+      await waitFor(() => {
+        const deleteCalls = fetchCallsMatching(
+          active!.routedFetch,
+          '/subjects/sub-1',
+        ).filter((call) => call.init?.method === 'DELETE');
+        expect(deleteCalls).toHaveLength(1);
+        expect(
+          active!.result.queryByTestId('shelf-row-header-sub-1'),
+        ).toBeNull();
+      });
+    });
+
+    it('shows an error and keeps the row when delete fails', async () => {
+      const routedFetch = buildRoutes(deleteScopeOptions());
+      routedFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (method === 'DELETE') {
+          return errorResponse(500);
+        }
+        if (url.includes('includeInactive=true')) {
+          return { subjects: ONE_SUBJECT };
+        }
+        return { subjects: ONE_SUBJECT };
+      });
+      active = renderScreen(<LibraryScreen />, {
+        profile: OWNER,
+        profiles: [OWNER],
+        routedFetch,
+      });
+
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
+      });
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+      fireEvent.press(active.result.getByTestId('delete-subject-sub-1'));
+
+      const deleteButton = getAlertButtons().find(
+        (button) => button.style === 'destructive',
+      );
+      await act(async () => {
+        await deleteButton?.onPress?.();
+      });
+
+      await waitFor(() => {
+        expect(platformAlertMock).toHaveBeenCalledWith(
+          'Could not delete subject',
+          expect.any(String),
+        );
+      });
+      expect(active.result.getByTestId('shelf-row-header-sub-1')).toBeTruthy();
     });
 
     it('disables other subject actions while one status update is saving', async () => {
@@ -992,7 +1294,9 @@ describe('LibraryScreen', () => {
         active!.result.getByTestId('manage-subjects-button');
       });
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
-      fireEvent.press(active.result.getByTestId('archive-subject-sub-1'));
+      const updatePromise = fireEvent.press(
+        active.result.getByTestId('archive-subject-sub-1'),
+      ) as unknown as Promise<void>;
 
       await waitFor(() => {
         expect(
@@ -1001,6 +1305,7 @@ describe('LibraryScreen', () => {
       });
       await act(async () => {
         finishUpdate();
+        await updatePromise;
       });
     });
   });
@@ -1447,7 +1752,7 @@ describe('LibraryScreen', () => {
       // Open the modal and press the archive action for the subject.
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
       await act(async () => {
-        fireEvent.press(active!.result.getByTestId('archive-subject-sub-1'));
+        await pressAsync(active!.result.getByTestId('archive-subject-sub-1'));
       });
 
       await waitFor(() => {

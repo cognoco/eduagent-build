@@ -22,8 +22,15 @@ import {
 import { goBackOrReplace } from '../../lib/navigation';
 import { useAllBooks } from '../../hooks/use-all-books';
 import { useTheme, useThemeColors } from '../../lib/theme';
-import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
-import { useOverallProgress } from '../../hooks/use-progress';
+import {
+  useDeleteSubject,
+  useSubjects,
+  useUpdateSubject,
+} from '../../hooks/use-subjects';
+import {
+  useOverallProgress,
+  useProgressInventory,
+} from '../../hooks/use-progress';
 import {
   useLibraryRetention,
   type LibraryRetentionTopic,
@@ -189,7 +196,7 @@ function LibraryScreenContent({
   // ---- Manage modal state -------------------------------------------------
   const [showManageSubjects, setShowManageSubjects] = useState(false);
   const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
-  const statusUpdateInFlightRef = useRef(false);
+  const subjectActionInFlightRef = useRef(false);
 
   // ---- Data hooks ---------------------------------------------------------
   const subjectsQuery = useSubjects({ includeInactive: true });
@@ -240,6 +247,7 @@ function LibraryScreenContent({
   }, [isSubjectsLoading, subjectsLoadTimedOut]);
 
   const updateSubject = useUpdateSubject();
+  const deleteSubject = useDeleteSubject();
   const allBooksQuery = useAllBooks();
   const allBooks = allBooksQuery.books;
 
@@ -271,6 +279,18 @@ function LibraryScreenContent({
         (progressQuery.data?.subjects ?? []).map((s) => [s.subjectId, s]),
       ),
     [progressQuery.data?.subjects],
+  );
+
+  const progressInventoryQuery = useProgressInventory();
+  const inventoryBySubjectId = useMemo(
+    () =>
+      new Map(
+        (progressInventoryQuery.data?.subjects ?? []).map((s) => [
+          s.subjectId,
+          s,
+        ]),
+      ),
+    [progressInventoryQuery.data?.subjects],
   );
 
   // ---- Books grouped by subjectId -----------------------------------------
@@ -423,6 +443,7 @@ function LibraryScreenContent({
     void subjectsQuery.refetch();
     void activeSubjectsFallbackQuery.refetch();
     void progressQuery.refetch();
+    void progressInventoryQuery.refetch();
     allBooksQuery.refetch();
     void libraryRetentionQuery.refetch();
   };
@@ -432,18 +453,93 @@ function LibraryScreenContent({
     status: Subject['status'],
   ): Promise<void> => {
     if (!canWrite) return;
-    if (statusUpdateInFlightRef.current) return;
-    statusUpdateInFlightRef.current = true;
+    if (subjectActionInFlightRef.current) return;
+    subjectActionInFlightRef.current = true;
     setPendingSubjectId(subject.id);
     try {
       await updateSubject.mutateAsync({ subjectId: subject.id, status });
     } catch (err: unknown) {
       platformAlert(t('library.manage.updateErrorTitle'), formatApiError(err));
     } finally {
-      statusUpdateInFlightRef.current = false;
+      subjectActionInFlightRef.current = false;
       setPendingSubjectId(null);
     }
   };
+
+  const getSubjectDeleteScope = useCallback(
+    (subject: Subject) => {
+      const progress = progressBySubjectId.get(subject.id);
+      const inventory = inventoryBySubjectId.get(subject.id);
+      return {
+        bookCount: booksBySubjectId.get(subject.id)?.length ?? 0,
+        startedTopicCount:
+          inventory?.topics.explored ??
+          (progress?.topicsLearning ?? 0) + (progress?.topicsMastered ?? 0),
+        sessionCount: inventory?.sessionsCount ?? 0,
+      };
+    },
+    [booksBySubjectId, inventoryBySubjectId, progressBySubjectId],
+  );
+
+  const handleConfirmDeleteSubject = useCallback(
+    async (subject: Subject): Promise<void> => {
+      if (!canWrite) return;
+      if (subjectActionInFlightRef.current) return;
+      subjectActionInFlightRef.current = true;
+      setPendingSubjectId(subject.id);
+      try {
+        await deleteSubject.mutateAsync({ subjectId: subject.id });
+      } catch (err: unknown) {
+        platformAlert(
+          t('library.manage.deleteErrorTitle'),
+          formatApiError(err),
+        );
+      } finally {
+        subjectActionInFlightRef.current = false;
+        setPendingSubjectId(null);
+      }
+    },
+    [canWrite, deleteSubject, t],
+  );
+
+  const handleDeleteSubjectPress = useCallback(
+    (subject: Subject): void => {
+      if (!canWrite) return;
+      if (subjectActionInFlightRef.current) return;
+
+      const { bookCount, startedTopicCount, sessionCount } =
+        getSubjectDeleteScope(subject);
+      const books = t('library.manage.deleteScopeBooks', {
+        count: bookCount,
+      });
+      const startedTopics = t('library.manage.deleteScopeStartedTopics', {
+        count: startedTopicCount,
+      });
+      const sessions = t('library.manage.deleteScopeSessions', {
+        count: sessionCount,
+      });
+
+      platformAlert(
+        t('library.manage.deleteConfirmTitle', { subject: subject.name }),
+        t('library.manage.deleteConfirmMessage', {
+          subject: subject.name,
+          books,
+          startedTopics,
+          sessions,
+        }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('library.manage.deleteConfirmAction'),
+            style: 'destructive',
+            onPress: () => handleConfirmDeleteSubject(subject),
+          },
+        ],
+        { cancelable: true },
+      );
+    },
+    [canWrite, getSubjectDeleteScope, handleConfirmDeleteSubject, t],
+  );
 
   // ---- Determine which shelves are visible (search filtering) -------------
 
@@ -1156,6 +1252,7 @@ function LibraryScreenContent({
             <ScrollView style={{ maxHeight: 360 }}>
               {sortedSubjects.map((subject) => {
                 const isPending = pendingSubjectId === subject.id;
+                const isDeleting = isPending && deleteSubject.isPending;
                 const isSavingAnySubject = pendingSubjectId !== null;
                 return (
                   <View
@@ -1173,7 +1270,7 @@ function LibraryScreenContent({
                         <>
                           <Pressable
                             onPress={() =>
-                              void handleSubjectStatusChange(subject, 'paused')
+                              handleSubjectStatusChange(subject, 'paused')
                             }
                             disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
@@ -1187,10 +1284,7 @@ function LibraryScreenContent({
                           </Pressable>
                           <Pressable
                             onPress={() =>
-                              void handleSubjectStatusChange(
-                                subject,
-                                'archived',
-                              )
+                              handleSubjectStatusChange(subject, 'archived')
                             }
                             disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
@@ -1205,7 +1299,7 @@ function LibraryScreenContent({
                         <>
                           <Pressable
                             onPress={() =>
-                              void handleSubjectStatusChange(subject, 'active')
+                              handleSubjectStatusChange(subject, 'active')
                             }
                             disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-primary py-2.5 items-center"
@@ -1219,10 +1313,7 @@ function LibraryScreenContent({
                           </Pressable>
                           <Pressable
                             onPress={() =>
-                              void handleSubjectStatusChange(
-                                subject,
-                                'archived',
-                              )
+                              handleSubjectStatusChange(subject, 'archived')
                             }
                             disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
@@ -1236,7 +1327,7 @@ function LibraryScreenContent({
                       ) : (
                         <Pressable
                           onPress={() =>
-                            void handleSubjectStatusChange(subject, 'active')
+                            handleSubjectStatusChange(subject, 'active')
                           }
                           disabled={isSavingAnySubject || !canWrite}
                           className="flex-1 rounded-button bg-primary py-2.5 items-center"
@@ -1250,6 +1341,22 @@ function LibraryScreenContent({
                         </Pressable>
                       )}
                     </View>
+                    <Pressable
+                      onPress={() => handleDeleteSubjectPress(subject)}
+                      disabled={isSavingAnySubject || !canWrite}
+                      className={
+                        isSavingAnySubject || !canWrite
+                          ? 'mt-2 rounded-button border border-danger/20 bg-danger/5 py-2.5 items-center opacity-60'
+                          : 'mt-2 rounded-button border border-danger/30 bg-danger/10 py-2.5 items-center'
+                      }
+                      testID={`delete-subject-${subject.id}`}
+                    >
+                      <Text className="text-body-sm font-semibold text-danger">
+                        {isDeleting
+                          ? t('library.manage.deleting')
+                          : t('library.manage.delete')}
+                      </Text>
+                    </Pressable>
                   </View>
                 );
               })}
