@@ -12,7 +12,7 @@ import {
   formatDailyReminderBody,
   sendPushNotification,
 } from '../../services/notifications';
-import { getRecentNotificationCount } from '../../services/settings';
+import { checkAndLogRateLimitInternal } from '../../services/settings';
 import { captureException } from '../../services/sentry';
 
 export const dailyReminderSend = inngest.createFunction(
@@ -49,29 +49,42 @@ export const dailyReminderSend = inngest.createFunction(
         };
       }
 
-      // [BUG-699-FOLLOWUP] 24h notification-log dedup. Inngest's idempotency
+      // [BUG-699-FOLLOWUP / BUG-838] Atomic dedup. Inngest's idempotency
       // key (event.id) covers exact-duplicate events within 24h, but an
-      // operator replay or a re-fire with a *new* event.id would bypass that
-      // guard and push the same recipient again. The notification-log check
-      // is belt-and-suspenders, consistent with all other cron-driven push
-      // paths in this codebase.
+      // operator replay or a re-fire with a *new* event.id would bypass it
+      // and push the same recipient again — and the prior implementation
+      // (getRecentNotificationCount → conditional send) was a read-then-write
+      // pair: two concurrent step.run invocations (operator replay racing a
+      // cron fire, or two parallel observers landing in the same millisecond)
+      // could both observe count===0 and both fire the push. concurrency
+      // limit=50 narrowed the window but did not close it.
+      //
+      // checkAndLogRateLimitInternal wraps the count check and the log insert
+      // in a single transaction with a pg_advisory_xact_lock keyed on
+      // ('rate-limit:<profileId>:daily_reminder'); concurrent callers
+      // serialize on the lock and the second caller observes the first's row.
+      // Mirrors the BUG-117 fix in trial-expiry.ts and the notify-struggle
+      // / recall-nudge-send pattern.
+      //
       // [BUG-976 / CCR-PR129-M-3] Fail closed on DB error: skip this cycle
       // rather than throwing uncaught (which would cause Inngest to retry
       // indefinitely and block the notification pipeline). captureException
       // makes the failure queryable in Sentry so we can measure transient
-      // DB hiccup frequency. Mirrors the recall-nudge-send pattern.
-      let recentCount: number;
+      // DB hiccup frequency.
+      let limited: boolean;
       try {
-        recentCount = await getRecentNotificationCount(
+        limited = await checkAndLogRateLimitInternal(
           db,
           profileId,
           'daily_reminder',
-          24,
+          { hours: 24, maxCount: 1 },
         );
       } catch (err) {
         captureException(err, {
           profileId,
-          extra: { context: 'daily-reminder-send:getRecentNotificationCount' },
+          extra: {
+            context: 'daily-reminder-send:checkAndLogRateLimitInternal',
+          },
         });
         return {
           status: 'skipped' as const,
@@ -79,18 +92,28 @@ export const dailyReminderSend = inngest.createFunction(
           profileId,
         };
       }
-      if (recentCount > 0) {
+      if (limited) {
         return { status: 'skipped' as const, reason: 'dedup_24h', profileId };
       }
 
       const body = formatDailyReminderBody(streakDays);
 
-      const sendResult = await sendPushNotification(db, {
-        profileId,
-        title: 'Keep your streak!',
-        body,
-        type: 'daily_reminder',
-      });
+      // [BUG-838] checkAndLogRateLimitInternal already inserted the
+      // notificationLog row in the same transaction that gated us — pass
+      // skipRateLimitLog so sendPushNotification does not double-log this
+      // push toward the daily cap. If the push itself fails we accept the
+      // unsent-but-logged state (mirrors trial-expiry.ts:120 rationale):
+      // a duplicate user-visible push is worse than an unsent one.
+      const sendResult = await sendPushNotification(
+        db,
+        {
+          profileId,
+          title: 'Keep your streak!',
+          body,
+          type: 'daily_reminder',
+        },
+        { skipRateLimitLog: true },
+      );
 
       if (sendResult.sent) {
         return {

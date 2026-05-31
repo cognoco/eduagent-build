@@ -39,7 +39,12 @@ function mapBookmarkRow(row: {
     subjectName: row.subjectName ?? 'Unknown',
     topicTitle: row.topicTitle ?? null,
     content: row.content,
-    createdAt: row.createdAt.toISOString(),
+    // [BUG-858] neon-serverless can return timestamp columns as raw strings
+    // rather than Date instances; wrap with `new Date(...)` so `.toISOString()`
+    // does not crash if the driver shape flips. See project memory
+    // project_drizzle_date_objects.md and the matching sites in
+    // library-search.ts.
+    createdAt: new Date(row.createdAt).toISOString(),
   };
 }
 
