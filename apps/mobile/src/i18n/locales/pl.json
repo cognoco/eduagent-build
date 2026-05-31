@@ -216,7 +216,8 @@
         "momentumWords": "+{{count}} słów",
         "solid": "Solidnie: {{subjects}}",
         "comingUp": "Wkrótce: {{topic}}",
-        "tryTonight": "Spróbuj dziś"
+        "tryTonight": "Spróbuj dziś",
+        "quietStarterWithFocus": "Zapytaj {{name}}, co ułatwiłoby wznowienie {{focus}}."
       },
       "pulse": {
         "multiAllActive": "{{count}} uczniów, wszyscy aktywni w tym tygodniu.",
@@ -228,7 +229,8 @@
       "mentorSlot": {
         "celebrationStreak": "{{name}} ma w tym tygodniu świetną passę — ta seria staje się nawykiem.",
         "celebrationTopics": "Wielki tydzień dla {{name}} — udało się opanować dużo nowego materiału.",
-        "worksFor": "Co działa w przypadku {{name}}"
+        "worksFor": "Co działa w przypadku {{name}}",
+        "mentorRead": "Opinia mentora o {{name}}"
       },
       "learnTogether": {
         "title": "Uczcie się razem",
@@ -1763,7 +1765,6 @@
       "yourChild": "Twoje dziecko",
       "lastSessionAgo": "Ostatnia sesja {{time}}",
       "noSessionsYet": "Brak jeszcze sesji",
-      "reportsSubtitle": "Tygodniowe i miesięczne aktualizacje dla {{name}}",
       "profileNotFound": "Nie znaleziono profilu",
       "unableToLoadChildDetails": "Nie można załadować szczegółów dziecka",
       "profileNoLongerAvailable": "Ten profil nie jest już dostępny",
@@ -1796,7 +1797,6 @@
       "childProfileJoined": "Dodano {{date}}",
       "learningAccommodationTitle": "Dostosowanie nauki dla {{name}}",
       "noLearningPreferenceSet": "Nie ustawiono preferencji nauki",
-      "childProfileScopeHint": "Tutaj znajdziesz ostatnie sesje, przedmioty i notatki mentora. Pełne wykresy postępów i raporty mają osobne zakładki.",
       "consentTitle": "Zgoda",
       "consentDescription": "Zarządzaj zgodą rodzica dla {{name}}.",
       "consentStatusError": "Nie można wczytać statusu zgody. Spróbuj ponownie.",
@@ -1812,7 +1812,12 @@
       "curriculumTitle": "Program nauczania",
       "curriculumSubtitle": "Przeglądaj przedmioty i tematy użytkownika {{name}}",
       "curriculumNotAvailableTitle": "Program nauczania tego dziecka nie jest dostępny",
-      "curriculumNotAvailableBody": "Możesz przeglądać program nauczania tylko dla dzieci powiązanych z Twoim kontem rodzinnym."
+      "curriculumNotAvailableBody": "Możesz przeglądać program nauczania tylko dla dzieci powiązanych z Twoim kontem rodzinnym.",
+      "subjectSessionNextStep": "Krótka powtórka z {{subject}} pomoże {{name}} wrócić do tematu.",
+      "subjectRawMentorSummary": "Zaczęło się od „{{rawInput}}”, więc {{name}} może wciąż doprecyzowywać temat {{subject}}.",
+      "subjectRawNextStep": "Jedna krótka sesja może zmienić to szerokie zainteresowanie w konkretny temat.",
+      "subjectQuietSummary": "{{subject}} czeka, aż {{name}} zechce do tego wrócić.",
+      "subjectQuietNextStep": "Zacznij od jednego łatwego pytania lub tematu, aby powrót był lekki."
     },
     "mentorMemory": {
       "title": "Pamięć mentora",
@@ -2491,10 +2496,10 @@
   "welcomeIntro": {
     "chooser": {
       "question": "What brings you here?",
-      "learnerCta": "I want to learn",
-      "learnerHint": "Study, homework help, and a mentor that's yours.",
-      "parentCta": "I'm done fighting over homework",
-      "parentHint": "A mentor for your kids — and your evenings back."
+      "learnerCta": "Ucz się z mentorem",
+      "learnerHint": "Twój osobisty mentor za ułamek ceny.",
+      "parentCta": "Koniec z kłótniami o lekcje",
+      "parentHint": "Odzyskaj swoje wieczory."
     },
     "learner": {
       "card1": {

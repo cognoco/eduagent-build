@@ -12,9 +12,8 @@ tags:
     file: ../_setup/seed-and-sign-in.yaml
 
 # open-family-dashboard.yaml navigates to child detail via CHILD_PROFILE_ID which is
-# not set by the parent-multi-child seed (it provides CHILD1/2/3_PROFILE_ID). Using
-# it here would cause double-navigation (dashboard -> child detail, then this flow
-# taps again). Replace with a bare wait for parent-home-screen, then tap CHILD1.
+# not set by the parent-multi-child seed (it provides CHILD1/2/3_PROFILE_ID). Use
+# a bare wait for parent-home-screen, then tap CHILD1's Reports action directly.
 - extendedWaitUntil:
     visible:
       id: "parent-home-screen"
@@ -23,23 +22,7 @@ tags:
 - takeScreenshot: 01-parent-dashboard
 
 - tapOn:
-    id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
-
-- extendedWaitUntil:
-    visible:
-      id: "child-detail-scroll"
-    timeout: 10000
-
-- takeScreenshot: 02-child-detail
-
-- scrollUntilVisible:
-    element:
-      id: "child-reports-link"
-    direction: DOWN
-    timeout: 10000
-
-- tapOn:
-    id: "child-reports-link"
+    id: "parent-home-weekly-report-${CHILD1_PROFILE_ID}"
 
 - extendedWaitUntil:
     visible:
@@ -62,7 +45,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: "parent-home-screen"
     timeout: 10000
 
-- takeScreenshot: 04-back-to-child-detail
+- takeScreenshot: 04-back-to-parent-dashboard

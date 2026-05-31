@@ -16,7 +16,6 @@ import { ErrorFallback } from '../../../../components/common';
 import { RecentSessionsList } from '../../../../components/progress';
 import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
-import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import { useProfileSessions } from '../../../../hooks/use-progress';
 import {
   useChildConsentStatus,
@@ -79,6 +78,21 @@ function formatJoinedDate(isoDate: string | null | undefined): string | null {
 }
 
 type DashboardSubject = DashboardChild['subjects'][number];
+type SubjectMentorNoteKey =
+  | 'parentView.index.subjectSessionNextStep'
+  | 'parentView.index.subjectRawMentorSummary'
+  | 'parentView.index.subjectRawNextStep'
+  | 'parentView.index.subjectQuietSummary'
+  | 'parentView.index.subjectQuietNextStep';
+type Translate = (
+  key: SubjectMentorNoteKey,
+  options?: Record<string, unknown>,
+) => string;
+
+type SubjectMentorNote = {
+  summary: string;
+  nextStep: string;
+};
 
 type ProgressNudgeAction = {
   subjectId: string;
@@ -173,6 +187,100 @@ function sortSubjectsByRecentSession(
     if (aLast !== bLast) return bLast - aLast;
     return a.name.localeCompare(b.name);
   });
+}
+
+function getLatestSessionForSubject(
+  subject: DashboardSubject,
+  sessions: ChildSession[] | undefined,
+): ChildSession | null {
+  const subjectId = subject.subjectId?.trim();
+  if (!subjectId || !sessions || sessions.length === 0) return null;
+
+  let latestSession: ChildSession | null = null;
+  let latestStartedAt = 0;
+  for (const session of sessions) {
+    if (session.subjectId?.trim() !== subjectId) continue;
+    const startedAt = Date.parse(session.startedAt);
+    if (Number.isNaN(startedAt)) continue;
+    if (!latestSession || startedAt > latestStartedAt) {
+      latestSession = session;
+      latestStartedAt = startedAt;
+    }
+  }
+
+  return latestSession;
+}
+
+function firstSentence(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  const match = normalized.match(/^.+?[.!?](?:\s|$)/);
+  return (match?.[0] ?? normalized).trim();
+}
+
+function sessionMentorSummary(session: ChildSession | null): string | null {
+  const summary =
+    session?.displaySummary ??
+    session?.highlight ??
+    session?.narrative ??
+    session?.homeworkSummary?.summary ??
+    null;
+  if (!summary) return null;
+
+  const cleanSummary = firstSentence(summary);
+  return cleanSummary.length > 0 ? cleanSummary : null;
+}
+
+function buildSubjectMentorNote({
+  t,
+  childName,
+  subject,
+  latestSession,
+  rawInput,
+}: {
+  t: Translate;
+  childName: string;
+  subject: DashboardSubject;
+  latestSession: ChildSession | null;
+  rawInput: string | null;
+}): SubjectMentorNote {
+  const latestSummary = sessionMentorSummary(latestSession);
+  if (latestSummary) {
+    return {
+      summary: latestSummary,
+      nextStep: t('parentView.index.subjectSessionNextStep', {
+        name: childName,
+        subject: subject.name,
+        defaultValue: `A short follow-up in ${subject.name} would help ${childName} reconnect with it.`,
+      }),
+    };
+  }
+
+  if (rawInput) {
+    return {
+      summary: t('parentView.index.subjectRawMentorSummary', {
+        name: childName,
+        subject: subject.name,
+        rawInput,
+        defaultValue: `This started from "${rawInput}", so ${childName} may still be finding the right shape for ${subject.name}.`,
+      }),
+      nextStep: t('parentView.index.subjectRawNextStep', {
+        defaultValue:
+          'One small session can turn that broad interest into a concrete topic.',
+      }),
+    };
+  }
+
+  return {
+    summary: t('parentView.index.subjectQuietSummary', {
+      name: childName,
+      subject: subject.name,
+      defaultValue: `${subject.name} is ready when ${childName} wants to return to it.`,
+    }),
+    nextStep: t('parentView.index.subjectQuietNextStep', {
+      defaultValue:
+        'Start with one easy question or topic so the restart feels light.',
+    }),
+  };
 }
 
 function RowLink({
@@ -326,11 +434,13 @@ function SubjectCard({
   childName,
   subject,
   showRetentionBadge,
+  latestSession,
 }: {
   profileId: string;
   childName: string;
   subject: DashboardSubject;
   showRetentionBadge: boolean;
+  latestSession: ChildSession | null;
 }): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -343,16 +453,60 @@ function SubjectCard({
     subject.rawInput.trim().toLowerCase() !== subject.name.trim().toLowerCase()
       ? subject.rawInput.trim()
       : null;
+  const translateMentorNote: Translate = (key, options) =>
+    t(key, options) as string;
+  const mentorNote = buildSubjectMentorNote({
+    t: translateMentorNote,
+    childName,
+    subject,
+    latestSession,
+    rawInput,
+  });
 
   const content = (
-    <View className="flex-row items-center justify-between">
-      <View className="flex-1 pe-3">
-        <Text className="text-body font-semibold text-text-primary">
-          {subject.name}
+    <View>
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pe-3">
+          <Text className="text-h3 font-semibold text-text-primary">
+            {subject.name}
+          </Text>
+        </View>
+        {showRetentionBadge ? (
+          <View className="rounded-full bg-primary-soft px-3 py-1">
+            <Text className="text-caption font-semibold text-primary">
+              {t(`parentView.retention.${subject.retentionStatus}.label`, {
+                defaultValue: subject.retentionStatus,
+              })}
+            </Text>
+          </View>
+        ) : null}
+        {canOpen ? (
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.textSecondary}
+            style={{ marginLeft: 10, marginTop: 4 }}
+          />
+        ) : null}
+      </View>
+      <View className="mt-3">
+        <Text
+          className="text-body-sm text-text-primary leading-5"
+          numberOfLines={3}
+          testID={canOpen ? `subject-mentor-summary-${subjectId}` : undefined}
+        >
+          {mentorNote.summary}
         </Text>
-        {rawInput ? (
+        <Text
+          className="text-caption text-text-secondary mt-2 leading-5"
+          numberOfLines={2}
+          testID={canOpen ? `subject-mentor-next-step-${subjectId}` : undefined}
+        >
+          {mentorNote.nextStep}
+        </Text>
+        {rawInput && !latestSession ? (
           <Text
-            className="text-caption text-text-secondary mt-1"
+            className="text-caption text-text-tertiary mt-3"
             testID={canOpen ? `subject-raw-input-${subjectId}` : undefined}
           >
             {t('parentView.index.subjectRawInputAudit', {
@@ -362,28 +516,11 @@ function SubjectCard({
           </Text>
         ) : null}
       </View>
-      {showRetentionBadge ? (
-        <View className="rounded-full bg-primary-soft px-3 py-1">
-          <Text className="text-caption font-semibold text-primary">
-            {t(`parentView.retention.${subject.retentionStatus}.label`, {
-              defaultValue: subject.retentionStatus,
-            })}
-          </Text>
-        </View>
-      ) : null}
-      {canOpen ? (
-        <Ionicons
-          name="chevron-forward"
-          size={18}
-          color={colors.textSecondary}
-          style={{ marginLeft: 10 }}
-        />
-      ) : null}
     </View>
   );
 
   if (!canOpen) {
-    return <View className="bg-surface rounded-card p-4 mt-3">{content}</View>;
+    return <View className="bg-surface rounded-card p-5 mt-3">{content}</View>;
   }
 
   return (
@@ -399,7 +536,7 @@ function SubjectCard({
           },
         } as Href)
       }
-      className="bg-surface rounded-card p-4 mt-3"
+      className="bg-surface rounded-card p-5 mt-3"
       accessibilityRole="button"
       accessibilityLabel={t('parentView.index.openSubjectProgress', {
         subject: subject.name,
@@ -607,9 +744,7 @@ export default function ChildDetailScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const colors = useThemeColors();
   const { profiles, isLoading: isProfileLoading } = useProfile();
-  const navigationContract = useNavigationContract();
   const { profileId: rawProfileId, mode: rawMode } = useLocalSearchParams<{
     profileId: string;
     mode?: string;
@@ -652,7 +787,9 @@ export default function ChildDetailScreen(): React.ReactElement {
   // (before consent loads, when `consentWithdrawn` is false) and leak a read in
   // the withdrawn state this guard exists to block.
   const { data: learnerProfile } = useChildLearnerProfile(
-    consentResolved && !consentWithdrawn ? profileId : undefined,
+    showSettingsOnly && consentResolved && !consentWithdrawn
+      ? profileId
+      : undefined,
   );
   const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt);
@@ -677,10 +814,6 @@ export default function ChildDetailScreen(): React.ReactElement {
     [child?.subjects, sessionsQuery.data],
   );
   const showSubjectRetentionBadges = !isNewLearner(child?.totalSessions);
-  const showCurriculumLink = navigationContract.isSurfaced(
-    'child/[profileId]/curriculum',
-    { profileId },
-  );
   const openProgressNudgeAction = (): void => {
     if (!progressNudgeAction) return;
 
@@ -875,47 +1008,6 @@ export default function ChildDetailScreen(): React.ReactElement {
           />
         ) : null}
 
-        {!showSettingsOnly && !showProgressOnly ? (
-          <>
-            {showCurriculumLink ? (
-              <RowLink
-                icon="book-outline"
-                title={t('parentView.index.curriculumTitle', {
-                  defaultValue: 'Curriculum',
-                })}
-                subtitle={t('parentView.index.curriculumSubtitle', {
-                  name: childName,
-                  defaultValue: `Browse ${childName}'s subjects and topics`,
-                })}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/child/[profileId]/curriculum',
-                    params: { profileId },
-                  } as Href)
-                }
-                testID="child-curriculum-link"
-              />
-            ) : null}
-            <RowLink
-              icon="document-text-outline"
-              title={t('parentView.reports.title', {
-                defaultValue: 'Reports',
-              })}
-              subtitle={t('parentView.index.reportsSubtitle', {
-                name: childName,
-                defaultValue: `Weekly and monthly updates for ${childName}`,
-              })}
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/child/[profileId]/reports',
-                  params: { profileId },
-                } as Href)
-              }
-              testID="child-reports-link"
-            />
-          </>
-        ) : null}
-
         {!showSettingsOnly && sortedSubjects.length > 0 ? (
           <View className="mt-6" testID="child-subjects-section">
             <Text className="text-h3 font-semibold text-text-primary mb-1">
@@ -936,6 +1028,10 @@ export default function ChildDetailScreen(): React.ReactElement {
                 childName={childName}
                 subject={subject}
                 showRetentionBadge={showSubjectRetentionBadges}
+                latestSession={getLatestSessionForSubject(
+                  subject,
+                  sessionsQuery.data,
+                )}
               />
             ))}
           </View>
@@ -948,7 +1044,7 @@ export default function ChildDetailScreen(): React.ReactElement {
           />
         ) : null}
 
-        {!showProgressOnly ? (
+        {showSettingsOnly ? (
           <>
             {profileId && child?.displayName ? (
               <RowLink
@@ -1005,22 +1101,6 @@ export default function ChildDetailScreen(): React.ReactElement {
               childProfileId={profileId}
               childName={childName}
             />
-
-            <View className="mt-5 rounded-card bg-primary-soft px-4 py-3">
-              <View className="flex-row items-start">
-                <Ionicons
-                  name="information-circle-outline"
-                  size={18}
-                  color={colors.primary}
-                />
-                <Text className="text-caption text-text-secondary ms-2 flex-1">
-                  {t('parentView.index.childProfileScopeHint', {
-                    defaultValue:
-                      "Recent sessions, subjects, and the mentor's notes live here. Full progress charts and reports have their own tabs.",
-                  })}
-                </Text>
-              </View>
-            </View>
           </>
         ) : null}
       </ScrollView>

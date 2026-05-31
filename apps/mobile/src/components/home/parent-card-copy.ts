@@ -83,7 +83,10 @@ function resolveQuiet(
     momentum: [],
     solid: null,
     comingUp: null,
-    starter: fallbackStarter(child, t),
+    starter:
+      !isNewLearner && focus
+        ? t('home.parent.card.quietStarterWithFocus', { name, focus })
+        : fallbackStarter(child, t),
   };
 }
 

@@ -21,6 +21,7 @@ interface LearnTogetherSheetProps {
   child: Pick<Profile, 'id' | 'displayName'>;
   dashboardChild: DashboardChild | undefined;
   latestRecap: RecapListItem | null;
+  hiddenPromptText?: string | null;
   onClose: () => void;
 }
 
@@ -36,6 +37,7 @@ export function LearnTogetherSheet({
   child,
   dashboardChild,
   latestRecap,
+  hiddenPromptText,
   onClose,
 }: LearnTogetherSheetProps): React.ReactElement {
   const { t } = useTranslation();
@@ -50,13 +52,14 @@ export function LearnTogetherSheet({
   const canClone =
     navigationContract.gates.showLearnThisToo && cloneTopicId !== null;
 
+  const hiddenPrompt = hiddenPromptText?.trim();
   const proposals = buildSingleChildPrompts(
     child,
     dashboardChild,
     t,
     false,
     MAX_PROPOSALS,
-  );
+  ).filter((prompt) => !hiddenPrompt || prompt.text.trim() !== hiddenPrompt);
   const hasProposals = proposals.length > 0;
   const isEmpty = !canClone && !hasProposals;
 

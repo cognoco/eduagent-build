@@ -224,6 +224,7 @@
         "quietWithFocus": "{{name}} had a quieter week — last time the focus was {{focus}}.",
         "quietNew": "{{name}} is all set up — chosen subjects: {{subjects}}. Here's how to help them begin.",
         "quietPlain": "{{name}} had a quieter week.",
+        "quietStarterWithFocus": "Ask {{name}} what would make {{focus}} easy to restart.",
         "headlineFromWeekly": "{{label}}: {{value}} ({{comparison}})",
         "activePlain": "{{name}} kept things moving in {{focus}}.",
         "activePlainNoFocus": "{{name}} kept things moving this week.",
@@ -244,6 +245,7 @@
       "mentorSlot": {
         "celebrationStreak": "{{name}} is on a real roll this week — that streak is becoming a habit.",
         "celebrationTopics": "Big week for {{name}} — lots of new ground covered.",
+        "mentorRead": "Mentor's read on {{name}}",
         "worksFor": "What works for {{name}}"
       },
       "learnTogether": {
@@ -1831,7 +1833,6 @@
       "yourChild": "Your child",
       "lastSessionAgo": "Last session {{time}}",
       "noSessionsYet": "No sessions yet",
-      "reportsSubtitle": "Weekly and monthly updates for {{name}}",
       "curriculumTitle": "Curriculum",
       "curriculumSubtitle": "Browse {{name}}'s subjects and topics",
       "curriculumNotAvailableTitle": "This child's curriculum is not available",
@@ -1854,6 +1855,11 @@
       "openProgressNudgeAction": "Open {{subject}}",
       "subjects": "Subjects",
       "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectSessionNextStep": "A short follow-up in {{subject}} would help {{name}} reconnect with it.",
+      "subjectRawMentorSummary": "This started from \"{{rawInput}}\", so {{name}} may still be finding the right shape for {{subject}}.",
+      "subjectRawNextStep": "One small session can turn that broad interest into a concrete topic.",
+      "subjectQuietSummary": "{{subject}} is ready when {{name}} wants to return to it.",
+      "subjectQuietNextStep": "Start with one easy question or topic so the restart feels light.",
       "subjectRawInputAudit": "Your child searched for \"{{rawInput}}\"",
       "openSubjectProgress": "Open {{subject}} progress",
       "recentSessions": "Recent sessions",
@@ -1868,7 +1874,6 @@
       "childProfileJoined": "Added {{date}}",
       "learningAccommodationTitle": "Learning accommodation for {{name}}",
       "noLearningPreferenceSet": "No learning preference set",
-      "childProfileScopeHint": "Recent sessions, subjects, and the mentor's notes live here. Full progress charts and reports have their own tabs.",
       "consentTitle": "Consent",
       "consentDescription": "Manage parental consent for {{name}}.",
       "consentStatusError": "Could not load consent status. Please try again.",
@@ -2522,10 +2527,10 @@
   "welcomeIntro": {
     "chooser": {
       "question": "What brings you here?",
-      "learnerCta": "I want to learn",
-      "learnerHint": "Study, homework help, and a mentor that's yours.",
-      "parentCta": "I'm done fighting over homework",
-      "parentHint": "A mentor for your kids — and your evenings back."
+      "learnerCta": "Learn with a mentor",
+      "learnerHint": "Your personal mentor for a fraction of the price.",
+      "parentCta": "End homework fights",
+      "parentHint": "Get your evenings back."
     },
     "learner": {
       "card1": {

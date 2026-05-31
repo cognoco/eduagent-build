@@ -97,12 +97,11 @@ jest.mock('react-i18next', () => ({
     t: (key: string) => {
       const dict: Record<string, string> = {
         'welcomeIntro.chooser.question': 'What brings you here?',
-        'welcomeIntro.chooser.learnerCta': 'I want to learn',
+        'welcomeIntro.chooser.learnerCta': 'Learn with a mentor',
         'welcomeIntro.chooser.learnerHint':
-          "Study, homework help, and a mentor that's yours.",
-        'welcomeIntro.chooser.parentCta': "I'm done fighting over homework",
-        'welcomeIntro.chooser.parentHint':
-          'A mentor for your kids - and your evenings back.',
+          'Your personal mentor for a fraction of the price.',
+        'welcomeIntro.chooser.parentCta': 'End homework fights',
+        'welcomeIntro.chooser.parentHint': 'Get your evenings back.',
         'welcomeIntro.bridge.headline':
           'Turn "I don\'t get it" into "I\'ve got this."',
         'welcomeIntro.bridge.supporting':
@@ -142,6 +141,12 @@ describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
     expect(screen.getByTestId('welcome-chooser')).toBeTruthy();
     expect(screen.getByTestId('welcome-chooser-learner')).toBeTruthy();
     expect(screen.getByTestId('welcome-chooser-parent')).toBeTruthy();
+    expect(screen.getByText('Learn with a mentor')).toBeTruthy();
+    expect(
+      screen.getByText('Your personal mentor for a fraction of the price.'),
+    ).toBeTruthy();
+    expect(screen.getByText('End homework fights')).toBeTruthy();
+    expect(screen.getByText('Get your evenings back.')).toBeTruthy();
     expect(screen.queryByTestId('welcome-intro-stub')).toBeNull();
     expect(screen.queryByTestId('pre-auth-bridge')).toBeNull();
   });
@@ -168,7 +173,7 @@ describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
     expect(started.length).toBe(1);
   });
 
-  it('"I want to learn" shows the learner deck and logs the choice', () => {
+  it('"Learn with a mentor" shows the learner deck and logs the choice', () => {
     render(<PreAuthWelcomeRoute />);
     chooseLearner();
     expect(screen.getByTestId('welcome-intro-stub')).toBeTruthy();
@@ -188,7 +193,7 @@ describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
     ).toBe(WELCOME_DARK_STAGE_COLORS.background);
   });
 
-  it('"I\'m done fighting over homework" shows the parent deck and logs the choice', () => {
+  it('"End homework fights" shows the parent deck and logs the choice', () => {
     render(<PreAuthWelcomeRoute />);
     chooseParent();
     expect(
@@ -199,13 +204,13 @@ describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
     });
   });
 
-  it('persists the chosen audience across the signup wall ("I want to learn")', () => {
+  it('persists the chosen audience across the signup wall ("Learn with a mentor")', () => {
     render(<PreAuthWelcomeRoute />);
     chooseLearner();
     expect(mockMarkAudience).toHaveBeenCalledWith('learner');
   });
 
-  it('persists the chosen audience across the signup wall ("I\'m done fighting over homework")', () => {
+  it('persists the chosen audience across the signup wall ("End homework fights")', () => {
     render(<PreAuthWelcomeRoute />);
     chooseParent();
     expect(mockMarkAudience).toHaveBeenCalledWith('parent');
