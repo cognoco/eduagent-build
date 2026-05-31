@@ -791,6 +791,38 @@ describe('billing routes', () => {
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
 
+    // [BUG-826] family/pro are shared-pool but support per-profile breakdown.
+    // Without an active profile the route would otherwise leak family-wide
+    // aggregates via getQuotaPool to a caller with no profile context.
+    it.each(['family', 'pro'] as const)(
+      '%s tier requires active profile and does not leak shared-pool aggregates',
+      async (tier) => {
+        mockFindOwnerProfile.mockResolvedValueOnce(null);
+        mockGetSubscriptionByAccountId.mockResolvedValue(
+          mockSubscription({ tier }),
+        );
+        mockGetEffectiveAccessForSubscription.mockResolvedValue(
+          mockEffectiveAccess({
+            subscription: mockSubscription({ tier }),
+            effectiveAccessTier: tier,
+          }),
+        );
+        mockGetQuotaPool.mockResolvedValue(
+          mockQuotaPool({ usedThisMonth: 999 }),
+        );
+
+        const res = await app.request(
+          '/v1/usage',
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(400);
+        expect(mockGetQuotaPool).not.toHaveBeenCalled();
+        expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
+      },
+    );
+
     it('returns child-visible usage from their profile breakdown', async () => {
       const childProfileId = '550e8400-e29b-41d4-a716-446655440000';
       mockProfileFindFirst.mockResolvedValue({
