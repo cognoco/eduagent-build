@@ -239,6 +239,8 @@ export const subjectProgressSchema = z.object({
   topicsTotal: z.number().int(),
   topicsCompleted: z.number().int(),
   topicsVerified: z.number().int(),
+  topicsMastered: z.number().int(),
+  topicsLearning: z.number().int(),
   urgencyScore: z.number(),
   // [L1.C1.11] 'unknown' represents a subject with zero retention cards —
   // the learner has no retention data to summarize. UI should treat 'unknown'
@@ -263,6 +265,9 @@ export const topicProgressSchema = z.object({
   daysSinceLastReview: z.number().int().min(0).nullable(),
   struggleStatus: struggleStatusSchema,
   masteryScore: z.number().min(0).max(1).nullable(),
+  masteredAt: isoDateField.nullable().optional(),
+  strongReviews: z.number().int().min(0),
+  strongReviewsTarget: z.number().int().min(1),
   masteryChallengeVerifiedAt: isoDateField.nullable().optional(),
   /**
    * Server-resolved Challenge Round verification state for the learner-visible
@@ -678,6 +683,8 @@ export const progressOverviewResponseSchema = z.object({
   subjects: z.array(subjectProgressSchema),
   totalTopicsCompleted: z.number().int(),
   totalTopicsVerified: z.number().int(),
+  totalTopicsMastered: z.number().int(),
+  totalTopicsLearning: z.number().int(),
   practiceActivityCount: z.number().int().min(0).default(0),
   practiceSummary: reportPracticeSummarySchema.default(
     emptyProgressOverviewPracticeSummary,

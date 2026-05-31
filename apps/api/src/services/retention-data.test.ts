@@ -68,7 +68,11 @@ jest.mock(
 );
 
 import type { Database } from '@eduagent/database';
-import { createScopedRepository } from '@eduagent/database';
+import {
+  createScopedRepository,
+  curriculumBooks,
+  retentionCards,
+} from '@eduagent/database';
 import { processRecallResult, getRetentionStatus } from './retention';
 import {
   canExitNeedsDeepening,
@@ -123,6 +127,7 @@ function mockRetentionCardRow(
     topicId: string;
     xpStatus: string;
     nextReviewAt: Date | null;
+    masteredAt: Date | null;
   }>,
 ) {
   return {
@@ -138,6 +143,7 @@ function mockRetentionCardRow(
     failureCount: 0,
     consecutiveSuccesses: 2,
     xpStatus: overrides?.xpStatus ?? 'pending',
+    masteredAt: overrides?.masteredAt ?? null,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -1021,6 +1027,51 @@ describe('processRecallTest', () => {
     );
   });
 
+  it('stamps topic and book mastery when delayed recall enters verified', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Detailed explanation of the topic',
+    });
+
+    const updateTables = (db.update as jest.Mock).mock.calls.map(
+      ([table]) => table,
+    );
+    expect(updateTables).toContain(retentionCards);
+    expect(updateTables).toContain(curriculumBooks);
+
+    const setMock = (db.update as jest.Mock).mock.results[0]!.value.set;
+    expect(setMock.mock.calls).toEqual(
+      expect.arrayContaining([
+        [
+          expect.objectContaining({
+            masteredAt: NOW,
+            updatedAt: NOW,
+          }),
+        ],
+      ]),
+    );
+  });
+
   it('calls syncXpLedgerStatus with decayed when recall fails with decay', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
@@ -1054,6 +1105,11 @@ describe('processRecallTest', () => {
       topicId,
       'decayed',
     );
+    expect(
+      (db.update as jest.Mock).mock.calls.some(
+        ([table]) => table === curriculumBooks,
+      ),
+    ).toBe(false);
   });
 
   // [AUDIT-SILENT-FAIL] Break test — a silent catch on XP ledger sync

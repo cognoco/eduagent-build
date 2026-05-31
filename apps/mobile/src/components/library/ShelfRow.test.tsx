@@ -32,7 +32,9 @@ const defaultProps = {
   subjectId: 'sub-math',
   name: 'Mathematics',
   bookCount: 3,
-  topicProgress: '18/32',
+  topicsMastered: 18,
+  topicsLearning: 4,
+  topicsTotal: 32,
   reviewDueCount: 0,
   isFinished: false,
   isPaused: false,
@@ -53,7 +55,7 @@ describe('ShelfRow', () => {
 
     screen.getByTestId('shelf-row-header-sub-math');
     screen.getByText('Mathematics');
-    screen.getByText('3 books · 18/32 topics');
+    screen.getByText('3 books · 18 mastered · 4 learning');
   });
 
   it('renders books standing on a shelf plank', () => {
@@ -100,13 +102,19 @@ describe('ShelfRow', () => {
         left: 84,
       }),
     );
-    screen.getByTestId('shelf-row-rail-sub-math');
     expect(
-      screen.getByTestId('shelf-row-progress-sub-math').props.style,
+      screen.getByTestId('shelf-row-progress-mastered-sub-math').props.style,
     ).toEqual(
       expect.objectContaining({
         backgroundColor: '#2f6fbd',
         width: '56%',
+      }),
+    );
+    expect(
+      screen.getByTestId('shelf-row-progress-learning-sub-math').props.style,
+    ).toEqual(
+      expect.objectContaining({
+        width: '13%',
       }),
     );
   });
@@ -145,11 +153,19 @@ describe('ShelfRow', () => {
   it('renders singular "book" label when bookCount is 1', () => {
     render(<ShelfRow {...defaultProps} bookCount={1} />);
 
-    screen.getByText('1 book · 18/32 topics');
+    screen.getByText('1 book · 18 mastered · 4 learning');
   });
 
   it('renders "Start learning" when subject has no books or topics', () => {
-    render(<ShelfRow {...defaultProps} bookCount={0} topicProgress="0/0" />);
+    render(
+      <ShelfRow
+        {...defaultProps}
+        bookCount={0}
+        topicsMastered={0}
+        topicsLearning={0}
+        topicsTotal={0}
+      />,
+    );
 
     screen.getByText('Start learning');
     expect(screen.queryByText(/books/)).toBeNull();

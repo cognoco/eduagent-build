@@ -263,6 +263,7 @@ function makeRetentionCardRow(
     consecutiveSuccesses: 0,
     xpStatus: 'pending',
     evaluateDifficultyRung: null,
+    masteredAt: null,
     createdAt: new Date('2026-04-01T00:00:00.000Z'),
     updatedAt: new Date('2026-04-01T00:00:00.000Z'),
     ...overrides,

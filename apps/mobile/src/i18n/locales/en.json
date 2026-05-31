@@ -1062,8 +1062,6 @@
       "finished": "Finished",
       "paused": "Paused",
       "archived": "Archived",
-      "shelfSubtitle_one": "{{count}} book · {{progress}} topics",
-      "shelfSubtitle_other": "{{count}} books · {{progress}} topics",
       "shelfSubtitleUnstarted": "Start learning",
       "shelfAccessibilityLabel": "{{name}} shelf, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Tap to {{action}}.",
       "shelfPausedSuffix": ", paused",
@@ -1071,7 +1069,11 @@
       "shelfReviewSuffix": ", review needed",
       "shelfFinishedSuffix": ", finished",
       "shelfActionOpen": "open",
-      "urgencyBadge": "Soon: {{reason}}"
+      "urgencyBadge": "Soon: {{reason}}",
+      "shelfSubtitleMastered_one": "{{count}} book · {{mastered}} mastered · {{learning}} learning",
+      "shelfSubtitleMastered_other": "{{count}} books · {{mastered}} mastered · {{learning}} learning",
+      "shelfSubtitleLearningOnly_one": "{{count}} book · {{learning}} learning",
+      "shelfSubtitleLearningOnly_other": "{{count}} books · {{learning}} learning"
     },
     "shelf": {
       "missingParam": "Missing subject. Please go back and try again.",
@@ -1081,7 +1083,7 @@
       "fallbackTitle": "Shelf",
       "bookCount_one": "{{count}} book",
       "bookCount_other": "{{count}} books",
-      "topicProgress": "{{completed}}/{{total}} topics",
+      "topicProgress": "{{mastered}} mastered · {{learning}} learning",
       "settingsAccessibilityLabel": "Subject settings",
       "studyNext": "Study next",
       "suggestionAdd": "Add to shelf",
@@ -1118,7 +1120,22 @@
       "practicedOftenHint": "You practice this topic often — keep it up!",
       "relatedRail": {
         "label": "Related topics"
-      }
+      },
+      "covers": "This topic covers",
+      "mastered": "Mastered",
+      "strongReviewProgress": "{{strong}}/{{total}} strong reviews"
+    },
+    "book": {
+      "readyToOpen": "Ready to open",
+      "buildThisBook": "Building this book",
+      "status": {
+        "NOT_STARTED": "Not started",
+        "IN_PROGRESS": "Learning",
+        "REVIEW_DUE": "Review due"
+      },
+      "mastered": "Mastered",
+      "reviewDue": "Review ready",
+      "topicProgressThreeState": "{{mastered}} mastered · {{learning}} learning · {{total}} total"
     }
   },
   "topic": {

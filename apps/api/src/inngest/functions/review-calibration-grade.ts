@@ -14,6 +14,7 @@ import {
 } from '../../services/retention-data';
 import { canRetestTopic, processRecallResult } from '../../services/retention';
 import { syncXpLedgerStatus } from '../../services/xp';
+import { stampMasteryOnVerify } from '../../services/retention-mastery';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
 
@@ -131,6 +132,17 @@ export async function handleReviewCalibrationGrade({
   if (persisted.length === 0) {
     return { skipped: 'cooldown_claim_lost', sessionId };
   }
+
+  await step.run('stamp-mastery-on-verify', async () => {
+    const db = getStepDatabase();
+    await stampMasteryOnVerify(db, {
+      profileId,
+      topicId,
+      cardId: card.id,
+      xpChange: result.xpChange,
+      masteredAt: eventAt,
+    });
+  });
 
   await step.run('sync-xp-ledger', async () => {
     const db = getStepDatabase();

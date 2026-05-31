@@ -143,6 +143,7 @@ export const curriculumBooks = pgTable(
     // future retries. Set to NOW() alongside retry_in_flight=true; reset to
     // NULL alongside retry_in_flight=false in the release step.
     retryClaimedAt: timestamp('retry_claimed_at', { withTimezone: true }),
+    masteredAt: timestamp('mastered_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

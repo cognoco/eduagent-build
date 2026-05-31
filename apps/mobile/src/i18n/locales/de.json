@@ -966,8 +966,6 @@
       "finished": "Fertig",
       "paused": "Pausiert",
       "archived": "Archiviert",
-      "shelfSubtitle_one": "{{count}} Buch · {{progress}} Themen",
-      "shelfSubtitle_other": "{{count}} Bücher · {{progress}} Themen",
       "shelfSubtitleUnstarted": "Jetzt lernen",
       "shelfAccessibilityLabel": "{{name}}-Regal, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Tippen zum {{action}}.",
       "shelfPausedSuffix": ", pausiert",
@@ -977,13 +975,17 @@
       "shelfActionOpen": "Öffnen",
       "urgencyBadge": "Bald: {{reason}}",
       "review_one": "{{count}} zum Wiederholen",
-      "review_other": "{{count}} zum Wiederholen"
+      "review_other": "{{count}} zum Wiederholen",
+      "shelfSubtitleMastered_one": "{{count}} Buch · {{mastered}} gemeistert · {{learning}} im Lernen",
+      "shelfSubtitleMastered_other": "{{count}} Bücher · {{mastered}} gemeistert · {{learning}} im Lernen",
+      "shelfSubtitleLearningOnly_one": "{{count}} Buch · {{learning}} im Lernen",
+      "shelfSubtitleLearningOnly_other": "{{count}} Bücher · {{learning}} im Lernen"
     },
     "shelf": {
       "missingParam": "Fehlendes Fach. Bitte gehe zurück und versuche es erneut.",
       "errorTitle": "Dieses Regal konnte nicht geladen werden",
       "fallbackTitle": "Regal",
-      "topicProgress": "{{completed}}/{{total}} Themen",
+      "topicProgress": "{{mastered}} gemeistert · {{learning}} im Lernen",
       "settingsAccessibilityLabel": "Facheinstellungen",
       "studyNext": "Als Nächstes lernen",
       "addAnotherBook": "Weiteres Buch hinzufügen",
@@ -1032,7 +1034,22 @@
       "practicedOftenHint": "Du übst dieses Thema oft — weiter so!",
       "relatedRail": {
         "label": "Verwandte Themen"
-      }
+      },
+      "covers": "Dieses Thema behandelt",
+      "mastered": "Gemeistert",
+      "strongReviewProgress": "{{strong}}/{{total}} starke Wiederholungen"
+    },
+    "book": {
+      "readyToOpen": "Bereit zum Öffnen",
+      "buildThisBook": "Buch wird vorbereitet",
+      "status": {
+        "NOT_STARTED": "Nicht gestartet",
+        "IN_PROGRESS": "In Arbeit",
+        "REVIEW_DUE": "Wiederholung fällig"
+      },
+      "mastered": "Gemeistert",
+      "reviewDue": "Wiederholung bereit",
+      "topicProgressThreeState": "{{mastered}} gemeistert · {{learning}} im Lernen · {{total}} gesamt"
     }
   },
   "topic": {

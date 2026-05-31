@@ -966,7 +966,7 @@
       "missingParam": "Mangler emne. Gå tilbake og prøv igjen.",
       "errorTitle": "Kunne ikke laste denne hyllen",
       "fallbackTitle": "Hylle",
-      "topicProgress": "{{completed}}/{{total}} temaer",
+      "topicProgress": "{{mastered}} mestret · {{learning}} lærer",
       "settingsAccessibilityLabel": "Emneinnstillinger",
       "studyNext": "Studer neste",
       "addAnotherBook": "Legg til en annen bok",
@@ -998,8 +998,6 @@
       "finished": "Ferdig",
       "paused": "Pauset",
       "archived": "Arkivert",
-      "shelfSubtitle_one": "{{count}} bok · {{progress}} temaer",
-      "shelfSubtitle_other": "{{count}} bøker · {{progress}} temaer",
       "shelfSubtitleUnstarted": "Start å lære",
       "shelfAccessibilityLabel": "{{name}}-hylle, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Trykk for å {{action}}.",
       "shelfPausedSuffix": ", pauset",
@@ -1009,7 +1007,11 @@
       "shelfActionOpen": "åpne",
       "urgencyBadge": "Snart: {{reason}}",
       "review_one": "{{count}} til repetisjon",
-      "review_other": "{{count}} til repetisjon"
+      "review_other": "{{count}} til repetisjon",
+      "shelfSubtitleMastered_one": "{{count}} bok · {{mastered}} mestret · {{learning}} lærer",
+      "shelfSubtitleMastered_other": "{{count}} bøker · {{mastered}} mestret · {{learning}} lærer",
+      "shelfSubtitleLearningOnly_one": "{{count}} bok · {{learning}} lærer",
+      "shelfSubtitleLearningOnly_other": "{{count}} bøker · {{learning}} lærer"
     },
     "nextAction": {
       "title": "Fortsett med {{subject}}",
@@ -1032,7 +1034,22 @@
       "practicedOftenHint": "Du øver ofte på dette emnet — fortsett slik!",
       "relatedRail": {
         "label": "Relaterte emner"
-      }
+      },
+      "covers": "Dette emnet dekker",
+      "mastered": "Mestret",
+      "strongReviewProgress": "{{strong}}/{{total}} sterke repetisjoner"
+    },
+    "book": {
+      "readyToOpen": "Klar til å åpne",
+      "buildThisBook": "Bygger denne boka",
+      "status": {
+        "NOT_STARTED": "Ikke startet",
+        "IN_PROGRESS": "Lærer",
+        "REVIEW_DUE": "Repetisjon klar"
+      },
+      "mastered": "Mestret",
+      "reviewDue": "Klar for repetisjon",
+      "topicProgressThreeState": "{{mastered}} mestret · {{learning}} lærer · {{total}} totalt"
     }
   },
   "topic": {

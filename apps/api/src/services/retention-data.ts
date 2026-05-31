@@ -57,6 +57,7 @@ import {
 } from './adaptive-teaching';
 import { calculateMasteryScore } from './assessments';
 import { syncXpLedgerStatus } from './xp';
+import { stampMasteryOnVerify } from './retention-mastery';
 import { routeAndCall, type ChatMessage } from './llm';
 import { captureException } from './sentry';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
@@ -98,6 +99,7 @@ function mapRetentionCardRow(
     lastReviewedAt: row.lastReviewedAt?.toISOString() ?? null,
     daysSinceLastReview: computeDaysSinceLastReview(row.lastReviewedAt),
     xpStatus: row.xpStatus as 'pending' | 'verified' | 'decayed',
+    masteredAt: row.masteredAt?.toISOString() ?? null,
     failureCount: row.failureCount,
     evaluateDifficultyRung: row.evaluateDifficultyRung as 1 | 2 | 3 | 4 | null,
   };
@@ -940,6 +942,16 @@ export async function processRecallTest(
       cooldownEndsAt: new Date(Date.now() + RETEST_COOLDOWN_MS).toISOString(),
     };
   }
+
+  await stampMasteryOnVerify(db, {
+    profileId,
+    topicId: input.topicId,
+    cardId: effectiveCard.id,
+    xpChange: result.xpChange,
+    masteredAt: result.newState.lastReviewedAt
+      ? new Date(result.newState.lastReviewedAt)
+      : undefined,
+  });
 
   // Emit practice activity event for ledger aggregation (weekly/monthly report
   // practiceSummary, library/progress counts). Matches dictation/vocabulary

@@ -966,7 +966,7 @@
       "missingParam": "科目がありません。戻って、もう一度お試しください。",
       "errorTitle": "この棚を読み込めませんでした",
       "fallbackTitle": "棚",
-      "topicProgress": "{{completed}}/{{total}}トピック",
+      "topicProgress": "習得{{mastered}}・学習中{{learning}}",
       "settingsAccessibilityLabel": "科目の設定",
       "studyNext": "次に学習する",
       "addAnotherBook": "別の本を追加",
@@ -998,8 +998,6 @@
       "finished": "完了",
       "paused": "一時停止中",
       "archived": "アーカイブ済み",
-      "shelfSubtitle_one": "{{count}}冊の本・{{progress}}トピック",
-      "shelfSubtitle_other": "{{count}}冊の本・{{progress}}トピック",
       "shelfSubtitleUnstarted": "学習を始める",
       "shelfAccessibilityLabel": "{{name}}の棚、{{subtitle}}{{pausedSuffix}}{{reviewSuffix}}。タップして{{action}}。",
       "shelfPausedSuffix": "、一時停止中",
@@ -1009,7 +1007,11 @@
       "shelfActionOpen": "開く",
       "urgencyBadge": "もうすぐ: {{reason}}",
       "review_one": "復習が{{count}}件",
-      "review_other": "復習が{{count}}件"
+      "review_other": "復習が{{count}}件",
+      "shelfSubtitleMastered_one": "{{count}}冊・習得{{mastered}}・学習中{{learning}}",
+      "shelfSubtitleMastered_other": "{{count}}冊・習得{{mastered}}・学習中{{learning}}",
+      "shelfSubtitleLearningOnly_one": "{{count}}冊・学習中{{learning}}",
+      "shelfSubtitleLearningOnly_other": "{{count}}冊・学習中{{learning}}"
     },
     "nextAction": {
       "title": "{{subject}}を続ける",
@@ -1032,7 +1034,22 @@
       "practicedOftenHint": "このトピックをよく練習しています — 続けましょう！",
       "relatedRail": {
         "label": "関連トピック"
-      }
+      },
+      "covers": "このトピックの内容",
+      "mastered": "習得済み",
+      "strongReviewProgress": "{{strong}}/{{total}}回の強い復習"
+    },
+    "book": {
+      "readyToOpen": "開けます",
+      "buildThisBook": "この本を準備中",
+      "status": {
+        "NOT_STARTED": "未開始",
+        "IN_PROGRESS": "学習中",
+        "REVIEW_DUE": "復習が必要"
+      },
+      "mastered": "習得済み",
+      "reviewDue": "復習できます",
+      "topicProgressThreeState": "習得{{mastered}}・学習中{{learning}}・全{{total}}"
     }
   },
   "topic": {

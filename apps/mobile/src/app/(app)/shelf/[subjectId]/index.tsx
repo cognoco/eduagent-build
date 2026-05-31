@@ -20,6 +20,7 @@ import {
 } from '../../../../lib/format-api-error';
 import { resolveLoadingMotionPreset } from '../../../../lib/motion-presets';
 import { useSubjectTint, useThemeColors } from '../../../../lib/theme';
+import { withOpacity } from '../../../../lib/color-opacity';
 
 export default function ShelfScreen() {
   const { t } = useTranslation();
@@ -35,7 +36,10 @@ export default function ShelfScreen() {
   // BUG-418: Use Array.isArray instead of ?? — TanStack Query's `select` is
   // bypassed when `enabled` is false, so `data` can be a wrapped object rather
   // than an array. The ?? operator only catches null/undefined, not objects.
-  const books = Array.isArray(booksQuery.data) ? booksQuery.data : [];
+  const books = useMemo(
+    () => (Array.isArray(booksQuery.data) ? booksQuery.data : []),
+    [booksQuery.data],
+  );
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
   const shelfTint = useSubjectTint(subjectId ?? 'shelf');
   const screenLoadingMotion = resolveLoadingMotionPreset({
@@ -203,6 +207,11 @@ export default function ShelfScreen() {
     (sum, b) => sum + (b.completedTopicCount ?? 0),
     0,
   );
+  const masteredTopics = books.reduce(
+    (sum, b) => sum + (b.masteredTopicCount ?? 0),
+    0,
+  );
+  const learningTopics = Math.max(0, completedTopics - masteredTopics);
   const showProgress = totalTopics > 0;
   const showBrowseAllSuggestions = bookSuggestions.length > 2;
 
@@ -336,20 +345,36 @@ export default function ShelfScreen() {
                 testID="shelf-progress-label"
               >
                 {t('library.shelf.topicProgress', {
-                  completed: completedTopics,
-                  total: totalTopics,
+                  mastered: masteredTopics,
+                  learning: learningTopics,
                 })}
               </Text>
               <View className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
                 <View
-                  className="h-full bg-primary rounded-full"
+                  className="h-full rounded-full"
                   style={{
+                    position: 'absolute',
+                    left: 0,
                     backgroundColor: shelfTint.solid,
                     width: `${Math.round(
-                      (completedTopics / totalTopics) * 100,
+                      (masteredTopics / totalTopics) * 100,
                     )}%`,
                   }}
-                  testID="shelf-progress-bar"
+                  testID="shelf-progress-mastered-bar"
+                />
+                <View
+                  className="h-full rounded-full"
+                  style={{
+                    position: 'absolute',
+                    left: `${Math.round(
+                      (masteredTopics / totalTopics) * 100,
+                    )}%`,
+                    backgroundColor: withOpacity(shelfTint.solid, 0.38),
+                    width: `${Math.round(
+                      (learningTopics / totalTopics) * 100,
+                    )}%`,
+                  }}
+                  testID="shelf-progress-learning-bar"
                 />
               </View>
             </View>

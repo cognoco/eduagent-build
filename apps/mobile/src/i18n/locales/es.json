@@ -966,8 +966,6 @@
       "finished": "Terminado",
       "paused": "En pausa",
       "archived": "Archivado",
-      "shelfSubtitle_one": "{{count}} libro · {{progress}} temas",
-      "shelfSubtitle_other": "{{count}} libros · {{progress}} temas",
       "shelfSubtitleUnstarted": "Empezar a aprender",
       "shelfAccessibilityLabel": "Estante de {{name}}, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Toca para {{action}}.",
       "shelfPausedSuffix": ", en pausa",
@@ -977,13 +975,17 @@
       "shelfActionOpen": "abrir",
       "urgencyBadge": "Pronto: {{reason}}",
       "review_one": "{{count}} para repasar",
-      "review_other": "{{count}} para repasar"
+      "review_other": "{{count}} para repasar",
+      "shelfSubtitleMastered_one": "{{count}} libro · {{mastered}} dominados · {{learning}} aprendiendo",
+      "shelfSubtitleMastered_other": "{{count}} libros · {{mastered}} dominados · {{learning}} aprendiendo",
+      "shelfSubtitleLearningOnly_one": "{{count}} libro · {{learning}} aprendiendo",
+      "shelfSubtitleLearningOnly_other": "{{count}} libros · {{learning}} aprendiendo"
     },
     "shelf": {
       "missingParam": "Falta la materia. Vuelve e inténtalo de nuevo.",
       "errorTitle": "No se pudo cargar este estante",
       "fallbackTitle": "Estante",
-      "topicProgress": "{{completed}}/{{total}} temas",
+      "topicProgress": "{{mastered}} dominados · {{learning}} aprendiendo",
       "settingsAccessibilityLabel": "Ajustes de la materia",
       "studyNext": "Próximo estudio",
       "addAnotherBook": "Añadir otro libro",
@@ -1032,7 +1034,22 @@
       "practicedOftenHint": "Practicas este tema con frecuencia — ¡sigue así!",
       "relatedRail": {
         "label": "Temas relacionados"
-      }
+      },
+      "covers": "Este tema cubre",
+      "mastered": "Dominado",
+      "strongReviewProgress": "{{strong}}/{{total}} repasos sólidos"
+    },
+    "book": {
+      "readyToOpen": "Listo para abrir",
+      "buildThisBook": "Preparando este libro",
+      "status": {
+        "NOT_STARTED": "Sin empezar",
+        "IN_PROGRESS": "En aprendizaje",
+        "REVIEW_DUE": "Repaso pendiente"
+      },
+      "mastered": "Dominado",
+      "reviewDue": "Repaso listo",
+      "topicProgressThreeState": "{{mastered}} dominados · {{learning}} aprendiendo · {{total}} en total"
     }
   },
   "topic": {

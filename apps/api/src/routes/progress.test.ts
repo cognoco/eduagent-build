@@ -234,6 +234,8 @@ const MOCK_SUBJECT_PROGRESS = {
   topicsTotal: 10,
   topicsCompleted: 3,
   topicsVerified: 1,
+  topicsMastered: 1,
+  topicsLearning: 2,
   urgencyScore: 0.4,
   retentionStatus: 'strong' as const,
   lastSessionAt: '2026-05-01T10:00:00.000Z',
@@ -251,12 +253,17 @@ const MOCK_TOPIC_PROGRESS = {
   summaryExcerpt: 'Brief overview',
   xpStatus: null,
   totalSessions: 2,
+  masteredAt: null,
+  strongReviews: 2,
+  strongReviewsTarget: 5,
 };
 
 const MOCK_OVERVIEW = {
   subjects: [],
   totalTopicsCompleted: 5,
   totalTopicsVerified: 2,
+  totalTopicsMastered: 2,
+  totalTopicsLearning: 3,
   practiceActivityCount: 0,
 };
 

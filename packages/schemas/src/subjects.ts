@@ -150,7 +150,6 @@ export type Curriculum = z.infer<typeof curriculumSchema>;
 export const bookProgressStatusSchema = z.enum([
   'NOT_STARTED',
   'IN_PROGRESS',
-  'COMPLETED',
   'REVIEW_DUE',
 ]);
 export type BookProgressStatus = z.infer<typeof bookProgressStatusSchema>;
@@ -166,6 +165,8 @@ export const curriculumBookSchema = z.object({
   status: bookProgressStatusSchema.optional(),
   topicCount: z.number().int().optional(),
   completedTopicCount: z.number().int().optional(),
+  masteredTopicCount: z.number().int().optional(),
+  masteredAt: isoDateField.nullable().optional(),
   createdAt: isoDateField,
   updatedAt: isoDateField,
 });
@@ -184,6 +185,8 @@ export const bookWithTopicsSchema = z.object({
   connections: z.array(topicConnectionSchema),
   status: bookProgressStatusSchema,
   completedTopicCount: z.number().int().optional(),
+  masteredTopicCount: z.number().int().optional(),
+  masteredAt: isoDateField.nullable().optional(),
   completedTopicIds: z.array(z.string().uuid()).optional(),
 });
 export type BookWithTopics = z.infer<typeof bookWithTopicsSchema>;

@@ -991,8 +991,6 @@
       "finished": "Ukończone",
       "paused": "Wstrzymany",
       "archived": "Zarchiwizowany",
-      "shelfSubtitle_one": "{{count}} książka · {{progress}} tematów",
-      "shelfSubtitle_other": "{{count}} książek · {{progress}} tematów",
       "shelfSubtitleUnstarted": "Rozpocznij naukę",
       "shelfAccessibilityLabel": "Półka {{name}}, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Stuknij, aby {{action}}.",
       "shelfPausedSuffix": ", wstrzymany",
@@ -1002,13 +1000,17 @@
       "shelfActionOpen": "otworzyć",
       "urgencyBadge": "Wkrótce: {{reason}}",
       "review_one": "{{count}} do powtórzenia",
-      "review_other": "{{count}} do powtórzenia"
+      "review_other": "{{count}} do powtórzenia",
+      "shelfSubtitleMastered_one": "{{count}} książka · {{mastered}} opanowane · {{learning}} w nauce",
+      "shelfSubtitleMastered_other": "{{count}} książek · {{mastered}} opanowane · {{learning}} w nauce",
+      "shelfSubtitleLearningOnly_one": "{{count}} książka · {{learning}} w nauce",
+      "shelfSubtitleLearningOnly_other": "{{count}} książek · {{learning}} w nauce"
     },
     "shelf": {
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",
       "errorTitle": "Nie można załadować tej półki",
       "fallbackTitle": "Półka",
-      "topicProgress": "{{completed}}/{{total}} tematów",
+      "topicProgress": "{{mastered}} opanowane · {{learning}} w nauce",
       "settingsAccessibilityLabel": "Ustawienia przedmiotu",
       "studyNext": "Ucz się dalej",
       "addAnotherBook": "Dodaj inną książkę",
@@ -1057,7 +1059,22 @@
       "practicedOftenHint": "Często ćwiczysz ten temat — tak trzymaj!",
       "relatedRail": {
         "label": "Powiązane tematy"
-      }
+      },
+      "covers": "Ten temat obejmuje",
+      "mastered": "Opanowane",
+      "strongReviewProgress": "{{strong}}/{{total}} mocnych powtórek"
+    },
+    "book": {
+      "readyToOpen": "Gotowe do otwarcia",
+      "buildThisBook": "Przygotowujemy tę książkę",
+      "status": {
+        "NOT_STARTED": "Nie rozpoczęto",
+        "IN_PROGRESS": "W nauce",
+        "REVIEW_DUE": "Powtórka wymagana"
+      },
+      "mastered": "Opanowane",
+      "reviewDue": "Powtórka gotowa",
+      "topicProgressThreeState": "{{mastered}} opanowane · {{learning}} w nauce · {{total}} razem"
     }
   },
   "topic": {

@@ -97,6 +97,22 @@ describe('retentionCardSchema', () => {
     expect(result.evaluateDifficultyRung).toBeUndefined();
   });
 
+  it('parses sticky mastery timestamp', () => {
+    const result = retentionCardSchema.parse({
+      ...baseCard,
+      masteredAt: '2025-02-24T00:00:00.000Z',
+    });
+    expect(result.masteredAt).toBe('2025-02-24T00:00:00.000Z');
+  });
+
+  it('accepts null mastery timestamp', () => {
+    const result = retentionCardSchema.parse({
+      ...baseCard,
+      masteredAt: null,
+    });
+    expect(result.masteredAt).toBeNull();
+  });
+
   it('parses card with evaluateDifficultyRung = null', () => {
     const result = retentionCardSchema.parse({
       ...baseCard,
