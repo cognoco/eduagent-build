@@ -5,13 +5,23 @@ export const meta = {
   phases: [{ title: 'Review+Fix' }],
 };
 
-const WORKTREE = String.raw`C:\Dev\Projects\Products\Apps\eduagent-build\.worktrees\notion-bf-3105`;
+// CONFIGURE PER RUN — pass { worktree, branch } via Workflow args:
+//   Workflow({ scriptPath: '.claude/workflows/full-codebase-review-15-lens.js',
+//              args: { worktree: String.raw`C:\...\.worktrees\my-branch`, branch: 'my-branch' } })
+const WORKTREE = args?.worktree;
+const BRANCH = args?.branch;
+if (!WORKTREE || !BRANCH) {
+  throw new Error(
+    'full-codebase-review-15-lens: pass args.worktree (absolute path to an existing worktree) and args.branch. ' +
+      'Example: Workflow({ scriptPath, args: { worktree: "C:\\\\Dev\\\\...\\\\.worktrees\\\\my-branch", branch: "my-branch" } })',
+  );
+}
 
 const COMMON = [
   'WORKTREE (your working root — all paths relative to this, all edits MUST be inside it):',
   WORKTREE,
   '',
-  'BRANCH: notion-bf-3105 (clean, tracking origin/main). No WIP from other agents.',
+  `BRANCH: ${BRANCH} (clean, tracking origin/main). No WIP from other agents.`,
   '',
   'HARD RULES — VIOLATIONS WILL BE REJECTED:',
   '1. NEVER run git commit, git push, /commit, or any commit skill. After saving each fixed file, run: git add <relative-path> immediately to stage it.',
