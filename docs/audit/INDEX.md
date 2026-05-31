@@ -25,6 +25,12 @@
 
 | File | Date | Scope |
 |---|---|---|
+| [workflow-1/](workflow-1/) | 2026-05-30 | **i18n hardcoded-string audit** (mobile JSX). Multi-agent workflow over all 265 non-test `apps/mobile/src/**/*.tsx`. 960 confirmed user-visible strings bypassing `t()` across 92 files (694 high — incl. 200 `accessibilityLabel`s). Seed inventory + `proposed-baseline.json` for the planned Phase 3 ratchet. |
+| [workflow-2/](workflow-2/) | 2026-05-30 | **GC6 internal-mock backlog survey.** Multi-agent workflow over 164 test files / 716 `jest.mock()` sites. Real backlog = 153 internal-violation sites (API 103, mobile 50; 101 `trivial-requireActual`). Full classification in `catalog.csv`. Caveat: ignore the `already-gc1-allow` "convertible" count. |
+| [workflow-3/](workflow-3/) | 2026-05-30 | **`inngest.send()` core-send compliance sweep** (semantic complement to the syntactic `safe-non-core.guard.test.ts` ratchet). 48 real dispatches; 2 confirmed HIGH mismatches — `mislabeled-core-send` (revenuecat-webhook-handler.ts:446) and `hidden-core-safesend` (subject.ts:161). |
+| [workflow-4/](workflow-4/) | 2026-05-30 | **Audience-matrix re-verification** of `docs/audience-matrix.md`. Multi-agent workflow re-locating each gate by description. Only 3/32 citations still accurate (line/symbol rot from the navigation-contract migration); findings mostly hold (9 of F1–F14). Corrected citation map inside. |
+| [2026-05-29-improve-codebase-architecture.md](2026-05-29-improve-codebase-architecture.md) | 2026-05-29 | Deepening opportunities (shallow→deep module consolidation for testability & AI-navigability). 11 candidates across API tutoring engine, mobile navigation, route/schema seams. Recommended start: #1–#3, #5, #6. Companion to the mined root `CONTEXT.md`. |
+| [2026-05-29-architecture-audit.md](2026-05-29-architecture-audit.md) | 2026-05-29 | Whole-monorepo architecture review (module complexity, silent failures, type-safety gaps, test-coverage holes, LLM-friendliness). Headline: untested billing/quota tier. |
 | [2026-05-08-web-e2e-full-suite-bug-ledger.md](2026-05-08-web-e2e-full-suite-bug-ledger.md) | 2026-05-08 | Web E2E full-suite bug ledger. |
 | [2026-05-11-end-user-playwright-bug-pass.md](2026-05-11-end-user-playwright-bug-pass.md) | 2026-05-11 | Seeded end-user Playwright bug pass. |
 | [2026-05-11-parent-home-end-user-audit.md](2026-05-11-parent-home-end-user-audit.md) | 2026-05-11 | Parent home end-user audit. |
