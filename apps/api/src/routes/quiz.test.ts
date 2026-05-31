@@ -194,6 +194,30 @@ function setUpdateReturning(rows: Array<{ id: string }> = [{ id: 'round-1' }]) {
   (mockDb as any).update = jest.fn().mockReturnValue({ set });
 }
 
+/**
+ * [BUG-851] completeQuizRound now row-locks the round via
+ * `quizRounds.findByIdForUpdate`, which translates to
+ * `db.select().from(quizRounds).where(...).for('update').limit(1)`. The
+ * existing route tests stubbed only `db.query.quizRounds.findFirst`, so this
+ * helper installs the parallel `.for('update')` chain returning the same
+ * row. Call this in any /complete test that previously stubbed findFirst
+ * with the round.
+ */
+function setRoundForUpdate<T>(round: T): void {
+  const limit = jest.fn().mockResolvedValue(round == null ? [] : [round]);
+  const forFn = jest.fn().mockReturnValue({ limit });
+  const where = jest.fn().mockReturnValue({ for: forFn });
+  const from = jest.fn().mockReturnValue({ where });
+  (mockDb as any).select = jest.fn().mockReturnValue({ from });
+  // The route-metering fixture's transaction stub captures its own selectImpl
+  // by closure (it doesn't read mockDb.select at call time). Re-install the
+  // plain transaction stub that passes mockDb itself so tx.select picks up
+  // the per-test override above.
+  (mockDb as any).transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb));
+}
+
 const ACTIVE_ROUND = {
   id: 'a0000000-0000-4000-a000-000000000001',
   profileId: 'test-profile-id',
@@ -937,7 +961,7 @@ describe('Quiz routes', () => {
     });
 
     it('scores the round and persists results', async () => {
-      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+      const roundWithResults = {
         ...ACTIVE_ROUND,
         results: [
           {
@@ -953,7 +977,11 @@ describe('Quiz routes', () => {
             timeMs: 5000,
           },
         ],
-      });
+      };
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(roundWithResults);
+      setRoundForUpdate(roundWithResults);
 
       const res = await app.request(
         `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
@@ -1004,7 +1032,7 @@ describe('Quiz routes', () => {
     });
 
     it('[BREAK/WI-163] complete scores from recorded attempts, not forged request results', async () => {
-      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+      const roundWithRecorded = {
         ...ACTIVE_ROUND,
         results: [
           {
@@ -1015,7 +1043,11 @@ describe('Quiz routes', () => {
             answerMode: 'multiple_choice',
           },
         ],
-      });
+      };
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(roundWithRecorded);
+      setRoundForUpdate(roundWithRecorded);
 
       const res = await app.request(
         `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
@@ -1068,6 +1100,8 @@ describe('Quiz routes', () => {
       (mockDb as any).query.quizRounds.findFirst = jest
         .fn()
         .mockResolvedValue(undefined);
+      // findByIdForUpdate goes through .select() and must also return nothing.
+      setRoundForUpdate(null);
 
       const res = await app.request(
         `/v1/quiz/rounds/${ROUND_ID_OTHER_PROFILE}/complete`,
@@ -1092,9 +1126,11 @@ describe('Quiz routes', () => {
     });
 
     it('returns 409 when the round is already completed', async () => {
+      const completedRound = { ...ACTIVE_ROUND, status: 'completed' as const };
       (mockDb as any).query.quizRounds.findFirst = jest
         .fn()
-        .mockResolvedValue({ ...ACTIVE_ROUND, status: 'completed' });
+        .mockResolvedValue(completedRound);
+      setRoundForUpdate(completedRound);
 
       const res = await app.request(
         `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
@@ -1130,6 +1166,11 @@ describe('Quiz routes', () => {
         accountId: 'test-account-id',
         profileId: 'test-profile-id',
       });
+      // setRoundForUpdate must come AFTER meteringFixture, because the
+      // fixture overwrites mockDb.transaction (and captures its own selectImpl
+      // by closure). setRoundForUpdate re-installs a transaction stub that
+      // passes mockDb itself so tx.select uses our per-test chain.
+      setRoundForUpdate(ACTIVE_ROUND);
 
       const res = await app.request(
         `/v1/quiz/rounds/${ROUND_ID_1}/complete`,

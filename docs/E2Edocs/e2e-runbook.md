@@ -274,6 +274,7 @@ emulator process too — it leaves AVD lock files that can break the next boot.
 | `Maestro driver did not start up in time` | UIAutomator lock from a previous non-graceful kill | `adb reboot` and re-run |
 | Bluetooth fails to start in emulator log | Bluetooth packet streamer never initializes | Harmless; ignore |
 | `Could not connect to bundle proxy on 8082` | `seed-and-run.sh` defaulted to BUG-7 proxy port | Override with `METRO_URL=http://10.0.2.2:8081` |
+| Cluster of consecutive `Bundle did not load within 120s` (`BUNDLE-INFRA`) on a **freshly-booted** emulator, while `curl http://localhost:8081/status` still returns `packager-status:running` | **Metro wedged under cumulative load.** `/status` keeps answering but bundle builds hang — `curl 'http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=true' ` times out (http=000) while the same URL on the proxy (`:8082`) returns 200. Seen 2026-05-31 after ~12 seeded flows; the emulator was fine (proved by a fresh boot still failing). | Restart Metro **and** the bundle proxy (kill `expo start` + `bundle-proxy.js`, relaunch both). No emulator reboot needed — this is a host-side Metro problem, not a device/UIAutomator-lock problem, so it is safe to kill mid-suite during a bundle-load (pre-Maestro) phase. Verify recovery by curling the `.expo/.virtual-metro-entry.bundle` URL through `:8082` (expect 200 in <2s after a cold first build). |
 
 ### Windows-only
 

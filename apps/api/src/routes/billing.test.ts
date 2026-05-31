@@ -1046,6 +1046,63 @@ describe('billing routes', () => {
       expect(res.status).toBe(401);
     });
 
+    // [BREAK BUG-825] Non-owner profile must NOT read account-level billing
+    // status fields (tier, status, monthlyLimit, dailyLimit, etc.) — mirrors
+    // the BUG-644 break test for /v1/subscription. Without the owner gate
+    // added in billing.ts:/subscription/status handler, a child profile on
+    // the parent's account could read the parent's billing data through this
+    // "fast KV-backed" endpoint that bypasses the /subscription gate.
+    it('[BREAK BUG-825] returns 403 when caller is a non-owner profile', async () => {
+      const childProfileId = '550e8400-e29b-41d4-a716-446655440000';
+      mockProfileFindFirst.mockResolvedValue({
+        id: childProfileId,
+        accountId: 'test-account-id',
+        displayName: 'Child',
+        avatarUrl: null,
+        birthYear: 2012,
+        location: 'EU',
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: 'nb',
+        pronouns: null,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      });
+      mockReadSubscriptionStatus.mockResolvedValue({
+        tier: 'family',
+        effectiveAccessTier: 'family',
+        billingAccess: 'current',
+        status: 'active',
+        monthlyLimit: 700,
+        usedThisMonth: 100,
+        dailyLimit: null,
+        usedToday: 0,
+      });
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' }),
+      );
+      mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
+
+      const res = await app.request(
+        '/v1/subscription/status',
+        { headers: { ...AUTH_HEADERS, 'X-Profile-Id': childProfileId } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      // Body must not leak any account-level status field.
+      expect(body).not.toHaveProperty('status');
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can view subscription status.',
+      });
+      // Neither KV nor DB read should fire once the gate trips.
+      expect(mockReadSubscriptionStatus).not.toHaveBeenCalled();
+      expect(mockGetSubscriptionByAccountId).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+    });
+
     // [BUG-97 / A1-MED] KV throws → fallback to DB AND captureException fired.
     // Break test: revert the try/catch in billing.ts and this turns into a 500.
     it('falls back to DB and captures the error when KV read throws', async () => {
@@ -1104,7 +1161,14 @@ describe('billing routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
+      // [BUG-825] With no owner profile resolvable, profileMeta.isOwner is
+      // false → the owner gate at the top of /subscription/status returns 403
+      // before any pool/quota read can fire. Original expectation was 400
+      // from the "no active profile" branch downstream; the owner gate is
+      // now first and prevents that branch from being reached. The core
+      // assertion of this test — that shared-pool reads don't fire on this
+      // path — is preserved.
+      expect(res.status).toBe(403);
       expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
