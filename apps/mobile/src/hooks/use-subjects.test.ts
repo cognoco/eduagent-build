@@ -258,7 +258,7 @@ describe('useUpdateSubject', () => {
 });
 
 describe('useDeleteSubject', () => {
-  it('sends DELETE /subjects/:id and invalidates subject, curriculum, and progress data', async () => {
+  it('sends DELETE /subjects/:id and invalidates subject, curriculum, library, and progress data', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ deleted: true, subjectId: 's1' }), {
         status: 200,
@@ -282,6 +282,7 @@ describe('useDeleteSubject', () => {
     expect(result.current.data).toEqual({ deleted: true, subjectId: 's1' });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['curriculum'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['library'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
   });
 });

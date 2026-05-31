@@ -14,7 +14,9 @@
  * 6. GET /v1/subjects/:id — 404 when not found/cross-profile
  * 7. PATCH /v1/subjects/:id — 200 updates subject
  * 8. PATCH /v1/subjects/:id — 404 when not found/cross-profile
- * 9. GET /v1/subjects — 401 without auth
+ * 9. DELETE /v1/subjects/:id — 200 hard-deletes owned subject data
+ * 10. DELETE /v1/subjects/:id — 400/403/404 boundary behavior
+ * 11. GET /v1/subjects — 401 without auth
  */
 
 const mockCaptureException = jest.fn();
@@ -60,8 +62,10 @@ import { eq } from 'drizzle-orm';
 import {
   assessments,
   curriculumBooks,
+  generateUUIDv7,
   learningSessions,
   practiceActivityEvents,
+  profiles,
   quizRounds,
   subjects,
   xpLedger,
@@ -656,6 +660,62 @@ describe('Integration: DELETE /v1/subjects/:id', () => {
     );
     expect(second.status).toBe(404);
     expect((await second.json()).code).toBe(ERROR_CODES.NOT_FOUND);
+  });
+
+  it('returns 400 for a malformed subject id before touching storage', async () => {
+    const profileId = await createOwnerProfile();
+
+    const res = await app.request(
+      '/v1/subjects/not-a-uuid',
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 403 in proxy mode and leaves the child subject intact', async () => {
+    const ownerProfile = await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: { userId: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+      displayName: 'Proxy Parent',
+      birthYear: 1980,
+    });
+    const childProfileId = generateUUIDv7();
+    const db = getIntegrationDb();
+    await db.insert(profiles).values({
+      id: childProfileId,
+      accountId: ownerProfile.accountId,
+      displayName: 'Proxy Child',
+      birthYear: 2013,
+      isOwner: false,
+    });
+    const subject = await seedSubject(childProfileId, 'Proxy Math');
+
+    const res = await app.request(
+      `/v1/subjects/${subject.id}`,
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          childProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'PROXY_MODE' });
+    await expect(
+      db.query.subjects.findFirst({ where: eq(subjects.id, subject.id) }),
+    ).resolves.toBeDefined();
   });
 
   it('does not delete another profile subject or its children', async () => {

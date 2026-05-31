@@ -21,7 +21,6 @@ jest.mock(
       configureLanguageSubject: jest.fn(),
       getSubject: jest.fn(),
       updateSubject: jest.fn(),
-      deleteSubject: jest.fn(),
       retryCurriculumForSubject: jest.fn(),
     };
   },
@@ -82,7 +81,6 @@ import {
   createSubjectWithStructure,
   getSubject,
   updateSubject,
-  deleteSubject,
   retryCurriculumForSubject,
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
@@ -134,7 +132,6 @@ const listSubjectsMock = jest.mocked(listSubjects);
 const createSubjectWithStructureMock = jest.mocked(createSubjectWithStructure);
 const getSubjectMock = jest.mocked(getSubject);
 const updateSubjectMock = jest.mocked(updateSubject);
-const deleteSubjectMock = jest.mocked(deleteSubject);
 const retryCurriculumForSubjectMock = jest.mocked(retryCurriculumForSubject);
 const resolveSubjectNameMock = jest.mocked(resolveSubjectName);
 const classifySubjectMock = jest.mocked(classifySubject);
@@ -376,61 +373,6 @@ describe('PATCH /v1/subjects/:id', () => {
       `/v1/subjects/${SUBJECT_ID}`,
       patchRequest({ name: 'Valid' }),
     );
-
-    expect(res.status).toBe(500);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// DELETE /v1/subjects/:id
-// ---------------------------------------------------------------------------
-
-describe('DELETE /v1/subjects/:id', () => {
-  const path = `/v1/subjects/${SUBJECT_ID}`;
-
-  it('returns a typed success envelope on delete', async () => {
-    deleteSubjectMock.mockResolvedValue({
-      deleted: true,
-      subjectId: SUBJECT_ID,
-    });
-
-    const res = await makeApp().request(path, { method: 'DELETE' });
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      deleted: true,
-      subjectId: SUBJECT_ID,
-    });
-    expect(deleteSubjectMock).toHaveBeenCalledWith(
-      expect.anything(),
-      PROFILE_ID,
-      SUBJECT_ID,
-    );
-  });
-
-  it('returns 400 for a malformed UUID', async () => {
-    const res = await makeApp().request('/v1/subjects/not-a-uuid', {
-      method: 'DELETE',
-    });
-
-    expect(res.status).toBe(400);
-    expect(deleteSubjectMock).not.toHaveBeenCalled();
-  });
-
-  it('returns 404 when the subject does not exist or belongs to another profile', async () => {
-    deleteSubjectMock.mockRejectedValue(new SubjectNotFoundError());
-
-    const res = await makeApp().request(path, { method: 'DELETE' });
-
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body).toMatchObject({ code: ERROR_CODES.NOT_FOUND });
-  });
-
-  it('propagates non-SubjectNotFoundError failures to the global handler', async () => {
-    deleteSubjectMock.mockRejectedValue(new Error('delete failed'));
-
-    const res = await makeApp().request(path, { method: 'DELETE' });
 
     expect(res.status).toBe(500);
   });
@@ -686,13 +628,6 @@ describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'updated' }),
-    });
-    expect(res.status).toBe(403);
-  });
-
-  it('DELETE /subjects/:id returns 403 in proxy mode', async () => {
-    const res = await makeProxyApp().request(`/subjects/${SUBJECT_ID}`, {
-      method: 'DELETE',
     });
     expect(res.status).toBe(403);
   });

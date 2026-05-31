@@ -96,14 +96,7 @@ export function useLibraryRetention(): UseQueryResult<LibraryRetentionResponse> 
   });
 }
 
-/**
- * Library-surface facade over the broad progress inventory query.
- *
- * The library manage sheet needs per-subject delete-scope counts before the
- * dedicated payload-narrow library endpoint exists. Keep the direct progress
- * hook dependency here so `library.tsx` stays inside the surface-ownership
- * import boundary.
- */
+// Facade: library manage-sheet needs inventory counts before a narrow endpoint exists.
 export function useLibraryProgressInventory(): UseQueryResult<KnowledgeInventory> {
   return useProgressInventory();
 }

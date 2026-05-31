@@ -192,6 +192,7 @@ export function useDeleteSubject(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
       void queryClient.invalidateQueries({ queryKey: ['curriculum'] });
+      void queryClient.invalidateQueries({ queryKey: ['library'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
   });
