@@ -27,10 +27,12 @@ jest.mock('expo-router', () => {
   return { Stack: MockStack };
 });
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({ background: '#000' }),
-}));
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({ background: '#000' }),
+  }),
+);
 
 describe('progress/_layout.tsx', () => {
   beforeEach(() => {

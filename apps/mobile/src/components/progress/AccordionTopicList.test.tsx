@@ -10,11 +10,14 @@ jest.mock('expo-router', () => ({
   useSegments: () => mockSegments,
 }));
 
-jest.mock('../../hooks/use-dashboard', () => ({
-  ...jest.requireActual('../../hooks/use-dashboard'),
-  useChildSubjectTopics: (...args: unknown[]) =>
-    mockUseChildSubjectTopics(...args),
-}));
+jest.mock(
+  '../../hooks/use-dashboard' /* gc1-allow: pattern-a conversion; use-dashboard requires a live TanStack query context; pattern-a spy overrides only the child-topics hook under test */,
+  () => ({
+    ...jest.requireActual('../../hooks/use-dashboard'),
+    useChildSubjectTopics: (...args: unknown[]) =>
+      mockUseChildSubjectTopics(...args),
+  }),
+);
 
 // RetentionSignal is a real sibling component — uses real implementation.
 // @expo/vector-icons and react-i18next are globally mocked in test-setup.ts.

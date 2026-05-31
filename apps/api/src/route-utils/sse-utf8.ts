@@ -1,6 +1,10 @@
 import type { Context } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { streamErrorFrameSchema } from '@eduagent/schemas';
+import { captureException } from '../services/sentry';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 const DEFAULT_STREAM_ERROR_MESSAGE =
   'Something went wrong while generating a reply. Please try again.';
@@ -66,7 +70,19 @@ export function streamSSEUtf8(
         try {
           await onError(error, stream);
         } catch (onErrorCaught) {
-          console.error(onErrorCaught);
+          // [L11-CR-2026-05-31] Surface the secondary fault to Sentry — without
+          // this, double-faulting onError callbacks are invisible in production
+          // and we can't query how often the SSE error handler itself throws.
+          logger.error('[sse-utf8] onError callback threw', {
+            event: 'sse_utf8.on_error.threw',
+            error:
+              onErrorCaught instanceof Error
+                ? onErrorCaught.message
+                : String(onErrorCaught),
+          });
+          captureException(onErrorCaught, {
+            extra: { context: 'sse-utf8.onError.threw' },
+          });
         }
       }
       await emitJsonErrorFrame(stream);

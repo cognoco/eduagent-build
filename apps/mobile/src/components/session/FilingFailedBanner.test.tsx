@@ -17,13 +17,16 @@ jest.mock('expo-router', () => ({
 
 // Mock useRetryFiling hook
 const mockMutateAsync = jest.fn();
-jest.mock('../../hooks/use-retry-filing', () => ({
-  ...jest.requireActual('../../hooks/use-retry-filing'),
-  useRetryFiling: () => ({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
+jest.mock(
+  '../../hooks/use-retry-filing' /* gc1-allow: pattern-a conversion; useRetryFiling fires a network mutation — override isolates banner behavior from actual API calls */,
+  () => ({
+    ...jest.requireActual('../../hooks/use-retry-filing'),
+    useRetryFiling: () => ({
+      mutateAsync: mockMutateAsync,
+      isPending: false,
+    }),
   }),
-}));
+);
 
 function makeSession(
   filingStatus: 'filing_pending' | 'filing_failed' | 'filing_recovered' | null,

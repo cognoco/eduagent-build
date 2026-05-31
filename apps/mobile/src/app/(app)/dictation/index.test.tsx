@@ -26,71 +26,88 @@ const mockGenerateMutateAsync = jest.fn();
 const mockGenerateReset = jest.fn();
 let mockGenerateIsPending = false;
 
-jest.mock('../../../hooks/use-dictation-api', () => ({
-  ...jest.requireActual('../../../hooks/use-dictation-api'),
-  useGenerateDictation: () => ({
-    mutateAsync: mockGenerateMutateAsync,
-    isPending: mockGenerateIsPending,
-    reset: mockGenerateReset,
+jest.mock(
+  '../../../hooks/use-dictation-api' /* gc1-allow: pattern-a conversion; wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    ...jest.requireActual('../../../hooks/use-dictation-api'),
+    useGenerateDictation: () => ({
+      mutateAsync: mockGenerateMutateAsync,
+      isPending: mockGenerateIsPending,
+      reset: mockGenerateReset,
+    }),
+    usePrepareHomework: () => ({
+      mutateAsync: jest.fn(),
+      isPending: false,
+      reset: jest.fn(),
+    }),
   }),
-  usePrepareHomework: () => ({
-    mutateAsync: jest.fn(),
-    isPending: false,
-    reset: jest.fn(),
-  }),
-}));
+);
 
 const mockSetData = jest.fn();
 
-jest.mock('./_layout', () => ({
-  ...jest.requireActual('./_layout'),
-  useDictationData: () => ({
-    data: null,
-    setData: mockSetData,
-    clear: jest.fn(),
+jest.mock(
+  './_layout' /* gc1-allow: native-boundary; _layout transitively loads expo-router Stack and native theme — cannot render in JSDOM */,
+  () => ({
+    ...jest.requireActual('./_layout'),
+    useDictationData: () => ({
+      data: null,
+      setData: mockSetData,
+      clear: jest.fn(),
+    }),
   }),
-}));
+);
 
 const mockGoBackOrReplace = jest.fn();
-jest.mock('../../../lib/navigation', () => ({
-  ...jest.requireActual('../../../lib/navigation'),
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  PRACTICE_HREF: '/(app)/practice',
-}));
-
-jest.mock('../../../lib/platform-alert', () => ({
-  ...jest.requireActual('../../../lib/platform-alert'),
-  platformAlert: jest.fn(),
-}));
-
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    textPrimary: '#fff',
-    primary: '#2563eb',
-    accent: '#00bfa5',
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    ...jest.requireActual('../../../lib/navigation'),
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    PRACTICE_HREF: '/(app)/practice',
   }),
-}));
+);
 
-jest.mock('../../../components/home/IntentCard', () => ({
-  ...jest.requireActual('../../../components/home/IntentCard'),
-  IntentCard: ({
-    title,
-    onPress,
-    testID,
-  }: {
-    title: string;
-    onPress: () => void;
-    testID?: string;
-  }) => {
-    const { Pressable, Text } = jest.requireActual('react-native');
-    return (
-      <Pressable onPress={onPress} testID={testID ?? `intent-${title}`}>
-        <Text>{title}</Text>
-      </Pressable>
-    );
-  },
-}));
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: wraps RN Alert.alert and Platform.OS — requires native Alert shim unavailable in JSDOM */,
+  () => ({
+    ...jest.requireActual('../../../lib/platform-alert'),
+    platformAlert: jest.fn(),
+  }),
+);
+
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      textPrimary: '#fff',
+      primary: '#2563eb',
+      accent: '#00bfa5',
+    }),
+  }),
+);
+
+jest.mock(
+  '../../../components/home/IntentCard' /* gc1-allow: pattern-a conversion; IntentCard uses native Pressable styling; mock provides testable Pressable substitute */,
+  () => ({
+    ...jest.requireActual('../../../components/home/IntentCard'),
+    IntentCard: ({
+      title,
+      onPress,
+      testID,
+    }: {
+      title: string;
+      onPress: () => void;
+      testID?: string;
+    }) => {
+      const { Pressable, Text } = jest.requireActual('react-native');
+      return (
+        <Pressable onPress={onPress} testID={testID ?? `intent-${title}`}>
+          <Text>{title}</Text>
+        </Pressable>
+      );
+    },
+  }),
+);
 
 const DictationChoiceScreen = require('./index').default as React.ComponentType;
 

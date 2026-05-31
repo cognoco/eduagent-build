@@ -122,20 +122,26 @@ jest.mock(
 );
 
 const mockPlatformAlert = jest.fn();
-jest.mock('../lib/platform-alert', () => ({
-  ...jest.requireActual('../lib/platform-alert'),
-  platformAlert: mockPlatformAlert,
-}));
-
-jest.mock('../lib/profile', () => ({
-  ...jest.requireActual('../lib/profile'),
-  useProfile: jest.fn().mockReturnValue({
-    profiles: [],
-    activeProfile: null,
-    switchProfile: jest.fn(),
-    isLoading: false,
+jest.mock(
+  '../lib/platform-alert' /* gc1-allow: pattern-a conversion; Alert.alert is a React Native native UI boundary that cannot be driven in JSDOM */,
+  () => ({
+    ...jest.requireActual('../lib/platform-alert'),
+    platformAlert: mockPlatformAlert,
   }),
-}));
+);
+
+jest.mock(
+  '../lib/profile' /* gc1-allow: pattern-a conversion; useProfile depends on ProfileContext; pattern-a spy controls profile list shape per-test */,
+  () => ({
+    ...jest.requireActual('../lib/profile'),
+    useProfile: jest.fn().mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      switchProfile: jest.fn(),
+      isLoading: false,
+    }),
+  }),
+);
 
 const { useProfile } = require('../lib/profile') as {
   useProfile: jest.Mock;

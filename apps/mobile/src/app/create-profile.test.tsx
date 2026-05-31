@@ -78,10 +78,13 @@ jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'reac
 
 // BUG-301: Made per-test overridable so isParentAddingChild can be tested.
 const mockUseProfile = jest.fn();
-jest.mock('../lib/profile', () => ({
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => mockUseProfile(),
-}));
+jest.mock(
+  '../lib/profile' /* gc1-allow: pattern-a conversion; useProfile depends on ProfileContext; pattern-a spy controls active-profile shape per-test */,
+  () => ({
+    ...jest.requireActual('../lib/profile'),
+    useProfile: () => mockUseProfile(),
+  }),
+);
 
 // WI-296: Controllable role so proxy/non-owner gate tests can set role independently.
 let mockActiveProfileRole: 'owner' | 'child' | 'impersonated-child' | null =
@@ -110,12 +113,15 @@ jest.mock(
 // exercise the family + add-child redirect path. Pattern A — real module with
 // the two readers overridden so each test controls the carried value.
 let mockAudience: 'learner' | 'parent' | null = 'learner';
-jest.mock('../lib/pre-auth-audience', () => ({
-  ...jest.requireActual('../lib/pre-auth-audience'),
-  readPreAuthAudienceSync: () => mockAudience,
-  readPreAuthAudience: () => Promise.resolve(mockAudience),
-  clearPreAuthAudience: () => Promise.resolve(),
-}));
+jest.mock(
+  '../lib/pre-auth-audience' /* gc1-allow: pattern-a conversion; pre-auth-audience reads SecureStore which is a native storage boundary */,
+  () => ({
+    ...jest.requireActual('../lib/pre-auth-audience'),
+    readPreAuthAudienceSync: () => mockAudience,
+    readPreAuthAudience: () => Promise.resolve(mockAudience),
+    clearPreAuthAudience: () => Promise.resolve(),
+  }),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },

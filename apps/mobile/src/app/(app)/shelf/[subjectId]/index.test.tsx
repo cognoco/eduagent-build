@@ -24,15 +24,17 @@ jest.mock(
 
 let mockFetch: RoutedMockFetch;
 
-jest.mock('../../../../lib/api-client', () => {
-  // gc1-allow: Clerk useAuth() external boundary
-  const {
-    createRoutedMockFetch,
-    mockApiClientFactory,
-  } = require('../../../../test-utils/mock-api-routes');
-  mockFetch = createRoutedMockFetch();
-  return mockApiClientFactory(mockFetch);
-});
+jest.mock(
+  '../../../../lib/api-client' /* gc1-allow: Clerk useAuth() external boundary; real api-client requires a live Hono server */,
+  () => {
+    const {
+      createRoutedMockFetch,
+      mockApiClientFactory,
+    } = require('../../../../test-utils/mock-api-routes');
+    mockFetch = createRoutedMockFetch();
+    return mockApiClientFactory(mockFetch);
+  },
+);
 
 // [GC6] lib/profile mock removed — the test now provides a REAL
 // ProfileContext.Provider via the shared `createScreenWrapper` harness, so
@@ -47,23 +49,25 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../../components/common', () => ({
-  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
-  BookPageFlipAnimation: ({
-    size,
-    testID,
-  }: {
-    size?: number;
-    testID?: string;
-  }) => {
-    const React = require('react');
-    const { View } = require('react-native');
-    return React.createElement(View, {
+jest.mock(
+  '../../../../components/common' /* gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM */,
+  () => ({
+    BookPageFlipAnimation: ({
+      size,
       testID,
-      style: { width: size, height: size },
-    });
-  },
-}));
+    }: {
+      size?: number;
+      testID?: string;
+    }) => {
+      const React = require('react');
+      const { View } = require('react-native');
+      return React.createElement(View, {
+        testID,
+        style: { width: size, height: size },
+      });
+    },
+  }),
+);
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -79,60 +83,68 @@ jest.mock('expo-router', () => ({
 // Default search params — overridden per test via mockSearchParams
 let mockSearchParams = () => ({ subjectId: 'sub-1' });
 
-jest.mock('../../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    accent: '#00bfa5',
-    background: '#faf5ee',
-    border: '#e8e0d4',
-    surface: '#ffffff',
-    textSecondary: '#888',
-    textInverse: '#fff',
+jest.mock(
+  '../../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      accent: '#00bfa5',
+      background: '#faf5ee',
+      border: '#e8e0d4',
+      surface: '#ffffff',
+      textSecondary: '#888',
+      textInverse: '#fff',
+    }),
+    useSubjectTint: () => ({
+      name: 'teal',
+      solid: '#0f766e',
+      soft: 'rgba(15,118,110,0.14)',
+    }),
   }),
-  useSubjectTint: () => ({
-    name: 'teal',
-    solid: '#0f766e',
-    soft: 'rgba(15,118,110,0.14)',
+);
+
+jest.mock(
+  '../../../../components/library/BookCard' /* gc1-allow: pattern-a conversion; provides testable Pressable substitute that renders book.id as testID */,
+  () => ({
+    ...jest.requireActual('../../../../components/library/BookCard'),
+    BookCard: ({
+      book,
+      onPress,
+    }: {
+      book: { id: string; title: string };
+      onPress: () => void;
+    }) => {
+      const { Pressable, Text } = jest.requireActual('react-native');
+      return (
+        <Pressable onPress={onPress} testID={`book-card-${book.id}`}>
+          <Text>{book.title}</Text>
+        </Pressable>
+      );
+    },
   }),
-}));
+);
 
-jest.mock('../../../../components/library/BookCard', () => ({
-  ...jest.requireActual('../../../../components/library/BookCard'),
-  BookCard: ({
-    book,
-    onPress,
-  }: {
-    book: { id: string; title: string };
-    onPress: () => void;
-  }) => {
-    const { Pressable, Text } = jest.requireActual('react-native');
-    return (
-      <Pressable onPress={onPress} testID={`book-card-${book.id}`}>
-        <Text>{book.title}</Text>
-      </Pressable>
-    );
-  },
-}));
-
-jest.mock('../../../../components/library/SuggestionCard', () => ({
-  ...jest.requireActual('../../../../components/library/SuggestionCard'),
-  SuggestionCard: ({
-    title,
-    onPress,
-    testID,
-  }: {
-    title: string;
-    onPress: () => void;
-    testID?: string;
-  }) => {
-    const { Pressable, Text } = jest.requireActual('react-native');
-    return (
-      <Pressable onPress={onPress} testID={testID}>
-        <Text>{title}</Text>
-      </Pressable>
-    );
-  },
-}));
+jest.mock(
+  '../../../../components/library/SuggestionCard' /* gc1-allow: pattern-a conversion; provides testable Pressable substitute that renders suggestion.title as testID */,
+  () => ({
+    ...jest.requireActual('../../../../components/library/SuggestionCard'),
+    SuggestionCard: ({
+      title,
+      onPress,
+      testID,
+    }: {
+      title: string;
+      onPress: () => void;
+      testID?: string;
+    }) => {
+      const { Pressable, Text } = jest.requireActual('react-native');
+      return (
+        <Pressable onPress={onPress} testID={testID}>
+          <Text>{title}</Text>
+        </Pressable>
+      );
+    },
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Default API route responses

@@ -16,11 +16,13 @@ import { useParentProxy } from './use-parent-proxy';
 // impossible flag combination (isOwner=true AND isParentProxy=true) that the
 // real hook cannot produce — that case overrides useParentProxy via the spy
 // below. All other exports from the module remain real.
-jest.mock('./use-parent-proxy', () => ({
-  // gc1-allow: defensive impossible-state test; useParentProxy cannot produce isOwner=true && isParentProxy=true from real profiles
-  ...jest.requireActual('./use-parent-proxy'),
-  useParentProxy: jest.fn(),
-}));
+jest.mock(
+  './use-parent-proxy' /* gc1-allow: defensive impossible-state test; useParentProxy cannot produce isOwner=true && isParentProxy=true from real profiles */,
+  () => ({
+    ...jest.requireActual('./use-parent-proxy'),
+    useParentProxy: jest.fn(),
+  }),
+);
 
 const mockUseParentProxy = useParentProxy as jest.MockedFunction<
   typeof useParentProxy

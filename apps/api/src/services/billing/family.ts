@@ -25,6 +25,7 @@ import {
 import { getEffectiveAccessForSubscription } from './access';
 import { getFamilyPoolBreakdownSharing } from '../settings';
 import { createLogger } from '../logger';
+import { captureException } from '../sentry';
 
 const logger = createLogger();
 
@@ -182,6 +183,15 @@ function formatDateLabel(
       requestedTimezone: timeZone,
       locale,
       error: err instanceof Error ? err.message : String(err),
+    });
+    // [L11-CR-2026-05-31] CLAUDE.md: "console.warn alone is never sufficient"
+    // in billing recovery paths — must be queryable as a rate via Sentry.
+    captureException(err, {
+      extra: {
+        context: 'billing.formatDateLabel.timezone_fallback',
+        requestedTimezone: timeZone,
+        locale,
+      },
     });
     return new Intl.DateTimeFormat(locale, {
       timeZone: 'UTC',

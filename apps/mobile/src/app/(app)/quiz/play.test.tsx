@@ -100,24 +100,30 @@ jest.mock(
   }),
 );
 
-jest.mock('../../../hooks/use-quiz', () => ({
-  ...jest.requireActual('../../../hooks/use-quiz'),
-  useCheckAnswer: () => ({
-    mutateAsync: mockCheckAnswer,
+jest.mock(
+  '../../../hooks/use-quiz' /* gc1-allow: pattern-a conversion; use-quiz hooks fire network mutations; pattern-a spy overrides only the answer-check and round-complete hooks under test */,
+  () => ({
+    ...jest.requireActual('../../../hooks/use-quiz'),
+    useCheckAnswer: () => ({
+      mutateAsync: mockCheckAnswer,
+    }),
+    useCompleteRound: () => ({
+      isPending: false,
+      mutate: mockCompleteRoundMutate,
+    }),
+    usePrefetchRound: () => ({
+      mutate: mockPrefetchMutate,
+    }),
   }),
-  useCompleteRound: () => ({
-    isPending: false,
-    mutate: mockCompleteRoundMutate,
-  }),
-  usePrefetchRound: () => ({
-    mutate: mockPrefetchMutate,
-  }),
-}));
+);
 
-jest.mock('../../../lib/platform-alert', () => ({
-  ...jest.requireActual('../../../lib/platform-alert'),
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-}));
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: pattern-a conversion; Alert.alert is a React Native native UI boundary that cannot be driven in JSDOM */,
+  () => ({
+    ...jest.requireActual('../../../lib/platform-alert'),
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
 
 jest.mock(
   '../../../lib/sentry' /* gc1-allow: @sentry/react-native external boundary */,
@@ -147,19 +153,24 @@ let mockRound: object | null = {
 };
 let mockReturnTo: string | null = null;
 
-jest.mock('./_layout', () => ({
-  ...jest.requireActual('./_layout'),
-  useQuizFlow: () => ({
-    round: mockRound,
-    activityType:
-      mockRound && 'activityType' in mockRound ? mockRound.activityType : null,
-    returnTo: mockReturnTo,
-    subjectId: null,
-    setPrefetchedRoundId: mockSetPrefetchedRoundId,
-    setRound: mockSetRound,
-    setCompletionResult: mockSetCompletionResult,
+jest.mock(
+  './_layout' /* gc1-allow: native-boundary; _layout transitively loads native-only router/i18n modules in JSDOM */,
+  () => ({
+    ...jest.requireActual('./_layout'),
+    useQuizFlow: () => ({
+      round: mockRound,
+      activityType:
+        mockRound && 'activityType' in mockRound
+          ? mockRound.activityType
+          : null,
+      returnTo: mockReturnTo,
+      subjectId: null,
+      setPrefetchedRoundId: mockSetPrefetchedRoundId,
+      setRound: mockSetRound,
+      setCompletionResult: mockSetCompletionResult,
+    }),
   }),
-}));
+);
 
 const { default: QuizPlayScreen } = require('./play');
 

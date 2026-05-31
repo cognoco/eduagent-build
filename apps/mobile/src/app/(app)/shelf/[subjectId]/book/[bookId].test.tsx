@@ -46,44 +46,62 @@ const mockUseCurriculum = jest.fn();
 const mockUseLearningResumeTarget = jest.fn();
 const mockStartFirstCurriculumMutateAsync = jest.fn();
 
-jest.mock('../../../../../hooks/use-books', () => ({
-  ...jest.requireActual('../../../../../hooks/use-books'),
-  useBookWithTopics: () => mockUseBookWithTopics(),
-  useBooks: () => mockUseBooks(),
-  useGenerateBookTopics: () => mockUseGenerateBookTopics(),
-  useDeleteBook: () => ({
-    mutateAsync: mockDeleteBookMutateAsync,
-    isPending: false,
+jest.mock(
+  '../../../../../hooks/use-books' /* gc1-allow: pattern-a conversion; use-books hooks fire network queries; pattern-a spy controls book/topic shape per-test */,
+  () => ({
+    ...jest.requireActual('../../../../../hooks/use-books'),
+    useBookWithTopics: () => mockUseBookWithTopics(),
+    useBooks: () => mockUseBooks(),
+    useGenerateBookTopics: () => mockUseGenerateBookTopics(),
+    useDeleteBook: () => ({
+      mutateAsync: mockDeleteBookMutateAsync,
+      isPending: false,
+    }),
   }),
-}));
+);
 
-jest.mock('../../../../../hooks/use-book-sessions', () => ({
-  ...jest.requireActual('../../../../../hooks/use-book-sessions'),
-  useBookSessions: () => mockUseBookSessions(),
-}));
+jest.mock(
+  '../../../../../hooks/use-book-sessions' /* gc1-allow: pattern-a conversion; hook fires network query; pattern-a spy controls session list shape */,
+  () => ({
+    ...jest.requireActual('../../../../../hooks/use-book-sessions'),
+    useBookSessions: () => mockUseBookSessions(),
+  }),
+);
 
-jest.mock('../../../../../hooks/use-notes', () => ({
-  ...jest.requireActual('../../../../../hooks/use-notes'),
-  useBookNotes: () => mockUseBookNotes(),
-  useCreateNote: () => ({ mutate: jest.fn(), isPending: false }),
-  useUpdateNote: () => ({ mutate: jest.fn(), isPending: false }),
-  useDeleteNoteById: () => ({ mutate: jest.fn() }),
-}));
+jest.mock(
+  '../../../../../hooks/use-notes' /* gc1-allow: pattern-a conversion; hooks fire network queries/mutations; pattern-a spy controls note list and CRUD behavior */,
+  () => ({
+    ...jest.requireActual('../../../../../hooks/use-notes'),
+    useBookNotes: () => mockUseBookNotes(),
+    useCreateNote: () => ({ mutate: jest.fn(), isPending: false }),
+    useUpdateNote: () => ({ mutate: jest.fn(), isPending: false }),
+    useDeleteNoteById: () => ({ mutate: jest.fn() }),
+  }),
+);
 
-jest.mock('../../../../../hooks/use-retention', () => ({
-  ...jest.requireActual('../../../../../hooks/use-retention'),
-  useRetentionTopics: () => mockUseRetentionTopics(),
-}));
+jest.mock(
+  '../../../../../hooks/use-retention' /* gc1-allow: pattern-a conversion; hook fires network query; pattern-a spy controls retention topics shape */,
+  () => ({
+    ...jest.requireActual('../../../../../hooks/use-retention'),
+    useRetentionTopics: () => mockUseRetentionTopics(),
+  }),
+);
 
-jest.mock('../../../../../hooks/use-curriculum', () => ({
-  ...jest.requireActual('../../../../../hooks/use-curriculum'),
-  useCurriculum: () => mockUseCurriculum(),
-}));
+jest.mock(
+  '../../../../../hooks/use-curriculum' /* gc1-allow: pattern-a conversion; hook fires network query; pattern-a spy controls curriculum shape */,
+  () => ({
+    ...jest.requireActual('../../../../../hooks/use-curriculum'),
+    useCurriculum: () => mockUseCurriculum(),
+  }),
+);
 
-jest.mock('../../../../../hooks/use-progress', () => ({
-  ...jest.requireActual('../../../../../hooks/use-progress'),
-  useLearningResumeTarget: () => mockUseLearningResumeTarget(),
-}));
+jest.mock(
+  '../../../../../hooks/use-progress' /* gc1-allow: pattern-a conversion; hook fires network query; pattern-a spy controls resume target shape */,
+  () => ({
+    ...jest.requireActual('../../../../../hooks/use-progress'),
+    useLearningResumeTarget: () => mockUseLearningResumeTarget(),
+  }),
+);
 
 jest.mock(
   '../../../../../hooks/use-sessions',
@@ -95,17 +113,23 @@ jest.mock(
   }),
 );
 
-jest.mock('../../../../../hooks/use-subjects', () => ({
-  ...jest.requireActual('../../../../../hooks/use-subjects'),
-  useSubjects: () => ({
-    data: [{ id: 'sub-1', name: 'Mathematics' }],
+jest.mock(
+  '../../../../../hooks/use-subjects' /* gc1-allow: pattern-a conversion; hook fires network query; pattern-a spy controls subject list shape */,
+  () => ({
+    ...jest.requireActual('../../../../../hooks/use-subjects'),
+    useSubjects: () => ({
+      data: [{ id: 'sub-1', name: 'Mathematics' }],
+    }),
   }),
-}));
+);
 
-jest.mock('../../../../../hooks/use-move-topic', () => ({
-  ...jest.requireActual('../../../../../hooks/use-move-topic'),
-  useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
-}));
+jest.mock(
+  '../../../../../hooks/use-move-topic' /* gc1-allow: pattern-a conversion; hook fires network mutation; pattern-a spy isolates move-topic behavior from real API calls */,
+  () => ({
+    ...jest.requireActual('../../../../../hooks/use-move-topic'),
+    useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
+  }),
+);
 
 jest.mock(
   '../../../../../components/common' /* gc1-allow: native-boundary; animations use reanimated worklets/SVG modules in JSDOM */,

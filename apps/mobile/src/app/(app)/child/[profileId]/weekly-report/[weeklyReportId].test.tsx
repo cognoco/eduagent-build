@@ -47,15 +47,19 @@ jest.mock('@sentry/react-native', () => ({
   captureException: jest.fn(),
 }));
 
-jest.mock('../../../../../lib/navigation', () => ({
-  // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
+jest.mock(
+  '../../../../../lib/navigation' /* gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
 
-jest.mock('../../../../../components/common', () => ({
-  // gc1-allow: barrel exports RN components including Reanimated animations — cannot render in JSDOM
-  ErrorFallback: () => null,
-}));
+jest.mock(
+  '../../../../../components/common' /* gc1-allow: barrel exports RN components including Reanimated animations — cannot render in JSDOM */,
+  () => ({
+    ErrorFallback: () => null,
+  }),
+);
 
 // prettier-ignore
 jest.mock('../../../../../components/nudge/NudgeActionSheet', () => ({ // gc1-allow: screen test verifies sheet invocation without native sheet behavior

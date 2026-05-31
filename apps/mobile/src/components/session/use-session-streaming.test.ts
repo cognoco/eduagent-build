@@ -32,11 +32,14 @@ jest.mock('../../lib/session-recovery', () => ({ // gc1-allow: uses Expo SecureS
 }));
 
 // Mock homework problem-cards
-jest.mock('../homework/problem-cards', () => ({
-  ...jest.requireActual('../homework/problem-cards'),
-  buildHomeworkSessionMetadata: jest.fn(() => ({})),
-  withProblemMode: jest.fn((problems: unknown[]) => problems),
-}));
+jest.mock(
+  '../homework/problem-cards' /* gc1-allow: pattern-a conversion; problem-cards transitively imports native modules unavailable in JSDOM */,
+  () => ({
+    ...jest.requireActual('../homework/problem-cards'),
+    buildHomeworkSessionMetadata: jest.fn(() => ({})),
+    withProblemMode: jest.fn((problems: unknown[]) => problems),
+  }),
+);
 
 const WATCHDOG_RECONNECT_TEXT = 'Connection dropped — Try again';
 

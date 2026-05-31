@@ -32,51 +32,61 @@ const mockPrepareMutateAsync = jest.fn();
 const mockPrepareReset = jest.fn();
 let mockPrepareIsPending = false;
 
-jest.mock('../../../hooks/use-dictation-api', () => ({
-  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
-  usePrepareHomework: () => ({
-    mutateAsync: mockPrepareMutateAsync,
-    isPending: mockPrepareIsPending,
-    reset: mockPrepareReset,
+jest.mock(
+  '../../../hooks/use-dictation-api' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    usePrepareHomework: () => ({
+      mutateAsync: mockPrepareMutateAsync,
+      isPending: mockPrepareIsPending,
+      reset: mockPrepareReset,
+    }),
+    useGenerateDictation: () => ({
+      mutateAsync: jest.fn(),
+      isPending: false,
+      reset: jest.fn(),
+    }),
   }),
-  useGenerateDictation: () => ({
-    mutateAsync: jest.fn(),
-    isPending: false,
-    reset: jest.fn(),
-  }),
-}));
+);
 
 const mockSetData = jest.fn();
 
-jest.mock('./_layout', () => ({
-  // gc1-allow: layout depends on expo-router Stack and native theme — cannot render in JSDOM
-  useDictationData: () => ({
-    data: null,
-    setData: mockSetData,
-    clear: jest.fn(),
+jest.mock(
+  './_layout' /* gc1-allow: layout depends on expo-router Stack and native theme — cannot render in JSDOM */,
+  () => ({
+    useDictationData: () => ({
+      data: null,
+      setData: mockSetData,
+      clear: jest.fn(),
+    }),
   }),
-}));
+);
 
 const mockGoBackOrReplace = jest.fn();
-jest.mock('../../../lib/navigation', () => ({
-  // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
-
-jest.mock('../../../lib/platform-alert', () => ({
-  // gc1-allow: wraps RN Alert.alert and Platform.OS — requires native Alert shim unavailable in JSDOM
-  platformAlert: jest.fn(),
-}));
-
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    textPrimary: '#fff',
-    textSecondary: '#888',
-    primary: '#2563eb',
-    accent: '#00bfa5',
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   }),
-}));
+);
+
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: wraps RN Alert.alert and Platform.OS — requires native Alert shim unavailable in JSDOM */,
+  () => ({
+    platformAlert: jest.fn(),
+  }),
+);
+
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      textPrimary: '#fff',
+      textSecondary: '#888',
+      primary: '#2563eb',
+      accent: '#00bfa5',
+    }),
+  }),
+);
 
 const TextPreviewScreen = require('./text-preview')
   .default as React.ComponentType;
