@@ -1122,7 +1122,11 @@ describe('session routes', () => {
         TEST_ENV,
       );
 
+      // [BUG-820] id: keyed on (sessionId, summaryStatus) so a retried
+      // /close with summaryStatus='skipped' is deduped by Inngest instead of
+      // double-applying the post-session pipeline.
       expect(sendSpy).toHaveBeenCalledWith({
+        id: `session-completed-${SESSION_ID}-skipped`,
         name: 'app/session.completed',
         data: expect.objectContaining({
           sessionId: SESSION_ID,
@@ -1600,7 +1604,9 @@ describe('session routes', () => {
       expect(body.summary.sessionId).toBe(SESSION_ID);
       expect(typeof body.summary.aiFeedback).toBe('string');
       expect(body.summary.status).toBe('accepted');
+      // [BUG-820] dedup id keyed on (sessionId, summaryStatus).
       expect(mockInngestSend).toHaveBeenCalledWith({
+        id: `session-completed-${SESSION_ID}-accepted`,
         name: 'app/session.completed',
         data: expect.objectContaining({
           sessionId: SESSION_ID,
@@ -1656,7 +1662,9 @@ describe('session routes', () => {
 
       const body = await res.json();
       expect(body.summary.status).toBe('skipped');
+      // [BUG-820] dedup id keyed on (sessionId, summaryStatus).
       expect(mockInngestSend).toHaveBeenCalledWith({
+        id: `session-completed-${SESSION_ID}-skipped`,
         name: 'app/session.completed',
         data: expect.objectContaining({
           sessionId: SESSION_ID,

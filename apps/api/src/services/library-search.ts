@@ -200,7 +200,14 @@ export async function searchLibrary(
       subjectId: n.subjectId,
       subjectName: n.subjectName,
       contentSnippet: truncateSnippet(n.content),
-      createdAt: n.createdAt.toISOString(),
+      // [BUG-858] Wrap with `new Date(...)` because neon-serverless can
+      // return timestamp columns as raw strings rather than Date instances
+      // (see project memory: project_drizzle_date_objects.md; schemas
+      // tolerate Date|string via isoDateField for the same reason). Bare
+      // `.toISOString()` crashes with "n.createdAt.toISOString is not a
+      // function" if the driver shape flips on upgrade or in a different
+      // test seam.
+      createdAt: new Date(n.createdAt).toISOString(),
     })),
     sessions: matchingSessions.map((s) => ({
       sessionId: s.sessionId,
@@ -217,7 +224,9 @@ export async function searchLibrary(
         s.highlight,
         s.closingLine,
       ]),
-      occurredAt: s.occurredAt.toISOString(),
+      // [BUG-858] See createdAt note above — neon-serverless may return
+      // string instead of Date; normalize via `new Date(...)` first.
+      occurredAt: new Date(s.occurredAt).toISOString(),
     })),
   };
 }

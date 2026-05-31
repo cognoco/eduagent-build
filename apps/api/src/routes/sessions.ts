@@ -390,7 +390,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       });
       // core-send: user-initiated filing retry — dispatch must throw on
       // failure so the user is not told "queued" when nothing was queued.
-      await inngest.send({ name: 'app/filing.retry', data: retryPayload });
+      // [BUG-820] Key by sessionId so a double-tapped retry does not enqueue
+      // two parallel filing workers for the same session.
+      await inngest.send({
+        id: `filing-retry-${sessionId}`,
+        name: 'app/filing.retry',
+        data: retryPayload,
+      });
 
       const updatedSession = await getSession(db, profileId, sessionId);
       if (!updatedSession) return notFound(c, 'Session not found');
@@ -1592,7 +1598,19 @@ async function dispatchSessionCompletedEvent(
 
   try {
     // core-send: pipeline integrity — silent drop breaks dashboard/streaks/memory
+    // [BUG-820] Inngest event-key dedup. Three routes can reach this dispatch
+    // without idempotency middleware: POST /sessions/:id/close, /summary,
+    // and /summary/skip. closeSession's CAS at session-crud.ts only protects
+    // the DB write — `summaryStatus='skipped'` is not in the early-exit set,
+    // so a retried /close (mobile retry, proxy retry, double-tap) re-runs
+    // the dispatch. Without an explicit `id:`, Inngest treats each send as
+    // a new event and the entire post-session pipeline (XP, streaks, memory
+    // extraction, retention scoring, embeddings) double-applies. Keying by
+    // (sessionId, summaryStatus) lets a legitimate status transition (e.g.
+    // 'skipped' → 'submitted') still dispatch once per transition while a
+    // retry within the same transition is deduped by Inngest.
     await inngest.send({
+      id: `session-completed-${completion.sessionId}-${options.summaryStatus}`,
       name: 'app/session.completed',
       data: {
         profileId,

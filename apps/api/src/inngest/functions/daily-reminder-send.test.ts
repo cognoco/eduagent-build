@@ -29,7 +29,15 @@ jest.mock(
   },
 );
 
+// [BUG-838] daily-reminder-send was migrated from
+// getRecentNotificationCount → checkAndLogRateLimitInternal to close the
+// read-then-write dedup race. Mock both so legacy assertions stay readable
+// (the count mock is unused after migration but retained to keep the diff
+// against history easy to read; production code no longer calls it).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+// `false` = not rate-limited → handler proceeds to send. Each test that
+// wants to simulate "already sent in 24h" overrides this with `true`.
+const mockCheckAndLogRateLimitInternal = jest.fn().mockResolvedValue(false);
 jest.mock(
   '../../services/settings' /* gc1-allow: pattern-a conversion */,
   () => {
@@ -40,6 +48,8 @@ jest.mock(
       ...actual,
       getRecentNotificationCount: (...args: unknown[]) =>
         mockGetRecentNotificationCount(...args),
+      checkAndLogRateLimitInternal: (...args: unknown[]) =>
+        mockCheckAndLogRateLimitInternal(...args),
     };
   },
 );
@@ -135,12 +145,18 @@ describe('dailyReminderSend', () => {
     it('sends a push notification with the correct profile and type', async () => {
       await executeHandler({ profileId: 'p-1', streakDays: 3 });
 
-      expect(mockSendPushNotification).toHaveBeenCalledWith(mockDb, {
-        profileId: 'p-1',
-        title: 'Keep your streak!',
-        body: 'Keep your streak going!',
-        type: 'daily_reminder',
-      });
+      // [BUG-838] checkAndLogRateLimitInternal already inserted the
+      // notificationLog row, so the handler passes skipRateLimitLog:true.
+      expect(mockSendPushNotification).toHaveBeenCalledWith(
+        mockDb,
+        {
+          profileId: 'p-1',
+          title: 'Keep your streak!',
+          body: 'Keep your streak going!',
+          type: 'daily_reminder',
+        },
+        { skipRateLimitLog: true },
+      );
     });
 
     it('returns status: sent with ticketId when push succeeds', async () => {
@@ -246,18 +262,21 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
   });
 
   it('skips sendPushNotification and returns dedup_24h when a daily_reminder was sent in last 24h', async () => {
-    mockGetRecentNotificationCount.mockResolvedValueOnce(1);
+    // [BUG-838] Migrated from getRecentNotificationCount→checkAndLogRateLimitInternal.
+    // `true` = already-rate-limited (the helper found a recent log row and
+    // refused to insert a new one); handler must skip the push.
+    mockCheckAndLogRateLimitInternal.mockResolvedValueOnce(true);
 
     const { result } = await executeHandler({
       profileId: 'p-dup',
       streakDays: 5,
     });
 
-    expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
+    expect(mockCheckAndLogRateLimitInternal).toHaveBeenCalledWith(
       mockDb,
       'p-dup',
       'daily_reminder',
-      24,
+      { hours: 24, maxCount: 1 },
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -268,7 +287,10 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
   });
 
   it('still sends when no recent daily_reminder notification exists', async () => {
-    mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+    // [BUG-838] `false` = the helper inserted a fresh log row inside its
+    // transaction; handler proceeds with the push and must pass
+    // skipRateLimitLog so sendPushNotification does not double-log.
+    mockCheckAndLogRateLimitInternal.mockResolvedValueOnce(false);
     mockSendPushNotification.mockResolvedValueOnce({
       sent: true,
       ticketId: 'ticket-002',
@@ -297,7 +319,7 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
 // function returns skipped:dedup_check_failed so retries are bounded.
 // ---------------------------------------------------------------------------
 
-describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure — fail closed', () => {
+describe('[BUG-976 / BUG-838] daily-reminder-send checkAndLogRateLimitInternal DB failure — fail closed', () => {
   const mockDb = {
     query: {
       profiles: {
@@ -314,9 +336,9 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure �
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
 
-  it('[BREAK] calls captureException and returns skipped:dedup_check_failed when getRecentNotificationCount throws', async () => {
+  it('[BREAK] calls captureException and returns skipped:dedup_check_failed when checkAndLogRateLimitInternal throws', async () => {
     const dbError = new Error('connection timeout');
-    mockGetRecentNotificationCount.mockRejectedValueOnce(dbError);
+    mockCheckAndLogRateLimitInternal.mockRejectedValueOnce(dbError);
 
     const { result, sendEventCalls } = await executeHandler({
       profileId: 'p-err',
@@ -328,7 +350,7 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure �
       expect.objectContaining({
         profileId: 'p-err',
         extra: expect.objectContaining({
-          context: 'daily-reminder-send:getRecentNotificationCount',
+          context: 'daily-reminder-send:checkAndLogRateLimitInternal',
         }),
       }),
     );
