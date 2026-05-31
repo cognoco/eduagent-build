@@ -45,3 +45,7 @@ graph.html
 /.nx/cache
 /.nx/workspace-data
 /_wip
+
+# Agent skill libraries (not application code — template patterns differ from project style)
+/.agents
+/.claude
