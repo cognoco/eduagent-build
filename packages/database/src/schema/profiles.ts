@@ -252,6 +252,17 @@ export const consentStates = pgTable(
     recipientChangeCount: integer('recipient_change_count')
       .notNull()
       .default(0),
+    // [Bug #872] GDPR / COPPA audit metadata. Without these fields a consent
+    // record cannot be re-derived from logs once Cloudflare access logs roll
+    // over: regulators ask "which policy version did this parent consent to,
+    // from what device" and the answer is "we no longer know". Captured on
+    // requestConsent (request_ip/user_agent of the parent action that
+    // initiated the request) and overwritten on processConsentResponse with
+    // the IP/UA of the parent click that approved or denied. Policy version
+    // is read from the typed config (CONSENT_POLICY_VERSION).
+    policyVersion: text('policy_version'),
+    requestIp: text('request_ip'),
+    userAgent: text('user_agent'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

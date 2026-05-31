@@ -173,7 +173,29 @@ export const revenuecatWebhookRoute = new Hono<{
   }
 
   // Parse and validate webhook payload
-  const rawBody = await c.req.json();
+  // [BUG-835] Malformed JSON body must surface as 400, not 500. RevenueCat
+  // treats any non-2xx as transient and retries for ~72h; a SyntaxError thrown
+  // from c.req.json() produced a 500 and a 3-day retry storm against the
+  // worker. A malformed body is permanently bad — ack with 400 so RC stops.
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch (err) {
+    logger.error('[revenuecat-webhook] malformed JSON body — rejecting 400', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(
+      err instanceof Error
+        ? err
+        : new Error('RevenueCat webhook malformed JSON body'),
+      {
+        extra: {
+          context: 'revenuecat.webhook.malformed_json',
+        },
+      },
+    );
+    return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, 'Invalid JSON body');
+  }
   const parsed = revenuecatWebhookSchema.safeParse(rawBody);
 
   if (!parsed.success) {

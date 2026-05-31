@@ -36,6 +36,7 @@ import {
   ConsentTokenExpiredError,
   ConsentNotAuthorizedError,
   ConsentRecordNotFoundError,
+  ConsentGracePeriodExpiredError,
 } from '../services/consent';
 import { notFound, forbidden, apiError } from '../errors';
 import {
@@ -194,6 +195,7 @@ type ConsentRouteEnv = {
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
+    CONSENT_POLICY_VERSION: string;
   };
   Variables: {
     user: AuthUser;
@@ -258,6 +260,18 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             emailFrom: c.env.EMAIL_FROM,
           },
           account.id,
+          // [Bug #872] Capture audit metadata so consent records remain
+          // re-derivable after Cloudflare access logs roll over. cf-connecting-ip
+          // is the canonical client IP on Cloudflare Workers; x-forwarded-for is
+          // the fallback for local dev / non-CF runtimes.
+          {
+            policyVersion: c.env.CONSENT_POLICY_VERSION,
+            requestIp:
+              c.req.header('cf-connecting-ip') ??
+              c.req.header('x-forwarded-for') ??
+              undefined,
+            userAgent: c.req.header('user-agent') ?? undefined,
+          },
         );
       } catch (error) {
         // [WI-374] Both the resend cap (same email) and the recipient-change
@@ -415,7 +429,15 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
 
       try {
-        await processConsentResponse(db, input.token, input.approved);
+        // [Bug #872] Audit metadata captured at response time.
+        await processConsentResponse(db, input.token, input.approved, {
+          policyVersion: c.env.CONSENT_POLICY_VERSION,
+          requestIp:
+            c.req.header('cf-connecting-ip') ??
+            c.req.header('x-forwarded-for') ??
+            undefined,
+          userAgent: c.req.header('user-agent') ?? undefined,
+        });
         return c.json(
           consentRespondResultSchema.parse({
             message: input.approved ? 'Consent granted' : 'Consent denied',
@@ -564,6 +586,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
       if (error instanceof ConsentRecordNotFoundError) {
         return notFound(c, error.message);
+      }
+      // [Bug #871] 7-day grace period expired — data may already be
+      // hard-deleted by archive-cleanup. Surface as 410 GONE rather than
+      // silently flipping consent to CONSENTED on an empty profile.
+      if (error instanceof ConsentGracePeriodExpiredError) {
+        return apiError(c, 410, ERROR_CODES.GONE, error.message);
       }
       throw error;
     }

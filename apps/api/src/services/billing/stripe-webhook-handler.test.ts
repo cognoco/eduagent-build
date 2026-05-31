@@ -60,6 +60,7 @@ import {
 } from '../billing';
 import { safeRefreshKvCache } from '../safe-refresh-kv-cache';
 import { inngest } from '../../inngest/client';
+import { captureException } from '../sentry';
 import type Stripe from 'stripe';
 
 const mockDb = {
@@ -175,6 +176,7 @@ describe('handleCheckoutCompleted', () => {
       id: 'cs_test_123',
       subscription: 'sub_stripe_123',
       metadata: { accountId: 'acc-1', tier: 'plus' },
+      payment_status: 'paid',
     } as unknown as Stripe.Checkout.Session;
 
     await handleCheckoutCompleted(
@@ -192,6 +194,73 @@ describe('handleCheckoutCompleted', () => {
       '2026-01-01T00:00:00.000Z',
     );
     expect(safeRefreshKvCache).toHaveBeenCalledTimes(1);
+  });
+
+  it('activates when payment_status=no_payment_required (100%-discount / setup flow)', async () => {
+    (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
+      mockUpdatedSub(),
+    );
+
+    const session = {
+      id: 'cs_test_setup',
+      subscription: 'sub_stripe_123',
+      metadata: { accountId: 'acc-1', tier: 'plus' },
+      payment_status: 'no_payment_required',
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(
+      mockDb,
+      mockKv,
+      session,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalled();
+  });
+
+  it('defers activation and escalates to Sentry when payment_status=unpaid [#829 break test]', async () => {
+    // [#829] Async payment methods (SEPA, Bacs, BLIK, bank transfer) fire
+    // checkout.session.completed with payment_status='unpaid' before the
+    // payment actually clears. Activating immediately would grant the paid
+    // tier + quota before money has arrived; a subsequent async_payment_failed
+    // would leave the user already consuming paid-tier quota.
+    const session = {
+      id: 'cs_test_unpaid',
+      subscription: 'sub_stripe_123',
+      metadata: { accountId: 'acc-1', tier: 'plus' },
+      payment_status: 'unpaid',
+      payment_method_types: ['sepa_debit'],
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(
+      mockDb,
+      mockKv,
+      session,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    // Activation MUST NOT be called — wait for async_payment_succeeded.
+    expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+    expect(safeRefreshKvCache).not.toHaveBeenCalled();
+
+    // The defer is escalated to Sentry so the rate is queryable.
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining(
+          "non-terminal payment_status='unpaid'",
+        ),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.checkout.completed.payment_pending',
+          stripeSessionId: 'cs_test_unpaid',
+          stripeSubscriptionId: 'sub_stripe_123',
+          accountId: 'acc-1',
+          tier: 'plus',
+          paymentStatus: 'unpaid',
+        }),
+      }),
+    );
   });
 });
 
@@ -227,6 +296,159 @@ describe('handlePaymentFailed', () => {
       expect.objectContaining({
         name: 'app/payment.failed',
         id: 'stripe-payment-failed:evt_pay_fail_1',
+      }),
+    );
+  });
+});
+
+describe('out-of-order subscription event escalation [#828 break tests]', () => {
+  // [#828] Stripe does NOT guarantee event ordering. customer.subscription.*
+  // or invoice.payment_* can arrive before checkout.session.completed has
+  // created the local row. updateSubscriptionFromWebhook returns null in
+  // that case. Previously the handlers returned silently — event state
+  // (period dates, cancelled_at, past_due) was lost forever because Stripe
+  // won't re-deliver after a 200. CLAUDE.md "Silent recovery without
+  // escalation is banned in billing".
+
+  it('handleSubscriptionEvent escalates when local subscription row not found', async () => {
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(null);
+
+    const sub = {
+      id: 'sub_stripe_out_of_order',
+      status: 'active',
+      metadata: { tier: 'plus' },
+      items: { data: [] },
+      canceled_at: null,
+    } as unknown as Stripe.Subscription;
+
+    await handleSubscriptionEvent(
+      mockDb,
+      mockKv,
+      sub,
+      '2026-01-01T00:00:00.000Z',
+      'evt_ooo_sub',
+      TEST_ENV,
+    );
+
+    expect(safeRefreshKvCache).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('handleSubscriptionEvent'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context:
+            'stripe.webhook.handleSubscriptionEvent.subscription_not_found',
+          stripeSubscriptionId: 'sub_stripe_out_of_order',
+          stripeEventId: 'evt_ooo_sub',
+        }),
+      }),
+    );
+  });
+
+  it('handleSubscriptionDeleted escalates when local subscription row not found', async () => {
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(null);
+
+    const sub = {
+      id: 'sub_stripe_ooo_del',
+      status: 'canceled',
+      metadata: {},
+      items: { data: [] },
+      canceled_at: null,
+    } as unknown as Stripe.Subscription;
+
+    await handleSubscriptionDeleted(
+      mockDb,
+      mockKv,
+      sub,
+      '2026-01-01T00:00:00.000Z',
+      'evt_ooo_del',
+    );
+
+    expect(safeRefreshKvCache).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('handleSubscriptionDeleted'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context:
+            'stripe.webhook.handleSubscriptionDeleted.subscription_not_found',
+          stripeSubscriptionId: 'sub_stripe_ooo_del',
+          stripeEventId: 'evt_ooo_del',
+        }),
+      }),
+    );
+  });
+
+  it('handlePaymentFailed escalates when local subscription row not found', async () => {
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(null);
+
+    const invoice = {
+      id: 'in_ooo_fail',
+      parent: {
+        subscription_details: { subscription: 'sub_stripe_ooo_inv' },
+      },
+      attempt_count: 1,
+    } as unknown as Stripe.Invoice;
+
+    await handlePaymentFailed(
+      mockDb,
+      mockKv,
+      invoice,
+      '2026-01-01T00:00:00.000Z',
+      'evt_ooo_inv_fail',
+    );
+
+    // No payment-failed Inngest dispatch — there's no account to notify.
+    expect(inngest.send).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('handlePaymentFailed'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.handlePaymentFailed.subscription_not_found',
+          stripeSubscriptionId: 'sub_stripe_ooo_inv',
+          stripeEventId: 'evt_ooo_inv_fail',
+          invoiceId: 'in_ooo_fail',
+        }),
+      }),
+    );
+  });
+
+  it('handlePaymentSucceeded escalates when local subscription row not found', async () => {
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(null);
+
+    const invoice = {
+      id: 'in_ooo_ok',
+      parent: {
+        subscription_details: { subscription: 'sub_stripe_ooo_inv_ok' },
+      },
+      attempt_count: 1,
+    } as unknown as Stripe.Invoice;
+
+    await handlePaymentSucceeded(
+      mockDb,
+      mockKv,
+      invoice,
+      '2026-01-01T00:00:00.000Z',
+      'evt_ooo_inv_ok',
+    );
+
+    expect(safeRefreshKvCache).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('handlePaymentSucceeded'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context:
+            'stripe.webhook.handlePaymentSucceeded.subscription_not_found',
+          stripeSubscriptionId: 'sub_stripe_ooo_inv_ok',
+          stripeEventId: 'evt_ooo_inv_ok',
+          invoiceId: 'in_ooo_ok',
+        }),
       }),
     );
   });
