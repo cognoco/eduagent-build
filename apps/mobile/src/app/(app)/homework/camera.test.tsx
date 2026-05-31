@@ -105,6 +105,7 @@ jest.mock(
       status: 'idle',
       error: null,
       errorCode: undefined,
+      source: null,
       failCount: 0,
       process: mockProcess,
       retry: mockRetry,
@@ -335,6 +336,7 @@ beforeEach(() => {
     status: 'idle',
     error: null,
     errorCode: undefined,
+    source: null,
     failCount: 0,
     process: mockProcess,
     retry: mockRetry,
@@ -551,12 +553,15 @@ describe('CameraScreen', () => {
     const captureButton = getByTestId('capture-button');
     const galleryButton = getByTestId('gallery-button');
     const flashButton = getByTestId('flash-toggle');
-    getByTestId('manual-entry-button');
+    const manualEntryButton = getByTestId('manual-entry-button');
     expect(captureButton.props.className).toContain('w-16 h-16');
     expect(galleryButton.props.className).toContain('w-16 h-16');
     expect(galleryButton.props.className).toContain('bg-accent');
     expect(flashButton.props.className).toContain('w-16 h-16');
     expect(flashButton.props.className).toContain('bg-accent');
+    expect(manualEntryButton.props.className).toContain('bg-white');
+    getByText('create-outline');
+    getByText('mic-outline');
     getByText(/center your homework/i);
   });
 
@@ -721,6 +726,8 @@ describe('CameraScreen', () => {
       text: null,
       status: 'processing',
       error: null,
+      errorCode: undefined,
+      source: null,
       failCount: 0,
       process: mockProcess,
       retry: mockRetry,
@@ -768,6 +775,7 @@ describe('CameraScreen', () => {
       status: 'error',
       error: 'Failed to cache image',
       errorCode: 'CACHE_FAILED',
+      source: null,
       // failCount: 0 — first failure shows the primary action buttons (retake +
       // suppressed retry). failCount >= 1 switches to the manual-input fallback
       // branch which uses 'try-camera-again-button' instead.
@@ -793,6 +801,8 @@ describe('CameraScreen', () => {
       text: null,
       status: 'processing',
       error: null,
+      errorCode: undefined,
+      source: null,
       failCount: 0,
       process: mockProcess,
       retry: mockRetry,
@@ -826,8 +836,9 @@ describe('CameraScreen', () => {
       text: null,
       status: 'error',
       error:
-        "We couldn't find a clear homework problem in this photo. Try again or type it in.",
-      errorCode: 'NOT_HOMEWORK',
+        "We couldn't read that clearly. Try taking the photo again with better lighting.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
       failCount: 1,
       process: mockProcess,
       retry: mockRetry,
@@ -840,9 +851,7 @@ describe('CameraScreen', () => {
     await waitFor(() => {
       getByText(/type it out/i);
       getByTestId('manual-input');
-      expect(
-        getByText(/couldn't find a clear homework problem in this photo/i),
-      ).toBeTruthy();
+      expect(getByText(/couldn't read this photo clearly/i)).toBeTruthy();
     });
   });
 
@@ -851,8 +860,9 @@ describe('CameraScreen', () => {
       text: null,
       status: 'error',
       error:
-        "We couldn't find a clear homework problem in this photo. Try again or type it in.",
-      errorCode: 'NOT_HOMEWORK',
+        "We couldn't read that clearly. Try taking the photo again with better lighting.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
       failCount: 1,
       process: mockProcess,
       retry: mockRetry,
@@ -865,9 +875,7 @@ describe('CameraScreen', () => {
     await waitFor(() => {
       getByText(/type it out/i);
       getByTestId('manual-input');
-      expect(
-        getByText(/couldn't find a clear homework problem in this photo/i),
-      ).toBeTruthy();
+      expect(getByText(/couldn't read this photo clearly/i)).toBeTruthy();
     });
   });
 
@@ -877,6 +885,7 @@ describe('CameraScreen', () => {
       status: 'error',
       error: 'Failed to read',
       errorCode: undefined,
+      source: null,
       failCount: 1,
       process: mockProcess,
       retry: mockRetry,
@@ -912,11 +921,37 @@ describe('CameraScreen', () => {
 
   // ---- Result phase ----
 
+  it('keeps server-sourced OCR text in the result editor even when the shape filter would drop it', async () => {
+    const serverText = 'fn ui db io tx rx id ts';
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: serverText,
+      status: 'done',
+      error: null,
+      errorCode: undefined,
+      source: 'server',
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(getByTestId('result-text-input').props.value).toBe(serverText);
+    });
+    expect(queryByTestId('dropped-fragments-chip')).toBeNull();
+  });
+
   it('navigates to session with correct params including imageUri on confirm', async () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Solve for x: 2x + 5 = 13',
       status: 'done',
       error: null,
+      errorCode: undefined,
+      source: 'local',
       failCount: 0,
       process: mockProcess,
       retry: mockRetry,
@@ -956,6 +991,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -979,6 +1015,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
       cancel: mockCancel,
@@ -1017,6 +1054,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1046,6 +1084,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1111,6 +1150,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1153,6 +1193,7 @@ describe('CameraScreen', () => {
       error: "We couldn't read that.",
       errorCode: undefined,
       failCount: 1,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1197,6 +1238,7 @@ describe('CameraScreen', () => {
       error: "We couldn't read that.",
       errorCode: undefined,
       failCount: 1,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1243,6 +1285,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1307,6 +1350,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1355,6 +1399,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1379,6 +1424,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1409,6 +1455,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });
@@ -1430,6 +1477,7 @@ describe('CameraScreen', () => {
       status: 'done',
       error: null,
       failCount: 0,
+      source: null,
       process: mockProcess,
       retry: mockRetry,
     });

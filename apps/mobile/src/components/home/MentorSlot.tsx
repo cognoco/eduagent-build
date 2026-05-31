@@ -16,8 +16,10 @@ import { firstNameOf } from './parent-card-prompts';
 //       week). Copy reframes rather than restating the numbers the card's
 //       momentum strip already shows (avoids the double-surface noted in the
 //       plan's Challenge LOW-3).
-//   (2) guidance — the dashboard's own coaching line for this child.
-//   (3) nothing — the slot is optional, never filler.
+//   (2) durable memory — parent-facing guidance from mentor memory, with terse
+//       trait notes reframed before display.
+//   (3) progress read — generated child progress summary.
+//   (4) nothing — the slot is optional, never filler.
 
 const STREAK_CELEBRATION_THRESHOLD = 7;
 const TOPICS_CELEBRATION_THRESHOLD = 3;
@@ -30,6 +32,9 @@ export interface MentorSlotInsight {
 const MEMORY_INSIGHT_PRIORITY: Array<
   CuratedMemoryView['categories'][number]['items'][number]['category']
 > = ['communicationNotes', 'learningStyle'];
+
+const BARE_IMPATIENCE_NOTE_PATTERN =
+  /^(?:the\s+)?(?:learner|child)\s+is\s+impatient\.?$/i;
 
 function firstDurableMemoryInsight(
   memory: CuratedMemoryView | null | undefined,
@@ -44,6 +49,21 @@ function firstDurableMemoryInsight(
   }
 
   return null;
+}
+
+function formatMentorSlotGuidance(
+  insight: MentorSlotInsight | null | undefined,
+  name: string,
+  t: Translate,
+): string | null {
+  const text = insight?.text.trim();
+  if (!text) return null;
+
+  if (insight?.kind === 'works' && BARE_IMPATIENCE_NOTE_PATTERN.test(text)) {
+    return t('home.parent.mentorSlot.impatientAdvice', { name });
+  }
+
+  return text;
 }
 
 export function resolveMentorSlotInsight(
@@ -79,7 +99,7 @@ export function MentorSlot({
   const topicsCelebration =
     (child.progress?.weeklyDeltaTopicsMastered ?? 0) >=
     TOPICS_CELEBRATION_THRESHOLD;
-  const guidance = insight?.text.trim() || null;
+  const guidance = formatMentorSlotGuidance(insight, name, t);
 
   if (streakCelebration || topicsCelebration) {
     const text = streakCelebration

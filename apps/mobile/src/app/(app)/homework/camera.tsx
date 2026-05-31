@@ -195,12 +195,14 @@ export default function CameraScreen(): React.ReactNode {
   useEffect(() => {
     if (!speech.error) return;
     platformAlert(t('homework.microphoneUnavailableTitle'), speech.error);
-  }, [speech.error]);
+  }, [speech.error, t]);
 
   // Sync OCR hook status into reducer
   useEffect(() => {
     if (ocr.status === 'done' && ocr.text) {
-      const splitResult = splitHomeworkProblems(ocr.text);
+      const splitResult = splitHomeworkProblems(ocr.text, undefined, {
+        skipFilter: ocr.source === 'server',
+      });
       dispatch({ type: 'OCR_SUCCESS', text: ocr.text });
       setOcrText(ocr.text);
       setDraftProblems(splitResult.problems);
@@ -215,7 +217,7 @@ export default function CameraScreen(): React.ReactNode {
       dispatch({ type: 'OCR_ERROR', message: userMessage });
       setDroppedProblems([]);
     }
-  }, [ocr.status, ocr.text, ocr.error, ocr.errorCode, t]);
+  }, [ocr.status, ocr.text, ocr.source, ocr.error, ocr.errorCode, t]);
 
   // [BUG-689 / M-9] UI-level safety timeout. The hook itself caps the
   // on-device pass at 20s and the server fallback at 15s, but a hung
@@ -911,15 +913,24 @@ export default function CameraScreen(): React.ReactNode {
             <Pressable
               testID="manual-entry-button"
               onPress={handleStartManualEntry}
-              className="absolute left-6 right-6 flex-row items-center justify-center gap-2 rounded-full bg-black/60 border border-white/20 py-3 px-4"
+              className="absolute left-6 right-6 flex-row items-center justify-center gap-2 rounded-full bg-white py-3 px-4"
               style={{ bottom: insets.bottom + 96 }}
               accessibilityLabel={t('homework.typeOrRecordInstead')}
               accessibilityRole="button"
             >
-              <Ionicons name="mic-outline" size={18} color="white" />
-              <Text className="text-body-sm font-semibold text-white text-center">
+              <Ionicons
+                name="create-outline"
+                size={18}
+                color={colors.textPrimary}
+              />
+              <Text className="text-body-sm font-semibold text-text-primary text-center">
                 {t('homework.typeOrRecordInstead')}
               </Text>
+              <Ionicons
+                name="mic-outline"
+                size={18}
+                color={colors.textPrimary}
+              />
             </Pressable>
 
             <Pressable

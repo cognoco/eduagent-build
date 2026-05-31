@@ -167,6 +167,26 @@ describe('MentorSlot', () => {
     screen.getByText('What works for Lilly');
   });
 
+  it('reframes bare impatience memory notes as actionable mentor advice', () => {
+    render(
+      <MentorSlot
+        child={makeChild({ currentStreak: 2 })}
+        insight={{
+          kind: 'works',
+          text: 'Learner is impatient',
+        }}
+        t={t}
+      />,
+    );
+
+    const guidance = screen.getByTestId('parent-home-mentor-slot-guidance');
+    expect(guidance.props.children).toBe(
+      'Short starts and quick wins may help Lilly stay with it.',
+    );
+    expect(screen.queryByText('Learner is impatient')).toBeNull();
+    screen.getByText('What works for Lilly');
+  });
+
   it('does not render the shallow dashboard guidance as a mentor insight', () => {
     render(
       <MentorSlot

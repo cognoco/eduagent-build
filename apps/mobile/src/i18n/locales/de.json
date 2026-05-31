@@ -230,7 +230,8 @@
         "celebrationStreak": "{{name}} hat diese Woche einen echten Lauf – dieser Streak wird zur Gewohnheit.",
         "celebrationTopics": "Große Woche für {{name}} – viele neue Themen behandelt.",
         "worksFor": "Was für {{name}} funktioniert",
-        "mentorRead": "Tutors Einschätzung zu {{name}}"
+        "mentorRead": "Tutors Einschätzung zu {{name}}",
+        "impatientAdvice": "Kurze Einstiege und schnelle Erfolgserlebnisse können {{name}} helfen, dranzubleiben."
       },
       "learnTogether": {
         "title": "Gemeinsam lernen",
@@ -1383,7 +1384,6 @@
     "stopDictatingProblemLabel": "Diktat der Aufgabe stoppen",
     "dictateProblemLabel": "Aufgabe diktieren",
     "ocrError": {
-      "NOT_HOMEWORK": "Wir konnten keine klare Aufgabe in diesem Foto finden. Versuche ein näheres Foto oder tippe die Aufgabe ein.",
       "LOW_QUALITY": "Wir konnten dieses Foto nicht klar lesen. Versuche es mit besserer Beleuchtung oder einer ruhigeren Hand.",
       "NO_TEXT": "Wir konnten keinen Text in diesem Foto finden. Stelle sicher, dass die Hausaufgabe sichtbar und gut beleuchtet ist.",
       "ML_KIT_UNAVAILABLE": "Fotolesen ist in dieser Version nicht verfügbar. Ein schnelles App-Update bringt es zurück.",
@@ -2124,8 +2124,8 @@
     "progressLabel": "Fortschritt",
     "more": "Mehr",
     "moreLabel": "Mehr",
-    "children": "Kinder",
-    "childrenLabel": "Kinder",
+    "children": "Familie",
+    "childrenLabel": "Familie",
     "recaps": "Zusammenfassungen",
     "recapsLabel": "Zusammenfassungen"
   },

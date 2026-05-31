@@ -27,6 +27,12 @@ jest.mock('../../hooks/use-navigation-contract', () => {
   };
 });
 
+let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+jest.mock('react-native-safe-area-context', () => ({
+  // gc1-allow: native-boundary — the switcher consumes device frame insets.
+  useSafeAreaInsets: () => mockSafeAreaInsets,
+}));
+
 // useModeSwitch internally uses useRouter + useQueryClient + useAppContext.setMode
 // (a TanStack mutation with onError/onSuccess). The switch-error state we surface
 // here is a UI consequence of setMode's onError callback; the mode-switching
@@ -89,6 +95,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockIsSwitching = false;
   mockSwitchError = null;
+  mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 });
 
 describe('ModeSwitcher', () => {
@@ -114,6 +121,8 @@ describe('ModeSwitcher', () => {
 
     expect(studyBtn).toBeTruthy();
     expect(familyBtn).toBeTruthy();
+    expect(screen.getByText('Family')).toBeTruthy();
+    expect(screen.queryByText('Children')).toBeNull();
 
     // Study is current mode → selected true; family → selected false
     expect(studyBtn.props.accessibilityState).toEqual({
@@ -123,6 +132,21 @@ describe('ModeSwitcher', () => {
     expect(familyBtn.props.accessibilityState).toEqual({
       selected: false,
       disabled: false,
+    });
+  });
+
+  it('pads the switcher below the device frame safe area', () => {
+    mockSafeAreaInsets = { top: 44, bottom: 0, left: 7, right: 9 };
+    mockUseNavigationContract.mockReturnValue(
+      buildContract('global-header', 'study'),
+    );
+
+    render(<ModeSwitcher />);
+
+    expect(screen.getByTestId('mode-switcher-container').props.style).toEqual({
+      paddingTop: 44,
+      paddingLeft: 7,
+      paddingRight: 9,
     });
   });
 

@@ -2,6 +2,7 @@ import { View, Pressable, Text, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
+import { useScreenTopInset } from '../../lib/use-screen-top-inset';
 import { useModeSwitch } from '../../lib/use-mode-switch';
 
 /**
@@ -22,6 +23,7 @@ export function ModeSwitcher(): React.ReactElement | null {
   const contract = useNavigationContract();
   const { switchMode, isSwitching, switchError, dismissError } =
     useModeSwitch();
+  const insets = useScreenTopInset();
 
   if (contract.chrome.modeSwitcher === 'hidden') {
     return null;
@@ -30,7 +32,15 @@ export function ModeSwitcher(): React.ReactElement | null {
   const currentMode = contract.effectiveAppContext;
 
   return (
-    <View testID="mode-switcher-container">
+    <View
+      testID="mode-switcher-container"
+      className="bg-background"
+      style={{
+        paddingTop: insets.top,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      }}
+    >
       <View
         testID="mode-switcher"
         className="flex-row items-center gap-1 px-4 py-2 bg-background"

@@ -12,7 +12,7 @@ import {
   withProblemStatus,
 } from './problem-cards';
 
-const S2_NON_HOMEWORK_FIXTURE = `
+const S2_REJECTED_OCR_FIXTURE = `
 todo fix build lint test deploy
 fn ui db io tx rx id ts js ux qa
 const api route hook state prop
@@ -108,7 +108,7 @@ describe('homework OCR guard helpers', () => {
   });
 
   it('S2 fixture is rejected by isLikelyHomework', () => {
-    expect(isLikelyHomework(S2_NON_HOMEWORK_FIXTURE)).toBe(false);
+    expect(isLikelyHomework(S2_REJECTED_OCR_FIXTURE)).toBe(false);
   });
 });
 
@@ -137,11 +137,27 @@ describe('splitHomeworkProblems', () => {
   });
 
   it('drops the single giant card path for non-homework OCR dumps', () => {
-    const result = splitHomeworkProblems(S2_NON_HOMEWORK_FIXTURE);
+    const result = splitHomeworkProblems(S2_REJECTED_OCR_FIXTURE);
 
     expect(result.problems).toHaveLength(0);
     expect(result.dropped).toBe(1);
-    expect(result.droppedProblems[0]?.text).toBe(S2_NON_HOMEWORK_FIXTURE);
+    expect(result.droppedProblems[0]?.text).toBe(S2_REJECTED_OCR_FIXTURE);
+  });
+
+  it('can skip the homework-shape filter for trusted server OCR reads', () => {
+    const filteredResult = splitHomeworkProblems(S2_REJECTED_OCR_FIXTURE);
+    const trustedServerResult = splitHomeworkProblems(
+      S2_REJECTED_OCR_FIXTURE,
+      undefined,
+      { skipFilter: true },
+    );
+
+    expect(filteredResult.problems).toHaveLength(0);
+    expect(filteredResult.dropped).toBe(1);
+    expect(trustedServerResult.problems).toHaveLength(1);
+    expect(trustedServerResult.problems[0]?.text).toBe(S2_REJECTED_OCR_FIXTURE);
+    expect(trustedServerResult.dropped).toBe(0);
+    expect(trustedServerResult.droppedProblems).toHaveLength(0);
   });
 
   it('splitHomeworkProblems returns dropped count', () => {
@@ -155,7 +171,7 @@ describe('splitHomeworkProblems', () => {
   });
 
   it('guardrails: S2 fixture without gate would produce visible cards', () => {
-    const legacyResult = legacySingleCardSplit(S2_NON_HOMEWORK_FIXTURE);
+    const legacyResult = legacySingleCardSplit(S2_REJECTED_OCR_FIXTURE);
 
     expect(legacyResult).toHaveLength(1);
     expect(legacyResult[0]?.text).toContain('todo fix build lint test deploy');
