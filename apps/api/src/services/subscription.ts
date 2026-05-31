@@ -21,6 +21,14 @@ export interface TierConfig {
   maxProfiles: number;
   llmTier: LLMTier;
   quotaModel: 'per-profile' | 'shared-pool';
+  // [BUG-826] Shared-pool tiers that still support per-profile breakdown
+  // views (owner sees aggregate + per-child split; child sees own slice).
+  // The /usage route gates on this to require an active profile context;
+  // without the gate, a child caller on a shared-pool tier with no
+  // profileId would receive family-wide aggregates via getQuotaPool.
+  // Adding a new shared-pool tier with breakdown support means flipping
+  // this flag here — the route reads it via getTierConfig.
+  supportsProfileBreakdown: boolean;
   ownerMonthlyQuota: number | null;
   ownerDailyQuota: number | null;
   childMonthlyQuota: number | null;
@@ -42,6 +50,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     maxProfiles: 2,
     llmTier: 'flash',
     quotaModel: 'per-profile',
+    supportsProfileBreakdown: false,
     ownerMonthlyQuota: 100,
     ownerDailyQuota: 10,
     childMonthlyQuota: 100,
@@ -68,6 +77,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     maxProfiles: 2,
     llmTier: 'standard',
     quotaModel: 'per-profile',
+    supportsProfileBreakdown: false,
     ownerMonthlyQuota: 700,
     ownerDailyQuota: null,
     childMonthlyQuota: 100,
@@ -83,6 +93,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     maxProfiles: 4,
     llmTier: 'standard',
     quotaModel: 'shared-pool',
+    supportsProfileBreakdown: true,
     ownerMonthlyQuota: null,
     ownerDailyQuota: null,
     childMonthlyQuota: null,
@@ -98,6 +109,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     maxProfiles: 6,
     llmTier: 'standard',
     quotaModel: 'shared-pool',
+    supportsProfileBreakdown: true,
     ownerMonthlyQuota: null,
     ownerDailyQuota: null,
     childMonthlyQuota: null,
