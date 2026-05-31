@@ -531,7 +531,24 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           new Date(),
           account.timezone ?? 'UTC',
         ).toISOString();
-      } catch {
+      } catch (err) {
+        // [L11-CR-2026-05-31] CLAUDE.md bans silent recovery in billing code.
+        // Surface as a structured warn + Sentry so the fallback rate is queryable.
+        logger.warn(
+          '[billing] invalid timezone in dayStartAt — fell back to UTC',
+          {
+            event: 'billing.dayStartAt.timezone_fallback',
+            requestedTimezone: account.timezone ?? null,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        );
+        captureException(err, {
+          extra: {
+            context: 'billing.usage.dayStartAt',
+            accountId: account.id,
+            requestedTimezone: account.timezone ?? null,
+          },
+        });
         const now = new Date();
         return new Date(
           Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
