@@ -49,6 +49,12 @@ const RLS_EXCEPTIONS: Record<string, string> = {
   curriculum_topics:
     'Parent-bridge source_child_profile_id is provenance, not ownership; ' +
     'topic ownership remains topics→books→subjects.profile_id',
+
+  // organization_invitations is organization-scoped via organization_id.
+  // target_profile_id and accepted_by_profile_id are invite target/audit
+  // pointers; org-membership RLS belongs to Identity T3, not this T2 auth slice.
+  organization_invitations:
+    'Organization-scoped invitation rows; profile-id columns are target/audit pointers pending T3 org-membership RLS.',
 };
 
 function getProfileScopedTables(): string[] {

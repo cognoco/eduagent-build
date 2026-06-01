@@ -75,6 +75,12 @@ const CASCADE_EXCEPTIONS: Record<string, string> = {
   // clear provenance without deleting the learner's cloned topic.
   'curriculum_topics.sourceChildProfileId':
     'Nullable parent-bridge provenance pointer; set null on delete is intentional.',
+
+  // organization_invitations.acceptedByProfileId records who accepted an
+  // invitation. The invitation remains organization-scoped audit/history data;
+  // deleting the accepting profile should clear only this pointer.
+  'organization_invitations.acceptedByProfileId':
+    'Nullable acceptance audit pointer; set null on delete is intentional.',
 };
 
 // ---------------------------------------------------------------------------
