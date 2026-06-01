@@ -9,6 +9,8 @@ gap_ids: [practice-1, practice-2, practice-4]
 
 # Resumable Practice State - Implementation Plan
 
+> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+
 **Goal:** Preserve in-progress quiz and dictation practice across app kills and
 make "save" language honest: either a practice activity is resumable, or the UI
 says it is final.

@@ -10,6 +10,8 @@ revised: 2026-05-31 (adversarial review folded in — see Review History)
 
 # Notification Reachability and Nudges - Implementation Plan
 
+> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+
 **Goal:** Make notification delivery intentionally reachable for guardian-only
 users and users who previously dismissed permission prompts, and decide the
 child-to-parent nudge model with an implemented path.

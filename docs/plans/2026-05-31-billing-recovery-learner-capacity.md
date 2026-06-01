@@ -9,6 +9,8 @@ gap_ids: [billing-3, billing-4, notif-3]
 
 # Billing Recovery and Learner Capacity - Implementation Plan
 
+> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+
 **Goal:** Make paid-access failures and child-cap exhaustion recoverable before
 users silently lose access or get stuck waiting for a parent who was never
 actually alerted.
