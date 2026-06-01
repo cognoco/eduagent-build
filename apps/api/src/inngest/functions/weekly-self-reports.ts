@@ -1,12 +1,7 @@
 // @inngest-admin: cross-profile
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import {
-  consentStates,
-  familyLinks,
-  profiles,
-  weeklyReports,
-} from '@eduagent/database';
+import { familyLinks, profiles, weeklyReports } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -21,6 +16,7 @@ import {
 import { generateWeeklyReportData } from '../../services/weekly-report';
 import { captureException } from '../../services/sentry';
 import { isoDate, subtractDays } from '../../services/progress-helpers';
+import { isGdprProcessingAllowed } from '../../services/consent';
 
 const weeklySelfReportEventSchema = z.object({
   profileId: z.string().uuid(),
@@ -207,14 +203,7 @@ export const weeklySelfReportGenerate = inngest.createFunction(
           };
         }
 
-        const consentState = await db.query.consentStates.findFirst({
-          where: and(
-            eq(consentStates.profileId, profileId),
-            eq(consentStates.consentType, 'GDPR'),
-          ),
-          orderBy: desc(consentStates.requestedAt),
-        });
-        if (consentState != null && consentState.status !== 'CONSENTED') {
+        if (!(await isGdprProcessingAllowed(db, profileId))) {
           return {
             status: 'skipped' as const,
             reason: 'consent_not_granted',
