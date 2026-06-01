@@ -1,0 +1,380 @@
+# Identity Foundation — Ontology (STRAWMAN for grilling)
+
+**Status:** STRAWMAN — **nothing here is ratified.** This is the conflict-mapped first draft built
+to be *attacked* in a grill, not admired. Every canonical pick is **[PROPOSED]**; the grill decides.
+**Date:** 2026-06-01 · **Owner:** Claude drafts, you + Claude ratify inline.
+
+**What this is.** The single *structural* terminus for the identity foundation: the entities, their
+one-line definitions, the relationships between them, and the invariants that bind them — in one
+agreed vocabulary that the PRD is *written in*, the data model *persists*, and CONTEXT.md *extracts
+its glossary from*. It is the referee that stops the term-drift the three streams keep producing.
+
+**What this is NOT.** Not physical schema (columns/tables/migrations = Phase E). Not the PRD
+(behaviour/journeys = `identity-foundation-prd.md`). Not a decision on *where it ultimately lives*
+(fold into CONTEXT.md vs stay beside it = Phase C, deferred).
+
+**The four sources each concept is reconciled against:**
+- **Intent** — `identity-reconstructed-prd-ANSWER.md` (doc 2, richest single statement of intent).
+- **Standard models** — Clerk data model + B2B-SaaS RBAC/ABAC (adopt standard names where they fit).
+- **Domain spikes** — `domain-model-options.md` (tenancy/IdP), `age-consent-spike.md` (age/consent).
+- **Current code** — `packages/database/src/schema/profiles.ts`, the auth/consent services, and the
+  **existing** `CONTEXT.md` identity glossary (which encodes the *old fused model* — cited as drift,
+  not authority).
+
+**The one rule that kills most drift:** *adopt the standard-model term unless the domain forces a
+divergence; when it diverges, record why.* This converts vocabulary fights from taste ("what should
+we call it") into tests ("does the standard term fit — yes/no").
+
+**Decision legend:** **[PROPOSED]** my recommended canonical pick (grill confirms/overrides) ·
+**[HOT]** a live conflict that must be decided in the grill · **[ALIGNED]** sources already agree,
+low-risk · **[DEFER]** real decision, but downstream of this ontology (parked, not dropped).
+
+---
+
+## §R — Ratification log (Grill #1)
+
+Decisions land here as they're ruled, newest first. The §0 table and §1–§4 bodies are updated in lockstep.
+
+- **C1 / C6 / C8 — The three core nouns — RATIFIED 2026-06-01.** **`Person`** (the human), **`Organization`**
+  (the grouping), **`Login`** (the authentication binding). Grounding: the standards *split* on the human —
+  Clerk/B2B-SaaS say "User" (login-coupled), but **NIST RBAC defines User as "a human being"** and **ABAC
+  calls the principal "Subject" (the attribute-carrier)**; our `Person` is the RBAC-human / ABAC-Subject,
+  named to shed the login coupling that "User" implies. `Organization` is the exact B2B-SaaS tenancy term
+  (Person + Organization = the data-modeling **Party pattern**). The **login has no standard entity name**
+  (RBAC/ABAC treat authentication as a *precondition*, not an entity; B2B-SaaS just calls it "User"), so it
+  is our refinement: modeled as the **authentication binding to the Clerk User**, **0..1 per Person**,
+  multi-method handled inside the one Clerk User via account-linking. **`Credential` was rejected** — in
+  security it means an auth *factor* (password/token), a collision we won't carry. The fused **`account`
+  concept is retired** (login→Login, tenant→Organization, human→Person). CONTEXT.md updated; legacy
+  `Profile`/`Owner`/`Child Profile` marked under-revision.
+
+- **C7 — Tenancy graph ownership — RATIFIED 2026-06-01.** **We own the entire Person / Organization /
+  Membership / Guardianship graph in Neon; Clerk is the authentication + credential lifecycle only,
+  never the tenancy/membership system of record.** Seam principle: *anything that must work for a
+  person with no login (the managed child) cannot be Clerk's; everything about proving who a
+  logged-in user is should be Clerk's.* Use Clerk to the max on the auth side (OAuth, passkeys,
+  sessions, JWT, Expo SDK, account-linking, JWT-as-decision-transport); the only forgone capability
+  is **Clerk Organizations-as-tenancy**, which is structurally unusable in the target model (can't
+  hold a credential-less child; our authz is edge-scoped + attribute-driven, not org-role RBAC).
+  **Supersedes** the `age-consent-spike.md §F/G` "Clerk Orgs for access" line — flag for its author at
+  fold-in. B2B/schools future remains compatible (federate teacher auth via Clerk SSO without making
+  Clerk the roster SoR). *(ADR candidate — see offer in chat.)*
+
+---
+
+## §0 — The hot conflicts (the grill agenda)
+
+These are the decisions that actually matter. Everything in §1–§4 hangs off them. Each is expanded
+below with options + pros/cons + a recommendation; this table is the index.
+
+| # | The conflict | Sources in tension | My rec (PROPOSED) | Expanded in |
+|---|---|---|---|---|
+| **C1** | Name for **the human** — `Person` vs `Profile` vs `Learner` | intent=`Person`; code+CONTEXT=`Profile` | ✅ **RATIFIED** — `Person` (RBAC-human / ABAC-Subject); "Learner" is a hat; retire `Profile` | §1.1, §R |
+| **C2** | Org-management role — `owner` vs `admin`; does "Owner" survive? | code enum=`owner`; doc 2 dissolves→`admin`+Payer | **`admin`**; "Owner" dissolved | §1.5, §2.1 |
+| **C3** | **Guardian — relationship/edge or role?** (doc 2 contradicts itself; CONTEXT calls "guardian" *retired*) | doc 2 both ways; CONTEXT=retired | **edge, never a role** | §2.2 |
+| **C4** | Is **`student`** a real role, and must *every* member be one? | code enum=`student`; CONTEXT=_Avoid_; doc 2=mandatory role | `student` = **membership marker, not a capability role**; **not** mandatory on every member | §1.5, §2.1 |
+| **C5** | **Ward vs Mentee — one relationship or two edges?** ("much more complex model" CHECK) | doc 2 = two distinct edges | **two edges, one shared "supervised-by" shape** | §2.2, §2.3 |
+| **C6** | Name for **the grouping** — `Organization` vs `Family` vs `Account` | intent/standard=`Organization`; code=`accounts` fused | ✅ **RATIFIED** — `Organization` (thin, B2B-SaaS term); "Family" = a label | §1.3, §R |
+| **C7** | **Clerk Organizations: adopt, or own the graph in Neon?** | `domain-model-options §6`=own-in-Neon; `age-consent §F/G`=Clerk Orgs | ✅ **RATIFIED** — own in Neon; Clerk = auth only | §1.2, §5, §R |
+| **C8** | name for **the login** — `Credential` vs `Account` vs `Login` | intent=`Credential`(0..1); code=`accounts` fused to login | ✅ **RATIFIED** — `Login` (binding to Clerk User, 0..1); `Credential` rejected (=auth factor); retire `account` | §1.2, §R |
+| **C9** | One term for the **managed-vs-own-login axis** ("managed login" / "Netflix model" / "credentialed") | doc 2 uses 3+ phrasings | **"managed" vs "credentialed"** as a Credential-presence attribute | §3.1 |
+
+---
+
+## §1 — Entities (the nouns)
+
+Micro-template per entity: **definition** · **labels across sources** · **standard-model name** ·
+**recommended canonical [status]** · **rationale**. Current-code mapping is cited so the crosswalk is
+grounded, not remembered.
+
+### §1.1 — Person  **[✅ RATIFIED — C1]**
+- **Definition:** one human; the permanent subject of learning data, consent, and identity —
+  **whether or not they can log in.** The scoping key for all learning data.
+- **Labels in the wild:** `Person` (doc 2, domain-model-options) · `Profile` (code `profiles`,
+  CONTEXT.md:17) · `Learner` (CONTEXT uses it everywhere as the role-in-context) · `Ward`/`member`
+  (doc 2, contextually).
+- **Standard name:** *User* / *Identity* / *Subject* (RBAC: the principal).
+- **Recommended canonical: `Person` [PROPOSED].** Keep **"Learner"** as a *context hat* (a Person
+  who is learning), not a synonym for the entity. **Retire bare `Profile`** as the human's name.
+- **Rationale / options:**
+  - *Keep `Profile`* — pro: zero churn, the whole codebase + CONTEXT already says it; con: `Profile`
+    is fused to "a login's sub-identity" (CONTEXT.md:17-19 "within a Clerk account") — the exact
+    fusion we're breaking. It cannot name a credential-less human without redefining itself.
+  - *Adopt `Person`* — pro: matches intent + the standard tenancy model; cleanly holds the
+    credential-less child; signals the clean cut. Con: large rename surface (`profiles` table, every
+    `profileId`, CONTEXT, audience-matrix). **Mitigated** — it's a clean cut anyway (re-seed, no
+    backfill), so the rename is in-scope by definition.
+  - *Net:* the rename cost is the one-time price of the decoupling that motivates the whole project.
+    Recommend `Person`.
+
+### §1.2 — Login  **[✅ RATIFIED — C7, C8]**
+- **Definition:** the **authentication binding** between a Person and their Clerk User — the means by
+  which a Person signs in. **Optional, 0..1 per Person.** Its *absence* is what "managed" means.
+- **Labels:** `Login` (ratified) · ~~`Credential`~~ (doc 2 — rejected: =auth factor) · `account` /
+  `clerk_user_id` (code — `accounts.clerk_user_id` `profiles.ts:54`, `profiles.clerk_user_id`
+  `profiles.ts:85`).
+- **Standard name:** Clerk **User** (we bind to it; we don't reuse the name). RBAC/ABAC give no entity
+  name for "the login" — they treat authentication as a precondition.
+- **Ratified: `Login`** = the binding to one Clerk User, **0..1 per Person**, multi-method handled
+  inside that Clerk User via account-linking; **Clerk owns authentication only** (ADR 0001). Retire the
+  fused `account`-as-login concept. `Credential` rejected for the security-factor collision.
+- **Rationale:** the load-bearing decoupling is **Person ≠ Credential**. Today `accounts` fuses the
+  human, the login, and the tenant into one row (`profiles.ts:50-69`). Splitting the *login* out as
+  `Credential` is what lets one model hold both real account-holders and credential-less children.
+  **C7 (Clerk Orgs) resolves here:** the deep-research verdict is *no hosted IdP can represent a
+  credential-less member* (`domain-model-options §6`) — so the family graph is ours regardless, and
+  adopting Clerk Organizations would force two membership representations. The `age-consent-spike
+  §F/G` "Clerk Orgs for access" line is **the loser of C7** and should be reconciled to "Clerk =
+  Credential only." *(Flag for the two authors to align.)*
+
+### §1.3 — Organization  **[✅ RATIFIED — C6]**
+- **Definition:** the **thin** grouping + billing container. Always exists (an org-of-one is
+  auto-created at signup). Holds the Subscription. Does **no** access/consent work itself.
+- **Labels:** `Organization` (doc 2, domain-model-options, standard) · `Family` (product copy) ·
+  `account` (code — `accounts` currently plays tenant + billing + login all at once) · "roster" /
+  "group" / "tenant".
+- **Standard name:** **Organization** / Tenant (universal in B2B-SaaS).
+- **Recommended canonical: `Organization` [PROPOSED]**, thin; **"Family" is a user-facing *label* on
+  an Organization**, not a separate entity. Code `organizations` table exists already
+  (`profiles.ts:145`, inert/T1) — clean-cut wires it for the first time.
+- **Rationale:** "family vs tutor roster vs school" must be org **data**, not schema. The danger is
+  not the table — it's letting the Organization carry access/consent (the legacy `accounts` mistake).
+  Keep it as a dormant grouping/billing seam; all real semantics live on Person + edges. *(Counter to
+  weigh in grill: do we even need a table pre-launch, or is org-of-one a derived construct until B2B?
+  doc 2 §VI keeps the table deliberately for B2B optionality — that's the position to attack/confirm.)*
+
+### §1.4 — Subscription  **[ALIGNED]**
+- **Definition:** entitlement + billing state, **attached to the Organization.** Carries the Payer.
+- **Labels:** `Subscription` (all sources) · code `subscriptions` keyed on `account_id`
+  (`billing.ts:37-47`; `organization_id` backfilled-but-inert, ORG-04).
+- **Standard name:** Stripe **customer → subscription** (customer = org).
+- **Recommended canonical: `Subscription` on `Organization` [PROPOSED].** Low controversy; the only
+  live drift is the key migrating from `account_id` → org (ORG-09/RC-09).
+
+### §1.5 — Role  **[HOT — C2, C4]**
+- **Definition:** a capability-granting label carried by a Membership. The RBAC role set.
+- **Labels:** doc 2 = `{admin, mentor, student}` · **code enum = `['owner', 'mentor', 'student']`**
+  (`profiles.ts:44-48` — note **`owner`, not `admin`**) · CONTEXT = `Owner`/`Child Profile` via the
+  `isOwner` boolean (CONTEXT.md:23-31), `student`/`learner` under `_Avoid_` (CONTEXT.md:31).
+- **Standard name:** RBAC **Role** → Permission mapping (kept as *data*, not `if (isOwner)`).
+- **Recommended canonical: role set `{admin, mentor, student}` [PROPOSED]**, where:
+  - **`admin`** = org management (members/invites/settings/billing-admin). **Replaces code `owner`**
+    (C2). Age-agnostic. Can be held by >1 Person; transferable.
+  - **`mentor`** = *may* mentor in this org; **data-visibility is edge-scoped** to linked mentees,
+    never org-wide (the role alone leaks nothing).
+  - **`student`** = "this member learns here." **Capability-light marker** (seat-counting / who-the-
+    org-serves), grants nothing beyond intrinsic self-ownership (C4).
+- **Rationale / the two live questions:**
+  - **C2 (`owner`→`admin`):** "owner" is the fused-model fossil (one flag = billing + management +
+    act-for-child, RC-01/PPA-R02). Splitting it three ways (admin / Payer / guardianship) is the core
+    cure; `admin` is the standard name for the management slice. The code enum's `owner` is **drift to
+    correct**, not precedent.
+  - **C4 (`student` mandatory?):** doc 2 makes `{student}` auto-created on every member; a CHECK
+    comment objects ("every user MUST be a student turns role design upside down… what if someone
+    signs up explicitly to be a mentor/parent?"). **Recommend: `student` is NOT auto-mandatory** —
+    an adult who joins only to mentor/pay/guard is `{}`-on-learning, `{mentor}` or `admin`+Payer. Self
+    *ownership* of one's own data is **intrinsic to Person** (needs no role), so a learner needs no
+    `student` role to own their work; `student` only marks org-level learner-seat membership. This
+    also fixes the "must I be a student to exist?" awkwardness.
+
+---
+
+## §2 — Relationships (the edges)
+
+Where the model lives. Membership grants *existence-visibility* only; **data access is edge-derived.**
+
+### §2.1 — Membership  **[ALIGNED on shape; carries C2/C4]**
+- **Definition:** the M:N link **Person ↔ Organization**, carrying a **role set** (§1.5). Grants
+  "you can see who is in this org," nothing more.
+- **Standard name:** **Membership** (carries roles) — universal.
+- **Code today:** `memberships(person_id, roles[])` (`profiles.ts:168-203`, inert) — and the *live*
+  substitute is `family_links` + `isOwner` (ORG-02, RC-01). Multi-org falls out of the M:N join for
+  free (ORG-08).
+- **[PROPOSED]** adopt as-is; the only decisions it carries are C2/C4 (its role-set contents).
+
+### §2.2 — Guardianship  **[HOT — C3, C5]**
+- **Definition:** a **dyadic edge** asserting an adult holds **consent authority / act-for rights**
+  over a (typically below-consent-age or credential-less) Person. Carries the **Consent record**.
+- **Labels:** `Guardianship edge` (doc 2 §III.3) · but doc 2 §IV *also* lists "Guardian" as a
+  capability **column** (the self-contradiction the CHECK flags) · code = `family_links`
+  (`profiles.ts:284-311`) + `consent_states` (`profiles.ts:313-376`) · CONTEXT.md:26 calls "guardian"
+  a **retired** label.
+- **Standard name:** none — **domain-specific** (this is the non-standard half; no IdP/RBAC models it).
+- **Recommended canonical: Guardianship is an EDGE, never a role [PROPOSED].**
+- **Rationale (C3):** consent is "*guardian G consented for ward W, policy V, time T, revocable*" — a
+  **per-pair** fact. One parent with three children has three independently-revocable records; an
+  org-wide role cannot express that (doc 2 §III.3). So it is structurally an edge. doc 2 §IV's
+  "Guardian column" is a **presentation convenience that leaked into the role model** — the grill
+  should kill it and keep capability derived *from the edge*. (Answers the CHECK "Guardian is a role
+  despite the earlier rule" — the rule wins; the column is the bug.) Note CONTEXT.md:26 "retired
+  guardian" is about the old *tab-shape* label, **not** this consent relationship — a name collision
+  to disambiguate, not a reason to avoid the word.
+- **C5 (ward vs mentee):** see §2.3.
+
+### §2.3 — Mentorship  **[HOT — C5]**
+- **Definition:** a **dyadic edge** granting a mentor **scoped visibility/help** for **one specific
+  mentee** — never org-wide. Carries **no** consent authority.
+- **Labels:** doc 2 = a `mentor` role + "edge to that one mentee" · code = `family_links` (mentor is
+  backfilled *from* it, RC-03) · "tutor".
+- **Standard name:** none generic; closest is a scoped ReBAC relationship ("mentor-of").
+- **The C5 decision — one relationship or two?**
+  - *Option A — two distinct edges* (doc 2): **Guardianship** (consent authority, adult→ward) and
+    **Mentorship** (visibility only, any-age→mentee) are different things with different rules.
+    Pro: each carries exactly its own semantics; an adult tutor (mentor, no consent power) and a
+    parent (guardian, consent power) are not conflated. Con: the CHECK's complaint — "ward and mentee
+    become two completely different entities… more complex than before."
+  - *Option B — one "supervision" edge with a type* (`{guardian|mentor}`): a single
+    **Supervised-By** edge shape, typed. Pro: one mechanism, simpler mental model, matches the CHECK's
+    "could simplify back to … a separate guardian/ward relationship." Con: risks re-fusing two things
+    with genuinely different legal weight (consent authority is adult-only + load-bearing; mentorship
+    is any-age + cosmetic-access) — the kind of fusion that caused today's drift.
+  - **Recommended: two edges, but presented as one "people who can see this Person's learning"
+    surface [PROPOSED].** Keep them structurally distinct (consent authority ≠ visibility), because
+    fusing legal consent with tutor-visibility is exactly the §III.3 trap — but unify them in the
+    *UI/derived-view* so the developer sees one "supervisors of X" list. This honours the CHECK's
+    simplicity instinct without re-fusing the load-bearing distinction. **This is the single most
+    important C5 call — grill it hard.**
+
+### §2.4 — Payer  **[ALIGNED — C2 adjacent]**
+- **Definition:** the Person (**≥18**) responsible for a Subscription's billing. **A field on the
+  Subscription, not a role and not a visibility grant.**
+- **Labels:** `payer_person_id` (doc 2) · today implicit in the account holder (`subscriptions.
+  account_id`, no explicit payer).
+- **Standard name:** Stripe customer's billing contact.
+- **[PROPOSED]** `Subscription.payer_person_id`, invariant age ≥ 18, **no learning-data access**.
+  Future B2B: add `payer_org_id` + "exactly one set" check (doc 2 §VI) — `[DEFER]`.
+
+---
+
+## §3 — Axes & attributes (NOT entities)
+
+The drift engine was turning *attributes* into entities/tables. These stay as computed attributes.
+
+### §3.1 — Credential presence — "managed" vs "credentialed"  **[HOT — C9]**
+- A Person **has a Credential (credentialed)** or **does not (managed)**. This is an **attribute of
+  the Person**, not a cohort table, not a subtype.
+- **Labels to collapse:** "managed login" / "Netflix-style account" / "proxied" / "credentialed" /
+  "managed vs own-login". **Recommend: "managed" (no Credential) vs "credentialed" (has Credential)
+  [PROPOSED].** Drop "Netflix", "proxied" (overloaded with the runtime proxy state, CONTEXT.md:34).
+
+### §3.2 — Consent requirement — `age × jurisdiction → policy`  **[ALIGNED via spike]**
+- **Not** a `minor` boolean. Resolved by one server function (doc 2 `resolveConsentRequirement`;
+  spike `AgeConsentDecision`). **Two names for one thing — reconcile in grill** (lean to the spike's
+  `AgeConsentDecision` shape since it's the more complete, method-typed/per-purpose version).
+- Drives: `consentAge` (per-market table, default 16 unknown), `requiresGuardianConsent`,
+  `payerEligible (≥18)`, `contentBand` (theming only, **never** gating).
+- Code today: flat `age <= 16` + `MINIMUM_AGE = 11` in `services/consent.ts:197` (CC-06) — the drift.
+
+### §3.3 — Content band / age bracket  **[ALIGNED]**
+- `computeAgeBracket` (`@eduagent/schemas`) — theming + copy **only**, never feature-gating
+  (CONTEXT.md:42). Keep as-is; it is the one identity-adjacent term that is *not* drifting.
+
+---
+
+## §4 — Invariants (the testable rules the PRD must honour)
+
+These are the structural commitments. The PRD's behaviour must not contradict them; each becomes a
+break-test at build. (Seeded from doc 2 §VIII + the spikes; **[PROPOSED]**, grill confirms.)
+
+1. Every Person ∈ ≥ 1 Organization (org-of-one auto-created at signup).
+2. **Learning data is scoped to `person_id`** — never to org/account/credential id.
+3. A Person's own learning data is read+write by that Person regardless of roles (intrinsic
+   self-ownership; needs no `student` role).
+4. **Data access is edge-derived;** Membership alone grants only existence-visibility.
+5. `admin` is age-agnostic; **Payer ≥ 18**; the two are separate fields, neither implies the other.
+6. A Person below their jurisdiction's consent age cannot have learning data processed without a
+   **valid Consent record on a Guardianship edge.**
+7. Under-13 (managed cohort) are **guardian-created only** — no self-sign-up below 13.
+8. **Person ≠ Credential:** a Person may have 0 or 1 Credential; a managed Person has none.
+9. Consent is **method-typed and per-purpose**, never a boolean (COPPA-readiness, spike §F).
+10. Guardianship (consent authority) and Mentorship (visibility) are **structurally distinct** edges
+    (the C5 outcome — revise if grill picks Option B).
+11. Billing + consent follow the **home Organization**; a second-org membership grants edge-scoped
+    visibility only, and changes neither who pays nor who consents.
+12. A paying adult gains **no** visibility into a self-consenting Person's data without that Person's
+    opt-in grant.
+13. **Graduation preserves identity:** managed → credentialed keeps the same `person_id` + all
+    history (no new Person).
+14. `family_links`/edge deletion **must not cascade-delete** the Person (a managed ward is never
+    orphaned). *(Today it cascades — the live bug, PPA-R11 / doc 2 inv. 15.)*
+
+---
+
+## §5 — Standard-model crosswalk (adopt / diverge)
+
+| Our concept | Standard term (Clerk / RBAC-ABAC) | Adopt or diverge | Why |
+|---|---|---|---|
+| Person | Clerk User / RBAC principal | **diverge** | standard "user" *is* the credential; we need a credential-less human |
+| Credential | Clerk **User** | **adopt** | 1:1 with a Clerk User; Clerk = auth only |
+| Organization | **Organization / Tenant** | **adopt** | standard tenant; kept thin |
+| Membership | **Membership** (with roles) | **adopt** | M:N person↔org carrying roles |
+| Role `{admin,mentor,student}` | **RBAC Role → Permission** | **adopt** (drop `owner`) | roles as data, not `isOwner` |
+| Guardianship | — (none) | **diverge — domain-specific** | no IdP/RBAC models consent authority over a credential-less person |
+| Mentorship | scoped ReBAC relation | **diverge (light)** | edge-scoped visibility; no engine needed at v1 |
+| Subscription/Payer | Stripe customer→subscription | **adopt** | customer = org; payer = billing contact |
+| Consent | — (none) | **diverge — domain-specific** | the non-standard half; method-typed/per-purpose |
+
+**The deliberate divergences are exactly three:** Person (credential-less), Guardianship, Consent.
+Everything else adopts the standard name. *That short list is the whole reason we can't just buy this
+off the shelf — and it's the list to defend in the grill.*
+
+---
+
+## §6 — Deferred decisions (real, but downstream of this ontology)  **[DEFER]**
+
+Parked so the ontology can land without them; each re-enters at the named phase.
+- **Multi-org governance** — whose subscription/quota/consent/visibility when a Person is in two orgs
+  (ORG-08; doc 2 §8). → PRD / Phase D.
+- **Transition events** — managed→credentialed, consent-age crossing, 18-graduation: the *mechanics*
+  (auto vs explicit step) (doc 2 J4/J11). → PRD.
+- **Consent mechanism** — which VPC vendor realises the Consent entity (KWS/k-ID) (spike §D). →
+  Phase D/E; ontology only commits to "method-typed, pluggable."
+- **Where this ontology ultimately lives** — fold into CONTEXT.md vs stay beside it. → Phase C.
+- **Physical schema** — tables/columns/migrations, the `Person` rename surface. → Phase E.
+
+---
+
+## §7 — Current-code crosswalk (grounded, for the eventual clean cut)
+
+| Ontology concept | Today's code | Cite | Note |
+|---|---|---|---|
+| Person | `profiles` | `profiles.ts:71` | rename surface; fused to a login today |
+| Credential | `accounts.clerk_user_id`, `profiles.clerk_user_id` | `profiles.ts:54,85` | decouple from Person |
+| Organization | `accounts` (fused) → `organizations` (inert) | `profiles.ts:50,145` | thin grouping; wire the inert table |
+| Membership + roles | `family_links`+`isOwner` (live) → `memberships.roles[]` (inert) | `profiles.ts:91,168,284` | live authz is the `isOwner` bool (RC-01) |
+| `admin` (was owner) | `isOwner` boolean; enum `'owner'` | `profiles.ts:44,91` | split three ways (admin/Payer/guardianship) |
+| Guardianship + Consent | `family_links` + `consent_states` | `profiles.ts:284,313` | promote to first-class edge |
+| Mentorship | `family_links` (mentor backfilled) | RC-03 | no route reads the role today |
+| Consent requirement | flat `age<=16`, `MINIMUM_AGE=11` | `consent.ts:197` | replace with `resolveConsentRequirement` |
+| Payer | implicit account holder | `billing.ts:37` | make explicit `payer_person_id` |
+| Proxy (act-for runtime) | `isParentProxy` / `X-Proxy-Mode` | CONTEXT.md:34 | mechanism for guardian act-for; decide keep/retire |
+
+> **CONTEXT.md is itself drift.** Its current identity glossary (Profile/Owner/Child Profile, with
+> "guardian" *retired* and student/learner *avoided*) encodes the **old fused model**. Grill #1's
+> output **overwrites** these lines, it does not extend them.
+
+---
+
+## §8 — Carried requirements & cleanup flags (do-not-lose)
+
+Raised during Grill #1; not terminology decisions, but must not be lost. Migrate to the PRD / consent
+spike / a cleanup pass as noted.
+
+- **REQ-1 — Consent-scope disclosure for mentor/helper data-sharing. `[LEGAL REVIEW]`** A guardian's
+  consent only *covers* a third-party helper (tutor/mentor) seeing the child's learning data **if the
+  consent flow explicitly discloses that the guardian may grant such access.** The Layer-1/Layer-2 split
+  (Guardianship = consent authority; a granted visibility edge = helper access) is only lawful when the
+  consent text says so. **Action:** verify the current consent flow discloses this — the existing parental
+  consent email (`apps/api/src/services/notifications.ts:368-369`) appears **not** to. Feeds the consent
+  spike + PRD; counsel must confirm scope language before a paid launch. (Raised by PM, Grill #1 / C4.)
+
+- **CLEANUP-1 — CONTEXT.md legacy examples confuse under the new model.** e.g. the old `_Avoid_: learner
+  (every Profile is a learner)` reasoning is obsolete now that `learner` is a positive role. Sweep the
+  CONTEXT.md identity section (and adjacent example clauses) for old-fused-model reasoning when the role
+  cluster lands. (Raised by PM, Grill #1 / C4b.)
+
+- **CLEANUP-2 — "mentor" copy double-use (AI vs human).** User-facing copy uses "mentor" for the **AI**
+  (~70 strings in `apps/mobile/src/i18n/locales/en.json`: "your mentor", "Mentor memory", "Mentor
+  language", …) **and** for the **human overseer** ("You're now mentoring {{childNames}}",
+  `mentorSlot`/`mentorRead`/"Mentor's read on {{name}}"). Once the human supervisory role is named
+  (reserving "mentor" for the AI), sweep the human-side strings to the new term. (Raised Grill #1 / C7-naming.)
