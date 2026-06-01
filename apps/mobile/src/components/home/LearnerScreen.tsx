@@ -490,8 +490,13 @@ export function LearnerScreen({
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
   const showLearningActions = navigationContract.gates.showLearningActions;
   const guardianProfile =
-    activeProfile && !activeProfile.isOwner && !navigationProxy.active
-      ? (profiles.find((profile) => profile.isOwner) ?? null)
+    activeProfile &&
+    showLearningActions &&
+    navigationProxy.parentProfileId &&
+    navigationProxy.parentProfileId !== activeProfile.id
+      ? (profiles.find(
+          (profile) => profile.id === navigationProxy.parentProfileId,
+        ) ?? null)
       : null;
 
   if (showParentHome && navigationContract.gates.showFamilyHome) {

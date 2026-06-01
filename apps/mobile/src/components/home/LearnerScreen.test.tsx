@@ -65,15 +65,24 @@ jest.mock(
   '../../hooks/use-navigation-contract' /* gc1-allow: hook wraps profile context, subscription query, and feature flags; not exercisable in isolation */,
   () => ({
     useNavigationContract: () => mockNavContract(),
-    useNavigationHomeContract: () => ({
-      contract: mockNavContract(),
-      proxy: {
-        active: mockIsExplicitProxyMode,
-        childName: mockIsExplicitProxyMode ? 'Alex' : '',
-        childProfileId: mockIsExplicitProxyMode ? 'child-id' : null,
-        parentProfileId: mockIsExplicitProxyMode ? 'owner-id' : null,
-      },
-    }),
+    useNavigationHomeContract: () => {
+      const parentProfile =
+        mockActiveProfilesForRender.find((profile) => profile.isOwner) ?? null;
+      const activeProfile = mockActiveProfileForRender;
+      return {
+        contract: mockNavContract(),
+        proxy: {
+          active: mockIsExplicitProxyMode,
+          childName: mockIsExplicitProxyMode
+            ? (activeProfile?.displayName ?? 'Alex')
+            : '',
+          childProfileId: mockIsExplicitProxyMode
+            ? (activeProfile?.id ?? null)
+            : null,
+          parentProfileId: parentProfile?.id ?? null,
+        },
+      };
+    },
     useNavigationDataScopeContract: () => mockNavContract(),
   }),
 );
@@ -219,13 +228,13 @@ jest.mock(
 // needs to react to per-test overrides (active profile, linked children,
 // explicit proxy flag). The wrapper reads from this ref so updates between
 // renders take effect without rebuilding the wrapper.
-let activeProfilesForRender: Profile[] = [];
-let activeProfileForRender: Profile | null = null;
+let mockActiveProfilesForRender: Profile[] = [];
+let mockActiveProfileForRender: Profile | null = null;
 
 function buildProfileContextValue(): ProfileContextValue {
   return {
-    profiles: activeProfilesForRender,
-    activeProfile: activeProfileForRender,
+    profiles: mockActiveProfilesForRender,
+    activeProfile: mockActiveProfileForRender,
     isExplicitProxyMode: mockIsExplicitProxyMode,
     switchProfile: mockSwitchProfile,
     isLoading: false,
@@ -294,11 +303,12 @@ describe('LearnerScreen', () => {
     const extraChildren = mockLinkedChildren.filter(
       (c) => !childrenAlreadyInProfiles.has(c.id),
     );
-    activeProfilesForRender = [
+    mockActiveProfilesForRender = [
       ...(merged.profiles ?? []),
       ...extraChildren,
     ] as Profile[];
-    activeProfileForRender = (merged.activeProfile ?? null) as Profile | null;
+    mockActiveProfileForRender = (merged.activeProfile ??
+      null) as Profile | null;
     return render(<LearnerScreen {...merged} />, { wrapper: Wrapper });
   }
 

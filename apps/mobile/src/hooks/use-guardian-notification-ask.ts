@@ -11,7 +11,7 @@ import {
 } from '../lib/profile';
 import { platformAlert } from '../lib/platform-alert';
 import { Sentry } from '../lib/sentry';
-import { useParentProxy } from './use-parent-proxy';
+import { useNavigationContract } from './use-navigation-contract';
 
 const PRIMER_DELAY_MS = 1500;
 
@@ -23,7 +23,7 @@ export function useGuardianNotificationAsk(): void {
   const { t } = useTranslation();
   const { activeProfile, profiles } = useProfile();
   const linkedChildren = useLinkedChildren();
-  const { isParentProxy } = useParentProxy();
+  const navigationContract = useNavigationContract();
   const firedForProfileRef = useRef<string | null>(null);
 
   const profileId = activeProfile?.id;
@@ -34,7 +34,7 @@ export function useGuardianNotificationAsk(): void {
     if (firedForProfileRef.current === profileId) return;
     if (!profileId) return;
     if (!guardianEligible) return;
-    if (isParentProxy) return;
+    if (navigationContract.isParentProxy) return;
 
     firedForProfileRef.current = profileId;
     let cancelled = false;
@@ -119,5 +119,5 @@ export function useGuardianNotificationAsk(): void {
       cancelled = true;
       timeouts.forEach((handle) => clearTimeout(handle));
     };
-  }, [profileId, guardianEligible, isParentProxy, t]);
+  }, [profileId, guardianEligible, navigationContract.isParentProxy, t]);
 }
