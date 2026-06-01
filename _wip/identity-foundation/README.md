@@ -48,6 +48,7 @@ backfill, no compatibility shims, no V0/V1 parallel run).
 
 | Path | What it is |
 |---|---|
+| `ROADMAP.md` | Pre-implementation roadmap + tracker (phases A–F, cross-cutting threads, sibling re-triage, decision log) — the live status doc. |
 | `identity-reconstructed-prd.md` | The product intent *reverse-engineered* from the rejected plans, with every element tagged `[STATED] / [IMPLIED] / [GAP] / [CONFLICT]`. Deliberately thin — the thinness IS the finding (real forward intent was never captured). **Its §11 is the open-questions agenda.** A strawman to gap-check, not a ratified spec. |
 | `archive/` | The three rejected 2026-05-31 plans (`identity-org-membership-redesign`, `identity-t1-data-model`, `identity-t2-auth`), each bannered SUPERSEDED. Kept as decision record + discussion input. |
 
