@@ -1,8 +1,10 @@
-# Identity Foundation — Ontology (STRAWMAN for grilling)
+# Identity Foundation — Ontology v1 (RATIFIED)
 
-**Status:** STRAWMAN — **nothing here is ratified.** This is the conflict-mapped first draft built
-to be *attacked* in a grill, not admired. Every canonical pick is **[PROPOSED]**; the grill decides.
-**Date:** 2026-06-01 · **Owner:** Claude drafts, you + Claude ratify inline.
+**Status:** **RATIFIED v1 — Grill #1 complete, 2026-06-01.** All nine conflicts (C1–C9), the
+role/edge/**capacity** model, and the §4 invariants are ratified (decision trail in §R; agenda/status
+in §0). Open items tracked as flags in §8. CONTEXT.md identity glossary extracted in lockstep.
+**Next:** fold in the two finished spikes, then draft `identity-foundation-prd.md` in this vocabulary.
+**Date:** 2026-06-01 · **Owner:** PM + Claude (ratified inline via `/grill-with-docs`).
 
 **What this is.** The single *structural* terminus for the identity foundation: the entities, their
 one-line definitions, the relationships between them, and the invariants that bind them — in one
@@ -34,6 +36,66 @@ low-risk · **[DEFER]** real decision, but downstream of this ontology (parked, 
 ## §R — Ratification log (Grill #1)
 
 Decisions land here as they're ruled, newest first. The §0 table and §1–§4 bodies are updated in lockstep.
+
+- **Mentorship authorization & capacity independence — RATIFIED 2026-06-01 (folds into §4).**
+  - **Guardianship and Mentorship are independent capacities; neither auto-implies the other.** A guardian
+    already has oversight of their charge via Layer 1, so being a guardian does **not** auto-make you a *mentor*
+    (the active-help capacity) — separate edge (default-*offered* for one's own charge, but distinct). A
+    **mentor never implies a guardian** (auto-conferring consent authority on a tutor would be a legal error).
+  - **A Mentorship is authorized by the mentee if consent-capable (≥ their consent age), else by the guardian
+    (for a charge).** A parent does **not** auto-mentor a consent-capable child — incl. an 18-year-old or any
+    self-consenting minor on the parent's org; the **learner grants** the edge. For a charge, the guardian
+    grants it (and may grant it to themselves). (#14)
+  - **Graduation re-confirms mentorships.** When a charge becomes consent-capable, guardian-granted mentorships
+    must be **re-confirmed by the now-consent-capable learner**, else they lapse (mirrors guardian-oversight →
+    teen-opt-in). (#15)
+
+- **Age tiers are flag-combinations, not entities; payer-eligibility is the same complex — RATIFIED 2026-06-01.**
+  One `resolveConsentRequirement(age × jurisdiction)` emits the capability flags; the three "tiers" are just
+  combinations, never boxes: **consent-gated** (`requiresGuardianConsent`, below consent age) → **consent-capable
+  minor** (self-consents, **not** `payerEligible`) → **adult** (`payerEligible`, ≥18). The **18 payer/contract
+  rung and the 13–16 consent rung are the same age ladder, different thresholds** — payer-eligibility is *not* a
+  separate concern. Numeric cohort labels ("under-13", "11-12", "11-15/17") are **banished** → use consent-gated /
+  charge / minor / adult (see CLEANUP-3).
+
+- **Mentor & guardian = capacities, not roles; role set → `{admin, learner}` — RATIFIED 2026-06-01.** The
+  test: a **role** is a Person's self-contained standing in an org ("I am an admin/learner here"); an **edge**
+  is a one-to-one tie to a *named* Person ("I am the mentor/guardian *of X*" — meaningless without the other
+  person). By that test **`mentor` and `guardian` are not roles** — they are **capacities** (the ratified term
+  for the position a Person occupies at one end of an edge; chosen over "party"/"end"; avoids colliding with
+  RBAC "role"). So **membership roles = `{admin, learner}`** only; **Mentorship** and **Guardianship** are
+  **edges** whose ends are capacities (`mentor`/`mentee`, `guardian`/`charge`). One Person → one role-set, any
+  number of capacities. Revises the earlier `{admin, mentor, learner}` and **closes C5**: both supervisory ties
+  are edges (symmetric with each other), only admin/learner are roles. External tutor = **edge-only** (own
+  org-of-one + cross-org Mentorship edge → cannot see the family roster, fixing RC-02/D2); a guardian needs no
+  Mentorship edge to their own charge (Layer-1 oversight already covers it).
+
+- **C2 / C3 / C4 + roles & guardianship cluster — RATIFIED 2026-06-01.**
+  - **Owner dissolved.** Org management → **`admin`** (age-agnostic, ≥1 per org, transferable). Billing →
+    **Payer** (a Subscription *designation* pointing at a Person **≥18**, billing-only, **no** learning-data
+    access — **not** a role; `Billing Contact` was the conventional alt, `Payer` kept for the ≥18-responsibility
+    semantics). Act-for-a-child → **Guardianship** edge (never part of `admin`; `isOwner` never *was*
+    guardianship — corrected).
+  - **Membership carries a role SET `{admin, mentor, learner}`** — any combination, mostly any age.
+    `student` → **`learner`** (app-consistent, age-neutral, off the legacy `_Avoid_` list). `learner` is the
+    marker that **activates the core learning surface**; self-ownership of one's own data is **intrinsic to
+    Person** and needs no role. **Not auto-mandatory.** **Invariant: the first member of an Organization is an
+    `admin`;** learning-roles are chosen at onboarding (mentor / learner / both).
+  - **`mentor` = the HUMAN supervisory role**; the **AI is rebranded "Mate" / "AI Mate"** (MentoMATE) — see
+    CLEANUP-2. Mentor data-visibility is **edge-scoped** to specific mentees, **never** org-wide.
+  - **Guardianship is a relationship/record, NOT a role (C3).** It records that an adult gave verifiable
+    consent for a consent-gated learner → a **Guardian → charge** edge carrying the consent record. Far-end
+    term: **`charge`** (formal/vernacular) ≡ **consent-gated learner** (technical synonym). Physical: edge
+    table `guardianships(guardian_person_id, learner_person_id, consent…)` — no bespoke far-end entity.
+  - **Two-layer model (the key insight from this session).** **Layer 1 — Consent authority (Guardianship):**
+    one/few consenting adults; establishes lawful basis to process a consent-gated learner's data; withdrawable.
+    **Layer 2 — Supervisory access (a granted visibility edge, e.g. Mentorship):** *who may see/help* a specific
+    learner; granted by the guardian (below consent age) or by the data subject (above). **A mentor never needs
+    guardianship** — they operate under the existing consent via a Layer-2 grant. (Edge-scoped, per-mentee:
+    fixes the org-wide-mentor leak, RC-02/D2.) See REQ-1 for the consent-scope-disclosure obligation.
+  - **`minor` = under-18** — the **contract/Payer threshold** (a minor cannot be Payer), *distinct* from the
+    consent gate (`requiresGuardianConsent`, 13–16 jurisdictional). Acceptable casual shorthand for a charge (a
+    charge is always a minor) but **one-directional** (not every minor is a charge) and **never a code gate**.
 
 - **C1 / C6 / C8 — The three core nouns — RATIFIED 2026-06-01.** **`Person`** (the human), **`Organization`**
   (the grouping), **`Login`** (the authentication binding). Grounding: the standards *split* on the human —
@@ -70,14 +132,14 @@ below with options + pros/cons + a recommendation; this table is the index.
 | # | The conflict | Sources in tension | My rec (PROPOSED) | Expanded in |
 |---|---|---|---|---|
 | **C1** | Name for **the human** — `Person` vs `Profile` vs `Learner` | intent=`Person`; code+CONTEXT=`Profile` | ✅ **RATIFIED** — `Person` (RBAC-human / ABAC-Subject); "Learner" is a hat; retire `Profile` | §1.1, §R |
-| **C2** | Org-management role — `owner` vs `admin`; does "Owner" survive? | code enum=`owner`; doc 2 dissolves→`admin`+Payer | **`admin`**; "Owner" dissolved | §1.5, §2.1 |
-| **C3** | **Guardian — relationship/edge or role?** (doc 2 contradicts itself; CONTEXT calls "guardian" *retired*) | doc 2 both ways; CONTEXT=retired | **edge, never a role** | §2.2 |
-| **C4** | Is **`student`** a real role, and must *every* member be one? | code enum=`student`; CONTEXT=_Avoid_; doc 2=mandatory role | `student` = **membership marker, not a capability role**; **not** mandatory on every member | §1.5, §2.1 |
-| **C5** | **Ward vs Mentee — one relationship or two edges?** ("much more complex model" CHECK) | doc 2 = two distinct edges | **two edges, one shared "supervised-by" shape** | §2.2, §2.3 |
+| **C2** | Org-management role — `owner` vs `admin`; does "Owner" survive? | code enum=`owner`; doc 2 dissolves→`admin`+Payer | ✅ **RATIFIED** — `admin`; "Owner" dissolved (→ admin / Payer / Guardianship) | §R |
+| **C3** | **Guardian — relationship/edge or role?** (doc 2 contradicts itself; CONTEXT calls "guardian" *retired*) | doc 2 both ways; CONTEXT=retired | ✅ **RATIFIED** — a relationship/edge (a **capacity**), never a role | §R |
+| **C4** | role set; learner-marker a role?; mandatory? | code=`student`; doc 2=mandatory | ✅ **RATIFIED** — roles **`{admin, learner}`**; `student`→`learner`; not mandatory; **first member = admin** | §R |
+| **C5** | mentor/guardian: roles or edges? one rel. or two? | doc 2 = two edges + mentor role | ✅ **RATIFIED** — two **edges** (Guardianship, Mentorship); ends are **capacities**; `mentor`/`guardian` not roles | §R |
 | **C6** | Name for **the grouping** — `Organization` vs `Family` vs `Account` | intent/standard=`Organization`; code=`accounts` fused | ✅ **RATIFIED** — `Organization` (thin, B2B-SaaS term); "Family" = a label | §1.3, §R |
 | **C7** | **Clerk Organizations: adopt, or own the graph in Neon?** | `domain-model-options §6`=own-in-Neon; `age-consent §F/G`=Clerk Orgs | ✅ **RATIFIED** — own in Neon; Clerk = auth only | §1.2, §5, §R |
 | **C8** | name for **the login** — `Credential` vs `Account` vs `Login` | intent=`Credential`(0..1); code=`accounts` fused to login | ✅ **RATIFIED** — `Login` (binding to Clerk User, 0..1); `Credential` rejected (=auth factor); retire `account` | §1.2, §R |
-| **C9** | One term for the **managed-vs-own-login axis** ("managed login" / "Netflix model" / "credentialed") | doc 2 uses 3+ phrasings | **"managed" vs "credentialed"** as a Credential-presence attribute | §3.1 |
+| **C9** | One term for the **managed-vs-own-login axis** ("managed login" / "Netflix model" / "credentialed") | doc 2 uses 3+ phrasings | ✅ **RATIFIED (by adoption)** — **"managed"** (no Login) vs **"credentialed"** (has Login), a Person attribute | §R |
 
 ---
 
@@ -250,12 +312,19 @@ Where the model lives. Membership grants *existence-visibility* only; **data acc
 
 The drift engine was turning *attributes* into entities/tables. These stay as computed attributes.
 
-### §3.1 — Credential presence — "managed" vs "credentialed"  **[HOT — C9]**
-- A Person **has a Credential (credentialed)** or **does not (managed)**. This is an **attribute of
-  the Person**, not a cohort table, not a subtype.
-- **Labels to collapse:** "managed login" / "Netflix-style account" / "proxied" / "credentialed" /
-  "managed vs own-login". **Recommend: "managed" (no Credential) vs "credentialed" (has Credential)
-  [PROPOSED].** Drop "Netflix", "proxied" (overloaded with the runtime proxy state, CONTEXT.md:34).
+### §3.1 — Login presence — "managed" vs "credentialed"  **[✅ RATIFIED — C9]**
+- A Person **has a Login (credentialed)** or **does not (managed)** — an **attribute of the Person**, not a
+  cohort table or subtype. ("Netflix"/"proxied" dropped — "proxied" overloaded with the runtime proxy state.)
+- **Two independent dimensions — do NOT fuse them.** *Login-presence* (managed ⊥ credentialed) is **separate**
+  from *consent-requirement* (`requiresGuardianConsent`, age × jurisdiction). All four combinations are valid:
+
+  | | **credentialed** (has Login) | **managed** (no Login) |
+  |---|---|---|
+  | **consent-gated** (a charge) | child with their **own device** → credentialed charge | guardian-set-up child → managed charge |
+  | **consent-capable** | normal adult/teen | rare: capable adult, no Login (shared-device/"Netflix") → **FLAG-3** |
+
+- **Therefore `charge` ≠ "no Login".** A charge is *consent-gated* (the consent dimension) and may be managed
+  **or** credentialed. Device-sharing among *capable* users is solved by **login switching**, not managed profiles.
 
 ### §3.2 — Consent requirement — `age × jurisdiction → policy`  **[ALIGNED via spike]**
 - **Not** a `minor` boolean. Resolved by one server function (doc 2 `resolveConsentRequirement`;
@@ -271,32 +340,56 @@ The drift engine was turning *attributes* into entities/tables. These stay as co
 
 ---
 
-## §4 — Invariants (the testable rules the PRD must honour)
+## §4 — Invariants (the testable rules the PRD must honour)  **[✅ RATIFIED — Grill #1, 2026-06-01]**
 
-These are the structural commitments. The PRD's behaviour must not contradict them; each becomes a
-break-test at build. (Seeded from doc 2 §VIII + the spikes; **[PROPOSED]**, grill confirms.)
+The structural commitments. The PRD's behaviour must not contradict them; each becomes a break-test at
+build. Ratified across Grill #1 — these are the **definition of "done"** the PRD is checked against.
 
-1. Every Person ∈ ≥ 1 Organization (org-of-one auto-created at signup).
-2. **Learning data is scoped to `person_id`** — never to org/account/credential id.
-3. A Person's own learning data is read+write by that Person regardless of roles (intrinsic
-   self-ownership; needs no `student` role).
-4. **Data access is edge-derived;** Membership alone grants only existence-visibility.
-5. `admin` is age-agnostic; **Payer ≥ 18**; the two are separate fields, neither implies the other.
-6. A Person below their jurisdiction's consent age cannot have learning data processed without a
-   **valid Consent record on a Guardianship edge.**
-7. Under-13 (managed cohort) are **guardian-created only** — no self-sign-up below 13.
-8. **Person ≠ Credential:** a Person may have 0 or 1 Credential; a managed Person has none.
-9. Consent is **method-typed and per-purpose**, never a boolean (COPPA-readiness, spike §F).
-10. Guardianship (consent authority) and Mentorship (visibility) are **structurally distinct** edges
-    (the C5 outcome — revise if grill picks Option B).
-11. Billing + consent follow the **home Organization**; a second-org membership grants edge-scoped
-    visibility only, and changes neither who pays nor who consents.
-12. A paying adult gains **no** visibility into a self-consenting Person's data without that Person's
-    opt-in grant.
-13. **Graduation preserves identity:** managed → credentialed keeps the same `person_id` + all
-    history (no new Person).
-14. `family_links`/edge deletion **must not cascade-delete** the Person (a managed ward is never
-    orphaned). *(Today it cascades — the live bug, PPA-R11 / doc 2 inv. 15.)*
+**A — Identity & scoping**
+1. Every Person belongs to ≥ 1 Organization (an *org-of-one* is auto-created at signup).
+2. **Learning data is scoped to `person_id`** — never to org / Login / account id.
+3. **Person ≠ Login:** a Person has **0 or 1** Login (managed = none, credentialed = one).
+4. **Login-presence (managed/credentialed) and consent-requirement are independent** — all four
+   combinations are valid; a **charge may be managed *or* credentialed** (see §3.1).
+
+**B — Roles & access**
+5. Membership roles = **`{admin, learner}`** only; the **first member of an Organization is an `admin`**.
+6. `mentor`/`guardian` are **capacities on edges, never roles**.
+7. A Person's **own** learning data is read+write by that Person regardless of roles (self-ownership is
+   **intrinsic**; the `learner` role *activates the surface*, it does not grant ownership).
+8. Access to **another** Person's learning data is **edge-derived** (a guardian or mentor capacity);
+   Membership alone grants only **existence-visibility**.
+9. **Mentor visibility is edge-scoped** to the named mentee — never org-wide.
+
+**C — Consent & age**
+10. Consent requirement is **computed from age × jurisdiction** (`requiresGuardianConsent`) — **never an
+    `isMinor` boolean**. The three tiers (consent-gated → consent-capable minor → adult) are
+    **flag-combinations, not entities**; payer-eligibility (≥18) is the **same age ladder, a different rung**.
+11. A **consent-gated** Person cannot have learning data processed without a **valid Consent on a
+    Guardianship edge** (held by the guardian; or self-held once consent-capable).
+12. Consent is **method-typed + per-purpose**, jurisdiction-stamped, and **withdrawable** — never a boolean.
+13. Below the credential-eligibility floor, Persons are **guardian-created only** (no self-sign-up). *(The
+    exact floor is a pending product decision — FLAG-2.)*
+
+**D — Capacities: guardianship & mentorship**
+14. **Guardianship (consent authority, Layer 1)** and **Mentorship (granted visibility, Layer 2)** are
+    distinct edges; **neither auto-implies the other**; a mentor **never** holds consent authority.
+15. A **Mentorship is authorized by the mentee if consent-capable, else by the guardian** (for a charge).
+16. **Graduation re-confirms mentorships:** when a charge becomes consent-capable, guardian-granted
+    mentorships must be **re-confirmed by the now-consent-capable learner**, else they lapse.
+
+**E — Billing & autonomy**
+17. `admin` is **age-agnostic**; **Payer ≥ 18**; the two are separate, neither implies the other.
+18. **Billing + consent follow the home Organization**; a second-org edge grants edge-scoped visibility
+    only — changing neither who pays nor who consents.
+19. A paying adult gains **no** visibility into a self-consenting learner's data without that learner's
+    **opt-in**.
+
+**F — Lifecycle & safety**
+20. **Graduation preserves identity:** managed → credentialed keeps the **same `person_id`** + all history.
+21. Edge deletion (guardianship / mentorship / membership) **never cascade-deletes** the Person or their
+    learning history — a managed Person (charge *or* the rare managed adult) is **never orphaned**.
+    *(Today `family_links` cascades — the live bug, PPA-R11.)*
 
 ---
 
@@ -373,8 +466,49 @@ spike / a cleanup pass as noted.
   CONTEXT.md identity section (and adjacent example clauses) for old-fused-model reasoning when the role
   cluster lands. (Raised by PM, Grill #1 / C4b.)
 
-- **CLEANUP-2 — "mentor" copy double-use (AI vs human).** User-facing copy uses "mentor" for the **AI**
-  (~70 strings in `apps/mobile/src/i18n/locales/en.json`: "your mentor", "Mentor memory", "Mentor
-  language", …) **and** for the **human overseer** ("You're now mentoring {{childNames}}",
-  `mentorSlot`/`mentorRead`/"Mentor's read on {{name}}"). Once the human supervisory role is named
-  (reserving "mentor" for the AI), sweep the human-side strings to the new term. (Raised Grill #1 / C7-naming.)
+- **CLEANUP-2 — Rebrand the AI from "mentor" → "Mate"; `mentor` becomes the human role. [DECIDED, Grill #1]**
+  Resolution of the mentor collision: **`mentor` = the human supervisory role**; the **AI is the learner's
+  "Mate" / "AI Mate"** (leaning into MentoMATE). Consequence — a **copy sweep**: the ~70 user-facing strings
+  in `apps/mobile/src/i18n/locales/en.json` that call the AI "mentor" ("your mentor", "Mentor memory",
+  "Mentor language", "Tell Your Mentor", …) must be reworded to "Mate"/"your Mate". The human-overseer
+  strings ("You're now mentoring {{childNames}}", `mentorSlot`/`mentorRead`/"Mentor's read on {{name}}")
+  **stay** as `mentor`. **Scope flag:** this is a brand-voice change to the AI's name across all copy — PM
+  owns it; sequence it as a deliberate copy pass, not a silent rename. (Raised + decided Grill #1.)
+
+- **FLAG-2 — The hard "11" age floor contradicts the any-age-charge intent. `[PRODUCT DECISION]`** Product
+  intent: any-age child can be a **charge** with guardian consent (even <11 — nothing learning-wise blocks
+  homework help). But today an 11 floor is **hard-coded and pervasive**: `MINIMUM_AGE = 11`
+  (`apps/api/src/services/consent.ts:197,246,275`) and — decisively — **`birthYearSchema` rejects age < 11 at
+  the API boundary** (deliberately, BUG-577: `packages/schemas/src/profiles.ts:48`, `age.ts:32`,
+  `apps/api/src/routes/profiles.test.ts:293`), plus all canonical copy frames "11–15"/"11–17"/"11+" (ToS
+  `en.json:1313,1345`; `docs/ux-design-specification.md:36`; `docs/PRD.md:38,64,393`). **No documented rationale
+  for 11 specifically** — reads as product scoping, not a legal line. **Action:** set the real floor (gated on
+  the under-13 VPC solution — age-consent spike — **and** an app-store age-rating check), then remove the code
+  floor + sweep copy. (Raised PM, Grill #1 / C9.)
+
+- **FLAG-3 — Managed, consent-capable adult (no Login). `[RESOLVED, Grill #1]`** **Supported, no new machinery.**
+  A managed consent-capable adult (the "Netflix-profile" grandparent) = an admin-created **`learner`** with **no
+  guardianship and no consent gate** (she's above the consent age → `requiresGuardianConsent = false`), **operated
+  by the admin who created her** (as a guardian operates a charge); her consent is the ordinary informal adult kind
+  (no VPC). She **graduates** to her own Login if wanted, and §4.21 (never orphaned) covers her. Kills the earlier
+  "require all capable Persons credentialed" lean. (Raised PM, resolved Grill #1 / C5.)
+
+- **CLEANUP-3 — Banish numeric cohort labels.** "under-13", "11-12", "11-15", "11-17" as cohort shorthands are
+  ambiguous (consent line = 13–16 jurisdictional; contract line = 18) and wrongly exclude younger children. Use
+  **consent-gated** (condition) / **charge** (person) / **minor** (under-18) / **adult** (≥18) — never a number.
+  **Status:** the *rule* is locked now (our artifacts use no numbers); the **copy sweep is deferred** to the
+  PRD/canonical rebaseline and **gated on FLAG-2** — served-age-range claims (ToS "aged 11–17") can't be rewritten
+  until the real floor is a decided fact. (Raised PM, Grill #1 / C9.)
+
+## §9 — Supported use cases (carry to PRD personas/journeys)
+
+Concrete scenarios the ratified model supports that the PRD must surface as personas/journeys (so they aren't
+lost when behaviour is specified). Each is **[DERIVED]** from the model, not a new decision.
+
+- **UC-1 — Managed shared-device profile (the "grandparent / Netflix" case). [carry to PRD personas]** A family
+  **admin** creates a profile for a **consent-capable** Person (an adult, or a capable teen) who will **not** hold
+  their own Login — e.g. a grandparent learning on the shared family tablet. Shape: a **managed Person + `learner`
+  membership**, **no guardianship, no consent gate** (above the consent age → `requiresGuardianConsent = false`),
+  **operated by the admin** (as a guardian operates a charge). They can **graduate** to their own Login later (same
+  `person_id`, §4.20). Differs from a charge *only* in the absence of guardianship/consent edges. Extends doc 2's
+  persona table (solo adult / family operator / mentor) with this **managed-adult** variant. (Raised PM, Grill #1.)

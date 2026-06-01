@@ -14,26 +14,136 @@ disagree, the schema wins and this file should be corrected.
 
 ### People & roles
 
-**Profile**:
-A named learning identity within a Clerk account; the atomic unit of ownership for all
-learning data. A Clerk account contains one or more Profiles.
-_Avoid_: user (an account holds many Profiles), account.
-→ `packages/schemas/src/profiles.ts:178`
+> **Identity vocabulary — under clean-cut revision (Grill #1, 2026-06-01).** The terms below
+> marked **[target]** are the ratified Identity Foundation model; the live schema still uses the
+> legacy fused model (`profiles` / `accounts` / `isOwner`) until the clean cut lands. Where this
+> section and today's schema disagree, **this section is the forward intent** (it overrides the
+> usual "schema wins" rule *for these identity terms only*, during the re-platform). Decision
+> record: `_wip/identity-foundation/identity-ontology.md`.
 
-**Owner**:
-A Profile with `isOwner === true` — the account holder who can subscribe, manage billing,
-add child Profiles, and reach guardian-facing surfaces. `isOwner` is the canonical check.
-_Avoid_: parent (copy-only), guardian (a retired V0 tab-shape label), account owner.
+**Person** _[target]_:
+One human — the permanent subject of all learning data, consent, and identity, **whether or not
+they can log in**. The scoping key for every learning record. A Person may hold a Login
+(*credentialed*) or not (*managed*); a managed Person is a real member with no sign-in of their own.
+_Avoid_: profile (the legacy fused term), user (a login/authz word — a Person needn't authenticate),
+account, learner (a Person *acting as* a learner is a hat, not the entity).
+→ `_wip/identity-foundation/identity-ontology.md` §1.1 · legacy `profiles.ts:71`
+
+**Organization** _[target]_:
+The thin grouping + billing container a Person belongs to via Membership; holds the Subscription and
+**never owns a Person or their data**. Always exists (an *org-of-one* is created at signup). "Family"
+is a user-facing label on an Organization, not a separate entity.
+_Avoid_: account (the legacy fused term), family / group / roster / tenant (all are an Organization).
+→ `_wip/identity-foundation/identity-ontology.md` §1.3 · legacy `accounts`, inert `organizations` `profiles.ts:145`
+
+**Login** _[target]_:
+The authentication binding between a Person and their Clerk User — the means by which a Person signs
+in. **Optional: 0 or 1 per Person** (managed = none, credentialed = one). Multiple sign-in methods
+(Google, Apple, email/password) live *inside* the one Clerk User via account-linking, not as separate
+Logins. Clerk owns authentication; we own everything else (ADR 0001).
+_Avoid_: credential (in security that means an auth *factor* — a password/token — not the login
+identity), user / Clerk user (the vendor object; Login is our binding to it), account.
+→ `_wip/identity-foundation/identity-ontology.md` §1.2 · Clerk User via `clerk_user_id` `profiles.ts:85`
+
+**Membership** _[target]_:
+The link between a Person and an Organization, carrying a **role set** `{admin, learner}` (any
+combination). Grants *existence-visibility* only — that you are in the org; **never** access to anyone's
+learning data (that is edge-derived). The first member of an Organization is always an `admin`. Supervisory
+ties (mentor, guardian) are **edges**, not roles — see *capacity*.
+_Avoid_: account membership, seat (a seat is a billing count, not the link).
+→ `_wip/identity-foundation/identity-ontology.md` §2.1 · inert `memberships` `profiles.ts:168`
+
+**admin** _[target]_:
+The membership role for **org management** — members, invites, settings, billing administration.
+Age-agnostic; ≥1 per org; transferable; more than one allowed. Replaces the dissolved `Owner`. Holds
+**no** learning-data access without a separate edge.
+_Avoid_: owner (dissolved — split into admin / Payer / Guardianship), account holder.
+→ `_wip/identity-foundation/identity-ontology.md` §1.5
+
+**learner** _[target]_:
+The membership role/marker meaning *"this member learns in this org"* — the switch that activates the
+core learning surface. Self-*ownership* of one's own data is intrinsic to Person and needs no role;
+`learner` marks active participation (and learner-seat counting). Not auto-assigned; chosen at onboarding.
+_Avoid_: student (school-loaded; the term we replaced), child, child profile.
+→ `_wip/identity-foundation/identity-ontology.md` §1.5
+
+**capacity** _[target]_:
+The position a Person occupies at **one end of an edge** (relationship) — *what they are in that
+relationship* — as opposed to a membership **role**. `mentor`/`mentee` and `guardian`/`charge` are
+capacities; `admin` and `learner` are roles. A Person carries one membership role-set but **any number of
+capacities** (e.g. guardian to one child, mentor to another).
+_Avoid_: relationship role / edge role (avoided so "role" stays reserved for membership roles), party.
+→ `_wip/identity-foundation/identity-ontology.md` §2
+
+**mentor** _[target]_:
+A **capacity** (not a role): the helper end of a **Mentorship** edge — a **human** who helps/oversees one
+specific learner. Visibility is **edge-scoped** to that named mentee; a mentor **never** sees the whole
+org/family. Any age. **Distinct from the AI** (the AI is the *Mate*).
+_Avoid_: mentor *role* (it is a capacity on an edge, not a membership role), AI mentor (that is the Mate), teacher.
+→ `_wip/identity-foundation/identity-ontology.md` §2.3
+
+**Mate** (AI Mate) _[target]_:
+The learner's **AI** tutor (MentoMATE) — the entity formerly called "mentor" throughout the app's copy.
+Renamed to free `mentor` for the human role. A copy sweep reassigns ~70 "your mentor" strings to "Mate".
+_Avoid_: mentor (now the human role), bot, assistant.
+→ `_wip/identity-foundation/identity-ontology.md` §8 CLEANUP-2
+
+**Guardianship** _[target]_:
+The dyadic relationship recording that an adult gave **verifiable consent** for a consent-gated learner —
+a **Guardian → charge** edge that carries the consent record and establishes lawful basis to process that
+learner's data (**Layer 1 — consent authority**). Withdrawable. **Not a role.**
+_Avoid_: family link (the legacy table), parental role, custody.
+→ `_wip/identity-foundation/identity-ontology.md` §2.2 · legacy `family_links`+`consent_states` `profiles.ts:284,313`
+
+**Guardian** _[target]_:
+The consenting adult who holds a Guardianship over a charge. Has inherent oversight of that charge (Layer 1).
+The privacy-law umbrella ("parent or guardian"); to give valid consent one must hold parental responsibility.
+_Avoid_: parent (copy-only — a guardian need not be a biological parent), owner.
+→ `_wip/identity-foundation/identity-ontology.md` §2.2
+
+**charge** _[target]_ (≡ **consent-gated learner**):
+The learner on the far end of a Guardianship — a learner below their jurisdiction's consent age, who needs
+a guardian's consent to be processed. **`charge`** is the formal/vernacular term; **"consent-gated learner"**
+is the technical synonym used in detailed/data-model contexts.
+_Avoid_: ward (custodial baggage), dependent. **`minor`** is acceptable casual shorthand (a charge is always
+a minor) but **imprecise** — not every minor is a charge (16–17s and e.g. Norwegian 13–15s self-consent) —
+and must **never** be a code gate; gate on `requiresGuardianConsent`.
+→ `_wip/identity-foundation/identity-ontology.md` §2.2
+
+**Mentorship** _[target]_:
+A dyadic **mentor → learner** edge granting **scoped visibility/help** for one specific mentee (**Layer 2 —
+supervisory access**). Granted by the guardian (below consent age) or by the data subject (above). Carries
+**no** consent authority. The far-end learner is loosely called a *mentee*.
+_Avoid_: org-wide mentor access (the leak this prevents), guardianship (a different layer).
+→ `_wip/identity-foundation/identity-ontology.md` §2.3
+
+**Payer** _[target]_:
+The Person (**≥18**) designated responsible for an Organization's Subscription. A Subscription *designation*,
+**not** a membership role, and grants **no** learning-data access. Separable from `admin` (an independent teen
+can be admin of their own org but needs an adult Payer for a paid plan).
+_Avoid_: owner, billing contact (considered; understates legal responsibility), customer (that is the org).
+→ `_wip/identity-foundation/identity-ontology.md` §2.4
+
+**minor** _[target]_:
+A Person **under 18** — the **contract/Payer threshold** (a minor cannot be the Payer/contract-holder).
+**Distinct from the consent gate**, which is `requiresGuardianConsent` (below the jurisdictional consent age,
+13–16). Fine in day-to-day speech; never a structural/code gate (use the precise condition).
+_Avoid_: using "minor" to mean "needs consent" (that is consent-gated / a charge — a different, jurisdictional line).
+→ `_wip/identity-foundation/identity-ontology.md` §R, §3.2
+
+**Owner** _[✗ superseded — dissolved by Grill #1 C2]_:
+Legacy: a Profile with `isOwner === true`. **Dissolved** in the clean cut → split into `admin` (org
+management) / **Payer** (billing) / **Guardianship** (act-for-a-child). Not canonical; do not build on it.
 → `packages/schemas/src/profiles.ts:155`
 
-**Child Profile**:
-A Profile with `isOwner === false` — a family-linked learner whose data the Owner can see.
-_Avoid_: learner (every Profile is a learner), student.
+**Child Profile** _[✗ superseded — Grill #1 C3/C4]_:
+Legacy: a Profile with `isOwner === false`. **Replaced** by Person + Membership(`learner`) + (for a
+consent-gated learner) a Guardianship edge making them a **charge**. Not canonical.
 → `packages/schemas/src/billing.ts:13` (`profileQuotaRole: 'child'`)
 
-**Parent Proxy**:
-The runtime state where an Owner is actively viewing the app *as* one of their Child
-Profiles via the proxy banner (`isParentProxy`).
+**Parent Proxy** _[⚠ legacy — under revision, Grill #1 C3/C5]_:
+The runtime state where an Owner views the app *as* one of their Child Profiles (`isParentProxy`).
+Candidate mechanism for guardian act-for under the new model; keep/retire decision pending.
 _Avoid_: impersonated child (that names the role on the child, not the Owner's state).
 → `apps/mobile/src/lib/navigation-contract.ts:75`
 
