@@ -28,7 +28,7 @@ README index). **Status: 2026-06-01 — Phase A not started; product intent NOT 
 
 | # | Phase | Deliverable | Owner | Status | Depends on | Exit gate |
 |---|---|---|---|---|---|---|
-| **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md` | Claude | ⬜ | — | drift quantified across intent / canonical docs / code; PM has concrete input |
+| **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md` | Claude | ✅ | — | drift quantified across intent / canonical docs / code; PM has concrete input |
 | **B** | Product intent | `product-intent.md` | **PM** (Claude facilitates) | ⬜ | A | reconstructed-PRD §11 questions resolved + signed off |
 | **C** | Doc-strategy decision (pilot) | ADR (*location per this decision*) | You + Claude | ⬜ | A informs; piloted via B/D/E | chunk-vs-monolith decided; PRD-rebuild-vs-separate-doc decided; rollout call made |
 | **D** | Domain model | `domain-model.md` + ADR(s) | Claude (you ratify) | ⬜ | B | entities / roles / **consent model** / tenancy locked; org/membership **re-derived**, not inherited |
@@ -42,7 +42,9 @@ README index). **Status: 2026-06-01 — Phase A not started; product intent NOT 
 - **Consent/COPPA spec + legal check** — spans B/D; gates any code touching consent. ⬜
 - **T1 revert** — decision MADE (forward-only); execution deferred to F. Do **not** delete migration
   `0106` in isolation (it's committed + applied). ⬜
-- **Sibling-plan re-triage** — see below. ⬜
+- **Sibling-plan re-triage** — see below. 🟡 provisional tags applied to all 7 plans (2026-06-01);
+  preliminary verdicts validated in `drift-map.md` §5 (one diverged: `learning-library-cleanup`). Final
+  couple-vs-independent split still deferred to after Phase D.
 
 ---
 
@@ -94,6 +96,21 @@ separate → evaluate standalone.
 
 ## Decision log
 
+- **2026-06-01** — **Phase A complete.** `drift-map.md` produced via a 34-agent citation-verified workflow
+  (three-way reconciliation; audit re-triage + sibling-coupling + doc-staleness folded in). All 7 sibling
+  plans tagged in `docs/plans/`. Key outputs: consent/COPPA-under-own-logins confirmed as the single
+  load-bearing P0; T1 (`0106`) confirmed inert (zero readers/writers); four parallel role/ownership
+  encodings identified; PRD-refresh backlog prioritized (PRD = P0). A coverage boundary (§7) flags 5
+  identity-adjacent areas no cluster reached (P2 self-reg minor, non-owner data-subject rights, the
+  2026-05-19 nav spec, `docs/flows/*` + store-compliance docs, the 36-gap audit) for a Phase-A addendum or
+  Phase-B intake.
+- **2026-06-01** — **Phase-A addendum complete.** An 8-agent verified sweep (`wf_b9dcc01e-849`) closed all 5
+  coverage-boundary areas → `drift-map.md` §7A. Surfaced: the P2 self-registered-minor consent breaks (incl.
+  a new authority-resolution **bug** — `getFamilyOwnerProfileId` treats the minor as their own consent
+  authority); the full non-owner data-subject-rights cluster; `resolveNavigationContract` confirmed as the
+  single nav migration seam (6 test suites will break together); store/legal launch-gates for the
+  credentialed-minor path; and a 36-gap audit evidence index (28/36 identity-coupled, 6 new-uncovered — 4
+  fold, 2 ship-now). Phase A (map + addendum) is now closed; ready for Phase B intent-lock.
 - **2026-06-01** — Roadmap created. Tracking = **repo-only**, this file. Chunked-doc structure is a
   **pilot** in this folder (reversible until C). Sibling-plan re-triage added as a thread (provisional
   now, final split after D). Cosmo implementation WIs deferred to F.
