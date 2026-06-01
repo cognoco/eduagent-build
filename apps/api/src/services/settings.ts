@@ -17,6 +17,7 @@ import {
 } from '@eduagent/database';
 import type {
   NotificationPrefsInput,
+  NotificationPrefsResponse,
   CelebrationLevel,
   WithdrawalArchivePreference,
   NotificationPayload,
@@ -28,16 +29,7 @@ import { assertParentAccess } from './family-access';
 // Types
 // ---------------------------------------------------------------------------
 
-export interface NotificationPrefs {
-  reviewReminders: boolean;
-  dailyReminders: boolean;
-  weeklyProgressPush: boolean;
-  weeklyProgressEmail: boolean;
-  monthlyProgressEmail: boolean;
-  pushEnabled: boolean;
-  pushTokenRegistered: boolean;
-  maxDailyPush: number;
-}
+export type NotificationPrefs = NotificationPrefsResponse;
 
 export interface LearningModeRecord {
   medianResponseSeconds?: number | null;

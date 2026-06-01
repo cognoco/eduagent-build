@@ -146,6 +146,8 @@ export async function createNudge(
     now.getTime() - NUDGE_WINDOW_HOURS * 60 * 60 * 1000,
   );
   const inserted = await db.transaction(async (tx) => {
+    // The nudge limit is per recipient per window, regardless of direction,
+    // so the advisory lock follows the same recipient key as the count query.
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${
         'nudge-rate:' + params.toProfileId
