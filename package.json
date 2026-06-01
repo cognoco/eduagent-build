@@ -43,7 +43,6 @@
     "test:e2e:record": "maestro record apps/mobile/e2e/flows/",
     "env:sync": "node scripts/setup-env.js",
     "sync-skills": "node scripts/sync-skills.mjs",
-    "migrations:manifest": "node scripts/update-migration-manifest.mjs",
     "verify:postinstall-safety": "node scripts/verify-no-secret-postinstall.cjs",
     "check:root-deps": "node scripts/check-no-mobile-deps-at-root.cjs",
     "check:github-workflow-security": "tsx scripts/check-github-workflow-security.ts",
