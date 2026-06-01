@@ -210,17 +210,7 @@ export async function fetchLearningResumeTarget(
         typeof entry[1] === 'string' && entry[1].length > 0,
     ),
   );
-  const resumeTargetClient = (
-    client.progress as unknown as {
-      'resume-target': {
-        $get: (
-          args: { query: Record<string, string> },
-          options?: { init?: RequestInit },
-        ) => Promise<Response>;
-      };
-    }
-  )['resume-target'];
-  const res = await resumeTargetClient.$get(
+  const res = await client.progress['resume-target'].$get(
     { query },
     { init: signal ? { signal } : undefined },
   );
@@ -748,19 +738,9 @@ export function useChildProgressSummary(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        // Hono RPC does not type hyphenated path segments, so the route segment
-        // is cast to the handler shape used by /progress-summary.
-        const progressSummaryClient = (
-          client.dashboard.children[':profileId'] as unknown as {
-            'progress-summary': {
-              $get: (
-                args: { param: { profileId: string } },
-                options?: { init?: RequestInit },
-              ) => Promise<Response>;
-            };
-          }
-        )['progress-summary'];
-        const res = await progressSummaryClient.$get(
+        const res = await client.dashboard.children[':profileId'][
+          'progress-summary'
+        ].$get(
           { param: { profileId: childProfileId ?? '' } },
           { init: { signal } },
         );
@@ -861,17 +841,7 @@ export function useProfileReportDetail(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const reportsClient = (
-          client.progress.reports as unknown as {
-            ':reportId': {
-              $get: (
-                args: { param: { reportId: string } },
-                options?: { init?: RequestInit },
-              ) => Promise<Response>;
-            };
-          }
-        )[':reportId'];
-        const res = await reportsClient.$get(
+        const res = await client.progress.reports[':reportId'].$get(
           { param: { reportId: reportId ?? '' } },
           { init: { signal } },
         );
@@ -1048,17 +1018,9 @@ export function useProfileWeeklyReportDetail(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const weeklyReportsClient = (
-          client.progress['weekly-reports'] as unknown as {
-            ':weeklyReportId': {
-              $get: (
-                args: { param: { weeklyReportId: string } },
-                options?: { init?: RequestInit },
-              ) => Promise<Response>;
-            };
-          }
-        )[':weeklyReportId'];
-        const res = await weeklyReportsClient.$get(
+        const res = await client.progress['weekly-reports'][
+          ':weeklyReportId'
+        ].$get(
           { param: { weeklyReportId: reportId ?? '' } },
           { init: { signal } },
         );
@@ -1128,18 +1090,7 @@ export function useMarkProfileReportViewed(): UseMutationResult<
   return useMutation({
     retry: 0,
     mutationFn: async ({ reportId }) => {
-      const reportsClient = (
-        client.progress.reports as unknown as {
-          ':reportId': {
-            view: {
-              $post: (args: {
-                param: { reportId: string };
-              }) => Promise<Response>;
-            };
-          };
-        }
-      )[':reportId'];
-      const res = await reportsClient.view.$post({
+      const res = await client.progress.reports[':reportId'].view.$post({
         param: { reportId },
       });
       await assertOk(res);
@@ -1172,18 +1123,9 @@ export function useMarkProfileWeeklyReportViewed(): UseMutationResult<
   return useMutation({
     retry: 0,
     mutationFn: async ({ reportId }) => {
-      const weeklyReportsClient = (
-        client.progress['weekly-reports'] as unknown as {
-          ':weeklyReportId': {
-            view: {
-              $post: (args: {
-                param: { weeklyReportId: string };
-              }) => Promise<Response>;
-            };
-          };
-        }
-      )[':weeklyReportId'];
-      const res = await weeklyReportsClient.view.$post({
+      const res = await client.progress['weekly-reports'][
+        ':weeklyReportId'
+      ].view.$post({
         param: { weeklyReportId: reportId },
       });
       await assertOk(res);

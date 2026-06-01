@@ -198,6 +198,47 @@ export function useDeleteSubject(): UseMutationResult<
   });
 }
 
+export interface RetryCurriculumResponse {
+  dispatched: number;
+}
+
+/**
+ * Re-triggers curriculum generation for a subject whose initial generation
+ * stalled or failed (LLM timeout/error left books with topicsGenerated=false).
+ * The server finds every stuck book under the subject and re-dispatches the
+ * Inngest retry event; the dispatch is single-flight guarded server-side
+ * (curriculum_books.retry_in_flight, WI-125), so repeated calls are safe.
+ *
+ * This is the escape hatch for the "Setting up <subject>…" dead-end on the
+ * home subject carousel: without it, a subject whose curriculum never
+ * generates is stuck non-interactive forever with no way to recover.
+ */
+export function useRetryCurriculum(): UseMutationResult<
+  RetryCurriculumResponse,
+  Error,
+  { subjectId: string }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation<RetryCurriculumResponse, Error, { subjectId: string }>({
+    mutationFn: async ({ subjectId }) => {
+      const res = await client.subjects[':id']['retry-curriculum'].$post({
+        param: { id: subjectId },
+      });
+      await assertOk(res);
+      return (await res.json()) as RetryCurriculumResponse;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      void queryClient.invalidateQueries({ queryKey: ['curriculum'] });
+    },
+    retry: (failureCount, error) =>
+      failureCount < 2 && isTransientSubjectUpdateError(error),
+    retryDelay: subjectUpdateRetryDelay,
+  });
+}
+
 export function useConfigureLanguageSubject(): UseMutationResult<
   { subject: Subject },
   Error,

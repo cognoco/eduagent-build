@@ -683,6 +683,86 @@ describe('LearnerScreen', () => {
     });
   });
 
+  it('offers a retry escape hatch when a preparing subject has stalled, and POSTs retry-curriculum on tap', async () => {
+    // A subject stuck in 'preparing' long past creation has almost certainly
+    // failed curriculum generation. Without a retry affordance the tile is an
+    // indefinite "Setting up…" dead-end (the UX-resilience bug this wires up).
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        {
+          id: 'sub-stalled',
+          name: 'Ancient History',
+          status: 'active',
+          curriculumStatus: 'preparing',
+          // Far past the stall threshold — generation clearly did not complete.
+          createdAt: '2020-01-01T00:00:00.000Z',
+          updatedAt: '2020-01-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    renderLearner();
+
+    await waitFor(() => {
+      screen.getByText('Setup stalled — tap to try again');
+    });
+    // The plain "Setting up…" dead-end copy must NOT be shown for a stalled subject.
+    expect(screen.queryByText('Setting up Ancient History...')).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('home-subject-card-sub-stalled'));
+    });
+
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(mockFetch, '/subjects/sub-stalled/retry-curriculum')
+          .length,
+      ).toBeGreaterThan(0);
+    });
+    const retryCall = fetchCallsMatching(
+      mockFetch,
+      '/subjects/sub-stalled/retry-curriculum',
+    )[0];
+    expect(retryCall?.init?.method).toBe('POST');
+    // A stalled tile must NOT navigate into the progress detail screen — its
+    // press is the retry action, not a route push.
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/progress/[subjectId]',
+      }),
+    );
+  });
+
+  it('keeps a freshly-created preparing subject as a non-tappable "Setting up…" tile (not yet stalled)', async () => {
+    // Recent createdAt => still within the normal generation window, so the
+    // retry affordance must NOT appear and the tile stays non-interactive.
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        {
+          id: 'sub-fresh',
+          name: 'Ancient History',
+          status: 'active',
+          curriculumStatus: 'preparing',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    renderLearner();
+
+    await waitFor(() => {
+      screen.getByText('Setting up Ancient History...');
+    });
+    expect(screen.queryByText('Setup stalled — tap to try again')).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('home-subject-card-sub-fresh'));
+    });
+    // Non-stalled preparing tile is disabled — neither retries nor navigates.
+    expect(fetchCallsMatching(mockFetch, '/retry-curriculum').length).toBe(0);
+  });
+
   it('hides learner-only elements in parent proxy mode', async () => {
     // [ACCOUNT-04] Proxy mode must be explicitly set — plain profile switches
     // to a non-owner profile do NOT trigger proxy chrome.

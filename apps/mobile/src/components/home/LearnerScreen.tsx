@@ -18,7 +18,7 @@ import {
 } from '../../hooks/use-progress';
 import { useDashboard } from '../../hooks/use-dashboard';
 import { isInGracePeriod } from '../../lib/consent-grace';
-import { useSubjects } from '../../hooks/use-subjects';
+import { useRetryCurriculum, useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import { useHasLinkedChildren, useProfile } from '../../lib/profile';
 import {
@@ -27,6 +27,8 @@ import {
   pushLearningResumeTarget,
 } from '../../lib/navigation';
 import { resolveLoadingMotionPreset } from '../../lib/motion-presets';
+import { platformAlert } from '../../lib/platform-alert';
+import { formatApiError } from '../../lib/format-api-error';
 import {
   clearSessionRecoveryMarker,
   isRecoveryMarkerFresh,
@@ -53,6 +55,14 @@ import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
+
+// A subject whose curriculum is still 'preparing' this long after it was
+// created (or last retried) has almost certainly failed generation rather than
+// being mid-flight — normal prewarm completes in seconds. Past this threshold
+// the home tile surfaces a retry escape hatch instead of an indefinite
+// "Setting up…" dead-end. Retry is single-flight guarded server-side, so an
+// early/needless retry during slow-but-normal generation is harmless.
+const STALLED_PREPARING_MS = 90_000;
 
 type HomeIntentAction = {
   testID: string;
@@ -119,6 +129,14 @@ export function LearnerScreen({
   const colors = useThemeColors();
   const { colorScheme } = useTheme();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
+  const retryCurriculum = useRetryCurriculum();
+  // When a stalled subject's curriculum is re-dispatched we stamp the moment so
+  // the tile stops offering "tap to retry" and shows "Setting up…" again for a
+  // grace window — the 3s subjects poll then flips it to ready on success, or
+  // back to stalled if this attempt also fails. Prevents a retry-spam loop.
+  const [retriedAtBySubject, setRetriedAtBySubject] = useState<
+    Record<string, number>
+  >({});
   const { data: resumeTarget } = useLearningResumeTarget();
   const { data: reviewSummary } = useReviewSummary();
   const { data: overallProgress } = useOverallProgress();
@@ -258,6 +276,30 @@ export function LearnerScreen({
     markQuizDiscoverySurfaced.mutate(quizDiscovery.activityType);
   }, [markQuizDiscoverySurfaced, quizDiscovery]);
 
+  const handleRetryCurriculum = useCallback(
+    (subjectId: string, subjectName: string) => {
+      if (retryCurriculum.isPending) return;
+      retryCurriculum.mutate(
+        { subjectId },
+        {
+          onSuccess: () => {
+            setRetriedAtBySubject((prev) => ({
+              ...prev,
+              [subjectId]: Date.now(),
+            }));
+          },
+          onError: (err) => {
+            platformAlert(
+              `Couldn't restart ${subjectName}`,
+              formatApiError(err),
+            );
+          },
+        },
+      );
+    },
+    [retryCurriculum],
+  );
+
   const subjectCards = useMemo(() => {
     if (!subjects?.length) return [];
     const activeSubjects = subjects.filter((s) => s.status === 'active');
@@ -276,8 +318,28 @@ export function LearnerScreen({
       const completed = progress?.topicsCompleted ?? 0;
 
       const isPreparing = s.curriculumStatus === 'preparing';
+      // A preparing subject is "stalled" once it has sat in preparing past the
+      // threshold (measured from creation, or the last retry if one happened).
+      // Stalled => curriculum generation likely failed and the tile offers a
+      // retry escape hatch instead of an indefinite "Setting up…" dead-end.
+      const isRetrying =
+        retryCurriculum.isPending &&
+        retryCurriculum.variables?.subjectId === s.id;
+      const referenceMs = Math.max(
+        new Date(s.createdAt).getTime(),
+        retriedAtBySubject[s.id] ?? 0,
+      );
+      const isStalled =
+        isPreparing &&
+        !isRetrying &&
+        Date.now() - referenceMs > STALLED_PREPARING_MS;
+
       let hint = isPreparing ? `Setting up ${s.name}...` : 'Open';
-      if (
+      if (isRetrying) {
+        hint = `Restarting ${s.name}...`;
+      } else if (isStalled) {
+        hint = `Setup stalled — tap to try again`;
+      } else if (
         !isPreparing &&
         resumeTarget?.subjectId === s.id &&
         ['active_session', 'paused_session'].includes(resumeTarget.resumeKind)
@@ -297,6 +359,9 @@ export function LearnerScreen({
         name: s.name,
         hint,
         isPreparing,
+        // Stalled tiles stay visually "preparing" (dimmed) but become tappable
+        // to retry; canRetry drives the onPress wiring in the carousel.
+        canRetry: isStalled,
         progress: total > 0 ? completed / total : 0,
         topicsCompleted: completed,
         topicsTotal: total,
@@ -304,7 +369,16 @@ export function LearnerScreen({
         tintSoft: tint.soft,
       };
     });
-  }, [subjects, overallProgress, resumeTarget, reviewSummary, colorScheme]);
+  }, [
+    subjects,
+    overallProgress,
+    resumeTarget,
+    reviewSummary,
+    colorScheme,
+    retriedAtBySubject,
+    retryCurriculum.isPending,
+    retryCurriculum.variables,
+  ]);
 
   const coachBand = useMemo(() => {
     if (navigationProxy.active) return null;
@@ -637,17 +711,19 @@ export function LearnerScreen({
                     {...card}
                     testID={`home-subject-card-${card.subjectId}`}
                     onPress={
-                      card.isPreparing
-                        ? undefined
-                        : () => {
-                            router.push({
-                              pathname: '/(app)/progress/[subjectId]',
-                              params: {
-                                subjectId: card.subjectId,
-                                returnTo: returnToTab,
-                              },
-                            } as Href);
-                          }
+                      card.canRetry
+                        ? () => handleRetryCurriculum(card.subjectId, card.name)
+                        : card.isPreparing
+                          ? undefined
+                          : () => {
+                              router.push({
+                                pathname: '/(app)/progress/[subjectId]',
+                                params: {
+                                  subjectId: card.subjectId,
+                                  returnTo: returnToTab,
+                                },
+                              } as Href);
+                            }
                     }
                   />
                 ))}

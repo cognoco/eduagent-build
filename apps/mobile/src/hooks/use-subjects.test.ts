@@ -10,6 +10,7 @@ import {
   useCreateSubject,
   useUpdateSubject,
   useDeleteSubject,
+  useRetryCurriculum,
 } from './use-subjects';
 
 const mockFetch = jest.fn();
@@ -284,5 +285,53 @@ describe('useDeleteSubject', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['curriculum'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['library'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+  });
+});
+
+describe('useRetryCurriculum', () => {
+  it('POSTs to /subjects/:id/retry-curriculum and invalidates subjects + curriculum', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ dispatched: 2 }), { status: 200 }),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useRetryCurriculum(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ subjectId: 's1' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const url = String(mockFetch.mock.calls[0]?.[0]);
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(url).toContain('/subjects/s1/retry-curriculum');
+    expect(init.method).toBe('POST');
+    expect(result.current.data).toEqual({ dispatched: 2 });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['curriculum'] });
+  });
+
+  it('surfaces a typed error when the retry dispatch fails', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('Subject not found', { status: 404 }),
+    );
+
+    const { result } = renderHook(() => useRetryCurriculum(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({ subjectId: 'missing' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.error).toBeInstanceOf(Error);
   });
 });
