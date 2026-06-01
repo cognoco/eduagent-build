@@ -332,4 +332,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-05-24
+Last updated: 2026-06-01

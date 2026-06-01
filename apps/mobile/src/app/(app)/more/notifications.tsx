@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Linking, ScrollView, View } from 'react-native';
+import { AppState, Linking, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as Notifications from 'expo-notifications';
 import {
@@ -46,21 +46,27 @@ export default function NotificationsScreen(): React.ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    void Notifications.getPermissionsAsync().then((nextPermission) => {
+    const refresh = async () => {
+      const nextPermission = await Notifications.getPermissionsAsync();
       if (!cancelled) {
         setPermissionState(nextPermission);
+      }
+    };
+    void refresh();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refresh();
       }
     });
     return () => {
       cancelled = true;
+      subscription.remove();
     };
   }, []);
 
   const osPermissionGranted = hasNotificationPermission(permissionState);
   const serverPushEnabled = notifPrefs?.pushEnabled === true;
   const pushTokenRegistered = notifPrefs?.pushTokenRegistered === true;
-  const pushReachable =
-    osPermissionGranted && serverPushEnabled && pushTokenRegistered;
   const pushDescription =
     !notifPrefs || !permissionState
       ? undefined
@@ -246,13 +252,10 @@ export default function NotificationsScreen(): React.ReactElement {
         <ToggleRow
           label={t('more.notifications.pushTitle')}
           description={pushDescription}
-          value={pushReachable}
+          value={serverPushEnabled}
           onToggle={handleTogglePush}
           disabled={
-            notifLoading ||
-            settingsUnavailable ||
-            updateNotifications.isPending ||
-            openSettingsVisible
+            notifLoading || settingsUnavailable || updateNotifications.isPending
           }
           testID="push-notifications-toggle"
         />
