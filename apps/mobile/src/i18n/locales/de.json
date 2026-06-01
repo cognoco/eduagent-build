@@ -368,6 +368,7 @@
     "subscreens": {
       "notifications": "Benachrichtigungen",
       "account": "Konto",
+      "securitySessions": "Geräte",
       "privacy": "Datenschutz & Daten",
       "help": "Hilfe & Feedback"
     }
@@ -2486,8 +2487,58 @@
     "requirementsHint": "Mindestens 8 Zeichen"
   },
   "accountSecurity": {
+    "providerFallback": "deinen Anbieter",
+    "signedInWith": "Angemeldet mit {{provider}}",
     "securedVia": "Gesichert über {{provider}}",
-    "changePasswordLabel": "Passwort ändern"
+    "changePasswordLabel": "Passwort ändern",
+    "addPasswordLabel": "Passwort hinzufügen",
+    "changeEmailLabel": "E-Mail ändern",
+    "manageDevicesLabel": "Geräte verwalten",
+    "timeoutMessage": "Der Sicherheitsdienst hat nicht rechtzeitig geantwortet. Prüfe deine Verbindung und versuche es erneut."
+  },
+  "addPassword": {
+    "providerContext": "Füge ein Passwort hinzu, damit du dich auch ohne {{provider}} anmelden kannst.",
+    "errorNotReady": "Kontosicherheit wird noch geladen.",
+    "submitLabel": "Passwort hinzufügen",
+    "submitting": "Hinzufügen...",
+    "submitButton": "Passwort hinzufügen"
+  },
+  "changeEmail": {
+    "description": "Wir senden einen Code, bevor deine Login-E-Mail geändert wird.",
+    "emailPlaceholder": "neu@example.com",
+    "sendCodeLabel": "E-Mail-Code senden",
+    "sendingCode": "Senden...",
+    "sendCodeButton": "Code senden",
+    "codeLabel": "Bestätigungscode",
+    "codePlaceholder": "6-stelligen Code eingeben",
+    "verifyLabel": "E-Mail bestätigen",
+    "verifying": "Aktualisieren...",
+    "verifyButton": "Bestätigen und aktualisieren",
+    "retrySyncLabel": "Synchronisierung erneut versuchen",
+    "retrySyncButton": "Synchronisierung erneut versuchen",
+    "errorNotReady": "Kontosicherheit wird noch geladen.",
+    "errorEmailRequired": "Gib deine neue E-Mail ein",
+    "errorSendCodeFirst": "Sende zuerst einen Code an deine neue E-Mail.",
+    "errorCodeRequired": "Gib den Bestätigungscode ein",
+    "errorSyncFailed": "Deine Login-E-Mail wurde geändert, aber der Kontoeintrag wurde nicht aktualisiert. {{message}}",
+    "warningOldEmailStillActive": "E-Mail aktualisiert, aber deine alte E-Mail ist noch aktiv.",
+    "successMessage": "E-Mail aktualisiert"
+  },
+  "securitySessions": {
+    "description": "Prüfe Geräte, die in deinem Konto angemeldet sind. Du kannst jede Sitzung außer dieser widerrufen.",
+    "deviceFallback": "Gerät",
+    "loading": "Geräte werden geladen...",
+    "loadErrorTitle": "Deine Geräte konnten nicht geladen werden",
+    "errorNotReady": "Kontosicherheit wird noch geladen.",
+    "retryLabel": "Geräte erneut laden",
+    "retryButton": "Erneut versuchen",
+    "emptyTitle": "Keine anderen Geräte",
+    "emptyDescription": "Im Moment ist nur diese Sitzung aktiv.",
+    "lastActive": "Zuletzt aktiv: {{value}}",
+    "currentBadge": "Dieses Gerät",
+    "revokeLabel": "Sitzung von {{device}} widerrufen",
+    "revoking": "Widerrufen...",
+    "revokeButton": "Widerrufen"
   },
   "changePassword": {
     "errorCurrentRequired": "Aktuelles Passwort eingeben",

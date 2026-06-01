@@ -72,6 +72,10 @@ function writeCachedVerifiedEmail(userId: string, email: string): void {
   });
 }
 
+export function invalidateVerifiedClerkEmailCache(userId: string): void {
+  verifiedEmailCache.delete(userId);
+}
+
 export function clearVerifiedClerkEmailCacheForTest(): void {
   verifiedEmailCache.clear();
 }

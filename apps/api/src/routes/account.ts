@@ -3,6 +3,8 @@ import type { Database } from '@eduagent/database';
 import {
   accountDeletionResponseSchema,
   accountDeletionStatusResponseSchema,
+  accountEmailUpdateRequestSchema,
+  accountEmailUpdateResponseSchema,
   cancelDeletionResponseSchema,
   dataExportSchema,
   ERROR_CODES,
@@ -12,6 +14,7 @@ import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireAccount } from '../middleware/profile-scope';
 
+import { updateAccountEmailFromClerk } from '../services/account';
 import {
   scheduleDeletion,
   cancelDeletion,
@@ -21,11 +24,15 @@ import {
 import { generateExport } from '../services/export';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
-import { NotFoundError, apiError } from '../errors';
+import { NotFoundError, apiError, validationError } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
 
 type AccountRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    CLERK_SECRET_KEY?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -49,6 +56,27 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       }
       return c.json({ code: 'NOT_FOUND', message: 'Account not found' }, 404);
     }
+  })
+  .patch('/account/email', async (c) => {
+    const db = c.get('db');
+    requireAccount(c.get('account'));
+    assertOwnerProfile(c, 'Only the account owner can change account email.');
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = accountEmailUpdateRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return validationError(c, parsed.error.issues);
+    }
+
+    const updated = await updateAccountEmailFromClerk(db, {
+      clerkUserId: c.get('user').userId,
+      requestedEmail: parsed.data.email,
+      clerkSecretKey: c.env.CLERK_SECRET_KEY,
+    });
+
+    return c.json(
+      accountEmailUpdateResponseSchema.parse({ email: updated.email }),
+    );
   })
   .post('/account/delete', async (c) => {
     const db = c.get('db');

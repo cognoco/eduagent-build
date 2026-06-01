@@ -3,7 +3,12 @@
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
-import { findAccountByClerkId, findOrCreateAccount } from './account';
+import { BadRequestError, ConflictError, NotFoundError } from '../errors';
+import {
+  findAccountByClerkId,
+  findOrCreateAccount,
+  updateAccountEmailFromClerk,
+} from './account';
 
 // Mock the billing service — trial auto-creation calls createSubscription
 const mockCreateSubscription = jest.fn().mockResolvedValue({
@@ -128,6 +133,58 @@ function createMockDb({
       }),
     }),
   } as unknown as Database;
+}
+
+function clerkUserFetch(
+  primaryEmail: string,
+): jest.MockedFunction<typeof fetch> {
+  return jest.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        primary_email_address_id: 'email-primary',
+        email_addresses: [
+          {
+            id: 'email-primary',
+            email_address: primaryEmail,
+            verification: { status: 'verified' },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ),
+  ) as jest.MockedFunction<typeof fetch>;
+}
+
+function createEmailUpdateDb({
+  emailLookupResult = undefined as
+    | ReturnType<typeof mockAccountRow>
+    | undefined,
+  updateReturning = [] as ReturnType<typeof mockAccountRow>[],
+} = {}): {
+  db: Database;
+  tx: {
+    query: { accounts: { findFirst: jest.Mock } };
+    update: jest.Mock;
+  };
+} {
+  const returning = jest.fn().mockResolvedValue(updateReturning);
+  const where = jest.fn().mockReturnValue({ returning });
+  const set = jest.fn().mockReturnValue({ where });
+  const update = jest.fn().mockReturnValue({ set });
+  const tx = {
+    query: {
+      accounts: {
+        findFirst: jest.fn().mockResolvedValue(emailLookupResult),
+      },
+    },
+    update,
+  };
+  const db = {
+    transaction: jest.fn(async (callback: (inner: typeof tx) => unknown) =>
+      callback(tx),
+    ),
+  } as unknown as Database;
+  return { db, tx };
 }
 
 beforeEach(() => {
@@ -714,5 +771,90 @@ describe('findOrCreateAccount', () => {
       expect(mockCreateSubscription).not.toHaveBeenCalled();
       expect(mockInngestSend).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('updateAccountEmailFromClerk', () => {
+  it('updates the authenticated account email when it matches Clerk verified primary email', async () => {
+    const updatedRow = mockAccountRow({
+      clerkUserId: 'user_test',
+      email: 'new@example.com',
+    });
+    const { db, tx } = createEmailUpdateDb({
+      emailLookupResult: undefined,
+      updateReturning: [updatedRow],
+    });
+    const fetchImpl = clerkUserFetch('new@example.com');
+
+    const result = await updateAccountEmailFromClerk(db, {
+      clerkUserId: 'user_test',
+      requestedEmail: 'new@example.com',
+      clerkSecretKey: 'sk_test',
+      fetchImpl,
+    });
+
+    expect(result.email).toBe('new@example.com');
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(tx.query.accounts.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.update).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://api.clerk.com/v1/users/user_test',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer sk_test' },
+      }),
+    );
+  });
+
+  it('[BREAK auth-2] rejects when the requested email belongs to another account', async () => {
+    const { db, tx } = createEmailUpdateDb({
+      emailLookupResult: mockAccountRow({
+        clerkUserId: 'different_user',
+        email: 'new@example.com',
+      }),
+      updateReturning: [],
+    });
+    const fetchImpl = clerkUserFetch('new@example.com');
+
+    await expect(
+      updateAccountEmailFromClerk(db, {
+        clerkUserId: 'user_test',
+        requestedEmail: 'new@example.com',
+        clerkSecretKey: 'sk_test',
+        fetchImpl,
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a client email that does not match Clerk verified primary email', async () => {
+    const { db } = createEmailUpdateDb();
+    const fetchImpl = clerkUserFetch('old@example.com');
+
+    await expect(
+      updateAccountEmailFromClerk(db, {
+        clerkUserId: 'user_test',
+        requestedEmail: 'new@example.com',
+        clerkSecretKey: 'sk_test',
+        fetchImpl,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  it('[BREAK auth-2] rejects when the caller clerkUserId has no local account row', async () => {
+    const { db } = createEmailUpdateDb({
+      emailLookupResult: undefined,
+      updateReturning: [],
+    });
+    const fetchImpl = clerkUserFetch('new@example.com');
+
+    await expect(
+      updateAccountEmailFromClerk(db, {
+        clerkUserId: 'missing_user',
+        requestedEmail: 'new@example.com',
+        clerkSecretKey: 'sk_test',
+        fetchImpl,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

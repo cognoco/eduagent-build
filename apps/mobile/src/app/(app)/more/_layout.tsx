@@ -36,6 +36,10 @@ export default function MoreLayout(): React.JSX.Element {
         options={{ title: t('more.subscreens.account') }}
       />
       <Stack.Screen
+        name="security-sessions"
+        options={{ title: t('more.subscreens.securitySessions') }}
+      />
+      <Stack.Screen
         name="privacy"
         options={{ title: t('more.subscreens.privacy') }}
       />
