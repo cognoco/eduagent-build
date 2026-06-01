@@ -41,6 +41,8 @@ import {
   getBooksResponseSchema,
   bookDeleteSchema,
   deleteBookResponseSchema,
+  subjectIdParamSchema,
+  deleteSubjectResponseSchema,
   bookSessionSchema,
   getBookSessionsResponseSchema,
   subjectSessionSchema,
@@ -891,6 +893,41 @@ describe('deleteBookResponseSchema', () => {
       startedTopicCount: 0,
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('subjectIdParamSchema', () => {
+  it('accepts a UUID subject id param', () => {
+    expect(subjectIdParamSchema.parse({ id: UUID })).toEqual({ id: UUID });
+  });
+
+  it('rejects a malformed subject id param', () => {
+    expect(subjectIdParamSchema.safeParse({ id: 'not-a-uuid' }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('deleteSubjectResponseSchema', () => {
+  it('accepts a successful subject delete response', () => {
+    expect(
+      deleteSubjectResponseSchema.parse({
+        deleted: true,
+        subjectId: UUID,
+      }),
+    ).toEqual({
+      deleted: true,
+      subjectId: UUID,
+    });
+  });
+
+  it('rejects deleted=false', () => {
+    expect(
+      deleteSubjectResponseSchema.safeParse({
+        deleted: false,
+        subjectId: UUID,
+      }).success,
+    ).toBe(false);
   });
 });
 

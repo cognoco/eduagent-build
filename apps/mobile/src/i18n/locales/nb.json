@@ -964,7 +964,19 @@
       "archive": "Arkiver",
       "resume": "Gjenoppta",
       "restore": "Gjenopprett",
-      "updateErrorTitle": "Kunne ikke oppdatere emne"
+      "updateErrorTitle": "Kunne ikke oppdatere emne",
+      "delete": "Slett",
+      "deleting": "Sletter ...",
+      "deleteConfirmTitle": "Slette {{subject}}?",
+      "deleteConfirmMessage": "Dette sletter {{subject}} permanent, inkludert {{books}}, {{startedTopics}} og {{sessions}} med læringshistorikk. Dette kan ikke angres.",
+      "deleteConfirmAction": "Slett",
+      "deleteScopeBooks_one": "{{count}} bok",
+      "deleteScopeBooks_other": "{{count}} bøker",
+      "deleteScopeStartedTopics_one": "{{count}} påbegynt emne",
+      "deleteScopeStartedTopics_other": "{{count}} påbegynte emner",
+      "deleteScopeSessions_one": "{{count}} økt",
+      "deleteScopeSessions_other": "{{count}} økter",
+      "deleteErrorTitle": "Kunne ikke slette emnet"
     },
     "shelf": {
       "missingParam": "Mangler emne. Gå tilbake og prøv igjen.",

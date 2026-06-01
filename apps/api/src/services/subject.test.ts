@@ -1,24 +1,11 @@
-import { createDatabaseModuleMock } from '../test-utils/database-module';
-
-const mockDatabaseModule = createDatabaseModuleMock({
-  includeActual: true,
-  exports: {
-    createScopedRepository: jest.fn(),
-  },
-});
-
-jest.mock(
-  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
-  () => mockDatabaseModule.module,
-);
-
 import type { Database } from '@eduagent/database';
-import { createScopedRepository } from '@eduagent/database';
+import { SubjectNotFoundError } from '@eduagent/schemas';
 import {
   listSubjects,
   createSubject,
   getSubject,
   updateSubject,
+  deleteSubject,
   archiveInactiveSubjects,
   createSubjectWithStructure,
 } from './subject';
@@ -89,6 +76,37 @@ function mockBookRow(
   };
 }
 
+type SubjectRow = ReturnType<typeof mockSubjectRow>;
+
+type ScopedRepoSetup = {
+  findManyResult?: SubjectRow[];
+  findFirstResult?: SubjectRow;
+  findManyMock?: jest.Mock;
+  findFirstMock?: jest.Mock;
+};
+
+let nextScopedRepoSetup: ScopedRepoSetup = {};
+
+function setupScopedRepo(options: ScopedRepoSetup = {}) {
+  nextScopedRepoSetup = options;
+}
+
+function createSubjectQueryMocks() {
+  const setup = nextScopedRepoSetup;
+  nextScopedRepoSetup = {};
+  return {
+    findMany:
+      setup.findManyMock ??
+      jest.fn().mockResolvedValue(setup.findManyResult ?? []),
+    findFirst:
+      setup.findFirstMock ?? jest.fn().mockResolvedValue(setup.findFirstResult),
+  };
+}
+
+afterEach(() => {
+  nextScopedRepoSetup = {};
+});
+
 function createMockDb({
   insertReturning = [] as ReturnType<typeof mockSubjectRow>[],
   updateReturning = [] as ReturnType<typeof mockSubjectRow>[],
@@ -99,6 +117,7 @@ function createMockDb({
 } = {}): Database {
   return {
     query: {
+      subjects: createSubjectQueryMocks(),
       curriculumBooks: {
         findFirst: jest.fn().mockResolvedValue(readyBook),
         findMany: jest.fn().mockResolvedValue(readyBooks),
@@ -121,18 +140,6 @@ function createMockDb({
       }),
     }),
   } as unknown as Database;
-}
-
-function setupScopedRepo({
-  findManyResult = [] as ReturnType<typeof mockSubjectRow>[],
-  findFirstResult = undefined as ReturnType<typeof mockSubjectRow> | undefined,
-} = {}) {
-  (createScopedRepository as jest.Mock).mockReturnValue({
-    subjects: {
-      findMany: jest.fn().mockResolvedValue(findManyResult),
-      findFirst: jest.fn().mockResolvedValue(findFirstResult),
-    },
-  });
 }
 
 function extractSqlTextAndValues(
@@ -240,27 +247,27 @@ describe('listSubjects', () => {
 
   it('filters by active status by default', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      subjects: { findMany },
-    });
+    setupScopedRepo({ findManyMock: findMany });
     const db = createMockDb();
     await listSubjects(db, profileId);
 
     // Should pass a SQL where clause (not undefined)
     expect(findMany).toHaveBeenCalledTimes(1);
-    expect(findMany.mock.calls[0][0]).not.toBeUndefined();
+    expect(findMany.mock.calls[0][0]?.where).not.toBeUndefined();
   });
 
   it('passes no status filter when includeInactive is true', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      subjects: { findMany },
-    });
+    setupScopedRepo({ findManyMock: findMany });
     const db = createMockDb();
     await listSubjects(db, profileId, { includeInactive: true });
 
     expect(findMany).toHaveBeenCalledTimes(1);
-    expect(findMany.mock.calls[0][0]).toBeUndefined();
+    expect(findMany.mock.calls[0][0]?.where).toBeDefined();
+    const whereValues = extractSqlTextAndValues(
+      findMany.mock.calls[0][0].where,
+    );
+    expect(whereValues).not.toContain('active');
   });
 
   it('returns subjects ordered by updatedAt descending', async () => {
@@ -395,6 +402,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
 
     const db = {
       query: {
+        subjects: createSubjectQueryMocks(),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
@@ -555,12 +563,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
 
   it('[WI-78 review] takes the subject-name lock before finding or creating a focused subject', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      subjects: {
-        findMany,
-        findFirst: jest.fn(),
-      },
-    });
+    setupScopedRepo({ findManyMock: findMany });
     const db = createFocusedBookDb();
 
     await createSubjectWithStructure(db, uuidProfileId, {
@@ -582,16 +585,11 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
       profileId: uuidProfileId,
       name: 'Botany',
     });
-    const findMany = jest.fn((whereClause: unknown) => {
-      const values = extractSqlTextAndValues(whereClause);
+    const findMany = jest.fn((options?: { where?: unknown }) => {
+      const values = extractSqlTextAndValues(options?.where);
       return Promise.resolve(values.includes('botany') ? [subjectRow] : []);
     });
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      subjects: {
-        findMany,
-        findFirst: jest.fn(),
-      },
-    });
+    setupScopedRepo({ findManyMock: findMany });
     const db = createFocusedBookDb({ subjectRow });
 
     await createSubjectWithStructure(db, uuidProfileId, {
@@ -599,7 +597,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
       focus: 'Tea',
     });
 
-    const values = extractSqlTextAndValues(findMany.mock.calls[0]?.[0]);
+    const values = extractSqlTextAndValues(findMany.mock.calls[0]?.[0]?.where);
     expect(values).toContain('botany');
     expect(values).not.toContain(' botany ');
   });
@@ -824,6 +822,72 @@ describe('updateSubject', () => {
 
     expect(result).not.toBeNull();
     expect(result!.name).toBe('Updated Name');
+  });
+});
+
+describe('deleteSubject', () => {
+  function createDeleteMockDb(): Database & {
+    delete: jest.Mock;
+    deleteWhere: jest.Mock;
+    deleteReturning: jest.Mock;
+  } {
+    const deleteReturning = jest.fn().mockResolvedValue([]);
+    const deleteWhere = jest.fn().mockReturnValue({
+      returning: deleteReturning,
+    });
+    const db = {
+      delete: jest.fn().mockReturnValue({
+        where: deleteWhere,
+      }),
+    } as unknown as Database & {
+      delete: jest.Mock;
+      deleteWhere: jest.Mock;
+      deleteReturning: jest.Mock;
+    };
+    db.deleteWhere = deleteWhere;
+    db.deleteReturning = deleteReturning;
+    return db;
+  }
+
+  it('throws SubjectNotFoundError when the atomic delete matches no subject', async () => {
+    const db = createDeleteMockDb();
+
+    await expect(
+      deleteSubject(db, profileId, uuidSubjectId),
+    ).rejects.toBeInstanceOf(SubjectNotFoundError);
+
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db.deleteWhere).toHaveBeenCalledTimes(1);
+    expect(db.deleteReturning).toHaveBeenCalledTimes(1);
+  });
+
+  it('hard-deletes only the active profile subject and returns a typed success envelope', async () => {
+    const db = createDeleteMockDb();
+    db.deleteReturning.mockResolvedValueOnce([{ id: uuidSubjectId }]);
+
+    await expect(
+      deleteSubject(db, uuidProfileId, uuidSubjectId),
+    ).resolves.toEqual({
+      deleted: true,
+      subjectId: uuidSubjectId,
+    });
+
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db.deleteWhere).toHaveBeenCalledTimes(1);
+    expect(db.deleteReturning).toHaveBeenCalledTimes(1);
+    const whereValues = extractSqlTextAndValues(
+      db.deleteWhere.mock.calls[0]![0],
+    );
+    expect(whereValues).toContain(uuidSubjectId.toLowerCase());
+    expect(whereValues).toContain(uuidProfileId.toLowerCase());
+  });
+
+  it('repeat delete returns not-found semantics instead of a second success', async () => {
+    const db = createDeleteMockDb();
+
+    await expect(
+      deleteSubject(db, uuidProfileId, uuidSubjectId),
+    ).rejects.toBeInstanceOf(SubjectNotFoundError);
   });
 });
 

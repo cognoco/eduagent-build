@@ -23,7 +23,8 @@ import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
 import { deriveRetentionStatus, RETENTION_ORDER } from '../lib/retention-utils';
-import type { RetentionStatus } from '@eduagent/schemas';
+import type { KnowledgeInventory, RetentionStatus } from '@eduagent/schemas';
+import { useProgressInventory } from './use-progress';
 
 // ---------------------------------------------------------------------------
 // Retention API shape
@@ -93,6 +94,11 @@ export function useLibraryRetention(): UseQueryResult<LibraryRetentionResponse> 
     enabled: !!activeProfile,
     retry: false,
   });
+}
+
+// Facade: library manage-sheet reads inventory counts through the library surface.
+export function useLibraryProgressInventory(): UseQueryResult<KnowledgeInventory> {
+  return useProgressInventory();
 }
 
 // ---------------------------------------------------------------------------

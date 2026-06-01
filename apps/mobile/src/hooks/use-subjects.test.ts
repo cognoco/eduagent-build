@@ -9,6 +9,7 @@ import {
   useSubjects,
   useCreateSubject,
   useUpdateSubject,
+  useDeleteSubject,
 } from './use-subjects';
 
 const mockFetch = jest.fn();
@@ -253,5 +254,35 @@ describe('useUpdateSubject', () => {
     expect(result.current.data).toEqual({
       subject: { id: 's1', name: 'Calculus', status: 'archived' },
     });
+  });
+});
+
+describe('useDeleteSubject', () => {
+  it('sends DELETE /subjects/:id and invalidates subject, curriculum, library, and progress data', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ deleted: true, subjectId: 's1' }), {
+        status: 200,
+      }),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useDeleteSubject(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ subjectId: 's1' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe('DELETE');
+    expect(result.current.data).toEqual({ deleted: true, subjectId: 's1' });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['curriculum'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['library'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
   });
 });

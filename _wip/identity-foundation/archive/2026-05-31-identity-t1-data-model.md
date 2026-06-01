@@ -3,8 +3,24 @@ title: Identity Redesign — T1 Data Model — Implementation Plan
 date: 2026-05-31
 profile: change
 spec: docs/plans/2026-05-31-identity-org-membership-redesign.md
-status: implemented
+status: superseded
+superseded_on: 2026-06-01
+superseded_by: pre-launch clean-cut decision — see _wip/identity-foundation/
 ---
+
+> # ⛔ SUPERSEDED — DO NOT FOLLOW / DO NOT BUILD ON
+>
+> **Decided 2026-06-01:** a pre-launch **clean-cut** foundation rebuild replaces this. The additive
+> `organizations` / `memberships` / `clerk_user_id` schema, migration **`0106`**, and the backfill
+> described here **were implemented and merged (PR #668)** but sit on the **rejected** incremental
+> approach and are **slated for a forward-only revert**.
+>
+> ⚠️ **Do not delete migration `0106` in isolation** — it is committed *and* applied to the shared
+> DBs. Reverting means a new forward drop-migration, or folding the un-apply into the clean re-baseline.
+> Deleting an applied migration recreates the exact ledger-drift this plan itself fought.
+>
+> Kept as a decision record + discussion input only. The schema shapes here are **not approved
+> design**. Live work: `_wip/identity-foundation/`.
 
 # Identity Redesign — T1 Data Model
 

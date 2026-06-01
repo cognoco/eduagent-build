@@ -989,7 +989,19 @@
       "archive": "Archiwizuj",
       "resume": "Wznów",
       "restore": "Przywróć",
-      "updateErrorTitle": "Nie można zaktualizować przedmiotu"
+      "updateErrorTitle": "Nie można zaktualizować przedmiotu",
+      "delete": "Usuń",
+      "deleting": "Usuwanie...",
+      "deleteConfirmTitle": "Usunąć {{subject}}?",
+      "deleteConfirmMessage": "Spowoduje to trwałe usunięcie {{subject}}, w tym {{books}}, {{startedTopics}} i {{sessions}} z historią nauki. Tej operacji nie można cofnąć.",
+      "deleteConfirmAction": "Usuń",
+      "deleteScopeBooks_one": "{{count}} książka",
+      "deleteScopeBooks_other": "{{count}} książek",
+      "deleteScopeStartedTopics_one": "{{count}} rozpoczęty temat",
+      "deleteScopeStartedTopics_other": "{{count}} rozpoczętych tematów",
+      "deleteScopeSessions_one": "{{count}} sesja",
+      "deleteScopeSessions_other": "{{count}} sesji",
+      "deleteErrorTitle": "Nie udało się usunąć tematu"
     },
     "row": {
       "finished": "Ukończone",

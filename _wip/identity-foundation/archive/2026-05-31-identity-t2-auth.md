@@ -3,9 +3,21 @@ title: Identity Redesign — T2 Identity / Auth — Implementation Plan
 date: 2026-05-31
 profile: change
 spec: docs/plans/2026-05-31-identity-org-membership-redesign.md
-status: draft
+status: superseded
+superseded_on: 2026-06-01
+superseded_by: pre-launch clean-cut decision — see _wip/identity-foundation/
 revision: v2 — hardened against adversarial review (chain-interaction findings CRITICAL-1, HIGH-1/2, MEDIUM-1/2/3, LOW-1)
 ---
+
+> # ⛔ SUPERSEDED — DO NOT FOLLOW THIS PLAN
+>
+> **Decided 2026-06-01:** rejected along with the rest of the incremental / flag-gated approach
+> (see the program plan). T2 was a **draft, never executed** — no T2 code shipped.
+>
+> Kept for the decision record and for the **adversarial edge-cases it documents** (headerless
+> mis-scoping, the provision-exempt redeem path, proxy-guard `isOwner ≠ proxy`), which remain useful
+> *lessons* for whatever the clean-cut design becomes — but the model, flows, and flag mechanics here
+> are **not approved design**. Live work: `_wip/identity-foundation/`.
 
 # Identity Redesign — T2 Identity / Auth
 

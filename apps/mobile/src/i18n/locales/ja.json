@@ -964,7 +964,19 @@
       "archive": "アーカイブ",
       "resume": "再開",
       "restore": "復元",
-      "updateErrorTitle": "科目を更新できませんでした"
+      "updateErrorTitle": "科目を更新できませんでした",
+      "delete": "削除",
+      "deleting": "削除中...",
+      "deleteConfirmTitle": "{{subject}}を削除しますか？",
+      "deleteConfirmMessage": "{{subject}}を完全に削除します。これには、{{books}}、{{startedTopics}}、学習履歴を含む{{sessions}}が含まれます。この操作は元に戻せません。",
+      "deleteConfirmAction": "削除",
+      "deleteScopeBooks_one": "{{count}}冊の本",
+      "deleteScopeBooks_other": "{{count}}冊の本",
+      "deleteScopeStartedTopics_one": "{{count}}件の開始済みトピック",
+      "deleteScopeStartedTopics_other": "{{count}}件の開始済みトピック",
+      "deleteScopeSessions_one": "{{count}}件のセッション",
+      "deleteScopeSessions_other": "{{count}}件のセッション",
+      "deleteErrorTitle": "科目を削除できませんでした"
     },
     "shelf": {
       "missingParam": "科目がありません。戻って、もう一度お試しください。",

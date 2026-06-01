@@ -964,7 +964,19 @@
       "archive": "Archivieren",
       "resume": "Fortsetzen",
       "restore": "Wiederherstellen",
-      "updateErrorTitle": "Fach konnte nicht aktualisiert werden"
+      "updateErrorTitle": "Fach konnte nicht aktualisiert werden",
+      "delete": "Löschen",
+      "deleting": "Wird gelöscht...",
+      "deleteConfirmTitle": "{{subject}} löschen?",
+      "deleteConfirmMessage": "Dadurch werden {{subject}} und alle zugehörigen Daten, einschließlich {{books}}, {{startedTopics}} und {{sessions}} mit Lernverlauf, dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "deleteConfirmAction": "Löschen",
+      "deleteScopeBooks_one": "{{count}} Buch",
+      "deleteScopeBooks_other": "{{count}} Bücher",
+      "deleteScopeStartedTopics_one": "{{count}} begonnenes Thema",
+      "deleteScopeStartedTopics_other": "{{count}} begonnene Themen",
+      "deleteScopeSessions_one": "{{count}} Sitzung",
+      "deleteScopeSessions_other": "{{count}} Sitzungen",
+      "deleteErrorTitle": "Thema konnte nicht gelöscht werden"
     },
     "row": {
       "finished": "Fertig",
