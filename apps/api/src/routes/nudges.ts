@@ -36,13 +36,14 @@ export const nudgeRoutes = new Hono<NudgeRouteEnv>()
     const db = c.get('db');
     const input = c.req.valid('json');
     // [WI-159 / DS-070] Guardian-to-learner sends remain owner-only writes.
-    // Learner-to-guardian sends are the one nudge write initiated by a
-    // non-owner learner profile; service-layer family-link authorization still
-    // proves the sender/recipient pair before any row is written.
-    if (
-      input.direction === 'guardian_to_learner' ||
-      c.req.header('X-Proxy-Mode') === 'true'
-    ) {
+    // Learner-to-guardian sends are intentionally route-allowed from a normal
+    // non-owner learner profile: on the legacy account/profile model,
+    // profileMeta.isOwner=false is both a managed learner's own active profile
+    // and an explicit parent-proxy view. There is no server-verified explicit
+    // proxy bit yet, so do not read X-Proxy-Mode here as a security boundary.
+    // Service-layer family-link, direction/template, and consent checks still
+    // prove the sender/recipient pair before any row is written.
+    if (input.direction === 'guardian_to_learner') {
       assertNotProxyMode(c);
     }
     const result = await createNudge(db, {

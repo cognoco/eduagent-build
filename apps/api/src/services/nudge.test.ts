@@ -463,6 +463,30 @@ describe('createNudge', () => {
       // insert must never have been called
       expect(db.insert as jest.Mock).not.toHaveBeenCalled();
     });
+
+    it('[BREAK] rejects a learner attempting guardian-to-learner attribution', async () => {
+      mockAssertParentAccess.mockRejectedValue(
+        new ForbiddenError('You do not have access to this child profile.'),
+      );
+      const db = makeDb();
+
+      await expect(
+        createNudge(db, {
+          fromProfileId: TO_PROFILE_ID,
+          toProfileId: FROM_PROFILE_ID,
+          direction: 'guardian_to_learner',
+          template: 'you_got_this',
+          now: BASE_NOW,
+        }),
+      ).rejects.toThrow(ForbiddenError);
+
+      expect(mockAssertParentAccess).toHaveBeenCalledWith(
+        db,
+        TO_PROFILE_ID,
+        FROM_PROFILE_ID,
+      );
+      expect(db.insert as jest.Mock).not.toHaveBeenCalled();
+    });
   });
 
   // ── Consent gating ────────────────────────────────────────────────────────
