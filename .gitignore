@@ -94,10 +94,6 @@ temp/*
 .worktrees/
 .claude/worktrees/
 
-# Local work-in-progress notes / coordination artifacts
-_wip/
-_scratchpad.md
-
 # Local planning docs (Archon workflow plans, exploratory specs).
 # These often embed environment-specific URLs, project IDs, and other
 # infra hints that should not be tracked. Force-add (`git add -f`) if
