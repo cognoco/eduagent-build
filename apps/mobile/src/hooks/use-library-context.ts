@@ -96,7 +96,7 @@ export function useLibraryRetention(): UseQueryResult<LibraryRetentionResponse> 
   });
 }
 
-// Facade: library manage-sheet needs inventory counts before a narrow endpoint exists.
+// Facade: library manage-sheet reads inventory counts through the library surface.
 export function useLibraryProgressInventory(): UseQueryResult<KnowledgeInventory> {
   return useProgressInventory();
 }

@@ -247,7 +247,9 @@ interface RouteOptions {
   progressError?: boolean;
   retention?: RetentionPayload;
   inventory?: unknown;
+  inventoryLoading?: boolean;
   allBooks?: LibraryBooksPayload;
+  allBooksLoading?: boolean;
   allBooksError?: boolean;
   search?: unknown;
   /** Sessions surfaced by useFailedFreeformLibraryFilingSessions. */
@@ -379,7 +381,9 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
     '/progress/overview': opts.progressError
       ? () => errorResponse()
       : progressBody,
-    '/progress/inventory': inventoryBody,
+    '/progress/inventory': opts.inventoryLoading
+      ? () => NEVER()
+      : inventoryBody,
     '/sessions/': (url: string) => {
       const id = url.split('/sessions/')[1]?.split(/[?/]/)[0] ?? '';
       const meta = failedById.get(id);
@@ -408,7 +412,11 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
       };
     },
     '/library/retention': retentionBody,
-    '/library/books': opts.allBooksError ? () => errorResponse() : allBooksBody,
+    '/library/books': opts.allBooksLoading
+      ? () => NEVER()
+      : opts.allBooksError
+        ? () => errorResponse()
+        : allBooksBody,
     '/library/search': opts.search ?? {
       subjects: [],
       books: [],
@@ -1144,6 +1152,25 @@ describe('LibraryScreen', () => {
         { cancelable: true },
       );
     });
+
+    it.each([
+      ['books', { allBooksLoading: true }],
+      ['inventory', { inventoryLoading: true }],
+    ] satisfies Array<[string, RouteOptions]>)(
+      'keeps delete disabled while %s deletion-scope data loads',
+      async (_label, loadingRouteOptions) => {
+        active = mount({ ...deleteScopeOptions(), ...loadingRouteOptions });
+        await waitFor(() => {
+          active!.result.getByTestId('manage-subjects-button');
+        });
+
+        fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+        const deleteButton = active.result.getByTestId('delete-subject-sub-1');
+
+        expect(deleteButton).toBeDisabled();
+        expect(platformAlertMock).not.toHaveBeenCalled();
+      },
+    );
 
     it('does not call delete when the confirmation is cancelled', async () => {
       active = mount(deleteScopeOptions());

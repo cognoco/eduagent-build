@@ -280,6 +280,8 @@ function LibraryScreenContent({
   );
 
   const progressInventoryQuery = useLibraryProgressInventory();
+  const isDeleteScopeReady =
+    allBooksQuery.isSuccess && progressInventoryQuery.isSuccess;
   const inventoryBySubjectId = useMemo(
     () =>
       new Map(
@@ -504,6 +506,7 @@ function LibraryScreenContent({
     (subject: Subject): void => {
       if (!canWrite) return;
       if (subjectActionInFlightRef.current) return;
+      if (!isDeleteScopeReady) return;
 
       const { bookCount, startedTopicCount, sessionCount } =
         getSubjectDeleteScope(subject);
@@ -536,7 +539,13 @@ function LibraryScreenContent({
         { cancelable: true },
       );
     },
-    [canWrite, getSubjectDeleteScope, handleConfirmDeleteSubject, t],
+    [
+      canWrite,
+      getSubjectDeleteScope,
+      handleConfirmDeleteSubject,
+      isDeleteScopeReady,
+      t,
+    ],
   );
 
   // ---- Determine which shelves are visible (search filtering) -------------
@@ -1252,6 +1261,8 @@ function LibraryScreenContent({
                 const isPending = pendingSubjectId === subject.id;
                 const isDeleting = isPending && deleteSubject.isPending;
                 const isSavingAnySubject = pendingSubjectId !== null;
+                const isDeleteDisabled =
+                  isSavingAnySubject || !canWrite || !isDeleteScopeReady;
                 return (
                   <View
                     key={subject.id}
@@ -1341,9 +1352,9 @@ function LibraryScreenContent({
                     </View>
                     <Pressable
                       onPress={() => handleDeleteSubjectPress(subject)}
-                      disabled={isSavingAnySubject || !canWrite}
+                      disabled={isDeleteDisabled}
                       className={
-                        isSavingAnySubject || !canWrite
+                        isDeleteDisabled
                           ? 'mt-2 rounded-button border border-danger/20 bg-danger/5 py-2.5 items-center opacity-60'
                           : 'mt-2 rounded-button border border-danger/30 bg-danger/10 py-2.5 items-center'
                       }

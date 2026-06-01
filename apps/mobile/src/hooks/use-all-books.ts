@@ -34,6 +34,7 @@ export interface EnrichedBook {
 export function useAllBooks(): {
   books: EnrichedBook[];
   isLoading: boolean;
+  isSuccess: boolean;
   isError: boolean;
   refetch: () => void;
 } {
@@ -86,6 +87,7 @@ export function useAllBooks(): {
   return {
     books,
     isLoading: libraryBooksQuery.isLoading,
+    isSuccess: libraryBooksQuery.isSuccess,
     isError: libraryBooksQuery.isError,
     refetch,
   };
