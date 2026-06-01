@@ -27,7 +27,8 @@ its glossary from*. It is the referee that stops the term-drift the three stream
 divergence; when it diverges, record why.* This converts vocabulary fights from taste ("what should
 we call it") into tests ("does the standard term fit — yes/no").
 
-**Decision legend:** **[PROPOSED]** my recommended canonical pick (grill confirms/overrides) ·
+**Decision legend:** **[✅ RATIFIED]** decided in Grill #1 (trail in §R) · **[PROPOSED]** original strawman
+pick, now superseded by the ratified outcome · **[HOT]** *(historical)* was a live conflict ·
 **[HOT]** a live conflict that must be decided in the grill · **[ALIGNED]** sources already agree,
 low-risk · **[DEFER]** real decision, but downstream of this ontology (parked, not dropped).
 
@@ -76,13 +77,14 @@ Decisions land here as they're ruled, newest first. The §0 table and §1–§4 
     access — **not** a role; `Billing Contact` was the conventional alt, `Payer` kept for the ≥18-responsibility
     semantics). Act-for-a-child → **Guardianship** edge (never part of `admin`; `isOwner` never *was*
     guardianship — corrected).
-  - **Membership carries a role SET `{admin, mentor, learner}`** — any combination, mostly any age.
-    `student` → **`learner`** (app-consistent, age-neutral, off the legacy `_Avoid_` list). `learner` is the
-    marker that **activates the core learning surface**; self-ownership of one's own data is **intrinsic to
-    Person** and needs no role. **Not auto-mandatory.** **Invariant: the first member of an Organization is an
-    `admin`;** learning-roles are chosen at onboarding (mentor / learner / both).
-  - **`mentor` = the HUMAN supervisory role**; the **AI is rebranded "Mate" / "AI Mate"** (MentoMATE) — see
-    CLEANUP-2. Mentor data-visibility is **edge-scoped** to specific mentees, **never** org-wide.
+  - **Membership carries a role SET `{admin, learner}`** — any combination, mostly any age. `student` →
+    **`learner`** (app-consistent, age-neutral, off the legacy `_Avoid_` list). `learner` is the marker that
+    **activates the core learning surface**; self-ownership of one's own data is **intrinsic to Person** and
+    needs no role. **Not auto-mandatory.** **Invariant: the first member of an Organization is an `admin`;** at
+    onboarding a new adult chooses whether to learn (`learner`) and/or to mentor (a **capacity**, below).
+  - **`mentor` is the HUMAN supervisory *capacity*** (an edge-end, **not** a role — see the capacity entry
+    above); the **AI is rebranded "Mate" / "AI Mate"** (MentoMATE) — see CLEANUP-2. Mentor data-visibility is
+    **edge-scoped** to specific mentees, **never** org-wide.
   - **Guardianship is a relationship/record, NOT a role (C3).** It records that an adult gave verifiable
     consent for a consent-gated learner → a **Guardian → charge** edge carrying the consent record. Far-end
     term: **`charge`** (formal/vernacular) ≡ **consent-gated learner** (technical synonym). Physical: edge
@@ -156,7 +158,7 @@ grounded, not remembered.
   CONTEXT.md:17) · `Learner` (CONTEXT uses it everywhere as the role-in-context) · `Ward`/`member`
   (doc 2, contextually).
 - **Standard name:** *User* / *Identity* / *Subject* (RBAC: the principal).
-- **Recommended canonical: `Person` [PROPOSED].** Keep **"Learner"** as a *context hat* (a Person
+- **Ratified canonical: `Person`.** Keep **"Learner"** as a *context hat* (a Person
   who is learning), not a synonym for the entity. **Retire bare `Profile`** as the human's name.
 - **Rationale / options:**
   - *Keep `Profile`* — pro: zero churn, the whole codebase + CONTEXT already says it; con: `Profile`
@@ -196,7 +198,7 @@ grounded, not remembered.
   `account` (code — `accounts` currently plays tenant + billing + login all at once) · "roster" /
   "group" / "tenant".
 - **Standard name:** **Organization** / Tenant (universal in B2B-SaaS).
-- **Recommended canonical: `Organization` [PROPOSED]**, thin; **"Family" is a user-facing *label* on
+- **Ratified canonical: `Organization`**, thin; **"Family" is a user-facing *label* on
   an Organization**, not a separate entity. Code `organizations` table exists already
   (`profiles.ts:145`, inert/T1) — clean-cut wires it for the first time.
 - **Rationale:** "family vs tutor roster vs school" must be org **data**, not schema. The danger is
@@ -205,39 +207,31 @@ grounded, not remembered.
   weigh in grill: do we even need a table pre-launch, or is org-of-one a derived construct until B2B?
   doc 2 §VI keeps the table deliberately for B2B optionality — that's the position to attack/confirm.)*
 
-### §1.4 — Subscription  **[ALIGNED]**
+### §1.4 — Subscription  **[✅ RATIFIED]**
 - **Definition:** entitlement + billing state, **attached to the Organization.** Carries the Payer.
 - **Labels:** `Subscription` (all sources) · code `subscriptions` keyed on `account_id`
   (`billing.ts:37-47`; `organization_id` backfilled-but-inert, ORG-04).
 - **Standard name:** Stripe **customer → subscription** (customer = org).
-- **Recommended canonical: `Subscription` on `Organization` [PROPOSED].** Low controversy; the only
+- **Ratified: `Subscription` on `Organization`.** Low controversy; the only
   live drift is the key migrating from `account_id` → org (ORG-09/RC-09).
 
-### §1.5 — Role  **[HOT — C2, C4]**
-- **Definition:** a capability-granting label carried by a Membership. The RBAC role set.
-- **Labels:** doc 2 = `{admin, mentor, student}` · **code enum = `['owner', 'mentor', 'student']`**
-  (`profiles.ts:44-48` — note **`owner`, not `admin`**) · CONTEXT = `Owner`/`Child Profile` via the
-  `isOwner` boolean (CONTEXT.md:23-31), `student`/`learner` under `_Avoid_` (CONTEXT.md:31).
-- **Standard name:** RBAC **Role** → Permission mapping (kept as *data*, not `if (isOwner)`).
-- **Recommended canonical: role set `{admin, mentor, student}` [PROPOSED]**, where:
-  - **`admin`** = org management (members/invites/settings/billing-admin). **Replaces code `owner`**
-    (C2). Age-agnostic. Can be held by >1 Person; transferable.
-  - **`mentor`** = *may* mentor in this org; **data-visibility is edge-scoped** to linked mentees,
-    never org-wide (the role alone leaks nothing).
-  - **`student`** = "this member learns here." **Capability-light marker** (seat-counting / who-the-
-    org-serves), grants nothing beyond intrinsic self-ownership (C4).
-- **Rationale / the two live questions:**
-  - **C2 (`owner`→`admin`):** "owner" is the fused-model fossil (one flag = billing + management +
-    act-for-child, RC-01/PPA-R02). Splitting it three ways (admin / Payer / guardianship) is the core
-    cure; `admin` is the standard name for the management slice. The code enum's `owner` is **drift to
-    correct**, not precedent.
-  - **C4 (`student` mandatory?):** doc 2 makes `{student}` auto-created on every member; a CHECK
-    comment objects ("every user MUST be a student turns role design upside down… what if someone
-    signs up explicitly to be a mentor/parent?"). **Recommend: `student` is NOT auto-mandatory** —
-    an adult who joins only to mentor/pay/guard is `{}`-on-learning, `{mentor}` or `admin`+Payer. Self
-    *ownership* of one's own data is **intrinsic to Person** (needs no role), so a learner needs no
-    `student` role to own their work; `student` only marks org-level learner-seat membership. This
-    also fixes the "must I be a student to exist?" awkwardness.
+### §1.5 — Role  **[✅ RATIFIED — C2, C4]**
+- **Definition:** a capability label carried by a Membership — the RBAC role set. **Ratified set: `{admin,
+  learner}`** (only these two are roles; `mentor`/`guardian` are **capacities** on edges, §2.2/§2.3).
+- **Labels (sources, all superseded):** doc 2 = `{admin, mentor, student}` · code enum = `['owner', 'mentor',
+  'student']` (`profiles.ts:44-48`, note `owner` not `admin`) · CONTEXT = `Owner`/`Child Profile` via `isOwner`.
+- **Standard name:** RBAC **Role → Permission** (kept as *data*, not `if (isOwner)`).
+- **Ratified:**
+  - **`admin`** = org management (members/invites/settings/billing-admin). **Replaces code `owner`** (C2).
+    Age-agnostic; ≥1 per org; transferable; >1 allowed. **No** learning-data access without an edge.
+  - **`learner`** = "this member learns here" — the marker that **activates the learning surface** (`student`
+    → `learner`, C4). Capability-light: self-ownership is **intrinsic to Person**, so `learner` grants nothing
+    beyond it; it marks active participation + learner-seat counting. **Not auto-mandatory.**
+  - `mentor` is **not a role** — it is a **capacity** on a Mentorship edge (§2.3); `owner` is **dissolved**
+    (→ admin / Payer / Guardianship).
+- **Why (C2/C4):** `owner` was the fused fossil (RC-01/PPA-R02), split three ways. `student`→`learner`, and
+  non-mandatory because an adult who only mentors/pays/guards carries **no** learning role — their power is a
+  capacity (mentor) or a Subscription field (Payer), not a `learner` role.
 
 ---
 
@@ -245,16 +239,15 @@ grounded, not remembered.
 
 Where the model lives. Membership grants *existence-visibility* only; **data access is edge-derived.**
 
-### §2.1 — Membership  **[ALIGNED on shape; carries C2/C4]**
-- **Definition:** the M:N link **Person ↔ Organization**, carrying a **role set** (§1.5). Grants
-  "you can see who is in this org," nothing more.
+### §2.1 — Membership  **[✅ RATIFIED]**
+- **Definition:** the M:N link **Person ↔ Organization**, carrying the **role set `{admin, learner}`** (§1.5).
+  Grants **existence-visibility** only ("you can see who is in this org"), never learning-data access.
 - **Standard name:** **Membership** (carries roles) — universal.
-- **Code today:** `memberships(person_id, roles[])` (`profiles.ts:168-203`, inert) — and the *live*
-  substitute is `family_links` + `isOwner` (ORG-02, RC-01). Multi-org falls out of the M:N join for
-  free (ORG-08).
-- **[PROPOSED]** adopt as-is; the only decisions it carries are C2/C4 (its role-set contents).
+- **Code today:** `memberships(person_id, roles[])` (`profiles.ts:168-203`, inert) — live substitute is
+  `family_links` + `isOwner` (ORG-02, RC-01). Multi-org falls out of the M:N join (ORG-08).
+- **Ratified:** first member of an org is `admin`; supervisory ties (mentor/guardian) are **edges, not roles**.
 
-### §2.2 — Guardianship  **[HOT — C3, C5]**
+### §2.2 — Guardianship  **[✅ RATIFIED — C3]**
 - **Definition:** a **dyadic edge** asserting an adult holds **consent authority / act-for rights**
   over a (typically below-consent-age or credential-less) Person. Carries the **Consent record**.
 - **Labels:** `Guardianship edge` (doc 2 §III.3) · but doc 2 §IV *also* lists "Guardian" as a
@@ -262,8 +255,8 @@ Where the model lives. Membership grants *existence-visibility* only; **data acc
   (`profiles.ts:284-311`) + `consent_states` (`profiles.ts:313-376`) · CONTEXT.md:26 calls "guardian"
   a **retired** label.
 - **Standard name:** none — **domain-specific** (this is the non-standard half; no IdP/RBAC models it).
-- **Recommended canonical: Guardianship is an EDGE, never a role [PROPOSED].**
-- **Rationale (C3):** consent is "*guardian G consented for ward W, policy V, time T, revocable*" — a
+- **Ratified: Guardianship is an EDGE, never a role.**
+- **Rationale (C3):** consent is "*guardian G consented for charge W, policy V, time T, revocable*" — a
   **per-pair** fact. One parent with three children has three independently-revocable records; an
   org-wide role cannot express that (doc 2 §III.3). So it is structurally an edge. doc 2 §IV's
   "Guardian column" is a **presentation convenience that leaked into the role model** — the grill
@@ -271,39 +264,28 @@ Where the model lives. Membership grants *existence-visibility* only; **data acc
   despite the earlier rule" — the rule wins; the column is the bug.) Note CONTEXT.md:26 "retired
   guardian" is about the old *tab-shape* label, **not** this consent relationship — a name collision
   to disambiguate, not a reason to avoid the word.
-- **C5 (ward vs mentee):** see §2.3.
+- **Far-end = `charge`**; the mentorship far-end = `mentee` (§2.3).
 
-### §2.3 — Mentorship  **[HOT — C5]**
-- **Definition:** a **dyadic edge** granting a mentor **scoped visibility/help** for **one specific
-  mentee** — never org-wide. Carries **no** consent authority.
-- **Labels:** doc 2 = a `mentor` role + "edge to that one mentee" · code = `family_links` (mentor is
-  backfilled *from* it, RC-03) · "tutor".
-- **Standard name:** none generic; closest is a scoped ReBAC relationship ("mentor-of").
-- **The C5 decision — one relationship or two?**
-  - *Option A — two distinct edges* (doc 2): **Guardianship** (consent authority, adult→ward) and
-    **Mentorship** (visibility only, any-age→mentee) are different things with different rules.
-    Pro: each carries exactly its own semantics; an adult tutor (mentor, no consent power) and a
-    parent (guardian, consent power) are not conflated. Con: the CHECK's complaint — "ward and mentee
-    become two completely different entities… more complex than before."
-  - *Option B — one "supervision" edge with a type* (`{guardian|mentor}`): a single
-    **Supervised-By** edge shape, typed. Pro: one mechanism, simpler mental model, matches the CHECK's
-    "could simplify back to … a separate guardian/ward relationship." Con: risks re-fusing two things
-    with genuinely different legal weight (consent authority is adult-only + load-bearing; mentorship
-    is any-age + cosmetic-access) — the kind of fusion that caused today's drift.
-  - **Recommended: two edges, but presented as one "people who can see this Person's learning"
-    surface [PROPOSED].** Keep them structurally distinct (consent authority ≠ visibility), because
-    fusing legal consent with tutor-visibility is exactly the §III.3 trap — but unify them in the
-    *UI/derived-view* so the developer sees one "supervisors of X" list. This honours the CHECK's
-    simplicity instinct without re-fusing the load-bearing distinction. **This is the single most
-    important C5 call — grill it hard.**
+### §2.3 — Mentorship  **[✅ RATIFIED — C5]**
+- **Definition:** a **dyadic edge** granting a **mentor** (a capacity) **scoped visibility/help** for **one
+  specific mentee** — never org-wide. Carries **no** consent authority (**Layer 2**).
+- **Labels:** `mentor`/`mentee` are **capacities** (edge-ends), not roles · code = `family_links` (mentor
+  backfilled, RC-03) · "tutor".
+- **Standard name:** a scoped ReBAC relationship ("mentor-of").
+- **Ratified (C5):** **Guardianship and Mentorship are two distinct edges** — consent authority ≠ visibility;
+  fusing them is the §III.3 trap. `mentor`/`guardian` are **capacities, not roles** (symmetric: both are
+  edge-ends). **Authorization:** a Mentorship is granted by the **mentee if consent-capable**, else by the
+  **guardian** (for a charge); **graduation re-confirms** guardian-granted mentorships (§4.14–16). A
+  single-child mentor is **edge-only** (own org-of-one + cross-org edge) → never sees the family roster (fixes
+  RC-02/D2). UI may present guardian + mentor as one "supervisors of X" view **without** fusing the edges.
 
-### §2.4 — Payer  **[ALIGNED — C2 adjacent]**
+### §2.4 — Payer  **[✅ RATIFIED]**
 - **Definition:** the Person (**≥18**) responsible for a Subscription's billing. **A field on the
   Subscription, not a role and not a visibility grant.**
 - **Labels:** `payer_person_id` (doc 2) · today implicit in the account holder (`subscriptions.
   account_id`, no explicit payer).
 - **Standard name:** Stripe customer's billing contact.
-- **[PROPOSED]** `Subscription.payer_person_id`, invariant age ≥ 18, **no learning-data access**.
+- **Ratified:** `Subscription.payer_person_id`, invariant age ≥ 18, **no learning-data access**.
   Future B2B: add `payer_org_id` + "exactly one set" check (doc 2 §VI) — `[DEFER]`.
 
 ---
@@ -401,7 +383,7 @@ build. Ratified across Grill #1 — these are the **definition of "done"** the P
 | Credential | Clerk **User** | **adopt** | 1:1 with a Clerk User; Clerk = auth only |
 | Organization | **Organization / Tenant** | **adopt** | standard tenant; kept thin |
 | Membership | **Membership** (with roles) | **adopt** | M:N person↔org carrying roles |
-| Role `{admin,mentor,student}` | **RBAC Role → Permission** | **adopt** (drop `owner`) | roles as data, not `isOwner` |
+| Roles `{admin, learner}` | **RBAC Role → Permission** | **adopt** (drop `owner`/`mentor`) | roles as data; mentor/guardian are **capacities** (edges) |
 | Guardianship | — (none) | **diverge — domain-specific** | no IdP/RBAC models consent authority over a credential-less person |
 | Mentorship | scoped ReBAC relation | **diverge (light)** | edge-scoped visibility; no engine needed at v1 |
 | Subscription/Payer | Stripe customer→subscription | **adopt** | customer = org; payer = billing contact |
@@ -466,8 +448,8 @@ spike / a cleanup pass as noted.
   CONTEXT.md identity section (and adjacent example clauses) for old-fused-model reasoning when the role
   cluster lands. (Raised by PM, Grill #1 / C4b.)
 
-- **CLEANUP-2 — Rebrand the AI from "mentor" → "Mate"; `mentor` becomes the human role. [DECIDED, Grill #1]**
-  Resolution of the mentor collision: **`mentor` = the human supervisory role**; the **AI is the learner's
+- **CLEANUP-2 — Rebrand the AI from "mentor" → "Mate"; `mentor` becomes the human capacity. [DECIDED, Grill #1]**
+  Resolution of the mentor collision: **`mentor` = the human supervisory capacity**; the **AI is the learner's
   "Mate" / "AI Mate"** (leaning into MentoMATE). Consequence — a **copy sweep**: the ~70 user-facing strings
   in `apps/mobile/src/i18n/locales/en.json` that call the AI "mentor" ("your mentor", "Mentor memory",
   "Mentor language", "Tell Your Mentor", …) must be reworded to "Mate"/"your Mate". The human-overseer
