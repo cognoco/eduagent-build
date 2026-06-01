@@ -36,6 +36,7 @@ import { classifySubject } from '../services/subject-classify';
 import { notFound, apiError, SubjectNotFoundError } from '../errors';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { withProfile } from '../route-utils/route-context';
 
 type SubjectRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -173,8 +174,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       // [learn-3] Server-derived proxy-mode write guard; subject delete is
       // irreversible and must never be available from parent proxy sessions.
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { id } = c.req.valid('param');
       try {
         const result = await deleteSubject(db, profileId, id);
