@@ -244,6 +244,26 @@ export async function getWeeklyReportForProfile(
   return row ? mapWeeklyReportRow(row) : null;
 }
 
+// Self-view: the active profile marks its own weekly report as viewed.
+// Scoped on childProfileId = the active profile (the report's subject), mirroring
+// getWeeklyReportForProfile — so a learner can only mark reports about themselves,
+// never another profile's, even by guessing an ID.
+export async function markWeeklyReportViewedForProfile(
+  db: Database,
+  profileId: string,
+  reportId: string,
+): Promise<void> {
+  await db
+    .update(weeklyReports)
+    .set({ viewedAt: new Date() })
+    .where(
+      and(
+        eq(weeklyReports.id, reportId),
+        eq(weeklyReports.childProfileId, profileId),
+      ),
+    );
+}
+
 export async function getWeeklyReportForParentChild(
   db: Database,
   parentProfileId: string,

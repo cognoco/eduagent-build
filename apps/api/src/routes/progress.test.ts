@@ -122,8 +122,10 @@ jest.mock(
 
 const mockListMonthlyReports = jest.fn();
 const mockGetMonthlyReport = jest.fn();
+const mockMarkMonthlyReportViewed = jest.fn();
 const mockListWeeklyReports = jest.fn();
 const mockGetWeeklyReport = jest.fn();
+const mockMarkWeeklyReportViewed = jest.fn();
 
 jest.mock(
   '../services/monthly-report' /* gc1-allow: pattern-a conversion */,
@@ -137,6 +139,8 @@ jest.mock(
         mockListMonthlyReports(...args),
       getMonthlyReportForProfile: (...args: unknown[]) =>
         mockGetMonthlyReport(...args),
+      markMonthlyReportViewedForProfile: (...args: unknown[]) =>
+        mockMarkMonthlyReportViewed(...args),
     };
   },
 );
@@ -153,6 +157,8 @@ jest.mock(
         mockListWeeklyReports(...args),
       getWeeklyReportForProfile: (...args: unknown[]) =>
         mockGetWeeklyReport(...args),
+      markWeeklyReportViewedForProfile: (...args: unknown[]) =>
+        mockMarkWeeklyReportViewed(...args),
     };
   },
 );
@@ -774,6 +780,96 @@ describe('progress routes', () => {
       const res = await app.request(
         `/v1/progress/weekly-reports/${REPORT_ID}`,
         {},
+        TEST_ENV,
+      );
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // ---- POST /v1/progress/reports/:reportId/view ----------------------------
+  // Regression: this route was missing entirely, so the mobile self-view
+  // mark-viewed call 404'd silently. Reverting the route restores the 404.
+
+  describe('POST /v1/progress/reports/:reportId/view', () => {
+    it('returns 200 with { viewed: true } (route exists, not 404)', async () => {
+      mockMarkMonthlyReportViewed.mockResolvedValueOnce(undefined);
+
+      const res = await app.request(
+        `/v1/progress/reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ viewed: true });
+    });
+
+    it('passes the active profileId to the service (prevents cross-profile IDOR)', async () => {
+      mockMarkMonthlyReportViewed.mockResolvedValueOnce(undefined);
+
+      await app.request(
+        `/v1/progress/reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(mockMarkMonthlyReportViewed).toHaveBeenCalledTimes(1);
+      const [, profileIdArg, reportIdArg] =
+        mockMarkMonthlyReportViewed.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(reportIdArg).toBe(REPORT_ID);
+    });
+
+    it('returns 401 without auth', async () => {
+      const res = await app.request(
+        `/v1/progress/reports/${REPORT_ID}/view`,
+        { method: 'POST' },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // ---- POST /v1/progress/weekly-reports/:weeklyReportId/view ---------------
+  // Regression: this route was missing entirely, so the mobile self-view
+  // mark-viewed call 404'd silently. Reverting the route restores the 404.
+
+  describe('POST /v1/progress/weekly-reports/:weeklyReportId/view', () => {
+    it('returns 200 with { viewed: true } (route exists, not 404)', async () => {
+      mockMarkWeeklyReportViewed.mockResolvedValueOnce(undefined);
+
+      const res = await app.request(
+        `/v1/progress/weekly-reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ viewed: true });
+    });
+
+    it('passes the active profileId to the service (prevents cross-profile IDOR)', async () => {
+      mockMarkWeeklyReportViewed.mockResolvedValueOnce(undefined);
+
+      await app.request(
+        `/v1/progress/weekly-reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(mockMarkWeeklyReportViewed).toHaveBeenCalledTimes(1);
+      const [, profileIdArg, reportIdArg] =
+        mockMarkWeeklyReportViewed.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(reportIdArg).toBe(REPORT_ID);
+    });
+
+    it('returns 401 without auth', async () => {
+      const res = await app.request(
+        `/v1/progress/weekly-reports/${REPORT_ID}/view`,
+        { method: 'POST' },
         TEST_ENV,
       );
       expect(res.status).toBe(401);

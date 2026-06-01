@@ -12,6 +12,7 @@ import { SchemaDriftError } from '@eduagent/schemas';
 import {
   generateWeeklyReportData,
   getWeeklyReportForProfile,
+  markWeeklyReportViewedForProfile,
 } from './weekly-report';
 import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 
@@ -125,6 +126,49 @@ describe('getWeeklyReportForProfile', () => {
 
     const findFirst = db.query.weeklyReports.findFirst as jest.Mock;
     const params = extractDrizzleParamValues(findFirst.mock.calls[0]?.[0]);
+    expect(params).toEqual(expect.arrayContaining([UUID.report, UUID.child]));
+    expect(params).not.toContain(UUID.parent);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// markWeeklyReportViewedForProfile — self-view DB update + scoping break test
+// Regression: the self-view POST route was missing, so the mobile mark-viewed
+// call 404'd silently. This service now backs
+// POST /progress/weekly-reports/:id/view.
+// ---------------------------------------------------------------------------
+
+describe('markWeeklyReportViewedForProfile', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('calls db.update with a viewedAt Date', async () => {
+    const mockWhere = jest.fn().mockResolvedValue(undefined);
+    const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
+    const mockUpdate = jest.fn().mockReturnValue({ set: mockSet });
+    const db = { update: mockUpdate } as unknown as Database;
+
+    await markWeeklyReportViewedForProfile(db, UUID.child, UUID.report);
+
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({ viewedAt: expect.any(Date) }),
+    );
+    expect(mockWhere).toHaveBeenCalledTimes(1);
+  });
+
+  // [BREAK] Self-view must scope on childProfileId = the active profile, never
+  // a foreign id. If the WHERE clause dropped the profile scope, this fails.
+  it('scopes the update to reportId + active profile, not a foreign id', async () => {
+    const mockWhere = jest.fn().mockResolvedValue(undefined);
+    const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
+    const mockUpdate = jest.fn().mockReturnValue({ set: mockSet });
+    const db = { update: mockUpdate } as unknown as Database;
+
+    await markWeeklyReportViewedForProfile(db, UUID.child, UUID.report);
+
+    const params = extractDrizzleParamValues(mockWhere.mock.calls[0]?.[0]);
     expect(params).toEqual(expect.arrayContaining([UUID.report, UUID.child]));
     expect(params).not.toContain(UUID.parent);
   });

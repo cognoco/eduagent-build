@@ -17,6 +17,7 @@ import {
   weeklyReportsResponseSchema,
   childReportDetailResponseSchema,
   weeklyReportDetailResponseSchema,
+  reportViewedResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
@@ -26,6 +27,7 @@ import { listProfileSessions } from '../services/session/session-crud';
 import {
   getMonthlyReportForProfile,
   listMonthlyReportsForProfile,
+  markMonthlyReportViewedForProfile,
 } from '../services/monthly-report';
 import { getOverdueTopicsGrouped } from '../services/overdue-topics';
 import {
@@ -41,6 +43,7 @@ import { getProfileOverdueCount } from '../services/retention-data';
 import {
   getWeeklyReportForProfile,
   listWeeklyReportsForProfile,
+  markWeeklyReportViewedForProfile,
 } from '../services/weekly-report';
 
 type ProgressRouteEnv = {
@@ -142,6 +145,17 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     return c.json(childReportDetailResponseSchema.parse({ report }));
   })
 
+  // Mark a monthly report for the active profile as viewed. Self-scoped: the
+  // service filters on childProfileId = active profile, so a learner can only
+  // mark their own reports, never another profile's.
+  .post('/progress/reports/:reportId/view', async (c) => {
+    const { db, profileId } = withProfile(c);
+    const reportId = c.req.param('reportId');
+
+    await markMonthlyReportViewedForProfile(db, profileId, reportId);
+    return c.json(reportViewedResponseSchema.parse({ viewed: true }));
+  })
+
   // List weekly reports for the active profile.
   .get('/progress/weekly-reports', async (c) => {
     const { db, profileId } = withProfile(c);
@@ -158,6 +172,17 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const report = await getWeeklyReportForProfile(db, profileId, reportId);
     if (!report) return notFound(c, 'Report not found');
     return c.json(weeklyReportDetailResponseSchema.parse({ report }));
+  })
+
+  // Mark a weekly report for the active profile as viewed. Self-scoped: the
+  // service filters on childProfileId = active profile, so a learner can only
+  // mark their own reports, never another profile's.
+  .post('/progress/weekly-reports/:weeklyReportId/view', async (c) => {
+    const { db, profileId } = withProfile(c);
+    const reportId = c.req.param('weeklyReportId');
+
+    await markWeeklyReportViewedForProfile(db, profileId, reportId);
+    return c.json(reportViewedResponseSchema.parse({ viewed: true }));
   })
 
   // Get active/paused session for a specific topic [F-4]

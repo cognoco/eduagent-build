@@ -381,6 +381,26 @@ export async function getMonthlyReportForProfile(
   return row ? mapMonthlyReportRow(row) : null;
 }
 
+// Self-view: the active profile marks its own monthly report as viewed.
+// Scoped on childProfileId = the active profile (the report's subject), mirroring
+// getMonthlyReportForProfile — so a learner can only mark reports about themselves,
+// never another profile's, even by guessing an ID.
+export async function markMonthlyReportViewedForProfile(
+  db: Database,
+  profileId: string,
+  reportId: string,
+): Promise<void> {
+  await db
+    .update(monthlyReports)
+    .set({ viewedAt: new Date() })
+    .where(
+      and(
+        eq(monthlyReports.id, reportId),
+        eq(monthlyReports.childProfileId, profileId),
+      ),
+    );
+}
+
 export async function getMonthlyReportForParentChild(
   db: Database,
   parentProfileId: string,
