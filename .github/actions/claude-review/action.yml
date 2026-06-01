@@ -189,5 +189,5 @@ runs:
           </pr_metadata>
 
         claude_args: >-
-          --max-turns 10
+          --max-turns 30
           --allowedTools "Write,Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
