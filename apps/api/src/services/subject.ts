@@ -21,6 +21,7 @@ import type {
   LanguageSetupInput,
   SubjectCreateInput,
   SubjectUpdateInput,
+  DeleteSubjectResponse,
   Subject,
   SubjectCurriculumStatus,
   SubjectStructureType,
@@ -583,6 +584,26 @@ export async function updateSubject(
     .where(and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)))
     .returning();
   return rows[0] ? mapSubjectRow(rows[0]) : null;
+}
+
+export async function deleteSubject(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<DeleteSubjectResponse> {
+  const [deletedSubject] = await db
+    .delete(subjects)
+    .where(and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)))
+    .returning({ id: subjects.id });
+
+  if (!deletedSubject) {
+    throw new SubjectNotFoundError();
+  }
+
+  return {
+    deleted: true,
+    subjectId: deletedSubject.id,
+  };
 }
 
 // ---------------------------------------------------------------------------

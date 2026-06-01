@@ -55,6 +55,11 @@ export const subjectUpdateSchema = z
   .strict();
 export type SubjectUpdateInput = z.infer<typeof subjectUpdateSchema>;
 
+export const subjectIdParamSchema = z.object({
+  id: z.string().uuid(),
+});
+export type SubjectIdParam = z.infer<typeof subjectIdParamSchema>;
+
 export const subjectSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
@@ -865,6 +870,13 @@ export const deleteBookResponseSchema = z.object({
   startedTopicCount: z.number().int().nonnegative(),
 });
 export type DeleteBookResponse = z.infer<typeof deleteBookResponseSchema>;
+
+/** DELETE /subjects/:id */
+export const deleteSubjectResponseSchema = z.object({
+  deleted: z.literal(true),
+  subjectId: z.string().uuid(),
+});
+export type DeleteSubjectResponse = z.infer<typeof deleteSubjectResponseSchema>;
 
 /** GET /subjects/:subjectId/books/:bookId/sessions — one session entry */
 export const bookSessionSchema = z.object({

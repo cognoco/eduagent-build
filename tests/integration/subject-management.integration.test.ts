@@ -14,7 +14,9 @@
  * 6. GET /v1/subjects/:id — 404 when not found/cross-profile
  * 7. PATCH /v1/subjects/:id — 200 updates subject
  * 8. PATCH /v1/subjects/:id — 404 when not found/cross-profile
- * 9. GET /v1/subjects — 401 without auth
+ * 9. DELETE /v1/subjects/:id — 200 hard-deletes owned subject data
+ * 10. DELETE /v1/subjects/:id — 400/403/404 boundary behavior
+ * 11. GET /v1/subjects — 401 without auth
  */
 
 const mockCaptureException = jest.fn();
@@ -38,17 +40,36 @@ import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
   createProfileViaRoute,
+  getIntegrationDb,
+  seedAssessmentRecord,
+  seedCurriculum,
+  seedLearningSession,
+  seedXpLedgerEntry,
   seedSubject,
 } from './route-fixtures';
 import {
   createSubjectWithStructureResponseSchema,
+  deleteSubjectResponseSchema,
   ERROR_CODES,
+  resumeTargetResponseSchema,
   subjectClassifyResultSchema,
   subjectListResponseSchema,
   subjectResolveResultSchema,
   subjectResponseSchema,
   UpstreamLlmError,
 } from '@eduagent/schemas';
+import { eq } from 'drizzle-orm';
+import {
+  assessments,
+  curriculumBooks,
+  generateUUIDv7,
+  learningSessions,
+  practiceActivityEvents,
+  profiles,
+  quizRounds,
+  subjects,
+  xpLedger,
+} from '@eduagent/database';
 
 import { app } from '../../apps/api/src/index';
 import {
@@ -467,6 +488,283 @@ describe('Integration: PATCH /v1/subjects/:id', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.code).toBe('NOT_FOUND');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /v1/subjects/:id
+// ---------------------------------------------------------------------------
+
+describe('Integration: DELETE /v1/subjects/:id', () => {
+  async function seedSubjectDeleteGraph(profileId: string, name: string) {
+    const db = getIntegrationDb();
+    const subject = await seedSubject(profileId, name);
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      bookTitle: `${name} Book`,
+      topics: [{ title: `${name} Topic` }],
+    });
+    const topicId = curriculum.topicIds[0]!;
+    const sessionId = await seedLearningSession({
+      profileId,
+      subjectId: subject.id,
+      topicId,
+    });
+    await seedAssessmentRecord({
+      profileId,
+      subjectId: subject.id,
+      topicId,
+      sessionId,
+      status: 'passed',
+      masteryScore: 0.8,
+    });
+    await seedXpLedgerEntry({
+      profileId,
+      subjectId: subject.id,
+      topicId,
+      amount: 10,
+    });
+    const [practice] = await db
+      .insert(practiceActivityEvents)
+      .values({
+        profileId,
+        subjectId: subject.id,
+        activityType: 'review',
+        pointsEarned: 5,
+        sourceType: 'integration_test',
+        sourceId: `${subject.id}:practice`,
+        dedupeKey: `${subject.id}:practice`,
+        metadata: {},
+      })
+      .returning({ id: practiceActivityEvents.id });
+    const [quiz] = await db
+      .insert(quizRounds)
+      .values({
+        profileId,
+        subjectId: subject.id,
+        activityType: 'capitals',
+        theme: 'integration',
+        questions: [],
+        results: [],
+        total: 1,
+        status: 'completed',
+      })
+      .returning({ id: quizRounds.id });
+
+    if (!practice || !quiz) {
+      throw new Error('Failed to seed subject delete set-null fixtures');
+    }
+
+    return {
+      subject,
+      bookId: curriculum.bookId,
+      sessionId,
+      practiceId: practice.id,
+      quizId: quiz.id,
+    };
+  }
+
+  it('hard-deletes the subject and cascades dependent learning rows while preserving analytics set-null rows', async () => {
+    const profileId = await createOwnerProfile();
+    const fixture = await seedSubjectDeleteGraph(profileId, 'Disposable Math');
+    const db = getIntegrationDb();
+
+    const res = await app.request(
+      `/v1/subjects/${fixture.subject.id}`,
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(deleteSubjectResponseSchema.parse(await res.json())).toEqual({
+      deleted: true,
+      subjectId: fixture.subject.id,
+    });
+    await expect(
+      db.query.subjects.findFirst({
+        where: eq(subjects.id, fixture.subject.id),
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      db.query.curriculumBooks.findMany({
+        where: eq(curriculumBooks.subjectId, fixture.subject.id),
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      db.query.learningSessions.findMany({
+        where: eq(learningSessions.subjectId, fixture.subject.id),
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      db.query.assessments.findMany({
+        where: eq(assessments.subjectId, fixture.subject.id),
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      db.query.xpLedger.findMany({
+        where: eq(xpLedger.subjectId, fixture.subject.id),
+      }),
+    ).resolves.toEqual([]);
+
+    const practice = await db.query.practiceActivityEvents.findFirst({
+      where: eq(practiceActivityEvents.id, fixture.practiceId),
+    });
+    expect(practice?.subjectId).toBeNull();
+    const quiz = await db.query.quizRounds.findFirst({
+      where: eq(quizRounds.id, fixture.quizId),
+    });
+    expect(quiz?.subjectId).toBeNull();
+
+    const resumeRes = await app.request(
+      '/v1/progress/resume-target',
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId,
+        ),
+      },
+      TEST_ENV,
+    );
+    expect(resumeRes.status).toBe(200);
+    expect(resumeTargetResponseSchema.parse(await resumeRes.json())).toEqual({
+      target: null,
+    });
+  });
+
+  it('returns 404 on repeat delete after the first successful hard delete', async () => {
+    const profileId = await createOwnerProfile();
+    const fixture = await seedSubjectDeleteGraph(profileId, 'Repeat Delete');
+    const headers = buildAuthHeaders(
+      { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+      profileId,
+    );
+
+    const first = await app.request(
+      `/v1/subjects/${fixture.subject.id}`,
+      { method: 'DELETE', headers },
+      TEST_ENV,
+    );
+    expect(first.status).toBe(200);
+
+    const second = await app.request(
+      `/v1/subjects/${fixture.subject.id}`,
+      { method: 'DELETE', headers },
+      TEST_ENV,
+    );
+    expect(second.status).toBe(404);
+    expect((await second.json()).code).toBe(ERROR_CODES.NOT_FOUND);
+  });
+
+  it('returns 400 for a malformed subject id before touching storage', async () => {
+    const profileId = await createOwnerProfile();
+
+    const res = await app.request(
+      '/v1/subjects/not-a-uuid',
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 403 in proxy mode and leaves the child subject intact', async () => {
+    const ownerProfile = await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: { userId: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+      displayName: 'Proxy Parent',
+      birthYear: 1980,
+    });
+    const childProfileId = generateUUIDv7();
+    const db = getIntegrationDb();
+    await db.insert(profiles).values({
+      id: childProfileId,
+      accountId: ownerProfile.accountId,
+      displayName: 'Proxy Child',
+      birthYear: 2013,
+      isOwner: false,
+    });
+    const subject = await seedSubject(childProfileId, 'Proxy Math');
+
+    const res = await app.request(
+      `/v1/subjects/${subject.id}`,
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          childProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'PROXY_MODE' });
+    await expect(
+      db.query.subjects.findFirst({ where: eq(subjects.id, subject.id) }),
+    ).resolves.toBeDefined();
+  });
+
+  it('does not delete another profile subject or its children', async () => {
+    const ownerProfileId = await createOwnerProfile();
+    const otherProfileId = await createOwnerProfile(
+      {
+        userId: OTHER_SUBJECT_AUTH_USER_ID,
+        email: OTHER_SUBJECT_AUTH_EMAIL,
+      },
+      'Other Integration Learner',
+    );
+    const fixture = await seedSubjectDeleteGraph(
+      ownerProfileId,
+      'Private Deletion Target',
+    );
+    const db = getIntegrationDb();
+
+    const res = await app.request(
+      `/v1/subjects/${fixture.subject.id}`,
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(
+          {
+            sub: OTHER_SUBJECT_AUTH_USER_ID,
+            email: OTHER_SUBJECT_AUTH_EMAIL,
+          },
+          otherProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).code).toBe(ERROR_CODES.NOT_FOUND);
+    await expect(
+      db.query.subjects.findFirst({
+        where: eq(subjects.id, fixture.subject.id),
+      }),
+    ).resolves.toBeDefined();
+    await expect(
+      db.query.curriculumBooks.findFirst({
+        where: eq(curriculumBooks.id, fixture.bookId),
+      }),
+    ).resolves.toBeDefined();
+    await expect(
+      db.query.learningSessions.findFirst({
+        where: eq(learningSessions.id, fixture.sessionId),
+      }),
+    ).resolves.toBeDefined();
   });
 });
 
