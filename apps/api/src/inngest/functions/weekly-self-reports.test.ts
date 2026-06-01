@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
 const mockListEligibleSelfReportProfileIdsAtLocalHour9 = jest
   .fn()
@@ -263,6 +266,97 @@ describe('weeklySelfReportGenerate', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  describe('[WI-368] weekly self-report GDPR consent helper consolidation', () => {
+    it('uses isGdprProcessingAllowed instead of an inline GDPR consent query', () => {
+      const source = readFileSync(
+        join(__dirname, 'weekly-self-reports.ts'),
+        'utf8',
+      );
+
+      expect(source).toContain("from '../../services/consent'");
+      expect(source).toContain('isGdprProcessingAllowed(db, profileId)');
+      expect(source).not.toContain('db.query.consentStates.findFirst');
+      expect(source).not.toContain("eq(consentStates.consentType, 'GDPR')");
+      expect(source).not.toContain("status !== 'CONSENTED'");
+    });
+
+    it.each([
+      ['PENDING'],
+      ['PARENTAL_CONSENT_REQUESTED'],
+      ['WITHDRAWN'],
+    ] as const)(
+      'skips weekly self report when latest GDPR consent is %s',
+      async (status) => {
+        mockDb.query.consentStates.findFirst.mockResolvedValue({
+          status,
+          requestedAt: new Date('2026-05-10T00:00:00.000Z'),
+        });
+
+        const result = await (weeklySelfReportGenerate as any).fn({
+          event: {
+            name: 'app/weekly-self-report.generate',
+            data: { profileId: PROFILE_A },
+          },
+          step: {
+            run: jest.fn(async (_name: string, fn: () => Promise<unknown>) =>
+              fn(),
+            ),
+          },
+        });
+
+        expect(result).toEqual({
+          status: 'skipped',
+          reason: 'consent_not_granted',
+          profileId: PROFILE_A,
+        });
+        expect(mockGetLatestSnapshotOnOrBefore).not.toHaveBeenCalled();
+        expect(mockGenerateWeeklyReportData).not.toHaveBeenCalled();
+        expect(mockInsertValues).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      [
+        'CONSENTED',
+        {
+          status: 'CONSENTED',
+          requestedAt: new Date('2026-05-10T00:00:00.000Z'),
+        },
+      ],
+      ['absent', null],
+    ] as const)(
+      'stores weekly self report when latest GDPR consent is %s',
+      async (_label, consentRow) => {
+        mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+
+        const result = await (weeklySelfReportGenerate as any).fn({
+          event: {
+            name: 'app/weekly-self-report.generate',
+            data: { profileId: PROFILE_A },
+          },
+          step: {
+            run: jest.fn(async (_name: string, fn: () => Promise<unknown>) =>
+              fn(),
+            ),
+          },
+        });
+
+        expect(result).toEqual({
+          status: 'completed',
+          profileId: PROFILE_A,
+          reportWeek: '2026-05-11',
+        });
+        expect(mockInsertValues).toHaveBeenCalledWith(
+          expect.objectContaining({
+            profileId: PROFILE_A,
+            childProfileId: PROFILE_A,
+            reportWeek: '2026-05-11',
+          }),
+        );
+      },
+    );
   });
 
   it('stores a weekly self report when the profile is eligible', async () => {

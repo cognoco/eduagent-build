@@ -17,11 +17,10 @@
 // recommendations). When in doubt, scope by profileId at the leaf even
 // when scanning broadly.
 
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   accounts,
-  consentStates,
   familyLinks,
   learningProfiles,
   notificationPreferences,
@@ -49,6 +48,7 @@ import { generateWeeklyReportData } from '../../services/weekly-report';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
+import { isGdprProcessingAllowed } from '../../services/consent';
 import {
   listEligibleSelfReportProfileIds,
   listEligibleSelfReportProfileIdsAtLocalHour9,
@@ -607,17 +607,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           const childProfileIds: string[] = [];
           const struggleLines: ChildStruggleLine[] = [];
           for (const link of links) {
-            // Consent gate (parity with sendStruggleNotification and ParentDashboardSummary):
-            // skip children whose most-recent GDPR consent state is anything other than
-            // CONSENTED. Missing row = no restriction (pre-consent-flow accounts).
-            const consentState = await db.query.consentStates.findFirst({
-              where: and(
-                eq(consentStates.profileId, link.childProfileId),
-                eq(consentStates.consentType, 'GDPR'),
-              ),
-              orderBy: desc(consentStates.requestedAt),
-            });
-            if (consentState != null && consentState.status !== 'CONSENTED') {
+            if (!(await isGdprProcessingAllowed(db, link.childProfileId))) {
               continue;
             }
 

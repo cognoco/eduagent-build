@@ -9,6 +9,9 @@
 // reports `partial` with accurate queued/failed counts.
 // ---------------------------------------------------------------------------
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -360,6 +363,122 @@ describe('[CR-2026-05-21-033] weeklyProgressPushGenerate idempotency', () => {
       'event.data.parentId + "-" + event.data.reportWeekStart',
     );
   });
+});
+
+describe('[WI-368] weekly progress push GDPR consent helper consolidation', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('uses isGdprProcessingAllowed instead of an inline GDPR consent query', () => {
+    const source = readFileSync(
+      join(__dirname, 'weekly-progress-push.ts'),
+      'utf8',
+    );
+
+    expect(source).toContain("from '../../services/consent'");
+    expect(source).toContain(
+      'isGdprProcessingAllowed(db, link.childProfileId)',
+    );
+    expect(source).not.toContain('db.query.consentStates.findFirst');
+    expect(source).not.toContain("eq(consentStates.consentType, 'GDPR')");
+    expect(source).not.toContain("status !== 'CONSENTED'");
+  });
+
+  it.each([
+    ['PENDING'],
+    ['PARENTAL_CONSENT_REQUESTED'],
+    ['WITHDRAWN'],
+  ] as const)(
+    'skips child digest generation when latest GDPR consent is %s',
+    async (status) => {
+      jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+      mockDb.query.familyLinks.findMany.mockResolvedValue([
+        { childProfileId: CHILD_ID },
+      ]);
+      mockDb.query.consentStates.findFirst.mockResolvedValue({
+        status,
+        requestedAt: new Date('2026-05-12T00:00:00.000Z'),
+      });
+      mockDb.query.profiles.findFirst.mockResolvedValue({
+        displayName: 'Alex',
+      });
+      mockGetLatestSnapshot.mockResolvedValue({
+        snapshotDate: '2026-05-13',
+        metrics: CURRENT_METRICS,
+      });
+      mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+        snapshotDate: '2026-05-06',
+        metrics: PREVIOUS_METRICS,
+      });
+
+      const result = await executeGenerateSteps({ parentId: PARENT_ID });
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'no_activity',
+        parentId: PARENT_ID,
+      });
+      expect(mockGetLatestSnapshot).not.toHaveBeenCalled();
+      expect(mockWeeklyReportInsertValues).not.toHaveBeenCalled();
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [
+      'CONSENTED',
+      {
+        status: 'CONSENTED',
+        requestedAt: new Date('2026-05-12T00:00:00.000Z'),
+      },
+    ],
+    ['absent', null],
+  ] as const)(
+    'includes child digest generation when latest GDPR consent is %s',
+    async (_label, consentRow) => {
+      jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+      mockDb.query.familyLinks.findMany.mockResolvedValue([
+        { childProfileId: CHILD_ID },
+      ]);
+      mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+      mockDb.query.profiles.findFirst.mockResolvedValue({
+        displayName: 'Alex',
+      });
+      mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
+        pushEnabled: true,
+        weeklyProgressPush: true,
+        weeklyProgressEmail: false,
+      });
+      mockGetLatestSnapshot.mockResolvedValue({
+        snapshotDate: '2026-05-13',
+        metrics: CURRENT_METRICS,
+      });
+      mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+        snapshotDate: '2026-05-06',
+        metrics: PREVIOUS_METRICS,
+      });
+
+      const result = await executeGenerateSteps({ parentId: PARENT_ID });
+
+      expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
+      expect(mockGenerateWeeklyReportData).toHaveBeenCalledWith(
+        'Alex',
+        '2026-05-11',
+        CURRENT_METRICS,
+        PREVIOUS_METRICS,
+        emptyPracticeActivitySummary,
+      );
+      expect(mockWeeklyReportInsertValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profileId: PARENT_ID,
+          childProfileId: CHILD_ID,
+          reportWeek: '2026-05-11',
+        }),
+      );
+    },
+  );
 });
 
 describe('weekly-progress-push isLocalHour9 (BUG-640 / J-4)', () => {
