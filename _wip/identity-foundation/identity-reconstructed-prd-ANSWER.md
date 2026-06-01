@@ -388,6 +388,22 @@ A reviewer signs off when these hold under test (each gets a happy-path **and** 
     does not buy oversight; visibility stays the teen's opt-in, J12). The **free tier is always the
     no-payer default**, so an independent teen is **never** hard-blocked from learning while unpaid
     (honours never-lock). Resolves the "no payer exists for a paid 16–17 independent" gap. Journey J14.
+18. **[DERIVED] No self-consent, and no consent dead-end.** Two break tests, from a real symptom observed
+    2026-06-01 (an adult signs in and lands directly on "parent or guardian must approve", is never asked
+    for age, and is effectively asked to consent *to themselves*):
+    - **(a) No self-authority.** A Person with **no guardianship edge** is never offered or recorded as
+      their **own** parental-consent authority. This forbids the legacy `getFamilyOwnerProfileId`
+      self-fallback (`consent.ts:1144` returns the caller's own profile when no `family_links` exist).
+      Above the consent age → self-consent; below it with no guardian → blocked from self-creation
+      (III.2), never "approve yourself."
+    - **(b) No age dead-end.** A Person stuck consent-required because of a **wrong or missing birth
+      year must have an in-product path to correct their age** — today there is none (birth-date
+      correction `onboard-3` is unbuilt), so a profile with a bad/absent age is a hard dead-end in the
+      holding gate, violating never-lock. The clean-cut must collect age before the gate can trigger, and
+      let a mis-set age be corrected (with the bracket-crossing guard from the profile-setup plan).
+    Break tests: a signed-in account with no guardianship edge must never reach a self-pointing
+    "approve" screen; and correcting an erroneously-minor age must clear the wrongly-required consent
+    state.
 
 ---
 
