@@ -3,8 +3,26 @@ title: Identity / Organization / Membership Redesign — Program Plan
 date: 2026-05-31
 profile: change
 spec: this document (self-contained; supersedes the ad-hoc account model)
-status: approved
+status: superseded
+superseded_on: 2026-06-01
+superseded_by: pre-launch clean-cut decision — see _wip/identity-foundation/
 ---
+
+> # ⛔ SUPERSEDED — DO NOT FOLLOW THIS PLAN
+>
+> **Decided 2026-06-01:** the incremental, dual-model, **flag-gated + backfill** migration approach
+> in this program plan is **REJECTED**. The identity/tenancy/role foundation will be rebuilt as a
+> **pre-launch clean cut** — disposable tables, re-seed dev/staging, **no `MODE_IDENTITY_V1` flag,
+> no backfill, no dual model, no compatibility shims**.
+>
+> **Status of the work:** T1 was implemented and merged (PR #668) on this rejected approach and is
+> slated for a forward-only revert; T2–T7 were never executed.
+>
+> **Why kept (not deleted):** decision record, and *discussion input only*. The target model shapes
+> (orgs / memberships / roles), the 7 lifecycle flows, and decisions D1–D6 are **NOT approved
+> design** — they must be re-derived from product intent, not carried forward as-is.
+>
+> **Live work:** `_wip/identity-foundation/`. Internal cross-references below are stale after the move.
 
 # Identity / Organization / Membership Redesign — Program Plan
 

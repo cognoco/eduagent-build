@@ -9,6 +9,8 @@ gap_ids: [onboard-1, onboard-2, onboard-3, onboard-4]
 
 # Profile Setup, Personalization, and Corrections - Implementation Plan
 
+> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+
 **Goal:** Make learner personalization reachable during first-run and editable
 later: pronouns, tutor-prose language, birth date corrections, and interests
 with school/free-time context.

@@ -9,6 +9,8 @@ gap_ids: [auth-2, auth-3, auth-4]
 
 # Account Security Self-Service - Implementation Plan
 
+> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+
 **Goal:** Give signed-in users a complete in-app security surface for changing
 their login email, adding a backup password to SSO-only accounts, and reviewing
 or revoking other active device sessions.

@@ -7,6 +7,8 @@ status: draft
 
 # Product Continuity Low-Hanging Fruit Implementation Plan
 
+> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+
 ## Goal
 
 Make the already-shipped learning value easier for students and family mentors to notice, trust, and act on.
