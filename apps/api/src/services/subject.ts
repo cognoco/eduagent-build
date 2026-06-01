@@ -591,19 +591,18 @@ export async function deleteSubject(
   profileId: string,
   subjectId: string,
 ): Promise<DeleteSubjectResponse> {
-  const repo = createScopedRepository(db, profileId);
-  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
-  if (!subject) {
+  const [deletedSubject] = await db
+    .delete(subjects)
+    .where(and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)))
+    .returning({ id: subjects.id });
+
+  if (!deletedSubject) {
     throw new SubjectNotFoundError();
   }
 
-  await db
-    .delete(subjects)
-    .where(and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)));
-
   return {
     deleted: true,
-    subjectId,
+    subjectId: deletedSubject.id,
   };
 }
 
