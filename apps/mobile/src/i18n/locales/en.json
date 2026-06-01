@@ -2533,6 +2533,8 @@
     "verifyLabel": "Verify email",
     "verifying": "Updating...",
     "verifyButton": "Verify and update",
+    "retrySyncLabel": "Retry account sync",
+    "retrySyncButton": "Retry sync",
     "errorNotReady": "Account security is still loading.",
     "errorEmailRequired": "Enter your new email",
     "errorSendCodeFirst": "Send a code to your new email first.",
@@ -2553,7 +2555,7 @@
     "emptyDescription": "Only this session is active right now.",
     "lastActive": "Last active: {{value}}",
     "currentBadge": "This device",
-    "revokeLabel": "Revoke session",
+    "revokeLabel": "Revoke {{device}} session",
     "revoking": "Revoking...",
     "revokeButton": "Revoke"
   },

@@ -26,6 +26,11 @@ interface DestroyableEmailAddress {
   id?: string | null;
 }
 
+interface EmailSyncCandidate {
+  emailAddress: string;
+  oldPrimaryEmail: DestroyableEmailAddress | null;
+}
+
 export function ChangeEmail(): React.JSX.Element {
   const { user } = useUser();
   const api = useApiClient();
@@ -39,6 +44,9 @@ export function ChangeEmail(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [syncCandidate, setSyncCandidate] = useState<EmailSyncCandidate | null>(
+    null,
+  );
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -55,6 +63,7 @@ export function ChangeEmail(): React.JSX.Element {
     setError(null);
     setWarning(null);
     setSuccess(false);
+    setSyncCandidate(null);
 
     if (!user) {
       setError(t('changeEmail.errorNotReady'));
@@ -85,6 +94,44 @@ export function ChangeEmail(): React.JSX.Element {
     }
   }, [email, handleClerkError, t, user]);
 
+  const syncEmailToBackend = useCallback(
+    async (candidate: EmailSyncCandidate) => {
+      const syncResponse = await api.account.email.$patch({
+        json: { email: candidate.emailAddress },
+      });
+      await assertOk(syncResponse);
+    },
+    [api],
+  );
+
+  const completeEmailChange = useCallback(
+    async (candidate: EmailSyncCandidate) => {
+      try {
+        await withClerkTimeout(
+          candidate.oldPrimaryEmail?.destroy?.() ?? Promise.resolve(),
+          'oldEmail.destroy',
+        );
+      } catch {
+        setWarning(t('changeEmail.warningOldEmailStillActive'));
+      } finally {
+        setEmail('');
+        setCode('');
+        setPendingEmail(null);
+        setSyncCandidate(null);
+        setSuccess(true);
+      }
+    },
+    [t],
+  );
+
+  const formatSyncError = useCallback(
+    (err: unknown): string =>
+      t('changeEmail.errorSyncFailed', {
+        message: formatApiError(err),
+      }),
+    [t],
+  );
+
   const handleVerify = useCallback(async () => {
     const trimmedCode = code.trim();
     setError(null);
@@ -103,6 +150,10 @@ export function ChangeEmail(): React.JSX.Element {
 
     const oldPrimaryEmail =
       user.primaryEmailAddress as DestroyableEmailAddress | null;
+    const candidate: EmailSyncCandidate = {
+      emailAddress: pendingEmail.emailAddress,
+      oldPrimaryEmail,
+    };
 
     setIsVerifying(true);
     try {
@@ -121,36 +172,53 @@ export function ChangeEmail(): React.JSX.Element {
       return;
     }
 
+    setSyncCandidate(candidate);
     try {
-      const syncResponse = await api.account.email.$patch({
-        json: { email: pendingEmail.emailAddress },
-      });
-      await assertOk(syncResponse);
+      await syncEmailToBackend(candidate);
     } catch (err) {
-      setError(
-        t('changeEmail.errorSyncFailed', {
-          message: formatApiError(err),
-        }),
-      );
+      setError(formatSyncError(err));
       setIsVerifying(false);
       return;
     }
 
+    await completeEmailChange(candidate);
+    setIsVerifying(false);
+  }, [
+    code,
+    completeEmailChange,
+    formatSyncError,
+    handleClerkError,
+    pendingEmail,
+    syncEmailToBackend,
+    t,
+    user,
+  ]);
+
+  const handleRetrySync = useCallback(async () => {
+    if (!syncCandidate) {
+      setError(t('changeEmail.errorSendCodeFirst'));
+      return;
+    }
+
+    setError(null);
+    setWarning(null);
+    setSuccess(false);
+    setIsVerifying(true);
     try {
-      await withClerkTimeout(
-        oldPrimaryEmail?.destroy?.() ?? Promise.resolve(),
-        'oldEmail.destroy',
-      );
-    } catch {
-      setWarning(t('changeEmail.warningOldEmailStillActive'));
+      await syncEmailToBackend(syncCandidate);
+      await completeEmailChange(syncCandidate);
+    } catch (err) {
+      setError(formatSyncError(err));
     } finally {
-      setEmail('');
-      setCode('');
-      setPendingEmail(null);
-      setSuccess(true);
       setIsVerifying(false);
     }
-  }, [api, code, handleClerkError, pendingEmail, t, user]);
+  }, [
+    completeEmailChange,
+    formatSyncError,
+    syncCandidate,
+    syncEmailToBackend,
+    t,
+  ]);
 
   return (
     <View className="mt-3">
@@ -175,7 +243,7 @@ export function ChangeEmail(): React.JSX.Element {
 
       <Pressable
         onPress={handleSendCode}
-        disabled={isSendingCode || isVerifying}
+        disabled={isSendingCode || isVerifying || !!syncCandidate}
         className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
         accessibilityLabel={t('changeEmail.sendCodeLabel')}
         accessibilityRole="button"
@@ -195,7 +263,7 @@ export function ChangeEmail(): React.JSX.Element {
           </Text>
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3"
-            editable={!isVerifying}
+            editable={!isVerifying && !syncCandidate}
             keyboardType="number-pad"
             onChangeText={setCode}
             placeholder={t('changeEmail.codePlaceholder')}
@@ -203,20 +271,37 @@ export function ChangeEmail(): React.JSX.Element {
             testID="change-email-code"
             value={code}
           />
-          <Pressable
-            onPress={handleVerify}
-            disabled={isVerifying}
-            className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
-            accessibilityLabel={t('changeEmail.verifyLabel')}
-            accessibilityRole="button"
-            testID="change-email-verify"
-          >
-            <Text className="text-body font-semibold text-text-inverse">
-              {isVerifying
-                ? t('changeEmail.verifying')
-                : t('changeEmail.verifyButton')}
-            </Text>
-          </Pressable>
+          {syncCandidate ? (
+            <Pressable
+              onPress={handleRetrySync}
+              disabled={isVerifying}
+              className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
+              accessibilityLabel={t('changeEmail.retrySyncLabel')}
+              accessibilityRole="button"
+              testID="change-email-retry-sync"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                {isVerifying
+                  ? t('changeEmail.verifying')
+                  : t('changeEmail.retrySyncButton')}
+              </Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={handleVerify}
+              disabled={isVerifying}
+              className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
+              accessibilityLabel={t('changeEmail.verifyLabel')}
+              accessibilityRole="button"
+              testID="change-email-verify"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                {isVerifying
+                  ? t('changeEmail.verifying')
+                  : t('changeEmail.verifyButton')}
+              </Text>
+            </Pressable>
+          )}
         </View>
       ) : null}
 
@@ -226,12 +311,14 @@ export function ChangeEmail(): React.JSX.Element {
         </Text>
       ) : null}
       {success ? (
-        <Text className="text-xs text-success mt-2">
+        <Text className="text-xs text-success mt-2" accessibilityRole="alert">
           {t('changeEmail.successMessage')}
         </Text>
       ) : null}
       {warning ? (
-        <Text className="text-xs text-warning mt-2">{warning}</Text>
+        <Text className="text-xs text-warning mt-2" accessibilityRole="alert">
+          {warning}
+        </Text>
       ) : null}
     </View>
   );

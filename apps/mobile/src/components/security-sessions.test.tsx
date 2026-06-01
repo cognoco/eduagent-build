@@ -84,6 +84,11 @@ describe('SecuritySessions', () => {
       screen.getByTestId('revoke-session-session-other');
     });
 
+    expect(
+      screen.getByTestId('revoke-session-session-other').props
+        .accessibilityLabel,
+    ).toBe('Revoke Desktop - Chrome session');
+
     fireEvent.press(screen.getByTestId('revoke-session-session-other'));
 
     await waitFor(() => {

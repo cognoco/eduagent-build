@@ -2502,6 +2502,8 @@
     "verifyLabel": "Bekreft e-post",
     "verifying": "Oppdaterer...",
     "verifyButton": "Bekreft og oppdater",
+    "retrySyncLabel": "Prøv synkronisering på nytt",
+    "retrySyncButton": "Prøv synkronisering på nytt",
     "errorNotReady": "Kontosikkerhet lastes fortsatt.",
     "errorEmailRequired": "Skriv inn den nye e-posten din",
     "errorSendCodeFirst": "Send først en kode til den nye e-posten din.",
@@ -2522,7 +2524,7 @@
     "emptyDescription": "Bare denne økten er aktiv akkurat nå.",
     "lastActive": "Sist aktiv: {{value}}",
     "currentBadge": "Denne enheten",
-    "revokeLabel": "Trekk tilbake økt",
+    "revokeLabel": "Trekk tilbake økten på {{device}}",
     "revoking": "Trekker tilbake...",
     "revokeButton": "Trekk tilbake"
   },

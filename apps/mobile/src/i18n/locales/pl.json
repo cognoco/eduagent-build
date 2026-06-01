@@ -2502,6 +2502,8 @@
     "verifyLabel": "Zweryfikuj e-mail",
     "verifying": "Aktualizowanie...",
     "verifyButton": "Zweryfikuj i zaktualizuj",
+    "retrySyncLabel": "Ponów synchronizację",
+    "retrySyncButton": "Ponów synchronizację",
     "errorNotReady": "Zabezpieczenia konta nadal się ładują.",
     "errorEmailRequired": "Wpisz nowy e-mail",
     "errorSendCodeFirst": "Najpierw wyślij kod na nowy e-mail.",
@@ -2522,7 +2524,7 @@
     "emptyDescription": "W tej chwili aktywna jest tylko ta sesja.",
     "lastActive": "Ostatnia aktywność: {{value}}",
     "currentBadge": "To urządzenie",
-    "revokeLabel": "Unieważnij sesję",
+    "revokeLabel": "Unieważnij sesję na {{device}}",
     "revoking": "Unieważnianie...",
     "revokeButton": "Unieważnij"
   },

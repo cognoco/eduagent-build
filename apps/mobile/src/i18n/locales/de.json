@@ -2502,6 +2502,8 @@
     "verifyLabel": "E-Mail bestätigen",
     "verifying": "Aktualisieren...",
     "verifyButton": "Bestätigen und aktualisieren",
+    "retrySyncLabel": "Synchronisierung erneut versuchen",
+    "retrySyncButton": "Synchronisierung erneut versuchen",
     "errorNotReady": "Kontosicherheit wird noch geladen.",
     "errorEmailRequired": "Gib deine neue E-Mail ein",
     "errorSendCodeFirst": "Sende zuerst einen Code an deine neue E-Mail.",
@@ -2522,7 +2524,7 @@
     "emptyDescription": "Im Moment ist nur diese Sitzung aktiv.",
     "lastActive": "Zuletzt aktiv: {{value}}",
     "currentBadge": "Dieses Gerät",
-    "revokeLabel": "Sitzung widerrufen",
+    "revokeLabel": "Sitzung von {{device}} widerrufen",
     "revoking": "Widerrufen...",
     "revokeButton": "Widerrufen"
   },

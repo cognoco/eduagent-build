@@ -2502,6 +2502,8 @@
     "verifyLabel": "メールを確認",
     "verifying": "更新中...",
     "verifyButton": "確認して更新",
+    "retrySyncLabel": "同期を再試行",
+    "retrySyncButton": "同期を再試行",
     "errorNotReady": "アカウントセキュリティを読み込み中です。",
     "errorEmailRequired": "新しいメールアドレスを入力してください",
     "errorSendCodeFirst": "先に新しいメールアドレスへコードを送信してください。",
@@ -2522,7 +2524,7 @@
     "emptyDescription": "現在有効なのはこのセッションだけです。",
     "lastActive": "最終アクティブ: {{value}}",
     "currentBadge": "このデバイス",
-    "revokeLabel": "セッションを取り消す",
+    "revokeLabel": "{{device}}のセッションを取り消す",
     "revoking": "取り消し中...",
     "revokeButton": "取り消す"
   },

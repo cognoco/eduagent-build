@@ -73,7 +73,7 @@ describe('ChangeEmail', () => {
   let active: ReturnType<typeof renderScreen> | null = null;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     mockCreateEmailAddress.mockResolvedValue(mockNewEmailResource());
     mockPrepareVerification.mockResolvedValue({});
     mockAttemptVerification.mockResolvedValue({});
@@ -127,6 +127,30 @@ describe('ChangeEmail', () => {
     });
   });
 
+  it('retries backend sync without reusing the verification code', async () => {
+    mockSyncEmail
+      .mockRejectedValueOnce(new Error('Network unavailable'))
+      .mockResolvedValueOnce(jsonResponse({ email: 'new@example.com' }));
+    active = renderScreen(<ChangeEmail />);
+
+    await submitEmailAndCode();
+
+    await waitFor(() => {
+      screen.getByText(/account record was not updated/i);
+      expect(mockAttemptVerification).toHaveBeenCalledTimes(1);
+      expect(mockDestroyOldEmail).not.toHaveBeenCalled();
+    });
+
+    fireEvent.press(screen.getByTestId('change-email-retry-sync'));
+
+    await waitFor(() => {
+      expect(mockSyncEmail).toHaveBeenCalledTimes(2);
+      expect(mockAttemptVerification).toHaveBeenCalledTimes(1);
+      expect(mockDestroyOldEmail).toHaveBeenCalledTimes(1);
+      screen.getByText('Email updated');
+    });
+  });
+
   it('does not claim success or destroy the old email when server sync returns a conflict', async () => {
     mockSyncEmail.mockResolvedValue(
       jsonResponse(
@@ -155,8 +179,12 @@ describe('ChangeEmail', () => {
     await submitEmailAndCode();
 
     await waitFor(() => {
-      screen.getByText('Email updated');
-      screen.getByText(/old email is still active/i);
+      expect(screen.getByText('Email updated').props.accessibilityRole).toBe(
+        'alert',
+      );
+      expect(
+        screen.getByText(/old email is still active/i).props.accessibilityRole,
+      ).toBe('alert');
     });
   });
 

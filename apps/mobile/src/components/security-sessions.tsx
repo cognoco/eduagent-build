@@ -201,6 +201,10 @@ export function SecuritySessions(): React.JSX.Element {
         const location = formatSessionLocation(session);
         const lastActive = formatLastActive(session.lastActiveAt);
         const revoking = revokingSessionId === session.id;
+        const title = formatSessionTitle(
+          session,
+          t('securitySessions.deviceFallback'),
+        );
 
         return (
           <View
@@ -211,10 +215,7 @@ export function SecuritySessions(): React.JSX.Element {
             <View className="flex-row items-start justify-between gap-3">
               <View className="flex-1">
                 <Text className="text-body font-semibold text-text-primary">
-                  {formatSessionTitle(
-                    session,
-                    t('securitySessions.deviceFallback'),
-                  )}
+                  {title}
                 </Text>
                 {location ? (
                   <Text className="text-body-sm text-text-secondary mt-1">
@@ -242,7 +243,9 @@ export function SecuritySessions(): React.JSX.Element {
                   disabled={revoking}
                   className="bg-danger/10 rounded-card px-3 py-2"
                   accessibilityRole="button"
-                  accessibilityLabel={t('securitySessions.revokeLabel')}
+                  accessibilityLabel={t('securitySessions.revokeLabel', {
+                    device: title,
+                  })}
                   testID={`revoke-session-${session.id}`}
                 >
                   <Text className="text-xs font-semibold text-danger">

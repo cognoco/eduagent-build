@@ -2502,6 +2502,8 @@
     "verifyLabel": "Verificar correo",
     "verifying": "Actualizando...",
     "verifyButton": "Verificar y actualizar",
+    "retrySyncLabel": "Reintentar sincronización",
+    "retrySyncButton": "Reintentar sincronización",
     "errorNotReady": "La seguridad de la cuenta todavía se está cargando.",
     "errorEmailRequired": "Introduce tu nuevo correo",
     "errorSendCodeFirst": "Primero envía un código a tu nuevo correo.",
@@ -2522,7 +2524,7 @@
     "emptyDescription": "Ahora mismo solo esta sesión está activa.",
     "lastActive": "Última actividad: {{value}}",
     "currentBadge": "Este dispositivo",
-    "revokeLabel": "Revocar sesión",
+    "revokeLabel": "Revocar sesión de {{device}}",
     "revoking": "Revocando...",
     "revokeButton": "Revocar"
   },
