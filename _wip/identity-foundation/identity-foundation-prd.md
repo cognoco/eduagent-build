@@ -267,6 +267,12 @@ Doc-2 material and are authored/ratified in **Part 10**, not asserted here.
   can't self-serve, R2.)* Which Person the store-completed purchase records as Payer under Family Sharing is
   open — **E3** (Part 10). A flat ≥18 gate returns only on a future non-store rail.
 - **R12 — Visibility opt-in exists and is learner-controlled (inv 19).**
+- **R13 — Guardian attachment to an *existing* Person exists.** A Guardianship edge + per-purpose Consent can
+  be attached to an already-existing self-registered Person who has transitioned into needing consent (e.g. a
+  `residence_jurisdiction` change re-engages the gate, inv 12/24); they sit in the R3 holding state until it
+  resolves. Distinct from R2, which *creates* a new managed charge. `[DERIVED: inv 12 + 24 + 11 + 25 + R1]`
+  The *initiation* flow (minor-invites-guardian vs guardian-claims) and **guardian-authority verification**
+  (VPC/REQ-2) are open — Part 10 (E11 P-tail, E13).
 
 ---
 
@@ -275,6 +281,18 @@ Doc-2 material and are authored/ratified in **Part 10**, not asserted here.
 Done = **the 30 ontology invariants hold true under test**, each with a happy-path **and** a break test
 written in the security-fix red-green pattern (§4 framing; repo: security-fix break-test). The legacy
 36-gap audit is a **regression checklist**, not the definition.
+
+**Named break-tests beyond the 30** (derivable consequences elevated to *mandatory tests* because they
+guard a real observed defect — ruled in Part 10 §F1, `[T✓ 2026-06-02 · P pending]`):
+
+- **F1-BT-a — no self-consent.** A consent-gated Person with **no Guardianship edge** can neither have
+  data processed **nor** be recorded as their own consent authority. Derives from §2.2 (dyadic, adult
+  guardian) + inv 11 (consent over guardian edges) + inv 28. **Red-green against the live
+  `getFamilyOwnerProfileId` self-fallback bug** (drift-map §7A): write the negative-path test → passes →
+  revert the guard → fails → restore. `[T✓]`
+- **F1-BT-b — no consent dead-end.** A wrong/missing birth year routes to an **in-product correction
+  path**, never a dead-end. Requirement derives from inv 25 + repo UX-resilience; the **correction-flow
+  design is `[P pending]`**.
 
 Carried open requirements that gate a *paid launch* but are not ours to close (ontology §8): **REQ-1**
 consent-scope disclosure (per-purpose), **REQ-2** the six-item legal register, **REQ-3** DPIA, **FLAG-2**
@@ -398,19 +416,40 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
 - **E7 — Multi-org governance** (whose quota/consent/visibility across two orgs). `[ANCHORED-OPEN: §6 → Phase D]`
 - **E8 — Separated parents (one Person vs two; shared custody).** `[ANCHORED-OPEN: §6 → Phase B]`
 - **E9 — Guardianship capability placement D1 (operate/manage/view global vs org-scoped).** `[ANCHORED-OPEN: §6]`
-- **E10 — De-credential (credentialed → managed reversion, T6).** `[ANCHORED-OPEN: §6 → probably disallowed]`
+- **E10 — De-credential (credentialed → managed reversion, T6). RULED 2026-06-02 `[T✓ · P n/a]` — disallow; no app flow.** Graduation is one-directional (inv 20); the reverse is an autonomy/privacy regression, and the one plausible case (a parent reverting a teen) is already blocked by inv 19. **Not a built product capability — no self-service, no UI.** If a genuine edge case ever arises (data repair, mistaken account, legal/ops request) it is a **manual, audited backend/ops intervention** that still honors canon — it may **not** strip a consent-capable learner's data control (inv 19) or orphan a Person (inv 21), and is append-only + audited (inv 25). Reopens only if product surfaces a real user-facing use case (ripple).
 - **E11 — Self-registered-minor consent path** (minor self-registers with own Login, no guardian yet).
-  `[ANCHORED-OPEN: §6]` — partly closed by R2 (guardian-created below the floor); confirm the
-  consent-capable-in-a-stricter-jurisdiction case routes to R3 (holding state).
+  **RULED 2026-06-02 `[T✓ · P pending]`.** Cases 1–2 covered (consent-capable self-consents — R1 + inv 10/11;
+  below-floor self-registration blocked + routed to R2 — inv 13/26, the redirect being F1-BT-b). Case 3 (a
+  self-registered minor who *transitions into* needing consent via a jurisdiction change, inv 12/24) lands in
+  the R3 holding state but needs a guardian attached → **new requirement R13** (guardian-attachment-to-existing).
+  Initiation flow + guardian-authority verification are P-pending. The two cross-org variants below are E12/E13.
+- **E12 — Two-existing-Persons consolidation** (minor self-registered *and* parent already registered → two
+  Persons, two org-of-one). **APPROACH AGREED 2026-06-02 `[T✓ shape · P flow → E7/Phase D]`.** Shape: the minor
+  **applies to *join*** the parent's org (UX = "join", not "merge"); under the hood = **home-org reassignment +
+  decommission the minor's now-empty org-of-one**. Constraints: (a) **the parent's resulting edge is conditional
+  on consent status** — **Guardianship** (Layer 1, R13 + VPC) **only if consent-gated**; for a **consent-capable**
+  minor the parent is **admin + Payer + *optional* Mentorship the minor grants** (inv 19 opt-in), **never
+  auto-Guardianship** (inv 14/19 — they self-consent); (b) **sequence to never orphan** — add the Membership
+  *before* decommissioning, named "migration-pending" interim state (inv 21, 25); (c) **reconcile the minor's
+  subscription** if any (minors can self-pay, v1.1) — cancel or fold into the parent-org seat (inv 18). The flow
+  is home-org reassignment = **E7 multi-org governance → Phase D** + PM (UX).
+- **E13 — Reverse / minor-initiated invitation. RULED 2026-06-02 `[T✓ ban · P join-flow]`.** **Ban
+  minor-initiated *Guardianship* (consent authority)** — a minor may not nominate their own consent authority
+  (the F1-BT-a attack surface; fails inv 30 assurance + inv 28). **Ban the *grant*, not the *request*:** the
+  legitimate "minor reaches out first" path is a **request to join** the parent's org, which **folds into E12** —
+  the minor *requests*, the **adult accepts + provides verifiable consent (VPC)**; authority always flows
+  adult-side (mirrors inv 15/16). Scope: the ban is specific to the **consent / Guardianship edge**;
+  minor-initiated **Payer / admin** invites are access-inert / org-management (inv 8, 17), not the same risk,
+  but in practice route through the E12 join-flow too. Verification tail = REQ-2 / VPC (counsel).
 
 ### F — A proposed additional invariant Doc 2 carried that the 30 do not state
 
-- **F1 — "No self-consent, and no consent dead-end."** Doc 2 invariant 18: a Person with no Guardianship
-  edge is never recorded as their *own* parental-consent authority (forbids the legacy self-fallback); and
-  a wrong/missing birth year must have an in-product correction path (no dead-end). `[NEEDS-DECISION: promote to a 31st ontology invariant, or keep as a PRD-level break-test?]` *(My lean: it's partly
-  derivable — the self-fallback contradicts inv 28 "consent ≠ contract / guardian-held"; the no-dead-end
-  half is inv 25. So it may be statable as a `[DERIVED]` break-test rather than a new invariant. Worth a
-  ruling because it's a real observed bug.)*
+- **F1 — "No self-consent, and no consent dead-end." RULED 2026-06-02 `[T✓ · P pending]` — keep `[DERIVED]`, NOT a 31st invariant.** Both halves trace to existing canon (self-fallback contradicts §2.2 dyadic+adult
+  guardian + inv 11 + inv 28; no-dead-end is inv 25 + UX-resilience), so elevating them would violate the
+  "30 independent invariants" integrity. Instead they become **mandatory named break-tests in Part 8**:
+  **F1-BT-a** (no self-fallback; red-green against the live `getFamilyOwnerProfileId` bug, drift-map §7A)
+  `[T✓]`, and **F1-BT-b** (no birth-year dead-end; correction-flow design `[P pending]`). **Not a canon
+  amendment** — no ontology edit.
 
 ### G — Carried legal / compliance / sweep items  *(ontology §8 — already open, no decision now)*
 
