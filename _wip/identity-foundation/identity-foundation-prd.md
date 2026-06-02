@@ -257,10 +257,11 @@ Doc-2 material and are authored/ratified in **Part 10**, not asserted here.
   retained and re-claimable.
 - **R7 — Per-Person export exists** for a Person or their guardian `[DERIVED: inv 2 person-scoping + inv 21 retention make a per-Person (not per-org) export the only consistent shape]`.
 - **R8 — Mentorship grant exists, edge-scoped (inv 9), authorized per inv 15, re-confirmed per inv 16.**
-- **R9 — Threshold-crossing re-evaluation exists, scheduler-driven (inv 24);** the *mechanism* (auto vs
-  explicit takeover) is open (Part 10).
-- **R10 — `residence_jurisdiction`-change re-evaluation exists (inv 12, 24; §3.4);** the *response*
-  (suspend vs re-prompt) is open (Part 10).
+- **R9 — Threshold-crossing re-evaluation exists, scheduler-driven (inv 24);** the *mechanism* is ruled
+  **per-dimension** (E1) — visibility→opt-in (inv 19), mentorships lapse-unless-reconfirmed (inv 16),
+  explicit consent self-takeover (inv 20); the takeover-prompt UX is P-pending.
+- **R10 — `residence_jurisdiction`-change re-evaluation exists (inv 12, 24; §3.4);** the *response* is ruled
+  **suspend-into-R3 + re-prompt-as-exit** (E2); grace-window / suspended-state feel / detection are P/legal.
 - **R11 — Payment capacity is store-delegated (inv 17, v1.1).** For store-mediated payment the store
   (merchant of record) adjudicates capacity; we impose no age gate. A consent-capable minor may self-pay
   where their store account permits, else an adult Payer is attached. *(A charge never reaches this flow —
@@ -394,7 +395,7 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
 
 - **D1 — Login-mode default per tier** ("credentialed by default above the consent age; managed by default
   for a charge"). `[NEEDS-DECISION]` — §3.1 says both modes are valid at any tier; the *default* is a UX call.
-- **D2 — Consent holding-state preview** (browse-only, no LLM). `[NEEDS-DECISION]` — sensible, unanchored.
+- **D2 — Consent holding-state preview** (browse-only, no LLM). `[NEEDS-DECISION]` — sensible, unanchored. **Grounding:** AI use by a consent-gated minor *requires* guardian consent — COPPA (the LLM call is a third-party disclosure → VPC, §4.4) + GDPR Art 8 (parental authorization to process a below-digital-consent-age child's data). D2 is lawful pre-consent **only because** it is no-LLM / no-collection — that is what sidesteps the trigger. The precise "what counts as no-collection" boundary is a counsel item (REQ-2).
 - **D3 — Withdrawal grace window length; resend/“change recipient” caps; notify-parent cooldown.**
   `[NEEDS-DECISION]` — all Doc-2 specifics, no canon value.
 - **D4 — Stricter-wins reconciliation of self-declared vs platform Age-Signal.** `[DERIVABLE: inv 29 worst-case-default generalises to "take the stricter signal"]` — confirm. `[T✓ 2026-06-02 · P n/a]`
@@ -407,14 +408,14 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
   A flat ≥18 worst-case default (inv 29) applies **only** to a future non-store rail — **not** a per-jurisdiction
   derivation. **Carried open:** **E3** (recorded-Payer identity under Family Sharing — now the active
   sub-question); under-18 **exposure** (P-axis); FLAG-2 / REQ-2 (launch gates).
-- **E1 — Threshold-crossing mechanism** (auto-expire vs explicit teen-takeover). `[ANCHORED-OPEN: §6 "transition events → PRD"]` — *we can decide it here.* Doc-2 rec: prompt-to-take-over, status-quo until taken.
-- **E2 — `residence_jurisdiction`-change response** (suspend vs re-prompt). `[ANCHORED-OPEN: §3.4]` — decidable here.
+- **E1 — Threshold-crossing mechanism. RULED 2026-06-02 `[T✓ envelope · P pending]` — per-dimension, not monolithic** (inv 22). At a consent-age / 18 crossing: **guardian visibility → learner opt-in, default off** (inv 19 — *not* status-quo, which Doc-2 wrongly proposed); **guardian-granted mentorships lapse unless re-confirmed** (inv 16); **account-control / consent self-takeover is explicit, status-quo-until-taken** (inv 20); the scheduler fires the re-eval regardless (inv 24). Open **P**: takeover-prompt flow, reminder cadence, any nudge-grace on visibility *within* the inv-19 constraint.
+- **E2 — `residence_jurisdiction`-change response. RULED 2026-06-02 `[T✓ envelope · P pending]` — suspend *and* re-prompt** (not either/or). If the new jurisdiction's standard isn't satisfied and the Person is now consent-gated, processing **suspends into the R3 holding state** (inv 11/12/25), scheduler-detected (inv 24); **re-prompt is the exit** (for a guardian-less self-registered minor, via R13). Only bites those crossing *into* needing guardian consent (adults unaffected; still-consent-capable self-re-confirm). Open **P/legal**: grace-window length, suspended-state feel (locked vs browse-only preview à la D2), residence-change detection (declared vs inferred, §3.4).
 - **E3 — Store-payer ↔ recorded-Payer mapping under family sharing.** `[ANCHORED-OPEN: §6 multi-org / Doc 2 J13]` — **now the active Payer sub-question after E0** (capacity is settled; *which Person* a store-completed purchase records as Payer under Family Sharing / Ask-to-Buy is not). → Phase D/E.
 - **E4 — Co-guardian consent precedence** (the one-of/all-of rule). `[ANCHORED-OPEN: inv 11 "rule is jurisdictional/legal — deferred §6"]` — likely defers to counsel; we can set a default.
 - **E5 — Last-guardian departure / charge custody.** `[ANCHORED-OPEN: §6]` — Doc-2 rec: retain + re-homable.
 - **E6 — Unified vs split multi-role surface** for the family operator. `[ANCHORED-OPEN: §6 / Doc 2 J-Family-Operator]` — note it must also serve an **admin-only** operator (learner-optional).
 - **E7 — Multi-org governance** (whose quota/consent/visibility across two orgs). `[ANCHORED-OPEN: §6 → Phase D]`
-- **E8 — Separated parents (one Person vs two; shared custody).** `[ANCHORED-OPEN: §6 → Phase B]`
+- **E8 — Separated parents (one Person vs two; shared custody). RULED 2026-06-02 `[T✓ reachability · P+legal pending]` — keep possible, decide v1 scope later.** The one-Person model is **not foreclosed** (Person≠Login + global consent edge + multi-org Membership); only regressing to the fused/account-bound shape would foreclose it, and the clean cut forbids that. Whether v1 *builds* shared-custody / one-vs-two-Persons is a **product + legal** call → PM (coordinating counsel).
 - **E9 — Guardianship capability placement D1 (operate/manage/view global vs org-scoped).** `[ANCHORED-OPEN: §6]`
 - **E10 — De-credential (credentialed → managed reversion, T6). RULED 2026-06-02 `[T✓ · P n/a]` — disallow; no app flow.** Graduation is one-directional (inv 20); the reverse is an autonomy/privacy regression, and the one plausible case (a parent reverting a teen) is already blocked by inv 19. **Not a built product capability — no self-service, no UI.** If a genuine edge case ever arises (data repair, mistaken account, legal/ops request) it is a **manual, audited backend/ops intervention** that still honors canon — it may **not** strip a consent-capable learner's data control (inv 19) or orphan a Person (inv 21), and is append-only + audited (inv 25). Reopens only if product surfaces a real user-facing use case (ripple).
 - **E11 — Self-registered-minor consent path** (minor self-registers with own Login, no guardian yet).
@@ -453,11 +454,15 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
 
 ### G — Carried legal / compliance / sweep items  *(ontology §8 — already open, no decision now)*
 
+**Ownership (per PM, 2026-06-02):** these are **PM-owned**, not a separate decider lane — the PM organizes
+them *with* counsel. Two inline exceptions: **G6** is frontend/copy only; **G7** (vendor) is the **technical
+reviewer's** procurement call, gated on clear legal requirements — not itself a legal topic.
+
 - **G1 — REQ-1** consent-scope disclosure (per-purpose). `[ANCHORED-OPEN: §8 REQ-1]`
 - **G2 — REQ-2** six-item legal register. `[ANCHORED-OPEN: §8 REQ-2]`
 - **G3 — REQ-3** DPIA gates launch. `[ANCHORED-OPEN: §8 REQ-3]`
 - **G4 — FLAG-2** the real age floor (per-jurisdiction + app-store rating; any-age charge lawful with VPC).
   `[ANCHORED-OPEN: §8 FLAG-2]`
 - **G5 — CLEANUP-2** AI "mentor" → "Mate" copy sweep. `[ANCHORED-OPEN: §8 CLEANUP-2]`
-- **G6 — CLEANUP-3** banish numeric cohort copy (gated on FLAG-2). `[ANCHORED-OPEN: §8 CLEANUP-3]`
-- **G7 — VPC vendor selection** (KWS vs k-ID) + platform Age-Signals timing. `[ANCHORED-OPEN: §6]`
+- **G6 — CLEANUP-3** banish numeric cohort copy — **frontend / user-facing copy only** (backend number-*gates* are already banned by inv 10); gated on FLAG-2. `[ANCHORED-OPEN: §8 CLEANUP-3]`
+- **G7 — VPC vendor selection** (KWS vs k-ID) + platform Age-Signals timing — **not a legal topic: the technical reviewer's procurement call, sequenced *after* the legal requirements are clear.** `[ANCHORED-OPEN: §6]`

@@ -5,7 +5,7 @@ architecture (domain + data model) → the **"ready to plan implementation" gate
 **not** an implementation plan, and **no Cosmo work items are created until F is passed.**
 
 **Tracking:** repo-only; this file is the single source. Deliverables land as sibling docs (see
-README index). **Status: 2026-06-02 — Phase A complete; Phase B in progress (B-tech underway, B-product pending PM); product intent NOT yet locked.**
+README index). **Status: 2026-06-02 — Phase A complete; Phase B in progress (B-tech **complete**, B-product pending PM); product intent NOT yet locked.**
 
 ---
 
@@ -29,7 +29,7 @@ README index). **Status: 2026-06-02 — Phase A complete; Phase B in progress (B
 | # | Phase | Deliverable | Owner | Status | Depends on | Exit gate |
 |---|---|---|---|---|---|---|
 | **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md` | Claude | ✅ | — | drift quantified across intent / canonical docs / code; PM has concrete input |
-| **B** | Product intent | `product-intent.md` | **PM** (Claude facilitates) | 🟡 | A | Part 10 resolved + **dual sign-off** (B-tech in progress; B-product = PM pass) |
+| **B** | Product intent | `product-intent.md` | **PM** (Claude facilitates) | 🟡 | A | Part 10 resolved + **dual sign-off** (B-tech ✓ 2026-06-02; B-product = PM pass) |
 | **C** | Doc-strategy decision (pilot) | ADR (*location per this decision*) | You + Claude | ⬜ | A informs; piloted via B/D/E | chunk-vs-monolith decided; PRD-rebuild-vs-separate-doc decided; rollout call made |
 | **D** | Domain model | `domain-model.md` + ADR(s) | Claude (you ratify) | ⬜ | B | entities / roles / **consent model** / tenancy locked; org/membership **re-derived**, not inherited |
 | **E** | Data model | `data-model.md` + ADR(s) | Claude (you ratify) | ⬜ | D | target schema + cut strategy locked |
@@ -96,6 +96,17 @@ separate → evaluate standalone.
 
 ## Decision log
 
+- **2026-06-02** — **Phase B-tech complete (technical/architecture sign-off on product intent).** All Part-10
+  Decision-Queue items that were the technical reviewer's to rule are ruled (`T✓`): §A personas, §B
+  authoring-altitude, C1, D4, **E0 Payer (→ ontology v1.1, store-delegated)**, E1 threshold-crossing
+  (per-dimension), E2 jurisdiction-change (suspend + re-prompt), E8 separated-parents (reachability), E10
+  de-credential (disallow), E11 self-registered-minor, E12 two-Persons consolidation, E13 reverse-invite
+  (ban minor-initiated guardianship), F1 (kept `[DERIVED]` + break-tests), plus new requirement **R13**
+  (guardian-attachment-to-existing). **Gate now hands to B-product (the PM pass)** — open product items
+  (C2/C3 framing, D1–D3 UX defaults, E5 last-guardian, E6 multi-role surface), every flagged P-tail, and
+  PM-coordinated legal (G1–G7, E4). **Phase-D queued:** E3 (Family-Sharing payer identity), E7 (multi-org
+  governance), E9 (guardianship capability placement); G7 vendor pick (technical reviewer) waits on legal
+  requirements. Subject to the **ripple rule** — a PM-added persona/journey/edge case can reopen any `T✓`.
 - **2026-06-02** — **Phase B sign-off model split (dual-axis).** Product-intent rulings now carry two
   **independent** sign-offs: **T (architecture / technical reviewer)** and **P (product / PM)** — legend
   + axis-applicability table + ripple rule in `identity-foundation-prd.md` Part 10. Consequence:
