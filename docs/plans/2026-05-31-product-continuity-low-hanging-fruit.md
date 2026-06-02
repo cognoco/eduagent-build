@@ -22,6 +22,7 @@ The low-hanging opportunity is not a new learning engine. It is better continuit
 In scope:
 
 - Student home next-step copy and CTA clarity.
+- Age-appropriate ordering of the four home intent cards: order them by age bracket (adults → "Learn something new" first; under-18/unknown → homework first), all at **equal visual weight — no per-option highlight**. The top hero/coach card stays the single highlighted CTA (untouched). No persistence, no backend (Task 8).
 - Session summary saved-artifact visibility.
 - My Notes hub previews and less-empty counts.
 - Parent recap next-step visibility.
@@ -41,6 +42,7 @@ Out of scope:
 ## File Map
 
 - `apps/mobile/src/components/home/LearnerScreen.tsx`
+- `apps/mobile/src/components/home/resolve-home-intent-actions.ts` (new — Task 8)
 - `apps/mobile/src/components/home/CoachBand.tsx`
 - `apps/mobile/src/components/home/parent-card-copy.ts`
 - `apps/mobile/src/components/home/ParentHomeScreen.tsx`
@@ -221,6 +223,7 @@ This is the user-pain ranking, separate from implementation order:
 5. Recap coming-up fields: helps mentors follow through without needing transcript access.
 6. Constructive retention copy: protects motivation and emotional safety across review surfaces.
 7. Voice permission timing: preserves user control and reduces first-session surprise.
+8. Age-appropriate home action order: stops funneling adult self-learners toward "Help with an assignment" first; orders the four equal-weight cards by age bracket. Small but removes a daily mismatch for non-student users.
 
 The implementation order still groups related code changes, but this ranking is the product rationale for why these seven beat other possible low-hanging improvements.
 
@@ -399,6 +402,69 @@ The implementation order still groups related code changes, but this ranking is 
   - Voice-mode sessions still prepare voice intentionally.
   - Existing mic-in-pill UI remains discoverable.
 
+- [ ] 8. Order the four home intent cards by age bracket, and remove the per-option highlight.
+
+  > **Identity-independent** (not coupled to owner/role/profile-shape) — can proceed regardless of the plan's pending identity-foundation re-triage. No persistence, no API, no schema, no migration.
+  >
+  > **Scope note:** this is **Part A only**. The originally-sketched "last-used behavioral personalization" (persist the last-tapped action and promote it) is **deferred to post-launch** — its payoff requires returning-user history that doesn't exist pre-launch, it adds a moving-UI element and net code/persistence for an unproven, deferred benefit, and at launch it would behave identically to this age default anyway. See "Deferred (post-launch)" below.
+
+  Today `HOME_INTENT_ACTIONS` in `LearnerScreen.tsx` is a static array with `home-action-homework` hardcoded `highlight: true` and first (`:80-110`), rendered at `:648` where `action.highlight` swaps the card to `bg-primary-soft border-primary/40` (`:657-661`). Two changes: (1) **order** the four cards by age bracket; (2) **remove the per-option highlight entirely** so all four sit at equal visual weight. The top hero/coach card (the genuinely highlighted CTA) is a separate element and is **not touched** by this task.
+
+  **(a) Remove the highlight mechanic for these four cards.** Delete the `highlight?: boolean` field from the `HomeIntentAction` type, delete `highlight: true` from the homework entry, and in the render replace the conditional `className` with the single non-highlighted style for all four:
+
+  ```tsx
+  // was: action.highlight ? 'bg-primary-soft border-primary/40' : 'bg-surface border-border'
+  // now: 'bg-surface border-border'   // all four equal weight
+  ```
+
+  (Grep confirms the action `highlight` field is referenced only here — `LearnerScreen.tsx:77,87,658`; the `bg-highlight-bg` chip at `:593` is an unrelated element and stays.)
+
+  **(b) Extract the actions + a pure resolver** into `apps/mobile/src/components/home/resolve-home-intent-actions.ts`. Move the `HomeIntentAction` type and the `HOME_INTENT_ACTIONS` const out of `LearnerScreen.tsx` into this module (import them back), so the resolver is self-contained and unit-testable. The resolver only **reorders** (no highlight):
+
+  ```ts
+  import type { AgeBracket } from '@eduagent/schemas';
+
+  const ADULT_FIRST_TEST_ID = 'home-action-study-new';   // adults → "Learn something new" first
+  const DEFAULT_FIRST_TEST_ID = 'home-action-homework';  // under-18 OR unknown birthYear → preserves today's order + the homework wedge
+
+  export function resolveHomeIntentActions(
+    actions: HomeIntentAction[],
+    opts: { ageBracket: AgeBracket | null },
+  ): HomeIntentAction[] {
+    const firstId =
+      opts.ageBracket === 'adult' ? ADULT_FIRST_TEST_ID : DEFAULT_FIRST_TEST_ID;
+    const first = actions.find((a) => a.testID === firstId);
+    const rest = actions.filter((a) => a.testID !== firstId);
+    return first ? [first, ...rest] : [...actions];
+  }
+  ```
+
+  For `null` bracket (birthYear unknown) the order is byte-for-byte today's layout — no regression.
+
+  **(c) Wire into `LearnerScreen`:** compute the bracket, resolve, render the resolved list:
+
+  ```tsx
+  const ageBracket = activeProfile?.birthYear != null
+    ? computeAgeBracket(activeProfile.birthYear)
+    : null;
+  const intentActions = resolveHomeIntentActions(HOME_INTENT_ACTIONS, { ageBracket });
+  // render intentActions.map(...) instead of HOME_INTENT_ACTIONS.map(...)
+  ```
+
+  `computeAgeBracket` is the canonical, sanctioned age-presentation helper (`packages/schemas/src/age.ts`); reordering is presentation, not feature-gating, so this is rule-clean. No new i18n keys — titles/subtitles are unchanged; only order moves. No `openIntentAction` change.
+
+  **Relationship to Task 1 (now clean, no competing emphasis):** with the per-option highlight removed, the only highlighted CTA on the home is the top hero/coach card (Task 1's "best next step"). The four intent cards are an equal-weight menu beneath it, merely ordered by age. One hero, one menu — no two-highlight competition.
+
+  **Deferred (post-launch), recorded so it isn't re-discovered as a gap:** last-used (recency) or most-used (frequency) behavioral personalization of the *order* of these cards, with this age default as the cold-start fallback. Deferred because the payoff needs returning-user history (none pre-launch) and it adds moving-UI + persistence for an unproven benefit. If revisited, prefer recency over frequency (one stored value vs. a running tally; "continue what you do" is the sharper signal). Cheapest implementation would be a profile-scoped local key via the `secure-storage` wrapper that `lib/intro-state.ts` uses — no backend.
+
+  Done when:
+
+  - `resolve-home-intent-actions.test.ts` covers: `'adult'` → `home-action-study-new` first; `'adolescent'` → `home-action-homework` first; `null` → `home-action-homework` first (today's order, no regression). (Order only — the resolver no longer sets any highlight.)
+  - `LearnerScreen` renders `home-action-study-new` first for an adult fixture profile and `home-action-homework` first for an under-18 fixture, and **none** of the four cards renders the `bg-primary-soft` highlight style.
+  - The existing assertion in `LearnerScreen.test.tsx` (~`:395-404`) is updated: drop any assertion that homework is *highlighted*; assert order for the fixture's `birthYear` (under-18 → homework first, unchanged; adult → `home-action-study-new` first).
+  - No new i18n keys; no persistence; no backend/schema/migration changes.
+  - `pnpm exec nx lint mobile` and `apps/mobile` `tsc --noEmit` are clean.
+
 ## Verification
 
 Run focused checks first:
@@ -438,6 +504,7 @@ If selectors or visible flows change in tested areas, update and run the relevan
 3. Do tasks 4 and 5 together because both improve mentor follow-through after a child session.
 4. Do task 3 after the copy patterns settle so My Notes can reuse the same artifact language.
 5. Do task 7 last because it is behavior-sensitive and needs focused voice tests.
+6. Do task 8 alongside task 1 — both edit `LearnerScreen` next-step emphasis; landing them together keeps the "contextual band vs. habitual action card" split coherent and avoids two passes over the same render tree.
 
 ## Risks And Mitigations
 
@@ -455,3 +522,6 @@ If selectors or visible flows change in tested areas, update and run the relevan
 
 - Risk: Session summary gains another dense module.
   Mitigation: The new card should replace confusion, not add detail. Keep rows short and link out to Library, My Notes, or Mentor Memory only when useful.
+
+- Risk (Task 8): removing the per-option highlight makes the homework action less prominent for students who do want homework help.
+  Mitigation: For under-18 profiles homework is still ordered first; the top hero/coach card (Task 1) remains the single highlighted CTA and can itself surface a homework next-step when contextually relevant. The four cards stay an always-visible, equal-weight menu — nothing is hidden.
