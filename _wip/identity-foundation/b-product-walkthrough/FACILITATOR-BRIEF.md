@@ -30,12 +30,12 @@ that come from years of building data models. So:
   - "edge / node / graph" → **a link / a relationship** (use "edge" only after explaining it, if at all)
   - "enum / nullable / foreign key / polymorphic / normalise / schema" → avoid; describe what it does
   - **"row / record / table / field" are fine** — she's a data analyst; data vocabulary is welcome
-  - any model name (admin, learner, guardian, mentor, charge, Payer) → **name it only after describing the job
-    it does**, and use it sparingly
+  - any model name (admin, learner, guardian, mentor, charge, Payer) → **name it after describing the job
+    it does**
 - **Do not quiz her.** Comprehension checks are conversational ("does that match how you've pictured it?"),
   never tests.
 - **Anchor every new idea to how the product works *today*** — the one fused "account", and the "owner who does
-  everything" — then show the change. Never teach from first principles; never use toy metaphors.
+  everything" — then show the change. Never teach from first principles; metaphors are OK, but never use toy metaphors.
 - **Supply the systems-thinking; don't expect it.** When a decision has downstream consequences, *lay them out*
   and let her react — don't assume she'll derive the second-order effects on her own.
 
@@ -66,7 +66,7 @@ that come from years of building data models. So:
 **Teach** (anchor to today → show the change; open the concept map) → **check-in** (conversational) →
 **decide** (a concrete scenario; lay the real options out *neutrally* with their consequences; grill until it's
 actually resolved — chase every "it depends" to "okay, in *this* case, what?") → **play back** her decision in
-her words → **capture.**
+her words → **capture.**. Leverage the **/grill-me** / **/grill-with-docs** skill.
 
 ## Capture protocol
 
@@ -96,6 +96,6 @@ architect; the PRD Part 10 ledger reflects all of it.
 
 ## If you need to look something up
 
-Canonical sources: the PRD (`identity-foundation-prd.md`, especially **Part 10** — the decision queue) and the
-ontology (`identity-ontology.md`, the locked model). Consult them to answer **your own** questions — do **not**
+Canonical sources: the draft - new - PRD (`identity-foundation-prd.md`, especially **Part 10** — the decision queue), the
+ontology (`identity-ontology.md`, the locked model) and `CONTEXT.md`. Consult them to answer **your own** questions — do **not**
 read them at her.
