@@ -18,6 +18,7 @@ import {
   ForbiddenError,
   NotFoundError,
   QuotaExceededError,
+  quotaExceededSchema,
   RateLimitedError,
   ResourceGoneError,
   UnauthorizedError,
@@ -97,4 +98,120 @@ export class UpstreamError extends Error {
     this.status = status;
     Object.setPrototypeOf(this, UpstreamError.prototype);
   }
+}
+
+// ---------------------------------------------------------------------------
+// 402 quota-error classification (shared by every 402 classifier:
+// api-client.customFetch, sse.classifyXhrError, assert-ok)
+// ---------------------------------------------------------------------------
+
+const VALID_TIERS: ReadonlyArray<QuotaExceededDetails['tier']> = [
+  'free',
+  'plus',
+  'family',
+  'pro',
+];
+const VALID_UPGRADE_TIERS: ReadonlyArray<UpgradeOption['tier']> = [
+  'plus',
+  'family',
+  'pro',
+];
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asTier(
+  value: unknown,
+  fallback: QuotaExceededDetails['tier'],
+): QuotaExceededDetails['tier'] {
+  return VALID_TIERS.includes(value as QuotaExceededDetails['tier'])
+    ? (value as QuotaExceededDetails['tier'])
+    : fallback;
+}
+
+function asInt(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.trunc(value)
+    : fallback;
+}
+
+/**
+ * Build a render-safe `QuotaExceededDetails` from a 402 body whose `details`
+ * failed strict `quotaExceededSchema` validation. Every field the
+ * `QuotaExceededCard` reads (reason, counters, resetsAt, topUpCreditsRemaining,
+ * upgradeOptions) is defaulted to a safe, render-able value when the server's
+ * `details` are absent or malformed.
+ */
+export function buildFallbackQuotaDetails(
+  rawDetails: unknown,
+): QuotaExceededDetails {
+  const d = asRecord(rawDetails);
+  const tier = asTier(d.tier, 'free');
+  const upgradeOptions: UpgradeOption[] = Array.isArray(d.upgradeOptions)
+    ? d.upgradeOptions.filter((option): option is UpgradeOption => {
+        const opt = asRecord(option);
+        return (
+          VALID_UPGRADE_TIERS.includes(opt.tier as UpgradeOption['tier']) &&
+          typeof opt.monthlyQuota === 'number' &&
+          typeof opt.priceMonthly === 'number'
+        );
+      })
+    : [];
+  return {
+    tier,
+    effectiveAccessTier: asTier(d.effectiveAccessTier, tier),
+    quotaModel: d.quotaModel === 'shared-pool' ? 'shared-pool' : 'per-profile',
+    profileRole:
+      d.profileRole === 'owner' || d.profileRole === 'child'
+        ? d.profileRole
+        : null,
+    reason: d.reason === 'monthly' ? 'monthly' : 'daily',
+    resetsAt:
+      typeof d.resetsAt === 'string' ? d.resetsAt : new Date().toISOString(),
+    monthlyLimit: asInt(d.monthlyLimit, 0),
+    usedThisMonth: asInt(d.usedThisMonth, 0),
+    dailyLimit:
+      typeof d.dailyLimit === 'number' ? Math.trunc(d.dailyLimit) : null,
+    usedToday: asInt(d.usedToday, 0),
+    topUpCreditsRemaining: asInt(d.topUpCreditsRemaining, 0),
+    upgradeOptions,
+  };
+}
+
+/**
+ * Classify a 402 response body. Returns a `QuotaExceededError` when the body is
+ * a quota block — either a strict `quotaExceededSchema` match, OR a body
+ * explicitly tagged `code: 'QUOTA_EXCEEDED'` whose `details` have drifted from
+ * the schema (best-effort details via `buildFallbackQuotaDetails`). Returns
+ * `null` for non-quota 402s so the caller constructs its own `UpstreamError`
+ * (preserving per-call-site status/code semantics).
+ *
+ * Belt-and-braces: a server-side quota-details shape change can never silently
+ * downgrade a quota block to a generic error (which would dead-end the user and
+ * be mis-captured as an LLM/upstream error in telemetry).
+ */
+export function quotaErrorFromBody(
+  raw: unknown,
+  fallbackMessage?: string,
+): QuotaExceededError | null {
+  const strict = quotaExceededSchema.safeParse(raw);
+  if (strict.success) {
+    return new QuotaExceededError(strict.data.message, strict.data.details);
+  }
+  const body = asRecord(raw);
+  const errObj = asRecord(body.error);
+  const code = errObj.code ?? body.code;
+  if (code !== 'QUOTA_EXCEEDED') return null;
+  const message =
+    (typeof body.message === 'string' && body.message) ||
+    (typeof errObj.message === 'string' && errObj.message) ||
+    fallbackMessage ||
+    'Quota exceeded';
+  return new QuotaExceededError(
+    message,
+    buildFallbackQuotaDetails(body.details),
+  );
 }

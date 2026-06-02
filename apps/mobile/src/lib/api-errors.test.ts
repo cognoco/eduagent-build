@@ -11,12 +11,15 @@
 import {
   QuotaExceededError as SchemasQuotaExceededError,
   ResourceGoneError as SchemasResourceGoneError,
+  quotaExceededSchema,
 } from '@eduagent/schemas';
 import {
   BadRequestError,
+  buildFallbackQuotaDetails,
   NetworkError,
   NotFoundError,
   QuotaExceededError,
+  quotaErrorFromBody,
   RateLimitedError,
   ResourceGoneError,
   UpstreamError,
@@ -177,5 +180,124 @@ describe('ConflictError re-export', () => {
     const err = new ConflictError('Already exists');
     expect(err).toBeInstanceOf(ConflictError);
     expect(err.message).toBe('Already exists');
+  });
+});
+
+describe('quotaErrorFromBody — 402 quota classification', () => {
+  const WELL_FORMED = {
+    code: 'QUOTA_EXCEEDED',
+    message:
+      "You've reached your daily question limit. Come back tomorrow for more!",
+    details: {
+      tier: 'free',
+      effectiveAccessTier: 'free',
+      quotaModel: 'per-profile',
+      profileRole: 'owner',
+      reason: 'daily',
+      resetsAt: '2026-06-01T01:00:00.000Z',
+      monthlyLimit: 100,
+      usedThisMonth: 10,
+      dailyLimit: 10,
+      usedToday: 10,
+      topUpCreditsRemaining: 0,
+      upgradeOptions: [
+        { tier: 'plus', monthlyQuota: 700, priceMonthly: 18.99 },
+      ],
+    },
+  };
+
+  it('returns a QuotaExceededError with exact details for a well-formed body', () => {
+    const err = quotaErrorFromBody(WELL_FORMED);
+    expect(err).toBeInstanceOf(QuotaExceededError);
+    expect(err?.details).toEqual(WELL_FORMED.details);
+    expect(err?.message).toBe(WELL_FORMED.message);
+  });
+
+  it('still returns a QuotaExceededError when details DRIFT from the schema', () => {
+    // A plausible future server-side drift: details is tagged QUOTA_EXCEEDED but
+    // is missing several schema-required fields. The OLD strict-only classifiers
+    // would reject this and downgrade to UpstreamError (silent dead-end + false
+    // LLM telemetry). This is the bug this hardening prevents.
+    const drifted = {
+      code: 'QUOTA_EXCEEDED',
+      message:
+        "You've reached your daily question limit. Come back tomorrow for more!",
+      details: { reason: 'daily', usedToday: 10, dailyLimit: 10 },
+    };
+
+    // RED condition: the strict schema (what the old code gated on) rejects it.
+    expect(quotaExceededSchema.safeParse(drifted).success).toBe(false);
+
+    // GREEN: the hardened classifier still surfaces a quota error.
+    const err = quotaErrorFromBody(drifted);
+    expect(err).toBeInstanceOf(QuotaExceededError);
+    expect(err?.message).toBe(drifted.message);
+    // Render-safe details: real values preserved, missing fields defaulted.
+    expect(err?.details.reason).toBe('daily');
+    expect(err?.details.usedToday).toBe(10);
+    expect(err?.details.dailyLimit).toBe(10);
+    expect(err?.details.tier).toBe('free');
+    expect(err?.details.upgradeOptions).toEqual([]);
+    expect(err?.details.topUpCreditsRemaining).toBe(0);
+  });
+
+  it('reads QUOTA_EXCEEDED from a nested error.code envelope', () => {
+    const err = quotaErrorFromBody({
+      error: { code: 'QUOTA_EXCEEDED', message: 'Out of questions' },
+      details: { reason: 'monthly' },
+    });
+    expect(err).toBeInstanceOf(QuotaExceededError);
+    expect(err?.message).toBe('Out of questions');
+    expect(err?.details.reason).toBe('monthly');
+  });
+
+  it('returns null for a non-quota 402 body (caller falls back to UpstreamError)', () => {
+    expect(
+      quotaErrorFromBody({ code: 'PAYMENT_REQUIRED', message: 'pay up' }),
+    ).toBeNull();
+    expect(quotaErrorFromBody('not json at all')).toBeNull();
+    expect(quotaErrorFromBody(null)).toBeNull();
+  });
+
+  it('uses the fallback message only when the body carries none', () => {
+    const err = quotaErrorFromBody({ code: 'QUOTA_EXCEEDED' }, 'fallback msg');
+    expect(err?.message).toBe('fallback msg');
+  });
+});
+
+describe('buildFallbackQuotaDetails', () => {
+  it('defaults every field to a render-safe value for empty input', () => {
+    const d = buildFallbackQuotaDetails(undefined);
+    expect(d).toEqual({
+      tier: 'free',
+      effectiveAccessTier: 'free',
+      quotaModel: 'per-profile',
+      profileRole: null,
+      reason: 'daily',
+      resetsAt: expect.any(String),
+      monthlyLimit: 0,
+      usedThisMonth: 0,
+      dailyLimit: null,
+      usedToday: 0,
+      topUpCreditsRemaining: 0,
+      upgradeOptions: [],
+    });
+  });
+
+  it('drops malformed upgrade options and non-numeric counters', () => {
+    const d = buildFallbackQuotaDetails({
+      monthlyLimit: '700', // wrong type → defaulted
+      usedToday: 3,
+      upgradeOptions: [
+        { tier: 'plus', monthlyQuota: 700, priceMonthly: 18.99 }, // kept
+        { tier: 'enterprise', monthlyQuota: 1, priceMonthly: 1 }, // bad tier → dropped
+        { tier: 'pro', monthlyQuota: 'x', priceMonthly: 1 }, // bad quota → dropped
+      ],
+    });
+    expect(d.monthlyLimit).toBe(0);
+    expect(d.usedToday).toBe(3);
+    expect(d.upgradeOptions).toEqual([
+      { tier: 'plus', monthlyQuota: 700, priceMonthly: 18.99 },
+    ]);
   });
 });

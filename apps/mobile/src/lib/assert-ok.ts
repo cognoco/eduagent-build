@@ -3,12 +3,11 @@ import {
   ConflictError,
   ConsentRequiredError,
   ForbiddenError,
-  QuotaExceededError,
+  quotaErrorFromBody,
   RateLimitedError,
   ResourceGoneError,
   UpstreamError,
 } from './api-errors';
-import { quotaExceededSchema } from '@eduagent/schemas';
 
 /**
  * Asserts that an API response is successful (2xx status).
@@ -87,26 +86,19 @@ export async function assertOk<T extends Response>(
   }
 
   if (res.status === 402) {
-    // Try to parse as a quota-exceeded structured body first
+    // A 402 tagged QUOTA_EXCEEDED always surfaces as a QuotaExceededError
+    // (strict schema match, or best-effort details if the server's details
+    // shape drifts) so the quota card is never silently downgraded to a
+    // generic UpstreamError.
     if (bodyText) {
+      let rawParsed: unknown;
       try {
-        const rawParsed: unknown = JSON.parse(bodyText);
-        const quotaResult = quotaExceededSchema.safeParse(rawParsed);
-        if (quotaResult.success) {
-          throw new QuotaExceededError(
-            quotaResult.data.message,
-            quotaResult.data.details,
-          );
-        }
-      } catch (e) {
-        // Re-throw guard: the outer catch (e) above wraps both the body-text read
-        // and quotaExceededSchema.safeParse. If a QuotaExceededError was already
-        // constructed (happy path), preserve it; otherwise fall through to
-        // UpstreamError with the truncated body.
-        // Re-throw if it's a QuotaExceededError we just constructed
-        if (e instanceof QuotaExceededError) throw e;
-        // Otherwise fall through to UpstreamError
+        rawParsed = JSON.parse(bodyText);
+      } catch {
+        rawParsed = undefined;
       }
+      const quotaError = quotaErrorFromBody(rawParsed, message);
+      if (quotaError) throw quotaError;
     }
     throw attachResponseFields(
       new UpstreamError(message, code ?? 'PAYMENT_REQUIRED', 402),

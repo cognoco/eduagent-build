@@ -619,7 +619,16 @@ describe('streamSSEViaXHR', () => {
     expect((caught as { status?: number }).status).toBe(402);
   });
 
-  it('[BUG-955] leaves quota-coded 402 responses with malformed details as generic API errors', async () => {
+  // [BUG-955 superseded] BUG-955 previously left a quota-coded 402 with
+  // malformed `details` as a generic UpstreamError (strict-schema gate). That
+  // silently downgraded a real quota block to a dead-end generic error and
+  // mis-captured it as an LLM/upstream error in telemetry. classifyXhrError now
+  // always surfaces a `code: 'QUOTA_EXCEEDED'` 402 as a QuotaExceededError,
+  // filling any drifted/missing detail fields with render-safe defaults
+  // (quotaErrorFromBody → buildFallbackQuotaDetails) so the QuotaExceededCard
+  // can always mount. The strict path still wins when details fully validate;
+  // non-quota 402s still surface as UpstreamError (see the test below).
+  it('surfaces a quota-coded 402 with malformed details as a QuotaExceededError with render-safe details', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {
       method: 'POST',
@@ -649,8 +658,16 @@ describe('streamSSEViaXHR', () => {
     }
 
     expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).name).not.toBe('QuotaExceededError');
+    expect((caught as Error).name).toBe('QuotaExceededError');
     expect((caught as Error).message).toContain('Quota reached');
+    const details = (caught as { details?: Record<string, unknown> }).details;
+    // Real fields from the body are preserved …
+    expect(details?.reason).toBe('monthly');
+    expect(details?.tier).toBe('plus');
+    // … and missing/drifted fields are defaulted to render-safe values.
+    expect(details?.upgradeOptions).toEqual([]);
+    expect(details?.topUpCreditsRemaining).toBe(0);
+    expect(details?.usedToday).toBe(0);
   });
 
   it('[BUG-955 / BUG-545] throws UpstreamError for non-quota 402 with error code', async () => {

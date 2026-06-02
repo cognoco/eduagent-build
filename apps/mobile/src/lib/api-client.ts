@@ -26,13 +26,12 @@ import {
   ForbiddenError,
   NetworkError,
   NotFoundError,
-  QuotaExceededError,
+  quotaErrorFromBody,
   RateLimitedError,
   ResourceGoneError,
   UnauthorizedError,
   UpstreamError,
 } from './api-errors';
-import type { QuotaExceededDetails } from './api-errors';
 
 export {
   BadRequestError,
@@ -42,6 +41,8 @@ export {
   NetworkError,
   NotFoundError,
   QuotaExceededError,
+  quotaErrorFromBody,
+  buildFallbackQuotaDetails,
   RateLimitedError,
   ResourceGoneError,
   UnauthorizedError,
@@ -283,12 +284,14 @@ export function useApiClient(): ApiClient {
         }
 
         if (res.status === 402) {
-          if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
-            throw new QuotaExceededError(
-              apiMessage ?? 'Quota exceeded',
-              parsed.details as QuotaExceededDetails,
-            );
-          }
+          // A 402 tagged QUOTA_EXCEEDED always surfaces as a QuotaExceededError
+          // (strict schema match, or best-effort details if the shape drifts) so
+          // the quota card is never silently downgraded to a generic error.
+          const quotaError = quotaErrorFromBody(
+            parsed,
+            apiMessage ?? undefined,
+          );
+          if (quotaError) throw quotaError;
           // [CR-API-402-04] Non-quota 402 — preserve status code so callers
           // can branch on payment-required without parsing raw HTTP status.
           throw new UpstreamError(

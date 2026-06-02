@@ -14,7 +14,6 @@
  */
 import {
   maybeReplayResponseSchema,
-  quotaExceededSchema,
   type ChallengeRoundSessionState,
 } from '@eduagent/schemas';
 import {
@@ -24,7 +23,7 @@ import {
   type IdempotencyReplayBody,
   NetworkError,
   NotFoundError,
-  QuotaExceededError,
+  quotaErrorFromBody,
   RateLimitedError,
   ResourceGoneError,
   triggerAuthExpired,
@@ -406,13 +405,12 @@ export function streamSSEViaXHR(
       return err;
     }
     if (status === 402) {
-      const quotaExceeded = quotaExceededSchema.safeParse(parsed);
-      if (quotaExceeded.success) {
-        return new QuotaExceededError(
-          quotaExceeded.data.message,
-          quotaExceeded.data.details,
-        );
-      }
+      // A 402 tagged QUOTA_EXCEEDED always surfaces as a QuotaExceededError
+      // (strict schema match, or best-effort details if the server's details
+      // shape drifts) so the in-chat quota card is never silently downgraded
+      // to a generic UpstreamError.
+      const quotaError = quotaErrorFromBody(parsed, apiMessage ?? undefined);
+      if (quotaError) return quotaError;
       // [BUG-545] Non-quota 402: use UpstreamError (not plain Error) so
       // callers can inspect .status and .code without parsing message strings.
       return new UpstreamError(
