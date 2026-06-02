@@ -386,34 +386,118 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
 ### C — Vision & audience framing  *(Doc 2 Parts I–II)*
 
 - **C1 — "Consumer-first; B2B not near-term but not foreclosed."** `[DERIVABLE: §6 keeps the org table a dormant B2B seam; inv 2/8/18 keep person-scoping]` — confirm as framing. `[T✓ 2026-06-02 · P pending]`
-- **C2 — "Homework-helper wedge is GTM framing, not an audience cap."** `[NEEDS-DECISION]` — a positioning
-  claim with **no** canon anchor. Ratify as product framing or drop from the PRD.
-- **C3 — The explicit audience list / "serious learners of any age."** `[NEEDS-DECISION]` — confirm the
-  audience statement (the tiers are anchored; naming them "the audience" is a product call).
+- **C2 — Homework-helper framing. RULED 2026-06-02 `[P✓]` — a GTM/ads way-in, NOT the product headline or an audience cap.**
+  "Homework helper" / "end homework fights" lives in **acquisition (ads)** as the wedge hook; it is **not** the
+  in-product headline and does **not** cap the audience to school-age homework. Concrete product consequence ruled:
+  the in-app welcome keeps **both doors ("Learn with a mentor" + "End homework fights") always shown to everyone**
+  (kept simple — no per-ad-source entry tailoring); a self-learner who sees the homework door just picks the other.
+  Positioning call; **no structural change.**
+- **C3 — Audience statement. RULED 2026-06-02 `[P✓]` — "serious learners (and the mentors who support them) of any age."**
+  **Two customers — learner and mentor — both any age** (maps to the two welcome doors). **Long-term north star =
+  learners** (who the product ultimately optimizes for). **Near-term wedge = parents/mentors**: onboarding leans on
+  them, betting they pick up learning themselves *and* promote the app (a referral flywheel). One asterisk on
+  "any age": the **helper/mentor** can be any age, but the narrower **consent-giver (legal parental consent
+  signature) must be an adult** — a legal floor, not an audience cap. Positioning call; **no structural change.**
 
 ### D — UX defaults Doc 2 asserted that the canon does not fix
 
-- **D1 — Login-mode default per tier** ("credentialed by default above the consent age; managed by default
-  for a charge"). `[NEEDS-DECISION]` — §3.1 says both modes are valid at any tier; the *default* is a UX call.
-- **D2 — Consent holding-state preview** (browse-only, no LLM). `[NEEDS-DECISION]` — sensible, unanchored. **Grounding:** AI use by a consent-gated minor *requires* guardian consent — COPPA (the LLM call is a third-party disclosure → VPC, §4.4) + GDPR Art 8 (parental authorization to process a below-digital-consent-age child's data). D2 is lawful pre-consent **only because** it is no-LLM / no-collection — that is what sidesteps the trigger. The precise "what counts as no-collection" boundary is a counsel item (REQ-2).
-- **D3 — Withdrawal grace window length; resend/“change recipient” caps; notify-parent cooldown.**
-  `[NEEDS-DECISION]` — all Doc-2 specifics, no canon value.
+- **D1 — Login-mode default per tier. RULED 2026-06-02 `[P✓ · T pending — see ripple]`.** **Self-signup → the
+  person gets their own login (credentialed), no age-based steering** (today's de-facto behaviour, confirmed as
+  intended; the consent gate still catches under-age self-signups). **Extension (PM-raised hole):** the
+  **parent-adds-child** path today **forces managed** (child has no own login) with no option for a child who
+  has their own device — this **must be resolved** by **asking the parent at add-child time: "will this child
+  use their own device/account, or yours?"** → own device = a **credentialed charge** (own login *and* still
+  consent-gated); parent's device = a **managed charge** (today's behaviour). **On-model:** §3.1 + inv 4 already
+  allow a credentialed charge (login-presence ⊥ consent-requirement). The **consent-giver is unchanged** — the
+  parent consents either way (no safety regression). **RIPPLE → architect:** the *mechanism* for provisioning a
+  child's own login (invite-flow where the child completes their own login vs. parent-creates-credential) is a
+  feasibility call, maps to the deferred **§6 "entry-point asymmetry / self-registered-minor"** item, and is
+  **net-new / T2+ unbuilt** work. T-axis pends the architect's mechanism confirmation. *(Prior: `[NEEDS-DECISION]`.)*
+- **D2 — Consent holding-state preview** (browse-only, no LLM). **RULED 2026-06-02 `[P✓]` — lock as-built.**
+  Keep the live `ConsentPendingGate` "While you wait…" preview (Browse Subjects + Sample Mentoring — **static,
+  no-AI, no-collection, no network**); the real AI stays hard-blocked at app *and* server (403). **Recorded
+  constraint:** it **must remain no-AI / no-collection** — that is the only reason it is lawful pre-consent.
+  **Grounding:** AI use by a consent-gated minor *requires* guardian consent — COPPA (the LLM call is a
+  third-party disclosure → VPC, §4.4) + GDPR Art 8 (parental authorization to process a below-digital-consent-age
+  child's data). The precise "what counts as no-collection" boundary is a counsel item (REQ-2). **No structural
+  change.** *(Prior: `[NEEDS-DECISION]`.)*
+- **D3 — Withdrawal grace window length; resend/"change recipient" caps; notify-parent cooldown. RULED 2026-06-02
+  `[P✓ — reasonable defaults]`.** Keep the **already-built caps**: **3 resends + 3 recipient-email changes + 7-day
+  link** (`consent.ts` `MAX_CONSENT_RESENDS` / `MAX_RECIPIENT_CHANGES`). **Add a short cooldown (~30–60s) between
+  resend taps** (cheap — stops a child spamming the parent); **no** elaborate server-side timed cooldown (the count
+  caps already bound total emails). **Withdrawal grace window stays the existing 7 days.** No structural change.
+  *(Prior: `[NEEDS-DECISION]`.)*
 - **D4 — Stricter-wins reconciliation of self-declared vs platform Age-Signal.** `[DERIVABLE: inv 29 worst-case-default generalises to "take the stricter signal"]` — confirm. `[T✓ 2026-06-02 · P n/a]`
 
 ### E — Product calls the model deliberately leaves open  *(Doc 2 Part IX + ontology §6)*
 
-- **E0 — Payer capacity (store-delegated). RULED 2026-06-02 `[T✓ · P pending]` — ontology v1.1 amendment**
+- **E0 — Payer capacity (store-delegated). RULED 2026-06-02 `[T✓ · P✓]` — ontology v1.1 amendment**
   (inv 17/10, §2.4, §3.2; ADR 0002; CONTEXT Payer+minor). For store-mediated payment (the only channel for
   the foreseeable future) capacity is **delegated to the store as merchant of record**; we impose no age gate.
   A flat ≥18 worst-case default (inv 29) applies **only** to a future non-store rail — **not** a per-jurisdiction
-  derivation. **Carried open:** **E3** (recorded-Payer identity under Family Sharing — now the active
-  sub-question); under-18 **exposure** (P-axis); FLAG-2 / REQ-2 (launch gates).
-- **E1 — Threshold-crossing mechanism. RULED 2026-06-02 `[T✓ envelope · P pending]` — per-dimension, not monolithic** (inv 22). At a consent-age / 18 crossing: **guardian visibility → learner opt-in, default off** (inv 19 — *not* status-quo, which Doc-2 wrongly proposed); **guardian-granted mentorships lapse unless re-confirmed** (inv 16); **account-control / consent self-takeover is explicit, status-quo-until-taken** (inv 20); the scheduler fires the re-eval regardless (inv 24). Open **P**: takeover-prompt flow, reminder cadence, any nudge-grace on visibility *within* the inv-19 constraint.
-- **E2 — `residence_jurisdiction`-change response. RULED 2026-06-02 `[T✓ envelope · P pending]` — suspend *and* re-prompt** (not either/or). If the new jurisdiction's standard isn't satisfied and the Person is now consent-gated, processing **suspends into the R3 holding state** (inv 11/12/25), scheduler-detected (inv 24); **re-prompt is the exit** (for a guardian-less self-registered minor, via R13). Only bites those crossing *into* needing guardian consent (adults unaffected; still-consent-capable self-re-confirm). Open **P/legal**: grace-window length, suspended-state feel (locked vs browse-only preview à la D2), residence-change detection (declared vs inferred, §3.4).
+  derivation. **Under-18 exposure (P-axis) RULED 2026-06-02 `[P✓]` — E0-a: keep store-delegated, no product block.**
+  A self-signed-up under-18 *owner* continues to see "Upgrade" and the store (Ask-to-Buy / payment method) is the
+  sole gatekeeper; a managed child on a parent's account continues to see **"Notify Parent"** (no Upgrade). Matches
+  built behaviour; **no structural change.** **Carried open:** **E3** (recorded-Payer identity under Family
+  Sharing — now the active sub-question); FLAG-2 / REQ-2 (launch gates).
+- **E1 — Threshold-crossing mechanism. RULED 2026-06-02 `[T✓ envelope · P pending]` — per-dimension, not monolithic** (inv 22). At a consent-age / 18 crossing: **guardian visibility → learner opt-in, default off** (inv 19 — *not* status-quo, which Doc-2 wrongly proposed); **guardian-granted mentorships lapse unless re-confirmed** (inv 16); **account-control / consent self-takeover is explicit, status-quo-until-taken** (inv 20); the scheduler fires the re-eval regardless (inv 24).
+  **Visibility-tail (Round 4) RULED 2026-06-02 `[P✓ within inv-19]`:** at the consent-age crossing, **prompt the teen**
+  to keep-or-turn-off the parent's view as an **affirmative opt-in** ("you control this now — keep sharing with your
+  parent, or turn it off?"), then **notify the parent** of the outcome; **the parent may ask to keep/regain access and
+  the teen decides** (grant/decline). **Fallback if the teen-prompt is too costly to build: visibility goes OFF
+  automatically — never ON.** Auto-keeping a parent's view on *without* the teen's opt-in would violate inv 19. **PM expectation
+  (corrected 2026-06-02): ~99% of teens will choose NOT to share with their parents** — so **default-off already
+  matches the common case**, making the birthday teen-prompt *optional polish* rather than load-bearing: **auto-off
+  gives ~99% the outcome they'd pick anyway.** The teen-prompt + the **reshare / ask-to-keep** path serve the **~1%**
+  who do want to keep a parent in the loop (parent asks → teen agrees). Lowest-cost build = auto-off + reshare button;
+  the explicit birthday prompt is a nicety. **Account-control takeover (Round 6) RULED 2026-06-02 `[P✓]` — prompt, not automatic.** On the
+  consent-age crossing the system does **not** auto-seize/auto-hand control; it **invites the now-capable teen to
+  take over and make it their own account** ("you're old enough to take this over — ready?"), and everything stays
+  **status-quo until they accept** (inv 20). Ties to the same **child-own-login provisioning mechanism** already
+  flagged to the architect (D1 ripple) — taking over requires the teen to set up their own login, so it can't be
+  silent anyway. **Reminder cadence:** gentle/occasional, never nagging (PM-default). No new structural change
+  beyond the D1 provisioning ripple.
+- **E2 — `residence_jurisdiction`-change response. RULED 2026-06-02 `[T✓ envelope · P pending]` — suspend *and* re-prompt** (not either/or). If the new jurisdiction's standard isn't satisfied and the Person is now consent-gated, processing **suspends into the R3 holding state** (inv 11/12/25), scheduler-detected (inv 24); **re-prompt is the exit** (for a guardian-less self-registered minor, via R13). Only bites those crossing *into* needing guardian consent (adults unaffected; still-consent-capable self-re-confirm). **Suspended-state feel RULED 2026-06-02 `[P✓]` — reuse the browse-only preview (D2), not a cold lock.** While the
+  AI is paused after a move into a stricter jurisdiction, the person sees the **same no-AI "while you wait" preview**
+  already built (Browse Subjects, no AI, no collection) **plus a clear explainer** ("the rules changed where you now
+  live — here's what's needed and how to fix it"). Avoids dropping a happily-learning user into a dead-end. **Push
+  cadence default:** gentle but persistent until resolved. **Detection RULED 2026-06-02 `[P✓]` — declared residence + conditional soft nudge.** Residence is a
+  **declared** setting the user/parent controls (source of truth) — we do **not** gate on current location, so a
+  **holiday or VPN never re-gates** (the §3.4 trip/VPN trap is avoided by design). A **soft nudge** ("looks like
+  you've moved — update your home country?") fires **only when** signals suggest a *sustained* change **AND** the new
+  jurisdiction would **actually change this person's consent requirement** (suppress the nudge when the move is a
+  no-op — e.g. an adult, or a move between two equal-threshold countries). **Never auto-pause off a signal alone** —
+  only the person confirming the new residence changes anything. **Still open P/legal:** grace-window length → counsel.
 - **E3 — Store-payer ↔ recorded-Payer mapping under family sharing.** `[ANCHORED-OPEN: §6 multi-org / Doc 2 J13]` — **now the active Payer sub-question after E0** (capacity is settled; *which Person* a store-completed purchase records as Payer under Family Sharing / Ask-to-Buy is not). → Phase D/E.
 - **E4 — Co-guardian consent precedence** (the one-of/all-of rule). `[ANCHORED-OPEN: inv 11 "rule is jurisdictional/legal — deferred §6"]` — likely defers to counsel; we can set a default.
-- **E5 — Last-guardian departure / charge custody.** `[ANCHORED-OPEN: §6]` — Doc-2 rec: retain + re-homable.
-- **E6 — Unified vs split multi-role surface** for the family operator. `[ANCHORED-OPEN: §6 / Doc 2 J-Family-Operator]` — note it must also serve an **admin-only** operator (learner-optional).
+- **E5 — Last-guardian departure / charge custody. PM LEAN 2026-06-02 `[P-lean · RIPPLE → architect · T pending]`.**
+  Replace today's **silent cascade-delete** of the child (children live in the parent's account → account deletion
+  wipes them, the live inv-21 violation) with an **explicit choice presented to the departing consenting parent at
+  account deletion**: (i) **export/download** the child's data; (ii) **attach another consenting adult** — *offered,
+  not forced* (PM reluctant to build the full re-home flow; = R13 guardian-attachment-to-existing / E11); (iii)
+  **delete** the child's data. Rationale: for a genuine *charge* (below consent age) the managing parent is the
+  responsible decider. **PM also leans to soften the "nothing is ever lost" promise → honest promise + disclaimer**
+  rather than build guaranteed safe-holding/re-homing.
+  **RIPPLES → architect (not absorbed):**
+  1. Does a parent-*initiated, explicit* delete (with export offered) reconcile with **inv 21** ("a managed Person
+     is never orphaned; learning history never cascade-deleted"), or must inv 21 be amended? *(Facilitator read: an
+     explicit chosen delete ≠ the silent orphan inv 21 forbids, so likely compatible — architect rules.)*
+  2. **Residual gap → RESOLVED by PM 2026-06-02 via a cross-cutting inactivity-expiry policy.** The
+     active-deletion prompt doesn't cover **abandonment / death / store-side deletion**; PM closes this with a
+     **general dormancy-deletion policy applied to ALL accounts** ("no activity for ~365 days → cleaned up", number
+     illustrative). Subsumes the abandoned-child case. **Architect:** requires the **durable scheduler** (inv 24,
+     not built today) — *shared* with Round-6 birthday/age re-checks (E1/E2) — plus a **warn + export window before
+     deletion** (inv 25 no-dead-end; data-subject rights). **COUNSEL (REQ-2, new sub-item):** legality leans
+     favorable (GDPR Art 5(1)(e) storage-limitation *encourages* not over-retaining), but counsel must fix: the
+     exact dormancy period; the mandatory pre-deletion notice + grace/export; children's-data handling; and
+     **carve-outs for legally-mandated retention** (billing/tax/transaction records outliving learning data).
+  3. **managed ≠ consent-gated** (§3.1) — **CONFIRMED by PM 2026-06-02.** A managed but *consent-capable* person
+     owns their own data (inv 7/19) — the parent must **not** delete *their* learning. The "parent decides"
+     export/delete path is **scoped to genuine under-consent-age charges only**; a capable managed person's
+     export/delete routes to **themselves**.
+  **Legal:** child's erasure right + the parent's authority to exercise it for a charge = counsel (REQ-2).
+  *(Prior: `[ANCHORED-OPEN: §6]` — Doc-2 rec: retain + re-homable.)*
+- **E6 — Unified vs split multi-role surface** for the family operator. **RULED 2026-06-02 `[P✓ · T✓-by-existing-build]` — split spaces, purpose-led landing.** The multi-role person sees **separate spaces** (a family/mentoring space and a "my own learning" space) with a runtime Study/Family switch — *as already built*. Landing is led by the explicit **"What brings you here?"** purpose choice at signup (persisted as the default space). The mentoring home is the landing only once a child is linked; a **family-door picker with no child yet lands on a focused "add your first child" setup screen** — planned (mode-nav plan HIGH-1: "no silent fall-through to Study") but **currently stranded / unbuilt** (`onboarding/intent.tsx` + `family-setup-empty` testID absent from the codebase; **PM to log as a missing feature in Notion**). That setup step is **not a hard gate** — skipping it (no child added) falls through to the Study/learner home (honours never-force-add-child). Pure presentation/landing over the person's several jobs (run / pay / parent / learner); **no structural change, no ripple.** Must still serve an **admin-only** operator (learner-optional). *(Prior: `[ANCHORED-OPEN: §6 / Doc 2 J-Family-Operator]`.)*
 - **E7 — Multi-org governance** (whose quota/consent/visibility across two orgs). `[ANCHORED-OPEN: §6 → Phase D]`
 - **E8 — Separated parents (one Person vs two; shared custody). RULED 2026-06-02 `[T✓ reachability · P+legal pending]` — keep possible, decide v1 scope later.** The one-Person model is **not foreclosed** (Person≠Login + global consent edge + multi-org Membership); only regressing to the fused/account-bound shape would foreclose it, and the clean cut forbids that. Whether v1 *builds* shared-custody / one-vs-two-Persons is a **product + legal** call → PM (coordinating counsel).
 - **E9 — Guardianship capability placement D1 (operate/manage/view global vs org-scoped).** `[ANCHORED-OPEN: §6]`
@@ -434,6 +518,20 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
   *before* decommissioning, named "migration-pending" interim state (inv 21, 25); (c) **reconcile the minor's
   subscription** if any (minors can self-pay, v1.1) — cancel or fold into the parent-org seat (inv 18). The flow
   is home-org reassignment = **E7 multi-org governance → Phase D** + PM (UX).
+  **P 2026-06-02 — REVISED (PM): a minimal "join my family" MUST work in v1.** *(Initial lean was to defer all
+  consolidation to Phase D; PM ruled the concrete journey must ship.)* A parent buys **Family**, **invites their
+  existing-account, self-consenting teen**, the teen accepts → the teen **joins the parent's family org** (shares the
+  **Family quota** seat); the parent becomes **admin + Payer**; and the **teen grants the parent a Mentorship**
+  (opt-in — **no auto-Guardianship**, the teen self-consents, inv 14/19). The teen's **person + learning history are
+  preserved** (inv 20/21); the teen's existing subscription, if any, is reconciled (inv 18). **Rationale:** deferring
+  leaves no clean path — the only workaround (re-create the teen as a fresh child profile) **destroys their history**,
+  the exact dead-end the foundation forbids.
+  **RIPPLE → architect (T-axis reverts to pending per the Part-10 ripple rule):** elevating E12 from Phase-D-deferred
+  to **v1-required** reopens feasibility. Architect to scope the **cheapest honest v1 version** — membership +
+  billing/quota reconciliation + home-org handling — honoring never-orphan (inv 21) and a named **migration-pending**
+  interim state (inv 25); interacts with **E7 multi-org governance**. **Scope note:** the *below-consent-age* teen
+  variant (needs guardianship + VPC via R13) may stay deferred; **v1 covers the consent-capable-teen join**, and
+  **parent-initiated invite is the v1 path** (child-initiated request-to-join, E13, may stay deferred).
 - **E13 — Reverse / minor-initiated invitation. RULED 2026-06-02 `[T✓ ban · P join-flow]`.** **Ban
   minor-initiated *Guardianship* (consent authority)** — a minor may not nominate their own consent authority
   (the F1-BT-a attack surface; fails inv 30 assurance + inv 28). **Ban the *grant*, not the *request*:** the
@@ -442,6 +540,10 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
   adult-side (mirrors inv 15/16). Scope: the ban is specific to the **consent / Guardianship edge**;
   minor-initiated **Payer / admin** invites are access-inert / org-management (inv 8, 17), not the same risk,
   but in practice route through the E12 join-flow too. Verification tail = REQ-2 / VPC (counsel).
+  **P 2026-06-02:** the **ban on minor-initiated Guardianship is kept** (free safety — a "don't-build-the-dangerous-thing"
+  rule, not a feature). **Parent-initiated** join is now **v1** (see E12 revision). The **child/minor-initiated**
+  request-to-join may **stay deferred to Phase D** (parent-initiated is the v1 path); v1 also retains the existing
+  **child-enters-parent-email** consent step (which is *not* a family "join").
 
 ### F — A proposed additional invariant Doc 2 carried that the 30 do not state
 
@@ -449,7 +551,12 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
   guardian + inv 11 + inv 28; no-dead-end is inv 25 + UX-resilience), so elevating them would violate the
   "30 independent invariants" integrity. Instead they become **mandatory named break-tests in Part 8**:
   **F1-BT-a** (no self-fallback; red-green against the live `getFamilyOwnerProfileId` bug, drift-map §7A)
-  `[T✓]`, and **F1-BT-b** (no birth-year dead-end; correction-flow design `[P pending]`). **Not a canon
+  `[T✓]`, and **F1-BT-b** (no birth-year dead-end; correction-flow design **RULED 2026-06-02 `[P✓]`**: an **in-app
+  self-service correction** removes the current dead-end; an edit that **does not cross the consent boundary** just
+  **saves** (honest typo, e.g. adult→adult); an edit that **would cross the boundary** — flipping the person between
+  "needs a parent" and "doesn't" — requires a **light verification step instead of instant trust**, so a real adult
+  can get unstuck but a child cannot simply *type* their way past the consent gate. Verification method = counsel /
+  age-assurance vendor, REQ-2.). **Not a canon
   amendment** — no ontology edit.
 
 ### G — Carried legal / compliance / sweep items  *(ontology §8 — already open, no decision now)*
