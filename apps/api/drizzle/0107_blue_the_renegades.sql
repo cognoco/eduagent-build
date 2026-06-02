@@ -1,0 +1,1 @@
+ALTER TABLE "memberships" ADD CONSTRAINT "memberships_roles_no_null" CHECK (array_position("memberships"."roles", NULL::"public"."membership_role") IS NULL);
