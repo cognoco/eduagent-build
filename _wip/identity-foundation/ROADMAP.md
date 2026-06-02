@@ -26,14 +26,15 @@ README index). **Status: 2026-06-02 — Phase A complete; Phase B in progress (B
 
 ## Phases
 
-| # | Phase | Deliverable | Owner | Status | Depends on | Exit gate |
-|---|---|---|---|---|---|---|
-| **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md` | Claude | ✅ | — | drift quantified across intent / canonical docs / code; PM has concrete input |
-| **B** | Product intent | `product-intent.md` | **PM** (Claude facilitates) | 🟡 | A | Part 10 resolved + **dual sign-off** (B-tech ✓ 2026-06-02; B-product = PM pass) |
-| **C** | Doc-strategy decision (pilot) | ADR (*location per this decision*) | You + Claude | ⬜ | A informs; piloted via B/D/E | chunk-vs-monolith decided; PRD-rebuild-vs-separate-doc decided; rollout call made |
-| **D** | Domain model | `domain-model.md` + ADR(s) | Claude (you ratify) | ⬜ | B | entities / roles / **consent model** / tenancy locked; org/membership **re-derived**, not inherited |
-| **E** | Data model | `data-model.md` + ADR(s) | Claude (you ratify) | ⬜ | D | target schema + cut strategy locked |
-| **F** | Ready-to-plan gate | — | You | ⬜ | B, D, E + threads | all ratified → implementation planning + Cosmo WIs + T1 revert begin |
+
+| #     | Phase                                                   | Deliverable                        | Owner                       | Status | Depends on                   | Exit gate                                                                                          |
+| ------- | --------------------------------------------------------- | ------------------------------------ | ----------------------------- | -------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md`                     | Claude                      | ✅     | —                           | drift quantified across intent / canonical docs / code; PM has concrete input                      |
+| **B** | Product intent                                          | `product-intent.md`                | **PM** (Claude facilitates) | 🟡     | A                            | Part 10 resolved +**dual sign-off** (B-tech ✓ 2026-06-02; B-product = PM pass)                    |
+| **C** | Doc-strategy decision (pilot)                           | ADR (*location per this decision*) | You + Claude                | ⬜     | A informs; piloted via B/D/E | chunk-vs-monolith decided; PRD-rebuild-vs-separate-doc decided; rollout call made                  |
+| **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ⬜     | B                            | entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited |
+| **E** | Data model                                              | `data-model.md` + ADR(s)           | Claude (you ratify)         | ⬜     | D                            | target schema + cut strategy locked                                                                |
+| **F** | Ready-to-plan gate                                      | —                                 | You                         | ⬜     | B, D, E + threads            | all ratified → implementation planning + Cosmo WIs + T1 revert begin                              |
 
 ---
 
@@ -50,6 +51,7 @@ reaches D only via the ripple rule.** So C and D no longer wait on the PM pass. 
   Truly-independent sibling plans may proceed anytime.
 
 **The rule that makes parallel safe — synchronize on *ratification gates*, not work-start:**
+
 - Do D's work in parallel, but **lock D's exit gate only after B-product clears** (ripple insurance). E follows
   D; F still gates on B, D, E.
 - **Track 2 stays product-neutral on unresolved P-tails** — model *both* options (e.g. E6 unified-vs-split
@@ -88,15 +90,16 @@ valid), so:
 
 **Preliminary classification — NOT final (confirm against the target):**
 
-| Sibling plan | Gap IDs | Coupling | Provisional verdict |
-|---|---|---|---|
-| `resumable-practice-state` | practice-1/2/4 | none | **Independent** → safe to proceed now on current model |
-| `learning-library-cleanup` | learn-2 (!), learn-3 | low | Mostly indep; `learn-3` half safe now, `learn-2` is a T3 identity item |
-| `notification-reachability-nudges` | notif-1..4 | partial | Per-member vs owner notifs overlap redesign flow #7 → split |
-| `profile-setup-personalization-corrections` | onboard-1..4 | coupled | Onboarding = who-creates-whom + roles + consent → **fold** |
-| `billing-recovery-learner-capacity` | billing-3/4, learn-1 (!), notif-3 | coupled | "Learner capacity" = seats/membership; cites `learn-1` → **fold** |
-| `account-security-self-service` | auth-2/3/4 | heavy | change-email / sessions / login all change under multi-login → **fold** |
-| `product-continuity-low-hanging-fruit` | (none) | separate | Earlier grab-bag, not in the identity batch → evaluate on own merits |
+
+| Sibling plan                                | Gap IDs                           | Coupling | Provisional verdict                                                     |
+| --------------------------------------------- | ----------------------------------- | ---------- | ------------------------------------------------------------------------- |
+| `resumable-practice-state`                  | practice-1/2/4                    | none     | **Independent** → safe to proceed now on current model                 |
+| `learning-library-cleanup`                  | learn-2 (!), learn-3              | low      | Mostly indep;`learn-3` half safe now, `learn-2` is a T3 identity item   |
+| `notification-reachability-nudges`          | notif-1..4                        | partial  | Per-member vs owner notifs overlap redesign flow #7 → split            |
+| `profile-setup-personalization-corrections` | onboard-1..4                      | coupled  | Onboarding = who-creates-whom + roles + consent →**fold**              |
+| `billing-recovery-learner-capacity`         | billing-3/4, learn-1 (!), notif-3 | coupled  | "Learner capacity" = seats/membership; cites`learn-1` → **fold**       |
+| `account-security-self-service`             | auth-2/3/4                        | heavy    | change-email / sessions / login all change under multi-login →**fold** |
+| `product-continuity-low-hanging-fruit`      | (none)                            | separate | Earlier grab-bag, not in the identity batch → evaluate on own merits   |
 
 **Split rule** (mirrors the audit re-triage): truly independent → proceed now on the current model;
 identity-coupled → park & fold into the foundation (don't build on the about-to-be-replaced model);
@@ -112,6 +115,7 @@ separate → evaluate standalone.
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
 - [ ] **C** — doc-strategy decided (where intent/ADRs live going forward; pilot rolled out or not).
 - [ ] T1 revert sequenced as the first implementation step.
+
 - → **Only then:** create Cosmo implementation work items.
 
 ---
@@ -136,12 +140,12 @@ separate → evaluate standalone.
 - **2026-06-02** — **Phase B sign-off model split (dual-axis).** Product-intent rulings now carry two
   **independent** sign-offs: **T (architecture / technical reviewer)** and **P (product / PM)** — legend
   + axis-applicability table + ripple rule in `identity-foundation-prd.md` Part 10. Consequence:
-  **Phase B's exit gate splits into B-tech (technical reviewer) and B-product (PM pass).** B-tech is
-  reachable now; B-product is a second event. We may proceed into Phase D on the working assumption that
-  the foundation accommodates all in-scope UX, but **D inherits residual risk until B-product clears** —
-  the ripple rule reopens any `T✓` architecture item if the PM adds an in-scope persona / journey / edge
-  case. First batch stamped `T✓ 2026-06-02`: §B authoring-altitude, A0–A5 personas (A4-surface→E6), C1
-  framing, D4 stricter-wins.
+    **Phase B's exit gate splits into B-tech (technical reviewer) and B-product (PM pass).** B-tech is
+    reachable now; B-product is a second event. We may proceed into Phase D on the working assumption that
+    the foundation accommodates all in-scope UX, but **D inherits residual risk until B-product clears** —
+    the ripple rule reopens any `T✓` architecture item if the PM adds an in-scope persona / journey / edge
+    case. First batch stamped `T✓ 2026-06-02`: §B authoring-altitude, A0–A5 personas (A4-surface→E6), C1
+    framing, D4 stricter-wins.
 - **2026-06-01** — **Phase A complete.** `drift-map.md` produced via a 34-agent citation-verified workflow
   (three-way reconciliation; audit re-triage + sibling-coupling + doc-staleness folded in). All 7 sibling
   plans tagged in `docs/plans/`. Key outputs: consent/COPPA-under-own-logins confirmed as the single

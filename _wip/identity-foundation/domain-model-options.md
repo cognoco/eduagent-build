@@ -3,6 +3,12 @@
 **Date:** 2026-06-01 · **Status:** DRAFT — discovery/options brief, **does not ratify anything.**
 **Owner:** Claude (you ratify) · **Feeds:** Phase D (`domain-model.md` + ADRs); informs Phase B intent-lock.
 
+> **⚠ Vocabulary superseded — folded into the ontology 2026-06-01 (Fold #1).** This is a **dated discovery
+> artifact**; its decisions now live, in ratified terms, in `identity-ontology.md` (see §R "Fold #1"). The
+> body below uses **pre-ratification names** — `Credential` → **Login**, `proxied` → **managed**, `ward` →
+> **charge** — left **unrewritten on purpose**. For current vocabulary read the ontology + `CONTEXT.md`, not
+> this file.
+
 > **What this is.** The "architecture/discovery spike" the strategy notes (§3.2) call for: the
 > highest-leverage research *before* the target model is drawn. It lays out the reference architecture,
 > a candidate entity set, the cohort model we've reasoned to, and the **build-vs-buy fork** for the

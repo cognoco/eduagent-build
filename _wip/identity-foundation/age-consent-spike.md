@@ -6,6 +6,14 @@
 **Method:** 5 parallel cited-research passes (European law, US/COPPA, platform signals, vendors, OSS/standards + Clerk). Volatile items date-stamped. `[LEGAL REVIEW]` = needs counsel before it enters a spec. `[VENDOR OUTREACH]` = firm commercial fact not public.
 **Out of scope (sibling spike):** AI-chat content-safety/moderation.
 
+> **⚠ Vocabulary superseded + C7 resolved — folded into the ontology 2026-06-01 (Fold #2).** This is a **dated
+> discovery artifact**; its decisions now live, in ratified terms, in `identity-ontology.md` (§R "Fold #2",
+> §3.2, §4.26–30, §8 REQ-2/REQ-3) and `CONTEXT.md`. Two corrections the body does **not** reflect (left
+> unrewritten on purpose): **(1) vocabulary** — `Credential` → **Login**, roles `Owner/Mentor/Student` →
+> `{admin, learner}` + capacities, the `Adult/Minor` flag → the computed `requiresGuardianConsent`;
+> **(2) C7** — every "**Clerk Orgs for access/identity**" line (§E, §G) is **superseded by ADR 0001** (own the
+> graph in Neon; Clerk = auth + the resolved-decision JWT claims only). Read the ontology, not this file.
+
 > ⚠️ The deep-research *workflow* harness failed mid-run (StructuredOutput incompatibility, ~3.4M tokens, no output). This brief was produced via direct parallel research agents instead. Same rigor, different vehicle.
 
 ---
