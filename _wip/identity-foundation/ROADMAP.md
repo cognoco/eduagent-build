@@ -37,6 +37,28 @@ README index). **Status: 2026-06-02 — Phase A complete; Phase B in progress (B
 
 ---
 
+## Execution model — parallel tracks  *(2026-06-02)*
+
+With **B-tech complete**, the dependency "D depends on B" refines to **D depends on B-*tech* (locked); B-*product*
+reaches D only via the ripple rule.** So C and D no longer wait on the PM pass. Two tracks run in parallel:
+
+- **Track 1 — Product (PM, architect alongside):** Phase **B-product** — the open product/UX items + P-tails +
+  PM-coordinated legal. **Front-load the ripple-prone items** (E5 last-guardian/custody; any *new* persona or
+  journey) so a structural surprise surfaces early.
+- **Track 2 — Architecture (Claude; architect ratifies):** **C first** (doc-strategy sets the container for D/E
+  output — decide it before generating more docs), then **D in parallel**, then **E** after D's core is stable.
+  Truly-independent sibling plans may proceed anytime.
+
+**The rule that makes parallel safe — synchronize on *ratification gates*, not work-start:**
+- Do D's work in parallel, but **lock D's exit gate only after B-product clears** (ripple insurance). E follows
+  D; F still gates on B, D, E.
+- **Track 2 stays product-neutral on unresolved P-tails** — model *both* options (e.g. E6 unified-vs-split
+  surface), never silently pick a product call to unblock itself.
+- A ripple finding (PM adds/changes a persona or journey) reopens the affected `T✓` for the architect *before*
+  D ratifies.
+
+Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *work* is parallelized.
+
 ## Cross-cutting threads
 
 - **Consent/COPPA spec + legal check** — spans B/D; gates any code touching consent. ⬜
@@ -96,6 +118,10 @@ separate → evaluate standalone.
 
 ## Decision log
 
+- **2026-06-02** — **Parallel-track execution adopted** (see "Execution model — parallel tracks" above). C + D
+  proceed now alongside the PM's B-product pass; D-ratify and E wait for B-product (ripple insurance); the PM
+  front-loads ripple-prone items (E5, new personas); Track 2 stays product-neutral on P-tails. Gate order
+  unchanged.
 - **2026-06-02** — **Phase B-tech complete (technical/architecture sign-off on product intent).** All Part-10
   Decision-Queue items that were the technical reviewer's to rule are ruled (`T✓`): §A personas, §B
   authoring-altitude, C1, D4, **E0 Payer (→ ontology v1.1, store-delegated)**, E1 threshold-crossing
