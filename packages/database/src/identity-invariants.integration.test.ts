@@ -27,6 +27,11 @@ const describeIntegration = databaseUrl ? describe : describe.skip;
 describeIntegration('[Identity T1] membership invariants', () => {
   let db: Database;
   const createdAccountIds: string[] = [];
+  // Orgs created directly by a test (not via the backfill). The backfill makes
+  // an org-of-one whose id equals the account id, so those are cleaned via the
+  // account loop below; standalone orgs (CHECK/multi-org tests) need their own
+  // list so they don't leak between tests.
+  const createdOrganizationIds: string[] = [];
 
   beforeAll(async () => {
     db = createDatabase(databaseUrl!);
@@ -35,9 +40,14 @@ describeIntegration('[Identity T1] membership invariants', () => {
   afterEach(async () => {
     for (const id of createdAccountIds) {
       await db.delete(accounts).where(eq(accounts.id, id));
+      // Backfill reuses account.id as the org-of-one id — delete that org too.
+      await db.delete(organizations).where(eq(organizations.id, id));
+    }
+    for (const id of createdOrganizationIds) {
       await db.delete(organizations).where(eq(organizations.id, id));
     }
     createdAccountIds.length = 0;
+    createdOrganizationIds.length = 0;
   });
 
   async function seedAccountWithOwnerAndChild(): Promise<{
@@ -132,6 +142,7 @@ describeIntegration('[Identity T1] membership invariants', () => {
       .insert(organizations)
       .values({ name: 'Org' })
       .returning({ id: organizations.id });
+    createdOrganizationIds.push(org!.id);
 
     await expect(
       db.insert(memberships).values({
@@ -139,6 +150,52 @@ describeIntegration('[Identity T1] membership invariants', () => {
         organizationId: org!.id,
         roles: [], // empty set — must be rejected by memberships_roles_non_empty
       }),
+    ).rejects.toThrow();
+  });
+
+  it('a roles array containing NULL is rejected by the CHECK constraint', async () => {
+    // Break test for the ARRAY[NULL] gap: cardinality(ARRAY[NULL]) = 1, so the
+    // memberships_roles_non_empty CHECK alone would let a role-less row through.
+    // The companion memberships_roles_no_null CHECK must reject it. Red-verify:
+    // drop that constraint and this stops throwing.
+    const suffix = `t1null-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const [a] = await db
+      .insert(accounts)
+      .values({
+        clerkUserId: `user_${suffix}`,
+        email: `${suffix}@example.test`,
+      })
+      .returning({ id: accounts.id });
+    createdAccountIds.push(a!.id);
+    const [person] = await db
+      .insert(profiles)
+      .values({
+        accountId: a!.id,
+        displayName: 'Person',
+        birthYear: 1990,
+        isOwner: true,
+      })
+      .returning({ id: profiles.id });
+    const [org] = await db
+      .insert(organizations)
+      .values({ name: 'Org' })
+      .returning({ id: organizations.id });
+    createdOrganizationIds.push(org!.id);
+
+    // Raw SQL: a NULL array element can't be expressed through the typed
+    // drizzle insert (roles is membership_role[], not (membership_role|null)[]).
+    await expect(
+      db.execute(sql`
+        INSERT INTO memberships (id, person_id, organization_id, roles)
+        VALUES (
+          gen_random_uuid(),
+          ${person!.id},
+          ${org!.id},
+          ARRAY[NULL]::membership_role[]
+        )
+      `),
     ).rejects.toThrow();
   });
 
@@ -176,7 +233,7 @@ describeIntegration('[Identity T1] membership invariants', () => {
       .insert(organizations)
       .values({ name: 'Org B' })
       .returning({ id: organizations.id });
-    createdAccountIds.push(orgA!.id, orgB!.id); // cleaned up via organizations delete
+    createdOrganizationIds.push(orgA!.id, orgB!.id);
 
     await db.insert(memberships).values({
       personId: person!.id,

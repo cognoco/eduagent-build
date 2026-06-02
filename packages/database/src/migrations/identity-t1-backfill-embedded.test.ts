@@ -24,7 +24,9 @@ const MIGRATION_PATH = join(
 function extractDoBlock(sql: string): string {
   const startMatch = /DO \$\$\s*\nBEGIN/.exec(sql);
   const endToken = 'END $$;';
-  const end = sql.indexOf(endToken);
+  // Search from the matched block start, not the file top, so a future comment
+  // containing "END $$;" before the real block can't slice the wrong span.
+  const end = sql.indexOf(endToken, startMatch?.index ?? 0);
   if (!startMatch || end === -1) {
     throw new Error('DO $$ ... END $$; block not found');
   }
