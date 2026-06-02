@@ -639,6 +639,42 @@ describe('SessionSummaryScreen', () => {
     screen.getByTestId('submit-summary-button');
   });
 
+  // [VOICE] The reflection ("write what you remember from the session") was
+  // the one text-entry surface in the app without a microphone, forcing
+  // learners to type. Voice input is critical here — kids don't type.
+  it('[VOICE] offers a microphone alongside the reflection input', () => {
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    screen.getByTestId('summary-input');
+    screen.getByTestId('summary-mic-button');
+  });
+
+  it('[VOICE] hides the microphone once a reflection has been submitted', async () => {
+    mockSubmitResult = {
+      summary: {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I learned about quadratic equations and how to solve them',
+        aiFeedback: 'Good summary. You captured the key concepts well.',
+        status: 'accepted',
+      },
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I learned about quadratic equations and how to solve them',
+    );
+    await pressAsync(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      screen.getByTestId('summary-submitted');
+    });
+    // The read-only submitted view has no composer, so no mic either.
+    expect(screen.queryByTestId('summary-mic-button')).toBeNull();
+  });
+
   describe('mentor-memory cue', () => {
     it('renders after two sessions and routes owners to mentor memory', async () => {
       mockTotalSessions = 2;

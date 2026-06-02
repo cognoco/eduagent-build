@@ -49,6 +49,8 @@ import {
   clearSummaryDraft,
 } from '../../lib/summary-draft';
 import { getReflectionStarters } from '../../lib/reflection-starters';
+import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
+import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
 import {
   CheckmarkPopAnimation,
   BrandCelebration,
@@ -176,6 +178,50 @@ export default function SessionSummaryScreen() {
     isProxyMode,
   );
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
+
+  // Voice input for the reflection. Every other text-entry surface in the app
+  // (the live chat via ChatShell, library NoteInput) offers a microphone —
+  // this recap was the one place that forced typing, which breaks the
+  // "voice is critical, kids don't type" rule. Mirrors the NoteInput pattern:
+  // tap to record, and the transcript is appended to whatever is already
+  // typed when listening stops. STT runs in the learner's conversation
+  // language and degrades gracefully (the button is a no-op) when the speech
+  // module is unavailable.
+  const {
+    isListening: summaryIsListening,
+    transcript: summaryTranscript,
+    startListening: startSummaryListening,
+    stopListening: stopSummaryListening,
+  } = useSpeechRecognition({
+    lang: getVoiceLocaleForLanguage(
+      activeProfile?.conversationLanguage ?? 'en',
+    ),
+  });
+  const [prevSummaryTranscript, setPrevSummaryTranscript] = useState('');
+  useEffect(() => {
+    if (!summaryTranscript || summaryTranscript === prevSummaryTranscript) {
+      return;
+    }
+    // Only fold the transcript in once recording has stopped, so we append a
+    // complete utterance rather than every interim partial.
+    if (!summaryIsListening) {
+      setSummaryText((prev) => {
+        const separator = prev.trim() ? ' ' : '';
+        // Respect the 2000-char cap the TextInput enforces for typed input —
+        // maxLength does not constrain a programmatic setState.
+        return (prev + separator + summaryTranscript).slice(0, 2000);
+      });
+    }
+    setPrevSummaryTranscript(summaryTranscript);
+  }, [summaryTranscript, summaryIsListening, prevSummaryTranscript]);
+
+  const handleSummaryMicPress = async (): Promise<void> => {
+    if (summaryIsListening) {
+      await stopSummaryListening();
+    } else {
+      await startSummaryListening();
+    }
+  };
 
   // BUG-449: when the user re-enters this screen from Library → Shelf → Book →
   // (past session tap), we must render their previously-saved summary instead
@@ -1440,9 +1486,41 @@ export default function SessionSummaryScreen() {
               testID="summary-input"
               accessibilityLabel="Write your learning summary"
             />
-            <Text className="text-caption text-text-secondary mt-1 text-right">
-              {summaryText.length}/2000
-            </Text>
+            <View className="flex-row items-center justify-between mt-1">
+              <Pressable
+                onPress={() => {
+                  void handleSummaryMicPress();
+                }}
+                disabled={submitSummary.isPending}
+                className="flex-row items-center p-2 -ms-2 min-h-[44px]"
+                testID="summary-mic-button"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  summaryIsListening
+                    ? t('session.noteInput.stopRecording')
+                    : t('session.noteInput.startRecording')
+                }
+              >
+                <Ionicons
+                  name={summaryIsListening ? 'mic' : 'mic-outline'}
+                  size={22}
+                  color={
+                    summaryIsListening ? colors.primary : colors.textSecondary
+                  }
+                />
+                {summaryIsListening ? (
+                  <Text
+                    className="text-caption text-text-secondary ms-2"
+                    testID="summary-listening-indicator"
+                  >
+                    {t('session.noteInput.listening')}
+                  </Text>
+                ) : null}
+              </Pressable>
+              <Text className="text-caption text-text-secondary">
+                {summaryText.length}/2000
+              </Text>
+            </View>
 
             {submitSummary.isError && (
               <Text
