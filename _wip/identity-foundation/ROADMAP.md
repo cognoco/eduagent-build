@@ -5,7 +5,7 @@ architecture (domain + data model) → the **"ready to plan implementation" gate
 **not** an implementation plan, and **no Cosmo work items are created until F is passed.**
 
 **Tracking:** repo-only; this file is the single source. Deliverables land as sibling docs (see
-README index). **Status: 2026-06-01 — Phase A not started; product intent NOT locked.**
+README index). **Status: 2026-06-02 — Phase A complete; Phase B in progress (B-tech underway, B-product pending PM); product intent NOT yet locked.**
 
 ---
 
@@ -29,7 +29,7 @@ README index). **Status: 2026-06-01 — Phase A not started; product intent NOT 
 | # | Phase | Deliverable | Owner | Status | Depends on | Exit gate |
 |---|---|---|---|---|---|---|
 | **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md` | Claude | ✅ | — | drift quantified across intent / canonical docs / code; PM has concrete input |
-| **B** | Product intent | `product-intent.md` | **PM** (Claude facilitates) | ⬜ | A | reconstructed-PRD §11 questions resolved + signed off |
+| **B** | Product intent | `product-intent.md` | **PM** (Claude facilitates) | 🟡 | A | Part 10 resolved + **dual sign-off** (B-tech in progress; B-product = PM pass) |
 | **C** | Doc-strategy decision (pilot) | ADR (*location per this decision*) | You + Claude | ⬜ | A informs; piloted via B/D/E | chunk-vs-monolith decided; PRD-rebuild-vs-separate-doc decided; rollout call made |
 | **D** | Domain model | `domain-model.md` + ADR(s) | Claude (you ratify) | ⬜ | B | entities / roles / **consent model** / tenancy locked; org/membership **re-derived**, not inherited |
 | **E** | Data model | `data-model.md` + ADR(s) | Claude (you ratify) | ⬜ | D | target schema + cut strategy locked |
@@ -96,6 +96,15 @@ separate → evaluate standalone.
 
 ## Decision log
 
+- **2026-06-02** — **Phase B sign-off model split (dual-axis).** Product-intent rulings now carry two
+  **independent** sign-offs: **T (architecture / technical reviewer)** and **P (product / PM)** — legend
+  + axis-applicability table + ripple rule in `identity-foundation-prd.md` Part 10. Consequence:
+  **Phase B's exit gate splits into B-tech (technical reviewer) and B-product (PM pass).** B-tech is
+  reachable now; B-product is a second event. We may proceed into Phase D on the working assumption that
+  the foundation accommodates all in-scope UX, but **D inherits residual risk until B-product clears** —
+  the ripple rule reopens any `T✓` architecture item if the PM adds an in-scope persona / journey / edge
+  case. First batch stamped `T✓ 2026-06-02`: §B authoring-altitude, A0–A5 personas (A4-surface→E6), C1
+  framing, D4 stricter-wins.
 - **2026-06-01** — **Phase A complete.** `drift-map.md` produced via a 34-agent citation-verified workflow
   (three-way reconciliation; audit re-triage + sibling-coupling + doc-staleness folded in). All 7 sibling
   plans tagged in `docs/plans/`. Key outputs: consent/COPPA-under-own-logins confirmed as the single

@@ -1,0 +1,424 @@
+# Identity Foundation — PRD (anchored spine + decision queue)
+
+**Status:** DRAFT, 2026-06-02. Built **bottom-up from the two canonical documents only** —
+`identity-ontology.md` (RATIFIED v1) and `CONTEXT.md` (identity glossary, lines 24–187). This is the
+**anchored spine**: every statement in the body (Parts 1–9) carries an inline anchor and asserts
+nothing that the canon does not support. Everything from the prior `…-ANSWER.md` (Doc 2) that could
+**not** be anchored is held in **Part 10 — Decision Queue** as a candidate awaiting an explicit ruling,
+never laundered into the body as settled.
+**Date:** 2026-06-02 · **Owner:** PM + Claude.
+
+**Why this shape.** Doc 2 is a rich but *uncertified* statement of intent (it carried at least three
+errors the ontology later corrected: learner-universal, "Clerk Orgs for access", mentor-as-a-role). So behaviour is admitted to the body only when it traces to the canon; the rest must earn its place through a ruling. The body is therefore thinner than a Doc-2 re-skin — deliberately.
+
+**Anchor key (every body claim cites one):**
+
+- `(inv N)` — invariant N from `identity-ontology.md` §4 (the 30 ratified invariants).
+- `(§X)` — a section of `identity-ontology.md`.
+- `(CONTEXT: term)` — a ratified glossary entry in `CONTEXT.md`.
+- `(repo: rule)` — an engineering rule in the repo `CLAUDE.md` (e.g. UX-resilience, typed errors).
+- `[DERIVED: …]` — not stated verbatim in the canon but **strictly forced** by the cited invariant(s);
+  the derivation is shown so it can be checked.
+
+**Decision-queue tags (Part 10 only):**
+
+- `[NEEDS-DECISION]` — a real product/UX call the canon does not force; we rule on it.
+- `[DERIVABLE]` — can likely be anchored on inspection; parked here only to confirm the chain.
+- `[ANCHORED-OPEN]` — already tracked as open/deferred in the ontology (§6/§8); listed for completeness,
+  not for us to re-decide now.
+
+---
+
+## Part 1 — Principles  *(anchored)*
+
+These are the load-bearing commitments, each a restatement of canon — not new intent.
+
+1. **A Person owns their own identity and learning data, permanently.** Learning data is scoped to
+   `person_id` (inv 2); a Person's own data is read+write by that Person regardless of roles, because
+   self-ownership is **intrinsic to the Person**, not granted by a role (inv 7; CONTEXT: learner). It
+   survives graduation (inv 20) and is **never orphaned** by an edge or membership deletion (inv 21).
+2. **A grouping never owns a Person or their data.** An Organization is a thin grouping/billing
+   container that does no access work (CONTEXT: Organization); access to *another* Person's data is
+   **edge-derived**, and membership alone grants only existence-visibility (inv 8). Billing and consent
+   follow the home Organization; a second-org edge changes neither who pays nor who consents (inv 18).
+3. **Each Person gets the maximum autonomy the law allows; guardian/payer is a minimal overlay.** The
+   three concerns — consent authority, billing control, data visibility — are **independent and never
+   fused** (inv 22); guardianship grants **separable** capabilities, not one bundled flag (inv 23); a
+   paying adult gains **no** visibility into a self-consenting learner's data without that learner's
+   opt-in (inv 19).
+4. **A Person can move between login modes, and between organizations, without losing anything.**
+   Managed → credentialed keeps the same `person_id` and all history (inv 20); a Person can leave an
+   Organization with their Person and history intact (inv 21).
+
+**"Done" is the 30 invariants holding under test, each with a break test** (§4 framing; repo:
+security-fix red-green). It is **not** "the legacy 36-gap audit closed" — that audit is a regression
+checklist (Part 8).
+
+---
+
+## Part 2 — Entities & actors  *(anchored — restating the canon's nouns in behavioural terms)*
+
+The vocabulary the rest of this PRD speaks. All from `CONTEXT.md` (identity glossary) + ontology §1–§2.
+
+- **Person** — one human, the permanent subject of learning data, consent, and identity, *whether or
+  not they can log in* (CONTEXT: Person; §1.1). The scoping key for all learning data (inv 2).
+- **Login** — the authentication binding to a Clerk User; **0 or 1 per Person** (CONTEXT: Login; inv 3).
+  Its absence is what "managed" means; its presence, "credentialed" (§3.1).
+- **Organization** — the thin grouping + billing container; always exists (an *org-of-one* at signup,
+  inv 1); never owns a Person (CONTEXT: Organization).
+- **Membership** — Person ↔ Organization, carrying the **role set `{admin, learner}`** (CONTEXT:
+  Membership; inv 5). Grants existence-visibility only (inv 8). First member is always `admin` (inv 5).
+  - **`admin`** — org management; age-agnostic; ≥1 per org; transferable; no data access without an edge
+    (CONTEXT: admin; inv 8, 17).
+  - **`learner`** — "this member learns here"; activates the learning surface; capability-light;
+    **not auto-assigned, chosen at onboarding** (CONTEXT: learner; inv 7).
+- **Capacity** — the end a Person occupies on an edge; `mentor`/`guardian` are capacities, **never roles**
+  (CONTEXT: capacity; inv 6).
+- **Guardianship** — a dyadic **guardian → charge** edge carrying the **Consent** record; **Layer 1**
+  (consent authority); withdrawable; grants separable capabilities (CONTEXT: Guardianship; §2.2; inv 23).
+  - **charge** ≡ **consent-gated learner** — a learner below their jurisdiction's consent age (CONTEXT:
+    charge).
+- **Mentorship** — a dyadic **mentor → mentee** edge granting **scoped** visibility/help for one specific
+  mentee; **Layer 2**; carries **no** consent authority; mentor may be any age (CONTEXT: Mentorship,
+  mentor; §2.3; inv 9, 14).
+- **Payer** — the Person designated for an Organization's Subscription; a Subscription designation,
+  **not** a role, **access-inert** (no data access) (CONTEXT: Payer; inv 17). **Payer *capacity* is
+  delegated, not adjudicated:** for store-mediated payment (the only channel for the foreseeable future) the
+  store is **merchant of record** and the sole capacity adjudicator — no age gate of ours. A flat **≥18**
+  worst-case default (inv 29) applies **only** to a future non-store rail where *we* are merchant of record,
+  **not** a per-jurisdiction derivation — over-restricting payment is harmless (an adult Payer can be
+  attached, R11) where over-restricting consent would block lawful learning. *(amended v1.1)*
+- **Mate (AI Mate)** — the learner's AI tutor; the entity formerly called "mentor" in copy, renamed so
+  `mentor` means the human capacity (CONTEXT: Mate; §8 CLEANUP-2).
+- **AgeConsentDecision** — the single resolved-decision object the app reads for a Person's consent
+  state; the COPPA-portable seam (CONTEXT: AgeConsentDecision; §3.2). Computed by
+  `resolveConsentRequirement(age × residence_jurisdiction)` (CONTEXT: AgeConsentDecision; §3.2).
+
+---
+
+## Part 3 — Capability model  *(anchored — the firm heart)*
+
+The legacy fused "owner" is **dissolved**; capability derives from **relationships**, not a role flag
+(CONTEXT: Owner ✗ superseded → split into admin / Payer / Guardianship). Five capability sources, only
+two of which are roles:
+
+
+| Capability                                             | **Self** (own data)  | **`admin`**           | **`guardian`** (edge → charge)  | **`mentor`** (edge → mentee)       | **Payer**           |
+| -------------------------------------------------------- | ---------------------- | ----------------------- | ---------------------------------- | ------------------------------------- | --------------------- |
+| Read/write**own** learning data                        | ✅ intrinsic (inv 7) | —                    | —                               | —                                  | —                  |
+| Manage org (members, invites, settings, billing-admin) | —                   | ✅ (CONTEXT: admin)   | —                               | —                                  | —                  |
+| Hold consent authority / act-for a charge              | —                   | —                    | ✅ (Layer 1, §2.2)              | —                                  | —                  |
+| See/help a**specific** person's learning data          | —                   | ❌ (inv 8)            | ✅ that charge (inv 8)           | ✅ that mentee, edge-scoped (inv 9) | ❌ (inv 17)         |
+| Manage subscription / billing                          | —                   | —                    | —                               | —                                  | ✅ (CONTEXT: Payer) |
+| **Age gate**                                           | any age              | age-agnostic (inv 17) | adult (consent authority, §2.2) | any age (inv 14; CONTEXT: mentor)   | store-delegated; ≥18 only on a future non-store rail (inv 17, v1.1) |
+
+**Rules (each cites its anchor):**
+
+- Roles are **`{admin, learner}`** only; `mentor`/`guardian` are capacities on edges (inv 5, 6). The
+  **first member of an Organization is `admin`** (inv 5).
+- **`learner` is opt-in, never auto-mandatory** (inv 5 "not mandatory"; CONTEXT: learner "not
+  auto-assigned, chosen at onboarding"). `[DERIVED: a Person may hold a Membership whose role set is {admin} with no learner — e.g. an adult who only operates a family — directly from "learner not mandatory" + "first member is admin".]`
+- **Self-ownership is intrinsic, not granted (inv 7).** `learner` activates the learning surface and
+  marks participation; it grants nothing beyond the ownership every Person already has.
+- **Data access is edge-derived (inv 8); mentor visibility is edge-scoped to the named mentee (inv 9)** —
+  never org-wide. An external tutor is edge-only (own org-of-one + cross-org Mentorship edge) and cannot
+  see the family roster (§2.3).
+- **Two supervisory layers** (§R two-layer model; CONTEXT: Guardianship, Mentorship): **Layer 1 —
+  Guardianship** (consent authority; adult; withdrawable) and **Layer 2 — Mentorship** (granted
+  visibility; any age). **Neither auto-implies the other** (inv 14); a mentor never holds consent
+  authority (inv 14) and never needs to be a guardian.
+- **Mentorship authority:** a Mentorship is granted by the **mentee if consent-capable, else by the
+  guardian** (inv 15); guardian-granted mentorships must be **re-confirmed** by the learner on
+  graduation, else they lapse (inv 16).
+- **`admin` ≠ Payer:** `admin` is age-agnostic; **Payer capacity is store-delegated** (the store adjudicates
+  for store-mediated payment; a flat ≥18 default applies only to a future non-store rail — inv 17, v1.1); the
+  two are separate, neither implies the other.
+
+---
+
+## Part 4 — Consent & age behaviour  *(anchored — the most-exposed surface)*
+
+### 4.1 — Age drives three independent things, on three scales  *(inv 10)*
+
+There is **no `minor` boolean** (inv 10; CONTEXT: Consent "never a boolean"). Age drives **consent
+capacity** (the jurisdiction's consent age, 13–16; inv 10) and **content level** (a continuous gradient,
+theming only, **never a gate** — CONTEXT: Age Bracket; §3.3). **Payment capacity is *not* age-driven on the
+store rail** — it is store-delegated (inv 17, v1.1); a flat 18 applies only to a future non-store rail where
+we are merchant of record. Numeric cohort labels are **banished** (§8 CLEANUP-3): use *consent-gated*
+(a charge), *consent-capable*, *adult*.
+
+### 4.2 — Two complementary pieces  *(§3.2)*
+
+- **`resolveConsentRequirement(age × residence_jurisdiction)`** — the **policy function**: what the law
+  requires (§3.2; CONTEXT: AgeConsentDecision). `residence_jurisdiction` is a **time-versioned** Person
+  attribute keyed off residence, not current location (§3.4; CONTEXT: residence_jurisdiction).
+- **`AgeConsentDecision`** — the **resolved object** the app reads and never looks behind: requirement +
+  whether satisfied + how proven + expiry/receipt; the single COPPA-portable seam (§3.2; CONTEXT:
+  AgeConsentDecision). Field *shape* is locked (§3.2); enum *values* are pinned at Phase E.
+
+### 4.3 — The behavioural rules (each an invariant)
+
+- **Age-gate precedes collection (inv 26).** Signup captures an age-range first; **no profile or learning
+  data is persisted until lawful basis exists** (`AgeConsentDecision` resolves to allowed). The age
+  screen is the only permitted pre-basis collection.
+- **Consent is recorded per purpose (inv 27),** never blanket — separate records for `{core, thirdPartyShare, targetedAds, aiTraining}` (§3.2; CONTEXT: Consent), required even when launch uses
+  only `core`. A human mentor seeing a charge's data is **not** one of these purposes — it is a
+  Mentorship edge + the REQ-1 disclosure (§3.2; §8 REQ-1).
+- **Consent ≠ contract (inv 28).** Processing rests on **verifiable guardian consent**, never on the
+  guardian being account-holder or Payer.
+- **Worst-case default (inv 29).** The `jurisdiction × ageBand → policy` table ships **strictest** (16 /
+  VPC-always) and is relaxed **per *verified* jurisdiction as config** — never country-by-country code.
+- **Assurance is proportionate (inv 30).** Consent carries a method + an assurance level; the required
+  level scales with age/risk — **self-declaration is not sufficient for young children** (CONTEXT: VPC).
+- **Consent is computed, withdrawable, jurisdiction-relative (inv 10–12).** A record valid under
+  jurisdiction A may not satisfy B, so a held consent does **not** auto-transfer when
+  `residence_jurisdiction` changes (inv 12; §3.4).
+- **Consent is evaluated over the *set* of Guardianship edges (inv 11)** — one parent with three children
+  has three independent, independently-revocable records.
+- **One central consent gate, not per-screen checks.** A data-processing request for a consent-gated
+  Person with no valid Consent throws a typed error (inv 11; repo: typed-error-hierarchy / UX-resilience)
+  — never a crash, never a blank wall. `[DERIVED: "central, typed" from inv 11 (the rule must be enforced somewhere uniform) + the repo's typed-error and "classify at the API boundary" rules.]`
+
+### 4.4 — Verifiable parental consent for a charge
+
+Email-plus is **insufficient VPC** once a charge's data is disclosed to third parties (LLM providers)
+(CONTEXT: VPC; §3.2 third-party purposes). Behaviour: **buy, don't build** — platform parental-consent
+where live, a VPC vendor elsewhere, outcome mirrored into the Consent record (§6 deferred; CONTEXT: VPC).
+The vendor choice and the under-13 VPC method are **open** (Part 10, `[ANCHORED-OPEN]`).
+
+---
+
+## Part 5 — Independence & visibility  *(anchored)*
+
+A Person **owns their account at every age**; managed vs credentialed is *login mechanics*, not ownership
+(§3.1; CONTEXT: Person). The autonomy ceiling, stated as **tiers** (the thresholds are the jurisdiction's
+consent age and a flat 18 — not numeric cohorts, §8 CLEANUP-3):
+
+
+| Tier                                      | Owns own data | Self-consent                              | Self-pay (Payer) | Overlay                                                                                                                                                        |
+| ------------------------------------------- | --------------- | ------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Consent-gated** (a charge)              | ✅ (inv 7)    | ❌ guardian consent required (inv 10–11) | ❌ never reaches self-pay — can't self-serve (R2) | guardian consent (Layer 1) + an adult Payer; guardian never operates the learning`[DERIVED: inv 23 separates consent-authority from operate; CONTEXT: charge]` |
+| **Consent-capable** (≥ consent age, <18) | ✅ (inv 7)    | ✅ where law permits (inv 10)             | ✅ where the store permits (inv 17, v1.1) | self-pays via their own store account where allowed, else an adult Payer is attached (R11); consent only where required                                         |
+| **Adult** (≥18)                          | ✅ (inv 7)    | ✅                                        | ✅ store-mediated (inv 17) | none required                                                                                                                                                  |
+
+**The wallet does not buy oversight (inv 19).** A parent who pays for a consent-capable learner gains
+**no** visibility into their learning without the learner's opt-in; above the consent age the learner is
+the data subject and controls their data (inv 19).
+
+**Self-pay is store-delegated (inv 17, v1.1).** Capacity for store-mediated payment is adjudicated by the
+store (merchant of record), not by us — a consent-capable minor self-pays where their store account allows;
+a flat ≥18 default applies only to a future non-store rail. Orthogonal to consent (inv 22), so it does not
+touch the consent floor. *(Whether to surface under-18 self-pay in the UX is a product call — Part 10, P-axis.)*
+
+*(Login-mode defaults per tier — e.g. "credentialed by default above the consent age" — are a UX choice
+Doc 2 asserted but the canon does not fix; see Part 10.)*
+
+---
+
+## Part 6 — Lifecycle & transition safety  *(anchored)*
+
+Non-negotiable safety properties binding every flow:
+
+- **Graduation preserves identity (inv 20).** Managed → credentialed keeps the same `person_id` + all
+  history. Break test: row count and `person_id` identical before/after.
+- **No orphans (inv 21).** Edge deletion (guardianship / mentorship / membership) never cascade-deletes
+  the Person or their history — a managed Person (charge *or* the rare managed adult, §8 FLAG-3) is never
+  orphaned.
+- **Time-triggered transitions are scheduler-driven (inv 24).** Consent-age / 18 crossings and
+  `residence_jurisdiction` re-evaluation fire with **no user action** — a dormant account still
+  transitions on its birthday — so they cannot live only in request handlers; a durable scheduler
+  re-evaluates each Person on the relevant dates. `[DERIVED requirement: a background scheduler must exist — directly from inv 24; this is also the repo end-to-end-tracing rule: "verify something actually dispatches the event."]`
+- **Transitions are append-only + audited; every interim state is a *named valid state* (inv 25)** —
+  consent-pending, graduation-pre-org-choice, suspended-pending-fresh-consent — never an implicit gap.
+  Each carries a Failure-Modes table (repo: UX-resilience, no dead-ends).
+
+---
+
+## Part 7 — Required transitions & flows  *(anchored as requirements, not as authored journeys)*
+
+The invariants **force these flows to exist**. This part states each as a *requirement with its anchor*.
+The detailed walk-throughs (screens, copy, and the per-state Failure-Modes tables the repo requires) are
+Doc-2 material and are authored/ratified in **Part 10**, not asserted here.
+
+- **R1 — Self-serve signup exists for consent-capable Persons and up.** Resolves age first (inv 26),
+  auto-creates an org-of-one with the Person as `admin` (inv 1, 5), and lets them **elect** `learner`
+  and/or a mentor capacity (inv 5 not-mandatory). A consent-gated Person cannot self-serve `[DERIVED: inv 13 "guardian-created only below the floor"]`.
+- **R2 — Guardian-creates-charge is the only path below the consent floor (inv 13).** Produces a charge
+  Person + `learner` membership + Guardianship edge + per-purpose Consent (inv 11, 27) at a proportionate
+  assurance level (inv 30; VPC, §4.4).
+- **R3 — A consent holding state exists** as a named valid interim state with no dead-end (inv 25, 26;
+  repo: UX-resilience) and unlocks the moment valid Consent lands (inv 11).
+- **R4 — Graduation (managed → credentialed) exists and preserves identity (inv 20);** on crossing the
+  consent age it converts guardian visibility to learner-opt-in (inv 19) and lapses unconfirmed
+  guardian-granted mentorships (inv 16).
+- **R5 — Self-service consent withdrawal exists and actually stops processing (inv 12)** — the UI promise
+  and system behaviour must match (inv 12; repo: silent-recovery-banned for the escalation path).
+- **R6 — Leaving / removal preserves the Person and history (inv 21);** edges detach, the Person is
+  retained and re-claimable.
+- **R7 — Per-Person export exists** for a Person or their guardian `[DERIVED: inv 2 person-scoping + inv 21 retention make a per-Person (not per-org) export the only consistent shape]`.
+- **R8 — Mentorship grant exists, edge-scoped (inv 9), authorized per inv 15, re-confirmed per inv 16.**
+- **R9 — Threshold-crossing re-evaluation exists, scheduler-driven (inv 24);** the *mechanism* (auto vs
+  explicit takeover) is open (Part 10).
+- **R10 — `residence_jurisdiction`-change re-evaluation exists (inv 12, 24; §3.4);** the *response*
+  (suspend vs re-prompt) is open (Part 10).
+- **R11 — Payment capacity is store-delegated (inv 17, v1.1).** For store-mediated payment the store
+  (merchant of record) adjudicates capacity; we impose no age gate. A consent-capable minor may self-pay
+  where their store account permits, else an adult Payer is attached. *(A charge never reaches this flow —
+  can't self-serve, R2.)* Which Person the store-completed purchase records as Payer under Family Sharing is
+  open — **E3** (Part 10). A flat ≥18 gate returns only on a future non-store rail.
+- **R12 — Visibility opt-in exists and is learner-controlled (inv 19).**
+
+---
+
+## Part 8 — Definition of "done"  *(anchored)*
+
+Done = **the 30 ontology invariants hold true under test**, each with a happy-path **and** a break test
+written in the security-fix red-green pattern (§4 framing; repo: security-fix break-test). The legacy
+36-gap audit is a **regression checklist**, not the definition.
+
+Carried open requirements that gate a *paid launch* but are not ours to close (ontology §8): **REQ-1**
+consent-scope disclosure (per-purpose), **REQ-2** the six-item legal register, **REQ-3** DPIA, **FLAG-2**
+the real age floor. These are `[ANCHORED-OPEN]` (Part 10).
+
+---
+
+## Part 9 — Crosswalk: new model ↔ today's code  *(anchored to §7 + CONTEXT legacy terms)*
+
+The clean cut lands in a codebase speaking the legacy vocabulary. The map (ontology §7; CONTEXT ✗/⚠
+entries):
+
+
+| New-model concept                           | Today's code                                                           | Crosswalk note                                                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Person                                      | `profiles` (§7)                                                       | rename surface; fused to a login today                                                                 |
+| Login                                       | `accounts.clerk_user_id` / `profiles.clerk_user_id` (§7)              | decouple from Person                                                                                   |
+| Organization                                | `accounts` (fused) → inert `organizations` (§7)                      | wire the inert table; keep thin                                                                        |
+| Membership`{admin, learner}`                | `family_links` + `isOwner` (live) → inert `memberships.roles[]` (§7) | live authz is the`isOwner` bool                                                                        |
+| The dissolved`owner`                        | `isOwner` boolean (CONTEXT: Owner ✗)                                  | **splits three ways** — admin / Payer / Guardianship; re-point each `isOwner` site at the correct one |
+| Guardian act-for                            | proxy mode /`isParentProxy` (CONTEXT: Parent Proxy ⚠)                 | candidate mechanism for guardian act-for; keep/retire decision pending                                 |
+| Consent gate on the edge                    | `consentStatus` + `consentMiddleware` (§7)                            | keep central middleware; move the key from profile to the Guardianship edge                            |
+| `mentor` capacity (edge-scoped)             | `membershipRoleEnum 'mentor'` backfilled, **unwired** (§7)            | wire it for the first time —**as a capacity on a Mentorship edge, not a role**                        |
+| `AgeConsentDecision` + per-jurisdiction age | flat`age<=16`, `MINIMUM_AGE=11` (§7)                                  | replace with`resolveConsentRequirement` + worst-case table                                             |
+| Payer (store-delegated; ≥18 only on a future non-store rail — v1.1) | implicit account holder (§7)                                          | make explicit; capacity adjudicated by the store as merchant of record; reconcile recorded-Payer identity (E3) |
+
+**Two-vocabulary risk (§R, audience-matrix):** until the crosswalk is executed, `resolveNavigationContract`
+(new) and `resolveTabShape`/`isOwner` (old) describe the same humans incompatibly. The clean cut should
+land `resolveNavigationContract` consuming the new role set, with the audience-matrix F-sites as the
+checklist — not leave both alive.
+
+---
+
+## Part 10 — Decision Queue  *(the residue — Doc-2 material that the canon does not anchor)*
+
+Everything Doc 2 asserted that did **not** earn a place in the body above. We process this list together:
+for each `[NEEDS-DECISION]`, you rule — **ratify** (it moves into the body with the ruling as its
+anchor), **keep as `[PROPOSED]`** (stays flagged), or **drop**. `[DERIVABLE]` items I expect to anchor on
+inspection (you sanity-check the chain). `[ANCHORED-OPEN]` items are already tracked open in the ontology
+— listed so nothing is lost, but not for us to decide now.
+
+### Sign-off model  *(dual-axis — added 2026-06-02)*
+
+Two reviewers with split authority sign each ruling **independently**:
+
+- **`T` — Architecture sign-off** (technical reviewer): the derivation is correct, internally
+  consistent, and the foundation accommodates it **under the currently-scoped persona/journey set**.
+- **`P` — Product sign-off** (PM): the item is functionally **complete and final** for scope.
+
+Per-item marker: **`[T✓ YYYY-MM-DD · P pending]`**. An item is *settled into the body* only when every
+**applicable** axis is ✓.
+
+| Item type | Axes that apply |
+|---|---|
+| Architecture / data-model / invariant-derivation | **T** only (`P n/a`) |
+| Personas, journeys, failure-mode recoveries, UX defaults, audience framing | **T + P** |
+| Process / methodology calls | **T** only; the artifacts they *produce* inherit **T + P** |
+| Legal / compliance | neither — stays `[ANCHORED-OPEN]`, outside T/P |
+
+**Ripple rule.** `T✓` certifies feasibility *for the current scope*. If the PM pass **adds** a persona,
+journey, or edge case, any `T✓` item whose foundation that change touches **reverts to `T pending`** for
+re-confirmation. Product enrichment can reopen architecture — by design, and visibly.
+
+### A — Personas  *(only UC-1 is anchored, via §9)*
+
+- **A0 — Managed-adult / "grandparent" persona.** `[ANCHORED: §9 UC-1]` — already canon; will be written
+  into Part 2/Part 5 as the one ratified persona.
+- **A1 — Solo adult learner.** `[DERIVABLE: adult tier (inv 10,17) + {learner} (inv 5)]`
+- **A2 — Independent consent-capable minor.** `[DERIVABLE: consent-capable tier (inv 10) + inv 19 opt-in]`
+- **A3 — Charge (guardian-managed).** `[DERIVABLE: inv 13 + Guardianship (§2.2) + CONTEXT: charge]`
+- **A4 — Family operator (admin + guardian×N + Payer, optionally learner).** `[DERIVABLE for the shape; NEEDS-DECISION for the surface]` — the multi-role *surface* (fused vs split) is E6 below.
+- **A5 — Mentor / tutor (any age, edge-only).** `[DERIVABLE: §2.3 + inv 9, 14]`
+- **Decision for A1–A5:** confirm we adopt these five as *derived* personas (anchored, not Doc-2-trusted),
+  with copy to be written. Likely a single yes; flagged because Doc 2 was the source of their framing.
+- **Sign-off:** `[T✓ 2026-06-02 · P pending]` — A0–A5 adopted as the persona set; A4's multi-role
+  *surface* deferred to **E6**. Tech-ratified (derivations hold, foundation accommodates the set as
+  scoped); the PM pass owes functional completeness.
+
+### B — Journeys & failure-mode tables  *(Doc 2 J1–J14 detail)*
+
+The *requirements* R1–R12 (Part 7) are anchored; the **walk-throughs** (specific steps, screens, copy,
+and the per-state Failure-Modes tables the repo requires) are Doc-2 detail. `[NEEDS-DECISION / NEEDS-AUTHORING]`: do we (i) author them here now as `[DERIVED]` walk-throughs of R1–R12 with fresh
+Failure-Modes tables, or (ii) defer the walk-throughs to the spec/plan layer and keep the PRD at the
+requirement altitude? *(My lean: author the Failure-Modes tables here — the repo rule wants failure modes
+specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.)*
+- **Ruling:** author the Failure-Modes tables here as `[DERIVED]` walk-throughs of R1–R12; each
+  non-invariant recovery tagged `[PROPOSED]`. **Sign-off:** `[T✓ 2026-06-02 · P n/a]` (process call);
+  the authored tables themselves inherit **T + P**.
+
+### C — Vision & audience framing  *(Doc 2 Parts I–II)*
+
+- **C1 — "Consumer-first; B2B not near-term but not foreclosed."** `[DERIVABLE: §6 keeps the org table a dormant B2B seam; inv 2/8/18 keep person-scoping]` — confirm as framing. `[T✓ 2026-06-02 · P pending]`
+- **C2 — "Homework-helper wedge is GTM framing, not an audience cap."** `[NEEDS-DECISION]` — a positioning
+  claim with **no** canon anchor. Ratify as product framing or drop from the PRD.
+- **C3 — The explicit audience list / "serious learners of any age."** `[NEEDS-DECISION]` — confirm the
+  audience statement (the tiers are anchored; naming them "the audience" is a product call).
+
+### D — UX defaults Doc 2 asserted that the canon does not fix
+
+- **D1 — Login-mode default per tier** ("credentialed by default above the consent age; managed by default
+  for a charge"). `[NEEDS-DECISION]` — §3.1 says both modes are valid at any tier; the *default* is a UX call.
+- **D2 — Consent holding-state preview** (browse-only, no LLM). `[NEEDS-DECISION]` — sensible, unanchored.
+- **D3 — Withdrawal grace window length; resend/“change recipient” caps; notify-parent cooldown.**
+  `[NEEDS-DECISION]` — all Doc-2 specifics, no canon value.
+- **D4 — Stricter-wins reconciliation of self-declared vs platform Age-Signal.** `[DERIVABLE: inv 29 worst-case-default generalises to "take the stricter signal"]` — confirm. `[T✓ 2026-06-02 · P n/a]`
+
+### E — Product calls the model deliberately leaves open  *(Doc 2 Part IX + ontology §6)*
+
+- **E0 — Payer capacity (store-delegated). RULED 2026-06-02 `[T✓ · P pending]` — ontology v1.1 amendment**
+  (inv 17/10, §2.4, §3.2; ADR 0002; CONTEXT Payer+minor). For store-mediated payment (the only channel for
+  the foreseeable future) capacity is **delegated to the store as merchant of record**; we impose no age gate.
+  A flat ≥18 worst-case default (inv 29) applies **only** to a future non-store rail — **not** a per-jurisdiction
+  derivation. **Carried open:** **E3** (recorded-Payer identity under Family Sharing — now the active
+  sub-question); under-18 **exposure** (P-axis); FLAG-2 / REQ-2 (launch gates).
+- **E1 — Threshold-crossing mechanism** (auto-expire vs explicit teen-takeover). `[ANCHORED-OPEN: §6 "transition events → PRD"]` — *we can decide it here.* Doc-2 rec: prompt-to-take-over, status-quo until taken.
+- **E2 — `residence_jurisdiction`-change response** (suspend vs re-prompt). `[ANCHORED-OPEN: §3.4]` — decidable here.
+- **E3 — Store-payer ↔ recorded-Payer mapping under family sharing.** `[ANCHORED-OPEN: §6 multi-org / Doc 2 J13]` — **now the active Payer sub-question after E0** (capacity is settled; *which Person* a store-completed purchase records as Payer under Family Sharing / Ask-to-Buy is not). → Phase D/E.
+- **E4 — Co-guardian consent precedence** (the one-of/all-of rule). `[ANCHORED-OPEN: inv 11 "rule is jurisdictional/legal — deferred §6"]` — likely defers to counsel; we can set a default.
+- **E5 — Last-guardian departure / charge custody.** `[ANCHORED-OPEN: §6]` — Doc-2 rec: retain + re-homable.
+- **E6 — Unified vs split multi-role surface** for the family operator. `[ANCHORED-OPEN: §6 / Doc 2 J-Family-Operator]` — note it must also serve an **admin-only** operator (learner-optional).
+- **E7 — Multi-org governance** (whose quota/consent/visibility across two orgs). `[ANCHORED-OPEN: §6 → Phase D]`
+- **E8 — Separated parents (one Person vs two; shared custody).** `[ANCHORED-OPEN: §6 → Phase B]`
+- **E9 — Guardianship capability placement D1 (operate/manage/view global vs org-scoped).** `[ANCHORED-OPEN: §6]`
+- **E10 — De-credential (credentialed → managed reversion, T6).** `[ANCHORED-OPEN: §6 → probably disallowed]`
+- **E11 — Self-registered-minor consent path** (minor self-registers with own Login, no guardian yet).
+  `[ANCHORED-OPEN: §6]` — partly closed by R2 (guardian-created below the floor); confirm the
+  consent-capable-in-a-stricter-jurisdiction case routes to R3 (holding state).
+
+### F — A proposed additional invariant Doc 2 carried that the 30 do not state
+
+- **F1 — "No self-consent, and no consent dead-end."** Doc 2 invariant 18: a Person with no Guardianship
+  edge is never recorded as their *own* parental-consent authority (forbids the legacy self-fallback); and
+  a wrong/missing birth year must have an in-product correction path (no dead-end). `[NEEDS-DECISION: promote to a 31st ontology invariant, or keep as a PRD-level break-test?]` *(My lean: it's partly
+  derivable — the self-fallback contradicts inv 28 "consent ≠ contract / guardian-held"; the no-dead-end
+  half is inv 25. So it may be statable as a `[DERIVED]` break-test rather than a new invariant. Worth a
+  ruling because it's a real observed bug.)*
+
+### G — Carried legal / compliance / sweep items  *(ontology §8 — already open, no decision now)*
+
+- **G1 — REQ-1** consent-scope disclosure (per-purpose). `[ANCHORED-OPEN: §8 REQ-1]`
+- **G2 — REQ-2** six-item legal register. `[ANCHORED-OPEN: §8 REQ-2]`
+- **G3 — REQ-3** DPIA gates launch. `[ANCHORED-OPEN: §8 REQ-3]`
+- **G4 — FLAG-2** the real age floor (per-jurisdiction + app-store rating; any-age charge lawful with VPC).
+  `[ANCHORED-OPEN: §8 FLAG-2]`
+- **G5 — CLEANUP-2** AI "mentor" → "Mate" copy sweep. `[ANCHORED-OPEN: §8 CLEANUP-2]`
+- **G6 — CLEANUP-3** banish numeric cohort copy (gated on FLAG-2). `[ANCHORED-OPEN: §8 CLEANUP-3]`
+- **G7 — VPC vendor selection** (KWS vs k-ID) + platform Age-Signals timing. `[ANCHORED-OPEN: §6]`

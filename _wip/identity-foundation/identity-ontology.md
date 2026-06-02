@@ -1,10 +1,14 @@
-# Identity Foundation — Ontology v1 (RATIFIED)
+# Identity Foundation — Ontology v1.1 (RATIFIED)
 
 **Status:** **RATIFIED v1 — Grill #1 complete, 2026-06-01.** All nine conflicts (C1–C9), the
 role/edge/**capacity** model, and the §4 invariants are ratified (decision trail in §R; agenda/status
 in §0). Open items tracked as flags in §8. CONTEXT.md identity glossary extracted in lockstep.
 **Next:** fold in the two finished spikes, then draft `identity-foundation-prd.md` in this vocabulary.
 **Date:** 2026-06-01 · **Owner:** PM + Claude (ratified inline via `/grill-with-docs`).
+
+**Amendments:** **v1.1 (2026-06-02)** — Payer *capacity* is **store-delegated** for store-mediated payment
+(inv 17/10, §2.4, §3.2 refined; ADR 0002). Rectifies the 2026-06-01 "payer-eligibility = same age ladder"
+framing, whose self-imposed ≥18 rung is impractical on a store-only channel. See §R (newest entry).
 
 **What this is.** The single *structural* terminus for the identity foundation: the entities, their
 one-line definitions, the relationships between them, and the invariants that bind them — in one
@@ -37,6 +41,51 @@ low-risk · **[DEFER]** real decision, but downstream of this ontology (parked, 
 ## §R — Ratification log (Grill #1)
 
 Decisions land here as they're ruled, newest first. The §0 table and §1–§4 bodies are updated in lockstep.
+Spike **folds** are logged here too (a fold reconciles a finished spike's decisions into this vocabulary).
+
+- **Payer capacity → store-delegated (amendment, ontology v1.1) — RATIFIED 2026-06-02 (T-axis).**
+  Supersedes the **payer-rung framing** of the 2026-06-01 entries below — both the "Age tiers are
+  flag-combinations… payer-eligibility is the same complex" entry **and** the "Payer ≥18 / a minor cannot be
+  Payer" clauses of the C2/C3/C4 cluster (those entries stand as dated record; this clause is the live rule). **Payment capacity for store-mediated payment is delegated to the store
+  as merchant of record** — the store's purchase flow is the sole capacity adjudicator; we impose **no age
+  gate of our own** on that rail (the only payment channel for the foreseeable future). A flat **≥18**
+  worst-case gate (inv 29) governs **only** a future **non-store** rail, where *we* are merchant of record —
+  and even there it is a blunt default, **not** a `jurisdiction × age` derivation engine. **The consent rung
+  (13–16) is untouched** and stays on the age ladder; only the **payer rung comes off it** for store payment.
+  Safe because Payer is **access-inert** (no learning-data access) and **consent-orthogonal** (inv 22):
+  over-restricting payment is harmless (an adult Payer can always be attached, R11) where over-restricting
+  consent would block lawful learning. **Bodies updated in lockstep:** inv 10 (payer rider), inv 17, §2.4,
+  §3.2. **CONTEXT.md:** Payer + minor glossary entries. **ADR 0002.** **Carried open:** which Person the
+  store records as Payer under Family Sharing / Ask-to-Buy (E3 / §6 — now the active sub-question); whether to
+  *expose* under-18 self-pay (PRD, P-axis); app-store family policy + counsel (FLAG-2, REQ-2) gate paid launch.
+
+- **Fold #2 — `age-consent-spike.md` (age assurance & VPC) folded in — 2026-06-01 (PM confirmed Q1–Q5).**
+  Executed the **C7 strike** on this spike (its §E/§G "Clerk Orgs for access" loses to ADR 0001; the surviving
+  half — own the consent receipts/audit in Neon, Clerk carries only the *resolved decision* as JWT claims — is
+  kept, §3.2). **§3.2 rewritten** to close the Grill-#1 reconcile TODO: `resolveConsentRequirement` (the policy
+  function) and `AgeConsentDecision` (the resolved-decision object the app reads) are **complementary, not
+  rivals**; object fields locked, enum *values* illustrative. **New invariants §4.26–30:** age-gate precedes
+  collection; consent recorded **per-purpose** `{core, thirdPartyShare, targetedAds, aiTraining}`; **consent ≠
+  contract** (parental consent is load-bearing, not the guardian's account-holder status); **worst-case-default**
+  policy table; **assurance is proportionate** (self-declaration insufficient for young children). **§8:** REQ-1
+  sharpened (per-purpose disclosure), **FLAG-2 reframed** (the floor is a per-jurisdiction policy value + a
+  product/app-store call, not a single number; any-age charge lawful with VPC), new **REQ-2** (6-item
+  legal-review register) + **REQ-3** (DPIA gates launch). **§6:** vendor-selection criteria + platform-signal /
+  store-compliance recorded. Spike left as a dated artifact (vocabulary + C7 banner only).
+
+- **Fold #1 — `domain-model-options.md` (tenancy/IdP spike) folded in — 2026-06-01.** The spike's headline
+  (own-the-graph) was already ratified as C7 / ADR 0001; this fold harvested its *residual* commitments into
+  the ontology in ratified vocabulary. **Added:** §3.4 `residence_jurisdiction` (time-versioned Person
+  attribute) and §3.5 the v1 authorization posture (RBAC + ABAC attributes + first-class edges; no policy
+  engine). **Strengthened:** §4.11 — consent satisfaction is evaluated over a *set* of guardian edges (shape
+  locked; the one-of/all-of rule is legal, deferred §6); §4.12 — consent satisfaction is *jurisdiction-relative*
+  (a record valid under A may not satisfy B). **New invariants §4.22–25:** the three-way separation of consent
+  authority ≠ billing ≠ visibility; guardianship grants *separable capabilities* (not one bundled flag — Q4(b));
+  time-triggered transitions need a durable scheduler; transitions are append-only with *named* interim states.
+  **Deferred → §6:** separated-parents one-vs-two Person; guardianship D1 (global vs org-scoped); T6
+  de-credential; entry-point / self-registered-minor consent; open IdP cost & lock-in items. The spike is left
+  as a **dated discovery artifact** (vocabulary-superseded banner only; `Credential`→Login, `proxied`→managed,
+  `ward`→charge not rewritten inline).
 
 - **Mentorship authorization & capacity independence — RATIFIED 2026-06-01 (folds into §4).**
   - **Guardianship and Mentorship are independent capacities; neither auto-implies the other.** A guardian
@@ -256,6 +305,10 @@ Where the model lives. Membership grants *existence-visibility* only; **data acc
   a **retired** label.
 - **Standard name:** none — **domain-specific** (this is the non-standard half; no IdP/RBAC models it).
 - **Ratified: Guardianship is an EDGE, never a role.**
+- **The edge grants *separable capabilities* (§4.23), not one bundled flag:** *consent-authority* / *operate* /
+  *manage* / *view*. **Term discipline — `capability` ≠ `capacity`:** a **capacity** is *which end* of an edge
+  a Person occupies (guardian vs charge); a **capability** is *what the edge authorizes* them to do. (Folded
+  from `domain-model-options.md` §9; placement of the operate/manage/view facets — D1 — deferred, §6.)
 - **Rationale (C3):** consent is "*guardian G consented for charge W, policy V, time T, revocable*" — a
   **per-pair** fact. One parent with three children has three independently-revocable records; an
   org-wide role cannot express that (doc 2 §III.3). So it is structurally an edge. doc 2 §IV's
@@ -279,13 +332,21 @@ Where the model lives. Membership grants *existence-visibility* only; **data acc
   single-child mentor is **edge-only** (own org-of-one + cross-org edge) → never sees the family roster (fixes
   RC-02/D2). UI may present guardian + mentor as one "supervisors of X" view **without** fusing the edges.
 
-### §2.4 — Payer  **[✅ RATIFIED]**
-- **Definition:** the Person (**≥18**) responsible for a Subscription's billing. **A field on the
-  Subscription, not a role and not a visibility grant.**
+### §2.4 — Payer  **[✅ RATIFIED · amended v1.1 2026-06-02]**
+- **Definition:** the Person responsible for a Subscription's billing. **A field on the
+  Subscription, not a role and not a visibility grant.** **Access-inert** (no learning-data access).
 - **Labels:** `payer_person_id` (doc 2) · today implicit in the account holder (`subscriptions.
   account_id`, no explicit payer).
 - **Standard name:** Stripe customer's billing contact.
-- **Ratified:** `Subscription.payer_person_id`, invariant age ≥ 18, **no learning-data access**.
+- **Ratified (v1.1):** `Subscription.payer_person_id`, **no learning-data access**. **Payer *capacity* is
+  delegated, not adjudicated by us:** for store-mediated payment (the only channel for the foreseeable future)
+  the store is **merchant of record** and the sole capacity adjudicator — we impose no eligibility test. We
+  adjudicate capacity ourselves **only** on a channel where no store is merchant of record (a future
+  direct/web rail); there the default is a **flat ≥18 worst-case gate (inv 29), not a `jurisdiction × age`
+  derivation** — over-restricting payment is harmless (an adult Payer can be attached, R11) where
+  over-restricting consent would block lawful learning. Per-jurisdiction relaxation stays available as config
+  under the inv-29 pattern, **unbuilt unless a direct rail justifies it**. *(Open: which Person the store
+  records as Payer under Family Sharing — E3 / §6.)*
   Future B2B: add `payer_org_id` + "exactly one set" check (doc 2 §VI) — `[DEFER]`.
 
 ---
@@ -308,17 +369,56 @@ The drift engine was turning *attributes* into entities/tables. These stay as co
 - **Therefore `charge` ≠ "no Login".** A charge is *consent-gated* (the consent dimension) and may be managed
   **or** credentialed. Device-sharing among *capable* users is solved by **login switching**, not managed profiles.
 
-### §3.2 — Consent requirement — `age × jurisdiction → policy`  **[ALIGNED via spike]**
-- **Not** a `minor` boolean. Resolved by one server function (doc 2 `resolveConsentRequirement`;
-  spike `AgeConsentDecision`). **Two names for one thing — reconcile in grill** (lean to the spike's
-  `AgeConsentDecision` shape since it's the more complete, method-typed/per-purpose version).
-- Drives: `consentAge` (per-market table, default 16 unknown), `requiresGuardianConsent`,
-  `payerEligible (≥18)`, `contentBand` (theming only, **never** gating).
+### §3.2 — Consent requirement & the consent decision  **[✅ FOLDED — Fold #2; closes the Grill-#1 reconcile TODO]**
+- **Not** a `minor` boolean. Two **complementary** pieces (not rival names):
+  - **`resolveConsentRequirement(age × residence_jurisdiction)`** — the **policy function**: what the *law
+    requires* (e.g. a 14-year-old in Germany needs guardian consent). Knows the rule only.
+  - **`AgeConsentDecision`** — the **resolved-decision object** the rest of the app reads (and never looks
+    behind): requirement **+** whether it is satisfied **+** how it was proven **+** expiry/receipt. The single
+    **COPPA-portable seam** — swap the verification method underneath and app code is unchanged.
+- **`AgeConsentDecision` fields (shape locked; enum *values* illustrative, pinned Phase E):** `ageBand`
+  (jurisdiction-relative) · `consentStatus` (`NOT_REQUIRED | REQUIRED_PENDING | GRANTED | REVOKED | EXPIRED`) ·
+  `assuranceLevel` (`SELF_DECLARED | PLATFORM_GUARDIAN | VENDOR_VERIFIED | VPC_VERIFIED`) · `consentMethod`
+  (`card | KBA | facial+review | platform:guardianDeclared | vendor:KWS …` — **never a bare boolean**) ·
+  `jurisdiction` · `purposeScope { core, thirdPartyShare, targetedAds, aiTraining }` (§4.27) ·
+  `retentionExpiresAt` · `receiptId` (→ ISO/IEC 27560 record).
+- **Per-purpose, not global** (§4.27): the four `purposeScope` buckets are *secondary-/external-use* purposes —
+  `core` (deliver the tutoring) / `thirdPartyShare` (data to an **external company** — analytics/ad SDKs) /
+  `targetedAds` / `aiTraining` (train models on the child's work). **Distinct from internal helper access:** a
+  human mentor seeing a charge's data is a **Mentorship edge + REQ-1 disclosure**, *not* a `purposeScope` bucket.
+- **Policy as data, worst-case default** (§4.29): a `jurisdiction × ageBand → policy` table (EU digital-consent
+  age runs **13–16**; DE/NL/IE/PL = 16). Ship **strictest (16 / VPC-always), relax per *verified* jurisdiction
+  as config — never country-by-country code**. `contentBand` (theming only, **never** gating) rides the same
+  age ladder; **payment capacity does *not*** — it is **store-delegated** (inv 17, amended v1.1), with a flat
+  ≥18 default only on a future non-store rail.
+- **Decision transport (ADR 0001):** Clerk may carry the *resolved* `AgeConsentDecision` as ~3 JWT claims
+  (`ageBand`/`consentStatus`/`assuranceLevel`); **we own** the consent receipts + age-assurance audit + event
+  log in Neon. Clerk **Organizations are not used** (the spike's "Clerk Orgs for access" line is superseded).
 - Code today: flat `age <= 16` + `MINIMUM_AGE = 11` in `services/consent.ts:197` (CC-06) — the drift.
 
 ### §3.3 — Content band / age bracket  **[ALIGNED]**
 - `computeAgeBracket` (`@eduagent/schemas`) — theming + copy **only**, never feature-gating
   (CONTEXT.md:42). Keep as-is; it is the one identity-adjacent term that is *not* drifting.
+
+### §3.4 — Residence jurisdiction  **[✅ FOLDED — Fold #1 / P1]**
+- A Person carries a **`residence_jurisdiction`**: a **first-class, time-versioned attribute** (history
+  retained for audit — *"what policy was in force when we processed"*), keyed off **residence**, not current
+  location (a holiday or VPN must not re-gate). It is the input to the consent computation (§3.2) that can
+  change without a birthday.
+- Consequence (drives transition T4 — §6): when it changes, `requiresGuardianConsent` re-evaluates under the
+  **new** jurisdiction's threshold and the gate may **re-engage** with no age change — see §4.12
+  (satisfaction is jurisdiction-relative) and §4.24 (the re-evaluation must be scheduler-driven, not
+  request-only). *(Detection — declared vs inferred residence — and whether re-engagement suspends or merely
+  re-prompts are deferred product/legal questions, §6.)*
+
+### §3.5 — Authorization posture for v1  **[✅ FOLDED — Fold #1 / P7]**
+- v1 authorization = **RBAC** (roles `{admin, learner}` as *data*, never `if (isOwner)`) **+ a small set of
+  ABAC attributes** (age × `residence_jurisdiction` → consent policy; any age-gated capability) **+ first-class
+  relationship edges** (Guardianship, Mentorship). **No external policy engine** (Zanzibar / OpenFGA / SpiceDB)
+  at v1.
+- Keep edges first-class so **ReBAC stays reachable** without retrofit. The test for "do we need an engine":
+  permission decisions that must traverse *arbitrary-depth* relationship chains a roles-array + direct-edge
+  check can't express. Revisit only if/when that appears.
 
 ---
 
@@ -346,10 +446,16 @@ build. Ratified across Grill #1 — these are the **definition of "done"** the P
 **C — Consent & age**
 10. Consent requirement is **computed from age × jurisdiction** (`requiresGuardianConsent`) — **never an
     `isMinor` boolean**. The three tiers (consent-gated → consent-capable minor → adult) are
-    **flag-combinations, not entities**; payer-eligibility (≥18) is the **same age ladder, a different rung**.
-11. A **consent-gated** Person cannot have learning data processed without a **valid Consent on a
-    Guardianship edge** (held by the guardian; or self-held once consent-capable).
-12. Consent is **method-typed + per-purpose**, jurisdiction-stamped, and **withdrawable** — never a boolean.
+    **flag-combinations, not entities**. **Payment capacity is *not* an age-ladder rung:** for store-mediated
+    payment it is **store-delegated** (inv 17, v1.1); a flat ≥18 rung applies **only** to a future non-store rail.
+11. A **consent-gated** Person cannot have learning data processed without **valid Consent**, evaluated over
+    the **set of Guardianship edges** that bear on them — `consentSatisfied = f({guardian-of edges}, the
+    jurisdiction's one-of/all-of rule)` — or self-held once consent-capable. *(The set shape is locked; the
+    one-of/all-of rule itself is jurisdictional/legal — deferred, §6.)*
+12. Consent is **method-typed + per-purpose**, **withdrawable**, and **jurisdiction-relative** — never a
+    boolean. Satisfaction is **scoped to the standard under which it was obtained**: a record valid under
+    jurisdiction A may not *satisfy* jurisdiction B, so a held consent does not automatically transfer across a
+    `residence_jurisdiction` change (§3.4).
 13. Below the credential-eligibility floor, Persons are **guardian-created only** (no self-sign-up). *(The
     exact floor is a pending product decision — FLAG-2.)*
 
@@ -361,7 +467,11 @@ build. Ratified across Grill #1 — these are the **definition of "done"** the P
     mentorships must be **re-confirmed by the now-consent-capable learner**, else they lapse.
 
 **E — Billing & autonomy**
-17. `admin` is **age-agnostic**; **Payer ≥ 18**; the two are separate, neither implies the other.
+17. `admin` is **age-agnostic**. **Payer capacity is store-delegated for store-mediated payment** — the
+    store (merchant of record) is the sole capacity adjudicator and we impose **no age gate of our own**; a
+    flat **≥18** worst-case default (inv 29) governs **only** a future non-store rail. Payer is
+    **access-inert** (no learning-data access) and **separate from `admin`** (neither implies the other).
+    *(Recorded-Payer identity under Family Sharing → E3 / §6; under-18 exposure → PRD; launch gates → FLAG-2/REQ-2.)*
 18. **Billing + consent follow the home Organization**; a second-org edge grants edge-scoped visibility
     only — changing neither who pays nor who consents.
 19. A paying adult gains **no** visibility into a self-consenting learner's data without that learner's
@@ -372,6 +482,39 @@ build. Ratified across Grill #1 — these are the **definition of "done"** the P
 21. Edge deletion (guardianship / mentorship / membership) **never cascade-deletes** the Person or their
     learning history — a managed Person (charge *or* the rare managed adult) is **never orphaned**.
     *(Today `family_links` cascades — the live bug, PPA-R11.)*
+
+**G — Separation, guardianship depth & transition safety**  *(folded from `domain-model-options.md` §8–§10)*
+22. **Three independent concerns — never fused:** **consent authority** ≠ **billing control** ≠ **data
+    visibility**. (Layer-1 Guardianship, the Payer designation, and Layer-2 visibility edges are the three;
+    most transition bugs trace to conflating two of them.)
+23. **Guardianship grants *separable* capabilities**, never one bundled flag — *consent-authority* / *operate*
+    (act-for) / *manage* (settings, billing scope) / *view*. They usually co-occur but must be allowed to
+    diverge: the credentialed tween **operates** their own profile (no act-for) yet still needs a guardian's
+    **consent-authority**. *(Whether the operate/manage/view facets are global or org-scoped — D1 — is
+    deferred, §6; consent-authority is the legal facet and is global.)*
+24. **Time-triggered transitions must be scheduler-driven.** Age / consent-threshold / 18 crossings and
+    `residence_jurisdiction` re-evaluation fire with **no user action** — a dormant account still transitions
+    on its birthday — so they **cannot live only in request handlers**; a durable scheduler re-evaluates each
+    Person on the relevant dates. (The "wired-but-untriggered" trap: if nothing *schedules* it, the transition
+    silently never happens.)
+25. **Transitions are append-only + audited, and every interim state is a *named valid state*** — graduation
+    pre-org-choice, the dormant adult with no Login, "suspended pending fresh consent" after a jurisdiction
+    re-engage — never an implicit gap. Each carries a Failure-Modes table (no dead-ends; repo UX-resilience rule).
+
+**H — Consent mechanics (COPPA-ready)**  *(folded from `age-consent-spike.md`)*
+26. **Age-gate precedes collection.** Signup captures an **age-range first** (neutral mechanism); **no profile
+    or learning data is persisted until lawful basis is established** (`AgeConsentDecision` resolves to allowed).
+    The age-screen itself is the only permitted pre-basis collection.
+27. **Consent is recorded per purpose** — separate records for `{core, thirdPartyShare, targetedAds, aiTraining}`
+    (§3.2) — **required even when launch uses only `core`** (COPPA-2025). Internal helper access (a mentor
+    seeing a charge's data) is **not** a purpose bucket — it is a Mentorship edge + REQ-1 disclosure.
+28. **Consent ≠ contract.** A consent-gated Person's processing rests on **verifiable guardian consent**
+    (§4.11), **never** on the guardian's contract / account-holder status — the "parent is account-holder ⇒
+    child covered" assumption is invalid (EDPB/ICO correction).
+29. **Worst-case default.** The `jurisdiction × ageBand → policy` table ships **strictest** (16 / VPC-always)
+    and is relaxed **per *verified* jurisdiction as config** — never country-by-country code.
+30. **Assurance is proportionate.** Consent carries a *method* + an *assurance level*; the required level scales
+    with age/risk — **self-declaration is not sufficient for young children**. (Ladder values → Phase D/E.)
 
 ---
 
@@ -401,11 +544,39 @@ Parked so the ontology can land without them; each re-enters at the named phase.
 - **Multi-org governance** — whose subscription/quota/consent/visibility when a Person is in two orgs
   (ORG-08; doc 2 §8). → PRD / Phase D.
 - **Transition events** — managed→credentialed, consent-age crossing, 18-graduation: the *mechanics*
-  (auto vs explicit step) (doc 2 J4/J11). → PRD.
-- **Consent mechanism** — which VPC vendor realises the Consent entity (KWS/k-ID) (spike §D). →
-  Phase D/E; ontology only commits to "method-typed, pluggable."
+  (auto vs explicit step) (doc 2 J4/J11). The §4.24–25 invariants bind the *safety*; the mechanism is here. → PRD.
+- **Consent mechanism / VPC vendor** — which vendor realises age-assurance + VPC (**KWS vs k-ID — substitutes,
+  pick one**). Selection criteria (Fold #2): **counterparty durability** (KWS = free Epic-subsidized infra vs
+  k-ID = paid-but-contractual), **EU method coverage + completion** (KWS skews US/BR/KR methods — the EU gap is
+  the real unknown), and a **per-event-at-onboarding, not per-MAU** cost shape. Consent receipts use **ISO/IEC
+  27560**, owned in Neon. `[VENDOR OUTREACH]` → Phase D/E; ontology commits only to "method-typed, pluggable."
+- **Platform age-signals & store compliance** (Fold #2) — iOS `DeclaredAgeRange` is **global**; Android Play
+  Age Signals returns **null in NO/EU/UK** (US-states/BR only), so Europe's parental gate is **in-app + vendor**,
+  not platform-signal-dependent; the **managed-charge-on-parent's-device** cohort has **no** platform signal on
+  either OS (in-app parental setup — fine, the adult is present). **Play Families** is a hard Android ship-gate.
+  → Phase D/E architecture + PRD journeys.
 - **Where this ontology ultimately lives** — fold into CONTEXT.md vs stay beside it. → Phase C.
 - **Physical schema** — tables/columns/migrations, the `Person` rename surface. → Phase E.
+
+*Folded from `domain-model-options.md` (Fold #1):*
+- **Separated parents — one Person or two, and is shared-custody in scope for v1?** (spike §10) A **Phase-B
+  product + legal** call. The architectural **imperative is already satisfied** — *don't foreclose the
+  one-Person model* — by Person ≠ Login (§4.3) + a global consent edge (§4.23) + multi-org Membership (ORG-08);
+  the only thing that forecloses it is regressing to the fused/account-bound shape. Decision deferred; the
+  reachability is locked. → Phase B / PRD.
+- **Guardianship D1 — global vs org-scoped capability placement.** (spike §9) Consent-authority is **global**
+  (a legal fact about two humans); *operate / manage / view* are plausibly **org-contextual**. Leaning: global
+  consent edge + org-scoped operation (also handles the credentialed-tween split and co-parent privacy). Gated
+  on the separated-parents ruling. → Phase D/E + legal.
+- **T6 — de-credential (credentialed → managed reversion).** (spike §8) Probably **disallowed**; a product
+  choice, not to be built speculatively. → PRD.
+- **Entry-point asymmetry & self-registered-minor consent.** (spike §8; drift-map §7A) Parent-creates-child
+  (managed from the start) vs **minor-self-registers-first** (own Login, *no guardian yet* → who consents?).
+  The self-registered-minor consent path is a known gap. → PRD journeys.
+- **Open IdP items (no impact on ADR 0001).** (spike §6) Clerk **migration / lock-in cost** (password-hash &
+  user portability — no verified claim); whether any **OSS / self-host** IdP can model a credential-less member
+  natively; Auth0 / Stytch current per-MAU pricing. Relevant only if the own-the-graph commitment is later
+  stress-tested. → revisit on demand (no scheduled phase).
 
 ---
 
@@ -442,6 +613,9 @@ spike / a cleanup pass as noted.
   consent text says so. **Action:** verify the current consent flow discloses this — the existing parental
   consent email (`apps/api/src/services/notifications.ts:368-369`) appears **not** to. Feeds the consent
   spike + PRD; counsel must confirm scope language before a paid launch. (Raised by PM, Grill #1 / C4.)
+  **Fold #2 reinforcement:** COPPA-2025's per-purpose model (§4.27) makes this sharper — `aiTraining` and
+  `thirdPartyShare` each need their *own* disclosed opt-in, so the consent text must **enumerate every purpose
+  and every helper-access grant**, never a single blanket consent.
 
 - **CLEANUP-1 — CONTEXT.md legacy examples confuse under the new model.** e.g. the old `_Avoid_: learner
   (every Profile is a learner)` reasoning is obsolete now that `learner` is a positive role. Sweep the
@@ -467,6 +641,12 @@ spike / a cleanup pass as noted.
   for 11 specifically** — reads as product scoping, not a legal line. **Action:** set the real floor (gated on
   the under-13 VPC solution — age-consent spike — **and** an app-store age-rating check), then remove the code
   floor + sweep copy. (Raised PM, Grill #1 / C9.)
+  **Fold #2 update (age-consent spike):** the floor is **not a single number** — "13" is simultaneously a legal
+  line (NO/UK/COPPA) *and* a product default, but the EU digital-consent age runs **13–16** (DE/NL/IE/PL = 16),
+  so the gate is a **per-jurisdiction policy value** (§4.29), not a constant. The spike confirms **any-age charge
+  is lawful *with VPC*** (nothing legal blocks a <11 charge given verifiable parental consent), so the real floor
+  is a **product / app-store-rating scoping call layered on the worst-case-16 table**, not a legal hard stop.
+  Still gated on the VPC solution + app-store rating.
 
 - **FLAG-3 — Managed, consent-capable adult (no Login). `[RESOLVED, Grill #1]`** **Supported, no new machinery.**
   A managed consent-capable adult (the "Netflix-profile" grandparent) = an admin-created **`learner`** with **no
@@ -481,6 +661,20 @@ spike / a cleanup pass as noted.
   **Status:** the *rule* is locked now (our artifacts use no numbers); the **copy sweep is deferred** to the
   PRD/canonical rebaseline and **gated on FLAG-2** — served-age-range claims (ToS "aged 11–17") can't be rewritten
   until the real floor is a decided fact. (Raised PM, Grill #1 / C9.)
+
+- **REQ-2 — Consent legal-review register (folded from `age-consent-spike.md` §H). `[LEGAL REVIEW]`** Six
+  questions counsel must close **before they enter a spec / before paid launch**; **none lockable by us**:
+  (1) can contract basis (GDPR 6(1)(b)) carry *any* of a minor's core processing via the parent's account
+  (likely no/limited — §4.28); (2) **cross-org consent** — whose consent governs a charge's data in a *second*
+  Organization (interacts with multi-org governance, §6 — and the "external tutor = third-party share?" question
+  from §3.2); (3) **graduation** — does the parent's original consent survive a managed→credentialed change, and
+  how is legacy data handled; (4) COPPA **AI-training** separate-consent applicability to our AI features;
+  (5) **EU AI-Act** high-risk trigger — does our adaptive path "steer" curriculum (Annex III 3(b));
+  (6) **Ofcom** child-AI-chatbot secondary regs (pending — monitor). Owner: counsel. (Folded Fold #2.)
+
+- **REQ-3 — DPIA is effectively mandatory; gate launch. `[COMPLIANCE]`** Children + AI + learning profiles ⇒ a
+  Data Protection Impact Assessment is required (UK Children's Code + UK/EU GDPR Art 35) and should **gate
+  launch**. Not an ontology item — a launch-checklist / PRD task. Owner: PM + counsel. (Folded Fold #2.)
 
 ## §9 — Supported use cases (carry to PRD personas/journeys)
 

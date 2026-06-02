@@ -91,9 +91,12 @@ _Avoid_: mentor (now the human role), bot, assistant.
 **Guardianship** _[target]_:
 The dyadic relationship recording that an adult gave **verifiable consent** for a consent-gated learner —
 a **Guardian → charge** edge that carries the consent record and establishes lawful basis to process that
-learner's data (**Layer 1 — consent authority**). Withdrawable. **Not a role.**
+learner's data (**Layer 1 — consent authority**). Withdrawable. **Not a role.** The edge grants **separable
+*capabilities*** (consent-authority / operate / manage / view), not one bundled flag — a credentialed tween
+operates their own profile yet still needs a guardian's consent-authority. Note **capability ≠ capacity**: a
+*capacity* is which end of the edge you are (guardian / charge); a *capability* is what the edge authorizes.
 _Avoid_: family link (the legacy table), parental role, custody.
-→ `_wip/identity-foundation/identity-ontology.md` §2.2 · legacy `family_links`+`consent_states` `profiles.ts:284,313`
+→ `_wip/identity-foundation/identity-ontology.md` §2.2, §4.23 · legacy `family_links`+`consent_states` `profiles.ts:284,313`
 
 **Guardian** _[target]_:
 The consenting adult who holds a Guardianship over a charge. Has inherent oversight of that charge (Layer 1).
@@ -117,19 +120,26 @@ supervisory access**). Granted by the guardian (below consent age) or by the dat
 _Avoid_: org-wide mentor access (the leak this prevents), guardianship (a different layer).
 → `_wip/identity-foundation/identity-ontology.md` §2.3
 
-**Payer** _[target]_:
-The Person (**≥18**) designated responsible for an Organization's Subscription. A Subscription *designation*,
-**not** a membership role, and grants **no** learning-data access. Separable from `admin` (an independent teen
-can be admin of their own org but needs an adult Payer for a paid plan).
+**Payer** _[target · amended v1.1 2026-06-02]_:
+The Person designated responsible for an Organization's Subscription. A Subscription *designation*,
+**not** a membership role, and grants **no** learning-data access (**access-inert**). **Payer *capacity* is
+delegated, not adjudicated by us:** for store-mediated payment (the only channel for the foreseeable future)
+the store is **merchant of record** and the sole capacity adjudicator — no age gate of ours. A flat **≥18**
+worst-case default (inv 29) applies **only** to a future non-store rail where we are merchant of record, not a
+per-jurisdiction derivation. Separable from `admin` (an independent teen can be admin of their own org; on a
+paid plan they self-pay where the store permits, else an adult Payer is attached).
 _Avoid_: owner, billing contact (considered; understates legal responsibility), customer (that is the org).
-→ `_wip/identity-foundation/identity-ontology.md` §2.4
+→ `_wip/identity-foundation/identity-ontology.md` §2.4, §R (v1.1)
 
-**minor** _[target]_:
-A Person **under 18** — the **contract/Payer threshold** (a minor cannot be the Payer/contract-holder).
-**Distinct from the consent gate**, which is `requiresGuardianConsent` (below the jurisdictional consent age,
-13–16). Fine in day-to-day speech; never a structural/code gate (use the precise condition).
-_Avoid_: using "minor" to mean "needs consent" (that is consent-gated / a charge — a different, jurisdictional line).
-→ `_wip/identity-foundation/identity-ontology.md` §R, §3.2
+**minor** _[target · amended v1.1 2026-06-02]_:
+A Person **under 18** — the **contract threshold** that applies **only** where *we* are merchant of record (a
+future non-store payment rail). On store-mediated payment (the only channel for now) being a minor does
+**not** bar Payer status — capacity is store-delegated (§2.4, inv 17). **Distinct from the consent gate**,
+which is `requiresGuardianConsent` (below the jurisdictional consent age, 13–16). Fine in day-to-day speech;
+never a structural/code gate (use the precise condition).
+_Avoid_: using "minor" to mean "needs consent" (that is consent-gated / a charge — a different, jurisdictional line);
+treating "minor" as an automatic Payer bar (true only on a future non-store rail).
+→ `_wip/identity-foundation/identity-ontology.md` §R (v1.1), §2.4, §3.2
 
 **Owner** _[✗ superseded — dissolved by Grill #1 C2]_:
 Legacy: a Profile with `isOwner === true`. **Dissolved** in the clean cut → split into `admin` (org
@@ -152,6 +162,36 @@ A computed classification from `birthYear` used for consent, voice, and age-appr
 copy — never for feature gating.
 _Avoid_: persona, age group, age tier.
 → `computeAgeBracket()`, `packages/schemas/src/age.ts:42`
+
+**residence_jurisdiction** _[target]_:
+A Person's place of residence as a **time-versioned** attribute (history retained for audit) — the input,
+with age, to the consent computation (`requiresGuardianConsent`). Keyed off **residence**, not current
+location (a holiday or VPN must not re-gate). A change can re-engage the consent gate with no birthday.
+_Avoid_: country (the billing/storefront country is a different, coarser signal), locale, current location.
+→ `_wip/identity-foundation/identity-ontology.md` §3.4
+
+**Consent** _[target]_:
+The record that lawful basis exists to process a consent-gated learner's data — **method-typed** (how it was
+obtained), **per-purpose** (a separate record per `core` / `thirdPartyShare` / `targetedAds` / `aiTraining`),
+**jurisdiction-stamped**, and **withdrawable**. **Never a boolean.** Carried on a Guardianship edge (held by the
+guardian, or self-held once consent-capable); stored as an ISO/IEC 27560 receipt + append-only event log.
+_Avoid_: `consented = true` (the bug this prevents), consent flag.
+→ `_wip/identity-foundation/identity-ontology.md` §3.2, §4.12, §4.27
+
+**AgeConsentDecision** _[target]_:
+The single **resolved-decision object** the app reads to know a Person's consent state — bundling what the law
+requires + whether it is satisfied + how it was proven (`consentMethod`, `assuranceLevel`) + `purposeScope` +
+expiry/`receiptId`. The COPPA-portable seam: app code reads **this**, never the underlying verification method.
+Computed via `resolveConsentRequirement(age × residence_jurisdiction)` (the policy function).
+_Avoid_: reading the raw method (card-on-file, vendor result) directly; `isMinor` boolean.
+→ `_wip/identity-foundation/identity-ontology.md` §3.2
+
+**Verifiable Parental Consent (VPC)** _[target]_:
+The high-assurance consent ceremony required (COPPA; in practice EU for young children) **before** processing a
+young charge's data — obtained via a vendor (KWS / k-ID) or a proportionate platform / card method, **not**
+self-declaration. The strongest `assuranceLevel`.
+_Avoid_: treating self-declared age as VPC; "parental consent" used loosely for the low-assurance case.
+→ `_wip/identity-foundation/identity-ontology.md` §3.2, §6
 
 ### Curriculum structure
 
