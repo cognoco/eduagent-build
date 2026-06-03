@@ -11,7 +11,7 @@
 > §3.2, §4.26–30, §8 REQ-2/REQ-3) and `CONTEXT.md`. Two corrections the body does **not** reflect (left
 > unrewritten on purpose): **(1) vocabulary** — `Credential` → **Login**, roles `Owner/Mentor/Student` →
 > `{admin, learner}` + capacities, the `Adult/Minor` flag → the computed `requiresGuardianConsent`;
-> **(2) C7** — every "**Clerk Orgs for access/identity**" line (§E, §G) is **superseded by ADR 0001** (own the
+> **(2) C7** — every "**Clerk Orgs for access/identity**" line (§E, §G) is **superseded by MMT-ADR-0001** (own the
 > graph in Neon; Clerk = auth + the resolved-decision JWT claims only). Read the ontology, not this file.
 
 > ⚠️ The deep-research *workflow* harness failed mid-run (StructuredOutput incompatibility, ~3.4M tokens, no output). This brief was produced via direct parallel research agents instead. Same rigor, different vehicle.

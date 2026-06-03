@@ -1,11 +1,12 @@
-# ADR 0002 — Payer capacity is store-delegated (not self-adjudicated by age)
+# MMT-ADR-0002 — Payer capacity is store-delegated (not self-adjudicated by age)
 
 **Status:** Accepted (Product-intent review, 2026-06-02) · **Scope:** Identity Foundation — Payer / billing capacity
 **Deciders:** PM (technical/architecture reviewer) + Claude · **Amends:** `identity-ontology.md` inv 17 / inv 10 / §2.4 / §3.2 (ontology **v1.1**; §R entry 2026-06-02)
 
-> **Placement note:** lives in `_wip/identity-foundation/adr/` for the same reason as ADR 0001 — the
-> canonical ADR home is the deferred Phase-C doc-strategy decision. Move to a repo-wide `docs/adr/` if/when
-> Phase C rules that way.
+> **Placement note:** Phase C ruled the ADR naming standard (`MMT-ADR-NNNN`) in `MMT-ADR-0003`; this ADR was
+> renamed accordingly (`aka ADR 0002` in pre-Phase-C references). It still **lives in
+> `_wip/identity-foundation/adr/`** — the *physical* home of the decisions layer is deferred to follow-up
+> **F-PLACEMENT**. Naming is settled; placement is not.
 
 ## Context
 

@@ -1,11 +1,12 @@
-# ADR 0001 — Own the identity/tenancy graph; Clerk for authentication only
+# MMT-ADR-0001 — Own the identity/tenancy graph; Clerk for authentication only
 
 **Status:** Accepted (Grill #1, 2026-06-01) · **Scope:** Identity Foundation re-platform (pre-launch clean cut)
 **Deciders:** PM + Claude · **Conflict ID:** C7 (`identity-ontology.md` §R)
 
-> **Placement note:** this ADR lives in `_wip/identity-foundation/adr/` because the identity-foundation
-> folder is a structural *pilot* and the canonical home for ADRs is a deferred **Phase-C** doc-strategy
-> decision. Move to a repo-wide `docs/adr/` if/when Phase C rules that way.
+> **Placement note:** Phase C ruled the ADR naming standard (`MMT-ADR-NNNN`) in `MMT-ADR-0003`; this ADR was
+> renamed accordingly. It still **lives in `_wip/identity-foundation/adr/`** — Phase C deferred the *physical*
+> home of the decisions layer to follow-up **F-PLACEMENT** (the repo-wide `docs/` taxonomy for all layers).
+> Naming is settled; placement is not.
 
 ## Context
 
