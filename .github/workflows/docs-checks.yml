@@ -11,6 +11,9 @@ on:
       - main
     paths:
       - 'docs/plans/**.md'
+      - 'docs/specs/**.md'
+      - 'scripts/check-decision-adr-link.ts'
+      - 'scripts/decision-adr-link-baseline.json'
       - 'apps/api/drizzle/**'
       - 'scripts/check-migration-rollback.sh'
       - '.github/workflows/docs-checks.yml'
@@ -23,6 +26,9 @@ on:
   pull_request:
     paths:
       - 'docs/plans/**.md'
+      - 'docs/specs/**.md'
+      - 'scripts/check-decision-adr-link.ts'
+      - 'scripts/decision-adr-link-baseline.json'
       - 'apps/api/drizzle/**'
       - 'scripts/check-migration-rollback.sh'
       - '.github/workflows/docs-checks.yml'
@@ -44,7 +50,7 @@ jobs:
   rollback-section:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
 
@@ -58,6 +64,30 @@ jobs:
       - name: Migration rollback-section check
         run: bash scripts/check-migration-rollback.sh
 
+  decision-adr-link:
+    # MMT-ADR-0000 §II.5 — forward-only ratchet. A new ADR-class decision block in
+    # docs/specs|plans without a linked MMT-ADR fails the check. Today's blocks
+    # are grandfathered in scripts/decision-adr-link-baseline.json (the backfill
+    # is deferred). See docs/adr/README.md.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies (root only)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Decision→ADR link check
+        run: pnpm run check:decision-adr-link
+
   maestro-validator:
     # Static integrity checker for Maestro flow YAML. See
     # docs/audit/e2e/validator-spec.md and docs/audit/e2e/m1b-execution-brief.md.
@@ -66,13 +96,13 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: 'pnpm'
