@@ -95,8 +95,11 @@ learner's data (**Layer 1 — consent authority**). Withdrawable. **Not a role.*
 *capabilities*** (consent-authority / operate / manage / view), not one bundled flag — a credentialed tween
 operates their own profile yet still needs a guardian's consent-authority. Note **capability ≠ capacity**: a
 *capacity* is which end of the edge you are (guardian / charge); a *capability* is what the edge authorizes.
+**The edge is *global* (a person-pair fact); it *stores* consent-authority + the consent record only —
+`operate`/`manage`/`view` are *derived* at query time** (`guardian-link ∧ shared-org ∧ charge-has-no-Login`),
+not stored per-org (MMT-ADR-0008). The "may this guardian act here?" check lives in **one named resolver**.
 _Avoid_: family link (the legacy table), parental role, custody.
-→ `_wip/identity-foundation/identity-ontology.md` §2.2, §4.23 · legacy `family_links`+`consent_states` `profiles.ts:284,313`
+→ `_wip/identity-foundation/identity-ontology.md` §2.2, §4.23 · **MMT-ADR-0008** · legacy `family_links`+`consent_states` `profiles.ts:284,313`
 
 **Guardian** _[target]_:
 The consenting adult who holds a Guardianship over a charge. Has inherent oversight of that charge (Layer 1).
