@@ -234,6 +234,14 @@ When writing implementation plans (via Claude Code plan mode, written specs, or 
 - Check type and name consistency across tasks. A function called `clearLayers` in Task 3 must still be `clearLayers` in Task 7.
 - Use TDD step decomposition for greenfield logic; use design-doc + acceptance criteria for migrations, audits, refactors.
 
+## Decisions (ADRs)
+
+Contested, hard-to-reverse architecture/product decisions are recorded as **Architecture Decision Records** (`MMT-ADR-NNNN`) in `docs/adr/` — **not** buried inline in a spec/plan or left only in `.claude/memory/`. The layer model, the **significance gate** (when a decision needs an ADR), the lockstep lifecycle, and the conventions are defined in [`docs/adr/MMT-ADR-0000`](docs/adr/MMT-ADR-0000-documentation-layer-model-and-decisions-layer.md); `docs/adr/README.md` is the operating guide. **Read 0000 to decide whether something is ADR-class — don't re-derive the gate here.**
+
+- **Lockstep:** an ADR (the *why*) and the canon line it changes (`architecture.md` / `PRD.md` / `CONTEXT.md` — the *what*) move in **one** change-set. Never one without the other.
+- **Enforced:** `scripts/check-decision-adr-link.ts` (the `docs-checks.yml` → `decision-adr-link` job) fails a new `docs/specs|plans` decision block with no linked `MMT-ADR`. Today's are grandfathered in `scripts/decision-adr-link-baseline.json`; genuine false positives use `--accept` with a commit-message justification.
+- **`ARCH-N` is frozen** (legacy register in `docs/specs/epics.md`) — no new `ARCH-N`; new architecture decisions are `MMT-ADR`s.
+
 ## Secrets Management
 
 All secrets are managed through Doppler. Assume the `doppler` CLI is installed and on PATH. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or platform-specific secret management. When secrets need to be set, say "add to Doppler."

@@ -7,7 +7,7 @@ in §0). Open items tracked as flags in §8. CONTEXT.md identity glossary extrac
 **Date:** 2026-06-01 · **Owner:** PM + Claude (ratified inline via `/grill-with-docs`).
 
 **Amendments:** **v1.1 (2026-06-02)** — Payer *capacity* is **store-delegated** for store-mediated payment
-(inv 17/10, §2.4, §3.2 refined; ADR 0002). Rectifies the 2026-06-01 "payer-eligibility = same age ladder"
+(inv 17/10, §2.4, §3.2 refined; MMT-ADR-0002). Rectifies the 2026-06-01 "payer-eligibility = same age ladder"
 framing, whose self-imposed ≥18 rung is impractical on a store-only channel. See §R (newest entry).
 
 **What this is.** The single *structural* terminus for the identity foundation: the entities, their
@@ -55,12 +55,12 @@ Spike **folds** are logged here too (a fold reconciles a finished spike's decisi
   Safe because Payer is **access-inert** (no learning-data access) and **consent-orthogonal** (inv 22):
   over-restricting payment is harmless (an adult Payer can always be attached, R11) where over-restricting
   consent would block lawful learning. **Bodies updated in lockstep:** inv 10 (payer rider), inv 17, §2.4,
-  §3.2. **CONTEXT.md:** Payer + minor glossary entries. **ADR 0002.** **Carried open:** which Person the
+  §3.2. **CONTEXT.md:** Payer + minor glossary entries. **MMT-ADR-0002.** **Carried open:** which Person the
   store records as Payer under Family Sharing / Ask-to-Buy (E3 / §6 — now the active sub-question); whether to
   *expose* under-18 self-pay (PRD, P-axis); app-store family policy + counsel (FLAG-2, REQ-2) gate paid launch.
 
 - **Fold #2 — `age-consent-spike.md` (age assurance & VPC) folded in — 2026-06-01 (PM confirmed Q1–Q5).**
-  Executed the **C7 strike** on this spike (its §E/§G "Clerk Orgs for access" loses to ADR 0001; the surviving
+  Executed the **C7 strike** on this spike (its §E/§G "Clerk Orgs for access" loses to MMT-ADR-0001; the surviving
   half — own the consent receipts/audit in Neon, Clerk carries only the *resolved decision* as JWT claims — is
   kept, §3.2). **§3.2 rewritten** to close the Grill-#1 reconcile TODO: `resolveConsentRequirement` (the policy
   function) and `AgeConsentDecision` (the resolved-decision object the app reads) are **complementary, not
@@ -74,7 +74,7 @@ Spike **folds** are logged here too (a fold reconciles a finished spike's decisi
   store-compliance recorded. Spike left as a dated artifact (vocabulary + C7 banner only).
 
 - **Fold #1 — `domain-model-options.md` (tenancy/IdP spike) folded in — 2026-06-01.** The spike's headline
-  (own-the-graph) was already ratified as C7 / ADR 0001; this fold harvested its *residual* commitments into
+  (own-the-graph) was already ratified as C7 / MMT-ADR-0001; this fold harvested its *residual* commitments into
   the ontology in ratified vocabulary. **Added:** §3.4 `residence_jurisdiction` (time-versioned Person
   attribute) and §3.5 the v1 authorization posture (RBAC + ABAC attributes + first-class edges; no policy
   engine). **Strengthened:** §4.11 — consent satisfaction is evaluated over a *set* of guardian edges (shape
@@ -229,7 +229,7 @@ grounded, not remembered.
 - **Standard name:** Clerk **User** (we bind to it; we don't reuse the name). RBAC/ABAC give no entity
   name for "the login" — they treat authentication as a precondition.
 - **Ratified: `Login`** = the binding to one Clerk User, **0..1 per Person**, multi-method handled
-  inside that Clerk User via account-linking; **Clerk owns authentication only** (ADR 0001). Retire the
+  inside that Clerk User via account-linking; **Clerk owns authentication only** (MMT-ADR-0001). Retire the
   fused `account`-as-login concept. `Credential` rejected for the security-factor collision.
 - **Rationale:** the load-bearing decoupling is **Person ≠ Credential**. Today `accounts` fuses the
   human, the login, and the tenant into one row (`profiles.ts:50-69`). Splitting the *login* out as
@@ -391,7 +391,7 @@ The drift engine was turning *attributes* into entities/tables. These stay as co
   as config — never country-by-country code**. `contentBand` (theming only, **never** gating) rides the same
   age ladder; **payment capacity does *not*** — it is **store-delegated** (inv 17, amended v1.1), with a flat
   ≥18 default only on a future non-store rail.
-- **Decision transport (ADR 0001):** Clerk may carry the *resolved* `AgeConsentDecision` as ~3 JWT claims
+- **Decision transport (MMT-ADR-0001):** Clerk may carry the *resolved* `AgeConsentDecision` as ~3 JWT claims
   (`ageBand`/`consentStatus`/`assuranceLevel`); **we own** the consent receipts + age-assurance audit + event
   log in Neon. Clerk **Organizations are not used** (the spike's "Clerk Orgs for access" line is superseded).
 - Code today: flat `age <= 16` + `MINIMUM_AGE = 11` in `services/consent.ts:197` (CC-06) — the drift.
@@ -577,7 +577,7 @@ Parked so the ontology can land without them; each re-enters at the named phase.
 - **Entry-point asymmetry & self-registered-minor consent.** (spike §8; drift-map §7A) Parent-creates-child
   (managed from the start) vs **minor-self-registers-first** (own Login, *no guardian yet* → who consents?).
   The self-registered-minor consent path is a known gap. → PRD journeys.
-- **Open IdP items (no impact on ADR 0001).** (spike §6) Clerk **migration / lock-in cost** (password-hash &
+- **Open IdP items (no impact on MMT-ADR-0001).** (spike §6) Clerk **migration / lock-in cost** (password-hash &
   user portability — no verified claim); whether any **OSS / self-host** IdP can model a credential-less member
   natively; Auth0 / Stytch current per-MAU pricing. Relevant only if the own-the-graph commitment is later
   stress-tested. → revisit on demand (no scheduled phase).

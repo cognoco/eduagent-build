@@ -31,7 +31,7 @@ README index). **Status: 2026-06-03 — Phase A complete; **Phase B complete** (
 | ------- | --------------------------------------------------------- | ------------------------------------ | ----------------------------- | -------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md`                     | Claude                      | ✅     | —                           | drift quantified across intent / canonical docs / code; PM has concrete input                      |
 | **B** | Product intent                                          | `product-intent.md`                | **PM** (Claude facilitates) | ✅     | A                            | Part 10 resolved +**dual sign-off** (B-tech ✓ 2026-06-02; B-product P✓ 2026-06-02; **4 ripples re-confirmed `T✓` 2026-06-03 — Part 10 §H**) |
-| **C** | Doc-strategy decision (pilot)                           | ADR (*location per this decision*) | You + Claude                | ⬜     | A informs; piloted via B/D/E | chunk-vs-monolith decided; PRD-rebuild-vs-separate-doc decided; rollout call made                  |
+| **C** | Doc-strategy decision (pilot)                           | **`MMT-ADR-0000`** (in `docs/adr/`) | You + Claude                | ✅     | A informs; piloted via B/D/E | **DONE 2026-06-03** — decisions layer ratified; convention + ratchet + 3 seed ADRs shipped; backfill deferred (Stream 2) |
 | **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ⬜     | B                            | entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited |
 | **E** | Data model                                              | `data-model.md` + ADR(s)           | Claude (you ratify)         | ⬜     | D                            | target schema + cut strategy locked                                                                |
 | **F** | Ready-to-plan gate                                      | —                                 | You                         | ⬜     | B, D, E + threads            | all ratified → implementation planning + Cosmo WIs + T1 revert begin                              |
@@ -63,6 +63,21 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
 
 ## Cross-cutting threads
 
+- **Documentation architecture / decisions layer (Phase C → Stream 2)** — `MMT-ADR-0000` ratified the 5-layer
+  model, the first-class `MMT-ADR-NNNN` decisions layer, the **significance gate** (when a decision needs an
+  ADR), the lockstep lifecycle, and the **physical layout** (§I.4: `docs/canon|adr|specs|plans|runbooks` +
+  `assets/`/`_archive/` drains). **Forward mechanism shipped** (convention, lockstep, the `decision-adr-link`
+  ratchet, `ARCH-N` freeze) + 3 seed ADRs; ADRs now homed at `docs/adr/`. **Deferred backfill = Stream 2
+  (structural remediation):** drain the ~70 censused decisions to ADRs repo-wide. **MoSCoW:** MUST =
+  memory-only **or** ≥2-source (drifting); SHOULD = single canon spot needing extraction; NICE =
+  stable/low-confidence; SKIP/tombstone = obsolete/superseded/mechanical. The **identity slice rides this
+  roadmap's tail** (re-baseline = Prong A new ADRs + Prong B supersession/tombstones — touch identity canon
+  once); constraint: **extract-before-cleanup** (no decision-bearing memory file is relocated before its ADR
+  exists). Also Stream 2: **build the principles/invariants catalog** (`docs/canon/principles.md` — promote the
+  CLAUDE.md Non-Negotiable Rules); the **`ARCH-N` drain** (incl. the `ARCH-3` "plain wrong" fix); the
+  agent-doctrine/memory pointer cleanup. The **reduced `docs/` reorg** (canon→`docs/canon/` + the drains — what
+  remains of F-PLACEMENT once the ADR home is settled) gates the bulk relocation. Estate-level generalisation to
+  the **ZDX standard** is parked as **WI-519**. 🟡
 - **Consent/COPPA spec + legal check (REQ-2 counsel queue)** — spans B/D; gates any code touching consent.
   PM-owned, worked with the lawyer. 🟡 **Split by structural impact — the queue does NOT gate F as a whole:**
   - **→ E (data model) — absorb now as a known constraint:** the legally-mandated **retention carve-out**
@@ -76,6 +91,7 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
     verification *method* (ties to G7 vendor pick); minor double-billing disclosure + grace (E12 option B).
 - **T1 revert** — decision MADE (forward-only); execution deferred to F. Do **not** delete migration
   `0106` in isolation (it's committed + applied). ⬜
+- **`MMT-ADR-0005` break-test owed** — a concurrency regression for the atomic book-mastery `UPDATE` (red against a read-then-write impl, green against the atomic version); tracked in the ADR's Consequences, not yet written. ⬜
 - **Sibling-plan re-triage** — see below. 🟡 provisional tags applied to all 7 plans (2026-06-01);
   preliminary verdicts validated in `drift-map.md` §5 (one diverged: `learning-library-cleanup`). Final
   couple-vs-independent split still deferred to after Phase D.
@@ -123,7 +139,7 @@ separate → evaluate standalone.
 - [ ] **D** — domain model locked, incl. consent/COPPA model + legal check.
 - [ ] **E** — data model + cut strategy locked.
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
-- [ ] **C** — doc-strategy decided (where intent/ADRs live going forward; pilot rolled out or not).
+- [x] **C** — doc-strategy decided (`MMT-ADR-0000`): decisions layer + `MMT-ADR-NNNN` + the `decision-adr-link` ratchet; ADRs homed at `docs/adr/`; the broader `docs/` reorg → deferred follow-up.
 - [ ] T1 revert sequenced as the first implementation step.
 
 - → **Only then:** create Cosmo implementation work items.
@@ -132,6 +148,25 @@ separate → evaluate standalone.
 
 ## Decision log
 
+- **2026-06-03** — **Phase C complete: doc-strategy ratified as `MMT-ADR-0000`.** Reframed (per the roadmap
+  premise) from "tidy specs" to **"install the missing decisions layer."** Calls: (a) a 5-layer doc model
+  (glossary / canon / **decisions(ADR)** / operational / lessons) + agent-doctrine as a *pointer* layer; (b) the
+  decisions layer is **first-class with a lockstep lifecycle** (ADR = immutable *why*, canon = living *what*, one
+  change-set); (c) identifier **`MMT-ADR-NNNN`** (mirrors estate `NEX-ADR`; `MEM` rejected — collides with the
+  memory layer); (d) the **`decision-adr-link` ratchet** (forward-only, baselined) is the *pivot* that stops new
+  accretion; (e) **`ARCH-N` frozen** + a five-exit disposition taxonomy (absorb-forward, no permanent alias);
+  (f) **chunking is reactive editorial, not ratified** as policy; the anchored-spine PRD stays standalone and the
+  ontology folds into `CONTEXT.md` at the clean cut; canon also carries a **principles/invariants catalog** (the
+  gate's conformance surface). The **gate is architectural significance** (a positive OR-test:
+  deviates-from-principle / constrains-others / moves-an-NFR / structural / foundational-tech), not a conjunctive
+  triple. **Physical layout decided** (§I.4): ADRs at `docs/adr/`, canon → `docs/canon/`. **Executed now (define + seed):** `MMT-ADR-0000`; the ratchet
+  (script + test + baseline of 18 + `docs-checks.yml` job); 3 seed ADRs (`0004` billing/memory-only, `0005`
+  book-mastery atomic UPDATE, `0006` OCR = `ARCH-14` promotion, code citation migrated); `adr/README.md`;
+  agent-doctrine pointer in CLAUDE.md/AGENTS.md; renamed `0001/0002` → `MMT-ADR-`. **Deferred (Stream 2 +
+  the roadmap tail for the identity slice):** the ~70-decision backfill (MoSCoW: memory-only / multi-source =
+  MUST), the **principles-catalog build**, the `ARCH-N` drain (incl. the discovered `ARCH-3` "plain wrong"
+  citation), the agent-doc/memory pointer cleanup, and the **reduced `docs/` reorg** (canon→`docs/canon/` + the
+  drains — what remains of F-PLACEMENT once the ADR home is settled). Estate-level ZDX generalisation parked as **WI-519**.
 - **2026-06-03** — **Phase B complete: the 4 architecture ripples re-confirmed by the architect (`T✓`).**
   Recorded in Part 10 §H. **(1) Scheduler (inv 24):** feasible on the existing Inngest cron + per-Person
   fan-out rail (mirrors `daily-snapshot.ts`), **zero new infra**; three consumers (E1 birthday, E2 residence,

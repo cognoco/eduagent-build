@@ -432,7 +432,7 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
 ### E — Product calls the model deliberately leaves open  *(Doc 2 Part IX + ontology §6)*
 
 - **E0 — Payer capacity (store-delegated). RULED 2026-06-02 `[T✓ · P✓]` — ontology v1.1 amendment**
-  (inv 17/10, §2.4, §3.2; ADR 0002; CONTEXT Payer+minor). For store-mediated payment (the only channel for
+  (inv 17/10, §2.4, §3.2; MMT-ADR-0002; CONTEXT Payer+minor). For store-mediated payment (the only channel for
   the foreseeable future) capacity is **delegated to the store as merchant of record**; we impose no age gate.
   A flat ≥18 worst-case default (inv 29) applies **only** to a future non-store rail — **not** a per-jurisdiction
   derivation. **Under-18 exposure (P-axis) RULED 2026-06-02 `[P✓]` — E0-a: keep store-delegated, no product block.**

@@ -40,7 +40,7 @@ _Avoid_: account (the legacy fused term), family / group / roster / tenant (all 
 The authentication binding between a Person and their Clerk User — the means by which a Person signs
 in. **Optional: 0 or 1 per Person** (managed = none, credentialed = one). Multiple sign-in methods
 (Google, Apple, email/password) live *inside* the one Clerk User via account-linking, not as separate
-Logins. Clerk owns authentication; we own everything else (ADR 0001).
+Logins. Clerk owns authentication; we own everything else (MMT-ADR-0001).
 _Avoid_: credential (in security that means an auth *factor* — a password/token — not the login
 identity), user / Clerk user (the vendor object; Login is our binding to it), account.
 → `_wip/identity-foundation/identity-ontology.md` §1.2 · Clerk User via `clerk_user_id` `profiles.ts:85`
