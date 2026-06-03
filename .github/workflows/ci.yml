@@ -79,12 +79,6 @@ jobs:
               - 'packages/retention/**'
               - 'pnpm-lock.yaml'
 
-      # This enables task distribution via Nx Cloud
-      # Run this command as early as possible, before dependencies are installed
-      # Learn more at https://nx.dev/ci/reference/nx-cloud-cli#npx-nxcloud-startcirun
-      # Uncomment this line to enable task distribution
-      # - run: pnpm exec nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="e2e-ci"
-
       # Setup pnpm (version read from packageManager field in package.json)
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
@@ -97,6 +91,18 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
+
+      # Restore the Nx local computation cache across CI runs. Replaces the
+      # Nx Cloud remote cache (disconnected in IID-792) so unchanged projects
+      # still skip lint/test/typecheck/build. `nx affected` and the task graph
+      # work without the cloud — only the shared cache needed replacing.
+      - name: Cache Nx local cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-
 
       # Enable pgvector extension before schema push (embeddings table uses vector type)
       - name: Enable pgvector extension
@@ -215,15 +221,6 @@ jobs:
       - name: API integration tests
         if: steps.changes.outputs.api == 'true'
         run: pnpm exec nx run api:test:integration
-
-      # Self-healing CI: AI-powered fix proposals for failed tasks.
-      # Runs with contents: read — logs suggestions only. If write access
-      # is needed for PR comments, move to a separate job with
-      # pull-requests: write permission only.
-      - name: Self-healing CI
-        if: always()
-        continue-on-error: true
-        run: pnpm exec nx fix-ci
 
       # Advisory check: flag stale counts in CLAUDE.md (does not block PRs)
       - name: Validate CLAUDE.md counts

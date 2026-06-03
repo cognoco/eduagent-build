@@ -1,6 +1,6 @@
 ---
 name: EAS Build configuration and known issues
-description: EAS Build for Android APK — OTA operational, Sentry upload disabled, NX Cloud connected, Doppler sync via pnpm env:sync
+description: EAS Build for Android APK — OTA operational, Sentry upload disabled, NX Cloud disconnected (2026-06-01), Doppler sync via pnpm env:sync
 type: project
 ---
 
@@ -19,7 +19,7 @@ EAS Build is the primary path for Android APK builds (alternative to WSL2 Gradle
 
 **Sentry source map upload: DISABLED (2026-03-27).** Disabled via `SENTRY_DISABLE_AUTO_UPLOAD=true` env var in `eas.json` build profiles (synced from Doppler). The Sentry Gradle plugin couldn't find the auth token during build. Crash tracking still works, stack traces are minified. Re-enable when auth token issue is resolved.
 
-**NX Cloud: CONNECTED (2026-04-03).** Dedicated NX Cloud project linked. `nx-cloud` package in workspace. Access token in `ci.yml`.
+**NX Cloud: DISCONNECTED (2026-06-01, IID-792).** Was connected 2026-04-03 (`nxCloudId` in `nx.json`; no access token was ever in `ci.yml` — connection was id-only). Disconnected because CI Pipeline Execution credits hit ~$617 for Apr30–May31, driven by a ~6.8× spike in CI run volume (148→964 PR runs) from agent-swarm activity — not by any premium feature (AI Fixes and Managed Compute both billed $0; distributed execution was never enabled). Removed `nxCloudId` from `nx.json` + the `nx fix-ci` step from `ci.yml`; added `actions/cache` for `.nx/cache` to keep cross-run caching for $0. `nx affected`/`run-many` are cloud-independent. Account-side cancellation (plan downgrade, workspace delete) is a manual follow-up for Jørn at cloud.nx.app.
 
 **Runtime version policy (2026-04-05):** Switched from `fingerprint` to `appVersion` policy. Fingerprint policy breaks in pnpm monorepo because `.pnpm` store paths differ between Windows and Linux (EAS). See `project_fingerprint_pnpm_mismatch.md` for full analysis.
 
