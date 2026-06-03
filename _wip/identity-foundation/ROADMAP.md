@@ -82,13 +82,18 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   remains of F-PLACEMENT once the ADR home is settled) gates the bulk relocation. Estate-level generalisation to
   the **ZDX standard** is parked as **WI-519**. 🟡
   - **Parallel ungoverned ADR audit (sealed cross-reference — do NOT build on).** In the same window another
-    session pushed `docs/ADR-register-draft.md` + `docs/plans/2026-06-03-adr-register-cleanup-wrong-decisions.md`
-    to `main`. Its **producing workflow is not in the repo**, so its selection criteria, coverage, and
-    importance-weighting are unverifiable; it covers only archived specs and applies **no significance gate**. **Do
-    not seed Stream 2 from it** (anchoring risk). After our controlled sweep, *diff* our result against its §1
-    conflict-resolutions and the cleanup plan's STANDS/refuted findings as a **completeness backstop only**, then
-    decide its disposition (archive / harvest the verified facts / discard). Physical relocation to `docs/_archive/`
-    is deferred until the parallel effort settles. ⬜
+    session pushed an ADR register draft + a cleanup plan to `main`, plus stale-fact "citation fixes" to
+    `architecture.md` / `project_context.md` / `audience-matrix.md` / `CLAUDE.md`. Its **producing workflow is not
+    in the repo**, so its selection criteria, coverage, and importance-weighting are unverifiable; it covers only
+    archived specs and applies **no significance gate**. **Do not seed Stream 2 from it** (anchoring risk).
+    **Disposition executed 2026-06-03:** the two draft docs are **quarantined** at
+    `docs/_archive/parallel-adr-audit-2026-06-03/` (see its `README.md` for provenance) — kept *only* as a
+    completeness backstop to diff against after our controlled sweep, not as input. The material canon/doctrine
+    edits from the citation-fix commits (`944d87a`, `1039bb217`) were **reverted** — they softened the LLM-envelope
+    Non-Negotiable Rule, re-characterized `isOwner`/owner-based gating that C2 dissolves, and flipped nav-contract
+    finding statuses; pure count/line refreshes were retained. After our controlled sweep, *diff* against the
+    quarantined §1 conflict-resolutions and the cleanup plan's STANDS/refuted findings as a backstop, then decide
+    final disposition (harvest verified facts / discard). ✅
 - **Consent/COPPA spec + legal check (REQ-2 counsel queue)** — spans B/D; gates any code touching consent.
   PM-owned, worked with the lawyer. 🟡 **Split by structural impact — the queue does NOT gate F as a whole:**
   - **→ E (data model) — absorb now as a known constraint:** the legally-mandated **retention carve-out**
