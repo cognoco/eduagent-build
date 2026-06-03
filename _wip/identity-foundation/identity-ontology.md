@@ -43,6 +43,28 @@ low-risk · **[DEFER]** real decision, but downstream of this ontology (parked, 
 Decisions land here as they're ruled, newest first. The §0 table and §1–§4 bodies are updated in lockstep.
 Spike **folds** are logged here too (a fold reconciles a finished spike's decisions into this vocabulary).
 
+- **Phase D — domain model ratified (4 rulings + 4 ADRs) — RATIFIED 2026-06-03 (architect).** The Phase-D
+  consolidated domain model (`domain-model.md`) locks entities / roles / consent / tenancy and the ADR layer
+  gains its first identity ADRs. **(1) Core entity & role model → MMT-ADR-0007** (reconstructed) — records the
+  *why* behind C1/C2/C4/C5/C6/C8/C9 (Person ≠ Login; roles `{admin, learner}`; mentor/guardian = capacities;
+  Owner dissolved). **(2) Guardianship D1 → Option A → MMT-ADR-0008** — **one *global* Guardianship edge stores
+  consent-authority + the consent record only; `operate`/`manage`/`view` are *derived* at query time**
+  (`guardian-link ∧ shared-org ∧ charge-has-no-Login`), not stored per-org; the credentialed-tween divergence
+  falls out of login-presence; the check lives in **one named resolver** (successor to `getFamilyOwnerProfileId`).
+  This **also rules the consent/visibility half of multi-org governance (E7)** — consent over the *set* of
+  guardian edges (inv 11), visibility = guardian-link ∧ shared org — keeping the separated-parents one-Person
+  model reachable (E8) for free. *(Supersedes the §6 "org-scoped operation" lean below.)* **(3) Durable scheduler
+  (inv 24) → Option 1 → MMT-ADR-0009** — one unified daily Inngest sweep evaluates all time-triggered transitions
+  (E1 age / E2 residence / E5 dormancy) in a single per-Person pass, idempotency `personId+day`, mirroring
+  `daily-snapshot.ts`. **(4) Family-join / consolidation primitive → MMT-ADR-0010** — invite-flow (child completes
+  own Clerk sign-up via JIT `findOrCreateAccount`, attached to the existing `person_id` via `migration-pending`)
+  + home-org reassignment; **v1 collapses to a single home org → sidesteps multi-org billing/quota federation
+  (E7, Phase-D-deferred)**; billing = option B (join-with-disclaimer). **Bodies updated in lockstep:** inv 23
+  (D1 parenthetical → ruled), inv 24 (scheduler → ADR-0009), §6 (Multi-org / Transition-events / Guardianship-D1
+  flipped from `[DEFER]` to ruled). **CONTEXT.md:** Guardianship entry (global-edge / derived-operation).
+  **Carried forward:** separated-parents v1 *build* scope (E8 → product + legal); recorded-Payer under Family
+  Sharing (E3 → Phase E); co-guardian one-of/all-of rule (E4 → counsel); VPC vendor (G7). **→ Phase E unblocked.**
+
 - **Payer capacity → store-delegated (amendment, ontology v1.1) — RATIFIED 2026-06-02 (T-axis).**
   Supersedes the **payer-rung framing** of the 2026-06-01 entries below — both the "Age tiers are
   flag-combinations… payer-eligibility is the same complex" entry **and** the "Payer ≥18 / a minor cannot be
@@ -494,13 +516,16 @@ build. Ratified across Grill #1 — these are the **definition of "done"** the P
 23. **Guardianship grants *separable* capabilities**, never one bundled flag — *consent-authority* / *operate*
     (act-for) / *manage* (settings, billing scope) / *view*. They usually co-occur but must be allowed to
     diverge: the credentialed tween **operates** their own profile (no act-for) yet still needs a guardian's
-    **consent-authority**. *(Whether the operate/manage/view facets are global or org-scoped — D1 — is
-    deferred, §6; consent-authority is the legal facet and is global.)*
+    **consent-authority**. *(D1 RULED — MMT-ADR-0008, Option A: the **whole edge is global** and stores
+    consent-authority + the consent record only; `operate`/`manage`/`view` are **derived** —
+    `guardian-link ∧ shared-org ∧ charge-has-no-Login` — never stored per-org. Supersedes the earlier
+    "org-scoped operation" §6 lean.)*
 24. **Time-triggered transitions must be scheduler-driven.** Age / consent-threshold / 18 crossings and
     `residence_jurisdiction` re-evaluation fire with **no user action** — a dormant account still transitions
     on its birthday — so they **cannot live only in request handlers**; a durable scheduler re-evaluates each
     Person on the relevant dates. (The "wired-but-untriggered" trap: if nothing *schedules* it, the transition
-    silently never happens.)
+    silently never happens.) *(Realized — MMT-ADR-0009: **one unified daily Inngest sweep** evaluates all
+    time-triggered transitions in a single per-Person pass, mirroring `daily-snapshot.ts`.)*
 25. **Transitions are append-only + audited, and every interim state is a *named valid state*** — graduation
     pre-org-choice, the dormant adult with no Login, "suspended pending fresh consent" after a jurisdiction
     re-engage — never an implicit gap. Each carries a Failure-Modes table (no dead-ends; repo UX-resilience rule).
@@ -546,9 +571,13 @@ off the shelf — and it's the list to defend in the grill.*
 
 Parked so the ontology can land without them; each re-enters at the named phase.
 - **Multi-org governance** — whose subscription/quota/consent/visibility when a Person is in two orgs
-  (ORG-08; doc 2 §8). → PRD / Phase D.
+  (ORG-08; doc 2 §8). **RULED (Phase D) — split by axis:** *consent/visibility* → MMT-ADR-0008 (consent over the
+  set of guardian edges; visibility = guardian-link ∧ shared org); *billing/quota* → MMT-ADR-0010 (v1 collapses
+  to a single home org; genuine federation stays Phase-D-deferred, named not dropped).
 - **Transition events** — managed→credentialed, consent-age crossing, 18-graduation: the *mechanics*
-  (auto vs explicit step) (doc 2 J4/J11). The §4.24–25 invariants bind the *safety*; the mechanism is here. → PRD.
+  (auto vs explicit step) (doc 2 J4/J11). The §4.24–25 invariants bind the *safety*. **Time-trigger rail RULED
+  (Phase D) — MMT-ADR-0009** (unified daily sweep); the managed→credentialed / join mechanism = MMT-ADR-0010
+  (invite-flow + `migration-pending`). Remaining product/UX detail → PRD.
 - **Consent mechanism / VPC vendor** — which vendor realises age-assurance + VPC (**KWS vs k-ID — substitutes,
   pick one**). Selection criteria (Fold #2): **counterparty durability** (KWS = free Epic-subsidized infra vs
   k-ID = paid-but-contractual), **EU method coverage + completion** (KWS skews US/BR/KR methods — the EU gap is
@@ -568,10 +597,12 @@ Parked so the ontology can land without them; each re-enters at the named phase.
   one-Person model* — by Person ≠ Login (§4.3) + a global consent edge (§4.23) + multi-org Membership (ORG-08);
   the only thing that forecloses it is regressing to the fused/account-bound shape. Decision deferred; the
   reachability is locked. → Phase B / PRD.
-- **Guardianship D1 — global vs org-scoped capability placement.** (spike §9) Consent-authority is **global**
-  (a legal fact about two humans); *operate / manage / view* are plausibly **org-contextual**. Leaning: global
-  consent edge + org-scoped operation (also handles the credentialed-tween split and co-parent privacy). Gated
-  on the separated-parents ruling. → Phase D/E + legal.
+- **Guardianship D1 — global vs org-scoped capability placement.** (spike §9) **RULED (Phase D) — Option A,
+  MMT-ADR-0008:** the **whole edge is global** and stores consent-authority + the consent record only;
+  `operate`/`manage`/`view` are **derived** (`guardian-link ∧ shared-org ∧ charge-has-no-Login`), **not** stored
+  per-org. This *supersedes* the earlier "global consent + org-scoped operation" lean — operation is a query, not
+  a second storage site; the credentialed-tween split and co-parent privacy fall out for free. Physical query
+  shape → Phase E.
 - **T6 — de-credential (credentialed → managed reversion).** (spike §8) Probably **disallowed**; a product
   choice, not to be built speculatively. → PRD.
 - **Entry-point asymmetry & self-registered-minor consent.** (spike §8; drift-map §7A) Parent-creates-child

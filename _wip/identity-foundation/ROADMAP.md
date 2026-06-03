@@ -5,7 +5,10 @@ architecture (domain + data model) → the **"ready to plan implementation" gate
 **not** an implementation plan, and **no Cosmo work items are created until F is passed.**
 
 **Tracking:** repo-only; this file is the single source. Deliverables land as sibling docs (see
-README index). **Status: 2026-06-03 — Phase A complete; **Phase B complete** (B-tech ✓; B-product P-pass ✓; **all 4 architecture ripples re-confirmed `T✓` by the architect 2026-06-03** — see decision log + Part 10 §H). inv 21 amended in canon. **D-ratify is now unblocked** (D carries the 4 ripple rulings forward). Tracks C (doc-strategy) + D (domain model) proceed.**
+README index). **Status: 2026-06-03 — Phases A, B, C, and **D complete**. Phase D ratified the domain model
+(`domain-model.md`) + 4 ADRs (MMT-ADR-0007 entity/role model · 0008 guardianship global-edge/derived-operation ·
+0009 unified transition scheduler · 0010 family-join primitive); ontology + CONTEXT.md moved in lockstep.
+**Phase E (data model) is now unblocked.** Remaining for F: E (data model) + sibling re-triage + T1 revert sequencing.**
 
 ---
 
@@ -32,7 +35,7 @@ README index). **Status: 2026-06-03 — Phase A complete; **Phase B complete** (
 | **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md`                     | Claude                      | ✅     | —                           | drift quantified across intent / canonical docs / code; PM has concrete input                      |
 | **B** | Product intent                                          | `product-intent.md`                | **PM** (Claude facilitates) | ✅     | A                            | Part 10 resolved +**dual sign-off** (B-tech ✓ 2026-06-02; B-product P✓ 2026-06-02; **4 ripples re-confirmed `T✓` 2026-06-03 — Part 10 §H**) |
 | **C** | Doc-strategy decision (pilot)                           | **`MMT-ADR-0000`** (in `docs/adr/`) | You + Claude                | ✅     | A informs; piloted via B/D/E | **DONE 2026-06-03** — decisions layer ratified; convention + ratchet + 3 seed ADRs shipped; backfill deferred (Stream 2) |
-| **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ⬜     | B                            | entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited |
+| **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ✅     | B                            | **DONE 2026-06-03** — entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited; 4 ADRs (MMT-ADR-0007–0010) placed |
 | **E** | Data model                                              | `data-model.md` + ADR(s)           | Claude (you ratify)         | ⬜     | D                            | target schema + cut strategy locked                                                                |
 | **F** | Ready-to-plan gate                                      | —                                 | You                         | ⬜     | B, D, E + threads            | all ratified → implementation planning + Cosmo WIs + T1 revert begin                              |
 
@@ -78,6 +81,14 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   agent-doctrine/memory pointer cleanup. The **reduced `docs/` reorg** (canon→`docs/canon/` + the drains — what
   remains of F-PLACEMENT once the ADR home is settled) gates the bulk relocation. Estate-level generalisation to
   the **ZDX standard** is parked as **WI-519**. 🟡
+  - **Parallel ungoverned ADR audit (sealed cross-reference — do NOT build on).** In the same window another
+    session pushed `docs/ADR-register-draft.md` + `docs/plans/2026-06-03-adr-register-cleanup-wrong-decisions.md`
+    to `main`. Its **producing workflow is not in the repo**, so its selection criteria, coverage, and
+    importance-weighting are unverifiable; it covers only archived specs and applies **no significance gate**. **Do
+    not seed Stream 2 from it** (anchoring risk). After our controlled sweep, *diff* our result against its §1
+    conflict-resolutions and the cleanup plan's STANDS/refuted findings as a **completeness backstop only**, then
+    decide its disposition (archive / harvest the verified facts / discard). Physical relocation to `docs/_archive/`
+    is deferred until the parallel effort settles. ⬜
 - **Consent/COPPA spec + legal check (REQ-2 counsel queue)** — spans B/D; gates any code touching consent.
   PM-owned, worked with the lawyer. 🟡 **Split by structural impact — the queue does NOT gate F as a whole:**
   - **→ E (data model) — absorb now as a known constraint:** the legally-mandated **retention carve-out**
@@ -136,7 +147,7 @@ separate → evaluate standalone.
 ## Definition of "ready to plan implementation" (Phase F gate)
 
 - [x] **B** — product intent ratified (Part 10 resolved; 4 architecture ripples re-confirmed `T✓` 2026-06-03, Part 10 §H).
-- [ ] **D** — domain model locked, incl. consent/COPPA model + legal check.
+- [x] **D** — domain model locked (`domain-model.md` + MMT-ADR-0007–0010); consent model locked; the legal-check items (E4 one-of/all-of; parent-delete; dormancy specifics) are named, scoped to E/counsel, and do not gate D.
 - [ ] **E** — data model + cut strategy locked.
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
 - [x] **C** — doc-strategy decided (`MMT-ADR-0000`): decisions layer + `MMT-ADR-NNNN` + the `decision-adr-link` ratchet; ADRs homed at `docs/adr/`; the broader `docs/` reorg → deferred follow-up.
@@ -147,6 +158,21 @@ separate → evaluate standalone.
 ---
 
 ## Decision log
+
+- **2026-06-03** — **Phase D complete: domain model ratified (`domain-model.md`) + 4 ADRs.** Grilled with the
+  architect, then authored. **Rulings:** (1) **Core entity & role model → MMT-ADR-0007** (reconstructed — the
+  ontology Grill-#1 entities/roles get a first-class ADR home, per the architect's call to capture them now, not
+  defer to Stream 2). (2) **Guardianship capability placement (D1/E9) → Option A → MMT-ADR-0008** — one *global*
+  edge stores consent-authority + the consent record only; `operate`/`manage`/`view` are **derived** at query
+  time (`guardian-link ∧ shared-org ∧ charge-has-no-Login`), not stored per-org; one named authority resolver;
+  this also rules the **consent/visibility half of multi-org governance (E7)** and keeps the separated-parents
+  one-Person model reachable (E8). (3) **Durable transition scheduler (inv 24) → Option 1 → MMT-ADR-0009** — one
+  unified daily Inngest sweep over all time-triggered transitions (E1/E2/E5), mirroring `daily-snapshot.ts`.
+  (4) **Family-join / consolidation primitive → MMT-ADR-0010** — invite-flow + home-org reassignment via
+  `migration-pending`; v1 single home org sidesteps multi-org federation; billing option B. **Lockstep:** ontology
+  §R + inv 23/24 + §6 flips; CONTEXT.md Guardianship entry. **Carried forward (named, not gating D):** separated-
+  parents v1 build scope (E8 → product + legal); recorded-Payer under Family Sharing (E3 → Phase E); co-guardian
+  one-of/all-of rule (E4 → counsel); VPC vendor (G7). **Consequence: Phase E (data model) is unblocked.**
 
 - **2026-06-03** — **Phase C complete: doc-strategy ratified as `MMT-ADR-0000`.** Reframed (per the roadmap
   premise) from "tidy specs" to **"install the missing decisions layer."** Calls: (a) a 5-layer doc model
