@@ -61,7 +61,7 @@ Skills under a **group directory** (currently `tech/`) are an exception to the 1
 
 **For full audience matrix** (which screens/APIs/Inngest jobs serve which user mode, with file:line citations and known gating gaps F1-F14), see `docs/audience-matrix.md`. For the *target* state — one `resolveNavigationContract()` function owning all UI gating — see `docs/specs/2026-05-21-navigation-contract.md`. The short version is below.
 
-> **Hard constraint for the V0 → V1 migration.** Today's 5-tab production mode (active when `MODE_NAV_V0_ENABLED=false` in Doppler) is supported product behavior and **must not regress** across any nav-contract PR. The V0 helpers (`resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` in `apps/mobile/src/lib/legacy-navigation-contract.ts:62-99`) and the V0-off short-circuits in `app-context.tsx:53-61, 70` stay alive when V1 ships. `resolveNavigationContract` wiring is gated behind a separate `MODE_NAV_V1_ENABLED` flag and never replaces the V0-off fallback. See the "Hard Constraint" section of the navigation-contract spec for the full flag matrix and test requirement.
+> **Hard constraint for the V0 → V1 migration.** Today's 5-tab production mode (active when `MODE_NAV_V0_ENABLED=false` in Doppler) is supported product behavior and **must not regress** across any nav-contract PR. The V0 helpers (`resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` in `apps/mobile/src/app/(app)/_layout.tsx:122-185`) and the V0-off short-circuits in `app-context.tsx:53-61, 70` stay alive when V1 ships. `resolveNavigationContract` wiring is gated behind a separate `MODE_NAV_V1_ENABLED` flag and never replaces the V0-off fallback. See the "Hard Constraint" section of the navigation-contract spec for the full flag matrix and test requirement.
 
 **Tab shape** controls which tabs appear. Two shapes (guardian / learner), but the guardian shape changes between V0 and V1:
 
@@ -72,7 +72,7 @@ Skills under a **group directory** (currently `tech/`) are an exception to the 1
 
 The V1 guardian redesign replaces `own-learning` + `library` with a single `recaps` tab — this is the source of truth. The sets live in `apps/mobile/src/lib/navigation-contract.ts`: `STUDY_TABS` (learner), `FAMILY_TABS` (V1 guardian), `LEGACY_GUARDIAN_TABS` (V0 guardian). The V0 5-tab shape is still the production default and must not regress — see the hard-constraint note above.
 
-Note: `home.tsx` branches on `navigationContract.home.screen` (`home.tsx:161`) — `'FamilyHome'` renders `<ParentHomeScreen>`, otherwise `<LearnerScreen showParentHome={false}>`. The screen decision is owned by the navigation contract (`resolveNavigationContract` for V1 / the legacy path for V0), not computed inline in `LearnerScreen.tsx`. (Updated 2026-06-03: previously `home.tsx` always mounted `<LearnerScreen>` and the branch lived inside it; the decision moved up into the contract.)
+Note: `home.tsx` always mounts `<LearnerScreen>`. The decision to render `ParentHomeScreen` vs the learner home happens **inside** `LearnerScreen.tsx` (around the `showParentHome && !isParentProxy && (mode === 'family' || hasLinkedChildren || isFamilyPlanOwner)` branch). `home.tsx` is not a branching point.
 
 **`isOwner` gating** controls what appears INSIDE tabs (especially More and Progress). Billing/Security live inside `more/account.tsx`; Export/Delete live inside `more/privacy.tsx` — they are not top-level More rows:
 
