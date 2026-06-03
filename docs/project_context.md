@@ -78,10 +78,10 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 ### Expo (Mobile) Rules
 
-- **Shared components are audience-unaware.** No conditional rendering based on user type (owner/role/age) in reusable components. Theming via CSS variables set at root layout, resolved per `colorScheme` (light/dark) + accent preset — NOT per "persona" (the `personaType`/`personaFromBirthYear` model was removed in Epic 12 and is forbidden; see `persona-fossil-guard.test.ts`). Page-level route files (e.g., `_layout.tsx`) may read profile/role for routing guards and CSS variable injection — that's the intended boundary.
-  - WRONG: `if (role === 'owner') { color = '#1a1a1a'; }` or branching a component on age bracket
+- **Shared components are persona-unaware.** No conditional rendering based on persona type in reusable components. Theming via CSS variables set at root layout. Page-level route files (e.g., `_layout.tsx`) may read persona for routing guards and CSS variable injection — that's the intended boundary.
+  - WRONG: `if (persona === 'teen') { color = '#1a1a1a'; }` or `isDark = persona === 'teen'`
   - WRONG: Hardcoded hex colors in component props (`color="#7c3aed"`, `backgroundColor: '#262626'`)
-  - RIGHT: Use NativeWind semantic classes (`bg-surface`, `text-primary`, `border-accent`) that resolve via CSS variables. The root `_layout.tsx` sets variables by `colorScheme` — components never need to know who the active user is. For age-appropriate copy/theming use `computeAgeBracket()` from `@eduagent/schemas` (never for feature gating); gate features on `isOwner` / `family_links` role instead.
+  - RIGHT: Use NativeWind semantic classes (`bg-surface`, `text-primary`, `border-accent`) that resolve via CSS variables. The root `_layout.tsx` sets variables per persona — components never need to know which persona is active.
 - **TanStack Query for all server state.** React Context for auth + active profile only. Local state for UI interactions.
 - **No Zustand at MVP.** Add only when shared client state crosses navigation boundaries and doesn't come from the server.
 - **Expo Router route groups:** `(auth)/`, `(app)/`. Root `_layout.tsx` sets theme CSS variables. (Epic 12 merged the old `(learner)/` and `(parent)/` groups into a unified `(app)/` group.)
@@ -200,9 +200,9 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 | Import from internal package paths | Import from package barrel (`@eduagent/schemas`) |
 | Create `__tests__/` directories | Co-locate tests next to source files |
 | Add Zustand/global state store | Use TanStack Query (server state) or React Context (auth/profile) |
-| Render differently per user type (persona/role/age) in components | Use CSS variables — components are audience-unaware |
+| Render differently per persona in components | Use CSS variables — components are persona-unaware |
 | Hardcode hex colors in component props/styles | Use NativeWind semantic classes (`bg-surface`, `text-primary`) |
-| Use `personaType` / `personaFromBirthYear` (removed in Epic 12) | Use `computeAgeBracket()` for theming/copy and `isOwner`/`family_links` role for gating; components use semantic tokens |
+| Check `persona` inside any component | Only root `_layout.tsx` reads persona; components use semantic tokens |
 | Call Stripe during learning sessions | Read from local DB (webhook-synced subscription state) |
 | Use `.then()` chains | Use `async`/`await` |
 | Put all schemas in one file | One schema file per domain |
@@ -214,7 +214,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 Challenge Round is the assessment mode where the tutor proposes a timed retrieval challenge after sufficient practice. API code lives under `apps/api/src/services/challenge-round/`; mobile components live under `apps/mobile/src/components/session/` (ChallengeOfferCard, ChallengeRoundBanner, DraftedNoteReview) and the orchestration hook at `apps/mobile/src/hooks/use-challenge-round.ts`.
 
-- **Trigger:** `apps/api/src/services/challenge-round/trigger.ts` — `evaluateChallengeReadiness()` runs in `prepareExchangeContext()` before each exchange. Only `sessionType === 'learning'` is eligible (the `SessionType` enum is now `learning | homework | interleaved`, so homework/interleaved are hard-gated). It also gates struggling status, short streaks, in-flight round, decline cooldown (24h per profile+topic), and insufficient remaining-turn budget (`MIN_CHALLENGE_REMAINING_TURNS = 3`).
+- **Trigger:** `apps/api/src/services/challenge-round/trigger.ts` — `evaluateChallengeReadiness()` runs in `prepareExchangeContext()` before each exchange. Hard-gates homework/review/quiz/freeform/practice/recall/dictation, struggling status, short streaks, in-flight round, decline cooldown (24h per profile+topic), and insufficient remaining-turn budget (`MIN_CHALLENGE_REMAINING_TURNS = 5`).
 - **State machine:** `apps/api/src/services/challenge-round/state.ts` — `transitionChallengeState()` enforces legal transitions; lives in `sessionMetadata.challengeRound` and is parsed via `challengeRoundSessionStateSchema` from `@eduagent/schemas`.
 - **Prompt blocks:** `apps/api/src/services/challenge-round/prompts.ts` exports `challengeOfferPrompt`, `challengeRoundActivePrompt`, `challengeRoundDraftingPrompt`. Injected by `exchange-prompts.ts` based on `challengeRound.state` + `challengeEligible`.
 - **Envelope signals:** `signals.challenge_round_offer: boolean` and `signals.challenge_round_evaluation: ChallengeRoundEvaluationItem[]` (each item has `concept`, `result ∈ {solid, partial, missing, misconception}`, `evidence`, `answerEventId`, `learnerQuote`, optional `correction`). UI hints: `ui_hints.challenge_round` (active/index/total) and `ui_hints.note_draft` (content + source_concepts + source_answer_event_ids). All defined in `packages/schemas/src/llm-envelope.ts`.

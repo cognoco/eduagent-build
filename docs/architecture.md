@@ -1188,13 +1188,7 @@ The original `lib/` was accumulating too many unrelated concerns. Replaced with 
 
 **LLM Response Envelope — Structured Output Contract:**
 
-The target contract is that LLM calls making state-machine decisions (close an interview, hold escalation, queue remediation, trigger a UI widget) return a typed JSON envelope instead of embedding markers or JSON blobs in free text. The contract lives in `@eduagent/schemas` as `llmResponseEnvelopeSchema` (`packages/schemas/src/llm-envelope.ts`), and a `parseEnvelope()` helper in `services/llm/envelope.ts` handles extraction + Zod validation.
-
-**Documented carve-outs (verified against code 2026-06-03).** Not every state-machine LLM call routes through the envelope today:
-
-- **Prose-only flows** (e.g., dictation-prepare-homework, learnerRecap, vocabulary extraction) return plain text and intentionally do not use the envelope.
-- **`notePrompt` / `fluencyDrill`** use the envelope on the primary path but retain a bare-JSON fallback as a historical safety net (`envelope.ts:258`).
-- **Assessment + summary evaluation still parse bespoke JSON outside the envelope.** `parseAssessmentEvaluation()` (`apps/api/src/services/assessments.ts`) returns `{ passed, shouldEscalateDepth, masteryScore, ... }` and `parseSummaryEvaluation()` (`apps/api/src/services/summaries.ts`) returns `{ hasUnderstandingGaps, isAccepted, ... }` — both drive state-machine decisions but parse their own `llmAssessmentEvaluationSchema` / `llmSummaryEvaluationSchema` via `JSON.parse`, not `parseEnvelope`. Migrating these two onto the envelope is pending.
+All LLM calls that make state-machine decisions (close an interview, hold escalation, queue remediation, trigger a UI widget) must return a typed JSON envelope instead of embedding markers or JSON blobs in free text. The contract lives in `@eduagent/schemas` as `llmResponseEnvelopeSchema` (`packages/schemas/src/llm-envelope.ts`), and a `parseEnvelope()` helper in `services/llm/envelope.ts` handles extraction + Zod validation.
 
 ```ts
 // Canonical shape — every state-machine LLM response conforms to this
@@ -1324,7 +1318,7 @@ Voice-first session mode, orthogonal to session type (learning/homework/interlea
 
 **Onboarding as route-level split, not conditional rendering:**
 
-`(app)/onboarding/` is a separate sub-directory with `index.tsx` (the conversational interview entry), plus `language-setup.tsx` and `pronouns.tsx`. The alternative — conditional rendering inside `home.tsx` based on onboarding state — overloads one component with two responsibilities and makes testing harder. Onboarding is a distinct flow with different UI needs (conversational interview, curriculum display with skip/accept). After onboarding completes, `router.replace('/(app)/home')` navigates to daily coaching. The `(app)/_layout.tsx` wraps both, so the tab bar is shared.
+`(app)/onboarding/` is a separate sub-directory with `interview.tsx`. The alternative — conditional rendering inside `home.tsx` based on onboarding state — overloads one component with two responsibilities and makes testing harder. Onboarding is a distinct flow with different UI needs (conversational interview, curriculum display with skip/accept). After onboarding completes, `router.replace('/(app)/home')` navigates to daily coaching. The `(app)/_layout.tsx` wraps both, so the tab bar is shared.
 
 **`routes/homework.ts` — homework processing route (includes OCR):**
 
