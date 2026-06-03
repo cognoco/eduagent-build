@@ -5,7 +5,7 @@ architecture (domain + data model) → the **"ready to plan implementation" gate
 **not** an implementation plan, and **no Cosmo work items are created until F is passed.**
 
 **Tracking:** repo-only; this file is the single source. Deliverables land as sibling docs (see
-README index). **Status: 2026-06-02 — Phase A complete; Phase B: B-tech **complete**, **B-product P-pass complete** (all Part-10 product items ruled `P✓`). Product intent is locked at the product level — but **4 ripples reopen architecture `T✓` items, pending architect re-confirmation before D ratifies** (see decision log 2026-06-02 + `_handoffs/2026-06-02-b-product-complete.md`).**
+README index). **Status: 2026-06-03 — Phase A complete; **Phase B complete** (B-tech ✓; B-product P-pass ✓; **all 4 architecture ripples re-confirmed `T✓` by the architect 2026-06-03** — see decision log + Part 10 §H). inv 21 amended in canon. **D-ratify is now unblocked** (D carries the 4 ripple rulings forward). Tracks C (doc-strategy) + D (domain model) proceed.**
 
 ---
 
@@ -30,7 +30,7 @@ README index). **Status: 2026-06-02 — Phase A complete; Phase B: B-tech **comp
 | #     | Phase                                                   | Deliverable                        | Owner                       | Status | Depends on                   | Exit gate                                                                                          |
 | ------- | --------------------------------------------------------- | ------------------------------------ | ----------------------------- | -------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md`                     | Claude                      | ✅     | —                           | drift quantified across intent / canonical docs / code; PM has concrete input                      |
-| **B** | Product intent                                          | `product-intent.md`                | **PM** (Claude facilitates) | 🟡     | A                            | Part 10 resolved +**dual sign-off** (B-tech ✓ 2026-06-02; **B-product P✓ 2026-06-02** — 4 ripples reopen `T✓`, architect re-confirm pending) |
+| **B** | Product intent                                          | `product-intent.md`                | **PM** (Claude facilitates) | ✅     | A                            | Part 10 resolved +**dual sign-off** (B-tech ✓ 2026-06-02; B-product P✓ 2026-06-02; **4 ripples re-confirmed `T✓` 2026-06-03 — Part 10 §H**) |
 | **C** | Doc-strategy decision (pilot)                           | ADR (*location per this decision*) | You + Claude                | ⬜     | A informs; piloted via B/D/E | chunk-vs-monolith decided; PRD-rebuild-vs-separate-doc decided; rollout call made                  |
 | **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ⬜     | B                            | entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited |
 | **E** | Data model                                              | `data-model.md` + ADR(s)           | Claude (you ratify)         | ⬜     | D                            | target schema + cut strategy locked                                                                |
@@ -63,7 +63,17 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
 
 ## Cross-cutting threads
 
-- **Consent/COPPA spec + legal check** — spans B/D; gates any code touching consent. ⬜
+- **Consent/COPPA spec + legal check (REQ-2 counsel queue)** — spans B/D; gates any code touching consent.
+  PM-owned, worked with the lawyer. 🟡 **Split by structural impact — the queue does NOT gate F as a whole:**
+  - **→ E (data model) — absorb now as a known constraint:** the legally-mandated **retention carve-out**
+    (billing/tax/transaction records survive learning-data deletion) forces a *segmented deletion* seam
+    (retain-financial / purge-learning); design E for it now — counsel only fills the exact period/scope.
+  - **→ D — contingent risk, get a binary read before D-ratify:** **parent-delete permissibility** (is a
+    guardian-initiated delete of an under-age charge's learning lawful *at all*?). A "no" reopens the E5
+    ruling + the inv-21 amendment. Lean favorable (GDPR storage-limitation); low odds, high blast radius.
+  - **→ post-F config/copy (ride decided mechanisms, do not gate F):** dormancy period; pre-deletion
+    notice / grace / export-window length; moved-country grace-window length; birth-year boundary
+    verification *method* (ties to G7 vendor pick); minor double-billing disclosure + grace (E12 option B).
 - **T1 revert** — decision MADE (forward-only); execution deferred to F. Do **not** delete migration
   `0106` in isolation (it's committed + applied). ⬜
 - **Sibling-plan re-triage** — see below. 🟡 provisional tags applied to all 7 plans (2026-06-01);
@@ -109,7 +119,7 @@ separate → evaluate standalone.
 
 ## Definition of "ready to plan implementation" (Phase F gate)
 
-- [ ] **B** — product intent ratified (§11 answered).
+- [x] **B** — product intent ratified (Part 10 resolved; 4 architecture ripples re-confirmed `T✓` 2026-06-03, Part 10 §H).
 - [ ] **D** — domain model locked, incl. consent/COPPA model + legal check.
 - [ ] **E** — data model + cut strategy locked.
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
@@ -122,6 +132,21 @@ separate → evaluate standalone.
 
 ## Decision log
 
+- **2026-06-03** — **Phase B complete: the 4 architecture ripples re-confirmed by the architect (`T✓`).**
+  Recorded in Part 10 §H. **(1) Scheduler (inv 24):** feasible on the existing Inngest cron + per-Person
+  fan-out rail (mirrors `daily-snapshot.ts`), **zero new infra**; three consumers (E1 birthday, E2 residence,
+  E5 inactivity); birthday scan can't filter to recently-active (dormant accounts still age) → an index on
+  `birth_date`/`last_activity` is a Phase-E note. **(2) E5:** **inv 21 amended in canon** (clarifying — an
+  explicit, authority-held, audited charge deletion ≠ the silent cascade it forbids); abandonment rides the
+  scheduler + warn/export window; delete-authority follows consent-authority. **(3) Child-own-login
+  (D1 + E1-takeover):** **invite-flow** (child self-provisions via the existing Clerk JIT account path), not
+  parent-creates-credential — the only mechanism coherent with the E1 managed→credentialed self-takeover.
+  **(4) E12 join-my-family:** a consolidation join **reusing the invite-flow primitive**, collapses to a single
+  home org (**sidesteps E7**); the active-store-sub teen case ruled **option B (join-with-disclaimer)** since
+  store-delegated billing rules out server-side refund. **Consequence: B's exit gate is met; D-ratify is
+  unblocked** (D carries the 4 forward). **ADRs pending placement** (scheduler; family-join primitive) — held
+  for the Phase-C doc-strategy call. **Counsel queue (REQ-2) grows by one:** minor double-billing disclosure +
+  grace.
 - **2026-06-02** — **Phase B-product complete (PM product sign-off).** The PM walkthrough ran all six segments;
   every open Part-10 product item is ruled `P✓`: **E6** (split surface, purpose-led landing; "add-first-child"
   landing = PM Notion follow-up), **C2/C3** (homework-helper = ads wedge; audience = serious learners + mentors,

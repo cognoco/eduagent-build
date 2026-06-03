@@ -401,7 +401,7 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
 
 ### D — UX defaults Doc 2 asserted that the canon does not fix
 
-- **D1 — Login-mode default per tier. RULED 2026-06-02 `[P✓ · T pending — see ripple]`.** **Self-signup → the
+- **D1 — Login-mode default per tier. RULED 2026-06-02 `[P✓ · T✓ 2026-06-03 → §H Ripple 1: invite-flow]`.** **Self-signup → the
   person gets their own login (credentialed), no age-based steering** (today's de-facto behaviour, confirmed as
   intended; the consent gate still catches under-age self-signups). **Extension (PM-raised hole):** the
   **parent-adds-child** path today **forces managed** (child has no own login) with no option for a child who
@@ -470,7 +470,7 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
   only the person confirming the new residence changes anything. **Still open P/legal:** grace-window length → counsel.
 - **E3 — Store-payer ↔ recorded-Payer mapping under family sharing.** `[ANCHORED-OPEN: §6 multi-org / Doc 2 J13]` — **now the active Payer sub-question after E0** (capacity is settled; *which Person* a store-completed purchase records as Payer under Family Sharing / Ask-to-Buy is not). → Phase D/E.
 - **E4 — Co-guardian consent precedence** (the one-of/all-of rule). `[ANCHORED-OPEN: inv 11 "rule is jurisdictional/legal — deferred §6"]` — likely defers to counsel; we can set a default.
-- **E5 — Last-guardian departure / charge custody. PM LEAN 2026-06-02 `[P-lean · RIPPLE → architect · T pending]`.**
+- **E5 — Last-guardian departure / charge custody. 2026-06-02 `[P-lean · T✓ 2026-06-03 → §H Ripple 2; inv 21 amended]`.**
   Replace today's **silent cascade-delete** of the child (children live in the parent's account → account deletion
   wipes them, the live inv-21 violation) with an **explicit choice presented to the departing consenting parent at
   account deletion**: (i) **export/download** the child's data; (ii) **attach another consenting adult** — *offered,
@@ -526,7 +526,7 @@ specced before coding — but treat each non-invariant recovery as `[PROPOSED]`.
   preserved** (inv 20/21); the teen's existing subscription, if any, is reconciled (inv 18). **Rationale:** deferring
   leaves no clean path — the only workaround (re-create the teen as a fresh child profile) **destroys their history**,
   the exact dead-end the foundation forbids.
-  **RIPPLE → architect (T-axis reverts to pending per the Part-10 ripple rule):** elevating E12 from Phase-D-deferred
+  **RIPPLE → architect (T-axis reverts to pending per the Part-10 ripple rule) — RESOLVED 2026-06-03 `[T✓ → §H Ripple 3]`:** elevating E12 from Phase-D-deferred
   to **v1-required** reopens feasibility. Architect to scope the **cheapest honest v1 version** — membership +
   billing/quota reconciliation + home-org handling — honoring never-orphan (inv 21) and a named **migration-pending**
   interim state (inv 25); interacts with **E7 multi-org governance**. **Scope note:** the *below-consent-age* teen
@@ -573,3 +573,50 @@ reviewer's** procurement call, gated on clear legal requirements — not itself 
 - **G5 — CLEANUP-2** AI "mentor" → "Mate" copy sweep. `[ANCHORED-OPEN: §8 CLEANUP-2]`
 - **G6 — CLEANUP-3** banish numeric cohort copy — **frontend / user-facing copy only** (backend number-*gates* are already banned by inv 10); gated on FLAG-2. `[ANCHORED-OPEN: §8 CLEANUP-3]`
 - **G7 — VPC vendor selection** (KWS vs k-ID) + platform Age-Signals timing — **not a legal topic: the technical reviewer's procurement call, sequenced *after* the legal requirements are clear.** `[ANCHORED-OPEN: §6]`
+
+### H — Phase-B closure: architect re-confirmation of the 4 ripples  *(2026-06-03)*
+
+The four ripples the B-product pass reopened (decision log 2026-06-02) are re-confirmed by the architect.
+All resolve to `T✓`; **Phase B's exit gate is met** and **D-ratify is unblocked** (it must carry these forward).
+ADRs for the two net-new mechanisms (scheduler; family-join primitive) are **pending placement** — held for the
+Phase-C doc-strategy call, content captured here.
+
+- **Ripple 4 — durable scheduler (inv 24). `T✓`.** Feasible on the **existing Inngest rail with zero new
+  infrastructure** — a new cron + per-Person fan-out function mirroring the production `daily-snapshot.ts`
+  pattern (`cron` admin scan → batched `step.sendEvent` fan-out → bounded-concurrency receiver, idempotency-keyed
+  on `personId + day`). Three consumers: birthday/age-cross (E1), residence re-eval (E2), inactivity-expiry (E5).
+  *Cost note for E:* the birthday/age scan **cannot** filter to active-recently (a dormant account still
+  transitions on its birthday, inv 24) → a daily date-predicated scan of all non-archived Persons, needing an
+  index on `birth_date` / `last_activity`. *Deferred to D-body:* unified one-cron-all-transitions (recommended)
+  vs. three separate crons.
+- **Ripple 2 — E5 last-guardian. `T✓`.** (a) inv 21 **amended in canon** (clarifying, not a 31st invariant):
+  an explicit, authority-held, audited guardian-initiated deletion of a genuine under-consent-age charge's data
+  (export offered first) is a **distinct permitted operation, not the silent cascade inv 21 forbids** — see
+  ontology inv 21 (edited 2026-06-03). (b) Abandonment fallback = the inactivity-expiry policy, **rides Ripple 4's
+  scheduler** + a warn/export window (inv 25). (c) Delete-authority **follows consent-authority** — the same
+  consent-gated-tier predicate (inv 10) scopes the parent-decides path to genuine under-age charges; a capable
+  managed Person's export/delete routes to themselves (inv 7/19). Dormancy specifics → counsel (REQ-2), not
+  B-gating.
+- **Ripple 1 — child-own-login provisioning (D1 + E1-takeover). `T✓` → invite-flow.** The child completes their
+  **own Clerk sign-up**; the existing JIT account provisioning (`middleware/account.ts` → `findOrCreateAccount`)
+  auto-creates their account on first authenticated request — **not** `parent-creates-credential` (zero
+  `clerkClient.users.create` usage in the repo; would add a new Clerk admin-write + a password-handoff smell).
+  Decisive: the **E1 self-takeover** (managed→credentialed graduation, inv 20, same `person_id`) *requires* the
+  teen to set up their own credential, so invite-flow is the **only** mechanism coherent across both D1 and E1.
+  inv 4 holds — an under-age self-signup still hits the consent gate (→ R3 holding until VPC). **Net-new (T2+):**
+  the "attach the self-provisioned account to the family graph against the existing `person_id` via a
+  `migration-pending` interim" step (today's add-child creates a managed profile inline). **This is the shared
+  primitive Ripple 3 reuses.**
+- **Ripple 3 — E12 "join my family" v1. `T✓` (feasible *in the target model*).** v1 = Ripple 1's join primitive
+  + (i) **home-org reassignment** (add the family Membership **before** decommissioning the teen's now-empty
+  org-of-one, via `migration-pending`, inv 21/25 — the org-of-one is a container; the Person + history ride the
+  `person_id`); (ii) teen-opt-in **Mentorship** grant (inv 14/19, no auto-Guardianship); (iii) **billing/quota
+  reconciliation**. v1 **collapses to a single home org → deliberately sidesteps E7 multi-org governance**
+  (the cheapest honest join is a *consolidation*, not a federation; true multi-org stays Phase-D). **Billing
+  fork RULED `[P✓ 2026-06-03]` — option B (join-with-disclaimer):** the joining teen with an active store sub
+  **joins immediately** (covered by family quota) and **keeps paying their own store sub until they self-cancel**
+  (store-delegated billing rules out server-side refund/credit — `revenuecat.ts`), with an explicit
+  double-charge warning + a follow-up nudge; chosen over block-until-cancel to avoid the cross-system dead-end
+  the UX-resilience rules forbid. **New counsel sub-item (REQ-2):** minor double-billing disclosure + grace.
+  Scope held: below-consent-age teen variant (guardianship + VPC via R13) and child-initiated request-to-join
+  (E13) stay Phase-D-deferred; v1 = consent-capable teen, parent-initiated invite.

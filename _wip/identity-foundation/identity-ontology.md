@@ -480,8 +480,12 @@ build. Ratified across Grill #1 — these are the **definition of "done"** the P
 **F — Lifecycle & safety**
 20. **Graduation preserves identity:** managed → credentialed keeps the **same `person_id`** + all history.
 21. Edge deletion (guardianship / mentorship / membership) **never cascade-deletes** the Person or their
-    learning history — a managed Person (charge *or* the rare managed adult) is **never orphaned**.
-    *(Today `family_links` cascades — the live bug, PPA-R11.)*
+    learning history — a managed Person (charge *or* the rare managed adult) is **never orphaned as a
+    *side-effect* of removing an edge**. An **explicit, authority-held, audited deletion** of a genuine
+    under-consent-age charge's data (guardian-initiated, export offered first — inv 25) is a **distinct
+    permitted operation**, not a cascade. The invariant forbids the *silent* orphan, not the guardian
+    exercising the charge's erasure right. *(Today `family_links` cascades on edge deletion — the live
+    bug, PPA-R11.)*
 
 **G — Separation, guardianship depth & transition safety**  *(folded from `domain-model-options.md` §8–§10)*
 22. **Three independent concerns — never fused:** **consent authority** ≠ **billing control** ≠ **data
