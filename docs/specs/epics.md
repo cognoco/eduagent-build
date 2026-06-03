@@ -300,6 +300,13 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 
 ### Additional Requirements
 
+> **`ARCH-N` register is FROZEN (MMT-ADR-0000 Part III, 2026-06-03).** This is a closed namespace — **no new `ARCH-N`
+> entries.** Every new architecture decision is an `MMT-ADR-NNNN` (see `docs/adr/`). Existing
+> entries are being drained to ADRs as backfill: each gets a terminal disposition (`→ MMT-ADR-NNNN` promoted /
+> tombstoned-obsolete / `corrected-by` / dropped). A stamped entry's code citations migrate to the new ID in the
+> same change. **Known drift:** `ARCH-3` is cited in `packages/database/src/utils/uuid.ts` for *UUID v7*, but the
+> entry below is *CI/CD* — a "plain wrong" citation to resolve during the drain (MMT-ADR-0000 Part III).
+
 **From Architecture — Starter Template & Infrastructure:**
 
 - ARCH-1: Fork `cognoco/nx-monorepo`, strip Supabase/Next.js/Express specifics, scaffold Hono API, rebuild database package (Epic 0 Story 1)
@@ -318,7 +325,7 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 - ARCH-11: ~~Workers KV~~ DB-backed cache (`home_surface_cache` table) for coaching cards (write on Inngest precompute, read on app open) and subscription status (write on Stripe/RevenueCat webhook, read on metering). _Original spec said Workers KV; implementation uses DB table as conscious adaptation — acceptable at current scale._
 - ARCH-12: SSE streaming for LLM responses via Hono `streamSSE()`. Design handler behind interface for potential Durable Objects migration.
 - ARCH-13: Inngest for all async work that survives request lifecycle. Event naming: `app/{domain}.{action}`, payloads always include `profileId` + `timestamp`.
-- ARCH-14: ML Kit on-device OCR primary, server-side fallback behind interface at `/v1/ocr`
+- ARCH-14: ML Kit on-device OCR primary, server-side fallback behind interface at `/v1/ocr` — **→ promoted to MMT-ADR-0006** (2026-06-03; code citation migrated)
 - ARCH-15: Hono RPC for end-to-end type safety. `AppType` exported via `@eduagent/schemas`.
 - ARCH-16: pgvector for per-user memory embeddings. `services/embeddings.ts` + `queries/embeddings.ts` (raw SQL cosine distance). Embedding model/provider TBD at Epic 2.
 - ARCH-17: Two-layer rate limiting: Cloudflare (100 req/min, wrangler.toml) + quota metering middleware (per-profile questions/month via `decrement_quota` PostgreSQL function)
