@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// OCR Provider — Story 2.5 (ARCH-14)
+// OCR Provider — Story 2.5 (MMT-ADR-0006, formerly ARCH-14)
 // Swappable provider interface for server-side OCR.
 // Pure business logic, no Hono imports.
 // ---------------------------------------------------------------------------
