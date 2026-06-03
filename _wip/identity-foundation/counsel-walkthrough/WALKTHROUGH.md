@@ -18,12 +18,20 @@ the architect maximum runway. Then A (is our consent valid), B (age floor), D (c
 
 1. Deletion, retention & erasure → *retention carve-out; parent-delete; inactivity; child's erasure* **[structural]**
 2. Is our consent valid? → *per-purpose disclosure; contract basis; AI-training consent*
-3. How young, how verified? → *the real age floor; assurance + boundary-crossing verification*
+3. How young, how verified? → *the real age floor; assurance + boundary-crossing verification; what we may rely on from Apple/Google* **[B3a structural]**
 4. Cross-org & lifecycle → *cross-org consent; graduation & legacy data*
 5. Forward-looking + the launch gate → *EU AI-Act; Ofcom; moved-country grace; minor double-billing; DPIA*
 
+**Two architecture ripples to watch — not just in Group C.** The structural pair C1/C2 leads in Segment 1, but
+**B3a (store-delegation liability) in Segment 3 is a third structural item** that can reopen inv 17 v1.1. Treat
+its ripple trigger with the same weight as C2's.
+
 **The capture verbs:** **Rule** (binding answer we build to) · **Parameter** (a value/threshold) · **Monitor**
-(unsettled; record current posture + the trigger to revisit). Every question leaves with one.
+(unsettled; record current posture + the trigger to revisit). Every question leaves with one — **plus a
+`basis:` citation to the governing provision** (e.g. *GDPR Art 8 / COPPA §312.5 / Children's Code std 5*). A
+bare yes/no is not a captured answer: a **Rule** needs the provision **+ one line of reasoning**; a
+**Parameter** needs the governing provision; a **Monitor** needs the **draft/guidance** instrument it's
+tracking. Counsel is told this up front, at the open.
 
 ---
 
@@ -146,11 +154,34 @@ data-model constraint.]**
 > standard** must we apply so a child can't simply *type* their way past the gate, while a genuine adult who
 > mistyped can still fix it? *(The vendor we'd use is a later step that waits on this answer.)*"
 
+**B3 — What can we rely on from Apple/Google?  `[STRUCTURAL → can reopen inv 17 v1.1]`**
+> "Our design **leans on the app stores** in two ways, and we want to test both. **First — and this is the one
+> we need a clear read on:** we let the **store decide who may pay**. Apple or Google, as merchant of record,
+> gate the purchase — Ask-to-Buy, the payment method, Family Sharing — and we add **no age check of our own**.
+> The question: when the store approves a payment from a **minor's** account, does that **discharge our
+> liability** — under COPPA, consumer-protection, and contract law — or do we **still carry our own
+> obligations** regardless of what the store allowed? A plain yes-or-no first, then the conditions. **Second,
+> lighter:** we also plan to **read an age signal from the platform** and take the stricter of it and what the
+> user told us — is **ingesting and relying on** that signal lawful, and does it carry its own duties, like
+> telling the user we're using it?"
+
+**[RIPPLE TRIGGER — same weight as C2. If counsel says the store approving a minor's purchase does NOT
+discharge our liability (we retain our own obligations), STOP treating it as settled — log it as a ripple to
+the architect. It reopens inv 17 v1.1 ("payment is store-delegated; no age gate of ours") — we may have to add
+our own gate after all. Tell the PM: "that changes an architecture decision; it goes to the architect before
+anything's final." Capture (b) as its own Rule/Monitor.]**
+
 ### Capture + play back
-**[Ledger → Part 10:]** `B1 age-floor [<Rule>]`, `B2 assurance+verification [<Rule/Param>]`. Re-anchor FLAG-2:
-if B1 confirms no legal floor, the code floor + "11" copy can be removed (gated on app-store rating).
+**[Ledger → Part 10:]** `B1 age-floor [<Rule> + basis]`, `B2 assurance+verification [<Rule/Param> + basis]`,
+`B3a store-delegation-liability [<Rule + binary> + basis]`, `B3b age-signal-ingestion [<Rule/Monitor> + basis]`.
+Re-anchor FLAG-2: if B1 confirms no legal floor, the code floor + "11" copy can be removed (gated on app-store
+rating).
 > "Plain version: **[restate]** — e.g. 'no legal floor with VPC, so the floor is ours to set on rating grounds;
-> VPC needs <level> for under-Ns; a boundary-crossing birth-year edit needs <method>.' Right?"
+> VPC needs <level> for under-Ns; a boundary-crossing birth-year edit needs <method>; the store approving a
+> minor's payment does / does-not let us off the hook; and reading the platform age signal is fine if we
+> <condition>.' Right?"
+
+**[If B3a rippled: read the ripple flag aloud and note it goes to the architect alongside any C2 ripple.]**
 
 ---
 
@@ -228,11 +259,13 @@ two simultaneous governing consents — flag to the architect; it touches the jo
 ## Closing
 
 When all five segments are done:
-- Confirm **every one of the 15 questions** (plus the DPIA wrapper, E5) carries a **Rule / Parameter / Monitor** outcome in **PRD Part 10**
-  (resolving G1–G4 there; recording the newer items alongside), or an explicit "counsel to revert by <date>."
-- **Read the ripple flags aloud** — above all the **C2 parent-delete** result. If it came back no/conditional,
-  it goes to the **architect** and reopens the last-guardian rule + the related invariant; nothing about it is
-  final until the architect rules.
+- Confirm **every one of the 16 questions** (plus the DPIA wrapper, E5) carries a **Rule / Parameter / Monitor**
+  outcome **+ a `basis:` citation** in **PRD Part 10** (resolving G1–G4 there; recording the newer items
+  alongside), or an explicit "counsel to revert by <date>."
+- **Read the ripple flags aloud — there are two.** **(1) C2 parent-delete:** if no/conditional, it reopens the
+  last-guardian rule + the related invariant. **(2) B3a store-delegation liability:** if we retain liability, it
+  reopens inv 17 v1.1 (payment store-delegation, no age gate of ours). Both go to the **architect**; nothing
+  about either is final until the architect rules.
 - Hand the PM the **two structural carries:** C1's retained-record categories (a data-model constraint) and
   the open **DPIA (E5)** as the launch-gating wrapper the rest feeds into.
 - Note the **REQ-2 label-drift** cleanup (rename the newer set so it stops colliding with the original

@@ -1,7 +1,7 @@
 # Facilitator Brief — Counsel walkthrough  *(read this first)*
 
 You are about to facilitate a **legal-review working session** for the identity foundation of the EduAgent /
-MentoMate app. You walk a **product owner (PM)** and **legal counsel**, sitting side by side, through fifteen
+MentoMate app. You walk a **product owner (PM)** and **legal counsel**, sitting side by side, through sixteen
 legal questions plus a DPIA launch-gate wrapper — teaching nothing, but **framing each situation and what's
 already locked** so counsel can
 rule accurately and the PM stays oriented. **You do not answer the legal questions** — counsel does. **You do
@@ -51,7 +51,7 @@ The audience is split, so calibrate to **both** without dumbing down for either:
   system ships the **strictest** rule and relaxes per verified country; a person is **never silently orphaned**.
   (Full list: packet §3.) These are the decided mechanisms each question *rides* — counsel rules on whether the
   law permits them and on what conditions/values, **not** on how they're designed.
-- **Deciding today — the 15 questions (+ the DPIA wrapper), in five groups** (packet §4; script order in `WALKTHROUGH.md`):
+- **Deciding today — the 16 questions (+ the DPIA wrapper), in five groups** (packet §4; script order in `WALKTHROUGH.md`):
   **C** deletion/retention/erasure *(front-loaded — the two structural answers)*, **A** consent validity,
   **B** the age floor + assurance, **D** cross-org + graduation, **E** forward-looking + the DPIA launch gate.
 - **NOT this session:** product/UX re-decisions (B-product is closed), and how data is physically stored (a
@@ -60,9 +60,10 @@ The audience is split, so calibrate to **both** without dumbing down for either:
 ## The per-segment loop
 
 **Frame** (the situation + what's locked, in plain English for both) → **Ask** (the precise legal question;
-legalese-for-counsel, glossed-for-PM) → **Capture** (one of **Rule / Parameter / Monitor**) → **Play back** to
-the PM in plain English and confirm. Run **Group C first** (it holds the structural pair). Leverage
-**/grill-with-docs** if an answer needs sharpening against the model.
+legalese-for-counsel, glossed-for-PM) → **Capture** (one of **Rule / Parameter / Monitor**, **always with a
+`basis:` citation**) → **Play back** to the PM in plain English and confirm. Run **Group C first** (it holds
+two of the three structural items; the third, **B3a**, lands in Segment 3 — give its ripple the same weight).
+Leverage **/grill-with-docs** if an answer needs sharpening against the model.
 
 - **Rule** — a binding answer we build to (permissible / not / required conditions).
 - **Parameter** — a value or threshold (a retention period, a grace window, an assurance level).
@@ -71,20 +72,30 @@ the PM in plain English and confirm. Run **Group C first** (it holds the structu
 ## Capture protocol
 
 For each question: (1) say the outcome back to the PM in plain English and confirm; (2) record it in **PRD
-Part 10** — the same ledger B-product used — tagged `Rule` / `Parameter` / `Monitor` with the date, resolving
-the **G1–G4** items there and recording the newer ones alongside; (3) if it touched something structural, add
-the appropriate flag (below).
+Part 10** — the same ledger B-product used — tagged `Rule` / `Parameter` / `Monitor` with the date **and a
+`basis:` citation** (the governing provision), resolving the **G1–G4** items there and recording the newer
+ones alongside; (3) if it touched something structural, add the appropriate flag (below).
+
+**Grounding is mandatory — tell counsel up front.** No answer is captured as a bare yes/no; each carries
+`basis:` — the provision it rests on (e.g. *GDPR Art 8 / COPPA §312.5 / Children's Code std 5*). Depth scales
+with type: a **Rule** = provision **+ one line of reasoning**; a **Parameter** = the governing provision; a
+**Monitor** = the **draft/guidance** instrument it tracks (the honest case where no settled citation exists —
+Ofcom, AI-Act application). Where an answer differs by regime, cite each (EU/US/UK). This isn't bureaucracy:
+the citations feed the DPIA directly and let us re-open just the affected answers when a reg changes.
 
 ## Ripple protocol — when to stop and flag
 
 Two kinds of answer go beyond "capture and move on":
 
-- **Architecture ripple → the architect (async).** The trigger is **C2 (parent-delete permissibility)**: if
-  counsel rules a guardian-initiated deletion of a child's learning **unlawful or only-conditionally lawful**,
-  **do not record it as settled** — log it as a **ripple to the architect**. It reopens the last-guardian
-  deletion rule and the related invariant. Tell the PM plainly: "that changes an architecture decision; it goes
-  to the architect before anything's final." Watch for a second one in **D1 (cross-org consent)** — if the
-  precedence answer needs a consent structure the model can't express, flag it too.
+- **Architecture ripple → the architect (async).** **Two primary triggers.** **(1) C2 (parent-delete
+  permissibility):** if counsel rules a guardian-initiated deletion of a child's learning **unlawful or
+  only-conditionally lawful**, log a **ripple to the architect** — it reopens the last-guardian deletion rule
+  and the related invariant. **(2) B3a (store-delegation liability):** if counsel rules that the store
+  approving a minor's purchase does **not** discharge our liability (we keep our own obligations), log a ripple
+  — it reopens **inv 17 v1.1** ("payment store-delegated; no age gate of ours"), since we may have to add our
+  own gate. For either, **do not record it as settled**, and tell the PM plainly: "that changes an architecture
+  decision; it goes to the architect before anything's final." Watch for a third in **D1 (cross-org consent)** —
+  if the precedence answer needs a consent structure the model can't express, flag it too.
 - **Data-model constraint → carried forward.** **C1 (retention carve-out)** won't ripple, but its answer — the
   **categories** of record that must survive a deletion — is a **design constraint** for the data-model phase.
   Capture the categories even if the exact period is "to confirm."
@@ -97,7 +108,7 @@ retain-financial seam) can be added — offer it, don't assume it's needed.
 
 ## Done when
 
-Every one of the 15 questions (and the DPIA wrapper) carries a **Rule / Parameter / Monitor** outcome (or an explicit "counsel to
+Every one of the 16 questions (and the DPIA wrapper) carries a **Rule / Parameter / Monitor** outcome **+ a `basis:` citation** (or an explicit "counsel to
 revert by <date>") in **PRD Part 10**; every ripple is logged — above all the **C2** result; the **C1**
 retained-record categories are handed to the data-model phase; and the **DPIA (E5)** is opened as the
 launch-gating wrapper. Then note the **REQ-2 label-drift** cleanup.

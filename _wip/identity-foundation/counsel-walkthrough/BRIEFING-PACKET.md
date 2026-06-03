@@ -20,18 +20,29 @@ that are genuinely insider.
 
 ## 0. What we need out of this session
 
-Fifteen legal questions plus the DPIA launch-gate wrapper (E5), grouped into five clusters (§4). For each,
+Sixteen legal questions plus the DPIA launch-gate wrapper (E5), grouped into five clusters (§4). For each,
 counsel gives one of:
 
 - **Rule** — a binding answer we can build to (permissible / not / required-conditions).
 - **Parameter** — a value or threshold (a retention period, a grace window, an assurance level).
 - **Monitor** — "not settled in law yet; here's the current posture; revisit on a trigger."
 
-**Two answers are structural** — they change what we build, not just a parameter — and are front-loaded:
+**Every answer must be grounded — `basis:` is mandatory, not optional.** A bare yes/no is unusable: each
+outcome carries a **`basis:` citation to the governing provision** (e.g. *GDPR Art 8*, *COPPA §312.5*, *UK
+Children's Code std 5*), so it is auditable, reusable in the DPIA, and re-checkable when the law changes.
+Depth scales with the answer type: a **Rule** cites the provision **+ one line of reasoning**; a **Parameter**
+cites the governing provision; a **Monitor** cites the **draft/guidance** instrument and flags it is not yet
+black-letter (the honest case where no settled citation exists — Ofcom, AI-Act application). Where an answer
+spans regimes, cite each (EU/US/UK).
+
+**Three answers are structural** — they change what we build, not just a parameter:
 1. **Retention carve-out** (Group C) → constrains the **data model** (a future phase). We need the *shape*
    of the obligation, not the exact number.
 2. **Parent-delete permissibility** (Group C) → can **reopen a locked architecture decision**. We need a
    **binary read** (lawful at all, yes/no) here, before the next phase locks.
+3. **Store-delegation of payment liability** (Group B, B3a) → can **reopen invariant 17 v1.1** ("payment is
+   store-delegated; no age gate of ours"). If the store gating a purchase does **not** discharge our liability
+   for a minor's payment, we may have to impose our own gate after all. Binary read needed.
 
 Everything else parameterises a mechanism we have **already decided** — counsel is ruling on stable ground,
 not a moving target. That is deliberate: the product decisions were locked first precisely so this session
@@ -114,7 +125,7 @@ whether the law permits them and on what conditions/values.
 
 ---
 
-## 4. The questions  *(five groups; Group C front-loaded — it holds the two structural ones)*
+## 4. The questions  *(five groups; Group C front-loaded — it holds two of the three structural ones; the third is B3a in Group B)*
 
 > Naming note for the record: "REQ-2" currently labels **two different lists** — the original 6-question
 > consent register (Group A/D/E items below, from ontology §8) **and** a newer Phase-B counsel list
@@ -152,6 +163,18 @@ whether the law permits them and on what conditions/values.
   regime require for VPC at the youngest ages; (b) for a **birth-year edit that crosses the consent boundary**
   (a person flipping themselves from "needs a parent" to "doesn't"), what verification standard prevents a
   child typing past the gate? *(The vendor pick is a later procurement step gated on this answer.)*
+- **B3 — What can we rely on from Apple/Google?  `[STRUCTURAL → can reopen inv 17 v1.1]`** Our model
+  **delegates payment capacity to the store** as merchant of record — *"the store is the sole capacity
+  adjudicator; we impose no age gate of our own"* (inv 17 v1.1) — and **ingests a platform age signal**
+  (reconciled stricter-wins vs self-declared, D4). Both lean on trusting the platform's classifications. Two
+  sub-asks: **(a) Payment `[binary read — structural]`:** does the store gating a purchase (merchant of record,
+  Ask-to-Buy, Family Sharing) **discharge our liability** for a **minor's** payment — COPPA, consumer-protection,
+  contract — or do we retain **independent** obligations regardless of what the store permits? If we retain
+  liability, inv 17 v1.1's "no age gate of ours" is reopened (architect ripple). **(b) Age signal:** is
+  **ingesting and relying on** a platform-provided age signal (even as the stricter input) lawful, and does
+  using it carry its own obligations (notice/consent to receive it)? *(Our read on (a): store-delegation is
+  the foreseeable-future channel and likely discharges the* payment-capacity *call — but whether it discharges*
+  liability *is exactly the untested assumption; counsel rules.)*
 
 ### Group C — Deletion, retention & erasure *(front-loaded — the two structural answers)*
 
@@ -218,10 +241,13 @@ no settled answer in a regime, "monitor + current posture" is an acceptable outp
 
 ## 6. After the session
 
-- Each question carries a **Rule / Parameter / Monitor** outcome, captured in **PRD Part 10** — the same ledger
-  B-product used — resolving the G1–G4 items there and recording the newer ones alongside.
-- **If C2 comes back "no/limited":** flag to the architect — it reopens the last-guardian deletion rule and
-  the related invariant. This is the one answer that can ripple back into architecture.
+- Each question carries a **Rule / Parameter / Monitor** outcome **+ a `basis:` citation** (the governing
+  provision), captured in **PRD Part 10** — the same ledger B-product used — resolving the G1–G4 items there
+  and recording the newer ones alongside.
+- **Two architecture ripples to watch.** **(1) If C2 comes back "no/limited":** flag to the architect — it
+  reopens the last-guardian deletion rule and the related invariant. **(2) If B3a comes back "we retain
+  liability":** flag to the architect — it reopens inv 17 v1.1 ("payment is store-delegated; no age gate of
+  ours"). Neither is final until the architect rules.
 - **C1's shape** feeds the data-model phase as a design constraint (the retain/purge seam).
 - The **DPIA (E5)** is opened as the launch-gating wrapper that the other answers populate.
 - Rename the newer "REQ-2" set so it stops colliding with the original 6-question register.
