@@ -5,7 +5,7 @@ architecture (domain + data model) → the **"ready to plan implementation" gate
 **not** an implementation plan, and **no Cosmo work items are created until F is passed.**
 
 **Tracking:** repo-only; this file is the single source. Deliverables land as sibling docs (see
-README index). **Status: 2026-06-02 — Phase A complete; Phase B in progress (B-tech **complete**, B-product pending PM); product intent NOT yet locked.**
+README index). **Status: 2026-06-02 — Phase A complete; Phase B: B-tech **complete**, **B-product P-pass complete** (all Part-10 product items ruled `P✓`). Product intent is locked at the product level — but **4 ripples reopen architecture `T✓` items, pending architect re-confirmation before D ratifies** (see decision log 2026-06-02 + `_handoffs/2026-06-02-b-product-complete.md`).**
 
 ---
 
@@ -30,7 +30,7 @@ README index). **Status: 2026-06-02 — Phase A complete; Phase B in progress (B
 | #     | Phase                                                   | Deliverable                        | Owner                       | Status | Depends on                   | Exit gate                                                                                          |
 | ------- | --------------------------------------------------------- | ------------------------------------ | ----------------------------- | -------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md`                     | Claude                      | ✅     | —                           | drift quantified across intent / canonical docs / code; PM has concrete input                      |
-| **B** | Product intent                                          | `product-intent.md`                | **PM** (Claude facilitates) | 🟡     | A                            | Part 10 resolved +**dual sign-off** (B-tech ✓ 2026-06-02; B-product = PM pass)                    |
+| **B** | Product intent                                          | `product-intent.md`                | **PM** (Claude facilitates) | 🟡     | A                            | Part 10 resolved +**dual sign-off** (B-tech ✓ 2026-06-02; **B-product P✓ 2026-06-02** — 4 ripples reopen `T✓`, architect re-confirm pending) |
 | **C** | Doc-strategy decision (pilot)                           | ADR (*location per this decision*) | You + Claude                | ⬜     | A informs; piloted via B/D/E | chunk-vs-monolith decided; PRD-rebuild-vs-separate-doc decided; rollout call made                  |
 | **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ⬜     | B                            | entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited |
 | **E** | Data model                                              | `data-model.md` + ADR(s)           | Claude (you ratify)         | ⬜     | D                            | target schema + cut strategy locked                                                                |
@@ -122,6 +122,25 @@ separate → evaluate standalone.
 
 ## Decision log
 
+- **2026-06-02** — **Phase B-product complete (PM product sign-off).** The PM walkthrough ran all six segments;
+  every open Part-10 product item is ruled `P✓`: **E6** (split surface, purpose-led landing; "add-first-child"
+  landing = PM Notion follow-up), **C2/C3** (homework-helper = ads wedge; audience = serious learners + mentors,
+  any age), **D1/D2/E0** (self-signup → own login + add-child "own device or yours?" choice; browse-preview locked
+  no-AI/no-collection; teen self-pay store-delegated), **E5** (last-guardian: parent-choice-at-deletion
+  export/attach-adult/delete, scoped to under-age; abandonment → inactivity-expiry policy; *P-lean*), **E1**
+  (visibility off-by-default at consent age + reshare; takeover **by prompt**, not auto), **D3** (reminder caps +
+  short cooldown), **E12** (**un-deferred — a minimal "join my family" is REQUIRED in v1**), **E13** (minor-initiated
+  guardianship ban kept; parent-initiated join = v1), **E2** (move → suspend to browse-preview; **declared-residence**
+  detection + conditional nudge), **F1-BT-b** (in-app birth-year fix; boundary-crossing → light verification).
+  **4 ripples reopen architecture (ripple rule) — architect must re-confirm before D ratifies:** (1) **child-own-login
+  provisioning** mechanism (D1 + E1-takeover; → §6 entry-point asymmetry; net-new/T2+); (2) **E5** — does explicit
+  parent-initiated delete reconcile with inv 21, + the abandonment fallback; (3) **E12** — **T reverts to pending**:
+  scope cheapest v1 join (membership + billing/quota reconciliation, never-orphan inv 21, migration-pending inv 25,
+  E7 interaction); (4) a shared **durable scheduler** (inv 24) now load-bearing for inactivity-expiry (E5) + birthday/age
+  (E1) + residence re-eval (E2). **Counsel queue (REQ-2):** inactivity-deletion specifics (period/notice/billing-tax
+  carve-outs); child erasure right + parent authority; moved-country grace-window; birth-year boundary verification
+  method. **PM action:** log the "add your first child" landing screen as a missing feature in Notion. Decisions live
+  in `identity-foundation-prd.md` Part 10 (commit `d6d93505d`); full handoff = `_handoffs/2026-06-02-b-product-complete.md`.
 - **2026-06-02** — **Parallel-track execution adopted** (see "Execution model — parallel tracks" above). C + D
   proceed now alongside the PM's B-product pass; D-ratify and E wait for B-product (ripple insurance); the PM
   front-loads ripple-prone items (E5, new personas); Track 2 stays product-neutral on P-tails. Gate order
