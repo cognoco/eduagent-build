@@ -11,7 +11,7 @@ ontology + `domain-model.md` + `CONTEXT.md` + ROADMAP moved in lockstep. The 8 t
 `person_retain` set are stated as a fresh create-from-empty baseline; from this baseline forward,
 append-only migrations are absolute. **`inv 17` rephrased** (the lone open call from the 2026-06-03
 counsel walkthrough); all architect calls closed. **Phase F (planning *for* the planning) is in
-progress; Phases G–R are the actual planning.** The roadmap's single end-state is *"ready to start
+progress; Phases G–P are the actual planning.** The roadmap's single end-state is *"ready to start
 implementation"*; the path to that end-state is A–R (the deep thinking + the firming,
 classification, planning) and the first work package in execution (after R).**
 
@@ -42,47 +42,45 @@ classification, planning) and the first work package in execution (after R).**
 | **C** | Doc-strategy decision (pilot)                           | **`MMT-ADR-0000`** (in `docs/adr/`) | You + Claude                | ✅     | A informs; piloted via B/D/E | **DONE 2026-06-03** — decisions layer ratified; convention + ratchet + 3 seed ADRs shipped; backfill deferred (Stream 2) |
 | **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ✅     | B                            | **DONE 2026-06-03** — entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited; 4 ADRs (MMT-ADR-0007–0010) placed |
 | **E** | Data model                                              | `data-model.md` + ADR(s)           | Claude (you ratify)         | ✅     | D                            | target schema + cut strategy locked                                                                |
-| **F** | Ready-to-plan gate (planning *for* the planning)       | —                                 | You                         | ⬜     | B, D, E + threads            | shape of G–R ratified; **`inv 17` rephrased**; sibling-plan re-triage scoped; gap analysis deferred to N; master plan deferred to Q (this phase is **planning for the planning**, not the planning itself) |
-| **G** | Lock the canonical set for the identity-foundation carve-out | (confirmation only — the 9 docs are in place) | You + Claude                | ⬜     | F                            | the canonical-set list is *explicitly confirmed*; each doc's role is named; the set is the lens for the gap analysis (N) |
+| **F** | Ready-to-plan gate (planning *for* the planning)       | —                                 | You                         | ⬜     | B, D, E + threads            | shape of G–P ratified; **`inv 17` rephrased**; sibling-plan re-triage scoped; gap analysis deferred to L; master plan deferred to O (this phase is **planning for the planning**, not the planning itself) |
+| **G** | Lock the canonical set for the identity-foundation carve-out | (confirmation only — the 9 docs are in place) | You + Claude                | ⬜     | F                            | the canonical-set list is *explicitly confirmed*; each doc's role is named; the set is the lens for the gap analysis (L) |
 | **H** | Author the `architecture.md` identity-foundation carve-out | a new section / rev in `architecture.md` | Claude (you ratify)         | ⬜     | G                            | the carve-out is rock-solid for: consent flow, IARC/store posture, Payer/billing mechanics, family-join shape, RLS scope, custody/carve-outs, launch-readiness guard; citations to ADRs + data model present |
-| **I** | Light pass on the rest of `architecture.md`             | edited `architecture.md`           | Claude                      | ⬜     | H                            | *directly misleading* information corrected; *merely incomplete* sections left as-is; scope-by-touching, not scope-by-coverage |
+| **I** | Light pass on the rest of `architecture.md` + `ARCH-N` touch (identity-foundation domain) | edited `architecture.md` + `docs/adr/` promotion/supersession | Claude (you ratify)         | ⬜     | H                            | (a) *directly misleading* information in `architecture.md` corrected; *merely incomplete* sections left as-is; scope-by-touching, not scope-by-coverage. (b) the `ARCH-N` items the identity-foundation domain intersects with are promoted / superseded; the registry-wide drain is *not* in scope (Stream 2) |
 | **J** | Light pass on memory + agent rules                      | edited `CLAUDE.md` / `AGENTS.md` / `.claude/memory/` | Claude                       | ⬜     | I                            | *misleading* info removed; the criterion is "would *any* agent's session context be polluted by stale information?"; fix only what's misleading |
-| **K** | `ARCH-N` touch (identity-foundation domain)            | `docs/adr/` promotion/supersession  | Claude (you ratify)         | ⬜     | J                            | the `ARCH-N` items the identity-foundation domain intersects with are promoted / superseded; the registry-wide drain is *not* in scope (Stream 2) |
-| **L** | **Consolidation activity** — produce the consolidated-audit document | `docs/audit/2026-05-29-full-audit/RECONCILED.md` (or similar) | Claude (you ratify)         | ⬜     | K                            | see the *L exit gate* below |
-| **M** | Canon-contradiction check                              | signed-off check (no new doc)      | Claude (you ratify)         | ⬜     | L                            | the canonical set has no internal disagreements; any contradictions resolved before the gap analysis (N) |
-| **N** | Unified gap analysis                                    | a single delta document            | Claude                      | ⬜     | M                            | one row per finding, tagged `(source-audit, source-finding-id, domain, classification, in-scope?, defer-to-which-workstream?, canonical-set-source)`; reads the consolidated-audit (L's output) + the canonical set (G–K) + the as-is |
-| **O** | Four-bucket triage                                      | the triage outcome, folded into the delta doc | You + Claude                | ⬜     | N                            | every finding lands in one of: (1) already handled in identity-foundation; (2) clear in for master plan; (3) clear out for master plan (named workstream); (4) defer (no workstream yet, or the workstream isn't mature enough) |
-| **P** | Sequencing                                              | the dependency map + critical path, folded into the master plan | Claude (you ratify)         | ⬜     | O                            | sequenced set of work packages with dependencies and bundles; the identity-foundation workstream is sequenced *first* (dogfood) |
-| **Q** | Remediation plan (the master plan)                     | a single document                   | Claude (you sign off)       | ⬜     | P                            | scope (in-scope work packages); out-of-scope workstreams (named, with rationale); sequenced work packages; dependency map; bundle grouping; Cosmo-enablement interface (B+/C− posture; identity-foundation as first dogfood) |
-| **R** | Hand off to execution (Cosmo work-package slicing)     | the Cosmo WIs (sliced from Q)       | You + Claude                | ⬜     | Q                            | every work package is a Cosmo work item (or grouped into a Cosmo work package); the Cosmo top-down process enablement is the precondition (parallel workstream) |
+| **K** | **Consolidation activity** — produce the consolidated-audit document (includes canon-contradiction check) | `docs/audit/2026-05-29-full-audit/RECONCILED.md` (or similar) | Claude (you ratify)         | ⬜     | J                            | see the *K exit gate* below |
+| **L** | Unified gap analysis                                    | a single delta document            | Claude                      | ⬜     | K                            | one row per finding, tagged `(source-audit, source-finding-id, domain, classification, in-scope?, defer-to-which-workstream?, canonical-set-source)`; reads the consolidated-audit (K's output) + the canonical set (G–J) + the as-is |
+| **M** | Four-bucket triage                                      | the triage outcome, folded into the delta doc | You + Claude                | ⬜     | L                            | every finding lands in one of: (1) already handled in identity-foundation; (2) clear in for master plan; (3) clear out for master plan (named workstream); (4) defer (no workstream yet, or the workstream isn't mature enough) |
+| **N** | Sequencing                                              | the dependency map + critical path, folded into the master plan | Claude (you ratify)         | ⬜     | M                            | sequenced set of work packages with dependencies and bundles; the identity-foundation workstream is sequenced *first* (dogfood) |
+| **O** | Remediation plan (the master plan)                     | a single document                   | Claude (you sign off)       | ⬜     | N                            | scope (in-scope work packages); out-of-scope workstreams (named, with rationale); sequenced work packages; dependency map; bundle grouping; Cosmo-enablement interface (B+/C− posture; identity-foundation as first dogfood) |
+| **P** | Hand off to execution (Cosmo work-package slicing)     | the Cosmo WIs (sliced from O)       | You + Claude                | ⬜     | O                            | every work package is a Cosmo work item (or grouped into a Cosmo work package); the Cosmo top-down process enablement is the precondition (parallel workstream) |
 
 ---
 
-### Phase L — detail (the consolidation activity)
+### Phase K — detail (the consolidation activity)
 
-**Goal:** produce a single consolidated-audit document that consolidates and reconciles the 14 sub-audits of the `2026-05-29-full-audit/` cluster (plus the linked `.deepsec/` module) *and* cross-checks the drift map against the canonical set, so the gap analysis (N) has *one document* to read.
+**Goal:** produce a single consolidated-audit document that consolidates and reconciles the 14 sub-audits of the `2026-05-29-full-audit/` cluster (plus the linked `.deepsec/` module) *and* cross-checks the drift map against the canonical set, so the gap analysis (L) has *one document* to read.
 
 **Inputs (the corpus):**
 - **6 in `deep-review/`** — `2026-05-29-arch-whole-repo`, `2026-05-30-agent-instructions`, `2026-05-30-errors-api`, `2026-05-30-l10n-a11y-mobile`, `2026-05-30-security-pii-api`, `2026-05-30-security-pii-inngest` (each with `REPORT.md` + `SUMMARY-prioritized.md` + sub-agent reports; the whole-cluster `META-REPORT.md` synthesizes them).
-- **4 in `workflow-N/`** — `workflow-1/findings.md`, `workflow-2/findings.md`, `workflow-3/inventory.md`, `workflow-4/recommendations.md`. **`workflow-3` is an inventory and `workflow-4` is recommendations** — both are *meta-outputs* (input to the master plan's workstream discovery and prioritization), **not findings to classify** in L.
+- **4 in `workflow-N/`** — `workflow-1/findings.md`, `workflow-2/findings.md`, `workflow-3/inventory.md`, `workflow-4/recommendations.md`. **`workflow-3` is an inventory and `workflow-4` is recommendations** — both are *meta-outputs* (input to the master plan's workstream discovery and prioritization), **not findings to classify** in K.
 - **4 at the root** — `architecture-audit.md`, `improve-codebase-architecture.md`, `agent-skills-recommendations.md`, `deepsec-handover.md` (the deepsec handover — references the `.deepsec/` module).
 - **`.deepsec/`** — the deepsec engagement itself, in the same codebase (not a separate codebase). Read alongside the `deepsec-handover.md` root-level sub-audit.
 
-**Discarded:** the `claude/` (5 files) and `codex/` (3 files) trial reconciliations — not authoritative; *not* input to L's output; mentioned in the provenance section as "not used."
+**Discarded:** the `claude/` (5 files) and `codex/` (3 files) trial reconciliations — not authoritative; *not* input to K's output; mentioned in the provenance section as "not used."
 
 **L sub-tasks (executed in order, with each one a discrete, reviewable step):**
 
-- **L.1 — Read the corpus + identify the 6 deep-review workstreams.** Use the 6 `deep-review/` runs as the workstream-discovery seed: architecture, agent-instructions, errors-api, l10n-a11y-mobile, security-pii-api, security-pii-inngest. Possibly 5 (if the two security workstreams merge) or 7 (if a `workflow-N/` finding doesn't fit). The 4 `workflow-1/2/findings.md` + the 4 root-level sub-audits cluster into the 6 (or 5–7) workstreams; the meta-outputs (`workflow-3/inventory.md` + `workflow-4/recommendations.md`) inform the master plan's workstream discovery, not L's findings-classification flow.
+- **K.1 — Read the corpus + identify the 6 deep-review workstreams.** Use the 6 `deep-review/` runs as the workstream-discovery seed: architecture, agent-instructions, errors-api, l10n-a11y-mobile, security-pii-api, security-pii-inngest. Possibly 5 (if the two security workstreams merge) or 7 (if a `workflow-N/` finding doesn't fit). The 4 `workflow-1/2/findings.md` + the 4 root-level sub-audits cluster into the 6 (or 5–7) workstreams; the meta-outputs (`workflow-3/inventory.md` + `workflow-4/recommendations.md`) inform the master plan's workstream discovery, not L's findings-classification flow.
 
-- **L.2 — Classify each finding (the 12 sub-audits that have findings).** For each finding, classify `(in-identity-foundation-scope, in-some-other-workstream's-scope, deferred)`. The "in-identity-foundation-scope" check uses the canonical set (G–K) as the lens. Discover the workstream assignments from the sub-audits' own clustering (L.1).
+- **K.2 — Classify each finding (the 12 sub-audits that have findings).** For each finding, classify `(in-identity-foundation-scope, in-some-other-workstream's-scope, deferred)`. The "in-identity-foundation-scope" check uses the canonical set (G–J) as the lens. Discover the workstream assignments from the sub-audits' own clustering (K.1).
 
-- **L.3 — Cross-check the drift map's §2.1–§2.7 against the canonical set.** The drift map was authored 2026-06-01; the canonical set was finalized 2026-06-04. The cross-check produces two outputs: (a) *live defects* (drift-map findings the canonical set didn't cover) and (b) *premature resolutions* (canonical-set conclusions the drift map didn't support).
+- **K.3 — Cross-check the drift map's §2.1–§2.7 against the canonical set.** The drift map was authored 2026-06-01; the canonical set was finalized 2026-06-04. The cross-check produces two outputs: (a) *live defects* (drift-map findings the canonical set didn't cover) and (b) *premature resolutions* (canonical-set conclusions the drift map didn't support).
 
-- **L.4 — Author the consolidated-audit document.** A single document with three sections: (A) the 14 sub-audits' findings classified by workstream; (B) the canonical set's resolutions cross-referenced; (C) the drift map's as-is findings cross-checked against the canonical set. Section A is the *primary* output (the classification is what N consumes); sections B and C are the *secondary* output (they make L's classifications auditable and self-contained).
+- **K.4 — Author the consolidated-audit document.** A single document with three sections: (A) the 14 sub-audits' findings classified by workstream; (B) the canonical set's resolutions cross-referenced; (C) the drift map's as-is findings cross-checked against the canonical set. Section A is the *primary* output (the classification is what L consumes); sections B and C are the *secondary* output (they make K's classifications auditable and self-contained).
 
-- **L.5 — Estimate the sizing of the *reconciliation* work.** This is the L sub-task the architect specifically called out. The classification (L.2) is the *light* part — assign each finding to a workstream. The *reconciliation* is the *deep* part — actually resolve the disagreements between sub-audits within each workstream. **L.5's output: a sizing estimate** — for each of the 5–7 workstreams, an estimate of (a) the number of contradictions / disagreements to reconcile within that workstream, (b) the estimated effort to reconcile (in session-counts or comparable units), (c) the dependency on canonical-set-building for that workstream, (d) the readiness to reconcile (e.g. does the workstream already have a partial canonical set, or is it starting from scratch?).
+- **K.5 — Estimate the sizing of the *reconciliation* work.** This is the L sub-task the architect specifically called out. The classification (K.2) is the *light* part — assign each finding to a workstream. The *reconciliation* is the *deep* part — actually resolve the disagreements between sub-audits within each workstream. **K.5's output: a sizing estimate** — for each of the 5–7 workstreams, an estimate of (a) the number of contradictions / disagreements to reconcile within that workstream, (b) the estimated effort to reconcile (in session-counts or comparable units), (c) the dependency on canonical-set-building for that workstream, (d) the readiness to reconcile (e.g. does the workstream already have a partial canonical set, or is it starting from scratch?).
 
-- **L.6 — Decision point: spin up a separate workstream to actually reconcile, or defer reconciliation entirely.** Based on L.5's sizing estimate + the architect's read on the value of reconciliation *now* (vs. reconciliation *later, when each workstream picks itself up*), the decision is: **spin up a separate workstream** to do the actual reconciliation (per-workstream: read the sub-audits' findings, resolve the contradictions, produce a per-workstream consolidated audit + a partial canonical set), or **defer reconciliation entirely** (let each workstream pick itself up in some future order; the consolidated-audit document L.4 produces is the *handoff*, not the reconciliation; each workstream's future activity does its own reconciliation as part of its own canonical-set-building). The decision criteria are: (a) the cost of doing reconciliation now (the L.5 sizing estimate) vs. the cost of doing it later (the duplicated effort across workstreams); (b) the value of having a *single reconciled audit* as the input to N (vs. the value of having the per-workstream reconciliations done in each workstream's own context); (c) the architect's call on whether the current *one-person bandwidth* can absorb the reconciliation work alongside the G–K firming work. **L's exit gate is the architect's ruling on this decision** (the architect picks spin-up or defer, with a written rationale).
+- **K.6 — Decision point: spin up a separate workstream to actually reconcile, or defer reconciliation entirely.** Based on K.5's sizing estimate + the architect's read on the value of reconciliation *now* (vs. reconciliation *later, when each workstream picks itself up*), the decision is: **spin up a separate workstream** to do the actual reconciliation (per-workstream: read the sub-audits' findings, resolve the contradictions, produce a per-workstream consolidated audit + a partial canonical set), or **defer reconciliation entirely** (let each workstream pick itself up in some future order; the consolidated-audit document K.4 produces is the *handoff*, not the reconciliation; each workstream's future activity does its own reconciliation as part of its own canonical-set-building). The decision criteria are: (a) the cost of doing reconciliation now (the K.5 sizing estimate) vs. the cost of doing it later (the duplicated effort across workstreams); (b) the value of having a *single reconciled audit* as the input to L (vs. the value of having the per-workstream reconciliations done in each workstream's own context); (c) the architect's call on whether the current *one-person bandwidth* can absorb the reconciliation work alongside the G–K firming work. **K's exit gate is the architect's ruling on this decision** (the architect picks spin-up or defer, with a written rationale).
 
 ---
 
@@ -218,7 +216,7 @@ separate → evaluate standalone.
 
 ## Definition of "ready to start implementation" (the *R* gate)
 
-The "ready to start implementation" gate is the *R* phase's exit gate, not F's. F closes as *"planning for the planning"* (i.e. the shape of G–R is ratified; the actual planning lives in G–R).
+The "ready to start implementation" gate is the *P* phase's exit gate, not F's. F closes as *"planning for the planning"* (i.e. the shape of G–P is ratified; the actual planning lives in G–P).
 
 **A–F (the deep thinking + planning-for-the-planning):**
 - [x] **A** — drift map + audit re-triage + sibling provisional tag (`drift-map.md`); 36-gap audit evidence index folded in.
@@ -226,32 +224,30 @@ The "ready to start implementation" gate is the *R* phase's exit gate, not F's. 
 - [x] **C** — doc-strategy decided (`MMT-ADR-0000`): decisions layer + `MMT-ADR-NNNN` + the `decision-adr-link` ratchet; ADRs homed at `docs/adr/`; the broader `docs/` reorg → deferred follow-up.
 - [x] **D** — domain model locked (`domain-model.md` + MMT-ADR-0007–0010); consent model locked; the legal-check items (E4 one-of/all-of; parent-delete; dormancy specifics) are named, scoped to E/counsel, and do not gate D.
 - [x] **E** — data model + cut strategy locked (`data-model.md` + MMT-ADR-0011/0012).
-- [ ] **F** — planning-for-the-planning ratified: the G–R shape is confirmed; the consolidation's corpus (14 sub-audits + `.deepsec/`) is identified; the four-bucket triage model is agreed; the `claude/` + `codex/` trial reconciliations are to be discarded; the launch-readiness guard is a Phase-F-thread tracked in this ROADMAP.
+- [ ] **F** — planning-for-the-planning ratified: the G–P shape is confirmed; the consolidation's corpus (14 sub-audits + `.deepsec/`) is identified; the four-bucket triage model is agreed; the `claude/` + `codex/` trial reconciliations are to be discarded; the launch-readiness guard is a Phase-F-thread tracked in this ROADMAP.
 
-**G–R (the firming, classification, planning — the actual planning runway):**
-- [ ] **G** — canonical set explicitly confirmed (9 docs; lens for the gap analysis).
+**G–P (the firming, classification, planning — the actual planning runway):**
+- [ ] **G** — canonical set explicitly confirmed (9 docs; lens for the gap analysis (L)).
 - [ ] **H** — `architecture.md` identity-foundation carve-out authored (rock-solid; cited to ADRs + data model).
-- [ ] **I** — light pass on the rest of `architecture.md` (misleading info corrected; merely incomplete left as-is).
+- [ ] **I** — light pass on the rest of `architecture.md` (misleading info corrected; merely incomplete left as-is) **+ `ARCH-N` touch (identity-foundation domain)**.
 - [ ] **J** — light pass on memory + agent rules (any agent's session context; fix only what's misleading).
-- [ ] **K** — `ARCH-N` touch (identity-foundation domain only; the registry-wide drain is *not* in scope — Stream 2).
-- [ ] **L** — consolidation activity (the 14 sub-audits + `.deepsec/`; produce the consolidated-audit doc; the L.5 sizing estimate; the L.6 spin-up-or-defer decision). See Phase L — detail above.
-- [ ] **M** — canon-contradiction check (no internal disagreements in the canonical set before the gap analysis).
-- [ ] **N** — unified gap analysis (one row per finding; the delta document).
-- [ ] **O** — four-bucket triage (handled / clear in / clear out / defer).
-- [ ] **P** — sequencing (dependency map + critical path; identity-foundation workstream first as the dogfood).
-- [ ] **Q** — remediation plan (the master plan; architect sign-off).
-- [ ] **R** — hand off to execution (Cosmo work-package slicing; the Cosmo top-down process enablement is the parallel precondition).
+- [ ] **K** — consolidation activity (the 14 sub-audits + `.deepsec/`; produce the consolidated-audit doc; the K.0 canon-contradiction check; the K.5 sizing estimate; the K.6 spin-up-or-defer decision). See Phase K — detail above.
+- [ ] **L** — unified gap analysis (one row per finding; the delta document).
+- [ ] **M** — four-bucket triage (handled / clear in / clear out / defer).
+- [ ] **N** — sequencing (dependency map + critical path; identity-foundation workstream first as the dogfood).
+- [ ] **O** — remediation plan (the master plan; architect sign-off).
+- [ ] **P** — hand off to execution (Cosmo work-package slicing; the Cosmo top-down process enablement is the parallel precondition).
 
 **Tracked open threads (not blockers, named for visibility):**
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
 - [ ] T1 revert sequenced as the first implementation step (lands *during* the execution phase, after R).
 - [ ] Launch-readiness guard exists (test file in `apps/api/src/services/identity/launch-readiness.test.ts`; the spec is the Phase-F-thread tracked in this ROADMAP; the implementation lands in the execution phase).
 - [ ] "11" age-floor final product call (gated on content-rating / directed-to-children store posture; surfaces in H's `architecture.md` carve-out for completeness).
-- [ ] Retention *values* (counsel; the schema's `retention_period` columns are seams; the values fill from the fillers walkthrough results, *not* in scope for G–R).
+- [ ] Retention *values* (counsel; the schema's `retention_period` columns are seams; the values fill from the fillers walkthrough results, *not* in scope for G–P).
 - [ ] `inv 17` rephrase — **DONE 2026-06-04** (locked in this session; moved out of the open-threads list).
 - [ ] G7 VPC vendor pick (procurement, after legal requirements are clear).
 
-- → **Only then:** create Cosmo implementation work items (the work that R hands off to).
+- → **Only then:** create Cosmo implementation work items (the work that P hands off to).
 
 ---
 
@@ -275,68 +271,68 @@ The "ready to start implementation" gate is the *R* phase's exit gate, not F's. 
   closed.** Carried forward (not architect-owned, on other tracks): G7 VPC vendor pick
   (procurement, after legal requirements are clear).
 
-- **2026-06-04** — **Roadmap extended: F is "planning for the planning" and G–R are the actual planning.**
+- **2026-06-04** — **Roadmap extended: F is "planning for the planning" and G–P are the actual planning.**
   A through F concluded with the deep-thinking runway: drift map (A) → product intent + 4
   architecture ripples (B) → doc-strategy + the decisions layer (C) → domain model + 4 ADRs (D) →
   data model + 2 ADRs (E) → the `inv 17` rephrase + planning-for-the-planning (F). **F closes
-  as "planning for the planning":** the shape of the G–R work is ratified, but the actual
-  planning lives in G–R. **G–R are 12 lettered phases** (one per step, sub-phases as
+  as "planning for the planning":** the shape of the G–P work is ratified, but the actual
+  planning lives in G–P. **G–P are 10 lettered phases** (one per step, sub-phases as
   `G.1`, `G.2` etc. if needed):
   - **G — Lock the canonical set** (confirmation only; the 9 docs are in place; this phase
-    *names* the lens for the gap analysis (N)).
+    *names* the lens for the gap analysis (L)).
   - **H — Author the `architecture.md` identity-foundation carve-out** (the *one* deep new
     piece of canonical authoring; rock-solid; cited to ADRs + data model).
-  - **I — Light pass on the rest of `architecture.md`** (misleading info corrected; merely
-    incomplete left as-is; scope-by-touching, not scope-by-coverage).
+  - **I — Light pass on the rest of `architecture.md` + `ARCH-N` touch (identity-foundation
+    domain)** (merged: misleading info corrected + `ARCH-N` promoted/superseded for the
+    identity-foundation domain; scope-by-touching, not scope-by-coverage).
   - **J — Light pass on memory + agent rules** (the criterion: "would *any* agent's session
     context be polluted by stale information?"; fix only what's misleading).
-  - **K — `ARCH-N` touch** (identity-foundation domain only; the registry-wide drain is
-    Stream 2, *not* in scope).
-  - **L — Consolidation activity** (the 14 sub-audits of the `2026-05-29-full-audit/`
+  - **K — `ARCH-N` touch** (REMOVED — merged into I as a joint scope).
+  - **K — Consolidation activity** (the 14 sub-audits of the `2026-05-29-full-audit/`
     cluster + the `.deepsec/` module; discard the `claude/` + `codex/` trial reconciliations;
     classify findings; discover workstreams from the sub-audits' own clustering (6 candidates:
     architecture; agent-instructions; errors-api; l10n-a11y-mobile; security-pii-api;
     security-pii-inngest); cross-check the drift map against the canonical set; produce
-    `docs/audit/2026-05-29-full-audit/RECONCILED.md`. **L.5 estimates the sizing of the
-    reconciliation work**; **L.6 is the decision point** — spin up a separate workstream to
-    actually reconcile (per-workstream deep reconciliation with partial canonical sets) or
-    *defer* reconciliation entirely (each workstream reconciles itself in its own context
-    when it picks itself up). The decision criteria: cost now vs. cost later; value of a
-    single reconciled audit as the N input vs. value of per-workstream reconciliations; the
-    one-person-bandwidth call.
-  - **M — Canon-contradiction check** (no internal disagreements in the canonical set
-    before the gap analysis).
-  - **N — Unified gap analysis** (one row per finding, tagged `(source-audit,
+    `docs/audit/2026-05-29-full-audit/RECONCILED.md`. **K.0 is the canon-contradiction
+    check** (canonical set has no internal disagreements before K.1); **K.5 estimates the
+    sizing of the reconciliation work**; **K.6 is the decision point** — spin up a separate
+    workstream to actually reconcile (per-workstream deep reconciliation with partial
+    canonical sets) or *defer* reconciliation entirely (each workstream reconciles itself
+    in its own context when it picks itself up). The decision criteria: cost now vs.
+    cost later; value of a single reconciled audit as the L input vs. value of per-workstream
+    reconciliations; the one-person-bandwidth call.
+  - **L — Unified gap analysis** (one row per finding, tagged `(source-audit,
     source-finding-id, domain, classification, in-scope?, defer-to-which-workstream?,
-    canonical-set-source)`; reads the consolidated-audit (L's output) + the canonical set
-    (G–K) + the as-is).
-  - **O — Four-bucket triage** (every finding lands in one of: (1) already handled in
+    canonical-set-source)`; reads the consolidated-audit (K's output) + the canonical set
+    (G–J) + the as-is).
+  - **M — Four-bucket triage** (every finding lands in one of: (1) already handled in
     identity-foundation; (2) clear in for the master plan; (3) clear out for the master
     plan (named workstream); (4) defer (no workstream yet, or the workstream isn't mature
     enough)).
-  - **P — Sequencing** (dependency map + critical path; identity-foundation workstream
+  - **N — Sequencing** (dependency map + critical path; identity-foundation workstream
     sequenced *first* as the dogfood of the Cosmo top-down process).
-  - **Q — Remediation plan (the master plan)** (architect sign-off; scope, out-of-scope
+  - **O — Remediation plan (the master plan)** (architect sign-off; scope, out-of-scope
     workstreams, sequenced work packages, dependency map, bundle grouping, Cosmo-enablement
     interface).
-  - **R — Hand off to execution** (Cosmo work-package slicing; the Cosmo top-down
+  - **P — Hand off to execution** (Cosmo work-package slicing; the Cosmo top-down
     process enablement is the parallel precondition).
 
-  **G–R's exit gate (the "ready to start implementation" gate)** is the R phase's
-  exit: the master plan (Q) is signed off *and* the Cosmo work packages are sliced (R).
-  The execution phase starts *after* R; its naming is Cosmo's, not the roadmap's.
 
-  **Naming convention:** G–R are lettered phases of *the pre-execution* (the
+  **G–P's exit gate (the "ready to start implementation" gate)** is the P phase's
+  exit: the master plan (O) is signed off *and* the Cosmo work packages are sliced (P).
+  The execution phase starts *after* P; its naming is Cosmo's, not the roadmap's.
+
+  **Naming convention:** G–P are lettered phases of *the pre-execution* (the
   pre-implementation work), one per discrete, reviewable step. Sub-phases (if a step needs
-  internal sub-pacing) get `G.1`, `G.2`, etc. The execution phase starts *after* R
+  internal sub-pacing) get `G.1`, `G.2`, etc. The execution phase starts *after* P
   (Cosmo work-package IDs, not roadmap letters).
 
   **Architectural decision recorded:** the letter discipline is *preserved* for the
   new pre-execution work because the work *is* discrete, reviewable, and step-shaped
-  (the L.5 sizing estimate, the L.6 decision point, etc. are each reviewable artifacts
+  (the K.5 sizing estimate, the K.6 decision point, etc. are each reviewable artifacts
   in their own right). F+'s descriptive sub-pacing was considered and rejected — the
   work is *step-shaped*, not *workflow-shaped*, so letters fit. **Phase F closes as
-  "planning for the planning"; Phases G–R are the planning.**
+  "planning for the planning"; Phases G–P are the planning.**
 
 - **2026-06-04** — **Phase E complete: data model realized (`data-model.md`) + 2 ADRs.** Grilled with the
   architect, 8 decisions locked (D1–D8), counsel walkthrough findings (`I-C1`/`I-C2`/`I-C4`, `I-PB-B2a`/
