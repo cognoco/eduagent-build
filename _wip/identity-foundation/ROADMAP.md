@@ -173,6 +173,24 @@ separate → evaluate standalone.
 
 ## Decision log
 
+- **2026-06-04** — **`inv 17` rephrased — store-delegation sharpened to payment mechanics only — RATIFIED
+  (architect).** The lone open call from the 2026-06-03 counsel walkthrough (`I-PB-B3a` — the store-
+  delegation of payment liability ripple): counsel ruled that inv 17 v1.1's "no age gate of ours"
+  overreached on four axes. **Rephrased inv 17** to: "Payer *mechanics* are store-delegated for
+  store-mediated payment; **store delegation does *not* discharge the four obligations that
+  remain ours**" (the consent gate on the LLM-disclosure trigger; the minor's contractual
+  incapacity; the supplier-side withdrawal + digital-content conformity + unfair-terms duties;
+  the paywall/upsell copy to a minor). **Companion correction in MMT-ADR-0002 (amendment
+  appended 2026-06-04):** the merchant of record is **Apple/Google alone**; **`RevenueCat` is
+  our Art 28 processor** (DPA duty, no liability absorption). **Bodies updated in lockstep:**
+  ontology §4 inv 17 (rephrased); ontology §R (newest-first ratification entry); CONTEXT.md
+  Payer entry (the "no age gate of ours" line replaced with the four-axes framing; pointer
+  updated). **No data-model or domain-model change** — the rephrase makes the canon say what
+  the schema already does (consent gate on the LLM-call side per `I-PB-B2a`; `payer_person_id`
+  access-inert per `MMT-ADR-0002`). **→ All 2026-06-03 counsel walkthrough architect calls
+  closed.** Carried forward (not architect-owned, on other tracks): G7 VPC vendor pick
+  (procurement, after legal requirements are clear).
+
 - **2026-06-04** — **Phase E complete: data model realized (`data-model.md`) + 2 ADRs.** Grilled with the
   architect, 8 decisions locked (D1–D8), counsel walkthrough findings (`I-C1`/`I-C2`/`I-C4`, `I-PB-B2a`/
   `I-PB-B2b`/`I-PB-B3b`, `I-A2`, `I-D1`, `I-E3`) baked in by structure. **8 tables** (person / login /

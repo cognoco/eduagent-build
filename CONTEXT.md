@@ -123,16 +123,21 @@ supervisory access**). Granted by the guardian (below consent age) or by the dat
 _Avoid_: org-wide mentor access (the leak this prevents), guardianship (a different layer).
 → `_wip/identity-foundation/identity-ontology.md` §2.3
 
-**Payer** _[target · amended v1.1 2026-06-02]_:
+**Payer** _[target · amended v1.1 2026-06-02 · rephrased 2026-06-04]_:
 The Person designated responsible for an Organization's Subscription. A Subscription *designation*,
-**not** a membership role, and grants **no** learning-data access (**access-inert**). **Payer *capacity* is
-delegated, not adjudicated by us:** for store-mediated payment (the only channel for the foreseeable future)
-the store is **merchant of record** and the sole capacity adjudicator — no age gate of ours. A flat **≥18**
-worst-case default (inv 29) applies **only** to a future non-store rail where we are merchant of record, not a
-per-jurisdiction derivation. Separable from `admin` (an independent teen can be admin of their own org; on a
-paid plan they self-pay where the store permits, else an adult Payer is attached).
+**not** a membership role, and grants **no** learning-data access (**access-inert**). **Payer *mechanics* are
+store-delegated for store-mediated payment** — the store (merchant of record = Apple / Google alone) handles
+settlement, refunds, chargebacks, tax, and purchase-capacity adjudication. **Store delegation does *not*
+discharge the four obligations that remain ours:** the COPPA / GDPR **consent gate** (fires on the
+**LLM-disclosure trigger, not the payment trigger**, in every flow), the minor's **contractual incapacity**,
+the **supplier-side withdrawal + digital-content conformity + unfair-terms** duties, and the **paywall/upsell
+copy to a minor**. **`RevenueCat` — the billing middleman that sits over the app stores and exposes the
+store-account's registered region — is our Art 28 processor** (DPA duty; does not absorb liability). A flat
+**≥18** worst-case default (inv 29) applies **only** to a future non-store rail where we are merchant of
+record, not a per-jurisdiction derivation. Separable from `admin` (an independent teen can be admin of their
+own org; on a paid plan they self-pay where the store permits, else an adult Payer is attached).
 _Avoid_: owner, billing contact (considered; understates legal responsibility), customer (that is the org).
-→ `_wip/identity-foundation/identity-ontology.md` §2.4, §R (v1.1)
+→ `_wip/identity-foundation/identity-ontology.md` §2.4, §R (v1.1 + 2026-06-04 rephrase) · **MMT-ADR-0002** (incl. 2026-06-04 amendment) · `I-PB-B3a` counsel walkthrough 2026-06-03
 
 **minor** _[target · amended v1.1 2026-06-02]_:
 A Person **under 18** — the **contract threshold** that applies **only** where *we* are merchant of record (a

@@ -43,6 +43,24 @@ low-risk · **[DEFER]** real decision, but downstream of this ontology (parked, 
 Decisions land here as they're ruled, newest first. The §0 table and §1–§4 bodies are updated in lockstep.
 Spike **folds** are logged here too (a fold reconciles a finished spike's decisions into this vocabulary).
 
+- **`inv 17` rephrased — store-delegation sharpened to payment mechanics only — RATIFIED 2026-06-04
+  (architect).** The lone open call from the 2026-06-03 counsel walkthrough (`I-PB-B3a` — the
+  "store-delegation of payment liability" ripple): counsel ruled that inv 17 v1.1's "no age gate
+  of ours" overreached on four axes (the COPPA/GDPR consent gate; the minor's contractual
+  incapacity; the supplier-side withdrawal + digital-content conformity + unfair-terms duties;
+  the paywall/upsell copy to a minor). **Rephrased inv 17** to: "Payer *mechanics* are store-
+  delegated for store-mediated payment; **store delegation does *not* discharge the four
+  obligations that remain ours**" — the gate fires on the **LLM-disclosure trigger, not the
+  payment trigger**, in every flow. **Companion correction in MMT-ADR-0002 (amendment):** the
+  merchant of record is **Apple/Google alone**; **RevenueCat is our Art 28 processor** (adds a
+  DPA duty, does *not* absorb liability). The Phase-D domain model and the Phase-E data model are
+  consistent with the rephrase (no schema change; the consent gate is already on the LLM-call
+  side per `I-PB-B2a`; the `payer_person_id` is already access-inert per `MMT-ADR-0002`).
+  **CONTEXT.md:** the Payer entry's "no age gate of ours" line updated to match the rephrased
+  canon. **Bodies updated in lockstep:** inv 17 (rephrased); MMT-ADR-0002 (RevenueCat amendment
+  line). **Carried forward (named, not gating):** the G7 VPC vendor pick (procurement, after
+  legal requirements are clear). **→ All 2026-06-03 counsel walkthrough architect calls closed.**
+
 - **Phase E — data model realization (8 rulings + 2 ADRs) — RATIFIED 2026-06-04 (architect).** The Phase-E
   physical realization (`data-model.md`) locks the 8 tables (person / login / organization / membership /
   subscription / guardianship / mentorship / consent_grant) + the structural `person_retain` per-class
@@ -517,9 +535,17 @@ build. Ratified across Grill #1 — these are the **definition of "done"** the P
     mentorships must be **re-confirmed by the now-consent-capable learner**, else they lapse.
 
 **E — Billing & autonomy**
-17. `admin` is **age-agnostic**. **Payer capacity is store-delegated for store-mediated payment** — the
-    store (merchant of record) is the sole capacity adjudicator and we impose **no age gate of our own**; a
-    flat **≥18** worst-case default (inv 29) governs **only** a future non-store rail. Payer is
+17. `admin` is **age-agnostic**. **Payer *mechanics* (settlement, refunds, chargebacks, tax,
+    purchase-capacity adjudication) are store-delegated for store-mediated payment** — the store
+    is the merchant of record for those legs. **Store delegation does *not* discharge the four
+    obligations that remain ours:** (a) the **COPPA / GDPR consent gate** (the LLM-disclosure
+    consent chain — mandatory, independent of payment; the gate fires on the **LLM-disclosure
+    trigger, not the payment trigger**, in every flow: solo teen, child-on-parent-phone via
+    Family Sharing, moved-country pause); (b) the **minor's contractual incapacity** (common-law
+    infancy; the store cannot bind a minor); (c) the **supplier-side withdrawal + digital-content
+    conformity + unfair-terms** duties (survive merchant-of-record); (d) the **paywall/upsell
+    copy to a minor** (independently regulated marketing). A flat **≥18** worst-case default
+    (inv 29) governs **only** a future non-store rail. Payer is
     **access-inert** (no learning-data access) and **separate from `admin`** (neither implies the other).
     *(Recorded-Payer identity under Family Sharing → E3 / §6; under-18 exposure → PRD; launch gates → FLAG-2/REQ-2.)*
 18. **Billing + consent follow the home Organization**; a second-org edge grants edge-scoped visibility
