@@ -117,6 +117,22 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   rationale in the same change** (the UK Crime & Policing Act 2026 likely makes that written record a statutory
   expectation). Product-owned; surfaced during Phase-E consent grilling (2026-06-04). Decide before the floor is
   touched in implementation. ⬜
+- **Phase-F launch-readiness guard — value-seams not at placeholder defaults.** When Phase F runs the
+  baseline migration, the value-seam columns (`person_retain.consent_receipt.retention_period`,
+  `person_retain.deletion_audit.retention_period`, `person_retain.financial_record.retention_period`,
+  the dormancy threshold on the unified daily sweep, the `birthYearSchema` signup floor, the moved-
+  country grace length, the boundary-crossing verification method per crossing) ship as columns /
+  config keys, not as values. **Guard:** a build-time / pre-launch test
+  (`apps/api/src/services/identity/launch-readiness.test.ts` shape, modeled on
+  `apps/api/src/inngest/functions/consent-revocation.test.ts`) that fails CI when any value-seam
+  is at its placeholder default (zero / "unset" / null where the schema expects a value). Plus a
+  **floor ↔ IARC consistency check** (P1 floor must not be above the minimum age the chosen
+  content rating covers). This makes "placeholder default is not the policy" *defensible* rather
+  than *hoped-for*, and gives the launch team a one-line stop-the-line signal. **Owner:** Phase F
+  implementation; **surface area:** 1 test file + a small constant module the test reads from.
+  **Source for the values:** the fillers walkthrough results
+  (`_wip/identity-foundation/phase-e-fillers-walkthrough/`). 🟡 *added 2026-06-04 during the Phase-
+  E → Phase-F handoff.* ⬜
 - **Sibling-plan re-triage** — see below. 🟡 provisional tags applied to all 7 plans (2026-06-01);
   preliminary verdicts validated in `drift-map.md` §5 (one diverged: `learning-library-cleanup`). Final
   couple-vs-independent split still deferred to after Phase D.
