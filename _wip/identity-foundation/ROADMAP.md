@@ -107,7 +107,13 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
     verification *method* (ties to G7 vendor pick); minor double-billing disclosure + grace (E12 option B).
 - **T1 revert** — decision MADE (forward-only); execution deferred to F. Do **not** delete migration
   `0106` in isolation (it's committed + applied). ⬜
-- **`MMT-ADR-0005` break-test owed** — a concurrency regression for the atomic book-mastery `UPDATE` (red against a read-then-write impl, green against the atomic version); tracked in the ADR's Consequences, not yet written. ⬜
+- **"11" age-floor — final product call owed.** The strictly-11+ signup floor (`birthYearSchema`,
+  `packages/schemas/src/profiles.ts:38-50`, tag `CR-2026-05-19-H11`) is a *self-imposed product rule, not a legal
+  line* (`I-PB-B1` — counsel ruled there is no legal usage floor). Keeping / lowering it is coupled to the
+  content-rating + directed-to-children / Kids-Category store posture, and per B1 must ship **with a documented
+  rationale in the same change** (the UK Crime & Policing Act 2026 likely makes that written record a statutory
+  expectation). Product-owned; surfaced during Phase-E consent grilling (2026-06-04). Decide before the floor is
+  touched in implementation. ⬜
 - **Sibling-plan re-triage** — see below. 🟡 provisional tags applied to all 7 plans (2026-06-01);
   preliminary verdicts validated in `drift-map.md` §5 (one diverged: `learning-library-cleanup`). Final
   couple-vs-independent split still deferred to after Phase D.
