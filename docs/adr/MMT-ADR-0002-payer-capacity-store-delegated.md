@@ -35,6 +35,28 @@ Rationale for the asymmetry (derive precisely for consent, default bluntly for p
   - **Under-18 *exposure*** — whether the product *surfaces* self-pay to under-18s at all is a product/brand call (PRD, **P-axis**), distinct from the capacity *mechanism* ratified here (**T-axis**).
   - **FLAG-2 / REQ-2** — app-store family policy + app rating, and service-contract capacity, gate paid launch (counsel).
 
+## Amendment (2026-06-04, architect)
+
+**Correction to the Decision's implicit "via RevenueCat" premise.** The merchant of record is
+**Apple / Google alone**; **`RevenueCat` — the billing middleman that sits over the app stores and exposes the store-account's registered region** is our **Art 28 processor**, not a co-merchant. The Decision
+above is **unchanged** on substance (store-delegation of payment mechanics is correct), but the
+procurement posture shifts:
+
+- **`RevenueCat` carries an Art 28 DPA duty** (controller/processor contract; per-jurisdiction
+  data-flow terms). This is a contract obligation, not a schema change.
+- **Liability is not transferred by the DPA.** A processor's compliance failure does not
+  discharge the controller (us) of the underlying obligations (the four axes of `inv 17`'s
+  rephrase).
+- **The `subscription.store_customer_ref` column on the schema** (added in Phase E, per
+  `data-model.md` §4.5) records the RevenueCat / store id for our reconciliation — a *link*, not
+  an authority delegation.
+
+**basis:** GDPR Art 28(1)/(3)/(10) (controller → processor contract and its limits); the
+2026-06-03 counsel walkthrough's `I-PB-B3a` ruling (which named this correction alongside the
+`inv 17` rephrase); `MMT-ADR-0011` §1 (the schema's `store_customer_ref` semantics). **This
+amendment does not open a new question; it sharpens the canon to match the schema and the
+counsel ruling.**
+
 ## Alternatives considered
 
 1. **Keep ≥18 and enforce it.** Rejected: incoherent on a store-only channel — blocks honest legal payers, bypassed by misdeclaration, redundant with the store's own family-payment routing.
