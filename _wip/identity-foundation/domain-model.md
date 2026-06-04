@@ -202,16 +202,27 @@ primitive** that also serves D1 add-child-own-device and the E1 self-takeover (M
 
 ## §7 — Handoff to Phase E + open legal
 
-**To Phase E (data model):**
+**Status: Phase E RATIFIED 2026-06-04 — the items below are the design *intent*; their physical realization
+is `data-model.md` §2–§4 and the two new ADRs. Items not closed by Phase E (E3 value, retention *values*,
+break-tests) remain on the F/legal tracks as named seams.**
+
+**To Phase E (data model) — now realized in `data-model.md` + MMT-ADR-0011/0012:**
 - Physical schema for every entity/edge/attribute above + the `profiles`→`person` rename surface.
+  **→** `data-model.md` §2 (table inventory) + §4 (per-table rationale). The squash is `MMT-ADR-0012`.
 - **E3 — recorded-Payer identity under Family Sharing / Ask-to-Buy:** *which* Person a store-completed
   purchase records as Payer. Bounded blast radius (Payer is access-inert) — a billing-attribution
-  question, not a security boundary (ADR-0002).
+  question, not a security boundary (ADR-0002). **→** column in place (`subscription.payer_person_id`),
+  value remains a Phase-F product + counsel call.
 - The **ADR-0008 derivation query** (the one authority resolver) + its break-tests (incl. F1-BT-a
-  no-self-fallback regression against the live `getFamilyOwnerProfileId` bug).
-- The **scheduler** function pair (ADR-0009) + the `birth_date` / `last_activity` index.
-- The **`migration-pending`** state machine + Failure-Modes tables (ADR-0010).
+  no-self-fallback regression against the live `getFamilyOwnerProfileId` bug). **→** schema is the input;
+  resolver + break-tests are Phase F.
+- The **scheduler** function pair (ADR-0009) + the `birth_date` / `last_activity` index. **→** indexes in
+  `data-model.md` §4.1; the sweep is now also the owner of consent refresh at age transitions (closes the
+  `I-C4` live defect) + the moved-country grace window (`I-E3`).
+- The **`migration-pending`** state machine + Failure-Modes tables (ADR-0010). **→** `data-model.md` §6.4
+  (per-failure-mode table).
 - The **segmented-deletion seam** (retain-financial / purge-learning) the retention carve-out forces.
+  **→** `data-model.md` §4.9 (`person_retain` per-class set) + §6.1 (the `I-C1` fix-by-structure).
 
 **To counsel (REQ-2 register — none gate F as a whole; see ROADMAP threads):** E4 one-of/all-of rule;
 dormancy period + pre-deletion notice + retention carve-outs; parent-delete permissibility (get a binary

@@ -5,10 +5,13 @@ architecture (domain + data model) → the **"ready to plan implementation" gate
 **not** an implementation plan, and **no Cosmo work items are created until F is passed.**
 
 **Tracking:** repo-only; this file is the single source. Deliverables land as sibling docs (see
-README index). **Status: 2026-06-03 — Phases A, B, C, and **D complete**. Phase D ratified the domain model
-(`domain-model.md`) + 4 ADRs (MMT-ADR-0007 entity/role model · 0008 guardianship global-edge/derived-operation ·
-0009 unified transition scheduler · 0010 family-join primitive); ontology + CONTEXT.md moved in lockstep.
-**Phase E (data model) is now unblocked.** Remaining for F: E (data model) + sibling re-triage + T1 revert sequencing.**
+README index). **Status: 2026-06-04 — Phases A, B, C, D, and **E complete**. Phase E ratified the data
+model (`data-model.md`) + 2 ADRs (MMT-ADR-0011 data-model realization · 0012 one-time baseline reset);
+ontology + `domain-model.md` + `CONTEXT.md` + ROADMAP moved in lockstep. The 8 tables + structural
+`person_retain` set are stated as a fresh create-from-empty baseline; from this baseline forward,
+append-only migrations are absolute. **Phase F (the "ready-to-plan" gate) is now unblocked.** Remaining
+for F: sibling re-triage against the target + T1 revert sequencing + the open threads (retention *values*,
+`inv 17` rephrase, "11" age-floor final call, G7 VPC vendor).**
 
 ---
 
@@ -159,7 +162,7 @@ separate → evaluate standalone.
 
 - [x] **B** — product intent ratified (Part 10 resolved; 4 architecture ripples re-confirmed `T✓` 2026-06-03, Part 10 §H).
 - [x] **D** — domain model locked (`domain-model.md` + MMT-ADR-0007–0010); consent model locked; the legal-check items (E4 one-of/all-of; parent-delete; dormancy specifics) are named, scoped to E/counsel, and do not gate D.
-- [ ] **E** — data model + cut strategy locked.
+- [x] **E** — data model + cut strategy locked (`data-model.md` + MMT-ADR-0011/0012).
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
 - [x] **C** — doc-strategy decided (`MMT-ADR-0000`): decisions layer + `MMT-ADR-NNNN` + the `decision-adr-link` ratchet; ADRs homed at `docs/adr/`; the broader `docs/` reorg → deferred follow-up.
 - [ ] T1 revert sequenced as the first implementation step.
@@ -169,6 +172,28 @@ separate → evaluate standalone.
 ---
 
 ## Decision log
+
+- **2026-06-04** — **Phase E complete: data model realized (`data-model.md`) + 2 ADRs.** Grilled with the
+  architect, 8 decisions locked (D1–D8), counsel walkthrough findings (`I-C1`/`I-C2`/`I-C4`, `I-PB-B2a`/
+  `I-PB-B2b`/`I-PB-B3b`, `I-A2`, `I-D1`, `I-E3`) baked in by structure. **8 tables** (person / login /
+  organization / membership / subscription / guardianship / mentorship / consent_grant) + the
+  **structural `person_retain` per-class retain-tier set** (consent_receipt / deletion_audit /
+  financial_record). The schema is a **fresh create-from-empty baseline** on the **documented reset**
+  (`MMT-ADR-0012`); from this baseline forward, append-only migrations are absolute. **`MMT-ADR-0011`**
+  carries the data-model realization (8 decisions in 6 sections — topology, edges, consent, scheduler,
+  retention seam, roles). **`MMT-ADR-0012`** carries the one-time baseline reset as its own governance
+  record (the reset is visible to future contributors). **The I-C1 receipt-survives-deletion defect is
+  fixed structurally** (the receipt lives in `consent_receipt`, not in a `deleted_at` column on
+  `consent_states`); **the I-C4 consent-refresh defect is fixed by the unified daily sweep** (the
+  sweep now owns consent re-evaluation at age transitions); **the I-D1 v1-stance is pre-wired**
+  (`consent_grant.organization_id` enforced; `controller_role` is the gated, clean-add future — not a
+  dormant column). **Lockstep:** ontology §R (newest-first entry), `domain-model.md` §7 (handoff
+  resolved), `CONTEXT.md` identity-noun parity (Person / Login / Organization / Membership / Subscription
+  / Payer / Guardianship / Mentorship all align with the new `data-model.md` §2), ROADMAP Phase-E box
+  flipped to `[x]`. **Carried forward (named, not gating E):** "11" age-floor final product call (added
+  to ROADMAP threads; gated on content-rating / directed-to-children store posture); retention *values*
+  (counsel); `inv 17` rephrase (`I-PB-B3a`, architect); G7 VPC vendor (procurement). **→ Phase F
+  unblocked.**
 
 - **2026-06-03** — **Phase D complete: domain model ratified (`domain-model.md`) + 4 ADRs.** Grilled with the
   architect, then authored. **Rulings:** (1) **Core entity & role model → MMT-ADR-0007** (reconstructed — the

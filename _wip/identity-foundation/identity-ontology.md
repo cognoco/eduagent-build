@@ -43,6 +43,34 @@ low-risk · **[DEFER]** real decision, but downstream of this ontology (parked, 
 Decisions land here as they're ruled, newest first. The §0 table and §1–§4 bodies are updated in lockstep.
 Spike **folds** are logged here too (a fold reconciles a finished spike's decisions into this vocabulary).
 
+- **Phase E — data model realization (8 rulings + 2 ADRs) — RATIFIED 2026-06-04 (architect).** The Phase-E
+  physical realization (`data-model.md`) locks the 8 tables (person / login / organization / membership /
+  subscription / guardianship / mentorship / consent_grant) + the structural `person_retain` per-class
+  retain-tier set (consent_receipt / deletion_audit / financial_record). The schema is stated as a fresh
+  create-from-empty baseline on the documented reset (`MMT-ADR-0012`); from this baseline forward,
+  append-only migrations are absolute. **(1) D1 cut posture → MMT-ADR-0012** — pre-launch, zero-data window
+  makes the squash free; the reset is documented, recorded, and visible to future contributors. **(2) D2
+  credential placement → nullable `login_id` on `person` + thin `login` table (binding, not Clerk mirror).
+  (3) D3 Payer placement → `payer_person_id` snapshot on `subscription` (access-inert); subscription→org;
+  quota derived from plan tier. (4) D4 roles → array-of-enum `{admin, learner}`; `is_owner` dissolves;
+  mentor/guardian move to edges. (5) D5 edges → two purpose-built tables (`guardianship`, `mentorship`);
+  `family_links` migrates into `guardianship`. (6) D6 consent → append-only `consent_grant` (computed
+  requirement, stored record); `birth_date` + country ISO; assurance seam (tokenised pass/fail only);
+  `org_id` kept and enforced; `controller_role` deferred entirely (no dormant column). (7) D7 scheduler
+  physicals → unified daily Inngest sweep, `personId+day` idempotency, denormalized `last_activity_at`,
+  indexes on `birth_date` + `residence_jurisdiction` + `last_activity_at`; sweep now also owns consent
+  refresh at age transitions (closes the live `I-C4` defect) + the moved-country grace window (`I-E3`).
+  **(8) D8 retention seam → structural `person_retain` set (not a column)** — the receipt moves to
+  `consent_receipt`, the prior-`birth_date` audit fact to `deletion_audit`, the billing/tax references to
+  `financial_record`; learning data and the `person` row drop on delete. This is the structural fix for
+  `I-C1` (the consent-receipt-survives-deletion live defect). **Companion ADR: MMT-ADR-0011** (the
+  data-model realization). **Bodies unchanged at the §1–§4 level** (Phase E is *physical*; the logical
+  model stands). **`CONTEXT.md`:** identity-noun parity check (Person / Login / Organization / Membership /
+  Subscription / Payer / Guardianship / Mentorship entries all align with the new `data-model.md` §2).
+  **Carried forward (named, not gating E):** "11" age-floor final product call (gated on content-rating /
+  directed-to-children store posture); retention *values* (counsel); `inv 17` rephrase (`I-PB-B3a`,
+  architect); G7 VPC vendor (procurement). **→ Phase F unblocked.**
+
 - **Phase D — domain model ratified (4 rulings + 4 ADRs) — RATIFIED 2026-06-03 (architect).** The Phase-D
   consolidated domain model (`domain-model.md`) locks entities / roles / consent / tenancy and the ADR layer
   gains its first identity ADRs. **(1) Core entity & role model → MMT-ADR-0007** (reconstructed) — records the
