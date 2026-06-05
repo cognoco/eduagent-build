@@ -354,7 +354,13 @@ export async function runHarness(
                   }
                 }
               } catch (err) {
-                liveError = err instanceof Error ? err.message : String(err);
+                // `|| String(err)` so an Error with an empty message never
+                // produces a falsy liveError (which the snapshot renderer
+                // would previously have dropped silently).
+                liveError =
+                  err instanceof Error
+                    ? err.message || String(err)
+                    : String(err);
                 summary.liveCallsFailed++;
               }
             }

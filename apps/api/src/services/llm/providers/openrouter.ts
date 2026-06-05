@@ -53,10 +53,27 @@ interface OpenRouterRequest {
   max_tokens: number;
   response_format?: { type: 'json_object' };
   // Provider-routing preferences. `zdr: true` restricts routing to
-  // zero-data-retention endpoints only — defensive default for this app
-  // (minors' data posture), even though eval traffic should already be
-  // synthetic. Do not remove without a compliance review.
-  provider: { zdr: boolean };
+  // zero-data-retention endpoints only. Omitted unless the caller opts in —
+  // see OpenRouterProviderOptions for the 2026-06-05 ruling.
+  provider?: { zdr: boolean };
+}
+
+export interface OpenRouterProviderOptions {
+  /**
+   * Pin routing to zero-data-retention endpoints only.
+   *
+   * Default `false` per owner ruling 2026-06-05 ("relax for eval traffic"):
+   * this adapter only ever carries SYNTHETIC eval fixtures — no learner data,
+   * no PII — and the strict pin made whole vendor catalogs unreachable
+   * (observed: zero ZDR endpoints hosted Mistral Small 4, so the candidate
+   * gate could not run at all). Known trade-off: our system prompts may be
+   * retained by non-ZDR hosts — a prompt-confidentiality cost, not a
+   * personal-data one.
+   *
+   * If this adapter is EVER promoted to production traffic, `zdr: true` must
+   * be re-pinned and the B3 transfer/DPA review done first (see header).
+   */
+  zdr?: boolean;
 }
 
 interface OpenRouterChoice {
@@ -86,7 +103,10 @@ function createOpenRouterContentFilterError(): SafetyFilterError {
 // Provider factory
 // ---------------------------------------------------------------------------
 
-export function createOpenRouterProvider(apiKey: string): LLMProvider {
+export function createOpenRouterProvider(
+  apiKey: string,
+  options?: OpenRouterProviderOptions,
+): LLMProvider {
   async function chat(
     messages: ChatMessage[],
     config: ModelConfig,
@@ -96,7 +116,8 @@ export function createOpenRouterProvider(apiKey: string): LLMProvider {
       model: config.model,
       messages: toOpenRouterMessages(messages),
       max_tokens: config.maxTokens,
-      provider: { zdr: true },
+      // ZDR pin is opt-in — see OpenRouterProviderOptions for the ruling.
+      ...(options?.zdr ? { provider: { zdr: true } } : {}),
       ...(config.responseFormat === 'json'
         ? { response_format: { type: 'json_object' as const } }
         : {}),

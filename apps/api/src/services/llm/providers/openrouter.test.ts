@@ -82,10 +82,23 @@ describe('OpenRouter Provider', () => {
       expect(body.max_completion_tokens).toBeUndefined();
     });
 
-    it('pins routing to zero-data-retention providers', async () => {
+    it('omits the provider-routing pin by default (ZDR relaxed for synthetic eval traffic, owner ruling 2026-06-05)', async () => {
       mockFetch.mockResolvedValueOnce(createOkResponse('ok'));
 
       await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+
+      const [, opts] = mockFetch.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.provider).toBeUndefined();
+    });
+
+    it('pins routing to zero-data-retention providers when zdr option is set', async () => {
+      mockFetch.mockResolvedValueOnce(createOkResponse('ok'));
+
+      const pinnedProvider = createOpenRouterProvider(TEST_API_KEY, {
+        zdr: true,
+      });
+      await pinnedProvider.chat(TEST_MESSAGES, TEST_CONFIG);
 
       const [, opts] = mockFetch.mock.calls[0];
       const body = JSON.parse(opts.body);
