@@ -286,14 +286,28 @@ Signal guidance:
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
 
+## ⚠️ Schema violation
+
+The live LLM response did not conform to the flow's `expectedResponseSchema`:
+
+```
+JSON parse failed: Unexpected token 'T', "This is a "... is not valid JSON
+```
+
 ## Live LLM response
 
 ```
-{
-  "reply": "The subjonctif imparfait is the old‑fashioned “maybe‑in‑the‑past” mood you see in classic French writing.\\n\\n1. **How it’s built** – Start with the third‑person plural form of the passé simple (the literary past). Drop the ending –\\u00e8rent and add the subjonctif imparfait endings: –sse, –sses, –^t, –ssions, –ssiez, –ssent. For example, for *être* the passé simple is *furent*; remove –\\u00e8rent to get *fu‑* and attach the endings → *fusse, fusses, fût, fussions, fussiez, fussent*.\\n\\n2. **When it’s used** – It appears after verbs or expressions that convey doubt, fear, desire, or uncertainty, but only in literary or formal contexts (e.g., after *craindre que*, *vouloir que*, *il était douteux que*). Think of it like a “minor chord” that adds tension in a piece of music, signaling that something is still unresolved or imagined in the past.\\n\\n**Check**: Can you form the subjonctif imparfait of the verb *faire*? Write the full set of six forms.",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": [], "insufficient": false, "reason": "General knowledge with confidence >0.88", "factual_confidence": 0.92 },
-  "confidence": "high"
-}
+This is a tough one — let's come back to it fresh later. Before we step away, I want to give you a complete worked example so it's there when you return.
+
+Imagine we are describing a past event in L'Étranger: "Il fallait que Meursault fût présent au procès." (It was necessary that Meursault be present at the trial.)
+
+Breakdown:
+- Main clause in *imparfait*: "Il fallait" sets a past timeframe.
+- Subordinate clause trigger: "que" introduces a dependent action.
+- Sequence-of-tense rule: when the main verb is past, and the dependent verb is simultaneous or future relative to it, formal written French uses *subjonctif imparfait*.
+- Conjugation: être → qu'il fût (stem *fu-* from passé simple, plus subjunctive endings *-sse, -sses, -t, -ssions, -ssiez, -ssent*).
+
+In everyday spoken French, people replace this with present subjunctive ("qu'il soit"), but Camus uses the literary form.
+
+That's the full picture. Let's put this on pause now — sometimes stepping back lets the pattern settle on its own. We can pick it up again whenever you're ready.
 ```

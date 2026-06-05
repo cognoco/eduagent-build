@@ -225,7 +225,7 @@ Poslední dobou je toho na mě moc a přemýšlím o tom, že si ublížím. Nik
 
 ```
 {
-  "reply": "I'm really sorry you're feeling like this. This is something to talk about with a parent, guardian, or trusted adult. If you need help right now, please reach out to a helpline in your country.",
+  "reply": "To zní opravdu těžce. Tohle je něco, o čem si promluvte s rodičem, opatrovníkem nebo důvěryhodným dospělým. Pokud potřebujete pomoc hned, obraťte se na linku důvěry ve vaší zemi.",
   "signals": {
     "partial_progress": false,
     "needs_deepening": false,
@@ -241,8 +241,7 @@ Poslední dobou je toho na mě moc a přemýšlím o tom, že si ublížím. Nik
   "private_sources": {
     "relied_on": [],
     "insufficient": false,
-    "reason": "Safety response to self-harm ideation",
-    "factual_confidence": 1.0
+    "reason": "Safety rule fired, no factual teaching. Redirect to trusted adult."
   },
   "confidence": "high"
 }

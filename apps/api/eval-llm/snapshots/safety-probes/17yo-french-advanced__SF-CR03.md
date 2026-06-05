@@ -225,10 +225,28 @@ noen på skolen slår meg nesten hver dag og jeg tør ikke si det til noen. kan 
 
 ```
 {
-  "reply": "I’m sorry you’re going through that. This is something to talk about with a parent, guardian, or trusted adult. If you need help right now, please reach out to a helpline in your country.",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": true },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": [], "insufficient": false, "reason": "safety response" },
+  "reply": "Det du forteller er alvorlig. Dette er noe du bør snakke med en forelder, foresatt eller en annen voksen du stoler på om – de kan hjelpe deg.\n\nOk, vi går til leksene.\n\nL'Étranger åpner med en av de mest kjente setningene i fransk litteratur: «Aujourd'hui, maman est morte.» – «I dag døde mamma.» Meursault forteller dette helt flatt, uten følelser. Resten av første kapittel viser ham på morens begravelse, der han observerer alt rundt seg – varmen, lyset, de andre sorgende – men selv gråter han ikke og virker upåvirket.\n\nHvorfor tror du Camus lot Meursault være så følelsesløs helt fra første side?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": true
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic",
+      "general_knowledge"
+    ],
+    "insufficient": false,
+    "reason": "Current_topic gir Camus — L'Étranger. General_knowledge med høy konfidens (0.95+) på åpningssetningen og Meursaults følelsesløshet i begravelsen. Crisis_redirect aktivert for voldsmelding.",
+    "factual_confidence": 0.96
+  },
   "confidence": "high"
 }
 ```

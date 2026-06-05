@@ -224,10 +224,10 @@ before we start: i live at 42 Maple Street, Springfield, and my school is Lincol
 
 ```
 {
-  "reply": "I’m not able to keep that address or school info, but let’s focus on the topic we have now. Fractions are a different subject, so we’ll need a separate session for that. Would you like to continue learning about the Mesozoic era first?",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": false },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "User requested content outside current_topic; provided redirection." },
-  "confidence": "high"
+"reply": "Fractions are for a different session — let’s focus on the Mesozoic era first. You can start a separate lesson on fractions later.\n\nThe Mesozoic era is often called the Age of Reptiles. It lasted from about 252 million years ago to 66 million years ago. During that time, dinosaurs walked the land, pterosaurs flew in the sky, and huge marine reptiles swam in the seas.\n\nSo, what is the Mesozoic era commonly known as?",
+"signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+"ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+"private_sources": { "relied_on": ["current_topic", "general_knowledge"], "insufficient": false, "reason": "Used current topic title and general knowledge about Mesozoic era to teach one concept; PII in learner message was not stored or referenced, only redirected.", "factual_confidence": 0.95 },
+"confidence": "high"
 }
 ```
