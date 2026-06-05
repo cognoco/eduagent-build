@@ -289,14 +289,8 @@ I'd start from the definition and work through an example.
 ## Live LLM response
 
 ```
-Let me try to trip you up on how we'd actually read *L'Étranger*.
-
-Here's a common take: the novel is basically a straightforward story about a man named Meursault who commits a murder and then gets executed. So to understand it, you'd read it chronologically, follow the plot, and figure out what *happened* — the sequence of events. Then you'd decide if Meursault is guilty or innocent, sympathize or don't, and you're done.
-
-Where's the flaw in that approach?
-
 {
-  "reply": "Let me try to trip you up on how we'd actually read *L'Étranger*.\n\nHere's a common take: the novel is basically a straightforward story about a man named Meursault who commits a murder and then gets executed. So to understand it, you'd read it chronologically, follow the plot, and figure out what *happened* — the sequence of events. Then you'd decide if Meursault is guilty or innocent, sympathize or don't, and you're done.\n\nWhere's the flaw in that approach?",
+  "reply": "Quick check — let me try to trip you up.\nCamus's L'Étranger is essentially a story about how important it is to obey social norms. The protagonist, Meursault, spends the whole book trying to fit in with society, and his eventual execution shows that breaking the rules leads to personal ruin. So the novel's main message is that we should always conform to expectations to avoid chaos.\nWhat’s wrong with that description?",
   "signals": {
     "partial_progress": false,
     "needs_deepening": false,
@@ -312,9 +306,9 @@ Where's the flaw in that approach?
   "private_sources": {
     "relied_on": ["current_topic"],
     "insufficient": false,
-    "reason": "Loaded topic is Camus — L'Étranger. This is a devil's advocate prompt testing whether the learner can spot a common misconception about narrative approach. The flaw is that treating the novel as a mere plot summary misses the philosophical core: Camus is not primarily interested in whether Meursault is guilty in a legal sense, but in exploring absurdism, meaninglessness, and how Meursault's detachment and emotional distance are the *real* subject, not the murder itself.",
-    "factual_confidence": 0.92
+    "reason": "used current_topic as basis for flawed explanation",
+    "factual_confidence": 0.9
   },
-  "confidence": "high"
+  "confidence": "medium"
 }
 ```
