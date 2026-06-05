@@ -250,6 +250,7 @@ function getExchangeEnvelopeInstruction(context: {
     'RESPONSE FORMAT — CRITICAL:\n' +
     'Reply with ONLY valid JSON in this exact shape, no prose before or after:\n' +
     'Your entire response must begin with `{` and end with `}`. Do not wrap it in markdown fences.\n' +
+    'Before finishing, verify the JSON is complete and syntactically valid — every opening brace and bracket has a matching closing one. A truncated or unclosed object is a hard failure.\n' +
     '{\n' +
     '  "reply": "<your full message to the learner — prose, newlines allowed>",\n' +
     `${signals}\n` +
