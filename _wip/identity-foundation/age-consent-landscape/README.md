@@ -39,7 +39,7 @@ A cell is populated with a `controlling_rule` if and only if its confidence is �
 
 - **No new research.** Every populated cell is defensible from the existing under-13 walkthrough synthesis + the four sub-area returns + the `SOURCES.md` verified list. No `WebFetch` retry pass on unverified primaries was run for this experiment.
 - **No canonical status.** The cells do not override the data model, the ADRs, or any other canonical artefact. They are inputs to a future canonical artefact, not one.
-- **No full EU MS coverage.** Only 3 of 10 jurisdictions (US, UK, DE) are populated in detail. The other 7 (NO, FR, SK, SE, DK, EE, GR) are skeleton rows with consent-age-threshold metadata only. The room can see what a populated cell looks like in the three priority jurisdictions, and where the research would go for the rest.
+- **No full EU MS coverage.** As of v0.2.0, **8 of 10 jurisdictions are populated in detail**: US, UK, NO, DE, FR, SE, DK all at 16/16 cells, and EE at 14/16 (the 2 EE marketing cells remain "?" because Estonian consumer protection law — Tarbijakaitse seadus — is not in the corpus and the EU-level framework is too generic to constitute a defensible EE-specific controlling rule). **SK and GR remain as "?" skeletons** with consent-age-threshold metadata only.
 
 ## What the experiment tells us (initial impressions)
 
@@ -51,7 +51,7 @@ These are observations, not findings. Each is "what does the shape of the matrix
 
 3. **Slovakia and Estonia are the most uncertain cells.** Slovakia because the synthesis flagged PT/SK as unverified in the EDPB Member-State list. Estonia because the consent-age derogation under GDPR Art 8 is unclear in the corpus. The "?" cells for these two are the *first* place a full-scan would go.
 
-4. **The non-EU "?" rows (Norway, France, Slovakia, Sweden, Denmark, Estonia, Greece) are visible in the heatmap as a dark band.** This is the *experiment's value* — it shows at a glance that the corpus is concentrated in 3 of 10 jurisdictions, and that a full scan would need to focus on the other 7.
+4. **The non-EU "?" rows are now narrowed to Slovakia and Greece only.** The previous pass concentrated the corpus in 3 of 10 jurisdictions; v0.2.0 has 8 of 10 populated in detail, leaving SK and GR as the only "?" rows in the heatmap. EE sits between: 14/16 cells populated, with the marketing pair as the most prominent gap. The dark band in the heatmap is now narrower — confirming the experiment's value is the visible *decrease* in dark cells as the corpus grows.
 
 5. **The highest-confidence cells (≥0.85) cluster in two places:** the US × LLM-conversation / AI-behavioural cells (because OpenAI / Anthropic / Gemini terms are all verified), and the DE × LLM-conversation / AI-behavioural cells (because AI Act Art 5(1)(b), Art 5(1)(f), and Art 50 are all verified). These are also the cells where the AI Act and the platform terms *both* bind, which is what makes them strong.
 
@@ -59,7 +59,7 @@ These are observations, not findings. Each is "what does the shape of the matrix
 
 If this experiment is useful, the next steps would be:
 
-- **Full population pass** for the 7 unpopulated jurisdictions (NO, FR, SK, SE, DK, EE, GR). Each gets the same per-activity × per-knowledge-state cell treatment as US / UK / DE.
+- **Full population pass** for the 2 remaining "?" jurisdictions (SK, GR). Each gets the same per-activity × per-knowledge-state cell treatment as the other 8. **SK is the higher-priority of the two** — the synthesis explicitly flagged Slovakia's consent age as unverified, and confirming the 16-floor (or 15, if the synthesis was wrong) is a load-bearing cell.
 - **Adversarial verification** of the medium-confidence cells (0.6–0.8) via the same `/workflow` judge-panel pattern used in the under-13 walkthrough. Likely lenses: jurisdiction-completeness (per regime), age-band-correctness (per activity × age-threshold interaction), statutory-vs-interpretive accuracy (rule placement), platform-mechanics-accuracy (the Layer 3 cells).
 - **WebFetch retry pass** on the unverified primaries (FTC, ICO, EDPB, Datatilsynet, Apple Developer, Google Play). This is what the under-13 walkthrough deferred to the live walkthrough room; for a full canonical version, it would happen here.
 - **Data-model amendment** to MMT-ADR-0011 (or new MMT-ADR-0013) to add a *prohibition-floor* primitive. The matrix shows this is needed: the consent axis alone cannot model the cells where `consent_unlockable: false` is the binding constraint.
@@ -70,7 +70,8 @@ If this experiment is useful, the next steps would be:
 - Underlying research: `_wip/identity-foundation/under-13-floor-walkthrough/SYNTHESIS.md` and the four sub-area returns in the same folder.
 - Citation list: `_wip/identity-foundation/under-13-floor-walkthrough/SOURCES.md`.
 - Roadmap context: `_wip/identity-foundation/ROADMAP.md` Phase F sub-thread on the under-13 floor re-litigation.
-- This experiment authored in the `age-consent` Claude Code session, 2026-06-05.
+- v0.1.0 (3 jurisdictions: US, UK, DE) authored in the `age-consent` Claude Code session, 2026-06-05.
+- v0.2.0 (8 jurisdictions: +NO, FR, SE, DK, EE) enriched in the same session, 2026-06-05. Five parallel sub-area agents populated 78 of 80 new cells; the 2 EE marketing cells remain "?" because Estonian consumer protection law is not in the corpus.
 
 ---
 
