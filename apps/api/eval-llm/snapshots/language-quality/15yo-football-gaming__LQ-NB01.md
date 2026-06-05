@@ -220,41 +220,19 @@ Kan du forklare hvorfor månen har faser? Jeg skjønner det ikke helt.
 - conversationLanguage: nb (Norwegian Bokmål)
 - Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
 
-## ⚠️ Schema violation
-
-The live LLM response did not conform to the flow's `expectedResponseSchema`:
-
-```
-JSON parse failed: Expected ',' or '}' after property value in JSON at position 796 (line 20 column 4)
-```
-
-## ⚠️ Quality issues
-
-- **ERROR LQ-NB01.envelope.parse:** Live response did not contain a parseable envelope with a string reply — nothing to judge.
-
 ## Live LLM response
 
 ```
 {
-  "reply": "Good question – that's about astronomy, not algebra. Let's finish the algebra equations session first.\nAn equation says two expressions are equal, for example 2x + 3 = 7. To find x, we isolate the variable: subtract 3 from both sides (2x = 4) and then divide by 2, so x = 2.\nNow, what value of x makes the equation 5x - 4 = 11 true?",
-  "signals": {
-    "partial_progress": false,
-    "needs_deepening": false,
-    "understanding_check": true,
-    "crisis_redirect": false
-  },
-  "ui_hints": {
-    "note_prompt": {
-      "show": false,
-      "post_session": false
-    }
-  },
-  "private_sources": {
-    "relied_on": ["current_topic"],
-    "insufficient": false,
-    "reason": "Used current_topic for algebra equation definition and solving steps",
-    "factual_confidence": 1.0
-  },
-  "confidence": "high"
-
+"reply": "Det er et annet tema, men la oss fokusere på algebra likninger nå. En likning sier at to uttrykk er like, og den inneholder ofte en ukjent variabel – typisk x. For eksempel: 2x + 3 = 7. x er det tallet vi må finne. Kan du prøve å løse den og fortelle hva x blir?",
+"signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+"ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+"private_sources": {
+"relied_on": ["current_topic", "general_knowledge"],
+"insufficient": false,
+"reason": "Teaching basic equation concept; using general knowledge for simple example; confidence high.",
+"factual_confidence": 1.0
+},
+"confidence": "high"
+}
 ```

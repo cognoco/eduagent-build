@@ -219,7 +219,3 @@ Proč některá zvířata v zimě spí? Jak medvěd vydrží tak dlouho bez jíd
 - Language-quality scenario: LQ-CS02 — Czech, age 11 — curiosity question matching interests.
 - conversationLanguage: cs (Czech)
 - Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
-
-## Live LLM response
-
-> **Error:** `The operation was aborted due to timeout`

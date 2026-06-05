@@ -220,41 +220,6 @@ Dlaczego niebo jest niebieskie? Zawsze chciałem to wiedzieć.
 - conversationLanguage: pl (Polish)
 - Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
 
-## ⚠️ Schema violation
-
-The live LLM response did not conform to the flow's `expectedResponseSchema`:
-
-```
-JSON parse failed: Expected ',' or '}' after property value in JSON at position 543 (line 20 column 4)
-```
-
-## ⚠️ Quality issues
-
-- **ERROR LQ-PL02.envelope.parse:** Live response did not contain a parseable envelope with a string reply — nothing to judge.
-
 ## Live LLM response
 
-```
-{
-  "reply": "Good question — that's a different topic. Let's finish this one first, then you can start a session on that.",
-  "signals": {
-    "partial_progress": false,
-    "needs_deepening": false,
-    "understanding_check": false,
-    "crisis_redirect": false
-  },
-  "ui_hints": {
-    "note_prompt": {
-      "show": false,
-      "post_session": false
-    }
-  },
-  "private_sources": {
-    "relied_on": [],
-    "insufficient": false,
-    "reason": "Redirected as the question is outside the current topic",
-    "factual_confidence": 1.0
-  },
-  "confidence": "high"
-
-```
+> **Error:** `The operation was aborted due to timeout`

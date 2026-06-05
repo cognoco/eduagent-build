@@ -288,4 +288,30 @@ Signal guidance:
 
 ## Live LLM response
 
-> **Error:** `The operation was aborted due to timeout`
+```
+Alright, let's step back. You mentioned you learn best with step-by-step, so let's try that here.
+
+The subjonctif imparfait is used in the same *situations* as the present subjunctive — it just shifts the time backward. Think of it like a musical key change: the melody (the reason you use subjunctive) stays the same, but the register moves lower.
+
+Here's the concrete anchor:
+
+**Present subjunctive:** "Je veux qu'il *vienne* demain." (I want him to come tomorrow.)
+
+**Imparfait subjunctive:** "Je voulais qu'il *vînt* le lendemain." (I wanted him to come the next day.)
+
+Notice: both use subjunctive because "vouloir que" always triggers it. The only thing that changed is the tense — present vs. imparfait — to match when the main action happened.
+
+The *form* of imparfait subjunctive looks strange (like *vînt*, *fît*, *eût*) because it's archaic, but the *function* is straightforward: same rules as present subjunctive, just pushed into the past.
+
+Does that help clarify why it exists and when you'd use it — even if the spelling still feels odd?
+
+```json
+{
+  "reply": "Alright, let's step back. You mentioned you learn best with step-by-step, so let's try that here.\n\nThe subjonctif imparfait is used in the same *situations* as the present subjunctive — it just shifts the time backward. Think of it like a musical key change: the melody (the reason you use subjunctive) stays the same, but the register moves lower.\n\nHere's the concrete anchor:\n\n**Present subjunctive:** \"Je veux qu'il *vienne* demain.\" (I want him to come tomorrow.)\n\n**Imparfait subjunctive:** \"Je voulais qu'il *vînt* le lendemain.\" (I wanted him to come the next day.)\n\nNotice: both use subjunctive because \"vouloir que\" always triggers it. The only thing that changed is the tense — present vs. imparfait — to match when the main action happened.\n\nThe *form* of imparfait subjunctive looks strange (like *vînt*, *fît*, *eût*) because it's archaic, but the *function* is straightforward: same rules as present subjunctive, just pushed into the past.\n\nDoes that help clarify why it exists and when you'd use it — even if the spelling still feels odd?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Teaching foundational concept (subjonctif imparfait) with step-by-step explanation and music analogy per learner preference. No external facts requiring source verification.", "factual_confidence": 0.92 },
+  "confidence": "medium"
+}
+```
+```

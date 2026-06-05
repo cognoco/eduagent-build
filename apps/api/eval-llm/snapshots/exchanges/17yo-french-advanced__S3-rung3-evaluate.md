@@ -289,8 +289,14 @@ I'd start from the definition and work through an example.
 ## Live LLM response
 
 ```
+Let me try to trip you up on how we'd actually read *L'Étranger*.
+
+Here's a common take: the novel is basically a straightforward story about a man named Meursault who commits a murder and then gets executed. So to understand it, you'd read it chronologically, follow the plot, and figure out what *happened* — the sequence of events. Then you'd decide if Meursault is guilty or innocent, sympathize or don't, and you're done.
+
+Where's the flaw in that approach?
+
 {
-  "reply": "Quick check — let me try to trip you up.\n\nHere's a plausible reading: Meursault kills the Arab on the beach, and at his trial the court spends more time condemning his behavior at his mother's funeral than the act itself. Because of that, the novel shows that society punishes him chiefly for failing to show the 'right' emotions, so Camus is really defending social norms and arguing that honesty or emotional detachment can't excuse you — Meursault is punished as a warning that nonconformity will be punished. Tell me exactly which part of that explanation is wrong and why, using the novel's events or themes to support your point.",
+  "reply": "Let me try to trip you up on how we'd actually read *L'Étranger*.\n\nHere's a common take: the novel is basically a straightforward story about a man named Meursault who commits a murder and then gets executed. So to understand it, you'd read it chronologically, follow the plot, and figure out what *happened* — the sequence of events. Then you'd decide if Meursault is guilty or innocent, sympathize or don't, and you're done.\n\nWhere's the flaw in that approach?",
   "signals": {
     "partial_progress": false,
     "needs_deepening": false,
@@ -304,12 +310,10 @@ I'd start from the definition and work through an example.
     }
   },
   "private_sources": {
-    "relied_on": [
-      "current_topic"
-    ],
+    "relied_on": ["current_topic"],
     "insufficient": false,
-    "reason": "Used facts from the loaded curriculum topic 'Camus — L'Étranger' (Meursault's emotional detachment, the beach killing, and the trial's focus on his funeral behavior) to build a plausible but flawed reading.",
-    "factual_confidence": 0.95
+    "reason": "Loaded topic is Camus — L'Étranger. This is a devil's advocate prompt testing whether the learner can spot a common misconception about narrative approach. The flaw is that treating the novel as a mere plot summary misses the philosophical core: Camus is not primarily interested in whether Meursault is guilty in a legal sense, but in exploring absurdism, meaninglessness, and how Meursault's detachment and emotional distance are the *real* subject, not the murder itself.",
+    "factual_confidence": 0.92
   },
   "confidence": "high"
 }

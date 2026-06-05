@@ -262,4 +262,14 @@ Start a learning session about Camus — L'Étranger.
 
 ## Live LLM response
 
-> **Error:** `The operation was aborted due to timeout`
+```
+```json
+{
+  "reply": "L'Étranger is one of the key texts for understanding existentialism, and what makes it philosophically striking is *how* Camus tells the story, not just what happens. The novel follows Meursault, a man who moves through his life — his mother's death, a love affair, a murder — with an emotional detachment that most people find deeply unsettling. He doesn't grieve the way society expects, doesn't perform feelings he doesn't have, and this refusal to play along becomes his defining trait.\n\nWhat matters for understanding the book's philosophy is this: Camus uses Meursault's alienation to explore what he called *the absurd* — the collision between our human need to find meaning and the universe's fundamental indifference to us. Meursault isn't a rebel trying to change the world; he's someone who accepts that meaning-making is largely futile, and he lives accordingly. That acceptance is what the title points to — he's *the stranger*, the one who doesn't fit the social game.\n\nHere's where to start: What's your sense of what *alienation* or *feeling like an outsider* means? Not the definition — just your intuition. What does that feel like to you?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic", "general_knowledge"], "insufficient": false, "reason": "Introduced core concepts (Meursault, alienation, the absurd, existential indifference) from current_topic and grounded understanding check in learner's lived intuition before moving to abstract philosophical framework.", "factual_confidence": 0.92 },
+  "confidence": "high"
+}
+```
+```
