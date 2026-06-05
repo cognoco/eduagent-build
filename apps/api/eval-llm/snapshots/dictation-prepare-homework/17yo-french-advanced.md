@@ -89,7 +89,3 @@ L'étranger regardait la mer. Il ne pensait à rien. La chaleur écrasait la pla
 - System prompt is fully static — identical across every profile.
 - Language is auto-detected by the LLM, not passed as a parameter.
 - No personalization surface at all. Appropriate for a pure utility.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

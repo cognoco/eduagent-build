@@ -62,7 +62,3 @@ Respond with a single JSON object only. No prose, no markdown, no code fences.
 ## Builder notes
 
 - Transport snapshot for Anthropic responseFormat=json conversion.
-
-## Live LLM response
-
-> **Error:** `runLive not implemented for this flow`

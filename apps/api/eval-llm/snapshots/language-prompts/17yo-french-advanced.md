@@ -91,7 +91,3 @@ Begin the next exchange following the four-strands rules above.
 - Returns string[] of 4 sections (role, pedagogy, correction rules, vocab/voice).
 - Empty knownVocabulary triggers the "complete beginner" branch (BUG-937).
 - Falls back to subjectName when languageCode misses the registry.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

@@ -82,7 +82,3 @@ Mentor: Great. Explain the pattern in your own words so we know where to resume 
 - Subject: French
 - Topic: Camus — L'Étranger
 - Synthetic transcript mirrors the retention-summary schema contract.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

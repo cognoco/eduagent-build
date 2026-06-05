@@ -93,7 +93,3 @@ Mentor: Great. Put it in your own words one more time.
 - Age tier: early teen (11-13): friendly, concrete, warm
 - Next topic: Spanish family vocabulary
 - Transcript is a synthetic 8-turn learner recap fixture.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

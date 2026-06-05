@@ -77,7 +77,3 @@ You may use precise grammar and punctuation terminology. Keep explanations conci
 - ageYears=17 — explanation register calibrated to age.
 - preferredExplanations=["step-by-step","analogies"] — tone shaped by style preferences.
 - Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

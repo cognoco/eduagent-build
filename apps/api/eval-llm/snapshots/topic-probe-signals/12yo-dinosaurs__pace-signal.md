@@ -84,7 +84,3 @@ USER: Tiny.
 ## Builder notes
 
 - Dimension: pace-signal
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

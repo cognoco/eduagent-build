@@ -104,7 +104,3 @@ Generate the suggestions now.
 - existingTitles: 3 books + 2 suggestions to avoid
 - Suggestions should be relevant but not duplicates of studied topics.
 - Descriptions should be varied enough to avoid a one-note shelf.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

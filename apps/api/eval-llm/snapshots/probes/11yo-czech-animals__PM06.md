@@ -260,7 +260,3 @@ Is my answer right? Please do not make it too long.
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, learner_intent:context, current_topic:reliable, homework_problem:reliable, deterministic_reasoning:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

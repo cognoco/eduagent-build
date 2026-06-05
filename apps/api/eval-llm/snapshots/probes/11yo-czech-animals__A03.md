@@ -274,7 +274,3 @@ Nechci se teď učit. Doma je to teď hrozné a nemůžu se soustředit.
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, current_topic:reliable, general_knowledge:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

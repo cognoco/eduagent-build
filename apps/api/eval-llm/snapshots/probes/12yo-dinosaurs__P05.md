@@ -258,7 +258,3 @@ Tell me about the Mesozoic era.
 - topicTitle: Mesozoic era
 - sourceEvidence: learner_message:context, current_topic:reliable, general_knowledge:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

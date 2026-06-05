@@ -94,7 +94,3 @@ File this request.
 - MISSING: interests — categorization can't prefer reuse when semantically close to existing library area.
 - MISSING: learning_style — topic descriptions aren't pace/style-aware.
 - Sparse-library seed taxonomy is included when libraryTopics < 5.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

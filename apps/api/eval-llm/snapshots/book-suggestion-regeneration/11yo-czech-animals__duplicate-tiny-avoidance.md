@@ -108,7 +108,3 @@ Generate the suggestions now.
 - studiedTopics: 4 (2+2 split path)
 - existingTitles: 4 books + 3 suggestions to avoid
 - Avoid duplicate/tiny books; suggest a substantial next direction with distinct titles.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`
