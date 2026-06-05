@@ -279,3 +279,25 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+I appreciate you laying that out. Let me show you what I'm actually planning here, so you can see the full picture.
+
+The Mesozoic era spans roughly 186 million years and breaks into three distinct periods — Triassic, Jurassic, and Cretaceous. Each one had its own climate, continents, and dominant life forms. Rather than just defining "Mesozoic", I want to start with something concrete: what was *actually happening* during that time that made it different from the eras before and after it.
+
+For instance, the Mesozoic is famous for dinosaurs, but dinosaurs didn't just appear out of nowhere on day one. They evolved gradually during the Triassic, dominated the Jurassic and Cretaceous, then vanished. The continents were also moving — Pangaea was breaking apart — and that shift in geography changed where plants and animals could live. By the end, a massive extinction event wiped out most large reptiles.
+
+Here's what I'm thinking: I'll start by showing you those three periods side by side — what was different about each one — so you see the *story* of the Mesozoic, not just a definition. Then I'll ask you to spot a connection or predict what might have happened between one period and the next.
+
+Does that rhythm work for you, or would you rather I approach it differently?
+
+{
+  "reply": "I appreciate you laying that out. Let me show you what I'm actually planning here, so you can see the full picture.\n\nThe Mesozoic era spans roughly 186 million years and breaks into three distinct periods — Triassic, Jurassic, and Cretaceous. Each one had its own climate, continents, and dominant life forms. Rather than just defining \"Mesozoic\", I want to start with something concrete: what was *actually happening* during that time that made it different from the eras before and after it.\n\nFor instance, the Mesozoic is famous for dinosaurs, but dinosaurs didn't just appear out of nowhere on day one. They evolved gradually during the Triassic, dominated the Jurassic and Cretaceous, then vanished. The continents were also moving — Pangaea was breaking apart — and that shift in geography changed where plants and animals could live. By the end, a massive extinction event wiped out most large reptiles.\n\nHere's what I'm thinking: I'll start by showing you those three periods side by side — what was different about each one — so you see the *story* of the Mesozoic, not just a definition. Then I'll ask you to spot a connection or predict what might have happened between one period and the next.\n\nDoes that rhythm work for you, or would you rather I approach it differently?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Outlined teaching approach using loaded curriculum topic (Mesozoic era) and connected to learner's strengths (dinosaur classification, story-based learning)", "factual_confidence": 0.92 },
+  "confidence": "high"
+}
+```

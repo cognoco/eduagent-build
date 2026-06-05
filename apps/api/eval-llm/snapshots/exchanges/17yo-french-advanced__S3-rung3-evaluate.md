@@ -285,3 +285,32 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Quick check — let me try to trip you up.\n\nHere's a plausible reading: Meursault kills the Arab on the beach, and at his trial the court spends more time condemning his behavior at his mother's funeral than the act itself. Because of that, the novel shows that society punishes him chiefly for failing to show the 'right' emotions, so Camus is really defending social norms and arguing that honesty or emotional detachment can't excuse you — Meursault is punished as a warning that nonconformity will be punished. Tell me exactly which part of that explanation is wrong and why, using the novel's events or themes to support your point.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic"
+    ],
+    "insufficient": false,
+    "reason": "Used facts from the loaded curriculum topic 'Camus — L'Étranger' (Meursault's emotional detachment, the beach killing, and the trial's focus on his funeral behavior) to build a plausible but flawed reading.",
+    "factual_confidence": 0.95
+  },
+  "confidence": "high"
+}
+```

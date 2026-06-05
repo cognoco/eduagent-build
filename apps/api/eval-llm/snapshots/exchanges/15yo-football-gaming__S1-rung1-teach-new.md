@@ -253,3 +253,32 @@ Start a learning session about algebra equations.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "An equation is a statement that two expressions are equal. The equals sign means the left side and right side have the same value. To solve for a variable you isolate it: undo operations using inverse operations and keep the equation balanced by doing the same operation to both sides.\nExample: Solve 3x + 5 = 20\n1) Subtract 5 from both sides: 3x = 15\n2) Divide both sides by 3: x = 5\nWhy this works: subtraction undoes addition and division undoes multiplication, so undoing step-by-step isolates the variable while preserving equality.\nNow solve 4x - 7 = 13 and tell me the value of x.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic"
+    ],
+    "insufficient": false,
+    "reason": "Used the loaded curriculum topic 'algebra equations' for definitions and the inverse-operations solving method.",
+    "factual_confidence": 0.95
+  },
+  "confidence": "high"
+}
+```

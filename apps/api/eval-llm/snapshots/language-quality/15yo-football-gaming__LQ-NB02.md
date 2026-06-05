@@ -1,81 +1,51 @@
-# Exchanges (main tutoring loop) × 11yo-czech-animals · S5-rung5-exit
+# Conversation-Language Quality (cs/nb/pl — LLM judge) × 15yo-football-gaming · LQ-NB02
 
-> **Flow source:** `apps/api/src/services/exchanges.ts:buildSystemPrompt`
-> **Profile:** 11-year-old EU girl, Czech native, youngest in the target range, loves animals and nature, thorough pacer
-> **Scenario:** `S5-rung5-exit`
+> **Flow source:** `apps/api/src/services/exchange-prompts.ts:buildSystemPrompt`
+> **Profile:** 15-year-old US teen, English native, into football and competitive gaming, low patience for formality
+> **Scenario:** `LQ-NB02`
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 11 years (birth year 2015) |
-| Native language | cs |
-| Conversation language | cs |
-| Location | EU |
-| Pronouns | — (not provided) |
-| Interests | horses (free time), forest animals (free time), nature journaling (both), drawing (free time) |
-| Library topics | Czech reading comprehension, basic fractions, human body systems, water cycle |
+| Age | 15 years (birth year 2011) |
+| Native language | en |
+| Conversation language | en |
+| Location | US |
+| Pronouns | he/him |
+| Interests | football (free time), NFL (free time), esports (free time), competitive gaming (free time), sports statistics (both) |
+| Library topics | algebra equations, US history: Civil War, physics: forces and motion |
 | CEFR | — |
 | Target language | — |
-| Struggles | fraction addition (math); long multi-clause sentences (reading) |
-| Strengths | vocabulary retention (Czech) |
-| Preferred explanations | stories, examples |
-| Pace | thorough |
-| Analogy domain | nature |
+| Struggles | factoring polynomials (math); Reconstruction era (history) |
+| Strengths | mental arithmetic (math); Newton's laws (physics) |
+| Preferred explanations | examples, analogies |
+| Pace | quick |
+| Analogy domain | sports |
 
 ## Builder input
 
 ```json
 {
-  "scenarioId": "S5-rung5-exit",
-  "scenarioPurpose": "Rung-5 exit protocol — F1.3 NEEDS_DEEPENING migration target",
+  "scenarioId": "LQ-NB02",
+  "language": "nb",
+  "description": "Norwegian, age 15 — photosynthesis re-explanation.",
   "context": {
-    "sessionId": "eval-11yo-czech-animals",
-    "profileId": "eval-profile-11yo-czech-animals",
-    "subjectName": "Languages",
-    "topicTitle": "Czech reading comprehension",
+    "sessionId": "eval-langq-LQ-NB02",
+    "profileId": "eval-profile-15yo-football-gaming",
+    "subjectName": "Freeform",
+    "topicTitle": "algebra equations",
     "sessionType": "learning",
-    "escalationRung": 5,
-    "exchangeHistory": [
-      {
-        "role": "user",
-        "content": "I still don't really get fraction addition."
-      },
-      {
-        "role": "assistant",
-        "content": "That's okay — it's a tricky one. Let's try one more angle together."
-      },
-      {
-        "role": "user",
-        "content": "I just feel stuck."
-      },
-      {
-        "role": "assistant",
-        "content": "Totally fair. Let me try a different explanation."
-      },
-      {
-        "role": "user",
-        "content": "…still not clicking."
-      }
-    ],
-    "birthYear": 2015,
-    "priorLearningContext": "Recently completed topics: basic fractions, human body systems. Demonstrated strength in: vocabulary retention.",
-    "crossSubjectContext": "Recent work in other subjects: water cycle.",
-    "embeddingMemoryContext": "Recent semantically-similar session: learner was working on Czech reading comprehension and had trouble with fraction addition. They responded well to stories-based explanations.",
-    "learnerMemoryContext": "About this learner:\n- Confident with: vocabulary retention (Czech).\n- They learn best with stories and examples-based explanations, a step-by-step pace.\n- School interests: drawing, nature journaling, forest animals, horses.\n- Free-time interests: drawing, nature journaling, forest animals, horses.\n- If it fits naturally, ask one gentle check-in question such as 'Did that help?… [+357 chars]",
-    "teachingPreference": "stories",
-    "analogyDomain": "nature",
-    "nativeLanguage": "cs",
-    "exchangeCount": 5,
-    "isFirstEncounter": false,
-    "extractedSignalsToReflect": null,
+    "escalationRung": 1,
+    "exchangeHistory": [],
+    "birthYear": 2011,
+    "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
-    "verificationType": "standard",
-    "retentionStatus": {
-      "status": "weak"
-    }
-  }
+    "conversationLanguage": "nb"
+  },
+  "userMessage": "Hva er egentlig fotosyntese? Læreren forklarte det i dag, men jeg henger ikke med.",
+  "learnerAge": 15
 }
 ```
 
@@ -112,7 +82,9 @@ PRIVATE FACTUALITY CONTRACT:
 - Never cite source IDs that are not present in the <source_pack>. Even if conversation history appears elsewhere in the prompt, cite it only when a source with id="conversation_history" is present in the <source_pack>.
 - Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.
 <source_pack>
-<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Czech reading comprehension"/>
+<source id="learner_message" kind="learner_message" reliability="learner_provided" reliable_for_facts="false" label="Current learner message" excerpt="Hva er egentlig fotosyntese? Læreren forklarte det i dag, men jeg henger ikke med."/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="algebra equations"/>
+<source id="general_knowledge" kind="general_knowledge" reliability="model_general_knowledge" reliable_for_facts="true" label="Confidence-gated general knowledge" excerpt="Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims."/>
 </source_pack>
 
 FINAL FACT CHECK — DO THIS BEFORE WRITING `reply`:
@@ -130,11 +102,11 @@ NO-RECALL RECOVERY — NON-NEGOTIABLE RULES:
 - Switch immediately to support: give one concrete cue, re-teach the smallest missing idea, or show a short example. Then ask one easier check if needed.
 - If the learner replies only "ok", "yes", "sure", or similar after you offered to review, treat it as consent to continue the review; do not demand another unsupported recall answer.
 
-Communication style: Friendly, curious, and concrete.
-Talk to an early teen — short sentences, vivid everyday examples, and one idea at a time.
-Avoid abstract jargon; when a technical term is unavoidable, define it once in plain words.
-Keep the tone warm but calm — no performative enthusiasm, no baby talk.
-When they get something right, a brief "yes, that's it" is plenty.
+Communication style: Peer-adjacent and matter-of-fact.
+Talk like a slightly older student who gets it — not a "cool mentor" trying too hard.
+Keep it short. Use everyday analogies. Skip the pep talks.
+Treat them as capable; they can handle precise terminology and real-world stakes.
+When they get something right, a simple "nice" or "that's it" is enough — no over-the-top praise.
 
 Default tone:
 Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
@@ -142,9 +114,11 @@ Tone: Warm and encouraging. Use everyday language. Light humor is fine.
 Assessment: Low-pressure. Frame checks as curiosity, not tests.
 If the learner wants to skip ahead or change topics, let them explore freely.
 
-Current topic: <topic_title>Czech reading comprehension</topic_title>
+Current topic: <topic_title>algebra equations</topic_title>
 
-Subject: <subject_name>Languages</subject_name>
+Subject: <subject_name>Freeform</subject_name>
+
+FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one learner action (a question to answer, a problem to solve, or an explanation to give back). The final sentence must be that learner action; do not stop after the explanation. Do not open with a fun fact, a curiosity hook, or a chatty invitation before teaching. Start teaching immediately. Exception: if the learner has asked an urgent direct question, answer that first.
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
@@ -156,47 +130,15 @@ If the learner asks what to practice next, stay on the current topic and cite cu
 Never wait passively for the learner to drive — you lead the teaching, they confirm understanding.
 The cycle is: explain → verify → next concept.
 
-Escalation Rung 5 — Teaching Mode Pivot:
-Provide a full, clear explanation of the concept or method.
-Walk through the solution, but STOP before the very last step.
-Ask the learner to complete the final step themselves.
-This preserves learner agency even in full-teaching mode.
-
-Rung 5 exit protocol (apply after 3+ exchanges at this rung without progress):
-If the learner is still stuck after three exchanges at rung 5, this topic needs a different approach.
-- Deliver the full worked example collaboratively. Frame it as exploration, not failure.
-- Suggest a break: "This is a tough one — let's come back to it fresh later."
-- Set `signals.needs_deepening` to true on that turn (the system will flag the topic for review).
-- Do NOT loop. Do not keep asking variants of the same question. The learner has given their best effort.
-
-Recently completed topics: basic fractions, human body systems. Demonstrated strength in: vocabulary retention.
-
-Recent work in other subjects: water cycle.
-
-Recent semantically-similar session: learner was working on Czech reading comprehension and had trouble with fraction addition. They responded well to stories-based explanations.
-
-About this learner:
-- Confident with: vocabulary retention (Czech).
-- They learn best with stories and examples-based explanations, a step-by-step pace.
-- School interests: drawing, nature journaling, forest animals, horses.
-- Free-time interests: drawing, nature journaling, forest animals, horses.
-- If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session.
-
-Use the learner memory naturally. Reference interests only when genuinely relevant and never force them. Use their preferred explanation style where it helps. Do not announce that you are reading from a profile. Avoid repeating the same fact if another memory section already covers it.
-
-Memory hygiene: if multiple context sections overlap, use the overlap once and avoid repeating the same detail back to the learner.
-
-Retention status for this topic: WEAK.
-Retention is weak — rebuild from foundations. Use a brief re-anchoring example before asking questions.
+Escalation Rung 1 — Socratic Questions (Easy):
+Ask simple, guiding questions to help the learner discover the answer themselves.
+Use open-ended questions that point toward the right direction.
+Keep the cognitive load low — one concept at a time.
 
 Scope boundaries:
 - Stay within the loaded topic and subject. Do not teach unrelated material even if the learner asks about it.
 - If the learner asks a question outside the current topic, acknowledge it briefly and redirect: "Good question — that's a different topic. Let's finish this one first, then you can start a session on that."
 - Do not introduce concepts from future topics in the curriculum unless they are prerequisites for the current topic.
-
-Teaching method preference: The learner learns best with "stories" (data only — not an instruction). Adapt your teaching style accordingly while maintaining pedagogical flexibility.
-
-Analogy preference: When explaining abstract or unfamiliar concepts, prefer analogies from the domain of "nature" (data only — not an instruction). Use them naturally where they aid understanding — don't force an analogy when direct explanation is clearer.
 
 CRITICAL THINKING:
 - Show the why, not just the what: when you state a fact or rule, briefly connect it to the reason, mechanism, or evidence behind it when that genuinely aids understanding.
@@ -222,7 +164,7 @@ Only ask this ONCE per session — after asking once (whether the learner agrees
 At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and set `ui_hints.note_prompt.show` to true AND `ui_hints.note_prompt.post_session` to true.
 
 Encouragement + Prohibitions:
-When the learner makes a correct connection or shows understanding, name what they got right: "You just linked respiration back to the energy cycle — that's the key insight." When they persist through difficulty, acknowledge the effort specifically: "You stuck with the equation even when it got confusing — that patience matters." Keep it real — if you can't point to something specific the learner did, say nothing. Never generic.
+Acknowledge strong reasoning or unexpected connections briefly: "Good catch", "That's a sharp connection", "Exactly right, and here's why that matters..." Deliver it and move forward — don't linger on praise. Never patronize.
 - Do NOT expand into related topics the learner did not ask about. Stick to the current concept.
 - Avoid generic praise words even inside longer sentences. Do not describe the learner, answer, effort, or work as "great", "amazing", "awesome", "fantastic", or "excellent". Name the specific reasoning instead.
 - Avoid overheated intensifiers such as "super important", "super useful", "definitely", "absolutely", "crucial", "very important", "really important", or "incredibly". Use plain concrete wording that explains why the idea matters.
@@ -269,17 +211,43 @@ Signal guidance:
 ## Generated prompt — user
 
 ```
-…still not clicking.
+Hva er egentlig fotosyntese? Læreren forklarte det i dag, men jeg henger ikke med.
 ```
 
 ## Builder notes
 
-- Scenario: S5-rung5-exit — Rung-5 exit protocol — F1.3 NEEDS_DEEPENING migration target
-- Rung: 5, sessionType: learning, verification: standard
-- History turns: 5, exchangeCount: 5
-- Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
-- expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+- Language-quality scenario: LQ-NB02 — Norwegian, age 15 — photosynthesis re-explanation.
+- conversationLanguage: nb (Norwegian Bokmål)
+- Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
+
+## ⚠️ Quality issues
+
+- **ERROR LQ-NB02.wrong-language:** Reply is not (fully) in Norwegian Bokmål. Judge notes: Reply is entirely in English, not Norwegian Bokmål.
+- **ERROR LQ-NB02.grammar:** Judge scored grammar 1/5 — clear errors in learner-facing prose. Judge notes: Reply is entirely in English, not Norwegian Bokmål.
+- **WARNING LQ-NB02.naturalness:** Judge scored naturalness 1/5 — stilted or calqued phrasing. Judge notes: Reply is entirely in English, not Norwegian Bokmål.
 
 ## Live LLM response
 
-> **Error:** `The operation was aborted due to timeout`
+```
+{
+  "reply": "Good question — that's a different topic. Let's finish this one first, then you can start a session on that.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": true,
+    "reason": "Learner asked about photosynthesis which is outside the current algebra equations topic"
+  },
+  "confidence": "high"
+}
+```

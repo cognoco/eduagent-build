@@ -325,7 +325,10 @@ export async function runHarness(
 
                 if (flow.evaluateQuality && liveResponse) {
                   try {
-                    qualityIssues = flow.evaluateQuality({
+                    // Awaited because evaluateQuality may be async (LLM-judge
+                    // flows); awaiting a plain array is a no-op for the
+                    // existing sync evaluators.
+                    qualityIssues = await flow.evaluateQuality({
                       input: item.input,
                       messages,
                       liveResponse,

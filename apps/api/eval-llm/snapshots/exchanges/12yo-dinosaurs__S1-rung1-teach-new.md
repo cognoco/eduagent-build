@@ -253,3 +253,15 @@ Start a learning session about Mesozoic era.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "The Mesozoic Era was the time when dinosaurs were the dominant land animals. It sits after the Paleozoic and before the Cenozoic. Scientists split the Mesozoic into three periods: Triassic, Jurassic, and Cretaceous. Many important changes happened then — dinosaurs first appear and diversify, and the era ends with a major mass extinction that removed most non-avian dinosaurs. Can you name the three periods of the Mesozoic Era?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Used the loaded curriculum topic 'current_topic' for basic facts: placement in geologic time, being the age of dinosaurs, division into Triassic/Jurassic/Cretaceous, and ending with a mass extinction.", "factual_confidence": 0.95 },
+  "confidence": "high"
+}
+```
