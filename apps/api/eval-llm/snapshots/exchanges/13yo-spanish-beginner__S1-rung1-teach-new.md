@@ -262,27 +262,4 @@ Start a learning session about Spanish present tense verbs.
 
 ## Live LLM response
 
-```
-{
-  "reply": "In Spanish, the present tense talks about things happening now or things that happen regularly. Regular verbs are grouped by their endings: -ar, -er, and -ir, and each group has its own set of endings. For example, -ar verbs get the endings -o, -as, -a, -amos, -áis, -an.\nWhat is the \"yo\" form of the verb \"hablar\" in the present tense?",
-  "signals": {
-    "partial_progress": false,
-    "needs_deepening": false,
-    "understanding_check": true,
-    "crisis_redirect": false
-  },
-  "ui_hints": {
-    "note_prompt": {
-      "show": false,
-      "post_session": false
-    }
-  },
-  "private_sources": {
-    "relied_on": ["current_topic"],
-    "insufficient": false,
-    "reason": "Used basic facts about present tense verbs from curriculum",
-    "factual_confidence": 0.95
-  },
-  "confidence": "high"
-}
-```
+> **Error:** `The operation was aborted due to timeout`

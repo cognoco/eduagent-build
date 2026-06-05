@@ -262,12 +262,4 @@ Start a learning session about Camus — L'Étranger.
 
 ## Live LLM response
 
-```
-{
-  "reply": "In Camus's novel *L'Étranger*, the main character is Meursault. He shows a striking emotional indifference – for example, when his mother dies he hardly expresses grief, and later he reacts to the heat of the courtroom more than to the moral weight of his crime. These moments illustrate Camus's philosophical idea of the absurd: people look for meaning, but the world remains indifferent and offers none.\\n\\nWhat does Meursault's detached reaction to his mother’s funeral reveal about the absurd in the novel?",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Used facts from loaded curriculum topic", "factual_confidence": 0.92 },
-  "confidence": "high"
-}
-```
+> **Error:** `The operation was aborted due to timeout`

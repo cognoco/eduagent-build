@@ -285,40 +285,28 @@ Signal guidance:
 The live LLM response did not conform to the flow's `expectedResponseSchema`:
 
 ```
-JSON parse failed: Unexpected token 'F', "Factoring "... is not valid JSON
+JSON parse failed: Unexpected token 'A', "Alright — "... is not valid JSON
 ```
 
 ## Live LLM response
 
 ```
-Factoring a polynomial means rewriting it as a product of simpler polynomials.  Think of it like breaking a sports team into smaller units that work together: the whole team’s score (the original polynomial) can be expressed as the combined scores of the sub‑teams (the factors).
+Alright — let’s strip it back to the core idea, then walk through it with an example.
 
-You can do this by using the distributive property in reverse.  
-For example, for the quadratic  
+Factoring a polynomial is like breaking a play down into its original moves. In football, a touchdown pass starts with the quarterback dropping back, a receiver running a route, the line blocking — separate actions that combine into one result. With polynomials, we’re doing the reverse: taking the combined result and splitting it back into the pieces that multiplied to create it.
 
-```
-x² + 5x + 6
-```
+Take `x² + 5x + 6`.  
+We’re looking for two numbers that multiply to `6` (the constant) and add to `5` (the middle coefficient).
 
-you look for two numbers that multiply to 6 (the constant term) and add to 5 (the coefficient of x). Those numbers are 2 and 3. So you split the middle term:
+- Pairs that multiply to 6: 1×6, 2×3, also negatives but let’s stick with positives.
+- Which pair adds to 5? `2 + 3 = 5`.
 
-```
-x² + 2x + 3x + 6
-```
+So we write:  
+`x² + 5x + 6 = (x + 2)(x + 3)`
 
-Now group the terms and factor each group:
+If you multiply `(x + 2)(x + 3)` back out — FOIL, distribute, whatever method — you get `x² + 3x + 2x + 6`, which simplifies right back to `x² + 5x + 6`. That’s the check.
 
-```
-(x² + 2x) + (3x + 6) = x(x + 2) + 3(x + 2)
-```
-
-Since both groups contain the common factor (x + 2), pull it out:
-
-```
-(x + 2)(x + 3)
-```
-
-So x² + 5x + 6 = (x + 2)(x + 3).  
-
-**Check:** Can you factor the quadratic `x² + 7x + 10` using the same steps
+Now you try the last step on a fresh one:  
+**Factor x² + 7x + 10.**  
+What two numbers multiply to 10 and add to 7?
 ```

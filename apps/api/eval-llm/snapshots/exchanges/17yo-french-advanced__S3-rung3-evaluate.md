@@ -288,27 +288,4 @@ I'd start from the definition and work through an example.
 
 ## Live LLM response
 
-```
-{
-  "reply": "Quick check — let me try to trip you up.\nCamus's L'Étranger is essentially a story about how important it is to obey social norms. The protagonist, Meursault, spends the whole book trying to fit in with society, and his eventual execution shows that breaking the rules leads to personal ruin. So the novel's main message is that we should always conform to expectations to avoid chaos.\nWhat’s wrong with that description?",
-  "signals": {
-    "partial_progress": false,
-    "needs_deepening": false,
-    "understanding_check": true,
-    "crisis_redirect": false
-  },
-  "ui_hints": {
-    "note_prompt": {
-      "show": false,
-      "post_session": false
-    }
-  },
-  "private_sources": {
-    "relied_on": ["current_topic"],
-    "insufficient": false,
-    "reason": "used current_topic as basis for flawed explanation",
-    "factual_confidence": 0.9
-  },
-  "confidence": "medium"
-}
-```
+> **Error:** `The operation was aborted due to timeout`

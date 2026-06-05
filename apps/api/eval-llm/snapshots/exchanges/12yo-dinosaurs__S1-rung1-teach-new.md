@@ -258,7 +258,7 @@ Start a learning session about Mesozoic era.
 
 ```
 {
-  "reply": "The Mesozoic era lasted from about 252 to 66 million years ago, roughly 186 million years.\nIt is split into three periods: the Triassic, then the Jurassic, then the Cretaceous.\nThese periods saw the rise and fall of dinosaurs.\nCan you name the three periods of the Mesozoic era in order?",
+  "reply": "The Mesozoic era is often called the Age of Dinosaurs. It lasted from about 252 to 66 million years ago and is split into three parts: Triassic, Jurassic, and Cretaceous.\n\nCan you name one of these three periods?",
   "signals": {
     "partial_progress": false,
     "needs_deepening": false,
@@ -272,10 +272,12 @@ Start a learning session about Mesozoic era.
     }
   },
   "private_sources": {
-    "relied_on": ["general_knowledge"],
+    "relied_on": [
+      "general_knowledge"
+    ],
     "insufficient": false,
-    "reason": "Used high‑confidence general knowledge about Mesozoic era dates and period division.",
-    "factual_confidence": 0.96
+    "reason": "Basic Mesozoic era structure — well-established general knowledge with confidence >0.88",
+    "factual_confidence": 0.97
   },
   "confidence": "high"
 }

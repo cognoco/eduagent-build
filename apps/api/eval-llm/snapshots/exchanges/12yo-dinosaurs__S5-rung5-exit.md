@@ -284,10 +284,24 @@ Signal guidance:
 
 ```
 {
-  "reply": "Good question — that's a different topic. Let's finish the Mesozoic era first, then we can start a new session on long division if you like.",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": false },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": [], "insufficient": true, "reason": "No source needed for redirect; topic mismatch." },
-  "confidence": "high"
+  "reply": "Long division can feel like a brick wall sometimes. Let's put it aside for now and jump into something you enjoy — the Mesozoic era. We can come back to division another time. Ready to talk dinosaurs?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": false,
+    "reason": "Acknowledging frustration with an off-topic subject and redirecting to the current topic."
+  },
+  "confidence": "medium"
 }
 ```

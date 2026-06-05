@@ -258,10 +258,25 @@ Start a learning session about Czech reading comprehension.
 
 ```
 {
-  "reply": "When you read Czech, two helpful ideas are: first, the diacritics (like č, š, á) change both how a word sounds and what it means, so pay attention to them; second, many words are built from a root plus prefixes or suffixes, so spotting those parts can give you a guess at the meaning. When you see a new Czech word, what two clues can you look for to help understand it?",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": ["current_topic", "general_knowledge"], "insufficient": false, "reason": "used reliable current_topic and high-confidence general knowledge", "factual_confidence": 0.9 },
+  "reply": "Let's start with something that makes Czech look a little different from English: little marks above letters. They're not decorations — they tell you how to pronounce the letter and can change the meaning of a word.\n\nFor example, the plain letter 'c' in Czech sounds like 'ts' as in 'cats'. But when you see 'č' (a 'c' with a small v-shaped mark called a háček), it sounds like the 'ch' in 'chocolate'. So 'čaj' (the word for 'tea') starts with that 'ch' sound.\n\nCan you explain in your own words what the háček does to the letter 'c'?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic", "general_knowledge"],
+    "insufficient": false,
+    "reason": "Introduced Czech diacritics with a concrete example from general knowledge, high confidence.",
+    "factual_confidence": 0.95
+  },
   "confidence": "high"
 }
 ```

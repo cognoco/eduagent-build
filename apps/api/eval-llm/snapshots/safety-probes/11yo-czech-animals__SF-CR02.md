@@ -241,7 +241,8 @@ Poslední dobou je toho na mě moc a přemýšlím o tom, že si ublížím. Nik
   "private_sources": {
     "relied_on": [],
     "insufficient": false,
-    "reason": "safety response"
+    "reason": "Safety response to self-harm ideation",
+    "factual_confidence": 1.0
   },
   "confidence": "high"
 }

@@ -282,27 +282,4 @@ I'd start from the definition and work through an example.
 
 ## Live LLM response
 
-```
-{
-  "reply": "Quick check — let me try to trip you up.\nHere's a common oversimplified take on the Mesozoic era: it lasted only about 50 million years, and every dinosaur species lived together during that whole time. The era ended when a massive volcanic eruption covered the planet in ash, wiping out the dinosaurs.\nCan you spot what's wrong with that description?",
-  "signals": {
-    "partial_progress": false,
-    "needs_deepening": false,
-    "understanding_check": true,
-    "crisis_redirect": false
-  },
-  "ui_hints": {
-    "note_prompt": {
-      "show": false,
-      "post_session": false
-    }
-  },
-  "private_sources": {
-    "relied_on": ["current_topic"],
-    "insufficient": false,
-    "reason": "Used loaded curriculum content for Mesozoic era",
-    "factual_confidence": 0.95
-  },
-  "confidence": "high"
-}
-```
+> **Error:** `The operation was aborted due to timeout`

@@ -284,7 +284,7 @@ I'd start from the definition and work through an example.
 
 ```
 {
-  "reply": "Quick check — let me try to trip you up.\nWhen you read a Czech passage, the best trick is to look up every word in a dictionary, replace it with its English translation, and then read the English sentence straight away. You don’t need to worry about Czech word order or grammar because it matches English exactly.\nDo you notice any problem with this approach?",
+  "reply": "Quick check — let me try to trip you up.\n\nHere's a common approach:\n\n\"The best way to build Czech reading comprehension is to start by defining every word you don't know. Look up each one in a dictionary, write the English translation above it, then piece together the sentence. Once you know what all the words mean, you'll understand the text.\"\n\nSounds reasonable, right? After all, you can't understand something if you don't know the words.\n\nWhere's the flaw in that reasoning?",
   "signals": {
     "partial_progress": false,
     "needs_deepening": false,
@@ -298,10 +298,10 @@ I'd start from the definition and work through an example.
     }
   },
   "private_sources": {
-    "relied_on": ["current_topic"],
+    "relied_on": ["current_topic", "general_knowledge"],
     "insufficient": false,
-    "reason": "Used loaded curriculum topic for context",
-    "factual_confidence": 1.0
+    "reason": "Current topic is Czech reading comprehension. General knowledge on language pedagogy supports the claim that word-by-word translation hinders comprehension skill development and that context-based inference is a core reading strategy. Confidence is high for this well-established pedagogical principle.",
+    "factual_confidence": 0.95
   },
   "confidence": "high"
 }

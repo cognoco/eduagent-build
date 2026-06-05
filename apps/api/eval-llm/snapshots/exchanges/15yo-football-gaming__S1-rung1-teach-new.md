@@ -258,10 +258,25 @@ Start a learning session about algebra equations.
 
 ```
 {
-  "reply": "An algebraic equation states that two expressions are equal. For example, 3x + 5 = 20 shows that the expression on the left equals the one on the right. To solve an equation we isolate the variable by applying inverse operations to both sides, keeping the equality true. Using these ideas, what value of x makes the equation 3x + 5 = 20 true?",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Provided definition and solving method from current_topic", "factual_confidence": 1.0 },
-  "confidence": "high"
+  "reply": "An equation is like a balance scale — the left side and right side have to weigh the same. If you have x + 3 = 7, you can think of it as: what number plus 3 gives 7? But the trick to solve any equation is to get x alone by doing the opposite operation to both sides. Here, the opposite of adding 3 is subtracting 3, so:\n\nx + 3 - 3 = 7 - 3\nx = 4\n\nNow try this: solve x + 5 = 12. What do you get?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic", "general_knowledge"],
+    "insufficient": false,
+    "reason": "Teaching core concept of solving one-step equations using inverse operations, supported by general knowledge of algebra at high confidence.",
+    "factual_confidence": 0.95
+  },
+  "confidence": "medium"
 }
 ```

@@ -288,27 +288,4 @@ I'd start from the definition and work through an example.
 
 ## Live LLM response
 
-```
-{
-  "reply": "Quick check — let me try to trip you up.\nIn Spanish, the present tense is only for actions happening right now. So you always change a verb like *hablar* to *hablo*, no matter who is doing the talking. Whether it’s *yo* (I), *tú* (you), or *ellos* (they), you just use *hablo*.\nCan you spot what’s wrong here?",
-  "signals": {
-    "partial_progress": false,
-    "needs_deepening": false,
-    "understanding_check": true,
-    "crisis_redirect": false
-  },
-  "ui_hints": {
-    "note_prompt": {
-      "show": false,
-      "post_session": false
-    }
-  },
-  "private_sources": {
-    "relied_on": ["current_topic"],
-    "insufficient": false,
-    "reason": "used current_topic for background",
-    "factual_confidence": 0.95
-  },
-  "confidence": "high"
-}
-```
+> **Error:** `The operation was aborted due to timeout`

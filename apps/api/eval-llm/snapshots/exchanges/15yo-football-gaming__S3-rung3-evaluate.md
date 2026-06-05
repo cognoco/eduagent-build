@@ -284,7 +284,7 @@ I'd start from the definition and work through an example.
 
 ```
 {
-  "reply": "Quick check — let me try to trip you up.\nTo solve the equation 2x + 5 = 13, some people say you can first divide both sides by 2, giving x + 2.5 = 6.5, and then subtract 5 to get x = 1.5. Does that sound right to you?",
+  "reply": "Quick check — let me try to trip you up.\n\nTake this equation: 5x − 2 = 3x + 4\n\nHere's how someone might solve it:\n- Move the x terms to the left: 5x − 3x = 4 − 2\n- So 2x = 2\n- x = 1\n\nSpot anything off in that reasoning?",
   "signals": {
     "partial_progress": false,
     "needs_deepening": false,
@@ -298,10 +298,10 @@ I'd start from the definition and work through an example.
     }
   },
   "private_sources": {
-    "relied_on": ["current_topic"],
+    "relied_on": ["current_topic", "general_knowledge"],
     "insufficient": false,
-    "reason": "used loaded curriculum content on algebra equations",
-    "factual_confidence": 1.0
+    "reason": "Common algebraic sign error when transposing constant terms — the −2 should become +2 when moved to the right side. The flawed solution incorrectly kept it as −2.",
+    "factual_confidence": 0.95
   },
   "confidence": "high"
 }
