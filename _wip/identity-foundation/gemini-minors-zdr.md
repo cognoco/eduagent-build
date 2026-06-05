@@ -27,7 +27,7 @@ Cells: ✓ allowed / ✗ prohibited / ⚠ conditional / — clause not present o
 | "**You also will not use the Services as part of a website, application, or other service (collectively, "API Clients") that is directed towards or is likely to be accessed by individuals under the age of 18.**" — same heading, same date. | ✗ | — | — | — |
 | Vertex AI Service Specific Terms § 17 "Training Restriction" — **no age clause**, no minor-use clause. Source: <https://cloud.google.com/vertex-ai/generative-ai/docs/data-governance> (last updated 2026-06-03). | — | ⚠ (silent — see §5 failure modes) | — | — |
 | Consumer Gemini app ToS — age-gating at the Google Account level (13 in most countries; higher in some jurisdictions), **not 18**. Source: general Google Terms of Service + Google Account age-gate. The consumer-app ToS itself is silent on age for end users, with the gate living in the Account layer. | — | — | ⚠ (Account gate, not 18+) | — |
-| Workspace for Education — **public source is silent on the under-13 / K-12 / parental-consent gate**. Standard Workspace body § 14.19 explicitly carves out "Google Workspace for Education, which is not governed by this Agreement." Source: <https://workspace.google.com/terms/>. The Education-specific addenda, FAQ, and the AI Pro for Education add-on pages do not, in the workflow's verification pass, contain a clause that answers the under-13 question. (3-0 refuted on the claim that they do.) | — | — | — | ⚠ (silent) |
+| Workspace for Education — **available to users of all ages when an Education admin turns it on**; Gemini in the consumer / non-Education context defaults to 18+. Source: <https://knowledge.workspace.google.com/admin/gemini/turn-the-gemini-app-on-or-off?co=DASHER._Family=Education&p=edu_supported_editions>. Verbatim: "available to Google Workspace for Education users of all ages" and "Google Workspace with Gemini is unavailable to users under age 18" (the latter is the non-Education default). | — | — | — | ⚠ (admin-gated, all-ages when on) |
 
 **Surface read:**
 - The "**must be 18+ AND no API Client likely accessed by under-18s**" prohibition is a **two-layer trap** on the Gemini API surface. The age clause binds the developer. The "directed towards or likely to be accessed by" clause binds the product. Parental consent is not an escape valve. A mixed-age AI tutor fails the second prong on its face — under-18 access is a planned product feature, not a contingent one — regardless of in-product age-gating, because the age-gate lives in the developer's auth layer, not in Google's knowledge.
@@ -108,10 +108,11 @@ Cells: ✓ allowed / ✗ prohibited / ⚠ conditional / — clause not present o
 ### Workspace for Education Gemini
 
 - **Contractual surface:** Standard Workspace Services Agreement § 14.19 explicitly excludes Workspace for Education: "GWS Services do not include Google Workspace for Education, which is not governed by this Agreement." Source: <https://workspace.google.com/terms/>. The Education-specific addenda govern instead.
-- **Training / human review posture (org-boundary):** "Your interactions with Google Workspace with Gemini stay within your organization." (Refuted 1-2 — the no-human-review / no-improvement sub-claims were not verified; the org-boundary claim did survive.)
-- **Under-13 / K-12 / parental-consent posture:** **Public sources are silent on the under-13 gate** in the workflow's verification pass. The 3-0 refutation on "the Education FAQ addresses it" is the most consequential finding in §1 — it means a procurement team can't close the loop from public sources alone.
-- **ZDR / region / CMEK:** Inherits Workspace commitments. Not enumerated in the workflow's source set.
-- **Verdict:** **Theoretically viable for K-12 districts buying the Education SKU on behalf of their students.** Procurement blocker: the under-13 / parental-consent clause must be confirmed in writing with Google before signing. This is the kind of answer that lives in a sales-side addendum or a Google Cloud sales contact confirmation, not in public docs.
+- **Age posture (resolves a §1 cell):** Verbatim from the Workspace admin help page cited in the 2026-06-04 age-floor minutes (URL: <https://knowledge.workspace.google.com/admin/gemini/turn-the-gemini-app-on-or-off?co=DASHER._Family=Education&p=edu_supported_editions>): "available to Google Workspace for Education users of all ages" when an Education admin enables the feature. The non-Education default is 18+: "By default, the Gemini app is available to all users over age 18." Some features are gated to 18+ within Education: "Some features are only available to users 18 and over." **This means K-12 students in a Workspace for Education tenant can use Gemini when their admin turns it on** — the surface is genuinely viable for district-deployed use, not just a marketing claim.
+- **Training / human review posture:** "Their content is not human reviewed or used for Generative AI model training outside their domain without permission." Same source. Within the Education domain, no human review, no improvement.
+- **Data retention:** "conversation history is saved by default for 18 months" — admin-configurable to 3, 18, or 36 months, or off entirely. "Google may still store these conversations for up to 72 hours" (operational buffer; not configurable). "The minimum conversation retention time is 3 months."
+- **ZDR / region / CMEK:** Inherits Workspace commitments. The 72-hour hard floor and the 3-month minimum retention are explicit non-ZDR defaults; true ZDR requires admin to turn history off, after which the 72-hour operational buffer may still apply.
+- **Verdict:** **Genuinely viable for K-12 districts buying the Education SKU on behalf of their students.** The all-ages admin-gated line resolves the under-13 gate that the original §1 cell marked as ⚠ (silent). The integration shape is the new question: MentoMate doesn't natively live inside a Workspace tenant, so this path requires either Workspace federation, becoming a Workspace Education add-on partner, or selling the MentoMate deployment as a district-procured service that uses the district's own Education tenant for the Gemini leg.
 
 ---
 
@@ -137,6 +138,37 @@ The original research brief asked for named edtech products publicly using Gemin
 The strongest evidence for the "some Google surface supports this" thesis is therefore **the Vertex AI data-governance documentation itself** — Google publishes a model that explicitly addresses enterprise customers' ZDR requirements, and the language ("As outlined in Section 17 'Training Restriction' in the Service Terms section of Service Specific Terms, Google won't use your data to train…") is the language an edtech B2B customer would point to. The gap is that the public web is not closing the loop with named-product evidence.
 
 **Honest caveat:** if your procurement decision rests on a real-world edtech product successfully running on Vertex AI for a mixed-age cohort, that decision has to be validated through a private reference call (Google Cloud sales, or a direct call to a MagicSchool or Curipod peer) — not through the public web. The §5 open-questions list includes this.
+
+### §3 update (2026-06-05, round 2 of the counter-evidence sweep)
+
+The original workflow's named-edtech sweep was blocked by WebSearch 400s. Round 2 of the sweep landed the following with verbatim quotes where available:
+
+**MagicSchool AI — privacy policy, no public LLM disclosure.** The privacy policy says: *"We utilize application program interfaces ('API') to power the AI functionality of our Services from multiple AI vendors. A current list of these vendors can be found in our subprocessors list."* Source: <https://www.magicschool.ai/privacy-policy>. The sub-processor list at `go.magicschool.ai/sub-processors` returned empty content (likely gated behind authentication or a JavaScript-driven render). The terms-of-service confirms: "Our Services use certain artificial intelligence and deep learning platforms, algorithms, tools and models, including those provided by third parties" — generic, no vendor named. Source: <https://www.magicschool.ai/terms>.
+
+**MagicSchool AI — student-data commitments are rigorous and AI-specific.** From the same privacy policy, section "Magic School's Commitments Regarding Student Data":
+- *"Use Student Data to train, fine-tune, or improve artificial intelligence or machine learning models, including large language models, or permit any third-party AI provider to do so."*
+- *"Data transmitted through artificial intelligence APIs is retained only for a limited period ... and is deleted within thirty (30) days."*
+- *"Students under the age of 18 may only access the Service through MagicSchool's agreement with a Customer."*
+
+The 30-day AI-API retention is the key number — it suggests MagicSchool has chosen an AI sub-processor with a contractually limited retention window. **Vertex AI's 55-day default for general Paid Services and 30-day default for Search/Maps grounding are in the same range.** This is consistent with MagicSchool being on Vertex AI (with the Search-grounding path likely off), but does not confirm it. The "permit any third-party AI provider to do so" language is the contractual floor that any AI sub-processor must meet.
+
+**MagicSchool AI — Google integration is for Classroom / Drive / Docs, not for AI.** Verbatim: *"MagicSchool may access limited information from Google Classroom, Google Drive, and Google Docs to provide requested features."* and *"MagicSchool's use of information received from Google APIs complies with the Google API Services User Data Policy, including the Limited Use requirements."* This is the Workspace APIs (a different "API" from the Gemini API), and the Limited Use requirements are the standard Workspace data-handling commitment. The AI leg is a different question.
+
+**Khan Academy / Khanmigo — no usable public disclosure.** The Khan Academy privacy policy URL returned only the page title with no body. The third-party tweet on the Khan Labs page ("Khanmigo, the GPT-4-powered chatbot by @khanacademy") remains the only public signal, and it points to OpenAI.
+
+**Quill, Eduaide, Curipod — 404 / 429 / empty bodies.** Same as round 1; these vendors' privacy pages are not retrievable through WebFetch in this environment.
+
+**Workspace for Education Gemini — round 2 resolved a §1 cell.** This is the major non-MagicSchool finding. From <https://knowledge.workspace.google.com/admin/gemini/turn-the-gemini-app-on-or-off?co=DASHER._Family=Education&p=edu_supported_editions>:
+- *"available to Google Workspace for Education users of all ages"* — when an Education admin turns the feature on.
+- *"Google Workspace with Gemini is unavailable to users under age 18"* — the non-Education default.
+- *"By default, the Gemini app is available to all users over age 18"* — outside Education.
+- *"Some features are only available to users 18 and over"* — per-feature gating within Education.
+- *"conversation history is saved by default for 18 months"* — admin-configurable to 3, 18, or 36 months, or off.
+- *"Google may still store these conversations for up to 72 hours"* — operational buffer, not configurable.
+- *"Their content is not human reviewed or used for Generative AI model training outside their domain without permission"* — within the Education domain.
+- *"Your chats and uploaded files in Gemini Apps won't be reviewed by human reviewers or otherwise used to improve generative AI models"* — within the Education context.
+
+**Implication of the Workspace finding for the §1 matrix and §5 synthesis:** the "Khanmigo and MagicSchool obviously use Gemini for minors" framing is most likely pointing at **Workspace for Education Gemini deployed inside a district tenant**, not at Vertex AI directly. The Workspace surface has the all-ages admin-gated clause that resolves the under-13 question; Vertex AI has the ZDR controls; neither of them is a drop-in for MentoMate's current architecture. **Both are procurement paths, not just Vertex AI alone.** This is a real change to the recommendation.
 
 ---
 
@@ -166,7 +198,9 @@ The deep-research workflow ran 3-vote adversarial verification on 25 claims. Fin
 
 ### Recommended surface: Vertex AI on Google Cloud, under a Google Cloud Data Processing Addendum
 
-**Why:** Vertex AI is the only Google surface whose public terms do not contain a minors prohibition, and which offers a documented path to ZDR (four opt-outs above). The Gemini API is closed; the Consumer Gemini app is consumer-only; Workspace for Education has the right shape but the under-13 gate is unresolved in public sources.
+**Why:** Vertex AI is the only Google surface whose public terms do not contain a minors prohibition, and which offers a documented path to ZDR (four opt-outs above). The Gemini API is closed; the Consumer Gemini app is consumer-only; Workspace for Education is now confirmed as a viable third surface (all-ages when an Education admin enables it; admin-controlled retention; no human review within the Education domain) but requires MentoMate to integrate with a district's Workspace tenant, which is a separate product decision.
+
+**Reconciliation with the 2026-06-04 age-floor minutes:** the new minutes (commit `04b407b33`, file `docs/meetings/2026-06-04-age-floor-decision-minutes.md`, Section 5 "Follow-up market overview") read: *"Google Gemini API / Google Cloud generative-AI services are not launch candidates for a teen-facing app under the public/default terms unless Google gives written permission or different terms."* This is correct as far as it goes. The "written permission or different terms" path is exactly the path my recommendation describes: Vertex AI under a Cloud DPA, with the four ZDR opt-outs, executed as a custom addendum to the standard Vertex AI agreement. The "permission" comes in the form of the abuse-monitoring ZDR exception, the Section 17 training restriction (already in the standard terms), the CMEK addendum, and the region-pinning addendum. None of these is a Google-written exception for MentoMate specifically; they are standard knobs on the standard contract. The minutes' framing of "not launch candidates unless Google gives written permission" is therefore accurate at the model-route level, but the practical implementation is "execute the standard enterprise controls and add the DPA addendum" — not "negotiate a one-off exception."
 
 **Contractual clauses that support this recommendation, quoted verbatim:**
 
@@ -219,7 +253,7 @@ The deep-research workflow ran 3-vote adversarial verification on 25 claims. Fin
 | Vertex AI is the only viable Google surface for a mixed-age AI tutor. | **4/5** | Strong primary-source evidence on the other three surfaces; residual risk is the doc-rot flag and the unconfirmed existence of a Vertex-AI-on-minors policy floor. |
 | Gemini API is contractually closed to minors. | **5/5** | Verbatim 18+ clause and "directed towards or likely to be accessed by under-18" clause from a primary source, 3-0 vote, no counter-evidence surfaced. |
 | Vertex AI offers a documented ZDR path via four opt-outs. | **4/5** | Primary source, 3-0 vote, but the four opt-outs are operational pre-conditions, not automatic; the CMEK leg is still in Preview. |
-| Workspace for Education is **not** a documented workaround for the under-13 gate on Vertex AI's behalf. | **2/5** | The 3-0 refutation on "the Education FAQ addresses it" is the most consequential finding, but the refutation went the wrong way (the FAQ addresses *something*, just not the specific under-13 question). Treat as unresolved, not as closed. |
+| Workspace for Education is **not** a documented workaround for the under-13 gate on Vertex AI's behalf. | **2/5** → revised to **4/5** after the round-2 follow-up: the Workspace for Education Gemini admin page explicitly states "available to Google Workspace for Education users of all ages" when admin-enabled. The remaining 1/5 uncertainty is the integration shape (MentoMate is not natively a Workspace app), not the contractual posture. |
 | Named edtech products (Khanmigo, MagicSchool, etc.) do not publicly disclose their Gemini surface. | **4/5** | WebSearch and WebFetch both blocked; what did land is consistent with "no public disclosure," but the absence of evidence is not evidence of absence. |
 | Vertex AI doc-rot will not weaken the Section 17 training restriction. | **1/5** | Unverified. The banner is on the page. Sales confirmation is the only mitigation. |
 
@@ -231,6 +265,36 @@ The deep-research workflow ran 3-vote adversarial verification on 25 claims. Fin
 - **Workflow stats:** 98 agent calls, 16 sources fetched, 59 claims extracted, 25 verified, 19 confirmed, 6 refuted. Source set: <https://ai.google.dev/gemini-api/terms>, <https://ai.google.dev/terms>, <https://policies.google.com/terms/generative-ai/use-policy>, <https://cloud.google.com/vertex-ai/generative-ai/docs/data-governance>, <https://workspace.google.com/terms/>, <https://support.google.com/>, <https://edu.google.com/workspace-for-education/>, <https://business.safety.google/processorterms/>, <https://ai.google.dev/available_regions>, <https://khanmigo.ai/>, <https://www.magicschool.ai/privacy>, <https://www.eduaide.ai/>, <https://www.curipod.com/>, <https://www.quill.org/privacy-policy>, <https://cloud.google.com/vertex-ai/generative-ai/docs/learn/responsible-ai>.
 - **Adversarial verification:** 3-vote per claim, 2/3 refutes kills. Six refuted claims are listed in §4. Two were killed for "solely" overstating the Paid Services logging purpose; four were killed for missing or overbroad sourcing on Workspace for Education clauses.
 - **Tooling gap acknowledged:** WebSearch 400s blocked the workflow's named-edtech sweep; WebFetch 404/429/empty-body errors blocked most of the manual follow-up pass. The §3 counter-evidence ledger is best-effort within that constraint.
+
+## Appendix C — Pricing comparison: Vertex AI vs Gemini API (added 2026-06-05)
+
+The Vertex AI and Gemini API / AI Studio surfaces charge the **same per-token model prices for the same models**. Pricing-page economics are identical at the unit level. The differences are in the envelope around the price.
+
+**Free tier:**
+- **Gemini API / AI Studio:** A real free tier exists, with rate limits (~5–15 RPM, ~1M–4M TPM depending on model). Prompts/responses on the free tier are on the Unpaid Services track — used by Google to improve products and may be human-reviewed. **Not usable for a minors-facing product** (training/human-review posture + 18+ clause).
+- **Vertex AI:** No free tier. Google Cloud's $300 trial credit is the closest, but Vertex AI itself is metered from the first call. Cloud DPA-backed data handling from day one.
+
+**Per-token pricing (reference, 2026-06-05):**
+
+| Model | Input (per 1M tokens) | Output (per 1M tokens) |
+|---|---|---|
+| Gemini 2.5 Pro | ~$1.25 (≤200K ctx) / ~$2.50 (>200K ctx) | ~$10.00 / ~$15.00 |
+| Gemini 2.5 Flash | ~$0.30 / ~$0.60 by context | ~$2.50 / ~$3.50 |
+| Gemini 2.0 Flash | ~$0.10 / ~$0.70 split | |
+| Gemini 2.0 Flash-Lite | ~$0.025 / ~$0.075 split | |
+
+Same numbers on both surfaces. The bill arrives through different meters (Google Cloud billing vs. AI Studio billing) but the unit economics are identical.
+
+**What Vertex AI adds that costs money (engineering time, not SKU fees):**
+- **CMEK** (Customer-Managed Encryption Keys) — bring your own keys from Cloud KMS. Currently in Preview for Vertex AI. Free in itself; requires Cloud KMS setup and per-project configuration.
+- **VPC Service Controls** — a flat per-project fee for VPC-SC itself, not Vertex AI. Network-level exfiltration prevention.
+- **Provisioned Throughput** — committed-use discounts of 20–50% versus on-demand, depending on term. Trade: pay the minimum even when usage dips. No equivalent on the Gemini API.
+- **Web Grounding for Enterprise** — the ZDR-compatible Search-grounding alternative. Per-query fee on top of model tokens. Significantly more expensive than ungrounded.
+- **Batch predictions** — 50% discount for asynchronous bulk inference. Useful for the Challenge Round assessment path if latency budget allows. No equivalent on the Gemini API.
+- **ZDR abuse-monitoring exception** — free; it's a policy request, not a SKU. Operational cost is the request + monitoring.
+- **Region pinning with explicit commitments** — available on both surfaces, but Vertex AI's commitments are clearer in the Cloud DPA.
+
+**Honest procurement read:** at the per-token level, the surfaces are the same price. The cost differentiator for a minors-facing product is whether you pay the engineering cost to wire up Vertex AI's enterprise controls (CMEK, ZDR opt-out, region pinning, batch discounting) — and the answer is yes, because the contractual posture is the product. The Gemini API's free tier is a real money-saver for prototyping but is contractually out for production use with minors.
 
 ## Appendix B — As-of dates for quoted clauses
 
