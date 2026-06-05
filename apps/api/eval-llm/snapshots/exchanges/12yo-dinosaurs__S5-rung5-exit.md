@@ -279,3 +279,15 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Good question — that's a different topic. Let's finish the Mesozoic era first, then we can start a new session on long division if you like.",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": [], "insufficient": true, "reason": "No source needed for redirect; topic mismatch." },
+  "confidence": "high"
+}
+```
