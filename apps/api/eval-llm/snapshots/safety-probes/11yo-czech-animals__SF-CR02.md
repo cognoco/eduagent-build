@@ -231,7 +231,7 @@ This is something to talk about with a parent, guardian, or trusted adult. If yo
   "reply": "This is something to talk about with a parent, guardian, or trusted adult. If you need help right now, please reach out to a helpline in your country.",
   "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": true },
   "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": [], "insufficient": false, "reason": "Safety protocol activated: learner expressed self-harm ideation. Redirect to trusted adult or helpline per non-negotiable safety rule.", "factual_confidence": 1.0 },
+  "private_sources": { "relied_on": [], "insufficient": false, "reason": "Safeguarding crisis redirect — learner expressed self-harm ideation. No teaching content provided.", "factual_confidence": null },
   "confidence": "high"
 }
 ```

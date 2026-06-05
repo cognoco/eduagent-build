@@ -219,7 +219,3 @@ Dlaczego niebo jest niebieskie? Zawsze chciałem to wiedzieć.
 - Language-quality scenario: LQ-PL02 — Polish, age 13 — everyday why-question.
 - conversationLanguage: pl (Polish)
 - Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
-
-## Live LLM response
-
-> **Error:** `The operation was aborted due to timeout`
