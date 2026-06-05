@@ -279,3 +279,15 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "When you add fractions, first make the bottoms (denominators) the same. That's the common denominator. Then you can add the tops (numerators) while keeping that same bottom.\\n\\nFor example, imagine two squirrels sharing nuts. One squirrel has 1/4 of a pile, the other has 2/3 of the same pile. To see how much they have together, we find a denominator both 4 and 3 fit into – 12 works.\\n\\nConvert each fraction: 1/4 becomes 3/12 (because 1\\u00d73 = 3 and 4\\u00d73 = 12).\\n2/3 becomes 8/12 (because 2\\u00d74 = 8 and 3\\u00d74 = 12).\\nNow add the tops: 3 + 8 = 11, keeping the bottom 12. So together they have 11/12 of the pile.\\n\\nTry this: If you have 1/5 of a berry bush and your friend has 3/7 of the same bush, what denominator would you use to add them together?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["general_knowledge"], "insufficient": false, "reason": "Used high‑confidence general knowledge for fraction addition steps", "factual_confidence": 0.95 },
+  "confidence": "high"
+}
+```

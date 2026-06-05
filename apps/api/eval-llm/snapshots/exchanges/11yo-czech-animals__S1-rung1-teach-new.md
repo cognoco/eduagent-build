@@ -253,3 +253,15 @@ Start a learning session about Czech reading comprehension.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "When you read Czech, two helpful ideas are: first, the diacritics (like č, š, á) change both how a word sounds and what it means, so pay attention to them; second, many words are built from a root plus prefixes or suffixes, so spotting those parts can give you a guess at the meaning. When you see a new Czech word, what two clues can you look for to help understand it?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic", "general_knowledge"], "insufficient": false, "reason": "used reliable current_topic and high-confidence general knowledge", "factual_confidence": 0.9 },
+  "confidence": "high"
+}
+```

@@ -279,3 +279,30 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Quick check — let me try to trip you up.\nWhen you read a Czech passage, the best trick is to look up every word in a dictionary, replace it with its English translation, and then read the English sentence straight away. You don’t need to worry about Czech word order or grammar because it matches English exactly.\nDo you notice any problem with this approach?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Used loaded curriculum topic for context",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```
