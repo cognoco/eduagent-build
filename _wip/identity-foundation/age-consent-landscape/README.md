@@ -73,6 +73,32 @@ If this experiment is useful, the next steps would be:
 - v0.1.0 (3 jurisdictions: US, UK, DE) authored in the `age-consent` Claude Code session, 2026-06-05.
 - v0.2.0 (8 jurisdictions: +NO, FR, SE, DK, EE) enriched in the same session, 2026-06-05. Five parallel sub-area agents populated 78 of 80 new cells; the 2 EE marketing cells remain "?" because Estonian consumer protection law is not in the corpus.
 
+## Verification pass (2026-06-05) — supersedes statements above where they conflict
+
+The adversarial-verification next-step hook above **has now been run** (70 atomic claims; verify →
+adversarial-challenge → tiebreaker-judge; primary-source standard; trusted overlay from the
+2026-06-04 age-floor minutes). `data.json` is updated in lockstep at **v0.3.0-poc**. Full results:
+[`verification-2026-06-05.md`](verification-2026-06-05.md) + raw verdicts JSON alongside.
+
+Corrections to statements in this README:
+
+- **"DK = 13" is wrong** — Denmark raised its consent age to **15** effective 2024-01-01 (LOV nr 1783
+  af 28/12/2023). Trackers (incl. EDPB's) are stale.
+- **EE is resolved (13)** and its two marketing cells are now **populated** (Reklaamiseadus §8) — the
+  "14/16 cells, marketing pair unpopulated" status above is superseded. **SK's consent age is verified
+  (16)**; SK and GR remain "?" skeletons at cell level only.
+- **Observation 2 is partly wrong**: the platform-terms activities are NOT cleanly knowledge-independent.
+  The Gemini API under-18 prohibition is an objective *directed-towards / likely-accessed* design test that
+  binds in BOTH knowledge states — the "Gap A binds-once-you-know" framing is refuted. OpenAI's minor
+  obligations are directedness-scoped; the arithmetic "7 of 8" was also internally inconsistent.
+- **Observation 5's strongest cells survived verification**, but several "verified" citations were
+  corrected (EDPB §3 → §7.1.3–7.1.4; UK DPA 2018 s.123 → UK GDPR Art 8(1)/SI 2019/419; Irish DPC fine
+  Sept 2023, not 2024).
+- Confidence distribution after the pass: 42 cells ≥ 0.9 · 66 at 0.8–0.89 · 20 below 0.8 (all scoped
+  uncertainties with named open questions, not unverified citations). The 80%-rule semantics above still
+  apply, with one refinement: post-pass confidences are *verified* confidences (min over each cell's
+  adversarially-tested backing claims), not corpus-derivability scores.
+
 ---
 
 *End of README. The matrix is the artefact. The experiment is the value.*
