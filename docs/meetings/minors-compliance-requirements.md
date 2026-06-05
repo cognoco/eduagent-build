@@ -12,7 +12,7 @@
 There are **two lists**:
 
 - **LIST A — Launch at 13+.** Everything you need to go live with a 13-and-over app. This is your main checklist.
-- **LIST B — The extra load if you also let in 11–12 year olds (under-13).** Everything in List A *still applies*. List B is **only the genuinely heavier, significantly stricter things** that switch on when you allow children under 13. (The small differences that aren't worth tracking separately — I've just folded the stricter version straight into List A, so you can do it once and be covered for both.)
+- **LIST B — The extra load if you also let in 10–12 year olds (any under-13 child).** Everything in List A *still applies*. List B is **only the genuinely heavier, significantly stricter things** that switch on when you allow children under 13. (The small differences that aren't worth tracking separately — I've just folded the stricter version straight into List A, so you can do it once and be covered for both.)
 
 **Status tags used below:**
 
@@ -91,13 +91,13 @@ This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized s
 
 ### A7. 🔴 Ask for age at sign-up, and gate on it
 - **What it means:** You must know roughly how old the user is, and block under-13s (at a 13+ launch).
-- **What you do:** Ask date of birth (not just a yes/no "are you 13?"). If under 13 → politely refuse. **Count how many under-13s try** — that number tells you later if it's worth building the 11+ version.
+- **What you do:** Ask date of birth (not just a yes/no "are you 13?"). If under 13 → politely refuse. **Count how many under-13s try** — that number tells you later if it's worth building the 10+ / under-13 version.
 - **Where it lives:** The sign-up / onboarding screens.
 - **Law:** GDPR Article 8; app store rules.
 
-### A8. 🔴 Get verified parent permission for 13–15 year olds in "age-16" countries
-- **What it means:** The "you can consent for yourself" age is **16 in Norway, Germany, France, Netherlands** (and others), and **13 in Ireland, Spain** (and others). So a flat "13+" is **not** enough for 13–15 year-olds in the age-16 countries — you need a parent to approve.
-- **What you do:** For users who are 13–15 *and* in an age-16 country, add a step that emails/contacts a parent to approve. Email-link confirmation is acceptable here (the heavy "verifiable" version is only for under-13 — see List B).
+### A8. 🔴 Get parent/guardian authorization where local self-consent age is higher
+- **What it means:** The "you can consent for yourself" age varies by country. Current checked examples: **Norway and UK = 13; Spain = 14; France = 15; Germany, Netherlands, and Ireland = 16.** So a flat "13+" is **not** enough everywhere — some 13–15 year-olds still need a parent/guardian to approve.
+- **What you do:** At launch, the simple safe version is to require parent/guardian authorization through 16 unless and until you build country-specific consent rules. Email-link confirmation can be acceptable for this GDPR-style teen consent flow if counsel agrees; the heavier COPPA-grade VPC version is only mandatory for under-13 US children — see List B.
 - **Where it lives:** The sign-up flow, triggered by age + country.
 - **Law:** GDPR Article 8(1)–(2).
 
@@ -115,15 +115,15 @@ This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized s
 
 ## Group 3 — Your deal with the AI providers (contracts + what you send them)
 
-### A11. 🔴 Sign a proper data contract with each AI provider, on the business tier
-- **What it means:** When a child's words go to Google/OpenAI/Anthropic, those companies are your "data processors." You must have a signed data agreement (a "DPA") with each. **Consumer/free tiers don't include one — you must use the business/enterprise tier.**
-- **What you do:** Use the paid/business product (e.g. Google Vertex, OpenAI's business tier via OpenAI Ireland, Anthropic's commercial tier) and accept/sign their DPA. Keep a list of which providers (and their sub-contractors) touch the data.
+### A11. 🔴 Sign a proper data contract with each AI provider, on the right product/contract route
+- **What it means:** When a child's words go to an AI provider, that provider is your "data processor." You must have a signed data agreement (a "DPA") or equivalent processor terms, and the exact product terms must allow a teen/minor-facing app. **Consumer/free tiers are not enough.**
+- **What you do:** Use only a paid/business/enterprise route whose terms allow this use case, and keep a list of which providers and sub-processors touch the data. Do **not** treat "Gemini exists for minors" as automatic permission to use Gemini API or Google Cloud Generative AI Services in MentoMate: Google's own Gemini Apps / Workspace for Education routes can serve minors under different Google-controlled terms, but the public Gemini API and Google Cloud generative-AI service terms restrict apps directed to or likely accessed by under-18s unless you have different written terms/permission. OpenAI/Anthropic-style API routes still need DPA/no-training/retention controls and child-safety safeguards.
 - **Where it lives:** A contract you accept in each provider's console / legal page. Keep copies.
 - **Law:** GDPR Article 28.
 
 ### A12. 🔴 Do a "transfer check" before sending kids' data to the US
 - **What it means:** Sending EU children's data to US companies needs extra paperwork unless the provider is certified under the EU-US data deal ("DPF"). If they're not certified, you must do a short written **transfer risk check (TIA)** and rely on standard EU contract clauses.
-- **What you do:** For each provider, check: are they on the official DPF certified list? If **yes** → lighter. If **no** (OpenAI was reported *not* listed) → you need standard contractual clauses + a short transfer assessment. Your DPO/consultant does this.
+- **What you do:** For each provider, check the official DPF certified list at launch time. If **yes** → lighter. If **no** → you need standard contractual clauses + a short transfer assessment. Your DPO/consultant does this. Do not rely on a one-time note about any provider's DPF status; it can change.
 - **Where it lives:** A short assessment document per provider, kept on file.
 - **Law:** GDPR Chapter V (Articles 44–46); "Schrems II" ruling.
 
@@ -203,9 +203,9 @@ This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized s
 
 ---
 
-# LIST B — Extra requirements ONLY if you also allow 11–12 year-olds (under-13)
+# LIST B — Extra requirements ONLY if you also allow 10–12 year-olds (under-13)
 
-> **Everything in List A still applies.** Below are the genuinely **heavier** things that switch on the moment you accept children **under 13** — this is the US **COPPA** regime plus stricter store/state rules. This is why launching 13+ first is so much simpler: the items below are the real extra cost.
+> **Everything in List A still applies.** Below are the genuinely **heavier** things that switch on the moment you accept children **under 13** — this is the US **COPPA** regime plus stricter store/state rules. This applies the same way to 10, 11, and 12 year-olds. This is why launching 13+ first is so much simpler: the items below are the real extra cost.
 
 ### B1. 🔴 Get *verifiable* parent consent BEFORE collecting anything (the heavy kind)
 - **What it means:** For under-13s, a simple parent email isn't enough. US law requires a **stronger, verified** parental consent (e.g. payment-card check, ID check, signed form) *before* you collect any data from the child.
@@ -213,11 +213,11 @@ This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized s
 - **Where it lives:** A new, heavier consent step in sign-up + a vendor contract.
 - **Law:** US COPPA (16 CFR Part 312).
 
-### B2. 🔴 Get separate parent opt-in to send the child's data to the AI providers
-- **What it means:** Sharing an under-13's data with outside companies (your AI providers) needs its **own** separate parental consent, on top of B1. And using that data to **train AI models is essentially never allowed** for children.
-- **What you do:** Add a distinct "I allow my child's data to be sent to [AI providers]" consent. Make sure your provider contracts (A11) guarantee **no training** on the data.
-- **Where it lives:** A separate consent toggle + provider contract terms.
-- **Law:** US COPPA (2025 amended Rule — third-party disclosure consent).
+### B2. 🔴 Decide and document the AI-provider consent scope
+- **What it means:** Under COPPA, the hard question is whether the LLM provider is tightly contracted as integral/internal-operations support, or whether sending the child's conversation to that provider counts as a third-party disclosure needing its own parent opt-in. Using child data to train general AI models should be treated as off-limits.
+- **What you do:** Assume you need a distinct "I allow my child's data to be sent to [AI providers]" consent unless counsel confirms the chosen provider route, contract, no-training terms, retention limits, and use restrictions keep it inside the allowed internal-operations/integral-service lane. Make sure your provider contracts (A11) guarantee **no training** on the data.
+- **Where it lives:** Consent text/version + provider contract terms + counsel sign-off.
+- **Law:** US COPPA (third-party disclosure / support-for-internal-operations distinction).
 
 ### B3. 🔴 Write a formal information-security program
 - **What it means:** A written security program with a named owner and a yearly review — not just "we use good security."
@@ -231,17 +231,17 @@ This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized s
 - **Where it lives:** A written policy + deletion behaviour in the app.
 - **Law:** US COPPA (2025 amended Rule — retention/deletion).
 
-### B5. 🔴 Turn country-detection back on
-- **What it means:** COPPA is a US (under-13) rule, so you need to know who is a US under-13 to apply it. (You currently treat everyone the same, location-blind.)
-- **What you do:** Re-introduce location/region detection so you can route under-13 US users into the COPPA flow.
-- **Where it lives:** App logic (developer task).
-- **Law:** Needed to apply US COPPA correctly.
+### B5. 🔴 Build country/residence routing for the under-13 flow
+- **What it means:** COPPA is a US under-13 rule, but under-13 handling is not US-only if the app is available globally. You need country/residence logic for 13+ launch anyway; the under-13 version adds COPPA routing on top.
+- **What you do:** Ask declared country/residence, use store/IP/billing signals as conflict checks where available, and fail closed when signals conflict or point to a stricter country. Route US under-13s into COPPA VPC; block or counsel-gate countries whose child rules are not mapped.
+- **Where it lives:** Store availability + sign-up flow + backend policy decision snapshot.
+- **Law:** Needed to apply US COPPA and non-US child-data rules correctly.
 
-### B6. 🔴 Meet the stricter store "Kids" rules
-- **What it means:** Apps that actually serve under-13s fall into Apple's **Kids Category** and Google's stricter kids rules — which typically **ban third-party ads and most third-party analytics** and tighten what SDKs you can use.
-- **What you do:** Remove/disallow third-party ad and analytics tools for the kids experience; re-check every embedded SDK is kids-policy-approved.
-- **Where it lives:** App build + store category settings.
-- **Law:** Apple Kids Category; Google Play Families (child-directed).
+### B6. 🔴 Meet the stricter store child-review rules
+- **What it means:** Serving under-13s can trigger Apple's Kids Category / Made for Kids review posture depending on target audience, metadata, rating, and store answers. Google Play is more direct: if children are one of your target audiences, the Families Policy applies. These rules typically restrict third-party ads, analytics, APIs/SDKs, identifiers, and social features.
+- **What you do:** Decide the store classification with counsel before allowing under-13s. Remove/disallow third-party ad and analytics tools for the kids experience unless the store policy explicitly permits them, and re-check every embedded SDK/API is approved for child-directed or mixed-audience use.
+- **Where it lives:** App build + store category/age-rating/privacy settings + review notes.
+- **Law:** Apple App Review Guidelines / Kids Category; Google Play Families Policy.
 
 ### B7. 🟠 Stronger US state age-verification for under-13
 - **What it means:** The US state app-store and minor-protection laws (A19) get stricter for under-13 — more states, firmer parental-consent requirements.
@@ -263,14 +263,14 @@ This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized s
 1. Appoint the DPO (A2) → they drive the DPIA (A1).
 2. Make the Art 9 decision (A23) — it changes how heavy A1 is.
 3. Sign provider data contracts on business tier + transfer checks (A11, A12).
-4. Build the consent flow correctly: age gate, parent consent for 13–15, real consent (A7, A8, A9).
+4. Build the consent flow correctly: age gate, country/residence gate, parent/guardian authorization through 16 unless country rules lower it, and real consent (A7, A8, A9).
 5. Privacy policy + UK representative + ROPA + breach plan (A5, A6, A3, A4).
 6. Design pass: child-friendly defaults, no manipulation, voice transcription-only (A14, A15, A16).
 7. Store declarations + subscription/cancellation/marketing (A18, A20, A21, A22).
 8. Build in the "you're talking to an AI" notice before 2 Aug 2026 (A10).
 
-**Before adding 11+:** the whole of List B — with B1 (verifiable parental consent vendor) and B2 (separate AI-sharing consent + no-training guarantee) being the big, costly ones.
+**Before adding 10+:** the whole of List B — with B1 (verifiable parental consent vendor) and B2 (AI-provider consent scope + no-training guarantee) being the big, costly ones.
 
 ---
 
-*Sources behind this guide: GDPR Articles 5, 6, 8, 9, 27, 28, 30, 33, 34, 35, 37, 44–46; EU AI Act Articles 5, 50; UK Age-Appropriate Design Code (Data Protection Act 2018) + Data (Use and Access) Act 2025; US COPPA (16 CFR Part 312, 2025 amended Rule); US ROSCA + state auto-renewal and App Store Accountability Acts; Norway angrerettloven & markedsføringsloven. Cross-checked against EDPB, ICO, CNIL, FTC and EUR-Lex primary materials, June 2026.*
+*Sources behind this guide: GDPR Articles 5, 6, 8, 9, 27, 28, 30, 33, 34, 35, 37, 44–46; EU AI Act Articles 5, 50; UK Age-Appropriate Design Code (Data Protection Act 2018) + Data (Use and Access) Act 2025; US COPPA (16 CFR Part 312, 2025 amended Rule); US ROSCA + state auto-renewal and App Store Accountability Acts; Norway angrerettloven & markedsføringsloven; Google Gemini API / Google Cloud Generative AI terms; Google Workspace for Education Gemini documentation; Apple App Review Guidelines; Google Play Families Policy. Cross-checked against EDPB, ICO, CNIL, FTC and EUR-Lex primary materials, June 2026.*
