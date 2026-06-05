@@ -258,3 +258,33 @@ Start a learning session about Camus — L'Étranger.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Albert Camus was a French writer who explored big philosophical ideas, and his novel *L'Étranger* (often translated as *The Stranger* or *The Outsider*) is a key work for understanding one of them: the absurd. In philosophy, 'the absurd' isn't about something being silly or ridiculous. Instead, it describes the conflict that arises because humans naturally want to find meaning and purpose in life, but the universe itself seems indifferent to that search. Camus believed this feeling of disconnect, where our desire for meaning clashes with the universe's silence, is a fundamental part of the human experience.\n\nHow would you describe this philosophical idea of 'the absurd' in your own words?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic",
+      "general_knowledge"
+    ],
+    "insufficient": false,
+    "reason": "Initial introduction of Camus and the absurd, relying on current topic and general knowledge for definitions.",
+    "factual_confidence": 0.95
+  },
+  "confidence": "high"
+}
+```

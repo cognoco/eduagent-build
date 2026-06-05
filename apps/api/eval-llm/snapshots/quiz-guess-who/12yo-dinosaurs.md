@@ -119,3 +119,71 @@ Generate the quiz round.
 - Fine-grained age: 12. Interests passed: dinosaurs, fossils, paleontology, extinction events, volcanoes.
 - Library topics passed: Mesozoic era; fossilization; plate tectonics; long division.
 - Topic titles passed: Mesozoic era; fossilization; plate tectonics; long division.
+
+## Live LLM response
+
+```
+```json
+{
+  "theme": "Paleontology Pioneers & Earth's Storytellers",
+  "questions": [
+    {
+      "canonicalName": "Charles Darwin",
+      "era": "19th century",
+      "acceptedAliases": ["Darwin", "C. Darwin"],
+      "clues": [
+        "My work profoundly changed how we understand life's diversity.",
+        "I sailed around the world on a ship called the Beagle.",
+        "Observations on a group of islands helped inspire my most famous theory.",
+        "The study of finches on the Galápagos was key to my ideas.",
+        "My major book introduced the concept of natural selection."
+      ],
+      "mcFallbackOptions": ["Charles Darwin", "Alfred Russel Wallace", "Carl Linnaeus", "Gregor Mendel"],
+      "funFact": "He initially studied medicine and theology before becoming a naturalist."
+    },
+    {
+      "canonicalName": "Alfred Wegener",
+      "era": "20th century",
+      "acceptedAliases": ["Wegener", "A. Wegener"],
+      "clues": [
+        "I was a meteorologist and polar researcher.",
+        "I proposed that Earth's landmasses were once joined.",
+        "My theory explained why identical fossils were found on distant continents.",
+        "I introduced the idea of 'Pangaea,' a supercontinent.",
+        "My most famous theory is about continental drift."
+      ],
+      "mcFallbackOptions": ["Alfred Wegener", "Arthur Holmes", "Harry Hess", "Marie Tharp"],
+      "funFact": "He died during an expedition in Greenland while searching for supplies."
+    },
+    {
+      "canonicalName": "Georges Cuvier",
+      "era": "18th/19th century",
+      "acceptedAliases": ["Cuvier", "Baron Cuvier"],
+      "clues": [
+        "I was a French naturalist who focused on animal anatomy.",
+        "I am considered a founder of vertebrate paleontology.",
+        "My studies of fossils led me to propose that species could go extinct.",
+        "I used comparative anatomy to reconstruct ancient animals from bone fragments.",
+        "I described the giant fossil ground sloths from South America."
+      ],
+      "mcFallbackOptions": ["Georges Cuvier", "Jean-Baptiste Lamarck", "Richard Owen", "William Buckland"],
+      "funFact": "He was a strong proponent of catastrophism, the idea that Earth's history was shaped by sudden, violent events."
+    },
+    {
+      "canonicalName": "Sue Hendrickson",
+      "era": "20th/21st century",
+      "acceptedAliases": ["Hendrickson", "S. Hendrickson"],
+      "clues": [
+        "I am known for my adventurous spirit and love of discovery.",
+        "I've found many important fossils, both on land and underwater.",
+        "My most famous discovery was made in South Dakota.",
+        "I unearthed one of the largest and most complete Tyrannosaurus rex skeletons ever found.",
+        "The famous T. rex fossil, 'Sue,' is named after me."
+      ],
+      "mcFallbackOptions": ["Sue Hendrickson", "Jack Horner", "Paul Sereno", "Robert Bakker"],
+      "funFact": "Before becoming a fossil hunter, she worked as a commercial diver and was involved in marine archaeology."
+    }
+  ]
+}
+```
+```

@@ -278,3 +278,31 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+```json
+{
+  "reply": "This is a tough one — let's come back to it fresh later.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": true,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": false,
+    "reason": "The learner has expressed being stuck on the concept of fraction addition after three exchanges. I am now applying the Rung 5 exit protocol to suggest a break and signal that the topic needs a different teaching approach."
+  },
+  "confidence": "high"
+}
+```
+```

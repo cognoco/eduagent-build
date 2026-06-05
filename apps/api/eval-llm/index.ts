@@ -12,6 +12,12 @@
 //   pnpm eval:llm -- --max-live-calls 5         # cap live LLM calls (default 20)
 //   doppler run -- pnpm eval:llm -- --live      # tier 2 (real LLM calls)
 //
+//   doppler run -- pnpm eval:llm -- --flow safety-probes --live \
+//     --openrouter-model mistralai/mistral-small-2603
+//     Candidate-model gate (model-selection memo §6): route all live calls to
+//     the named model via OpenRouter instead of production routing. Restore
+//     snapshots afterwards: git checkout -- apps/api/eval-llm/snapshots
+//
 //   doppler run -- pnpm eval:llm -- --live --check-baseline
 //     Compare envelope signal metrics against baseline.json; exit 1 on drift.
 //   doppler run -- pnpm eval:llm -- --live --update-baseline
@@ -66,6 +72,7 @@ import {
   type Baseline,
 } from './runner/metrics';
 import { bootstrapLlmProviders } from './runner/llm-bootstrap';
+import { setOpenRouterModelOverride } from './runner/llm-client';
 
 const BASELINE_PATH = path.resolve(__dirname, 'baseline.json');
 const DEFAULT_TOLERANCE_PP = 0.05; // 5pp — one sample of noise at N≈20
@@ -151,15 +158,41 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Candidate-model gate (--openrouter-model): reroutes every live call to
+  // the named model via the eval-only OpenRouter adapter. Guard rails:
+  // pointless without --live, and a candidate's envelope metrics must never
+  // be written into the production-model baseline.
+  if (options.openrouterModel) {
+    if (!options.live) {
+      console.error(
+        '--openrouter-model requires --live (it only affects live LLM calls).',
+      );
+      process.exit(2);
+    }
+    if (options.updateBaseline) {
+      console.error(
+        '--openrouter-model cannot be combined with --update-baseline: the baseline tracks the PRODUCTION routing, not a candidate model.',
+      );
+      process.exit(2);
+    }
+  }
+
   // Bootstrap LLM providers early so any missing-key errors surface before
   // the run matrix starts. Tier-1 runs skip this — no LLM calls are made.
   if (options.live) {
     bootstrapLlmProviders();
+    if (options.openrouterModel) {
+      setOpenRouterModelOverride(options.openrouterModel);
+    }
   }
 
   console.log(
     `\nEval-LLM harness — tier ${
       options.live ? '2 (live LLM calls)' : '1 (prompt snapshots only)'
+    }${
+      options.openrouterModel
+        ? `\nCANDIDATE-MODEL RUN — all live calls routed to "${options.openrouterModel}" via OpenRouter (not production routing). Snapshots will reflect the candidate; restore with: git checkout -- apps/api/eval-llm/snapshots`
+        : ''
     }\n`,
   );
 

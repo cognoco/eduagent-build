@@ -252,3 +252,33 @@ Start a learning session about algebra equations.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Algebra equations are like a balance scale where both sides need to be equal. In these equations, we use letters, called **variables**, to represent numbers we don't know yet. Numbers that are known are called **constants**.\n\nThe main goal of solving an algebra equation is to figure out what number that variable stands for to make both sides of the equation equal.\n\nFor example, in the equation `x + 5 = 10`, 'x' is the variable, and '5' and '10' are constants. We want to find out what 'x' has to be so that when you add 5 to it, you get 10.\n\nWhat do we call the letters that stand for unknown numbers in an algebra equation?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic",
+      "general_knowledge"
+    ],
+    "insufficient": false,
+    "reason": "Initial explanation of algebra equations, variables, constants, and the goal of solving them, using general knowledge and current topic.",
+    "factual_confidence": 0.95
+  },
+  "confidence": "high"
+}
+```

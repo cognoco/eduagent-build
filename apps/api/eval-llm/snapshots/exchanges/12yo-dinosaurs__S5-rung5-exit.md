@@ -278,3 +278,33 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+```json
+{
+  "reply": "I hear you. It can be frustrating to feel stuck on something like long division.\n\nFor this session, our topic is the Mesozoic era. How about we dive into some dinosaurs and volcanoes for now? You can always start a new session focused on math when you're ready.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic"
+    ],
+    "insufficient": false,
+    "reason": "Redirecting from an off-topic subject (long division) to the session's loaded topic (Mesozoic era) as per scope boundary rules."
+  },
+  "confidence": "high"
+}
+```
+```

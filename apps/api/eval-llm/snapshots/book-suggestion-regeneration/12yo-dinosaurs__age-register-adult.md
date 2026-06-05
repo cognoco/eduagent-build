@@ -98,3 +98,7 @@ Generate the suggestions now.
 - studiedTopics: 3 (2+2 split path)
 - existingTitles: 2 books + 1 suggestions to avoid
 - Adult learner register: no childish framing, stickers, or tiny novelty books.
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

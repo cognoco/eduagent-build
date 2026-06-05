@@ -125,3 +125,73 @@ Generate a dictation for me.
 - i18n Phase 1: conversationLanguage=cs wired for runtime preamble injection.
 - Interests wired (audit P0.1): horses, forest animals, nature journaling, drawing.
 - Library topics wired (audit P0.1): Czech reading comprehension, basic fractions, human body systems, water cycle.
+
+## Live LLM response
+
+```
+```json
+{
+  "sentences": [
+    {
+      "text": "Ráno mlha zahalila starý les.",
+      "withPunctuation": "Ráno mlha zahalila starý les tečka",
+      "wordCount": 6,
+      "chunks": ["Ráno mlha zahalila starý les."],
+      "chunksWithPunctuation": ["Ráno mlha zahalila starý les tečka"]
+    },
+    {
+      "text": "Jelen tiše vyšel z houští k bystřině.",
+      "withPunctuation": "Jelen tiše vyšel z houští k bystřině tečka",
+      "wordCount": 8,
+      "chunks": ["Jelen tiše vyšel z houští", "k bystřině."],
+      "chunksWithPunctuation": ["Jelen tiše vyšel z houští", "k bystřině tečka"]
+    },
+    {
+      "text": "Dívka na koni pozorovala jeho stín.",
+      "withPunctuation": "Dívka na koni pozorovala jeho stín tečka",
+      "wordCount": 6,
+      "chunks": ["Dívka na koni pozorovala jeho stín."],
+      "chunksWithPunctuation": ["Dívka na koni pozorovala jeho stín tečka"]
+    },
+    {
+      "text": "Zaznamenala obrysy listů do deníku.",
+      "withPunctuation": "Zaznamenala obrysy listů do deníku tečka",
+      "wordCount": 7,
+      "chunks": ["Zaznamenala obrysy listů", "do deníku."],
+      "chunksWithPunctuation": ["Zaznamenala obrysy listů", "do deníku tečka"]
+    },
+    {
+      "text": "Zřetelně slyšela šumění potoka blízko.",
+      "withPunctuation": "Zřetelně slyšela šumění potoka blízko tečka",
+      "wordCount": 6,
+      "chunks": ["Zřetelně slyšela šumění potoka", "blízko."],
+      "chunksWithPunctuation": ["Zřetelně slyšela šumění potoka", "blízko tečka"]
+    },
+    {
+      "text": "Kudy voda teče, tam roste nový život.",
+      "withPunctuation": "Kudy voda teče čárka tam roste nový život tečka",
+      "wordCount": 8,
+      "chunks": ["Kudy voda teče,", "tam roste nový život."],
+      "chunksWithPunctuation": ["Kudy voda teče čárka", "tam roste nový život tečka"]
+    },
+    {
+      "text": "Její kůň spokojeně odfrkl, jemně dupaje.",
+      "withPunctuation": "Její kůň spokojeně odfrkl čárka jemně dupaje tečka",
+      "wordCount": 7,
+      "chunks": ["Její kůň spokojeně odfrkl,", "jemně dupaje."],
+      "chunksWithPunctuation": ["Její kůň spokojeně odfrkl čárka", "jemně dupaje tečka"]
+    },
+    {
+      "text": "Načrtla ještě hlubokou stinnou jeskyni.",
+      "withPunctuation": "Načrtla ještě hlubokou stinnou jeskyni tečka",
+      "wordCount": 6,
+      "chunks": ["Načrtla ještě hlubokou stinnou jeskyni."],
+      "chunksWithPunctuation": ["Načrtla ještě hlubokou stinnou jeskyni tečka"]
+    }
+  ],
+  "title": "Lesní putování",
+  "topic": "Dobrodružství v lese s koňmi a kreslením",
+  "language": "cs"
+}
+```
+```

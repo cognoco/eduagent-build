@@ -108,3 +108,52 @@ Generate the quiz round.
 
 - Fine-grained age: 12. Interests passed: dinosaurs, fossils, paleontology, extinction events, volcanoes.
 - Library topics passed: Mesozoic era; fossilization; plate tectonics; long division.
+
+## Live LLM response
+
+```
+```json
+{
+  "theme": "Mesozoic Capitals: Where Ancient Giants Roamed and Continents Shifted",
+  "questions": [
+    {
+      "country": "Argentina",
+      "correctAnswer": "Buenos Aires",
+      "distractors": ["Cordoba", "Rosario", "Mendoza"],
+      "funFact": "Buenos Aires is famous for its vibrant street art and the passionate tango dance."
+    TypeOf: string
+    },
+    {
+      "country": "China",
+      "correctAnswer": "Beijing",
+      "distractors": ["Shanghai", "Chengdu", "Xi'an"],
+      "funFact": "Beijing is home to the Forbidden City, a massive imperial palace complex that was once off-limits to most people."
+    },
+    {
+      "country": "United States",
+      "correctAnswer": "Washington, D.C.",
+      "distractors": ["New York City", "Los Angeles", "Chicago"],
+      "funFact": "Washington, D.C., is not part of any state but a special federal district, designed to be politically neutral."
+    },
+    {
+      "country": "South Africa",
+      "correctAnswer": "Pretoria",
+      "distractors": ["Johannesburg", "Cape Town", "Durban"],
+      "funFact": "Pretoria is sometimes called 'Jacaranda City' because of the thousands of jacaranda trees that bloom beautiful purple flowers in spring."
+    },
+    {
+      "country": "Germany",
+      "correctAnswer": "Berlin",
+      "distractors": ["Munich", "Hamburg", "Frankfurt"],
+      "funFact": "Berlin has more bridges than Venice, despite being an inland city with numerous canals and rivers."
+    },
+    {
+      "country": "Mongolia",
+      "correctAnswer": "Ulaanbaatar",
+      "distractors": ["Erdenet", "Darkhan", "Khovd"],
+      "funFact": "Ulaanbaatar is one of the coldest capital cities in the world, with average winter temperatures often dropping far below freezing."
+    }
+  ]
+}
+```
+```

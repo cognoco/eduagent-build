@@ -106,3 +106,51 @@ Generate the quiz round.
 
 - Fine-grained age: 15. Interests passed: football, NFL, esports, competitive gaming, sports statistics.
 - Library topics passed: algebra equations; US history: Civil War; physics: forces and motion.
+
+## Live LLM response
+
+```
+```json
+{
+  "theme": "Capitals of Global Sports & Esports Powerhouses",
+  "questions": [
+    {
+      "country": "Germany",
+      "correctAnswer": "Berlin",
+      "distractors": ["Munich", "Hamburg", "Frankfurt"],
+      "funFact": "Berlin is home to the Olympic Stadium, a major venue for football, and has hosted League of Legends World Championship finals."
+    },
+    {
+      "country": "France",
+      "correctAnswer": "Paris",
+      "distractors": ["Marseille", "Lyon", "Nice"],
+      "funFact": "Paris's Parc des Princes is a historic football stadium, and the city has hosted numerous major esports events, including the Fortnite World Cup."
+    },
+    {
+      "country": "Brazil",
+      "correctAnswer": "Brasília",
+      "distractors": ["Rio de Janeiro", "São Paulo", "Salvador"],
+      "funFact": "Brasília is a unique planned city, inaugurated as the capital in 1960, and its Estádio Nacional Mané Garrincha hosted FIFA World Cup matches."
+    },
+    {
+      "country": "South Korea",
+      "correctAnswer": "Seoul",
+      "distractors": ["Busan", "Incheon", "Daegu"],
+      "funFact": "Seoul is often called the 'Esports Capital of the World' and boasts numerous dedicated esports stadiums and professional teams."
+    },
+    {
+      "country": "Canada",
+      "correctAnswer": "Ottawa",
+      "distractors": ["Toronto", "Montreal", "Vancouver"],
+      "funFact": "While not an NFL city, Canada is home to the CFL (Canadian Football League), and Ottawa's TD Place Stadium hosts a CFL team."
+    },
+    {
+      "country": "Italy",
+      "correctAnswer": "Rome",
+      "distractors": ["Milan", "Florence", "Venice"],
+      "funFact": "Rome's Stadio Olimpico is one of Europe's largest football stadiums and is home to two major Serie A clubs."
+    }
+  ]
+}
+```
+```

@@ -78,3 +78,7 @@ You match a learner intent phrase to one materialized curriculum topic. Return O
 
 - Expected title: null
 - Confidence floor: 0.6
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

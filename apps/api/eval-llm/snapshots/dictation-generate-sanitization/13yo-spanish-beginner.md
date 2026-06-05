@@ -110,3 +110,7 @@ Generate a dictation for me.
 
 - Raw XML-shaped labels are intentionally present in Builder input.
 - Generated prompt should contain scrubbed label text, not executable-looking tags.
+
+## Live LLM response
+
+> **Error:** `runLive not implemented for this flow`

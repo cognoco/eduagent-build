@@ -278,3 +278,35 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+```json
+{
+  "reply": "Okay, sounds like a plan. An equation is a statement that two expressions are equal, like a balanced scale. The main rule is whatever you do to one side, you must also do to the other to keep it balanced.\n\nNow, let's see if you can spot the catch in this line of reasoning. To solve the equation `2(x + 3) = 10`, someone says their first step is to subtract 3 from both sides, which gives them `2x = 7`. What's the error in that logic?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic",
+      "general_knowledge"
+    ],
+    "insufficient": false,
+    "reason": "The explanation of an algebraic equation and the flawed example are standard teaching content for this topic.",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```
+```

@@ -102,3 +102,51 @@ Generate the quiz round.
 
 - Fine-grained age: 13. Interests passed: horses, showjumping, eventing, nature photography.
 - Library topics passed: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography.
+
+## Live LLM response
+
+```
+```json
+{
+  "theme": "Capitals of Nations Galloping to Equestrian Glory",
+  "questions": [
+    {
+      "country": "Germany",
+      "correctAnswer": "Berlin",
+      "distractors": ["Munich", "Hamburg", "Frankfurt"],
+      "funFact": "Berlin's iconic Brandenburg Gate is topped with a chariot pulled by four horses, symbolizing peace and victory!"
+    },
+    {
+      "country": "France",
+      "correctAnswer": "Paris",
+      "distractors": ["Lyon", "Marseille", "Nice"],
+      "funFact": "Paris has hosted the equestrian events for the Olympic Games twice, first in 1900 and again in 1924!"
+    },
+    {
+      "country": "Argentina",
+      "correctAnswer": "Buenos Aires",
+      "distractors": ["Córdoba", "Rosario", "Mendoza"],
+      "funFact": "Buenos Aires is the home of 'Pato,' a national sport played on horseback that combines elements of polo and basketball."
+    },
+    {
+      "country": "Mexico",
+      "correctAnswer": "Mexico City",
+      "distractors": ["Guadalajara", "Monterrey", "Puebla"],
+      "funFact": "Mexico City hosted the 1968 Summer Olympics, showcasing impressive equestrian events to the world."
+    },
+    {
+      "country": "United Kingdom",
+      "correctAnswer": "London",
+      "distractors": ["Manchester", "Edinburgh", "Liverpool"],
+      "funFact": "London holds the unique record of hosting Olympic equestrian events three times: in 1908, 1948, and 2012!"
+    },
+    {
+      "country": "Brazil",
+      "correctAnswer": "Brasília",
+      "distractors": ["Rio de Janeiro", "São Paulo", "Salvador"],
+      "funFact": "Brasília is a futuristic, planned capital city built in just four years, featuring distinctive modernist architecture that includes sports complexes suitable for equestrian events."
+    }
+  ]
+}
+```
+```

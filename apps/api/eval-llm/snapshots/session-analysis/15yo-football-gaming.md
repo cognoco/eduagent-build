@@ -109,3 +109,7 @@ Learner: Oh! Okay that makes more sense now. Can we try one more?
 - MISSING: suppressed_inferences — LLM will re-emit signals the learner explicitly deleted.
 - MISSING: age — engagement/confidence signals aren't age-calibrated.
 - Transcript (user msg) is a synthetic 5-turn fake for snapshot purposes.
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

@@ -128,3 +128,165 @@ Generate a dictation for me.
 - i18n Phase 1: conversationLanguage=en wired for runtime preamble injection.
 - Interests wired (audit P0.1): football, NFL, esports, competitive gaming, sports statistics.
 - Library topics wired (audit P0.1): algebra equations, US history: Civil War, physics: forces and motion.
+
+## Live LLM response
+
+```
+```json
+{
+  "sentences": [
+    {
+      "text": "The stadium lights cast long, stark shadows across the field.",
+      "withPunctuation": "The stadium lights cast long comma stark shadows across the field period",
+      "wordCount": 9,
+      "chunks": [
+        "The stadium lights",
+        "cast long, stark shadows",
+        "across the field."
+      ],
+      "chunksWithPunctuation": [
+        "The stadium lights",
+        "cast long comma stark shadows",
+        "across the field period"
+      ]
+    },
+    {
+      "text": "He meticulously reviewed the projected trajectories of each play.",
+      "withPunctuation": "He meticulously reviewed the projected trajectories of each play period",
+      "wordCount": 9,
+      "chunks": [
+        "He meticulously reviewed",
+        "the projected trajectories",
+        "of each play."
+      ],
+      "chunksWithPunctuation": [
+        "He meticulously reviewed",
+        "the projected trajectories",
+        "of each play period"
+      ]
+    },
+    {
+      "text": "Every variable, every potential outcome, weighed heavily on him.",
+      "withPunctuation": "Every variable comma every potential outcome comma weighed heavily on him period",
+      "wordCount": 9,
+      "chunks": [
+        "Every variable,",
+        "every potential outcome,",
+        "weighed heavily on him."
+      ],
+      "chunksWithPunctuation": [
+        "Every variable comma",
+        "every potential outcome comma",
+        "weighed heavily on him period"
+      ]
+    },
+    {
+      "text": "A decisive choice would determine the game's ultimate trajectory.",
+      "withPunctuation": "A decisive choice would determine the game's ultimate trajectory period",
+      "wordCount": 9,
+      "chunks": [
+        "A decisive choice",
+        "would determine",
+        "the game's ultimate trajectory."
+      ],
+      "chunksWithPunctuation": [
+        "A decisive choice",
+        "would determine",
+        "the game's ultimate trajectory period"
+      ]
+    },
+    {
+      "text": "The opposing team's defense seemed an insurmountable, chaotic force.",
+      "withPunctuation": "The opposing team's defense seemed an insurmountable comma chaotic force period",
+      "wordCount": 8,
+      "chunks": [
+        "The opposing team's defense",
+        "seemed an insurmountable, chaotic force."
+      ],
+      "chunksWithPunctuation": [
+        "The opposing team's defense",
+        "seemed an insurmountable comma chaotic force period"
+      ]
+    },
+    {
+      "text": "Could their carefully honed strategy overcome such formidable resistance?",
+      "withPunctuation": "Could their carefully honed strategy overcome such formidable resistance question mark",
+      "wordCount": 9,
+      "chunks": [
+        "Could their carefully honed strategy",
+        "overcome such formidable resistance?"
+      ],
+      "chunksWithPunctuation": [
+        "Could their carefully honed strategy",
+        "overcome such formidable resistance question mark"
+      ]
+    },
+    {
+      "text": "He felt the immense pressure, a palpable, invisible weight.",
+      "withPunctuation": "He felt the immense pressure comma a palpable comma invisible weight period",
+      "wordCount": 9,
+      "chunks": [
+        "He felt the immense pressure,",
+        "a palpable, invisible weight."
+      ],
+      "chunksWithPunctuation": [
+        "He felt the immense pressure comma",
+        "a palpable comma invisible weight period"
+      ]
+    },
+    {
+      "text": "Victory depended on precise calculations, quick reflexes, and sheer will.",
+      "withPunctuation": "Victory depended on precise calculations comma quick reflexes comma and sheer will period",
+      "wordCount": 11,
+      "chunks": [
+        "Victory depended on",
+        "precise calculations,",
+        "quick reflexes,",
+        "and sheer will."
+      ],
+      "chunksWithPunctuation": [
+        "Victory depended on",
+        "precise calculations comma",
+        "quick reflexes comma",
+        "and sheer will period"
+      ]
+    },
+    {
+      "text": "A single misstep would unravel their meticulous, year-long preparation.",
+      "withPunctuation": "A single misstep would unravel their meticulous comma year-long preparation period",
+      "wordCount": 9,
+      "chunks": [
+        "A single misstep",
+        "would unravel their meticulous,",
+        "year-long preparation."
+      ],
+      "chunksWithPunctuation": [
+        "A single misstep",
+        "would unravel their meticulous comma",
+        "year-long preparation period"
+      ]
+    },
+    {
+      "text": "This moment demanded absolute clarity, unwavering focus, and resilience.",
+      "withPunctuation": "This moment demanded absolute clarity comma unwavering focus comma and resilience period",
+      "wordCount": 9,
+      "chunks": [
+        "This moment demanded",
+        "absolute clarity,",
+        "unwavering focus,",
+        "and resilience."
+      ],
+      "chunksWithPunctuation": [
+        "This moment demanded",
+        "absolute clarity comma",
+        "unwavering focus comma",
+        "and resilience period"
+      ]
+    }
+  ],
+  "title": "The Strategist's Gambit",
+  "topic": "Internal monologue on competitive strategy, physics of motion, and decision-making under pressure.",
+  "language": "en"
+}
+```
+```

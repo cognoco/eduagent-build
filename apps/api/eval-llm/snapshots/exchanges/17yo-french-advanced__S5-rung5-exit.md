@@ -284,3 +284,34 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+```json
+{
+  "reply": "I hear you. This is a tough one — let's come back to it fresh later. Sometimes the best way to understand something is to give your brain a break from it.\n\nFor now, we can shift back to the story and ideas in *L'Étranger*.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": true,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic"
+    ],
+    "insufficient": false,
+    "reason": "Applying Rung 5 exit protocol after repeated expressions of not understanding the concept. Redirecting back to the main topic.",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```
+```

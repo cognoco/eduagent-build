@@ -268,3 +268,7 @@ My answer says Rome conquered places mainly because merchants wanted rare spices
 - topicTitle: Ancient trade
 - sourceEvidence: learner_message:context, current_topic:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

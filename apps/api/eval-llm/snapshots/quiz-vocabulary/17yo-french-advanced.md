@@ -120,3 +120,64 @@ Generate the quiz round.
 - Fine-grained age: 17. Interests passed: French literature, philosophy, existentialism, creative writing.
 - Native language passed: cs — L1-aware distractors active for supported pairs.
 - Library topics passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.
+
+## Live LLM response
+
+```
+```json
+{
+  "theme": "French Literature & Philosophical Concepts",
+  "targetLanguage": "French",
+  "questions": [
+    {
+      "term": "l'absurde",
+      "correctAnswer": "the absurd",
+      "acceptedAnswers": ["the absurd", "absurdity"],
+      "distractors": ["the absolute", "the absurd thing", "the answer"],
+      "funFact": "The philosophy of Absurdism, famously explored by Albert Camus, highlights the conflict between humanity's search for meaning and the universe's indifference.",
+      "cefrLevel": "B2"
+    },
+    {
+      "term": "la condition humaine",
+      "correctAnswer": "the human condition",
+      "acceptedAnswers": ["the human condition"],
+      "distractors": ["human nature", "the human form", "the human state"],
+      "funFact": "This phrase refers to the fundamental experiences and characteristics that define human existence, such as birth, growth, emotion, conflict, and mortality.",
+      "cefrLevel": "B2"
+    },
+    {
+      "term": "remettre en question",
+      "correctAnswer": "to question",
+      "acceptedAnswers": ["to question", "to challenge", "to call into question"],
+      "distractors": ["to put back in question", "to give back a question", "to answer a question"],
+      "funFact": "This common phrase is often used in academic and philosophical discussions to talk about critically examining ideas or assumptions.",
+      "cefrLevel": "B2"
+    },
+    {
+      "term": "le récit",
+      "correctAnswer": "the narrative",
+      "acceptedAnswers": ["the narrative", "the story", "the account"],
+      "distractors": ["the receipt", "the recipe", "the repetition"],
+      "funFact": "In literature, 'le récit' refers to the sequence of events as they are told, distinguishing it from the 'histoire' (the actual events).",
+      "cefrLevel": "B1"
+    },
+    {
+      "term": "la raison",
+      "correctAnswer": "reason",
+      "acceptedAnswers": ["reason", "the reason", "intellect"],
+      "distractors": ["the season", "the solution", "the decision"],
+      "funFact": "During the Enlightenment, philosophers greatly emphasized the power of 'la raison' as the primary source of authority and legitimacy.",
+      "cefrLevel": "B1"
+    },
+    {
+      "term": "la conscience",
+      "correctAnswer": "consciousness",
+      "acceptedAnswers": ["consciousness", "conscience"],
+      "distractors": ["the science", "the knowledge", "the understanding"],
+      "funFact": "In philosophy, 'la conscience' can refer to both self-awareness and the moral sense of right and wrong.",
+      "cefrLevel": "B2"
+    }
+  ]
+}
+```
+```

@@ -78,3 +78,7 @@ Use clear, direct explanations suitable for a middle-schooler. You can name gram
 - ageYears=12 — explanation register calibrated to age.
 - preferredExplanations=["humor","examples","stories"] — tone shaped by style preferences.
 - Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

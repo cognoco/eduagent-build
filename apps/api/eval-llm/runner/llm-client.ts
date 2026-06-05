@@ -21,6 +21,7 @@
 
 import { routeAndCall } from '../../src/services/llm/router';
 import type { ChatMessage, EscalationRung } from '../../src/services/llm/types';
+import { callOpenRouterModel } from './llm-bootstrap';
 
 const HARNESS_FLOW_TAG = 'eval-harness';
 
@@ -29,6 +30,31 @@ type RouteAndCallOptions = NonNullable<Parameters<typeof routeAndCall>[2]>;
 /** Options accepted by the harness wrapper — the same shape `routeAndCall`
  *  accepts, minus `flow` (the wrapper hardcodes that). */
 export type HarnessLlmOptions = Omit<RouteAndCallOptions, 'flow'>;
+
+// ---------------------------------------------------------------------------
+// Candidate-model override (`--openrouter-model <slug>`)
+//
+// When set, EVERY runHarnessLlm call bypasses the production router and goes
+// to the named model via the eval-only OpenRouter adapter — same messages,
+// same prompts, verbatim (the prompts are model-agnostic by policy; per-model
+// overlays, if ever needed, are a separate routing concern, not a harness
+// concern). This is the executable form of the model-selection memo's §6
+// validation gate: run any flow's live evals against a candidate model before
+// adopting it, e.g.
+//
+//   doppler run -- pnpm eval:llm -- --flow safety-probes --live \
+//     --openrouter-model mistralai/mistral-small-2603
+//
+// NOTE: live runs overwrite the checked-in snapshot files with the candidate's
+// responses. After a candidate run, restore them before committing:
+//   git checkout -- apps/api/eval-llm/snapshots
+// ---------------------------------------------------------------------------
+
+let openRouterModelOverride: string | null = null;
+
+export function setOpenRouterModelOverride(model: string | null): void {
+  openRouterModelOverride = model;
+}
 
 /**
  * Run a real LLM call from the eval harness.
@@ -39,8 +65,15 @@ export type HarnessLlmOptions = Omit<RouteAndCallOptions, 'flow'>;
 export async function runHarnessLlm(
   messages: ChatMessage[],
   escalationRung: EscalationRung,
-  options?: HarnessLlmOptions
+  options?: HarnessLlmOptions,
 ): Promise<string> {
+  if (openRouterModelOverride) {
+    return callOpenRouterModel(messages, openRouterModelOverride, {
+      ...(options?.responseFormat === 'json'
+        ? { responseFormat: 'json' as const }
+        : {}),
+    });
+  }
   const result = await routeAndCall(messages, escalationRung, {
     ...options,
     flow: HARNESS_FLOW_TAG,

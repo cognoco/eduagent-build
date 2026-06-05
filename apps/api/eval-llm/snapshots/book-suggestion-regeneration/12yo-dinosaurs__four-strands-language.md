@@ -111,3 +111,7 @@ Generate the suggestions now.
 - studiedTopics: 4 (2+2 split path)
 - existingTitles: 2 books + 1 suggestions to avoid
 - Four Strands-adjacent language suggestions should include output, input, fluency, and form practice.
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

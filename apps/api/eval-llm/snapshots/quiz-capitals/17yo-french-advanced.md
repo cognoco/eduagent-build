@@ -103,3 +103,52 @@ Generate the quiz round.
 
 - Fine-grained age: 17. Interests passed: French literature, philosophy, existentialism, creative writing.
 - Library topics passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.
+
+## Live LLM response
+
+```
+```json
+{
+  "theme": "Capitals of Philosophical Crossroads: Cities that Shaped Existential and Enlightenment Thought",
+  "questions": [
+    {
+      "country": "Algeria",
+      "correctAnswer": "Algiers",
+      "distractors": ["Oran", "Constantine", "Tunis"],
+      "funFact": "Algiers is famously mentioned in Camus's *L'Étranger*, where much of the novel's action unfolds."
+     immunotherapy and chemotherapy ."
+    },
+    {
+      "country": "Germany",
+      "correctAnswer": "Berlin",
+      "distractors": ["Munich", "Hamburg", "Frankfurt"],
+      "funFact": "Berlin has more museums than rainy days, offering a vast repository of human thought and history."
+    },
+    {
+      "country": "United Kingdom",
+      "correctAnswer": "London",
+      "distractors": ["Manchester", "Edinburgh", "Dublin"],
+      "funFact": "London was home to many Enlightenment figures and boasts the world's oldest underground railway network."
+    },
+    {
+      "country": "Switzerland",
+      "correctAnswer": "Bern",
+      "distractors": ["Zurich", "Geneva", "Basel"],
+      "funFact": "Bern's medieval Old City is a UNESCO World Heritage site and is known for its distinctive arcades."
+    },
+    {
+      "country": "Netherlands",
+      "correctAnswer": "Amsterdam",
+      "distractors": ["Rotterdam", "Utrecht", "The Hague"],
+      "funFact": "Amsterdam has more bicycles than residents, embodying a practical approach to daily life that contrasts with complex philosophical debates."
+    },
+    {
+      "country": "Portugal",
+      "correctAnswer": "Lisbon",
+      "distractors": ["Porto", "Coimbra", "Madrid"],
+      "funFact": "Lisbon experienced a devastating earthquake in 1755, which profoundly influenced Enlightenment thinkers like Voltaire and his work *Candide*."
+    }
+  ]
+}
+```
+```

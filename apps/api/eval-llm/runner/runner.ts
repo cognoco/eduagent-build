@@ -37,6 +37,13 @@ export interface RunOptions {
    */
   maxLiveCalls?: number;
   /**
+   * Candidate-model gate: route every live call to this OpenRouter model slug
+   * (verbatim passthrough, e.g. "mistralai/mistral-small-2603") instead of the
+   * production router. Requires --live and OPENROUTER_API_KEY. The §6
+   * validation-gate switch from the 2026-06-05 model-selection memo.
+   */
+  openrouterModel?: string;
+  /**
    * Baseline regression guard. When true, after the run the CLI compares
    * `summary.envelopeMetrics` against the checked-in baseline file and
    * exits non-zero if any metric drifts more than `baselineTolerancePp`.
@@ -141,6 +148,9 @@ export function parseCliArgs(argv: string[]): {
       if (Number.isFinite(parsed) && parsed >= 0) {
         options.maxLiveCalls = parsed;
       }
+    } else if (arg === '--openrouter-model') {
+      const next = argv[++i];
+      if (next) options.openrouterModel = next;
     } else if (arg === '--check-baseline') {
       options.checkBaseline = true;
     } else if (arg === '--update-baseline') {

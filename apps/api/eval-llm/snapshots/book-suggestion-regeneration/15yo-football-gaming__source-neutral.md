@@ -93,3 +93,7 @@ Generate the suggestions now.
 - studiedTopics: 3 (2+2 split path)
 - existingTitles: 1 books + 0 suggestions to avoid
 - Descriptions must stay source-neutral: no precise unsourced dates, percentages, or overconfident claims.
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

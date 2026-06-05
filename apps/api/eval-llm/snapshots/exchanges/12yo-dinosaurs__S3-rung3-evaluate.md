@@ -278,3 +278,35 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+```json
+{
+  "reply": "Okay, sounds like a plan. The Mesozoic Era is a massive stretch of time in Earth's history, famously known as the Age of Dinosaurs. It's so long that it's divided into three periods: the Triassic, the Jurassic, and the Cretaceous.\n\nNow for a challenge — tell me what you think is wrong with this description:\n\n'The Mesozoic Era was one long, stable time when Earth was covered in hot, steamy jungles. All the famous dinosaurs, like Stegosaurus, Triceratops, and T. rex, lived together in these jungles, fighting for survival until an asteroid wiped them out.'",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic",
+      "general_knowledge"
+    ],
+    "insufficient": false,
+    "reason": "The core facts about the Mesozoic Era and its periods are well-established general knowledge and directly related to the current topic.",
+    "factual_confidence": 0.99
+  },
+  "confidence": "high"
+}
+```
+```

@@ -284,3 +284,35 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+```json
+{
+  "reply": "Alright, let me play devil's advocate for a moment.\n\nHere's one interpretation of the book: Absurdism in *L'Étranger* shows that because life has no grand meaning, the only logical response is emotional indifference. Meursault is the ideal absurd man because he's detached—he doesn't cry at his mother's funeral, he doesn't feel love for Marie, he shoots a man without real hatred. His indifference is the philosophical goal.\n\nWhat's the main problem with that interpretation?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic",
+      "general_knowledge"
+    ],
+    "insufficient": false,
+    "reason": "",
+    "factual_confidence": 0.98
+  },
+  "confidence": "high"
+}
+```
+```

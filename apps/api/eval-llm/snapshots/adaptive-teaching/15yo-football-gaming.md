@@ -66,3 +66,7 @@ Continue the exchange with the direct instruction frame above.
 - Receives (method): one of visual_diagrams / step_by_step / real_world_examples / practice_problems.
 - Direct instruction fires after 3 strikes (DEFAULT_MAX_STRIKES).
 - No personalization fields beyond struggle/method are read here — age/voice/interest tweaks would have to be added at the call site.
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`
