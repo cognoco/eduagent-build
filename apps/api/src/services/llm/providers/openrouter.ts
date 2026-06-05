@@ -1,0 +1,189 @@
+import {
+  makeChatStreamResult,
+  type LLMProvider,
+  type ChatMessage,
+  type ChatResult,
+  type ChatStreamResult,
+  type ModelConfig,
+} from '../types';
+import { normalizeStopReason, type StopReason } from '../stop-reason';
+import { SafetyFilterError } from '../../../errors';
+import { createProviderHttpError } from './errors';
+import { toOpenAIContent } from './openai';
+
+// ---------------------------------------------------------------------------
+// OpenRouter Provider — EVAL-ONLY model-candidate adapter
+//
+// Purpose: one adapter to A/B candidate models (Mistral Small 4, gpt-oss-120b,
+// US-hosted DeepSeek, …) in the eval harness (`pnpm eval:llm --live`) without
+// writing a per-vendor integration for each candidate. See
+// docs/meetings/2026-06-05-llm-model-selection-research-memo.md §4.
+//
+// NOT registered in production middleware (middleware/llm.ts) by design:
+// OpenRouter is a US broker — adding it to the production path for minors'
+// conversation data would add a processor to the B3 transfer/DPA chain.
+// If a candidate model wins its eval, promote it to a direct vendor
+// integration instead of shipping this adapter to production.
+//
+// Wire format: OpenAI-compatible chat completions. Model IDs are passed
+// through VERBATIM (e.g. "mistralai/mistral-small-2603",
+// "openai/gpt-oss-120b") — there is deliberately no MODEL_MAP here, because
+// the whole point is calling models the production router doesn't know.
+// ---------------------------------------------------------------------------
+
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+// 25s timeout — matches the other providers (CF Workers 30s subrequest wall
+// minus 5s buffer). Kept identical even though this adapter only runs in
+// Node eval contexts, so behavior doesn't change if it's ever reused.
+const OPENROUTER_TIMEOUT_MS = 25_000;
+
+type OpenRouterContent = ReturnType<typeof toOpenAIContent>;
+
+interface OpenRouterMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: OpenRouterContent;
+}
+
+interface OpenRouterRequest {
+  model: string;
+  messages: OpenRouterMessage[];
+  // OpenRouter normalizes `max_tokens` across all upstream providers
+  // (unlike OpenAI first-party, which moved to `max_completion_tokens`).
+  max_tokens: number;
+  response_format?: { type: 'json_object' };
+  // Provider-routing preferences. `zdr: true` restricts routing to
+  // zero-data-retention endpoints only — defensive default for this app
+  // (minors' data posture), even though eval traffic should already be
+  // synthetic. Do not remove without a compliance review.
+  provider: { zdr: boolean };
+}
+
+interface OpenRouterChoice {
+  message?: { content?: string };
+  finish_reason?: string;
+}
+
+interface OpenRouterResponse {
+  choices?: OpenRouterChoice[];
+  error?: { message: string; code?: number | string };
+}
+
+function toOpenRouterMessages(messages: ChatMessage[]): OpenRouterMessage[] {
+  return messages.map((m) => ({
+    role: m.role,
+    content: toOpenAIContent(m.content),
+  }));
+}
+
+function createOpenRouterContentFilterError(): SafetyFilterError {
+  return new SafetyFilterError(
+    'The response was blocked by content safety filters. Please try rephrasing your question.',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Provider factory
+// ---------------------------------------------------------------------------
+
+export function createOpenRouterProvider(apiKey: string): LLMProvider {
+  async function chat(
+    messages: ChatMessage[],
+    config: ModelConfig,
+  ): Promise<ChatResult> {
+    const body: OpenRouterRequest = {
+      // Verbatim passthrough — see header comment.
+      model: config.model,
+      messages: toOpenRouterMessages(messages),
+      max_tokens: config.maxTokens,
+      provider: { zdr: true },
+      ...(config.responseFormat === 'json'
+        ? { response_format: { type: 'json_object' as const } }
+        : {}),
+    };
+
+    const res = await fetch(OPENROUTER_BASE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        // Attribution headers — show up in the OpenRouter dashboard so eval
+        // traffic is identifiable. No auth significance.
+        'HTTP-Referer': 'https://eduagent.app',
+        'X-Title': 'EduAgent Eval Harness',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(OPENROUTER_TIMEOUT_MS),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw createProviderHttpError(
+        `OpenRouter API request failed (${res.status}): ${errorBody}`,
+        res.status,
+        errorBody,
+      );
+    }
+
+    const data = (await res.json()) as OpenRouterResponse;
+
+    if (data.error) {
+      // Preserve structured error as cause (mirrors openai.ts /
+      // FCR-2026-05-23-L11.F11) so Sentry groups by code if this ever runs
+      // in an instrumented context.
+      throw new Error(`OpenRouter API error: ${data.error.message}`, {
+        cause: data.error,
+      });
+    }
+
+    const choice = data.choices?.[0];
+    if (choice?.finish_reason === 'content_filter') {
+      throw createOpenRouterContentFilterError();
+    }
+
+    const text = choice?.message?.content;
+    if (!text) {
+      throw new Error('OpenRouter returned empty response');
+    }
+    return {
+      content: text,
+      // OpenRouter normalizes finish_reason to the OpenAI vocabulary
+      // ("stop" | "length" | "content_filter" | "tool_calls"), so the
+      // OpenAI normalization table applies.
+      stopReason: normalizeStopReason('openai', choice?.finish_reason),
+    };
+  }
+
+  return {
+    id: 'openrouter',
+    chat,
+
+    /**
+     * EVAL-ONLY buffered stream: performs a non-streaming chat() and yields
+     * the full content once. The eval harness never streams (`callLlm` /
+     * `runHarnessLlm` are non-streaming), so a real SSE implementation would
+     * be dead code here. If this provider is ever promoted to production,
+     * implement true SSE streaming first (or extract the shared
+     * OpenAI-compatible SSE parser from providers/openai.ts).
+     */
+    chatStream(messages: ChatMessage[], config: ModelConfig): ChatStreamResult {
+      let resolveStop!: (r: StopReason) => void;
+      const stopReasonPromise = new Promise<StopReason>((resolve) => {
+        resolveStop = resolve;
+      });
+
+      async function* generate(): AsyncIterable<string> {
+        try {
+          const result = await chat(messages, config);
+          resolveStop(result.stopReason);
+          yield result.content;
+        } catch (err) {
+          resolveStop('unknown');
+          throw err;
+        }
+      }
+
+      return makeChatStreamResult(generate(), stopReasonPromise);
+    },
+  };
+}

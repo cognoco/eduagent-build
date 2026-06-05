@@ -39,6 +39,9 @@ import { exchangesFlow } from './flows/exchanges';
 import { topicProbeSignalsFlow } from './flows/topic-probe-signals';
 import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
 import { probesFlow } from './flows/probes';
+// [H3 — 2026-06-05 safety audit] Adversarial safety regression suite:
+// jailbreaks, prompt extraction, crisis disclosures, harmful-content asks.
+import { safetyProbesFlow } from './flows/safety-probes';
 import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
 import { progressSummaryFlow } from './flows/progress-summary';
 import { assessmentEvaluationFlow } from './flows/assessment-evaluation';
@@ -97,6 +100,7 @@ const FLOWS: FlowDefinition[] = [
   topicProbeSignalsFlow as FlowDefinition,
   topicIntentMatcherFlow as FlowDefinition,
   probesFlow as FlowDefinition,
+  safetyProbesFlow as FlowDefinition,
   bookSuggestionRegenerationFlow as FlowDefinition,
   progressSummaryFlow as FlowDefinition,
   assessmentEvaluationFlow as FlowDefinition,

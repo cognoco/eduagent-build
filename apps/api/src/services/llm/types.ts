@@ -10,7 +10,7 @@ export type { StopReason };
 
 /** Model selection based on rung */
 export interface ModelConfig {
-  provider: 'gemini' | 'openai' | 'anthropic' | 'mock';
+  provider: 'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'mock';
   model: string;
   maxTokens: number;
   /** Ask providers with native support to constrain output to JSON. */

@@ -40,8 +40,63 @@ import {
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import { stripPhoneticHints } from './llm/sanitize';
+import { safeSend } from './safe-non-core';
+import { inngest } from '../inngest/client';
 
 const logger = createLogger();
+
+/**
+ * [H2/H7 — 2026-06-05 safety audit] Structured safety event when the
+ * crisis-redirect rule fires (learner expressed distress / self-harm
+ * ideation / bullying / abuse and the model redirected to a trusted
+ * adult/helpline).
+ *
+ * Before this, the redirect fired with zero logging — "how many learners
+ * mentioned self-harm last month?" was unanswerable (a silent-recovery
+ * violation on the highest-stakes path in the app, and a DPIA-visible gap).
+ *
+ * Deliberately logs METADATA ONLY — never the learner's message or the
+ * model's reply. §6 ruling (2026-06-05): internal logging only, no guardian
+ * notification; the structured event is the prerequisite for any future
+ * notification design.
+ */
+export async function emitCrisisRedirectEvent(context: {
+  sessionId?: string;
+  profileId?: string;
+  flow: string;
+  provider?: string;
+  model?: string;
+}): Promise<void> {
+  logger.warn('safety.crisis_redirect_fired', {
+    flow: context.flow,
+    session_id: context.sessionId,
+    profile_id: context.profileId,
+    provider: context.provider,
+    model: context.model,
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only marker (H2/H7, 2026-06-05 safety
+        // audit). The user-facing response (empathize + helpline redirect)
+        // already happened in the LLM reply; this event exists so ops can
+        // query "crisis redirects per week" in the dashboard and so RR-12's
+        // monitoring guardrail has a signal. No downstream handler is needed
+        // or intended until the §6(b) guardian-notification design is ruled.
+        name: 'app/safety.crisis_redirect_fired',
+        data: {
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: context.flow,
+          provider: context.provider,
+          model: context.model,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'safety.crisis_redirect_fired',
+    { sessionId: context.sessionId, profileId: context.profileId },
+  );
+}
 
 /**
  * F1.1 — Server-side hard cap on interview / onboarding exchanges. Per the
@@ -1417,6 +1472,20 @@ export async function processExchange(
     flow: 'processExchange',
   });
   const finalParsed = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+
+  // [H2/H7] Crisis redirect fired — emit the structured safety event before
+  // anything else can short-circuit. safeSend guarantees a dispatch failure
+  // never breaks the learner-facing exchange.
+  if (finalParsed.crisisRedirect) {
+    await emitCrisisRedirectEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: 'exchange.process',
+      provider: result.provider,
+      model: result.model,
+    });
+  }
+
   const privateSourcesForAudit = inferObviousReliableSourceForAudit(
     finalParsed.privateSources,
     sourceEvidence,
@@ -1547,6 +1616,8 @@ export interface ParsedExchangeEnvelope {
   understandingCheck: boolean;
   partialProgress: boolean;
   needsDeepening: boolean;
+  /** Safety: crisis-redirect rule fired this turn (H2, 2026-06-05 safety audit). Observational — drives structured safety logging, never flow control. */
+  crisisRedirect: boolean;
   notePrompt: boolean;
   notePromptPostSession: boolean;
   /** Challenge Round: model proposed an offer; caller gates eligibility. */
@@ -1601,6 +1672,7 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   understandingCheck: false,
   partialProgress: false,
   needsDeepening: false,
+  crisisRedirect: false,
   notePrompt: false,
   notePromptPostSession: false,
   challengeRoundOffer: false,
@@ -1733,6 +1805,7 @@ export function parseExchangeEnvelope(
       understandingCheck: detectUnderstandingCheckFromProse(fallbackText),
       partialProgress: false,
       needsDeepening: false,
+      crisisRedirect: false,
       notePrompt: false,
       notePromptPostSession: false,
       challengeRoundOffer: false,
@@ -1792,6 +1865,7 @@ function envelopeToParsedExchange(
       detectUnderstandingCheckFromProse(cleanReply),
     partialProgress: signals.partial_progress === true,
     needsDeepening: signals.needs_deepening === true,
+    crisisRedirect: signals.crisis_redirect === true,
     notePrompt: notePrompt?.show === true,
     notePromptPostSession: notePrompt?.post_session === true,
     challengeRoundOffer: signals.challenge_round_offer === true,

@@ -5,6 +5,7 @@ import type {
   ModelConfig,
   MessagePart,
 } from '../types';
+import { SafetyFilterError } from '../../../errors';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -347,6 +348,84 @@ describe('Gemini Provider', () => {
       await expect(
         provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
       ).rejects.toThrow('blocked by content safety filters');
+    });
+
+    // [H1 — 2026-06-05 safety audit][BREAK] Every content-block reason must
+    // be a terminal SafetyFilterError, not just SAFETY. Before the fix,
+    // PROHIBITED_CONTENT / BLOCKLIST / SPII surfaced as generic errors which
+    // the router retried and FELL BACK to another provider — re-opening the
+    // "Gemini refused, ask someone else" loophole. Reverting
+    // isTerminalBlockReason() in gemini.ts makes these fail.
+    describe('[H1] non-SAFETY content-block reasons are terminal SafetyFilterError', () => {
+      it.each(['PROHIBITED_CONTENT', 'BLOCKLIST'])(
+        'prompt-level blockReason %s throws SafetyFilterError',
+        async (blockReason) => {
+          fetchSpy.mockResolvedValue(
+            mockFetchResponse({
+              promptFeedback: { blockReason },
+              candidates: [],
+            }),
+          );
+
+          await expect(
+            provider.chat(
+              [{ role: 'user', content: 'blocked prompt' }],
+              DEFAULT_CONFIG,
+            ),
+          ).rejects.toThrow(SafetyFilterError);
+        },
+      );
+
+      it.each(['PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'IMAGE_SAFETY'])(
+        'candidate-level finishReason %s throws SafetyFilterError',
+        async (finishReason) => {
+          fetchSpy.mockResolvedValue(
+            mockFetchResponse({
+              candidates: [{ content: { parts: [] }, finishReason }],
+            }),
+          );
+
+          await expect(
+            provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
+          ).rejects.toThrow(SafetyFilterError);
+        },
+      );
+
+      it('RECITATION is NOT terminal — copyright block, retry elsewhere is acceptable', async () => {
+        fetchSpy.mockResolvedValue(
+          mockFetchResponse({
+            candidates: [
+              { content: { parts: [] }, finishReason: 'RECITATION' },
+            ],
+          }),
+        );
+
+        // Empty parts + non-terminal reason → generic empty-response error,
+        // which the router treats as transient (retry/fallback allowed).
+        await expect(
+          provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
+        ).rejects.toThrow('Gemini returned empty response');
+      });
+
+      it('stream: candidate-level PROHIBITED_CONTENT throws SafetyFilterError', async () => {
+        const chunk = `data: ${JSON.stringify({
+          candidates: [
+            { content: { parts: [] }, finishReason: 'PROHIBITED_CONTENT' },
+          ],
+        })}`;
+        fetchSpy.mockResolvedValue(mockStreamResponse(chunk));
+
+        const streamResult = provider.chatStream(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG,
+        );
+
+        await expect(async () => {
+          for await (const _ of streamResult) {
+            // drain
+          }
+        }).rejects.toThrow(SafetyFilterError);
+      });
     });
   });
 

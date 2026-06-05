@@ -170,16 +170,37 @@ function extractFinishReason(data: GeminiResponse): string | undefined {
   return data.candidates?.[0]?.finishReason;
 }
 
+// [H1 — 2026-06-05 safety audit] ALL of Gemini's content-block reasons are
+// terminal, not just `SAFETY`. Previously `PROHIBITED_CONTENT`, `BLOCKLIST`,
+// and `SPII` surfaced as generic errors, which the router treats as
+// *transient* — it retried and fell back to another provider, re-opening
+// exactly the "Gemini refused, ask someone else" loophole that
+// SafetyFilterError's no-retry/no-fallback rule (router.ts:617, 660-685) was
+// built to close. `IMAGE_SAFETY` is included as the same class.
+// `RECITATION` is deliberately excluded: it is a copyright/licensing block,
+// not a content-safety judgment — retrying it elsewhere is acceptable.
+const TERMINAL_BLOCK_REASONS = new Set([
+  'SAFETY',
+  'PROHIBITED_CONTENT',
+  'BLOCKLIST',
+  'SPII',
+  'IMAGE_SAFETY',
+]);
+
+function isTerminalBlockReason(reason: string | undefined): boolean {
+  return reason !== undefined && TERMINAL_BLOCK_REASONS.has(reason);
+}
+
 function extractResponseText(data: GeminiResponse): string {
-  // Prompt-level safety block — the entire input was rejected
-  if (data.promptFeedback?.blockReason === 'SAFETY') {
+  // Prompt-level content block — the entire input was rejected
+  if (isTerminalBlockReason(data.promptFeedback?.blockReason)) {
     throw new SafetyFilterError(
       'Your message could not be processed due to content safety filters. Please rephrase and try again.',
     );
   }
 
-  // Candidate-level safety block — the generated output was rejected
-  if (data.candidates?.[0]?.finishReason === 'SAFETY') {
+  // Candidate-level content block — the generated output was rejected
+  if (isTerminalBlockReason(data.candidates?.[0]?.finishReason)) {
     throw new SafetyFilterError(
       'The response was blocked by content safety filters. Please try rephrasing your question.',
     );
@@ -292,13 +313,16 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
               try {
                 const chunk = JSON.parse(jsonStr) as GeminiResponse;
 
-                // Safety block during streaming
-                if (chunk.promptFeedback?.blockReason === 'SAFETY') {
+                // Content block during streaming — [H1] all terminal block
+                // reasons, not just SAFETY (see TERMINAL_BLOCK_REASONS above).
+                if (isTerminalBlockReason(chunk.promptFeedback?.blockReason)) {
                   throw new SafetyFilterError(
                     'Your message could not be processed due to content safety filters. Please rephrase and try again.',
                   );
                 }
-                if (chunk.candidates?.[0]?.finishReason === 'SAFETY') {
+                if (
+                  isTerminalBlockReason(chunk.candidates?.[0]?.finishReason)
+                ) {
                   throw new SafetyFilterError(
                     'The response was blocked by content safety filters. Please try rephrasing your question.',
                   );
