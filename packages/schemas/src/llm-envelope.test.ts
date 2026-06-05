@@ -662,6 +662,43 @@ describe('normaliseSignals', () => {
     expect(result.challenge_round_offer).toBe(false);
     expect(result.challenge_round_evaluation).toEqual([]);
   });
+
+  // [H2 — 2026-06-05 safety audit] crisis_redirect signal
+  it('defaults crisis_redirect to false', () => {
+    expect(normaliseSignals(undefined).crisis_redirect).toBe(false);
+    expect(normaliseSignals({}).crisis_redirect).toBe(false);
+  });
+
+  it('passes through explicit crisis_redirect', () => {
+    expect(normaliseSignals({ crisis_redirect: true }).crisis_redirect).toBe(
+      true,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [H2 — 2026-06-05 safety audit] crisis_redirect envelope signal
+// ---------------------------------------------------------------------------
+
+describe('crisis_redirect envelope signal', () => {
+  it('accepts crisis_redirect signal', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply:
+        "I'm sorry you're going through this. This is something to talk about with a parent, guardian, or trusted adult.",
+      signals: { crisis_redirect: true },
+      confidence: 'high',
+    });
+    expect(parsed.signals?.crisis_redirect).toBe(true);
+  });
+
+  it('tolerates null crisis_redirect (LLM emitting null for unset)', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Back to fractions.',
+      signals: { crisis_redirect: null },
+      confidence: 'medium',
+    });
+    expect(parsed.signals?.crisis_redirect ?? false).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
