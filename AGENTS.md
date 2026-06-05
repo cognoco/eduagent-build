@@ -42,6 +42,40 @@ Key skills:
 | systematic-debugging | Any bug, test failure, or unexpected behavior | `.agents/skills/systematic-debugging/SKILL.md` |
 | verification-before-completion | About to claim work is done, fixed, or passing | `.agents/skills/verification-before-completion/SKILL.md` |
 
+## Output Conventions
+
+How to talk to the users): they run 7–8 parallel sessions and cannot hold opaque IDs in their head, and they lose time digging the signal out of long replies. These two rules fix that. (Trialed here project-local; promote to global config if it works.)
+
+### Naming opaque references
+
+On the **first mention per message** of any identifier whose meaning isn't reconstructable from context — migration numbers, stage/phase codes (`T1`, `E3`), ADR/WI/ticket IDs, feature flags, history-laden table/column names — never write the bare token. Expand it telegraphically, caveman style (dense fragments, dashes, no filler verbs):
+
+> **`ID` — what it is; where it sits in any sequence; what it does / why it matters; current state**
+
+Example — not "deferred to T1 revert" but "deferred to **`T1` — stage 1 of the old 6-stage identity migration; shipped empty org/membership tables, wired no readers; now being reverted**." Later mentions of the same token in the same message stay bare. Don't expand self-describing names; don't re-expand a token twice in one message.
+
+### Closing summary
+
+End every substantive reply with a roundup block so the signal isn't buried in prose, using bracketed-caps headers so each section reads as a distinct element. Skip only for trivial one-line exchanges.
+
+FFour standard buckets (below). **Show a bucket only when something genuinely fits it** — omit empty ones, never pad with "N/A". The four are defaults, **not a cage**: add another bracketed section (e.g. `[ RISK ]`, `[ BLOCKED ON ]`) whenever real content fits a category these four don't cover. Be conservative, and don't create elements just to fill up a bucket. Only genuinely useful information or required actions or decisions should be listed.
+
+```
+---
+**[ BOTTOM LINE ]** <one sentence — the conclusion or current state>
+
+**[ FYI ]** <no action needed; omit if empty>
+- <happened / worth knowing / bears watching>
+
+**[ ACTIONS ]** <things to do that aren't forks — run X, approve Y, optional; omit if none>
+1. <concrete, actionable without rereading the body>
+
+**[ DECISIONS ]** <forks that block progress until ruled; omit if none>
+1. <the choice to rule on — name the recommended option>
+```
+
+Sorting test: **DECISIONS** = "I can't responsibly continue until you choose"; **ACTIONS** = "a task or option that doesn't gate the main thread." `[ DECISIONS ]` goes **last** (the gate, under the cursor at reply time); number DECISIONS and ACTIONS independently so "Decision 2" and "Action 1" never collide. Don't pad — one honest sentence beats three hedged ones.
+
 ## Git Commits
 
 Always load the commit skill from `.agents/skills/commit/SKILL.md` before committing. It is the single source of truth for staging, message format, hook handling, and push behavior. Never use ad-hoc commit flows, `--no-verify`, or broad staging without first checking scope.
