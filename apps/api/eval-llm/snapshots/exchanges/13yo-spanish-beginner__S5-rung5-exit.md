@@ -285,3 +285,15 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Think of ser as the tree’s species – it tells what something is and doesn’t change. For example: soy Juan (I am Juan), la mesa es de madera (the table is made of wood), son las tres (it is three o'clock), soy español (I am Spanish).\\n\\nThink of estar as where the tree is right now or how it feels at the moment – location, condition, or an ongoing action. For example: estoy en la escuela (I am at school), está cansado (he is tired), estamos comiendo (we are eating).\\n\\nNow try this: Fill in the correct verb (ser or estar) in the sentence: \"Yo ___ (ser/estar) enfermo ___ (hoy/siempre).\" Which verb fits and why?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Used reliable curriculum content on Spanish present tense verbs.", "factual_confidence": 0.99 },
+  "confidence": "high"
+}
+```

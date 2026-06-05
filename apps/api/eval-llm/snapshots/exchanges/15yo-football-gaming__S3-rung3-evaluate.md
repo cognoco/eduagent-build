@@ -279,3 +279,30 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Quick check — let me try to trip you up.\nTo solve the equation 2x + 5 = 13, some people say you can first divide both sides by 2, giving x + 2.5 = 6.5, and then subtract 5 to get x = 1.5. Does that sound right to you?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "used loaded curriculum content on algebra equations",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```

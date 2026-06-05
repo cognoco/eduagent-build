@@ -253,3 +253,15 @@ Start a learning session about algebra equations.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "An algebraic equation states that two expressions are equal. For example, 3x + 5 = 20 shows that the expression on the left equals the one on the right. To solve an equation we isolate the variable by applying inverse operations to both sides, keeping the equality true. Using these ideas, what value of x makes the equation 3x + 5 = 20 true?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Provided definition and solving method from current_topic", "factual_confidence": 1.0 },
+  "confidence": "high"
+}
+```

@@ -279,3 +279,46 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## ⚠️ Schema violation
+
+The live LLM response did not conform to the flow's `expectedResponseSchema`:
+
+```
+JSON parse failed: Unexpected token 'F', "Factoring "... is not valid JSON
+```
+
+## Live LLM response
+
+```
+Factoring a polynomial means rewriting it as a product of simpler polynomials.  Think of it like breaking a sports team into smaller units that work together: the whole team’s score (the original polynomial) can be expressed as the combined scores of the sub‑teams (the factors).
+
+You can do this by using the distributive property in reverse.  
+For example, for the quadratic  
+
+```
+x² + 5x + 6
+```
+
+you look for two numbers that multiply to 6 (the constant term) and add to 5 (the coefficient of x). Those numbers are 2 and 3. So you split the middle term:
+
+```
+x² + 2x + 3x + 6
+```
+
+Now group the terms and factor each group:
+
+```
+(x² + 2x) + (3x + 6) = x(x + 2) + 3(x + 2)
+```
+
+Since both groups contain the common factor (x + 2), pull it out:
+
+```
+(x + 2)(x + 3)
+```
+
+So x² + 5x + 6 = (x + 2)(x + 3).  
+
+**Check:** Can you factor the quadratic `x² + 7x + 10` using the same steps
+```
