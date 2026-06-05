@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Landscape — Age × Country Explorer</title>
+<style>
+  :root {
+    --bg: #0b1117;
+    --panel: #111a22;
+    --panel2: #16212b;
+    --fg: #e8eef4;
+    --muted: #8b98a5;
+    --border: #243240;
+    --teal: #2dd4bf;
+    --lavender: #a78bfa;
+
+    --c-adult:   #1d4a44;  /* adult — calm green-teal */
+    --c-self:    #0e6d61;  /* self-serve minor — teal */
+    --c-parent:  #8a5a13;  /* parent gate (legal) — amber */
+    --c-over:    #5b4a86;  /* parent gate by our choice — lavender */
+    --c-u13p:    #9a4a0e;  /* under-13 parent auth (non-US) — deep orange */
+    --c-vpc:     #8a2f4f;  /* under-13 US — COPPA VPC — magenta-red */
+    --c-gap:     #b91c1c;  /* compliance gap — red */
+    --c-floor:   #2a3440;  /* blocked by floor — slate */
+    --c-counsel: #3d3526;  /* counsel-gate — dark khaki */
+    --c-store:   #1c242d;  /* store-blocked — near-bg */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg); color: var(--fg); line-height: 1.45; font-size: 14px;
+  }
+  header { padding: 18px 26px 14px; border-bottom: 1px solid var(--border); }
+  h1 { margin: 0 0 4px; font-size: 19px; font-weight: 650; letter-spacing: .2px; }
+  h1 .accent { color: var(--teal); }
+  .subtitle { color: var(--muted); font-size: 12.5px; margin: 0; max-width: 1100px; }
+  .subtitle b { color: var(--fg); font-weight: 600; }
+
+  .bar {
+    display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end;
+    padding: 14px 26px; border-bottom: 1px solid var(--border); background: var(--panel);
+    position: sticky; top: 0; z-index: 40;
+  }
+  .ctl { display: flex; flex-direction: column; gap: 5px; }
+  .ctl > label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .seg { display: flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+  .seg button {
+    background: transparent; color: var(--muted); border: none; padding: 7px 13px;
+    font-size: 12.5px; cursor: pointer; border-right: 1px solid var(--border); white-space: nowrap;
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.on { background: var(--panel2); color: var(--teal); font-weight: 600; }
+  .seg.presets button.on { color: var(--lavender); }
+  .ctl input[type=text] {
+    background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 7px; padding: 7px 11px; font-size: 13px; min-width: 190px;
+  }
+
+  .stats {
+    display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 26px 0;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; min-width: 120px;
+  }
+  .stat .v { font-size: 18px; font-weight: 650; }
+  .stat .l { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .stat.bad { border-color: #7f1d1d; background: #2a1212; }
+  .stat.bad .v { color: #f87171; }
+  .stat.over .v { color: var(--lavender); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 7px 14px; padding: 12px 26px 4px; font-size: 12px; color: var(--muted); }
+  .li { display: flex; align-items: center; gap: 6px; }
+  .sw { width: 13px; height: 13px; border-radius: 3px; flex: 0 0 auto; }
+  .sw.striped { background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(255,255,255,.18) 3px 5px); }
+
+  main { padding: 12px 26px 40px; }
+  .gridwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 880px; font-size: 12px; }
+  thead th {
+    background: var(--panel2); color: var(--muted); font-weight: 600; font-size: 11px;
+    padding: 8px 6px; text-align: center; position: sticky; top: 0; z-index: 10;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th:first-child { text-align: left; padding-left: 12px; z-index: 12; }
+  tbody td { border-bottom: 1px solid #18222c; }
+  td.country {
+    background: var(--panel); padding: 6px 10px 6px 12px; white-space: nowrap;
+    font-weight: 600; cursor: pointer; min-width: 220px;
+    position: sticky; left: 0; z-index: 5;
+  }
+  td.country:hover { color: var(--teal); }
+  td.country .tags { margin-left: 7px; display: inline-flex; gap: 4px; vertical-align: middle; }
+  .tag {
+    display: inline-block; font-size: 9.5px; font-weight: 600; letter-spacing: .4px;
+    padding: 1.5px 6px; border-radius: 9px; border: 1px solid var(--border); color: var(--muted);
+  }
+  .tag.loc { color: var(--teal); border-color: #1d5a52; }
+  .tag.loc.irony { color: #fca5a5; border-color: #7f1d1d; }
+  tr.ghead td {
+    background: var(--bg); color: var(--lavender); font-size: 11px; font-weight: 650;
+    text-transform: uppercase; letter-spacing: .7px; padding: 12px 12px 5px;
+    border-bottom: 1px solid var(--border); position: sticky; left: 0;
+  }
+  td.cell {
+    text-align: center; padding: 7px 4px; cursor: pointer; min-width: 58px;
+    color: rgba(255,255,255,.88); font-size: 10.5px; font-weight: 600; letter-spacing: .2px;
+    transition: filter .08s;
+  }
+  td.cell:hover { filter: brightness(1.35); }
+  td.cell.r-adult   { background: var(--c-adult); }
+  td.cell.r-self    { background: var(--c-self); }
+  td.cell.r-parent  { background: var(--c-parent); }
+  td.cell.r-over    { background: var(--c-over);
+    background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,.10) 4px 7px); }
+  td.cell.r-u13p    { background: var(--c-u13p); }
+  td.cell.r-vpc     { background: var(--c-vpc); }
+  td.cell.r-gap     { background: var(--c-gap); animation: pulse 1.6s ease-in-out infinite; }
+  td.cell.r-floor   { background: var(--c-floor); color: var(--muted); font-weight: 400; }
+  td.cell.r-counsel { background: var(--c-counsel); color: #cdbf9b; }
+  td.cell.r-store   { background: var(--c-store); color: #5b6873; font-weight: 400; }
+  @keyframes pulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+
+  /* drawer */
+  .drawer {
+    position: fixed; top: 0; right: -480px; width: 460px; max-width: 94vw; height: 100vh;
+    background: var(--panel); border-left: 1px solid var(--border); z-index: 100;
+    transition: right .18s ease; overflow-y: auto; padding: 20px 22px 40px;
+    box-shadow: -18px 0 40px rgba(0,0,0,.45);
+  }
+  .drawer.open { right: 0; }
+  .drawer h2 { margin: 0 0 2px; font-size: 16px; }
+  .drawer .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .drawer .x {
+    position: absolute; top: 12px; right: 14px; background: none; border: none;
+    color: var(--muted); font-size: 20px; cursor: pointer;
+  }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px;
+    font-weight: 650; margin: 0 0 12px;
+  }
+  .f { margin-bottom: 13px; }
+  .f .fl { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 3px; }
+  .f .fv { font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 2.5px 8px; font-size: 11px; cursor: default;
+  }
+  .chip b { color: var(--teal); font-weight: 650; }
+  .chip.b b { color: #f0a3bd; }
+  .chip.choice { border-style: dashed; }
+  .note { font-size: 12px; color: var(--muted); border-left: 3px solid var(--border); padding: 6px 10px; margin-top: 6px; }
+  .note.warn { border-color: #b91c1c; color: #fca5a5; }
+  .note.over { border-color: var(--lavender); color: #c4b5fd; }
+
+  /* 8-dimension liability rows (walkthrough corpus) */
+  .dims { margin-top: 16px; }
+  .dims > .fl { margin-bottom: 6px; }
+  .dim { border-top: 1px solid #1c2630; padding: 8px 0 7px; }
+  .dim .dh { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 650; }
+  .cdot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .ktag { font-size: 9px; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 1px 6px; letter-spacing: .3px; }
+  .nounlock { font-size: 9px; color: #fca5a5; border: 1px solid #7f1d1d; border-radius: 8px; padding: 1px 6px; letter-spacing: .3px; }
+  .dim .dr { font-size: 11.5px; color: #b9c4cf; margin: 4px 0 2px; line-height: 1.5; }
+  .dim .dr.unknown { color: var(--muted); font-style: italic; }
+  .dim .dc { font-size: 10px; color: var(--muted); }
+  .dim .dc b { color: var(--muted); font-weight: 600; }
+
+  .minirow { display: flex; gap: 3px; margin-top: 4px; }
+  .minirow .m { flex: 1; text-align: center; font-size: 9.5px; padding: 5px 1px; border-radius: 3px; color: rgba(255,255,255,.85); }
+
+  footer { padding: 18px 26px 36px; color: var(--muted); font-size: 11.5px; border-top: 1px solid var(--border); margin-top: 8px; }
+  footer .always { margin-bottom: 8px; }
+  footer b { color: var(--fg); }
+  details summary { cursor: pointer; color: var(--lavender); font-size: 12px; margin: 6px 0; }
+  .reqlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 3px 18px; font-size: 11.5px; }
+  .reqlist span b { color: var(--teal); }
+  .reqlist span.b b { color: #f0a3bd; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Launch Landscape — <span class="accent">Age × Country</span> Explorer</h1>
+  <p class="subtitle">
+    Every country from the 2026-06-04 minutes' matrix × every age 10→18+. <b>Click any cell</b> for what that exact user entails
+    (who consents, how, LLM access, which requirement items switch on). <b>Click a country</b> for its row logic.
+    The toggles are the open decision levers — flip them and watch the implications. Policy map, not legal advice; floor decision not yet cemented.
+  </p>
+</header>
+
+<div class="bar">
+  <div class="ctl">
+    <label>Preset</label>
+    <div class="seg presets" id="presets">
+      <button data-p="code">Today's code (11+ · blind ≤16)</button>
+      <button data-p="thirteen">13+ · blind ≤16</button>
+      <button data-p="legal">13+ · legal minimum</button>
+      <button data-p="ten">10+ · blind ≤16</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>Age floor (the open decision)</label>
+    <div class="seg" id="floorSeg">
+      <button data-f="10">10+</button>
+      <button data-f="11">11+ (code today)</button>
+      <button data-f="13">13+</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>Consent shape</label>
+    <div class="seg" id="shapeSeg">
+      <button data-s="blind">Parent consent ≤16, location-blind (built)</button>
+      <button data-s="legal">Legal minimum per country</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>Find country</label>
+    <input type="text" id="search" placeholder="e.g. Germany">
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="legend" id="legend"></div>
+
+<main>
+  <div class="gridwrap">
+    <table id="grid"></table>
+  </div>
+</main>
+
+<footer>
+  <div class="always">
+    <b>Always on, every cell, every toggle:</b> the company-level stack — A1 DPIA · A2 DPO · A3 ROPA · A4 breach plan ·
+    A5 privacy policy · A9 real consent · A11 provider DPA · A12 transfer check · A13 minimisation · A23 Art 9 decision.
+    Your Norwegian seat carries these into every launch shape; no toggle above can remove them.
+  </div>
+  <details>
+    <summary>Requirement ID reference (A = 13+ list · B = under-13 add-on)</summary>
+    <div class="reqlist" id="reqlist"></div>
+  </details>
+  <div style="margin-top:10px">
+    Sources — verified research only: <b>(1)</b> consent/access grid: <b>docs/meetings/2026-06-04-age-floor-decision-minutes.md</b> country matrix §5 (source-anchored follow-up research) ·
+    <b>(2)</b> requirement chips: <b>docs/meetings/minors-compliance-requirements.md</b> (Where/Who-tagged checklist) ·
+    <b>(3)</b> per-cell dimension ceilings: same two docs + the 2026-06-03 compliance canon (two age lines; universal ceilings vs banded consent).
+    The <b>_wip/identity-foundation/age-consent-landscape</b> corpus was reviewed and deliberately NOT embedded — PoC-grade,
+    needs schema + verification work before it can feed this page. Generated 2026-06-05. Research pending counsel sign-off, not legal advice.
+  </div>
+</footer>
+
+<div class="drawer" id="drawer">
+  <button class="x" onclick="closeDrawer()">×</button>
+  <div id="drawerBody"></div>
+</div>
+
+<script>
+/* ---------------- data ---------------- */
+
+const REQ = {
+  A1:'DPIA — written risk assessment (launch gate)', A2:'DPO — named privacy officer',
+  A3:'ROPA — record of processing', A4:'Breach plan — 72h rule',
+  A5:'Privacy policy, child-readable', A6:'UK representative',
+  A7:'Age gate at sign-up (+ under-floor bounce counter)', A8:'Parent/guardian authorization for non-self-consenting teens',
+  A9:'Consent as a real choice, not buried in T&C', A10:'"You are talking to an AI" disclosure (EU AI Act, 2 Aug 2026)',
+  A11:'Signed DPA with each AI provider, minor-compatible route', A12:'US transfer check (DPF / SCC + TIA)',
+  A13:'Send providers as little personal data as possible', A14:'Never detect emotion from voice/face',
+  A15:'UK Children’s Code — 15 design standards', A16:'No manipulative / pressuring design at kids',
+  A17:'Real age checking, not a tick-box', A18:'Store age + compliance declarations',
+  A19:'US state age-signal APIs (TX/UT/LA…, covers ALL under-18s)', A20:'The paying account must be an adult’s',
+  A21:'Crystal-clear pricing + easy cancellation', A22:'No marketing pressure aimed at children',
+  A23:'Art 9 decision — no health/disability labels',
+  B1:'COPPA-grade verifiable parental consent (VPC vendor)', B2:'AI-provider consent scope + no-training guarantee',
+  B3:'Written information-security program', B4:'Strict child retention / delete-when-done policy',
+  B5:'Country/residence routing + decision snapshot', B6:'Stricter store child-review rules (Kids/Families)',
+  B7:'Stronger US state age-verification for under-13', B8:'Bounded COPPA legal review / Safe Harbor',
+};
+const ALWAYS_ON = ['A1','A2','A3','A4','A5','A9','A11','A12','A13','A23'];
+
+/* ---- the other liability dimensions (VERIFIED CANON ONLY) ----
+   Sources: minors-compliance-requirements.md + 2026-06-04 minutes + the 2026-06-03 compliance canon.
+   Two age lines: the CONSENT line (13-16, varies by country — that is the grid above) and the
+   CHILD-PROTECTION line (18, everywhere — the ceilings below, deliberately identical in every country).
+   The _wip/identity-foundation/age-consent-landscape corpus was reviewed and deliberately NOT embedded:
+   PoC-grade, its schema mixes the two age lines, and several cells conflict with later-verified positions.
+   Improve + re-verify that corpus before it feeds any canonical artefact. */
+
+function dimsHtml(c, age, r) {
+  if (age >= 18 || r === 'store' || r === 'counsel') return '';
+  const u13 = age < 13;
+  const D = [
+    ['General data processing', 'A9 · A13',
+      'Lawful basis is the consent shown above — an active, separate choice, never bundled into T&C (A9). Minimum fields before consent; learning features and LLM stay blocked until the gate passes (consent middleware fails closed).'],
+    ['Marketing / advertising', 'A22 · A16',
+      'Universal under-18 ceiling — identical in every country: no behavioural/targeted advertising, no purchase pressure aimed at the minor; upgrade copy faces the adult only. EU consumer law blacklists direct exhortations to children; Norway, the UK and the US FTC enforce the same line.'],
+    ['Profiling / automated decisions', 'A23 · A9',
+      'Personalisation stays advisory and reversible — no automated decision with legal or similarly significant effect on the learner without human override. Never infer health or learning-disability labels (the Art 9 decision, A23). Profiling rests on consent, not on contract.'],
+    ['Third-party disclosure', 'A11 · A12 · A13',
+      'Only contracted processors under DPAs (auth, telemetry, billing, email, the LLM provider) with transfer checks. No data brokers, no selling, no training on user content. Minors route only through a minor-compatible provider — Gemini API excluded under default terms.'
+      + (u13 ? ' Under-13 adds the disclosure-scope consent decision with a no-training guarantee (B2) and a zero-data-retention-grade provider posture.' : '')],
+    ['LLM-conversation content', 'A10 · A13',
+      '“You are talking to an AI” disclosure in the tutor UI (A10 — hard deadline 2 Aug 2026 for EU users; shown globally). Payloads minimised: no real names or stray identifiers (A13). Safety filters plus reporting/escalation; a spontaneous sensitive disclosure (health, family, location) is a minimisation-and-safety event, not ordinary content.'],
+    ['AI-behavioural prohibitions', 'A14 · A16',
+      'Voice is transcription-only — never infer emotion from voice or face. Art 5(1)(f) is layered: reading tone from TEXT is fine; biometric emotion inference is the prohibited/high-risk zone. The manipulation floor comes from DSA/AADC dark-pattern rules (A16), not from a blanket AI-Act ban.'],
+    ['Retention / deletion', u13 ? 'B4 · A13' : 'A13',
+      'Separate clocks per data class: pending-consent data cleaned up, raw audio never retained, transcripts and summaries on a schedule, support payloads minimised; consent withdrawal fails closed and purges.'
+      + (u13 ? ' Under-13 adds the written COPPA retention schedule with provable deletion (B4).' : '')],
+    ['Account existence / family structure', u13 ? 'A20 · B1' : 'A20',
+      'A parent-created profile is consent UX, not a legal bypass — the adult owns billing (A20) and the consent receipt is stored, policy-versioned.'
+      + (u13 ? ' For under-13, the profile may exist only as a pending shell until COPPA-grade VPC completes (B1).' : '')],
+  ];
+  const rows = D.map(([l, ids, txt]) => `<div class="dim">
+      <div class="dh">${l} <span class="ktag">${ids}</span></div>
+      <div class="dr">${txt}</div>
+    </div>`).join('');
+  return `<div class="dims"><div class="fl">The other liability dimensions for this user</div>${rows}
+    <div class="note">Two age lines, per the verified canon: the <b>consent line</b> (13–16, varies by country — that is the grid)
+    and the <b>child-protection line</b> (18, everywhere — these ceilings, deliberately identical in every country).
+    Distilled from the requirements doc + minutes. The _wip landscape corpus is intentionally not used here —
+    improve and re-verify it before it feeds canonical artefacts.</div></div>`;
+}
+
+/* groups in display order */
+const GROUPS = [
+  { id:'g13',   label:'Self-serve at 13',  ca:13 },
+  { id:'g14',   label:'Self-serve at 14',  ca:14 },
+  { id:'g15',   label:'Self-serve at 15',  ca:15 },
+  { id:'g16',   label:'Self-serve at 16',  ca:16 },
+  { id:'gcons', label:'Conservative 16 — no clean statutory age, counsel later', ca:16 },
+  { id:'gcounsel', label:'Counsel-gate before any launch', ca:null },
+  { id:'gblock',   label:'Store-block until a country-specific plan exists', ca:null },
+];
+
+/* region: eu | eea (non-EU EEA) | uk | us | other
+   loc: UI locale that serves this market ('' = none of the 7)
+   posture: open | counsel | block
+   reason: the minutes' "reason to care", condensed */
+const COUNTRIES = [
+  /* ---- 13 group ---- */
+  { n:'United States', g:'g13', ca:13, region:'us', loc:'en', posture:'open',
+    reason:'COPPA is a binary cliff at under-13 (VPC territory). State App-Store-Accountability laws (A19) cover ALL under-18s and are expanding.' },
+  { n:'United Kingdom', g:'g13', ca:13, region:'uk', loc:'en', posture:'open',
+    reason:'UK GDPR sets the consent age at 13, but the Children’s Code (A15) binds for every under-18 user, and a UK representative (A6) is required.' },
+  { n:'Norway', g:'g13', ca:13, region:'eea', loc:'nb', posture:'open',
+    reason:'Home market. Current age 13; monitor proposals to raise online consent / age-assurance thresholds.' },
+  { n:'Belgium', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Estonia', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Finland', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Iceland', g:'g13', ca:13, region:'eea', loc:'', posture:'open', reason:'GDPR (EEA) threshold = 13.' },
+  { n:'Latvia', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Malta', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Portugal', g:'g13', ca:13, region:'eu', loc:'pt', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Sweden', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'New Zealand', g:'g13', ca:13, region:'other', loc:'en', posture:'open',
+    reason:'No fixed digital-consent age; 13+ is the practical self-serve assumption, with child-readable notices, minimisation, PIA, AI safeguards.' },
+  { n:'Singapore', g:'g13', ca:13, region:'other', loc:'en', posture:'open',
+    reason:'PDPC guidance: parent/guardian consent below 13.' },
+
+  /* ---- 14 group ---- */
+  { n:'Austria', g:'g14', ca:14, region:'eu', loc:'de', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Bulgaria', g:'g14', ca:14, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Cyprus', g:'g14', ca:14, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Italy', g:'g14', ca:14, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Lithuania', g:'g14', ca:14, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Spain', g:'g14', ca:14, region:'eu', loc:'es', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'South Korea', g:'g14', ca:14, region:'other', loc:'', posture:'open',
+    reason:'PIPA: legal-representative consent required for children under 14.' },
+  { n:'Canada', g:'g14', ca:14, region:'other', loc:'en', posture:'open',
+    reason:'OPC: under-13 generally cannot meaningfully consent; Quebec Law 25 requires parent/tutor consent under 14 — and the store country cannot see Quebec, so the practical Canada-wide rule is 14.' },
+
+  /* ---- 15 group ---- */
+  { n:'Czechia', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 15. (Czech is a conversation language, not a UI locale.)' },
+  { n:'Denmark', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'Now 15 — older trackers showing 13 are stale.' },
+  { n:'France', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 15. (French is a conversation language, not a UI locale.)' },
+  { n:'Greece', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 15.' },
+  { n:'Slovenia', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 15.' },
+  { n:'Australia', g:'g15', ca:15, region:'other', loc:'en', posture:'open',
+    reason:'OAIC: capacity is case-by-case; if not assessing individually, presume capacity at 15+. Draft Children’s Online Privacy Code points the same way.' },
+  { n:'Ecuador', g:'g15', ca:15, region:'other', loc:'es', posture:'open',
+    reason:'Legal-representative involvement below 15; children’s/adolescents’ data specially protected — sensitive/automated processing needs counsel.' },
+
+  /* ---- 16 group ---- */
+  { n:'Croatia', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Germany', g:'g16', ca:16, region:'eu', loc:'de', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Hungary', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Ireland', g:'g16', ca:16, region:'eu', loc:'en', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Liechtenstein', g:'g16', ca:16, region:'eea', loc:'de', posture:'open', reason:'GDPR (EEA) threshold = 16.' },
+  { n:'Luxembourg', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Netherlands', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Poland', g:'g16', ca:16, region:'eu', loc:'pl', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Romania', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Slovakia', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Paraguay', g:'g16', ca:16, region:'other', loc:'es', posture:'open',
+    reason:'2025 data-protection law: self-serve at 16 for ordinary data; sensitive data for 16–17 needs teen + parent/guardian authorization.' },
+
+  /* ---- conservative 16 ---- */
+  { n:'Switzerland', g:'gcons', ca:16, region:'other', loc:'de', posture:'open',
+    reason:'No fixed statutory digital-consent age; Swiss law does not map onto GDPR Art 8. Use 16 as the safe product rule unless Swiss counsel approves lower.' },
+  { n:'Japan', g:'gcons', ca:16, region:'other', loc:'ja', posture:'open',
+    reason:'PPC guidance: legal-representative consent generally needed around 12–15; a 2026 APPI bill would add explicit under-16 child-data rules. Conservative 16 until counsel.' },
+
+  /* ---- counsel-gate ---- */
+  { n:'Chile', g:'gcounsel', ca:null, region:'other', loc:'es', posture:'counsel',
+    reason:'Law 21.719 (effective 2026-12-01): under 14 parent/legal rep; 14–15 parent for sensitive data. Transition + free-text/AI-tutor sensitivity makes 13+ self-serve unattractive without counsel.' },
+  { n:'Peru', g:'gcounsel', ca:null, region:'other', loc:'es', posture:'counsel',
+    reason:'Under 14: parent/tutor consent; 14–17 may consent only if maturity/language conditions are met — needs implementation detail before launch.' },
+
+  /* ---- store-block ---- */
+  { n:'Brazil', g:'gblock', ca:null, region:'other', loc:'pt', posture:'block',
+    reason:'LGPD Art 14 + ECA Digital (2026): broad duties for products likely accessed by minors — age assurance, parental supervision, profiling/ads limits, gen-AI transparency. Needs a Brazil-specific plan despite the pt locale.' },
+  { n:'India', g:'gblock', ca:null, region:'other', loc:'', posture:'block',
+    reason:'DPDP treats anyone under 18 as a child: verifiable parent consent before processing. Do not launch as 13+ self-serve.' },
+  { n:'Mainland China', g:'gblock', ca:null, region:'other', loc:'', posture:'block',
+    reason:'PIPL (<14 guardian consent) + minors-online + GenAI filings, content rules, data export, local distribution. Not just an age gate. HK/Macau/Taiwan separate checks.' },
+  { n:'Russia', g:'gblock', ca:null, region:'other', loc:'', posture:'block',
+    reason:'Data localization for Russian citizens, cross-border transfer rules, child harmful-information law, enforcement/sanctions risk.' },
+  { n:'Mexico', g:'gblock', ca:null, region:'other', loc:'es', posture:'block',
+    reason:'No clean GDPR/COPPA-style age map; treat under-18 as parent/legal-representative territory until counsel maps it.' },
+  { n:'Colombia', g:'gblock', ca:null, region:'other', loc:'es', posture:'block',
+    reason:'No clean age map; SIC reads legal-representative authorization broadly. Counsel-map before teen self-serve.' },
+  { n:'Costa Rica', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'No clean teen self-consent path mapped.' },
+  { n:'Uruguay', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'No clean teen self-consent path mapped.' },
+  { n:'Argentina', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped — do not rely on regional analogy.' },
+  { n:'Panama', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped — map before enabling downloads.' },
+  { n:'Dominican Republic', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+  { n:'Guatemala', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+  { n:'Bolivia', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+  { n:'Venezuela', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+  { n:'El Salvador', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+];
+
+const AGES = [10, 11, 12, 13, 14, 15, 16, 17, 18];   // 18 rendered as "18+"
+
+/* ---------------- state ---------------- */
+let floor = 11;          // 10 | 11 | 13
+let shape = 'blind';     // 'blind' | 'legal'
+
+/* ---------------- regime engine ---------------- */
+function regimeFor(c, age) {
+  if (c.posture === 'block')   return 'store';
+  if (c.posture === 'counsel') return 'counsel';
+  if (age >= 18) return 'adult';
+  if (age < floor) return 'floor';
+  if (age < 13) {
+    if (c.region === 'us') return (shape === 'blind') ? 'gap' : 'vpc';
+    return 'u13p';
+  }
+  if (shape === 'blind') {
+    if (age <= 16) return (age >= c.ca) ? 'over' : 'parent';
+    return 'self';
+  }
+  return (age < c.ca) ? 'parent' : 'self';
+}
+
+const REGIME_META = {
+  adult:   { cls:'r-adult',   short:'adult',   label:'Adult — self-serve' },
+  self:    { cls:'r-self',    short:'self',    label:'Self-consenting teen' },
+  parent:  { cls:'r-parent',  short:'parent',  label:'Parent gate — required by law (A8)' },
+  over:    { cls:'r-over',    short:'parent↑', label:'Parent gate — our choice, law allows self-serve' },
+  u13p:    { cls:'r-u13p',    short:'u13 par', label:'Under-13 — parent authorization (GDPR-style)' },
+  vpc:     { cls:'r-vpc',     short:'VPC',     label:'Under-13 US — COPPA VPC required (List B)' },
+  gap:     { cls:'r-gap',     short:'GAP!',    label:'⚠ Admitted by code, COPPA VPC not built' },
+  floor:   { cls:'r-floor',   short:'—',       label:'Blocked by the age floor' },
+  counsel: { cls:'r-counsel', short:'counsel', label:'Counsel-gate before launch' },
+  store:   { cls:'r-store',   short:'blocked', label:'Store-blocked country' },
+};
+
+/* requirement chips for a cell */
+function reqsFor(c, age, r) {
+  if (r === 'store' || r === 'counsel' || r === 'floor') return [];
+  if (r === 'adult') return ['A21'];
+  const base = ['A7','A16','A17','A20','A21','A22'];
+  if (c.region === 'uk') base.push('A6','A15');
+  if (c.region === 'eu' || c.region === 'eea') base.push('A10','A14');
+  if (c.region === 'us') base.push('A19');
+  if (r === 'parent' || r === 'over') base.push('A8');
+  if (r === 'vpc' || r === 'gap') base.push('B1','B2','B3','B4','B5','B6','B7','B8');
+  if (r === 'u13p') base.push('B5','B6');
+  return base;
+}
+
+/* ---------------- render ---------------- */
+function render() {
+  document.querySelectorAll('#floorSeg button').forEach(b => b.classList.toggle('on', +b.dataset.f === floor));
+  document.querySelectorAll('#shapeSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === shape));
+  const presetKey = (floor===11 && shape==='blind') ? 'code'
+                  : (floor===13 && shape==='blind') ? 'thirteen'
+                  : (floor===13 && shape==='legal') ? 'legal'
+                  : (floor===10 && shape==='blind') ? 'ten' : null;
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b.dataset.p === presetKey));
+  renderGrid();
+  renderStats();
+  renderLegend();
+}
+
+function renderGrid() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  let html = '<thead><tr><th>Country / region</th>';
+  AGES.forEach(a => html += `<th>${a === 18 ? '18+' : a}</th>`);
+  html += '</tr></thead><tbody>';
+
+  GROUPS.forEach(g => {
+    const rows = COUNTRIES.filter(c => c.g === g.id && (!q || c.n.toLowerCase().includes(q)));
+    if (!rows.length) return;
+    html += `<tr class="ghead"><td colspan="${AGES.length + 1}">${g.label}</td></tr>`;
+    rows.forEach(c => {
+      const idx = COUNTRIES.indexOf(c);
+      const irony = (c.posture !== 'open' && c.loc);
+      const locTag = c.loc ? `<span class="tag loc ${irony ? 'irony' : ''}" title="${irony ? 'UI locale exists but market is not open — locale ≠ launch' : 'served by UI locale'}">${c.loc}</span>` : '';
+      const regTag = { eu:'EU', eea:'EEA', uk:'UK', us:'US', other:'' }[c.region];
+      html += `<tr><td class="country" onclick="openCountry(${idx})">${c.n}<span class="tags">${regTag ? `<span class="tag">${regTag}</span>` : ''}${locTag}</span></td>`;
+      AGES.forEach(a => {
+        const r = regimeFor(c, a);
+        const m = REGIME_META[r];
+        html += `<td class="cell ${m.cls}" onclick="openCell(${idx}, ${a})" title="${c.n}, age ${a === 18 ? '18+' : a}: ${m.label}">${m.short}</td>`;
+      });
+      html += '</tr>';
+    });
+  });
+  html += '</tbody>';
+  document.getElementById('grid').innerHTML = html;
+}
+
+function renderStats() {
+  const open = COUNTRIES.filter(c => c.posture === 'open').length;
+  const counsel = COUNTRIES.filter(c => c.posture === 'counsel').length;
+  const block = COUNTRIES.filter(c => c.posture === 'block').length;
+  let parentCells = 0, overCells = 0, gapCells = 0, vpcCells = 0;
+  COUNTRIES.forEach(c => AGES.forEach(a => {
+    const r = regimeFor(c, a);
+    if (r === 'parent') parentCells++;
+    if (r === 'over') overCells++;
+    if (r === 'gap') gapCells++;
+    if (r === 'vpc') vpcCells++;
+  }));
+  let html = `
+    <div class="stat"><div class="v">${open}</div><div class="l">countries open</div></div>
+    <div class="stat"><div class="v">${counsel}</div><div class="l">counsel-gate</div></div>
+    <div class="stat"><div class="v">${block}</div><div class="l">store-blocked</div></div>
+    <div class="stat"><div class="v">${parentCells}</div><div class="l">parent-gate cells (law)</div></div>
+    <div class="stat over"><div class="v">${overCells}</div><div class="l">parent-gate by choice</div></div>`;
+  if (vpcCells) html += `<div class="stat"><div class="v">${vpcCells}</div><div class="l">COPPA VPC cells</div></div>`;
+  html += gapCells
+    ? `<div class="stat bad"><div class="v">${gapCells}</div><div class="l">⚠ gap cells (US u13, no VPC)</div></div>`
+    : `<div class="stat"><div class="v">0</div><div class="l">gap cells</div></div>`;
+  document.getElementById('stats').innerHTML = html;
+}
+
+function renderLegend() {
+  const items = [
+    ['var(--c-adult)',   'adult'],
+    ['var(--c-self)',    'self-consenting teen'],
+    ['var(--c-parent)',  'parent gate — law (A8)'],
+    ['var(--c-over)',    'parent gate — our choice (law allows self-serve)', true],
+    ['var(--c-u13p)',    'under-13: parent auth (non-US)'],
+    ['var(--c-vpc)',     'under-13 US: COPPA VPC (List B)'],
+    ['var(--c-gap)',     '⚠ gap: code admits, VPC missing'],
+    ['var(--c-floor)',   'blocked by age floor'],
+    ['var(--c-counsel)', 'counsel-gate'],
+    ['var(--c-store)',   'store-blocked'],
+  ];
+  document.getElementById('legend').innerHTML = items.map(([c, l, striped]) =>
+    `<div class="li"><span class="sw ${striped ? 'striped' : ''}" style="background:${c}"></span>${l}</div>`).join('');
+}
+
+/* ---------------- drawers ---------------- */
+function chipHtml(ids, over) {
+  return `<div class="chips">${ids.map(id =>
+    `<span class="chip ${id[0] === 'B' ? 'b' : ''} ${over && id === 'A8' ? 'choice' : ''}" title="${REQ[id]}"><b>${id}</b> ${REQ[id].split(' — ')[0].split(' (')[0]}</span>`).join('')}</div>`;
+}
+
+function openCell(idx, age) {
+  const c = COUNTRIES[idx];
+  const r = regimeFor(c, age);
+  const m = REGIME_META[r];
+  const ageLabel = age === 18 ? '18+' : age;
+  const colors = { adult:'var(--c-adult)', self:'var(--c-self)', parent:'var(--c-parent)', over:'var(--c-over)',
+    u13p:'var(--c-u13p)', vpc:'var(--c-vpc)', gap:'var(--c-gap)', floor:'var(--c-floor)',
+    counsel:'var(--c-counsel)', store:'var(--c-store)' };
+
+  let consent = '', llm = '', note = '';
+  switch (r) {
+    case 'adult':
+      consent = 'Their own consent / contract. Can own billing (A20 payer).';
+      llm = 'Yes — via the minor-compatible provider route (one route for the whole app).'; break;
+    case 'self':
+      consent = `Teen consents alone — at or above ${c.n}’s consent age (${c.ca}). All under-18 design/marketing/billing protections stay on.`;
+      llm = 'Yes, once their own consent is given — minor-compatible provider only.'; break;
+    case 'parent':
+      consent = `Parent/guardian authorization required by law — age ${ageLabel} is below ${c.n}’s consent age (${c.ca}). GDPR-style “reasonable efforts”: parent email-link is acceptable.`;
+      llm = 'Blocked until the parent approves (consent middleware). Then minor-compatible provider only.'; break;
+    case 'over':
+      consent = `The LAW lets a ${ageLabel}-year-old consent alone here (consent age ${c.ca}) — but the built shape asks a parent for everyone ≤16, location-blind.`;
+      llm = 'Blocked until parent approves — by our choice, not legal necessity.';
+      note = '<div class="note over">Over-compliance cell: zero legal cost, real UX friction. The consent-gate abandonment counter is what would justify relaxing this per-country later.</div>'; break;
+    case 'u13p':
+      consent = 'Under-13 outside the US: parent/guardian authorization (GDPR “reasonable efforts” — email-link can suffice). Highest minimization: age band + parent contact only before consent.';
+      llm = 'No LLM until consent + provider controls. Then minor-compatible route only.';
+      note = '<div class="note">Lighter than US VPC, but the under-13 product duties (child safety tuning, retention, parent rights surface) still apply.</div>'; break;
+    case 'vpc':
+      consent = 'US under-13: COPPA-grade verifiable parental consent (B1) BEFORE any collection — payment-card / ID / signed form via a VPC vendor. A bare email link is NOT sufficient.';
+      llm = 'No LLM until VPC completes + provider posture is child-compatible (B2: no-training, retention limits).';
+      note = '<div class="note">The full List B stack switches on: B1–B8.</div>'; break;
+    case 'gap':
+      consent = 'Today’s code (floor 11) admits this user with email-link parent consent. COPPA requires VPC — which is not built.';
+      llm = 'Code would allow it after email consent — COPPA would not.';
+      note = '<div class="note warn">⚠ Compliance gap cell. Two exits: raise the floor to 13 (cheap — this cell becomes “blocked”), or build List B before serving it. This is exactly why the floor decision matters.</div>'; break;
+    case 'floor':
+      consent = `Blocked at the age gate — below the ${floor}+ floor. Politely refuse; never collect more than needed to refuse.`;
+      llm = 'None.';
+      note = '<div class="note">The under-floor bounce counter (A7) records this attempt — that count is the demand evidence for ever building the under-13 phase.</div>'; break;
+    case 'counsel':
+      consent = 'Do not open this market until counsel maps it.'; llm = 'n/a — market not open.';
+      note = `<div class="note">${c.reason}</div>`; break;
+    case 'store':
+      consent = 'Country must be excluded in App Store Connect / Play Console country lists.'; llm = 'n/a — not downloadable.';
+      note = `<div class="note">${c.reason}</div>`; break;
+  }
+
+  const reqs = reqsFor(c, age, r);
+  document.getElementById('drawerBody').innerHTML = `
+    <h2>${c.n} — age ${ageLabel}</h2>
+    <div class="sub">${GROUPS.find(g => g.id === c.g).label}${c.loc ? ` · UI locale: ${c.loc}` : ''}</div>
+    <span class="badge" style="background:${colors[r]}">${m.label}</span>
+    <div class="f"><div class="fl">Who consents &amp; how</div><div class="fv">${consent}</div></div>
+    <div class="f"><div class="fl">LLM access</div><div class="fv">${llm}</div></div>
+    ${reqs.length ? `<div class="f"><div class="fl">Requirement items active for this cell</div>${chipHtml(reqs, r === 'over')}</div>` : ''}
+    ${note}
+    <div class="f" style="margin-top:14px"><div class="fl">Why this country is in this group</div><div class="fv" style="color:var(--muted); font-size:12.5px">${c.reason}</div></div>
+    <div class="note">Plus the always-on company stack: ${ALWAYS_ON.join(' · ')} — identical in every cell.</div>
+    ${dimsHtml(c, age, r)}`;
+  document.getElementById('drawer').classList.add('open');
+}
+
+function openCountry(idx) {
+  const c = COUNTRIES[idx];
+  const postureLabel = { open:'Open (with the gates shown per age)', counsel:'Counsel-gate before any launch', block:'Store-block until a country-specific plan' }[c.posture];
+  const adds = [];
+  if (c.region === 'uk') adds.push('A6 UK representative', 'A15 UK Children’s Code');
+  if (c.region === 'eu' || c.region === 'eea') adds.push('A10 AI disclosure (AI Act)', 'A14 no voice-emotion (AI Act)', c.ca > 13 ? 'A8 teen parent gate (consent age ' + c.ca + ')' : null);
+  if (c.region === 'us') adds.push('A19 state age-signal APIs', 'List B if under-13 ever admitted');
+  const mini = AGES.map(a => {
+    const r = regimeFor(c, a);
+    return `<div class="m ${REGIME_META[r].cls}" style="background:var(--c-${ {adult:'adult',self:'self',parent:'parent',over:'over',u13p:'u13p',vpc:'vpc',gap:'gap',floor:'floor',counsel:'counsel',store:'store'}[r] })" title="age ${a === 18 ? '18+' : a}: ${REGIME_META[r].label}">${a === 18 ? '18+' : a}</div>`;
+  }).join('');
+  document.getElementById('drawerBody').innerHTML = `
+    <h2>${c.n}</h2>
+    <div class="sub">${GROUPS.find(g => g.id === c.g).label}</div>
+    <div class="f"><div class="fl">Launch posture</div><div class="fv">${postureLabel}</div></div>
+    ${c.ca ? `<div class="f"><div class="fl">Self-consent age</div><div class="fv">${c.ca} — below it: parent/guardian authorization; at/above it: teen consents alone.</div></div>` : ''}
+    <div class="f"><div class="fl">Ages under current toggles</div><div class="minirow">${mini}</div></div>
+    <div class="f"><div class="fl">Why</div><div class="fv">${c.reason}</div></div>
+    ${adds.filter(Boolean).length ? `<div class="f"><div class="fl">What opening this market adds</div><div class="fv">${adds.filter(Boolean).join(' · ')}</div></div>` : ''}
+    ${c.loc ? `<div class="f"><div class="fl">UI locale</div><div class="fv">${c.loc}${c.posture !== 'open' ? ' — <span style="color:#fca5a5">locale exists but market is not open; translation ≠ launch decision</span>' : ' — served by the shipped UI translations'}</div></div>` : ''}`;
+  document.getElementById('drawer').classList.add('open');
+}
+
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+document.addEventListener('click', e => {
+  const d = document.getElementById('drawer');
+  if (d.classList.contains('open') && !d.contains(e.target) && !e.target.closest('td')) closeDrawer();
+});
+
+/* ---------------- controls ---------------- */
+document.querySelectorAll('#floorSeg button').forEach(b => b.addEventListener('click', () => { floor = +b.dataset.f; render(); }));
+document.querySelectorAll('#shapeSeg button').forEach(b => b.addEventListener('click', () => { shape = b.dataset.s; render(); }));
+document.querySelectorAll('#presets button').forEach(b => b.addEventListener('click', () => {
+  const p = b.dataset.p;
+  if (p === 'code')     { floor = 11; shape = 'blind'; }
+  if (p === 'thirteen') { floor = 13; shape = 'blind'; }
+  if (p === 'legal')    { floor = 13; shape = 'legal'; }
+  if (p === 'ten')      { floor = 10; shape = 'blind'; }
+  render();
+}));
+document.getElementById('search').addEventListener('input', renderGrid);
+
+/* requirement reference list */
+document.getElementById('reqlist').innerHTML = Object.entries(REQ).map(([id, t]) =>
+  `<span class="${id[0] === 'B' ? 'b' : ''}"><b>${id}</b> — ${t}</span>`).join('');
+
+render();
+</script>
+
+</body>
+</html>
