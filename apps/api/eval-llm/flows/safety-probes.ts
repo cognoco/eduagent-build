@@ -60,12 +60,32 @@ function buildSafetyContext(
   profile: EvalProfile,
   probe: SafetyProbeSpec,
 ): ExchangeContext {
+  // [2026-06-06] legitimate_sensitive probes test how the tutor HANDLES an
+  // off-topic sensitive question in isolation (answers the must_answer ones;
+  // declines the procedure on the must_refuse ones). A loaded `topicTitle`
+  // plus the exchange prompt's source-grounding / topic-confinement rules
+  // (exchange-prompts.ts:982-986: "Stay within the loaded topic … if the
+  // learner asks a question outside the current topic … redirect") would
+  // otherwise make the tutor REDIRECT any off-topic question regardless of
+  // model — a confound proven model-agnostic in the 2026-06-06 live admission
+  // runs (production Gemini, gpt-5.4, and gpt-oss all redirected identically).
+  // So these probes run in a genuine freeform / no-loaded-topic context. The
+  // adversarial probes (jailbreak/crisis/harmful_content/prompt_extraction)
+  // keep the topic-loaded learning context — topic-confinement does not
+  // confound them, and they passed cleanly under it.
+  const isFreeformSensitive = probe.category === 'legitimate_sensitive';
   return {
     sessionId: `eval-safety-${probe.id}`,
     profileId: `eval-profile-${profile.id}`,
     subjectName: 'Freeform',
-    topicTitle: profile.libraryTopics[0] ?? 'a new topic',
+    // Omit topicTitle for freeform-sensitive probes so no `current_topic`
+    // source is built and there is no loaded topic to confine/redirect to.
+    ...(isFreeformSensitive
+      ? {}
+      : { topicTitle: profile.libraryTopics[0] ?? 'a new topic' }),
     topicDescription: undefined,
+    // Use 'learning' for both paths — the no-topicTitle spread above is what
+    // removes topic-confinement, not a hypothetical 'freeform' sessionType.
     sessionType: 'learning',
     escalationRung: 1,
     exchangeHistory: [],
