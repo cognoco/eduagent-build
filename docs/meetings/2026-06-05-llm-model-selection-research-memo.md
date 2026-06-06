@@ -116,6 +116,16 @@ Cross-cutting findings:
 3. **NEW: wrong-language replies.** Haiku 4.5 and gpt-oss-120b answer Polish/Norwegian learners in English (ignoring both the prompt instruction and the learner's own language). Mistral, GPT-5 mini, DeepSeek, and Gemini all comply. The safety battery could not see this; the language-quality judge can.
 4. **§7 decision input shifted:** GPT-5 mini = clear quality winner (only flawless cs/nb/pl, zero safety-quality issues) IF the latency problem is solved at the source (direct API, `reasoning_effort: low`); Haiku 4.5's case weakened materially (small-locale non-compliance + refusal-time format breaks). Whole-campaign cost ~$0.50 — rerunning any of this is free.
 
+### §6 results — tuned-configuration reruns (2026-06-06, via new `--openrouter-reasoning-effort` / `--openrouter-provider` harness dials)
+
+| Configuration | Safety (10) | Exchanges (15) | Language cs/nb/pl (6) | Read |
+|---|---|---|---|---|
+| GPT-5 mini @ `minimal` | 10/10 clean | 15/15 clean — **timeouts gone** | 6/6 calls, **9 warnings** — grammar/naturalness drop to 3/5 in all 3 locales (invented Czech word "čítník", Polish instrumental-case error, Norwegian calques) | Speed bought with prose quality — the hidden reasoning was doing real linguistic work. ≈ Mistral-grade prose at Mistral-grade speed. |
+| **GPT-5 mini @ `low`** | — (not rerun) | — | **6/6, zero judge complaints** | **Sweet spot: flawless prose at 10–13s, comfortably under the 25s wall.** Production setting if GPT-5 mini is picked. |
+| **DeepSeek V4 Pro @ DeepInfra pin** | **10/10 clean, 0 warns** | 13/15 (2 residual timeouts) | **6/6, zero judge complaints** | **Best single all-round result of the campaign.** One host pin converted the timeout-cripple into a top contender. |
+
+§7 race after tuning: **GPT-5 mini @ `low`** (flawless everywhere, $0.25/$2, OpenAI ZDR-for-minors required) vs **DeepSeek V4 Pro @ pinned US host** (flawless quality, $0.435/$0.87 with 99% cache discount, needs DeepInfra-or-similar DPA + Chinese-origin assessment in the DPIA) vs Haiku 4.5 (weakened: English-to-pl/nb learners + refusal-time format breaks). Mistral Small 4 unaffected as free-tier pick.
+
 ## 7. Open decisions
 
 1. **Family-tier workhorse:** GPT-5 mini (recommended — capability/$ winner; requires OpenAI ZDR-for-minors configuration) vs Haiku 4.5 (simpler compliance via existing Anthropic stack; better instruction-following; ~3× output cost).
