@@ -147,7 +147,9 @@ Direct probes (LQ-CS01 prompt, pinned hosts, 3 runs per cell, `reasoning: { effo
 
 Same-day pricing verification (OpenRouter endpoint API, 2026-06-06): the memo's DeepSeek price $0.435/$0.87 + 99% cache is the **Chinese first-party API only** (unusable); cheapest lawful US host is DeepInfra at **$1.30/$2.60 fp4, no cache discount** — eliminating DeepSeek's price case vs GPT-5 mini ($0.25/$2.00). DeepSeek V4 Pro has **no EU-region host** (14 endpoints: 5 Chinese, 9 US). gpt-oss-120b is served by **Nebius (EU, $0.15/$0.60)** — latency unverified, noted as a future EU-residency option.
 
-### §7 resolution proposal — the pinning matrix (2026-06-06, pending owner ratification)
+### §7 resolution — the pinning matrix (RATIFIED by owner 2026-06-06 → MMT-ADR-0013)
+
+> **Ratified.** Recorded as [`MMT-ADR-0013`](../adr/MMT-ADR-0013-llm-provider-model-selection-and-routing.md); the canonical pinning table now lives in `docs/specs/2026-06-06-llm-routing-and-judge-architecture.md` §1.5. The §1 open decisions below are resolved by this ratification (workhorse = GPT-5 mini @ low; OpenRouter eval adapter = added).
 
 | Slot | Who / where | Model + config | Data flow | Status |
 |---|---|---|---|---|
@@ -175,8 +177,8 @@ Same-day pricing verification (OpenRouter endpoint API, 2026-06-06): the memo's 
 
 ## 7. Open decisions
 
-1. **Family-tier workhorse:** GPT-5 mini (recommended — capability/$ winner; requires OpenAI ZDR-for-minors configuration) vs Haiku 4.5 (simpler compliance via existing Anthropic stack; better instruction-following; ~3× output cost).
-2. **OpenRouter eval adapter:** add now as a fourth, eval-only provider adapter (recommended — unblocks all model A/Bs with one key) vs defer until the free-tier model decision is final.
+1. ~~**Family-tier workhorse:** GPT-5 mini vs Haiku 4.5.~~ **RESOLVED 2026-06-06 (MMT-ADR-0013):** GPT-5 mini @ `low` is the paid workhorse; Haiku 4.5 is reassigned to the judge role (non-reasoning). Mistral Small 4 is the free-tier/default.
+2. ~~**OpenRouter eval adapter:** add now vs defer.~~ **RESOLVED 2026-06-05:** added (eval-only — `providers/openrouter.ts`).
 
 ## 8. Follow-ups
 

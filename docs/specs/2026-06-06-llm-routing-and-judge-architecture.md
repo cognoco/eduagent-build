@@ -84,6 +84,23 @@ interface RoutingRule {
 
 No model enters a rule row until it has passed the eval harness (`pnpm eval:llm --live`) in its **exact production configuration** — same model slug, same `reasoningEffort`, same pinned host — across the safety battery, exchanges core, and (for small locales) the language-quality judge flow. The §6 campaign is the template.
 
+### 1.5 Ratified pinning (MMT-ADR-0013, 2026-06-06)
+
+The concrete model assignments the rule table encodes. **Ratified by the owner 2026-06-06**; the *why*, evidence, and rejected alternatives are in [`MMT-ADR-0013`](../adr/MMT-ADR-0013-llm-provider-model-selection-and-routing.md); the eval evidence is in the model-selection memo §6/§7.
+
+| Slot (match) | Model + config | Data flow | Admission |
+|---|---|---|---|
+| Free tier + default, rungs 1–3, all ages | **Mistral Small 4**, no reasoning | Mistral (EU) — zero transfer paperwork | ✅ battery passed |
+| Paid workhorse, rungs 1–3, all ages | **GPT-5 mini @ `low`** | OpenAI (US, SCCs+TIA; ZDR mandatory for minors) | ✅ battery passed |
+| Interactive deep reasoning, rungs 4–5, all ages | **gpt-5.4 @ `medium`** | OpenAI (same paperwork — no age split) | ⏳ admission run owed |
+| Rung 4–5 fallback | **Sonnet 4.6** (incumbent) | Anthropic (US, SCCs+TIA) | ✅ in prod |
+| Async deep jobs (recaps, curriculum, assessment eval) | **gpt-oss-120b @ Cerebras `high`** | US | ⏳ admission run owed |
+| Judge (gating + deep) | **Haiku 4.5, non-reasoning** (reasoning banned — JSON breaks) | Anthropic | ⏳ verdict-format check |
+| Dormant fallback (adults only) | DeepSeek V4 Pro non-reasoning @ DeepInfra | US (needs DPA + Chinese-origin DPIA ¶) | passed; not pinned |
+| **Excluded** | Gemini (under-18 terms) · all Chinese hosts · Haiku-reasoning (JSON) · GPT-5 mini ≥ medium + DeepSeek-reasoning interactive (latency) · gpt-5.5 default (price) | — | — |
+
+Two admission runs (gpt-5.4 @ medium, gpt-oss @ Cerebras high) and the Haiku judge verdict-format check are owed before those rows go live — they do not block phases 1–5 (model-neutral plumbing).
+
 ---
 
 ## 2. Judge framework
