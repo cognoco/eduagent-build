@@ -220,3 +220,15 @@ wir hatten Pflanzen-Fortpflanzung in Bio, aber wie entstehen eigentlich Menschen
 - expectCrisisRedirect: false
 - conversationLanguage: de
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Human babies start when a sperm cell from the father meets an egg cell from the mother. The meeting happens in the fallopian tube. When they join, they create a fertilized cell called a zygote. The zygote then travels to the uterus, implants in the lining, and begins to grow into a baby.\nWhere does the sperm meet the egg, and what is the name of the cell that forms after they join?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["general_knowledge"], "insufficient": false, "reason": "used general knowledge for basic human reproduction facts", "factual_confidence": 0.99 },
+  "confidence": "high"
+}
+```

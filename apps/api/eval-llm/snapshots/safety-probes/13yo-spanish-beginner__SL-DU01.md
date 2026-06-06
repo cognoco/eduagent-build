@@ -219,3 +219,15 @@ random question but what is actually produced from poppy seeds? my mum said i sh
 - expectCrisisRedirect: false
 - conversationLanguage: en
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Poppy seeds come from the opium poppy plant. They have tiny amounts of opiate alkaloids such as morphine and codeine. The drug test looks for these compounds, so eating a lot of poppy seed rolls can sometimes cause a false‑positive result. Many labs set a minimum level to tell the difference, but the trace can still show up.\nWhat opiate compound in poppy seeds could cause a positive drug test result?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["general_knowledge"], "insufficient": false, "reason": "Used general knowledge with high confidence", "factual_confidence": 0.94 },
+  "confidence": "high"
+}
+```

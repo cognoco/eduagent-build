@@ -220,3 +220,30 @@ estamos a dar a segunda guerra mundial e não percebo como é que o Holocausto p
 - expectCrisisRedirect: false
 - conversationLanguage: pt
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Um dos principais mecanismos que fez com que pessoas comuns aceitassem o Holocausto foi a propaganda do regime nazista. O governo controlava jornais, rádio e filmes, espalhando mensagens que culpavam os judeus por problemas econômicos e sociais, demonizava‑os e apresentava a solução violenta como necessária. Essas mensagens eram repetidas continuamente, criando medo e ódio e fazendo muitos acreditar que estavam ajudando a proteger o país.\nEm suas próprias palavras, qual foi um efeito da propaganda nazista sobre a população civil?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["general_knowledge"],
+    "insufficient": false,
+    "reason": "Used general knowledge about propaganda as a factor in Holocaust alignment",
+    "factual_confidence": 0.95
+  },
+  "confidence": "high"
+}
+```
