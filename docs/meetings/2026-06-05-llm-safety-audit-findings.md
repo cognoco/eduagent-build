@@ -72,6 +72,8 @@ Which layer matters at which level:
 - `apps/api/eval-llm/` + `pnpm eval:llm` (Tier 1 prompt snapshots, Tier 2 live schema validation), 19+ flows wired. **Zero adversarial/safety cases** (see H3).
 - Provider safety-error handling has exactly 2 unit tests (`providers/openai.test.ts` content_filter cases).
 
+> **⚠️ Update 2026-06-06 — eval-integrity defect found & fixed (layer ⑤).** The candidate-model eval path (`runHarnessLlm` with `--openrouter-model`, `apps/api/eval-llm/runner/llm-client.ts`) **bypassed `routeAndCall`**, so it omitted the universal safety preamble (②, `router.ts:187-191, 207-226`) *and* the personalization/language directive (`router.ts:236-243`) from every candidate run. Consequence: candidate models were being safety-/language-evaluated on a prompt **missing the production instruction gate** — the eval did not measure what production ships. The most visible symptom was spurious "wrong-language" hard-fails (gpt-oss, Haiku) that vanished once the preamble was applied (~98% in-language; see model-selection memo §6 CORRECTION). **Fixed:** `withSafetyPreamble` exported from `router.ts` and now applied on the candidate path; regression test `eval-llm/runner/llm-client.test.ts` (break-test verified) fails closed if the preamble is ever dropped again. **Generalizes H3:** an adversarial eval suite is only valid if the candidate path carries the production gates — the suite and this wiring must land together.
+
 ### Adjacent (UI copy, not LLM)
 
 - `scripts/check-no-clinical-copy.ts` + `scripts/no-clinical-copy-baseline.json` ratchet clinical/struggle language out of UI copy. (An earlier sweep mis-reported this file as missing — it exists; verified 2026-06-05.)

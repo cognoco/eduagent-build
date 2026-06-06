@@ -1,6 +1,8 @@
 # MMT-ADR-0013 — LLM provider/model selection and the routing rule table (Gemini exit)
 
-**Status:** Accepted · **Date:** 2026-06-06 · **Scope:** All production LLM calls · **Deciders:** PM (owner) + Claude · **Supersedes:** the `gemini_only` Family-tier routing policy in `router.ts`
+**Status:** Accepted (amended 2026-06-06 — see Amendment 1) · **Date:** 2026-06-06 · **Scope:** All production LLM calls · **Deciders:** PM (owner) + Claude · **Supersedes:** the `gemini_only` Family-tier routing policy in `router.ts`
+
+> **⚠️ Amendment 1 (2026-06-06) revises the paid-workhorse and gpt-oss rows below — read [Amendment 1](#amendment-1--gpt-oss-promoted-to-interactive-paid-workhorse-2026-06-06) first; the original Decision/Consequences text is retained for the record but is partly superseded.**
 
 > **Lockstep:** this ADR is the *why*; the *what* it ratifies lives in `docs/specs/2026-06-06-llm-routing-and-judge-architecture.md` (§1.5 ratified pinning) and the model-selection evidence in `docs/meetings/2026-06-05-llm-model-selection-research-memo.md` (§6 results, §7 resolution). `docs/architecture.md` (ARCH-9 routing) sync is owed by the routing-table implementation PR (follow-up below).
 
@@ -45,3 +47,37 @@ Adopt the pinning matrix (full table + per-slot evidence in spec §1.5 and memo 
 3. **gpt-oss-120b on the interactive path** (cheapest reasoner) — rejected for now: wrong-language to small-locale learners + single-host dependency are unacceptable on the latency-/uptime-sensitive path. Re-examinable via the promotion path above.
 4. **gpt-5.5 as the deep-reasoning model** — rejected: $5/$30 is 2× gpt-5.4 for no measured quality gain; kept as a rotation candidate only.
 5. **A keyword/topic denylist for safety** — rejected: the dual-use line runs through the word, so token matching is guaranteed wrong in one direction and is the mechanism that produces spurious "I can't answer that" refusals.
+
+## Amendment 1 — gpt-oss promoted to interactive paid workhorse (2026-06-06)
+
+**What changed and why.** The original Decision confined gpt-oss-120b to async on two grounds, the first of which proved false:
+
+1. **"Wrong-language to small-locale learners" was a harness artifact, not a model property.** The candidate eval path (`runHarnessLlm` with `--openrouter-model`) bypassed `routeAndCall`, so it omitted the production language directive `getPersonalizationPreamble` prepends (`router.ts:236-243`). Re-run **with the production preamble applied**, gpt-oss-120b @ Cerebras is **~98% in-language as-is across all 9 conversation locales (0/270 with a belt-and-braces directive)** — vs 30–73% English without it. The harness bug is fixed (`withSafetyPreamble` exported from `router.ts` and applied on the candidate path; regression test `apps/api/eval-llm/runner/llm-client.test.ts`, break-test verified). Evidence: model-selection memo §6 CORRECTION; `C:\Temp\resample-lang-prod.mjs`. *(Corollary: Haiku 4.5's "answers Polish learners in English" finding is equally an artifact and must be re-tested with the fixed harness before its case is weakened.)*
+2. **The N=1 jailbreak flake cleared** — resampled 100× (direct Cerebras), 0 compliances; it was a benign `{"type":"refusal"}` envelope-format slip on a refusal (~1%), not a jailbreak. The direct adapter must map non-envelope refusals → safe envelope (+ unit test).
+3. **Single-host concentration remains the one real concern** — mitigated by an automatic off-Cerebras fallback (GPT-5 mini), not by confinement. gpt-oss is also **text-only** — vision stays off-Cerebras.
+
+Full interactive validation (2026-06-06, direct Cerebras): safety 44/44 + jailbreak 100× (0) + multi-turn adversarial 5/5 HELD; teaching 55/55; latency p50 1.3s / p95 2.8s / 0-over-wall.
+
+**Vendor-consolidation question settled (web-verified 2026-06-06, memory `project_cerebras_vendor_posture`):** Cerebras serves **open-weight models only** — GPT-5 mini, gpt-5.4, and Claude (closed) are not and never will be available there, so Cerebras cannot become a single vendor. Its compliance triplet (ZDR + no-training + executed DPA) is *likely achievable* (ZDR/no-train are its advertised default; DPA/SCCs/SOC 2 are in its Trust Center) but US-only datacenters keep it on the SCCs+TIA route. **Owner ruling: keep separate agreements with the other vendors for now**; Cerebras dedicated-endpoints / self-host parked as a future option.
+
+**Revised pinning (Option B — supersedes the corresponding Decision rows):**
+
+| Slot (match) | Model + config | Change |
+|---|---|---|
+| Free tier + default, rungs 1–3, all ages | **Mistral Small 4**, no reasoning (incl. vision on free) | unchanged — kept for EU residency / zero transfer paperwork |
+| **Paid workhorse (incl. Family tier), rungs 1–3, all ages** | **gpt-oss-120b @ Cerebras `high` (primary)** | **CHANGED** — was GPT-5 mini primary |
+| **Paid fallback + all paid vision/multimodal** | **GPT-5 mini @ `low`** | **CHANGED** — demoted from primary to fallback + vision handler |
+| Interactive deep reasoning, rungs 4–5, all ages | **gpt-5.4 @ `medium`** | unchanged |
+| Rung 4–5 fallback | **Sonnet 4.6** | unchanged |
+| Async deep jobs | **gpt-oss-120b @ Cerebras `high`** | unchanged (now shares the primary text path) |
+| Judge | **Haiku 4.5, non-reasoning** | unchanged |
+
+This also **fills the Family-tier hole the Gemini exit left** (paid Family minors now route to gpt-oss primary + GPT-5 mini fallback).
+
+**Gates before these rows serve minor traffic (all owed, none block the model-neutral plumbing phases 1–5):**
+1. **Cerebras compliance triplet** — ZDR + no-training + executed DPA, with ZDR written into the DPA text (not just marketing); confirm availability at our contract tier; SCCs + TIA (Cerebras US-only, not DPF-certified).
+2. **OpenAI ZDR-for-minors** for the GPT-5 mini fallback (already owed).
+3. **Build:** direct Cerebras adapter (with `{"type":"refusal"}`→safe-envelope handler + unit test) + compliance-aware fallback in `getFallbackConfig` that drops Gemini/Vertex (both under-18-banned) and fails closed to `CircuitOpenError`; direct Mistral adapter for the EU free tier. (Thread B build spec.)
+4. **Teaching-quality A/B** — gpt-oss vs the GPT-5 mini incumbent at paid rungs 1–3, to confirm no pedagogy regression from the primary swap.
+
+**Scope rejected:** "gpt-oss everywhere incl. free tier (drop Mistral)" — rejected because (a) it puts US transfers on the free-tier EU-minor path, losing Mistral's EU-residency advantage, and (b) it does not actually deliver single-vendor simplicity (Cerebras can't host the closed fallback/vision models and single-host needs an off-Cerebras fallback regardless).

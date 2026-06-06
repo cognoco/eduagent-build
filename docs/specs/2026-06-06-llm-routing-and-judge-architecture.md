@@ -90,16 +90,19 @@ The concrete model assignments the rule table encodes. **Ratified by the owner 2
 
 | Slot (match) | Model + config | Data flow | Admission |
 |---|---|---|---|
-| Free tier + default, rungs 1–3, all ages | **Mistral Small 4**, no reasoning | Mistral (EU) — zero transfer paperwork | ✅ battery passed |
-| Paid workhorse, rungs 1–3, all ages | **GPT-5 mini @ `low`** | OpenAI (US, SCCs+TIA; ZDR mandatory for minors) | ✅ battery passed |
+| Free tier + default, rungs 1–3, all ages (incl. free vision) | **Mistral Small 4**, no reasoning | Mistral (EU) — zero transfer paperwork | ✅ battery passed |
+| **Paid workhorse (incl. Family tier), rungs 1–3, all ages** | **gpt-oss-120b @ Cerebras `high` (primary)** ← *Amendment 1* | Cerebras (US, SCCs+TIA; triplet owed) | ✅ safety/teaching/language/latency validated; ⏳ triplet + adapter owed |
+| **Paid fallback + all paid vision/multimodal** | **GPT-5 mini @ `low`** | OpenAI (US, SCCs+TIA; ZDR mandatory for minors) | ✅ battery passed |
 | Interactive deep reasoning, rungs 4–5, all ages | **gpt-5.4 @ `medium`** | OpenAI (same paperwork — no age split) | ⏳ admission run owed |
 | Rung 4–5 fallback | **Sonnet 4.6** (incumbent) | Anthropic (US, SCCs+TIA) | ✅ in prod |
-| Async deep jobs (recaps, curriculum, assessment eval) | **gpt-oss-120b @ Cerebras `high`** | US | ⏳ admission run owed |
+| Async deep jobs (recaps, curriculum, assessment eval) | **gpt-oss-120b @ Cerebras `high`** | US | ✅ validated; ⏳ triplet owed |
 | Judge (gating + deep) | **Haiku 4.5, non-reasoning** (reasoning banned — JSON breaks) | Anthropic | ⏳ verdict-format check |
 | Dormant fallback (adults only) | DeepSeek V4 Pro non-reasoning @ DeepInfra | US (needs DPA + Chinese-origin DPIA ¶) | passed; not pinned |
 | **Excluded** | Gemini (under-18 terms) · all Chinese hosts · Haiku-reasoning (JSON) · GPT-5 mini ≥ medium + DeepSeek-reasoning interactive (latency) · gpt-5.5 default (price) | — | — |
 
 Two admission runs (gpt-5.4 @ medium, gpt-oss @ Cerebras high) and the Haiku judge verdict-format check are owed before those rows go live — they do not block phases 1–5 (model-neutral plumbing).
+
+> **✅ RATIFIED 2026-06-06 (Option B — MMT-ADR-0013 Amendment 1).** The §6 "wrong-language" results that confined gpt-oss-120b to async-only were a **harness artifact** — the candidate eval path bypassed `routeAndCall` and so omitted the production language preamble (`getPersonalizationPreamble`, `router.ts:236-243`). Re-run with the preamble applied, gpt-oss is **~98% in-language as-is across all 9 conversation locales (0/270 with a belt-and-braces directive)** — see model-selection memo §6 CORRECTION. The harness bug is fixed (`withSafetyPreamble` exported + applied on the candidate path; regression test `eval-llm/runner/llm-client.test.ts`, break-test verified). With safety (44/44 + 100× jailbreak + 5/5 multi-turn), teaching (55/55), and latency (p50 1.3s) validated, **gpt-oss-120b @ Cerebras is promoted to the interactive PAID text workhorse (rungs 1–3, all ages, including the Family/under-18 tier the Gemini exit vacated), with GPT-5 mini demoted to fallback + the paid multimodal/vision handler** (gpt-oss is text-only). **Mistral Small 4 stays on the EU free tier** for residency. gpt-5.4 @ medium stays at rungs 4–5. The matrix rows above reflect this. **"Everywhere incl. free tier (drop Mistral)" was rejected** — it loses Mistral's EU-residency advantage for free-tier minors without delivering single-vendor simplicity (Cerebras is open-weight only — can't host the closed fallback/vision models — and single-host needs an off-Cerebras fallback regardless; vendor research in memory `project_cerebras_vendor_posture`). **Gates before minor traffic:** Cerebras compliance triplet (ZDR + no-training + executed DPA, ZDR in the DPA text; SCCs+TIA, Cerebras US-only); OpenAI ZDR-for-minors for the fallback; direct Cerebras + Mistral adapters + compliance-aware fallback (drop Gemini/Vertex, fail-closed); teaching-quality A/B vs the GPT-5 mini incumbent at paid rungs 1–3. See the Thread B build spec.
 
 ---
 
@@ -226,7 +229,7 @@ Explicitly rejected as risk proxies (evaluated 2026-06-06): **escalation rung** 
 
 1. **Behavior-identical refactor.** Encode today's `getModelConfig` branches (incl. `gemini_only` policy, premium→Sonnet, BUG-732 rung floor) as rules. Equivalence snapshot test over the full input matrix proves zero routing change. No user-visible effect.
 2. **Thread the new match inputs.** Pass `flow` + `conversationLanguage` into resolution (already in `routeAndCall` options — parameter plumbing only). No rule uses them yet.
-3. **T1 + wrong-language tripwire.** Sync classifier on all replies; millisecond language-detection check (reply language ≠ profile language → one hardened retry) — the exact failure the §6 battery observed (Haiku answering Polish learners in English).
+3. **T1 + wrong-language tripwire.** Sync classifier on all replies; millisecond language-detection check (reply language ≠ profile language → one hardened retry). Note (corrected 2026-06-06): the dramatic §6 "Haiku/gpt-oss answer Polish learners in English" results were a **harness artifact** (candidate path omitted the production language preamble), not a model property — with the preamble, gpt-oss is ~98% in-language. The residual real rate is low (~2% before the belt-and-braces directive, on small/edge locales), so this tripwire is a **cheap last-line safety net for that long tail**, not a fix for a systemic defect. Keep it; right-size expectations.
 4. **Judge framework.** Profiles, Inngest path, verdict storage, dashboards, coverage reconciliation. Suitability judge runs **post-display** first to calibrate flag rates; language-quality judge sampled for cs/nb/pl.
 5. **Gating modes.** Mode G for under-consent-age learners behind a flag, with the `llm.gate.latency` acceptance criterion measured before default-on. Risk-promotion policy table + mode F escalation wiring.
 6. **Model flips.** Re-point rows per the §7 ruling (Gemini exit), flag-gated, judge dashboards watching. Each model admitted via §1.4.
