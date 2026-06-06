@@ -126,6 +126,40 @@ Cross-cutting findings:
 
 §7 race after tuning: **GPT-5 mini @ `low`** (flawless everywhere, $0.25/$2, OpenAI ZDR-for-minors required) vs **DeepSeek V4 Pro @ pinned US host** (flawless quality, $0.435/$0.87 with 99% cache discount, needs DeepInfra-or-similar DPA + Chinese-origin assessment in the DPIA) vs Haiku 4.5 (weakened: English-to-pl/nb learners + refusal-time format breaks). Mistral Small 4 unaffected as free-tier pick.
 
+### §6 results — reasoning-mode probes, all candidates + GPT-5.4/5.5 (2026-06-06)
+
+Direct probes (LQ-CS01 prompt, pinned hosts, 3 runs per cell, `reasoning: { effort }` via OpenRouter; GPT-5 mini also direct OpenAI API). Question: can any model do DEEP reasoning inside the interactive 25s wall (rungs 4–5)?
+
+| Model @ host | Effort | Latency | Reasoning tokens | Valid JSON | Under 25s | Verdict |
+|---|---|---|---|---|---|---|
+| Mistral Small 4 @ Mistral | medium/high | 4.7–7.1s | 219–485 | 6/6 | 6/6 | accepts the param but barely thinks — not a deep-reasoning candidate, no regression either |
+| GPT-5 mini @ OpenAI | medium | 10.9–13.5s **+ one 120s hang** | 960–1,280 | ok | 2/3 | unreliable at medium |
+| GPT-5 mini @ OpenAI | high | 42.7–48.9s | 3,456–4,416 | 3/3 | **0/3** | dead for interactive reasoning — low-effort workhorse only |
+| Haiku 4.5 @ Anthropic | medium/high | 7.1–13.5s | 365–826 | **2/6** | 6/6 | **reasoning mode breaks JSON envelopes (4/6 invalid) — BANNED for envelope flows; judge stays non-reasoning** |
+| gpt-oss-120b @ Cerebras | medium | **1.1–1.6s** | 647–886 | 3/3 | 3/3 | outlier: wafer-scale host = full reasoning at chat speed |
+| gpt-oss-120b @ Cerebras | high | **1.6–2.3s** | 2,103–3,111 | 3/3 | 3/3 | deep reasoning in ~2s; $0.35/$0.75 |
+| **gpt-5.4 @ OpenAI** | low | 11.9–13.0s | 287–328 | 3/3 | 3/3 | viable |
+| **gpt-5.4 @ OpenAI** | **medium** | **11.5–16.8s** | 503–789 | 3/3 | 3/3 | **interactive deep-reasoning winner — fits the wall with margin; $2.50/$15 undercuts Sonnet ($3/$15); already the configured `OPENAI_ADVANCED_MODEL`** |
+| gpt-5.4 @ OpenAI | high | 19.8–29.9s | 1,135–1,685 | 3/3 | 2/3 | cliff edge — async only |
+| gpt-5.5 @ OpenAI | low–high | 7.0–25.1s | 100–999 | 9/9 | 8/9 | clean but $5/$30 = 2× gpt-5.4 for no measured benefit; keep as rotation candidate only |
+| DeepSeek V4 Pro @ DeepInfra | medium | 23.8–49.0s | 924–1,828 | 3/3 | 2/3 (both at 24s cliff) | **dead for interactive reasoning** (non-reasoning mode unaffected) |
+| DeepSeek V4 Pro @ DeepInfra | high | 17.5–39.8s | 603–1,968 | 3/3 | 1/3 | same |
+
+Same-day pricing verification (OpenRouter endpoint API, 2026-06-06): the memo's DeepSeek price $0.435/$0.87 + 99% cache is the **Chinese first-party API only** (unusable); cheapest lawful US host is DeepInfra at **$1.30/$2.60 fp4, no cache discount** — eliminating DeepSeek's price case vs GPT-5 mini ($0.25/$2.00). DeepSeek V4 Pro has **no EU-region host** (14 endpoints: 5 Chinese, 9 US). gpt-oss-120b is served by **Nebius (EU, $0.15/$0.60)** — latency unverified, noted as a future EU-residency option.
+
+### §7 resolution proposal — the pinning matrix (2026-06-06, pending owner ratification)
+
+| Slot | Who / where | Model + config | Data flow | Status |
+|---|---|---|---|---|
+| Free tier + default, rungs 1–3 | all ages, all markets | **Mistral Small 4**, no reasoning | Mistral (EU) — zero transfer paperwork | ✅ battery passed |
+| Paid workhorse, rungs 1–3 | all ages, all markets | **GPT-5 mini @ `low`** | OpenAI (US, SCCs+TIA; ZDR mandatory for minors; Azure-EU residency option later) | ✅ battery passed |
+| Interactive deep reasoning, rungs 4–5 | all ages, all markets | **gpt-5.4 @ `medium`** | OpenAI (same paperwork — no age split needed) | ⏳ battery admission run pending |
+| Rung 4–5 fallback | all | Sonnet 4.6 (incumbent) | Anthropic (US, SCCs+TIA) | ✅ in prod |
+| Async deep jobs (recaps, curriculum, assessment eval) | no one waits | **gpt-oss-120b @ Cerebras `high`** (primary) / DeepSeek reasoning @ DeepInfra (alt) | US | ⏳ battery in this config pending |
+| Judge (gating + deep) | minors' conversation text | **Haiku 4.5, non-reasoning** (reasoning mode banned — JSON breaks) | Anthropic | ⏳ verdict-format reliability check in judge flow |
+| Dormant fallback row | adults | DeepSeek V4 Pro non-reasoning @ DeepInfra | US (needs DPA + Chinese-origin DPIA ¶ before activation) | passed battery; not pinned |
+| Excluded | — | Gemini (vendor terms, under-18); all Chinese hosts (every market); Haiku-reasoning (JSON); GPT-5 mini ≥ medium + DeepSeek-reasoning interactive (latency); gpt-5.5 as default (price) | — | — |
+
 ## 7. Open decisions
 
 1. **Family-tier workhorse:** GPT-5 mini (recommended — capability/$ winner; requires OpenAI ZDR-for-minors configuration) vs Haiku 4.5 (simpler compliance via existing Anthropic stack; better instruction-following; ~3× output cost).
