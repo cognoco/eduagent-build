@@ -44,6 +44,19 @@ export interface RunOptions {
    */
   openrouterModel?: string;
   /**
+   * Reasoning-effort dial for the candidate model (requires
+   * --openrouter-model). Measured 2026-06-06 on gpt-5-mini: medium = at the
+   * 25s wall, low = 10–13s, minimal = 4–7s. See memo §6 diagnostics.
+   */
+  openrouterReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  /**
+   * Pin candidate serving to one OpenRouter host, fallbacks disabled
+   * (requires --openrouter-model). For open/hybrid-weight models the host
+   * changes behavior (e.g. deepseek-v4-pro: DeepInfra fast/non-reasoning,
+   * Novita reasoning-by-default).
+   */
+  openrouterProvider?: string;
+  /**
    * Baseline regression guard. When true, after the run the CLI compares
    * `summary.envelopeMetrics` against the checked-in baseline file and
    * exits non-zero if any metric drifts more than `baselineTolerancePp`.
@@ -151,6 +164,24 @@ export function parseCliArgs(argv: string[]): {
     } else if (arg === '--openrouter-model') {
       const next = argv[++i];
       if (next) options.openrouterModel = next;
+    } else if (arg === '--openrouter-reasoning-effort') {
+      const next = argv[++i];
+      if (
+        next === 'minimal' ||
+        next === 'low' ||
+        next === 'medium' ||
+        next === 'high'
+      ) {
+        options.openrouterReasoningEffort = next;
+      } else {
+        console.error(
+          `Invalid --openrouter-reasoning-effort "${next ?? ''}" — use minimal|low|medium|high.`,
+        );
+        process.exit(2);
+      }
+    } else if (arg === '--openrouter-provider') {
+      const next = argv[++i];
+      if (next) options.openrouterProvider = next;
     } else if (arg === '--check-baseline') {
       options.checkBaseline = true;
     } else if (arg === '--update-baseline') {

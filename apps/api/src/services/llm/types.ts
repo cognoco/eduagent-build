@@ -15,6 +15,14 @@ export interface ModelConfig {
   maxTokens: number;
   /** Ask providers with native support to constrain output to JSON. */
   responseFormat?: 'json';
+  /**
+   * Reasoning-effort dial for reasoning-capable models. Currently consumed
+   * only by the eval-only OpenRouter adapter (candidate-model gate);
+   * production rung configs never set it. Measured 2026-06-06 on
+   * gpt-5-mini: medium = 16–23s (at the 25s wall), low = 10–13s,
+   * minimal = 4–7s with 0 reasoning tokens — see model-selection memo §6.
+   */
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
 /** Multimodal message parts for vision/image input */

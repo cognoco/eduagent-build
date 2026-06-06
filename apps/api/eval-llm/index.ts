@@ -74,7 +74,10 @@ import {
   validateBaselineStructure,
   type Baseline,
 } from './runner/metrics';
-import { bootstrapLlmProviders } from './runner/llm-bootstrap';
+import {
+  bootstrapLlmProviders,
+  setOpenRouterProviderPin,
+} from './runner/llm-bootstrap';
 import { setOpenRouterModelOverride } from './runner/llm-client';
 
 const BASELINE_PATH = path.resolve(__dirname, 'baseline.json');
@@ -179,14 +182,27 @@ async function main(): Promise<void> {
       );
       process.exit(2);
     }
+  } else if (options.openrouterReasoningEffort || options.openrouterProvider) {
+    console.error(
+      '--openrouter-reasoning-effort / --openrouter-provider require --openrouter-model (they only shape candidate-model calls).',
+    );
+    process.exit(2);
   }
 
   // Bootstrap LLM providers early so any missing-key errors surface before
   // the run matrix starts. Tier-1 runs skip this — no LLM calls are made.
   if (options.live) {
+    if (options.openrouterProvider) {
+      // Must precede bootstrap so the adapter is created with the pin.
+      setOpenRouterProviderPin([options.openrouterProvider]);
+    }
     bootstrapLlmProviders();
     if (options.openrouterModel) {
-      setOpenRouterModelOverride(options.openrouterModel);
+      setOpenRouterModelOverride(options.openrouterModel, {
+        ...(options.openrouterReasoningEffort
+          ? { reasoningEffort: options.openrouterReasoningEffort }
+          : {}),
+      });
     }
   }
 
@@ -195,7 +211,15 @@ async function main(): Promise<void> {
       options.live ? '2 (live LLM calls)' : '1 (prompt snapshots only)'
     }${
       options.openrouterModel
-        ? `\nCANDIDATE-MODEL RUN — all live calls routed to "${options.openrouterModel}" via OpenRouter (not production routing). Snapshots will reflect the candidate; restore with: git checkout -- apps/api/eval-llm/snapshots`
+        ? `\nCANDIDATE-MODEL RUN — all live calls routed to "${options.openrouterModel}" via OpenRouter (not production routing).${
+            options.openrouterReasoningEffort
+              ? ` reasoning_effort=${options.openrouterReasoningEffort}.`
+              : ''
+          }${
+            options.openrouterProvider
+              ? ` Host pinned to "${options.openrouterProvider}" (fallbacks off).`
+              : ''
+          } Snapshots will reflect the candidate; restore with: git checkout -- apps/api/eval-llm/snapshots`
         : ''
     }\n`,
   );

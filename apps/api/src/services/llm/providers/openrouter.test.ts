@@ -105,6 +105,45 @@ describe('OpenRouter Provider', () => {
       expect(body.provider).toEqual({ zdr: true });
     });
 
+    it('pins serving hosts with fallbacks disabled when providerOrder is set', async () => {
+      mockFetch.mockResolvedValueOnce(createOkResponse('ok'));
+
+      const pinnedProvider = createOpenRouterProvider(TEST_API_KEY, {
+        providerOrder: ['deepinfra'],
+      });
+      await pinnedProvider.chat(TEST_MESSAGES, TEST_CONFIG);
+
+      const [, opts] = mockFetch.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.provider).toEqual({
+        order: ['deepinfra'],
+        allow_fallbacks: false,
+      });
+    });
+
+    it('passes reasoningEffort through as the unified reasoning param', async () => {
+      mockFetch.mockResolvedValueOnce(createOkResponse('ok'));
+
+      await provider.chat(TEST_MESSAGES, {
+        ...TEST_CONFIG,
+        reasoningEffort: 'minimal',
+      });
+
+      const [, opts] = mockFetch.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.reasoning).toEqual({ effort: 'minimal' });
+    });
+
+    it('omits the reasoning param when reasoningEffort is unset', async () => {
+      mockFetch.mockResolvedValueOnce(createOkResponse('ok'));
+
+      await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+
+      const [, opts] = mockFetch.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.reasoning).toBeUndefined();
+    });
+
     it('requests JSON object mode when responseFormat is json', async () => {
       mockFetch.mockResolvedValueOnce(createOkResponse('{"reply":"Hello"}'));
 

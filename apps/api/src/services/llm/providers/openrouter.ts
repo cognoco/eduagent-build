@@ -53,9 +53,16 @@ interface OpenRouterRequest {
   max_tokens: number;
   response_format?: { type: 'json_object' };
   // Provider-routing preferences. `zdr: true` restricts routing to
-  // zero-data-retention endpoints only. Omitted unless the caller opts in —
-  // see OpenRouterProviderOptions for the 2026-06-05 ruling.
-  provider?: { zdr: boolean };
+  // zero-data-retention endpoints only (opt-in — see
+  // OpenRouterProviderOptions for the 2026-06-05 ruling). `order` +
+  // `allow_fallbacks: false` pins serving to specific hosts — required for
+  // open/hybrid models where host config changes model behavior (gpt-oss
+  // brace-dropping on Google; DeepSeek reasoning-by-default on Novita).
+  provider?: { zdr?: boolean; order?: string[]; allow_fallbacks?: boolean };
+  // OpenRouter's unified reasoning control — maps to reasoning_effort for
+  // OpenAI models, thinking budgets elsewhere. Only sent when the caller
+  // sets config.reasoningEffort.
+  reasoning?: { effort: 'minimal' | 'low' | 'medium' | 'high' };
 }
 
 export interface OpenRouterProviderOptions {
@@ -74,6 +81,13 @@ export interface OpenRouterProviderOptions {
    * be re-pinned and the B3 transfer/DPA review done first (see header).
    */
   zdr?: boolean;
+  /**
+   * Pin serving to these OpenRouter hosts (in preference order) with
+   * fallbacks disabled. For open/hybrid-weight candidates the host IS part
+   * of the model choice — measured 2026-06-06: deepseek-v4-pro via
+   * DeepInfra = 5–10s non-reasoning, via Novita = 34–49s reasoning-on.
+   */
+  providerOrder?: string[];
 }
 
 interface OpenRouterChoice {
@@ -111,13 +125,26 @@ export function createOpenRouterProvider(
     messages: ChatMessage[],
     config: ModelConfig,
   ): Promise<ChatResult> {
+    // Both routing preferences are opt-in; the `provider` object is only
+    // sent when at least one is set.
+    const providerPrefs: NonNullable<OpenRouterRequest['provider']> = {
+      ...(options?.zdr ? { zdr: true } : {}),
+      ...(options?.providerOrder && options.providerOrder.length > 0
+        ? { order: options.providerOrder, allow_fallbacks: false }
+        : {}),
+    };
+
     const body: OpenRouterRequest = {
       // Verbatim passthrough — see header comment.
       model: config.model,
       messages: toOpenRouterMessages(messages),
       max_tokens: config.maxTokens,
-      // ZDR pin is opt-in — see OpenRouterProviderOptions for the ruling.
-      ...(options?.zdr ? { provider: { zdr: true } } : {}),
+      ...(Object.keys(providerPrefs).length > 0
+        ? { provider: providerPrefs }
+        : {}),
+      ...(config.reasoningEffort
+        ? { reasoning: { effort: config.reasoningEffort } }
+        : {}),
       ...(config.responseFormat === 'json'
         ? { response_format: { type: 'json_object' as const } }
         : {}),

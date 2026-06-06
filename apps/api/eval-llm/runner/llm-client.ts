@@ -51,9 +51,15 @@ export type HarnessLlmOptions = Omit<RouteAndCallOptions, 'flow'>;
 // ---------------------------------------------------------------------------
 
 let openRouterModelOverride: string | null = null;
+let openRouterReasoningEffort: 'minimal' | 'low' | 'medium' | 'high' | null =
+  null;
 
-export function setOpenRouterModelOverride(model: string | null): void {
+export function setOpenRouterModelOverride(
+  model: string | null,
+  opts?: { reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' },
+): void {
   openRouterModelOverride = model;
+  openRouterReasoningEffort = opts?.reasoningEffort ?? null;
 }
 
 /**
@@ -71,6 +77,9 @@ export async function runHarnessLlm(
     return callOpenRouterModel(messages, openRouterModelOverride, {
       ...(options?.responseFormat === 'json'
         ? { responseFormat: 'json' as const }
+        : {}),
+      ...(openRouterReasoningEffort
+        ? { reasoningEffort: openRouterReasoningEffort }
         : {}),
     });
   }

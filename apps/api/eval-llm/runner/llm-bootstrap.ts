@@ -32,6 +32,23 @@ let bootstrapped = false;
 // route to yet). Use `callOpenRouterModel` below.
 let openRouterProvider: LLMProvider | null = null;
 
+// Host pin for the candidate adapter (`--openrouter-provider <host>`). Must
+// be set BEFORE bootstrapLlmProviders() — the CLI entry point does this. For
+// open/hybrid-weight candidates the serving host changes model behavior
+// (reasoning-by-default, format bugs), so unpinned results can be roulette.
+let openRouterProviderPin: string[] | null = null;
+
+export function setOpenRouterProviderPin(order: string[] | null): void {
+  openRouterProviderPin = order;
+  // Recreate the provider if bootstrap already ran (idempotent otherwise).
+  const key = process.env['OPENROUTER_API_KEY'];
+  if (key && openRouterProvider) {
+    openRouterProvider = createOpenRouterProvider(key, {
+      ...(order ? { providerOrder: order } : {}),
+    });
+  }
+}
+
 /**
  * Register LLM providers from process.env. Safe to call multiple times.
  * Throws if no provider keys are present (so tier-2 runs fail early rather
@@ -58,7 +75,11 @@ export function bootstrapLlmProviders(): void {
   // its absence must not fail runs that only exercise production providers.
   const openRouterKey = process.env['OPENROUTER_API_KEY'];
   if (openRouterKey) {
-    openRouterProvider = createOpenRouterProvider(openRouterKey);
+    openRouterProvider = createOpenRouterProvider(openRouterKey, {
+      ...(openRouterProviderPin
+        ? { providerOrder: openRouterProviderPin }
+        : {}),
+    });
   }
 
   if (!geminiKey && !openaiKey && !anthropicKey) {
@@ -120,7 +141,11 @@ export async function callLlm(
 export async function callOpenRouterModel(
   messages: ChatMessage[],
   model: string,
-  opts: { maxTokens?: number; responseFormat?: 'json' } = {},
+  opts: {
+    maxTokens?: number;
+    responseFormat?: 'json';
+    reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  } = {},
 ): Promise<string> {
   bootstrapLlmProviders();
   if (!openRouterProvider) {
@@ -134,6 +159,7 @@ export async function callOpenRouterModel(
     model,
     maxTokens: opts.maxTokens ?? 8192,
     ...(opts.responseFormat ? { responseFormat: opts.responseFormat } : {}),
+    ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
   });
   return result.content;
 }
