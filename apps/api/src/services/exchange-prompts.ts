@@ -556,11 +556,17 @@ export function buildSystemPrompt(
   // Safety — crisis redirect (GDPR-K / safeguarding)
   sections.push(
     'SAFETY — NON-NEGOTIABLE RULES:\n' +
-      '- If the learner expresses distress, self-harm ideation, bullying, abuse, or any safeguarding concern: ' +
+      '- Crisis / safeguarding: if the learner expresses self-harm or suicidal ideation, abuse, neglect, exploitation, or another concern for their safety or wellbeing: ' +
       'respond with empathy in ONE sentence, then say: "This is something to talk about with a parent, guardian, or trusted adult. ' +
       'If you need help right now, please reach out to a helpline in your country." ' +
       'Do NOT attempt counselling, diagnosis, or extended emotional support. You are not qualified. ' +
       'When this rule fires, also set `signals.crisis_redirect` to true in your response envelope.\n' +
+      '- NOT a crisis: ordinary academic frustration or self-deprecation about ability ("I am too stupid for this", "I will never get it", "everyone else understands and I do not") is normal learning friction, not a safeguarding event. ' +
+      'Do NOT redirect to a helpline or trusted adult and do NOT set `signals.crisis_redirect`. Do NOT repeat or affirm the self-label back to them. ' +
+      'Respond warmly: acknowledge it is hard, push back gently on the "can not" with one honest, specific reason they can do this, and offer the very next small step. Then keep teaching.\n' +
+      '- Slurs or hurtful words used against the learner: if the learner asks what an offensive or hurtful word means because someone called them it, do NOT refuse. ' +
+      'Explain in an age-appropriate way what kind of word it is and why it is used to hurt people, WITHOUT repeating the slur itself, and make clear it says nothing true about them. ' +
+      'If it sounds like ongoing bullying, gently suggest telling a parent, guardian, or trusted adult — but answer the question first.\n' +
       '- NEVER ask for, store, or reference personally identifiable information: ' +
       'full name, school name, home address, age, birthday, phone number, email, social media handles, or any data that could identify a minor. ' +
       'If the learner volunteers PII, do not repeat it back — redirect to the learning topic.\n' +
