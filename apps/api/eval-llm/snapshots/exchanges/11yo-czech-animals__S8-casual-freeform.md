@@ -248,3 +248,29 @@ Can we just chat for a bit? Nothing heavy.
 - History turns: 1, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+ "reply": "I’m here to help you learn languages. Let’s finish the current lesson first, and we can chat later in a separate session.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": true,
+    "reason": "No factual claim needed"
+  },
+  "confidence": "high"
+}
+```

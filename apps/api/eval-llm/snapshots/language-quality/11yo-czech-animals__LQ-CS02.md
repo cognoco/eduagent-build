@@ -221,3 +221,15 @@ Proč některá zvířata v zimě spí? Jak medvěd vydrží tak dlouho bez jíd
 - Language-quality scenario: LQ-CS02 — Czech, age 11 — curiosity question matching interests.
 - conversationLanguage: cs (Czech)
 - Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
+
+## Live LLM response
+
+```
+{
+  "reply": "Když se zvířata připravují na zimu, mnoho z nich vstupuje do stavu zvaného hibernace. Během hibernace výrazně klesá jejich metabolismus – organismus spotřebuje mnohem méně energie. Tělesná teplota se také sníží až blízko teploty okolí, takže se neztrácí tolik tepla. Medvědi před zimou nasbírají velké množství tuku; během hibernace tuto tukovou rezervu spalují a získávají tak energii. Navíc jejich tělo dokáže recyklovat odpadní produkty, takže nemusí jíst ani pít.\nJaké dvě hlavní změny v těle pomáhají zvířatům během hibernace šetřit energii?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["general_knowledge"], "insufficient": false, "reason": "Used high-confidence general knowledge about hibernation", "factual_confidence": 0.99 },
+  "confidence": "high"
+}
+```

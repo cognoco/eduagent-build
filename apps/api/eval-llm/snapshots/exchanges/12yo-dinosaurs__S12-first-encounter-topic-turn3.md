@@ -278,3 +278,15 @@ I mix up ingredients and energy.
 - History turns: 4, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "The Mesozoic era lasted about 180 million years, from 252 to 66 million years ago, and it was home to many dinosaurs and lots of plants like ferns, conifers, and early flowering plants. Those plants made their own food using photosynthesis. In that process water supplies hydrogen atoms for the sugar, carbon dioxide supplies the carbon atoms, and sunlight provides the energy that drives the reaction. You mentioned you mix up ingredients and energy, so think of water as the ingredient that gives the plant the raw parts, and sunlight as the power source that makes the recipe work.\nWhat does water provide and what does sunlight provide in the plant's sugar-making process?",
+  "signals": { "partial_progress": true, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic","general_knowledge"], "insufficient": false, "reason": "Explanation uses Mesozoic era context and general knowledge of photosynthesis.", "factual_confidence": 0.95 },
+  "confidence": "high"
+}
+```

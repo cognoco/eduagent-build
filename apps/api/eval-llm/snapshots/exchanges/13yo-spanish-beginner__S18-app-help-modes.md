@@ -301,3 +301,29 @@ What's the difference between Explorer and Challenge mode?
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Challenge mode is the optional in‑session check that the mentor offers when you’ve shown mastery of a topic. I’m not sure what Explorer mode refers to in MentoMate — you can look at More > Help & feedback for details.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": false,
+    "reason": "Answered using internal app knowledge"
+  },
+  "confidence": "high"
+}
+```

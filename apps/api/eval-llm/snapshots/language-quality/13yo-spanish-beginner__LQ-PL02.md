@@ -221,3 +221,36 @@ Dlaczego niebo jest niebieskie? Zawsze chciałem to wiedzieć.
 - Language-quality scenario: LQ-PL02 — Polish, age 13 — everyday why-question.
 - conversationLanguage: pl (Polish)
 - Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
+
+## ⚠️ Quality issues
+
+- **ERROR LQ-PL02.wrong-language:** Reply is not (fully) in Polish. Judge notes: The tutor's entire reply is in English, not Polish.
+- **ERROR LQ-PL02.grammar:** Judge scored grammar 1/5 — clear errors in learner-facing prose. Judge notes: The tutor's entire reply is in English, not Polish.
+- **WARNING LQ-PL02.naturalness:** Judge scored naturalness 1/5 — stilted or calqued phrasing. Judge notes: The tutor's entire reply is in English, not Polish.
+- **WARNING LQ-PL02.register:** Judge flagged register as wrong for a 13-year-old. Judge notes: The tutor's entire reply is in English, not Polish.
+
+## Live LLM response
+
+```
+{
+  "reply": "Good question — that's a different topic. Let's finish this one first, then you can start a session on that.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": false,
+    "reason": "Redirected to current topic before answering unrelated question."
+  },
+  "confidence": "high"
+}
+```

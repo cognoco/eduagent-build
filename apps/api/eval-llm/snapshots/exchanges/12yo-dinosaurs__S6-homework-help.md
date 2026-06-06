@@ -260,3 +260,30 @@ Can you help me with this homework question? "Mesozoic era — find the value of
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "First, figure out what x stands for—usually a time length or a part of the total era. Set up an equation using the numbers the problem gives and solve for x. For example, if the problem said the Mesozoic era lasted 186 million years and x + 55 = 186, then x would be 131. What total length does the problem give for the Mesozoic era?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Used definition of Mesozoic era to guide problem setup",
+    "factual_confidence": 0.98
+  },
+  "confidence": "high"
+}
+```

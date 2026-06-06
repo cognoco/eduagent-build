@@ -221,3 +221,37 @@ Kan du forklare hvorfor månen har faser? Jeg skjønner det ikke helt.
 - Language-quality scenario: LQ-NB01 — Norwegian, age 15 — explain moon phases.
 - conversationLanguage: nb (Norwegian Bokmål)
 - Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
+
+## ⚠️ Quality issues
+
+- **ERROR LQ-NB01.wrong-language:** Reply is not (fully) in Norwegian Bokmål. Judge notes: Reply is entirely in English, not Norwegian Bokmål.
+- **ERROR LQ-NB01.grammar:** Judge scored grammar 1/5 — clear errors in learner-facing prose. Judge notes: Reply is entirely in English, not Norwegian Bokmål.
+- **WARNING LQ-NB01.naturalness:** Judge scored naturalness 1/5 — stilted or calqued phrasing. Judge notes: Reply is entirely in English, not Norwegian Bokmål.
+- **WARNING LQ-NB01.register:** Judge flagged register as wrong for a 15-year-old. Judge notes: Reply is entirely in English, not Norwegian Bokmål.
+
+## Live LLM response
+
+```
+{
+  "reply": "Good question — that’s a different topic. Let’s finish this one first, then you can start a session on that.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": false,
+    "reason": "User asked about moon phases, which is outside current loaded topic of algebra equations; redirected per policy.",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```

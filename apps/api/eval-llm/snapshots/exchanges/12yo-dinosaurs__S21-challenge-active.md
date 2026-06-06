@@ -294,3 +294,30 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 6
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Sure! The Mesozoic era is the stretch of time from about 252 to 66 million years ago.\nIt’s famous as the age of dinosaurs because they ruled the land, sea, and air.\nThe era is split into three periods: Triassic, Jurassic, and Cretaceous.\nEach period had different dinosaurs and changing environments.\nFor example, early in the Triassic the continents were together in a super‑continent called Pangaea; later they split apart, making new coastlines.\nVolcanoes and sea‑level changes also shaped the climate.\nThe era ends with a massive extinction event about 66 million years ago that wiped out most dinosaurs.\nWhat major event marks the end of the Mesozoic era, and why did it cause so many dinosaurs to disappear?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Used reliable current_topic content",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```

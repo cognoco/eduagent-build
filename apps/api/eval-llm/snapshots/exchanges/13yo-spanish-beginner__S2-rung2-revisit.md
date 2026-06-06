@@ -276,3 +276,30 @@ Yeah, ser vs estar still doesn't make sense to me.
 - History turns: 2, exchangeCount: 2
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply":"Okay, let’s sort out ser and estar step by step.\n1. Both verbs mean “to be” and are irregular in the present tense (yo soy, yo estoy).\n2. Use ser for permanent or essential qualities – things that don’t normally change.\n   Example: “El caballo es rápido.” (The horse is fast as a trait.)\n3. Use estar for temporary states, locations, or conditions that can change.\n   Example: “El caballo está cansado.” (The horse is tired right now.)\n4. Think of nature: a mountain is tall – that’s a permanent description, so you’d use ser. A cloud moves across the sky – that’s a temporary condition, so you’d use estar.\nWhich verb would you use in “The horse is fast” – ser or estar?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Used facts about present tense verbs and the distinct uses of ser and estar.",
+    "factual_confidence": 0.95
+  },
+  "confidence": "high"
+}
+```

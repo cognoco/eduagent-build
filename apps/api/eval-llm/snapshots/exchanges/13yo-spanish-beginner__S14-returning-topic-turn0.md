@@ -261,3 +261,30 @@ Start a learning session about Spanish present tense verbs.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply":"In Spanish, the present tense is used for actions happening now and for habits.\nTo conjugate regular verbs, you remove the infinitive ending (-ar, -er, -ir) and add the present tense endings.\nFor -ar verbs the endings are: -o (yo), -as (tú), -a (él/ella/usted), -amos (nosotros), -áis (vosotros), -an (ellos/ellas/ustedes).\nFor example, the verb hablar (to speak) becomes hablo, hablas, habla, hablamos, habláis, hablan.\nNow, conjugate hablar for nosotros in the present tense. What is the correct form?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Used loaded curriculum facts about present tense verb conjugation",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```

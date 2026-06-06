@@ -291,3 +291,15 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 9
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "The Mesozoic Era is the span of time from about 252 to 66 million years ago, often called the Age of Dinosaurs. It’s split into three periods: Triassic, Jurassic, and Cretaceous.\nFor example, the Jurassic period was warm and humid, letting giants like Brachiosaurus roam the forests.\nWhich period comes first in the Mesozoic Era, and what’s one big event that marks the end of the era?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic", "general_knowledge"], "insufficient": false, "reason": "used definition and period breakdown from Mesozoic era", "factual_confidence": 0.96 },
+  "confidence": "high"
+}
+```

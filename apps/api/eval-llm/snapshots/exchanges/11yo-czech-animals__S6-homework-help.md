@@ -260,3 +260,15 @@ Can you help me with this homework question? "Czech reading comprehension — fi
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+ "reply": "First, read the Czech sentence that includes x and look for clues like numbers or relationships that indicate its value.\nFor example, if the sentence says 'V zahradě je x stromů a přibude ještě tři,' you would add 3 to the known count.\nDoes the passage say that x comes from adding two numbers together?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Used topic content to guide reading comprehension approach", "factual_confidence": 0.95 },
+  "confidence": "high"
+}
+```

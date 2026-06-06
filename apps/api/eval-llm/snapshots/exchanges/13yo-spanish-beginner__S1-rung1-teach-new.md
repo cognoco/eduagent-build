@@ -261,3 +261,30 @@ Start a learning session about Spanish present tense verbs.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "InSpanish, present‑tense verbs change their ending to show who is doing the action. Regular verbs fall into three groups based on the infinitive ending:\n- **-ar** verbs use the endings ‑o, ‑as, ‑a, ‑amos, ‑áis, ‑an.\n- **-er** verbs use the endings ‑o, ‑es, ‑e, ‑emos, ‑éis, ‑en.\n- **-ir** verbs use the endings ‑o, ‑es, ‑e, ‑imos, ‑í​s, ‑en.\nThese endings tell you the subject, so you usually omit the pronoun (yo, tú, etc.).\nWhat is the ‘yo’ form of the regular -ar verb ‘bailar’ (to dance)?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Used current_topic source for conjugation rules of regular -ar, -er, and -ir verbs in present tense.",
+    "factual_confidence": 0.97
+  },
+  "confidence": "high"
+}
+```

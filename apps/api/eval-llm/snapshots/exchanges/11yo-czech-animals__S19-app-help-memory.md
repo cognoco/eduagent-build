@@ -295,3 +295,29 @@ Where can I see what you remember about me?
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "You can view what the mentor remembers about you by opening More > Mentor memory.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": false,
+    "reason": "App navigation answer"
+  },
+  "confidence": "high"
+}
+```

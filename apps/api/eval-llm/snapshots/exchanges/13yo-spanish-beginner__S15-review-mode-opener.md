@@ -277,3 +277,30 @@ Start a learning session about Spanish present tense verbs.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Let's start learning aboutSpanish present tense verbs.\nFirst, regular verbs keep the same pattern. They end in -ar, -er, or -ir in the infinitive. To make the present tense, drop the ending and add a new one that matches the subject.\nFor -ar verbs the endings are: -o (yo), -as (tú), -a (él/ella/usted), -amos (nosotros), -áis (vosotros), -an (ellos/ellas/ustedes). Example: hablar → hablo, hablas, habla, hablamos, habláis, hablan.\nFor -er verbs the endings are: -o, -es, -e, -emos, -éis, -en. Example: comer → como, comes, come, comemos, coméis, comen.\nThese endings tell you who is doing the action, so you can often drop the subject pronoun.\nNow a quick check: How would you say \"I eat\" (using the verb comer) in the present tense?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Used current_topic for conjugation rules.",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```

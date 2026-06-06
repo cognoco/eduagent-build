@@ -255,3 +255,30 @@ Start a learning session about Mesozoic era.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "TheMesozoic era stretched from about 252 million years ago to 66 million years ago—a span of roughly 180 million years.\nIt’s split into three consecutive periods: the Triassic, the Jurassic, and the Cretaceous.\nThink of them as three chapters in a dinosaur story, each with its own set of star dinosaurs and volcanoes.\nCan you list the three periods that make up the Mesozoic era?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic", "general_knowledge"],
+    "insufficient": false,
+    "reason": "Used high-confidence facts about Mesozoic era from current_topic and general knowledge.",
+    "factual_confidence": 0.99
+  },
+  "confidence": "high"
+}
+```

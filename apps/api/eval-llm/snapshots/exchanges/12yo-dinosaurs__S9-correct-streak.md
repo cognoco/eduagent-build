@@ -293,3 +293,15 @@ Then you need to account for the boundary condition.
 - History turns: 8, exchangeCount: 4
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "First, the Mesozoic era lasted about 186 million years, from roughly 252 to 66 million years ago.\\nIt’s divided into three periods: Triassic, Jurassic, and Cretaceous.\\nThe Jurassic period is followed by the Cretaceous period.\\nWhich period comes right after the Jurassic period?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Facts drawn from loaded Mesozoic era curriculum.", "factual_confidence": 0.99 },
+  "confidence": "high"
+}
+```

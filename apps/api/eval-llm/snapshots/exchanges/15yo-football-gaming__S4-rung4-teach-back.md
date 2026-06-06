@@ -284,3 +284,7 @@ Signal guidance:
 - History turns: 4, exchangeCount: 4
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (60 calls); re-run with --max-live-calls to raise`

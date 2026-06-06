@@ -287,3 +287,29 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Quick check — let me try to trip you up.\nIn Spanish present tense, you simply drop the infinitive ending (-ar, -er, -ir) and add the same set of endings -o, -as, -a, -amos, -áis, -an to every verb, no matter which type it is.\nCan you spot what's wrong with this description?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [],
+    "insufficient": false,
+    "reason": "challenge turn; no factual source used"
+  },
+  "confidence": "high"
+}
+```

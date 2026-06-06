@@ -255,3 +255,30 @@ Start a learning session about Mesozoic era.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "The Mesozoic era lasted from about 252 to 66 million years ago and is divided into three periods: the Triassic, the Jurassic, and the Cretaceous.\nThink of it like a volcano that erupts in three stages—first the early magma (Triassic), then a big blast of lava (Jurassic) full of dinosaurs, and finally the final eruption (Cretaceous) that ends with a massive extinction.\nWhich period came first, the Triassic or the Jurassic?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic", "general_knowledge"],
+    "insufficient": false,
+    "reason": "Used current_topic and general knowledge to provide factual statements about the Mesozoic era.",
+    "factual_confidence": 0.96
+  },
+  "confidence": "high"
+}
+```

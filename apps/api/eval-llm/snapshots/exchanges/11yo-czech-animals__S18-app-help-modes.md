@@ -295,3 +295,15 @@ What's the difference between Explorer and Challenge mode?
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Explorer mode lets you freely browse and learn about topics at your own pace. Challenge mode is an optional quiz the mentor may offer when it thinks you’re ready; you can accept or skip it.",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": [], "insufficient": false, "reason": "Answer based on app map" },
+  "confidence": "high"
+}
+```

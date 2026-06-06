@@ -300,3 +300,30 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 6
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Starting with the definition is a common approach. In Spanish, the present tense (el presente) is used for actions happening now, habits or routines, and general truths. Regular verbs follow predictable patterns:\n- For -ar verbs the endings are: yo -o, tú -as, él/ella/usted -a, nosotros -amos, vosotros -áis, ellos/ellas/ustedes -an.\n- For -er verbs the endings are: yo -o, tú -es, él/ella/usted -e, nosotros -emos, vosotros -éis, ellos/ellas/ustedes -en.\n- For -ir verbs the endings are: yo -o, tú -es, él/ella/usted -e, nosotros -imos, vosotros -ís, ellos/ellas/ustedes -en.\nFor example, the regular -ar verb hablar becomes hablo, hablas, habla, hablamos, habláis, hablan. Irregular verbs such as ser, estar, and ir have their own forms.\nNow, what does the present tense express, and which ending would you attach to a regular -ar verb for tú?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Used current_topic for definitions and conjugation patterns",
+    "factual_confidence": 0.96
+  },
+  "confidence": "high"
+}
+```

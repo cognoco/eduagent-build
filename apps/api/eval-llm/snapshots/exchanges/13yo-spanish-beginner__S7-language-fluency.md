@@ -273,3 +273,60 @@ Yes, let's go.
 - History turns: 2, exchangeCount: 2
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## ⚠️ Schema violation
+
+The live LLM response did not conform to the flow's `expectedResponseSchema`:
+
+```
+[
+  {
+    "origin": "number",
+    "code": "too_small",
+    "minimum": 1,
+    "inclusive": true,
+    "path": [
+      "ui_hints",
+      "fluency_drill",
+      "score",
+      "total"
+    ],
+    "message": "Too small: expected number to be >=1"
+  }
+]
+```
+
+## Live LLM response
+
+```
+{
+  "reply": "Perfect! We'll do a short fluency drill (30 seconds). I’ll give you an infinitive verb and you write the “yo” form in the present tense. Try to answer quickly. Here we go:\n1. hablar\n2. comer\n3. vivir\nSend your answers when you’re ready.",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": false,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    },
+    "fluency_drill": {
+      "active": true,
+      "duration_s": 30,
+      "score": {
+        "correct": 0,
+        "total": 0
+      }
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Using loaded curriculum for present tense verb forms.",
+    "factual_confidence": 0.99
+  },
+  "confidence": "high"
+}
+```

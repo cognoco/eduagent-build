@@ -290,3 +290,29 @@ Signal guidance:
 - History turns: 4, exchangeCount: 4
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Which verb are you trying to conjugate, and what do you think the first step in its present tense form might be?",
+  "signals": {
+    "partial_progress": true,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": ["current_topic"],
+    "insufficient": false,
+    "reason": "Prompting learner to recall rule order for Spanish present tense verbs"
+  },
+  "confidence": "high"
+}
+```

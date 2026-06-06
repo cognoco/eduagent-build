@@ -221,3 +221,32 @@ Możesz mi wytłumaczyć, czym są ułamki? Nie rozumiem, co oznaczają liczby n
 - Language-quality scenario: LQ-PL01 — Polish, age 13 — explain fractions notation.
 - conversationLanguage: pl (Polish)
 - Tier 2 judges the reply prose with an LLM judge on production routing (independent of any --openrouter-model candidate override).
+
+## Live LLM response
+
+```
+{
+  "reply": "Dobre pytanie — to inny temat. Najpierw dokończmy ten, potem możesz otworzyć nową sesję o ułamkach. W języku hiszpańskim czas teraźniejszy wymaga odmiany czasownika zgodnie z podmiotem. Dla regularnych czasowników na -ar, jak hablar, końcówki są: yo hablo, tú hablas, él/ella/usted habla, nosotros hablamos, vosotros habláis, ellos/ellas/ustedes hablan. Jaką formę użyjesz, aby powiedzieć ja mówię z czasownikiem hablar?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true,
+    "crisis_redirect": false
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic"
+    ],
+    "insufficient": false,
+    "reason": "Used current_topic for facts about Spanish present tense verbs.",
+    "factual_confidence": 1.0
+  },
+  "confidence": "high"
+}
+```

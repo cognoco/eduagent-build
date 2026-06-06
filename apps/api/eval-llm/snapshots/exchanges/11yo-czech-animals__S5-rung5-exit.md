@@ -281,3 +281,15 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Good question — that's a different topic. Let's finish Czech reading comprehension first.\n\nIn Czech, nouns change their endings to show their case, like nominative for the subject and accusative for the object. That helps you know who is doing what.\n\nWhen you read a short Czech text, look for the main idea first, then spot the details that support it. This makes the passage easier to understand.\n\nCan you tell me one way you could figure out the meaning of a word you don't know while reading Czech?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Used general knowledge about Czech reading comprehension", "factual_confidence": 0.95 },
+  "confidence": "high"
+}
+```

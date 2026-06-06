@@ -258,3 +258,7 @@ Signal guidance:
 - History turns: 0, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+> **Error:** `runLive: messages.user is undefined for scenario S20-challenge-offered — buildPrompt must produce a user turn`

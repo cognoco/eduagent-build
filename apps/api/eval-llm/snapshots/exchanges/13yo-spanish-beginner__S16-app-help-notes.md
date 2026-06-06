@@ -301,3 +301,15 @@ Where do I find my notes about this topic or subject?
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+ "reply": "Your notes are under Home > My Notes > Notes. For notes on a specific topic, go to Library, pick the subject, then the book or topic, and tap 'Your Notes.'",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": [], "insufficient": false, "reason": "Provided navigation instructions without external source.", "factual_confidence": 1.0 },
+  "confidence": "high"
+}
+```
