@@ -42,6 +42,11 @@ import {
 import { stripPhoneticHints } from './llm/sanitize';
 import { safeSend } from './safe-non-core';
 import { inngest } from '../inngest/client';
+import {
+  detectCatastrophicSafetyTrigger,
+  tripwireResponse,
+  type CatastrophicCategory,
+} from './safety-tripwire';
 
 const logger = createLogger();
 
@@ -1424,11 +1429,67 @@ export function applySourceAuditSafetyFallback(
  * - Routes to the appropriate model via routeAndCall
  * - Detects understanding check markers in the response
  */
+/**
+ * Build a synthetic crisis envelope JSON for a deterministic tripwire hit, so
+ * the streaming path's `classifyExchangeOutcome` parses a real envelope (and
+ * persists the safe canned reply) instead of treating the short-circuit as an
+ * orphan fallback. `crisis_redirect` is set true so any envelope-aware consumer
+ * sees the same signal the model would have emitted.
+ */
+function buildTripwireEnvelope(category: CatastrophicCategory): string {
+  return JSON.stringify({
+    reply: tripwireResponse(category),
+    signals: { crisis_redirect: true },
+    confidence: 'high',
+  });
+}
+
+/**
+ * Non-streaming ExchangeResult for a deterministic tripwire hit. The LLM is
+ * never called — `provider`/`model` record that the response was produced by
+ * the safety floor, not a model.
+ */
+function buildTripwireResult(
+  category: CatastrophicCategory,
+  context: ExchangeContext,
+): ExchangeResult {
+  const response = tripwireResponse(category);
+  return {
+    response,
+    newEscalationRung: context.escalationRung,
+    isUnderstandingCheck: false,
+    expectedResponseMinutes: estimateExpectedResponseMinutes(response, context),
+    needsDeepening: false,
+    partialProgress: false,
+    provider: 'safety-tripwire',
+    model: `deterministic:${category}`,
+    latencyMs: 0,
+    readyToFinish: false,
+  };
+}
+
 export async function processExchange(
   context: ExchangeContext,
   userMessage: string,
   imageData?: ImageData,
 ): Promise<ExchangeResult> {
+  // [Safety tripwire, 2026-06-06] Deterministic floor for the catastrophic
+  // categories (self-harm method-seeking, sexual content involving a minor).
+  // Detection runs on the INPUT before the LLM is called, so the floor holds
+  // even if the model is jailbroken — we never hand the worst inputs to the
+  // model and never depend on it behaving. On a hit we escalate to the same
+  // crisis path the model uses (structured event + safe canned reply), never
+  // a refusal wall. See safety-tripwire.ts for why this is not a word list.
+  const inputTrip = detectCatastrophicSafetyTrigger(userMessage);
+  if (inputTrip) {
+    await emitCrisisRedirectEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: `exchange.process.tripwire.${inputTrip.category}`,
+    });
+    return buildTripwireResult(inputTrip.category, context);
+  }
+
   const appHelpTurn = isAppHelpQuery(userMessage);
   const sourceEvidence = buildExchangeSourceEvidence(context, userMessage, {
     appHelpTurn,
@@ -1552,6 +1613,35 @@ export async function streamExchange(
   userMessage: string,
   imageData?: ImageData,
 ): Promise<ExchangeStreamResult> {
+  // [Safety tripwire, 2026-06-06] Same deterministic input-side floor as
+  // processExchange. On a hit we stream the safe canned reply (no LLM call) and
+  // resolve rawResponsePromise to a synthetic crisis envelope so the caller's
+  // classifyExchangeOutcome persists the safe reply rather than an orphan
+  // fallback. The structured safety event is emitted here, deterministically.
+  const inputTrip = detectCatastrophicSafetyTrigger(userMessage);
+  if (inputTrip) {
+    await emitCrisisRedirectEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: `exchange.stream.tripwire.${inputTrip.category}`,
+    });
+    const safeReply = tripwireResponse(inputTrip.category);
+    const rawEnvelope = buildTripwireEnvelope(inputTrip.category);
+    async function* singleChunk(): AsyncIterable<string> {
+      yield safeReply;
+    }
+    return {
+      stream: singleChunk(),
+      rawResponsePromise: Promise.resolve(rawEnvelope),
+      newEscalationRung: context.escalationRung,
+      provider: 'safety-tripwire',
+      model: `deterministic:${inputTrip.category}`,
+      sourceEvidence: buildExchangeSourceEvidence(context, userMessage, {
+        appHelpTurn: false,
+      }),
+    };
+  }
+
   const appHelpTurn = isAppHelpQuery(userMessage);
   const sourceEvidence = buildExchangeSourceEvidence(context, userMessage, {
     appHelpTurn,
