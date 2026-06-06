@@ -218,6 +218,12 @@ Phases 1–5 are model-neutral and safe before the §7 ruling.
 - Romantic/companion scenarios are structurally absent from the minors' scenario vocabulary — not refused, nonexistent.
 - Role play runs in mode F with a role-play-aware T2 rubric, and is admitted per §1.4 with boundary-behavior scenarios in the battery.
 
+**Deep-think bridge (the sanctioned pattern for any reply that needs > 25 s of model time):**
+- The 25 s wall is per HTTP request, so deep reasoning beyond it MUST go through the async path (Inngest) and arrive as a follow-up assistant message. The interactive cover is a **bridge turn** from a small fast model (own flow label, e.g. `exchange.bridge` → rule-table row), shown immediately.
+- The bridge is **content-constrained**: acknowledge, restate the problem, optionally ask what the learner has tried — never substantive claims. A bridge that asserts X while the deep model later concludes not-X is worse than a typing indicator; incoherence costs more trust than silence.
+- Both beats pass the normal judge gates (bridge is tiny → cheap to gate; deep reply gates like any reply).
+- Not needed for launch: rung 4–5 fits the wall at gpt-5.4 @ medium (11.5–16.8 s measured 2026-06-06) under a thinking indicator. Build the bridge only when a flow genuinely wants 30 s+ thinks (research-grade answers, full-document analysis).
+
 ## 9. Acceptance criteria
 
 - [ ] Phase 1 equivalence test: rule table reproduces current routing for the full input matrix.
