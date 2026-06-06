@@ -82,16 +82,24 @@ describe('OpenAI Provider', () => {
       expect(body.response_format).toEqual({ type: 'json_object' });
     });
 
-    it('throws on non-2xx response', async () => {
+    it('throws on non-2xx response without leaking the body', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
         text: async () => 'Rate limited',
       });
 
-      await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
-        'OpenAI API request failed (429): Rate limited',
+      let caughtError: unknown;
+      try {
+        await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect((caughtError as Error).message).toBe(
+        'OpenAI API request failed (status 429)',
       );
+      expect((caughtError as Error).message).not.toContain('Rate limited');
     });
 
     it('preserves HTTP status on non-2xx response errors', async () => {
@@ -115,7 +123,7 @@ describe('OpenAI Provider', () => {
       );
     });
 
-    it('throws on data.error field in response body', async () => {
+    it('throws on data.error field without leaking the vendor message', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -124,12 +132,20 @@ describe('OpenAI Provider', () => {
         }),
       });
 
-      await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
-        'OpenAI API error: Invalid model',
+      let caughtError: unknown;
+      try {
+        await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect((caughtError as Error).message).toBe(
+        'OpenAI API error [invalid_request_error]',
       );
+      expect((caughtError as Error).message).not.toContain('Invalid model');
     });
 
-    it('[FCR-2026-05-23-L11.F11] data.error preserves structured cause chain', async () => {
+    it('[FCR-2026-05-23-L11.F11] data.error keeps only non-content tokens as cause', async () => {
       const structuredError = {
         message: 'Rate limit exceeded',
         type: 'rate_limit_error',
@@ -149,11 +165,15 @@ describe('OpenAI Provider', () => {
       }
 
       expect(caughtError).toBeInstanceOf(Error);
-      expect((caughtError as Error).message).toContain('Rate limit exceeded');
-      // Structured error fields must be preserved as cause for Sentry grouping.
-      expect((caughtError as Error & { cause: unknown }).cause).toEqual(
-        structuredError,
+      // Vendor free-text message must NOT survive (it can echo input).
+      expect((caughtError as Error).message).not.toContain(
+        'Rate limit exceeded',
       );
+      // Only the structured type/code tokens are kept for Sentry grouping.
+      expect((caughtError as Error & { cause: unknown }).cause).toEqual({
+        type: 'rate_limit_error',
+        code: 'rate_limit_exceeded',
+      });
     });
 
     it('throws SafetyFilterError when OpenAI returns a content_filter finish reason without text', async () => {
@@ -239,7 +259,7 @@ describe('OpenAI Provider', () => {
         )) {
           chunks.push(chunk);
         }
-      }).rejects.toThrow('OpenAI API stream failed (500): Internal error');
+      }).rejects.toThrow('OpenAI API stream failed (status 500)');
     });
 
     it('preserves HTTP status on non-2xx stream response errors', async () => {

@@ -8,7 +8,7 @@ import {
 } from '../types';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { SafetyFilterError } from '../../../errors';
-import { createProviderHttpError } from './errors';
+import { createProviderApiError, createProviderHttpError } from './errors';
 import { toOpenAIContent } from './openai';
 
 // ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ export function createOpenRouterProvider(
     if (!res.ok) {
       const errorBody = await res.text();
       throw createProviderHttpError(
-        `OpenRouter API request failed (${res.status}): ${errorBody}`,
+        'OpenRouter API request',
         res.status,
         errorBody,
       );
@@ -176,12 +176,10 @@ export function createOpenRouterProvider(
     const data = (await res.json()) as OpenRouterResponse;
 
     if (data.error) {
-      // Preserve structured error as cause (mirrors openai.ts /
-      // FCR-2026-05-23-L11.F11) so Sentry groups by code if this ever runs
-      // in an instrumented context.
-      throw new Error(`OpenRouter API error: ${data.error.message}`, {
-        cause: data.error,
-      });
+      // Keep only the structured type/code tokens (mirrors openai.ts /
+      // FCR-2026-05-23-L11.F11); the vendor message can echo learner input,
+      // so it never enters the error.
+      throw createProviderApiError('OpenRouter API', data.error);
     }
 
     const choice = data.choices?.[0];

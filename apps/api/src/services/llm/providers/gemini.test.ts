@@ -182,7 +182,7 @@ describe('Gemini Provider', () => {
 
       await expect(
         provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
-      ).rejects.toThrow('Gemini API request failed (429)');
+      ).rejects.toThrow('Gemini API request failed (status 429)');
     });
 
     it('preserves HTTP status on non-200 response errors', async () => {
@@ -213,19 +213,29 @@ describe('Gemini Provider', () => {
       ).rejects.toThrow('Gemini returned empty response');
     });
 
-    it('throws on API error response', async () => {
+    it('throws on API error response without leaking the vendor message', async () => {
       fetchSpy.mockResolvedValue(
         mockFetchResponse({
           error: { message: 'Invalid API key', code: 403 },
         }),
       );
 
-      await expect(
-        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
-      ).rejects.toThrow('Gemini API error: Invalid API key');
+      let caughtError: unknown;
+      try {
+        await provider.chat(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG,
+        );
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect((caughtError as Error).message).toBe('Gemini API error [403]');
+      expect((caughtError as Error).message).not.toContain('Invalid API key');
+      expect((caughtError as Error).cause).toEqual({ code: 403 });
     });
 
-    it('[FCR-2026-05-23-L11.F11] data.error preserves structured cause chain', async () => {
+    it('[FCR-2026-05-23-L11.F11] data.error keeps only non-content tokens as cause', async () => {
       const structuredError = { message: 'Quota exceeded', code: 429 };
       fetchSpy.mockResolvedValue(mockFetchResponse({ error: structuredError }));
 
@@ -240,11 +250,13 @@ describe('Gemini Provider', () => {
       }
 
       expect(caughtError).toBeInstanceOf(Error);
-      expect((caughtError as Error).message).toContain('Quota exceeded');
-      // Structured error fields must be preserved as cause for Sentry grouping.
-      expect((caughtError as Error & { cause: unknown }).cause).toEqual(
-        structuredError,
-      );
+      // The vendor free-text message must NOT survive (it can echo input).
+      expect((caughtError as Error).message).not.toContain('Quota exceeded');
+      // Only the structured code token is kept — preserved for Sentry grouping
+      // and the router's numeric-code HTTP classification.
+      expect((caughtError as Error & { cause: unknown }).cause).toEqual({
+        code: 429,
+      });
     });
 
     it('concatenates initial contiguous system messages into systemInstruction', async () => {
@@ -524,7 +536,7 @@ describe('Gemini Provider', () => {
         )) {
           // consume stream
         }
-      }).rejects.toThrow('Gemini API stream failed (500)');
+      }).rejects.toThrow('Gemini API stream failed (status 500)');
     });
 
     it('preserves HTTP status on non-200 stream response errors', async () => {

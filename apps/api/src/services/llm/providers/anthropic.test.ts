@@ -170,8 +170,8 @@ describe('createAnthropicProvider — responseFormat json in fetch payload', () 
 // [FCR-2026-05-23-L11.F11] data.error preserves structured cause chain
 // ---------------------------------------------------------------------------
 
-describe('createAnthropicProvider — data.error preserves cause', () => {
-  it('throws with cause set to the structured error object', async () => {
+describe('createAnthropicProvider — data.error keeps only non-content tokens', () => {
+  it('drops the vendor message and keeps type as cause', async () => {
     const structuredError = {
       type: 'rate_limit_error',
       message: 'Too many requests',
@@ -197,11 +197,13 @@ describe('createAnthropicProvider — data.error preserves cause', () => {
     }
 
     expect(caughtError).toBeInstanceOf(Error);
-    expect((caughtError as Error).message).toContain('Too many requests');
-    // [FCR-2026-05-23-L11.F11] structured error fields must be preserved as cause
-    expect((caughtError as Error & { cause: unknown }).cause).toEqual(
-      structuredError,
-    );
+    // The vendor free-text message must NOT survive (it can echo input).
+    expect((caughtError as Error).message).not.toContain('Too many requests');
+    // [FCR-2026-05-23-L11.F11] only the structured type token is kept as cause
+    // for Sentry grouping — never the vendor message.
+    expect((caughtError as Error & { cause: unknown }).cause).toEqual({
+      type: 'rate_limit_error',
+    });
   });
 });
 

@@ -10,7 +10,7 @@ import {
 } from '../types';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
-import { createProviderHttpError } from './errors';
+import { createProviderApiError, createProviderHttpError } from './errors';
 
 const logger = createLogger();
 
@@ -165,7 +165,7 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       if (!res.ok) {
         const errorBody = await res.text();
         throw createProviderHttpError(
-          `Anthropic API request failed (${res.status}): ${errorBody}`,
+          'Anthropic API request',
           res.status,
           errorBody,
         );
@@ -174,11 +174,10 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       const data = (await res.json()) as AnthropicResponse;
 
       if (data.error) {
-        // [FCR-2026-05-23-L11.F11] Preserve structured error as cause so Sentry
-        // captures type/code fields for grouping (rate-limit, auth, content-filter).
-        throw new Error(`Anthropic API error: ${data.error.message}`, {
-          cause: data.error,
-        });
+        // [FCR-2026-05-23-L11.F11] Keep only the structured type/code tokens for
+        // Sentry grouping (rate-limit, auth, content-filter); the vendor message
+        // can echo learner input, so it never enters the error.
+        throw createProviderApiError('Anthropic API', data.error);
       }
 
       const text = data.content?.find((b) => b.type === 'text')?.text;
@@ -227,7 +226,7 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
           if (!res.ok) {
             const errorBody = await res.text();
             throw createProviderHttpError(
-              `Anthropic API stream failed (${res.status}): ${errorBody}`,
+              'Anthropic API stream',
               res.status,
               errorBody,
             );

@@ -11,7 +11,7 @@ import {
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
 import { SafetyFilterError } from '../../../errors';
-import { createProviderHttpError } from './errors';
+import { createProviderApiError, createProviderHttpError } from './errors';
 
 const logger = createLogger();
 
@@ -148,7 +148,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
       if (!res.ok) {
         const errorBody = await res.text();
         throw createProviderHttpError(
-          `OpenAI API request failed (${res.status}): ${errorBody}`,
+          'OpenAI API request',
           res.status,
           errorBody,
         );
@@ -157,11 +157,10 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
       const data = (await res.json()) as OpenAIResponse;
 
       if (data.error) {
-        // [FCR-2026-05-23-L11.F11] Preserve structured error as cause so Sentry
-        // captures type/code fields for grouping (rate-limit, auth, content-filter).
-        throw new Error(`OpenAI API error: ${data.error.message}`, {
-          cause: data.error,
-        });
+        // [FCR-2026-05-23-L11.F11] Keep only the structured type/code tokens for
+        // Sentry grouping (rate-limit, auth, content-filter); the vendor message
+        // can echo learner input, so it never enters the error.
+        throw createProviderApiError('OpenAI API', data.error);
       }
 
       const choice = data.choices?.[0];
@@ -211,7 +210,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           if (!res.ok) {
             const errorBody = await res.text();
             throw createProviderHttpError(
-              `OpenAI API stream failed (${res.status}): ${errorBody}`,
+              'OpenAI API stream',
               res.status,
               errorBody,
             );

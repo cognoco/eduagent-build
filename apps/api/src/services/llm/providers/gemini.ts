@@ -10,7 +10,7 @@ import {
 } from '../types';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { SafetyFilterError } from '../../../errors';
-import { createProviderHttpError } from './errors';
+import { createProviderApiError, createProviderHttpError } from './errors';
 
 // ---------------------------------------------------------------------------
 // Gemini Provider — ARCH-8, ARCH-9
@@ -209,11 +209,10 @@ function extractResponseText(data: GeminiResponse): string {
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
     if (data.error) {
-      // [FCR-2026-05-23-L11.F11] Preserve structured error as cause so Sentry
-      // captures code/message fields for grouping (rate-limit, auth, quota).
-      throw new Error(`Gemini API error: ${data.error.message}`, {
-        cause: data.error,
-      });
+      // [FCR-2026-05-23-L11.F11] Keep only the structured type/code tokens for
+      // Sentry grouping (rate-limit, auth, quota); the vendor message can echo
+      // learner input, so it never enters the error.
+      throw createProviderApiError('Gemini API', data.error);
     }
     throw new Error('Gemini returned empty response');
   }
@@ -248,7 +247,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
       if (!res.ok) {
         const errorBody = await res.text();
         throw createProviderHttpError(
-          `Gemini API request failed (${res.status}): ${errorBody}`,
+          'Gemini API request',
           res.status,
           errorBody,
         );
@@ -288,7 +287,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
           if (!res.ok) {
             const errorBody = await res.text();
             throw createProviderHttpError(
-              `Gemini API stream failed (${res.status}): ${errorBody}`,
+              'Gemini API stream',
               res.status,
               errorBody,
             );

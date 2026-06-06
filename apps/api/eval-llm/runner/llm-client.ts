@@ -19,7 +19,10 @@
 // downstream Tier 2 envelope-shape validation would be theater.
 // ---------------------------------------------------------------------------
 
-import { routeAndCall } from '../../src/services/llm/router';
+import {
+  routeAndCall,
+  withSafetyPreamble,
+} from '../../src/services/llm/router';
 import type { ChatMessage, EscalationRung } from '../../src/services/llm/types';
 import { callOpenRouterModel } from './llm-bootstrap';
 
@@ -74,7 +77,19 @@ export async function runHarnessLlm(
   options?: HarnessLlmOptions,
 ): Promise<string> {
   if (openRouterModelOverride) {
-    return callOpenRouterModel(messages, openRouterModelOverride, {
+    // CRITICAL: replicate the production preamble. `routeAndCall` prepends the
+    // personalization + safety preamble (router.ts:~872) — including the
+    // `getPersonalizationPreamble` language directive that tells the model
+    // which language the learner-visible `reply` must be in. The candidate
+    // path bypasses `routeAndCall`, so without this the candidate would see a
+    // prompt missing that directive and its language eval would not reflect
+    // production. We apply the SAME `withSafetyPreamble` to keep the candidate
+    // and production prompts identical apart from the model itself.
+    const safeMessages = withSafetyPreamble(messages, options?.ageBracket, {
+      conversationLanguage: options?.conversationLanguage,
+      pronouns: options?.pronouns,
+    });
+    return callOpenRouterModel(safeMessages, openRouterModelOverride, {
       ...(options?.responseFormat === 'json'
         ? { responseFormat: 'json' as const }
         : {}),

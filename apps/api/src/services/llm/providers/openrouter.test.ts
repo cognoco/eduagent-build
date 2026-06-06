@@ -173,12 +173,13 @@ describe('OpenRouter Provider', () => {
 
       expect(caughtError).toBeInstanceOf(Error);
       expect((caughtError as Error).message).toBe(
-        'OpenRouter API request failed (429): Rate limited',
+        'OpenRouter API request failed (status 429)',
       );
+      expect((caughtError as Error).message).not.toContain('Rate limited');
       expect((caughtError as Error & { status?: number }).status).toBe(429);
     });
 
-    it('throws on data.error field and preserves it as cause', async () => {
+    it('throws on data.error field, keeping only non-content tokens as cause', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -196,13 +197,12 @@ describe('OpenRouter Provider', () => {
       }
 
       expect(caughtError).toBeInstanceOf(Error);
-      expect((caughtError as Error).message).toBe(
-        'OpenRouter API error: No allowed providers',
+      expect((caughtError as Error).message).toBe('OpenRouter API error [404]');
+      expect((caughtError as Error).message).not.toContain(
+        'No allowed providers',
       );
-      expect((caughtError as Error).cause).toEqual({
-        message: 'No allowed providers',
-        code: 404,
-      });
+      // Only the numeric code survives (kept for router HTTP classification).
+      expect((caughtError as Error).cause).toEqual({ code: 404 });
     });
 
     it('throws SafetyFilterError on content_filter finish reason', async () => {
@@ -265,7 +265,7 @@ describe('OpenRouter Provider', () => {
         for await (const _ of streamResult) {
           // drain
         }
-      }).rejects.toThrow('OpenRouter API request failed (500)');
+      }).rejects.toThrow('OpenRouter API request failed (status 500)');
       await expect(streamResult.stopReasonPromise).resolves.toBe('unknown');
     });
   });
