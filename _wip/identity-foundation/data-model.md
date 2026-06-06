@@ -55,7 +55,7 @@ Eight tables in the active graph, plus a per-class retain-tier set. Each row bel
                                          │
    ┌─────────────┐    ┌─────────────┐    │   ┌──────────────┐
    │ person  A   │    │ person  B   │    │   │ person  C    │
-   │ (ward)      │◄───┼ guardianship┼────┘   │ (mentee)     │
+   │ (charge)    │◄───┼ guardianship┼────┘   │ (mentee)     │
    └──────┬──────┘    └─────────────┘        └──────┬───────┘
           │                                        ▲
           │                                        │ mentorship
@@ -68,7 +68,7 @@ Eight tables in the active graph, plus a per-class retain-tier set. Each row bel
           ▼
    ┌─────────────┐                  ┌────────────────────┐
    │ organization│                  │ consent_grant      │ (append-only event log)
-   │ (home org)  │                  │  - ward            │   keys: (ward × purpose × org)
+   │ (home org)  │                  │  - charge          │   keys: (charge × purpose × org)
    └──────┬──────┘                  │  - purpose         │   snapshots: age, jurisdiction
           │                         │  - lawful_basis    │   at-grant values
           │ membership              │  - assurance_token │
@@ -140,8 +140,8 @@ For each table: the constraint it exists to satisfy (cite invariant, ADR, counse
 
 - **Constraint it satisfies:** `D5`, `MMT-ADR-0008`, `inv 14` / `inv 19` (never auto-conferred; opt-in); the **`F1-BT-a` — no-self-guardian guard, the attack surface the ratified model bans**.
 - **vs. legacy:** `family_links` (parent→child) is renamed + re-purposed; the consent record lives on this edge; the operational powers do *not* live on this edge.
-- **Validation:** `guardian <> ward`; `UNIQUE (guardian, ward) where revoked_at IS NULL` (partial unique — re-granting after revoke is a new row, preserving history).
-- **Indexes:** `(ward_person_id)`, `(guardian_person_id)`.
+- **Validation:** `guardian <> charge`; `UNIQUE (guardian, charge) where revoked_at IS NULL` (partial unique — re-granting after revoke is a new row, preserving history).
+- **Indexes:** `(charge_person_id)`, `(guardian_person_id)`.
 
 ### 4.7 `mentorship`
 
@@ -153,9 +153,9 @@ For each table: the constraint it exists to satisfy (cite invariant, ADR, counse
 ### 4.8 `consent_grant`
 
 - **Constraint it satisfies:** `D6` (append-only event log; computed requirement, stored record); `I-PB-B2a` (per-purpose, separate consent for the LLM-disclosure purpose; tokenised pass/fail only); `I-A2` (recorded `lawful_basis`); `I-PB-B2b` (retain prior value + audit fact for direction-aware gate); `I-D1` v1-stance (org-scoped from birth).
-- **vs. legacy:** `consent_states` (stamped status) is replaced by an event log; the `UNIQUE(profileId, consentType)` constraint that was the `I-D1` blocker is *gone* — the new key is `(ward × purpose × organization)` and history is preserved.
-- **Validation:** `ward_person_id ON DELETE RESTRICT` *(load-bearing: active grants must be re-homed before a person-delete is permitted)*; `organization_id ON DELETE RESTRICT`; all other fields as described in `MMT-ADR-0011` §3.
-- **Indexes:** `(ward_person_id, purpose, organization_id)` — the resolution hot path; `(granted_at)`; `(withdrawn_at) where withdrawn_at IS NOT NULL`.
+- **vs. legacy:** `consent_states` (stamped status) is replaced by an event log; the `UNIQUE(profileId, consentType)` constraint that was the `I-D1` blocker is *gone* — the new key is `(charge × purpose × organization)` and history is preserved.
+- **Validation:** `charge_person_id ON DELETE RESTRICT` *(load-bearing: active grants must be re-homed before a person-delete is permitted)*; `organization_id ON DELETE RESTRICT`; all other fields as described in `MMT-ADR-0011` §3.
+- **Indexes:** `(charge_person_id, purpose, organization_id)` — the resolution hot path; `(granted_at)`; `(withdrawn_at) where withdrawn_at IS NOT NULL`.
 
 ### 4.9 The `person_retain` per-class set
 
@@ -197,7 +197,7 @@ In the squash, all of the above happens in one baseline migration. Listed here s
 
 - **Sweep idempotency** (D7c): the per-person fan-out event's `idempotency_key = "personId+day"`; the framework dedupes; no run-log table.
 - **Webhook idempotency** (existing, unchanged): the existing `webhook_idempotency` table is the source for store/billing webhooks.
-- **Consent-grant uniqueness** is *not* enforced at the row level — re-granting after withdrawal is a new row in the event log. The "current state" is a read-time aggregate (`MAX(granted_at)` per `(ward × purpose × org)`); the schema permits re-grants to preserve history.
+- **Consent-grant uniqueness** is *not* enforced at the row level — re-granting after withdrawal is a new row in the event log. The "current state" is a read-time aggregate (`MAX(granted_at)` per `(charge × purpose × org)`); the schema permits re-grants to preserve history.
 
 ---
 

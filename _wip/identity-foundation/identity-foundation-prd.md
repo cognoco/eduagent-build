@@ -2358,8 +2358,8 @@ Person.
 #### I-L1 — Retention periods on the three `person_retain` tables  `[Parameters]`
 | Table | Floor | basis |
 |---|---|---|
-| `consent_receipt` | **Until (ward turns 18) + 3 years**; adult floor **3 years** from withdrawal | GDPR Art 5(2) + Art 7(1) (must demonstrate consent) + EDPB Guidelines 05/2020 §7.1; UK Limitation Act 1980 s.28 (minor disability — clock from 18); (phase-2 US: COPPA §312.10 "only as long as reasonably necessary") |
-| `deletion_audit` | **6 years** (or until ward 18 + 3y, whichever is longer for a minor) | GDPR Art 5(2) (accountability) + Art 30; UK Limitation Act 1980 (6y contract) + s.28 minor-tolling |
+| `consent_receipt` | **Until (charge turns 18) + 3 years**; adult floor **3 years** from withdrawal | GDPR Art 5(2) + Art 7(1) (must demonstrate consent) + EDPB Guidelines 05/2020 §7.1; UK Limitation Act 1980 s.28 (minor disability — clock from 18); (phase-2 US: COPPA §312.10 "only as long as reasonably necessary") |
+| `deletion_audit` | **6 years** (or until charge 18 + 3y, whichever is longer for a minor) | GDPR Art 5(2) (accountability) + Art 30; UK Limitation Act 1980 (6y contract) + s.28 minor-tolling |
 | `financial_record` | **Per-jurisdiction; conservative single floor = 10 years** (NO 5 / UK 6 / US 7 / DEEU 10) | Norway *bokføringsloven* §13 (5y); DE §147 AO / EU VAT Directive 2006/112 (10y); UK Companies Act 2006 s.388 / HMRC (6y); US IRC §6501 (7y) |
 - **Per-jurisdiction split is real** for `financial_record` — the `retention_period` column stores
   the value per-row; the schema doesn't need to know the regime at read time.

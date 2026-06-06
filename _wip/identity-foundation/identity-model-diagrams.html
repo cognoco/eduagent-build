@@ -85,7 +85,7 @@
     <div class="legend">
       <div><b>Person ≠ Credential</b> — Credential is <code>0..1</code> and optional; a proxied child is a Person with none. <span class="pill">§3, §4</span></div>
       <div><b>Membership</b> — M:N Person↔Org, carries a role set; multi-org is native. <span class="pill">ORG-08</span></div>
-      <div><b>Guardianship</b> — global <code>guardian → ward</code> edge; <b>consent authority is global</b>, operational caps (proxy/manage/view) are org-scoped via Membership. <span class="pill">§9</span></div>
+      <div><b>Guardianship</b> — global <code>guardian → charge</code> edge; <b>consent authority is global</b>, operational caps (proxy/manage/view) are org-scoped via Membership. <span class="pill">§9</span></div>
       <div><b>Consent</b> — <code>required = f(age, jurisdiction)</code>, <code>satisfied</code> is jurisdiction-scoped + append-only; never a stamped boolean. <span class="pill">§8.3</span></div>
       <div><b>Subscription</b> — held by the Organization (Stripe customer = org). <span class="pill">§2</span></div>
       <div><b>Role → Permission</b> — capability matrix as <i>data</i>, replacing <code>isOwner</code> checks. <span class="pill">RC-07</span></div>
@@ -130,7 +130,7 @@ const DIAGRAMS = {
     ROLE ||--o{ PERMISSION : "grants"
     ORGANIZATION ||--o{ SUBSCRIPTION : "holds"
     PERSON ||--o{ GUARDIANSHIP : "is guardian"
-    PERSON ||--o{ GUARDIANSHIP : "is ward"
+    PERSON ||--o{ GUARDIANSHIP : "is charge"
     PERSON ||--o{ CONSENT : "subject of"
     GUARDIANSHIP ||--o{ CONSENT : "authority for"
     PERSON {

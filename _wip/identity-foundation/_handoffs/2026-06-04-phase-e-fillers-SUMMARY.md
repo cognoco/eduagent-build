@@ -16,7 +16,7 @@ adult app.
   **P6 — `payer_person_id` = the store-account-holder** (organiser/parent).
 
 ## Legal parameters
-- **L1 retention** — receipt: ward 18 + 3y; deletion-audit: 6y; financial: per-jurisdiction (floor 10y).
+- **L1 retention** — receipt: charge 18 + 3y; deletion-audit: 6y; financial: per-jurisdiction (floor 10y).
 - **L2** — 24-month dormancy → 30-day notice (guardian also notified for minors).
 - **L3** — 30-day moved-country grace → browse-preview.
 - **L4** — 13–16 "reasonable efforts" at launch; under-13 enumerated-VPC is phase-2. **G7 RFP sized to
