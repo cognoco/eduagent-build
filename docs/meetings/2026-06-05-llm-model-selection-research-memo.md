@@ -160,6 +160,19 @@ Same-day pricing verification (OpenRouter endpoint API, 2026-06-06): the memo's 
 | Dormant fallback row | adults | DeepSeek V4 Pro non-reasoning @ DeepInfra | US (needs DPA + Chinese-origin DPIA ¶ before activation) | passed battery; not pinned |
 | Excluded | — | Gemini (vendor terms, under-18); all Chinese hosts (every market); Haiku-reasoning (JSON); GPT-5 mini ≥ medium + DeepSeek-reasoning interactive (latency); gpt-5.5 as default (price) | — | — |
 
+### §7.1 Rationale — the non-obvious calls
+
+**Why the age split dissolved.** An earlier proposal routed adults to a stronger/cheaper model than minors (DeepSeek for 18+). It became unnecessary: every *interactive* slot's winner is OpenAI regardless of age, so under-18 and adult share the same models. No residency-based or age-based model routing to build; age only changes the *judge gating mode* (spec §3), never the model.
+
+**Why gpt-oss-120b is confined to async, despite being the cheapest/fastest reasoner.** It is *confined*, not *promoted*, to async. Two failures are fatal on the interactive path and absorbable in async:
+1. **Wrong-language to small-locale learners** — it answered Polish and Norwegian learners in *English* (language-quality judge hard fail). On the interactive path the child reads the prose directly, so this is the product visibly breaking; GPT-5 mini was flawless there.
+2. **Host-dependent envelope breakage** — open-weights means behavior varies by serving host; JSON truncated on the Google host, clean only on Cerebras. Safe use requires pinning ONE host → single-supplier concentration risk, unacceptable on the latency-/uptime-sensitive real-time path.
+   Plus: one unexplained degenerate `{"final":"Yes"}` jailbreak response (N=1, needs sampling), and it is **text-only** (the interactive default must handle homework photos).
+   Async jobs (recaps, curriculum, assessment eval) have the property the chat path lacks: **nobody waits, so output is validated and regenerated before anyone sees it.** A wrong-language recap is caught and re-run invisibly; an envelope hiccup is retried; a single host is fine for a 2-second job. Its one superpower — full reasoning in ~2s at $0.35/$0.75 — is pure upside exactly there.
+   **Promotion path** (async → interactive) if all three clear: (a) small-locale wrong-language fixed (prompt-hardening or fine-tune), (b) a second verified host exists so it is not Cerebras-only (Nebius EU serves it — latency untested), (c) more sampling clears the jailbreak flake.
+
+**The framing in one line.** GPT-5 mini is *merely very good but flawless where it counts*; gpt-oss is *spectacular in one dimension but broken in two the interactive path cannot tolerate and the async path can absorb*.
+
 ## 7. Open decisions
 
 1. **Family-tier workhorse:** GPT-5 mini (recommended — capability/$ winner; requires OpenAI ZDR-for-minors configuration) vs Haiku 4.5 (simpler compliance via existing Anthropic stack; better instruction-following; ~3× output cost).
