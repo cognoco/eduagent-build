@@ -72,6 +72,8 @@ Which layer matters at which level:
 - `apps/api/eval-llm/` + `pnpm eval:llm` (Tier 1 prompt snapshots, Tier 2 live schema validation), 19+ flows wired. **Zero adversarial/safety cases** (see H3).
 - Provider safety-error handling has exactly 2 unit tests (`providers/openai.test.ts` content_filter cases).
 
+> **⚠️ Update 2026-06-06 — eval-integrity defect found & fixed (layer ⑤).** The candidate-model eval path (`runHarnessLlm` with `--openrouter-model`, `apps/api/eval-llm/runner/llm-client.ts`) **bypassed `routeAndCall`**, so it omitted the universal safety preamble (②, `router.ts:187-191, 207-226`) *and* the personalization/language directive (`router.ts:236-243`) from every candidate run. Consequence: candidate models were being safety-/language-evaluated on a prompt **missing the production instruction gate** — the eval did not measure what production ships. The most visible symptom was spurious "wrong-language" hard-fails (gpt-oss, Haiku) that vanished once the preamble was applied (~98% in-language; see model-selection memo §6 CORRECTION). **Fixed:** `withSafetyPreamble` exported from `router.ts` and now applied on the candidate path; regression test `eval-llm/runner/llm-client.test.ts` (break-test verified) fails closed if the preamble is ever dropped again. **Generalizes H3:** an adversarial eval suite is only valid if the candidate path carries the production gates — the suite and this wiring must land together.
+
 ### Adjacent (UI copy, not LLM)
 
 - `scripts/check-no-clinical-copy.ts` + `scripts/no-clinical-copy-baseline.json` ratchet clinical/struggle language out of UI copy. (An earlier sweep mis-reported this file as missing — it exists; verified 2026-06-05.)
@@ -133,7 +135,7 @@ LLM calls are logged generically (`router.ts:111-133`); Sentry captures errors �
 
 | Tie | Consequence |
 |---|---|
-| **Launch-posture brief, Dial 4** (no Gemini API for teens) | Removes the only configured ③-layer → H4/H5 jump to launch-relevant. Safety re-hardening belongs **inside** the Gemini re-routing work item. |
+| **Launch-posture brief, Dial 4** (no Gemini API for teens) — **now triggered: `MMT-ADR-0016` ratifies the Gemini exit for under-18 (gpt-oss-120b @ Cerebras = universal default text)** | No longer conditional: removing Gemini's classifier lane makes **H4/H5 launch-relevant**. The mitigation is the independent **Haiku judge + gating modes** specced in `docs/specs/2026-06-06-llm-routing-and-judge-architecture.md` §2–§3; safety re-hardening rides the Thread B routing build (`docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md`). |
 | **Model-selection memo §6** (validation gate, child-safety probes) | H3's jailbreak suite is the concrete implementation of that gate; build once, gates both prompt edits and model swaps. |
 | **Review-relearn findings (RR doc)** | RR-1/RR-9 edit the same prompt files that hold the safety rules → land H3 first so those rewrites get safety regression coverage. RR-12 (Challenge Round prod flip) opens a new LLM surface → H1+H2+H7 are prerequisites; H7 doubles as RR-12's required monitoring. RR-9's "never fabricate a score" fallback fix is the same silent-recovery pattern as H2 — one design sweep closes both. |
 

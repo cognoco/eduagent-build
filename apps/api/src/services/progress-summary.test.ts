@@ -5,8 +5,10 @@ import type { KnowledgeInventory } from '@eduagent/schemas';
 import {
   buildProgressSummaryPrompt,
   classifyActivityState,
+  collectGroundedNumbers,
   computeNudgeRecommended,
   deterministicProgressSummaryFallback,
+  summaryNumbersGrounded,
   trimSummary,
 } from './progress-summary';
 
@@ -335,5 +337,100 @@ describe('trimSummary [WI-118 / DS-029]', () => {
 
   it('normalizes whitespace and trims', () => {
     expect(trimSummary('  hello\n\n  world  ')).toBe('hello world');
+  });
+});
+
+describe('[Art 5(1)(d)] progress-summary number-grounding guard', () => {
+  function makeGuardInventory(): KnowledgeInventory {
+    return {
+      profileId: '00000000-0000-0000-0000-000000000001',
+      snapshotDate: '2026-05-13',
+      currentlyWorkingOn: [],
+      thisWeekMini: { sessions: 0, wordsLearned: 0, topicsTouched: 0 },
+      global: {
+        topicsAttempted: 5,
+        topicsMastered: 3,
+        vocabularyTotal: 20,
+        vocabularyMastered: 12,
+        weeklyDeltaTopicsMastered: null,
+        weeklyDeltaVocabularyTotal: null,
+        weeklyDeltaTopicsExplored: null,
+        totalSessions: 10,
+        totalActiveMinutes: 120,
+        totalWallClockMinutes: 150,
+        currentStreak: 2,
+        longestStreak: 5,
+      },
+      subjects: [
+        {
+          subjectId: '00000000-0000-4000-8000-000000000101',
+          subjectName: 'Mathematics',
+          pedagogyMode: 'socratic',
+          sessionsCount: 7,
+          activeMinutes: 80,
+          wallClockMinutes: 90,
+          lastSessionAt: null,
+          topics: {
+            total: 4,
+            explored: 1,
+            mastered: 3,
+            inProgress: 0,
+            notStarted: 0,
+          },
+          vocabulary: {
+            total: 0,
+            mastered: 0,
+            learning: 0,
+            new: 0,
+            byCefrLevel: {},
+          },
+          estimatedProficiency: null,
+          estimatedProficiencyLabel: null,
+        },
+      ],
+    };
+  }
+
+  it('collects every number the summary is allowed to assert', () => {
+    const grounded = collectGroundedNumbers(makeGuardInventory());
+    // global totals
+    expect(grounded.has(10)).toBe(true); // totalSessions
+    expect(grounded.has(120)).toBe(true); // totalActiveMinutes
+    expect(grounded.has(3)).toBe(true); // topicsMastered
+    expect(grounded.has(20)).toBe(true); // vocabularyTotal
+    expect(grounded.has(2)).toBe(true); // currentStreak
+    // subject counts
+    expect(grounded.has(7)).toBe(true); // sessionsCount
+    expect(grounded.has(80)).toBe(true); // activeMinutes
+    expect(grounded.has(4)).toBe(true); // topics.total
+    // subject-list length ("across 1 subject")
+    expect(grounded.has(1)).toBe(true);
+  });
+
+  it('passes a summary whose numbers all come from the inventory', () => {
+    const summary =
+      'Emma has completed 10 sessions across 1 subject, mastering 3 topics.';
+    expect(summaryNumbersGrounded(summary, makeGuardInventory())).toBe(true);
+  });
+
+  it('passes a summary with no numbers at all', () => {
+    expect(
+      summaryNumbersGrounded(
+        'Emma made steady progress this week.',
+        makeGuardInventory(),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects a summary that fabricates a count not in the inventory', () => {
+    // 12 topics mastered is a fabrication — the inventory says 3.
+    const summary = 'Emma has now mastered 12 topics. Great momentum!';
+    expect(summaryNumbersGrounded(summary, makeGuardInventory())).toBe(false);
+  });
+
+  it('rejects a summary that invents a plausible-but-ungrounded statistic', () => {
+    // 45 active minutes appears nowhere in the inventory (it is 120 / 80).
+    const summary = 'Emma studied for 45 minutes across her subjects.';
+    expect(summaryNumbersGrounded(summary, makeGuardInventory())).toBe(false);
   });
 });

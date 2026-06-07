@@ -53,10 +53,12 @@
   .seg button:last-child { border-right: none; }
   .seg button.on { background: var(--panel2); color: var(--teal); font-weight: 600; }
   .seg.presets button.on { color: var(--lavender); }
-  .ctl input[type=text] {
+  .ctl input[type=text], .ctl select {
     background: var(--bg); color: var(--fg); border: 1px solid var(--border);
     border-radius: 7px; padding: 7px 11px; font-size: 13px; min-width: 190px;
   }
+  .ctl select { max-width: 340px; }
+  .ctl select option, .ctl select optgroup { background: var(--bg); color: var(--fg); }
 
   .stats {
     display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 26px 0;
@@ -219,6 +221,10 @@
       <button data-s="blind">Parent consent ≤16, location-blind (built)</button>
       <button data-s="legal">Legal minimum per country</button>
     </div>
+  </div>
+  <div class="ctl">
+    <label>Grid lens — colour the map by</label>
+    <select id="lensSel"></select>
   </div>
   <div class="ctl">
     <label>Find country</label>
@@ -487,6 +493,7 @@ const AGES = [10, 11, 12, 13, 14, 15, 16, 17, 18];   // 18 rendered as "18+"
 /* ---------------- state ---------------- */
 let floor = 11;          // 10 | 11 | 13
 let shape = 'blind';     // 'blind' | 'legal'
+let lens = 'access';     // 'access' | a requirement id (A6, A8, B1, …)
 
 /* ---------------- regime engine ---------------- */
 function regimeFor(c, age) {
@@ -532,6 +539,38 @@ function reqsFor(c, age, r) {
   return base;
 }
 
+/* ---------------- requirement lenses ----------------
+   Colour the grid by ONE requirement: where does it bind by law, where do we apply it
+   anyway (our choice / single global product rule), where is it simply not applicable. */
+const LENS_VARIES  = ['A6','A7','A8','A10','A14','A15','A16','A17','A19','A20','A21','A22',
+                      'B1','B2','B3','B4','B5','B6','B7','B8'];
+const LENS_COMPANY = ['A1','A2','A3','A4','A5','A9','A11','A12','A13','A18','A23'];
+
+function lensApplies(id, c, age, r) {
+  const minor = age < 18;
+  const u13cell = (r === 'u13p' || r === 'vpc' || r === 'gap');
+  if (LENS_COMPANY.includes(id)) return 'law';   // company-level: identical everywhere
+  switch (id) {
+    case 'A6':  return c.region === 'uk' ? 'law' : 'off';
+    case 'A7':  return 'law';                                              // every sign-up passes the gate
+    case 'A8':  return r === 'parent' ? 'law' : (r === 'over' ? 'choice' : 'off');
+    case 'A10': return (c.region === 'eu' || c.region === 'eea') ? 'law' : 'choice';  // built once, shown globally
+    case 'A14': return (c.region === 'eu' || c.region === 'eea') ? 'law' : 'choice';  // global product rule
+    case 'A15': return minor ? (c.region === 'uk' ? 'law' : 'choice') : 'off';        // UK code applied globally by design
+    case 'A16': return minor ? 'law' : 'off';
+    case 'A17': return 'law';
+    case 'A19': return (c.region === 'us' && minor) ? 'law' : 'off';      // specific US states only
+    case 'A20': return minor ? 'law' : 'off';
+    case 'A21': return 'law';                                              // protects every subscriber
+    case 'A22': return minor ? 'law' : 'off';
+    case 'B1': case 'B2': case 'B3': case 'B4': case 'B7': case 'B8':
+      return (r === 'vpc' || r === 'gap') ? 'law' : 'off';                // COPPA: US under-13 cells
+    case 'B5': case 'B6':
+      return u13cell ? 'law' : 'off';                                     // infra/store: all under-13 cells
+  }
+  return 'off';
+}
+
 /* ---------------- render ---------------- */
 function render() {
   document.querySelectorAll('#floorSeg button').forEach(b => b.classList.toggle('on', +b.dataset.f === floor));
@@ -565,7 +604,14 @@ function renderGrid() {
       AGES.forEach(a => {
         const r = regimeFor(c, a);
         const m = REGIME_META[r];
-        html += `<td class="cell ${m.cls}" onclick="openCell(${idx}, ${a})" title="${c.n}, age ${a === 18 ? '18+' : a}: ${m.label}">${m.short}</td>`;
+        let cls = m.cls, short = m.short, title = `${c.n}, age ${a === 18 ? '18+' : a}: ${m.label}`;
+        if (lens !== 'access' && r !== 'store' && r !== 'counsel' && r !== 'floor') {
+          const st = lensApplies(lens, c, a, r);
+          cls = st === 'law' ? 'r-self' : st === 'choice' ? 'r-over' : 'r-floor';
+          short = st === 'law' ? 'law' : st === 'choice' ? 'choice' : '—';
+          title = `${c.n}, age ${a === 18 ? '18+' : a}: ${lens} ${REQ[lens]} — ${st === 'law' ? 'applies (law)' : st === 'choice' ? 'applies by our choice / global product rule' : 'not applicable'}`;
+        }
+        html += `<td class="cell ${cls}" onclick="openCell(${idx}, ${a})" title="${title}">${short}</td>`;
       });
       html += '</tr>';
     });
@@ -578,41 +624,70 @@ function renderStats() {
   const open = COUNTRIES.filter(c => c.posture === 'open').length;
   const counsel = COUNTRIES.filter(c => c.posture === 'counsel').length;
   const block = COUNTRIES.filter(c => c.posture === 'block').length;
-  let parentCells = 0, overCells = 0, gapCells = 0, vpcCells = 0;
-  COUNTRIES.forEach(c => AGES.forEach(a => {
-    const r = regimeFor(c, a);
-    if (r === 'parent') parentCells++;
-    if (r === 'over') overCells++;
-    if (r === 'gap') gapCells++;
-    if (r === 'vpc') vpcCells++;
-  }));
   let html = `
     <div class="stat"><div class="v">${open}</div><div class="l">countries open</div></div>
     <div class="stat"><div class="v">${counsel}</div><div class="l">counsel-gate</div></div>
-    <div class="stat"><div class="v">${block}</div><div class="l">store-blocked</div></div>
+    <div class="stat"><div class="v">${block}</div><div class="l">store-blocked</div></div>`;
+  if (lens === 'access') {
+    let parentCells = 0, overCells = 0, gapCells = 0, vpcCells = 0;
+    COUNTRIES.forEach(c => AGES.forEach(a => {
+      const r = regimeFor(c, a);
+      if (r === 'parent') parentCells++;
+      if (r === 'over') overCells++;
+      if (r === 'gap') gapCells++;
+      if (r === 'vpc') vpcCells++;
+    }));
+    html += `
     <div class="stat"><div class="v">${parentCells}</div><div class="l">parent-gate cells (law)</div></div>
     <div class="stat over"><div class="v">${overCells}</div><div class="l">parent-gate by choice</div></div>`;
-  if (vpcCells) html += `<div class="stat"><div class="v">${vpcCells}</div><div class="l">COPPA VPC cells</div></div>`;
-  html += gapCells
-    ? `<div class="stat bad"><div class="v">${gapCells}</div><div class="l">⚠ gap cells (US u13, no VPC)</div></div>`
-    : `<div class="stat"><div class="v">0</div><div class="l">gap cells</div></div>`;
+    if (vpcCells) html += `<div class="stat"><div class="v">${vpcCells}</div><div class="l">COPPA VPC cells</div></div>`;
+    html += gapCells
+      ? `<div class="stat bad"><div class="v">${gapCells}</div><div class="l">⚠ gap cells (US u13, no VPC)</div></div>`
+      : `<div class="stat"><div class="v">0</div><div class="l">gap cells</div></div>`;
+  } else {
+    let law = 0, choice = 0;
+    COUNTRIES.forEach(c => AGES.forEach(a => {
+      const r = regimeFor(c, a);
+      if (r === 'store' || r === 'counsel' || r === 'floor') return;
+      const st = lensApplies(lens, c, a, r);
+      if (st === 'law') law++;
+      if (st === 'choice') choice++;
+    }));
+    html += `
+    <div class="stat"><div class="v">${law}</div><div class="l">cells where it binds (law)</div></div>
+    <div class="stat over"><div class="v">${choice}</div><div class="l">by our choice / global rule</div></div>`;
+    if (LENS_COMPANY.includes(lens)) html += `<div class="stat"><div class="v">all</div><div class="l">company-level — identical everywhere</div></div>`;
+    if (!law && !choice) html += `<div class="stat bad"><div class="v">0</div><div class="l">nothing at this floor — try 11+ / 10+</div></div>`;
+  }
   document.getElementById('stats').innerHTML = html;
 }
 
 function renderLegend() {
-  const items = [
-    ['var(--c-adult)',   'adult'],
-    ['var(--c-self)',    'self-consenting teen'],
-    ['var(--c-parent)',  'parent gate — law (A8)'],
-    ['var(--c-over)',    'parent gate — our choice (law allows self-serve)', true],
-    ['var(--c-u13p)',    'under-13: parent auth (non-US)'],
-    ['var(--c-vpc)',     'under-13 US: COPPA VPC (List B)'],
-    ['var(--c-gap)',     '⚠ gap: code admits, VPC missing'],
-    ['var(--c-floor)',   'blocked by age floor'],
-    ['var(--c-counsel)', 'counsel-gate'],
-    ['var(--c-store)',   'store-blocked'],
-  ];
-  document.getElementById('legend').innerHTML = items.map(([c, l, striped]) =>
+  let items, prefix = '';
+  if (lens === 'access') {
+    items = [
+      ['var(--c-adult)',   'adult'],
+      ['var(--c-self)',    'self-consenting teen'],
+      ['var(--c-parent)',  'parent gate — law (A8)'],
+      ['var(--c-over)',    'parent gate — our choice (law allows self-serve)', true],
+      ['var(--c-u13p)',    'under-13: parent auth (non-US)'],
+      ['var(--c-vpc)',     'under-13 US: COPPA VPC (List B)'],
+      ['var(--c-gap)',     '⚠ gap: code admits, VPC missing'],
+      ['var(--c-floor)',   'blocked by age floor'],
+      ['var(--c-counsel)', 'counsel-gate'],
+      ['var(--c-store)',   'store-blocked'],
+    ];
+  } else {
+    prefix = `<div class="li" style="color:var(--fg)"><b style="color:var(--teal)">${lens}</b>&nbsp;${REQ[lens]} →</div>`;
+    items = [
+      ['var(--c-self)',  'applies — law'],
+      ['var(--c-over)',  'applies — our choice / single global product rule', true],
+      ['var(--c-floor)', 'not applicable to this cell (or no user: under floor)'],
+      ['var(--c-counsel)', 'counsel-gate'],
+      ['var(--c-store)', 'store-blocked'],
+    ];
+  }
+  document.getElementById('legend').innerHTML = prefix + items.map(([c, l, striped]) =>
     `<div class="li"><span class="sw ${striped ? 'striped' : ''}" style="background:${c}"></span>${l}</div>`).join('');
 }
 
@@ -727,6 +802,30 @@ document.querySelectorAll('#presets button').forEach(b => b.addEventListener('cl
   render();
 }));
 document.getElementById('search').addEventListener('input', renderGrid);
+
+/* lens selector */
+{
+  const sel = document.getElementById('lensSel');
+  const o0 = document.createElement('option');
+  o0.value = 'access'; o0.textContent = 'Consent / access (default)';
+  sel.appendChild(o0);
+  const g1 = document.createElement('optgroup');
+  g1.label = 'Requirement lenses — vary by cell';
+  LENS_VARIES.forEach(id => {
+    const o = document.createElement('option');
+    o.value = id; o.textContent = `${id} · ${REQ[id]}`;
+    g1.appendChild(o);
+  });
+  const g2 = document.createElement('optgroup');
+  g2.label = 'Always-on, company-level — lights every cell';
+  LENS_COMPANY.forEach(id => {
+    const o = document.createElement('option');
+    o.value = id; o.textContent = `${id} · ${REQ[id]}`;
+    g2.appendChild(o);
+  });
+  sel.appendChild(g1); sel.appendChild(g2);
+  sel.addEventListener('change', () => { lens = sel.value; render(); });
+}
 
 /* requirement reference list */
 document.getElementById('reqlist').innerHTML = Object.entries(REQ).map(([id, t]) =>

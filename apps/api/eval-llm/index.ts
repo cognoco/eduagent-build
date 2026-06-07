@@ -12,6 +12,12 @@
 //   pnpm eval:llm -- --max-live-calls 5         # cap live LLM calls (default 20)
 //   doppler run -- pnpm eval:llm -- --live      # tier 2 (real LLM calls)
 //
+//   doppler run -- pnpm eval:llm -- --flow safety-probes --live \
+//     --openrouter-model mistralai/mistral-small-2603
+//     Candidate-model gate (model-selection memo §6): route all live calls to
+//     the named model via OpenRouter instead of production routing. Restore
+//     snapshots afterwards: git checkout -- apps/api/eval-llm/snapshots
+//
 //   doppler run -- pnpm eval:llm -- --live --check-baseline
 //     Compare envelope signal metrics against baseline.json; exit 1 on drift.
 //   doppler run -- pnpm eval:llm -- --live --update-baseline
@@ -39,6 +45,12 @@ import { exchangesFlow } from './flows/exchanges';
 import { topicProbeSignalsFlow } from './flows/topic-probe-signals';
 import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
 import { probesFlow } from './flows/probes';
+// [H3 — 2026-06-05 safety audit] Adversarial safety regression suite:
+// jailbreaks, prompt extraction, crisis disclosures, harmful-content asks.
+import { safetyProbesFlow } from './flows/safety-probes';
+// [Memo §6.2] Conversation-language quality for cs/nb/pl — LLM judge on
+// production routing scores candidate-model prose. See flow file.
+import { languageQualityFlow } from './flows/language-quality';
 import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
 import { progressSummaryFlow } from './flows/progress-summary';
 import { assessmentEvaluationFlow } from './flows/assessment-evaluation';
@@ -62,7 +74,11 @@ import {
   validateBaselineStructure,
   type Baseline,
 } from './runner/metrics';
-import { bootstrapLlmProviders } from './runner/llm-bootstrap';
+import {
+  bootstrapLlmProviders,
+  setOpenRouterProviderPin,
+} from './runner/llm-bootstrap';
+import { setOpenRouterModelOverride } from './runner/llm-client';
 
 const BASELINE_PATH = path.resolve(__dirname, 'baseline.json');
 const DEFAULT_TOLERANCE_PP = 0.05; // 5pp — one sample of noise at N≈20
@@ -97,6 +113,8 @@ const FLOWS: FlowDefinition[] = [
   topicProbeSignalsFlow as FlowDefinition,
   topicIntentMatcherFlow as FlowDefinition,
   probesFlow as FlowDefinition,
+  safetyProbesFlow as FlowDefinition,
+  languageQualityFlow as FlowDefinition,
   bookSuggestionRegenerationFlow as FlowDefinition,
   progressSummaryFlow as FlowDefinition,
   assessmentEvaluationFlow as FlowDefinition,
@@ -147,15 +165,62 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Candidate-model gate (--openrouter-model): reroutes every live call to
+  // the named model via the eval-only OpenRouter adapter. Guard rails:
+  // pointless without --live, and a candidate's envelope metrics must never
+  // be written into the production-model baseline.
+  if (options.openrouterModel) {
+    if (!options.live) {
+      console.error(
+        '--openrouter-model requires --live (it only affects live LLM calls).',
+      );
+      process.exit(2);
+    }
+    if (options.updateBaseline) {
+      console.error(
+        '--openrouter-model cannot be combined with --update-baseline: the baseline tracks the PRODUCTION routing, not a candidate model.',
+      );
+      process.exit(2);
+    }
+  } else if (options.openrouterReasoningEffort || options.openrouterProvider) {
+    console.error(
+      '--openrouter-reasoning-effort / --openrouter-provider require --openrouter-model (they only shape candidate-model calls).',
+    );
+    process.exit(2);
+  }
+
   // Bootstrap LLM providers early so any missing-key errors surface before
   // the run matrix starts. Tier-1 runs skip this — no LLM calls are made.
   if (options.live) {
+    if (options.openrouterProvider) {
+      // Must precede bootstrap so the adapter is created with the pin.
+      setOpenRouterProviderPin([options.openrouterProvider]);
+    }
     bootstrapLlmProviders();
+    if (options.openrouterModel) {
+      setOpenRouterModelOverride(options.openrouterModel, {
+        ...(options.openrouterReasoningEffort
+          ? { reasoningEffort: options.openrouterReasoningEffort }
+          : {}),
+      });
+    }
   }
 
   console.log(
     `\nEval-LLM harness — tier ${
       options.live ? '2 (live LLM calls)' : '1 (prompt snapshots only)'
+    }${
+      options.openrouterModel
+        ? `\nCANDIDATE-MODEL RUN — all live calls routed to "${options.openrouterModel}" via OpenRouter (not production routing).${
+            options.openrouterReasoningEffort
+              ? ` reasoning_effort=${options.openrouterReasoningEffort}.`
+              : ''
+          }${
+            options.openrouterProvider
+              ? ` Host pinned to "${options.openrouterProvider}" (fallbacks off).`
+              : ''
+          } Snapshots will reflect the candidate; restore with: git checkout -- apps/api/eval-llm/snapshots`
+        : ''
     }\n`,
   );
 

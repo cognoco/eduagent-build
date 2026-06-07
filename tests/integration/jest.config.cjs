@@ -24,7 +24,26 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js'],
   testMatch: ['**/tests/integration/**/*.integration.test.ts'],
-  testPathIgnorePatterns: ['node_modules'],
+  // The `**/tests/integration/**` glob also matches every copy of this suite
+  // inside `.worktrees/<branch>/` checkouts. Without the guards below, a repo
+  // with N worktrees runs N+1 copies of every suite against the SAME shared
+  // Neon database — cross-suite FK violations everywhere (observed 2026-06-05:
+  // 408 suites collected instead of ~51, 252 failed). Anchored to <rootDir> so
+  // the config still works when run from inside a worktree (where rootDir IS
+  // the worktree and contains no nested .worktrees). Mirrors the guards in
+  // apps/api/jest.config.cjs and apps/api/jest.integration.config.cjs.
+  modulePathIgnorePatterns: [
+    '\\.claude/worktrees',
+    '<rootDir>/.worktrees/',
+    '<rootDir>/.tmp/',
+    '[/\\\\]\\.tmp',
+  ],
+  testPathIgnorePatterns: [
+    'node_modules',
+    '<rootDir>/.worktrees/',
+    '<rootDir>/.tmp/',
+    '[/\\\\]\\.tmp',
+  ],
   // Integration tests share a Neon database. Global-scope operations like
   // quota-reset and concurrent session writes race across parallel workers,
   // so serial execution is required for deterministic runs.

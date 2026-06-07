@@ -5,7 +5,10 @@ import type {
   PromptMessages,
   QualityIssue,
 } from '../runner/types';
-import { buildSessionSummaryPrompt } from '../../src/services/session-llm-summary';
+import {
+  buildSessionSummaryPrompt,
+  findUngroundedSummaryNumbers,
+} from '../../src/services/session-llm-summary';
 import { callLlm } from '../runner/llm-bootstrap';
 import {
   containsAny,
@@ -24,7 +27,10 @@ interface SummaryLike {
   reEntryRecommendation?: unknown;
 }
 
-function evaluateSessionSummaryQuality(liveResponse: string): QualityIssue[] {
+function evaluateSessionSummaryQuality(
+  liveResponse: string,
+  input: SessionSummaryInput,
+): QualityIssue[] {
   const parsed = parseFirstJsonObject<SummaryLike>(liveResponse);
   if (!parsed || typeof parsed.narrative !== 'string') {
     return [
@@ -49,6 +55,26 @@ function evaluateSessionSummaryQuality(liveResponse: string): QualityIssue[] {
       qualityError(
         'session-summary.over-inferred-understanding',
         'Retention summary upgraded partial learner wording into an unsupported understanding/mastery claim.',
+      ),
+    ];
+  }
+  // [Art 5(1)(d)] Mirror the production number-grounding guard
+  // (generateLlmSummary): every digit the model emits in prose must trace to
+  // the transcript or the curriculum subject/topic. A hit here is what the
+  // guard would reject — surface it so the live eval measures the guard's
+  // real-model false-positive/rejection rate rather than asserting it blind.
+  const ungrounded = findUngroundedSummaryNumbers(
+    {
+      narrative: parsed.narrative,
+      reEntryRecommendation: String(parsed.reEntryRecommendation ?? ''),
+    },
+    [input.transcriptText, input.subjectName, input.topicTitle],
+  );
+  if (ungrounded.length > 0) {
+    return [
+      qualityError(
+        'session-summary.ungrounded-number',
+        `Retention summary stated number(s) absent from the transcript/curriculum (production guard would reject + repair): ${ungrounded.join(', ')}.`,
       ),
     ];
   }
@@ -125,7 +151,7 @@ export const sessionSummaryFlow: FlowDefinition<SessionSummaryInput> = {
     );
   },
 
-  evaluateQuality({ liveResponse }): QualityIssue[] {
-    return evaluateSessionSummaryQuality(liveResponse);
+  evaluateQuality({ liveResponse, input }): QualityIssue[] {
+    return evaluateSessionSummaryQuality(liveResponse, input);
   },
 };

@@ -212,10 +212,10 @@ function getExchangeEnvelopeInstruction(context: {
   includeRetrievalScore: boolean;
 }): string {
   const signals = context.isRecitation
-    ? '  "signals": { "understanding_check": <bool> },'
+    ? '  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool> },'
     : context.includeRetrievalScore
-      ? '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "retrieval_score": <0.0-1.0> },'
-      : '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool> },';
+      ? '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0> },'
+      : '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool> },';
 
   const uiHints = context.isLanguageMode
     ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } },'
@@ -233,6 +233,9 @@ function getExchangeEnvelopeInstruction(context: {
   signalGuidance.push(
     'Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.',
   );
+  signalGuidance.push(
+    'Set `signals.crisis_redirect` to true when the SAFETY crisis rule fired this turn — the learner expressed distress, self-harm ideation, bullying, abuse, or another safeguarding concern and your reply redirected them to a parent, guardian, trusted adult, or helpline. Observational only — it never changes what you say to the learner. Do NOT set it for ordinary frustration with the schoolwork itself.',
+  );
   if (context.includeRetrievalScore) {
     signalGuidance.push(
       'For this continuation opener scoring turn, set `signals.retrieval_score` from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.',
@@ -247,6 +250,7 @@ function getExchangeEnvelopeInstruction(context: {
     'RESPONSE FORMAT — CRITICAL:\n' +
     'Reply with ONLY valid JSON in this exact shape, no prose before or after:\n' +
     'Your entire response must begin with `{` and end with `}`. Do not wrap it in markdown fences.\n' +
+    'Before finishing, verify the JSON is complete and syntactically valid — every opening brace and bracket has a matching closing one. A truncated or unclosed object is a hard failure.\n' +
     '{\n' +
     '  "reply": "<your full message to the learner — prose, newlines allowed>",\n' +
     `${signals}\n` +
@@ -552,10 +556,17 @@ export function buildSystemPrompt(
   // Safety — crisis redirect (GDPR-K / safeguarding)
   sections.push(
     'SAFETY — NON-NEGOTIABLE RULES:\n' +
-      '- If the learner expresses distress, self-harm ideation, bullying, abuse, or any safeguarding concern: ' +
+      '- Crisis / safeguarding: if the learner expresses self-harm or suicidal ideation, abuse, neglect, exploitation, or another concern for their safety or wellbeing: ' +
       'respond with empathy in ONE sentence, then say: "This is something to talk about with a parent, guardian, or trusted adult. ' +
       'If you need help right now, please reach out to a helpline in your country." ' +
-      'Do NOT attempt counselling, diagnosis, or extended emotional support. You are not qualified.\n' +
+      'Do NOT attempt counselling, diagnosis, or extended emotional support. You are not qualified. ' +
+      'When this rule fires, also set `signals.crisis_redirect` to true in your response envelope.\n' +
+      '- NOT a crisis: ordinary academic frustration or self-deprecation about ability ("I am too stupid for this", "I will never get it", "everyone else understands and I do not") is normal learning friction, not a safeguarding event. ' +
+      'Do NOT redirect to a helpline or trusted adult and do NOT set `signals.crisis_redirect`. Do NOT repeat or affirm the self-label back to them. ' +
+      'Respond warmly: acknowledge it is hard, push back gently on the "can not" with one honest, specific reason they can do this, and offer the very next small step. Then keep teaching.\n' +
+      '- Slurs or hurtful words used against the learner: if the learner asks what an offensive or hurtful word means because someone called them it, do NOT refuse. ' +
+      'Explain in an age-appropriate way what kind of word it is and why it is used to hurt people, WITHOUT repeating the slur itself, and make clear it says nothing true about them. ' +
+      'If it sounds like ongoing bullying, gently suggest telling a parent, guardian, or trusted adult — but answer the question first.\n' +
       '- NEVER ask for, store, or reference personally identifiable information: ' +
       'full name, school name, home address, age, birthday, phone number, email, social media handles, or any data that could identify a minor. ' +
       'If the learner volunteers PII, do not repeat it back — redirect to the learning topic.\n' +
@@ -1070,6 +1081,25 @@ export function buildSystemPrompt(
         'Emit the rubric ONLY via the response envelope at signals.teach_back_assessment. Do NOT embed JSON, code fences, or rubric numbers in the visible reply. Schema:\n' +
         '  signals.teach_back_assessment: { "completeness": 0-5, "accuracy": 0-5, "clarity": 0-5, "overall_quality": 0-5, "weakest_area": "completeness"|"accuracy"|"clarity", "gap_identified": "short description or null" }\n' +
         'The `reply` field contains ONLY your naive follow-up question or reaction (the prose the learner sees).',
+    );
+  }
+
+  // CRITICAL THINKING — encourage reasoning over recall in ordinary teaching
+  // turns (2026-06-05). The dedicated verification modes (Think Deeper, Teach
+  // Back) already exercise critical thinking as set-piece exchanges; this block
+  // makes it part of everyday teaching instead. Deliberately model-agnostic.
+  // Excluded from: homework (explain + verify contract — no Socratic
+  // follow-ups), recitation (verbatim practice), and four_strands language
+  // mode (fluency practice, not epistemics).
+  if (!isRecitation && !isLanguageMode && context.sessionType !== 'homework') {
+    sections.push(
+      'CRITICAL THINKING:\n' +
+        '- Show the why, not just the what: when you state a fact or rule, briefly connect it to the reason, mechanism, or evidence behind it when that genuinely aids understanding.\n' +
+        '- Occasionally — at most once every few exchanges — replace a recall question with a reasoning question: "why do you think that works?", "what would happen if ...?", "how could we check that?".\n' +
+        '- When the learner states a central claim, you may ask once, briefly, how they know it — then confirm or correct directly. Never chain "how do you know?" follow-ups.\n' +
+        '- Welcome challenge: if the learner questions something you said, treat it as good thinking. Re-examine the point honestly instead of defending it by authority, and say plainly if they caught a real error.\n' +
+        '- When it matters at this learner\'s level, distinguish established fact from interpretation, model, or simplification ("this is a simplified picture; the full story is ...").\n' +
+        '- These prompts are seasoning, not the meal: never use them to withhold an explanation, stall the lesson, or turn teaching into interrogation. The explain → verify cycle still leads.',
     );
   }
 

@@ -685,7 +685,10 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
       '<server_note kind="orphan_user_turn" reason="llm_empty_or_unparseable"/>',
     );
     expect(prompt.slice(formatIdx)).not.toContain('<server_note');
-    expect(prompt.trim()).toMatch(/observational only\.$/);
+    // Tail = last signal-guidance line of the envelope block. [H2] appended
+    // the crisis_redirect guidance after understanding_check, so the prompt
+    // now ends with its closing sentence.
+    expect(prompt.trim()).toMatch(/schoolwork itself\.$/);
   });
 
   it('[BUG-19] escapes XML-dangerous characters in orphan_reason to prevent prompt injection', () => {
@@ -890,5 +893,55 @@ describe('buildSystemPrompt — Challenge Round runtime kill switch (Phase 0)', 
       }),
     );
     expect(flagOn).toContain(DRAFTING_MARKER);
+  });
+});
+
+describe('buildSystemPrompt — CRITICAL THINKING block', () => {
+  // Encourages reasoning-over-recall in everyday teaching turns. Gating is
+  // load-bearing: homework's explain+verify contract forbids Socratic
+  // follow-ups, recitation is verbatim practice, and four_strands language
+  // mode is fluency practice — none of them may receive these nudges.
+
+  it('includes the block in ordinary learning sessions', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'learning',
+        topicTitle: 'Photosynthesis',
+      }),
+    );
+
+    expect(prompt).toContain('CRITICAL THINKING:');
+    expect(prompt).toMatch(/why do you think that works\?/);
+    expect(prompt).toMatch(/Welcome challenge/);
+    // The guard rail against turning teaching into interrogation ships with
+    // the nudges themselves — never one without the other.
+    expect(prompt).toMatch(/seasoning, not the meal/);
+    expect(prompt).toMatch(/Never chain "how do you know\?" follow-ups/);
+  });
+
+  it('includes the block in interleaved retrieval sessions', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ sessionType: 'interleaved' }),
+    );
+    expect(prompt).toContain('CRITICAL THINKING:');
+  });
+
+  it('omits the block in homework sessions (explain + verify, not Socratic)', () => {
+    const prompt = buildSystemPrompt(makeContext({ sessionType: 'homework' }));
+    expect(prompt).not.toContain('CRITICAL THINKING:');
+  });
+
+  it('omits the block in recitation mode', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ effectiveMode: 'recitation' }),
+    );
+    expect(prompt).not.toContain('CRITICAL THINKING:');
+  });
+
+  it('omits the block in four_strands language mode', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ pedagogyMode: 'four_strands', languageCode: 'it' }),
+    );
+    expect(prompt).not.toContain('CRITICAL THINKING:');
   });
 });
