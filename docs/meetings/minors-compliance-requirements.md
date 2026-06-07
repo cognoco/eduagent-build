@@ -1,7 +1,9 @@
 # What You Need To Legally Launch An App For Minors — Plain-Language Guide
 
-**Last updated:** 2026-06-05
+**Last updated:** 2026-06-07
 **Scope:** EU/EEA (you are based in Norway) + UK + USA. AI tutoring app, sold to consumers, used by children.
+
+> **2026-06-07 change:** added **A24** (storage limitation, proportionality, and purpose-fencing of the persistent learning memory), prompted by a code-verified retention/erasure audit — see `docs/audits/2026-06-07-data-retention-and-erasure-audit.md`. That audit confirmed account-deletion cleanly cascades the whole learning memory, but surfaced three live issues: the Clerk login identity is never deleted in-app (Art 17 gap), verbatim learner answers survive the "30-day transcript" purge indefinitely (misleading-notice risk), and the 30-day purge sits behind an env flag that defaults OFF and must be verified in production.
 
 > **Read this first.** This is a plain-language summary of real laws so *you* can see what to do and where. It is **not** legal advice. Two of the items below (the DPIA and the DPO) literally require a qualified privacy professional to sign off — budget for a few hours of a privacy lawyer's or consultant's time before launch. Everything here is traceable to a real law; the short "**Law:**" tag on each item is just so your lawyer can find it fast.
 
@@ -51,7 +53,7 @@ Two fair questions come up when reading the lists: *"isn't this one only for the
 
 | Scope bucket | Items |
 |---|---|
-| **Everywhere — company-level GDPR** (your Norwegian seat carries these into every market; no launch shape removes them) | A1, A2, A3, A4, A5, A9, A11, A13, A23 |
+| **Everywhere — company-level GDPR** (your Norwegian seat carries these into every market; no launch shape removes them) | A1, A2, A3, A4, A5, A9, A11, A13, A23, A24 |
 | **Everywhere — universal law or store rules** | A7, A16, A17, A18, A20, A21, A22 |
 | **EEA/UK data leaving for the US** (your AI providers) | A12 |
 | **EU users only** | A10, A14 |
@@ -82,8 +84,8 @@ For MentoMate, think about every child-data category this way:
 | Processing / sharing | Who else receives or processes it? | Clerk, email provider, store/RevenueCat, Sentry/telemetry if allowed, LLM provider, OCR/STT providers if enabled, support tooling. Each needs a processor/child-data decision. |
 | Storage | Where can copies live? | Main DB, object storage/photos, transcripts, summaries, device storage, caches, logs, Sentry events, support systems, LLM/provider logs, backups. |
 | Parent control | What can the parent do later? | Review relevant child data, revoke consent, delete the child profile/data, and request export/review where required. |
-| Retention | How long do we keep it? | Separate retention rules for pending consent, active profile data, learning history, raw photos/audio, transcripts, support tickets, telemetry/logs, and backups. |
-| Deletion / withdrawal | What happens if consent is denied, absent, or withdrawn? | Stop processing, block LLM/provider calls, delete or archive according to the policy/grace period, and keep only minimal audit/legal records. |
+| Retention | How long do we keep it? | Separate retention rules for pending consent, active profile data, learning history, raw photos/audio, transcripts, support tickets, telemetry/logs, and backups. **Code-verified state (2026-06-07):** raw transcripts purge at 30 days *if* the `RETENTION_PURGE_ENABLED` flag is set in production (verify — it defaults OFF); the persistent **learning memory** (notes, summaries, extracted facts, mastery, challenge-round quotes) currently has **no retention rule and no age-out** — see A24 and the audit doc. |
+| Deletion / withdrawal | What happens if consent is denied, absent, or withdrawn? | Stop processing, block LLM/provider calls, delete or archive according to the policy/grace period, and keep only minimal audit/legal records. **Code-verified state (2026-06-07):** account deletion cleanly FK-cascades the entire learning memory (good), but does **not** delete the Clerk login identity, an orphaned org row, or BYOK-waitlist emails — see A24 / audit doc items R1, R3. |
 | Audit trail | How do we prove we did it correctly? | Store consent receipt, policy version, age/country decision snapshot, processor posture, and deletion-job evidence. Add tests for "no access before consent." |
 
 This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized something, but the lifecycle defines **what** they authorized, **where** the data goes, and **when** it disappears.
@@ -291,6 +293,23 @@ This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized s
 - **Who:** All users — inferring ADHD/dyslexia/disability about anyone triggers it; doing it to minors makes it more acute.
 - **Law:** GDPR Article 9.
 
+## Group 8 — The persistent learning memory (retention, proportionality, purpose)
+
+### A24. 🔴 Set a retention rule, a proportionality justification, and a purpose-fence for the "the mentor remembers" data
+- **What it means:** The product's core promise is that the tutor *remembers what the learner has covered* — so a derived **learning memory** (mastery state, notes, session summaries, LLM-extracted facts, challenge-round answer quotes) is kept long after the raw 30-day chat transcript is deleted. That surviving memory is **still the child's personal data**, and (because it tailors tuition to the child) it is **profiling**. Deleting the bulky transcript while keeping a lean summary is *good* privacy-by-design — but the surviving layer must stand on its own three legs below. A code-verified audit (`docs/audits/2026-06-07-data-retention-and-erasure-audit.md`) found it currently has **none of them documented**. (Note: this is profiling, but **not** Article 22 automated-decision-making — it only personalises teaching and carries no legal/similarly-significant effect — so the Art 22 prohibitions do not bite. The DPIA should still say so explicitly.)
+- **What you do — three pieces, all into the DPIA (A1) and ROPA (A3):**
+  1. **Retention rule (storage limitation).** Write down how long the learning memory is kept and the trigger that ends it. The defensible rule: **kept while the account is active, deleted/anonymised on account deletion or after a defined dormancy period** (the ~365-day inactivity-expiry, `E5` scheduler) — *not* "forever, detached from anything." Today there is no written rule and no age-out cron for `learning_profiles` / `memory_facts` / `topic_notes` / `session_summaries`. Add the rule; bind it to the account lifecycle.
+  2. **Proportionality justification (the child-specific paragraph).** Because the data subject is a minor, the DPIA must explicitly argue *why* an indefinitely-held profile of a child's learning performance is necessary and proportionate to the tutoring purpose — the same way a school justifies keeping a pupil record. State the purpose (teaching continuity), why a shorter period would defeat it, and the mitigations (minimised content, no third-party disclosure, learner/guardian can view and correct, deleted on erasure). This is read strictly for under-18s.
+  3. **Purpose-fence.** Record that the learning memory may be used **only** to power tutoring continuity. Deriving "concepts covered" from a conversation to feed the tutor is compatible-purpose processing and needs no new basis — but reusing it for model training, analytics, or marketing is a **new purpose** needing its own lawful basis and notice. Keep the internal use fenced; the vendor no-training / zero-retention posture (A11/A12, MMT-ADR-0016) already protects the external side.
+- **Two live problems the audit found that this item also has to close:**
+  - **Verbatim quotes survive the "30-day transcript deletion."** Word-for-word learner answers persist indefinitely in `learning_sessions.metadata` (challenge-round `learnerQuote`), `topic_notes.content`, and `session_summaries`. So a notice that says "we delete your chats after 30 days" is **misleading**. **Chosen fix:** (a) **now** — make the privacy notice (A5) accurate: state that a learning summary is retained and may include short quotes from the learner's answers; (b) **fast-follow** — age-out/abstract those verbatim fields on the same 30-day clock so only non-reconstructible state survives. Run (a) before launch; keep (b) as post-launch tightening unless a regulator pushes back.
+  - **Erasure is not fully complete.** Account deletion cascades the whole in-DB learning memory cleanly, but does **not** delete the **Clerk login identity** (no `deleteUser` call exists), an orphaned `organizations` row, or `byok_waitlist` emails. The Clerk gap is a real Art 17 (right to erasure) defect — wire a Clerk user-delete into the deletion job with a break test (audit item R1).
+- **Also verify before relying on the 30-day claim:** the transcript purge sits behind `RETENTION_PURGE_ENABLED`, which **defaults OFF** and is not in committed config. Confirm it is set in production or transcripts are kept forever (audit item R2).
+- **Where it lives:** The DPIA (A1) + ROPA (A3) for the written rule/justification/fence; the privacy policy (A5) for the accurate notice; the deletion job + a new age-out job in code for enforcement.
+- **Where:** Everywhere (company-level GDPR) — storage limitation, purpose limitation, and erasure follow your Norwegian seat into every market.
+- **Who:** All users; read strictly for minors (the proportionality paragraph exists because the data subject is a child).
+- **Law:** GDPR Article 5(1)(e) (storage limitation), Article 5(1)(b) (purpose limitation), Article 17 (erasure), Article 35 (DPIA must record all of the above); Article 22 explicitly *not* engaged.
+
 ---
 
 # LIST B — Extra requirements ONLY if you also allow 10–12 year-olds (under-13)
@@ -368,7 +387,7 @@ This is why the 10+ stack is bigger than VPC: VPC proves the parent authorized s
 # Suggested order of attack
 
 **For a 13+ launch, do these first (they gate everything else):**
-1. Appoint the DPO (A2) → they drive the DPIA (A1).
+1. Appoint the DPO (A2) → they drive the DPIA (A1). Hand them the code-verified retention/erasure audit (`docs/audits/2026-06-07-data-retention-and-erasure-audit.md`) and A24 — the learning-memory retention rule, proportionality paragraph, and purpose-fence are DPIA content.
 2. Make the Art 9 decision (A23) — it changes how heavy A1 is.
 3. Sign provider data contracts on business tier + transfer checks (A11, A12).
 4. Build the consent flow correctly: age gate, country/residence gate, parent/guardian authorization through 16 unless country rules lower it, and real consent (A7, A8, A9).
