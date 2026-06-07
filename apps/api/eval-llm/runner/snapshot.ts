@@ -167,10 +167,14 @@ function renderSnapshot(inputs: SnapshotInputs): string {
     sections.push(``);
   }
 
-  if (liveError) {
+  // `!== undefined`, not truthiness: a failed call whose error has an empty
+  // message must still render an error section — silently omitting it made 4
+  // failed candidate-model calls look like tier-1 prompt-only snapshots
+  // (observed 2026-06-05).
+  if (liveError !== undefined) {
     sections.push(`## Live LLM response`);
     sections.push(``);
-    sections.push(`> **Error:** \`${liveError}\``);
+    sections.push(`> **Error:** \`${liveError || '(empty error message)'}\``);
     sections.push(``);
   } else if (liveResponse !== undefined) {
     sections.push(`## Live LLM response`);

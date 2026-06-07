@@ -248,6 +248,15 @@ const signalsSchema = z.preprocess(
        * Replaces the legacy free-text trailing JSON block.
        */
       teach_back_assessment: teachBackAssessmentSignalSchema,
+      /**
+       * Safety: the crisis-redirect rule fired this turn (learner expressed
+       * distress, self-harm ideation, bullying, abuse, or another
+       * safeguarding concern and the model redirected to a trusted
+       * adult/helpline). Observational — drives structured safety logging
+       * (H2/H7, 2026-06-05 safety audit), never flow control. The reply text
+       * itself is NOT logged.
+       */
+      crisis_redirect: optionalBooleanSchema,
       /** Challenge Round: model is proposing a challenge round at this turn. Server gates eligibility. */
       challenge_round_offer: optionalBooleanSchema,
       /** Challenge Round: per-concept evaluation of the learner's explanations. Drives mastery + note + weak-spot persistence. */
@@ -402,6 +411,8 @@ export interface NormalisedEnvelopeSignals {
    *  null (not undefined) when not scored — distinguishes "no score yet" from
    *  "score of 0". */
   retrieval_score: number | null;
+  /** Safety: crisis-redirect rule fired this turn. Observational, drives safety logging only. */
+  crisis_redirect: boolean;
   /** Challenge Round: LLM is proposing a challenge at this turn (server gates). */
   challenge_round_offer: boolean;
   /** Challenge Round: per-concept evaluations. Empty array when not in a round. */
@@ -420,6 +431,7 @@ export function normaliseSignals(
     needs_deepening: signals?.needs_deepening ?? false,
     understanding_check: signals?.understanding_check ?? false,
     retrieval_score: signals?.retrieval_score ?? null,
+    crisis_redirect: signals?.crisis_redirect ?? false,
     challenge_round_offer: signals?.challenge_round_offer ?? false,
     challenge_round_evaluation: signals?.challenge_round_evaluation ?? [],
   };

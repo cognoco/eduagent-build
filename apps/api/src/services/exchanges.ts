@@ -40,8 +40,68 @@ import {
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import { stripPhoneticHints } from './llm/sanitize';
+import { safeSend } from './safe-non-core';
+import { inngest } from '../inngest/client';
+import {
+  detectCatastrophicSafetyTrigger,
+  tripwireResponse,
+  type CatastrophicCategory,
+} from './safety-tripwire';
 
 const logger = createLogger();
+
+/**
+ * [H2/H7 — 2026-06-05 safety audit] Structured safety event when the
+ * crisis-redirect rule fires (learner expressed distress / self-harm
+ * ideation / bullying / abuse and the model redirected to a trusted
+ * adult/helpline).
+ *
+ * Before this, the redirect fired with zero logging — "how many learners
+ * mentioned self-harm last month?" was unanswerable (a silent-recovery
+ * violation on the highest-stakes path in the app, and a DPIA-visible gap).
+ *
+ * Deliberately logs METADATA ONLY — never the learner's message or the
+ * model's reply. §6 ruling (2026-06-05): internal logging only, no guardian
+ * notification; the structured event is the prerequisite for any future
+ * notification design.
+ */
+export async function emitCrisisRedirectEvent(context: {
+  sessionId?: string;
+  profileId?: string;
+  flow: string;
+  provider?: string;
+  model?: string;
+}): Promise<void> {
+  logger.warn('safety.crisis_redirect_fired', {
+    flow: context.flow,
+    session_id: context.sessionId,
+    profile_id: context.profileId,
+    provider: context.provider,
+    model: context.model,
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only marker (H2/H7, 2026-06-05 safety
+        // audit). The user-facing response (empathize + helpline redirect)
+        // already happened in the LLM reply; this event exists so ops can
+        // query "crisis redirects per week" in the dashboard and so RR-12's
+        // monitoring guardrail has a signal. No downstream handler is needed
+        // or intended until the §6(b) guardian-notification design is ruled.
+        name: 'app/safety.crisis_redirect_fired',
+        data: {
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: context.flow,
+          provider: context.provider,
+          model: context.model,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'safety.crisis_redirect_fired',
+    { sessionId: context.sessionId, profileId: context.profileId },
+  );
+}
 
 /**
  * F1.1 — Server-side hard cap on interview / onboarding exchanges. Per the
@@ -1369,11 +1429,67 @@ export function applySourceAuditSafetyFallback(
  * - Routes to the appropriate model via routeAndCall
  * - Detects understanding check markers in the response
  */
+/**
+ * Build a synthetic crisis envelope JSON for a deterministic tripwire hit, so
+ * the streaming path's `classifyExchangeOutcome` parses a real envelope (and
+ * persists the safe canned reply) instead of treating the short-circuit as an
+ * orphan fallback. `crisis_redirect` is set true so any envelope-aware consumer
+ * sees the same signal the model would have emitted.
+ */
+function buildTripwireEnvelope(category: CatastrophicCategory): string {
+  return JSON.stringify({
+    reply: tripwireResponse(category),
+    signals: { crisis_redirect: true },
+    confidence: 'high',
+  });
+}
+
+/**
+ * Non-streaming ExchangeResult for a deterministic tripwire hit. The LLM is
+ * never called — `provider`/`model` record that the response was produced by
+ * the safety floor, not a model.
+ */
+function buildTripwireResult(
+  category: CatastrophicCategory,
+  context: ExchangeContext,
+): ExchangeResult {
+  const response = tripwireResponse(category);
+  return {
+    response,
+    newEscalationRung: context.escalationRung,
+    isUnderstandingCheck: false,
+    expectedResponseMinutes: estimateExpectedResponseMinutes(response, context),
+    needsDeepening: false,
+    partialProgress: false,
+    provider: 'safety-tripwire',
+    model: `deterministic:${category}`,
+    latencyMs: 0,
+    readyToFinish: false,
+  };
+}
+
 export async function processExchange(
   context: ExchangeContext,
   userMessage: string,
   imageData?: ImageData,
 ): Promise<ExchangeResult> {
+  // [Safety tripwire, 2026-06-06] Deterministic floor for the catastrophic
+  // categories (self-harm method-seeking, sexual content involving a minor).
+  // Detection runs on the INPUT before the LLM is called, so the floor holds
+  // even if the model is jailbroken — we never hand the worst inputs to the
+  // model and never depend on it behaving. On a hit we escalate to the same
+  // crisis path the model uses (structured event + safe canned reply), never
+  // a refusal wall. See safety-tripwire.ts for why this is not a word list.
+  const inputTrip = detectCatastrophicSafetyTrigger(userMessage);
+  if (inputTrip) {
+    await emitCrisisRedirectEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: `exchange.process.tripwire.${inputTrip.category}`,
+    });
+    return buildTripwireResult(inputTrip.category, context);
+  }
+
   const appHelpTurn = isAppHelpQuery(userMessage);
   const sourceEvidence = buildExchangeSourceEvidence(context, userMessage, {
     appHelpTurn,
@@ -1417,6 +1533,20 @@ export async function processExchange(
     flow: 'processExchange',
   });
   const finalParsed = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+
+  // [H2/H7] Crisis redirect fired — emit the structured safety event before
+  // anything else can short-circuit. safeSend guarantees a dispatch failure
+  // never breaks the learner-facing exchange.
+  if (finalParsed.crisisRedirect) {
+    await emitCrisisRedirectEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: 'exchange.process',
+      provider: result.provider,
+      model: result.model,
+    });
+  }
+
   const privateSourcesForAudit = inferObviousReliableSourceForAudit(
     finalParsed.privateSources,
     sourceEvidence,
@@ -1483,6 +1613,35 @@ export async function streamExchange(
   userMessage: string,
   imageData?: ImageData,
 ): Promise<ExchangeStreamResult> {
+  // [Safety tripwire, 2026-06-06] Same deterministic input-side floor as
+  // processExchange. On a hit we stream the safe canned reply (no LLM call) and
+  // resolve rawResponsePromise to a synthetic crisis envelope so the caller's
+  // classifyExchangeOutcome persists the safe reply rather than an orphan
+  // fallback. The structured safety event is emitted here, deterministically.
+  const inputTrip = detectCatastrophicSafetyTrigger(userMessage);
+  if (inputTrip) {
+    await emitCrisisRedirectEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: `exchange.stream.tripwire.${inputTrip.category}`,
+    });
+    const safeReply = tripwireResponse(inputTrip.category);
+    const rawEnvelope = buildTripwireEnvelope(inputTrip.category);
+    async function* singleChunk(): AsyncIterable<string> {
+      yield safeReply;
+    }
+    return {
+      stream: singleChunk(),
+      rawResponsePromise: Promise.resolve(rawEnvelope),
+      newEscalationRung: context.escalationRung,
+      provider: 'safety-tripwire',
+      model: `deterministic:${inputTrip.category}`,
+      sourceEvidence: buildExchangeSourceEvidence(context, userMessage, {
+        appHelpTurn: false,
+      }),
+    };
+  }
+
   const appHelpTurn = isAppHelpQuery(userMessage);
   const sourceEvidence = buildExchangeSourceEvidence(context, userMessage, {
     appHelpTurn,
@@ -1547,6 +1706,8 @@ export interface ParsedExchangeEnvelope {
   understandingCheck: boolean;
   partialProgress: boolean;
   needsDeepening: boolean;
+  /** Safety: crisis-redirect rule fired this turn (H2, 2026-06-05 safety audit). Observational — drives structured safety logging, never flow control. */
+  crisisRedirect: boolean;
   notePrompt: boolean;
   notePromptPostSession: boolean;
   /** Challenge Round: model proposed an offer; caller gates eligibility. */
@@ -1601,6 +1762,7 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   understandingCheck: false,
   partialProgress: false,
   needsDeepening: false,
+  crisisRedirect: false,
   notePrompt: false,
   notePromptPostSession: false,
   challengeRoundOffer: false,
@@ -1733,6 +1895,7 @@ export function parseExchangeEnvelope(
       understandingCheck: detectUnderstandingCheckFromProse(fallbackText),
       partialProgress: false,
       needsDeepening: false,
+      crisisRedirect: false,
       notePrompt: false,
       notePromptPostSession: false,
       challengeRoundOffer: false,
@@ -1792,6 +1955,7 @@ function envelopeToParsedExchange(
       detectUnderstandingCheckFromProse(cleanReply),
     partialProgress: signals.partial_progress === true,
     needsDeepening: signals.needs_deepening === true,
+    crisisRedirect: signals.crisis_redirect === true,
     notePrompt: notePrompt?.show === true,
     notePromptPostSession: notePrompt?.post_session === true,
     challengeRoundOffer: signals.challenge_round_offer === true,

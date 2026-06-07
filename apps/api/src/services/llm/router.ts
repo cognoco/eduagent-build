@@ -255,7 +255,16 @@ function getPersonalizationPreamble(opts: {
   return lines.join(' ');
 }
 
-function withSafetyPreamble(
+// Exported so the eval harness's candidate-model path (`runHarnessLlm` with
+// `--openrouter-model`) can prepend the IDENTICAL personalization + safety
+// preamble that `routeAndCall` applies at line ~872. Before this was exported,
+// the candidate path called the provider with raw `messages`, omitting the
+// language directive from `getPersonalizationPreamble` — so every candidate's
+// language eval was run on a prompt missing the one line that sets reply
+// language, silently corrupting the §6 candidate comparison. Reusing this
+// function (rather than re-deriving the preamble in the harness) keeps the two
+// paths from drifting.
+export function withSafetyPreamble(
   messages: ChatMessage[],
   ageBracket?: AgeBracket,
   personalization?: {

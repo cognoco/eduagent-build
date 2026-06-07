@@ -37,6 +37,26 @@ export interface RunOptions {
    */
   maxLiveCalls?: number;
   /**
+   * Candidate-model gate: route every live call to this OpenRouter model slug
+   * (verbatim passthrough, e.g. "mistralai/mistral-small-2603") instead of the
+   * production router. Requires --live and OPENROUTER_API_KEY. The §6
+   * validation-gate switch from the 2026-06-05 model-selection memo.
+   */
+  openrouterModel?: string;
+  /**
+   * Reasoning-effort dial for the candidate model (requires
+   * --openrouter-model). Measured 2026-06-06 on gpt-5-mini: medium = at the
+   * 25s wall, low = 10–13s, minimal = 4–7s. See memo §6 diagnostics.
+   */
+  openrouterReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  /**
+   * Pin candidate serving to one OpenRouter host, fallbacks disabled
+   * (requires --openrouter-model). For open/hybrid-weight models the host
+   * changes behavior (e.g. deepseek-v4-pro: DeepInfra fast/non-reasoning,
+   * Novita reasoning-by-default).
+   */
+  openrouterProvider?: string;
+  /**
    * Baseline regression guard. When true, after the run the CLI compares
    * `summary.envelopeMetrics` against the checked-in baseline file and
    * exits non-zero if any metric drifts more than `baselineTolerancePp`.
@@ -141,6 +161,27 @@ export function parseCliArgs(argv: string[]): {
       if (Number.isFinite(parsed) && parsed >= 0) {
         options.maxLiveCalls = parsed;
       }
+    } else if (arg === '--openrouter-model') {
+      const next = argv[++i];
+      if (next) options.openrouterModel = next;
+    } else if (arg === '--openrouter-reasoning-effort') {
+      const next = argv[++i];
+      if (
+        next === 'minimal' ||
+        next === 'low' ||
+        next === 'medium' ||
+        next === 'high'
+      ) {
+        options.openrouterReasoningEffort = next;
+      } else {
+        console.error(
+          `Invalid --openrouter-reasoning-effort "${next ?? ''}" — use minimal|low|medium|high.`,
+        );
+        process.exit(2);
+      }
+    } else if (arg === '--openrouter-provider') {
+      const next = argv[++i];
+      if (next) options.openrouterProvider = next;
     } else if (arg === '--check-baseline') {
       options.checkBaseline = true;
     } else if (arg === '--update-baseline') {
@@ -315,7 +356,10 @@ export async function runHarness(
 
                 if (flow.evaluateQuality && liveResponse) {
                   try {
-                    qualityIssues = flow.evaluateQuality({
+                    // Awaited because evaluateQuality may be async (LLM-judge
+                    // flows); awaiting a plain array is a no-op for the
+                    // existing sync evaluators.
+                    qualityIssues = await flow.evaluateQuality({
                       input: item.input,
                       messages,
                       liveResponse,
@@ -344,7 +388,13 @@ export async function runHarness(
                   }
                 }
               } catch (err) {
-                liveError = err instanceof Error ? err.message : String(err);
+                // `|| String(err)` so an Error with an empty message never
+                // produces a falsy liveError (which the snapshot renderer
+                // would previously have dropped silently).
+                liveError =
+                  err instanceof Error
+                    ? err.message || String(err)
+                    : String(err);
                 summary.liveCallsFailed++;
               }
             }

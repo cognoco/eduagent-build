@@ -23,6 +23,7 @@ import {
   MAX_INTERVIEW_EXCHANGES,
 } from './exchanges';
 import type { ExchangeContext } from './exchanges';
+import { tripwireResponse } from './safety-tripwire';
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -46,6 +47,93 @@ const baseContext: ExchangeContext = {
   exchangeHistory: [],
   birthYear: currentYear - 14,
 };
+
+// ---------------------------------------------------------------------------
+// Deterministic safety tripwire — pipeline wiring [2026-06-06]
+//
+// [BREAK] These prove the input-side floor short-circuits the LLM entirely for
+// the catastrophic categories. The provider below THROWS if called, so if the
+// tripwire wiring is reverted the test fails with the provider error instead of
+// the canned safe reply. Precision of WHICH inputs trip lives in
+// safety-tripwire.test.ts; this file proves the wiring, not the patterns.
+// ---------------------------------------------------------------------------
+
+describe('processExchange — safety tripwire wiring', () => {
+  const throwingProvider: LLMProvider = {
+    id: 'gemini',
+    async chat() {
+      throw new Error('LLM must not be called when the safety tripwire fires');
+    },
+    chatStream(): never {
+      throw new Error('LLM must not be called when the safety tripwire fires');
+    },
+  };
+
+  it('[BREAK] short-circuits the LLM and returns the safe self-harm reply', async () => {
+    registerProvider(throwingProvider);
+    try {
+      const result = await processExchange(baseContext, 'how do i kill myself');
+      expect(result.response).toBe(tripwireResponse('self_harm_method'));
+      expect(result.provider).toBe('safety-tripwire');
+      expect(result.model).toBe('deterministic:self_harm_method');
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
+  it('streamExchange short-circuits the LLM and streams the safe reply', async () => {
+    registerProvider(throwingProvider);
+    try {
+      const result = await streamExchange(baseContext, 'how do i kill myself');
+      let streamed = '';
+      for await (const chunk of result.stream) streamed += chunk;
+      expect(streamed).toBe(tripwireResponse('self_harm_method'));
+      expect(result.provider).toBe('safety-tripwire');
+      // raw envelope must parse with crisis_redirect so onComplete persists the
+      // safe reply rather than treating the short-circuit as an orphan.
+      const raw = await result.rawResponsePromise;
+      const parsed = parseExchangeEnvelope(raw);
+      expect(parsed.crisisRedirect).toBe(true);
+      expect(parsed.cleanResponse).toBe(tripwireResponse('self_harm_method'));
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
+  it('does NOT trip on a legitimate curriculum question (LLM is used)', async () => {
+    let called = false;
+    const countingProvider: LLMProvider = {
+      id: 'gemini',
+      async chat() {
+        called = true;
+        return {
+          content: JSON.stringify({
+            reply: 'Heroin is highly addictive because…',
+            signals: { understanding_check: false },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(countingProvider);
+    try {
+      const result = await processExchange(
+        baseContext,
+        'why do people get addicted to heroin so fast',
+      );
+      expect(called).toBe(true);
+      expect(result.provider).not.toBe('safety-tripwire');
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // buildSystemPrompt

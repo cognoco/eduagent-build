@@ -114,8 +114,14 @@ export interface FlowDefinition<Input = unknown> {
    * "did the model return the right shape?"; this hook says "did the model
    * satisfy the scenario contract?" Error issues fail the CLI quality gate;
    * warnings are rendered for review without failing the run.
+   *
+   * May be async — the language-quality flow uses an LLM judge (via
+   * production routing, independent of any --openrouter-model candidate
+   * override). The runner awaits the result either way.
    */
-  evaluateQuality?(context: QualityCheckContext<Input>): QualityIssue[];
+  evaluateQuality?(
+    context: QualityCheckContext<Input>,
+  ): QualityIssue[] | Promise<QualityIssue[]>;
 
   /**
    * Set true when this flow returns the shared LLM response envelope (the
