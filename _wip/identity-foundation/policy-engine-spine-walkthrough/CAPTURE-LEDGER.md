@@ -32,16 +32,25 @@ related_handoff: _handoffs/2026-06-XX-policy-engine-spine-ruling.md (to be autho
 > Is the prohibition-floor + consent-edge framing the right spine, and is `MMT-ADR-0013` the right ADR to draft it under? This ruling gates R-2, R-4, and R-5.
 
 ```yaml
-ruling: LOCKED | REFINEMENT | REJECTED | SPLIT | DEFER
+ruling: LOCKED
 primitive_pair:
-  prohibition_floor: ""  # one-sentence definition, locked or refined
-  consent_edge: ""  # one-sentence definition, locked or refined
-ruling_text_verbatim: ""
-rationale: ""
-dissent_or_caveats: ""
-captured_by: ""
-captured_at: ""
-pm_signoff: ""
+  prohibition_floor: "A rule that binds regardless of consent (consent_unlockable = false); neither user nor guardian can unlock it. E.g. Gemini §20(d) under-18 closure; AI Act Art 5(1)(b) age-vulnerability exploitation; CSAM-adjacent provider refusals."
+  consent_edge: "A rule that binds only while the relevant consent is absent; valid guardian/user consent unlocks the activity. E.g. GDPR Art 8 sub-digital-consent-age processing; COPPA VPC; UK Children's Code best-interests gate."
+ruling_text_verbatim: "yes, build both"
+rationale: >
+  The engine's output must be the union of two first-class primitives because a single primitive cannot model
+  both flavors. The age-consent PoC found 7 of 8 activity categories contain cells where consent_unlockable:false
+  is the binding constraint; modelling everything as consent-edge would either let a sub-13 user through a hard
+  ban or wrongly refuse a 17-year-old a legal route. Cheap to add in the pre-baseline window (MMT-ADR-0012),
+  append-only after.
+dissent_or_caveats: >
+  None from the PM. Facilitator note: the prohibition-floor primitive must be expressible independently of any
+  age/regime value (some floors, e.g. CSAM refusal, are age-invariant), so the data-model amendment (WP-2) must
+  not collapse the floor into an age-keyed column only. MMT-ADR-0013 (already drafted, status Proposed) is the
+  vehicle; this ruling confirms its §1 "kind column" decision.
+captured_by: "Claude (facilitator)"
+captured_at: "2026-06-07"
+pm_signoff: "principal (user) — ruled 'yes, build both', 2026-06-07"
 ```
 
 **Implications of the ruling:**
@@ -59,15 +68,34 @@ pm_signoff: ""
 > Does serving sub-13 children via a parent-owned account, with no child login at all, trip COPPA "directed to children" or "actual knowledge"?
 
 ```yaml
-ruling: COPPA_APPLIES | COPPA_DOES_NOT_APPLY | UNCLEAR_WITH_DEFENSIBLE_POSTURE
-ruling_text_verbatim: ""  # verbatim counsel language
-rationale: ""  # 1-3 sentences
-dissent_or_caveats: ""
-defensible_posture_if_unclear: ""  # if UNCLEAR_WITH_DEFENSIBLE_POSTURE, what is the posture
-captured_by: ""
-captured_at: ""
-pm_signoff: ""
-counsel_signoff: ""  # counsel signoff mandatory
+ruling: UNCLEAR_WITH_DEFENSIBLE_POSTURE
+ruling_text_verbatim: >
+  "We will keep it open. In v2 we will open up managed accounts for kids under 13 OUTSIDE of the USA —
+  but this is not relevant for launch." (principal/PM ruling, 2026-06-07)
+rationale: >
+  Keep the sub-13 door open as a future (v2) option rather than slamming it shut, but scope the v2 target
+  to NON-US managed-child accounts. This sidesteps the unresolved US-COPPA actual-knowledge question entirely
+  for v2: COPPA is US-only, so a non-US-first sub-13 path makes the regime taxonomy (R-2), not COPPA, the
+  binding constraint. The US sub-13 path therefore stays CONSERVATIVE (no parent-operator open in the US;
+  full VPC or no-service if ever attempted), while the door that actually opens in v2 is the non-US one.
+defensible_posture_if_unclear: >
+  Engine default posture (bake in now, exercise in v2): no child-side login/credential/free-text chat; do NOT
+  collect the child's DOB/grade/school at the controller layer; treat parent-supplied profile data as
+  parent-data, not child-data. US sub-13 remains gated/closed under this posture. The v2 opening is NON-US
+  managed-child accounts, governed by the R-2 regime cells (EU_GDPR_* and ROW), NOT by a COPPA carve-out.
+dissent_or_caveats: >
+  IMPORTANT FLAG for v2 planning (not launch): "outside the USA" dodges COPPA but is NOT automatically
+  lighter-weight. The EU is actually STRICTER on this exact parent-operator pattern — GDPR Art 8 + EDPB
+  05/2020 §3 put the verification burden on the controller (Layer 5 EU row = "3b: No"), plus per-Member-State
+  consent-age thresholds (13–16) and the EU AI Act high-risk-in-education obligations. So a lighter-weight v2
+  sub-13 launch realistically means permissive ROW jurisdictions FIRST, with the EU treated as its own
+  heavier cell — not "non-US = easy". This is captured for v2 scoping, not a launch blocker.
+  Legal status: this is a facilitator-captured business posture; COUNSEL SIGN-OFF on the COPPA reading and
+  the non-US per-regime verification bar is OUTSTANDING and MANDATORY before any v2 build (HW-2, V-1, V-5).
+captured_by: "Claude (facilitator)"
+captured_at: "2026-06-07"
+pm_signoff: "principal (user) — ruled keep-open, v2 = non-US sub-13 managed accounts, 2026-06-07"
+counsel_signoff: "OUTSTANDING — facilitator-captured business posture only; requires licensed-counsel sign-off before v2 build (HW-2)"
 ```
 
 **Implications of the ruling:**
@@ -83,23 +111,35 @@ counsel_signoff: ""  # counsel signoff mandatory
 > What is the locked first-class regime enum the policy engine keys on?
 
 ```yaml
-ruling: LOCKED | REFINEMENT | REJECTED | SPLIT | DEFER
+ruling: LOCKED
 regime_enum:
-  - ""  # one entry per locked regime
-  - ""
-  - ""
-  - ""
-  - ""
-  - ""
-  - ""
-  - ""
-ruling_text_verbatim: ""
-rationale: ""
-us_sub13_carveout_cell: ""  # if R-1 was COPPA_DOES_NOT_APPLY or UNCLEAR_WITH_DEFENSIBLE_POSTURE, what is the US sub-13 carve-out cell
-dissent_or_caveats: ""
-captured_by: ""
-captured_at: ""
-pm_signoff: ""
+  - "US_COPPA"      # United States — under-13 protected (COPPA actual-knowledge doctrine); state codes (CA AADC) folded
+  - "EU_GDPR_16"    # EU consent-age 16 — DE, NL, IE, SK, most MSes (most restrictive EU)
+  - "EU_GDPR_15"    # EU consent-age 15 — FR
+  - "EU_GDPR_14"    # EU consent-age 14 — ES, CY, BG (PT reported 13, verify; AT/IT/SI 14-or-13 fold here w/ verify-flag)
+  - "EU_GDPR_13"    # EU consent-age 13 — SE, DK, FI; + NO/IS/LI via EEA
+  - "UK_AADC"       # United Kingdom — UK GDPR (consent 13) + Children's Code design overlay
+  - "ROW"           # rest of world (incl. all of Asia, CH, etc.) — strictest default; carries optional sub_regime "strict" metadata
+ruling_text_verbatim: "ok [lock the 7 buckets as the v1 set, knowing it grows as new markets are entered]"
+rationale: >
+  The engine keys on a small first-class regime enum, NOT a 200-country list. A bucket is defined by WHICH LAW
+  applies, not by the age number (so US-at-13 and EU_GDPR_13 are distinct buckets — different doctrines:
+  COPPA actual-knowledge vs GDPR reasonable-efforts). 7 buckets cover near-term launch geography (US/EU/UK)
+  plus a strictest-default catch-all. PM confirmed the set is a v1 STARTING set, not a ceiling.
+us_sub13_carveout_cell: >
+  Per R-1: the US_COPPA sub-13 cell stays CONSERVATIVE — no parent-operator route opened in the US; full VPC
+  or no-service if ever attempted. The v2 sub-13 opening (R-1) lives in EU_GDPR_* (heavier) and ROW (lighter)
+  cells, NOT in a US carve-out. So R-2 needs no new US sub-cell; it needs the ROW + EU cells to carry the
+  managed-child sub-13 posture for v2.
+dissent_or_caveats: >
+  (a) The country→regime MAPPING is verifiable data (a lookup table checked against EDPB/legal trackers), NOT
+  part of the locked enum — it can change without a schema change. (b) Adding a NEW bucket later is a supported
+  low-cost enum addition, but each new bucket's rules must be legal-research-filled before use → growth is paced
+  by counsel, not code. (c) Open verifies that may refine cells, not the enum: PT 13-vs-14 (V-4), CA-AADC
+  post-NetChoice-v-Bonta residuals folded into US_COPPA (V-3), ICO Annex B design bands for UK_AADC (HW-1/V-2).
+captured_by: "Claude (facilitator)"
+captured_at: "2026-06-07"
+pm_signoff: "principal (user) — ruled 'ok', lock the 7 as v1 starting set, 2026-06-07"
 ```
 
 **The candidate enum (proposed; walkthrough ratifies or refines):**
@@ -121,28 +161,41 @@ The walkthrough can drop, add, or rename regimes. Per-Member-State detail is res
 > Are the two axes (known-age × known-residence) the right state input, and is the v1 determination-method set correct?
 
 ```yaml
-ruling: LOCKED | REFINEMENT | REJECTED | SPLIT | DEFER
+ruling: LOCKED
 axes_model:
   known_age:
-    determination_methods: []  # e.g., ['self_report', 'parent_reported']
+    determination_methods: ['self_report', 'parent_reported', 'verified_credential', 'age_estimation_signal']
     confidence: 0.0_to_1.0
   known_residence:
-    determination_methods: []  # e.g., ['self_report', 'billing_address', 'geo_ip']
+    determination_methods: ['self_report', 'billing_address', 'geo_ip', 'verified_credential']
     confidence: 0.0_to_1.0
 v1_determination_method_set:
   age:
-    - ""  # one entry per v1 method
-    - ""
+    - "self_report"      # neutral age gate — industry-standard + legally sufficient for a 13+ service
+    - "parent_reported"  # managed-child case (Decision 2 / R-1)
   residence:
-    - ""
-    - ""
-default_for_unknown: MOST_RESTRICTIVE  # the safety/legal default
-ruling_text_verbatim: ""
-rationale: ""
-dissent_or_caveats: ""
-captured_by: ""
-captured_at: ""
-pm_signoff: ""
+    - "geo_ip"
+    - "billing_address"
+default_for_unknown: MOST_RESTRICTIVE  # unknown age → most-protected; unknown residence → strictest regime
+phase_2_methods: ['verified_credential', 'age_estimation_signal']  # deferred; needed only when under-13 (v2) opens
+ruling_text_verbatim: "yes that sounds good if it is sufficient to trust what they tell us and not verify"
+rationale: >
+  Two independent axes (known-age × known-residence), each with determination_method + confidence, crossed
+  with the regime buckets (R-2) — NOT a per-age-band bucket. The PM's condition ("sufficient to trust, not
+  verify") HOLDS for the 13+ launch: a self-reported age gate is the industry-standard, legally accepted
+  mechanism for a 13+ service; hard verification is NOT required. Verification (verified_credential) is
+  phase-2 precisely because it is needed only for the under-13 population, which is itself deferred to v2 —
+  the two move together, so launch defers nothing it actually needs.
+dissent_or_caveats: >
+  Flip-side handling rule (build into the engine, not a verify-everyone mandate): self-report cuts both ways
+  — if a 13+ user volunteers an under-13 age, that is ACTUAL KNOWLEDGE and the engine must act on it
+  (block/redirect/escalate), not ignore it. Also: "trust, don't verify" is sufficient for 13+ ONLY; the day
+  under-13 (v2) opens, US VPC + EU reasonable-efforts verification become mandatory and verified_credential
+  must ship then (gated on counsel, per R-1). "Default to most-restrictive when unknown" means a user who
+  refuses an age/region is treated as most-protected, not least.
+captured_by: "Claude (facilitator)"
+captured_at: "2026-06-07"
+pm_signoff: "principal (user) — ruled lock, conditioned on trust-sufficient-for-launch (condition holds for 13+), 2026-06-07"
 ```
 
 **Implications of the ruling:**
@@ -158,16 +211,25 @@ pm_signoff: ""
 > Is the 3-param runtime key (`model · service_provider · serving_region`) and the 4-param vetting axis (`model · provider_via_service · service · region`) the right split?
 
 ```yaml
-ruling: LOCKED | REFINEMENT | REJECTED | SPLIT | DEFER
-runtime_key: []  # 3-param: ['model', 'service_provider', 'serving_region']
-vetting_axis: []  # 4-param: ['model', 'provider_via_service', 'service', 'region']
+ruling: LOCKED
+runtime_key: ['model', 'service_provider', 'serving_region']  # fast per-request picker reads this
+vetting_axis: ['model', 'provider_via_service', 'service', 'region']  # slow legal/contractual vetting; the extra axis = same model via different services vetted separately
 flow: VETTING_PIPELINE -> ALLOWED_MODELS_TABLE -> POLICY_ENGINE_FILTER -> ROUTER
-ruling_text_verbatim: ""
-rationale: ""
-dissent_or_caveats: ""
-captured_by: ""
-captured_at: ""
-pm_signoff: ""
+ruling_text_verbatim: "lock it"
+rationale: >
+  Two jobs that must stay separate: slow on-cadence VETTING (does a provider/model/region ever pass — ToS,
+  ZDR, log-retention, training-data, age-closure) emitting rows into an approved (allowed-models) table; and
+  fast per-request ROUTING (pick the best ALLOWED option by complexity/cost/load). The router never re-checks
+  compliance — it reads vetted rows already filtered by the policy engine for this user's bucket+age. Mashing
+  them together makes the router re-implement compliance per-request: slow, brittle, bug-prone.
+dissent_or_caveats: >
+  This re-specs the prior hard-coded GATE-1 minor-routing rule: the papered/ZDR endpoint becomes a vetted ROW
+  in the allowed-models table + a policy-engine filter, not a hard-coded if-branch. Note the supersession of
+  the old "Family standard = Gemini-only" routing — Gemini is §20(d)-closed to minors, so it cannot be a
+  minor route; it survives only as a policy-table data point, not an allowed row for under-18 cells.
+captured_by: "Claude (facilitator)"
+captured_at: "2026-06-07"
+pm_signoff: "principal (user) — ruled 'lock it', 2026-06-07"
 ```
 
 **Implications of the ruling:**
@@ -185,33 +247,49 @@ pm_signoff: ""
 > **Note (memo §4.3):** the launch provider set is **illustrative, not ratified** in the room — the ratified output is the vetting-research workstream's table. R-5 locks the *shape* (the slots) and the *process* (the workstream), not the four named providers.
 
 ```yaml
-ruling: LOCKED | REFINEMENT | REJECTED | SPLIT | DEFER
-slot_structure:  # the LOCKED architecture shape (the real ruling)
-  - "US_primary_route"
-  - "EU_primary_route"
-  - "cost_effective_non_us_alternative"
-launch_provider_set:  # ILLUSTRATIVE example only — NOT ratified here.
-  status: illustrative_not_ratified  # ratified set is the vetting workstream's output table
-  ratified_output_owner: "vetting-research workstream (WP-4)"
-  example_providers:  # how the slots may fill; the workstream decides the actual picks
-    - "anthropic_claude"      # illustrates US_primary_route
-    - "openai"                # illustrates US_primary_route (candidate)
-    - "mistral"               # illustrates EU_primary_route
-    - "deepseek_via_papered_service"  # illustrates cost_effective_non_us_alternative
+ruling: REFINEMENT  # principle confirmed; the concrete shape DEFERS to the already-ratified MMT-ADR-0016
+supersession_note: >
+  The walkthrough's abstract three-slot sketch (US-primary / EU-primary / cost-effective-non-US) and its
+  "a future vetting-research workstream will pick the providers" framing are SUPERSEDED by the ratified
+  routing decision MMT-ADR-0016 + docs/specs/2026-06-06-llm-routing-and-judge-architecture.md §1.5 +
+  docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md (owner-ratified 2026-06-07). The provider
+  picks are NOT deferred — they exist. R-5 therefore confirms the PRINCIPLE and points at the spec for the
+  concrete shape; it does NOT lock the stale sketch.
+actual_ratified_structure:  # per MMT-ADR-0016 / routing-spec §1.5 — this is the real "slot structure"
+  universal_default: "gpt-oss-120b @ Cerebras (US), reasoningEffort high — all tiers incl. free, rungs 1–3, all ages"
+  residency_branch: "EU-vs-RoW (one merged branch: EU-residency required OR Cerebras unavailable) → tier secondary"
+  secondary_free: "Mistral Small 4 (EU) — also free-tier vision"
+  secondary_paid: "GPT-5 mini @ low (OpenAI, EU-residency deployment; ZDR-for-minors) — also paid-tier vision"
+  deep_reasoning_paid: "gpt-5.4 @ medium — Plus / Pro / AI-Upgrade entitlement only"
+  deep_reasoning_family: "gpt-oss-120b @ Cerebras high — Family tier EXCLUDED from gpt-5.4 (owner ruling 2026-06-07)"
+  rung45_fallback: "Sonnet 4.6 (Anthropic, US)"
+  judge: "Haiku 4.5 non-reasoning (Anthropic)"
+  dormant_adult_only: "DeepSeek V4 Pro @ DeepInfra — passed, not pinned, adults only"
 out_of_scope_routes:
-  - ""  # e.g., 'workspace_for_education_gemini' (kept as a policy-table data point, not a route)
+  - "gemini / vertex — UNCONDITIONALLY banned for under-18 (GCP SST §20(d) + Gemini API terms); fail-closed in getFallbackConfig (FALLBACK_FORBIDDEN). Adult-only (verified-18+) eligibility is an OPEN legal ruling (routing-spec §10.1) — banned until ruled. Workspace-for-Education tenant exception kept only as a policy-table data point, not a route."
 vetting_research_workstream:
-  named: true | false
-  owner: ""  # PM/architect/separate
-  poc_shape: "same as age-consent-landscape PoC (data.json + index.html)"
-  inputs: []  # e.g., ['locked slot structure (R-5)', 'illustrative provider set (R-5)', 'locked regime taxonomy (R-2)']
-  outputs: "per-cell allowed-models table rows with vetting criteria metadata — this table IS the ratified provider set"
-ruling_text_verbatim: ""
-rationale: ""
-dissent_or_caveats: ""
-captured_by: ""
-captured_at: ""
-pm_signoff: ""
+  named: superseded  # the "future workstream owns the picks" framing is stale — picks already ratified
+  realized_as: "the eval-harness ADMISSION GATE (routing-spec §1.4: pnpm eval:llm --live in exact prod config) + the non-code compliance prerequisites (G-P1 Cerebras triplet, G-P2 OpenAI ZDR-for-minors, G-P3 teaching A/B) — these play the ongoing 'vetting' role; no separate PoC workstream needed"
+  outputs: "the §1.5 routing matrix rows = the ratified provider set (declarative rule table; provider swap = config edit, not logic)"
+ruling_text_verbatim: >
+  "I believe this is already documented in more detail, but yes — EU versus the rest of the world is how I
+  did it for now and then per plan." (principal, 2026-06-07, citing the two routing specs)
+rationale: >
+  The R-5 PRINCIPLE holds and is already realized: provider selection is name-agnostic at the architecture
+  level (declarative rule table + per-vendor adapters; swaps are config edits), Gemini-for-Education is out
+  as a route, and an admission/compliance gate governs which models may enter a row. But the concrete slot
+  structure and provider set are owner-ratified in MMT-ADR-0016, organized as EU-vs-RoW residency branching
+  on a universal gpt-oss/Cerebras default — NOT the walkthrough's US/EU/non-US three-slot sketch. R-5 defers
+  to that spec rather than re-deciding it.
+dissent_or_caveats: >
+  DOC-DRIFT FINDING: the walkthrough prep (BRIEFING-PACKET §8, this ledger's R-5 template, FACILITATOR-BRIEF)
+  predates/ignores MMT-ADR-0016 and still presents the provider picks as an open future workstream. The
+  walkthrough-folder R-5 material should be reconciled to point at the routing specs (cleanup item, see
+  Homework). Open legal ruling that genuinely remains: adult-only (18+) Gemini eligibility inside a
+  mixed-audience app (routing-spec §10.1) — owed before any Gemini row is added.
+captured_by: "Claude (facilitator)"
+captured_at: "2026-06-07"
+pm_signoff: "principal (user) — confirmed principle; deferred concrete shape to ratified routing specs (EU-vs-RoW), 2026-06-07"
 ```
 
 **Implications of the ruling:**
@@ -226,41 +304,45 @@ pm_signoff: ""
 
 Counsel re-verifications of Bucket-B questions from the original under-13 synthesis (`SYNTHESIS.md` §6 Bucket B) and the R-1 underpinning. One row per verification.
 
+> **Session note:** this was a FACILITATOR-RUN session with no live licensed counsel present. None of V-1..V-5
+> were verified in the room — all are OUTSTANDING homework for counsel. The R-1 business posture was captured
+> on the facilitator's reading of SYNTHESIS.md Layer 5; it is NOT a legal clearance.
+
 ```yaml
 - question_id: V-1
   topic: "R-1 underpinning — COPPA 'directed to children' and 'actual knowledge' doctrine applicability to the parent-operator pattern"
-  ruling_in_room: ""  # captured in R-1 above
-  effect_on_r1: ""
-  captured_by: ""
-  captured_at: ""
+  ruling_in_room: "NOT VERIFIED IN ROOM — no counsel present. Facilitator captured the UNCLEAR_WITH_DEFENSIBLE_POSTURE reading (R-1); a written counsel opinion is owed (HW-2)."
+  effect_on_r1: "R-1 stands as a business posture (keep door open, v2 = non-US sub-13) gated on this verification before any build."
+  captured_by: "Claude (facilitator)"
+  captured_at: "2026-06-07"
 
 - question_id: V-2
   topic: "ICO Annex B exact wording (carry-over from under-13 synthesis Q1)"
-  ruling_in_room: ""
-  effect_on_r2: ""  # may affect the UK_AADC regime-cell
-  captured_by: ""
-  captured_at: ""
+  ruling_in_room: "NOT VERIFIED — outstanding (HW-1). Most consequential unverified primary citation."
+  effect_on_r2: "May refine the UK_AADC design-band detail; does NOT change the 7-bucket enum."
+  captured_by: "Claude (facilitator)"
+  captured_at: "2026-06-07"
 
 - question_id: V-3
   topic: "California AADC (AB-2273) post-NetChoice v. Bonta (carry-over from under-13 synthesis Q4)"
-  ruling_in_room: ""
-  effect_on_r2: ""  # may affect the US_COPPA regime-cell
-  captured_by: ""
-  captured_at: ""
+  ruling_in_room: "NOT VERIFIED — outstanding. CA-AADC residuals folded into US_COPPA pending this."
+  effect_on_r2: "May refine the US_COPPA cell detail; does NOT change the enum."
+  captured_by: "Claude (facilitator)"
+  captured_at: "2026-06-07"
 
 - question_id: V-4
   topic: "EDPB Guidelines 05/2020 §3 paragraph-level reading (carry-over from under-13 synthesis Q6)"
-  ruling_in_room: ""
-  effect_on_r2: ""  # may affect the EU_GDPR_X regime-cells
-  captured_by: ""
-  captured_at: ""
+  ruling_in_room: "NOT VERIFIED — outstanding. Underpins the EU 'controller bears verification burden' finding that makes EU sub-13 heavier than ROW (R-1 caveat)."
+  effect_on_r2: "Confirms the EU_GDPR_* cells are reasonable-efforts/VPC-gated for sub-13; relevant to v2 scoping."
+  captured_by: "Claude (facilitator)"
+  captured_at: "2026-06-07"
 
 - question_id: V-5
   topic: "NetChoice-style Netflix-profile analogue — any regulator blessing? (carry-over from under-13 synthesis Q11)"
-  ruling_in_room: ""
-  effect_on_r1: ""  # directly relevant to the parent-operator R-1 ruling
-  captured_by: ""
-  captured_at: ""
+  ruling_in_room: "NOT VERIFIED — prior research found NONE. Directly underpins R-1; bundle with HW-2."
+  effect_on_r1: "Absence of any regulator blessing is WHY R-1 is 'unclear, defensible posture' not 'does not apply'."
+  captured_by: "Claude (facilitator)"
+  captured_at: "2026-06-07"
 ```
 
 ---
@@ -271,14 +353,24 @@ To be completed by counsel within 1–2 weeks of the walkthrough. One row per ho
 
 ```yaml
 - homework_id: HW-1
-  question: ""  # typically a carry-over from V-1 through V-5
-  owner: ""
-  due: ""
+  question: "Verify ICO Children's Code Annex B exact wording against the live ICO document (V-2). Most consequential unverified primary; may refine UK_AADC design-band detail."
+  owner: "counsel"
+  due: "2026-06-21"
   status: open
 - homework_id: HW-2
-  question: ""
-  owner: ""
-  due: ""
+  question: "Written counsel opinion on the parent-operator COPPA reading (V-1) + the Netflix-profile-analogue regulator-blessing check (V-5). MANDATORY before any v2 sub-13 build. Must also cover the NON-US verification bar (EU GDPR Art 8 reasonable-efforts per EDPB 05/2020 §3, and ROW strict-jurisdiction screening) since v2 scope = non-US sub-13 managed accounts."
+  owner: "counsel"
+  due: "2026-06-21"
+  status: open
+- homework_id: HW-3
+  question: "Reconcile the walkthrough-folder R-5 material (BRIEFING-PACKET §8, FACILITATOR-BRIEF R-5, this ledger's R-5 template) to the ratified routing decision MMT-ADR-0016 + the two 2026-06-06 routing specs. The walkthrough still presents provider picks as an open future workstream; they are ratified. Doc-drift cleanup, not a decision."
+  owner: "Claude / architect"
+  due: "2026-06-14"
+  status: open
+- homework_id: HW-4
+  question: "Resolve the open legal ruling on adult-only (verified-18+) Gemini/Vertex eligibility inside a mixed-audience app (routing-spec §10.1). Owed before any Gemini row is added; Gemini stays unconditionally banned until ruled."
+  owner: "counsel"
+  due: "TBD (not launch-blocking; Gemini stays banned meanwhile)"
   status: open
 ```
 
@@ -419,17 +511,20 @@ To be filled in post-walkthrough, once the rulings are firm.
   status: open
 ```
 
-**If R-1 was COPPA_APPLIES, instead (contingent):**
+> **R-1 was ruled UNCLEAR_WITH_DEFENSIBLE_POSTURE (keep-open, v2 = non-US) — so WP-9 ABOVE is the active
+> contingent. WP-9-alt below is N/A** (it was the COPPA_APPLIES branch).
+
+**If R-1 was COPPA_APPLIES, instead (contingent) — N/A, R-1 was NOT COPPA_APPLIES:**
 
 ```yaml
 - wp_id: WP-9-alt
-  work_package: "Sub-13 v2 path posture memo — codify the COPPA_APPLIES ruling into a written record; the sub-13 v1.1 path remains launch-blocked, requiring full VPC; no new US sub-13 route is opened via parent-operator"
+  work_package: "N/A — R-1 ruled UNCLEAR_WITH_DEFENSIBLE_POSTURE, not COPPA_APPLIES. (Original: sub-13 v2 path posture memo codifying a COPPA_APPLIES ruling.) Re-activate only if counsel (HW-2) flips R-1 to COPPA_APPLIES."
   inputs: ["R-1 ruling"]
   owner: "Claude + counsel"
   reviewer: "PM"
   due: ""
   blocked_by: []
-  status: open
+  status: not_applicable
 ```
 
 **Sub-13 v1.1 ungating workstream (contingent, demand-triggered):**
@@ -450,12 +545,12 @@ To be filled in post-walkthrough, once the rulings are firm.
 ## Walkthrough sign-off
 
 ```yaml
-pm_signoff: ""
-pm_signoff_at: ""
-counsel_signoff: ""  # mandatory for R-1
-counsel_signoff_at: ""
-facilitator_signoff: ""
-facilitator_signoff_at: ""
+pm_signoff: "principal (user) — ruled R-0 through R-5 in a facilitator-run session"
+pm_signoff_at: "2026-06-07"
+counsel_signoff: "OUTSTANDING — no licensed counsel present; R-1 captured as business posture only. MANDATORY counsel sign-off owed via HW-2 before any v2 sub-13 build."
+counsel_signoff_at: "pending"
+facilitator_signoff: "Claude (architect/facilitator)"
+facilitator_signoff_at: "2026-06-07"
 ```
 
 ---
