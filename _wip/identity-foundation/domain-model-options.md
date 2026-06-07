@@ -6,8 +6,8 @@
 > **⚠ Vocabulary superseded — folded into the ontology 2026-06-01 (Fold #1).** This is a **dated discovery
 > artifact**; its decisions now live, in ratified terms, in `identity-ontology.md` (see §R "Fold #1"). The
 > body below uses **pre-ratification names** — `Credential` → **Login**, `proxied` → **managed**, `ward` →
-> **charge** — left **unrewritten on purpose**. For current vocabulary read the ontology + `CONTEXT.md`, not
-> this file.
+> **charge** — **rewritten inline 2026-06-06 per the charge-terminology sweep** (banner kept for traceability).
+> For current vocabulary read the ontology + `CONTEXT.md`, not this file.
 
 > **What this is.** The "architecture/discovery spike" the strategy notes (§3.2) call for: the
 > highest-leverage research *before* the target model is drawn. It lays out the reference architecture,
@@ -302,7 +302,7 @@ code path per move. This section locks the *requirements* the transitions impose
 | **T2** | Consent gate lifts (crosses consent threshold) | **time** | `consentRequired` re-evaluates to false | guardian's **billing control / visibility** don't auto-dissolve | silent: nothing fires → teen over-restricted, *or* processing runs on a now-ungrounded parental consent |
 | **T3** | Minor → Adult at 18 ("graduation") | **time** | guardianship dissolves; Person becomes autonomous; possibly own org | **learning history travels with the Person** | promised in PRD, **not built** (PPA-R11); hits identity + consent + billing + portability + membership at once |
 | **T4** | Jurisdiction change | action (moves country) | `consentRequired` re-evaluates under the **new** threshold — gate can **re-engage** with no birthday | — | a frozen `consented=true` is *wrong*; re-engaging may require **suspending processing** until fresh consent |
-| **T5** | Guardianship mutation (added / removed / withdrawn / custody change) | action | the **Guardianship edge(s)**; consent authority may move | the ward Person persists | sole guardian withdraws consent for a below-threshold child → processing must **stop** (today's broken-revoke bug, CC-02/03/07) |
+| **T5** | Guardianship mutation (added / removed / withdrawn / custody change) | action | the **Guardianship edge(s)**; consent authority may move | the charge Person persists | sole guardian withdraws consent for a below-threshold child → processing must **stop** (today's broken-revoke bug, CC-02/03/07) |
 | **T6** | De-credential (revert to proxied) | action | — | — | probably **disallowed**; flag as product choice, don't build speculatively |
 
 **Entry points** (not transitions, but set initial state and interact): parent-creates-child (proxied
@@ -416,14 +416,14 @@ transitions now give concrete requirements for. Leaning + options, **not a lock*
 Phase E, and the hinge (D1) needs a product+legal ruling.
 
 **Requirements (from §4 + §8):** R1 relationship between **two Persons** (not a property of one);
-R2 many-to-many (multi-guardian; multi-ward); R3 own lifecycle (create/modify/dissolve — T3, T5);
+R2 many-to-many (multi-guardian; multi-charge); R3 own lifecycle (create/modify/dissolve — T3, T5);
 R4 append-only auditable (GDPR 7(3); fixes CC-02/03/07); R5 **dissolvable independently of membership**
 (T3: guardianship ends at 18, membership may persist) ⇒ **guardianship ≠ membership**.
 
 **Clarifying frame — one relationship, *separable* capabilities.** Not "consent authority vs. proxy
 rights — one relation or two," but **one `guardian-of` relationship that grants capabilities
 independently:** *consent authority* (legal — give/withdraw consent), *proxy/operate* (act as the
-ward), *manage* (settings/billing scope), *view*. Why separable: **grp 2 (credentialed tween) splits
+charge), *manage* (settings/billing scope), *view*. Why separable: **grp 2 (credentialed tween) splits
 them** — operates their own profile (no proxy) yet still needs parental *consent* (authority persists).
 They usually co-occur but must be allowed to diverge; bundling into one flag is therefore rejected.
 
@@ -442,11 +442,11 @@ before D1 locks.
 | Option | Fit | Verdict |
 |---|---|---|
 | (a) Attribute on Membership | Fails R1, R5; weak R2/R3 | **Reject** — also close to inert `0106` nudge; guardrail 2 says don't inherit |
-| (b) **Dedicated edge entity** `Guardianship(guardian, ward, capabilities, type, jurisdictionContext, validFrom/To, status)` | Satisfies R1–R5; ReBAC-shaped | **Leading** |
+| (b) **Dedicated edge entity** `Guardianship(guardian, charge, capabilities, type, jurisdictionContext, validFrom/To, status)` | Satisfies R1–R5; ReBAC-shaped | **Leading** |
 | (c) Generic tuple store (Zanzibar) | ReBAC-native, maximal | **Over-engineered for v1** (§7); (b) is forward-compatible to it |
 | (d) Derive from consent records | Fragile — consent is an event log, guardianship a *standing* relation | **Reject** |
 
-**Candidate synthesis (hypothesis):** a first-class **`Guardianship` edge** (b) — `guardian → ward`,
+**Candidate synthesis (hypothesis):** a first-class **`Guardianship` edge** (b) — `guardian → charge`,
 **separable capability grants**, a **`relationship_type`/basis** (parent / legal guardian / custodian —
 governs what consent it can validly give; ties to Task-2 consent + legal), **temporal validity +
 append-only event log** (R3/R4), and a **jurisdiction context** (which regime's standard the consent

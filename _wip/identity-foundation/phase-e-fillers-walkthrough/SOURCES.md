@@ -67,8 +67,8 @@ question, with instrument + clause + regime split. Captures: `CAPTURE-LEDGER.md`
 ### I-L1 — retention periods
 | Table | Citation |
 |---|---|
-| `consent_receipt` (until ward 18 + 3y; adult floor 3y) | GDPR Art 5(2) + Art 7(1) (demonstrate consent) + EDPB Guidelines 05/2020 §7.1; UK Limitation Act 1980 s.28 (minor-disability tolling — clock runs from 18); *phase-2 US:* COPPA §312.10 |
-| `deletion_audit` (6y; or ward 18 + 3y if longer) | GDPR Art 5(2) (accountability) + Art 30 (records of processing); UK Limitation Act 1980 (6y contract) + s.28 |
+| `consent_receipt` (until charge 18 + 3y; adult floor 3y) | GDPR Art 5(2) + Art 7(1) (demonstrate consent) + EDPB Guidelines 05/2020 §7.1; UK Limitation Act 1980 s.28 (minor-disability tolling — clock runs from 18); *phase-2 US:* COPPA §312.10 |
+| `deletion_audit` (6y; or charge 18 + 3y if longer) | GDPR Art 5(2) (accountability) + Art 30 (records of processing); UK Limitation Act 1980 (6y contract) + s.28 |
 | `financial_record` (per-jurisdiction; floor 10y) | **NO** *bokføringsloven* §13 (5y); **DE** §147 AO + EU VAT Directive 2006/112/EC (10y); **UK** Companies Act 2006 s.388 + HMRC (6y); **US** IRC §6501 / IRS (7y) |
 
 ### I-L2 — dormancy + notice

@@ -153,7 +153,7 @@ Spike **folds** are logged here too (a fold reconciles a finished spike's decisi
   **Deferred → §6:** separated-parents one-vs-two Person; guardianship D1 (global vs org-scoped); T6
   de-credential; entry-point / self-registered-minor consent; open IdP cost & lock-in items. The spike is left
   as a **dated discovery artifact** (vocabulary-superseded banner only; `Credential`→Login, `proxied`→managed,
-  `ward`→charge not rewritten inline).
+  `ward`→charge — rewritten inline 2026-06-06 per the charge-terminology sweep; this banner kept for traceability).
 
 - **Mentorship authorization & capacity independence — RATIFIED 2026-06-01 (folds into §4).**
   - **Guardianship and Mentorship are independent capacities; neither auto-implies the other.** A guardian
@@ -273,7 +273,7 @@ grounded, not remembered.
   **whether or not they can log in.** The scoping key for all learning data.
 - **Labels in the wild:** `Person` (doc 2, domain-model-options) · `Profile` (code `profiles`,
   CONTEXT.md:17) · `Learner` (CONTEXT uses it everywhere as the role-in-context) · `Ward`/`member`
-  (doc 2, contextually).
+  (doc 2, contextually). **Note 2026-06-06:** `Ward` archaeology is historical; the active vocabulary is `charge` (sweep complete; this entry retained as the change log).
 - **Standard name:** *User* / *Identity* / *Subject* (RBAC: the principal).
 - **Ratified canonical: `Person`.** Keep **"Learner"** as a *context hat* (a Person
   who is learning), not a synonym for the entity. **Retire bare `Profile`** as the human's name.

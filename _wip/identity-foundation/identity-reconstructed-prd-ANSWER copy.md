@@ -131,13 +131,13 @@ they lied to create), matches reality (no 11-year-old has a standalone account o
 
 ### III.3 — Consent is a dyadic guardianship edge, not a role  *(fills §7, corrects §3/§4)*
 
-Consent is "**guardian G consented for ward W, policy version V, at time T, revocable**." That is a
+Consent is "**guardian G consented for charge C, policy version V, at time T, revocable**." That is a
 **per-pair fact** an org-wide role cannot express (one parent with three children has three distinct,
 independently-revocable consent records). So:
 
 # CHECK - design too detailed for PRD (but correct in principle)
 
-- Promote **`family_links`** (guardian person → ward person) to a first-class **Guardianship edge**.
+- Promote **`family_links`** (guardian person → charge person) to a first-class **Guardianship edge**.
 - Hang the consent record (**`consent_states`**) off that edge, strengthened with:
   `verification_method` (`platform` | `email_plus` | `vpc_vendor`), `jurisdiction`, `policy_version`
   (exists), and a snapshot of any platform age/consent signal.
@@ -235,12 +235,12 @@ link. Three shapes:
 
 # Now also introducing "managed login"
 
-1. **Guardian creates / invites a ward** — the *only* path for 11–12 (also usable for 13+). The
-   guardian initiates from their org; the ward gets a **managed** login by default (own login if 13+
+1. **Guardian creates / invites a charge** — the *only* path for 11–12 (also usable for 13+). The
+   guardian initiates from their org; the charge gets a **managed** login by default (own login if 13+
    and the guardian opts in), a `{student}` membership in the guardian's org, and a **guardianship
    edge** + consent record. This is the III.2 "guardian-created" keystone made concrete.
 2. **Adult invited as co-admin / co-guardian** — joins with `{admin}` (plus a guardianship edge per
-   ward where applicable). The second-parent case.
+   charge where applicable). The second-parent case.
 3. **Mentor invited for a specific mentee** (e.g. a tutor) — joins with `{mentor}` and a **mentor edge
    to that one mentee**, never org-wide visibility. The mentor may be **any age**.
 
@@ -277,19 +277,19 @@ The fused "owner" is dissolved. Capability is derived from relationships.
 
 # Guardian is role, despite earlier rule
 
-# Ward and mentee become two completely different entities
+# Charge and mentee become two completely different entities
 
-# Now you have to be guardian to handle wards and mentor for mentees
+# Now you have to be guardian to handle charges and mentor for mentees
 
-# All in all, much more complex model than before - could be simplified back to "owner/admin, mentor, student" + separate "guardian/ward" relationship
+# All in all, much more complex model than before - could be simplified back to "owner/admin, mentor, student" + separate "guardian/charge" relationship
 
 
-| Capability                                    | **Self / `{student}`** (the member, own data) | **Admin** (org role)           | **Guardian** (edge → ward)         | **Mentor** (edge → mentee) | **Payer** (subscription field) |
+| Capability                                    | **Self / `{student}`** (the member, own data) | **Admin** (org role)           | **Guardian** (edge → charge)       | **Mentor** (edge → mentee) | **Payer** (subscription field) |
 | ----------------------------------------------- | ----------------------------------------------- | -------------------------------- | ------------------------------------- | ----------------------------- | -------------------------------- |
 | Read/write**own** learning data               | ✅ intrinsic                                  | —                             | —                                  | —                          | —                             |
 | Manage org (members, invites, settings)       | —                                            | ✅                             | —                                  | —                          | —                             |
 | Consent / act-for a specific minor            | —                                            | —                             | ✅ (act-for only below consent age) | —                          | —                             |
-| See/help a**specific** person's learning data | —                                            | ❌ (membership ≠ data access) | ✅ (that ward)                      | ✅ (that mentee)            | ❌                             |
+| See/help a**specific** person's learning data | —                                            | ❌ (membership ≠ data access) | ✅ (that charge)                    | ✅ (that mentee)            | ❌                             |
 | Manage subscription / billing                 | —                                            | —                             | —                                  | —                          | ✅                             |
 | **Age gate**                                  | any age (11+)                                 | **age-agnostic**               | adult                               | **any age (11+)**           | **≥ 18**                      |
 
@@ -376,7 +376,7 @@ consumer model moves.
 | **Person** (`profiles`)                                   | Identity + own learning data, permanent. Managed (`clerk_user_id` null) or credentialed. The **scoping key** for all learning data.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **Organization** (`organizations`)                        | **Thin** grouping + billing container. Always exists (org-of-one). The dormant B2B seam — does **no** access/consent work.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **Membership** (`memberships`)                            | Person ↔ org link granting**existence-visibility** only. Carries a **role set `{admin, mentor, student}`** — a Person holds **any combination, at any age**: **`admin`** (age-agnostic org management), **`mentor`** (can mentor here; data-visibility is **edge-scoped** to linked mentees, never org-wide), **`student`** (learns here; capability-light — grants nothing beyond intrinsic self-ownership, but marks *who the org serves*, e.g. learner-seat counting). E.g. older child = `{student, mentor}`, adult tutor = `{mentor}`, plain learner = `{student}`. |
-| **Guardianship edge** (`family_links` + `consent_states`) | Dyadic guardian → ward, carrying the consent record. The legally load-bearing relationship.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Guardianship edge** (`family_links` + `consent_states`) | Dyadic guardian → charge, carrying the consent record. The legally load-bearing relationship.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **Subscription**                                          | On the org. Carries**`payer_person_id`** with invariant **payer age ≥ 18**. Future: `payer_org_id`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 > **Honest note on "keeping Approach A":** this keeps the archived plan's **org *table*** (preserving
@@ -416,22 +416,22 @@ A reviewer signs off when these hold under test (each gets a happy-path **and** 
 9. **Billing + consent follow the home org**; a second org grants edge-scoped visibility only.
 10. A paying adult does **not** gain visibility into a self-consenting teen's data without the teen's
     opt-in grant.
-11. **Two sign-up entry paths exist** — self-serve (13+) and invitation link (guardian-creates-ward,
+11. **Two sign-up entry paths exist** — self-serve (13+) and invitation link (guardian-creates-charge,
     co-admin, or mentor-for-mentee) — and an invitation **attaches to an existing Person / creates the
     right edges, never a duplicate Person**; links are single-use, expiring, and role/edge-scoped.
-12. **[DERIVED] Graduation preserves identity.** Managed → credentialed (a managed ward claims their
+12. **[DERIVED] Graduation preserves identity.** Managed → credentialed (a managed charge claims their
     own login) keeps the **same `person_id`** and all learning history — no new Person, no data loss
     (Journey J4). The break test: history row count and `person_id` are identical before and after.
 13. **[DERIVED] Consent revoke is real, not cosmetic.** A guardian can withdraw consent from the UI and
-    LLM data-processing for that ward **actually stops** — the system never shows a withdrawal promise
+    LLM data-processing for that charge **actually stops** — the system never shows a withdrawal promise
     it cannot keep (Journey J7). This directly retires the live broken-promise bug
     (`drift-map-exec-summary.md` §"the one risk").
 14. **[DERIVED] Export and departure are per-Person.** A Person (or their guardian, below consent age)
     can export their own data and leave an org **without** the Person or their learning history being
     deleted (Journeys J8, J9). Leaving a group detaches edges/membership only.
-15. **[DERIVED] A managed minor is never orphaned.** A managed ward's Person + data **survive** guardian
+15. **[DERIVED] A managed minor is never orphaned.** A managed charge's Person + data **survive** guardian
     or org departure and remain claimable later via graduation — `family_links` deletion must **not**
-    cascade-delete the ward's Person (Journey J8). (Today it cascades — see Part XII crosswalk.)
+    cascade-delete the charge's Person (Journey J8). (Today it cascades — see Part XII crosswalk.)
 16. **[DERIVED] The store payer reconciles to `payer_person_id`.** The IAP/RevenueCat payment identity
     maps to a `payer_person_id` that satisfies the ≥18 invariant, and **payment never originates in a
     minor's UI** (Journey J13).
@@ -460,7 +460,7 @@ A reviewer signs off when these hold under test (each gets a happy-path **and** 
   records a `payer_person_id` (≥18); the *store* charges whoever owns the Apple/Google account (under
   Family Sharing, the family organiser, who may not be the same human). How the IAP identity is bound to
   `payer_person_id`, and what happens when they differ, is undrawn — see Journey J13.
-- **[NEEDS-RATIFICATION]** **Birthday-crossing autonomy upgrade.** When a ward crosses 13 or their
+- **[NEEDS-RATIFICATION]** **Birthday-crossing autonomy upgrade.** When a charge crosses 13 or their
   market's consent age, does the guardianship edge / consent requirement **auto-expire**, or does it
   require an explicit teen-takeover step? Part V states the *ceiling* per band but not the *transition
   event* — see Journey J11.
@@ -516,20 +516,20 @@ consent lands; teen in a 13-market or 16+: straight through, self-consent record
 | Self-declared vs platform conflict | Device says 15, user typed 19                        | Treated as the**younger** (15) band        | Can request platform re-check; stricter always wins                                                    |
 | Birth year mis-entered             | Typo at the gate                                     | —                                         | **Editable** later (today a wrong birthday can never be corrected — a known live dead-end this fixes) |
 
-### J2 — Guardian creates an 11–12 ward (the III.2 keystone)  *(closes the load-bearing new flow)*
+### J2 — Guardian creates an 11–12 charge (the III.2 keystone)  *(closes the load-bearing new flow)*
 
 From the family operator's org: "Add a child" → name + birth year → **VPC consent step** (platform
-parental approval where live, else VPC vendor — III.4) → on success: ward Person + `{student}`
-membership + **guardianship edge** + `consent_states` record created → ward is usable (managed login by
-default; own login if guardian opts in and ward is 13+).
+parental approval where live, else VPC vendor — III.4) → on success: charge Person + `{student}`
+membership + **guardianship edge** + `consent_states` record created → charge is usable (managed login by
+default; own login if guardian opts in and charge is 13+).
 
 
 | State                       | Trigger                                           | User sees                              | Recovery                                                                  |
 | ----------------------------- | --------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
-| VPC vendor / platform down  | Consent provider unavailable                      | "We couldn't verify consent right now" | Ward saved in**consent-pending**; learning gated; retry later — not lost |
-| Guardian abandons mid-setup | App closed before consent completes               | Half-created ward in pending state     | Resume from family screen; pending ward clearly flagged                   |
-| Guardian is <18             | An adult-only role attempted by a minor           | Blocked with reason                    | Cannot create a ward; guardian role is adult-only (Part IV)               |
-| Duplicate child             | Guardian adds a ward who already exists elsewhere | —                                     | Invite/attach path (III.6 Path B) —**never** a duplicate Person          |
+| VPC vendor / platform down  | Consent provider unavailable                      | "We couldn't verify consent right now" | Charge saved in**consent-pending**; learning gated; retry later — not lost |
+| Guardian abandons mid-setup | App closed before consent completes               | Half-created charge in pending state   | Resume from family screen; pending charge clearly flagged                 |
+| Guardian is <18             | An adult-only role attempted by a minor           | Blocked with reason                    | Cannot create a charge; guardian role is adult-only (Part IV)             |
+| Duplicate child             | Guardian adds a charge who already exists elsewhere | —                                     | Invite/attach path (III.6 Path B) —**never** a duplicate Person        |
 
 ### J3 — Consent holding-state → granted → unlock
 
@@ -545,15 +545,15 @@ Auto-polls; unlocks the learning loop the moment a valid consent record lands on
 
 ### J4 — Managed → credentialed graduation  *(the Part II promise, today absent in code)*
 
-A managed ward (or the guardian on their behalf) claims an own login. **Same `person_id`**, all history
+A managed charge (or the guardian on their behalf) claims an own login. **Same `person_id`**, all history
 intact (invariant 12). Above consent age, the graduated teen becomes their own data subject.
 
 
 | State                                   | Trigger                                   | User sees                                                             | Recovery                                                                                               |
 | ----------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Login collides with an existing account | Teen already had their own EduAgent login | —                                                                    | Attach to existing Person (no duplicate);**merge of two pre-existing Persons stays out of scope** (D5) |
-| Graduation across the consent age       | Ward graduates at 13/16                   | Becomes self-consenting; guardian visibility converts to opt-in (J12) | Ties into J11 birthday-crossing                                                                        |
-| Guardian initiates without ward present | Managed 11–12                            | Guardian completes; ward keeps managed login until 13                 | No data moves; identity unchanged                                                                      |
+| Graduation across the consent age       | Charge graduates at 13/16                 | Becomes self-consenting; guardian visibility converts to opt-in (J12) | Ties into J11 birthday-crossing                                                                        |
+| Guardian initiates without charge present | Managed 11–12                            | Guardian completes; charge keeps managed login until 13               | No data moves; identity unchanged                                                                      |
 
 ### J5 — Invitation: mentor-for-mentee claim  *(III.6 Path B.3, made walk-able)*
 
@@ -569,7 +569,7 @@ mentor claims it → mentor joins with `{mentor}` + an edge **to that one mentee
 
 ### J6 — Invitation: co-admin / co-guardian (second parent)  *(III.6 Path B.2)*
 
-Existing admin invites another adult → joins with `{admin}` (+ a guardianship edge per ward where
+Existing admin invites another adult → joins with `{admin}` (+ a guardianship edge per charge where
 applicable). **[NEEDS-RATIFICATION]:** co-guardian consent precedence when two guardians disagree
 (the matrix has a single Guardian column).
 
@@ -581,39 +581,39 @@ applicable). **[NEEDS-RATIFICATION]:** co-guardian consent precedence when two g
 
 ### J7 — Self-service consent revoke + restore  *(retires the live broken promise)*
 
-Guardian withdraws from the child-management screen → LLM processing for that ward **stops** → 7-day
+Guardian withdraws from the child-management screen → LLM processing for that charge **stops** → 7-day
 grace → restore is available throughout. The UI promise and the system behaviour must match (invariant 13).
 
 
 | State                    | Trigger                | User sees                                                | Recovery                                             |
 | -------------------------- | ------------------------ | ---------------------------------------------------------- | ------------------------------------------------------ |
-| Withdraw                 | Guardian taps withdraw | Confirm → ward enters withdrawn/grace; learning blocked | **Restore** within grace                             |
-| Grace expires            | 7 days, no restore     | Ward data scheduled for deletion                         | Per data-retention policy; export offered first (J9) |
-| Withdrawn ward opens app | —                     | "Access paused — ask your grown-up," not a crash        | Switch profile / sign out; restore by guardian       |
+| Withdraw                 | Guardian taps withdraw | Confirm → charge enters withdrawn/grace; learning blocked | **Restore** within grace                           |
+| Grace expires            | 7 days, no restore     | Charge data scheduled for deletion                       | Per data-retention policy; export offered first (J9) |
+| Withdrawn charge opens app | —                    | "Access paused — ask your grown-up," not a crash        | Switch profile / sign out; restore by guardian     |
 
 ### J8 — Leave org / remove member, data preserved  *(+ the managed-minor paradox)*
 
 A membership is revoked (self or by admin); edges detach; the **Person and learning history survive**
-(invariants 14–15). **The hard case [NEEDS-RATIFICATION]:** a *managed* 11–12 ward has **no login** to
+(invariants 14–15). **The hard case [NEEDS-RATIFICATION]:** a *managed* 11–12 charge has **no login** to
 retain their own data — so guardian/org departure must not orphan or delete them. Today `family_links`
-ON DELETE CASCADE would delete the ward; the clean-cut model must break that cascade.
+ON DELETE CASCADE would delete the charge; the clean-cut model must break that cascade.
 
 
 | State                           | Trigger           | User sees                             | Recovery                                                              |
 | --------------------------------- | ------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
 | Adult/teen leaves org           | Self-initiated    | Membership gone; own data retained    | Re-join later via invite; data intact                                 |
-| Guardian removes a managed ward | Admin action      | Confirm with consequence stated       | Ward Person retained, claimable via graduation (J4) —**not** deleted |
-| Guardian deletes own account    | Last admin leaves | **[NEEDS-RATIFICATION]** ward custody | Ward must be re-homable, never silently destroyed                     |
+| Guardian removes a managed charge | Admin action      | Confirm with consequence stated       | Charge Person retained, claimable via graduation (J4) —**not** deleted |
+| Guardian deletes own account    | Last admin leaves | **[NEEDS-RATIFICATION]** charge custody | Charge must be re-homable, never silently destroyed                   |
 
 ### J9 — Per-person data export
 
 A Person (or guardian below consent age) exports **their own** data, not the whole org's (closes
-archived consent-3). Available to every band, including a managed ward via their guardian.
+archived consent-3). Available to every band, including a managed charge via their guardian.
 
 
 | State                           | Trigger                  | User sees                      | Recovery                                       |
 | --------------------------------- | -------------------------- | -------------------------------- | ------------------------------------------------ |
-| Non-owner child requests export | Today blocked (live gap) | Export available for own data  | Guardian can export on a managed ward's behalf |
+| Non-owner child requests export | Today blocked (live gap) | Export available for own data  | Guardian can export on a managed charge's behalf |
 | Export during withdrawal grace  | J7 in progress           | Export offered before deletion | Ensures GDPR data-portability before erasure   |
 
 ### J10 — Admin / ownership transfer
@@ -629,15 +629,15 @@ to another member and (optionally) drop your own — no data moves, the org is u
 
 ### J11 — Birthday-crossing autonomy upgrade  *(role/edge lifecycle — [NEEDS-RATIFICATION])*
 
-A ward crosses 13 (or their market's consent age, or 16/18). Part V defines the *ceiling* per band; the
+A charge crosses 13 (or their market's consent age, or 16/18). Part V defines the *ceiling* per band; the
 *transition* is undrawn. Open call: does the guardianship edge/consent **auto-expire**, or require an
 explicit teen-takeover? Recommended default below; PM to ratify.
 
 
 | State                             | Trigger  | User sees                                                                                 | Recovery                                               |
 | ----------------------------------- | ---------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Ward turns own-market consent age | Birthday | **Recommend:** prompt teen to take over self-consent; guardian visibility → opt-in (J12) | Until taken over, status quo holds (no sudden lockout) |
-| Ward turns 18                     | Birthday | Becomes Payer-eligible; guardian overlay drops                                            | Own org/payer if they leave the family                 |
+| Charge turns own-market consent age | Birthday | **Recommend:** prompt teen to take over self-consent; guardian visibility → opt-in (J12) | Until taken over, status quo holds (no sudden lockout) |
+| Charge turns 18                     | Birthday | Becomes Payer-eligible; guardian overlay drops                                            | Own org/payer if they leave the family                 |
 
 ### J12 — Teen → payer visibility opt-in  *(Part V's promise made walk-able)*
 
@@ -661,7 +661,7 @@ minor's paywall offers only "ask a grown-up to subscribe" (today's `ChildPaywall
 | State                           | Trigger                        | User sees                                                                   | Recovery                              |
 | --------------------------------- | -------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------- |
 | Store payer ≠`payer_person_id` | Family Sharing organiser pays  | **[NEEDS-RATIFICATION]** which identity governs quota/consent               | Define mapping before build           |
-| Minor hits paywall              | Quota/expiry on a managed ward | "Ask a grown-up to subscribe" (no purchase UI)                              | Notify-parent (24h cooldown)          |
+| Minor hits paywall              | Quota/expiry on a managed charge | "Ask a grown-up to subscribe" (no purchase UI)                              | Notify-parent (24h cooldown)          |
 | Silent payment failure          | Card declined, webhook lag     | **Must escalate** (metric/Inngest, not console.warn) per repo billing rules | Owner notified; not a silent dead-end |
 
 ### J14 — Adult Payer attaches to an independent teen's paid plan (13–17)  *(resolves the no-eligible-payer gap)*
@@ -702,7 +702,7 @@ be re-pointed at it.**
 | **`{student}` / Self (own learning surface)** | `learner` tab shape                                       | `resolveTabShape`, `STUDY_TABS` (`navigation-contract.ts`)                              | A solo adult, an independent teen, and a child-as-learner all render the`learner` shape.                                                                                                                                       |
 | **`{admin}` + guardian×N (family operator)** | `guardian` tab shape + `mode='family'`                    | `resolveTabShape`, `FAMILY_TABS`/`LEGACY_GUARDIAN_TABS`, `ParentHomeScreen`             | The old`guardian` shape ≈ "has `{admin}` and ≥1 guardianship edge." V0 5-tab must not regress (hard constraint).                                                                                                             |
 | **The dissolved `owner`**                     | `isOwner` boolean (one flag)                              | `profiles.isOwner`, `assertNotProxyMode`, ~13 `isOwner` gate sites (audience-matrix F5) | **Splits three ways:** org-management → `{admin}`; billing rows → **Payer**; act-for-a-child → **guardianship edge**. Each current `isOwner` gate must be re-pointed at the *correct one* of the three, not blanket-mapped. |
-| **Guardian "act-for" a managed ward**         | proxy mode /`isParentProxy` / `X-Proxy-Mode`              | `useParentProxy`, `proxy-guard.ts` (currently unreachable from UI)                      | Proxy mode is the natural mechanism for guardian act-for below consent age — decide whether clean-cut wires it live or retires it.                                                                                            |
+| **Guardian "act-for" a managed charge**       | proxy mode /`isParentProxy` / `X-Proxy-Mode`              | `useParentProxy`, `proxy-guard.ts` (currently unreachable from UI)                      | Proxy mode is the natural mechanism for guardian act-for below consent age — decide whether clean-cut wires it live or retires it.                                                                                            |
 | **Consent gate on the edge**                  | `consentStatus` + `consentMiddleware`                     | `middleware/consent.ts`, `consent_states`                                               | Keep the central-middleware pattern; move enforcement key from profile to the**guardianship edge** (III.3).                                                                                                                    |
 | **`mentor` (edge-scoped)**                    | `membershipRoleEnum` `'mentor'` (backfilled, **unwired**) | `memberships` table, migration 0106                                                     | Enum exists but**no route reads it** and `memberships`/`organizations` aren't exported from `schema/index.ts`. Clean cut wires it for the first time.                                                                          |
 | **Per-jurisdiction consent age**              | flat`age <= 16`                                           | `services/consent.ts`                                                                   | Replace the single threshold with`resolveConsentRequirement` + per-market table (III.1).                                                                                                                                       |
