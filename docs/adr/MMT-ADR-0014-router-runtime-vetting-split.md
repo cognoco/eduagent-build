@@ -1,6 +1,6 @@
 # MMT-ADR-0014 — Router runtime is 3-param; vetting is 4-axis offline; hard split between them
 
-**Status:** Proposed (pending architect ratification) · 2026-06-06 · **Scope:** Identity Foundation — provider-and-model-agnostic router + vetting pipeline + supersession of prior routing canon · **Deciders:** Architect (jjoerg) + Claude · **Builds on:** MMT-ADR-0013 (policy-engine spine), MMT-ADR-0002 (Payer capacity is store-delegated) · **Inputs:** `_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md` §4 + §5 (the 4 router decisions + the vet/route split) + the gemini-minors ZDR research (2026-06-05) + `_wip/identity-foundation/policy-engine-spine-walkthrough/` (the post-walkthrough R-4 ruling) · **Resolves:** the router's *shape* and the prior routing canon's supersession
+**Status:** Accepted · 2026-06-07 (shape ratified by architect; drafted 2026-06-06; illustrative launch set + vetted rows are DB-mastered in `allowed_models`; seed ratified via walkthrough R-4/R-5) · **Scope:** Identity Foundation — provider-and-model-agnostic router + vetting pipeline + supersession of prior routing canon · **Deciders:** Architect (jjoerg) + Claude · **Builds on:** MMT-ADR-0013 (policy-engine spine), MMT-ADR-0002 (Payer capacity is store-delegated) · **Inputs:** `_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md` §4 + §5 (the 4 router decisions + the vet/route split) + the gemini-minors ZDR research (2026-06-05) + `_wip/identity-foundation/policy-engine-spine-walkthrough/` (the post-walkthrough R-4 ruling) · **Resolves:** the router's *shape* and the prior routing canon's supersession
 
 > **Placement.** L2 ADR; lockstep canon partners are `architecture.md` (the routing section, to be authored in Phase H) + the incubating `data-model.md` (the `allowed_models` table per MMT-ADR-0013's amendment scope). The vetting-research workstream (WP-4) is the operational consumer; this ADR is the *shape* + the supersession of "Family standard = Gemini-only" and the re-spec of GATE-1.
 
@@ -113,6 +113,8 @@ The launch set is *illustrative*, not ratified in any memo. The four providers a
 | **DeepSeek via papered service** | Cost-effective non-US route; *only* the model weights — vetting is for the service layer | Open — vetting PoC pending |
 
 **The ratified launch set is the vetting-research workstream's output** (WP-4). The memo commits the *shape* (US-primary + EU-primary + cost-effective alt) and the *process*; the workstream commits the *set*. This avoids the "memo commits a launch set that the vetting workstream then has to walk back" anti-pattern.
+
+> **Source of truth.** The live vetted set is **DB-mastered** in `allowed_models` (the vetting pipeline owns it; the C2-B/WP-4 workstream carries the per-row decision trail). The table above is a **point-in-time snapshot, illustrative only** — do not read it as current truth. This ADR records the routing *shape*; the data lives in the DB. Same principle as MMT-ADR-0013 §2.
 
 ### 7. Workspace-for-Education: out of scope as a route, current read (4-E reframed)
 

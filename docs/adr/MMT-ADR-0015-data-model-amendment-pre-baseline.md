@@ -1,8 +1,10 @@
 # MMT-ADR-0015 — Pre-baseline data-model amendments: Payer sub field, Sub-admin-as-profile-mgmt, charge terminology + G-3/G-4/G-6, AgeBracket 'child' value, knowledge assertions, allowed_models
 
-**Status:** Proposed (pending architect ratification) · 2026-06-06 · **Scope:** Identity Foundation — pre-baseline data-model amendments to MMT-ADR-0011 (the 2026-06-04 baseline) · **Deciders:** Architect (jjoerg) + Claude · **Builds on:** MMT-ADR-0007 (Guardianship as edge), MMT-ADR-0008 (Guardianship global edge), MMT-ADR-0011 (data-model realization, 2026-06-04 baseline), MMT-ADR-0012 (one-time baseline reset) · **Inputs:** `_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md` §1 (the 6-persona set, Payer ruling, G/P/M split, G-3 3a, G-4 4b, G-6 6b, charge terminology) + MMT-ADR-0013 (policy-engine spine, the policy tables + knowledge assertions) + MMT-ADR-0014 (router, the allowed_models table) · **Resolves:** the pre-baseline amendment scope that the MMT-ADR-0012 window keeps open
+**Status:** Accepted · 2026-06-07 (shape ratified by architect, incl. the regime `ENUM`→lookup-table correction; drafted 2026-06-06; policy-matrix content is DB-mastered) · **Scope:** Identity Foundation — pre-baseline data-model amendments to MMT-ADR-0011 (the 2026-06-04 baseline) · **Deciders:** Architect (jjoerg) + Claude · **Builds on:** MMT-ADR-0007 (Guardianship as edge), MMT-ADR-0008 (Guardianship global edge), MMT-ADR-0011 (data-model realization, 2026-06-04 baseline), MMT-ADR-0012 (one-time baseline reset) · **Inputs:** `_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md` §1 (the 6-persona set, Payer ruling, G/P/M split, G-3 3a, G-4 4b, G-6 6b, charge terminology) + MMT-ADR-0013 (policy-engine spine, the policy tables + knowledge assertions) + MMT-ADR-0014 (router, the allowed_models table) · **Resolves:** the pre-baseline amendment scope that the MMT-ADR-0012 window keeps open
 
 > **Placement.** L2 ADR; amends MMT-ADR-0011 with the pre-baseline additions. Lockstep canon partner is `_wip/identity-foundation/data-model.md` (the Phase-E deliverable, to be updated lockstep when this ADR is ratified). This ADR is the *amendment scope*; the migration SQL is in the data-model.md lockstep.
+>
+> **Shape vs data.** This ADR fixes table/column/enum *shape*. The policy-matrix *content* — regime rows, per-cell `policy_rules`, thresholds, country mappings, vetted `allowed_models` rows — is **DB-mastered data** populated by the C2-B/WP-4 workstream (per-datapoint decision trail), never frozen in canon. Same principle as MMT-ADR-0013 §2 / MMT-ADR-0014 §6.
 
 ## Context
 
@@ -12,7 +14,7 @@ MMT-ADR-0012 (one-time baseline reset, ratified 2026-06-04) describes a fresh cr
 - **§1.5 Profile-mgmt ruling** — bundled with Sub admin (C). Sub admin = profile mgmt + billing.
 - **§1.6 Guardian rulings** — G-3 3a (exactly 1 per charge), G-4 4b (explicit qualification ENUM), G-6 6b (explicit takeover, branching on `charges.has_own_account`).
 - **§1.2 6-persona set** — Non-consenting minor (managed profile) is its own persona; the data model needs to express it.
-- **§3.2 + §3.3 Engine decisions** — the policy engine needs `policy_rules` (with `kind` column), `policy_axes`, the two-axis knowledge model (B3: profile + history).
+- **§3.2 + §3.3 Engine decisions** — the policy engine needs `policy_rules` (with `kind` column), a `regimes` lookup table + `policy_cells`, the two-axis knowledge model (B3: profile + history).
 - **§4.2 + §5 Router decisions** — the `allowed_models` table (vetting pipeline output).
 - **§3.3 + original under-13 synthesis Gap G** — `AgeBracket` schema needs a 'child' value.
 
@@ -165,21 +167,29 @@ CREATE INDEX idx_policy_rules_cell_kind ON policy_rules (cell_id, kind);
 
 **Rationale:** the two-primitive model (MMT-ADR-0013 §1). The `kind` column is the type-safety boundary; the eval-logic split (prohibition-floor = unconditional; consent-edge = conditional on consent-state) is enforced at the engine.
 
-### Amendment 8: `policy_cells` table + `policy_axes` (MMT-ADR-0013 §2 — regime taxonomy)
+### Amendment 8: `regimes` lookup table + `policy_cells` (MMT-ADR-0013 §2 — regime taxonomy)
 
 **File:** `data-model.md` (the spec); physical schema per Drizzle conventions.
 
-**New types + table:**
+**Source-of-truth note (corrected 2026-06-07 per the DB-is-master principle; architect ratifies):** the **regime is a data lookup table, not a Postgres `ENUM` type**. An `ENUM` would make adding/retiring a regime an `ALTER TYPE` migration — contradicting MMT-ADR-0013 §2's "regime change = data-update, not schema-change." Regimes, their thresholds, and country mappings are **DB-mastered rows** populated by the C2-B/WP-4 workstream. The determination-method sets *stay* `ENUM`s (they change by our deliberate rollout decision, not external regulatory cadence).
+
+**New types + tables:**
 
 ```sql
-CREATE TYPE regime AS ENUM (
-  'US_COPPA', 'EU_GDPR_13', 'EU_GDPR_14', 'EU_GDPR_15', 'EU_GDPR_16', 'UK_AADC', 'ROW'
+-- Regime = DATA (rows), not a Postgres ENUM type. Add/retire a regime = INSERT/UPDATE, not a migration.
+CREATE TABLE regimes (
+  id          BIGSERIAL PRIMARY KEY,
+  code        TEXT NOT NULL UNIQUE,   -- e.g. 'US_COPPA', 'EU_GDPR_16', 'UK_AADC', 'ROW'
+  description TEXT,                    -- the live threshold / characteristic; DB-mastered, not frozen in canon
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- v1 seed rows (snapshot; walkthrough R-2 ratifies the seed, DB is master thereafter):
+--   US_COPPA · EU_GDPR_16 · EU_GDPR_15 · EU_GDPR_14 · EU_GDPR_13 · UK_AADC · ROW
 
+-- Determination methods stay ENUMs (our-decision cadence, small + stable):
 CREATE TYPE age_method AS ENUM (
   'self_report', 'parent_reported', 'verified_credential', 'age_estimation_signal'
 );
-
 CREATE TYPE residence_method AS ENUM (
   'self_report', 'billing_address', 'geo_ip', 'verified_credential'
 );
@@ -188,14 +198,14 @@ CREATE TABLE policy_cells (
   id BIGSERIAL PRIMARY KEY,
   age_band_min SMALLINT NOT NULL,  -- 0 for "any sub-13", 13 for "13–15", etc.
   age_band_max SMALLINT NOT NULL,
-  regime regime NOT NULL,
+  regime_id BIGINT NOT NULL REFERENCES regimes(id),  -- FK to the lookup table, not an ENUM column
   knowledge_axis ENUM('age', 'residence') NOT NULL,
   knowledge_value JSONB NOT NULL,  -- {method, confidence}
-  UNIQUE (age_band_min, age_band_max, regime, knowledge_axis, knowledge_value)
+  UNIQUE (age_band_min, age_band_max, regime_id, knowledge_axis, knowledge_value)
 );
 ```
 
-**Rationale:** the regime taxonomy (MMT-ADR-0013 §2). The regime enum is locked inline (per the A-vs-B memo §3.2 candidate + the walkthrough R-2 ratification). The age-band + regime + knowledge-cell is the *addressing* scheme; `policy_rules` joins on `cell_id` to apply.
+**Rationale:** the regime taxonomy (MMT-ADR-0013 §2). The regime *seed* is the A-vs-B memo §3.2 candidate ratified by walkthrough R-2; the live list is DB-mastered data thereafter. The age-band + regime + knowledge-cell is the *addressing* scheme; `policy_rules` joins on `cell_id` to apply.
 
 **v1 determination-method set:** `age_method` is `self_report` or `parent_reported`; `residence_method` is `self_report` (or `geo_ip` or `billing_address`). `verified_credential` and `age_estimation_signal` are v1.1 or later.
 

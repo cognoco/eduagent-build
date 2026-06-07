@@ -1,6 +1,6 @@
 # MMT-ADR-0013 — Policy-engine spine: two-primitive model, regime taxonomy, knowledge axes, router key
 
-**Status:** Proposed (pending architect ratification) · 2026-06-06 · **Scope:** Identity Foundation — policy engine + data-model amendments + router wiring (pre-launch clean cut) · **Deciders:** Architect (jjoerg) + Claude · **Builds on:** MMT-ADR-0000 (decisions layer), MMT-ADR-0007 (Guardianship as edge), MMT-ADR-0008 (Guardianship global edge), MMT-ADR-0011 (data-model realization), MMT-ADR-0012 (one-time baseline reset) · **Inputs:** `_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md` (the 25 decisions ratified in the 2026-06-06 grilling session) + `_wip/identity-foundation/policy-engine-spine-walkthrough/` (the live walkthrough's R-0 through R-5 rulings, post-walkthrough) · **Resolves:** the policy-engine's *shape* (per the A-vs-B memo §3 + the walkthrough prep)
+**Status:** Accepted · 2026-06-07 (shape ratified by architect; drafted 2026-06-06; inline enum *seeds* — regime list, determination-method set, illustrative launch set — await walkthrough R-0..R-5, then DB-mastered) · **Scope:** Identity Foundation — policy engine + data-model amendments + router wiring (pre-launch clean cut) · **Deciders:** Architect (jjoerg) + Claude · **Builds on:** MMT-ADR-0000 (decisions layer), MMT-ADR-0007 (Guardianship as edge), MMT-ADR-0008 (Guardianship global edge), MMT-ADR-0011 (data-model realization), MMT-ADR-0012 (one-time baseline reset) · **Inputs:** `_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md` (the 25 decisions ratified in the 2026-06-06 grilling session) + `_wip/identity-foundation/policy-engine-spine-walkthrough/` (the live walkthrough's R-0 through R-5 rulings, post-walkthrough) · **Resolves:** the policy-engine's *shape* (per the A-vs-B memo §3 + the walkthrough prep)
 
 > **Placement.** L2 ADR; lockstep canon partners are the incubating `data-model.md` (the policy tables + the kind column + the knowledge-assertions table) + `architecture.md` (the policy-engine spine section, to be authored in Phase H). The post-walkthrough R-0 through R-5 rulings feed the implementation; this ADR is the *shape* between the decisions and the code.
 
@@ -30,21 +30,17 @@ The engine's *output* for any `(age × residence × knowledge)` cell is the unio
 
 **Eval-logic split:** prohibition-floor = unconditional; consent-edge = conditional on the consent-state input. The engine has *two* evaluation paths; the `kind` column makes this explicit.
 
-### 2. Regime taxonomy (locked inline enum, post-walkthrough R-2)
+### 2. Regime taxonomy (regime-keyed engine; the live taxonomy is DB-mastered)
 
-The engine keys on a small first-class regime enum, not on a 200-country list. **Locked enum (proposed; walkthrough R-2 ratifies the final list):**
+**The structural decision** (what this ADR ratifies): the engine keys on a small first-class **regime** concept, not on a 200-country list. A regime-keyed engine makes a legal/regulatory change a *data-update*, not a *schema-change*. The PoC's 10 jurisdictions map into regimes by *tag*, not by *enumeration*.
 
-| Regime | Threshold (or characteristic) | Notes |
-|---|---|---|
-| `US_COPPA` | Under-13 VPC required; actual-knowledge doctrine | The hardest US regime |
-| `EU_GDPR_16` | Digital-consent age 16 (DE, NL, IE, SK, most MSes) | Most restrictive EU |
-| `EU_GDPR_15` | Digital-consent age 15 (FR) | Mid-EU |
-| `EU_GDPR_14` | Digital-consent age 14 (ES, CY, BG; PT widely reported as 13, counsel to verify) | Mid-EU |
-| `EU_GDPR_13` | Digital-consent age 13 (SE, DK, FI; plus NO via EEA, UK via retained UK GDPR) | Least restrictive EU |
-| `UK_AADC` | UK Children's Code + UK GDPR | UK has its own DPA + design-code overlay |
-| `ROW` | Rest of world (with optional sub-regime metadata for known strict jurisdictions) | Default |
+> **Source of truth (the master across all systems is the DB).** The live regime list, each regime's age threshold, its member-country mapping, and every per-cell policy value are **DB-mastered** (`policy_cells` / `policy_rules` + a `regimes` lookup table — see the amendment scope) and are populated + maintained by the **C2-B compliance-population workstream (WP-4)**, which carries the per-datapoint decision trail (full traceability). **This ADR records the *shape* and the *why* — not the live values.** Do not read the snapshot below as current truth; read the DB. Outside the DB we keep only the decision trail that led to each datapoint, never a second copy of the data.
 
-A regime-keyed engine is a *data-update* problem, not a *schema-change* problem. The PoC's 10 jurisdictions map into the regime enum by *tag*, not by *enumeration*.
+**v1 starting taxonomy — point-in-time snapshot (seeded 2026-06; walkthrough R-2 ratifies the *seed*; the DB is master from then on):**
+
+`US_COPPA` · `EU_GDPR_16` · `EU_GDPR_15` · `EU_GDPR_14` · `EU_GDPR_13` · `UK_AADC` · `ROW`
+
+The thresholds, member-country mappings, and "counsel-to-verify" qualifiers that earlier drafts embedded here are **deliberately not reproduced** — they are volatile data, live in the DB (with the C2-B trail), and would rot this decision record if frozen in it. The structural commitment is: *these regime keys exist as the engine's first-class axis, and adding/retiring one is a data operation, not a migration.*
 
 ### 3. Two-axis knowledge model (B3: profile + history)
 
@@ -91,7 +87,7 @@ This ADR requires the following amendments to the MMT-ADR-0011 data-model baseli
 | Amendment | Shape | Why |
 |---|---|---|
 | `policy_rules` table with `kind` column | `kind` ENUM('prohibition_floor', 'consent_edge') | Two-primitive model. |
-| `policy_axes` table (the regime taxonomy + determination-method enums) | ENUMs for the locked regime list; ENUMs for the v1 determination-method set | Regime-keyed engine; data, not code. |
+| `regimes` lookup table + `policy_cells` / `policy_rules` | regime definitions stored as **data rows** (not a Postgres `ENUM` type), so adding/retiring a regime is an `INSERT`/`UPDATE`, not a migration; the regime *values* + thresholds + country mappings are DB-mastered data | Regime-keyed engine; **data, not code** — keeps a regulatory change a data-update (consistent with §2 + §3.5). The determination-method set may stay a small `ENUM` (changes by our deliberate rollout decision, not external cadence). |
 | `knowledge_assertions` table | person_id, axis ('age'|'residence'), method ENUM, confidence DECIMAL, timestamp, actor_id | The history. B3 profile + history. |
 | Profile additions: `age_knowing` jsonb, `residence_knowing` jsonb | `{method, confidence, last_updated}` per axis | The current state. Engine reads this per LLM call. |
 | `allowed_models` table | (model, provider_via_service, service, region, criteria_metadata jsonb) UNIQUE | Vetting pipeline output. The table schema is the *only* contract between vetting and routing. |
