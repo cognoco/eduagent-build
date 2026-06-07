@@ -1,4 +1,4 @@
-# MMT-ADR-0013 — LLM provider/model selection and the routing rule table (Gemini exit)
+# MMT-ADR-0016 — LLM provider/model selection and the routing rule table (Gemini exit)
 
 **Status:** Accepted (amended 2026-06-06 — see Amendment 1) · **Date:** 2026-06-06 · **Scope:** All production LLM calls · **Deciders:** PM (owner) + Claude · **Supersedes:** the `gemini_only` Family-tier routing policy in `router.ts`
 
@@ -77,7 +77,7 @@ This also **fills the Family-tier hole the Gemini exit left** (paid Family minor
 **Gates before these rows serve minor traffic (all owed, none block the model-neutral plumbing phases 1–5):**
 1. **Cerebras compliance triplet** — ZDR + no-training + executed DPA, with ZDR written into the DPA text (not just marketing); confirm availability at our contract tier; SCCs + TIA (Cerebras US-only, not DPF-certified).
 2. **OpenAI ZDR-for-minors** for the GPT-5 mini fallback (already owed).
-3. **Build:** direct Cerebras adapter (with `{"type":"refusal"}`→safe-envelope handler + unit test) + compliance-aware fallback in `getFallbackConfig` that drops Gemini/Vertex (both under-18-banned) and fails closed to `CircuitOpenError`; direct Mistral adapter for the EU free tier. (Thread B build spec.)
+3. **Build:** direct Cerebras adapter (with `{"type":"refusal"}`→safe-envelope handler + unit test) + compliance-aware fallback in `getFallbackConfig` that drops Gemini/Vertex (both under-18-banned) and fails closed to `CircuitOpenError`; direct Mistral adapter for the EU free tier. (Thread B build spec: `docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md`.)
 4. **Teaching-quality A/B** — gpt-oss vs the GPT-5 mini incumbent at paid rungs 1–3, to confirm no pedagogy regression from the primary swap.
 
 **Scope rejected:** "gpt-oss everywhere incl. free tier (drop Mistral)" — rejected because (a) it puts US transfers on the free-tier EU-minor path, losing Mistral's EU-residency advantage, and (b) it does not actually deliver single-vendor simplicity (Cerebras can't host the closed fallback/vision models and single-host needs an off-Cerebras fallback regardless).
