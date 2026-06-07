@@ -13,6 +13,7 @@ import type {
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { assertParentAccess } from './family-access';
+import { createLogger } from './logger';
 
 export const INACTIVITY_THRESHOLDS = {
   NO_RECENT_ACTIVITY_DAYS: 2,
@@ -20,6 +21,8 @@ export const INACTIVITY_THRESHOLDS = {
 } as const;
 
 const MAX_PROGRESS_SUMMARY_CHARS = 500;
+
+const logger = createLogger();
 
 type ActivityState = ProgressSummary['activityState'];
 
@@ -102,6 +105,59 @@ export function deterministicProgressSummaryFallback(
   return `${name}'s latest learning activity is recorded. A richer summary will appear after the next refresh.`;
 }
 
+// ---------------------------------------------------------------------------
+// [Art 5(1)(d)] Accuracy guard for the LLM-generated progress summary.
+//
+// The summary is parent-facing personal data about a minor. The prompt feeds
+// ONLY structured inventory numbers and forbids inference, but nothing verifies
+// the model obeyed. A fabricated count ("mastered 12 topics" when it is 3) is
+// inaccurate personal data carrying an Art 16 rectification duty. This is the
+// matching OUTPUT guard: every integer in the summary must be grounded in the
+// inventory it was built from. On violation `generateProgressSummary` fails
+// CLOSED to `deterministicProgressSummaryFallback` — never a fabricated number.
+//
+// Scope: catches fabricated NUMBERS (the concrete, verifiable inaccuracy).
+// Qualitative drift ("struggled with fractions") is constrained by the prompt
+// only; verifying it would need an LLM judge and is out of scope for this guard.
+// ---------------------------------------------------------------------------
+
+export function collectGroundedNumbers(
+  inventory: KnowledgeInventory,
+): Set<number> {
+  const grounded = new Set<number>();
+  const add = (value: unknown): void => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      grounded.add(Math.trunc(value));
+    }
+  };
+  const g = inventory.global;
+  add(g.totalSessions);
+  add(g.totalActiveMinutes);
+  add(g.topicsMastered);
+  add(g.vocabularyTotal);
+  add(g.currentStreak);
+  // "across N subjects" is grounded in the inventory even though it is the
+  // length of the provided list rather than a passed numeric field.
+  add(inventory.subjects.length);
+  for (const subject of inventory.subjects) {
+    add(subject.sessionsCount);
+    add(subject.activeMinutes);
+    add(subject.topics.mastered);
+    add(subject.topics.total);
+  }
+  return grounded;
+}
+
+export function summaryNumbersGrounded(
+  summary: string,
+  inventory: KnowledgeInventory,
+): boolean {
+  const found = summary.match(/\d+/g);
+  if (!found) return true;
+  const grounded = collectGroundedNumbers(inventory);
+  return found.every((token) => grounded.has(Number.parseInt(token, 10)));
+}
+
 export function buildProgressSummaryPrompt(input: {
   childName: string;
   inventory: KnowledgeInventory;
@@ -180,7 +236,24 @@ export async function generateProgressSummary(input: {
     sessionId: input.latestSessionId,
     conversationLanguage: input.conversationLanguage,
   });
-  return trimSummary(result.response);
+  const summary = trimSummary(result.response);
+
+  // [Art 5(1)(d)] Reject any summary asserting a number the inventory does not
+  // contain — inaccurate personal data about a minor — and fall back to the
+  // deterministic summary. Logged (not silent) so a prompt regression that
+  // starts fabricating numbers is queryable.
+  if (!summaryNumbersGrounded(summary, input.inventory)) {
+    logger.warn('progress_summary.ungrounded_number_rejected', {
+      flow: 'progress-summary-generation',
+      sessionId: input.latestSessionId,
+    });
+    return deterministicProgressSummaryFallback(
+      input.childName,
+      input.latestSessionAt,
+    );
+  }
+
+  return summary;
 }
 
 export async function getProgressSummary(
