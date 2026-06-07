@@ -187,6 +187,60 @@ function parseLlmSummaryResponse(
   }
 }
 
+/**
+ * [Art 5(1)(d)] Build the set of numbers the model is allowed to state in a
+ * session summary: every digit-run from the transcript plus the curriculum
+ * subject/topic titles it was handed. Numbers are normalised to integers so a
+ * narrative "12" matches a transcript "12" regardless of surrounding text.
+ */
+export function collectGroundedSummaryNumbers(
+  sources: ReadonlyArray<string | null>,
+): Set<number> {
+  const grounded = new Set<number>();
+  for (const source of sources) {
+    if (!source) {
+      continue;
+    }
+    for (const token of source.match(/\d+/g) ?? []) {
+      const value = Number.parseInt(token, 10);
+      if (Number.isFinite(value)) {
+        grounded.add(value);
+      }
+    }
+  }
+  return grounded;
+}
+
+/**
+ * [Art 5(1)(d)] Returns the distinct numbers the model put into the
+ * learner/parent-facing prose (`narrative` + `reEntryRecommendation`) that are
+ * NOT present in any grounding source — i.e. likely hallucinated figures
+ * (scores, counts, durations). Written-out numbers ("three") are intentionally
+ * not checked: conservative on false positives, and invented quantities are
+ * almost always digits. An empty result means the summary is numerically
+ * grounded. Mirrors the progress-summary number-grounding guard.
+ */
+export function findUngroundedSummaryNumbers(
+  summary: Pick<LlmSummary, 'narrative' | 'reEntryRecommendation'>,
+  groundingSources: ReadonlyArray<string | null>,
+): number[] {
+  const tokens = `${summary.narrative}\n${summary.reEntryRecommendation}`.match(
+    /\d+/g,
+  );
+  if (!tokens) {
+    return [];
+  }
+  const grounded = collectGroundedSummaryNumbers(groundingSources);
+  const ungrounded: number[] = [];
+  for (const token of tokens) {
+    const value = Number.parseInt(token, 10);
+    if (!grounded.has(value) && !ungrounded.includes(value)) {
+      ungrounded.push(value);
+    }
+  }
+  return ungrounded;
+}
+
 async function loadSummaryPromptInput(
   db: Database,
   input: SessionLlmSummaryInput,
@@ -267,7 +321,42 @@ export async function generateLlmSummary(
     });
     const parsed = parseLlmSummaryResponse(result.response);
     if (parsed.ok) {
-      return parsed.summary;
+      // [Art 5(1)(d)] Numeric-accuracy guard. A retention summary is
+      // learner/parent-facing personal data; an invented figure (score,
+      // count, duration) is an accuracy violation. Every digit the model
+      // emits in prose must trace to the transcript or the curriculum
+      // subject/topic it was given. Treat an ungrounded number like any other
+      // validation failure: one repair attempt, then throw into the existing
+      // retry/reconcile recovery rather than store a wrong number.
+      const ungrounded = findUngroundedSummaryNumbers(parsed.summary, [
+        promptInput.transcriptText,
+        promptInput.subjectName,
+        promptInput.topicTitle,
+      ]);
+      if (ungrounded.length === 0) {
+        return parsed.summary;
+      }
+
+      lastReason = `ungrounded numeric claim(s): ${ungrounded.join(', ')}`;
+      lastZodError = null;
+      logger.warn('session-llm-summary.ungrounded_number_rejected', {
+        profileId: input.profileId,
+        sessionId: input.sessionId,
+        count: ungrounded.length,
+      });
+      if (attempt === MAX_SUMMARY_REPAIR_ATTEMPTS) {
+        break;
+      }
+
+      messages = [
+        ...messages,
+        { role: 'assistant', content: result.response },
+        {
+          role: 'user',
+          content: `The previous summary included number(s) not supported by the transcript: ${ungrounded.join(', ')}. Rewrite the JSON object using only figures that appear in the transcript, or remove the unsupported numbers entirely. Return a corrected JSON object only.`,
+        },
+      ];
+      continue;
     }
 
     lastReason = parsed.reason;

@@ -260,7 +260,3 @@ Can you help me with this homework question? "algebra equations — find the val
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (60 calls); re-run with --max-live-calls to raise`

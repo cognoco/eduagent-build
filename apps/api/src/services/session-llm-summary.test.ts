@@ -21,6 +21,8 @@ import type { Database } from '@eduagent/database';
 import {
   buildSessionSummaryPrompt,
   buildSessionSummaryTranscriptText,
+  collectGroundedSummaryNumbers,
+  findUngroundedSummaryNumbers,
   generateLlmSummary,
 } from './session-llm-summary';
 
@@ -106,6 +108,76 @@ describe('buildSessionSummaryPrompt', () => {
   });
 });
 
+describe('[Art 5(1)(d)] session-summary number-grounding guard', () => {
+  describe('collectGroundedSummaryNumbers', () => {
+    it('collects digit-runs from every non-null source as integers', () => {
+      const grounded = collectGroundedSummaryNumbers([
+        'Learner solved 12 problems over 45 minutes',
+        'Chapter 12',
+        null,
+      ]);
+
+      expect(grounded.has(12)).toBe(true);
+      expect(grounded.has(45)).toBe(true);
+      expect(grounded.has(99)).toBe(false);
+    });
+  });
+
+  describe('findUngroundedSummaryNumbers', () => {
+    it('returns [] when every number traces to a grounding source', () => {
+      const ungrounded = findUngroundedSummaryNumbers(
+        {
+          narrative: 'Worked through 12 fraction problems together.',
+          reEntryRecommendation: 'Pick up at problem 13.',
+        },
+        ['Learner attempted 12 problems and got to 13', null, null],
+      );
+
+      expect(ungrounded).toEqual([]);
+    });
+
+    it('returns [] when the prose contains no digits', () => {
+      const ungrounded = findUngroundedSummaryNumbers(
+        {
+          narrative: 'Reviewed long division and remainders carefully.',
+          reEntryRecommendation: 'Continue with another division example.',
+        },
+        ['Learner asked about long division', null, null],
+      );
+
+      expect(ungrounded).toEqual([]);
+    });
+
+    it('flags a hallucinated score the transcript never mentions', () => {
+      const ungrounded = findUngroundedSummaryNumbers(
+        {
+          narrative: 'The learner scored 8 out of 10 on the quiz.',
+          reEntryRecommendation: 'Move on to the next topic.',
+        },
+        [
+          'Learner: can we do a quiz? Mentor: sure, here is one question.',
+          null,
+          null,
+        ],
+      );
+
+      expect(ungrounded).toEqual([8, 10]);
+    });
+
+    it('grounds a number that only appears in the curriculum topic title', () => {
+      const ungrounded = findUngroundedSummaryNumbers(
+        {
+          narrative: 'Covered the key ideas in Chapter 12 on cell biology.',
+          reEntryRecommendation: 'Re-read the Chapter 12 summary next time.',
+        },
+        ['Learner: what is in this chapter?', 'Biology', 'Chapter 12'],
+      );
+
+      expect(ungrounded).toEqual([]);
+    });
+  });
+});
+
 describe('generateLlmSummary', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -154,6 +226,93 @@ describe('generateLlmSummary', () => {
       }),
     );
     expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
+  });
+
+  it('[Art 5(1)(d)] repairs an ungrounded number then returns the corrected summary', async () => {
+    const db = createMockDb([
+      { eventType: 'user_message', content: 'Can we do algebra?' },
+      {
+        eventType: 'ai_response',
+        content: 'Yes, let us balance both sides of the equation.',
+      },
+    ]);
+
+    mockRouteAndCall
+      // First attempt invents "7 equations" — no 7 in the transcript.
+      .mockResolvedValueOnce({
+        response: JSON.stringify({
+          narrative:
+            'Worked through algebra and solved 7 equations by balancing both sides of the equation.',
+          topicsCovered: ['algebra'],
+          sessionState: 'completed',
+          reEntryRecommendation:
+            'Start with another one-step equation and narrate each inverse operation.',
+        }),
+      })
+      // Repair drops the unsupported figure.
+      .mockResolvedValueOnce({
+        response: JSON.stringify({
+          narrative:
+            'Worked through algebra and balanced both sides of the equation step by step.',
+          topicsCovered: ['algebra', 'balancing equations'],
+          sessionState: 'completed',
+          reEntryRecommendation:
+            'Start with another one-step equation and narrate each inverse operation.',
+        }),
+      });
+
+    const result = await generateLlmSummary(db, {
+      sessionId: 'session-grounded',
+      profileId: 'profile-1',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        topicsCovered: ['algebra', 'balancing equations'],
+      }),
+    );
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
+    // The repair turn must name the unsupported figure for the model.
+    const repairMessages = mockRouteAndCall.mock.calls[1]![0] as Array<{
+      role: string;
+      content: string;
+    }>;
+    const repairPrompt = repairMessages[repairMessages.length - 1]!.content;
+    expect(repairPrompt).toContain('not supported by the transcript');
+    expect(repairPrompt).toContain('7');
+  });
+
+  it('[Art 5(1)(d)] throws when an ungrounded number survives the repair attempt', async () => {
+    const db = createMockDb([
+      { eventType: 'user_message', content: 'Can we do algebra?' },
+      { eventType: 'ai_response', content: 'Yes, let us balance both sides.' },
+    ]);
+
+    // Both attempts keep the invented "7" — no 7 anywhere in the transcript.
+    const ungroundedResponse = JSON.stringify({
+      narrative:
+        'Worked through algebra and solved 7 equations by balancing both sides.',
+      topicsCovered: ['algebra'],
+      sessionState: 'completed',
+      reEntryRecommendation: 'Pick up from where we left off.',
+    });
+    mockRouteAndCall.mockResolvedValue({ response: ungroundedResponse });
+
+    await expect(
+      generateLlmSummary(db, {
+        sessionId: 'session-ungrounded',
+        profileId: 'profile-1',
+      }),
+    ).rejects.toThrow('session summary generation failed validation');
+
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    // The invented figure must not leak into the Sentry payload.
+    const extra = mockCaptureException.mock.calls[0]![1]?.extra as Record<
+      string,
+      unknown
+    >;
+    expect(String(extra?.reason ?? '')).not.toContain('7');
   });
 
   it('returns null when there are no learner/mentor turns to summarize', async () => {

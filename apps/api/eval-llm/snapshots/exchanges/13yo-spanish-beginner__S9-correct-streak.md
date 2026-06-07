@@ -299,7 +299,3 @@ Then you need to account for the boundary condition.
 - History turns: 8, exchangeCount: 4
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `OpenRouter API request failed (429): {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"{\"message\":\"We're experiencing high traffic right now! Please try again soon.\",\"type\":\"too_many_requests_error\",\"param\":\"queue\",\"code\":\"queue_exceeded\"}","provider_name":"Cerebras","is_byok":true,"previous_errors":[{"code":429,"message":"Provider returned error","provider_name":"Cerebras","raw":"openai/gpt-oss-120b is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations"}]}},"user_id":"user_2v23wxgC11PJ486Adh5YgoNk8v8"}`
