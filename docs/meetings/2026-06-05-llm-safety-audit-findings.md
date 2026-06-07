@@ -135,7 +135,7 @@ LLM calls are logged generically (`router.ts:111-133`); Sentry captures errors �
 
 | Tie | Consequence |
 |---|---|
-| **Launch-posture brief, Dial 4** (no Gemini API for teens) | Removes the only configured ③-layer → H4/H5 jump to launch-relevant. Safety re-hardening belongs **inside** the Gemini re-routing work item. |
+| **Launch-posture brief, Dial 4** (no Gemini API for teens) — **now triggered: `MMT-ADR-0016` ratifies the Gemini exit for under-18 (gpt-oss-120b @ Cerebras = universal default text)** | No longer conditional: removing Gemini's classifier lane makes **H4/H5 launch-relevant**. The mitigation is the independent **Haiku judge + gating modes** specced in `docs/specs/2026-06-06-llm-routing-and-judge-architecture.md` §2–§3; safety re-hardening rides the Thread B routing build (`docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md`). |
 | **Model-selection memo §6** (validation gate, child-safety probes) | H3's jailbreak suite is the concrete implementation of that gate; build once, gates both prompt edits and model swaps. |
 | **Review-relearn findings (RR doc)** | RR-1/RR-9 edit the same prompt files that hold the safety rules → land H3 first so those rewrites get safety regression coverage. RR-12 (Challenge Round prod flip) opens a new LLM surface → H1+H2+H7 are prerequisites; H7 doubles as RR-12's required monitoring. RR-9's "never fabricate a score" fallback fix is the same silent-recovery pattern as H2 — one design sweep closes both. |
 

@@ -1,7 +1,7 @@
 # LLM Routing Rule Table & Judge Architecture
 
 **Date:** 2026-06-06
-**Status:** Draft — design ratified in owner conversation 2026-06-05/06; implementation not started
+**Status:** Draft — design ratified in owner conversation 2026-06-05/06/07; implementation not started
 **Depends on:** `docs/meetings/2026-06-05-llm-model-selection-research-memo.md` (§6 eval results, §7 open model ruling)
 **Related:** `docs/specs/2026-04-07-epic-17-voice-first-design.md` (voice — forward invariants only here)
 
@@ -25,7 +25,7 @@
 
 - Building voice or role play (forward invariants only — see §8).
 - Changing prompts per model. Prompts remain model-agnostic by standing directive; per-model variation lives only in routing config.
-- Ruling on the §7 free/Family workhorse model. The table ships behavior-identical first; model flips are a later, flag-gated phase.
+- Re-deciding the §1.5 pinning (it is ratified). The table ships behavior-identical first; the flips to the §1.5 matrix are a later, flag-gated phase (Thread B build spec).
 - Guardian notification on accumulated flags (open ruling, §10).
 
 ---
@@ -84,25 +84,33 @@ interface RoutingRule {
 
 No model enters a rule row until it has passed the eval harness (`pnpm eval:llm --live`) in its **exact production configuration** — same model slug, same `reasoningEffort`, same pinned host — across the safety battery, exchanges core, and (for small locales) the language-quality judge flow. The §6 campaign is the template.
 
-### 1.5 Ratified pinning (MMT-ADR-0016, 2026-06-06)
+### 1.5 Ratified pinning (MMT-ADR-0016)
 
-The concrete model assignments the rule table encodes. **Ratified by the owner 2026-06-06**; the *why*, evidence, and rejected alternatives are in [`MMT-ADR-0016`](../adr/MMT-ADR-0016-llm-provider-model-selection-and-routing.md); the eval evidence is in the model-selection memo §6/§7.
+The concrete model assignments the rule table encodes. **Ratified by the owner 2026-06-07.** The *why*, evidence, and rejected alternatives are in [`MMT-ADR-0016`](../adr/MMT-ADR-0016-llm-provider-model-selection-and-routing.md); eval evidence is in the model-selection memo §6 (the §7 tables there are superseded evidence-stage picks — route from *this* table, not from the memo).
+
+**Roles in one line:** gpt-oss is everyone's default text brain. When the business-rule layer routes away from US-hosted Cerebras — EU-residency required *or* Cerebras unavailable (one merged branch) — each tier falls to its secondary: **free → Mistral, paid → GPT-5 mini**, and that same secondary also handles the tier's **vision** (gpt-oss is text-only). gpt-5.4 is the deep-reasoning model for paying non-Family users; Haiku judges.
 
 | Slot (match) | Model + config | Data flow | Admission |
 |---|---|---|---|
-| Free tier + default, rungs 1–3, all ages (incl. free vision) | **Mistral Small 4**, no reasoning | Mistral (EU) — zero transfer paperwork | ✅ battery passed |
-| **Paid workhorse (incl. Family tier), rungs 1–3, all ages** | **gpt-oss-120b @ Cerebras `high` (primary)** ← *Amendment 1* | Cerebras (US, SCCs+TIA; triplet owed) | ✅ safety/teaching/language/latency validated; ⏳ triplet + adapter owed |
-| **Paid fallback + all paid vision/multimodal** | **GPT-5 mini @ `low`** | OpenAI (US, SCCs+TIA; ZDR mandatory for minors) | ✅ battery passed |
-| Interactive deep reasoning, rungs 4–5, all ages | **gpt-5.4 @ `medium`** | OpenAI (same paperwork — no age split) | ⏳ admission run owed |
+| **Primary text — all tiers (free incl.), rungs 1–3, all ages** | **gpt-oss-120b @ Cerebras `high`** | Cerebras (US, SCCs+TIA; triplet owed) | ✅ safety/teaching/language/latency validated; ⏳ triplet + adapter owed |
+| **Secondary text — free tier** (EU-residency required *or* Cerebras unavailable) | **Mistral Small 4**, no reasoning | Mistral (EU) — zero transfer paperwork | ✅ battery passed |
+| **Secondary text — paid tiers** (EU-residency required *or* Cerebras unavailable) | **GPT-5 mini @ `low`** | OpenAI (EU-residency deployment for the EU branch; ZDR mandatory for minors) | ✅ battery passed |
+| Vision — free tier | **Mistral Small 4** | Mistral (EU) | ✅ battery passed |
+| Vision — paid tiers | **GPT-5 mini @ `low`** | OpenAI | ✅ battery passed |
+| Interactive deep reasoning, rungs 4–5 — **Plus / Pro / AI-Upgrade** | **gpt-5.4 @ `medium`** | OpenAI | ⏳ admission run owed |
+| Interactive deep reasoning, rungs 4–5 — **Family tier** | **gpt-oss-120b @ Cerebras `high`** (no gpt-5.4) | Cerebras (US) | ✅ validated |
 | Rung 4–5 fallback | **Sonnet 4.6** (incumbent) | Anthropic (US, SCCs+TIA) | ✅ in prod |
 | Async deep jobs (recaps, curriculum, assessment eval) | **gpt-oss-120b @ Cerebras `high`** | US | ✅ validated; ⏳ triplet owed |
 | Judge (gating + deep) | **Haiku 4.5, non-reasoning** (reasoning banned — JSON breaks) | Anthropic | ⏳ verdict-format check |
 | Dormant fallback (adults only) | DeepSeek V4 Pro non-reasoning @ DeepInfra | US (needs DPA + Chinese-origin DPIA ¶) | passed; not pinned |
-| **Excluded** | Gemini (under-18 terms) · all Chinese hosts · Haiku-reasoning (JSON) · GPT-5 mini ≥ medium + DeepSeek-reasoning interactive (latency) · gpt-5.5 default (price) | — | — |
+| **Excluded for under-18; adult-only use UNDER REVIEW** | Gemini / Vertex (under-18 terms — see open ruling §10.1) | — | — |
+| **Excluded entirely** | all Chinese hosts · Haiku-reasoning (JSON) · GPT-5 mini ≥ medium + DeepSeek-reasoning interactive (latency) · gpt-5.5 default (price) | — | — |
+
+**Business-rule layer (not built yet).** The age/residency/plan → model mapping that picks primary-vs-secondary is a later rule-table addition. Until it lands, `getModelConfig` pins gpt-oss as the primary for all tiers and wires each tier's secondary as the **fallback** target (so the failover models are already correct); the residency-driven *primary* substitution arrives with the rule-table phase. EU-residency and Cerebras-outage are deliberately one branch (same secondary serves both).
 
 Two admission runs (gpt-5.4 @ medium, gpt-oss @ Cerebras high) and the Haiku judge verdict-format check are owed before those rows go live — they do not block phases 1–5 (model-neutral plumbing).
 
-> **✅ RATIFIED 2026-06-06 (Option B — MMT-ADR-0016 Amendment 1).** The §6 "wrong-language" results that confined gpt-oss-120b to async-only were a **harness artifact** — the candidate eval path bypassed `routeAndCall` and so omitted the production language preamble (`getPersonalizationPreamble`, `router.ts:236-243`). Re-run with the preamble applied, gpt-oss is **~98% in-language as-is across all 9 conversation locales (0/270 with a belt-and-braces directive)** — see model-selection memo §6 CORRECTION. The harness bug is fixed (`withSafetyPreamble` exported + applied on the candidate path; regression test `eval-llm/runner/llm-client.test.ts`, break-test verified). With safety (44/44 + 100× jailbreak + 5/5 multi-turn), teaching (55/55), and latency (p50 1.3s) validated, **gpt-oss-120b @ Cerebras is promoted to the interactive PAID text workhorse (rungs 1–3, all ages, including the Family/under-18 tier the Gemini exit vacated), with GPT-5 mini demoted to fallback + the paid multimodal/vision handler** (gpt-oss is text-only). **Mistral Small 4 stays on the EU free tier** for residency. gpt-5.4 @ medium stays at rungs 4–5. The matrix rows above reflect this. **"Everywhere incl. free tier (drop Mistral)" was rejected** — it loses Mistral's EU-residency advantage for free-tier minors without delivering single-vendor simplicity (Cerebras is open-weight only — can't host the closed fallback/vision models — and single-host needs an off-Cerebras fallback regardless; vendor research in memory `project_cerebras_vendor_posture`). **Gates before minor traffic:** Cerebras compliance triplet (ZDR + no-training + executed DPA, ZDR in the DPA text; SCCs+TIA, Cerebras US-only); OpenAI ZDR-for-minors for the fallback; direct Cerebras + Mistral adapters + compliance-aware fallback (drop Gemini/Vertex, fail-closed); teaching-quality A/B vs the GPT-5 mini incumbent at paid rungs 1–3. See the Thread B build spec (`docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md`).
+**Gates before minor traffic:** Cerebras compliance triplet (ZDR + no-training + executed DPA, ZDR in the DPA text; SCCs+TIA, Cerebras US-only); OpenAI ZDR-for-minors for the paid secondary + gpt-5.4; direct Cerebras + Mistral adapters + compliance-aware fallback (drop Gemini/Vertex for under-18, fail-closed); teaching-quality A/B (gpt-oss vs GPT-5 mini at paid rungs 1–3). See the Thread B build spec (`docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md`).
 
 ---
 
@@ -268,6 +276,6 @@ Phases 1–5 are model-neutral and safe before the §7 ruling.
 
 ## 10. Open rulings
 
-1. **§7 workhorse model** (memo): GPT-5 mini @ low effort vs DeepSeek @ pinned US host — gates phase 6 only.
+1. **Adult-only (verified 18+) Gemini eligibility.** The Gemini/Vertex block is written at the *under-18* level, so adults are not *per se* excluded — **but** the GCP terms test is *app-audience* level ("directed towards or likely to be accessed by under-18"), and this app plainly is likely-accessed-by-minors (child/family profiles). Whether adult-only routing *inside a mixed-audience app* survives that test is a legal ruling owed before any Gemini row is added; it also requires robust 18+ age assurance. **Until ruled, Gemini/Vertex stays fully excluded.** If permitted, `FALLBACK_FORBIDDEN` (and the primary matrix) becomes age-conditional: Gemini banned for under-18, allowed only for verified-18+.
 2. **Guardian notification** on accumulated suitability flags: internal-only vs notify (privacy-vs-oversight; plumbing supports either).
 3. **Verdict retention period** — set inside the E5 DPIA work, not this spec.

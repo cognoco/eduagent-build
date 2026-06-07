@@ -66,6 +66,8 @@ Two of the original candidates were stale:
 
 ## 5. Recommendations
 
+> **⚠️ SUPERSEDED — initial 2026-06-05 recommendations; the live decision differs.** Routed from `MMT-ADR-0016` + routing-spec §1.5: **gpt-oss-120b @ Cerebras = universal default text for ALL tiers (free incl.)**; Mistral (free) / GPT-5 mini (paid) are the per-tier secondary (EU-residency + outage + vision); gpt-5.4 @ medium = rungs 4–5 for Plus/Pro/AI-Upgrade only (Family excluded → gpt-oss high); Haiku judge. Table retained as evidence only.
+
 | Tier | Recommendation | Rationale |
 |---|---|---|
 | **Free** | **Mistral Small 4, single model** | Cheapest credible option; multimodal (covers homework photos with one model); EU-native (cleanest transfer story); reasoning mode available. Revisit gpt-oss-120b text-session split only after real usage data shows the image-vs-text session ratio. |
@@ -159,22 +161,9 @@ Direct probes (LQ-CS01 prompt, pinned hosts, 3 runs per cell, `reasoning: { effo
 
 Same-day pricing verification (OpenRouter endpoint API, 2026-06-06): the memo's DeepSeek price $0.435/$0.87 + 99% cache is the **Chinese first-party API only** (unusable); cheapest lawful US host is DeepInfra at **$1.30/$2.60 fp4, no cache discount** — eliminating DeepSeek's price case vs GPT-5 mini ($0.25/$2.00). DeepSeek V4 Pro has **no EU-region host** (14 endpoints: 5 Chinese, 9 US). gpt-oss-120b is served by **Nebius (EU, $0.15/$0.60)** — latency unverified, noted as a future EU-residency option.
 
-### §7 resolution — the pinning matrix (RATIFIED by owner 2026-06-06 → MMT-ADR-0016)
+### §7 resolution — SUPERSEDED (live pinning = MMT-ADR-0016 / spec §1.5)
 
-> **Ratified.** Recorded as [`MMT-ADR-0016`](../adr/MMT-ADR-0016-llm-provider-model-selection-and-routing.md); the canonical pinning table now lives in `docs/specs/2026-06-06-llm-routing-and-judge-architecture.md` §1.5. The §1 open decisions below are resolved by this ratification (workhorse = GPT-5 mini @ low; OpenRouter eval adapter = added).
-
-| Slot | Who / where | Model + config | Data flow | Status |
-|---|---|---|---|---|
-| Free tier + default, rungs 1–3 | all ages, all markets | **Mistral Small 4**, no reasoning | Mistral (EU) — zero transfer paperwork | ✅ battery passed |
-| Paid workhorse, rungs 1–3 | all ages, all markets | **GPT-5 mini @ `low`** | OpenAI (US, SCCs+TIA; ZDR mandatory for minors; Azure-EU residency option later) | ✅ battery passed |
-| Interactive deep reasoning, rungs 4–5 | all ages, all markets | **gpt-5.4 @ `medium`** | OpenAI (same paperwork — no age split needed) | ⏳ battery admission run pending |
-| Rung 4–5 fallback | all | Sonnet 4.6 (incumbent) | Anthropic (US, SCCs+TIA) | ✅ in prod |
-| Async deep jobs (recaps, curriculum, assessment eval) | no one waits | **gpt-oss-120b @ Cerebras `high`** (primary) / DeepSeek reasoning @ DeepInfra (alt) | US | ⏳ battery in this config pending |
-| Judge (gating + deep) | minors' conversation text | **Haiku 4.5, non-reasoning** (reasoning mode banned — JSON breaks) | Anthropic | ⏳ verdict-format reliability check in judge flow |
-| Dormant fallback row | adults | DeepSeek V4 Pro non-reasoning @ DeepInfra | US (needs DPA + Chinese-origin DPIA ¶ before activation) | passed battery; not pinned |
-| Excluded | — | Gemini (vendor terms, under-18); all Chinese hosts (every market); Haiku-reasoning (JSON); GPT-5 mini ≥ medium + DeepSeek-reasoning interactive (latency); gpt-5.5 as default (price) | — | — |
-
-> **✅ RATIFIED 2026-06-06 (Option B — MMT-ADR-0016 Amendment 1).** Given the wrong-language correction, the async-only confinement of gpt-oss-120b no longer holds. **gpt-oss-120b @ Cerebras `high` is promoted to the interactive PAID text workhorse (rungs 1–3, all ages, incl. Family/under-18), GPT-5 mini demoted to fallback + paid vision handler, Mistral kept on the EU free tier, gpt-5.4 @ medium unchanged at rungs 4–5.** This fills the Gemini-only Family routing hole (follow-up below). **"Everywhere incl. free tier (drop Mistral)" rejected** — loses Mistral's EU residency for free-tier minors without delivering single-vendor simplicity (Cerebras is open-weight only; can't host closed fallback/vision; single-host needs an off-Cerebras fallback regardless — vendor research in `.claude` memory `project_cerebras_vendor_posture`). Owner keeps separate agreements with the other vendors for now; Cerebras dedicated-endpoints/self-host parked for later. Gates before minor traffic: Cerebras triplet (ZDR-in-DPA + no-training + DPA; SCCs+TIA, US-only), OpenAI ZDR-for-minors, direct Cerebras+Mistral adapters + compliance-aware fallback, teaching-quality A/B vs the GPT-5 mini incumbent. The ratified-pinning row in the table above is superseded by MMT-ADR-0016 Amendment 1 / spec §1.5.
+> **⚠️ SUPERSEDED — do not route from this section.** The original §7 pinning here (GPT-5 mini as the paid workhorse, Mistral as the free-tier *primary*, gpt-oss confined to async) was an evidence-stage pick, superseded the same week. **Live decision: gpt-oss-120b @ Cerebras `high` is the universal default text model for ALL tiers (free incl.); Mistral (free) and GPT-5 mini (paid) are the per-tier secondary covering EU-residency + Cerebras-outage + vision; gpt-5.4 @ medium = rungs 4–5 for Plus/Pro/AI-Upgrade only (Family excluded → gpt-oss high); Sonnet 4.6 fallback; Haiku 4.5 judge.** Canonical: [`MMT-ADR-0016`](../adr/MMT-ADR-0016-llm-provider-model-selection-and-routing.md) + spec `docs/specs/2026-06-06-llm-routing-and-judge-architecture.md` §1.5; build spec `docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md`. The §6 eval tables above are retained as evidence; the stale §7 pinning table + intermediate amendment banner that were here have been removed to avoid confusing future readers.
 
 ### §7.1 Rationale — the non-obvious calls
 
@@ -192,14 +181,14 @@ Same-day pricing verification (OpenRouter endpoint API, 2026-06-06): the memo's 
 
 ## 7. Open decisions
 
-1. ~~**Family-tier workhorse:** GPT-5 mini vs Haiku 4.5.~~ **RESOLVED 2026-06-06 (MMT-ADR-0016):** GPT-5 mini @ `low` is the paid workhorse; Haiku 4.5 is reassigned to the judge role (non-reasoning). Mistral Small 4 is the free-tier/default.
+1. ~~**Family-tier workhorse:** GPT-5 mini vs Haiku 4.5.~~ **RESOLVED 2026-06-07 (MMT-ADR-0016):** gpt-oss-120b @ Cerebras `high` is the universal default text model for ALL tiers; Mistral (free) / GPT-5 mini (paid) are the per-tier secondary (EU-residency + outage + vision); gpt-5.4 @ medium = rungs 4–5 for Plus/Pro only (Family excluded → gpt-oss high); Haiku 4.5 = judge (non-reasoning).
 2. ~~**OpenRouter eval adapter:** add now vs defer.~~ **RESOLVED 2026-06-05:** added (eval-only — `providers/openrouter.ts`).
 
 ## 8. Follow-ups
 
 - [x] Wire OpenRouter eval adapter (if Decision 2 = now). *(Done 2026-06-05 — `providers/openrouter.ts` + `--openrouter-model` harness flag.)*
 - [x] Run the §6 eval matrix for: Mistral Small 4, GPT-5 mini, Haiku 4.5, gpt-oss-120b, US-hosted DeepSeek V4 Pro. *(Safety-probe pass done 2026-06-05 — see §6 results above. Owner ruling 2026-06-05: ALL FIVE candidates are under serious consideration — the "(optional)" framing on gpt-oss-120b and DeepSeek is withdrawn. Still open: ×3 reruns, `exchangesFlow` envelope pass, conversation-language pass, vision/OCR pass.)*
-- [ ] Replace Gemini-only Family routing in `router.ts` (`LlmProviderPolicy = 'gemini_only'`, `GEMINI_ADVANCED_MODEL_MIN_RUNG`) per the winning picks — separate work item; coordinate with the vendor-block remediation tracked in `project_google_gemini_vendor_under18_blocked.md`. **Candidate replacement under consideration: gpt-oss-120b @ Cerebras primary + GPT-5 mini fallback (see PROPOSED REVISION above).**
+- [ ] Replace Gemini-only Family routing in `router.ts` (`LlmProviderPolicy = 'gemini_only'`, `GEMINI_ADVANCED_MODEL_MIN_RUNG`) per the winning picks — separate work item; coordinate with the vendor-block remediation tracked in `project_google_gemini_vendor_under18_blocked.md`. **Ratified replacement (MMT-ADR-0016): gpt-oss-120b @ Cerebras primary (all tiers) + per-tier secondary (free→Mistral, paid→GPT-5 mini). Build = Thread B spec `docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md`.**
 - [x] **Fix the candidate-path harness bypass** (2026-06-06). `runHarnessLlm` now applies the production `withSafetyPreamble` (incl. the language directive) before calling a `--openrouter-model` candidate; `withSafetyPreamble` exported from `router.ts`; regression test `apps/api/eval-llm/runner/llm-client.test.ts` (break-test verified). *This invalidated the language column of the §6 matrix for all five candidates — see ⚠️ CORRECTION.*
 - [ ] **Re-run the language-quality column for all five candidates** with the fixed harness, so the §6 matrix reflects production conditions (gpt-oss already re-verified directly; the other four pending).
 - [ ] For whichever vendors are selected: Art 28 DPA + ZDR/retention terms review (B3 bucket), and add the model/vendor choice to the DPIA (E5 gate).
