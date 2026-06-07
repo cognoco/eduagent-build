@@ -1,19 +1,37 @@
 # Identity Foundation — Pre-Implementation Roadmap
 
 **Scope:** the thinking/decision runway only — drift map → product intent → doc strategy →
-architecture (domain + data model) → the **"ready to plan implementation" gate (F)**. This file is
-**not** an implementation plan, and **no Cosmo work items are created until F is passed.**
+architecture (domain + data model + the policy-engine/router spine) → the firming, classification, and
+planning runway → the **"ready to start implementation" gate (the exit of Phase P)**. This file is
+**not** an implementation plan, and **no Cosmo work items are created until Phase P slices them.**
 
 **Tracking:** repo-only; this file is the single source. Deliverables land as sibling docs (see
-README index). **Status: 2026-06-04 — Phases A, B, C, D, and **E complete**. Phase E ratified the data
-model (`data-model.md`) + 2 ADRs (MMT-ADR-0011 data-model realization · 0012 one-time baseline reset);
-ontology + `domain-model.md` + `CONTEXT.md` + ROADMAP moved in lockstep. The 8 tables + structural
-`person_retain` set are stated as a fresh create-from-empty baseline; from this baseline forward,
-append-only migrations are absolute. **`inv 17` rephrased** (the lone open call from the 2026-06-03
-counsel walkthrough); all architect calls closed. **Phase F (planning *for* the planning) is in
-progress; Phases G–P are the actual planning.** The roadmap's single end-state is *"ready to start
-implementation"*; the path to that end-state is A–R (the deep thinking + the firming,
-classification, planning) and the first work package in execution (after R).**
+README index).
+
+**Status: 2026-06-07.** Phases **A, B, C, D, E complete** — Phase E ratified the data model
+(`data-model.md`) + 2 ADRs (`MMT-ADR-0011` data-model realization · `MMT-ADR-0012` one-time baseline
+reset); ontology + `domain-model.md` + `CONTEXT.md` moved in lockstep. The 8 tables + structural
+`person_retain` set are a fresh create-from-empty baseline; from it forward, append-only migrations
+are absolute.
+
+**Since the 2026-06-04 data-model lock, the runway grew.** A v1 launch-scope investigation — *does v1
+serve sub-consent-age minors, or defer them to v2?* (the **"A-vs-B" decision**) — ran 2026-06-01→06-05
+and surfaced work we did **not** previously know the runway owed: two new load-bearing architectural
+lanes (a **policy / business-rules engine** and a **model router**), a persona-set refinement (5→6),
+a capability split (Payer / Guardian / Mentor / Subscription-administrator), a charge-terminology
+change ("ward" → "charge"), and an age-floor posture (the **"Path X"** v1/v1.1 split, see threads).
+All of it is captured and **signed** in the decision-capture memo (`2026-06-XX-a-vs-b-decision-capture.md`,
+ratified 2026-06-06; the PM has since confirmed sign-off). That memo enumerated **ten work packages**
+("WP-1".."WP-10"); this roadmap folds them into the phases below, referencing each by its memo ID in
+parentheses so the working terms stay traceable.
+
+**Where this leaves the phase structure.** Phase **F** now carries a **spine sub-phase (F.1)** — the
+policy-engine + router decisions and their decision records — that must close before the deep
+architecture authoring (Phase H) can cite them. Phases **G–P** keep their shape but inherit the new
+content (consent-category model, engine, router, personas, charge terminology, the age-floor split) as
+*inputs*. The roadmap's single end-state is unchanged: *"ready to start implementation"* = the exit of
+Phase P (master plan signed + Cosmo work packages sliced). The execution phase starts after P; its
+naming is Cosmo's, not the roadmap's.
 
 ---
 
@@ -42,17 +60,109 @@ classification, planning) and the first work package in execution (after R).**
 | **C** | Doc-strategy decision (pilot)                           | **`MMT-ADR-0000`** (in `docs/adr/`) | You + Claude                | ✅     | A informs; piloted via B/D/E | **DONE 2026-06-03** — decisions layer ratified; convention + ratchet + 3 seed ADRs shipped; backfill deferred (Stream 2) |
 | **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ✅     | B                            | **DONE 2026-06-03** — entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited; 4 ADRs (MMT-ADR-0007–0010) placed |
 | **E** | Data model                                              | `data-model.md` + ADR(s)           | Claude (you ratify)         | ✅     | D                            | target schema + cut strategy locked                                                                |
-| **F** | Ready-to-plan gate (planning *for* the planning)       | —                                 | You                         | ⬜     | B, D, E + threads            | shape of G–P ratified; **`inv 17` rephrased**; sibling-plan re-triage scoped; gap analysis deferred to L; master plan deferred to O (this phase is **planning for the planning**, not the planning itself) |
-| **G** | Lock the canonical set for the identity-foundation carve-out | (confirmation only — the 9 docs are in place) | You + Claude                | ⬜     | F                            | the canonical-set list is *explicitly confirmed*; each doc's role is named; the set is the lens for the gap analysis (L) |
-| **H** | Author the `architecture.md` identity-foundation carve-out | a new section / rev in `architecture.md` | Claude (you ratify)         | ⬜     | G                            | the carve-out is rock-solid for: consent flow, IARC/store posture, Payer/billing mechanics, family-join shape, RLS scope, custody/carve-outs, launch-readiness guard; citations to ADRs + data model present |
+| **F** | Ready-to-plan gate (planning *for* the planning) **+ the policy-engine/router spine (F.1)** | — (F.1 deliverables: 3 ADRs + vetting kickoff + memory/handoff — see Phase F.1 detail) | You (F); Claude drafts F.1 | 🟡 in progress | B, D, E + threads | shape of G–P ratified; **`inv 17` rephrased**; sibling-plan re-triage scoped; **F.1 closed** (spine ADRs drafted, vetting workstream named, memo/handoff/memory landed); gap analysis deferred to L; master plan deferred to O (this phase is **planning for the planning**, not the planning itself) |
+| **G** | Lock the canonical set for the identity-foundation carve-out | (confirmation only — the docs are in place) | You + Claude                | ⬜     | F                            | the canonical-set list is *explicitly confirmed* — **now includes the 3 spine ADRs from F.1** (`MMT-ADR-0013` engine · the `MMT-ADR-0011` amendment · the router ADR) plus the decision-capture memo + handoff; each doc's role is named; the set is the lens for the gap analysis (L) |
+| **H** | Author the `architecture.md` identity-foundation carve-out | a new section / rev in `architecture.md` | Claude (you ratify)         | ⬜     | G                            | the carve-out is rock-solid for: **the three consent categories + the policy engine + the model router/vetting split + the 6-persona / capability model**, consent flow, IARC/store posture, Payer/billing mechanics, family-join shape, RLS scope, custody/carve-outs, the age-floor split ("Path X"), launch-readiness guard; citations to ADRs + data model present |
 | **I** | Light pass on the rest of `architecture.md` + `ARCH-N` touch (identity-foundation domain) | edited `architecture.md` + `docs/adr/` promotion/supersession | Claude (you ratify)         | ⬜     | H                            | (a) *directly misleading* information in `architecture.md` corrected; *merely incomplete* sections left as-is; scope-by-touching, not scope-by-coverage. (b) the `ARCH-N` items the identity-foundation domain intersects with are promoted / superseded; the registry-wide drain is *not* in scope (Stream 2) |
-| **J** | Light pass on memory + agent rules                      | edited `CLAUDE.md` / `AGENTS.md` / `.claude/memory/` | Claude                       | ⬜     | I                            | *misleading* info removed; the criterion is "would *any* agent's session context be polluted by stale information?"; fix only what's misleading |
+| **J** | Light pass on memory + agent rules **(absorbs the spine cleanup sweep, WP-8)** | edited `CLAUDE.md` / `AGENTS.md` / `.claude/memory/` | Claude (you ratify)          | ⬜     | I                            | *misleading* info removed; the criterion is "would *any* agent's session context be polluted by stale information?"; **plus the A-vs-B cleanup sweep** — charge-terminology ("ward"→"charge"), 6-persona set, Payer/Guardian/Mentor/Sub-admin split, the age-floor split ("Path X"), the engine-inside-identity-foundation decision, and the routing-canon supersessions (Family=Gemini-only; GATE-1) applied as the source of truth |
 | **K** | **Consolidation activity** — produce the consolidated-audit document (includes canon-contradiction check) | `docs/audit/2026-05-29-full-audit/RECONCILED.md` (or similar) | Claude (you ratify)         | ⬜     | J                            | see the *K exit gate* below |
 | **L** | Unified gap analysis                                    | a single delta document            | Claude                      | ⬜     | K                            | one row per finding, tagged `(source-audit, source-finding-id, domain, classification, in-scope?, defer-to-which-workstream?, canonical-set-source)`; reads the consolidated-audit (K's output) + the canonical set (G–J) + the as-is |
 | **M** | Four-bucket triage                                      | the triage outcome, folded into the delta doc | You + Claude                | ⬜     | L                            | every finding lands in one of: (1) already handled in identity-foundation; (2) clear in for master plan; (3) clear out for master plan (named workstream); (4) defer (no workstream yet, or the workstream isn't mature enough) |
 | **N** | Sequencing                                              | the dependency map + critical path, folded into the master plan | Claude (you ratify)         | ⬜     | M                            | sequenced set of work packages with dependencies and bundles; the identity-foundation workstream is sequenced *first* (dogfood) |
 | **O** | Remediation plan (the master plan)                     | a single document                   | Claude (you sign off)       | ⬜     | N                            | scope (in-scope work packages); out-of-scope workstreams (named, with rationale); sequenced work packages; dependency map; bundle grouping; Cosmo-enablement interface (B+/C− posture; identity-foundation as first dogfood) |
 | **P** | Hand off to execution (Cosmo work-package slicing)     | the Cosmo WIs (sliced from O)       | You + Claude                | ⬜     | O                            | every work package is a Cosmo work item (or grouped into a Cosmo work package); the Cosmo top-down process enablement is the precondition (parallel workstream) |
+
+---
+
+## Phase F.1 — the policy-engine + router spine (the "A-vs-B" outcome)
+
+**What F.1 is.** The v1 launch-scope investigation (the **"A-vs-B" decision** — serve sub-consent-age
+minors at launch, or defer to v2) did not just answer that question; it surfaced two **new
+load-bearing architectural lanes** the earlier runway never accounted for. F.1 is the sub-phase that
+**captures those decisions as decision records (ADRs)** so the deep architecture authoring (Phase H)
+has something to cite. It is *decision-capture for decisions already made*, not new architecture
+authoring — that is why it sits under F ("planning for the planning"), not in the G–P authoring
+runway.
+
+**The decisions F.1 records** (all signed in `2026-06-XX-a-vs-b-decision-capture.md`, 2026-06-06):
+
+- **A policy / business-rules engine**, living *inside* identity-foundation. It maps
+  `(age × residence × known/unknown)` → policy. Its output is the union of **two primitives**: a
+  **prohibition-floor** (rules that bind regardless of consent — e.g. a platform's under-18 closure)
+  and a **consent-edge** (rules unlockable by guardian/user consent — e.g. GDPR Art 8 with
+  reasonable-efforts verification). "Known/unknown" is **two independent axes** (known-age,
+  known-residence), each with a determination method + confidence; **unknown defaults to
+  most-restrictive**.
+- **A model router**, provider-and-model-agnostic at the architecture level, sitting *downstream* of
+  the engine: it reads a vetted `allowed-models` table, filtered by the engine's eligibility output.
+  **Vetting and routing are a hard split** (different code, different schemas, different cadences,
+  different owners) — the runtime picker never re-evaluates compliance.
+- **A persona-set refinement (5→6)** and a **capability split**: the Payer field grants billing
+  access only; the **Guardian** edge grants consent authority only; the **Mentor** edge grants data
+  access only; **profile management** bundles with the Subscription-administrator role. The "full
+  parent" is one human wearing all four hats.
+- **The age-floor posture ("Path X").** v1's floor is **13+** as the *consent-capacity* floor (one of
+  three independent axes — consent capacity 13–16 per-market, contract capacity 18, content level a
+  continuous gradient that never gates). Sub-13 is **built but front-end-gated**; the US is excluded
+  from sub-13 entirely in v1 to avoid COPPA. The **"Path X" split**: v1 closes the 13+ load-bearing
+  gaps and future-proofs the schema in the pre-baseline window; **v1.1** closes the sub-13-specific
+  gaps and ungates (demand-triggered, three preconditions). See the cross-cutting thread.
+
+**The walkthrough (runs in parallel; results assumed back soon).** The policy-engine spine walkthrough
+(`policy-engine-spine-walkthrough/`, package tightened + reconciled with the memo 2026-06-07) is a
+90–120-min PM + **live legal counsel** + architect session that ratifies the *shape* of the engine via
+six rulings: **R-0** two-primitive model · **R-1** the one COPPA legal call (does the
+parent-operated, no-child-login path trip COPPA?) · **R-2** the regime-taxonomy enum · **R-3** the
+knowledge axes · **R-4** the router key · **R-5** the launch-set *shape* (the provider names are
+illustrative; the vetting workstream produces the actual set). **R-1 is the contingent fork** that
+decides the sub-13-US branch below.
+
+**Why planning proceeds without waiting for the walkthrough.** The memo already *signed* these
+decisions; the walkthrough is **confirmatory** for R-0/R-3/R-4 and **fills enum values** (R-2/R-3) that
+are inputs to the **ADR bodies**, not to the roadmap's structure. The roadmap is built from work-package
+existence, sequence, and dependencies — stable regardless of the enum values. The **only** things the
+walkthrough can move are (a) the R-1 contingent branch, encoded explicitly below, and (b) the
+low-probability tail risk that R-0 is rejected (memo-ratified, so unlikely) — which would change the
+ADR *bodies*, not the phase sequence. Net: F.1's planning is done now; F.1's *closure* waits only on
+the walkthrough rulings + the ADR authoring (which is execution, downstream of this roadmap anyway).
+
+### F.1 work packages (folded from the decision-capture memo; memo IDs in parentheses)
+
+| Seq | Work package | Memo ID | Inputs / blocked by | Owner | Status |
+|---|---|---|---|---|---|
+| 1 | **Decision-capture memo** — the 25 signed A-vs-B decisions | (the memo) | — | Claude drafts / PM signs | ✅ signed 2026-06-06 |
+| 2 | **Tighten the walkthrough package** — reconcile to the memo (WP namespace, R-5 framing, supersedes list, de-stale legal corpus) | — | the memo | Claude | ✅ 2026-06-07 |
+| 3 | **Run the policy-engine spine walkthrough** — six rulings R-0..R-5; counsel rules R-1 | (the walkthrough) | tightened package | PM + counsel + architect | ⬜ **parallel — to book** |
+| 4 | **Policy-engine spine decision record** (`MMT-ADR-0013`, keystone ADR) — two-primitive model + regime taxonomy + two-axis knowledge model + engine→router flow | (**WP-1**) | memo §3; enum *seeds* from walkthrough R-0/R-2/R-3 | Claude drafted / architect ratified | ✅ **shape ratified 2026-06-07** (enum seeds DB-mastered; await walkthrough) |
+| 5 | **Data-model amendment decision record** (`MMT-ADR-0015` — a *new* ADR that amends `MMT-ADR-0011`, not an in-place edit) — prohibition-floor primitive, two-axis knowledge tables, `regimes` lookup table, Payer sub-field (primary + ≤1 secondary), Guardian=consent-only / Mentor=data-access / Sub-admin=profile-mgmt, charge terminology, `AgeBracket` 'child' | (**WP-2**) | `MMT-ADR-0013` | Claude drafted / architect ratified | ✅ **ratified 2026-06-07** — ⚠ **`data-model.md` lockstep SQL still to write (now DUE)** |
+| 6 | **Router decision record** (`MMT-ADR-0014`) — 3-param runtime / 4-param vetting split, hard split, tested do-not-do lists, tiered v1 fallback; **supersedes** "Family standard = Gemini-only" + **re-specs** GATE-1 minor-routing | (**WP-3**) | memo §4–5; enum seed from walkthrough R-4/R-5 | Claude drafted / architect ratified | ✅ **shape ratified 2026-06-07** (vetted set DB-mastered in `allowed_models`) |
+| 7 | **Kick off the model-vetting research workstream** — *parallel*, orchestrated under this roadmap; same shape as the `age-consent-landscape/` PoC; output = the `allowed-models` table rows with vetting metadata | (**WP-4**) | rulings R-2/R-5 → can start once enums land; **not blocking** | **PM-owned** | ⬜ parallel — owner assigned (PM) |
+| 8 | **This roadmap update** — fold the spine + the ten work packages into the phases | (**WP-5**) | the memo | Claude / PM reviews | 🟡 in progress |
+| 9 | **Memory note + handoff doc** — durable `.claude/memory/` record of the decisions + the distilled `_handoffs/` handoff | (**WP-6**, **WP-7**) | the memo + walkthrough rulings | Claude / PM reviews | ⬜ |
+
+**Folds into the G–P runway, not F.1:**
+
+- The **spine cleanup sweep** — charge-terminology, 6-persona, capability split, "Path X", routing
+  supersessions applied to `CLAUDE.md` / `AGENTS.md` / `.claude/memory/` — is the memo's Phase-J
+  expansion (**WP-8**); it is absorbed into **Phase J** (see the phases table).
+
+**The R-1 contingent fork (encoded; resolves at the walkthrough):**
+
+- If the COPPA call is **"does not apply"** or **"unclear-with-defensible-posture"** → counsel codifies
+  the defensible posture in writing; the **US sub-13 parent-operator path opens** (**WP-9**).
+- If the COPPA call is **"COPPA applies"** → a posture memo records it; the US sub-13 path **stays
+  launch-blocked** (requires full verifiable-parental-consent) (**WP-9-alt**).
+- **Either way**, the **sub-13 v1.1 ungating workstream** (**WP-10**) stays deferred — demand-triggered,
+  three preconditions (demand signal + the EU verifiable-consent VPC vendor + end-to-end sub-13 policy
+  cell verification). It is a *named future workstream*, not in-scope for G–P.
+
+### F.1 exit gate
+
+The 3 spine ADRs (`MMT-ADR-0013` engine · the `MMT-ADR-0011` amendment · the router ADR) are **drafted
+and architect-ratified**; the model-vetting research workstream is **named with an owner**; the
+memo + handoff + memory note have **landed**; and the **R-1 fork is resolved** (or explicitly carried
+as a tracked contingency that does not block Phase H). Only then does **Phase F close** and **Phase G**
+(canonical-set lock) begin.
 
 ---
 
@@ -109,6 +219,33 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
 
 ## Cross-cutting threads
 
+- **Policy-engine + router spine (Phase F.1)** — the two new architectural lanes from the "A-vs-B"
+  decision (the engine + the router). Full detail in the **Phase F.1** section above; 3 ADRs
+  (`MMT-ADR-0013` engine · `MMT-ADR-0011` amendment · router ADR) gate Phase H. Walkthrough runs in
+  parallel. 🟡 in progress.
+- **Model-vetting research workstream (WP-4)** — a *parallel*, **PM-owned** workstream (orchestrated
+  under this roadmap) that vets `(model · provider · service · region)` tuples and emits the
+  `allowed-models` table the router reads. Same shape as the `age-consent-landscape/` PoC. Starts once
+  the regime-taxonomy + launch-set rulings (R-2/R-5) land; **not on the F→P critical path**. ⬜
+- **Persona / capability / charge-terminology refinement** — the "A-vs-B" decisions refine the persona
+  set 5→6, split capabilities (Payer = billing only · Guardian = consent only · Mentor = data access
+  only · profile-mgmt = Subscription-administrator), and rename "ward" → **"charge"**. These ripple into
+  the data-model amendment (F.1 WP-2), the architecture carve-out (Phase H), and the cleanup sweep
+  (Phase J / WP-8). 🟡
+- **Age-floor posture — "Path X" (supersedes the old "11" thread).** v1's floor is **13+ as the
+  *consent-capacity* floor** — one of three independent axes (consent capacity 13–16 per-market;
+  contract/payment capacity 18; content level a continuous gradient that **never gates**). The strictly-
+  11+ heritage (`birthYearSchema`, `packages/schemas/src/profiles.ts:38-50`) is **not** a legal line
+  (counsel: no legal usage floor) and is **superseded** by the three-axis model. **"Path X" is the
+  v1/v1.1 split:** v1 closes the 13+ load-bearing gaps (router age gate, crisis/human-in-the-loop
+  escalation, under-18 PII scrubbing, the `AgeBracket` "child" value, the prohibition-floor primitive)
+  and future-proofs the schema with sub-13 cells in the pre-baseline window; **v1.1** closes the
+  sub-13-specific gaps (output classifier, sub-13 retention TTLs, AI-disclosure UX, EU "reasonable-
+  efforts" flows, the VPC vendor) and ungates — demand-triggered, three preconditions. Sub-13 is
+  **built but front-end-gated**; **US sub-13 is excluded in v1** pending the R-1 COPPA fork. The
+  birth-year floor must still ship **with a documented rationale in the same change** (likely a UK
+  Crime & Policing Act 2026 statutory expectation). Product + counsel owned; lands in the H carve-out
+  for completeness. ⬜
 - **Documentation architecture / decisions layer (Phase C → Stream 2)** — `MMT-ADR-0000` ratified the 5-layer
   model, the first-class `MMT-ADR-NNNN` decisions layer, the **significance gate** (when a decision needs an
   ADR), the lockstep lifecycle, and the **physical layout** (§I.4: `docs/canon|adr|specs|plans|runbooks` +
@@ -150,13 +287,6 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
     verification *method* (ties to G7 vendor pick); minor double-billing disclosure + grace (E12 option B).
 - **T1 revert** — decision MADE (forward-only); execution deferred to F. Do **not** delete migration
   `0106` in isolation (it's committed + applied). ⬜
-- **"11" age-floor — final product call owed.** The strictly-11+ signup floor (`birthYearSchema`,
-  `packages/schemas/src/profiles.ts:38-50`, tag `CR-2026-05-19-H11`) is a *self-imposed product rule, not a legal
-  line* (`I-PB-B1` — counsel ruled there is no legal usage floor). Keeping / lowering it is coupled to the
-  content-rating + directed-to-children / Kids-Category store posture, and per B1 must ship **with a documented
-  rationale in the same change** (the UK Crime & Policing Act 2026 likely makes that written record a statutory
-  expectation). Product-owned; surfaced during Phase-E consent grilling (2026-06-04). Decide before the floor is
-  touched in implementation. ⬜
 - **Phase-F launch-readiness guard — value-seams not at placeholder defaults.** When Phase F runs the
   baseline migration, the value-seam columns (`person_retain.consent_receipt.retention_period`,
   `person_retain.deletion_audit.retention_period`, `person_retain.financial_record.retention_period`,
@@ -214,7 +344,7 @@ separate → evaluate standalone.
 
 ---
 
-## Definition of "ready to start implementation" (the *R* gate)
+## Definition of "ready to start implementation" (the Phase-P exit gate)
 
 The "ready to start implementation" gate is the *P* phase's exit gate, not F's. F closes as *"planning for the planning"* (i.e. the shape of G–P is ratified; the actual planning lives in G–P).
 
@@ -224,13 +354,20 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 - [x] **C** — doc-strategy decided (`MMT-ADR-0000`): decisions layer + `MMT-ADR-NNNN` + the `decision-adr-link` ratchet; ADRs homed at `docs/adr/`; the broader `docs/` reorg → deferred follow-up.
 - [x] **D** — domain model locked (`domain-model.md` + MMT-ADR-0007–0010); consent model locked; the legal-check items (E4 one-of/all-of; parent-delete; dormancy specifics) are named, scoped to E/counsel, and do not gate D.
 - [x] **E** — data model + cut strategy locked (`data-model.md` + MMT-ADR-0011/0012).
-- [ ] **F** — planning-for-the-planning ratified: the G–P shape is confirmed; the consolidation's corpus (14 sub-audits + `.deepsec/`) is identified; the four-bucket triage model is agreed; the `claude/` + `codex/` trial reconciliations are to be discarded; the launch-readiness guard is a Phase-F-thread tracked in this ROADMAP.
+- [~] **F** — planning-for-the-planning ratified: the G–P shape is confirmed; the consolidation's corpus (14 sub-audits + `.deepsec/`) is identified; the four-bucket triage model is agreed; the `claude/` + `codex/` trial reconciliations are to be discarded; the launch-readiness guard is a Phase-F-thread tracked in this ROADMAP. **Now also carries F.1 (the policy-engine/router spine) — F cannot close until F.1 closes.**
+  - [x] **F.1 — memo** signed (the 25 A-vs-B decisions; PM sign-off confirmed).
+  - [x] **F.1 — walkthrough package** tightened + reconciled to the memo (2026-06-07).
+  - [ ] **F.1 — walkthrough run** (PM + counsel + architect; six rulings R-0..R-5; the R-1 COPPA fork). *Parallel — to book.*
+  - [x] **F.1 — 3 spine ADRs** drafted + **architect-ratified 2026-06-07** (`MMT-ADR-0013` engine / `MMT-ADR-0015` data-model amendment / `MMT-ADR-0014` router). Shape accepted; enum *seeds* + the R-1 fork still come from the walkthrough.
+  - [ ] **F.1 — `data-model.md` lockstep SQL** written for the `MMT-ADR-0015` amendments (now DUE — the ratified ADR's canon partner; per MMT-ADR-0000 lockstep).
+  - [x] **F.1 — model-vetting research workstream** owner assigned = **PM** (WP-4); kickoff brief still to draft.
+  - [~] **F.1 — roadmap update** (this document, WP-5) + memory/handoff (WP-6/7) landed.
 
 **G–P (the firming, classification, planning — the actual planning runway):**
-- [ ] **G** — canonical set explicitly confirmed (9 docs; lens for the gap analysis (L)).
-- [ ] **H** — `architecture.md` identity-foundation carve-out authored (rock-solid; cited to ADRs + data model).
+- [ ] **G** — canonical set explicitly confirmed (now **incl. the 3 F.1 spine ADRs + the memo/handoff**; lens for the gap analysis (L)).
+- [ ] **H** — `architecture.md` identity-foundation carve-out authored (rock-solid; **covers the consent-category model + engine + router/vetting split + personas/capabilities + "Path X"**; cited to ADRs + data model).
 - [ ] **I** — light pass on the rest of `architecture.md` (misleading info corrected; merely incomplete left as-is) **+ `ARCH-N` touch (identity-foundation domain)**.
-- [ ] **J** — light pass on memory + agent rules (any agent's session context; fix only what's misleading).
+- [ ] **J** — light pass on memory + agent rules (any agent's session context; fix only what's misleading) **+ the A-vs-B cleanup sweep (WP-8): charge-terminology, 6-persona, capability split, "Path X", routing supersessions**.
 - [ ] **K** — consolidation activity (the 14 sub-audits + `.deepsec/`; produce the consolidated-audit doc; the K.0 canon-contradiction check; the K.5 sizing estimate; the K.6 spin-up-or-defer decision). See Phase K — detail above.
 - [ ] **L** — unified gap analysis (one row per finding; the delta document).
 - [ ] **M** — four-bucket triage (handled / clear in / clear out / defer).
@@ -239,19 +376,44 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 - [ ] **P** — hand off to execution (Cosmo work-package slicing; the Cosmo top-down process enablement is the parallel precondition).
 
 **Tracked open threads (not blockers, named for visibility):**
+- [ ] Policy-engine spine walkthrough booked + run (PM + live counsel + architect); the **R-1 COPPA fork** resolved.
+- [x] Model-vetting research workstream (WP-4) — **owner = PM**; runs parallel; off the F→P critical path; kickoff brief still to draft.
+- [ ] Sub-13 v1.1 ungating workstream (WP-10) — deferred, demand-triggered (named future workstream, not in G–P).
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
-- [ ] T1 revert sequenced as the first implementation step (lands *during* the execution phase, after R).
+- [ ] T1 revert sequenced as the first implementation step (lands *during* the execution phase, after P).
 - [ ] Launch-readiness guard exists (test file in `apps/api/src/services/identity/launch-readiness.test.ts`; the spec is the Phase-F-thread tracked in this ROADMAP; the implementation lands in the execution phase).
-- [ ] "11" age-floor final product call (gated on content-rating / directed-to-children store posture; surfaces in H's `architecture.md` carve-out for completeness).
+- [ ] Age-floor "Path X" final product call (13+ consent-capacity floor; sub-13 built-but-gated; US sub-13 gated on the R-1 fork; surfaces in H's carve-out for completeness; ships with documented rationale).
 - [ ] Retention *values* (counsel; the schema's `retention_period` columns are seams; the values fill from the fillers walkthrough results, *not* in scope for G–P).
-- [ ] `inv 17` rephrase — **DONE 2026-06-04** (locked in this session; moved out of the open-threads list).
-- [ ] G7 VPC vendor pick (procurement, after legal requirements are clear).
+- [ ] G7 VPC vendor pick (procurement, after legal requirements are clear; precondition for the WP-10 sub-13 ungating).
 
 - → **Only then:** create Cosmo implementation work items (the work that P hands off to).
 
 ---
 
 ## Decision log
+
+- **2026-06-07** — **Roadmap integrated with the "A-vs-B" outcome — the runway grew by a spine sub-phase
+  (F.1) + two architectural lanes.** The v1 launch-scope investigation (the **"A-vs-B" decision** —
+  serve sub-consent-age minors at launch, or defer to v2) ran 2026-06-01→06-05 and surfaced work the
+  earlier runway did not account for, now signed in the decision-capture memo (2026-06-06; **PM
+  sign-off confirmed**). **Integration calls made this session:** (1) **Phase F now carries F.1** — the
+  **policy-engine + model-router spine** — recorded as 3 ADRs (`MMT-ADR-0013` engine · `MMT-ADR-0011`
+  amendment · router ADR ≈`0014`) that gate Phase H; the new **Phase F.1 section** folds the memo's
+  ten work packages ("WP-1".."WP-10") into the phases by sequence + dependency. (2) **G–P keep their
+  shape but inherit new inputs** — the canonical set (G) gains the 3 spine ADRs; the carve-out (H)
+  must cover the consent-category model + engine + router/vetting split + the 6-persona/capability
+  model + the age-floor split; the cleanup sweep (J) absorbs the memo's Phase-J expansion (WP-8 —
+  charge-terminology, personas, capabilities, "Path X", routing supersessions). (3) **The "11"
+  age-floor thread is superseded** by the three-axis model + the **"Path X"** v1/v1.1 split. (4) **The
+  R-1 COPPA fork is encoded explicitly** (US sub-13 parent-operator path opens or stays blocked on the
+  walkthrough's legal ruling); the **sub-13 v1.1 ungating workstream (WP-10)** is a named, deferred,
+  demand-triggered future workstream, out of G–P scope. **Parallelism ruled:** the walkthrough runs in
+  parallel with this planning — it is confirmatory for the already-signed decisions and only fills
+  enum *values* (inputs to the ADR *bodies*) + resolves the R-1 fork, neither of which destabilizes
+  the phase structure. **Also this session:** the walkthrough package was tightened + reconciled to the
+  memo (WP namespace, R-5 "illustrative-not-ratified" framing, the supersedes list, de-staled legal
+  corpus). **F.1 closure** (and therefore Phase F) waits on: walkthrough run → 3 ADRs ratified →
+  vetting workstream named → memory/handoff landed → R-1 resolved.
 
 - **2026-06-04** — **`inv 17` rephrased — store-delegation sharpened to payment mechanics only — RATIFIED
   (architect).** The lone open call from the 2026-06-03 counsel walkthrough (`I-PB-B3a` — the store-
