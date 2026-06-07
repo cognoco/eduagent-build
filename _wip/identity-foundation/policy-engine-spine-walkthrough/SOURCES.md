@@ -1,4 +1,6 @@
-# Sources — Under-13 Floor Walkthrough
+# Sources — Policy-Engine Spine Walkthrough
+
+> Reused as the legal-research backbone for the policy-engine spine walkthrough (originally authored for the under-13 floor walkthrough; the legal substance is unchanged).
 
 > **Consolidated citation list.** One row per source cited in
 > `SYNTHESIS.md` and `BRIEFING-PACKET.md`. The verification status column

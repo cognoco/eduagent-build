@@ -1,4 +1,6 @@
-# Synthesis — Under-13 Floor Walkthrough
+# Synthesis — Policy-Engine Spine Walkthrough
+
+> Reused as the legal-research backbone for the policy-engine spine walkthrough (originally authored for the under-13 floor walkthrough; the legal substance is unchanged).
 
 > **Briefing-packet primary input.** Six-Layer Constraint-Sets Venn, jurisdiction × age-band matrix, and the seven structural gaps surfaced across four sub-area returns. This document names the constraints. The walkthrough decides.
 >

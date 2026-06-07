@@ -15,7 +15,7 @@ The 13+ launch floor is already ruled (Phase-E handoff, 2026-06-04). The A-vs-B 
 3. **Regime taxonomy** — collapse the ~200 countries into a small first-class list of **regimes** (US-COPPA, EU-GDPR-13-floor, EU-GDPR-14-floor, EU-GDPR-15-floor, EU-GDPR-16-default, UK-AADC, ROW, …). The policy engine keys on **regimes**, not on the full country list.
 4. **Knowledge axes** — "known/unknown" is **two independent axes** (known-age × known-residence), each with a **determination method** (self-report / geo-IP / billing-address / verified) and a **confidence** feeding the knowledge-state. **Default for unknown = most-restrictive.**
 5. **3-param runtime router key** — the router's runtime key is **model · service-provider · serving-region**. The **vetting pipeline** (offline, on-cadence) evaluates 4-axis (model · provider-via-service · service · region) × criteria (ToS, ZDR, log-retention, training-data, age-closure) and emits rows into an **allowed-models table**; the router reads from that table, the policy engine filters.
-6. **Launch set** — the launch-time provider set is **Anthropic · OpenAI · Mistral · (DeepSeek via papered service)**. **Workspace-for-Education Gemini is OUT of scope as a route** but stays as a *policy-table data point* (the §20(d) under-18 closure-with-education-tenant exception is real and informs the engine, just not a route). Vetting is deferred to a parallel research workstream.
+6. **Launch set (shape + process, not names)** — lock the *slot structure* (a US-primary route + an EU-primary route + a cost-effective non-US alternative) and the principle that the **vetting-research workstream owns the actual provider picks**. The named set **Anthropic · OpenAI · Mistral · (DeepSeek via papered service)** is an **illustrative example, not a ratified list** (memo §4.3). **Workspace-for-Education Gemini is OUT of scope as a route** but stays as a *policy-table data point* (the §20(d) under-18 closure-with-education-tenant exception is real and informs the engine, just not a route).
 
 **One sentence for the whole walkthrough:** ratify the *shape* of the policy engine (primitives, regimes, knowledge axes, router key, launch set) so the next-round ADR drafting has a spine to draft against.
 
@@ -28,6 +28,17 @@ The legal synthesis (`SYNTHESIS.md`) leaned on the URLs in `SOURCES.md`. Some pr
 **This is the worklist for counsel in the room.** `SOURCES.md` lists the unverified primaries in priority order. The single most consequential unverified citation is **ICO Children's Code Annex B** (a UK design-band seam that the original under-13 synthesis leaned on, and that R-1 / R-2 may still need to address). Counsel, please re-verify Annex B against the live ICO document in the room or as homework. The synthesis can be read end-to-end on the verified URLs alone; the unverified citations support enforcement-signal density but are not load-bearing for the R-1 ruling.
 
 **For R-1 specifically:** the COPPA "actual knowledge" doctrine (16 CFR Part 312.2) and the "directed to children" trigger (16 CFR Part 312.2) are the controlling concepts. Both are statute-level; the synthesis is read on verified primary text for those. The unverified primaries are secondary to the R-1 ruling.
+
+---
+
+## What the spine supersedes (read before the rulings)
+
+Ratifying this spine **invalidates prior canon**. The A-vs-B decision-capture memo §6 lists the full set; the four items most relevant to this room are below (one line each). Each R-ruling below builds on these supersessions — they are the *why* behind the rulings, not background.
+
+- **Prior routing canon "Family standard = Gemini-only"** — **invalidated** (memo §6 SUPERSEDES). Gemini/Vertex AI is §20(d)-closed to minors, so a Gemini-only family route is not legally available.
+- **Prior GATE-1 minor-routing rule** ("pin 13–17 minors to a papered/ZDR LLM endpoint") — **re-spec'd** (memo §6 SUPERSEDES). The policy-engine output becomes the eligibility filter; the papered/ZDR endpoint is a vetted row in the allowed-models table, not a hard-coded routing rule. (This is what R-4 operationalises.)
+- **Prior single-primitive policy-engine model** (consent-edge only) — **superseded by the two-primitive model** (prohibition-floor + consent-edge; memo §6 SUPERSEDES). (This is what R-0 ratifies.)
+- **Prior 2-knowledge-state model** (unknown, known-under-threshold) — **superseded by the two-axis model** (known-age × known-residence; memo §6 SUPERSEDES). (This is what R-3 ratifies.)
 
 ---
 
@@ -123,21 +134,29 @@ The R-2 ruling locks the **first-class regime enum** (the rows above, plus any r
 
 ---
 
-## 8. R-5 — Launch set (with vetting deferred)
+## 8. R-5 — Launch set (shape + process, not names)
 
-**The candidate set, not yet locked.** The walkthrough ratifies the *engineering intent* of the launch provider set. The candidate set:
+**What R-5 locks — and what it does *not*.** Per memo §4.3 the launch provider set is **illustrative, not ratified**: the actual set is the *output* of the vetting-research workstream, not a decision made in this room. So R-5 locks the **architecture shape** (the slot structure) and the **process** (who produces the names) — it does **not** lock four provider names.
 
-| Provider | Role | Vetting status (pre-walkthrough) |
+**The slot structure to lock (the real ruling).** Three architecture slots:
+
+- a **US-primary route**,
+- an **EU-primary route**,
+- a **cost-effective non-US alternative**.
+
+**The illustrative example set (NOT ratified — for orientation only).** The four named providers show how the slots *may* fill; the vetting-research workstream owns the actual picks.
+
+| Provider (illustrative) | Slot it illustrates | Vetting status |
 |---|---|---|
-| **Anthropic (Claude)** | Primary US-domiciled route; minor-safe per usage policy | Open — vetting PoC pending |
-| **OpenAI** | Primary US-domiciled route; under-18 ToS nuances (Root-system model spec) | Open — vetting PoC pending |
-| **Mistral** | EU-domiciled route (model + serving region) | Open — vetting PoC pending |
-| **DeepSeek via papered service** | Cost-effective non-US route; *only* the model weights — vetting is for the service layer | Open — vetting PoC pending |
+| **Anthropic (Claude)** | US-primary route; minor-safe per usage policy | Illustrative — vetting workstream decides |
+| **OpenAI** | US-primary route; under-18 ToS nuances (Root-system model spec) | Illustrative — vetting workstream decides |
+| **Mistral** | EU-primary route (model + serving region) | Illustrative — vetting workstream decides |
+| **DeepSeek via papered service** | Cost-effective non-US alternative; *only* the model weights — vetting is for the service layer | Illustrative — vetting workstream decides |
 | ~~Workspace for Education Gemini~~ | ~~All-ages unlock via education tenant~~ | **OUT of scope as a route** — keep as a *policy-table data point* (the §20(d) under-18-closure-with-education-tenant exception is real and informs the engine, just not a route) |
 
-**Why vetting is deferred to a parallel research workstream.** The vetting pipeline is its own workstream with its own PoC shape (the same `age-consent-landscape/`-style data.json + index.html). The walkthrough ratifies the *engineering intent* (the providers we're targeting); the *vetting verdict* (which pass for which cells) is the workstream's output. This is the same separation-of-concerns move as R-4.
+**The vetting-pipeline-owns-the-picks principle.** The vetting pipeline is its own workstream with its own PoC shape (the same `age-consent-landscape/`-style data.json + index.html). The walkthrough ratifies the *slot shape + the process*; the *ratified provider set* is the workstream's output table. If an illustrative provider fails vetting (or is dropped), the architecture doesn't change — the slot stays, a different vetted row fills it, and the policy engine filters at runtime. This is the same separation-of-concerns move as R-4.
 
-**The ruling to make:** LOCKED · REFINEMENT · REJECTED · SPLIT. The ruling text includes the **locked provider set** as an inline enum and confirms Workspace-for-Education is out of scope as a route.
+**The ruling to make:** LOCKED · REFINEMENT · REJECTED · SPLIT. The ruling text locks the **slot structure** (US-primary + EU-primary + cost-effective non-US alt), confirms the **vetting workstream owns the actual picks**, marks the four named providers as **illustrative-not-ratified**, and confirms Workspace-for-Education is out of scope as a route.
 
 ---
 
@@ -150,7 +169,7 @@ The R-2 ruling locks the **first-class regime enum** (the rows above, plus any r
 | R-2 | Regime taxonomy | Locked first-class regime enum |
 | R-3 | Knowledge axes | v1 determination-method set; default-for-unknown rule |
 | R-4 | Router key | 3-param runtime key; 4-param vetting axis; flow lock |
-| R-5 | Launch set | Locked launch provider set; vetting-research workstream named |
+| R-5 | Launch set (shape + process) | Locked slot structure (US-primary + EU-primary + cost-effective non-US alt); four named providers illustrative-not-ratified; vetting-research workstream named as producer of the ratified set |
 
 **Dependency order:** R-0 → (R-2 + R-3) → R-4 → R-5. R-1 is independent.
 

@@ -25,7 +25,7 @@ The five high-level decisions from the A-vs-B conversation, made concrete:
 | **R-2** | **Regime taxonomy** — collapse the ~200 countries into ~5–8 first-class regimes (US-COPPA, EU-GDPR-13-floor, EU-GDPR-14-floor, EU-GDPR-15-floor, EU-GDPR-16-default, UK-AADC, ROW, …). The policy engine keys on regimes, not jurisdictions. | The taxonomy is locked. The PoC's 10 jurisdictions are a research sample; the *engine* is regime-keyed. |
 | **R-3** | **Knowledge axes** — "known/unknown" is two independent axes (known-age × known-residence), each with a **determination method** (self-report / geo-IP / billing-address / verified) and a **confidence** feeding the knowledge-state. Default for unknown = most-restrictive. | The axes are locked. The "determination method + confidence" structure is in scope for the policy-engine schema (the v1 implementation can start with self-report + geo-IP, expand later). |
 | **R-4** | **3-param runtime router key** — the router's runtime key is **model · service-provider · serving-region**. The vetting pipeline (offline, on-cadence) evaluates 4-axis (model · provider-via-service · service · region) × criteria (ToS, ZDR, log-retention, training-data, age-closure) and emits rows into an **allowed-models table**; the router reads from that table, the policy engine filters. | The 3-vs-4 split is locked. The router never sees vetting criteria directly; it sees vetted rows. |
-| **R-5** | **Launch set, with vetting deferred to a parallel research workstream** — the launch-time provider set is **Anthropic · OpenAI · Mistral · (DeepSeek via papered service)**. **Workspace-for-Education Gemini is OUT of scope as a route** but stays as a *policy-table data point* (the §20(d) under-18 closure-with-education-tenant exception is real and informs the engine, just not a route). | The launch set is locked. The vetting-research workstream is named as a parallel PoC (same shape as the age-consent-landscape PoC, separate owner). |
+| **R-5** | **Launch set — shape + process, not names.** Lock the *slot structure* (a US-primary route + an EU-primary route + a cost-effective non-US alternative) and the principle that the **vetting-research workstream owns the actual provider picks**. The named set **Anthropic · OpenAI · Mistral · (DeepSeek via papered service)** is **illustrative, not ratified** (memo §4.3). **Workspace-for-Education Gemini is OUT of scope as a route** but stays as a *policy-table data point* (the §20(d) under-18 closure-with-education-tenant exception is real and informs the engine, just not a route). | The slot structure + the process are locked; the four provider names are illustrative-not-ratified. The vetting-research workstream is named as a parallel PoC (same shape as the age-consent-landscape PoC, separate owner) and as the producer of the ratified provider set. |
 
 **Dependency order:** R-0 → (R-2 + R-3) → R-4 → R-5. R-1 is independent of the others (it's a legal ruling, not an engineering spine) and can be taken at any point, but is **load-bearing for the sub-13 v2 path** — flag that scope. R-0 must rule first because R-4 reads the prohibition-floor primitive and R-5 reads the consent-edge primitive.
 
@@ -41,7 +41,7 @@ The five high-level decisions from the A-vs-B conversation, made concrete:
 | **3. R-2 — Regime taxonomy** | 15 min | Walk the candidate 5–8 regimes. Rule: locked / refinement / rejected. Decide the first-class regime list. | Briefing packet §5; `age-consent-landscape/data.json` |
 | **4. R-3 — Knowledge axes** | 15 min | Walk the two-axis model (age × residence) with determination method + confidence. Rule the default-for-unknown = most-restrictive. Decide the v1 determination-method set. | Briefing packet §6 |
 | **5. R-4 — Router key** | 10 min | Walk the 3-param runtime / 4-param vetting split. Rule the 3-param key. Confirm the vetting-pipeline → allowed-models-table → router flow. | Briefing packet §7 |
-| **6. R-5 — Launch set** | 10 min | Walk the candidate launch set (Anthropic, OpenAI, Mistral, DeepSeek-via-papered-service). Rule: locked / refinement / rejected. Confirm Workspace-for-Education is out of scope as a route. | Briefing packet §8 |
+| **6. R-5 — Launch set** | 10 min | Lock the slot *shape* (US-primary + EU-primary + cost-effective non-US alt) and the vetting-pipeline-owns-the-picks principle. Mark the four named providers (Anthropic, OpenAI, Mistral, DeepSeek-via-papered-service) as illustrative-not-ratified. Confirm Workspace-for-Education is out of scope as a route. | Briefing packet §8 |
 | **7. Closing + capture** | 5–10 min | Read back the six rulings. Capture into `CAPTURE-LEDGER.md`. Identify homework follow-ups (mostly: vetting-research workstream, ADR-0013 draft, `MMT-ADR-0011` amendment scope). Name the post-walkthrough deliverables. | `CAPTURE-LEDGER.md` |
 
 **Time-box discipline:** R-1 is the legal ruling and the one most likely to need iteration — let it run over if it must. If R-2 (regime taxonomy) drags, the cleanest cut is the 4th-tier sub-cells (per-Member-State threshold detail) — the 5–8-regime skeleton is the spine, the per-Member-State detail is research-input.
@@ -73,7 +73,7 @@ The five high-level decisions from the A-vs-B conversation, made concrete:
 > - R-2 (regime taxonomy): [ruling, with the locked regime list]
 > - R-3 (knowledge axes): [ruling, with the v1 determination-method set]
 > - R-4 (router key): [ruling, 3-param runtime / 4-param vetting]
-> - R-5 (launch set): [ruling, with the locked launch set]
+> - R-5 (launch set): [ruling, with the locked slot structure — US-primary + EU-primary + cost-effective non-US alt; four named providers illustrative-not-ratified; vetting workstream named]
 >
 > If any ruling is split, contingent, or rejected, identify the contingency now and assign an owner to resolve it within 1–2 weeks.
 >
@@ -108,7 +108,7 @@ Each ruling should be captured with the following structure:
 - **Counsel signoff (R-1 only):** [name, firm, timestamp]
 ```
 
-For R-2 (regime taxonomy), the ruling text should include the **locked regime list** as an inline enum. For R-3 (knowledge axes), the ruling text should include the **v1 determination-method set** as an inline enum. For R-5 (launch set), the ruling text should include the **locked provider set** as an inline enum. These inline enums are the artifacts that the post-walkthrough ADR drafting needs.
+For R-2 (regime taxonomy), the ruling text should include the **locked regime list** as an inline enum. For R-3 (knowledge axes), the ruling text should include the **v1 determination-method set** as an inline enum. For R-5 (launch set), the ruling text should include the **locked slot structure** (US-primary + EU-primary + cost-effective non-US alt) as an inline enum, plus the **illustrative provider set flagged not-ratified** (memo §4.3) and the named vetting-research workstream — *not* a locked provider list. These inline enums are the artifacts that the post-walkthrough ADR drafting needs.
 
 ---
 
@@ -116,7 +116,7 @@ For R-2 (regime taxonomy), the ruling text should include the **locked regime li
 
 - **If R-0 cannot be ruled in 15 min:** capture the discussion, mark R-0 as "needs follow-up," and proceed to R-2/R-3 with R-0 marked as "to be confirmed in writing within 48 hours." **Do not** let R-0's open status block R-2 — R-2 is regime-keyed, not primitive-keyed, and can be ruled without R-0's specifics.
 - **If R-1 splits across jurisdictions (e.g., US-allowed, EU-uncertain, UK-allowed):** the regime-taxonomy R-2 cell needs a per-jurisdiction carve-out. Flag this as a major downstream work item — the regime-taxonomy enum becomes wider, and the "default for unknown" rule in R-3 must apply per-cell, not globally.
-- **If R-5 is UNDECIDED because the vetting-research workstream hasn't reported:** rule the *engineering intent* (the providers we're targeting) and defer the *vetting verdict* (which of those providers actually pass for which cells) to the vetting-research PoC. Do not pretend the launch set is ratified when the vetting is unknown.
+- **If R-5 stalls on the provider names:** that is the wrong axis — R-5 does not ratify provider names. Rule the *slot shape* (US-primary + EU-primary + cost-effective non-US alt) and the *vetting-pipeline-owns-the-picks* principle; mark the four named providers as illustrative-not-ratified (memo §4.3) and defer the actual picks (which providers pass for which cells) to the vetting-research PoC. Do not pretend a provider list is ratified — the ratified output is the workstream's table.
 
 ---
 
@@ -125,7 +125,7 @@ For R-2 (regime taxonomy), the ruling text should include the **locked regime li
 - **Do not let the room re-litigate the 13+ launch floor.** That's ratified. The walkthrough is a spine workshop, not a re-run of the under-13 walkthrough.
 - **Do not let counsel absorb R-0, R-2, R-3, R-4, or R-5.** Only R-1 is a legal ruling. The rest are engineering spine rulings; counsel is in the room as a verifier, not a decider.
 - **Do not skip R-0.** The router and the launch set both read the primitives it defines. If R-0 is rejected, the whole spine reshapes — better to find that out in the first 15 minutes than after an hour of R-2/R-3 work.
-- **Do not pad R-5 with vetting speculation.** The vetting comes from a parallel research workstream, not from the facilitator. If the vetting-research PoC hasn't reported, rule the *intent* (the provider set we're targeting) and defer the *verdict* (which pass).
+- **Do not let R-5 turn into a provider bake-off.** R-5 locks the *slot shape* (US-primary + EU-primary + cost-effective non-US alt) and names the workstream; it does **not** ratify provider names (memo §4.3 — the four named providers are illustrative). The vetting verdict comes from a parallel research workstream, not from the facilitator. Rule the shape + process; defer the picks.
 
 ---
 
@@ -142,7 +142,7 @@ If R-0 is locked (the expected outcome):
 
 5. **`MMT-ADR-0013` draft** — the policy-engine spine ADR. Two-primitive model + regime taxonomy + knowledge axes + 3-param router key. Lockstep with `data-model.md` per `MMT-ADR-0000`.
 6. **`MMT-ADR-0011` amendment scope** — identify which data-model primitives need to change to support the policy engine (the prohibition-floor primitive, the age × residence × knowledge × consent-state seam columns). Cheap pre-baseline, append-only after.
-7. **Vetting-research workstream PoC kickoff** — same shape as `age-consent-landscape/`. Separate owner. Inputs: the locked launch set (R-5) and the locked regime taxonomy (R-2). Outputs: per-cell `allowed-models` table rows with vetting criteria metadata.
+7. **Vetting-research workstream PoC kickoff** — same shape as `age-consent-landscape/`. Separate owner. Inputs: the locked slot structure + the illustrative provider set (R-5) and the locked regime taxonomy (R-2). Outputs: per-cell `allowed-models` table rows with vetting criteria metadata — this table is the *ratified* provider set (the R-5 names were illustrative).
 
 ---
 

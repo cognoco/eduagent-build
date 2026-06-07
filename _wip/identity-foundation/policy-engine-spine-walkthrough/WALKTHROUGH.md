@@ -19,7 +19,7 @@
 3. **R-2** — Regime taxonomy. What's the locked first-class regime enum (5–8 entries) the policy engine keys on?
 4. **R-3** — Knowledge axes. Two axes (age × residence) with determination method + confidence; v1 determination-method set; default-for-unknown = most-restrictive.
 5. **R-4** — Router key. 3-param runtime (`model · service_provider · serving_region`) / 4-param vetting (`model · provider_via_service · service · region`); the vetting-pipeline → allowed-models-table → policy-engine-filter → router flow.
-6. **R-5** — Launch set. The locked launch provider set (Anthropic · OpenAI · Mistral · DeepSeek-via-papered-service), with vetting deferred to a parallel research workstream. Workspace-for-Education Gemini is **out of scope as a route**.
+6. **R-5** — Launch set (shape + process, not the names). Lock the *slot structure* — a US-primary route + an EU-primary route + a cost-effective non-US alternative — and lock the principle that the **vetting-research workstream owns the actual picks**. The four named providers (Anthropic · OpenAI · Mistral · DeepSeek-via-papered-service) are an **illustrative example set, not a ratified list** (memo §4.3). Confirm Workspace-for-Education Gemini is **out of scope as a route** (kept as a policy-table data point).
 
 The walkthrough is a *spine workshop*, not a *plan*. The output is the *shape* of the engine and the locked enums (regime list, determination-method set, launch set), which become the inputs to the post-walkthrough ADR drafting.
 
@@ -35,7 +35,7 @@ The walkthrough is a *spine workshop*, not a *plan*. The output is the *shape* o
 | **3. R-2 — Regime taxonomy** | 15 min | Walk the candidate 5–8 regimes. Rule: locked / refinement / rejected. Decide the first-class regime list. | Briefing packet §5; `age-consent-landscape/data.json` |
 | **4. R-3 — Knowledge axes** | 15 min | Walk the two-axis model (age × residence) with determination method + confidence. Rule the default-for-unknown = most-restrictive. Decide the v1 determination-method set. | Briefing packet §6 |
 | **5. R-4 — Router key** | 10 min | Walk the 3-param runtime / 4-param vetting split. Rule the 3-param key. Confirm the vetting-pipeline → allowed-models-table → router flow. | Briefing packet §7 |
-| **6. R-5 — Launch set** | 10 min | Walk the candidate launch set. Rule: locked / refinement / rejected. Confirm Workspace-for-Education is out of scope as a route. | Briefing packet §8 |
+| **6. R-5 — Launch set** | 10 min | Lock the slot *shape* (US-primary + EU-primary + cost-effective non-US alt) and the vetting-pipeline-owns-the-picks principle. Mark the four named providers as illustrative, not ratified. Confirm Workspace-for-Education is out of scope as a route. | Briefing packet §8 |
 | **7. Closing + capture** | 5–10 min | Read back the six rulings. Capture into `CAPTURE-LEDGER.md`. Identify homework follow-ups. Name the post-walkthrough deliverables. | `CAPTURE-LEDGER.md` |
 
 **Time-box discipline:** R-1 is the legal ruling and the one most likely to need iteration — let it run over if it must. If R-2 (regime taxonomy) drags, the cleanest cut is the 4th-tier sub-cells (per-Member-State threshold detail) — the 5–8-regime skeleton is the spine, the per-Member-State detail is research-input. If R-0 cannot be ruled in 15 minutes, capture the discussion, mark R-0 as "needs follow-up," and proceed to R-2/R-3 with R-0 marked as "to be confirmed in writing within 48 hours." Do not let R-0's open status block the rest of the spine.
@@ -58,7 +58,9 @@ The walkthrough is a *spine workshop*, not a *plan*. The output is the *shape* o
 >
 > Time-box: 90 to 120 minutes. Let's go."
 
-**Outputs from this block:** counsel has the `SOURCES.md` worklist; PM and architect have the time-box; room agrees on dependency order.
+**Before the rulings, name what dies.** Point the room at the briefing packet's "What the spine supersedes" subsection (memo §6) — the four prior-canon items this spine invalidates (Family=Gemini-only routing; GATE-1 minor-routing; single-primitive policy engine; 2-knowledge-state model). These are the *why* behind R-0, R-3, and R-4; surfacing them up front keeps the room from re-deriving settled supersessions mid-ruling.
+
+**Outputs from this block:** counsel has the `SOURCES.md` worklist; PM and architect have the time-box; room agrees on dependency order; room has seen the supersession list.
 
 ---
 
@@ -148,16 +150,18 @@ The walkthrough is a *spine workshop*, not a *plan*. The output is the *shape* o
 
 ## Block 6 — R-5: Launch set (10 min)
 
+**Framing note (read first):** R-5 does **not** lock four provider names. Per memo §4.3 the launch provider set is *illustrative, not ratified* — the actual set is the **output of the vetting-research workstream**. What R-5 locks is the *architecture shape* (the slot structure) and the *process* (who produces the names). Keep R-5 a real ruling — just move it from "lock these 4 names" to "lock the shape + name the workstream that produces the names."
+
 **What the facilitator walks the room through:**
 
-1. The candidate set (2 min) — Anthropic · OpenAI · Mistral · DeepSeek-via-papered-service. Workspace-for-Education Gemini is **out of scope as a route** (informs the policy engine, not a route).
-2. Why vetting is deferred (3 min) — the vetting pipeline is its own workstream with its own PoC shape (the same `age-consent-landscape/`-style data.json + index.html). The walkthrough ratifies the *engineering intent*; the *vetting verdict* is the workstream's output.
-3. What "locked launch set" means at the time of the walkthrough (2 min) — the set of providers we're *targeting* in the architecture. It does not mean "all of these pass vetting for all cells" — that's the vetting-research workstream's finding. If a provider fails vetting for a cell, the policy engine filters it out at runtime; the architecture doesn't need to change.
-4. Discussion + ruling (3 min) — capture the locked launch set, the out-of-scope confirmations (Workspace-for-Education), the vetting-research workstream name.
+1. The slot structure to lock (2 min) — three architecture slots, not four names: a **US-primary route**, an **EU-primary route**, and a **cost-effective non-US alternative**. The four illustrative providers (Anthropic for US-primary, OpenAI as US-primary candidate, Mistral for EU-primary, DeepSeek-via-papered-service for the cost-effective non-US alt) are an *example* of how the slots may fill — **not a ratified list**. Workspace-for-Education Gemini is **out of scope as a route** (informs the policy engine as a policy-table data point, not a route).
+2. The vetting-pipeline-owns-the-picks principle (3 min) — the vetting pipeline is its own workstream with its own PoC shape (the same `age-consent-landscape/`-style data.json + index.html). The walkthrough ratifies the *slot shape + the process*; the *actual provider picks* are the workstream's output table. The four named providers are illustrative inputs to that workstream, not its conclusion.
+3. What "locked" means here (2 min) — the slots and the process are locked; the *names* are not. It does not mean "these four providers are the launch set" — that's the vetting-research workstream's finding. If an illustrative provider fails vetting for a cell (or is dropped entirely), the architecture doesn't change: the slot stays, a different vetted row fills it, and the policy engine filters at runtime.
+4. Discussion + ruling (3 min) — capture the locked slot structure, the vetting-pipeline-owns-the-picks principle, the illustrative-not-ratified status of the four named providers, the out-of-scope confirmation (Workspace-for-Education), and the vetting-research workstream name.
 
-**Ruling format:** LOCKED · REFINEMENT · REJECTED · SPLIT · DEFER. The ruling text **must** include the locked provider set as an inline enum and confirm Workspace-for-Education is out of scope as a route.
+**Ruling format:** LOCKED · REFINEMENT · REJECTED · SPLIT · DEFER. The ruling text **must** lock the slot structure (US-primary + EU-primary + cost-effective non-US alt), confirm the vetting workstream owns the actual picks, mark the four named providers as illustrative-not-ratified, and confirm Workspace-for-Education is out of scope as a route.
 
-**Outputs from this block:** R-5 ruling text + the locked launch set + the vetting-research workstream named.
+**Outputs from this block:** R-5 ruling text + the locked slot structure + the illustrative provider example set (flagged not-ratified) + the vetting-research workstream named (as the producer of the ratified set).
 
 ---
 

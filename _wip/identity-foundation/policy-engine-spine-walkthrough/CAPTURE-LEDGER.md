@@ -178,25 +178,34 @@ pm_signoff: ""
 
 ---
 
-### Ruling: R-5 — Launch set (with vetting deferred)
+### Ruling: R-5 — Launch set (shape + process, not names)
 
-> What is the locked launch provider set, and is the vetting-research workstream named?
+> What slot *structure* is locked, is the vetting-research workstream named as the producer of the ratified provider set, and is Workspace-for-Education confirmed out of scope as a route?
+>
+> **Note (memo §4.3):** the launch provider set is **illustrative, not ratified** in the room — the ratified output is the vetting-research workstream's table. R-5 locks the *shape* (the slots) and the *process* (the workstream), not the four named providers.
 
 ```yaml
 ruling: LOCKED | REFINEMENT | REJECTED | SPLIT | DEFER
-launch_provider_set:
-  - ""  # one entry per locked provider, e.g., 'anthropic_claude'
-  - ""
-  - ""
-  - ""
+slot_structure:  # the LOCKED architecture shape (the real ruling)
+  - "US_primary_route"
+  - "EU_primary_route"
+  - "cost_effective_non_us_alternative"
+launch_provider_set:  # ILLUSTRATIVE example only — NOT ratified here.
+  status: illustrative_not_ratified  # ratified set is the vetting workstream's output table
+  ratified_output_owner: "vetting-research workstream (WP-4)"
+  example_providers:  # how the slots may fill; the workstream decides the actual picks
+    - "anthropic_claude"      # illustrates US_primary_route
+    - "openai"                # illustrates US_primary_route (candidate)
+    - "mistral"               # illustrates EU_primary_route
+    - "deepseek_via_papered_service"  # illustrates cost_effective_non_us_alternative
 out_of_scope_routes:
-  - ""  # e.g., 'workspace_for_education_gemini'
+  - ""  # e.g., 'workspace_for_education_gemini' (kept as a policy-table data point, not a route)
 vetting_research_workstream:
   named: true | false
   owner: ""  # PM/architect/separate
   poc_shape: "same as age-consent-landscape PoC (data.json + index.html)"
-  inputs: []  # e.g., ['locked launch set (R-5)', 'locked regime taxonomy (R-2)']
-  outputs: "per-cell allowed-models table rows with vetting criteria metadata"
+  inputs: []  # e.g., ['locked slot structure (R-5)', 'illustrative provider set (R-5)', 'locked regime taxonomy (R-2)']
+  outputs: "per-cell allowed-models table rows with vetting criteria metadata — this table IS the ratified provider set"
 ruling_text_verbatim: ""
 rationale: ""
 dissent_or_caveats: ""
@@ -207,8 +216,8 @@ pm_signoff: ""
 
 **Implications of the ruling:**
 
-- **LOCKED** → the launch set is the engineering intent. The vetting-research workstream is named as a parallel PoC. The post-walkthrough `MMT-ADR-0013` drafting has the launch-set scope; the workstream has the vetting-verdict scope.
-- **REFINEMENT** → likely an addition to the launch set (e.g., a fifth provider with a noted caveat) or a refinement to the out-of-scope list. Capture the refinement.
+- **LOCKED** → the slot structure (US-primary + EU-primary + cost-effective non-US alt) and the vetting-pipeline-owns-the-picks principle are the engineering intent. The four named providers are illustrative inputs, not a ratified list. The vetting-research workstream is named as a parallel PoC and as the producer of the ratified provider set. The post-walkthrough `MMT-ADR-0013` drafting has the slot-structure scope; the workstream has the provider-set + vetting-verdict scope.
+- **REFINEMENT** → likely a change to the slot structure (e.g., adding a fourth slot) or a refinement to the out-of-scope list. Capture the refinement. (Adding/removing a *named provider* is not an R-5 refinement — that is the vetting workstream's call.)
 - **REJECTED / SPLIT / DEFER** → analogous to R-0's fallbacks.
 
 ---
@@ -326,6 +335,8 @@ Captured for the record; not for this walkthrough's resolution. Carry-over from 
 
 ## Downstream work-package list (Phase F closure + Phase G entry)
 
+> **WP namespace is canonical per the A-vs-B decision-capture memo §7.** The WP-1..WP-10 numbering below matches the memo exactly; do not re-number locally.
+
 To be filled in post-walkthrough, once the rulings are firm.
 
 ```yaml
@@ -385,13 +396,21 @@ To be filled in post-walkthrough, once the rulings are firm.
   due: ""
   blocked_by: []
   status: open
+- wp_id: WP-8
+  work_package: "Phase J cleanup — CLAUDE.md / AGENTS.md / .claude/memory/ sweep, applying the A-vs-B decisions as the source of truth. Includes the charge-terminology sweep, the 6-persona update, the Payer/Guardian/Sub-admin/Mentor split, the Path X framing, the 3-param/4-param router split, the two-primitive model, the engine-inside-identity-foundation decision, and the routing-canon supersessions. MoSCoW: MUST = memory-only or ≥2-source drifting; SHOULD = single canon spot needing extraction; SKIP/tombstone = superseded."
+  inputs: ["A-vs-B decision-capture memo (after ratification)", "R-0 through R-5 rulings"]
+  owner: "Claude"
+  reviewer: "PM"
+  due: ""
+  blocked_by: []
+  status: open
 ```
 
-**If R-1 was COPPA_DOES_NOT_APPLY or UNCLEAR_WITH_DEFENSIBLE_POSTURE, also:**
+**If R-1 was COPPA_DOES_NOT_APPLY or UNCLEAR_WITH_DEFENSIBLE_POSTURE, also (contingent):**
 
 ```yaml
-- wp_id: WP-8
-  work_package: "Counsel follow-up — codify the defensible posture (or the COPPA_DOES_NOT_APPLY ruling) into a written opinion for the architecture / engineering record; capture the US sub-13 carve-out cell in the regime-taxonomy"
+- wp_id: WP-9
+  work_package: "Counsel follow-up — codify the defensible posture (or the COPPA_DOES_NOT_APPLY ruling) into a written opinion for the architecture / engineering record; capture the US sub-13 carve-out cell in the regime-taxonomy; potentially flip D-2.2 (sub-13 US v1 = no service) to 'open via parent-operator'"
   inputs: ["R-1 ruling", "V-1 verification"]
   owner: "counsel"
   reviewer: "PM"
@@ -400,16 +419,29 @@ To be filled in post-walkthrough, once the rulings are firm.
   status: open
 ```
 
-**If R-1 was COPPA_APPLIES, also:**
+**If R-1 was COPPA_APPLIES, instead (contingent):**
 
 ```yaml
-- wp_id: WP-8
-  work_package: "Sub-13 v2 path posture memo — codify the COPPA_APPLIES ruling into a written record; the sub-13 v2 path remains launch-blocked, requiring full VPC; no new US sub-13 route is opened"
+- wp_id: WP-9-alt
+  work_package: "Sub-13 v2 path posture memo — codify the COPPA_APPLIES ruling into a written record; the sub-13 v1.1 path remains launch-blocked, requiring full VPC; no new US sub-13 route is opened via parent-operator"
   inputs: ["R-1 ruling"]
   owner: "Claude + counsel"
   reviewer: "PM"
   due: ""
   blocked_by: []
+  status: open
+```
+
+**Sub-13 v1.1 ungating workstream (contingent, demand-triggered):**
+
+```yaml
+- wp_id: WP-10
+  work_package: "Sub-13 v1.1 ungating workstream — closes Gaps B, D, E (sub-13-specific, deferred from v1 per Path X), the sub-13 EU onboarding + consent flows, the G7 VPC vendor procurement for the EU 'reasonable efforts' bar, and the per-Member-State consent-age-axis handling. Triggered by demand signal + G7 procurement + policy-engine sub-13 cell verification (the three preconditions)."
+  inputs: ["WP-1 output", "WP-4 output", "demand signal", "G7 procurement"]
+  owner: "separate workstream"
+  reviewer: "PM"
+  due: ""
+  blocked_by: ["WP-1", "WP-4"]
   status: open
 ```
 

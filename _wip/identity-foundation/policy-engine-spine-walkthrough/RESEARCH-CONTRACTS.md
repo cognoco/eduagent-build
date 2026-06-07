@@ -1,5 +1,7 @@
 # Phase 1 — Research Contracts
 
+> Reused as the legal-research backbone for the policy-engine spine walkthrough (originally authored for the under-13 floor walkthrough; the legal substance is unchanged). The "under-13-floor walkthrough" references below name the original effort that commissioned this research; the research returns it produced are the same backbone the policy-engine spine walkthrough leans on.
+
 **Purpose.** Four sub-areas of cited, skim-grade research to populate the
 under-13-floor walkthrough briefing packet. Plain `Agent` calls run in
 parallel; each agent receives one of the four contracts below. **No
