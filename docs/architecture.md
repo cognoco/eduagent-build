@@ -24,7 +24,7 @@ date: '2026-02-15'
 
 _This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._
 
-> **[TRANSITIONAL — DOC STATE]** This document is mid-refresh. The **`## Identity Foundation`** section is **new, ratified canon** (identity-foundation runway, Phase H; cited to ADRs + `data-model.md`). **Every other section is LEGACY** — pre-refresh setup-record content, pending review/revision in the Stream-2 `architecture.md` rebuild (the `ARCH-N` reverse-engineering). Where a legacy section conflicts with `## Identity Foundation`, **Identity Foundation wins**. Direct conflicts are flagged inline with `<!-- [LEGACY-REVIEW] -->` comments (greppable; resolved in Phase I). These transitional markers (`[TRANSITIONAL — DOC STATE]`, `[CANON-NEW]`, `[LEGACY-REVIEW]`) are temporary and stripped at the Stream-2 rebuild.
+> **[TRANSITIONAL — DOC STATE]** This document is mid-refresh. The **`## Identity Foundation`** section is **new, ratified canon** (identity-foundation runway, Phase H; cited to ADRs + `data-model.md`). **Every other section is LEGACY** — pre-refresh setup-record content, pending review/revision in the Stream-2 `architecture.md` rebuild (the `ARCH-N` reverse-engineering). Where a legacy section conflicts with `## Identity Foundation`, **Identity Foundation wins**. The direct conflicts the carve-out supersedes were flagged inline with `<!-- [LEGACY-REVIEW] -->` comments and **resolved in Phase I (2026-06-08)**; the legacy sections themselves remain pre-refresh, pending the Stream-2 rebuild. These transitional markers (`[TRANSITIONAL — DOC STATE]`, `[CANON-NEW]`, `[LEGACY-REVIEW]`) are temporary and stripped at the Stream-2 rebuild.
 
 ## Project Context Analysis
 
@@ -65,7 +65,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Uptime | 99.5% | Multi-provider LLM fallback, circuit breaker with defined thresholds |
 | Data durability | 99.99% | Neon managed backups, point-in-time recovery |
 | GDPR compliance | Full | Consent state machine, deletion orchestrator, data residency |
-| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile isolation, audit trail | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — 13+ consent-capacity floor (was 11), sub-13 built-but-gated; MMT-ADR-0015. Rewrite → Phase I. -->|
+| Minor consent & age | 13+ consent-capacity floor (sub-13 built, gated off) | Append-only consent log keyed (charge × purpose × org); three-axis age model; floor backend-enforced. See § Identity Foundation (MMT-ADR-0015). |
 
 **UX Specification Implications:**
 
@@ -95,7 +95,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 **Complexity Indicators:**
 
 - **Real-time features**: LLM streaming via SSE, coaching card live updates
-- **Multi-tenancy**: Family accounts with profile isolation, shared billing, independent learning state <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — tenancy = org/membership re-derived (not profile-isolation framing); MMT-ADR-0007/0010. Rewrite → Phase I. -->
+- **Multi-tenancy**: Org/membership model — a thin organization owns the billing + consent + quota anchor; membership is the person↔org link; learning data is person-scoped (org/membership re-derived, not profile-isolation). See § Identity Foundation (MMT-ADR-0007/0010).
 - **Regulatory**: GDPR (EU users 11-15), data deletion rights, parental consent workflows
 - **AI orchestration**: Multi-provider routing by conversation state, cost management, fallback chains
 - **Data complexity**: Relational (users, sessions, curricula) + vector (memory embeddings) + temporal (spaced repetition schedules, knowledge decay)
@@ -372,7 +372,7 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 
 **Mobile → API auth flow:** Clerk JWT verification. Mobile obtains JWT from Clerk SDK, sends as `Authorization: Bearer` header. Hono middleware verifies via Clerk's JWKS endpoint (cacheable in Workers KV). Profile ID extracted from Clerk session metadata, injected into request context for scoped repository.
 
-**Authorization model:** Custom RBAC on profile metadata, not Clerk Organizations. Clerk orgs are designed for B2B multi-tenancy (team invites, role management UI) — wrong abstraction for family accounts. Store profile type (parent, teen, learner), family linkage, and consent state in Neon. Clerk provides authenticated user identity; application middleware maps to profile and enforces access rules. <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — roles primitive {admin, learner} on membership (not "profile type parent/teen/learner"); capabilities split into Guardian/Mentor/Payer edges; MMT-ADR-0007/0008/0015. Rewrite → Phase I. -->
+**Authorization model:** Custom authorization in our own store, not Clerk Organizations. Clerk orgs are built for B2B multi-tenancy (team invites, role-management UI) — the wrong abstraction for family accounts. Clerk supplies authenticated user identity only; the person, tenancy, roles, consent, and billing state are owned in Neon. Roles are a primitive — a non-empty array over {admin, learner} on the person↔org membership — and the capabilities (consent authority, data visibility, billing control) are separate Guardian / Mentor / Payer edges, never fused into the role. Application middleware maps the Clerk identity to the person and enforces access. See § Identity Foundation (MMT-ADR-0007/0008/0015).
 
 **Rate limiting:** Cloudflare Workers built-in rate limiting (100 req/min per user per PRD). Configuration in `wrangler.toml`, not code. For the quota system (questions/month), `decrementQuota()` in `services/billing.ts` is the enforcement point (conditional UPDATE via Drizzle ORM).
 
@@ -564,7 +564,7 @@ The `(app)/` group contains all authenticated screens. View differences between 
 
 > **[CANON-NEW · ratified]** Authored Phase H (2026-06-08) from the locked identity-foundation canonical set (`_wip/identity-foundation/CANONICAL-SET.md` — 19 members). Stated as **outcomes, not whys** (`MMT-ADR-0000` §I.2); every claim cites its ADR or `data-model.md` §. This is a **relocatable unit** — the eventual `architecture.md` rebuild (Stream 2) re-homes it intact. Citations to `data-model.md` / `domain-model.md` / `identity-foundation-prd.md` reference the ratified canon currently in `_wip/identity-foundation/` (graduates to `docs/canon/` at Phase J(0); paths update there).
 
-This section is the authoritative architecture of the app's identity / tenancy / role / consent / policy-engine foundation. It supersedes the legacy identity content elsewhere in this document (flagged `[LEGACY-REVIEW]`). The decision trail (the *why*) lives in `MMT-ADR-0001`, `0002`, `0007`–`0016`; the schema realization in `data-model.md`.
+This section is the authoritative architecture of the app's identity / tenancy / role / consent / policy-engine foundation. It supersedes the legacy identity content elsewhere in this document (the direct conflicts were flagged `[LEGACY-REVIEW]` and resolved in Phase I). The decision trail (the *why*) lives in `MMT-ADR-0001`, `0002`, `0007`–`0016`; the schema realization in `data-model.md`.
 
 ### Identity model & tenancy
 
@@ -620,7 +620,7 @@ The three capabilities are split and never fused. Profile-management authority b
 | Columns | snake_case | `profile_id`, `created_at`, `escalation_rung` |
 | Foreign keys | `{referenced_table_singular}_id` | `profile_id`, `session_id`, `curriculum_id` |
 | Indexes | `idx_{table}_{columns}` | `idx_session_events_session_id`, `idx_topic_schedules_next_review` |
-| Enums | snake_case type, SCREAMING_SNAKE values | `consent_state` type: `PENDING`, `PARENTAL_CONSENT_REQUESTED`, `CONSENTED`, `WITHDRAWN` | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — stamped-status consent_states replaced by append-only consent_grant event log keyed (charge × purpose × organization); MMT-ADR-0011 §3. Rewrite → Phase I. -->|
+| Enums | snake_case type, SCREAMING_SNAKE values | `verification_type` type: `EVALUATE`, `TEACH_BACK` |
 | Timestamps | Always `created_at` + `updated_at` | UTC, `timestamp with time zone` |
 
 **Drizzle schema file organization:** One schema file per domain, not one giant file and not one file per table.
@@ -1695,7 +1695,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | Data durability | 99.99% | Neon managed backups, point-in-time recovery | Covered |
 | Rate limiting | 100 req/min | Cloudflare Workers rate limiting (wrangler.toml) + quota metering middleware | Covered |
 | GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
-| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile-scoped data access | Covered | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — 13+ floor, sub-13 built-but-gated; three-axis age model; MMT-ADR-0015. Rewrite → Phase I. -->|
+| Minor consent & age | 13+ consent-capacity floor (sub-13 built, gated) | Append-only consent log; three-axis age model; backend-enforced floor — see § Identity Foundation (MMT-ADR-0015) | Defined — § Identity Foundation |
 | i18n | 7 locales | English source + 6 LLM-translated locales (de/es/ja/nb/pl/pt) registered in `apps/mobile/src/i18n/index.ts`. LLM `preferredLanguage` in system prompt for learning language. | Covered |
 | Accessibility | WCAG 2.1 AA | Phased per UX spec (MVP free, v1.1 moderate, v2.0 operational). NativeWind supports accessibility props. | Phased |
 | Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
