@@ -75,7 +75,7 @@ Out of scope:
 - A 1-4 exchange unfiled freeform session stays as chat history/bookmarks and has no Library filing affordance.
 - A 5+ exchange freeform session may be filed to Library by the close-path or user-triggered filing paths.
 - If the learner declines or removes Library filing, no topic-bound artifact is saved beyond the chat history, bookmarks, and normal session summary data.
-- If filing succeeds, the Library topic can carry the LLM-generated learner recap / structured session summary as the saved summary artifact.
+- If filing succeeds, the filed session keeps the LLM-generated learner recap / structured session summary as the saved review artifact.
 
 ## Rejected Alternatives
 
