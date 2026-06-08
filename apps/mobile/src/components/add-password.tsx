@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, Pressable, View } from 'react-native';
-import { useUser } from '@clerk/clerk-expo';
+import { useUser, useReverification } from '@clerk/clerk-expo';
 
 import { extractClerkError } from '../lib/clerk-error';
 import {
@@ -27,6 +27,16 @@ export function AddPassword({
 }): React.JSX.Element {
   const { user } = useUser();
   const { t } = useTranslation();
+  // [CRITICAL-2b] First-time password set on an SSO-only account is a
+  // credential mutation with no current-password gate — require Clerk step-up
+  // reverification so an unattended unlocked phone cannot silently add a
+  // password and create a second way in.
+  const reverifiedUpdatePassword = useReverification(
+    (params: { newPassword: string }) => {
+      if (!user) throw new Error('User not ready');
+      return user.updatePassword(params);
+    },
+  );
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +67,7 @@ export function AddPassword({
     setIsSubmitting(true);
     try {
       await withClerkTimeout(
-        user.updatePassword({ newPassword }),
+        reverifiedUpdatePassword({ newPassword }),
         'user.updatePassword',
       );
       await withClerkTimeout(user.reload(), 'user.reload');
@@ -73,7 +83,14 @@ export function AddPassword({
     } finally {
       setIsSubmitting(false);
     }
-  }, [confirmPassword, newPassword, onPasswordAdded, t, user]);
+  }, [
+    confirmPassword,
+    newPassword,
+    onPasswordAdded,
+    reverifiedUpdatePassword,
+    t,
+    user,
+  ]);
 
   return (
     <View className="mt-3">

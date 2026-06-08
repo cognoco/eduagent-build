@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, Pressable, ScrollView, View } from 'react-native';
-import { useAuth, useUser } from '@clerk/clerk-expo';
+import { useAuth, useUser, useReverification } from '@clerk/clerk-expo';
 
 import { extractClerkError } from '../lib/clerk-error';
 import {
   isClerkRequestTimeoutError,
   withClerkTimeout,
 } from '../lib/clerk-timeout';
+import { platformAlert } from '../lib/platform-alert';
 
 interface SessionActivity {
   browserName?: string | null;
   city?: string | null;
   country?: string | null;
   deviceType?: string | null;
+  ipAddress?: string | null;
 }
 
 interface SecuritySessionResource {
@@ -61,8 +63,28 @@ export function SecuritySessions(): React.JSX.Element {
   const [revokingSessionId, setRevokingSessionId] = useState<string | null>(
     null,
   );
+  const [isRevokingAll, setIsRevokingAll] = useState(false);
   const canLoadSessions = typeof user?.getSessions === 'function';
   const userId = user?.id ?? null;
+
+  // [CRITICAL-2b] Step-up reverification before destroying a session. If the
+  // Clerk instance requires reverification for sensitive actions, the enhanced
+  // fetcher prompts the user to re-confirm their credentials and retries on
+  // success; otherwise it passes through unchanged. This is the defence against
+  // an unattended unlocked phone silently revoking the owner's other devices.
+  const reverifiedRevoke = useReverification(
+    (session: SecuritySessionResource) =>
+      session.revoke?.() ?? Promise.resolve(),
+  );
+  const reverifiedRevokeAll = useReverification(
+    async (targets: SecuritySessionResource[]) => {
+      for (const session of targets) {
+        if (session.revoke) {
+          await withClerkTimeout(session.revoke(), 'session.revoke');
+        }
+      }
+    },
+  );
 
   useEffect(() => {
     userRef.current = user;
@@ -115,7 +137,7 @@ export function SecuritySessions(): React.JSX.Element {
       setRevokingSessionId(session.id);
       setRevokeError(null);
       try {
-        await withClerkTimeout(session.revoke(), 'session.revoke');
+        await withClerkTimeout(reverifiedRevoke(session), 'session.revoke');
         await loadSessions();
       } catch (err) {
         setRevokeError(formatClerkError(err));
@@ -123,8 +145,43 @@ export function SecuritySessions(): React.JSX.Element {
         setRevokingSessionId(null);
       }
     },
-    [formatClerkError, loadSessions, sessionId],
+    [formatClerkError, loadSessions, reverifiedRevoke, sessionId],
   );
+
+  const otherSessions = sessions.filter((s) => s.id !== sessionId && s.revoke);
+
+  // [HIGH-1] The headline emergency action: revoke every session except the
+  // current device in one tap. This is the safe default when the user has lost
+  // a device and cannot reliably identify which row it is (HIGH-2).
+  const runRevokeAll = useCallback(async () => {
+    if (otherSessions.length === 0) return;
+    setIsRevokingAll(true);
+    setRevokeError(null);
+    try {
+      await reverifiedRevokeAll(otherSessions);
+      await loadSessions();
+    } catch (err) {
+      setRevokeError(formatClerkError(err));
+    } finally {
+      setIsRevokingAll(false);
+    }
+  }, [formatClerkError, loadSessions, otherSessions, reverifiedRevokeAll]);
+
+  const handleRevokeAll = useCallback(() => {
+    if (otherSessions.length === 0) return;
+    platformAlert(
+      t('securitySessions.signOutAllTitle'),
+      t('securitySessions.signOutAllConfirm', { count: otherSessions.length }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('securitySessions.signOutAllConfirmButton'),
+          style: 'destructive',
+          onPress: () => void runRevokeAll(),
+        },
+      ],
+    );
+  }, [otherSessions.length, runRevokeAll, t]);
 
   if (isLoading) {
     return (
@@ -196,10 +253,29 @@ export function SecuritySessions(): React.JSX.Element {
           {revokeError}
         </Text>
       ) : null}
+      {otherSessions.length > 0 ? (
+        <Pressable
+          onPress={handleRevokeAll}
+          disabled={isRevokingAll}
+          className="bg-danger rounded-card px-4 py-3.5 mb-4 items-center"
+          accessibilityRole="button"
+          accessibilityLabel={t('securitySessions.signOutAllLabel')}
+          testID="security-sessions-revoke-all"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            {isRevokingAll
+              ? t('securitySessions.signingOutAll')
+              : t('securitySessions.signOutAllButton', {
+                  count: otherSessions.length,
+                })}
+          </Text>
+        </Pressable>
+      ) : null}
       {sessions.map((session) => {
         const isCurrent = session.id === sessionId;
         const location = formatSessionLocation(session);
         const lastActive = formatLastActive(session.lastActiveAt);
+        const ipAddress = session.latestActivity?.ipAddress ?? null;
         const revoking = revokingSessionId === session.id;
         const title = formatSessionTitle(
           session,
@@ -222,8 +298,16 @@ export function SecuritySessions(): React.JSX.Element {
                     {location}
                   </Text>
                 ) : null}
-                {lastActive ? (
+                {ipAddress ? (
                   <Text className="text-xs text-text-secondary mt-1">
+                    {t('securitySessions.ipAddress', { ip: ipAddress })}
+                  </Text>
+                ) : null}
+                {/* [HIGH-2] Last-active is the primary disambiguator when two
+                    devices render identical titles — keep it prominent so the
+                    user can tell the lost device from the one in their hand. */}
+                {lastActive ? (
+                  <Text className="text-body-sm font-medium text-text-primary mt-1">
                     {t('securitySessions.lastActive', { value: lastActive })}
                   </Text>
                 ) : null}
@@ -240,7 +324,7 @@ export function SecuritySessions(): React.JSX.Element {
               ) : (
                 <Pressable
                   onPress={() => void handleRevoke(session)}
-                  disabled={revoking}
+                  disabled={revoking || isRevokingAll}
                   className="bg-danger/10 rounded-card px-3 py-2"
                   accessibilityRole="button"
                   accessibilityLabel={t('securitySessions.revokeLabel', {

@@ -2528,7 +2528,6 @@
     "errorSendCodeFirst": "Send først en kode til den nye e-posten din.",
     "errorCodeRequired": "Skriv inn bekreftelseskoden",
     "errorSyncFailed": "Innloggings-e-posten ble endret, men kontoposten ble ikke oppdatert. {{message}}",
-    "warningOldEmailStillActive": "E-post oppdatert, men den gamle e-posten er fortsatt aktiv.",
     "successMessage": "E-post oppdatert"
   },
   "securitySessions": {
@@ -2545,7 +2544,14 @@
     "currentBadge": "Denne enheten",
     "revokeLabel": "Trekk tilbake økten på {{device}}",
     "revoking": "Trekker tilbake...",
-    "revokeButton": "Trekk tilbake"
+    "revokeButton": "Trekk tilbake",
+    "ipAddress": "IP-adresse {{ip}}",
+    "signOutAllButton": "Logg ut alle andre enheter ({{count}})",
+    "signOutAllLabel": "Logg ut alle andre enheter",
+    "signingOutAll": "Logger ut alle enheter ...",
+    "signOutAllTitle": "Logge ut alle andre enheter?",
+    "signOutAllConfirm": "Dette vil avslutte {{count}} andre økt(er). Denne enheten forblir pålogget.",
+    "signOutAllConfirmButton": "Logg ut alle"
   },
   "changePassword": {
     "errorCurrentRequired": "Skriv inn ditt nåværende passord",

@@ -2528,7 +2528,6 @@
     "errorSendCodeFirst": "Envie primeiro um código para seu novo e-mail.",
     "errorCodeRequired": "Digite o código de verificação",
     "errorSyncFailed": "Seu e-mail de login mudou, mas o registro da conta não foi atualizado. {{message}}",
-    "warningOldEmailStillActive": "E-mail atualizado, mas seu e-mail antigo ainda está ativo.",
     "successMessage": "E-mail atualizado"
   },
   "securitySessions": {
@@ -2545,7 +2544,14 @@
     "currentBadge": "Este dispositivo",
     "revokeLabel": "Revogar sessão de {{device}}",
     "revoking": "Revogando...",
-    "revokeButton": "Revogar"
+    "revokeButton": "Revogar",
+    "ipAddress": "IP {{ip}}",
+    "signOutAllButton": "Terminar sessão nos outros dispositivos ({{count}})",
+    "signOutAllLabel": "Terminar sessão nos outros dispositivos",
+    "signingOutAll": "A terminar sessão em todos os dispositivos...",
+    "signOutAllTitle": "Terminar sessão nos outros dispositivos?",
+    "signOutAllConfirm": "Isto vai terminar {{count}} outra(s) sessão(ões). Este dispositivo mantém a sessão iniciada.",
+    "signOutAllConfirmButton": "Terminar todas"
   },
   "changePassword": {
     "errorCurrentRequired": "Insira sua senha atual",

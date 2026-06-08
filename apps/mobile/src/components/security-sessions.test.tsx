@@ -5,6 +5,7 @@ import { SecuritySessions } from './security-sessions';
 
 const mockGetSessions = jest.fn();
 const mockRevokeOther = jest.fn();
+const mockRevokeOther2 = jest.fn();
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ sessionId: 'session-current' }),
@@ -13,6 +14,22 @@ jest.mock('@clerk/clerk-expo', () => ({
       getSessions: mockGetSessions,
     },
   }),
+  // [CRITICAL-2b] Passthrough: the wrapped revoke runs directly in tests.
+  useReverification: (fn: (...args: unknown[]) => unknown) => fn,
+}));
+
+// Auto-confirm the destructive "sign out all" alert so the handler proceeds.
+jest.mock('../lib/platform-alert', () => ({
+  platformAlert: (
+    _title: string,
+    _message: string,
+    buttons?: Array<{ style?: string; onPress?: () => void }>,
+  ) => {
+    const confirm =
+      buttons?.find((b) => b.style === 'destructive') ??
+      buttons?.[buttons.length - 1];
+    confirm?.onPress?.();
+  },
 }));
 
 function sessionsFixture() {
@@ -25,6 +42,7 @@ function sessionsFixture() {
         deviceType: 'Phone',
         city: 'Oslo',
         country: 'NO',
+        ipAddress: '192.0.2.10',
       },
       revoke: jest.fn(),
     },
@@ -36,8 +54,21 @@ function sessionsFixture() {
         deviceType: 'Desktop',
         city: 'Prague',
         country: 'CZ',
+        ipAddress: '198.51.100.5',
       },
       revoke: mockRevokeOther,
+    },
+    {
+      id: 'session-other-2',
+      lastActiveAt: new Date('2026-05-29T08:00:00.000Z'),
+      latestActivity: {
+        browserName: 'Firefox',
+        deviceType: 'Desktop',
+        city: 'Berlin',
+        country: 'DE',
+        ipAddress: '203.0.113.7',
+      },
+      revoke: mockRevokeOther2,
     },
   ];
 }
@@ -48,6 +79,7 @@ describe('SecuritySessions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockRevokeOther.mockResolvedValue({});
+    mockRevokeOther2.mockResolvedValue({});
     mockGetSessions.mockResolvedValue(sessionsFixture());
   });
 
@@ -94,6 +126,36 @@ describe('SecuritySessions', () => {
     await waitFor(() => {
       expect(mockRevokeOther).toHaveBeenCalled();
       expect(mockGetSessions).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('[HIGH-1] signs out all other devices in one action, sparing the current session', async () => {
+    active = renderScreen(<SecuritySessions />);
+
+    await waitFor(() => {
+      screen.getByTestId('security-sessions-revoke-all');
+    });
+
+    fireEvent.press(screen.getByTestId('security-sessions-revoke-all'));
+
+    await waitFor(() => {
+      expect(mockRevokeOther).toHaveBeenCalledTimes(1);
+      expect(mockRevokeOther2).toHaveBeenCalledTimes(1);
+      // The list refreshes after the bulk revoke.
+      expect(mockGetSessions).toHaveBeenCalledTimes(2);
+    });
+    // The current session's own revoke is never invoked by the bulk action.
+    const [current] = sessionsFixture();
+    if (!current) throw new Error('sessionsFixture must be non-empty');
+    expect(current.revoke).not.toHaveBeenCalled();
+  });
+
+  it('[HIGH-2] surfaces the IP address so identical device labels can be told apart', async () => {
+    active = renderScreen(<SecuritySessions />);
+
+    await waitFor(() => {
+      screen.getByText(/198\.51\.100\.5/);
+      screen.getByText(/203\.0\.113\.7/);
     });
   });
 

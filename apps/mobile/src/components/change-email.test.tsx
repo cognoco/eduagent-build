@@ -25,6 +25,10 @@ jest.mock('@clerk/clerk-expo', () => ({
     },
   }),
   useAuth: () => ({ getToken: jest.fn() }),
+  // [CRITICAL-2b] useReverification wraps a sensitive action and, if the Clerk
+  // instance requires step-up, prompts + retries. In tests it is a passthrough
+  // so the wrapped action runs directly and assertions stay on the real call.
+  useReverification: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 jest.mock(
@@ -89,7 +93,7 @@ describe('ChangeEmail', () => {
     cleanupScreen();
   });
 
-  it('[auth-2] verifies, promotes, syncs, and removes the old login email', async () => {
+  it('[auth-2] verifies, promotes the new email to primary, and syncs the server', async () => {
     active = renderScreen(<ChangeEmail />);
 
     await submitEmailAndCode();
@@ -109,12 +113,25 @@ describe('ChangeEmail', () => {
       expect(mockSyncEmail).toHaveBeenCalledWith({
         json: { email: 'new@example.com' },
       });
-      expect(mockDestroyOldEmail).toHaveBeenCalled();
       screen.getByText('Email updated');
     });
   });
 
-  it('does not claim success or destroy the old email when server sync fails', async () => {
+  it('[CRITICAL-2c] never destroys the old email — it is kept as a recovery address', async () => {
+    active = renderScreen(<ChangeEmail />);
+
+    await submitEmailAndCode();
+
+    await waitFor(() => {
+      screen.getByText('Email updated');
+    });
+    // The old address must remain a valid, verified recovery identifier so a
+    // mistaken or hostile email change cannot strip the owner of their last
+    // out-of-band way back in.
+    expect(mockDestroyOldEmail).not.toHaveBeenCalled();
+  });
+
+  it('does not claim success when server sync fails (old email untouched)', async () => {
     mockSyncEmail.mockRejectedValue(new Error('Conflict'));
     active = renderScreen(<ChangeEmail />);
 
@@ -138,7 +155,6 @@ describe('ChangeEmail', () => {
     await waitFor(() => {
       screen.getByText(/account record was not updated/i);
       expect(mockAttemptVerification).toHaveBeenCalledTimes(1);
-      expect(mockDestroyOldEmail).not.toHaveBeenCalled();
     });
 
     fireEvent.press(screen.getByTestId('change-email-retry-sync'));
@@ -146,12 +162,12 @@ describe('ChangeEmail', () => {
     await waitFor(() => {
       expect(mockSyncEmail).toHaveBeenCalledTimes(2);
       expect(mockAttemptVerification).toHaveBeenCalledTimes(1);
-      expect(mockDestroyOldEmail).toHaveBeenCalledTimes(1);
+      expect(mockDestroyOldEmail).not.toHaveBeenCalled();
       screen.getByText('Email updated');
     });
   });
 
-  it('does not claim success or destroy the old email when server sync returns a conflict', async () => {
+  it('does not claim success when server sync returns a conflict', async () => {
     mockSyncEmail.mockResolvedValue(
       jsonResponse(
         {
@@ -169,22 +185,6 @@ describe('ChangeEmail', () => {
       screen.getByText(/already in use/i);
       expect(screen.queryByText('Email updated')).toBeNull();
       expect(mockDestroyOldEmail).not.toHaveBeenCalled();
-    });
-  });
-
-  it('shows a non-blocking warning when old email removal fails', async () => {
-    mockDestroyOldEmail.mockRejectedValue(new Error('destroy failed'));
-    active = renderScreen(<ChangeEmail />);
-
-    await submitEmailAndCode();
-
-    await waitFor(() => {
-      expect(screen.getByText('Email updated').props.accessibilityRole).toBe(
-        'alert',
-      );
-      expect(
-        screen.getByText(/old email is still active/i).props.accessibilityRole,
-      ).toBe('alert');
     });
   });
 

@@ -10,6 +10,8 @@ const mockPush = jest.fn();
 jest.mock('@clerk/clerk-expo', () => ({
   useUser: () => ({ user: mockUser }),
   useAuth: () => ({ getToken: jest.fn(), signOut: jest.fn() }),
+  // [CRITICAL-2b] Passthrough: wrapped Clerk calls run directly in tests.
+  useReverification: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 jest.mock('expo-router', () => ({
