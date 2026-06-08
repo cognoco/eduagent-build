@@ -20,6 +20,25 @@ work reads against.
 restructure any member (that is Phase J) and does **not** author new canon (that is
 Phase H). Membership is the deliverable.
 
+**Why the members live where they do (and why G moves nothing).** Per
+`MMT-ADR-0000` §I.4 — the physical-placement rule — the layers land in different
+homes *on different timelines*:
+
+- **ADRs (L2) are global from birth** → already at `docs/adr/`. ✅ placed.
+- **Registers (L3, type-named)** → already at `docs/registers/`. ✅ placed.
+- **A stream's domain canon (L1) incubates in `_wip/<slug>/` until its clean cut,
+  *then* folds into `docs/canon/`.** So the four domain docs below are *correctly*
+  in `_wip/identity-foundation/` right now — moving them to `docs/canon/` during the
+  planning runway would **violate** §I.4. They graduate at the **clean-cut build
+  (after Phase P)**, not in G–P.
+
+The **only** physical relocation the runway performs is **Phase J step (c)** — and
+it touches *different* files: the **loose root estate canon** (`architecture.md`,
+`PRD.md`, `ux-design-specification.md`) → `docs/canon/`, plus the artifact drains.
+That step is **gated on this Phase-G lock** (you can't sort loose docs into
+canon/L3/archive until "the canonical set" is a closed list — which this file makes
+it). So G is the *prerequisite* that unblocks the move, not the move itself.
+
 ---
 
 ## The set
