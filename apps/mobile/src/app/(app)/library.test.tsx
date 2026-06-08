@@ -960,9 +960,16 @@ describe('LibraryScreen', () => {
       { id: 'sub-1', name: 'Math', status: 'active' },
     ];
 
+    // Delete is only offered on archived subjects (archive-first). The delete
+    // tests therefore operate on an archived subject — the only state from
+    // which the delete affordance renders.
+    const ONE_ARCHIVED_SUBJECT: SubjectFixture[] = [
+      { id: 'sub-1', name: 'Math', status: 'archived' },
+    ];
+
     function deleteScopeOptions(): RouteOptions {
       return {
-        subjects: ONE_SUBJECT,
+        subjects: ONE_ARCHIVED_SUBJECT,
         allBooks: {
           subjects: [
             {
@@ -1144,13 +1151,41 @@ describe('LibraryScreen', () => {
 
       expect(platformAlertMock).toHaveBeenCalledWith(
         'Delete Math?',
-        'This permanently deletes Math, including 2 books, 3 started topics, and 4 sessions with learning history. This cannot be undone.',
+        'This permanently deletes Math — including 2 books, 3 started topics, and 4 sessions with learning history, along with all mastery progress, flashcard reviews, and streak for this subject. This cannot be undone.',
         expect.arrayContaining([
           expect.objectContaining({ style: 'cancel' }),
           expect.objectContaining({ style: 'destructive' }),
         ]),
         { cancelable: true },
       );
+    });
+
+    it('only offers Delete on archived subjects (archive-first gate)', async () => {
+      active = mount({
+        subjects: [
+          { id: 'sub-active', name: 'Active Math', status: 'active' },
+          { id: 'sub-paused', name: 'Paused History', status: 'paused' },
+          { id: 'sub-arch', name: 'Archived Spanish', status: 'archived' },
+        ],
+      });
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
+      });
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+
+      // Active and paused subjects offer no delete affordance — a subject must
+      // be archived (a reversible state) before it can be permanently deleted.
+      expect(
+        active.result.queryByTestId('delete-subject-sub-active'),
+      ).toBeNull();
+      expect(
+        active.result.queryByTestId('delete-subject-sub-paused'),
+      ).toBeNull();
+      // Archived subjects expose Delete alongside Restore.
+      expect(
+        active.result.getByTestId('restore-subject-sub-arch'),
+      ).toBeTruthy();
+      expect(active.result.getByTestId('delete-subject-sub-arch')).toBeTruthy();
     });
 
     it.each([
@@ -1196,7 +1231,7 @@ describe('LibraryScreen', () => {
     });
 
     it('deletes the subject after confirmation and removes it after refetch', async () => {
-      let subjects: SubjectFixture[] = [...ONE_SUBJECT];
+      let subjects: SubjectFixture[] = [...ONE_ARCHIVED_SUBJECT];
       const routedFetch = buildRoutes(deleteScopeOptions());
       routedFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
         const method = (init?.method ?? 'GET').toUpperCase();
@@ -1250,9 +1285,9 @@ describe('LibraryScreen', () => {
           return errorResponse(500);
         }
         if (url.includes('includeInactive=true')) {
-          return { subjects: ONE_SUBJECT };
+          return { subjects: ONE_ARCHIVED_SUBJECT };
         }
-        return { subjects: ONE_SUBJECT };
+        return { subjects: ONE_ARCHIVED_SUBJECT };
       });
       active = renderScreen(<LibraryScreen />, {
         profile: OWNER,

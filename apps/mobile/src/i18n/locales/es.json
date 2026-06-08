@@ -968,7 +968,7 @@
       "delete": "Eliminar",
       "deleting": "Eliminando...",
       "deleteConfirmTitle": "¿Eliminar {{subject}}?",
-      "deleteConfirmMessage": "Esto elimina permanentemente {{subject}}, incluyendo {{books}}, {{startedTopics}} y {{sessions}} con el historial de aprendizaje. Esta acción no se puede deshacer.",
+      "deleteConfirmMessage": "Esto elimina {{subject}} de forma permanente, lo que incluye {{books}}, {{startedTopics}} y {{sessions}} con su historial de aprendizaje, además de todo el progreso de dominio, las revisiones de tarjetas y la racha de esta materia. Esta acción no se puede deshacer.",
       "deleteConfirmAction": "Eliminar",
       "deleteScopeBooks_one": "{{count}} libro",
       "deleteScopeBooks_other": "{{count}} libros",
