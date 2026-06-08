@@ -115,7 +115,7 @@ where it lives.
 
 | Canonical name | What it is | In code |
 |---|---|---|
-| **mentor-draft-note** | A note the mentor stitches from the learner's `solid` Challenge-Round answers; learner reviews → edit / save / skip. Transient until saved; once saved it **becomes a `learner-note`**. | `buildValidatedDraft` → `topic_notes` (`session-exchange.ts`) |
+| **mentor-draft-note** | A note the mentor **lightly tidies** from the learner's `solid` Challenge-Round answers (smooths into legible prose, keeps the learner's substance) — offered via a "save your answers as your note?" prompt; learner reviews → edit / save / skip. Once saved it becomes a `learner-note` with `source = 'challenge_draft'` and shows the **MentoMate logo** (not the checkmark). ⚠ Draft-building exists (`buildValidatedDraft`); the save-prompt + `validateNoteDraft` lexical guard + logo stamp are **unwired** (see plan below). | `buildValidatedDraft` → (TBD save) → `topic_notes` (`session-exchange.ts:842`) |
 
 ### C · Authored by the mentor *for* the learner
 
@@ -183,15 +183,25 @@ carry different value, and both ship.** They never supersede each other.
   unblocked by this decision; the concept-capture spec explicitly deferred
   note-text grading).
 
-**Distinct glyphs, distinct surfaces (collision resolved):**
-- **A → green checkmark, on the note** ("your note text is correct").
-- **B → star / "mastered", at topic / book level**, *not* on the note ("you
-  proved this topic under questioning"). ⚠ This means B's current note-surface
-  star (concept-capture T10) **moves off the note** — the note carries only A's
-  checkmark; B's mastery lives on the book/topic "mastered" badge.
-- Absence of a checkmark is **neutral** — never a red ✗ (no-struggle copy rule).
-**In code:** B — `concepts`/`concept_mastery` (concept-capture layer); A — TBD
-(a note-text-grading service, not yet specced).
+**Note marks — at most one per note, decided by *how the note was made*
+(collision resolved 2026-06-08):**
+
+| How the note was made | Mark | Means | Status |
+|---|---|---|---|
+| Hand-typed by the learner, mentor checks the text | ✅ **green checkmark** (model A) | "your own words are correct" | not built |
+| **Saved from Challenge-Round answers** (lightly tidied — mentor smooths the learner's `solid` answers, keeps the substance) | 🔷 **MentoMate logo** | "built from your verified `solid` answers" | draft *built* (`buildValidatedDraft`, `session-exchange.ts:842`); save-prompt + stamp + lexical guard **unwired** |
+| Hand-typed, not (yet) verified | *(no mark)* | neutral — **never** a red ✗ (no-struggle rule) | — |
+
+⚠ **Checkmark and logo are mutually exclusive by provenance.** A challenge-saved
+note is `solid`-by-construction, so the **logo is its quality signal** — it never
+also needs A's free-text check. A hand-typed note never gets the logo.
+⚠ The **mastery star (B)** is a *different surface entirely*: the topic / book
+"mastered" badge, **never on the note** — so concept-capture's note-surface star
+(T10) **moves off the note**.
+**In code:** A — TBD (note-text-grading service); logo — finish wiring
+`buildValidatedDraft` → `validateNoteDraft` (lexical guard) → save →
+`MentomateLogo`; B — `concepts`/`concept_mastery`. See the implementation plan
+`docs/plans/2026-06-08-note-correctness-and-challenge-draft.md`.
 
 ---
 
