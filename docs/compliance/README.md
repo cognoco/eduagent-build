@@ -28,6 +28,15 @@
 | A11/A12 | Provider DPAs (business tier) + US-transfer checks | DPO + you | per-provider contract files |
 | A14 | Voice = transcription only (AI Act Art 5(1)(f)) | Eng | product rule + voice-lib check |
 
-## The one DB dependency
+## Launch substrate — the new identity-foundation architecture
 
-Nothing here is blocked on the identity-model migrations. The only place the database design gates *implementation* (not drafting) is the **consent-record wiring** (A8/A9) — the spec can be written now against the ratified identity model; the receipt-storage wiring lands with the schema.
+**Decision (user, 2026-06-08): everything launches on the new architecture**, not the legacy `accounts`/`profiles` schema. Consequences baked into the data-layer docs:
+
+- The **DPIA** and **ROPA** are written against the ratified target ([`_wip/identity-foundation/data-model.md`](../../_wip/identity-foundation/data-model.md)), citing it as the schema source. They assess the *design*; a re-confirmation pass against the *built* schema (live `file:line` citations) is owed before final DPIA sign-off.
+- The target model **closes several risks by construction**: consent-receipt survives deletion (`person_retain`, the `I-C1` fix), consent is an append-only event log with recorded `lawful_basis` (`consent_grant`), age/jurisdiction gating is regime-banded (the policy engine), and vendor routing enforces the Gemini-under-18 exclusion (`allowed_models` / `MMT-ADR-0014`).
+- **Timeline reality:** the target is **ratified but not yet built** — execution is post-Phase-P and gated on external `WI-530`. So **launch is downstream of building the identity foundation.** The compliance drafting here does not unblock that; the build does.
+
+### Carried into the new build (not legacy fixes)
+- New delete flow must erase the external **Clerk identity** (R1) and the out-of-model **`byok_waitlist`** email (R3a) — neither is handled by the identity cascade. The legacy `executeDeletion` byok fix is break-tested and interim; its *requirement* carries forward.
+- `person_retain.*.retention_period` values must be counsel-set, not placeholder (Phase-F launch-readiness guard).
+- The legacy `organizations`-row PII gap (R3b) is **moot** — the target schema drops that table.

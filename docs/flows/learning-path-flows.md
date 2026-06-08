@@ -23,7 +23,7 @@ Complete trace of every learning path in MentoMate, from the learner's first tap
 > **What changed since 2026-06-08**
 > - **Learn Something New current flow.** Home's `home-action-study-new` quick action routes directly to `/create-subject`; the obsolete `ONBOARDING_FAST_PATH` flag is no longer part of the current mobile feature-flag set. First curriculum sessions use `POST /subjects/:subjectId/sessions/first-curriculum`, with `/ready` shown only for the first subject so the learner gets a reflection moment before opening chat.
 > - **Session completion timing.** Tapping End Session closes the session and creates a pending summary row, but the normal `app/session.completed` pipeline is queued only after the learner submits or skips the "Your Words" reflection. Stale idle sessions are the exception: the stale-session cron auto-closes and dispatches completion with `summaryStatus='auto_closed'`.
-> - **Notes and Challenge Round.** Tutoring sessions now include note prompts/manual note entry, summary-to-note side effects, and the feature-gated Challenge Round path: eligible learners can accept a short evaluated challenge, then review/save a drafted note when there is solid evidence.
+> - **Notes and Challenge Round.** Topic-scoped tutoring sessions include note prompts/manual note entry, summary-to-note side effects, and the feature-gated Challenge Round path: eligible learners can accept a short evaluated challenge, then review/save a drafted note when there is solid evidence. Freeform Ask Anything does not offer Challenge Round; it offers bookmarks during chat and can offer notes at session end by asking the learner to add the session to Library first.
 
 ---
 
@@ -196,6 +196,9 @@ Home Screen (LearnerScreen)
                       └─ Session Summary opens:
                           ├─ "Your Words" reflection text box
                           │   └─ AI evaluates reflection quality and returns feedback
+                          ├─ Optional "Write a note" CTA
+                          │   ├─ If session already has `topicId` -> opens note input
+                          │   └─ If session has no `topicId` -> asks to add session to Library first
                           ├─ OR "Skip for now"
                           └─ Recall Bridge questions (homework sessions only — not here)
 ```
@@ -208,6 +211,7 @@ Home Screen (LearnerScreen)
 | Every message | Exchange count, escalation rung | `learning_sessions` |
 | Session close | Duration (active + wall-clock), status | `learning_sessions` |
 | Auto-filing (if eligible) | New topic created/linked from transcript | `curriculum_topics`, `learning_sessions.topicId` |
+| Freeform note (if learner accepts Library filing) | Topic-bound learner-note | `topic_notes` with `sessionId` |
 | Post-session pipeline | SM-2 retention card | `retention_cards` |
 | Post-session pipeline | Progress snapshot (daily aggregate) | `progress_snapshots` |
 | Post-session pipeline | Session embedding (1024-dim vector) | `session_embeddings` |
@@ -218,6 +222,8 @@ Home Screen (LearnerScreen)
 ### Key behavior
 - Freeform close does not block the learner on a manual filing prompt. If the session is still unfiled and has at least 3 exchanges, close-path auto-filing is requested in the background.
 - The post-session Inngest pipeline can wait up to 60s for filing resolution before computing topic-bound retention. If filing does not resolve in time, the pipeline proceeds with the best available placement and filing retry/observer jobs handle recovery.
+- Freeform does not offer Challenge Round.
+- Freeform live-chat saving uses bookmarks. Learner-notes are offered at the end/session summary; if the session is unfiled, the app asks the learner to add the session to Library before opening note input. Declining Library filing saves no topic-bound note, but the session transcript and any bookmarks remain.
 
 ---
 
@@ -666,6 +672,8 @@ Bookmarks do not change session pedagogy or recording — they are a per-message
 ## Notes (Within Tutoring Sessions)
 
 Learners can save their own notes while learning. Notes are topic-bound: the session needs a `topicId` before the note can be saved directly.
+
+For freeform Ask Anything, note capture is an end-of-session flow. If the freeform session is already filed to a topic, the note input can open directly. If it is still unfiled, the learner first sees a Library filing consent step because the note will live in Library as a normal topic note. Declining filing means no learner-note is saved; bookmarks remain the instant-save option for mentor replies.
 
 ```
 During a teaching session...

@@ -4,7 +4,10 @@
 **Controller:** `[legal entity name — TODO]`, established in Norway. **DPO:** `[name / dpo@… — TODO]`.
 **Product:** MentoMate — an AI tutoring app for learners aged 13+ (built to extend to 10+ outside COPPA later).
 **Date / version:** Draft 2026-06-08, v0.1. **Review:** on any material change to data, purposes, or AI providers.
-**Companion documents:** [`ropa.md`](ropa.md) (data register), [`art9-special-category-decision.md`](art9-special-category-decision.md), [`breach-response-plan.md`](breach-response-plan.md), [`docs/audit/2026-06-07-data-retention-and-erasure-audit.md`](../audit/2026-06-07-data-retention-and-erasure-audit.md) (code-verified data flows), [`docs/meetings/minors-compliance-requirements.md`](../meetings/minors-compliance-requirements.md) (LIST A).
+**Companion documents:** [`ropa.md`](ropa.md) (data register), [`art9-special-category-decision.md`](art9-special-category-decision.md), [`breach-response-plan.md`](breach-response-plan.md), [`docs/meetings/minors-compliance-requirements.md`](../meetings/minors-compliance-requirements.md) (LIST A).
+**Schema source of truth:** [`_wip/identity-foundation/data-model.md`](../../_wip/identity-foundation/data-model.md) (ratified target). Legacy data-flow evidence: [`docs/audit/2026-06-07-data-retention-and-erasure-audit.md`](../audit/2026-06-07-data-retention-and-erasure-audit.md).
+
+> **Launch substrate = the new identity-foundation architecture.** This DPIA assesses processing **as it will be at launch**, on the ratified target schema (`person`/`login`/`organization`/`membership`/`guardianship`/`mentorship`/`consent_grant` + a `person_retain` tier + a policy engine), **not** the legacy `accounts`/`profiles` schema. The target is **ratified but not yet built** — its execution is post-Phase-P (gated on `WI-530`), so **launch is downstream of building it**. Several risks below are *closed by construction* in the target model (the consent-receipt-survival fix, the consent event log, regime-banded gating, vendor routing) and become real launch conditions only as "build it correctly," not "design it."
 
 > **Plain-language note.** A DPIA is a written "what could go wrong for the people whose data we handle, and what we do about it" assessment. The law **requires** it here because we (a) profile individuals using AI and (b) those individuals are **children** — that combination is explicitly high-risk. This draft does the heavy lifting; the DPO/lawyer reviews, adjusts, and signs.
 
@@ -28,24 +31,24 @@ Three or more of these each independently flag high risk; children + profiling +
 An AI tutor holds a teaching conversation with a learner, tracks what they have covered, and adapts. A persistent **learning memory** (mastery state, misconceptions, summaries, extracted facts) lets the tutor remember across sessions. A guardian can oversee a child's progress. The service is sold as a consumer subscription paid by an adult.
 
 ### 2.2 Data and data subjects
-See [`ropa.md`](ropa.md) for the full register. In summary:
-- **Subjects:** adult owners (18+), self-consenting teens (13+), non-self-consenting teens (13–15 below local consent age). *(Future, non-US only: 10–12 — out of scope for this launch.)*
-- **Data:** email + login identity; date of birth, country, display name, pronouns, language, interests; the tutoring conversation and everything derived from it (mastery, notes, facts, quotes, summaries, quizzes, vocabulary, progress); billing state; error/telemetry.
+See [`ropa.md`](ropa.md) for the full register (target schema). In summary:
+- **Subjects:** a **`person`** (the human, the learning-data scope key) wearing capability hats — Subscription-administrator (`admin` role; an adult), learner, Guardian (consent authority), Mentor (data access), Payer (billing). Owner/`is_owner` dissolves into the `admin` role.
+- **Data:** `login` identity (email, Clerk binding); `person` (birth_date, residence, display name, pronouns, language, interests); `knowledge_assertions` (age/residence determination history — the COPPA actual-knowledge / Art 8 audit trail); `consent_grant` event log; the tutoring conversation and everything derived from it (mastery, notes, facts, quotes, summaries, quizzes, vocabulary, progress; scoped `person_id`); billing; error/telemetry.
 - **No special-category (Art 9) data** — no health or disability data is collected or inferred (§6.3; [`art9-special-category-decision.md`](art9-special-category-decision.md)).
 
-### 2.3 Data flow (verified against code)
-1. Sign-up → age + country gate (A7/A17) → consent (A9) → profile created.
-2. Learner converses → turns sent to an **LLM provider** (names/identifiers minimised, A13) → reply rendered.
-3. After a session, the conversation is distilled into the **learning memory**; the raw transcript is **purged at 30 days** (`RETENTION_PURGE_ENABLED=true` in prod, verified 2026-06-08).
-4. Embeddings (Voyage) power memory recall. Billing via RevenueCat + the app stores. Email via Resend. Errors via Sentry. Durable jobs via Inngest. DB on Neon; compute on Cloudflare.
-5. Account deletion → single atomic delete → **~55 tables FK-cascade-wiped** + the external Clerk identity erased (commit `9137c7961`).
+### 2.3 Data flow (target architecture)
+1. Sign-up → age + residence gate via the **policy engine** (`regimes`×`policy_cells`×`policy_rules`; unknown axis defaults to most-restrictive) → `consent_grant` recorded with `lawful_basis` (A9) → `person` created; the determination is logged to `knowledge_assertions`.
+2. Learner converses → turns routed through the **model router** to a **vetted** LLM provider (`allowed_models`, `MMT-ADR-0014`; identifiers minimised, A13; Gemini excluded for this app) → reply rendered.
+3. After a session, the conversation is distilled into the **learning memory** (scoped `person_id`); the raw transcript is **purged at 30 days** (`RETENTION_PURGE_ENABLED=true`, verified 2026-06-08).
+4. Embeddings (Voyage) power memory recall. Billing via RevenueCat + the app stores, anchored to `organization`. Email via Resend. Errors via Sentry. Durable jobs via Inngest (the unified daily sweep, `MMT-ADR-0009`). DB on Neon; compute on Cloudflare.
+5. **Erasure = re-home-then-delete** (`data-model.md` §6.1): `consent_grant` → `consent_receipt`; write `deletion_audit`; create `financial_record`; then drop `person` + all learning data; erase the external Clerk identity; erase the out-of-model `byok_waitlist` email. `consent_grant ON DELETE RESTRICT` forces the re-home first — the structural fix for the legacy consent-receipt-destruction defect (`I-C1`).
 
 ### 2.4 Recipients / processors
 Clerk, LLM provider(s), Voyage, RevenueCat + Apple/Google, Resend, Sentry, Inngest, Neon, Cloudflare. Each requires a signed DPA on a business/enterprise route (A11) and a US-transfer assessment (A12).
 
 ## 3. Consultation
 - **DPO:** `[to be recorded — the DPO owns and signs this DPIA]`.
-- **Engineering:** data-flow facts above are code-verified (audit doc).
+- **Engineering:** the target data flow is per the ratified `data-model.md`; the legacy flow it replaces is code-verified (audit doc). A re-confirmation pass against the built schema is required before final sign-off (§9 substrate condition).
 - **Data subjects' views:** a children's-product proxy — apply the UK Children's Code (A15) and child-readable privacy summary (A5) as the representation of children's interests.
 - **Counsel:** `[to be recorded — confirms Art 9 scope, international transfers, AI-provider terms]`.
 
@@ -59,7 +62,7 @@ Clerk, LLM provider(s), Voyage, RevenueCat + Apple/Google, Resend, Sentry, Innge
 
 ## 5. Accuracy, rights, and transparency
 - **Transparency:** plain-language privacy policy + child-readable summary (A5); clear "you're talking to an AI" indicator (A10, AI Act Art 50, due 2 Aug 2026).
-- **Rights:** access, rectification, erasure, withdrawal of consent — account deletion and consent-withdrawal both trigger the verified FK-cascade erasure. Guardian can view/correct a child's data.
+- **Rights:** access, rectification, erasure, withdrawal of consent — both deletion and consent-withdrawal run the re-home-then-delete pattern (§2.3 step 5), which **preserves the consent receipt and the deletion audit while erasing the person and learning data** (the `person_retain` tier; `data-model.md` §3.2/§6.1). Guardian can view/correct a charge's data.
 - **Accuracy:** learner/guardian can correct the record; mastery state is revisable.
 
 ## 6. Risks to individuals, and mitigations
@@ -67,14 +70,15 @@ Clerk, LLM provider(s), Voyage, RevenueCat + Apple/Google, Resend, Sentry, Innge
 | # | Risk to the individual (esp. a child) | Likelihood | Severity | Mitigation | Residual |
 |---|---|---|---|---|---|
 | 6.1 | **Misleading retention notice** — user told "chats deleted in 30 days" but verbatim answers survive in notes/summaries/quotes | Med | Med | **(a) Done** — privacy policy now discloses retained learning summary incl. short quotes + purpose-fence (A24-a, 2026-06-08). **(b) Fast-follow** — age-out/abstract verbatim fields on the 30-day clock (A24-b) | Low after (a); Very low after (b) |
-| 6.2 | **Incomplete erasure** — data surviving an account deletion | Low | High | Clerk identity erasure wired + break test (R1, done). **`byok_waitlist` email erasure now wired** into `executeDeletion` with a real-DB red→green break test (R3a, done 2026-06-08). **Remaining:** the `organizations` row — the T1 backfill writes the owner's display-name into `organizations.name` (PII) and the table has no FK to accounts, so it survives erasure. This is a **T1 artifact** slated for removal by the ratified identity revert; closed either by that revert dropping the table or by a minimal org-row erasure if the revert slips (R3b) | Low; org PII closes on T1 revert (or R3b) |
+| 6.2 | **Incomplete erasure** — data surviving a person deletion | Low | High | Target erasure is **re-home-then-delete** (§2.3 step 5) — structurally closes the legacy consent-receipt-destruction defect (`I-C1`). The legacy `organizations`-row PII gap (R3b) is **moot** — the target schema drops that table. **Two requirements must be built into the new delete flow:** (a) erase the external **Clerk identity** (R1 logic carries forward); (b) erase the out-of-model **`byok_waitlist`** email (legacy fix break-tested; `byok_waitlist` is outside the identity carve-out so it gets no cascade). | Low, conditional on the new delete flow implementing (a)+(b) |
 | 6.3 | **Inadvertent health/disability inference** (Art 9) | Low | High | Hard product rule: no clinical/disability label or inference, anywhere (A23). **Action:** extend the no-clinical-copy guard to cover LLM-written `memory_facts`/`topic_notes`/`misconception` fields, not just static copy | Low |
 | 6.4 | **Child's data sent to an AI provider on the wrong terms / used to train models** | Med | High | Business/enterprise route only, no-training + retention controls, DPA signed (A11); US-transfer check per provider (A12); **Gemini blocked** for this app (under-18 terms); names minimised (A13) | Low once DPAs signed |
 | 6.5 | **Manipulative/pressuring design aimed at a child** (streaks, urgency, upsell) | Med | Med | No guilt/streak pressure; easy guilt-free exit; upsell neutral and adult-facing (A16/A22); UK Children's Code defaults (A15) | Low |
 | 6.6 | **Child entered into a paid contract** | Low | Med | Billing sits with the adult owner; a child cannot start a paid plan (A20); clear cancellation (A21) | Low |
 | 6.7 | **Data breach at us or a processor** | Low | High | Breach plan + 72h Datatilsynet process (A4); processor DPAs oblige vendor notification; secrets via Doppler; Sentry PII scrubbing; (defense-in-depth: app-level scoping + planned RLS) | Low–Med |
-| 6.8 | **Weak age assurance** — under-13 slips in at a 13+ launch | Med | Med | DOB (not yes/no) at sign-up; cautious treatment of protection-lowering answers (A17); under-13 rejection wired; under-13 bounce instrumented | Low–Med |
-| 6.9 | **Over-broad profiling / function creep** | Low | Med | Purpose-fence (§4); profiling limited to teaching personalisation | Low |
+| 6.8 | **Weak age assurance** — under-13 slips in at a 13+ launch | Med | Med | DOB (not yes/no) at sign-up; **`knowledge_assertions`** records method + confidence per axis; the **policy engine** defaults unknown age/residence to most-restrictive and bands consent by regime; protection-lowering edits gated (`data-model.md` §6.2); under-13 rejection + bounce instrumented | Low–Med |
+| 6.9 | **Wrong-regime / wrong-jurisdiction consent** | Low | High | The **policy engine** (`regimes`×`policy_cells`×`policy_rules`) bands consent by jurisdiction (US sub-13 excluded; EU per-country self-consent ages); `knowledge_assertions` is the audit trail | Low once engine content (DB-mastered) is populated |
+| 6.10 | **Over-broad profiling / function creep** | Low | Med | Purpose-fence (§4); profiling limited to teaching personalisation | Low |
 
 **On Article 22 (automated decisions):** the profiling **personalises teaching only** and carries **no legal or similarly significant effect** on the learner. Therefore the Art 22 prohibition on solely-automated significant decisions is **not engaged**. The DPIA records this explicitly so the question is closed.
 
@@ -96,11 +100,15 @@ Most processors are US-based. For each: check DPF certification at launch; where
 
 ### Launch-blocking conditions carried out of this DPIA
 1. **DPO appointed** and this DPIA signed (A1/A2).
-2. **Provider DPAs signed** on business tier + transfer checks done; **no Gemini for this app** (A11/A12, 6.4).
-3. **R3 erasure** — BYOK email **done** (6.2); **organizations PII** closed before launch via the T1 revert dropping the table (preferred) **or** a minimal org-row erasure if the revert slips (R3b).
+2. **Provider DPAs signed** on business tier + transfer checks done; **no Gemini for this app**, enforced via `allowed_models` (A11/A12, 6.4).
+3. **New delete flow implements both** (a) external Clerk-identity erasure and (b) `byok_waitlist` erasure (6.2). *(R3b organizations-PII is moot — dropped by the target schema.)*
 4. **Privacy policy pre-publish TODO** resolved — DPO name, registered address, Art 27 rep (A5).
-5. **Consent flow** verified: age/country gate + real consent + parent authorization through 16 (A7/A8/A9).
+5. **Consent flow** verified against the `consent_grant` event log: per-purpose consent, recorded `lawful_basis`, Guardian authorization where self-consent doesn't apply (A9 / `data-model.md` §4.8).
 6. **No-clinical-copy guard** extended to LLM-written memory fields (6.3).
+7. **`person_retain.*.retention_period` values set** (not placeholder defaults) — counsel fills; enforced by the Phase-F launch-readiness guard (the value-seam test).
+8. **Policy-engine content (DB-mastered) populated** for the launch jurisdictions before go-live (6.9) — the PM-owned compliance-population workstream.
+
+> **Substrate condition (overarching):** because launch runs on the new architecture, **all of the above presuppose the identity-foundation baseline is built and migrated.** That build is post-Phase-P and gated on `WI-530`. This DPIA assesses the *design*; a pre-launch re-confirmation pass against the *built* schema (with live `file:line` citations replacing the `data-model.md` references) is required before final sign-off.
 
 ### Tracked, not launch-blocking
 - A24-b verbatim age-out (post-launch tightening, 6.1b).
