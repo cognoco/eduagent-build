@@ -2,7 +2,7 @@
 
 **Status:** Accepted · 2026-06-04 · **Scope:** the pre-launch, one-time collapse of the migration
 chain to a fresh baseline (Phase E ruling **D1**). · **Deciders:** Architect (jjoerg) + Claude
-· **Realizes:** `_wip/identity-foundation/data-model.md` §1 (the cut) · **Builds on:**
+· **Realizes:** `docs/canon/identity/data-model.md` §1 (the cut) · **Builds on:**
 `MMT-ADR-0000` §I.4 (lockstep lifecycle); the project rule that staging/prod use committed,
 append-only migrations.
 

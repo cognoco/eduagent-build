@@ -55,10 +55,13 @@ relative to the repo root.
 
 | # | Document | Role in the set | Ratified |
 |---|---|---|---|
-| 1 | `_wip/identity-foundation/identity-ontology.md` | The **conceptual vocabulary** — entities, roles, edges, the terms every other doc is written in. Source of the shared language. | Phase A/C (ontology v1) |
-| 2 | `_wip/identity-foundation/domain-model.md` | The **domain model** — entities / roles / consent model / tenancy; org & membership **re-derived, not inherited**. | Phase D · 2026-06-03 |
-| 3 | `_wip/identity-foundation/data-model.md` | The **target schema** — 8 tables + cut strategy + the F.1 lockstep SQL for the `MMT-ADR-0015` amendments (`kind` column, seam columns, `allowed_models`). | Phase E · 2026-06-04, amended F.1 · 2026-06-08 |
-| 4 | `_wip/identity-foundation/identity-foundation-prd.md` | The **product layer** — personas (6), the three-axis age model, 13+ launch floor with sub-13 built-but-gated, ICP-vs-persona distinction. | Phase B · 2026-06-02 (Part 10 ripple) |
+*(Graduated `_wip/` → `docs/canon/identity/` in Phase J0, 2026-06-08, prefix-dropped, per the `MMT-ADR-0000` §I.4 sub-layout amendment. The scrub provenance lives in `_wip/identity-foundation/_history/`.)*
+
+| 1 | `docs/canon/identity/ontology.md` | The **conceptual vocabulary** — entities, roles, edges, the terms every other doc is written in. Source of the shared language. | Phase A/C (ontology v1) · graduated J0 |
+| 2 | `docs/canon/identity/domain-model.md` | The **domain model** — entities / roles / consent model / tenancy; org & membership **re-derived, not inherited**. | Phase D · 2026-06-03 · graduated J0 |
+| 3 | `docs/canon/identity/data-model.md` | The **target schema** — 8 tables + cut strategy + the F.1 lockstep SQL for the `MMT-ADR-0015` amendments (`kind` column, seam columns, `allowed_models`). | Phase E · 2026-06-04, amended F.1 · 2026-06-08 · graduated J0 |
+| 4 | `docs/canon/identity/prd.md` | The **product layer** — personas (6), the three-axis age model, 13+ launch floor with sub-13 built-but-gated, ICP-vs-persona distinction; Part 10 settled product/UX rulings. | Phase B · 2026-06-02 (Part 10 ripple) · graduated J0 |
+| + | `docs/compliance/identity-compliance-register.md` | The **compliance obligations** rescued from the PRD decision queue in J0 — binding rules (COPPA / GDPR / EU AI-Act / OSA / DPIA) + locked product parameters. **New J0 member** (set was 17 at Phase-G lock; now 18). | Phase J0 · 2026-06-08 |
 
 ### L2 — Decisions (the *why*: ADRs)
 
@@ -67,7 +70,7 @@ plus the governing meta-ADR `0000`.
 
 | # | ADR | Role in the set | Status |
 |---|---|---|---|
-| 5 | `MMT-ADR-0000` — documentation layer model + decisions layer | The **governing meta-ADR**: the 5-layer model, the significance gate, the lockstep rule, §I.4 physical layout. **Incl. its three amendments** — memory↔canon boundary (2026-06-07), `docs/registers/` L3 sibling (2026-06-08), canon-graduates-at-ratification (2026-06-08). | Accepted (Phase C) + 3 amendments |
+| 5 | `MMT-ADR-0000` — documentation layer model + decisions layer | The **governing meta-ADR**: the 5-layer model, the significance gate, the lockstep rule, §I.4 physical layout. **Incl. its five amendments** — memory↔canon boundary (2026-06-07), `docs/registers/` L3 sibling, canon-graduates-at-ratification, no-document-sole-system-of-record, and the **domain-canon sub-layout** (`docs/canon/<domain>/`, prefix-dropped — the J0 enabling amendment) (all 2026-06-08). | Accepted (Phase C) + 5 amendments |
 | 6 | `MMT-ADR-0001` — own the identity/tenancy graph; Clerk for auth only | **The tenancy foundation** — we own the identity/tenancy graph; Clerk is authentication only. `0007` *builds on* this (not superseded). | Accepted · 2026-06-01 (Grill #1) |
 | 7 | `MMT-ADR-0002` — Payer capacity is store-delegated | **The Payer-capacity decision** — Payer is store-delegated, not self-adjudicated by age; basis for the §8/D3 `payer_person_id` placement. | Accepted · 2026-06-02 |
 | 8 | `MMT-ADR-0007` — core identity entity and role model | Person ≠ Login; entities + roles primitive (vs capacities). | Accepted · Phase D |

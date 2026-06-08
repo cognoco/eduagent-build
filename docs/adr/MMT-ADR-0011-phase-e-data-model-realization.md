@@ -9,7 +9,7 @@ creates. · **Deciders:** Architect (jjoerg) + Claude · **Realizes:** the 8 Pha
 (the one-time cut).
 
 > **Placement.** Global L2 from birth; lockstep canon partner is
-> `_wip/identity-foundation/data-model.md` (the Phase-E deliverable).
+> `docs/canon/identity/data-model.md` (the Phase-E deliverable).
 
 ## Context
 
