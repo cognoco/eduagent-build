@@ -1037,6 +1037,13 @@
       "revisitTitle": "Repeter {{subject}}",
       "startTitle": "Start {{subject}}"
     },
+    "noteSignal": {
+      "verified": "Verified",
+      "verifiedAccessibilityLabel": "Verified - your words held up",
+      "tutorAddition": "The tutor has more on this topic",
+      "showTutorAdditionAccessibilityLabel": "Show what the tutor added",
+      "hideTutorAdditionAccessibilityLabel": "Hide what the tutor added"
+    },
     "bookmarkCard": {
       "accessibilityLabel": "Åpne lagret bokmerke: {{title}}"
     },

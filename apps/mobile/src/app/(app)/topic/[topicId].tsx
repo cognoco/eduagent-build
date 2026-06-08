@@ -31,6 +31,7 @@ import {
 import { useTopicRetention } from '../../../hooks/use-retention';
 import {
   useTopicNotes,
+  useConceptMasterySignals,
   useCreateNote,
   useUpdateNote,
   useDeleteNoteById,
@@ -318,6 +319,9 @@ export default function TopicDetailScreen() {
   const { data: notesData, isLoading: notesLoading } = useTopicNotes(
     subjectId,
     topicId,
+  );
+  const conceptSignalsQuery = useConceptMasterySignals(
+    topicId ? [topicId] : [],
   );
   const { data: topicSessions, isLoading: sessionsLoading } = useTopicSessions(
     subjectId,
@@ -839,6 +843,9 @@ export default function TopicDetailScreen() {
                         content={note.content}
                         sourceLine={formatSourceLine(note)}
                         updatedAt={note.updatedAt}
+                        conceptSignal={
+                          conceptSignalsQuery.data?.signals?.[note.topicId]
+                        }
                         onLongPress={handleNoteLongPress}
                         onSourcePress={
                           sourceSessionId

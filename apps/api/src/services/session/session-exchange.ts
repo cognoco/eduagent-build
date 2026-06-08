@@ -117,6 +117,7 @@ import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from '../curriculum-topic-ownership';
+import { captureConceptMastery } from '../concept-capture';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
   decideMasteryAndReview,
@@ -819,6 +820,22 @@ async function finalizeChallengeRoundIfReady(
       topicId,
       decision,
       now,
+    );
+  }
+
+  if (session.subjectId) {
+    await safeWrite(
+      () =>
+        captureConceptMastery(
+          db,
+          profileId,
+          session,
+          topicId,
+          evaluations,
+          now,
+        ),
+      'challenge-round.concept-capture',
+      { profileId, sessionId: session.id, topicId },
     );
   }
 

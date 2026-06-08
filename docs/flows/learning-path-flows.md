@@ -1,6 +1,6 @@
 # Learning Path Flows — End-User Perspective
 
-Complete trace of every learning path in MentoMate, from the learner's first tap to post-session recording. Last updated 2026-05-23.
+Complete trace of every learning path in MentoMate, from the learner's first tap to post-session recording. Last updated 2026-06-08.
 
 > **What changed since 2026-04-14**
 > - The five tutoring-session paths below are unchanged in shape; only their **entry points** moved. The intermediate `/(app)/learn-new` screen was deleted in the home IA simplification (commit 55ddcbdb). Learners now tap a quick action or the Ask Anything bar directly on `/(app)/home` to start any path.
@@ -20,6 +20,11 @@ Complete trace of every learning path in MentoMate, from the learner's first tap
 > - **Weekly progress push.** New push-driven `/(app)/child/[profileId]/weekly-report/[weeklyReportId]` route marks the report viewed on mount.
 > - **Quiz robustness fixes.** BUG-929 / CR-PR129-M4 resets `answerState` / `selectedAnswer` / `freeTextAnswer` / `guessWhoCluesUsed` and the per-question timer in the same React batch on advance. BUG-892 replaces the web `window.confirm` quit with an in-app Modal. BUG-941 envelope-strip is applied at the chat-bubble render boundary across all sessions and the new transcript view.
 
+> **What changed since 2026-06-08**
+> - **Learn Something New current flow.** Home's `home-action-study-new` quick action routes directly to `/create-subject`; the obsolete `ONBOARDING_FAST_PATH` flag is no longer part of the current mobile feature-flag set. First curriculum sessions use `POST /subjects/:subjectId/sessions/first-curriculum`, with `/ready` shown only for the first subject so the learner gets a reflection moment before opening chat.
+> - **Session completion timing.** Tapping End Session closes the session and creates a pending summary row, but the normal `app/session.completed` pipeline is queued only after the learner submits or skips the "Your Words" reflection. Stale idle sessions are the exception: the stale-session cron auto-closes and dispatches completion with `summaryStatus='auto_closed'`.
+> - **Notes and Challenge Round.** Tutoring sessions now include note prompts/manual note entry, summary-to-note side effects, and the feature-gated Challenge Round path: eligible learners can accept a short evaluated challenge, then review/save a drafted note when there is solid evidence.
+
 ---
 
 ## Status legend
@@ -27,7 +32,7 @@ Complete trace of every learning path in MentoMate, from the learner's first tap
 Each path below describes shipped, prod-active behavior unless tagged. Tags used inline:
 
 - **prod-active** — running for real users in production today.
-- **flag-gated (dev/staging only)** — code shipped, but a `FEATURE_FLAGS.*` value defaults off in production. Most common case: `ONBOARDING_FAST_PATH` defaults off in prod, on in dev/staging.
+- **flag-gated** — code shipped, but a runtime flag keeps it dark or limited. Example: `CHALLENGE_ROUND_RUNTIME_ENABLED` is an API-side kill switch and defaults off unless set to `true`.
 - **prompt-only** — implemented as an LLM prompt rule with no UI/route surface (e.g., the teach-first opener, the chatty fun-fact opener).
 - **data-only** — backend computes/persists it, but no UI consumes it yet (e.g., `topicOrder`, `daysSinceLastReview`).
 
@@ -40,6 +45,7 @@ Where the actual prod-experience differs from the "intended" pedagogy described 
 | Path | Entry Point (current IA) | Session Type (DB) | UI Mode | Summary |
 |---|---|---|---|---|
 | **Freeform Chat** | Home Ask Anything bar (`home-ask-anything`) | `learning` | `freeform` | Open-ended — no subject or topic chosen upfront |
+| **Learn Something New** | Home quick action (`home-action-study-new`) → `/create-subject` | `learning` | `learning` | Create/choose a subject, start the first curriculum topic, then continue as guided learning |
 | **Guided Learning** | Library v3 single pane → topic detail (or subject carousel on home) | `learning` | `freeform` (scoped) | Focused on a specific topic within a subject |
 | **Homework Help** | Home Homework quick action (`home-action-homework`) | `homework` | `homework` | Photo or typed math/science problem |
 | **Practice / Review** | Topic detail | `learning` | `practice` | Timed review of a previously studied topic |
@@ -53,28 +59,32 @@ Where the actual prod-experience differs from the "intended" pedagogy described 
 | **Quiz** | Home Practice quick action → Practice hub "Quiz" | `POST /quiz/rounds` (generate), `POST /quiz/rounds/:id/check` (per answer), `POST /quiz/rounds/:id/complete` (submit) | Three activity types — Capitals, Vocabulary (per language subject), Guess Who. Server-validated answers with mid-round prefetch for instant Play Again. Past rounds discoverable via `/(app)/quiz/history` and `/(app)/quiz/[roundId]`. |
 | **Dictation** | Home Practice quick action → Practice hub "Dictation" | `POST /dictation/generate` (LLM topic), `POST /dictation/prepare-homework` (sentence split), `POST /dictation/review` (multimodal photo review), `POST /dictation/results` (record) | TTS dictation with paced playback; optional photo review of handwriting; sentence-level remediation. |
 
-Additionally, two **verification overlays** can activate within any tutoring session:
+Additionally, two **verification overlays** can activate within eligible learning/practice sessions:
 - **Devil's Advocate** (`evaluate`) — AI presents a flawed explanation; learner finds the error
 - **Feynman Technique** (`teach_back`) — learner explains the concept to a "clueless" AI
 
+A separate **Challenge Round** can activate inside eligible learning sessions when the API flag is enabled. It is not a route-level path and not guaranteed after a fixed number of turns; the server gates it by session type, evidence, retention/readiness, quota, and cooldown.
+
 ---
 
-## Path 0: New-Subject Onboarding (the wall before Path 2)
+## Path 0: Learn Something New / First Curriculum Session
 
 ### Who hits it
-Every learner the first time they create a subject. "Start Learning" on a fresh subject does not skip this — it is the only way to reach Path 2 the first time, and it is the path the audit doc (`docs/plans/app evolution plan/2026-05-06-learning-product-evolution-audit.md`) is primarily redesigning.
+Learners who tap **Learn something new** on Home, use an Add subject affordance, or create a subject from an unresolved chat/homework prompt. This path creates or resolves the subject, gets the first usable curriculum topic, and opens a normal teaching session.
 
-### Status (2026-05-06)
-Two parallel routes through the same screens exist in code. **Production today follows the long path** because `FEATURE_FLAGS.ONBOARDING_FAST_PATH` defaults off in prod (audit Section A). Dev/staging follow the short path.
+### Status (2026-06-08)
+Shipped, prod-active. There is no current mobile `ONBOARDING_FAST_PATH` flag in `apps/mobile/src/lib/feature-flags.ts`. The first-curriculum route is the current path. API-side topic intent matching exists behind `MATCHER_ENABLED` and defaults off.
 
 ### Flow
 
 ```
-Home / Library / Chat
-  └─ Tap "Add subject" or type a free-form prompt into Ask Anything
+Home
+  └─ Tap "Learn something new" (`home-action-study-new`)
       └─ /create-subject
           │
-          ├─ Subject classification (CFLF) runs:
+          ├─ Learner types what they want to learn
+          │
+          ├─ Subject classification / resolution runs:
           │   ├─ direct_match           → silently creates, no confirmation card
           │   ├─ resolved (1 suggestion)→ "We'll start with X — Accept / Edit"
           │   ├─ resolved (n>1)         → suggestion list with chips
@@ -83,11 +93,7 @@ Home / Library / Chat
           ├─ Subject structure decided server-side (subject-classify.ts → subject.ts):
           │   ├─ broad         → bookSuggestions only; learner picks a book in /pick-book
           │   ├─ narrow        → topics generated synchronously (one default book wraps them)
-          │   └─ focused_book  → book stub created with topicsGenerated=false; topics deferred
-          │
-          ├─ Topic-grain learner intent ("how are chemical reactions created") is NOT
-          │   propagated past this point. SubjectResolveResult has name/focus/focusDescription
-          │   but no topicHint field. (audit Section J — Slice 1 PR 5i)
+          │   └─ focused_book  → book stub first; topics can materialize on first session start
           │
           └─ Routes by branch:
               ├─ broad                  → /pick-book/[subjectId]
@@ -95,14 +101,27 @@ Home / Library / Chat
               └─ language subject       → /onboarding/language-setup → first curriculum session
 
 POST /subjects/:subjectId/sessions/first-curriculum
-  ├─ Polls up to FIRST_CURRICULUM_SESSION_WAIT_MS = 25,000ms for:
-  │     1. first materialized topic in `curriculum_topics` for this subject
-  │
-  ├─ If topic arrives in time → creates `learning_sessions` row, returns sessionId
-  └─ If topic timeout (broad/focused_book and the materialization Inngest job hasn't
-       fired yet) → returns an error and the learner sees a "still preparing" state.
+  ├─ Polls up to FIRST_CURRICULUM_SESSION_WAIT_MS = 25,000ms for a topic
+  ├─ If a focused book has no topics yet, tries to materialize them inline
+  ├─ If a topic is available:
+  │   ├─ optionally runs topic-intent matching when `MATCHER_ENABLED=true`
+  │   ├─ creates a `learning_sessions` row
+  │   └─ returns sessionId + topicId
+  └─ If still preparing:
+      ├─ API returns 409 Conflict
+      └─ Mobile retries up to 3 attempts, 2s apart
 
-→ Path 2 (Guided Learning) opens at sessionId
+If first curriculum session is ready:
+  ├─ First subject ever → /ready → learner taps CTA → Session Screen
+  └─ Existing learner   → Session Screen directly
+
+If still not ready after retries:
+  ├─ First subject ever → /ready with subject/topic/raw input fallback
+  └─ Existing learner   → Session Screen without precreated sessionId
+
+→ The teaching session then behaves like Path 2 (Guided Learning):
+  chat opens, the learner exchanges messages with the mentor, notes/challenge
+  may appear, and End Session sends the learner to Session Summary.
 ```
 
 ### Status entry summary
@@ -114,7 +133,7 @@ POST /subjects/:subjectId/sessions/first-curriculum
 | Teach-first first-turn rule | **prompt-only** (shipped TF-1..TF-8, but masked by chatty fun-fact opener — see "First-Turn AI Opener" below) |
 | `startFirstCurriculumSession` 25s polling | shipped, prod-active |
 | Curriculum pre-warm on subject create | shipped |
-| Topic-grain intent matching | **not shipped** (audit Section J — Slice 1 PR 5i) |
+| Topic-grain intent matching | API flag-gated by `MATCHER_ENABLED`; defaults off |
 | Topic-probe signal extraction | async Inngest extraction from early `session_events` |
 
 ### What gets recorded
@@ -126,6 +145,7 @@ POST /subjects/:subjectId/sessions/first-curriculum
 | Signal extraction | goals/experienceLevel/etc. | `learning_sessions.metadata.extractedSignals` |
 | First-curriculum session create | sessionId, optional bookId | `learning_sessions` |
 | Curriculum materialization (broad/focused_book) | books, topics | `curriculum_books`, `curriculum_topics` (deferred from subject create) |
+| Teaching chat | user/assistant turns, quick actions, feedback, note/challenge metadata | `session_events`, `learning_sessions.metadata` |
 
 ---
 
@@ -169,15 +189,15 @@ Home Screen (LearnerScreen)
                   │   ├─ Voice mode toggle available (switches to ≤50-word responses)
                   │   └─ Each exchange writes session_events rows in real-time
                   │
-                  └─ Learner taps "I'm Done"
-                      └─ Filing Prompt appears:
-                          ├─ "Yes, add it" → LLM classifies transcript → creates/finds
-                          │   subject + book + topic in library → navigates to book detail
-                          └─ "No thanks" → navigates to Session Summary
-                              ├─ "Your Words" text box → learner writes what they learned
-                              │   └─ AI evaluates summary quality → accepted/needs revision
-                              ├─ OR "Skip for now"
-                              └─ Recall Bridge questions (homework sessions only — not here)
+                  └─ Learner taps "End Session"
+                      ├─ API closes the session with `summaryStatus='pending'`
+                      ├─ If still unfiled and there were at least 3 exchanges,
+                      │   close-path auto-filing is requested in the background
+                      └─ Session Summary opens:
+                          ├─ "Your Words" reflection text box
+                          │   └─ AI evaluates reflection quality and returns feedback
+                          ├─ OR "Skip for now"
+                          └─ Recall Bridge questions (homework sessions only — not here)
 ```
 
 ### What gets recorded
@@ -187,8 +207,7 @@ Home Screen (LearnerScreen)
 | Every message | User message + AI response events | `session_events` |
 | Every message | Exchange count, escalation rung | `learning_sessions` |
 | Session close | Duration (active + wall-clock), status | `learning_sessions` |
-| Filing (if accepted) | New topic created, linked to session | `curriculum_topics` (filedFrom=`freeform_filing`) |
-| Filing (if accepted) | Session backfilled with topicId | `learning_sessions.topicId` |
+| Auto-filing (if eligible) | New topic created/linked from transcript | `curriculum_topics`, `learning_sessions.topicId` |
 | Post-session pipeline | SM-2 retention card | `retention_cards` |
 | Post-session pipeline | Progress snapshot (daily aggregate) | `progress_snapshots` |
 | Post-session pipeline | Session embedding (1024-dim vector) | `session_embeddings` |
@@ -197,8 +216,8 @@ Home Screen (LearnerScreen)
 | Post-session pipeline | Topic suggestions ("What next?") | `topic_suggestions` |
 
 ### Key behavior
-- The post-session Inngest pipeline **waits up to 60s** for filing to complete before computing retention — because without filing, there's no `topicId` to attach the retention card to.
-- If filing fails, a retry Inngest function fires (up to 2 attempts). If all fail, the pipeline proceeds without a topic link.
+- Freeform close does not block the learner on a manual filing prompt. If the session is still unfiled and has at least 3 exchanges, close-path auto-filing is requested in the background.
+- The post-session Inngest pipeline can wait up to 60s for filing resolution before computing topic-bound retention. If filing does not resolve in time, the pipeline proceeds with the best available placement and filing retry/observer jobs handle recovery.
 
 ---
 
@@ -232,16 +251,35 @@ Library v3 (single-pane topic-first view)
                           │   ├─ Socratic: guided questions, escalation ladder
                           │   └─ Four Strands: direct teaching, strand rotation
                           │
+                          ├─ Learner and AI exchange messages
+                          │   ├─ every user message + AI reply is stored as session events
+                          │   ├─ learner can use quick chips and switch input mode
+                          │   ├─ learner can add a note from the session tools
+                          │   └─ LLM can surface a note prompt via the response envelope
+                          │
+                          ├─ Challenge Round may be offered (flag-gated)
+                          │   ├─ only when `CHALLENGE_ROUND_RUNTIME_ENABLED=true`
+                          │   ├─ server also requires enough exchanges, correct-streak evidence,
+                          │   │   retention/readiness, quota, and no cooldown block
+                          │   ├─ learner can Accept / Decline / Don't ask again
+                          │   └─ if accepted, the round asks up to 3 evaluated questions
+                          │
                           ├─ SM-2 may auto-trigger verification overlays:
                           │   ├─ Devil's Advocate: "Here's how I'd explain it... can you
                           │   │   spot what's wrong?"
                           │   └─ Feynman: "Pretend I know nothing — explain this to me"
                           │
-                          └─ Learner taps "I'm Done"
-                              └─ Navigate directly to Session Summary
-                                  (no filing prompt — topic already exists)
-                                  ├─ "Your Words" summary
+                          └─ Learner taps "End Session"
+                              ├─ API closes the session with `summaryStatus='pending'`
+                              ├─ creates/updates a `session_summaries` row
+                              └─ navigates to Session Summary
+                                  ├─ "Your Words" reflection text box
+                                  │   ├─ learner submits ≥10 chars
+                                  │   ├─ LLM evaluates reflection quality
+                                  │   ├─ feedback appears as "Mate feedback"
+                                  │   └─ submitted reflection can auto-create a topic note
                                   └─ OR "Skip for now"
+                                      └─ queues post-session processing without learner reflection
 ```
 
 ### What gets recorded
@@ -293,7 +331,7 @@ Home Screen (LearnerScreen)
                   ├─ No Socratic escalation ladder in homework mode
                   │   (direct explanation, not questioning)
                   │
-                  └─ Learner taps "I'm Done"
+                  └─ Learner taps "End Session"
                       └─ Filing Prompt appears:
                           ├─ "Yes, add it" → classifies + files to library
                           └─ "No thanks" → Session Summary
@@ -339,7 +377,7 @@ Topic Detail Screen (status: in_progress or completed)
           │   ├─ Devil's Advocate (evaluate)
           │   └─ Feynman Technique (teach_back)
           │
-          └─ Learner taps "I'm Done"
+          └─ Learner taps "End Session"
               └─ Navigate directly to Session Summary
                   (no filing prompt — topic exists)
 ```
@@ -379,7 +417,7 @@ Library v3 (single pane — retention pills shown inline on each topic row)
                       ├─ AI knows this is a relearn session — uses remediation pedagogy
                       │   (focuses on gaps, uses different examples than original session)
                       │
-                      └─ Learner taps "I'm Done"
+                      └─ Learner taps "End Session"
                           └─ Session Summary (no filing prompt — topic exists)
 ```
 
@@ -410,12 +448,12 @@ Home Screen
                   │   confirms correct lines, gently surfaces the missed word
                   │   when the learner stalls (no Socratic ladder)
                   │
-                  └─ Learner taps "I'm Done"
-                      └─ Session Summary (filing prompt available)
+                  └─ Learner taps "End Session"
+                      └─ Session Summary (no close-time filing prompt)
 ```
 
 ### What gets recorded
-Same shape as a guided session — `learning_sessions.uiMode = 'recitation'`. Verification overlays are not used. Whether the post-session pipeline awards XP, marks streak, or files into a topic depends on whether the learner picks an existing topic or files at close.
+Same shape as a guided session — `learning_sessions.uiMode = 'recitation'`. Verification overlays are not used. Topic-bound post-session outputs depend on whether the session already has subject/topic context; the close handler does not show a filing prompt for recitation.
 
 ---
 
@@ -625,6 +663,49 @@ Bookmarks do not change session pedagogy or recording — they are a per-message
 
 ---
 
+## Notes (Within Tutoring Sessions)
+
+Learners can save their own notes while learning. Notes are topic-bound: the session needs a `topicId` before the note can be saved directly.
+
+```
+During a teaching session...
+  ├─ Learner taps Add note in the session tools
+  │   └─ NoteInput opens under the composer
+  │       └─ Save → POST topic note with sessionId attached
+  │
+  ├─ LLM emits `ui_hints.note_prompt.show=true`
+  │   ├─ after enough real exchange, usually when the learner explains
+  │   │   something correctly in their own words
+  │   └─ app shows "Write note" prompt / opens NoteInput
+  │
+  ├─ LLM emits `ui_hints.note_prompt.post_session=true`
+  │   └─ app opens note input near the end-of-session prompt
+  │
+  ├─ Challenge Round finishes with solid learner evidence
+  │   └─ app can show a drafted note for learner review
+  │       ├─ Save → topic note created
+  │       └─ Skip → no note saved
+  │
+  └─ Learner submits "Your Words" reflection on Session Summary
+      └─ API may auto-create a topic note from the reflection
+```
+
+### What gets recorded
+
+| When | What | Where |
+|---|---|---|
+| Manual note / LLM note prompt | learner-authored note body, topicId, optional sessionId | notes tables via `useCreateNote` |
+| Challenge drafted note | learner-reviewed note body, topicId, sessionId | notes tables |
+| Reflection auto-note | submitted summary content copied to topic note when a topic exists | notes tables |
+
+### Key behavior
+
+- The LLM can request that the UI offer a note, but the learner still chooses whether to write or save it.
+- A note cannot be saved without a topic; the app surfaces a save error instead of silently dropping it.
+- Topic note caps are enforced server-side. Summary-to-note creation treats a cap conflict as non-fatal so summary submission still succeeds.
+
+---
+
 ## First-Turn AI Opener (All Learning-Type Sessions)
 
 Status: **prompt-only**, prod-active, **conflicts with the teach-first rule** that also ships in the same prompt files.
@@ -645,11 +726,11 @@ Until 5b ships, the path-by-path "AI responds using the subject's pedagogy" desc
 
 Status: **shipped, prod-active.** Applies to Freeform, Guided, Homework, Practice, Relearn, and Recitation summary screens.
 
-After every tutoring session ends and the learner reaches Session Summary, the API generates a "next topic" recap and the mobile client renders it on the summary screen as `session-next-topic-card`.
+After the session is resolved (learner submits or skips the Session Summary reflection, or stale cleanup auto-closes the session), the API can generate learner-facing recap fields. The mobile summary screen polls/refreshes those fields and renders `session-next-topic-card` when `nextTopicId` and `nextTopicTitle` are available.
 
 ```
-Session ends
-  └─ Inngest post-session pipeline runs
+Session resolved
+  └─ `app/session.completed` Inngest pipeline runs
       └─ session-recap.ts (lines 33–34, 79, 107–125, 387–388) generates:
           ├─ nextTopicId
           ├─ nextTopicTitle
@@ -658,11 +739,11 @@ Session ends
               └─ Persists onto sessionSummary; schema fields at
                  packages/schemas/src/sessions.ts lines 426–428
 
-Session Summary screen (apps/mobile/src/app/(app)/session-summary/[sessionId].tsx
-  lines 1034–1074)
-  └─ Renders `session-next-topic-card` with title, reason,
-     and "Continue learning" CTA
-      └─ CTA opens a guided session at nextTopicId
+Session Summary screen (apps/mobile/src/app/session-summary/[sessionId].tsx)
+  ├─ initially shows existing summary/takeaway content
+  ├─ shows a recap skeleton while learner recap is still loading
+  └─ when next-topic fields arrive, renders `session-next-topic-card`
+      └─ "Continue learning" opens a guided session at nextTopicId
 
 Next session opens
   └─ session-context-builders.ts:324 feeds nextTopicReason back into
@@ -674,7 +755,68 @@ What is **not yet wired** (audit Section E):
 - `topicOrder` — the ordered topic id list for the subject — is in the API response (`packages/schemas/src/subjects.ts:333`) but the mobile recap card does not render it as an ordered preview ("present tense → irregulars → sentence practice → mixed recall"). Slice 2 wires this up.
 - The "next time we'll start with X" home-screen teaser at second-session open does not exist (no payload field, no component). Slice 2 adds it.
 
-The recap is independent of filing — it appears on the summary screen for filed and unfiled sessions alike. For freeform and homework paths the filing prompt comes first; on "No thanks" the summary screen (with the recap card) renders.
+The recap is independent of the learner staying on the page. It may arrive after the Summary screen first renders, and a retry/skeleton state is expected. Topic-bound next-topic CTAs require a subject/topic context; freeform sessions with unresolved filing may still complete post-session processing without a topic-bound recommendation.
+
+---
+
+## Challenge Round (Within Eligible Learning Sessions)
+
+Status: **code shipped, API flag-gated.** `CHALLENGE_ROUND_RUNTIME_ENABLED` defaults to `false`; while false, the prompt block is not injected, LLM challenge signals are ignored, and mobile receives no `challengeOffer`, `challengeRound`, or `draftedNote` fields.
+
+Challenge Round is not the same as the `evaluate` verification overlay. It is a short transfer/application check inside an ordinary learning session, followed by mastery/review persistence and optional note capture.
+
+### Eligibility
+
+The server can offer a Challenge Round only when all of these are true:
+
+- Session type is `learning`.
+- Learner is in normal struggle status.
+- The session has at least 5 exchanges.
+- Recent correct streak is at least 2.
+- Retention is strong, or the topic is new with stronger current-session evidence: at least 7 exchanges, 4 solid answers, and a 4-answer correct streak.
+- Quota has at least 3 turns remaining; free tier also needs at least 5% quota fraction remaining.
+- There is no active/offered/declined round blocking this session, and no recent decline cooldown for the same topic.
+
+### Flow
+
+```
+During a learning session...
+  └─ Server says the learner is eligible
+      └─ LLM may emit `signals.challenge_round_offer=true`
+          └─ Mobile shows ChallengeOfferCard
+              ├─ Accept
+              │   └─ POST /v1/challenge-round/accept
+              │       └─ Next exchange starts active round
+              │           ├─ app shows ChallengeRoundBanner
+              │           ├─ LLM asks up to 3 questions
+              │           ├─ after each learner answer, LLM emits structured
+              │           │   `challenge_round_evaluation`
+              │           └─ server validates answer event ids and advances state
+              │
+              ├─ Decline
+              │   └─ records declined state for this session
+              │
+              └─ Don't ask again
+                  └─ records session decline + topic cooldown
+
+When the final challenge answer is evaluated:
+  ├─ all solid        → mastery evidence is persisted
+  ├─ partial/misconception → review targets are persisted
+  ├─ all missing      → no mastery; reteach path
+  └─ solid evidence   → app may show DraftedNoteReview
+      ├─ Save note
+      └─ Skip note
+```
+
+### What gets recorded
+
+| When | What | Where |
+|---|---|---|
+| Offer/accept/decline/active/drafting/complete | Challenge Round state | `learning_sessions.metadata.challengeRound` |
+| Each evaluated answer | concept, result (`solid`/`partial`/`missing`/`misconception`), answerEventId, correction/evidence | AI event metadata + challenge state |
+| Verified all-solid result | transfer-depth mastery evidence | `assessments` |
+| Partial/misconception result | review targets for follow-up | `needs_deepening_topics` |
+| Challenge note | learner-approved note from solid evidence | notes tables |
 
 ---
 
@@ -722,10 +864,42 @@ During a learning session...
 
 ## Post-Session Pipeline (All Paths)
 
-After every session ends, the `app/session.completed` Inngest function runs a 9-step pipeline. The steps vary by session type:
+The normal path is **not** "End Session immediately runs all background work." Current flow is:
 
 ```
-Session Close
+Learner taps End Session
+  └─ POST /sessions/:sessionId/close
+      ├─ closes `learning_sessions`
+      ├─ writes wall-clock + active duration
+      ├─ creates/updates `session_summaries`
+      └─ sets `summaryStatus='pending'`
+          │
+          └─ No `app/session.completed` dispatch yet
+
+Session Summary
+  ├─ Submit "Your Words"
+  │   ├─ POST /sessions/:sessionId/summary
+  │   ├─ LLM evaluates the reflection
+  │   ├─ status becomes `accepted` or `submitted`
+  │   ├─ reflection bonus XP can be applied
+  │   ├─ reflection may auto-create a topic note
+  │   └─ dispatches `app/session.completed`
+  │
+  └─ Skip for now
+      ├─ POST /sessions/:sessionId/summary/skip
+      ├─ status becomes `skipped`
+      └─ dispatches `app/session.completed`
+
+Stale idle session
+  └─ session-stale-cleanup cron auto-closes after 30 minutes idle
+      ├─ status becomes `auto_closed`
+      └─ dispatches `app/session.completed` with reason `silence_timeout`
+```
+
+Once `app/session.completed` is dispatched, the Inngest function runs the post-session pipeline. The exact steps vary by session type and available topic context:
+
+```
+`app/session.completed`
   │
   ├─ [freeform/homework only] Wait for filing (up to 60s)
   │
@@ -734,8 +908,11 @@ Session Close
   ├─ Step 1c: Extract vocabulary (language subjects only)
   ├─ Step 1d: Update needs-deepening progress
   ├─ Step 1e: Check milestone completion (language subjects)
-  ├─ Step 2: Write coaching card + progress snapshot + milestones
-  ├─ Step 3: Analyze learner profile (consent-gated, LLM call)
+  ├─ Step 2: Refresh progress snapshot + coaching card + pending summary row
+  ├─ Step 2b: Generate parent-facing session insights
+  ├─ Step 2c: Generate learner recap / next-topic fields
+  ├─ Step 2d: Generate and store structured LLM session summary
+  ├─ Step 3: Analyze learner profile (consent + GDPR gated, LLM call)
   ├─ Step 4: Update streaks + award XP
   ├─ Step 5: Generate session embedding (vector for similarity search)
   ├─ Step 6: [homework only] Extract homework summary (parent-facing)
@@ -743,6 +920,8 @@ Session Close
   ├─ Step 8: Update pace baseline (median response time)
   └─ Step 9: Queue celebrations (streaks, mastery, verification success)
 ```
+
+Daily reconciliation also protects the summary layer: `summary-reconciliation-cron` scans recent ended sessions for missing summary rows, missing LLM summaries, or missing learner recaps and fans out create/regenerate events without replaying the full `app/session.completed` pipeline.
 
 ---
 
@@ -753,10 +932,11 @@ Session Close
 | Subject known at start | No | Yes | Sometimes | Yes | Yes | Optional |
 | Topic known at start | No | Yes | No | Yes | Yes | Optional |
 | Subject classification | On first message | Skipped | On first message | Skipped | Skipped | Skipped |
-| Filing prompt on close | Yes | No | Yes | No | No | Yes |
+| Filing on close | Background auto-file if eligible | No | Manual filing prompt | No | No | No |
 | Pedagogy | Depends on subject | Depends on subject | Direct (no Socratic) | Depends on subject | Remediation-focused | Verbatim recall, no Socratic |
 | Escalation ladder | Yes (if Socratic) | Yes (if Socratic) | No | Yes (if Socratic) | Yes (if Socratic) | No |
 | Verification overlays | None | evaluate / teach_back | None | evaluate / teach_back | None | None |
+| Challenge Round | Topic-bound only, flag-gated | Flag-gated | No | Flag-gated | Flag-gated | No |
 | Timer visible | No | No | No | Yes | No | No |
 | Question count visible | No | No | Yes | No | No | No |
 | Recall bridge | No | No | Yes | No | No | No |

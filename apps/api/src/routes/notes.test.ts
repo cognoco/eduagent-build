@@ -40,23 +40,34 @@ function makeFakeDb({
     deleteRows: [deleteSucceeds ? [{ id: NOTE_ID }] : []],
     select() {
       const rows = this.selectRows.shift() ?? [];
-      return {
+      const builder = {
         from() {
-          return this;
+          return builder;
         },
         innerJoin() {
-          return this;
+          return builder;
         },
         where() {
-          return this;
+          return builder;
         },
         orderBy() {
-          return this;
+          return builder;
         },
         limit() {
           return Promise.resolve(rows);
         },
+        then<TResult1 = unknown[], TResult2 = never>(
+          onfulfilled?:
+            | ((value: unknown[]) => TResult1 | PromiseLike<TResult1>)
+            | null,
+          onrejected?:
+            | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+            | null,
+        ) {
+          return Promise.resolve(rows).then(onfulfilled, onrejected);
+        },
       };
+      return builder;
     },
     delete() {
       const rows = this.deleteRows.shift() ?? [];
@@ -495,6 +506,54 @@ describe('note routes', () => {
       const app = makeNoProfileApp(db);
 
       const res = await app.request('/v1/notes/topic-ids');
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /v1/notes/concept-mastery', () => {
+    it('returns concept-mastery signals for requested topics', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      db.selectRows = [[{ topicId: TOPIC_ID, status: 'solid' }], []];
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/notes/concept-mastery?topicIds=${TOPIC_ID}`,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        signals: {
+          [TOPIC_ID]: {
+            verified: true,
+            hasTutorAddition: false,
+            tutorAdditions: [],
+          },
+        },
+      });
+      expect(db.selectRows).toHaveLength(0);
+    });
+
+    it('returns an empty signal object for topics with no captured concepts', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      db.selectRows = [[]];
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/notes/concept-mastery?topicIds=${TOPIC_ID}`,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({ signals: {} });
+    });
+
+    it('rejects invalid topic IDs', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/notes/concept-mastery?topicIds=${TOPIC_ID},not-a-uuid`,
+      );
+
       expect(res.status).toBe(400);
     });
   });

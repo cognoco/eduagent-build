@@ -1037,6 +1037,13 @@
       "revisitTitle": "{{subject}}を復習",
       "startTitle": "{{subject}}を始める"
     },
+    "noteSignal": {
+      "verified": "Verified",
+      "verifiedAccessibilityLabel": "Verified - your words held up",
+      "tutorAddition": "The tutor has more on this topic",
+      "showTutorAdditionAccessibilityLabel": "Show what the tutor added",
+      "hideTutorAdditionAccessibilityLabel": "Hide what the tutor added"
+    },
     "bookmarkCard": {
       "accessibilityLabel": "保存したブックマークを開く: {{title}}"
     },

@@ -22,3 +22,4 @@ export * from './notifications';
 export * from './practice-activity';
 export * from './webhook-idempotency';
 export * from './challenge-round-cooldowns';
+export * from './concept-mastery';

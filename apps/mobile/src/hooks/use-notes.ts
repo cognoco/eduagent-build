@@ -12,15 +12,18 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type {
   AllNotesResponse,
   BookNotesResponse,
+  ConceptMasterySignalsResponse,
   TopicNotesResponse,
   CreateNoteInput,
   NoteResponse,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { queryKeys } from '../lib/query-keys';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
@@ -158,6 +161,40 @@ export function useNoteTopicIds(): UseQueryResult<{ topicIds: string[] }> {
       }
     },
     enabled: !!activeProfile,
+  });
+}
+
+export function useConceptMasterySignals(
+  topicIds: string[],
+): UseQueryResult<ConceptMasterySignalsResponse> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+  const sortedTopicIds = useMemo(
+    () => [...new Set(topicIds)].sort(),
+    [topicIds],
+  );
+
+  return useQuery({
+    queryKey: queryKeys.library.conceptMastery(
+      activeProfile?.id,
+      sortedTopicIds,
+    ),
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.notes['concept-mastery'].$get(
+          {
+            query: { topicIds: sortedTopicIds.join(',') },
+          },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return (await res.json()) as ConceptMasterySignalsResponse;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && sortedTopicIds.length > 0,
   });
 }
 

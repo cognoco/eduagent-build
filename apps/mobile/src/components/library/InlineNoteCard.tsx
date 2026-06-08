@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import type { ConceptMasterySignal } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 import { withOpacity } from '../../lib/color-opacity';
 
@@ -10,6 +12,7 @@ interface InlineNoteCardProps {
   content: string;
   sourceLine: string;
   updatedAt: string;
+  conceptSignal?: ConceptMasterySignal;
   defaultExpanded?: boolean;
   /**
    * Open the note's edit/delete menu. Fires both on native long-press AND on
@@ -28,17 +31,23 @@ export function InlineNoteCard({
   content,
   sourceLine,
   updatedAt: _updatedAt,
+  conceptSignal,
   defaultExpanded = false,
   onLongPress,
   onSourcePress,
   testID,
 }: InlineNoteCardProps): React.ReactElement {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [additionsExpanded, setAdditionsExpanded] = useState(false);
   const themeColors = useThemeColors();
+  const { t } = useTranslation();
 
   const cardTestID = testID ?? `note-card-${noteId}`;
   const accentBg = withOpacity(themeColors.accent, 0.08);
   const accentBorder = withOpacity(themeColors.accent, 0.35);
+  const tutorAdditions = conceptSignal?.tutorAdditions ?? [];
+  const hasTutorAdditions =
+    conceptSignal?.hasTutorAddition === true && tutorAdditions.length > 0;
 
   return (
     <Pressable
@@ -100,13 +109,31 @@ export function InlineNoteCard({
             {sourceLine}
           </Text>
         )}
-        <Ionicons
-          name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={14}
-          color={themeColors.textSecondary}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {conceptSignal?.verified === true ? (
+            <View
+              testID={`${cardTestID}-verified`}
+              accessibilityLabel={t(
+                'library.noteSignal.verifiedAccessibilityLabel',
+              )}
+            >
+              <Ionicons
+                name="star"
+                size={15}
+                color={themeColors.reward}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              />
+            </View>
+          ) : null}
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={14}
+            color={themeColors.textSecondary}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+        </View>
         {onLongPress ? (
           <Pressable
             onPress={(e) => {
@@ -143,6 +170,50 @@ export function InlineNoteCard({
       >
         {content}
       </Text>
+      {hasTutorAdditions ? (
+        <Pressable
+          testID={`${cardTestID}-addition-toggle`}
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            additionsExpanded
+              ? 'library.noteSignal.hideTutorAdditionAccessibilityLabel'
+              : 'library.noteSignal.showTutorAdditionAccessibilityLabel',
+          )}
+          onPress={(e) => {
+            e?.stopPropagation?.();
+            setAdditionsExpanded((value) => !value);
+          }}
+          style={{
+            marginTop: 8,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <Ionicons
+            name={additionsExpanded ? 'chevron-up' : 'add-circle-outline'}
+            size={15}
+            color={themeColors.accent}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+          <Text style={{ fontSize: 12, color: themeColors.textSecondary }}>
+            {t('library.noteSignal.tutorAddition')}
+          </Text>
+        </Pressable>
+      ) : null}
+      {hasTutorAdditions && additionsExpanded ? (
+        <View testID={`${cardTestID}-additions`} style={{ marginTop: 6 }}>
+          {tutorAdditions.map((addition) => (
+            <Text
+              key={addition}
+              style={{ fontSize: 13, color: themeColors.textSecondary }}
+            >
+              {addition}
+            </Text>
+          ))}
+        </View>
+      ) : null}
     </Pressable>
   );
 }

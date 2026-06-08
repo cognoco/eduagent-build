@@ -1062,6 +1062,13 @@
       "revisitTitle": "Revisar {{subject}}",
       "startTitle": "Começar {{subject}}"
     },
+    "noteSignal": {
+      "verified": "Verified",
+      "verifiedAccessibilityLabel": "Verified - your words held up",
+      "tutorAddition": "The tutor has more on this topic",
+      "showTutorAdditionAccessibilityLabel": "Show what the tutor added",
+      "hideTutorAdditionAccessibilityLabel": "Hide what the tutor added"
+    },
     "bookmarkCard": {
       "accessibilityLabel": "Abrir marcador salvo: {{title}}"
     },

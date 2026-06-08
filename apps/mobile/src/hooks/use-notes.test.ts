@@ -11,6 +11,7 @@ import {
 import { setActiveProfileId, NetworkError } from '../lib/api-client';
 import {
   useBookNotes,
+  useConceptMasterySignals,
   useCreateNote,
   useNoteTopicIds,
   useUpdateNote,
@@ -433,5 +434,48 @@ describe('useNoteTopicIds', () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+});
+
+describe('useConceptMasterySignals', () => {
+  it('fetches and returns concept-mastery signals for topic IDs', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          signals: {
+            'topic-1': {
+              verified: true,
+              hasTutorAddition: false,
+              tutorAdditions: [],
+            },
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useConceptMasterySignals(['topic-1']), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.data?.signals['topic-1']).toEqual({
+      verified: true,
+      hasTutorAddition: false,
+      tutorAdditions: [],
+    });
+  });
+
+  it('stays idle when no topic IDs are provided', () => {
+    const { result } = renderHook(() => useConceptMasterySignals([]), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });

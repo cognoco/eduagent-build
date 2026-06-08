@@ -384,6 +384,11 @@ export const queryKeys = {
   library: {
     retention: (profileId: string | undefined) =>
       ['library', 'retention', profileId] as const,
+
+    conceptMastery: (
+      profileId: string | undefined,
+      topicIds: readonly string[],
+    ) => ['library', 'concept-mastery', profileId, [...topicIds]] as const,
   },
 
   // ------------------------------------------------------------------
