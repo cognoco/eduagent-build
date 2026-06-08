@@ -136,7 +136,7 @@ the walkthrough rulings + the ADR authoring (which is execution, downstream of t
 | 4 | **Policy-engine spine decision record** (`MMT-ADR-0013`, keystone ADR) — two-primitive model + regime taxonomy + two-axis knowledge model + engine→router flow | (**WP-1**) | memo §3; enum *seeds* from walkthrough R-0/R-2/R-3 | Claude drafted / architect ratified | ✅ **shape ratified 2026-06-07** (enum seeds DB-mastered; await walkthrough) |
 | 5 | **Data-model amendment decision record** (`MMT-ADR-0015` — a *new* ADR that amends `MMT-ADR-0011`, not an in-place edit) — prohibition-floor primitive, two-axis knowledge tables, `regimes` lookup table, Payer sub-field (primary + ≤1 secondary), Guardian=consent-only / Mentor=data-access / Sub-admin=profile-mgmt, charge terminology, `AgeBracket` 'child' | (**WP-2**) | `MMT-ADR-0013` | Claude drafted / architect ratified | ✅ **ratified 2026-06-07** — ⚠ **`data-model.md` lockstep SQL still to write (now DUE)** |
 | 6 | **Router decision record** (`MMT-ADR-0014`) — 3-param runtime / 4-param vetting split, hard split, tested do-not-do lists, tiered v1 fallback; **supersedes** "Family standard = Gemini-only" + **re-specs** GATE-1 minor-routing | (**WP-3**) | memo §4–5; enum seed from walkthrough R-4/R-5 | Claude drafted / architect ratified | ✅ **shape ratified 2026-06-07** (vetted set DB-mastered in `allowed_models`) |
-| 7 | **Model-vetting workstream — the standing admission process** (compliance half PM + capability half eng/eval-harness); output = the model master + a per-change vetting record in `docs/registers/llm-models/` (→ policy-engine `allowed_models` DB) | (**WP-4**) | rulings R-2/R-5 → enums; **not blocking** | PM + eng | 🟡 iteration-1 (launch set) recorded after-the-fact; process ongoing |
+| 7 | **Vetting runbook (WP-4)** — reframed 2026-06-08 to its only remainder: a short, repeatable **vetting runbook** (criteria checklist — compliance: transfer mechanism / ZDR / age-closure; capability: eval-harness §6 battery) so future master changes are mechanical. The standing process + master + per-change records already exist (`MMT-ADR-0014` + `docs/registers/llm-models/`); iteration-1 **ratified**. | (**WP-4**) | — | PM (compliance) + eng (capability) | ⬜ runbook to draft |
 | 8 | **This roadmap update** — fold the spine + the ten work packages into the phases | (**WP-5**) | the memo | Claude / PM reviews | 🟡 in progress |
 | 9 | **Handoff doc + thin memory *pointer*** — the distilled `_handoffs/` handoff (**WP-7**) + a **pointer-only** `.claude/memory/` signpost to the ratified ADRs (**WP-6, reframed** 2026-06-07: a pointer with cited provenance, **not** a content copy — per the memory↔canon principle). Full memory alignment is Phase J. | (**WP-6**, **WP-7**) | the memo (+ walkthrough rulings appended later) | Claude / PM reviews | ⬜ |
 
@@ -223,12 +223,12 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   decision (the engine + the router). Full detail in the **Phase F.1** section above; 3 ADRs
   (`MMT-ADR-0013` engine · `MMT-ADR-0011` amendment · router ADR) gate Phase H. Walkthrough runs in
   parallel. 🟡 in progress.
-- **Model-vetting workstream (WP-4) — the *standing* vetting process.** Two halves, one master table:
-  **compliance/legal** (PM-owned) + **capability/quality** (eng / eval-harness-owned). It vets
-  `(model · provider · service · region)` tuples and emits the model master + an **immutable vetting record per
-  change** in `docs/registers/llm-models/` (interim home until the policy-engine `allowed_models` DB exists).
-  **Not superseded** — it *is* the admission gate. **Iteration-1 (the launch set) is recorded** (after-the-fact,
-  `2026-06-06-launch-set-iteration-1.md`); the process is now ongoing, **not on the F→P critical path**. 🟡
+- **Vetting runbook (WP-4).** Reframed 2026-06-08 to its only remainder: a **short, repeatable vetting
+  runbook** — the criteria checklist for a vetting pass (compliance: transfer mechanism / ZDR / age-closure;
+  capability: eval-harness §6 battery). The *standing process* it documents **already exists** —
+  `MMT-ADR-0014` (vetting/routing split + admission gate) + `docs/registers/llm-models/` (master + immutable
+  per-change records). **Iteration-1 (launch set) is recorded and ratified** (`2026-06-06-launch-set-iteration-1.md`,
+  approved 2026-06-08). Owners: compliance half PM/legal, capability half eng. Off the F→P critical path. ⬜
 - **Persona / capability / charge-terminology refinement** — the "A-vs-B" decisions refine the persona
   set 5→6, split capabilities (Payer = billing only · Guardian = consent only · Mentor = data access
   only · profile-mgmt = Subscription-administrator), and rename "ward" → **"charge"**. These ripple into
@@ -391,8 +391,8 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
   - [x] **F.1 — walkthrough package** tightened + reconciled to the memo (2026-06-07).
   - [x] **F.1 — walkthrough run** — DONE (facilitator-run, **no live counsel**; landed via pull): R-0/2/3/4 LOCKED, R-5 REFINEMENT (→ `MMT-ADR-0016`), R-1 UNCLEAR-with-posture. **Caveat: real counsel sign-off still owed (HW-2)** — booked separately, not launch-blocking.
   - [x] **F.1 — 3 spine ADRs** drafted + **architect-ratified 2026-06-07** (`MMT-ADR-0013` engine / `MMT-ADR-0015` data-model amendment / `MMT-ADR-0014` router). Shape accepted; enum *seeds* + the R-1 fork still come from the walkthrough.
-  - [ ] **F.1 — `data-model.md` lockstep SQL** written for the `MMT-ADR-0015` amendments (now DUE — the ratified ADR's canon partner; per MMT-ADR-0000 lockstep).
-  - [x] **F.1 — model-vetting research workstream** owner assigned = **PM** (WP-4); kickoff brief still to draft.
+  - [x] **F.1 — `data-model.md` lockstep SQL** written for the `MMT-ADR-0015` amendments ✅ 2026-06-08 (commit `5b624f6ff`; the ratified ADR's canon partner, per MMT-ADR-0000 lockstep).
+  - [~] **F.1 — vetting (WP-4)** reframed to a **short vetting runbook** (criteria checklist); the standing process/master/records already exist + iteration-1 **ratified** 2026-06-08; runbook still to draft (PM compliance + eng capability).
   - [~] **F.1 — roadmap update** (this document, WP-5) + memory/handoff (WP-6/7) landed.
 
 **G–P (the firming, classification, planning — the actual planning runway):**
@@ -409,7 +409,7 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 
 **Tracked open threads (not blockers, named for visibility):**
 - [~] Policy-engine spine walkthrough **run** (facilitator-only, no live counsel; R-1 = provisional posture). **Still owed: real counsel sign-off (HW-2)** on R-1 before any sub-13 / v2 build; not launch-blocking. *(`MMT-ADR-0016` ↔ `0014` reconciliation + WP-4 fate pending — see decision log / open below.)*
-- [x] Model-vetting research workstream (WP-4) — **owner = PM**; runs parallel; off the F→P critical path; kickoff brief still to draft.
+- [~] Vetting (WP-4) — reframed to a **short vetting runbook**; iteration-1 record **ratified** 2026-06-08; standing process/master/records already exist; runbook to draft. Off the F→P critical path.
 - [ ] Sub-13 v1.1 ungating workstream (WP-10) — deferred, demand-triggered (named future workstream, not in G–P).
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
 - [ ] T1 revert sequenced as the first implementation step (lands *during* the execution phase, after P).
