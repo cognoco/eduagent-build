@@ -7,6 +7,8 @@ import { registerProvider, _clearProviders } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
 import { createAnthropicProvider } from '../services/llm/providers/anthropic';
+import { createCerebrasProvider } from '../services/llm/providers/cerebras';
+import { createMistralProvider } from '../services/llm/providers/mistral';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
@@ -16,6 +18,8 @@ type LLMEnv = {
     GEMINI_API_KEY?: string;
     OPENAI_API_KEY?: string;
     ANTHROPIC_API_KEY?: string;
+    CEREBRAS_API_KEY?: string;
+    MISTRAL_API_KEY?: string;
     ENVIRONMENT?: string;
   };
 };
@@ -43,9 +47,14 @@ function envHash(env: {
   GEMINI_API_KEY?: string;
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
+  CEREBRAS_API_KEY?: string;
+  MISTRAL_API_KEY?: string;
 }): string {
   // Simple concatenation — keys are hex/base64 tokens so `|` is a safe separator.
-  return `${env.GEMINI_API_KEY ?? ''}|${env.OPENAI_API_KEY ?? ''}|${env.ANTHROPIC_API_KEY ?? ''}`;
+  // [BUG-488] Every registered provider's key MUST be in the hash, or a
+  // key-only change (e.g. adding CEREBRAS_API_KEY on a reused isolate) would
+  // not trigger re-registration.
+  return `${env.GEMINI_API_KEY ?? ''}|${env.OPENAI_API_KEY ?? ''}|${env.ANTHROPIC_API_KEY ?? ''}|${env.CEREBRAS_API_KEY ?? ''}|${env.MISTRAL_API_KEY ?? ''}`;
 }
 
 export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
@@ -53,6 +62,8 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
     GEMINI_API_KEY: c.env?.GEMINI_API_KEY,
     OPENAI_API_KEY: c.env?.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: c.env?.ANTHROPIC_API_KEY,
+    CEREBRAS_API_KEY: c.env?.CEREBRAS_API_KEY,
+    MISTRAL_API_KEY: c.env?.MISTRAL_API_KEY,
   });
 
   if (_registeredEnvHash !== currentHash) {
@@ -69,6 +80,8 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
     const geminiKey = c.env?.GEMINI_API_KEY;
     const openaiKey = c.env?.OPENAI_API_KEY;
     const anthropicKey = c.env?.ANTHROPIC_API_KEY;
+    const cerebrasKey = c.env?.CEREBRAS_API_KEY;
+    const mistralKey = c.env?.MISTRAL_API_KEY;
 
     if (geminiKey) {
       registerProvider(createGeminiProvider(geminiKey));
@@ -80,6 +93,19 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
 
     if (anthropicKey) {
       registerProvider(createAnthropicProvider(anthropicKey));
+    }
+
+    // Interactive-routing v2 providers (MMT-ADR-0016). Registered when their
+    // key is present so they are available behind LLM_ROUTING_V2_ENABLED; the
+    // router does not select them while the flag is off, so registering them
+    // is inert until cutover. Not part of the primary-key gate below — a
+    // deployment still needs a flag-off primary (Gemini/OpenAI).
+    if (cerebrasKey) {
+      registerProvider(createCerebrasProvider(cerebrasKey));
+    }
+
+    if (mistralKey) {
+      registerProvider(createMistralProvider(mistralKey));
     }
 
     const hasAnyProvider = geminiKey || openaiKey || anthropicKey;

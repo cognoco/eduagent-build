@@ -21,6 +21,8 @@ export { createGeminiProvider } from './providers/gemini';
 export { createOpenAIProvider } from './providers/openai';
 export { createAnthropicProvider } from './providers/anthropic';
 export { createOpenRouterProvider } from './providers/openrouter';
+export { createCerebrasProvider } from './providers/cerebras';
+export { createMistralProvider } from './providers/mistral';
 export { getTextContent } from './types';
 export { extractFirstJsonArray, extractFirstJsonObject } from './extract-json';
 export { normalizeStopReason } from './stop-reason';
