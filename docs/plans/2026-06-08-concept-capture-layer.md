@@ -5,10 +5,23 @@ profile: code
 spec: docs/specs/2026-06-08-concept-capture-layer-design.md
 adr: docs/adr/MMT-ADR-0017-concept-capture-additive-layer.md
 branch: conceptgrain
-status: draft
+status: parked
 ---
 
 # Concept-Capture Layer — Implementation Plan
+
+> **PARKED 2026-06-08 — hold until the identity-foundation baseline reset.** The
+> core code is built and committed on `conceptgrain`, but migration `0107`
+> (`concepts` / `concept_mastery`) is now **reference-only** — its FKs target
+> `profiles`, which the **one-time baseline reset** (`MMT-ADR-0012`) renames to
+> `person`, and the reset rebuilds the schema create-from-empty, discarding the
+> numbered chain. Decision (2026-06-08): **do not apply `0107` anywhere, do not
+> finish to dev/live now.** Re-home `concepts` / `concept_mastery` into the new
+> baseline at reset time, FKs targeting `person`. The note-correctness nudge
+> (this plan's T11–T13) is **superseded** by
+> `2026-06-08-note-correctness-and-challenge-draft.md` (also parked). See
+> `_wip/identity-foundation/data-model.md §1`, `docs/adr/MMT-ADR-0012`, and the
+> `0107` reference-only header.
 
 **Goal:** Add an additive concept-grain mastery layer that durably records **every** per-concept Challenge-Round verdict (solid *and* weak), and derives a read-time note "star," a neutral topic-level tutor-addition affordance, concept-focused review, and a note-correctness nudge — without re-keying the topic-grained spine.
 

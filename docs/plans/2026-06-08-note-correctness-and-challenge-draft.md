@@ -3,10 +3,20 @@ title: Note-Correctness Check + Challenge-Saved Note — Implementation Plan
 date: 2026-06-08
 profile: code
 spec: docs/glossary.md §4 (Two stars / Note marks — settled 2026-06-08)
-status: draft
+status: parked
 ---
 
 # Note-Correctness Check + Challenge-Saved Note — Implementation Plan
+
+> **PARKED 2026-06-08 — execute on the post-reset baseline, not now.** This plan is
+> net-new code against today's `profiles` schema, which the identity-foundation
+> **one-time baseline reset** (`MMT-ADR-0012`) renames to `person`. Building it now
+> would accrue full re-home cost at the reset, and A is polish (not launch-critical).
+> Design is settled and kept as-is; **execution waits until the new baseline exists**,
+> so `note_correctness` and `topic_notes.source` are born on `person`. Any migration
+> step here follows the 0107 posture — `db:push:dev` / author into the baseline at
+> reset — **never generate a numbered migration into the pre-reset chain.** See
+> `_wip/identity-foundation/data-model.md §1` and `docs/adr/MMT-ADR-0012`.
 
 **Goal:** Give a `learner-note` at most one provenance mark — a **green checkmark**
 when the mentor grades the learner's hand-typed note text correct (model A), or a
@@ -28,7 +38,7 @@ are non-core (`safeSend`) so failure never blocks a note save.
 In scope:
 - `packages/database/src/schema/note-correctness.ts` (new) + barrel `index.ts`
 - `packages/database/src/schema/notes.ts` (add `source` column to `topic_notes`)
-- `apps/api/drizzle/0108_*.sql` (generated migration) + `_journal.json`
+- ~~`apps/api/drizzle/0108_*.sql` (generated migration)~~ — **dropped (migration-hold, see T3):** no numbered migration pre-reset; schema folds into the post-reset baseline
 - `apps/api/src/services/note-correctness.ts` (new — LLM grading + read-side signal)
 - `apps/api/src/services/note-correctness-prompts.ts` (new — grading prompt)
 - `apps/api/src/inngest/functions/note-correctness-grade.ts` (new Inngest fn) + registration + event-schema declaration
@@ -106,16 +116,17 @@ Out of scope (must not change):
   `database:typecheck` passes; the column is `NOT NULL DEFAULT 'manual'` so the
   migration backfills existing rows without a separate UPDATE.
 
-- [ ] **T3** (change): Generate `apps/api/drizzle/0108_*.sql` via `pnpm run
-  db:generate:dev`. — **done when:** the SQL contains `CREATE TYPE
-  "public"."note_correctness_status"`, `CREATE TYPE "public"."topic_note_source"`,
-  `CREATE TABLE "note_correctness"`, `ALTER TABLE "topic_notes" ADD COLUMN
-  "source"` with the default, the unique + index, and the FKs — **and zero
-  `DROP`/`ALTER ... DROP` lines** (grep). `db:migrate:dev` applies clean and a
-  re-run of `db:generate:dev` produces no diff. **Rollback:** drop
-  `note_correctness`, drop `topic_notes.source`, drop both enums — safe, pre-launch,
-  no shipped surface depends on these (mark degrades to neutral). Record this
-  Rollback note verbatim in the commit.
+- [ ] **T3** (change): **Migration-hold posture (parked-plan amendment 2026-06-08).**
+  Do **NOT** generate a numbered `0108` migration into the pre-reset chain — the
+  identity-foundation baseline reset (`MMT-ADR-0012`) discards it and renames the
+  `profiles` FK target to `person`. Instead: when this plan executes post-reset,
+  author `note_correctness` + `topic_notes.source` + both enums **into the new
+  `person`-based baseline** (or the first append-only migration after it), FKs
+  targeting `person`. For any pre-reset dev iteration, materialize via
+  `db:push:dev` only. — **done when:** the schema TS (`note-correctness.ts`,
+  `notes.ts`) typechecks and `db:push:dev` applies clean against the dev DB;
+  **no `apps/api/drizzle/0108_*.sql` is committed.** (See the PARKED banner above
+  and the `0107` reference-only header for the precedent.)
 
 - [ ] **T4** (code): New `apps/api/src/services/note-correctness.ts` exporting
   `gradeNoteCorrectness(db, profileId, noteId): Promise<void>`. Logic:
