@@ -8,7 +8,7 @@ planning runway → the **"ready to start implementation" gate (the exit of Phas
 **Tracking:** repo-only; this file is the single source. Deliverables land as sibling docs (see
 README index).
 
-**Status: 2026-06-07.** Phases **A, B, C, D, E complete** — Phase E ratified the data model
+**Status: 2026-06-08.** Phases **A–F complete** — F closed via the F.1 spine ADRs + the 2026-06-08 ADR-14/16 reconciliation; **Phase G is next** (lock the canonical set + seed the documentation index). Phase E ratified the data model
 (`data-model.md`) + 2 ADRs (`MMT-ADR-0011` data-model realization · `MMT-ADR-0012` one-time baseline
 reset); ontology + `domain-model.md` + `CONTEXT.md` moved in lockstep. The 8 tables + structural
 `person_retain` set are a fresh create-from-empty baseline; from it forward, append-only migrations
@@ -386,14 +386,14 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 - [x] **C** — doc-strategy decided (`MMT-ADR-0000`): decisions layer + `MMT-ADR-NNNN` + the `decision-adr-link` ratchet; ADRs homed at `docs/adr/`; the broader `docs/` reorg → deferred follow-up.
 - [x] **D** — domain model locked (`domain-model.md` + MMT-ADR-0007–0010); consent model locked; the legal-check items (E4 one-of/all-of; parent-delete; dormancy specifics) are named, scoped to E/counsel, and do not gate D.
 - [x] **E** — data model + cut strategy locked (`data-model.md` + MMT-ADR-0011/0012).
-- [~] **F** — planning-for-the-planning ratified: the G–P shape is confirmed; the consolidation's corpus (14 sub-audits + `.deepsec/`) is identified; the four-bucket triage model is agreed; the `claude/` + `codex/` trial reconciliations are to be discarded; the launch-readiness guard is a Phase-F-thread tracked in this ROADMAP. **Now also carries F.1 (the policy-engine/router spine) — F cannot close until F.1 closes.**
+- [x] **F** — planning-for-the-planning ratified: the G–P shape is confirmed; the consolidation's corpus (14 sub-audits + `.deepsec/`) is identified; the four-bucket triage model is agreed; the `claude/` + `codex/` trial reconciliations are to be discarded; the launch-readiness guard is a Phase-F-thread tracked in this ROADMAP. **Carried F.1 (the policy-engine/router spine); F.1 closed 2026-06-08 → F closed.**
   - [x] **F.1 — memo** signed (the 25 A-vs-B decisions; PM sign-off confirmed).
   - [x] **F.1 — walkthrough package** tightened + reconciled to the memo (2026-06-07).
   - [x] **F.1 — walkthrough run** — DONE (facilitator-run, **no live counsel**; landed via pull): R-0/2/3/4 LOCKED, R-5 REFINEMENT (→ `MMT-ADR-0016`), R-1 UNCLEAR-with-posture. **Caveat: real counsel sign-off still owed (HW-2)** — booked separately, not launch-blocking.
   - [x] **F.1 — 3 spine ADRs** drafted + **architect-ratified 2026-06-07** (`MMT-ADR-0013` engine / `MMT-ADR-0015` data-model amendment / `MMT-ADR-0014` router). Shape accepted; enum *seeds* + the R-1 fork still come from the walkthrough.
   - [x] **F.1 — `data-model.md` lockstep SQL** written for the `MMT-ADR-0015` amendments ✅ 2026-06-08 (commit `5b624f6ff`; the ratified ADR's canon partner, per MMT-ADR-0000 lockstep).
-  - [~] **F.1 — vetting (WP-4)** reframed to a **short vetting runbook** (criteria checklist); the standing process/master/records already exist + iteration-1 **ratified** 2026-06-08; runbook still to draft (PM compliance + eng capability).
-  - [~] **F.1 — roadmap update** (this document, WP-5) + memory/handoff (WP-6/7) landed.
+  - [x] **F.1 — vetting (WP-4)** = the short vetting runbook drafted (`docs/runbooks/llm-model-vetting.md`); standing process/master/records already exist; iteration-1 record **ratified** 2026-06-08.
+  - [x] **F.1 — roadmap update** (WP-5) + memory pointer (WP-6, `.claude/memory/project_identity_foundation_decisions.md`) + handoff (WP-7, `_handoffs/2026-06-08-phase-f-close.md`) landed.
 
 **G–P (the firming, classification, planning — the actual planning runway):**
 - [ ] **G** — canonical set explicitly confirmed (now **incl. the 3 F.1 spine ADRs + the memo/handoff**; lens for the gap analysis (L)).
@@ -409,7 +409,7 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 
 **Tracked open threads (not blockers, named for visibility):**
 - [~] Policy-engine spine walkthrough **run** (facilitator-only, no live counsel; R-1 = provisional posture). **Still owed: real counsel sign-off (HW-2)** on R-1 before any sub-13 / v2 build; not launch-blocking. *(`MMT-ADR-0016` ↔ `0014` reconciliation + WP-4 fate pending — see decision log / open below.)*
-- [~] Vetting (WP-4) — reframed to a **short vetting runbook**; iteration-1 record **ratified** 2026-06-08; standing process/master/records already exist; runbook to draft. Off the F→P critical path.
+- [x] Vetting (WP-4) — short vetting runbook drafted (`docs/runbooks/llm-model-vetting.md`); iteration-1 record **ratified** 2026-06-08; standing process/master/records exist. Off the F→P critical path.
 - [ ] Sub-13 v1.1 ungating workstream (WP-10) — deferred, demand-triggered (named future workstream, not in G–P).
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
 - [ ] T1 revert sequenced as the first implementation step (lands *during* the execution phase, after P).
@@ -423,6 +423,13 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 ---
 
 ## Decision log
+
+- **2026-06-08** — **Phase F closed.** F.1 spine (ADRs `0013`/`0014`/`0015` + the `data-model.md` lockstep) ratified;
+  the ADR-14/16 reconciliation landed (registers + `0016`-repurposed + the vetting runbook); WP-4 reframed to the
+  vetting runbook (`docs/runbooks/llm-model-vetting.md`); the iteration-1 vetting record ratified; WP-6 memory
+  pointer + WP-7 handoff (`_handoffs/2026-06-08-phase-f-close.md`) landed. R-1 (COPPA) carried as a tracked
+  contingency (HW-2 owed, not launch-blocking) per the F.1 exit gate. **Next: Phase G** (lock the canonical set +
+  seed the documentation index).
 
 - **2026-06-08** — **`0014`↔`0016` reconciliation RESOLVED → decompose (not merge); `docs/registers/` L3 home created.**
   The three open rulings from the 2026-06-07 entry are decided. (a) **Gemini-exit = compliance *input*** (GCP §20(d)
