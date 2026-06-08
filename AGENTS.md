@@ -16,7 +16,8 @@ Counts verified 2026-06-01. Test-case totals are a heuristic grep of `it(` / `te
 2. Start with the relevant plan/spec if one exists for the task.
 3. Use `docs/project_context.md` for repo-specific implementation rules.
 4. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
-5. For substantial repo work, durable decisions, repeated feedback, or any request involving "memory", load the project-memory skill from `.agents/skills/project-memory/SKILL.md` and follow its workflow. Memory lives in `.claude/memory/MEMORY.md` plus topic files.
+5. For the cross-layer map of canon / ADRs / specs / registers, see the documentation index: [`docs/INDEX.md`](docs/INDEX.md). *(Seeded 2026-06-08 — identity-foundation canon is fully indexed; estate-wide population is in progress.)*
+6. For substantial repo work, durable decisions, repeated feedback, or any request involving "memory", load the project-memory skill from `.agents/skills/project-memory/SKILL.md` and follow its workflow. Memory lives in `.claude/memory/MEMORY.md` plus topic files.
 
 Memory is context, not law. If memory conflicts with this file, current docs, code, or explicit user instructions, follow the higher-priority source and update/archive the stale memory when appropriate.
 

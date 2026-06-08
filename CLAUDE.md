@@ -15,6 +15,7 @@
 1. Start with the relevant plan/spec if one exists for the task.
 2. Use `docs/project_context.md` for repo-specific implementation rules.
 3. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
+4. For the cross-layer map of canon / ADRs / specs / registers, see the documentation index: [`docs/INDEX.md`](docs/INDEX.md). *(Seeded 2026-06-08 — identity-foundation canon is fully indexed; estate-wide population is in progress.)*
 
 ## Output Conventions
 
