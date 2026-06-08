@@ -13,7 +13,7 @@
 1. **The scary version is not true.** Deleting your account *does* wipe the learning memory — assessments, notes, mastery state, extracted facts, everything. It is a clean database-level cascade, not a half-job. (Section 1.)
 2. **But three things survive account deletion** that shouldn't, or need a documented reason to: your **login identity at Clerk** (the auth provider — never deleted in-app), an orphaned **organisation row**, and any **BYOK waitlist email**. The Clerk one is a real erasure gap. (Section 2.)
 3. **The subtle version IS true.** "We delete chat transcripts after 30 days" only deletes the *raw turn-by-turn log*. Word-for-word fragments of what the learner typed survive **indefinitely** in notes, session summaries, extracted facts, and challenge-round evidence. So "we delete your chats" is, as written, **misleading**. (Section 3.)
-4. **The 30-day deletion may not even be running.** It is behind an environment flag (`RETENTION_PURGE_ENABLED`) that defaults OFF and is not in any committed config. If it isn't set in production, transcripts are kept **forever**, not 30 days — directly contradicting the notice. **This must be checked in production before launch.** (Section 4.)
+4. **The 30-day deletion IS running in production** (verified 2026-06-08). It is behind an environment flag (`RETENTION_PURGE_ENABLED`) that defaults OFF and is in no committed config — so it *looked* at-risk — but the flag is confirmed set to `true` in prod Doppler, so transcripts do purge at 30 days. Still add the flag to committed config docs so its required-in-prod status is visible and can't silently regress. (Section 4.)
 5. **The published privacy policy is stale and internally inconsistent** with the code (says 30-day account-deletion grace; code does 7 days; says ages 11–15; never mentions the transcript purge). (Section 5.)
 
 The architecture (throw away the bulky raw log, keep a lean derived summary) is the *correct* privacy-by-design move. The exposure is in the edges and the notice, not the design.
@@ -83,11 +83,11 @@ Everything *derived* from the conversation is untouched by the 30-day clock and 
 
 ---
 
-## 4. The 30-day purge may not be running — R2 (open, verify in production)
+## 4. The 30-day purge — running in production (R2 RESOLVED 2026-06-08)
 
-The cron short-circuits unless `RETENTION_PURGE_ENABLED === 'true'` (`apps/api/src/inngest/helpers.ts:258-262`, gate read in `transcript-purge-cron.ts:29`). This flag is **absent from `.env.example`, `wrangler.toml`, and the dev local env** — so it **defaults to disabled**. The functions are correctly registered for production (`apps/api/src/inngest/index.ts:251-253`, not dead code), but if the flag is not explicitly set in the production Worker environment (Doppler / Worker secret), **no transcript is ever deleted** and the "30 days" claim is false in the most consequential direction.
+The cron short-circuits unless `RETENTION_PURGE_ENABLED === 'true'` (`apps/api/src/inngest/helpers.ts:258-262`, gate read in `transcript-purge-cron.ts:29`). This flag is **absent from `.env.example`, `wrangler.toml`, and the dev local env** — so it **defaults to disabled**, which made the "30 days" claim *look* unproven. The functions are correctly registered for production (`apps/api/src/inngest/index.ts:251-253`, not dead code).
 
-→ **R2 (open, BLOCKING for the notice's truth):** Confirm `RETENTION_PURGE_ENABLED=true` is set in the **production** Doppler config, and confirm the cron has actually run (check Inngest run history for `transcript-purge-cron`). Until verified, treat "transcripts kept 30 days" as **unproven**. Add the flag to committed config docs so its required-in-prod status is visible.
+→ **R2 (RESOLVED 2026-06-08):** `RETENTION_PURGE_ENABLED=true` is **confirmed set in the production Doppler config** (user-verified). The purge therefore runs daily in prod and the "transcripts kept 30 days" claim is backed by a live deletion job. **Residual hardening (low priority):** the flag is silent config — add it to committed config docs / `.env.example` with a "required `true` in prod" note so it can't regress unnoticed, and (nice-to-have) glance at the Inngest run history for `transcript-purge-cron` to confirm purge events have actually fired (expected to be few/none pre-launch with no real session volume).
 
 ---
 
@@ -109,7 +109,7 @@ The authoritative retention design lives in `docs/_archive/specs/Done/2026-05-05
 | ID | Item | Owner | Severity | Blocks launch? |
 |---|---|---|---|---|
 | **R1** | Wire Clerk user-delete into `executeDeletion` + consent-withdrawal path; add break test | eng | HIGH | Yes (Art 17 erasure completeness) |
-| **R2** | Verify `RETENTION_PURGE_ENABLED=true` in production + cron has run; commit the flag to config docs | eng/ops | HIGH | Yes (makes the "30-day" notice true or false) |
+| ~~**R2**~~ | ~~Verify `RETENTION_PURGE_ENABLED=true` in production~~ — **RESOLVED 2026-06-08** (confirmed set in prod Doppler; purge runs). Residual: commit the flag to config docs so it can't regress | eng/ops | ~~HIGH~~ → LOW | No (resolved) |
 | **R3** | Erase/anonymise orphaned `organizations` row + `byok_waitlist` email on account deletion | eng | MEDIUM | DPIA-tracked |
 | **A24-a** | Make the privacy notice accurate about retained quotes (and fix §7 7-vs-30-day, age range, transcript-purge mention) | DPO + eng | — | Part of A5 |
 | **A24-b** | Age-out / abstract verbatim fields on the 30-day clock (fast-follow) | eng | — | No (post-launch tightening) |
