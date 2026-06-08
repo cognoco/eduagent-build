@@ -145,6 +145,45 @@ A home and a convention alone are an empty folder that rots; the trajectory only
 - **Follow-on work this decision creates** (stated as durable consequence, not a plan): the **principles catalog** must be built (today approximated by the CLAUDE.md Non-Negotiable Rules); the legacy `ARCH-N` register must drain to ADRs; the physical `docs/` reorganisation implied by §I.4 (canon into `docs/canon/`, the artifact drains) is pending.
 - **Risks & mitigations:** reverse-engineered rationale is lower-fidelity → after-the-fact ADRs are stamped `reconstructed YYYY-MM-DD`, and where the *why* is unrecoverable the decision is recorded plainly rather than invented; the gate mis-set (too low = friction, too high = leaks continue) → the OR-trigger's "default to flag" plus the baselined ratchet calibrate it against real cases.
 
+## Amendment (2026-06-07, architect) — the memory↔canon boundary
+
+**The L4 boundary, stated positively.** The five-layer model (§I.1) defines L4 memory by what it *holds* (working-style, heuristics, transient gotchas) and the agent-doctrine row by a single test ("could this be a **link** instead of a **copy**?"). That test was never lifted to memory itself, so the L4↔L1 boundary lived only *negatively* (the §I.1 discriminating test; the extract-before-cleanup constraint of the Stream-2 backfill). This amendment ratifies the **positive rule**. It opens no new question — it makes the §I.1 model say for memory what it already says for doctrine.
+
+**1. The rule (single source of truth).** Structured canon is master; **memory (`.claude/memory/`) never holds a *copy* of canon.** This is the documentation-layer parallel of the DB-is-master principle in `MMT-ADR-0013` §2 ("Outside the DB we keep only the decision trail … never a second copy of the data") — there the master is the DB, here it is the L1/L2 layers. A memory note that duplicates a decision rots the moment canon evolves: the same drift failure the policy-snapshot reframe fixed, reproduced one layer up.
+
+**2. Memory's positive role — the residue with no other home.** Three categories, and only these:
+- **(a) Pointers / navigation** into the documentation index — recall shortcuts that *point at* canon.
+- **(b) Non-canon working state** — in-flight / blocked status, session continuity; true *now*, not a durable truth about the system.
+- **(c) User / feedback / preference facts** — how to work with the user.
+
+Memory is **not a rung in the §I.1 hierarchy** in the copy-of-knowledge sense — it is an **orthogonal recall cache that points *into* the hierarchy**, the same orthogonality §I.1 already grants agent-doctrine ("a thin pointer index spanning every stratum, not a rung in the stack").
+
+**3. Provenance requirement.** Every retained memory entry must either **(a)** cite the canon doc it points to, or **(b)** be a clearly-typed non-canon working-state / user-fact entry (category 2(b) or 2(c)). An entry that can be linked to **neither** *and* has uncertain provenance is a **cull candidate** (the disposition Phase J executes).
+
+**4. Interim governance — forward-only ratchet (in effect immediately, until Phase J runs the full alignment).** This stops new accretion so Phase J inherits only the *legacy* backlog, mirroring the repo's forward-only-ratchet pattern (GC1 internal-mocks; the §II.5 `decision-adr-link` ratchet):
+- **(i)** No new *content-bearing* memory — a durable decision goes to its canonical home (ADR / canon / data-model), never a memory copy.
+- **(ii)** Any new memory entry is a **pointer that cites its canon source at creation** (provenance baked in → no future orphans).
+- **(iii)** `CLAUDE.md` / `AGENTS.md` stay **pointer-layer** — new canon is **not** inlined into agent-doctrine (the §I.1 cross-cutting test, enforced going forward).
+- **(iv)** Cleanup debt noticed in passing is **logged to a Phase-J worklist, not fixed ad hoc.**
+
+**5. Lockstep — this is the rule; the phases are the execution.** This amendment ratifies the *rule only*. The **retroactive** alignment — restructuring existing memories into pointers, culling the un-linkable-and-unprovenanced, reducing agent-doctrine to pointer-layer — is **Phase J** of the identity-foundation roadmap (`_wip/identity-foundation/ROADMAP.md`); the **estate-wide drain** of the same is **Stream 2** (see the §II.5 ratchet and the Consequences "follow-on work"). The rule presupposes a **documentation index** — the thing memory pointers point *at* — which **does not yet exist**; it is seeded by Phase G. Until the index exists, category-2(a) pointers cite the canon doc directly.
+
+**basis:** `MMT-ADR-0013` §2 (DB-is-master — the source-of-truth precedent this parallels); §I.1 (the five-layer model + the agent-doctrine "link not copy" test this lifts to memory); §II.5 (the forward-only ratchet pattern the interim governance mirrors); `_wip/identity-foundation/ROADMAP.md` cross-cutting threads + the 2026-06-07 Phase-J re-scope decision-log entry (the threads this amendment encodes).
+
+## Amendment (2026-06-08) — `docs/registers/` as an L3 operational sibling
+
+**The addition.** `docs/registers/` is a new **type-named L3 directory** for **governed data masters + their immutable provenance trails** — interim homes for policy-engine data that has no runtime/DB home yet, each master paired with the per-change decision/vetting trail. Placement follows §I.4 exactly: type-first (`registers/`), domain-second (e.g. `registers/llm-models/`). First instance: `registers/llm-models/` — the vetted model set + its vetting trail, backing `MMT-ADR-0014`. A future `registers/policy-cells/` will host the policy matrix master + its decision trail, backing `MMT-ADR-0013`.
+
+**Why not a new domain root.** `registers/` names an artifact *type* (a register), not a domain — so it does not violate §I.4's "no bespoke domain roots" rule. Contrast a rejected `docs/llm-routing/`, which would have been a domain root; `registers/` is the type-layer equivalent of `specs/` or `runbooks/`.
+
+**Why not inside `specs/`, `plans/`, or `runbooks/`.** A register is neither a feature definition (specs), an implementation plan (plans), nor a procedure (runbooks). It is governed *data* plus its provenance — an artifact type §I.4's original enumeration did not anticipate.
+
+**Relationship to canon and the DB-is-master principle.** A register is **not canon** (L1). Canon points *at* it; it never copies the register's volatile contents. This is the documentation-layer image of `MMT-ADR-0013` §2 ("Outside the DB we keep only the decision trail … never a second copy of the data"): the register is the interim source of truth for its data; the trail records only the *why/when/who-verified* of each change. When the policy-engine DB exists, the master migrates in and the register folder becomes the historical provenance archive.
+
+**This is editorial, not a gated decision.** Per §I.5, applying §I.4's existing type-first principle to a new artifact type is *reactive editorial practice that fails the significance gate*. This amendment **records** the sibling for visibility and to keep the §I.4 model current; it is **not** itself a new significance-gated decision. No fresh ADR-class choice was made — the §I.4 type-first rule already governs the placement; this amendment is the model update that the rule demands when a new type arrives.
+
+**basis:** §I.4 (type-first, domain-second placement — the principle being applied); §I.5 (folder structure is reactive editorial, not a gated decision); `MMT-ADR-0013` §2 (DB-is-master — the source-of-truth discipline the register pattern mirrors); `MMT-ADR-0014` (router/vetting split — the ADR that needs the model master); `docs/registers/README.md` (the artifact this amendment describes).
+
 ## Alternatives considered
 
 1. **Tidy specs (separate concerns within them), no decisions layer.** Rejected — treats the symptom; decisions still have nowhere to go and keep leaking.

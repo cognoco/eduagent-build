@@ -63,8 +63,8 @@ naming is Cosmo's, not the roadmap's.
 | **F** | Ready-to-plan gate (planning *for* the planning) **+ the policy-engine/router spine (F.1)** | — (F.1 deliverables: 3 ADRs + vetting kickoff + memory/handoff — see Phase F.1 detail) | You (F); Claude drafts F.1 | 🟡 in progress | B, D, E + threads | shape of G–P ratified; **`inv 17` rephrased**; sibling-plan re-triage scoped; **F.1 closed** (spine ADRs drafted, vetting workstream named, memo/handoff/memory landed); gap analysis deferred to L; master plan deferred to O (this phase is **planning for the planning**, not the planning itself) |
 | **G** | Lock the canonical set for the identity-foundation carve-out | (confirmation only — the docs are in place) | You + Claude                | ⬜     | F                            | the canonical-set list is *explicitly confirmed* — **now includes the 3 spine ADRs from F.1** (`MMT-ADR-0013` engine · the `MMT-ADR-0011` amendment · the router ADR) plus the decision-capture memo + handoff; each doc's role is named; the set is the lens for the gap analysis (L) |
 | **H** | Author the `architecture.md` identity-foundation carve-out | a new section / rev in `architecture.md` | Claude (you ratify)         | ⬜     | G                            | the carve-out is rock-solid for: **the three consent categories + the policy engine + the model router/vetting split + the 6-persona / capability model**, consent flow, IARC/store posture, Payer/billing mechanics, family-join shape, RLS scope, custody/carve-outs, the age-floor split ("Path X"), launch-readiness guard; citations to ADRs + data model present |
-| **I** | Light pass on the rest of `architecture.md` + `ARCH-N` touch (identity-foundation domain) | edited `architecture.md` + `docs/adr/` promotion/supersession | Claude (you ratify)         | ⬜     | H                            | (a) *directly misleading* information in `architecture.md` corrected; *merely incomplete* sections left as-is; scope-by-touching, not scope-by-coverage. (b) the `ARCH-N` items the identity-foundation domain intersects with are promoted / superseded; the registry-wide drain is *not* in scope (Stream 2) |
-| **J** | Light pass on memory + agent rules **(absorbs the spine cleanup sweep, WP-8)** | edited `CLAUDE.md` / `AGENTS.md` / `.claude/memory/` | Claude (you ratify)          | ⬜     | I                            | *misleading* info removed; the criterion is "would *any* agent's session context be polluted by stale information?"; **plus the A-vs-B cleanup sweep** — charge-terminology ("ward"→"charge"), 6-persona set, Payer/Guardian/Mentor/Sub-admin split, the age-floor split ("Path X"), the engine-inside-identity-foundation decision, and the routing-canon supersessions (Family=Gemini-only; GATE-1) applied as the source of truth |
+| **I** | Light pass on the rest of `architecture.md` + `ARCH-N` touch (identity-foundation domain) | edited `architecture.md` + `docs/adr/` promotion/supersession | Claude (you ratify)         | ⬜     | H                            | (a) *directly misleading* information in `architecture.md` corrected; *merely incomplete* sections left as-is; scope-by-touching, not scope-by-coverage. (b) the `ARCH-N` items the identity-foundation domain intersects with are promoted / superseded; the registry-wide drain is *not* in scope (Stream 2). (c) **define the canon-authorship process** — how content enters `architecture.md`, the ADR↔`architecture.md`↔`ARCH-N` relationship — and **reconcile the `MMT-ADR-0016`↔`MMT-ADR-0000` doctrine divergence**; the refresh is wider than the document |
+| **J** | **Align agent-doctrine + memory with the canonical set** — a full alignment activity, **not** a light pass (re-scoped 2026-06-07; absorbs the spine cleanup sweep, WP-8) | edited `CLAUDE.md` / `AGENTS.md` / `.claude/memory/` + a memory-disposition inventory (per-item: re-home / pointer-ify / cull) | Claude (you ratify)          | ⬜     | I **+ the documentation index + the ratified memory↔canon rule** | two operations: **(a) restructure** retained memories into *pointers* to canon (extract real-canon content to its home first — extract-before-cleanup); **(b) cull** memories that *both* can't be linked to canon *and* have uncertain provenance. Plus `CLAUDE.md`/`AGENTS.md` reduced to pointer-layer (inline canon drained) + the A-vs-B cleanup sweep (charge-terminology, 6-persona, capability split, "Path X", engine-placement, routing supersessions). Scope = identity-foundation-touched surface; the estate-wide drain is Stream 2 |
 | **K** | **Consolidation activity** — produce the consolidated-audit document (includes canon-contradiction check) | `docs/audit/2026-05-29-full-audit/RECONCILED.md` (or similar) | Claude (you ratify)         | ⬜     | J                            | see the *K exit gate* below |
 | **L** | Unified gap analysis                                    | a single delta document            | Claude                      | ⬜     | K                            | one row per finding, tagged `(source-audit, source-finding-id, domain, classification, in-scope?, defer-to-which-workstream?, canonical-set-source)`; reads the consolidated-audit (K's output) + the canonical set (G–J) + the as-is |
 | **M** | Four-bucket triage                                      | the triage outcome, folded into the delta doc | You + Claude                | ⬜     | L                            | every finding lands in one of: (1) already handled in identity-foundation; (2) clear in for master plan; (3) clear out for master plan (named workstream); (4) defer (no workstream yet, or the workstream isn't mature enough) |
@@ -132,13 +132,13 @@ the walkthrough rulings + the ADR authoring (which is execution, downstream of t
 |---|---|---|---|---|---|
 | 1 | **Decision-capture memo** — the 25 signed A-vs-B decisions | (the memo) | — | Claude drafts / PM signs | ✅ signed 2026-06-06 |
 | 2 | **Tighten the walkthrough package** — reconcile to the memo (WP namespace, R-5 framing, supersedes list, de-stale legal corpus) | — | the memo | Claude | ✅ 2026-06-07 |
-| 3 | **Run the policy-engine spine walkthrough** — six rulings R-0..R-5; counsel rules R-1 | (the walkthrough) | tightened package | PM + counsel + architect | ⬜ **parallel — to book** |
+| 3 | **Run the policy-engine spine walkthrough** — six rulings R-0..R-5 | (the walkthrough) | tightened package | facilitator-run (PM + architect; **no live counsel**) | ✅ **DONE** (landed via pull) — R-0/2/3/4 **LOCKED**, R-5 **REFINEMENT** (launch-set *shape* → `MMT-ADR-0014`; actual set → `docs/registers/llm-models/` master), R-1 **UNCLEAR-with-posture**; ledger filled. **Caveat: real counsel sign-off still owed (HW-2)** — not launch-blocking |
 | 4 | **Policy-engine spine decision record** (`MMT-ADR-0013`, keystone ADR) — two-primitive model + regime taxonomy + two-axis knowledge model + engine→router flow | (**WP-1**) | memo §3; enum *seeds* from walkthrough R-0/R-2/R-3 | Claude drafted / architect ratified | ✅ **shape ratified 2026-06-07** (enum seeds DB-mastered; await walkthrough) |
 | 5 | **Data-model amendment decision record** (`MMT-ADR-0015` — a *new* ADR that amends `MMT-ADR-0011`, not an in-place edit) — prohibition-floor primitive, two-axis knowledge tables, `regimes` lookup table, Payer sub-field (primary + ≤1 secondary), Guardian=consent-only / Mentor=data-access / Sub-admin=profile-mgmt, charge terminology, `AgeBracket` 'child' | (**WP-2**) | `MMT-ADR-0013` | Claude drafted / architect ratified | ✅ **ratified 2026-06-07** — ⚠ **`data-model.md` lockstep SQL still to write (now DUE)** |
 | 6 | **Router decision record** (`MMT-ADR-0014`) — 3-param runtime / 4-param vetting split, hard split, tested do-not-do lists, tiered v1 fallback; **supersedes** "Family standard = Gemini-only" + **re-specs** GATE-1 minor-routing | (**WP-3**) | memo §4–5; enum seed from walkthrough R-4/R-5 | Claude drafted / architect ratified | ✅ **shape ratified 2026-06-07** (vetted set DB-mastered in `allowed_models`) |
-| 7 | **Kick off the model-vetting research workstream** — *parallel*, orchestrated under this roadmap; same shape as the `age-consent-landscape/` PoC; output = the `allowed-models` table rows with vetting metadata | (**WP-4**) | rulings R-2/R-5 → can start once enums land; **not blocking** | **PM-owned** | ⬜ parallel — owner assigned (PM) |
+| 7 | **Model-vetting workstream — the standing admission process** (compliance half PM + capability half eng/eval-harness); output = the model master + a per-change vetting record in `docs/registers/llm-models/` (→ policy-engine `allowed_models` DB) | (**WP-4**) | rulings R-2/R-5 → enums; **not blocking** | PM + eng | 🟡 iteration-1 (launch set) recorded after-the-fact; process ongoing |
 | 8 | **This roadmap update** — fold the spine + the ten work packages into the phases | (**WP-5**) | the memo | Claude / PM reviews | 🟡 in progress |
-| 9 | **Memory note + handoff doc** — durable `.claude/memory/` record of the decisions + the distilled `_handoffs/` handoff | (**WP-6**, **WP-7**) | the memo + walkthrough rulings | Claude / PM reviews | ⬜ |
+| 9 | **Handoff doc + thin memory *pointer*** — the distilled `_handoffs/` handoff (**WP-7**) + a **pointer-only** `.claude/memory/` signpost to the ratified ADRs (**WP-6, reframed** 2026-06-07: a pointer with cited provenance, **not** a content copy — per the memory↔canon principle). Full memory alignment is Phase J. | (**WP-6**, **WP-7**) | the memo (+ walkthrough rulings appended later) | Claude / PM reviews | ⬜ |
 
 **Folds into the G–P runway, not F.1:**
 
@@ -223,10 +223,12 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   decision (the engine + the router). Full detail in the **Phase F.1** section above; 3 ADRs
   (`MMT-ADR-0013` engine · `MMT-ADR-0011` amendment · router ADR) gate Phase H. Walkthrough runs in
   parallel. 🟡 in progress.
-- **Model-vetting research workstream (WP-4)** — a *parallel*, **PM-owned** workstream (orchestrated
-  under this roadmap) that vets `(model · provider · service · region)` tuples and emits the
-  `allowed-models` table the router reads. Same shape as the `age-consent-landscape/` PoC. Starts once
-  the regime-taxonomy + launch-set rulings (R-2/R-5) land; **not on the F→P critical path**. ⬜
+- **Model-vetting workstream (WP-4) — the *standing* vetting process.** Two halves, one master table:
+  **compliance/legal** (PM-owned) + **capability/quality** (eng / eval-harness-owned). It vets
+  `(model · provider · service · region)` tuples and emits the model master + an **immutable vetting record per
+  change** in `docs/registers/llm-models/` (interim home until the policy-engine `allowed_models` DB exists).
+  **Not superseded** — it *is* the admission gate. **Iteration-1 (the launch set) is recorded** (after-the-fact,
+  `2026-06-06-launch-set-iteration-1.md`); the process is now ongoing, **not on the F→P critical path**. 🟡
 - **Persona / capability / charge-terminology refinement** — the "A-vs-B" decisions refine the persona
   set 5→6, split capabilities (Payer = billing only · Guardian = consent only · Mentor = data access
   only · profile-mgmt = Subscription-administrator), and rename "ward" → **"charge"**. These ripple into
@@ -246,6 +248,36 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   birth-year floor must still ship **with a documented rationale in the same change** (likely a UK
   Crime & Policing Act 2026 statutory expectation). Product + counsel owned; lands in the H carve-out
   for completeness. ⬜
+- **Canon-authorship process + ADR ↔ `architecture.md` ↔ `ARCH-N` relationship — undefined; a live
+  contradiction exists (instance resolved 2026-06-08; root cause survives).** `MMT-ADR-0016` *originally* asserted
+  "ADRs are the decision system of record — there is no `architecture.md` register to sync," which **diverged in
+  essence** from `MMT-ADR-0000`'s lockstep model (ADR = *why*, canon = *what*, they move together). That line was
+  **removed** when `0016` was repurposed (2026-06-08), so the live contradiction is gone — but the **root cause
+  remains** and is the real work: two ADRs *could* disagree on what canon *is* because the process was never defined.
+  Root cause: `MMT-ADR-0000` defined the *layers* but not a crisp **process** for (a) how content gets *into*
+  `architecture.md`, (b) how an ADR relates to the `architecture.md` it changes, (c) how both relate to the
+  frozen `ARCH-N` register. **Scope:** define this as part of the `architecture.md` refresh (Phase H/I) — the
+  refresh must be *wider than the document*, making the authorship/relationship process crystal-clear to
+  agents and humans, and reconciling the `0016`↔`0000` divergence. 🟡 *(raised 2026-06-07)*
+- **Documentation index — the boot-flow linchpin (does NOT exist yet).** The intended agent boot-flow is
+  `CLAUDE.md`/`AGENTS.md` (pointer layer) → a documentation index → the layered canon. Per-layer indexes
+  exist (`docs/adr/README.md`, `docs/audit/INDEX.md`) and `docs/canon/` exists, but **no unifying index**
+  enumerates what's available across layers, and `CLAUDE.md` points to none. The index is a prerequisite
+  for (a) the boot-flow and (b) a meaningful Phase J (memories-as-pointers need a target). Seeded by
+  **Phase G** (lock the canonical set); built before Phase J. ⬜ *(added 2026-06-07)*
+- **Memory ↔ canon boundary — needs a ratified rule (set before Phase J).** Same single-source-of-truth
+  principle as DB-is-master: **structured canon is master; memory never holds a *copy* of canon.** Memory's
+  positive role is the residue with no other home — (1) pointers/navigation into the index, (2) non-canon
+  working state, (3) user/feedback facts. Today the boundary is defined only *negatively* (extract-before-
+  cleanup; the Stream-2 decision backfill); the *positive* rule must land as a principle in the doc-strategy
+  layer (addendum to `MMT-ADR-0000` or `docs/canon/principles.md`) **before** Phase J executes. ⬜
+- **Interim governance (now → Phase J) — stop the bleeding, forward-only.** So Phase J inherits only the
+  *legacy* backlog, not this runway's output: **(1)** no new *content-bearing* memory — durable decisions go
+  to their canonical home (ADR/canon/data-model), never a memory copy; **(2)** any new memory entry is a
+  *pointer* and **cites the canon doc it points to at creation** (provenance baked in → no future orphans);
+  **(3)** `CLAUDE.md`/`AGENTS.md` stay pointer-layer — new canon is not inlined into agent-doctrine; **(4)**
+  cleanup debt noticed in passing is logged to a Phase-J worklist, not fixed ad hoc. Mirrors the repo's
+  forward-only-ratchet pattern (GC1, `decision-adr-link`). 🟡 *(added 2026-06-07)*
 - **Documentation architecture / decisions layer (Phase C → Stream 2)** — `MMT-ADR-0000` ratified the 5-layer
   model, the first-class `MMT-ADR-NNNN` decisions layer, the **significance gate** (when a decision needs an
   ADR), the lockstep lifecycle, and the **physical layout** (§I.4: `docs/canon|adr|specs|plans|runbooks` +
@@ -357,7 +389,7 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 - [~] **F** — planning-for-the-planning ratified: the G–P shape is confirmed; the consolidation's corpus (14 sub-audits + `.deepsec/`) is identified; the four-bucket triage model is agreed; the `claude/` + `codex/` trial reconciliations are to be discarded; the launch-readiness guard is a Phase-F-thread tracked in this ROADMAP. **Now also carries F.1 (the policy-engine/router spine) — F cannot close until F.1 closes.**
   - [x] **F.1 — memo** signed (the 25 A-vs-B decisions; PM sign-off confirmed).
   - [x] **F.1 — walkthrough package** tightened + reconciled to the memo (2026-06-07).
-  - [ ] **F.1 — walkthrough run** (PM + counsel + architect; six rulings R-0..R-5; the R-1 COPPA fork). *Parallel — to book.*
+  - [x] **F.1 — walkthrough run** — DONE (facilitator-run, **no live counsel**; landed via pull): R-0/2/3/4 LOCKED, R-5 REFINEMENT (→ `MMT-ADR-0016`), R-1 UNCLEAR-with-posture. **Caveat: real counsel sign-off still owed (HW-2)** — booked separately, not launch-blocking.
   - [x] **F.1 — 3 spine ADRs** drafted + **architect-ratified 2026-06-07** (`MMT-ADR-0013` engine / `MMT-ADR-0015` data-model amendment / `MMT-ADR-0014` router). Shape accepted; enum *seeds* + the R-1 fork still come from the walkthrough.
   - [ ] **F.1 — `data-model.md` lockstep SQL** written for the `MMT-ADR-0015` amendments (now DUE — the ratified ADR's canon partner; per MMT-ADR-0000 lockstep).
   - [x] **F.1 — model-vetting research workstream** owner assigned = **PM** (WP-4); kickoff brief still to draft.
@@ -367,7 +399,7 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 - [ ] **G** — canonical set explicitly confirmed (now **incl. the 3 F.1 spine ADRs + the memo/handoff**; lens for the gap analysis (L)).
 - [ ] **H** — `architecture.md` identity-foundation carve-out authored (rock-solid; **covers the consent-category model + engine + router/vetting split + personas/capabilities + "Path X"**; cited to ADRs + data model).
 - [ ] **I** — light pass on the rest of `architecture.md` (misleading info corrected; merely incomplete left as-is) **+ `ARCH-N` touch (identity-foundation domain)**.
-- [ ] **J** — light pass on memory + agent rules (any agent's session context; fix only what's misleading) **+ the A-vs-B cleanup sweep (WP-8): charge-terminology, 6-persona, capability split, "Path X", routing supersessions**.
+- [ ] **J** — **align agent-doctrine + memory with canon (full activity, not a light pass)**: (a) retained memories restructured into *pointers* to canon (extract-before-cleanup); (b) memories that can't be linked to canon *and* have uncertain provenance culled; `CLAUDE.md`/`AGENTS.md` reduced to pointer-layer; the A-vs-B cleanup sweep (WP-8) folded in. **Gated on the documentation index + the ratified memory↔canon rule.**
 - [ ] **K** — consolidation activity (the 14 sub-audits + `.deepsec/`; produce the consolidated-audit doc; the K.0 canon-contradiction check; the K.5 sizing estimate; the K.6 spin-up-or-defer decision). See Phase K — detail above.
 - [ ] **L** — unified gap analysis (one row per finding; the delta document).
 - [ ] **M** — four-bucket triage (handled / clear in / clear out / defer).
@@ -376,7 +408,7 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 - [ ] **P** — hand off to execution (Cosmo work-package slicing; the Cosmo top-down process enablement is the parallel precondition).
 
 **Tracked open threads (not blockers, named for visibility):**
-- [ ] Policy-engine spine walkthrough booked + run (PM + live counsel + architect); the **R-1 COPPA fork** resolved.
+- [~] Policy-engine spine walkthrough **run** (facilitator-only, no live counsel; R-1 = provisional posture). **Still owed: real counsel sign-off (HW-2)** on R-1 before any sub-13 / v2 build; not launch-blocking. *(`MMT-ADR-0016` ↔ `0014` reconciliation + WP-4 fate pending — see decision log / open below.)*
 - [x] Model-vetting research workstream (WP-4) — **owner = PM**; runs parallel; off the F→P critical path; kickoff brief still to draft.
 - [ ] Sub-13 v1.1 ungating workstream (WP-10) — deferred, demand-triggered (named future workstream, not in G–P).
 - [ ] Sibling plans re-triaged against the target; coupled set identified + handled.
@@ -391,6 +423,54 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 ---
 
 ## Decision log
+
+- **2026-06-08** — **`0014`↔`0016` reconciliation RESOLVED → decompose (not merge); `docs/registers/` L3 home created.**
+  The three open rulings from the 2026-06-07 entry are decided. (a) **Gemini-exit = compliance *input*** (GCP §20(d)
+  removed an option; no alternatives weighed) — realized as an *excluded* register row + a vetting-record note, **not**
+  an architecture decision; the routing supersession of "Family standard = Gemini-only" stays in `MMT-ADR-0014`.
+  (b) **Not merged — decomposed by *kind*:** routing mechanism (fail-closed→`CircuitOpenError`; separately-routable
+  tutor/judge roles) folded into **`MMT-ADR-0014`** (§4, §8); ephemeral model picks moved to an **interim register
+  master** (`docs/registers/llm-models/master.md`, DB-bound, *not canon*); Gemini exit to the vetting trail.
+  **`MMT-ADR-0016` repurposed in place** (number/file kept — nothing cited the dispersed content, verified) into the
+  **safety/judge-architecture** ADR holding only the significance-gated decisions: judgment-based safety (no app-owned
+  denylist) + a vendor-independent, non-reasoning judge. (c) **Interim model-master format = a register *doc***, not a
+  code config — *no code reads it yet*; it is the migration seed for the policy-engine `allowed_models` DB. **New
+  structure:** `docs/registers/` added as a **type-named L3 sibling** (governed data masters + immutable provenance
+  trails) per `MMT-ADR-0000` §I.4; ADR-0000 **amended** (2026-06-08) to record it. **Vetting records = a permanent
+  series** — one immutable record per master change, forever; `2026-06-06-launch-set-iteration-1.md` is the first,
+  written after-the-fact. The `0016`↔`0000` doctrine-divergence *instance* is gone (the offending lockstep-denial line
+  was removed in the repurpose); the **canon-authorship-process** work survives for Phase H/I (which also owns defining
+  the undefined routing nouns `tutor` / `judge` / `rung` / `tier` / `flow` / `slot`, glossed inline in `0014`/`0016` for now).
+
+- **2026-06-07** — **`MMT-ADR-0016` (LLM routing) surfaced from a parallel track; reconciliation opened
+  (open rulings pending).** A separate model-selection research track (openrouter PR #741) produced
+  `MMT-ADR-0016` + routing specs (originally drafted as ADR-0013, renumbered) and landed via the pull; the
+  walkthrough deferred R-5 to it. Findings: (1) `0016` **pins ephemeral model slugs** as ratified canon —
+  same drift trap as the policy matrix; to be stripped to a (interim) data master + after-the-fact vetting
+  records, the ADR keeping durable rulings only. (2) `0014`↔`0016` = **one routing mechanism named twice**
+  (`allowed_models`/routing-rule table; vetting/eval-harness admission gate) — reconcile vocabulary +
+  cross-refs + layering. (3) **WP-4 not superseded** — it *is* the admission/vetting function (compliance
+  half PM + capability half eng). (4) `0016` asserts a **doctrine divergence** from `MMT-ADR-0000`
+  (ADRs-as-sole-system-of-record vs ADR↔canon lockstep) — flagged **not minor**; reconcile during the
+  `architecture.md` refresh (Phase H/I), which must also define the canon-authorship process
+  (`architecture.md` ↔ ADR ↔ `ARCH-N`). **Open for ruling (this is a thinking thread, not yet decided):**
+  merge-vs-keep `0014`/`0016`; whether the Gemini-exit is an architecture *decision* or a compliance *input*;
+  the interim model-master format (config vs doc).
+
+- **2026-06-07** — **Phase J re-scoped (light pass → full doc/memory alignment); memory↔canon boundary +
+  documentation index + interim governance added as threads.** Triggered by the question "should the A-vs-B
+  decisions live in memory?" → **no.** Generalized to a principle (same as DB-is-master): **structured canon
+  is master; memory holds pointers + non-canon working state + user facts, never a copy of canon.** Findings:
+  (1) the unifying **documentation index does NOT exist** (only per-layer `adr/README.md`, `audit/INDEX.md`);
+  it is the boot-flow linchpin + a prerequisite for Phase J, seeded by Phase G. (2) **Phase J re-scoped** from
+  "light pass" to a **full alignment activity** — (a) restructure retained memories into pointers to canon
+  (extract-before-cleanup), (b) cull memories that can't be linked to canon *and* have uncertain provenance,
+  (c) reduce `CLAUDE.md`/`AGENTS.md` to pointer-layer; gated on the index + the ratified rule; scoped to the
+  identity-foundation surface (estate-wide = Stream 2). (3) **Interim governance (now → J)** = forward-only
+  ratchet: no new content-bearing memory, new memory = provenance-cited pointers, doctrine stays pointer-layer,
+  cleanup debt logged not fixed ad hoc. (4) **WP-6 reframed** from a memory content-summary to a thin
+  provenance-cited pointer; the decisions' real home is canon (ADRs ✅, carve-out + CONTEXT pending). The
+  memory↔canon *rule* must be ratified in the doc-strategy layer **before** Phase J runs.
 
 - **2026-06-07** — **Roadmap integrated with the "A-vs-B" outcome — the runway grew by a spine sub-phase
   (F.1) + two architectural lanes.** The v1 launch-scope investigation (the **"A-vs-B" decision** —

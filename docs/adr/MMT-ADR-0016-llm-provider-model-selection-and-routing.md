@@ -1,62 +1,52 @@
-# MMT-ADR-0016 — LLM provider/model selection and the routing rule table (Gemini exit)
+# MMT-ADR-0016 — Safety and judge architecture: judgment-based safety (no app-owned denylist) and a vendor-independent judge
 
-**Status:** Accepted · **Date:** 2026-06-06 (last revised 2026-06-07) · **Scope:** All production LLM calls · **Deciders:** PM (owner) + Claude · **Supersedes:** the `gemini_only` Family-tier routing policy in `router.ts`
+**Status:** Accepted · 2026-06-06 (re-scoped 2026-06-08) · **Scope:** All production LLM safety + evaluation calls · **Deciders:** PM (owner) + Architect (jjoerg) + Claude · **Builds on:** MMT-ADR-0014 (router/vetting split), MMT-ADR-0013 (policy-engine spine)
 
-> **Lockstep:** this ADR is the *why* **and the canonical record of the decision** (ADRs are the decision system of record — there is no `architecture.md` register to sync). The *what* (concrete pinning) lives in `docs/specs/2026-06-06-llm-routing-and-judge-architecture.md` (§1.5); the model-selection evidence in `docs/meetings/2026-06-05-llm-model-selection-research-memo.md` (§6 results — the memo's §7 pinning tables are superseded evidence-stage picks, retained as evidence only); the Thread B build spec is `docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md`.
+> **Re-scope note (2026-06-08).** This ADR originally bundled three different *kinds* of thing — the routing *mechanism*, the ratified *model picks*, and the Gemini *compliance exit* — under the title "LLM provider/model selection and the routing rule table." Per the architect's ruling, model choices are **ephemeral data and do not belong in an ADR**; the routing mechanism already has a home; and the Gemini exit is a compliance *input*, not an architecture decision. Those three were dispersed to their correct homes, and this ADR now holds **only** the genuinely significance-gated safety/judge *architecture*:
+> - **Model picks** (the vetted set per slot) → `docs/registers/llm-models/master.md` (interim master; **not canon**, DB-bound — DB-is-master, MMT-ADR-0013 §2) + its vetting trail.
+> - **The Gemini exit** → recorded as a **compliance input** in `docs/registers/llm-models/vetting/2026-06-06-launch-set-iteration-1.md`; the routing supersession of "Family standard = Gemini-only" is **MMT-ADR-0014** §Supersession.
+> - **Routing mechanism** (3-param key, vetting/routing split, fail-closed, separately-routable roles) → **MMT-ADR-0014**.
+>
+> What remains is what passes the §II.1 significance gate as *architecture*: how safety is decided, and how the judge is positioned. (Prior content is recoverable from git history; nothing cited the dispersed material — verified 2026-06-08.)
 
 ## Context
 
-Google Gemini — the current default LLM pool across every routing tier — is contractually unusable for under-18 end users: GCP Service Specific Terms §20(d) and the Gemini API terms both prohibit apps "directed towards or likely to be accessed by" under-18 end users (verified raw-text 2026-06-05; see `.claude` memory `project_google_gemini_vendor_under18_blocked`). Because this app plainly is likely-accessed-by-minors (child/family profiles), every tier needs a re-pick, and the re-pick must hold under three constraints that no prior selection process enforced together:
+Two cross-cutting decisions govern every production LLM call and are independent of *which* model fills any slot (that is register data). They were ratified during the Gemini-exit re-pick but are durable beyond it: they constrain the **safety mechanism** and the **evaluation ("judge") architecture** for all models, present and future. Both clear the significance gate — they select an approach, constrain other work, and move a quality attribute (safety) — and are therefore ADR-class, where the model picks are not.
 
-1. **Latency** — production runs on Cloudflare Workers with a ~25s wall; reasoning-heavy configs routinely exceed it.
-2. **Compliance** — minors' conversation text is in scope; lawful processing requires a transfer mechanism (DPF or SCCs+TIA), which rules out Chinese-hosted inference entirely and the Gemini vendor specifically (for the under-18 audience).
-3. **Small-locale prose quality** — cs/nb/pl learners read tutor prose directly; wrong-language or broken-grammar replies are a visible product failure that only an independent language judge catches.
-
-Five candidates were evaluated in their **exact production configurations** (model slug, reasoning effort, pinned host) through the eval harness §6 gate: safety battery, exchanges core, language-quality judge, and reasoning-mode latency probes. Live pricing was re-verified against OpenRouter's endpoint API on 2026-06-06.
+The terms **tutor** (the learner-facing prose-generating call) and **judge** (the post-generation evaluator that emits the structured response envelope) are glossed inline here; their formal canon definitions are tracked on the Phase-J / canon-authorship to-do.
 
 ## Decision
 
-Adopt the pinning matrix below (full table + per-slot evidence in spec §1.5, eval evidence in memo §6). Model choice is expressed as a **declarative routing rule table** (spec §1), matched on flow/language/rung/tier/capability; switching a model is a row edit, a new vendor is one adapter file. No model enters a row until it passes the harness in its exact production config (spec §1.4 admission gate).
+### 1. Safety is decided by judgment of handling, not by an app-owned denylist
 
-**Roles:**
+Safety is decided by **judgment of how a topic is handled**, not by token/keyword matching. There is **no app-owned word denylist**. The danger line runs *through* the word, not around it — "what poppy seeds produce" vs "how to extract opium" share tokens but differ entirely in intent and handling.
 
-- **Primary text — all tiers (free, Plus, Family, Pro), all ages, the default everywhere allowed: gpt-oss-120b @ Cerebras `high`.** Validated for safety (44/44 battery + 100× jailbreak resample, 0 compliances + 5/5 multi-turn adversarial), teaching (55/55), latency (p50 1.3s / p95 2.8s, 0-over-wall), and language (~98% in-language as-is across all 9 conversation locales, 0/270 with a belt-and-braces directive). Cheaper-or-equal to Mistral and materially smarter — the reason it is the universal default rather than a confined async model.
-- **Secondary text — used when the business-rule layer routes away from US-hosted Cerebras** (EU-residency required *or* Cerebras unavailable — one merged branch), tier-split:
-  - **Free → Mistral Small 4** (EU-hosted, zero transfer paperwork).
-  - **Paid (Plus / Family / Pro) → GPT-5 mini @ `low`** (OpenAI; EU-residency deployment for the EU branch; ZDR mandatory for minors).
-- **Vision: free → Mistral Small 4; paid → GPT-5 mini.** gpt-oss is text-only, so each tier's secondary also handles its images.
-- **Interactive deep reasoning (rungs 4–5): gpt-5.4 @ `medium` for Plus / Pro / the $15 AI-Upgrade add-on only.** The **Family tier has no access to gpt-5.4** (owner ruling 2026-06-07) — Family's rungs 4–5 stay on gpt-oss-120b @ Cerebras `high`. Free never escalates to a premium model.
-- **Rung 4–5 fallback: Sonnet 4.6** (incumbent, vendor diversity).
-- **Async deep jobs (recaps, curriculum, assessment eval): gpt-oss-120b @ Cerebras `high`** — shares the primary text path.
-- **Judge: Haiku 4.5, non-reasoning** — vendor-independent of the tutor; reasoning mode banned (breaks JSON envelopes).
-- **Dormant adult-only fallback: DeepSeek V4 Pro non-reasoning @ DeepInfra** — not pinned.
+**Over-blocking is a hard failure, equal in weight to under-blocking.** Refusing a legitimate question is as much a defect as answering a dangerous one. A denylist is guaranteed wrong in one direction and is the mechanism that produces spurious "I can't answer that" refusals; it is therefore not built.
 
-**Business-rule layer.** The age/residency/plan → model mapping that selects primary-vs-secondary is **not built yet**. Until it lands, `getModelConfig` pins gpt-oss as the all-tier primary and wires each tier's secondary as the **fallback** target; the residency-driven *primary* substitution is a later rule-table addition. EU-residency and Cerebras-outage are deliberately one branch (the same secondary serves both).
+### 2. The judge is vendor-independent of the tutor, non-reasoning, and age-gated only in mode
 
-**No age-based split on the primary path.** Under-18 and adult share gpt-oss as the everyday model; age changes only the judge *gating mode* (spec §3) and the residency branch, never the default model. The only tier-based model carve-out is Family's exclusion from gpt-5.4.
-
-**No app-owned word denylist** (spec §2.0). Safety is decided by judgment of handling, not token matching — the danger line runs through the word ("what poppy seeds produce" vs "how to extract opium"). Over-blocking a legitimate question is a hard failure, equal in weight to under-blocking.
+- **Vendor-independent of the tutor.** The judge must not share a model vendor with the tutor it evaluates — an evaluator that shares the tutor's blind spots cannot catch them. (The router *capability* that makes roles separately-routable is MMT-ADR-0014 §8; this is the *policy* that requires the separation be maintained.)
+- **Non-reasoning.** The judge runs in non-reasoning mode; reasoning mode breaks the JSON response envelope (`llmResponseEnvelopeSchema`), and envelope integrity is load-bearing for the state machine.
+- **Age varies only the judge's gating mode, never the default model.** Under-18 and adult share the same everyday tutor model; age changes the judge's *gating mode* (how strictly the envelope is gated) and the residency branch — not which model generates prose. (The one tier-based model carve-out — Family's exclusion from the premium deep-reasoning model — is register data, not an age rule, and lives in the model master.)
 
 ## Consequences
 
-- The `gemini_only` `LlmProviderPolicy` and `GEMINI_ADVANCED_MODEL_MIN_RUNG` in `router.ts` are superseded and removed when the routing table lands (spec rollout phase 6). Until then Gemini stays the runtime default — this ADR ratifies the *target*; the migration is staged behind `LLM_ROUTING_V2_ENABLED`.
-- **Single-host concentration on Cerebras is the one residual risk** on the primary path — mitigated by the automatic per-tier secondary (free→Mistral, paid→GPT-5 mini), not by confining gpt-oss. gpt-oss is text-only, so vision always lands on the secondary.
-- **gpt-oss serves under-18 paid traffic**, filling the Family-tier hole the Gemini exit left. This makes the Cerebras compliance triplet a launch gate for minors (below).
-- **Cerebras cannot become a single vendor** (web-verified 2026-06-06, memory `project_cerebras_vendor_posture`): it serves open-weight models only — GPT-5 mini, gpt-5.4, and Claude are not available there. Its compliance triplet (ZDR + no-training + executed DPA) is *likely achievable* (ZDR/no-train are its advertised default; DPA/SCCs/SOC 2 in its Trust Center) but US-only datacenters keep it on the SCCs+TIA route. Owner ruling: keep separate agreements with the other vendors; Cerebras dedicated-endpoints / self-host parked as a future option.
-- **DeepSeek V4 Pro is dropped from launch**, kept only as a dormant adult-only fallback row. Its price advantage was the Chinese first-party API (unusable); the cheapest lawful US host (DeepInfra, $1.30/$2.60, no cache discount) is ~5× GPT-5 mini's input price, and reasoning mode misses the 25s wall. No EU host exists. Activation requires a DeepInfra DPA + a Chinese-origin-model paragraph in the DPIA.
-- **Compliance follow-ups owed (B3 bucket + E5 DPIA gate):** Cerebras triplet (ZDR-in-DPA text, SCCs+TIA); OpenAI ZDR-for-minors (covers the paid secondary + gpt-5.4); Art 28 DPAs + ZDR/retention review for OpenAI / Anthropic / Mistral; record the model/vendor choices in the DPIA.
-- **Build gates (Thread B):** direct Cerebras adapter (`{"type":"refusal"}`→safe-envelope handler + unit test) + direct Mistral adapter + compliance-aware `getFallbackConfig` that drops Gemini/Vertex (under-18-banned) and fails closed to `CircuitOpenError`; OpenAI adapter taught `gpt-5-mini` + `reasoning_effort`. Teaching-quality A/B (gpt-oss vs GPT-5 mini at paid rungs 1–3) before the flag flip.
-
-## Open ruling — adult-only (verified 18+) Gemini eligibility
-
-The Gemini/Vertex block is written at the *under-18* level, so adults are not *per se* excluded. **However**, the GCP terms test is *app-audience* level — "directed towards or likely to be accessed by under-18" — and this app is plainly likely-accessed-by-minors. Whether adult-only routing *inside a mixed-audience app* survives that test is an unresolved legal question, and any "Gemini for adults" path additionally requires robust 18+ age assurance. **Until ruled, Gemini/Vertex stays fully excluded** (the matrix and `FALLBACK_FORBIDDEN` ban it unconditionally). If permitted, the ban becomes age-conditional (banned under-18, allowed for verified-18+) and a Gemini row is added for the adult segment — a follow-up amendment, not assumed here.
+- **No denylist component is built.** Safety lives in the prompt-layer safety preamble + the judge's evaluation, not in a maintained word list. (v1 ships without a strong post-envelope content classifier — Gap B / Path X is v1.1 per MMT-ADR-0013 §6 + MMT-ADR-0014 §5; the v1 posture is vendor refusal + safety preamble + the judge.)
+- **The judge is a distinct routing role** with its own eligibility set and its own vendor constraint (MMT-ADR-0014 §8). Changing the judge model is a register edit with a vetting record, subject to the vendor-independence rule above.
+- **The everyday model is age-blind.** Routing never forks the default tutor model on age; only the judge gating mode and the residency branch fork. This keeps the primary path uniform and avoids an age-split model matrix.
+- **The model picks that realise these roles are register data**, not canon: the judge model, the tutor model, and every slot live in `docs/registers/llm-models/master.md` with their vetting trail. This ADR constrains *how* those roles are filled (vendor-independence, non-reasoning, no denylist), never *which model* fills them.
 
 ## Alternatives considered
 
-1. **Keep Gemini for everyone** — rejected, contractually prohibited for under-18 end users (the whole reason for this ADR). Adult-only Gemini is a separate open ruling (above).
-2. **Confine gpt-oss to async only** (its originally-evaluated role) — rejected: the "wrong-language to small-locale learners" finding that justified confinement was a harness artifact (the candidate eval path bypassed `routeAndCall`, omitting the production language preamble `getPersonalizationPreamble`, `router.ts:236-243`); with the preamble, gpt-oss is ~98% in-language. Harness bug fixed (`withSafetyPreamble` exported + applied; regression test `apps/api/eval-llm/runner/llm-client.test.ts`, break-test verified). The N=1 jailbreak flake cleared on 100× resample (a benign `{"type":"refusal"}` envelope-format slip on refusals, ~1%; the direct adapter normalizes it). Single-host risk is handled by the per-tier secondary, not confinement.
-3. **GPT-5 mini as the paid primary** (an earlier evidence-stage pick) — superseded: gpt-oss is cheaper-or-equal, measurably smarter, and validated across every axis. GPT-5 mini is retained as the paid secondary + vision handler, where its closed-model vision and EU-residency deployment are exactly what the secondary needs.
-4. **Mistral as the free-tier *primary*** (an earlier evidence-stage pick) — superseded: free now defaults to gpt-oss like every other tier; Mistral drops to the free secondary (EU-residency + outage) + free vision. "Drop Mistral entirely" remains rejected — it is needed for the EU-residency free branch.
-5. **Age-split routing (different everyday models for adults vs minors)** — rejected as unnecessary: the everyday model is gpt-oss for both; age drives only the judge gating mode and the residency branch. (Tier does carve out one row: Family is excluded from gpt-5.4.)
-6. **gpt-5.5 as the deep-reasoning model** — rejected: $5/$30 is 2× gpt-5.4 for no measured quality gain; kept as a rotation candidate only.
-7. **A keyword/topic denylist for safety** — rejected: the dual-use line runs through the word, so token matching is guaranteed wrong in one direction and is the mechanism that produces spurious "I can't answer that" refusals.
+1. **An app-owned keyword/topic denylist for safety.** Rejected — the dual-use line runs through the word, so token matching is guaranteed wrong in one direction and is the mechanism that produces spurious refusals. Over-blocking is a hard failure equal to under-blocking.
+2. **A judge that may share the tutor's vendor.** Rejected — an evaluator sharing the tutor's blind spots cannot catch them; vendor-independence is the cheapest structural guard.
+3. **A reasoning-mode judge.** Rejected — reasoning mode breaks the JSON envelope the state machine depends on.
+4. **Age-split everyday model** (different default tutor models for adults vs minors). Rejected — unnecessary; the everyday model is shared, age drives only the judge gating mode + the residency branch. (Tier carves out one row — Family excluded from the premium deep-reasoning model — but that is register data, not an age rule.)
+
+## What this ADR does not decide
+
+- **Which models fill the tutor, judge, secondary, vision, deep-reasoning, or fallback slots** — register data (`docs/registers/llm-models/master.md`) with its vetting trail, DB-bound. This ADR governs the *shape* of the safety + judge roles, not their occupants.
+- **The routing mechanism** (3-param key, vetting/routing split, fail-closed, fallback tiers, separately-routable roles) — MMT-ADR-0014.
+- **The Gemini exclusion** — a compliance input recorded in the vetting trail; the routing supersession is MMT-ADR-0014.
+- **The judge's gating-mode thresholds per age** — operational tuning (envelope spec), not architecture.
+- **Formal definitions of `tutor` / `judge`** — Phase-J / canon-authorship to-do.

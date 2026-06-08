@@ -84,6 +84,8 @@ Within one cell of the policy matrix, the engine emits an *eligibility set* — 
 
 **v1's tier definitions are populated by the vetting-research workstream (WP-4).** Same artifact as the allowed-models table. The tiers are *data* — when a new `(model, service, region)` becomes vetted, the tier definitions update via a deploy.
 
+**Fail-closed on exhaustion (router error behavior).** When every tier in the eligibility set is exhausted — all tuples failed, or the set is *empty* after policy filtering — the router **fails closed**: it raises `CircuitOpenError` and never falls through to a non-vetted or policy-ineligible model. A compliance-ineligible model is never a fallback target, and an empty eligibility set is a hard stop, not a licence to relax the filter. Concretely, `getFallbackConfig` drops under-18-banned vendors (Gemini/Vertex) and terminates in `CircuitOpenError`, never in an unfiltered default. This is a structural property of the router mechanism (not a per-cell policy), which is why it lives here.
+
 ### 5. Do-not-do lists (B1: explicit, tested)
 
 **The router does *not*:**
@@ -122,6 +124,12 @@ The gemini-minors ZDR research found that Workspace-for-Education Gemini is the 
 
 **This is a *current read*, not a locked decision.** The walkthrough's R-1 (parent-operator COPPA), R-2 (regime taxonomy), and R-3 (knowledge axes) may surface reasons to revisit — e.g., if the regime taxonomy carves out a US-district-tenant regime, the engine has to know about it; if the knowledge axes surface a 'tenant-type' dimension, the policy-table data point becomes a route-candidate. **The memo does not pre-empt the walkthrough; this ADR carries the current read and is open to amendment by the walkthrough.**
 
+### 8. Roles are separately routable (tutor vs judge)
+
+The router resolves each **call role** independently against its own eligibility set: the **tutor** call (the learner-facing prose generation) and the **judge** call (the post-generation envelope evaluator) are distinct routing requests, each picking its own `(model, service, region)` row. This is a router *capability* — it is what makes vendor-independence between roles **enforceable**. Whether that independence is *required* (the judge must not share a vendor with the tutor) and the judge's non-reasoning constraint are **safety/judge-architecture policy**, and live in MMT-ADR-0016, not here. The division is the same mechanism-vs-policy line this ADR draws throughout: 0014 owns the mechanism (roles are separable; the engine *can* keep them on different vendors), MMT-ADR-0016 owns the policy (they *must* be kept independent).
+
+*(The terms `tutor` and `judge` are glossed inline here pending their formal definition in canon — tracked on the Phase-J / canon-authorship to-do.)*
+
 ## Supersession
 
 - **Prior "Family standard = Gemini-only" canon:** **SUPERSEDE.** Invalidated by the gemini-minors ZDR research. The architecture cannot be "use whatever model is best" because the model *and* the service *and* the region are each a compliance axis. Workspace-for-Education is out of scope as a route per §7.
@@ -151,6 +159,8 @@ The detailed migration SQL is out of scope for this ADR (that is the `data-model
 - **Workspace-for-Education is out of scope as a route.** The §20(d) under-18-closure-with-education-tenant exception is real and informs the engine, just not a route. v2 may add the integration if a district asks.
 - **The 3-param runtime key is simple.** The picker picks within the vetted set. Adding runtime axes is the half-migration pattern; rejected.
 - **Age-appropriate is envelope-side, not router-side.** The router picks the model; the model (or the envelope) is responsible for content-level concerns.
+- **The router fails closed.** On eligibility-set exhaustion (all tiers failed, or an empty set after policy filtering) it raises `CircuitOpenError`; a non-vetted or policy-ineligible model is never a fallback target (§4).
+- **Tutor and judge are separately-routable roles** (§8). The *requirement* that the judge stay vendor-independent of the tutor — and that it run non-reasoning — is MMT-ADR-0016 (safety/judge architecture), enforced on top of this routing capability.
 
 ## Alternatives considered
 
