@@ -23,7 +23,7 @@ Complete trace of every learning path in MentoMate, from the learner's first tap
 > **What changed since 2026-06-08**
 > - **Learn Something New current flow.** Home's `home-action-study-new` quick action routes directly to `/create-subject`; the obsolete `ONBOARDING_FAST_PATH` flag is no longer part of the current mobile feature-flag set. First curriculum sessions use `POST /subjects/:subjectId/sessions/first-curriculum`, with `/ready` shown only for the first subject so the learner gets a reflection moment before opening chat.
 > - **Session completion timing.** Tapping End Session closes the session and creates a pending summary row, but the normal `app/session.completed` pipeline is queued only after the learner submits or skips the "Your Words" reflection. Stale idle sessions are the exception: the stale-session cron auto-closes and dispatches completion with `summaryStatus='auto_closed'`.
-> - **Notes, Challenge Round, and freeform filing.** Topic-scoped tutoring sessions include note prompts/manual note entry, summary-to-note side effects, and the feature-gated Challenge Round path: eligible learners can accept a short evaluated challenge, then review/save a drafted note when there is solid evidence. Freeform Ask Anything does not offer Challenge Round or a learner-note flow. It offers bookmarks during chat, and Library filing becomes available only after 5 exchanges; if saved to Library, the LLM-generated recap/session summary is the durable review artifact.
+> - **Notes, Challenge Round, and freeform filing.** Topic-scoped tutoring sessions include note prompts/manual note entry, summary-to-note side effects, and the feature-gated Challenge Round path: eligible learners can accept a short evaluated challenge, then review/save a drafted note when there is solid evidence. Freeform Ask Anything does not offer Challenge Round or a learner-note flow. It offers bookmarks once an AI response is persisted with a `subjectId`; bookmarks do not require `topicId`. Library filing becomes available only after 5 exchanges; if saved to Library, the LLM-generated recap/session summary is the durable review artifact. See [`MMT-ADR-0018`](../adr/MMT-ADR-0018-freeform-library-filing-threshold.md).
 
 ---
 
@@ -222,7 +222,7 @@ Home Screen (LearnerScreen)
 - Freeform close does not block the learner on a manual filing prompt. If the session is still unfiled and has at least 5 exchanges, close-path auto-filing is requested in the background.
 - The post-session Inngest pipeline can wait up to 60s for filing resolution before computing topic-bound retention. If filing does not resolve in time, the pipeline proceeds with the best available placement and filing retry/observer jobs handle recovery.
 - Freeform does not offer Challenge Round.
-- Freeform does not offer a learner-note flow. Live-chat saving uses bookmarks, and filed sessions rely on the LLM learner recap / structured session summary as the review artifact.
+- Freeform does not offer a learner-note flow. Live-chat saving uses bookmarks once an AI response has been persisted with a `subjectId`; bookmarks can remain topicless. Filed sessions rely on the LLM learner recap / structured session summary as the review artifact.
 - Below 5 exchanges, an unfiled freeform session remains chat history plus any bookmarks and does not show the Add to Library affordance.
 
 ---
@@ -652,7 +652,7 @@ Home Screen
 
 ## Bookmarks (Within Any Tutoring Session)
 
-Learners can save AI messages mid-session. After a few AI responses, a one-time `BookmarkNudgeTooltip` appears (gated per profile via `bookmark-nudge-shown` SecureStore key) and offers an inline "Bookmark now" CTA that bookmarks the latest AI message.
+Learners can save AI messages mid-session once the AI response has a persisted session event. Bookmarks are subject-backed (`subjectId` required) but topic-optional (`topicId` nullable), so a freeform bookmark can be saved before Library filing creates or links a topic. After a few AI responses, a one-time `BookmarkNudgeTooltip` appears (gated per profile via `bookmark-nudge-shown` SecureStore key) and offers an inline "Bookmark now" CTA that bookmarks the latest AI message.
 
 ```
 During any tutoring session...
@@ -665,7 +665,7 @@ During any tutoring session...
               └─ Parent-proxy mode hides delete (read-only)
 ```
 
-Bookmarks do not change session pedagogy or recording — they are a per-message side index for the learner.
+Bookmarks do not change session pedagogy or recording — they are a per-message side index for the learner. Topic-filtered bookmark surfaces show only bookmarks with a topic relationship; the general saved-items surface can include topicless bookmarks.
 
 ---
 
@@ -673,7 +673,7 @@ Bookmarks do not change session pedagogy or recording — they are a per-message
 
 Learners can save their own notes while learning. Notes are topic-bound: the session needs a `topicId` before the note can be saved directly.
 
-For freeform Ask Anything, there is no separate learner-note flow. The learner can bookmark mentor replies during chat. If a 5+ exchange freeform session is filed to Library, the durable review artifact is the LLM-generated learner recap / structured session summary, not a learner-authored topic note.
+For freeform Ask Anything, there is no separate learner-note flow. The learner can bookmark subject-backed mentor replies during chat; those bookmarks do not require a topic. If a 5+ exchange freeform session is filed to Library, the durable review artifact is the LLM-generated learner recap / structured session summary, not a learner-authored topic note.
 
 ```
 During a teaching session...

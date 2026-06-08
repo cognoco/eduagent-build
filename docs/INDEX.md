@@ -72,8 +72,8 @@ root and in `docs/`.
 ## L2 — All decisions (ADRs)
 
 The full ADR register and the significance gate live in
-[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0017`
-(`0003` is unused — number gap, not a live record; `0017` promotes the legacy `ARCH-8` LLM-orchestrator entry). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
+[`docs/adr/README.md`](adr/README.md). Current ADR files run through `MMT-ADR-0018`
+(`0003` is unused — number gap, not a live record; `0017` currently has a numbering collision to clean separately). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
 draining to ADRs as Stream-2 work) is described in `MMT-ADR-0000` Part III.
 
 ## L3 — Operational
