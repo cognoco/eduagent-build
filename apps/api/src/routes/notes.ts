@@ -16,7 +16,10 @@ import {
   conceptMasterySignalsResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
+import {
+  requireProfileId,
+  type ProfileMeta,
+} from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { notFound, NotFoundError } from '../errors';
 import {
@@ -31,6 +34,7 @@ import {
 } from '../services/notes';
 import { getConceptMasterySignalsForTopics } from '../services/concept-mastery';
 import { getTopicSessions } from '../services/session';
+import { withProfile } from '../route-utils/route-context';
 
 type NotesRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -38,6 +42,7 @@ type NotesRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -162,8 +167,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     '/notes/concept-mastery',
     zValidator('query', conceptMasteryQuerySchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { topicIds } = c.req.valid('query');
 
       const signals = await getConceptMasterySignalsForTopics(

@@ -45,4 +45,6 @@ ALTER TABLE "concepts" ADD CONSTRAINT "concepts_subject_id_subjects_id_fk" FOREI
 ALTER TABLE "concepts" ADD CONSTRAINT "concepts_topic_id_curriculum_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."curriculum_topics"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "concept_mastery_profile_id_idx" ON "concept_mastery" USING btree ("profile_id");--> statement-breakpoint
 CREATE INDEX "concepts_profile_topic_idx" ON "concepts" USING btree ("profile_id","topic_id");--> statement-breakpoint
-CREATE INDEX "concepts_profile_id_idx" ON "concepts" USING btree ("profile_id");
+CREATE INDEX "concepts_profile_id_idx" ON "concepts" USING btree ("profile_id");--> statement-breakpoint
+ALTER TABLE "concept_mastery" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "concepts" ENABLE ROW LEVEL SECURITY;
