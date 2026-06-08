@@ -12,7 +12,7 @@ MMT-ADR-0012 (one-time baseline reset, ratified 2026-06-04) describes a fresh cr
 
 - **§1.4 Payer ruling** — Payer is a *sub field*, not a persona. v1 supports 3a/3b/3c holders. 1 primary + max 1 secondary per subscription.
 - **§1.5 Profile-mgmt ruling** — bundled with Sub admin (C). Sub admin = profile mgmt + billing.
-- **§1.6 Guardian rulings** — G-3 3a (exactly 1 per charge), G-4 4b (explicit qualification ENUM), G-6 6b (explicit takeover, branching on `charges.has_own_account`).
+- **§1.6 Guardian rulings** — G-3 3a (exactly 1 per charge), G-4 4b (explicit qualification ENUM), G-6 6b (explicit takeover, branching on `person.has_own_account`).
 - **§1.2 6-persona set** — Non-consenting minor (managed profile) is its own persona; the data model needs to express it.
 - **§3.2 + §3.3 Engine decisions** — the policy engine needs `policy_rules` (with `kind` column), a `regimes` lookup table + `policy_cells`, the two-axis knowledge model (B3: profile + history).
 - **§4.2 + §5 Router decisions** — the `allowed_models` table (vetting pipeline output).
@@ -38,28 +38,27 @@ The MMT-ADR-0011 baseline is **amended** with the following additions, all pre-b
 
 **Compatibility:** the 'child' value is a *new* value, not a rename. Existing 'adolescent' and 'adult' values are preserved. Existing user profiles map to 'adolescent' (13–17) or 'adult' (18+) as before. The new value activates when a user's age falls below 13; v1's launch-floor logic maps sub-13 to 'child' (and the v1 launch config blocks sub-13 signups at the API).
 
-### Amendment 2: `persons.charge_terminology` rename + `charges` table (charge terminology + G-3 3a)
+### Amendment 2: charge terminology (`ward`→`charge`) + G-3 3a (one Guardian per charge)
 
 **Files:** `data-model.md` (the spec); physical schema per Drizzle conventions.
 
 **Charge terminology sweep (2026-06-06):** the term *ward* is replaced by *charge* across all five file sets (CLAUDE.md, AGENTS.md, CONTEXT.md, .claude/memory/, ontology). The sweep report is at `_wip/identity-foundation/charge-terminology-sweep-report.md` (109 edits across 13 files; verification PASS; legal-corpus skip set is `policy-engine-spine-walkthrough/{SYNTHESIS.md, CAPTURE-LEDGER.md, BRIEFING-PACKET.md}` only). **Schema columns and table names that referenced "ward" are renamed in this amendment:**
 
-- `wards` table → `charges` table (per the charge-terminology sweep).
-- `wardships` table → `guardianships` table (per the sweep + MMT-ADR-0008's terminology).
+- Legacy `family_links` is realized as the `guardianship` edge (MMT-ADR-0008). There is **no** `wards`/`charges` entity table — *charge* is the child-side **role** on that edge (the `charge_person_id` column), not a table of its own.
 - `ward_person_id` column → `charge_person_id` column (per the sweep).
 - `ward × purpose × org` event-log key → `charge × purpose × org` (per the sweep).
 
-**G-3 3a — exactly 1 Guardian per charge:** the `guardianships` table has a UNIQUE constraint on `charge_person_id` (one row per charge). The 1:1 is *enforced* at the schema layer, not just at the engine. MMT-ADR-0008's "guardianship is a global edge" is preserved; the 1:1 is on the *active* guardian edge per charge.
+**G-3 3a — one active Guardian per charge (v1):** enforced in **service code** on grant, *not* as a DB constraint. The `guardianship` edge keeps its natural `UNIQUE (guardian_person_id, charge_person_id) WHERE revoked_at IS NULL` (blocks duplicate edges, preserves re-grant history) and stays structurally N:M — so a future co-parent / shared-custody model needs only a relaxation of the service rule, no baseline migration. This is the schema-flexible / behavior-gated posture also used for sub-13 (Path X). MMT-ADR-0008's "guardianship is a global edge" is preserved.
 
-**Mentor N-per-charge:** the `mentorships` table has no UNIQUE constraint on `charge_person_id` (a charge can have multiple mentors). The N-per-charge is the default; v1.1 may add caps if a UX reason emerges.
+**Mentor N-per-charge:** the `mentorship` table has no UNIQUE constraint on `charge_person_id` (a charge can have multiple mentors). The N-per-charge is the default; v1.1 may add caps if a UX reason emerges.
 
-**Downstream impact:** all code that reads/writes `wards` / `wardships` / `ward_person_id` updates to `charges` / `guardianships` / `charge_person_id`. The sweep report is the audit trail.
+**Downstream impact:** all code that reads/writes `ward_person_id` (and the legacy `family_links` rows) updates to `charge_person_id` on the `guardianship` edge. The sweep report is the audit trail.
 
-### Amendment 3: `guardianships.qualification` ENUM (G-4 4b)
+### Amendment 3: `guardianship.qualification` ENUM (G-4 4b)
 
 **File:** `data-model.md` (the spec); physical schema per Drizzle conventions.
 
-**New column:** `guardianships.qualification` ENUM NOT NULL with values:
+**New column:** `guardianship.qualification` ENUM NOT NULL with values:
 
 - `biological_parent`
 - `adoptive_parent`
@@ -77,13 +76,13 @@ The MMT-ADR-0011 baseline is **amended** with the following additions, all pre-b
 
 **v1 surface:** 1 dropdown in the profile-mgmt UX. Defaults to `biological_parent` (typical case); the Subscription administrator picks from the dropdown when granting consent for a charge.
 
-**Downstream impact:** the consent-grant flow (the `consent_receipt` insert + the `guardianships` row insert) captures the qualification at insert time. The G-4 ruling is in the A-vs-B memo §1.6.
+**Downstream impact:** the consent-grant flow (the `consent_receipt` insert + the `guardianship` row insert) captures the qualification at insert time. The G-4 ruling is in the A-vs-B memo §1.6.
 
-### Amendment 4: `charges.has_own_account` BOOLEAN (G-6 6b)
+### Amendment 4: `person.has_own_account` BOOLEAN (G-6 6b)
 
 **File:** `data-model.md` (the spec); physical schema per Drizzle conventions.
 
-**New column:** `charges.has_own_account` BOOLEAN NOT NULL DEFAULT false.
+**New column:** `person.has_own_account` BOOLEAN NOT NULL DEFAULT false.
 
 **Rationale:** G-6 6b — explicit takeover flow branches on this column:
 
@@ -96,7 +95,7 @@ Both cases end with the Guardian edge transitioning to *historical* (read-only a
 
 **Downstream impact:** the G-6 ruling is in the A-vs-B memo §1.6; the in-product flow is a Phase F / v1 implementation; the audit log captures every transition (create, transfer, expire, takeover).
 
-### Amendment 5: `subscriptions.payer_person_id` + `subscription_payers` table (Payer re-architecture, §1.4)
+### Amendment 5: `subscription.payer_person_id` + `subscription_payers` table (Payer re-architecture, §1.4)
 
 **File:** `data-model.md` (the spec); physical schema per Drizzle conventions.
 
@@ -104,8 +103,8 @@ Both cases end with the Guardian edge transitioning to *historical* (read-only a
 
 **New shape:** the Payer is a *sub field* on the subscription, with a primary/secondary role structure:
 
-- `subscriptions.payer_person_id` — FK to persons, NOT NULL, UNIQUE per sub. The *primary* Payer. v1: the Subscription administrator persona (3a) or the Solo adult learner persona (3b) or an Independent teen 18+ (3c). Out of v1 scope: 3d (non-member adult) and 3e (Payer of a different org) — the data model supports them; the v1 UX doesn't surface them.
-- `subscription_payers` join table — `(subscription_id, person_id, role ENUM('primary', 'secondary'))` UNIQUE(subscription_id, person_id). v1: at most 1 secondary per subscription. The secondary's capabilities: read subscription state, view invoices, update payment method. **No cancel, no upgrade, no plan change.** Primary Payer gets a notification (in-app + email) on every secondary payment-method change.
+- `subscription.payer_person_id` — FK to person, NOT NULL, UNIQUE per sub. The *primary* Payer. v1: the Subscription administrator persona (3a) or the Solo adult learner persona (3b) or an Independent teen 18+ (3c). Out of v1 scope: 3d (non-member adult) and 3e (Payer of a different org) — the data model supports them; the v1 UX doesn't surface them.
+- `subscription_payers` join table — `(subscription_id, person_id, role TEXT CHECK (role IN ('primary', 'secondary')))` UNIQUE(subscription_id, person_id). v1: at most 1 secondary per subscription. The secondary's capabilities: read subscription state, view invoices, update payment method. **No cancel, no upgrade, no plan change.** Primary Payer gets a notification (in-app + email) on every secondary payment-method change.
 
 **Capability tier (4b tight):**
 
@@ -138,7 +137,7 @@ Both cases end with the Guardian edge transitioning to *historical* (read-only a
 
 **The split cases (off-ICP for v1, designed-for-later):** a grandparent who is the Payer but not the Guardian; a court-appointed guardian who is the Guardian but not the Payer. The data model supports the splits; the v1 UX doesn't surface them.
 
-**Downstream impact:** the capability matrix in `domain-model.md` updates accordingly. The `subscriptions.profile_mgmt_authority` is implicit in the Subscription administrator's `{admin}` role + Payer field; no new column is needed. The audit log captures who *initiated* a profile change (the Subscription administrator) and who *consented* (the Guardian, if a charge is affected).
+**Downstream impact:** the capability matrix in `domain-model.md` updates accordingly. The `subscription.profile_mgmt_authority` is implicit in the Subscription administrator's `{admin}` role + Payer field; no new column is needed. The audit log captures who *initiated* a profile change (the Subscription administrator) and who *consented* (the Guardian, if a charge is affected).
 
 ### Amendment 7: `policy_rules` table (MMT-ADR-0013 §1 — two-primitive model)
 
@@ -150,8 +149,8 @@ Both cases end with the Guardian edge transitioning to *historical* (read-only a
 CREATE TYPE policy_kind AS ENUM ('prohibition_floor', 'consent_edge');
 
 CREATE TABLE policy_rules (
-  id BIGSERIAL PRIMARY KEY,
-  cell_id BIGINT NOT NULL REFERENCES policy_cells(id),
+  id UUID PRIMARY KEY,
+  cell_id UUID NOT NULL REFERENCES policy_cells(id),
   kind policy_kind NOT NULL,
   rule_text TEXT NOT NULL,
   citation_url TEXT,
@@ -178,7 +177,7 @@ CREATE INDEX idx_policy_rules_cell_kind ON policy_rules (cell_id, kind);
 ```sql
 -- Regime = DATA (rows), not a Postgres ENUM type. Add/retire a regime = INSERT/UPDATE, not a migration.
 CREATE TABLE regimes (
-  id          BIGSERIAL PRIMARY KEY,
+  id          UUID PRIMARY KEY,
   code        TEXT NOT NULL UNIQUE,   -- e.g. 'US_COPPA', 'EU_GDPR_16', 'UK_AADC', 'ROW'
   description TEXT,                    -- the live threshold / characteristic; DB-mastered, not frozen in canon
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -195,11 +194,11 @@ CREATE TYPE residence_method AS ENUM (
 );
 
 CREATE TABLE policy_cells (
-  id BIGSERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY,
   age_band_min SMALLINT NOT NULL,  -- 0 for "any sub-13", 13 for "13–15", etc.
   age_band_max SMALLINT NOT NULL,
-  regime_id BIGINT NOT NULL REFERENCES regimes(id),  -- FK to the lookup table, not an ENUM column
-  knowledge_axis ENUM('age', 'residence') NOT NULL,
+  regime_id UUID NOT NULL REFERENCES regimes(id),  -- FK to the lookup table, not an ENUM column
+  knowledge_axis TEXT NOT NULL CHECK (knowledge_axis IN ('age', 'residence')),
   knowledge_value JSONB NOT NULL,  -- {method, confidence}
   UNIQUE (age_band_min, age_band_max, regime_id, knowledge_axis, knowledge_value)
 );
@@ -217,14 +216,14 @@ CREATE TABLE policy_cells (
 
 ```sql
 CREATE TABLE knowledge_assertions (
-  id BIGSERIAL PRIMARY KEY,
-  person_id BIGINT NOT NULL REFERENCES persons(id),
-  axis ENUM('age', 'residence') NOT NULL,
+  id UUID PRIMARY KEY,
+  person_id UUID NOT NULL REFERENCES person(id),
+  axis TEXT NOT NULL CHECK (axis IN ('age', 'residence')),
   method TEXT NOT NULL,  -- ENUM name (e.g., 'self_report', 'geo_ip')
   confidence DECIMAL(3, 2) NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   source TEXT NOT NULL,  -- e.g., 'profile_form', 'session_start_check', 'signup'
   asserted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  actor_id BIGINT REFERENCES persons(id),  -- who triggered the assertion
+  actor_id UUID REFERENCES person(id),  -- who triggered the assertion
   revoked_at TIMESTAMPTZ  -- non-null = superseded by a later assertion
 );
 
@@ -234,7 +233,7 @@ CREATE INDEX idx_knowledge_assertions_person_axis ON knowledge_assertions (perso
 **Profile additions (current state, cached for runtime reads):**
 
 ```sql
-ALTER TABLE persons
+ALTER TABLE person
   ADD COLUMN age_knowing JSONB,        -- {method, confidence, last_updated}
   ADD COLUMN residence_knowing JSONB;  -- {method, confidence, last_updated}
 ```
@@ -253,7 +252,7 @@ ALTER TABLE persons
 CREATE TYPE model_tier AS ENUM ('primary', 'secondary', 'tertiary');
 
 CREATE TABLE allowed_models (
-  id BIGSERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY,
   model TEXT NOT NULL,
   provider_via_service TEXT NOT NULL,  -- e.g., 'anthropic-via-azure'
   service TEXT NOT NULL,                -- e.g., 'azure-openai'
@@ -277,14 +276,14 @@ CREATE INDEX idx_allowed_models_runtime_key ON allowed_models (model, service, r
 | # | Amendment | Affected table(s) | Pre-baseline | Cost |
 |---|---|---|---|---|
 | 1 | `AgeBracket` gains 'child' value | `packages/schemas/src/age.ts` | ✅ | Low (enum addition) |
-| 2 | `wards` → `charges` rename + G-3 3a UNIQUE | `charges`, `guardianships` | ✅ | Low (rename + constraint) |
-| 3 | `guardianships.qualification` ENUM | `guardianships` | ✅ | Low (column addition) |
-| 4 | `charges.has_own_account` BOOLEAN | `charges` | ✅ | Low (column addition) |
+| 2 | `ward`→`charge` terminology + G-3 3a (service-enforced) | `guardianship` | ✅ | Low (rename + service rule) |
+| 3 | `guardianship.qualification` ENUM | `guardianship` | ✅ | Low (column addition) |
+| 4 | `person.has_own_account` BOOLEAN | `person` | ✅ | Low (column addition) |
 | 5 | Payer sub field + `subscription_payers` | `subscriptions`, `subscription_payers` | ✅ | Medium (new table + ENUM) |
 | 6 | Sub admin = profile mgmt (capability matrix) | (no schema change; UX only) | ✅ | Low (capability matrix) |
 | 7 | `policy_rules` table | `policy_rules` (new) | ✅ | Medium (new table + ENUM) |
 | 8 | `policy_cells` table + regime/method enums | `policy_cells` (new) + 3 enums | ✅ | Medium (new table + 3 enums) |
-| 9 | `knowledge_assertions` table + profile jsonb columns | `knowledge_assertions` (new) + `persons` jsonb additions | ✅ | Medium (new table + 2 jsonb columns) |
+| 9 | `knowledge_assertions` table + profile jsonb columns | `knowledge_assertions` (new) + `person` jsonb additions | ✅ | Medium (new table + 2 jsonb columns) |
 | 10 | `allowed_models` table | `allowed_models` (new) | ✅ | Medium (new table + ENUM) |
 
 **Net:** 6 schema amendments + 4 new tables + 1 capability matrix update. All pre-baseline. All low-to-medium cost. **None require data migration** (the pre-baseline baseline is create-from-empty; the amendments are additive to the migration).
@@ -293,8 +292,8 @@ CREATE INDEX idx_allowed_models_runtime_key ON allowed_models (model, service, r
 
 The migrations land in the pre-baseline window per the dependency chain:
 
-1. **Enum additions first** (no dependencies): `policy_kind`, `regime`, `age_method`, `residence_method`, `model_tier`. (4 of the 5 enums; the 5th, `knowledge_axis`, is in step 3.)
-2. **Schema renames + column additions to existing tables** (depend on the pre-baseline tables from MMT-ADR-0011): Amendments 1, 2, 3, 4, 5, 9 (the jsonb columns on `persons`).
+1. **Enum + lookup-table additions first** (no dependencies): the `policy_kind`, `age_method`, `residence_method`, `model_tier` enums and the `regimes` lookup table. (`knowledge_axis` / `axis` are `TEXT` + `CHECK`, not enums.)
+2. **Schema renames + column additions to existing tables** (depend on the pre-baseline tables from MMT-ADR-0011): Amendments 1, 2, 3, 4, 5, 9 (the jsonb columns on `person`).
 3. **New tables** (depend on the enums + the existing tables): Amendments 7, 8, 9 (the `knowledge_assertions` table), 10.
 4. **Capability matrix update** (UX, not schema): Amendment 6.
 
@@ -314,8 +313,8 @@ The pre-baseline migration lands as a single atomic migration per the MMT-ADR-00
 
 - **MMT-ADR-0011 (Phase-E data-model realization):** **AMEND.** The 8-table baseline is preserved; the 10 amendments are added.
 - **MMT-ADR-0012 (one-time baseline reset):** **AMEND** (pre-baseline window is the cheap moment). The reset posture is unchanged.
-- **MMT-ADR-0007 (Guardianship as edge):** **CONFIRM.** The edge shape is ratified; the data-model primitive is a `guardianships` table per MMT-ADR-0008 + this ADR's Amendment 2.
-- **MMT-ADR-0008 (Guardianship global edge):** **AMEND.** The edge is global and 1:1 per charge (G-3 3a); the operational capabilities are derived at query time per MMT-ADR-0008 + this ADR's Amendment 6 (profile mgmt moves from the edge to the Subscription administrator).
+- **MMT-ADR-0007 (Guardianship as edge):** **CONFIRM.** The edge shape is ratified; the data-model primitive is a `guardianship` table per MMT-ADR-0008 + this ADR's Amendment 2.
+- **MMT-ADR-0008 (Guardianship global edge):** **AMEND.** The edge is global and stays structurally N:M; v1 enforces one active Guardian per charge (G-3 3a) in service code, not a DB constraint; the operational capabilities are derived at query time per MMT-ADR-0008 + this ADR's Amendment 6 (profile mgmt moves from the edge to the Subscription administrator).
 - **MMT-ADR-0002 (Payer capacity is store-delegated):** **CONFIRM.** The store is the merchant of record; the Payer field is a sub field per this ADR's Amendment 5. The store-IAP identity (PRD Part IX open item) is unchanged.
 - **MMT-ADR-0013 (policy-engine spine):** **CONFIRM.** The policy engine's data-model primitives (`policy_rules`, `policy_cells`, `knowledge_assertions`, `allowed_models`) are Amendments 7, 8, 9, 10 of this ADR.
 - **MMT-ADR-0014 (router runtime / vetting split):** **CONFIRM.** The `allowed_models` table is Amendment 10 of this ADR; the hard-split shape is per MMT-ADR-0014.
@@ -324,8 +323,8 @@ The pre-baseline migration lands as a single atomic migration per the MMT-ADR-00
 
 1. **Defer all amendments to v1.1.** Rejected — the pre-baseline window is the cheap moment. Post-baseline is append-only; the same amendments would require more migration work later.
 2. **Defer Payer architecture to a separate ADR.** Rejected — the Payer re-architecture is *part of* the A-vs-B decisions; bundling keeps the canonical-doc surface small.
-3. **Use a single `person` table for charges + non-charges (no separate `charges` table).** Rejected — charges have specific properties (Guardian edge, `has_own_account`, G-6 takeover branching) that don't apply to non-charges. The separate table is the cleanest model.
-4. **Make `charges.has_own_account` a view, not a column.** Rejected — the column is the canonical state; the G-6 flow reads + writes it. A view is a derived artifact; the source of truth is the column.
+3. **A separate `charges` entity table (distinct from `person`).** Rejected — "charge" is a *role* a person plays on the `guardianship` edge, not a distinct entity. A person can be a charge in one relationship and not in another, and `has_own_account` / the G-6 takeover branch are properties of the **person**, not of a charge-specific table. Modeling charge as the `charge_person_id` role keeps the graph at the eight ratified entity tables (MMT-ADR-0011).
+4. **Make `person.has_own_account` a view, not a column.** Rejected — the column is the canonical state; the G-6 flow reads + writes it. A view is a derived artifact; the source of truth is the column.
 5. **Use a JSONB `qualification` field instead of an ENUM.** Rejected — the ENUM is the type-safety boundary; the JSONB would lose it. Future jurisdictions / qualifications can be added as ENUM values without a schema migration.
 6. **Skip the `knowledge_assertions` table and use only the profile's `age_knowing` / `residence_knowing` jsonb.** Rejected — the audit trail is the *legal* artifact for COPPA actual-knowledge + GDPR Art 8 reasonable-efforts verification. B1 (profile-only) loses the history.
 7. **Bundle all 10 amendments into one big migration.** Rejected — the migration order respects dependencies (enums first, then renames, then new tables), but a single atomic migration per the MMT-ADR-0012 reset posture is the right shape. **One migration, 10 amendments, dependency-ordered.**

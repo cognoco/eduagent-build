@@ -582,7 +582,7 @@ The three capabilities are split and never fused. Profile-management authority b
 - **Guardian = consent only.** A global edge (`guardianship`) carrying the consent record and consent authority; operational powers do **not** live on it. Never auto-conferred; `guardian <> charge` (no self-guardian); a `qualification` ENUM names the relationship (`MMT-ADR-0008`; `data-model.md` §4.6, §2A.4).
 - **Mentor = data access only.** An opt-in edge (`mentorship`), **never auto-conferred** (`data-model.md` §4.7).
 - **Payer = a subscription sub-field, not a persona.** 1 primary (`payer_person_id`, NOT NULL) + ≤1 secondary (`subscription_payers`). The secondary may read state, view invoices, and **update the payment method only** — no cancel/upgrade/plan-change; the primary is notified on every change (`MMT-ADR-0002`; `MMT-ADR-0015` §5; `data-model.md` §2A.4).
-- **Charge terminology.** The human a Guardian acts for is a **charge** (the term "ward" is retired). The consent key is `(charge × purpose × organization)`. Exactly one Guardian per charge; the birthday-crossing takeover branches on `person.has_own_account` (`MMT-ADR-0015`; `data-model.md` §2A.4).
+- **Charge terminology.** The human a Guardian acts for is a **charge** (the term "ward" is retired). The consent key is `(charge × purpose × organization)`. v1 enforces one active Guardian per charge in service code (the `guardianship` edge stays structurally N:M for a future co-parent / shared-custody model); the birthday-crossing takeover branches on `person.has_own_account` (`MMT-ADR-0015`; `data-model.md` §2A.4).
 
 ### Consent & the age model
 
