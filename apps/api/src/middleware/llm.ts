@@ -3,12 +3,17 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
-import { registerProvider, _clearProviders } from '../services/llm';
+import {
+  registerProvider,
+  _clearProviders,
+  setLlmRoutingV2Enabled,
+} from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
 import { createAnthropicProvider } from '../services/llm/providers/anthropic';
 import { createCerebrasProvider } from '../services/llm/providers/cerebras';
 import { createMistralProvider } from '../services/llm/providers/mistral';
+import { isLlmRoutingV2Enabled } from '../config';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
@@ -20,6 +25,7 @@ type LLMEnv = {
     ANTHROPIC_API_KEY?: string;
     CEREBRAS_API_KEY?: string;
     MISTRAL_API_KEY?: string;
+    LLM_ROUTING_V2_ENABLED?: string;
     ENVIRONMENT?: string;
   };
 };
@@ -58,6 +64,13 @@ function envHash(env: {
 }
 
 export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
+  // Inject the V2 routing cutover flag into the pure router module every
+  // request. Idempotent and decoupled from the API-key env-hash below (the
+  // flag is not a provider key, so a flag flip must take effect even when the
+  // key set is unchanged). Default-off until LLM_ROUTING_V2_ENABLED=true in
+  // Doppler (MMT-ADR-0016 §1.5 cutover).
+  setLlmRoutingV2Enabled(isLlmRoutingV2Enabled(c.env?.LLM_ROUTING_V2_ENABLED));
+
   const currentHash = envHash({
     GEMINI_API_KEY: c.env?.GEMINI_API_KEY,
     OPENAI_API_KEY: c.env?.OPENAI_API_KEY,
@@ -146,4 +159,6 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
 export function resetLlmMiddleware(): void {
   _registeredEnvHash = null;
   _clearProviders();
+  // Reset the V2 flag so a test that flipped it on cannot leak into the next.
+  setLlmRoutingV2Enabled(false);
 }
