@@ -261,3 +261,25 @@ export function getStepRetentionPurgeEnabled(): boolean {
     'true'
   );
 }
+
+// ---------------------------------------------------------------------------
+// [R1] Module-level CLERK_SECRET_KEY — set by Inngest middleware on CF Workers,
+// falls back to process.env for Node.js test environments. Used by the
+// scheduled-deletion job to erase the Clerk login identity (GDPR Art 17).
+// ---------------------------------------------------------------------------
+
+let _clerkSecretKey: string | undefined;
+
+/** Called by Inngest middleware to inject the CLERK_SECRET_KEY binding. */
+export function setClerkSecretKey(key: string): void {
+  _clerkSecretKey = key;
+}
+
+/** Reset the injected key — for test cleanup only. */
+export function resetClerkSecretKey(): void {
+  _clerkSecretKey = undefined;
+}
+
+export function getStepClerkSecretKey(): string | undefined {
+  return _clerkSecretKey ?? process.env['CLERK_SECRET_KEY'];
+}

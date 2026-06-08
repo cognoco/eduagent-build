@@ -3,7 +3,7 @@
 **Date:** 2026-06-07
 **Trigger:** Compliance question — "the mentor remembers what the student has learned, and chat transcripts are kept for 30 days. Is the surviving learning memory a GDPR problem?"
 **Method:** Source-of-truth code audit (DB schema FK behaviour + deletion flows + purge cron), not policy-doc reading. All claims carry `file:line`.
-**Status:** Findings recorded. Three are documentation items (folded into `docs/meetings/minors-compliance-requirements.md` → A24). Three are open engineering/verification items (R1, R2, R3 below).
+**Status:** Findings recorded. Documentation items folded into `docs/meetings/minors-compliance-requirements.md` → A24. Of the engineering/verification items: **R1 (Clerk erasure), R2 (purge flag), and A24-a (privacy-policy rewrite) are RESOLVED 2026-06-08** (commits `9137c7961` + docs). **R3 (orphaned org row / BYOK email) and A24-b (verbatim age-out) remain open.**
 **Feeds:** the DPIA (`E5` launch gate — the GDPR Art 35 risk assessment that must exist before first child use) and the ROPA (A3).
 
 ---
@@ -11,10 +11,10 @@
 ## TL;DR for the non-coder
 
 1. **The scary version is not true.** Deleting your account *does* wipe the learning memory — assessments, notes, mastery state, extracted facts, everything. It is a clean database-level cascade, not a half-job. (Section 1.)
-2. **But three things survive account deletion** that shouldn't, or need a documented reason to: your **login identity at Clerk** (the auth provider — never deleted in-app), an orphaned **organisation row**, and any **BYOK waitlist email**. The Clerk one is a real erasure gap. (Section 2.)
+2. **The Clerk login-identity erasure gap is now FIXED** (2026-06-08, commit `9137c7961`): account deletion now erases the external Clerk login (email/credentials) after the DB cascade. Two lesser survivors remain to handle: an orphaned **organisation row** and any **BYOK waitlist email** (R3). (Section 2.)
 3. **The subtle version IS true.** "We delete chat transcripts after 30 days" only deletes the *raw turn-by-turn log*. Word-for-word fragments of what the learner typed survive **indefinitely** in notes, session summaries, extracted facts, and challenge-round evidence. So "we delete your chats" is, as written, **misleading**. (Section 3.)
 4. **The 30-day deletion IS running in production** (verified 2026-06-08). It is behind an environment flag (`RETENTION_PURGE_ENABLED`) that defaults OFF and is in no committed config — so it *looked* at-risk — but the flag is confirmed set to `true` in prod Doppler, so transcripts do purge at 30 days. Still add the flag to committed config docs so its required-in-prod status is visible and can't silently regress. (Section 4.)
-5. **The published privacy policy is stale and internally inconsistent** with the code (says 30-day account-deletion grace; code does 7 days; says ages 11–15; never mentions the transcript purge). (Section 5.)
+5. **The published privacy policy has been rewritten** (2026-06-08) to match the code: account-deletion grace corrected 30→7 days, "ages 11–15" removed (now age-neutral, min-age 13), and it now discloses the 30-day transcript purge, the persistent learning memory, the purpose-fence, and international transfers. A pre-publish TODO still flags the DPO name, registered address, and EU/UK representative. (Section 5.)
 
 The architecture (throw away the bulky raw log, keep a lean derived summary) is the *correct* privacy-by-design move. The exposure is in the edges and the notice, not the design.
 
@@ -45,12 +45,12 @@ and every learner-data table carries `profile_id → profiles.id ON DELETE CASCA
 
 | Survivor | Where | Why it survives | Severity |
 |---|---|---|---|
-| **Clerk login identity** | auth provider (external) | There is **no `clerk.users.deleteUser()` call anywhere in the codebase**. The DB row referencing `clerk_user_id` is deleted, but the Clerk-side user (email, auth credentials) is not. | **HIGH** — a real Art 17 (right to erasure) gap. Personal data (email) persists at a processor after the user asked to be deleted. |
+| **Clerk login identity** | auth provider (external) | ~~No `clerk.users.deleteUser()` call anywhere in the codebase.~~ **FIXED 2026-06-08 (commit `9137c7961`):** `deleteClerkUser()` (`services/clerk-user.ts`) now issues `DELETE /v1/users/{id}`; the scheduled-deletion Inngest job calls it after the DB cascade confirms `'deleted'`. | ~~**HIGH** — real Art 17 gap~~ → **resolved**. |
 | **`organizations` row** + `organization_invitations` | `packages/database/src/schema/profiles.ts:145-163` | `organizations` reuses `accounts.id` as its PK *by convention* but has **no FK** to `accounts`, so no cascade. Identity `T1` artifact (stage-1 identity migration). | MEDIUM — only PII if org name / invitation email embeds personal data. Confirm whether populated in production. |
 | **`byok_waitlist` email** | `packages/database/src/schema/billing.ts:255-263` | Email-only table, no profile/account FK. | MEDIUM — bare email survives erasure. Needs an explicit erase-on-request path. |
 | **Inngest event history** | external processor | Event payloads (`accountId`, `profileIds`) live on Inngest per their retention. | LOW/MEDIUM — covered by the Inngest DPA + their retention; note in ROPA. |
 
-→ **R1 (open):** Wire a Clerk user-delete into `executeDeletion` (and the consent-withdrawal `deleteProfile` path where the deleted profile owns the Clerk identity). Add a **break test** (security-fix rule): attempt deletion, assert the Clerk user is gone.
+→ **R1 (RESOLVED 2026-06-08, commit `9137c7961`):** Clerk user-delete wired into the scheduled-deletion Inngest job (capture `clerk_user_id` before the cascade → erase after a confirmed `'deleted'`). Break test verified red→green at the service layer (`clerk-user.test.ts`: DELETE issued, 404 idempotent, throws-not-skips on error/missing-secret) and the orchestration layer (`account-deletion.test.ts`: erases with captured id on `'deleted'`, never on `'cancelled'`/`'already_deleted'`/null-credential). The consent-withdrawal path needed no change — it deletes only child profiles (managed persons, `clerk_user_id = null`, no login to erase).
 → **R3 (open):** Decide erase/anonymise behaviour for the orphaned `organizations` row and `byok_waitlist` email; fold both into the deletion job or a periodic sweep.
 
 ---
@@ -85,20 +85,22 @@ Everything *derived* from the conversation is untouched by the 30-day clock and 
 
 ## 4. The 30-day purge — running in production (R2 RESOLVED 2026-06-08)
 
-The cron short-circuits unless `RETENTION_PURGE_ENABLED === 'true'` (`apps/api/src/inngest/helpers.ts:258-262`, gate read in `transcript-purge-cron.ts:29`). This flag is **absent from `.env.example`, `wrangler.toml`, and the dev local env** — so it **defaults to disabled**, which made the "30 days" claim *look* unproven. The functions are correctly registered for production (`apps/api/src/inngest/index.ts:251-253`, not dead code).
+The cron short-circuits unless `RETENTION_PURGE_ENABLED === 'true'` (`apps/api/src/inngest/helpers.ts:258-262`, gate read in `transcript-purge-cron.ts:29`). The flag was **absent from `.env.example`** and so **defaults to disabled**, which made the "30 days" claim *look* unproven. The functions are correctly registered for production (`apps/api/src/inngest/index.ts:251-253`, not dead code).
 
-→ **R2 (RESOLVED 2026-06-08):** `RETENTION_PURGE_ENABLED=true` is **confirmed set in the production Doppler config** (user-verified). The purge therefore runs daily in prod and the "transcripts kept 30 days" claim is backed by a live deletion job. **Residual hardening (low priority):** the flag is silent config — add it to committed config docs / `.env.example` with a "required `true` in prod" note so it can't regress unnoticed, and (nice-to-have) glance at the Inngest run history for `transcript-purge-cron` to confirm purge events have actually fired (expected to be few/none pre-launch with no real session volume).
+→ **R2 (RESOLVED 2026-06-08):** `RETENTION_PURGE_ENABLED=true` is **confirmed set in the production Doppler config** (user-verified). The purge therefore runs daily in prod and the "transcripts kept 30 days" claim is backed by a live deletion job. **Residual hardening — also DONE 2026-06-08:** the flag is now documented in `.env.example` (new "DATA RETENTION" section) with an explicit "required `true` in prod / do not regress" note, so its required-in-prod status is visible in committed config. Nice-to-have remaining: glance at the Inngest run history for `transcript-purge-cron` to confirm purge events have fired (expected few/none pre-launch with no real session volume).
 
 ---
 
-## 5. Privacy-notice mismatches (input to the A5 privacy-policy rewrite)
+## 5. Privacy-notice mismatches (RESOLVED 2026-06-08 — A5 privacy-policy rewrite done)
 
-`docs/privacy-policy.html` (dated March 2026) is stale against the code:
+> **Resolved 2026-06-08.** `docs/privacy-policy.html` rewritten (now dated June 2026). Every mismatch below is fixed; the remaining unknowns (DPO name, registered address, EU/UK Art 27 representative, final age-floor confirmation) are flagged in an HTML `PRE-PUBLISH TODO` comment in the file so the doc cannot ship to production with them unresolved. The list below is retained as the record of what was wrong.
 
-- **§7 says account-deletion grace is "30-day"; the code sleeps 7 days** (`account-deletion.ts`). Notice over-promises a longer cancellation window than exists. (§4's "7-day" consent-withdrawal grace *does* match the code.)
-- Says "children aged **11–15**" — the age floor is now 13+ (per the 2026-06-04 minutes); 11–15 is wrong on both ends.
-- **Never mentions the 30-day transcript purge tier** at all.
-- Names no DPO (A2), no UK representative (A6).
+The old `docs/privacy-policy.html` (dated March 2026) was stale against the code:
+
+- **§7 said account-deletion grace is "30-day"; the code sleeps 7 days** (`account-deletion.ts`). Notice over-promised a longer cancellation window than exists. (§4's "7-day" consent-withdrawal grace *did* match the code.) → **fixed**: now states 7 days.
+- Said "children aged **11–15**" — wrong on both ends. → **fixed**: removed; now age-neutral with a min-age-13 statement and jurisdictional consent bands.
+- **Never mentioned the 30-day transcript purge tier**, the persistent learning memory, or the purpose-fence. → **fixed**: new §8 (Data Retention) covers all three; new §7 covers international transfers.
+- Named no DPO (A2), no UK representative (A6). → **partially fixed**: a DPO contact email + named controller are present; the DPO *name* and the EU/UK representative remain in the pre-publish TODO (A2/A6 still owed before launch).
 
 The authoritative retention design lives in `docs/_archive/specs/Done/2026-05-05-tiered-conversation-retention.md` (archived, marked Done) — but it deliberately does **not** cover the persistent `learning_profiles` / `memory_facts` / `topic_notes` layer, which is exactly the layer with no documented retention rule today. That gap is the substance of A24.
 
@@ -108,10 +110,10 @@ The authoritative retention design lives in `docs/_archive/specs/Done/2026-05-05
 
 | ID | Item | Owner | Severity | Blocks launch? |
 |---|---|---|---|---|
-| **R1** | Wire Clerk user-delete into `executeDeletion` + consent-withdrawal path; add break test | eng | HIGH | Yes (Art 17 erasure completeness) |
-| ~~**R2**~~ | ~~Verify `RETENTION_PURGE_ENABLED=true` in production~~ — **RESOLVED 2026-06-08** (confirmed set in prod Doppler; purge runs). Residual: commit the flag to config docs so it can't regress | eng/ops | ~~HIGH~~ → LOW | No (resolved) |
+| ~~**R1**~~ | ~~Wire Clerk user-delete into `executeDeletion` + consent-withdrawal path; add break test~~ — **RESOLVED 2026-06-08** (commit `9137c7961`). `deleteClerkUser()` added to `services/clerk-user.ts`; the scheduled-deletion Inngest job captures `clerk_user_id` before the DB cascade and erases the Clerk identity after a confirmed `'deleted'`. Red→green break test verified at both the service and orchestration layers. Consent-withdrawal path needs no change — it only deletes child profiles (managed persons, `clerk_user_id = null`, no login). | eng | ~~HIGH~~ → done | No (resolved) |
+| ~~**R2**~~ | ~~Verify `RETENTION_PURGE_ENABLED=true` in production~~ — **RESOLVED 2026-06-08** (confirmed set in prod Doppler; purge runs). Residual (commit the flag to config docs so it can't regress) **also DONE 2026-06-08** — added to `.env.example` with a "required true in prod" note. | eng/ops | ~~HIGH~~ → done | No (resolved) |
 | **R3** | Erase/anonymise orphaned `organizations` row + `byok_waitlist` email on account deletion | eng | MEDIUM | DPIA-tracked |
-| **A24-a** | Make the privacy notice accurate about retained quotes (and fix §7 7-vs-30-day, age range, transcript-purge mention) | DPO + eng | — | Part of A5 |
+| ~~**A24-a**~~ | ~~Make the privacy notice accurate about retained quotes (and fix §7 7-vs-30-day, age range, transcript-purge mention)~~ — **RESOLVED 2026-06-08**: `docs/privacy-policy.html` rewritten (June 2026). Adds learning-memory retention + purpose-fence + transcript-purge disclosure, fixes §8 grace 30→7 days, removes "ages 11–15" (now age-neutral, min-age 13), adds international-transfers section, names controller + DPO contact. Pre-publish TODO comment flags the DPO name, registered address, EU/UK Art 27 rep, and final age-floor confirmation. | DPO + eng | — | Part of A5 |
 | **A24-b** | Age-out / abstract verbatim fields on the 30-day clock (fast-follow) | eng | — | No (post-launch tightening) |
 | — | Add learning-memory retention period + proportionality + purpose-fence to the DPIA | DPO | — | Yes (A1 content) |
 

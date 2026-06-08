@@ -194,3 +194,101 @@ export async function resolveVerifiedClerkEmail({
   writeCachedVerifiedEmail(userId, verifiedEmail);
   return { ok: true, email: verifiedEmail, source: 'clerk-api' };
 }
+
+// ---------------------------------------------------------------------------
+// [R1] Right-to-erasure: delete the Clerk-side login identity.
+//
+// Account deletion (executeDeletion) removes every in-app row via FK cascade,
+// but the user's Clerk record (email, credentials, OAuth links) lives outside
+// our database. Without this call the login identity survived account deletion
+// — a GDPR Art 17 erasure gap. The scheduled-deletion Inngest function invokes
+// this AFTER the DB delete is confirmed, so we only ever erase the credential
+// of an account that was actually deleted (never a cancelled one).
+// ---------------------------------------------------------------------------
+
+export type DeleteClerkUserResult =
+  | { deleted: true }
+  | { deleted: false; reason: 'already-absent' };
+
+/**
+ * Deletes a Clerk user via the Backend API (`DELETE /v1/users/{id}`).
+ *
+ * - 2xx → `{ deleted: true }`.
+ * - 404 → `{ deleted: false, reason: 'already-absent' }` — idempotent no-op so
+ *   an Inngest retry after a partial success does not fail the function.
+ * - Any other non-2xx, a network error, or a missing secret key → THROWS, so
+ *   the calling Inngest step retries and ultimately surfaces in Sentry. We must
+ *   never silently skip identity erasure (a "successful" account deletion that
+ *   leaves the login alive is exactly the bug this closes).
+ */
+export async function deleteClerkUser({
+  userId,
+  clerkSecretKey,
+  fetchImpl = fetch,
+}: {
+  userId: string;
+  clerkSecretKey?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<DeleteClerkUserResult> {
+  if (!clerkSecretKey) {
+    const err = new Error(
+      '[clerk-user] CLERK_SECRET_KEY unavailable — cannot erase Clerk identity',
+    );
+    captureException(err, {
+      userId,
+      tags: { surface: 'clerk_delete', reason: 'missing_secret' },
+    });
+    throw err;
+  }
+
+  let res: Response;
+  try {
+    res = await fetchImpl(
+      `${CLERK_API_BASE}/users/${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${clerkSecretKey}` },
+      },
+    );
+  } catch (err) {
+    logger.warn('[clerk-user] delete failed (network)', {
+      event: 'clerk_user.delete.network_error',
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      userId,
+      tags: { surface: 'clerk_delete', reason: 'network_error' },
+    });
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+
+  if (res.status === 404) {
+    // Already gone — treat as an idempotent success so a retry after a partial
+    // run completes cleanly. The identity is erased, which is the goal.
+    invalidateVerifiedClerkEmailCache(userId);
+    logger.info('[clerk-user] delete: user already absent', {
+      event: 'clerk_user.delete.already_absent',
+      userId,
+    });
+    return { deleted: false, reason: 'already-absent' };
+  }
+
+  if (!res.ok) {
+    const err = new Error(
+      `[clerk-user] delete failed with status ${res.status}`,
+    );
+    captureException(err, {
+      userId,
+      tags: { surface: 'clerk_delete', reason: `http_${res.status}` },
+    });
+    throw err;
+  }
+
+  invalidateVerifiedClerkEmailCache(userId);
+  logger.info('[clerk-user] identity erased', {
+    event: 'clerk_user.delete.ok',
+    userId,
+  });
+  return { deleted: true };
+}

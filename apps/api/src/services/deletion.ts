@@ -202,6 +202,24 @@ export async function getProfileIdsForAccount(
 }
 
 /**
+ * [R1] Reads the Clerk login id for an account so the scheduled-deletion job
+ * can erase the external identity AFTER the DB cascade. Captured in its own
+ * Inngest step (before executeDeletion removes the row) so the id survives the
+ * delete and a retry of the Clerk-erasure step re-uses the memoized value.
+ * Returns null if the account is gone or somehow has no credential.
+ */
+export async function getAccountClerkUserId(
+  db: Database,
+  accountId: string,
+): Promise<string | null> {
+  const row = await db.query.accounts.findFirst({
+    where: eq(accounts.id, accountId),
+    columns: { clerkUserId: true },
+  });
+  return row?.clerkUserId ?? null;
+}
+
+/**
  * Result of an executeDeletion call.
  * - 'deleted': account row was deleted (happy path).
  * - 'cancelled': the cancellation flag is set and later than the schedule,

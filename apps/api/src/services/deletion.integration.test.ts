@@ -186,7 +186,13 @@ describeIfDb(
       );
       expect((before.rows as Array<{ c: number }>)[0]!.c).toBeGreaterThan(0);
 
-      await executeDeletion(db, accountId);
+      // executeDeletion only deletes when an active (non-cancelled) deletion is
+      // scheduled — the [Bug #494] atomic guard requires deletionScheduledAt IS
+      // NOT NULL. Production schedules via the account route before the Inngest
+      // job runs executeDeletion; mirror that here so the cascade actually fires.
+      await scheduleDeletion(db, accountId);
+      const deletionResult = await executeDeletion(db, accountId);
+      expect(deletionResult).toBe('deleted');
 
       const summaries = await db.execute(
         sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`,

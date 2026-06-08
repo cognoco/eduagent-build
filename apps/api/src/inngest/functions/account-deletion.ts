@@ -1,10 +1,12 @@
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, getStepClerkSecretKey } from '../helpers';
 import {
   accountExists,
   isDeletionCancelled,
   executeDeletion,
+  getAccountClerkUserId,
 } from '../../services/deletion';
+import { deleteClerkUser } from '../../services/clerk-user';
 
 export const scheduledDeletion = inngest.createFunction(
   {
@@ -42,6 +44,15 @@ export const scheduledDeletion = inngest.createFunction(
       return { status: 'already_deleted', accountId };
     }
 
+    // [R1] Capture the Clerk login id BEFORE executeDeletion removes the row,
+    // so we can erase the external identity afterwards (GDPR Art 17). Held in
+    // its own memoized step so a retry of the Clerk-erasure step below re-uses
+    // the captured value rather than reading a now-deleted row.
+    const clerkUserId = await step.run('capture-clerk-user-id', async () => {
+      const db = getStepDatabase();
+      return getAccountClerkUserId(db, accountId);
+    });
+
     // Check if deletion was cancelled
     const cancelled = await step.run('check-cancellation', async () => {
       const db = getStepDatabase();
@@ -67,6 +78,21 @@ export const scheduledDeletion = inngest.createFunction(
       // Cancellation arrived between the check-cancellation step and the
       // delete step (TOCTOU window now closed by the atomic guard).
       return { status: 'cancelled', accountId };
+    }
+
+    // [R1] The DB cascade is done; now erase the external Clerk login identity
+    // (email, credentials, OAuth links). Only runs when the account was truly
+    // deleted ('deleted'), never on a cancelled run. A throw here (network
+    // error, non-404 HTTP error, missing secret) makes Inngest retry the step
+    // and ultimately page via Sentry — we never silently leave a login alive.
+    // A 404 is idempotent (the user was already gone), so a retry completes.
+    if (deletionResult === 'deleted' && clerkUserId) {
+      await step.run('delete-clerk-user', async () => {
+        return deleteClerkUser({
+          userId: clerkUserId,
+          clerkSecretKey: getStepClerkSecretKey(),
+        });
+      });
     }
 
     return { status: deletionResult, accountId };
