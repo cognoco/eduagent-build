@@ -2,14 +2,18 @@ import { scheduledDeletion } from './account-deletion';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockGetStepDatabase = jest.fn();
+const mockGetStepClerkSecretKey = jest.fn();
 const mockAccountExists = jest.fn();
 const mockIsDeletionCancelled = jest.fn();
 const mockExecuteDeletion = jest.fn();
+const mockGetAccountClerkUserId = jest.fn();
+const mockDeleteClerkUser = jest.fn();
 
 jest.mock(
-  '../helpers' /* gc1-allow: getStepDatabase wraps Inngest step-level DB acquisition; must be intercepted to inject mockDb without a real Neon connection */,
+  '../helpers' /* gc1-allow: getStepDatabase/getStepClerkSecretKey wrap Inngest step-level binding acquisition; must be intercepted to inject test doubles without a real Neon connection or CF env */,
   () => ({
     getStepDatabase: () => mockGetStepDatabase(),
+    getStepClerkSecretKey: () => mockGetStepClerkSecretKey(),
   }),
 );
 
@@ -20,6 +24,15 @@ jest.mock(
     isDeletionCancelled: (...args: unknown[]) =>
       mockIsDeletionCancelled(...args),
     executeDeletion: (...args: unknown[]) => mockExecuteDeletion(...args),
+    getAccountClerkUserId: (...args: unknown[]) =>
+      mockGetAccountClerkUserId(...args),
+  }),
+);
+
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: deleteClerkUser performs a live DELETE against the Clerk Backend API (a true external boundary) — it cannot run in the unit test environment */,
+  () => ({
+    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
   }),
 );
 
@@ -29,8 +42,12 @@ describe('scheduledDeletion', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
     // Default: account still exists at end of grace period (happy path)
     mockAccountExists.mockResolvedValue(true);
+    // Default: account carries a Clerk login id and Clerk delete succeeds.
+    mockGetAccountClerkUserId.mockResolvedValue('clerk_acc-1');
+    mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   });
 
   it('should be defined as an Inngest function with the expected id', () => {
@@ -111,8 +128,10 @@ describe('scheduledDeletion', () => {
     });
 
     // getStepDatabase called once each for check-account-exists,
-    // check-cancellation, delete-account-data ([BUG-844] adds the new step).
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(3);
+    // capture-clerk-user-id ([R1]), check-cancellation, delete-account-data
+    // ([BUG-844] added the existence check). The delete-clerk-user step uses
+    // getStepClerkSecretKey, not getStepDatabase, so it does not add here.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(4);
   });
 
   // [BREAK / BUG-844] If the account was removed during the 7-day sleep
@@ -265,5 +284,102 @@ describe('[Fix Bug #494] TOCTOU cancellation detected by executeDeletion atomic 
       status: 'already_deleted',
       accountId: 'acc-gone',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [R1][BREAK] Right-to-erasure: after the DB cascade deletes the account, the
+// external Clerk login identity (email/credentials/OAuth) must also be erased.
+// Before this fix executeDeletion removed every in-app row but left the Clerk
+// user alive — a GDPR Art 17 erasure gap. Red→green: remove the
+// `delete-clerk-user` step from account-deletion.ts and the first test fails.
+//
+// Clerk is a true external boundary, so deleteClerkUser is mocked (gc1-allow
+// above) — the assertion is on the wiring (was it called, with what), not on
+// the network call itself, which clerk-user.test.ts covers directly.
+// ---------------------------------------------------------------------------
+describe('[R1] Clerk identity erasure on account deletion', () => {
+  const mockDb = { query: {} };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
+    mockAccountExists.mockResolvedValue(true);
+    mockIsDeletionCancelled.mockResolvedValue(false);
+    mockGetAccountClerkUserId.mockResolvedValue('clerk_user_abc');
+    mockDeleteClerkUser.mockResolvedValue({ deleted: true });
+  });
+
+  it('[BREAK] erases the Clerk user with the captured id after a "deleted" result', async () => {
+    mockExecuteDeletion.mockResolvedValue('deleted');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-1' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'deleted', accountId: 'acc-1' });
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk_user_abc',
+      clerkSecretKey: 'sk_test_step',
+    });
+  });
+
+  it('captures the Clerk id BEFORE executeDeletion removes the row', async () => {
+    const callOrder: string[] = [];
+    mockGetAccountClerkUserId.mockImplementation(async () => {
+      callOrder.push('capture');
+      return 'clerk_user_abc';
+    });
+    mockExecuteDeletion.mockImplementation(async () => {
+      callOrder.push('delete-db');
+      return 'deleted';
+    });
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    await handler({ event: { data: { accountId: 'acc-1' } }, step });
+
+    expect(callOrder.indexOf('capture')).toBeLessThan(
+      callOrder.indexOf('delete-db'),
+    );
+  });
+
+  it('does NOT erase the Clerk user when the deletion was cancelled', async () => {
+    mockExecuteDeletion.mockResolvedValue('cancelled');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    await handler({ event: { data: { accountId: 'acc-1' } }, step });
+
+    expect(mockDeleteClerkUser).not.toHaveBeenCalled();
+  });
+
+  it('does NOT erase the Clerk user when the row was already gone', async () => {
+    mockExecuteDeletion.mockResolvedValue('already_deleted');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    await handler({ event: { data: { accountId: 'acc-1' } }, step });
+
+    expect(mockDeleteClerkUser).not.toHaveBeenCalled();
+  });
+
+  it('skips Clerk erasure when the account has no Clerk credential', async () => {
+    mockGetAccountClerkUserId.mockResolvedValue(null);
+    mockExecuteDeletion.mockResolvedValue('deleted');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-1' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'deleted', accountId: 'acc-1' });
+    expect(mockDeleteClerkUser).not.toHaveBeenCalled();
   });
 });

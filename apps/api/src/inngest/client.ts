@@ -8,6 +8,7 @@ import {
   setAppUrl,
   setSupportEmail,
   setRetentionPurgeEnabled,
+  setClerkSecretKey,
   setMemoryFactsDedupConfig,
   beginStepDatabaseScope,
   closeStepDatabases,
@@ -50,6 +51,9 @@ const envBindingMiddleware = new InngestMiddleware({
         }
         if (env && typeof env['RETENTION_PURGE_ENABLED'] === 'string') {
           setRetentionPurgeEnabled(env['RETENTION_PURGE_ENABLED']);
+        }
+        if (env && typeof env['CLERK_SECRET_KEY'] === 'string') {
+          setClerkSecretKey(env['CLERK_SECRET_KEY']);
         }
         if (env) {
           setMemoryFactsDedupConfig({
