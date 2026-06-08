@@ -424,6 +424,16 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 
 ## Decision log
 
+- **2026-06-08** — **Canonical set corrected 17 → 19 (added `MMT-ADR-0001` + `0002`).** The Phase-H plan's
+  citation self-review caught that the Phase-G lock **omitted** two accepted, identity-foundation-scoped ADRs the
+  carve-out leans on: **`MMT-ADR-0001`** (own the identity/tenancy graph; Clerk = auth only — `0007` *builds on* it,
+  not superseded) and **`MMT-ADR-0002`** (Payer capacity store-delegated). Correction of an omission, not a
+  re-decision; `CANONICAL-SET.md` updated with a post-lock correction note. `MMT-ADR-0004` (mobile-IAP rails) stays
+  *out* — billing mechanism, not core identity canon.
+- **2026-06-08** — **Phase H plan drafted** (`docs/plans/2026-06-08-phase-h-architecture-identity-carveout.md`,
+  `status: draft`, design profile). Carve-out section for `docs/architecture.md` (target identity model, outcomes-only,
+  cited to the 19-member set + `data-model.md` §s), supersession markers at the legacy "11-15"/RBAC anchors (full
+  rewrite = Phase I), and the in-document `0016`↔`0000` canon-authorship preamble. Awaiting approval before authoring.
 - **2026-06-08** — **§I.4 incubation rule revised + domain-canon move scheduled front-of-J.** Architect ruling:
   the `MMT-ADR-0000` §I.4 rule that a stream's L1 canon "incubates in `_wip/` until its **clean cut**" is **too
   conservative** for a pre-launch clean-cut migration (model ratified + certain to build). **Revised:** domain canon

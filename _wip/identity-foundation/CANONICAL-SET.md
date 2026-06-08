@@ -62,35 +62,37 @@ relative to the repo root.
 
 ### L2 — Decisions (the *why*: ADRs)
 
-The identity-foundation decision trail. `docs/adr/MMT-ADR-0007…0016` plus the governing
-meta-ADR `0000`.
+The identity-foundation decision trail. `docs/adr/MMT-ADR-0001`, `0002`, `0007…0016`
+plus the governing meta-ADR `0000`.
 
 | # | ADR | Role in the set | Status |
 |---|---|---|---|
-| 5 | `MMT-ADR-0000` — documentation layer model + decisions layer | The **governing meta-ADR**: the 5-layer model, the significance gate, the lockstep rule, §I.4 physical layout. **Incl. its two amendments** — memory↔canon boundary (2026-06-07) and `docs/registers/` L3 sibling (2026-06-08). | Accepted (Phase C) + 2 amendments |
-| 6 | `MMT-ADR-0007` — core identity entity and role model | Entities + roles primitive. | Accepted · Phase D |
-| 7 | `MMT-ADR-0008` — guardianship global edge, derived operation | Guardianship as a global edge, not a row attribute. | Accepted · Phase D |
-| 8 | `MMT-ADR-0009` — durable transition scheduler, unified sweep | Age/consent transitions via a durable scheduler. | Accepted · Phase D |
-| 9 | `MMT-ADR-0010` — family-join consolidation primitive | The family-join primitive. | Accepted · Phase D |
-| 10 | `MMT-ADR-0011` — Phase-E data-model realization | The 2026-06-04 data-model **baseline**. | Accepted · Phase E |
-| 11 | `MMT-ADR-0012` — one-time baseline reset | The pre-launch one-time migration collapse (clean-cut). | Accepted · Phase E |
-| 12 | `MMT-ADR-0013` — policy-engine spine | Two-primitive model, regime taxonomy, knowledge axes, router key. The engine's *shape*. | Accepted · 2026-06-07 |
-| 13 | `MMT-ADR-0014` — router runtime / vetting split | 3-param runtime router ⟂ 4-axis offline vetting; hard split; supersedes prior routing canon; fail-closed → `CircuitOpenError`; separately-routable tutor/judge roles. | Accepted · 2026-06-07 |
-| 14 | `MMT-ADR-0015` — pre-baseline data-model amendments | Payer sub-field, Sub-admin-as-profile-mgmt, charge terminology + G-3/G-4/G-6, `AgeBracket` 'child', knowledge assertions, `allowed_models`. Amends `0011`. | Accepted · 2026-06-07 |
-| 15 | `MMT-ADR-0016` — safety & judge architecture | **Repurposed 2026-06-08** to judgment-based safety (no app-owned denylist) + a vendor-independent, non-reasoning judge. Model picks moved *out* to the register. | Accepted · 2026-06-06, re-scoped 2026-06-08 |
+| 5 | `MMT-ADR-0000` — documentation layer model + decisions layer | The **governing meta-ADR**: the 5-layer model, the significance gate, the lockstep rule, §I.4 physical layout. **Incl. its three amendments** — memory↔canon boundary (2026-06-07), `docs/registers/` L3 sibling (2026-06-08), canon-graduates-at-ratification (2026-06-08). | Accepted (Phase C) + 3 amendments |
+| 6 | `MMT-ADR-0001` — own the identity/tenancy graph; Clerk for auth only | **The tenancy foundation** — we own the identity/tenancy graph; Clerk is authentication only. `0007` *builds on* this (not superseded). | Accepted · 2026-06-01 (Grill #1) |
+| 7 | `MMT-ADR-0002` — Payer capacity is store-delegated | **The Payer-capacity decision** — Payer is store-delegated, not self-adjudicated by age; basis for the §8/D3 `payer_person_id` placement. | Accepted · 2026-06-02 |
+| 8 | `MMT-ADR-0007` — core identity entity and role model | Person ≠ Login; entities + roles primitive (vs capacities). | Accepted · Phase D |
+| 9 | `MMT-ADR-0008` — guardianship global edge, derived operation | Guardianship as a global edge, not a row attribute. | Accepted · Phase D |
+| 10 | `MMT-ADR-0009` — durable transition scheduler, unified sweep | Age/consent transitions via a durable scheduler. | Accepted · Phase D |
+| 11 | `MMT-ADR-0010` — family-join consolidation primitive | The family-join primitive. | Accepted · Phase D |
+| 12 | `MMT-ADR-0011` — Phase-E data-model realization | The 2026-06-04 data-model **baseline**. | Accepted · Phase E |
+| 13 | `MMT-ADR-0012` — one-time baseline reset | The pre-launch one-time migration collapse (clean-cut). | Accepted · Phase E |
+| 14 | `MMT-ADR-0013` — policy-engine spine | Two-primitive model, regime taxonomy, knowledge axes, router key. The engine's *shape*. | Accepted · 2026-06-07 |
+| 15 | `MMT-ADR-0014` — router runtime / vetting split | 3-param runtime router ⟂ 4-axis offline vetting; hard split; supersedes prior routing canon; fail-closed → `CircuitOpenError`; separately-routable tutor/judge roles. | Accepted · 2026-06-07 |
+| 16 | `MMT-ADR-0015` — pre-baseline data-model amendments | Payer sub-field, Sub-admin-as-profile-mgmt, charge terminology + G-3/G-4/G-6, `AgeBracket` 'child', knowledge assertions, `allowed_models`. Amends `0011`. | Accepted · 2026-06-07 |
+| 17 | `MMT-ADR-0016` — safety & judge architecture | **Repurposed 2026-06-08** to judgment-based safety (no app-owned denylist) + a vendor-independent, non-reasoning judge. Model picks moved *out* to the register. | Accepted · 2026-06-06, re-scoped 2026-06-08 |
 
 ### L3 — Operational (registers; supporting specs)
 
 | # | Artifact | Role in the set | Note |
 |---|---|---|---|
-| 16 | `docs/registers/` (README + `llm-models/master.md` + `llm-models/vetting/2026-06-06-launch-set-iteration-1.md`) | The **vetted-model master + immutable provenance trail**, backing `MMT-ADR-0014`. Type-named L3 sibling added to §I.4 by the 2026-06-08 ADR-0000 amendment. | **NOT canon** — canon points *at* it; DB-is-master image. Confirmed *as a member by reference* (the register pattern), not as canon. |
+| 18 | `docs/registers/` (README + `llm-models/master.md` + `llm-models/vetting/2026-06-06-launch-set-iteration-1.md`) | The **vetted-model master + immutable provenance trail**, backing `MMT-ADR-0014`. Type-named L3 sibling added to §I.4 by the 2026-06-08 ADR-0000 amendment. | **NOT canon** — canon points *at* it; DB-is-master image. Confirmed *as a member by reference* (the register pattern), not as canon. |
 | — | `docs/specs/2026-06-06-llm-routing-and-judge-architecture.md`, `docs/specs/2026-06-06-llm-routing-gpt-oss-cerebras-build.md` | The concrete provider/model picks + build spec; **supersede `R-5`'s abstract sketch**. | **Supporting L3, not canon.** Named so H knows they exist; they are not lens members. |
 
 ### Audit-trail (provenance, immutable)
 
 | # | Artifact | Role in the set | Lifecycle |
 |---|---|---|---|
-| 17 | `_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md` | The **A-vs-B decision-capture memo** — the 25 ratified decisions from the 2026-06-06 grilling session, in their strongest defensible form, tagged against prior canon. The **provenance/audit trail** behind ADRs `0013`–`0016`. | **Option III grilling record** — preserved as a tagged commit, **not updated**. Current truth lives in the ADRs; the memo is the audit trail. |
+| 19 | `_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md` | The **A-vs-B decision-capture memo** — the 25 ratified decisions from the 2026-06-06 grilling session, in their strongest defensible form, tagged against prior canon. The **provenance/audit trail** behind ADRs `0013`–`0016`. | **Option III grilling record** — preserved as a tagged commit, **not updated**. Current truth lives in the ADRs; the memo is the audit trail. |
 
 ---
 
@@ -127,7 +129,15 @@ the only outstanding signature — **HW-2**, a tracked contingency, not launch-b
 
 ## Status
 
-**Phase G canonical set: LOCKED 2026-06-08.** Membership is closed at 17 entries
-(15 canon L1/L2 + 1 register-by-reference + 1 audit-trail memo; 2 supporting specs
+**Phase G canonical set: LOCKED 2026-06-08.** Membership is closed at **19 entries**
+(17 canon L1/L2 + 1 register-by-reference + 1 audit-trail memo; 2 supporting specs
 named-but-not-members). This is the lens for Phase L and the citation boundary for
 Phase H. Changes to the set after this point are themselves ADR-class events.
+
+> **Correction (2026-06-08, post-lock).** The initial lock listed 17 entries; it
+> **omitted `MMT-ADR-0001`** (own the identity/tenancy graph — the tenancy foundation
+> `0007` builds on) **and `MMT-ADR-0002`** (Payer capacity store-delegated). Both are
+> `Accepted`, scoped *Identity Foundation*, and load-bearing for the carve-out — the
+> omission was an error caught by the Phase-H plan's citation self-review, not a
+> re-decision. Set corrected to 19. (`MMT-ADR-0004` mobile-IAP rails remain *out* —
+> billing mechanism, not core identity canon, like the routing specs.)
