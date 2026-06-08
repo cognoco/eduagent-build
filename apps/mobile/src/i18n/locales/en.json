@@ -1123,6 +1123,13 @@
       "deleteTitle": "Delete note",
       "deleteMessage": "Are you sure you want to delete this note?"
     },
+    "noteSignal": {
+      "verified": "Verified",
+      "verifiedAccessibilityLabel": "Verified - your words held up",
+      "tutorAddition": "The tutor has more on this topic",
+      "showTutorAdditionAccessibilityLabel": "Show what the tutor added",
+      "hideTutorAdditionAccessibilityLabel": "Hide what the tutor added"
+    },
     "bookmarkCard": {
       "accessibilityLabel": "Open saved bookmark: {{title}}"
     },

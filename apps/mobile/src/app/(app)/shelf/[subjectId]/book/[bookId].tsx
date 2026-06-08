@@ -43,6 +43,7 @@ import {
 import { useMoveTopic } from '../../../../../hooks/use-move-topic';
 import {
   useBookNotes,
+  useConceptMasterySignals,
   useCreateNote,
   useUpdateNote,
   useDeleteNoteById,
@@ -565,9 +566,14 @@ export default function BookScreen() {
     () => notesQuery.data?.notes ?? [],
     [notesQuery.data?.notes],
   );
-  const noteTopicIds = useMemo(
-    () => new Set(notes.map((n) => n.topicId)),
+  const noteTopicIdList = useMemo(
+    () => [...new Set(notes.map((n) => n.topicId))].sort(),
     [notes],
+  );
+  const conceptSignalsQuery = useConceptMasterySignals(noteTopicIdList);
+  const noteTopicIds = useMemo(
+    () => new Set(noteTopicIdList),
+    [noteTopicIdList],
   );
   const topicTitleMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -1733,6 +1739,9 @@ export default function BookScreen() {
                       content={note.content}
                       sourceLine={formatSourceLine(note)}
                       updatedAt={note.updatedAt}
+                      conceptSignal={
+                        conceptSignalsQuery.data?.signals?.[note.topicId]
+                      }
                       onLongPress={handleNoteLongPress}
                       onSourcePress={
                         sourceSessionId

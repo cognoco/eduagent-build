@@ -13,9 +13,13 @@ import {
   topicSessionsResponseSchema,
   allNotesQuerySchema,
   allNotesResponseSchema,
+  conceptMasterySignalsResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
+import {
+  requireProfileId,
+  type ProfileMeta,
+} from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { notFound, NotFoundError } from '../errors';
 import {
@@ -28,7 +32,9 @@ import {
   getTopicIdsWithNotes,
   listAllNotes,
 } from '../services/notes';
+import { getConceptMasterySignalsForTopics } from '../services/concept-mastery';
 import { getTopicSessions } from '../services/session';
+import { withProfile } from '../route-utils/route-context';
 
 type NotesRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -36,6 +42,7 @@ type NotesRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -51,6 +58,46 @@ const topicParamSchema = z.object({
 
 const noteIdParamSchema = z.object({
   noteId: z.string().uuid(),
+});
+
+const MAX_CONCEPT_MASTERY_TOPIC_IDS = 100;
+
+const conceptMasteryQuerySchema = z.object({
+  topicIds: z.string().transform((value, ctx) => {
+    const topicIds = value
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+
+    if (topicIds.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'topicIds must include at least one UUID',
+      });
+      return z.NEVER;
+    }
+
+    if (topicIds.length > MAX_CONCEPT_MASTERY_TOPIC_IDS) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `topicIds may include at most ${MAX_CONCEPT_MASTERY_TOPIC_IDS} UUIDs`,
+      });
+      return z.NEVER;
+    }
+
+    for (const topicId of topicIds) {
+      const parsed = z.string().uuid().safeParse(topicId);
+      if (!parsed.success) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'topicIds must be comma-separated UUIDs',
+        });
+        return z.NEVER;
+      }
+    }
+
+    return [...new Set(topicIds)];
+  }),
 });
 
 export const noteRoutes = new Hono<NotesRouteEnv>()
@@ -115,6 +162,26 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     const topicIds = await getTopicIdsWithNotes(db, profileId);
     return c.json(topicIdsResponseSchema.parse({ topicIds }));
   })
+  // GET /notes/concept-mastery — derived concept-grain note signals
+  .get(
+    '/notes/concept-mastery',
+    zValidator('query', conceptMasteryQuerySchema),
+    async (c) => {
+      const { db, profileId } = withProfile(c);
+      const { topicIds } = c.req.valid('query');
+
+      const signals = await getConceptMasterySignalsForTopics(
+        db,
+        profileId,
+        topicIds,
+      );
+      return c.json(
+        conceptMasterySignalsResponseSchema.parse({
+          signals: Object.fromEntries(signals),
+        }),
+      );
+    },
+  )
   // GET /subjects/:subjectId/topics/:topicId/notes (list all notes for topic)
   .get(
     '/subjects/:subjectId/topics/:topicId/notes',

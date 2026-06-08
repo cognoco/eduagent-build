@@ -1037,6 +1037,13 @@
       "revisitTitle": "Repeter {{subject}}",
       "startTitle": "Start {{subject}}"
     },
+    "noteSignal": {
+      "verified": "Verifisert",
+      "verifiedAccessibilityLabel": "Verifisert – ordene dine holdt mål",
+      "tutorAddition": "Veilederen har mer om dette emnet",
+      "showTutorAdditionAccessibilityLabel": "Vis hva veilederen la til",
+      "hideTutorAdditionAccessibilityLabel": "Skjul det veilederen la til"
+    },
     "bookmarkCard": {
       "accessibilityLabel": "Åpne lagret bokmerke: {{title}}"
     },

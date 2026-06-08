@@ -1037,6 +1037,13 @@
       "revisitTitle": "{{subject}} wiederholen",
       "startTitle": "Mit {{subject}} starten"
     },
+    "noteSignal": {
+      "verified": "Verifiziert",
+      "verifiedAccessibilityLabel": "Verifiziert – deine Worte wurden bestätigt",
+      "tutorAddition": "Der Tutor hat mehr zu diesem Thema",
+      "showTutorAdditionAccessibilityLabel": "Tutor-Zusatz anzeigen",
+      "hideTutorAdditionAccessibilityLabel": "Tutor-Zusatz ausblenden"
+    },
     "bookmarkCard": {
       "accessibilityLabel": "Gespeichertes Lesezeichen öffnen: {{title}}"
     },

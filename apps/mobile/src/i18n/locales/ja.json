@@ -1037,6 +1037,13 @@
       "revisitTitle": "{{subject}}を復習",
       "startTitle": "{{subject}}を始める"
     },
+    "noteSignal": {
+      "verified": "確認済み",
+      "verifiedAccessibilityLabel": "確認済み - あなたの回答は正解でした",
+      "tutorAddition": "このトピックに関するチューターからの補足",
+      "showTutorAdditionAccessibilityLabel": "チューターが追加した内容を表示",
+      "hideTutorAdditionAccessibilityLabel": "チューターが追加した内容を非表示"
+    },
     "bookmarkCard": {
       "accessibilityLabel": "保存したブックマークを開く: {{title}}"
     },

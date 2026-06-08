@@ -39,6 +39,7 @@ export * from './depth-evaluation';
 
 // Topic Notes
 export * from './notes';
+export * from './concept-mastery';
 
 // Library Search
 export * from './library-search';

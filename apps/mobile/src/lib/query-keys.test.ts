@@ -82,8 +82,9 @@ describe('queryKeys mode-scoped factories', () => {
       'child',
       childId,
     ]);
-    expect(queryKeys.dashboard.childSessionDetail(mode, childId, sessionId))
-      .toEqual(['dashboard', mode, 'child', childId, 'session', sessionId]);
+    expect(
+      queryKeys.dashboard.childSessionDetail(mode, childId, sessionId),
+    ).toEqual(['dashboard', mode, 'child', childId, 'session', sessionId]);
   });
 
   it('covers dashboard child report keys', () => {
@@ -94,17 +95,12 @@ describe('queryKeys mode-scoped factories', () => {
       childId,
       'reports',
     ]);
-    expect(queryKeys.dashboard.childReportDetail(mode, childId, reportId))
-      .toEqual(['dashboard', mode, 'child', childId, 'report', reportId]);
-    expect(queryKeys.dashboard.childWeeklyReportDetail(mode, childId, reportId))
-      .toEqual([
-        'dashboard',
-        mode,
-        'child',
-        childId,
-        'weekly-report',
-        reportId,
-      ]);
+    expect(
+      queryKeys.dashboard.childReportDetail(mode, childId, reportId),
+    ).toEqual(['dashboard', mode, 'child', childId, 'report', reportId]);
+    expect(
+      queryKeys.dashboard.childWeeklyReportDetail(mode, childId, reportId),
+    ).toEqual(['dashboard', mode, 'child', childId, 'weekly-report', reportId]);
   });
 
   it('adds mode after session-domain prefixes', () => {
@@ -136,19 +132,22 @@ describe('queryKeys mode-scoped factories', () => {
 
   it('matches session keys across modes for the same profileId [BUG-553]', () => {
     expect(
-      queryKeys.sessions.matchAnyMode(sessionId, profileId)(
-        queryKeys.sessions.detail('study', sessionId, profileId),
-      ),
+      queryKeys.sessions.matchAnyMode(
+        sessionId,
+        profileId,
+      )(queryKeys.sessions.detail('study', sessionId, profileId)),
     ).toBe(true);
     expect(
-      queryKeys.sessions.matchTranscriptAnyMode(sessionId, profileId)(
-        queryKeys.sessions.transcript('family', sessionId, profileId),
-      ),
+      queryKeys.sessions.matchTranscriptAnyMode(
+        sessionId,
+        profileId,
+      )(queryKeys.sessions.transcript('family', sessionId, profileId)),
     ).toBe(true);
     expect(
-      queryKeys.sessions.matchSummaryAnyMode(sessionId, profileId)(
-        queryKeys.sessions.summary('family', sessionId, profileId),
-      ),
+      queryKeys.sessions.matchSummaryAnyMode(
+        sessionId,
+        profileId,
+      )(queryKeys.sessions.summary('family', sessionId, profileId)),
     ).toBe(true);
   });
 
@@ -159,21 +158,24 @@ describe('queryKeys mode-scoped factories', () => {
     const otherProfileId = 'prof-other';
 
     expect(
-      queryKeys.sessions.matchAnyMode(sessionId, profileId)(
-        queryKeys.sessions.detail('study', sessionId, otherProfileId),
-      ),
+      queryKeys.sessions.matchAnyMode(
+        sessionId,
+        profileId,
+      )(queryKeys.sessions.detail('study', sessionId, otherProfileId)),
     ).toBe(false);
 
     expect(
-      queryKeys.sessions.matchTranscriptAnyMode(sessionId, profileId)(
-        queryKeys.sessions.transcript('family', sessionId, otherProfileId),
-      ),
+      queryKeys.sessions.matchTranscriptAnyMode(
+        sessionId,
+        profileId,
+      )(queryKeys.sessions.transcript('family', sessionId, otherProfileId)),
     ).toBe(false);
 
     expect(
-      queryKeys.sessions.matchSummaryAnyMode(sessionId, profileId)(
-        queryKeys.sessions.summary('family', sessionId, otherProfileId),
-      ),
+      queryKeys.sessions.matchSummaryAnyMode(
+        sessionId,
+        profileId,
+      )(queryKeys.sessions.summary('family', sessionId, otherProfileId)),
     ).toBe(false);
   });
 });
@@ -190,6 +192,14 @@ describe('queryKeys non-mode-scoped factories', () => {
       'library',
       'retention',
       'prof-abc',
+    ]);
+    expect(
+      queryKeys.library.conceptMastery('prof-abc', ['topic-1', 'topic-2']),
+    ).toEqual([
+      'library',
+      'concept-mastery',
+      'prof-abc',
+      ['topic-1', 'topic-2'],
     ]);
   });
 });

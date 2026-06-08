@@ -1,3 +1,13 @@
+-- ============================================================================
+-- REFERENCE ONLY — DO NOT APPLY TO STAGING OR PRODUCTION.
+-- This is stage T1 of the old 6-stage identity migration (empty
+-- organizations + memberships tables, no readers). It is being REVERTED by the
+-- identity-foundation reconstruction: data-model.md lists both tables under
+-- "Replaces (T1, inert)", and the baseline reset (MMT-ADR-0012) rebuilds the
+-- schema create-from-empty. Do not apply or build on this.
+-- Status: committed for history reference, superseded; applied nowhere live.
+-- See _wip/identity-foundation/data-model.md §2 and docs/adr/MMT-ADR-0012.
+-- ============================================================================
 CREATE TYPE "public"."membership_role" AS ENUM('owner', 'mentor', 'student');--> statement-breakpoint
 CREATE TABLE "memberships" (
 	"id" uuid PRIMARY KEY NOT NULL,

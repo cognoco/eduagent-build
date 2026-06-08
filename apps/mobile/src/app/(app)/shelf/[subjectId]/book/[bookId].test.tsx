@@ -73,6 +73,7 @@ jest.mock(
   () => ({
     ...jest.requireActual('../../../../../hooks/use-notes'),
     useBookNotes: () => mockUseBookNotes(),
+    useConceptMasterySignals: () => ({ data: { signals: {} } }),
     useCreateNote: () => ({ mutate: jest.fn(), isPending: false }),
     useUpdateNote: () => ({ mutate: jest.fn(), isPending: false }),
     useDeleteNoteById: () => ({ mutate: jest.fn() }),

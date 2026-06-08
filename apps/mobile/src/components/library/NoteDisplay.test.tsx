@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { NoteDisplay } from './NoteDisplay';
 
 describe('NoteDisplay', () => {
@@ -37,6 +37,52 @@ describe('NoteDisplay', () => {
     const content = 'First note\n--- Apr 5 ---\nSecond note';
     const { getByText } = render(<NoteDisplay content={content} readOnly />);
     getByText('Apr 5');
+  });
+
+  it('shows a verified star when concept mastery is solid', () => {
+    render(
+      <NoteDisplay
+        content="Some note"
+        readOnly
+        conceptSignal={{
+          verified: true,
+          hasTutorAddition: false,
+          tutorAdditions: [],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('note-verified-signal')).toBeTruthy();
+  });
+
+  it('shows tutor additions only after the learner opens them', () => {
+    render(
+      <NoteDisplay
+        content="Some note"
+        readOnly
+        conceptSignal={{
+          verified: false,
+          hasTutorAddition: true,
+          tutorAdditions: [
+            'ATP releases usable energy when a phosphate breaks off.',
+          ],
+        }}
+      />,
+    );
+
+    expect(
+      screen.queryByText(
+        'ATP releases usable energy when a phosphate breaks off.',
+      ),
+    ).toBeNull();
+
+    fireEvent.press(screen.getByTestId('note-tutor-addition-toggle'));
+
+    expect(
+      screen.getByText(
+        'ATP releases usable energy when a phosphate breaks off.',
+      ),
+    ).toBeTruthy();
   });
 
   // [a11y sweep] Break tests: edit/delete icon wrappers must be a11y-hidden

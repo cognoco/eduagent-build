@@ -79,4 +79,44 @@ describe('InlineNoteCard', () => {
     render(<InlineNoteCard {...baseProps} sourceLine="Note · Apr 24" />);
     expect(screen.getByText('Note · Apr 24'));
   });
+
+  it('shows a verified star for solid concept mastery', () => {
+    render(
+      <InlineNoteCard
+        {...baseProps}
+        conceptSignal={{
+          verified: true,
+          hasTutorAddition: false,
+          tutorAdditions: [],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('note-card-note-1-verified')).toBeTruthy();
+  });
+
+  it('keeps tutor additions collapsed until opened', () => {
+    render(
+      <InlineNoteCard
+        {...baseProps}
+        conceptSignal={{
+          verified: false,
+          hasTutorAddition: true,
+          tutorAdditions: ['Use the discriminant before choosing a method.'],
+        }}
+      />,
+    );
+
+    expect(
+      screen.queryByText('Use the discriminant before choosing a method.'),
+    ).toBeNull();
+
+    fireEvent.press(screen.getByTestId('note-card-note-1-addition-toggle'), {
+      stopPropagation: jest.fn(),
+    });
+
+    expect(
+      screen.getByText('Use the discriminant before choosing a method.'),
+    ).toBeTruthy();
+  });
 });
