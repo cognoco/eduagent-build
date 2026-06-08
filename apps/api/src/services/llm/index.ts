@@ -14,6 +14,10 @@ export {
   ANTHROPIC_SONNET_MODEL,
   getOpenAIAdvancedModel,
   _setOpenAIAdvancedModelForTesting,
+  setLlmRoutingV2Enabled,
+  _getLlmRoutingV2Enabled,
+  getFallbackConfigForTest,
+  getModelConfigForTest,
 } from './router';
 export { parseConversationLanguage } from './conversation-language';
 export { mockProvider, createMockProvider } from './providers/mock';
@@ -21,6 +25,8 @@ export { createGeminiProvider } from './providers/gemini';
 export { createOpenAIProvider } from './providers/openai';
 export { createAnthropicProvider } from './providers/anthropic';
 export { createOpenRouterProvider } from './providers/openrouter';
+export { createCerebrasProvider } from './providers/cerebras';
+export { createMistralProvider } from './providers/mistral';
 export { getTextContent } from './types';
 export { extractFirstJsonArray, extractFirstJsonObject } from './extract-json';
 export { normalizeStopReason } from './stop-reason';

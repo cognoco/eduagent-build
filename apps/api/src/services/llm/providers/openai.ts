@@ -45,6 +45,10 @@ interface OpenAIRequest {
   max_completion_tokens: number;
   stream?: boolean;
   response_format?: { type: 'json_object' };
+  // Reasoning-effort dial for the GPT-5 family (gpt-5-mini, gpt-5.4). Only
+  // sent when the caller sets config.reasoningEffort; non-reasoning models
+  // (gpt-4o*) never receive it. Previously this field was silently dropped.
+  reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
 interface OpenAIChoice {
@@ -92,6 +96,9 @@ const MODEL_MAP: Record<string, string> = {
   'gpt-4o': 'gpt-4o',
   'gpt-5.5': 'gpt-5.5',
   'gpt-5.4': 'gpt-5.4',
+  // Interactive-routing secondary / vision model (MMT-ADR-0016 §1.5). Direct
+  // OpenAI id drops the `openai/` prefix used on OpenRouter.
+  'gpt-5-mini': 'gpt-5-mini',
 };
 
 function mapModel(config: ModelConfig): string {
@@ -132,6 +139,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
         max_completion_tokens: config.maxTokens,
         ...(config.responseFormat === 'json'
           ? { response_format: { type: 'json_object' as const } }
+          : {}),
+        ...(config.reasoningEffort
+          ? { reasoning_effort: config.reasoningEffort }
           : {}),
       };
 
@@ -192,6 +202,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           max_completion_tokens: config.maxTokens,
           ...(config.responseFormat === 'json'
             ? { response_format: { type: 'json_object' as const } }
+            : {}),
+          ...(config.reasoningEffort
+            ? { reasoning_effort: config.reasoningEffort }
             : {}),
           stream: true,
         };

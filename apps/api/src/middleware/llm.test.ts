@@ -256,4 +256,78 @@ describe('llmMiddleware', () => {
     expect(registerProvider).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledTimes(2);
   });
+
+  // Helper: collect the `id`s of every provider object passed to the mocked
+  // registerProvider. createCerebrasProvider / createMistralProvider are NOT
+  // mocked (GC1: no new internal jest.mock), so they return real provider
+  // objects whose `id` we can assert on directly.
+  function registeredProviderIds(): string[] {
+    return (registerProvider as jest.Mock).mock.calls.map(
+      (call) => (call[0] as { id: string }).id,
+    );
+  }
+
+  it('[v2 infra] registers cerebras + mistral when their keys are present', async () => {
+    // A flag-off primary (Gemini) keeps the hasAnyProvider gate satisfied; the
+    // v2 providers are registered alongside it so they are available behind
+    // LLM_ROUTING_V2_ENABLED without being part of the primary-key gate.
+    const c = createMockContext({
+      GEMINI_API_KEY: 'gem-key',
+      CEREBRAS_API_KEY: 'cb-key',
+      MISTRAL_API_KEY: 'mi-key',
+    });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(c, next);
+
+    const ids = registeredProviderIds();
+    expect(ids).toContain('cerebras');
+    expect(ids).toContain('mistral');
+    expect(ids).toContain('gemini');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('[v2 infra] does NOT register cerebras/mistral when only their keys would gate the deployment', async () => {
+    // The v2 providers are explicitly NOT in the primary-key gate. With ONLY a
+    // cerebras key and no Gemini/OpenAI/Anthropic primary, the middleware still
+    // throws (a flag-off deployment must have a primary), but cerebras is
+    // registered before the gate check runs.
+    process.env['NODE_ENV'] = 'development';
+    const c = createMockContext({
+      ENVIRONMENT: 'production',
+      CEREBRAS_API_KEY: 'cb-key',
+    });
+    const next = jest.fn();
+
+    await expect(llmMiddleware(c, next)).rejects.toThrow(
+      'At least one LLM API key is required',
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-488 extended] re-registers when CEREBRAS_API_KEY changes (hash includes it)', async () => {
+    // Proves the env-hash covers the v2 keys: a cerebras-only key rotation on a
+    // reused isolate must trigger _clearProviders() + fresh registration, not
+    // be silently ignored.
+    const c1 = createMockContext({
+      GEMINI_API_KEY: 'gem-key',
+      CEREBRAS_API_KEY: 'cb-key-1',
+    });
+    const c2 = createMockContext({
+      GEMINI_API_KEY: 'gem-key',
+      CEREBRAS_API_KEY: 'cb-key-2',
+    });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(c1, next);
+    expect(registeredProviderIds()).toContain('cerebras');
+
+    jest.clearAllMocks();
+
+    // Only the cerebras key changed — the hash must differ, forcing a
+    // re-registration that includes cerebras again.
+    await llmMiddleware(c2, next);
+    expect(registeredProviderIds()).toContain('cerebras');
+    expect(registerProvider).toHaveBeenCalled();
+  });
 });
