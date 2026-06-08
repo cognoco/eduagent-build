@@ -430,10 +430,16 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
   not superseded) and **`MMT-ADR-0002`** (Payer capacity store-delegated). Correction of an omission, not a
   re-decision; `CANONICAL-SET.md` updated with a post-lock correction note. `MMT-ADR-0004` (mobile-IAP rails) stays
   *out* — billing mechanism, not core identity canon.
-- **2026-06-08** — **Phase H plan drafted** (`docs/plans/2026-06-08-phase-h-architecture-identity-carveout.md`,
-  `status: draft`, design profile). Carve-out section for `docs/architecture.md` (target identity model, outcomes-only,
-  cited to the 19-member set + `data-model.md` §s), supersession markers at the legacy "11-15"/RBAC anchors (full
-  rewrite = Phase I), and the in-document `0016`↔`0000` canon-authorship preamble. Awaiting approval before authoring.
+- **2026-06-08** — **Phase H plan drafted + scoped** (`_wip/identity-foundation/2026-06-08-phase-h-architecture-identity-carveout.md`,
+  `status: draft`, design profile). **Approach ruled: plop-and-defer.** Author the identity carve-out into the
+  **single** `architecture.md` (no parallel doc) as a clean, target-idiom, **relocatable** section — the *beachhead*
+  of the eventual rebuild; cited to the 19-member set + `data-model.md` §s. The **full structural rebuild +
+  `ARCH-N` reverse-engineering is Stream 2** (its inputs come from K–P), **not** H — rebuilding now would be
+  rebuild-twice at the point of least information (content is ready, whole-doc structure isn't). **Transitional
+  markers required** (`[TRANSITIONAL — DOC STATE]` doc banner · `[CANON-NEW]` section banner · `[LEGACY-REVIEW]`
+  anchor markers — greppable, stripped by Stream 2) so new-ratified-canon vs legacy-pending is unambiguous in the
+  interim. **Canon-authorship process + `0016`↔`0000` reconciliation moved to Phase I** (ROADMAP I-row (c)), tightening
+  H to carve-out + markers. Awaiting approval before authoring.
 - **2026-06-08** — **§I.4 incubation rule revised + domain-canon move scheduled front-of-J.** Architect ruling:
   the `MMT-ADR-0000` §I.4 rule that a stream's L1 canon "incubates in `_wip/` until its **clean cut**" is **too
   conservative** for a pre-launch clean-cut migration (model ratified + certain to build). **Revised:** domain canon
