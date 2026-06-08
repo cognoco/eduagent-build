@@ -3,8 +3,12 @@ title: Phase H — architecture.md Identity-Foundation Carve-out — Implementat
 date: 2026-06-08
 profile: design
 spec: _wip/identity-foundation/ROADMAP.md (Phase H); _wip/identity-foundation/CANONICAL-SET.md (the lens)
-status: draft
+status: done
 ---
+
+> **Executed 2026-06-08.** All tasks T1–T7 complete. The `## Identity Foundation`
+> section is authored in `docs/architecture.md` with transitional markers; self-review
+> (citation audit) clean. Close handoff: `_handoffs/2026-06-08-phase-h-close.md`.
 
 # Phase H — architecture.md Identity-Foundation Carve-out — Implementation Plan
 
