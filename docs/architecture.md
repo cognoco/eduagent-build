@@ -24,6 +24,8 @@ date: '2026-02-15'
 
 _This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._
 
+> **[TRANSITIONAL — DOC STATE]** This document is mid-refresh. The **`## Identity Foundation`** section is **new, ratified canon** (identity-foundation runway, Phase H; cited to ADRs + `data-model.md`). **Every other section is LEGACY** — pre-refresh setup-record content, pending review/revision in the Stream-2 `architecture.md` rebuild (the `ARCH-N` reverse-engineering). Where a legacy section conflicts with `## Identity Foundation`, **Identity Foundation wins**. Direct conflicts are flagged inline with `<!-- [LEGACY-REVIEW] -->` comments (greppable; resolved in Phase I). These transitional markers (`[TRANSITIONAL — DOC STATE]`, `[CANON-NEW]`, `[LEGACY-REVIEW]`) are temporary and stripped at the Stream-2 rebuild.
+
 ## Project Context Analysis
 
 ### Requirements Overview
@@ -63,7 +65,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Uptime | 99.5% | Multi-provider LLM fallback, circuit breaker with defined thresholds |
 | Data durability | 99.99% | Neon managed backups, point-in-time recovery |
 | GDPR compliance | Full | Consent state machine, deletion orchestrator, data residency |
-| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile isolation, audit trail |
+| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile isolation, audit trail | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — Path X: 13+ consent-capacity floor (was 11), sub-13 built-but-gated; MMT-ADR-0015. Rewrite → Phase I. -->|
 
 **UX Specification Implications:**
 
@@ -93,7 +95,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 **Complexity Indicators:**
 
 - **Real-time features**: LLM streaming via SSE, coaching card live updates
-- **Multi-tenancy**: Family accounts with profile isolation, shared billing, independent learning state
+- **Multi-tenancy**: Family accounts with profile isolation, shared billing, independent learning state <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — tenancy = org/membership re-derived (not profile-isolation framing); MMT-ADR-0007/0010. Rewrite → Phase I. -->
 - **Regulatory**: GDPR (EU users 11-15), data deletion rights, parental consent workflows
 - **AI orchestration**: Multi-provider routing by conversation state, cost management, fallback chains
 - **Data complexity**: Relational (users, sessions, curricula) + vector (memory embeddings) + temporal (spaced repetition schedules, knowledge decay)
@@ -370,7 +372,7 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 
 **Mobile → API auth flow:** Clerk JWT verification. Mobile obtains JWT from Clerk SDK, sends as `Authorization: Bearer` header. Hono middleware verifies via Clerk's JWKS endpoint (cacheable in Workers KV). Profile ID extracted from Clerk session metadata, injected into request context for scoped repository.
 
-**Authorization model:** Custom RBAC on profile metadata, not Clerk Organizations. Clerk orgs are designed for B2B multi-tenancy (team invites, role management UI) — wrong abstraction for family accounts. Store profile type (parent, teen, learner), family linkage, and consent state in Neon. Clerk provides authenticated user identity; application middleware maps to profile and enforces access rules.
+**Authorization model:** Custom RBAC on profile metadata, not Clerk Organizations. Clerk orgs are designed for B2B multi-tenancy (team invites, role management UI) — wrong abstraction for family accounts. Store profile type (parent, teen, learner), family linkage, and consent state in Neon. Clerk provides authenticated user identity; application middleware maps to profile and enforces access rules. <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — roles primitive {admin, learner} on membership (not "profile type parent/teen/learner"); capabilities split into Guardian/Mentor/Payer edges; MMT-ADR-0007/0008/0015. Rewrite → Phase I. -->
 
 **Rate limiting:** Cloudflare Workers built-in rate limiting (100 req/min per user per PRD). Configuration in `wrangler.toml`, not code. For the quota system (questions/month), `decrementQuota()` in `services/billing.ts` is the enforcement point (conditional UPDATE via Drizzle ORM).
 
@@ -558,6 +560,54 @@ The `(app)/` group contains all authenticated screens. View differences between 
 7. Stripe integration (can be parallel with 4-6)
 8. ML Kit OCR (can be parallel, needed for homework flow)
 
+## Identity Foundation
+
+> **[CANON-NEW · ratified]** Authored Phase H (2026-06-08) from the locked identity-foundation canonical set (`_wip/identity-foundation/CANONICAL-SET.md` — 19 members). Stated as **outcomes, not whys** (`MMT-ADR-0000` §I.2); every claim cites its ADR or `data-model.md` §. This is a **relocatable unit** — the eventual `architecture.md` rebuild (Stream 2) re-homes it intact. Citations to `data-model.md` / `domain-model.md` / `identity-foundation-prd.md` reference the ratified canon currently in `_wip/identity-foundation/` (graduates to `docs/canon/` at Phase J(0); paths update there).
+
+This section is the authoritative architecture of the app's identity / tenancy / role / consent / policy-engine foundation. It supersedes the legacy identity content elsewhere in this document (flagged `[LEGACY-REVIEW]`). The decision trail (the *why*) lives in `MMT-ADR-0001`, `0002`, `0007`–`0016`; the schema realization in `data-model.md`.
+
+### Identity model & tenancy
+
+- **We own the identity/tenancy graph; Clerk is authentication only.** Clerk supplies authenticated user identity; everything else — the person, tenancy, roles, consent, and billing state — is owned in our store (`MMT-ADR-0001`).
+- **Person ≠ Login.** `person` is the human and the **scope key for all learning data**; `login` is a thin Clerk binding (a nullable `person.login_id`), not a Clerk mirror. A managed child is a `person` with **no** `login` (`MMT-ADR-0007`; `data-model.md` §4.1–4.2).
+- **Roles are a primitive, distinct from capacities.** `membership.roles` is a non-empty array over `{admin, learner}` on the person↔org link. The capabilities — consent authority, billing control, data visibility — are **separate edges/fields, never fused into the role** (`MMT-ADR-0007`; `inv 22`; `data-model.md` §4.4).
+- **Organization and membership are re-derived, not inherited.** `organization` is the thin container that owns the billing + consent + quota anchor; `membership` is the person↔org link (`UNIQUE (person, org)`; first member is `admin`). Neither carries over from the legacy fused-`accounts` / `family_links` shape — both are re-derived from the model (`MMT-ADR-0010`; `data-model.md` §4.3–4.4). v1 is a single home org per family.
+- **`is_owner` is gone** — ownership is *derived* (admin role + Payer self-reference), not stored (`data-model.md` §4.1).
+- **Scoping is the future RLS surface (`T3`).** `person_id` is the scope key for learning data; `organization_id` for membership/subscription; the `person_retain` legal tier is **role-gated, not RLS-default** — a deliberate exception recorded so the RLS rollout does not flatten the audit trail (`data-model.md` §5.1).
+
+### Capability split — Guardian / Mentor / Payer
+
+The three capabilities are split and never fused (`inv 22`). Profile-management authority bundles with the **Subscription-administrator** (`{admin}` role + the Payer field) — no separate column.
+
+- **Guardian = consent only.** A global edge (`guardianship`) carrying the consent record and consent authority; operational powers do **not** live on it. Never auto-conferred; `guardian <> charge` (no self-guardian — the `F1-BT-a` attack the model bans); a `qualification` ENUM names the relationship (G-4) (`MMT-ADR-0008`; `data-model.md` §4.6, §2A.4).
+- **Mentor = data access only.** An opt-in edge (`mentorship`), **never auto-conferred** (`inv 19`; `data-model.md` §4.7).
+- **Payer = a subscription sub-field, not a persona.** 1 primary (`payer_person_id`, NOT NULL) + ≤1 secondary (`subscription_payers`). The secondary may read state, view invoices, and **update the payment method only** — no cancel/upgrade/plan-change; the primary is notified on every change (`MMT-ADR-0002`; `MMT-ADR-0015` §5; `data-model.md` §2A.4).
+- **Charge terminology.** The human a Guardian acts for is a **charge** (the term "ward" is retired). The consent key is `(charge × purpose × organization)`. Exactly one Guardian per charge (G-3); the birthday-crossing takeover branches on `person.has_own_account` (G-6) (`MMT-ADR-0015`; `data-model.md` §2A.4).
+
+### Consent & the age model (Path X)
+
+- **The age model is three-axis** — age × residence × knowledge-state — not a single age number (`MMT-ADR-0015`; `data-model.md` §2A.2, §2A.5).
+- **`AgeBracket` is `child | adolescent | adult`** — the `'child'` value is additive, required for the launch-floor logic and v1.1 sub-13 ungating (`data-model.md` §2A.5).
+- **Path X — the v1 launch floor is a 13+ consent-capacity floor.** `birthYearSchema` floors at 13 (raised from 11), backend-enforced. Sub-13 is **built-but-gated**: the data model future-proofs it, a backend kill-switch gates it, and the knowingly-under-13 delete-path stays warm. v1 closes the 13+ load-bearing gaps; **v1.1** ungates sub-13 (`MMT-ADR-0015`; `data-model.md` §2A.5; `identity-foundation-prd.md`). *(This supersedes the legacy "11–15" framing.)*
+- **`regimes` are data rows, not a Postgres `ENUM`** — a regime change is an `INSERT`, not a migration. v1 seed: `US_COPPA`, `EU_GDPR_16/15/14/13`, `UK_AADC`, `ROW` (`MMT-ADR-0013` §2; `data-model.md` §2A.1).
+- **Consent is an append-only event log** (`consent_grant`), per-purpose, keyed `(charge × purpose × organization)`. The current requirement is *computed*; the record is *stored*; history is preserved. The legacy stamped-status `consent_states` is gone — and with it the `UNIQUE(profile, consentType)` constraint that blocked org-scoped consent (`MMT-ADR-0011` §3; `data-model.md` §4.8).
+- **Knowledge is an append-only audit history** (`knowledge_assertions`: method × confidence) with a cached current state on `person`; **default-for-unknown is most-restrictive** (engine behavior, not a column) (`data-model.md` §2A.2).
+- **The gate is direction-aware.** Protection-*adding* edits are trusted instantly; protection-*lowering* edits (DOB later, laxer regime, age crossing up) succeed in the input layer but do **not** lower protection until a verification clears — the more-protective state persists meanwhile (`I-PB-B2b`; `data-model.md` §6.2).
+
+### Policy-engine spine, router/vetting, safety & judge
+
+- **The engine is two primitives**, type-enforced via `policy_rules.kind`: `prohibition_floor` (unconditional) and `consent_edge` (consent-gated). The eval-logic split is enforced at the engine (`MMT-ADR-0013` §1; `data-model.md` §2A.1).
+- **Policy is data, not code.** `policy_cells` address an age-band × `regime` × knowledge grid; the content of `regimes` / `policy_cells` / `policy_rules` is **DB-mastered** — canon points at it and never holds a second copy (the DB-is-master principle) (`MMT-ADR-0013` §2; `data-model.md` §2A.1).
+- **Router ⟂ vetting is a hard split** (`MMT-ADR-0014`). The **runtime router** key is **3-param** (`model · service · region`), filtered by the engine's eligibility output. **Vetting** is a **4-axis offline pipeline** — the 4th axis (`provider_via_service`) is vetting-only. The **only** contract between them is the `allowed_models` table: vetting writes it; the router reads the *row*, not the criteria (`data-model.md` §2A.3).
+- **Fail-closed.** An empty or unavailable eligibility result raises `CircuitOpenError` — the flow stops rather than routing to an unvetted model. The tutor and judge roles are **separately routable** (`MMT-ADR-0014`).
+- **Safety is judgment-based; the judge is vendor-independent.** No app-owned denylist; the judge is a non-reasoning, vendor-independent evaluator. The concrete model picks are **not canon** — they live in the `docs/registers/llm-models/` master + its vetting trail (`MMT-ADR-0016`; `docs/registers/README.md`).
+
+### Lifecycle & clean-cut posture
+
+- **Transitions are durable, via one unified sweep.** A single daily Inngest sweep drives age-crossing re-evaluation, consent refresh, dormancy, and residence-grace maturation; it is idempotent on a `personId+day` key, with no run-log table (`MMT-ADR-0009`; `data-model.md` §5.4, §6.5).
+- **Family-join is a consolidation primitive** (`MMT-ADR-0010`). A teen joining a family gains a home-org `membership`, has their now-empty org-of-one decommissioned, and gets the Payer set per the join's billing option. A nullable `migration-pending` flag on `person` is the atomic rollback signal; mid-join failure exposes no half-state (`data-model.md` §6.4).
+- **Clean-cut posture** (`MMT-ADR-0012`). Pre-launch, with zero real users, the target model is built directly, dev/staging re-seeded, and the legacy model deleted in **one** baseline migration. **No** `MODE_IDENTITY_V1` flag, **no** backfill, **no** compatibility shims, **no** V0/V1 parallel run. Backwards compatibility is **none** — caller-facing types update in the same change-set (`data-model.md` §5.3).
+
 ## Implementation Patterns & Consistency Rules
 
 ### Naming Patterns
@@ -570,7 +620,7 @@ The `(app)/` group contains all authenticated screens. View differences between 
 | Columns | snake_case | `profile_id`, `created_at`, `escalation_rung` |
 | Foreign keys | `{referenced_table_singular}_id` | `profile_id`, `session_id`, `curriculum_id` |
 | Indexes | `idx_{table}_{columns}` | `idx_session_events_session_id`, `idx_topic_schedules_next_review` |
-| Enums | snake_case type, SCREAMING_SNAKE values | `consent_state` type: `PENDING`, `PARENTAL_CONSENT_REQUESTED`, `CONSENTED`, `WITHDRAWN` |
+| Enums | snake_case type, SCREAMING_SNAKE values | `consent_state` type: `PENDING`, `PARENTAL_CONSENT_REQUESTED`, `CONSENTED`, `WITHDRAWN` | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — stamped-status consent_states replaced by append-only consent_grant event log keyed (charge × purpose × organization); MMT-ADR-0011 §3. Rewrite → Phase I. -->|
 | Timestamps | Always `created_at` + `updated_at` | UTC, `timestamp with time zone` |
 
 **Drizzle schema file organization:** One schema file per domain, not one giant file and not one file per table.
@@ -1645,7 +1695,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | Data durability | 99.99% | Neon managed backups, point-in-time recovery | Covered |
 | Rate limiting | 100 req/min | Cloudflare Workers rate limiting (wrangler.toml) + quota metering middleware | Covered |
 | GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
-| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile-scoped data access | Covered |
+| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile-scoped data access | Covered | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — Path X: 13+ floor, sub-13 built-but-gated; three-axis age model; MMT-ADR-0015. Rewrite → Phase I. -->|
 | i18n | 7 locales | English source + 6 LLM-translated locales (de/es/ja/nb/pl/pt) registered in `apps/mobile/src/i18n/index.ts`. LLM `preferredLanguage` in system prompt for learning language. | Covered |
 | Accessibility | WCAG 2.1 AA | Phased per UX spec (MVP free, v1.1 moderate, v2.0 operational). NativeWind supports accessibility props. | Phased |
 | Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
