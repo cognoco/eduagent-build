@@ -1,8 +1,8 @@
 # Data model — identity foundation (Phase E)
 
-**Status:** DRAFT — ratify
-**Provenance:** derived from `domain-model.md` v1.1 (RATIFIED 2026-06-03) + the 8 Phase-E decisions (D1–D8, 2026-06-04) + the counsel walkthrough of 2026-06-03 (`I-C1` / `I-C2` / `I-C4`, `I-PB-B2a` / `I-PB-B2b` / `I-PB-B3b`, `I-A2`, `I-D1`, `I-E3`)
-**Lockstep partners:** `docs/adr/MMT-ADR-0011-phase-e-data-model-realization.md`, `docs/adr/MMT-ADR-0012-one-time-baseline-reset.md`, `identity-ontology.md` (newest-first §R entry), `domain-model.md` (carry of §7 handoff), `CONTEXT.md` (identity-noun parity check), `ROADMAP.md` (Phase-E box flip)
+**Status:** Phase-E baseline RATIFIED (2026-06-04). **Amended pre-baseline 2026-06-07** per `MMT-ADR-0013` (policy-engine spine), `MMT-ADR-0014` (router runtime/vetting split), `MMT-ADR-0015` (data-model amendments) — the additions fold into the baseline (pre-baseline window, `MMT-ADR-0012`). See **§2A**.
+**Provenance:** derived from `domain-model.md` v1.1 (RATIFIED 2026-06-03) + the 8 Phase-E decisions (D1–D8, 2026-06-04) + the counsel walkthrough of 2026-06-03 (`I-C1` / `I-C2` / `I-C4`, `I-PB-B2a` / `I-PB-B2b` / `I-PB-B3b`, `I-A2`, `I-D1`, `I-E3`) + the A-vs-B decisions (memo 2026-06-06) realized in `MMT-ADR-0013/0014/0015`
+**Lockstep partners:** `docs/adr/MMT-ADR-0011-phase-e-data-model-realization.md`, `docs/adr/MMT-ADR-0012-one-time-baseline-reset.md`, **`docs/adr/MMT-ADR-0013-policy-engine-spine.md`, `docs/adr/MMT-ADR-0014-router-runtime-vetting-split.md`, `docs/adr/MMT-ADR-0015-data-model-amendment-pre-baseline.md`**, `identity-ontology.md` (newest-first §R entry), `domain-model.md` (carry of §7 handoff), `CONTEXT.md` (identity-noun parity check), `ROADMAP.md` (Phase-E box flip)
 **Out of scope (Phase F):** the actual `drizzle-kit` baseline migration, the `T1` revert execution, `RLS` enforcement, the `inv 17` rephrase (architect), the "11" final product call, retention *values* (counsel), `G7` VPC vendor (procurement)
 
 > **What this doc is.** The physical realization of the ratified domain model: the tables, columns, constraints, indexes, FKs, and the structural `person_retain` seam. It does not re-derive the *what* (the entities, edges, invariants) — that lives in the ontology. It states the *how* the schema makes the invariants true.
@@ -34,6 +34,142 @@ Eight tables in the active graph, plus a per-class retain-tier set. Each row bel
 | `mentorship` | Opt-in mentor grant. | (the `mentor` role value) | — | Per `inv 19`; never auto-conferred |
 | `consent_grant` | Append-only per-purpose consent event log. | `consent_states` (stamped status) | — | Computed requirement, stored record; per `D6` |
 | `person_retain` set | Per-class retain-tier: `consent_receipt`, `deletion_audit`, `financial_record`. | (none — currently no retain-tier) | — | The structural fix for `I-C1` |
+
+**Pre-baseline amendment tables (added 2026-06-07 — `MMT-ADR-0013/0014/0015`; schema in §2A):**
+
+| Table | Purpose | Source ADR | Source-of-truth |
+|---|---|---|---|
+| `regimes` | Policy-engine regime lookup — **data rows, not a Postgres `ENUM`** (so a regime change is an `INSERT`, not a migration). | `0013` §2 | rows = **DB-mastered data** (C2-B/WP-4 trail); §2A carries only the v1 *seed snapshot* |
+| `policy_cells` | Addressing grid: age-band × `regime_id` × knowledge cell. | `0013` §2 | structure here; cell content DB-mastered |
+| `policy_rules` | Per-cell rules; `kind` = `prohibition_floor` \| `consent_edge`. | `0013` §1 | structure here; rule content DB-mastered |
+| `knowledge_assertions` | Append-only known-age × known-residence history (the legal audit artifact). | `0013` §3 (B3) | — |
+| `allowed_models` | Vetting-pipeline output; the router reads it (only contract between vetting + routing). | `0014` | structure here; vetted rows DB-mastered |
+| `subscription_payers` | Primary + ≤1 secondary Payer join (Payer = sub-field, not persona). | `0015` §5 | — |
+
+**Modified baseline tables (pre-baseline):** `subscription` keeps `payer_person_id` (now NOT NULL, the *primary* Payer) + the `subscription_payers` join; `guardianship` gains `qualification` ENUM (G-4); `person`/charge gains `has_own_account` BOOLEAN (G-6 takeover branch) + the `wards`→`charges` / `wardships`→`guardianships` / `ward_person_id`→`charge_person_id` terminology rename; `AgeBracket` schema gains a `'child'` value and `birthYearSchema` flips 11→13 (the v1 launch floor, ships with documented rationale). Profile additions: `age_knowing` / `residence_knowing` jsonb (cached current knowledge state). Full schema in §2A.
+
+---
+
+## §2A — Pre-baseline amendments (policy engine + router + capability split)
+
+Realizes `MMT-ADR-0013` (engine), `MMT-ADR-0014` (router), `MMT-ADR-0015` (data-model amendments). All land **in the baseline migration** (pre-baseline window); post-baseline is append-only. **The *why* lives in the ADRs — this section is the schema realization only.**
+
+> **Shape vs data (single source of truth).** This section fixes table/column *shape*. The policy-matrix *content* — regime rows, per-cell `policy_rules`, thresholds, country mappings, vetted `allowed_models` rows — is **DB-mastered data**, populated + maintained by the **C2-B / WP-4 (PM-owned) compliance-population workstream**, which carries the per-datapoint decision trail. Canon never holds a second copy of that data; only the decision trail that led to it. The seed values below are a **point-in-time snapshot**, ratified by the walkthrough's R-2/R-3/R-5, then DB-mastered.
+
+### 2A.1 Policy engine — `regimes`, `policy_cells`, `policy_rules`
+
+```sql
+-- Regime = DATA (rows), not a Postgres ENUM. Add/retire a regime = INSERT/UPDATE, not a migration.
+CREATE TABLE regimes (
+  id          BIGSERIAL PRIMARY KEY,
+  code        TEXT NOT NULL UNIQUE,    -- 'US_COPPA', 'EU_GDPR_16', 'UK_AADC', 'ROW', …
+  description TEXT,                     -- live threshold/characteristic; DB-mastered, not frozen in canon
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- v1 SEED SNAPSHOT (walkthrough R-2 ratifies the seed; DB is master thereafter):
+--   US_COPPA · EU_GDPR_16 · EU_GDPR_15 · EU_GDPR_14 · EU_GDPR_13 · UK_AADC · ROW
+
+CREATE TYPE policy_kind AS ENUM ('prohibition_floor', 'consent_edge');
+
+CREATE TABLE policy_cells (
+  id              BIGSERIAL PRIMARY KEY,
+  age_band_min    SMALLINT NOT NULL,   -- 0 = "any sub-13"
+  age_band_max    SMALLINT NOT NULL,
+  regime_id       BIGINT NOT NULL REFERENCES regimes(id),   -- FK to lookup, not an ENUM column
+  knowledge_axis  TEXT NOT NULL CHECK (knowledge_axis IN ('age','residence')),
+  knowledge_value JSONB NOT NULL,      -- {method, confidence}
+  UNIQUE (age_band_min, age_band_max, regime_id, knowledge_axis, knowledge_value)
+);
+
+CREATE TABLE policy_rules (
+  id               BIGSERIAL PRIMARY KEY,
+  cell_id          BIGINT NOT NULL REFERENCES policy_cells(id),
+  kind             policy_kind NOT NULL,   -- prohibition_floor = unconditional; consent_edge = consent-gated
+  rule_text        TEXT NOT NULL,
+  citation_url     TEXT,
+  source_instrument TEXT,                  -- 'AI Act Art 5(1)(b)', 'Gemini §20(d)', …
+  effective_at     TIMESTAMPTZ NOT NULL,
+  expires_at       TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (cell_id, kind, source_instrument, effective_at)
+);
+CREATE INDEX idx_policy_rules_cell_kind ON policy_rules (cell_id, kind);
+```
+
+The two-primitive `kind` is the type-safety boundary; the eval-logic split (prohibition-floor unconditional; consent-edge conditional on consent-state) is enforced at the engine. `rule_text` / cell rows are **DB-mastered content**, not seeded in canon.
+
+### 2A.2 Knowledge axes — `knowledge_assertions` + profile cache (B3)
+
+```sql
+CREATE TABLE knowledge_assertions (        -- the history (legal audit artifact: COPPA actual-knowledge, Art 8)
+  id          BIGSERIAL PRIMARY KEY,
+  person_id   BIGINT NOT NULL REFERENCES person(id),
+  axis        TEXT NOT NULL CHECK (axis IN ('age','residence')),
+  method      TEXT NOT NULL,               -- 'self_report','parent_reported','geo_ip','billing_address',…
+  confidence  DECIMAL(3,2) NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+  source      TEXT NOT NULL,               -- 'signup','profile_form','session_start_check'
+  asserted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actor_id    BIGINT REFERENCES person(id),
+  revoked_at  TIMESTAMPTZ                  -- non-null = superseded by a later assertion
+);
+CREATE INDEX idx_knowledge_assertions_person_axis ON knowledge_assertions (person_id, axis, asserted_at DESC);
+
+ALTER TABLE person                          -- the current state (cached for per-LLM-call runtime reads)
+  ADD COLUMN age_knowing       JSONB,        -- {method, confidence, last_updated}
+  ADD COLUMN residence_knowing JSONB;
+```
+
+Determination methods stay small `ENUM`-style value sets (`age_method`: `self_report` · `parent_reported` · `verified_credential` · `age_estimation_signal`; `residence_method`: `self_report` · `billing_address` · `geo_ip` · `verified_credential`) — **v1 set** = `self_report` + `parent_reported` (age), `geo_ip` + `billing_address` (residence); the rest v1.1. They change by *our* rollout decision, not regulatory cadence, so an ENUM is fine. **Default-for-unknown = most-restrictive** is engine *behavior* when `*_knowing` is null, not a schema column.
+
+### 2A.3 Router — `allowed_models`
+
+```sql
+CREATE TYPE model_tier AS ENUM ('primary', 'secondary', 'tertiary');
+
+CREATE TABLE allowed_models (              -- vetting-pipeline output; the ONLY contract vetting↔routing
+  id                   BIGSERIAL PRIMARY KEY,
+  model                TEXT NOT NULL,
+  provider_via_service TEXT NOT NULL,       -- 'anthropic-via-azure' (4th vetting axis)
+  service              TEXT NOT NULL,
+  region               TEXT NOT NULL,
+  criteria_metadata    JSONB NOT NULL,      -- ToS/ZDR/log/training/age-closure; router reads row, not metadata
+  tier                 model_tier NOT NULL DEFAULT 'primary',
+  effective_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at           TIMESTAMPTZ,
+  UNIQUE (model, provider_via_service, service, region)
+);
+```
+
+Runtime router key is **3-param** (`model · service · region`, filtered by the engine's eligibility output); the 4th axis (`provider_via_service`) is vetting-only. Rows are **DB-mastered** (PM-owned WP-4); the launch provider *set* is the workstream's output, not canon.
+
+### 2A.4 Capability split — Payer sub-field, Guardian/Mentor edges, charge terminology
+
+```sql
+-- Payer is a sub-field, not a persona: 1 primary (NOT NULL) + ≤1 secondary.
+ALTER TABLE subscription ALTER COLUMN payer_person_id SET NOT NULL;  -- the PRIMARY payer (was nullable snapshot)
+CREATE TABLE subscription_payers (
+  subscription_id BIGINT NOT NULL REFERENCES subscription(id),
+  person_id       BIGINT NOT NULL REFERENCES person(id),
+  role            TEXT NOT NULL CHECK (role IN ('primary','secondary')),
+  UNIQUE (subscription_id, person_id)
+);
+-- v1: ≤1 secondary per subscription (enforced in service code); secondary = read state + view invoices
+--     + update payment method ONLY (no cancel/upgrade/plan-change); primary notified on every change.
+
+-- Guardian = consent only (already a global edge per MMT-ADR-0008); add explicit qualification:
+ALTER TABLE guardianship ADD COLUMN qualification TEXT NOT NULL DEFAULT 'biological_parent'
+  CHECK (qualification IN ('biological_parent','adoptive_parent','stepparent','grandparent',
+    'court_appointed_guardian','foster_parent','kinship_caregiver','sibling_with_custody','other'));
+
+-- G-6 birthday-crossing takeover branch:
+ALTER TABLE person ADD COLUMN has_own_account BOOLEAN NOT NULL DEFAULT false;
+```
+
+**Charge terminology (sweep 2026-06-06):** `wards`→`charges`, `wardships`→`guardianship`, `ward_person_id`→`charge_person_id`, the `ward × purpose × org` event key → `charge × purpose × org`. Profile-management authority bundles with the **Subscription-administrator** (`{admin}` role + Payer field) — no new column; the Guardian edge is consent-only, the Mentor edge is data-access-only.
+
+### 2A.5 Age bracket — `'child'` value + launch floor
+
+`AgeBracket` schema (`packages/schemas/src/age.ts`): `'adolescent' | 'adult'` → **`'child' | 'adolescent' | 'adult'`** (additive; required for the 13+ launch-floor logic and the v1.1 sub-13 ungating). `birthYearSchema` (`packages/schemas/src/profiles.ts`) flips `≤ currentYear-11` → `≤ currentYear-13` (the v1 launch floor), shipping **with a documented rationale in the same change**. The kill-switch is backend-enforced; the "knowingly under-13" delete-path stays warm.
 
 ---
 
@@ -93,7 +229,7 @@ Eight tables in the active graph, plus a per-class retain-tier set. Each row bel
    all learning data    ─────────drop────►       the live `consent_grant` row is gone)
 ```
 
-The key asymmetry: **the live consent record moves, the receipt stays.** `consent_grant` is the working row; `consent_receipt` is the durable artifact. The `ward_person_id ON DELETE RESTRICT` on `consent_grant` enforces "you can't hard-delete a person with active grants — re-home them first."
+The key asymmetry: **the live consent record moves, the receipt stays.** `consent_grant` is the working row; `consent_receipt` is the durable artifact. The `charge_person_id ON DELETE RESTRICT` on `consent_grant` enforces "you can't hard-delete a person with active grants — re-home them first." *(Terminology: `ward`→`charge` per the 2026-06-06 sweep / `MMT-ADR-0015`.)*
 
 ---
 
@@ -343,6 +479,9 @@ Every invariant, ADR, counsel ruling, and code citation this doc relies on. Desi
 - `MMT-ADR-0010` — family-join / consolidation primitive
 - `MMT-ADR-0011` — *(this phase)* Phase-E data-model realization
 - `MMT-ADR-0012` — *(this phase)* one-time baseline reset
+- `MMT-ADR-0013` — *(amendment)* policy-engine spine (two-primitive, regime taxonomy, knowledge axes, router key) — §2A
+- `MMT-ADR-0014` — *(amendment)* router runtime / vetting hard-split — §2A.3
+- `MMT-ADR-0015` — *(amendment)* pre-baseline data-model amendments (Payer sub-field, G-3/4/6, charge terminology, AgeBracket child, knowledge/policy/allowed_models tables) — §2A
 
 ### Counsel rulings baked in
 - `I-C1` — `consent_states` `onDelete:'cascade'` defect; `consent.ts:898-901` write-then-delete defect; no retain-tier
