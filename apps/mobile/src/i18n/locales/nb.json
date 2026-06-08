@@ -1038,11 +1038,11 @@
       "startTitle": "Start {{subject}}"
     },
     "noteSignal": {
-      "verified": "Verified",
-      "verifiedAccessibilityLabel": "Verified - your words held up",
-      "tutorAddition": "The tutor has more on this topic",
-      "showTutorAdditionAccessibilityLabel": "Show what the tutor added",
-      "hideTutorAdditionAccessibilityLabel": "Hide what the tutor added"
+      "verified": "Verifisert",
+      "verifiedAccessibilityLabel": "Verifisert – ordene dine holdt mål",
+      "tutorAddition": "Veilederen har mer om dette emnet",
+      "showTutorAdditionAccessibilityLabel": "Vis hva veilederen la til",
+      "hideTutorAdditionAccessibilityLabel": "Skjul det veilederen la til"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Åpne lagret bokmerke: {{title}}"

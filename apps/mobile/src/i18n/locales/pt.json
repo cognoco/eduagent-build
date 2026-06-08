@@ -1063,11 +1063,11 @@
       "startTitle": "Começar {{subject}}"
     },
     "noteSignal": {
-      "verified": "Verified",
-      "verifiedAccessibilityLabel": "Verified - your words held up",
-      "tutorAddition": "The tutor has more on this topic",
-      "showTutorAdditionAccessibilityLabel": "Show what the tutor added",
-      "hideTutorAdditionAccessibilityLabel": "Hide what the tutor added"
+      "verified": "Verificado",
+      "verifiedAccessibilityLabel": "Verificado - as suas palavras foram confirmadas",
+      "tutorAddition": "O tutor tem mais sobre este tópico",
+      "showTutorAdditionAccessibilityLabel": "Mostrar o que o tutor adicionou",
+      "hideTutorAdditionAccessibilityLabel": "Ocultar o que o tutor adicionou"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Abrir marcador salvo: {{title}}"

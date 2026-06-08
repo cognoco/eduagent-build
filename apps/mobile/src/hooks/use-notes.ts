@@ -22,6 +22,7 @@ import type {
   NoteResponse,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { useApiQuery } from './use-api-query';
 import { useProfile } from '../lib/profile';
 import { queryKeys } from '../lib/query-keys';
 import { combinedSignal } from '../lib/query-timeout';
@@ -174,27 +175,18 @@ export function useConceptMasterySignals(
     [topicIds],
   );
 
-  return useQuery({
+  return useApiQuery<ConceptMasterySignalsResponse>({
     queryKey: queryKeys.library.conceptMastery(
       activeProfile?.id,
       sortedTopicIds,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.notes['concept-mastery'].$get(
-          {
-            query: { topicIds: sortedTopicIds.join(',') },
-          },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as ConceptMasterySignalsResponse;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && sortedTopicIds.length > 0,
+    enabled: sortedTopicIds.length > 0,
+    fetch: (signal) =>
+      client.notes['concept-mastery'].$get(
+        { query: { topicIds: sortedTopicIds.join(',') } },
+        { init: { signal } },
+      ),
+    select: (json) => json,
   });
 }
 
