@@ -3,10 +3,17 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
-import { registerProvider, _clearProviders } from '../services/llm';
+import {
+  registerProvider,
+  _clearProviders,
+  setLlmRoutingV2Enabled,
+} from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
 import { createAnthropicProvider } from '../services/llm/providers/anthropic';
+import { createCerebrasProvider } from '../services/llm/providers/cerebras';
+import { createMistralProvider } from '../services/llm/providers/mistral';
+import { isLlmRoutingV2Enabled } from '../config';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
@@ -16,6 +23,9 @@ type LLMEnv = {
     GEMINI_API_KEY?: string;
     OPENAI_API_KEY?: string;
     ANTHROPIC_API_KEY?: string;
+    CEREBRAS_API_KEY?: string;
+    MISTRAL_API_KEY?: string;
+    LLM_ROUTING_V2_ENABLED?: string;
     ENVIRONMENT?: string;
   };
 };
@@ -43,16 +53,30 @@ function envHash(env: {
   GEMINI_API_KEY?: string;
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
+  CEREBRAS_API_KEY?: string;
+  MISTRAL_API_KEY?: string;
 }): string {
   // Simple concatenation — keys are hex/base64 tokens so `|` is a safe separator.
-  return `${env.GEMINI_API_KEY ?? ''}|${env.OPENAI_API_KEY ?? ''}|${env.ANTHROPIC_API_KEY ?? ''}`;
+  // [BUG-488] Every registered provider's key MUST be in the hash, or a
+  // key-only change (e.g. adding CEREBRAS_API_KEY on a reused isolate) would
+  // not trigger re-registration.
+  return `${env.GEMINI_API_KEY ?? ''}|${env.OPENAI_API_KEY ?? ''}|${env.ANTHROPIC_API_KEY ?? ''}|${env.CEREBRAS_API_KEY ?? ''}|${env.MISTRAL_API_KEY ?? ''}`;
 }
 
 export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
+  // Inject the V2 routing cutover flag into the pure router module every
+  // request. Idempotent and decoupled from the API-key env-hash below (the
+  // flag is not a provider key, so a flag flip must take effect even when the
+  // key set is unchanged). Default-off until LLM_ROUTING_V2_ENABLED=true in
+  // Doppler (MMT-ADR-0016 §1.5 cutover).
+  setLlmRoutingV2Enabled(isLlmRoutingV2Enabled(c.env?.LLM_ROUTING_V2_ENABLED));
+
   const currentHash = envHash({
     GEMINI_API_KEY: c.env?.GEMINI_API_KEY,
     OPENAI_API_KEY: c.env?.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: c.env?.ANTHROPIC_API_KEY,
+    CEREBRAS_API_KEY: c.env?.CEREBRAS_API_KEY,
+    MISTRAL_API_KEY: c.env?.MISTRAL_API_KEY,
   });
 
   if (_registeredEnvHash !== currentHash) {
@@ -69,6 +93,8 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
     const geminiKey = c.env?.GEMINI_API_KEY;
     const openaiKey = c.env?.OPENAI_API_KEY;
     const anthropicKey = c.env?.ANTHROPIC_API_KEY;
+    const cerebrasKey = c.env?.CEREBRAS_API_KEY;
+    const mistralKey = c.env?.MISTRAL_API_KEY;
 
     if (geminiKey) {
       registerProvider(createGeminiProvider(geminiKey));
@@ -80,6 +106,19 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
 
     if (anthropicKey) {
       registerProvider(createAnthropicProvider(anthropicKey));
+    }
+
+    // Interactive-routing v2 providers (MMT-ADR-0016). Registered when their
+    // key is present so they are available behind LLM_ROUTING_V2_ENABLED; the
+    // router does not select them while the flag is off, so registering them
+    // is inert until cutover. Not part of the primary-key gate below — a
+    // deployment still needs a flag-off primary (Gemini/OpenAI).
+    if (cerebrasKey) {
+      registerProvider(createCerebrasProvider(cerebrasKey));
+    }
+
+    if (mistralKey) {
+      registerProvider(createMistralProvider(mistralKey));
     }
 
     const hasAnyProvider = geminiKey || openaiKey || anthropicKey;
@@ -120,4 +159,6 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
 export function resetLlmMiddleware(): void {
   _registeredEnvHash = null;
   _clearProviders();
+  // Reset the V2 flag so a test that flipped it on cannot leak into the next.
+  setLlmRoutingV2Enabled(false);
 }

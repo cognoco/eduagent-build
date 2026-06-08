@@ -11,6 +11,11 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  // Interactive-routing v2 vendors (MMT-ADR-0016 §1.5). Optional: registered
+  // when present (middleware/llm.ts) but only selected behind
+  // LLM_ROUTING_V2_ENABLED, so absence is inert until cutover.
+  CEREBRAS_API_KEY: z.string().min(1).optional(),
+  MISTRAL_API_KEY: z.string().min(1).optional(),
   APP_URL: z.string().url().default('https://www.mentomate.com'),
   // Optional outside production: only consent/settings email-link flows need it.
   // Keeping it optional here prevents unrelated routes from failing globally
@@ -138,6 +143,15 @@ const envSchema = z.object({
   //     / draftedNote fields, so mobile has nothing to render.
   // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
   CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Interactive routing v2 (MMT-ADR-0016 §1.5 / the gpt-oss-cerebras-build
+  // spec). Default-OFF: while 'false', getModelConfig/getFallbackConfig stay
+  // byte-identical to today's Gemini-default routing. Flipping to 'true' pins
+  // the §1.5 matrix (Cerebras gpt-oss primary, tier-aware secondaries) and the
+  // fail-closed, Gemini-forbidden fallback. The flag flip for MINOR traffic is
+  // additionally gated by non-code legal prerequisites (G-P1/G-P2/G-P3) — see
+  // the build spec; this flag only controls the code path.
+  LLM_ROUTING_V2_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -197,6 +211,16 @@ export function isTopicIntentMatcherEnabled(
 export function isChallengeRoundRuntimeEnabled(
   value: string | undefined,
 ): boolean {
+  return value === 'true';
+}
+
+/**
+ * Interactive routing v2 gate (MMT-ADR-0016). Threaded into the router's
+ * getModelConfig/getFallbackConfig. Default-closed: undefined / anything other
+ * than 'true' keeps the current Gemini-default routing so a missing binding
+ * never accidentally cuts over. See the gpt-oss-cerebras-build spec.
+ */
+export function isLlmRoutingV2Enabled(value: string | undefined): boolean {
   return value === 'true';
 }
 

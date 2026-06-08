@@ -418,6 +418,41 @@ describe('OpenAI Provider', () => {
       },
     );
 
+    it('maps gpt-5-mini through without the default-fallback warn', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      mockFetch.mockResolvedValueOnce(createOkResponse('test'));
+      await provider.chat(TEST_MESSAGES, {
+        ...TEST_CONFIG,
+        model: 'gpt-5-mini',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.model).toBe('gpt-5-mini');
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('emits reasoning_effort when set, omits it when not', async () => {
+      mockFetch.mockResolvedValue(createOkResponse('test'));
+
+      await provider.chat(TEST_MESSAGES, {
+        ...TEST_CONFIG,
+        model: 'gpt-5-mini',
+        reasoningEffort: 'low',
+      });
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body).reasoning_effort).toBe(
+        'low',
+      );
+
+      await provider.chat(TEST_MESSAGES, {
+        ...TEST_CONFIG,
+        model: 'gpt-4o-mini',
+      });
+      expect(
+        'reasoning_effort' in JSON.parse(mockFetch.mock.calls[1][1].body),
+      ).toBe(false);
+    });
+
     it('warns and defaults to gpt-4o-mini for unmapped models', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       mockFetch.mockResolvedValueOnce(createOkResponse('test'));

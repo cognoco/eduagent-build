@@ -370,12 +370,121 @@ export function setOpenAIAdvancedModel(
  */
 export const _setOpenAIAdvancedModelForTesting = setOpenAIAdvancedModel;
 
+// ---------------------------------------------------------------------------
+// LLM_ROUTING_V2_ENABLED — module-level cutover flag (MMT-ADR-0016 §1.5).
+//
+// The router is a pure module with no Hono context, so the flag is injected at
+// worker boot from middleware/llm.ts (mirrors `setOpenAIAdvancedModel`), read
+// from the Doppler-sourced `LLM_ROUTING_V2_ENABLED` env var. Default `false`:
+// EVERY routing change in this PR is inert until middleware flips it on, so the
+// Gemini-default path (and its equivalence snapshot) stays byte-identical while
+// the flag is off. Kept module-level (not a per-call option) so
+// getModelConfig/getFallbackConfig can read it without threading a flag through
+// every call site.
+// ---------------------------------------------------------------------------
+let routingV2Enabled = false;
+
+export function setLlmRoutingV2Enabled(enabled: boolean): void {
+  routingV2Enabled = enabled;
+}
+
+/** Exported for testing only — read/reset the V2 routing flag. */
+export function _getLlmRoutingV2Enabled(): boolean {
+  return routingV2Enabled;
+}
+
+// MMT-ADR-0016 §1.5 model IDs — selected only under LLM_ROUTING_V2_ENABLED.
+// Universal default text model (all tiers, rungs 1–3, + Family/Free rungs 4–5).
+const CEREBRAS_DEFAULT_MODEL = 'gpt-oss-120b';
+// Free-tier secondary + free-tier vision (gpt-oss is text-only).
+const MISTRAL_SECONDARY_MODEL = 'mistral-small-2603';
+// Paid-tier secondary + paid-tier vision.
+const OPENAI_MINI_MODEL = 'gpt-5-mini';
+// Rung at/after which a `premium`-tier request reaches gpt-5.4 under V2.
+// Lower than the legacy `OPENAI_ADVANCED_MODEL_MIN_RUNG = 5` (which gates the
+// legacy preferred-provider=openai path); the V2 matrix uses its own floor so
+// Plus/Pro reach gpt-5.4 from rung 4 without disturbing the legacy constant.
+const V2_ADVANCED_MODEL_MIN_RUNG = 4;
+
+// Providers an under-18 product must NEVER route to (MMT-ADR-0016 §10.1 /
+// GATE-1: Gemini + Vertex are banned for under-18 users). Age-INDEPENDENT for
+// now — there is no age input; the ban applies to every request under V2. (If
+// the adult-only Gemini ruling lands — routing-spec §10.1 — this set becomes
+// age-conditional via the policy spine; that is a later change, out of scope
+// here.) Used fail-closed by the V2 fallback selector: when the only
+// registered alternative is forbidden, the selector returns null and the
+// caller raises the existing circuit-open error rather than silently serving a
+// banned vendor.
+const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
+
+/**
+ * V2 primary-model matrix (MMT-ADR-0016 §1.5). Pure function of
+ * (rung, tier, capability) — providerPolicy is intentionally NOT consulted:
+ * the legacy `gemini_only` policy (how Family / Plus-standard / addon-standard
+ * arrive) targets Gemini, which is banned under-18, so under V2 those requests
+ * are remapped here to the compliant universal default. The Family→gpt-5.4
+ * exclusion is structural, not handled here: Family never resolves to the
+ * `premium` llmTier upstream (`resolveExchangeLlmRouting`), so it can never
+ * satisfy the `llmTier === 'premium'` gate below and always lands on gpt-oss.
+ */
+function getModelConfigV2(
+  rung: EscalationRung,
+  llmTier: LLMTier,
+  capability: LlmCapability,
+): ModelConfig {
+  const isFree = llmTier === 'flash';
+
+  // Vision: gpt-oss is text-only. Paid → GPT-5 mini @ low; free → Mistral Small.
+  if (capability === 'vision') {
+    return isFree
+      ? {
+          provider: 'mistral',
+          model: MISTRAL_SECONDARY_MODEL,
+          maxTokens: MIN_REPLY_MAX_TOKENS,
+        }
+      : {
+          provider: 'openai',
+          model: OPENAI_MINI_MODEL,
+          maxTokens: MIN_REPLY_MAX_TOKENS,
+          reasoningEffort: 'low',
+        };
+  }
+
+  // Deep-reasoning rungs (4–5), Plus/Pro/AI-Upgrade (resolved as `premium`
+  // upstream) → gpt-5.4 @ medium. Family is excluded structurally (never
+  // `premium`); Free (`flash`) never reaches this branch either.
+  if (rung >= V2_ADVANCED_MODEL_MIN_RUNG && llmTier === 'premium') {
+    return {
+      provider: 'openai',
+      model: getOpenAIAdvancedModel(),
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+      reasoningEffort: 'medium',
+    };
+  }
+
+  // Universal default — all tiers, rungs 1–3, plus Family/Free rungs 4–5.
+  return {
+    provider: 'cerebras',
+    model: CEREBRAS_DEFAULT_MODEL,
+    maxTokens: MIN_REPLY_MAX_TOKENS,
+    reasoningEffort: 'high',
+  };
+}
+
 function getModelConfig(
   rung: EscalationRung,
   llmTier: LLMTier = 'standard',
   preferredProvider?: PreferredLlmProvider,
   providerPolicy: LlmProviderPolicy = 'default',
+  capability: LlmCapability = 'text',
 ): ModelConfig {
+  // V2 cutover: the §1.5 matrix is authoritative for ALL tiers/policies. It is
+  // checked before every legacy branch (including gemini_only and
+  // preferredProvider) so no flag-on request can resolve to a banned vendor.
+  if (routingV2Enabled) {
+    return getModelConfigV2(rung, llmTier, capability);
+  }
+
   if (providerPolicy === 'gemini_only') {
     const isLight = llmTier === 'flash' || rung <= 2;
     return {
@@ -486,7 +595,17 @@ function getFallbackConfig(
   primary: ModelConfig,
   rung: EscalationRung,
   providerPolicy: LlmProviderPolicy = 'default',
+  llmTier: LLMTier = 'standard',
+  capability: LlmCapability = 'text',
 ): ModelConfig | null {
+  // V2 cutover: compliance-driven, allow-list fallback (MMT-ADR-0016 §1.5 +
+  // §10.1). Never returns Gemini/Vertex; fails closed when no compliant
+  // provider is registered. providerPolicy is not consulted under V2 (its
+  // gemini_only target is banned).
+  if (routingV2Enabled) {
+    return getFallbackConfigV2(primary, llmTier, capability);
+  }
+
   if (providerPolicy === 'gemini_only') {
     return null;
   }
@@ -547,6 +666,127 @@ function getFallbackConfig(
   }
 
   return null;
+}
+
+/**
+ * V2 fallback selector (MMT-ADR-0016 §1.5 T12 + §10.1 T9). Returns the first
+ * registered, NON-FALLBACK_FORBIDDEN compliant candidate for the failed
+ * primary, else `null` (→ caller raises circuit-open). Tier-aware: each tier's
+ * §1.5 secondary is its first fallback. Gemini/Vertex never appear in any
+ * candidate list, and the FALLBACK_FORBIDDEN guard in the loop is a
+ * belt-and-suspenders backstop so a future candidate-list edit cannot
+ * reintroduce a banned vendor.
+ */
+function getFallbackConfigV2(
+  primary: ModelConfig,
+  llmTier: LLMTier,
+  capability: LlmCapability,
+): ModelConfig | null {
+  const shared = {
+    responseFormat: primary.responseFormat,
+  } satisfies Pick<ModelConfig, 'responseFormat'>;
+  const isFree = llmTier === 'flash';
+
+  const sonnet = (): ModelConfig => ({
+    provider: 'anthropic',
+    model: ANTHROPIC_SONNET_MODEL,
+    maxTokens: MIN_REPLY_MAX_TOKENS,
+    ...shared,
+  });
+  const gpt5mini = (): ModelConfig => ({
+    provider: 'openai',
+    model: OPENAI_MINI_MODEL,
+    maxTokens: MIN_REPLY_MAX_TOKENS,
+    reasoningEffort: 'low',
+    ...shared,
+  });
+  const mistral = (): ModelConfig => ({
+    provider: 'mistral',
+    model: MISTRAL_SECONDARY_MODEL,
+    maxTokens: MIN_REPLY_MAX_TOKENS,
+    ...shared,
+  });
+
+  let candidates: Array<() => ModelConfig>;
+  if (capability === 'vision') {
+    // gpt-oss (Cerebras) is text-only — vision fallbacks must stay
+    // vision-capable (Mistral Small / GPT-5 mini / Sonnet all are).
+    candidates = isFree ? [mistral, sonnet] : [gpt5mini, sonnet];
+  } else {
+    switch (primary.provider) {
+      case 'cerebras':
+        // Free Cerebras → Mistral → Sonnet; paid Cerebras → GPT-5 mini → Sonnet.
+        candidates = isFree ? [mistral, sonnet] : [gpt5mini, sonnet];
+        break;
+      case 'mistral':
+        candidates = [gpt5mini, sonnet];
+        break;
+      case 'openai':
+        // Covers both gpt-5.4 (rungs 4–5) and gpt-5-mini — Sonnet, never Gemini.
+        candidates = [sonnet];
+        break;
+      case 'anthropic':
+        candidates = [gpt5mini];
+        break;
+      default:
+        candidates = [];
+    }
+  }
+
+  for (const make of candidates) {
+    const cfg = make();
+    if (FALLBACK_FORBIDDEN.has(cfg.provider)) continue;
+    if (providers.has(cfg.provider)) return cfg;
+  }
+  return null;
+}
+
+/**
+ * Exported for testing only — exercises the fallback selector directly so the
+ * compliance break test (`router.fallback-compliance.test.ts`) can assert the
+ * chosen target without driving a full routeAndCall. Honors the same flag the
+ * production call path does; tests enable V2 via `setLlmRoutingV2Enabled(true)`.
+ */
+export function getFallbackConfigForTest(
+  primary: ModelConfig,
+  rung: EscalationRung,
+  opts?: {
+    providerPolicy?: LlmProviderPolicy;
+    llmTier?: LLMTier;
+    capability?: 'text' | 'vision';
+  },
+): ModelConfig | null {
+  return getFallbackConfig(
+    primary,
+    rung,
+    opts?.providerPolicy,
+    opts?.llmTier,
+    opts?.capability,
+  );
+}
+
+/**
+ * Exported for testing only — resolves the primary ModelConfig directly so the
+ * V2 matrix tests can assert `{ provider, model, reasoningEffort }` (the last
+ * of which RouteResult does not surface). Honors the same flag the production
+ * path does.
+ */
+export function getModelConfigForTest(
+  rung: EscalationRung,
+  opts?: {
+    llmTier?: LLMTier;
+    preferredProvider?: PreferredLlmProvider;
+    providerPolicy?: LlmProviderPolicy;
+    capability?: 'text' | 'vision';
+  },
+): ModelConfig {
+  return getModelConfig(
+    rung,
+    opts?.llmTier,
+    opts?.preferredProvider,
+    opts?.providerPolicy,
+    opts?.capability,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -888,6 +1128,7 @@ export async function routeAndCall(
       _options?.llmTier,
       _options?.preferredProvider,
       _options?.providerPolicy,
+      capability,
     ),
     ...(_options?.responseFormat ? { responseFormat: 'json' as const } : {}),
   };
@@ -950,6 +1191,8 @@ export async function routeAndCall(
         config,
         rung,
         _options?.providerPolicy,
+        _options?.llmTier,
+        capability,
       );
       if (!fallbackConfig) throw err;
 
@@ -980,6 +1223,8 @@ export async function routeAndCall(
     config,
     rung,
     _options?.providerPolicy,
+    _options?.llmTier,
+    capability,
   );
   if (fallbackConfig) {
     logger.warn('[llm] Primary provider circuit open, using fallback', {
@@ -1301,6 +1546,7 @@ export async function routeAndStream(
       options?.llmTier,
       options?.preferredProvider,
       options?.providerPolicy,
+      capability,
     ),
     ...(options?.responseFormat ? { responseFormat: 'json' as const } : {}),
   };
@@ -1316,6 +1562,8 @@ export async function routeAndStream(
       config,
       rung,
       options?.providerPolicy,
+      options?.llmTier,
+      capability,
     );
     // NOTE: recordSuccess/recordFailure fire during iteration, not here,
     // because chatStream() returns a lazy AsyncIterable — the actual HTTP
@@ -1384,6 +1632,8 @@ export async function routeAndStream(
     config,
     rung,
     options?.providerPolicy,
+    options?.llmTier,
+    capability,
   );
   if (fallbackConfig) {
     logger.warn('[llm] Primary stream circuit open, using fallback', {

@@ -589,6 +589,7 @@ describe('validateProductionBindings', () => {
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
+    LLM_ROUTING_V2_ENABLED: 'false',
   };
 
   const fakeKv = {} as unknown;

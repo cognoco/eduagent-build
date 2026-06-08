@@ -1,4 +1,4 @@
-import type { EscalationRung } from '@eduagent/schemas';
+import type { ConversationLanguage, EscalationRung } from '@eduagent/schemas';
 import type { StopReason } from './stop-reason';
 
 // ---------------------------------------------------------------------------
@@ -10,7 +10,14 @@ export type { StopReason };
 
 /** Model selection based on rung */
 export interface ModelConfig {
-  provider: 'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'mock';
+  provider:
+    | 'gemini'
+    | 'openai'
+    | 'anthropic'
+    | 'cerebras'
+    | 'mistral'
+    | 'openrouter'
+    | 'mock';
   model: string;
   maxTokens: number;
   /** Ask providers with native support to constrain output to JSON. */
@@ -23,6 +30,15 @@ export interface ModelConfig {
    * minimal = 4–7s with 0 reasoning tokens — see model-selection memo §6.
    */
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  /**
+   * Learner's tutor-prose language, threaded from the router so a provider
+   * that must synthesize a fallback reply (e.g. the Cerebras adapter
+   * rewriting a bare model refusal into a safe envelope — see
+   * providers/refusal-envelope.ts) can localize it. Optional: providers that
+   * never synthesize text ignore it, and the refusal helper falls back to
+   * English when unset.
+   */
+  conversationLanguage?: ConversationLanguage;
 }
 
 /** Multimodal message parts for vision/image input */
