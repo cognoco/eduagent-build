@@ -2,7 +2,7 @@
 
 **Register:** llm-models · **Change:** initial population of the vetted set across
 all tiers · **Date of vetting:** 2026-06-06 · **Deciders:** PM (owner) + Claude ·
-**Status:** complete · **Record stamp:** `reconstructed 2026-06-08` (written
+**Status:** **RATIFIED** — compliance half (PM/legal) + capability half (eng) approved 2026-06-08 · **Record stamp:** `reconstructed 2026-06-08` (written
 after-the-fact from `MMT-ADR-0016` and the eval evidence it cites, per
 `MMT-ADR-0000` reconstruction discipline).
 
