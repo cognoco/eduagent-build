@@ -1,6 +1,22 @@
 # Glossary — shared product & learning vocabulary
 
-**Status:** Active draft · started 2026-06-08 · owners: product (Zuzana) + agent
+**Status:** DRAFT · working reference, **NOT canon** · started 2026-06-08 · owners: product (Zuzana) + agent
+
+> [!IMPORTANT]
+> **This is not a canonical document.** It was reverse-engineered from the
+> (drifted) codebase and shipped copy, so it is a **drift-mapping artifact**: it
+> records what the code and UI *currently say* — including where that has drifted
+> from the ratified model — and must be **validated against canon before any
+> entry is trusted**. The sources of truth are:
+>
+> - **Identity / tenancy / roles, and the authoritative definition of any term:**
+>   the **L0 glossary `CONTEXT.md`** (root + per-area) and **`docs/canon/`**
+>   (identity canon lives under `docs/canon/identity/`).
+> - Where this file and canon disagree, **canon wins** and this file is corrected
+>   to point at it — it never overrides canon.
+>
+> The section-level `STATUS: settled` tags below are **pre-canon claims by the
+> authoring pass, not ratifications**; treat them as draft until reconciled.
 
 ## Why this exists
 
