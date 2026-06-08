@@ -21,4 +21,4 @@ not here.
 
 **Stream canon + tracker:** `_wip/identity-foundation/` — `ROADMAP.md` (live status, phases A–P), `identity-ontology.md`, `domain-model.md`, `data-model.md`, `identity-foundation-prd.md`, the signed A-vs-B memo.
 
-**State (2026-06-08):** Phase F **closed**; Phase G next (lock the canonical set + seed the documentation index). Carried contingency: R-1 (COPPA) provisional posture — real counsel sign-off (HW-2) owed, not launch-blocking. Note: the `project` "Strictly 11+" memory is **superseded** by the Path-X 13+ consent floor (sub-13 built-but-gated) — Phase-J cleanup target.
+**Current state pointer:** read `_wip/identity-foundation/ROADMAP.md` for phase status and `_wip/identity-foundation/CANONICAL-SET.md` for canon membership. Carried contingency remains R-1 (COPPA) provisional posture — real counsel sign-off (HW-2) owed before any sub-13/v2 build, not launch-blocking for the runway.

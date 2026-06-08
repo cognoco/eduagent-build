@@ -7,7 +7,7 @@
 
 ## Identity Foundation (re-platform)
 
-- [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to the ratified identity/policy-engine/router/safety ADRs (0007–0016) + the `docs/registers/llm-models/` register. Runway tracked in `_wip/identity-foundation/ROADMAP.md`. Phase F closed; G next. (Path-X 13+ floor supersedes the "Strictly 11+" note below.)
+- [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to the ratified identity/policy-engine/router/safety ADRs + the `docs/registers/llm-models/` register. Current runway state lives in `_wip/identity-foundation/ROADMAP.md`; canon membership lives in `_wip/identity-foundation/CANONICAL-SET.md`.
 
 ## Product Constraint — Strictly 11+
 

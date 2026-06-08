@@ -58,7 +58,7 @@ relative to the repo root.
 | 1 | `_wip/identity-foundation/identity-ontology.md` | The **conceptual vocabulary** — entities, roles, edges, the terms every other doc is written in. Source of the shared language. | Phase A/C (ontology v1) |
 | 2 | `_wip/identity-foundation/domain-model.md` | The **domain model** — entities / roles / consent model / tenancy; org & membership **re-derived, not inherited**. | Phase D · 2026-06-03 |
 | 3 | `_wip/identity-foundation/data-model.md` | The **target schema** — 8 tables + cut strategy + the F.1 lockstep SQL for the `MMT-ADR-0015` amendments (`kind` column, seam columns, `allowed_models`). | Phase E · 2026-06-04, amended F.1 · 2026-06-08 |
-| 4 | `_wip/identity-foundation/identity-foundation-prd.md` | The **product layer** — personas (6), the three-axis age model, Path X (13+ load-bearing v1 / sub-13 built-but-gated), ICP-vs-persona distinction. | Phase B · 2026-06-02 (Part 10 ripple) |
+| 4 | `_wip/identity-foundation/identity-foundation-prd.md` | The **product layer** — personas (6), the three-axis age model, 13+ launch floor with sub-13 built-but-gated, ICP-vs-persona distinction. | Phase B · 2026-06-02 (Part 10 ripple) |
 
 ### L2 — Decisions (the *why*: ADRs)
 
@@ -78,7 +78,7 @@ plus the governing meta-ADR `0000`.
 | 13 | `MMT-ADR-0012` — one-time baseline reset | The pre-launch one-time migration collapse (clean-cut). | Accepted · Phase E |
 | 14 | `MMT-ADR-0013` — policy-engine spine | Two-primitive model, regime taxonomy, knowledge axes, router key. The engine's *shape*. | Accepted · 2026-06-07 |
 | 15 | `MMT-ADR-0014` — router runtime / vetting split | 3-param runtime router ⟂ 4-axis offline vetting; hard split; supersedes prior routing canon; fail-closed → `CircuitOpenError`; separately-routable tutor/judge roles. | Accepted · 2026-06-07 |
-| 16 | `MMT-ADR-0015` — pre-baseline data-model amendments | Payer sub-field, Sub-admin-as-profile-mgmt, charge terminology + G-3/G-4/G-6, `AgeBracket` 'child', knowledge assertions, `allowed_models`. Amends `0011`. | Accepted · 2026-06-07 |
+| 16 | `MMT-ADR-0015` — pre-baseline data-model amendments | Payer sub-field, Sub-admin-as-profile-mgmt, charge terminology, consent authority / data access / profile-management capability split, `AgeBracket` 'child', knowledge assertions, `allowed_models`. Amends `0011`. | Accepted · 2026-06-07 |
 | 17 | `MMT-ADR-0016` — safety & judge architecture | **Repurposed 2026-06-08** to judgment-based safety (no app-owned denylist) + a vendor-independent, non-reasoning judge. Model picks moved *out* to the register. | Accepted · 2026-06-06, re-scoped 2026-06-08 |
 
 ### L3 — Operational (registers; supporting specs)
@@ -115,8 +115,8 @@ the only outstanding signature — **HW-2**, a tracked contingency, not launch-b
 
 ## Watch-outs the lens carries (for L and H)
 
-- **Stale `.claude/memory/` "Strictly 11+" constraint.** Superseded by **Path X**
-  (13+ consent-capacity floor; sub-13 built-but-gated). It is a **Phase-J cleanup
+- **Stale `.claude/memory/` "Strictly 11+" constraint.** Superseded by the
+  13+ consent-capacity floor with sub-13 built-but-gated. It is a **Phase-J cleanup
   target** — do **not** treat it as canon. Not a member of this set.
 - **Deep provenance citations resolve by name, not path.** Citations inside the
   ratified `identity-ontology.md` / `identity-foundation-prd.md` point at files now
