@@ -23,7 +23,7 @@ Complete trace of every learning path in MentoMate, from the learner's first tap
 > **What changed since 2026-06-08**
 > - **Learn Something New current flow.** Home's `home-action-study-new` quick action routes directly to `/create-subject`; the obsolete `ONBOARDING_FAST_PATH` flag is no longer part of the current mobile feature-flag set. First curriculum sessions use `POST /subjects/:subjectId/sessions/first-curriculum`, with `/ready` shown only for the first subject so the learner gets a reflection moment before opening chat.
 > - **Session completion timing.** Tapping End Session closes the session and creates a pending summary row, but the normal `app/session.completed` pipeline is queued only after the learner submits or skips the "Your Words" reflection. Stale idle sessions are the exception: the stale-session cron auto-closes and dispatches completion with `summaryStatus='auto_closed'`.
-> - **Notes and Challenge Round.** Topic-scoped tutoring sessions include note prompts/manual note entry, summary-to-note side effects, and the feature-gated Challenge Round path: eligible learners can accept a short evaluated challenge, then review/save a drafted note when there is solid evidence. Freeform Ask Anything does not offer Challenge Round; it offers bookmarks during chat and can offer notes at session end by asking the learner to add the session to Library first.
+> - **Notes, Challenge Round, and freeform filing.** Topic-scoped tutoring sessions include note prompts/manual note entry, summary-to-note side effects, and the feature-gated Challenge Round path: eligible learners can accept a short evaluated challenge, then review/save a drafted note when there is solid evidence. Freeform Ask Anything does not offer Challenge Round or a learner-note flow. It offers bookmarks during chat, and Library filing becomes available only after 5 exchanges; if saved to Library, the LLM-generated recap/session summary is the durable review artifact.
 
 ---
 
@@ -63,7 +63,7 @@ Additionally, two **verification overlays** can activate within eligible learnin
 - **Devil's Advocate** (`evaluate`) — AI presents a flawed explanation; learner finds the error
 - **Feynman Technique** (`teach_back`) — learner explains the concept to a "clueless" AI
 
-A separate **Challenge Round** can activate inside eligible learning sessions when the API flag is enabled. It is not a route-level path and not guaranteed after a fixed number of turns; the server gates it by session type, evidence, retention/readiness, quota, and cooldown.
+A separate **Challenge Round** can activate inside eligible topic-bound learning sessions when the API flag is enabled. It is not a route-level path and not guaranteed after a fixed number of turns; the server gates it by session type, topic context, evidence, retention/readiness, quota, and cooldown.
 
 ---
 
@@ -191,14 +191,13 @@ Home Screen (LearnerScreen)
                   │
                   └─ Learner taps "End Session"
                       ├─ API closes the session with `summaryStatus='pending'`
-                      ├─ If still unfiled and there were at least 3 exchanges,
+                      ├─ If still unfiled and there were at least 5 exchanges,
                       │   close-path auto-filing is requested in the background
                       └─ Session Summary opens:
                           ├─ "Your Words" reflection text box
                           │   └─ AI evaluates reflection quality and returns feedback
-                          ├─ Optional "Write a note" CTA
-                          │   ├─ If session already has `topicId` -> opens note input
-                          │   └─ If session has no `topicId` -> asks to add session to Library first
+                          ├─ If filed to Library, shows Library destination/status
+                          ├─ LLM learner recap / structured session summary may arrive
                           ├─ OR "Skip for now"
                           └─ Recall Bridge questions (homework sessions only — not here)
 ```
@@ -211,7 +210,7 @@ Home Screen (LearnerScreen)
 | Every message | Exchange count, escalation rung | `learning_sessions` |
 | Session close | Duration (active + wall-clock), status | `learning_sessions` |
 | Auto-filing (if eligible) | New topic created/linked from transcript | `curriculum_topics`, `learning_sessions.topicId` |
-| Freeform note (if learner accepts Library filing) | Topic-bound learner-note | `topic_notes` with `sessionId` |
+| Learner recap / LLM session summary | LLM-written session review artifact | `session_summaries` |
 | Post-session pipeline | SM-2 retention card | `retention_cards` |
 | Post-session pipeline | Progress snapshot (daily aggregate) | `progress_snapshots` |
 | Post-session pipeline | Session embedding (1024-dim vector) | `session_embeddings` |
@@ -220,10 +219,11 @@ Home Screen (LearnerScreen)
 | Post-session pipeline | Topic suggestions ("What next?") | `topic_suggestions` |
 
 ### Key behavior
-- Freeform close does not block the learner on a manual filing prompt. If the session is still unfiled and has at least 3 exchanges, close-path auto-filing is requested in the background.
+- Freeform close does not block the learner on a manual filing prompt. If the session is still unfiled and has at least 5 exchanges, close-path auto-filing is requested in the background.
 - The post-session Inngest pipeline can wait up to 60s for filing resolution before computing topic-bound retention. If filing does not resolve in time, the pipeline proceeds with the best available placement and filing retry/observer jobs handle recovery.
 - Freeform does not offer Challenge Round.
-- Freeform live-chat saving uses bookmarks. Learner-notes are offered at the end/session summary; if the session is unfiled, the app asks the learner to add the session to Library before opening note input. Declining Library filing saves no topic-bound note, but the session transcript and any bookmarks remain.
+- Freeform does not offer a learner-note flow. Live-chat saving uses bookmarks, and filed sessions rely on the LLM learner recap / structured session summary as the review artifact.
+- Below 5 exchanges, an unfiled freeform session remains chat history plus any bookmarks and does not show the Add to Library affordance.
 
 ---
 
@@ -673,7 +673,7 @@ Bookmarks do not change session pedagogy or recording — they are a per-message
 
 Learners can save their own notes while learning. Notes are topic-bound: the session needs a `topicId` before the note can be saved directly.
 
-For freeform Ask Anything, note capture is an end-of-session flow. If the freeform session is already filed to a topic, the note input can open directly. If it is still unfiled, the learner first sees a Library filing consent step because the note will live in Library as a normal topic note. Declining filing means no learner-note is saved; bookmarks remain the instant-save option for mentor replies.
+For freeform Ask Anything, there is no separate learner-note flow. The learner can bookmark mentor replies during chat. If a 5+ exchange freeform session is filed to Library, the durable review artifact is the LLM-generated learner recap / structured session summary, not a learner-authored topic note.
 
 ```
 During a teaching session...
@@ -711,6 +711,7 @@ During a teaching session...
 - The LLM can request that the UI offer a note, but the learner still chooses whether to write or save it.
 - A note cannot be saved without a topic; the app surfaces a save error instead of silently dropping it.
 - Topic note caps are enforced server-side. Summary-to-note creation treats a cap conflict as non-fatal so summary submission still succeeds.
+- Freeform Ask Anything is excluded from learner-note CTAs in this flow, even when later Library filing creates or links a topic.
 
 ---
 
@@ -767,7 +768,7 @@ The recap is independent of the learner staying on the page. It may arrive after
 
 ---
 
-## Challenge Round (Within Eligible Learning Sessions)
+## Challenge Round (Within Eligible Topic-Bound Learning Sessions)
 
 Status: **code shipped, API flag-gated.** `CHALLENGE_ROUND_RUNTIME_ENABLED` defaults to `false`; while false, the prompt block is not injected, LLM challenge signals are ignored, and mobile receives no `challengeOffer`, `challengeRound`, or `draftedNote` fields.
 
@@ -778,6 +779,7 @@ Challenge Round is not the same as the `evaluate` verification overlay. It is a 
 The server can offer a Challenge Round only when all of these are true:
 
 - Session type is `learning`.
+- The session is topic-bound with a real `topicId`; freeform Ask Anything is excluded.
 - Learner is in normal struggle status.
 - The session has at least 5 exchanges.
 - Recent correct streak is at least 2.
@@ -940,11 +942,11 @@ Daily reconciliation also protects the summary layer: `summary-reconciliation-cr
 | Subject known at start | No | Yes | Sometimes | Yes | Yes | Optional |
 | Topic known at start | No | Yes | No | Yes | Yes | Optional |
 | Subject classification | On first message | Skipped | On first message | Skipped | Skipped | Skipped |
-| Filing on close | Background auto-file if eligible | No | Manual filing prompt | No | No | No |
+| Filing on close | Background auto-file if 5+ exchanges and eligible | No | Manual filing prompt | No | No | No |
 | Pedagogy | Depends on subject | Depends on subject | Direct (no Socratic) | Depends on subject | Remediation-focused | Verbatim recall, no Socratic |
 | Escalation ladder | Yes (if Socratic) | Yes (if Socratic) | No | Yes (if Socratic) | Yes (if Socratic) | No |
 | Verification overlays | None | evaluate / teach_back | None | evaluate / teach_back | None | None |
-| Challenge Round | Topic-bound only, flag-gated | Flag-gated | No | Flag-gated | Flag-gated | No |
+| Challenge Round | No | Flag-gated | No | Flag-gated | Flag-gated | No |
 | Timer visible | No | No | No | Yes | No | No |
 | Question count visible | No | No | Yes | No | No | No |
 | Recall bridge | No | No | Yes | No | No | No |

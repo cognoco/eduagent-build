@@ -1,110 +1,84 @@
 ---
-title: Freeform Notes Via Library Filing - Implementation Plan
+title: Freeform Library Filing Threshold - Implementation Plan
 date: 2026-06-08
 profile: code
-spec: docs/flows/learning-path-flows.md - Ask Anything note and filing flow
-status: draft
-reviewed: 2026-06-08 (supersedes hidden provisional-topic anchoring after product review)
+spec: docs/flows/learning-path-flows.md - Ask Anything filing flow
+status: implemented
+reviewed: 2026-06-08 (supersedes hidden provisional-topic anchoring and freeform note CTA plans)
 ---
 
-# Freeform Notes Via Library Filing - Implementation Plan
+# Freeform Library Filing Threshold - Implementation Plan
 
-**Goal:** Let Ask Anything sessions offer note capture without minting hidden mid-session topics. If the learner wants to record a topic-bound note from a freeform session, the app first asks them to accept Library filing for that session.
+**Goal:** Keep Ask Anything low-friction for quick questions, and only make Library filing available once a freeform session has enough substance to deserve a durable curriculum topic.
 
-**Approach:** Keep Ask Anything lightweight during chat. Learners can bookmark mentor replies instantly because bookmarks are session-event based and do not need a topic. Topic-bound notes remain Library artifacts: at the end of a freeform session, the app may offer "Write a note"; if the session is not already filed to a topic, the note flow asks to add the session to Library first, then opens note entry after filing resolves.
+**Decision:** Freeform Ask Anything sessions do not get Challenge Round and do not get a separate learner-note flow. Bookmarks remain the instant-save path during chat. Library filing becomes available only after **5 exchanges**. If the learner allows Library saving, the app relies on the LLM-generated learner recap / structured session summary as the saved session artifact, not a learner-authored note.
 
 ## Product Boundary
 
 - Ask Anything starts without a subject or topic choice.
 - No hidden or provisional `curriculum_topics` rows are created mid-session.
-- No mid-session `topicId` anchor is added to make notes or Challenge Round work.
-- Challenge Round stays out of freeform. It remains a formal topic-bound learning-session feature.
-- Bookmarks are available inside freeform sessions for instant saving of mentor replies.
-- Learner-notes remain topic-bound. A freeform learner-note can be created only after the session has a real Library topic through filing.
-- The note offer is the filing consent moment: if the learner wants to write a note from an unfiled freeform session, ask whether to add the session to Library first.
-- Declining Library filing means no topic-bound note is saved. The session transcript/history and any bookmarks remain available.
-- If the existing close-path filing has already resolved the session to a Library topic, the note flow can open directly against that topic.
-- If filing is pending or failed, the note flow must show a recoverable state rather than hiding the note or saving it somewhere unexpected.
+- No mid-session `topicId` anchor is added to unlock topic-bound features.
+- Challenge Round stays out of freeform.
+- Freeform learner-notes stay out of scope; notes remain topic-bound for normal topic sessions.
+- Bookmarks remain available inside freeform sessions for instant saving of mentor replies.
+- Freeform Library filing is unavailable for 1-4 exchange sessions.
+- Freeform Library filing is available for 5+ exchange sessions when the filing classifier has enough signal.
+- If the learner keeps the session out of Library, the chat history and bookmarks remain; no Library topic is created.
 
 ## Scope
 
 In scope:
-- `apps/mobile/src/app/session-summary/[sessionId].tsx` - freeform end-of-session note CTA, Library filing consent, filed/pending/failed states
-- `apps/mobile/src/components/session/SessionFooter.tsx` - keep live freeform note entry blocked unless a real topic exists; ensure copy points learners to the end-of-session note flow
-- `apps/mobile/src/hooks/use-filing.ts`, `use-retry-filing.ts`, `use-notes.ts` - reuse existing mutations for add/restore/retry and note creation
-- `apps/api/src/routes/sessions.ts` and `apps/api/src/services/session/session-crud.ts` - verify existing `/library-filing/add`, `/library-filing/restore`, and `/retry-filing` endpoints cover note-triggered filing
-- `apps/api/src/services/session/session-filing-dispatch.ts` - preserve close-path filing behavior unless tests show it conflicts with note consent copy
-- `docs/flows/learning-path-flows.md` - document freeform bookmarks, note offer, and Library filing consent
-- `.claude/memory/project_freeform_library_filing_decision.md` - update stale memory so future work does not resurrect hidden anchoring
+- `apps/api/src/config/filing.ts` - raise `minFreeformExchanges` from 3 to 5.
+- `apps/api/src/services/session/session-filing-dispatch.ts` - keep close-path auto-filing behind the shared threshold.
+- `apps/api/src/services/session/session-crud.ts` - block user-triggered add/restore/retry filing for below-threshold freeform sessions.
+- `apps/mobile/src/components/session-summary/SessionSummaryLibraryFilingControls.tsx` - hide Library filing controls for unfiled below-threshold freeform sessions.
+- `apps/api/src/routes/sessions.test.ts` - prove close-path auto-filing waits until 5 exchanges.
+- `apps/api/src/services/session/session-crud.integration.test.ts` - prove API filing services reject 4-exchange freeform sessions and allow 5-exchange sessions.
+- `apps/mobile/src/app/session-summary/[sessionId].test.tsx` - prove the summary UI does not offer Library filing at 4 exchanges.
+- `docs/flows/learning-path-flows.md` and project memory - record the product boundary.
 
 Out of scope:
-- Hidden provisional topics
-- Mid-session freeform topic anchoring
-- Challenge Round or challenge-like mode in freeform
-- Letting learner-notes exist outside `topic_notes`
-- Re-keying notes, retention, mastery, or Challenge Round away from topics
-- Removing existing bookmarks
+- Hidden provisional topics.
+- Mid-session freeform topic anchoring.
+- Challenge Round or challenge-like mode in freeform.
+- New freeform learner-note CTAs.
+- Re-keying notes, retention, mastery, or Challenge Round away from topics.
+- Removing existing bookmarks.
 
 ## Current Code Baseline
 
-- Freeform sessions start as `sessionType: 'learning'` with `metadata.effectiveMode = 'freeform'`, usually without `topicId`.
+- Freeform sessions are `sessionType: 'learning'` with `metadata.effectiveMode = 'freeform'`, usually without `topicId`.
 - Bookmarks already work during the shared session UI because the bookmark action saves by assistant `eventId`.
-- Live note input already requires `topicId`; without one it shows the "cannot save" fallback.
-- Freeform close currently goes to session summary; close-path auto-file may dispatch in the background when the session is topicless, unfiled, and has enough exchanges.
-- Summary already has Library filing endpoints for add, restore, retry, and keep-out. The plan should reuse that machinery instead of adding a new topic lifecycle.
+- Topic-bound notes already require `topicId`.
+- Close-path filing already uses `FILING_CONFIG.minFreeformExchanges`.
+- Summary already has Library filing endpoints for add, restore, retry, and keep-out.
+- The post-session pipeline already generates learner recap and structured LLM session-summary fields after the session is resolved.
 
 ## Tasks
 
-### Phase 1 - Product State And Copy
+- [x] **T1: Raise the freeform filing threshold** - `FILING_CONFIG.minFreeformExchanges` is 5, so close-path auto-filing and stranded backfill use the new threshold.
 
-- [x] **T1: Replace hidden-anchor docs with note-through-filing docs** - done when: `docs/flows/learning-path-flows.md` says Ask Anything has instant bookmarks, no freeform Challenge Round, no hidden topic anchoring, and a note can be recorded only after the learner accepts Library filing or the session is already filed.
+- [x] **T2: Apply the threshold to manual filing actions** - add/restore/retry filing services return `null` for below-threshold freeform sessions, including kept-out and failed states.
 
-- [x] **T2: Update stale freeform filing memory** - done when: `.claude/memory/project_freeform_library_filing_decision.md` states that bookmarks are the instant-save path, learner-notes require a filed Library topic, and hidden provisional topics are rejected.
+- [x] **T3: Hide below-threshold summary controls** - the Session Summary Library filing card does not appear for unfiled 1-4 exchange freeform sessions.
 
-### Phase 2 - Summary Note Offer
+- [x] **T4: Keep freeform Challenge Round and notes out of scope** - docs and memory state that freeform has bookmarks and optional Library filing, not Challenge Round or learner-note entry.
 
-- [ ] **T3: Add a freeform summary note CTA** - done when: session summary shows a note CTA for freeform sessions that have enough transcript content to make a note useful, and the CTA does not appear for empty/quick one-off sessions. The CTA copy must make clear that a note is saved to Library, not merely to chat history.
-
-- [ ] **T4: Route filed sessions directly to note input** - done when: if the freeform session already has `topicId`, pressing the note CTA opens `NoteInput` and saves via `useCreateNote({ topicId, sessionId, content })`; the saved note appears on normal note/Library surfaces.
-
-- [ ] **T5: Ask for Library filing before unfiled note entry** - done when: if the freeform session has no `topicId`, pressing the note CTA shows a consent step: "Notes live in Library. Add this session to Library so you can save a note?" Accepting calls the existing Library filing add/restore/retry path as appropriate; declining closes the consent step and saves no note.
-
-- [ ] **T6: Open note entry after filing resolves** - done when: after user-accepted filing succeeds and the refetched session has `topicId`, the UI opens note input against that real topic. If filing is still pending, the UI shows pending status and a retry/refetch path instead of a hidden note field.
-
-- [ ] **T7: Make filing failure recoverable** - done when: filing failure from the note flow shows retry and keep-as-chat actions. Retry reuses existing retry/add/restore endpoints. Keep-as-chat leaves the session unfiled or kept out of Library and does not save a note.
-
-### Phase 3 - Guardrails
-
-- [ ] **T8: Keep freeform Challenge Round blocked** - done when: tests assert a topicless freeform session cannot receive or accept a Challenge Round, and no freeform-only challenge affordance is introduced in this plan.
-
-- [ ] **T9: Keep live freeform notes blocked without topic** - done when: existing `SessionFooter` note behavior still refuses to save a learner-note without `topicId`, but the user-facing recovery points to the end-of-session Library filing note flow rather than implying the note disappeared.
-
-- [ ] **T10: Preserve bookmarks as instant save** - done when: no bookmark code path requires `topicId`, and a regression test or existing test proves an assistant message in a freeform session can be bookmarked.
-
-### Phase 4 - Validation
-
-- [ ] **T11: Add mobile tests** - done when: tests cover filed freeform note save, unfiled freeform note CTA -> filing consent, consent decline -> no note, filing success -> note input opens, filing failure -> retry/keep-as-chat, and no Challenge Round affordance in freeform.
-
-- [ ] **T12: Add API tests only if endpoint behavior changes** - done when: if implementation changes the filing endpoints or close-path filing dispatch, API tests cover profile scoping, state transitions, retry limits, and no hidden topic creation. If API behavior is reused unchanged, document that in the task notes and keep validation to existing endpoint coverage.
-
-- [ ] **T13: Run focused validation** - done when these pass for touched files:
-  - `pnpm exec nx run api:test` if API/session filing code changes
-  - `pnpm exec nx test:integration api` if API filing persistence changes
-  - `pnpm exec nx lint mobile`
-  - `cd apps/mobile && pnpm exec tsc --noEmit`
-  - related mobile Jest tests for session summary/session footer/bookmarks/notes
+- [x] **T5: Validate with focused tests** - API route tests, API integration tests, and mobile session summary tests cover the 4-vs-5 exchange boundary.
 
 ## Acceptance Criteria
 
 - Freeform chat never creates a hidden topic mid-session.
 - Freeform does not offer Challenge Round.
+- Freeform does not offer a separate learner-note flow.
 - Bookmarking mentor replies works in freeform without Library filing.
-- The freeform note offer appears at the end/summary, not as a hidden mid-chat topic action.
-- If the session is unfiled, note creation first asks the learner to add the session to Library.
-- If the learner declines filing, no learner-note is saved and nothing vanishes.
-- If filing succeeds, the note is saved as a normal topic note and appears where notes normally live.
-- If filing fails, the learner sees retry/keep-as-chat recovery.
+- A 1-4 exchange unfiled freeform session stays as chat history/bookmarks and has no Library filing affordance.
+- A 5+ exchange freeform session may be filed to Library by the close-path or user-triggered filing paths.
+- If the learner declines or removes Library filing, no topic-bound artifact is saved beyond the chat history, bookmarks, and normal session summary data.
+- If filing succeeds, the Library topic can carry the LLM-generated learner recap / structured session summary as the saved summary artifact.
 
-## Rejected Alternative
+## Rejected Alternatives
 
-The previous hidden-anchor plan created provisional topics mid-session so topic-bound features could attach before Library filing. That approach is rejected because it made notes disappear from normal note surfaces until promotion, risked confusing delayed affordances, over-sold Challenge Round eligibility, and changed the mental model of Ask Anything from lightweight chat into hidden curriculum creation.
+The previous hidden-anchor plan created provisional topics mid-session so topic-bound features could attach before Library filing. That approach is rejected because it made Ask Anything feel like hidden curriculum creation and complicated privacy/visibility.
+
+The later freeform-note plan asked the learner to accept Library filing so they could write a topic note. That approach is rejected for now because it adds a lot of UI/state work for a small benefit. Five exchanges is a cleaner signal: if the session is meaningful enough, file it and let the LLM produce the summary; if it is short, keep it as chat history plus bookmarks.
