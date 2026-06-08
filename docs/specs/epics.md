@@ -318,9 +318,9 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 
 **From Architecture — Technical Patterns:**
 
-- ARCH-7: Scoped repository pattern (`createScopedRepository(profileId)`) for all data access. Never raw `WHERE profile_id =` clauses.
-- ARCH-8: LLM orchestration module (`routeAndCall()`) — all LLM calls must go through this. No direct provider API calls.
-- ARCH-9: Model routing by conversation state (escalation rung): Gemini Flash for rung 1-2, Gemini Pro for standard rung 3+, and advanced providers only from rung 4 upward for entitled profiles.
+- ARCH-7: Scoped repository pattern (`createScopedRepository(profileId)`) for all data access. Never raw `WHERE profile_id =` clauses. **— stands; the scope key migrates `profile_id` → `person_id` at the clean-cut baseline (the pattern is unchanged). See § Identity Foundation / `data-model.md` §5.1.**
+- ARCH-8: LLM orchestration module (`routeAndCall()`) — all LLM calls must go through this. No direct provider API calls. **— → promoted to MMT-ADR-0017 (2026-06-08, reconstructed; code citations migrated). `routeAndCall()` remains the single LLM entry point; the router/vetting split (MMT-ADR-0014) sits downstream.**
+- ARCH-9: Model routing by conversation state (escalation rung): Gemini Flash for rung 1-2, Gemini Pro for standard rung 3+, and advanced providers only from rung 4 upward for entitled profiles. **— → superseded by MMT-ADR-0014 (router/vetting split — the durable routing-by-rung mechanism) + MMT-ADR-0016 (safety/judge). The pinned model names are register data (`docs/registers/llm-models/`), not canon; "Family standard = Gemini-only" is superseded by MMT-ADR-0014 §Supersession. Code citations migrated to MMT-ADR-0014 (2026-06-08).**
 - ARCH-10: SM-2 as pure math library in `packages/retention/` (~50 lines, zero deps)
 - ARCH-11: ~~Workers KV~~ DB-backed cache (`home_surface_cache` table) for coaching cards (write on Inngest precompute, read on app open) and subscription status (write on Stripe/RevenueCat webhook, read on metering). _Original spec said Workers KV; implementation uses DB table as conscious adaptation — acceptable at current scale._
 - ARCH-12: SSE streaming for LLM responses via Hono `streamSSE()`. Design handler behind interface for potential Durable Objects migration.
