@@ -295,7 +295,7 @@ export function withSafetyPreamble(
 }
 
 // ---------------------------------------------------------------------------
-// Model routing configuration (ARCH-9)
+// Model routing configuration (MMT-ADR-0014)
 // ---------------------------------------------------------------------------
 
 // [BUG-875] Minimum max_tokens budget for any teaching reply. The wrapping
@@ -838,7 +838,7 @@ async function withRetry<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Core orchestrator — all LLM calls go through here (ARCH-8)
+// Core orchestrator — all LLM calls go through here (MMT-ADR-0017)
 // ---------------------------------------------------------------------------
 
 export async function routeAndCall(

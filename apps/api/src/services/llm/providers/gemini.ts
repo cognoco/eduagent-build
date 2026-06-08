@@ -13,7 +13,7 @@ import { SafetyFilterError } from '../../../errors';
 import { createProviderApiError, createProviderHttpError } from './errors';
 
 // ---------------------------------------------------------------------------
-// Gemini Provider — ARCH-8, ARCH-9
+// Gemini Provider — MMT-ADR-0017, MMT-ADR-0014
 // Uses raw fetch() for Cloudflare Workers compatibility (no Node.js SDK)
 // ---------------------------------------------------------------------------
 

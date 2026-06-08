@@ -16,7 +16,7 @@ import { createProviderApiError, createProviderHttpError } from './errors';
 const logger = createLogger();
 
 // ---------------------------------------------------------------------------
-// OpenAI Provider — fallback for Gemini (ARCH-8, ARCH-9)
+// OpenAI Provider — fallback for Gemini (MMT-ADR-0017, MMT-ADR-0014)
 // Uses raw fetch() for Cloudflare Workers compatibility (no Node.js SDK)
 // ---------------------------------------------------------------------------
 

@@ -2,7 +2,7 @@ import type { EscalationRung } from '@eduagent/schemas';
 import type { StopReason } from './stop-reason';
 
 // ---------------------------------------------------------------------------
-// LLM orchestrator types (ARCH-8, ARCH-9)
+// LLM orchestrator types (MMT-ADR-0017, MMT-ADR-0014)
 // ---------------------------------------------------------------------------
 
 export type { EscalationRung };
