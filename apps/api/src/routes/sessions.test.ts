@@ -793,7 +793,7 @@ describe('session routes', () => {
         response: 'Sounds like we covered enough — ready to wrap up?',
         escalationRung: 1,
         isUnderstandingCheck: false,
-        exchangeCount: 3,
+        exchangeCount: 5,
         expectedResponseMinutes: 3,
         aiEventId: EVENT_ID,
         readyToFinish: true,
@@ -1164,7 +1164,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 3,
+        exchangeCount: 5,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
@@ -1200,7 +1200,7 @@ describe('session routes', () => {
       });
     });
 
-    it('does not dispatch close-path auto-file for below-threshold freeform sessions', async () => {
+    it('does not dispatch close-path auto-file for 4-exchange freeform sessions', async () => {
       useAutoFileProfile();
       (getSession as jest.Mock).mockResolvedValueOnce({
         id: SESSION_ID,
@@ -1211,7 +1211,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 2,
+        exchangeCount: 4,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
@@ -1247,7 +1247,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 3,
+        exchangeCount: 5,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),

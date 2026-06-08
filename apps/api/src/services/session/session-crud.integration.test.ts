@@ -484,6 +484,7 @@ describeIfDb('session-crud Library filing requests (integration)', () => {
     effectiveMode?: 'freeform' | 'learning';
     filingStatus?: 'filing_failed' | 'filing_kept_out' | null;
     filingRetryCount?: number;
+    exchangeCount?: number;
   }): Promise<{ profileId: string; subjectId: string; sessionId: string }> {
     const owner = await seedProfileWithSubject('Library filing');
     const [session] = await db
@@ -491,7 +492,7 @@ describeIfDb('session-crud Library filing requests (integration)', () => {
       .values({
         profileId: owner.profileId,
         subjectId: owner.subjectId,
-        exchangeCount: 1,
+        exchangeCount: input?.exchangeCount ?? 1,
         metadata: { effectiveMode: input?.effectiveMode ?? 'freeform' },
         filingStatus: input?.filingStatus ?? null,
         filingRetryCount: input?.filingRetryCount ?? 0,
@@ -528,11 +529,26 @@ describeIfDb('session-crud Library filing requests (integration)', () => {
     ]);
   }
 
-  it('allows below-threshold unfiled freeform sessions with transcript and returns a generated dispatch id', async () => {
+  it('rejects below-threshold unfiled freeform sessions even when transcript-backed', async () => {
     const session = await seedSession({
       effectiveMode: 'freeform',
       filingStatus: null,
       filingRetryCount: 2,
+      exchangeCount: 4,
+    });
+    await seedTranscript(session);
+
+    await expect(
+      requestSessionLibraryFiling(db, session.profileId, session.sessionId),
+    ).resolves.toBeNull();
+  });
+
+  it('allows 5-exchange unfiled freeform sessions with transcript and returns a generated dispatch id', async () => {
+    const session = await seedSession({
+      effectiveMode: 'freeform',
+      filingStatus: null,
+      filingRetryCount: 2,
+      exchangeCount: 5,
     });
     await seedTranscript(session);
 
@@ -556,6 +572,7 @@ describeIfDb('session-crud Library filing requests (integration)', () => {
         effectiveMode: 'freeform',
         filingStatus,
         filingRetryCount: 3,
+        exchangeCount: 5,
       });
       await seedTranscript(session);
 
@@ -599,6 +616,7 @@ describeIfDb('session-crud Library filing requests (integration)', () => {
       effectiveMode: 'freeform',
       filingStatus: 'filing_kept_out',
       filingRetryCount: 3,
+      exchangeCount: 5,
     });
 
     const result = await restoreSessionForAutoFiling(
@@ -613,16 +631,31 @@ describeIfDb('session-crud Library filing requests (integration)', () => {
     expect(result?.dispatchId).not.toBe('restore-0');
   });
 
+  it('rejects below-threshold kept-out restore requests', async () => {
+    const session = await seedSession({
+      effectiveMode: 'freeform',
+      filingStatus: 'filing_kept_out',
+      filingRetryCount: 3,
+      exchangeCount: 4,
+    });
+
+    await expect(
+      restoreSessionForAutoFiling(db, session.profileId, session.sessionId),
+    ).resolves.toBeNull();
+  });
+
   it('retry reset clears failed exhausted retry count and generates unique dispatch ids not based on retry count', async () => {
     const first = await seedSession({
       effectiveMode: 'freeform',
       filingStatus: 'filing_failed',
       filingRetryCount: 3,
+      exchangeCount: 5,
     });
     const second = await seedSession({
       effectiveMode: 'freeform',
       filingStatus: 'filing_failed',
       filingRetryCount: 3,
+      exchangeCount: 5,
     });
 
     const firstResult = await resetFilingForRetry(
@@ -642,5 +675,18 @@ describeIfDb('session-crud Library filing requests (integration)', () => {
     expect(secondResult?.dispatchId).toMatch(/^retry-/);
     expect(firstResult?.dispatchId).not.toBe(secondResult?.dispatchId);
     expect(firstResult?.dispatchId).not.toBe('retry-0');
+  });
+
+  it('rejects below-threshold filing retry requests', async () => {
+    const session = await seedSession({
+      effectiveMode: 'freeform',
+      filingStatus: 'filing_failed',
+      filingRetryCount: 3,
+      exchangeCount: 4,
+    });
+
+    await expect(
+      resetFilingForRetry(db, session.profileId, session.sessionId),
+    ).resolves.toBeNull();
   });
 });

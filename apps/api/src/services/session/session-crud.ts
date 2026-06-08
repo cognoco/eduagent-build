@@ -73,8 +73,15 @@ import { createLogger } from '../logger';
 import { addBreadcrumb, captureException } from '../sentry';
 import type { TimedEvent } from './session-context-builders';
 import { findOwnedCurriculumTopics } from '../curriculum-topic-ownership';
+import { FILING_CONFIG } from '../../config/filing';
 
 const logger = createLogger();
+
+function hasMinimumFreeformLibraryFilingExchanges(session: {
+  exchangeCount?: number | null;
+}): boolean {
+  return (session.exchangeCount ?? 0) >= FILING_CONFIG.minFreeformExchanges;
+}
 
 // ---------------------------------------------------------------------------
 // Error classes
@@ -1619,6 +1626,10 @@ export async function requestSessionLibraryFiling(
     return null;
   }
 
+  if (!hasMinimumFreeformLibraryFilingExchanges(session)) {
+    return null;
+  }
+
   if (session.topicId !== null || session.filedAt !== null) {
     return null;
   }
@@ -1683,6 +1694,10 @@ export async function restoreSessionForAutoFiling(
     return null;
   }
 
+  if (!hasMinimumFreeformLibraryFilingExchanges(session)) {
+    return null;
+  }
+
   if (
     session.filingStatus !== 'filing_kept_out' ||
     session.topicId !== null ||
@@ -1726,6 +1741,10 @@ export async function resetFilingForRetry(
   if (!session) return null;
 
   if (getSessionEffectiveMode(session) !== 'freeform') {
+    return null;
+  }
+
+  if (!hasMinimumFreeformLibraryFilingExchanges(session)) {
     return null;
   }
 

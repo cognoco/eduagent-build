@@ -1,4 +1,4 @@
 export const FILING_CONFIG = {
-  minFreeformExchanges: 3,
+  minFreeformExchanges: 5,
   maxRetries: 3,
 } as const;
