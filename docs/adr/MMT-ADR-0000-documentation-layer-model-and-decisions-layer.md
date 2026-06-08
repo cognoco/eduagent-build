@@ -200,6 +200,14 @@ Memory is **not a rung in the §I.1 hierarchy** in the copy-of-knowledge sense �
 
 **basis:** §I.4 (the incubation rule being revised — the `_wip/` → `docs/canon/` graduation); §I.1 + the 2026-06-07 memory↔canon amendment (the documentation index + memory-pointer layer whose durability motivates the earlier trigger); `MMT-ADR-0012` (the pre-launch one-time baseline reset — the clean-cut certainty that removes the "might be cut" risk); `_wip/identity-foundation/ROADMAP.md` (the runway that schedules the first execution at front-of-J).
 
+## Amendment (2026-06-08, architect) — no document is the sole system of record
+
+**The guard.** Canon (L1, the living *what*) and ADRs (L2, the immutable *why*) are **distinct layers that move in lockstep** (§II.2). **No ADR, canon document, or agent-doctrine line asserts itself as the sole or authoritative system of record to the exclusion of the others.** A doc that claims to be the *only* record re-creates the duplication-and-drift disease this ADR exists to cure, by denying the lockstep relationship that keeps the *what* and the *why* in sync.
+
+**Why this is recorded, not merely implied.** §II.2 already *describes* the lockstep relationship, but never stated the negative invariant — and the absence was load-bearing: `MMT-ADR-0016` (pre-repurpose) carried a line asserting "ADRs are the decision system of record — there is no `architecture.md` register to sync," which diverged in essence from this ADR's model. That line was removed when `0016` was repurposed (2026-06-08), so the **instance is resolved**; this amendment records the **guard** so a future ADR cannot re-introduce it. The canon-authorship process this protects is written up operationally in `docs/adr/README.md` § "How canon is authored."
+
+**basis:** §I.2 (canon = the *what*, the ADR north-star); §II.2 (the lockstep lifecycle this makes non-negotiable); the 2026-06-07 `_wip/identity-foundation/ROADMAP.md` canon-authorship thread (the divergence this closes); identity-foundation Phase I-c (the runway step that authored it).
+
 ## Alternatives considered
 
 1. **Tidy specs (separate concerns within them), no decisions layer.** Rejected — treats the symptom; decisions still have nowhere to go and keep leaking.

@@ -25,6 +25,17 @@ A decision has two halves that must move in **one change-set**:
 
 When a decision lands or changes, you touch **both** in the same commit/PR. Never write the ADR and leave canon stale, or edit canon without the ADR. When an ADR's rule should bind future work, **promote** it — the rule graduates into canon while the ADR remains the dated *why++* (MMT-ADR-0000 §II.3).
 
+## How canon is authored (the ADR ↔ canon ↔ ARCH-N relationship)
+
+This is the one-screen operating answer to "how does content get *into* `architecture.md` (or any canon doc)?" — consolidated from MMT-ADR-0000 §I.2 / §II.2–II.3 / Part III. The full reasoning lives there; this is the procedure.
+
+1. **Three artifacts, three roles — never conflated.** `architecture.md` (+ `PRD.md`, `ux-design-specification.md`, `principles.md`) is **L1 canon**: the living *what* — outcomes, current rules, no rationale. An **`MMT-ADR-NNNN`** is **L2**: the immutable, dated *why* behind a significant choice. The legacy **`ARCH-1…ARCH-26`** register is a **frozen** pre-ADR record, draining into ADRs. `architecture.md` is **not** a decision log — its title and preamble say so.
+2. **Content enters canon only via lockstep.** A significant rule reaches `architecture.md` by landing (or superseding) its ADR **and** editing the exact canon lines in the **same change-set** — never canon without its ADR, never an orphan ADR that leaves canon stale (§II.2). Canon we cannot trace back to an ADR is **grandfathered, not reverse-engineered** into an invented one (§I.2 north-star).
+3. **Promotion is the upward lockstep.** When an ADR's rule should bind future work, the *rule* graduates into canon (or the principles catalog) while the ADR keeps the *why++*; promotion copies the rule up and links back, never duplicating the rationale (§II.3).
+4. **`ARCH-N` is frozen and absorbs forward.** No new `ARCH-N`; each owes a terminal disposition (promote / tombstone / `corrected-by` / drop), and a promoted entry migrates its code citations to the new ID in the same change (§Part III; worked example: `MMT-ADR-0006`, `MMT-ADR-0017`).
+
+**The invariant that keeps these from drifting:** no ADR, canon doc, or agent-doctrine line declares itself the *sole* system of record. Canon and ADRs are distinct layers that move in lockstep — see the MMT-ADR-0000 "no document is the sole system of record" guard.
+
 ## Format
 
 - **Filename:** `MMT-ADR-NNNN-kebab-title.md` (zero-padded 4 digits; flat, domain-agnostic sequence). `MMT` = MentoMate, mirroring the estate's `NEX-ADR-NNNN`.

@@ -50,7 +50,7 @@ file is the authoritative list; this index points at it rather than duplicating 
 The members, at a glance (full roles + status in the canonical-set doc):
 
 - **Domain docs (L1):** [`identity-ontology.md`](../_wip/identity-foundation/identity-ontology.md) · [`domain-model.md`](../_wip/identity-foundation/domain-model.md) · [`data-model.md`](../_wip/identity-foundation/data-model.md) · [`identity-foundation-prd.md`](../_wip/identity-foundation/identity-foundation-prd.md) — *ratified; scheduled to graduate `_wip/` → `docs/canon/` at the front of Phase J (`MMT-ADR-0000` §I.4 amendment, 2026-06-08). These links update at that move.*
-- **Decisions (L2):** [`MMT-ADR-0000`](adr/MMT-ADR-0000-documentation-layer-model-and-decisions-layer.md) (+ 3 amendments) · `MMT-ADR-0007`–`0010` (domain) · `MMT-ADR-0011`/`0012` (data) · `MMT-ADR-0013`–`0016` (policy-engine spine) — all under [`docs/adr/`](adr/)
+- **Decisions (L2):** [`MMT-ADR-0000`](adr/MMT-ADR-0000-documentation-layer-model-and-decisions-layer.md) (+ 4 amendments) · `MMT-ADR-0007`–`0010` (domain) · `MMT-ADR-0011`/`0012` (data) · `MMT-ADR-0013`–`0016` (policy-engine spine) — all under [`docs/adr/`](adr/)
 - **Registers (L3, not canon):** [`docs/registers/llm-models/`](registers/llm-models/) — vetted-model master + vetting trail
 - **Audit trail:** [`2026-06-XX-a-vs-b-decision-capture.md`](../_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md) — the A-vs-B grilling record (Option III, immutable)
 - **Supporting specs (L3, not canon):** the two `2026-06-06` LLM-routing specs in [`docs/specs/`](specs/)
@@ -72,8 +72,8 @@ root and in `docs/`.
 ## L2 — All decisions (ADRs)
 
 The full ADR register and the significance gate live in
-[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0016`
-(`0003` is unused — number gap, not a live record). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
+[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0017`
+(`0003` is unused — number gap, not a live record; `0017` promotes the legacy `ARCH-8` LLM-orchestrator entry). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
 draining to ADRs as Stream-2 work) is described in `MMT-ADR-0000` Part III.
 
 ## L3 — Operational

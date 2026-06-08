@@ -13,16 +13,16 @@ inputDocuments:
   - 'docs/ux-design-specification.md'
 workflowType: 'architecture'
 lastStep: 8
-status: 'complete'
+status: 'mid-refresh'
 completedAt: '2026-05-23'
 project_name: 'MentoMate'
 user_name: 'Zuzka'
 date: '2026-02-15'
 ---
 
-# Architecture Decision Document
+# Architecture
 
-_This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._
+_This document is **L1 canon** — the authoritative *what* of how the system is built (`MMT-ADR-0000` §I.1–I.2): outcomes and current rules, not the *why*. The reasoning behind a significant choice lives in an **ADR** (`docs/adr/`); new canon enters here only **in lockstep** with its ADR, in one change-set (`MMT-ADR-0000` §II.2–II.3). The legacy `ARCH-1…ARCH-26` register (`docs/specs/epics.md`) is **frozen** and draining to ADRs (`MMT-ADR-0000` Part III). See `docs/adr/README.md` § "How canon is authored" for the full entry process._
 
 > **[TRANSITIONAL — DOC STATE]** This document is mid-refresh. The **`## Identity Foundation`** section is **new, ratified canon** (identity-foundation runway, Phase H; cited to ADRs + `data-model.md`). **Every other section is LEGACY** — pre-refresh setup-record content, pending review/revision in the Stream-2 `architecture.md` rebuild (the `ARCH-N` reverse-engineering). Where a legacy section conflicts with `## Identity Foundation`, **Identity Foundation wins**. The direct conflicts the carve-out supersedes were flagged inline with `<!-- [LEGACY-REVIEW] -->` comments and **resolved in Phase I (2026-06-08)**; the legacy sections themselves remain pre-refresh, pending the Stream-2 rebuild. These transitional markers (`[TRANSITIONAL — DOC STATE]`, `[CANON-NEW]`, `[LEGACY-REVIEW]`) are temporary and stripped at the Stream-2 rebuild.
 
