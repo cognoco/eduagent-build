@@ -18,7 +18,7 @@ Cosmo work items (= **Phase F** gate).
 **Sources (each ruling traces to ratified canon):**
 - Vocabulary + the 30 invariants: `identity-ontology.md` v1.1 (RATIFIED).
 - Product rulings + the 4 architecture ripples: `identity-foundation-prd.md` Part 10 (esp. §H).
-- Discovery/options: `domain-model-options.md` (Fold #1 into the ontology), `age-consent-spike.md`.
+- Discovery/options: `archive/domain-model-options.md` (Fold #1 into the ontology), `_research/age-consent-spike.md`.
 - Decisions layer: MMT-ADR-0001 (own the graph), 0002 (payer store-delegated), **0007–0010** (Phase D).
 
 ---

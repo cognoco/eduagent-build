@@ -55,7 +55,7 @@ naming is Cosmo's, not the roadmap's.
 
 | #     | Phase                                                   | Deliverable                        | Owner                       | Status | Depends on                   | Exit gate                                                                                          |
 | ------- | --------------------------------------------------------- | ------------------------------------ | ----------------------------- | -------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `drift-map.md`                     | Claude                      | ✅     | —                           | drift quantified across intent / canonical docs / code; PM has concrete input                      |
+| **A** | Drift map (+ audit re-triage + sibling provisional-tag) | `archive/drift-map.md`                     | Claude                      | ✅     | —                           | drift quantified across intent / canonical docs / code; PM has concrete input                      |
 | **B** | Product intent                                          | `product-intent.md`                | **PM** (Claude facilitates) | ✅     | A                            | Part 10 resolved +**dual sign-off** (B-tech ✓ 2026-06-02; B-product P✓ 2026-06-02; **4 ripples re-confirmed `T✓` 2026-06-03 — Part 10 §H**) |
 | **C** | Doc-strategy decision (pilot)                           | **`MMT-ADR-0000`** (in `docs/adr/`) | You + Claude                | ✅     | A informs; piloted via B/D/E | **DONE 2026-06-03** — decisions layer ratified; convention + ratchet + 3 seed ADRs shipped; backfill deferred (Stream 2) |
 | **D** | Domain model                                            | `domain-model.md` + ADR(s)         | Claude (you ratify)         | ✅     | B                            | **DONE 2026-06-03** — entities / roles /**consent model** / tenancy locked; org/membership **re-derived**, not inherited; 4 ADRs (MMT-ADR-0007–0010) placed |
@@ -109,7 +109,7 @@ runway.
   gaps and ungates (demand-triggered, three preconditions). See the cross-cutting thread.
 
 **The walkthrough (runs in parallel; results assumed back soon).** The policy-engine spine walkthrough
-(`policy-engine-spine-walkthrough/`, package tightened + reconciled with the memo 2026-06-07) is a
+(`_walkthroughs/policy-engine-spine-walkthrough/`, package tightened + reconciled with the memo 2026-06-07) is a
 90–120-min PM + **live legal counsel** + architect session that ratifies the *shape* of the engine via
 six rulings: **R-0** two-primitive model · **R-1** the one COPPA legal call (does the
 parent-operated, no-child-login path trip COPPA?) · **R-2** the regime-taxonomy enum · **R-3** the
@@ -333,10 +333,10 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   than *hoped-for*, and gives the launch team a one-line stop-the-line signal. **Owner:** Phase F
   implementation; **surface area:** 1 test file + a small constant module the test reads from.
   **Source for the values:** the fillers walkthrough results
-  (`_wip/identity-foundation/phase-e-fillers-walkthrough/`). 🟡 *added 2026-06-04 during the Phase-
+  (`_wip/identity-foundation/_walkthroughs/phase-e-fillers-walkthrough/`). 🟡 *added 2026-06-04 during the Phase-
   E → Phase-F handoff.* ⬜
 - **Sibling-plan re-triage** — see below. 🟡 provisional tags applied to all 7 plans (2026-06-01);
-  preliminary verdicts validated in `drift-map.md` §5 (one diverged: `learning-library-cleanup`). Final
+  preliminary verdicts validated in `archive/drift-map.md` §5 (one diverged: `learning-library-cleanup`). Final
   couple-vs-independent split still deferred to after Phase D.
 
 ---
@@ -381,7 +381,7 @@ separate → evaluate standalone.
 The "ready to start implementation" gate is the *P* phase's exit gate, not F's. F closes as *"planning for the planning"* (i.e. the shape of G–P is ratified; the actual planning lives in G–P).
 
 **A–F (the deep thinking + planning-for-the-planning):**
-- [x] **A** — drift map + audit re-triage + sibling provisional tag (`drift-map.md`); 36-gap audit evidence index folded in.
+- [x] **A** — drift map + audit re-triage + sibling provisional tag (`archive/drift-map.md`); 36-gap audit evidence index folded in.
 - [x] **B** — product intent ratified (Part 10 resolved; 4 architecture ripples re-confirmed `T✓` 2026-06-03, Part 10 §H; **`inv 17` rephrased 2026-06-04** — all 2026-06-03 counsel walkthrough architect calls closed).
 - [x] **C** — doc-strategy decided (`MMT-ADR-0000`): decisions layer + `MMT-ADR-NNNN` + the `decision-adr-link` ratchet; ADRs homed at `docs/adr/`; the broader `docs/` reorg → deferred follow-up.
 - [x] **D** — domain model locked (`domain-model.md` + MMT-ADR-0007–0010); consent model locked; the legal-check items (E4 one-of/all-of; parent-delete; dormancy specifics) are named, scoped to E/counsel, and do not gate D.
@@ -690,7 +690,7 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
     the ripple rule reopens any `T✓` architecture item if the PM adds an in-scope persona / journey / edge
     case. First batch stamped `T✓ 2026-06-02`: §B authoring-altitude, A0–A5 personas (A4-surface→E6), C1
     framing, D4 stricter-wins.
-- **2026-06-01** — **Phase A complete.** `drift-map.md` produced via a 34-agent citation-verified workflow
+- **2026-06-01** — **Phase A complete.** `archive/drift-map.md` produced via a 34-agent citation-verified workflow
   (three-way reconciliation; audit re-triage + sibling-coupling + doc-staleness folded in). All 7 sibling
   plans tagged in `docs/plans/`. Key outputs: consent/COPPA-under-own-logins confirmed as the single
   load-bearing P0; T1 (`0106`) confirmed inert (zero readers/writers); four parallel role/ownership
@@ -699,7 +699,7 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
   2026-05-19 nav spec, `docs/flows/*` + store-compliance docs, the 36-gap audit) for a Phase-A addendum or
   Phase-B intake.
 - **2026-06-01** — **Phase-A addendum complete.** An 8-agent verified sweep (`wf_b9dcc01e-849`) closed all 5
-  coverage-boundary areas → `drift-map.md` §7A. Surfaced: the P2 self-registered-minor consent breaks (incl.
+  coverage-boundary areas → `archive/drift-map.md` §7A. Surfaced: the P2 self-registered-minor consent breaks (incl.
   a new authority-resolution **bug** — `getFamilyOwnerProfileId` treats the minor as their own consent
   authority); the full non-owner data-subject-rights cluster; `resolveNavigationContract` confirmed as the
   single nav migration seam (6 test suites will break together); store/legal launch-gates for the

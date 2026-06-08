@@ -5,9 +5,11 @@ the bedrock that auth, consent, billing, data-scoping, and the whole authorizati
 Today that bedrock is a single fused `accounts` row + `profiles` (with an `isOwner` boolean) +
 `family_links` + `subscriptions`, and it has drifted badly from where the product is actually headed.
 
-**Status:** 2026-06-01 — **product intent NOT yet locked.** No clean-cut code has started. The prior
-(rejected) implementation plans are archived here; one of them (T1) shipped to `main` and is slated
-for revert (see below).
+**Status:** `ROADMAP.md` is the live status doc. As of **2026-06-08**, product intent and the
+domain/data model are **ratified** (`identity-ontology.md`, `domain-model.md`, `data-model.md`,
+`identity-foundation-prd.md`), the decision trail lives in `docs/adr/MMT-ADR-0007…0016`, and the
+pre-implementation runway (phases A–P) is mid-flight. No clean-cut code has started. The prior
+(rejected) implementation plans — incl. the T1 revert — are in `archive/`.
 
 ---
 
@@ -46,21 +48,31 @@ backfill, no compatibility shims, no V0/V1 parallel run).
 
 ## What's here
 
+**Live, load-bearing docs (root):**
+
 | Path | What it is |
 |---|---|
-| `ROADMAP.md` | Pre-implementation roadmap + tracker (phases A–F, cross-cutting threads, sibling re-triage, decision log) — the live status doc. |
-| `identity-reconstructed-prd.md` | The product intent *reverse-engineered* from the rejected plans, with every element tagged `[STATED] / [IMPLIED] / [GAP] / [CONFLICT]`. Deliberately thin — the thinness IS the finding (real forward intent was never captured). **Its §11 is the open-questions agenda.** A strawman to gap-check, not a ratified spec. |
-| `archive/` | The three rejected 2026-05-31 plans (`identity-org-membership-redesign`, `identity-t1-data-model`, `identity-t2-auth`), each bannered SUPERSEDED. Kept as decision record + discussion input. |
+| `ROADMAP.md` | Pre-implementation roadmap + tracker (phases A–P, cross-cutting threads, decision log) — **the live status doc.** |
+| `2026-06-XX-a-vs-b-decision-capture.md` | The signed A-vs-B decision memo — 25 ratified decisions; §7 is the canonical `WP-1…WP-10` namespace. Immutable. |
+| `identity-ontology.md` | **RATIFIED** ontology v1.1 — the entity / role / capacity vocabulary; the `CONTEXT.md` identity glossary is extracted from it in lockstep. |
+| `domain-model.md` | **RATIFIED** Phase-D domain model — entities / roles / consent / tenancy. |
+| `data-model.md` | Phase-E data model (baseline + pre-baseline amendments per `MMT-ADR-0011`/`0015`); the ADR lockstep partner. |
+| `identity-foundation-prd.md` | The anchored-spine PRD, built bottom-up from the ontology + glossary. |
+| `identity-model-diagrams.html` | Visual companion to the model (dark/light toggle). *(may need a refresh post-A-vs-B — see ROADMAP)* |
 
-## The work still owed (rough sequence)
+**Subfolders:**
 
-1. **Author the product intent** — answer the reconstructed-PRD §11 questions (target user, role
-   capabilities, consent-under-own-logins, one-owner-per-org, multi-org rules, credential
-   thresholds, success criteria). PM-owned; needs a real product-definition session, not a doc mine.
-2. **Derive the target data model** from that intent. *Then* check whether the archived design
-   happens to fit — as a finding, not an input.
-3. **Plan + execute the clean cut** — including the **T1 revert** (forward-only) as an early step.
-4. **Re-baseline the canonical docs** (PRD / ARCHITECTURE.md / CONTEXT.md) to the new truth.
+| Path | What it is |
+|---|---|
+| `_handoffs/` | Session-continuity handoff docs. |
+| `_walkthroughs/` | Facilitated rulings sessions — `policy-engine-spine-`, `counsel-`, `b-product-`, `phase-e-fillers-` walkthroughs (packages + capture ledgers). |
+| `_research/` | Investigations still consulted — `age-consent-landscape/`, `gemini-minors-zdr.md`, `age-consent-spike.md`, plus `raw/`. |
+| `archive/` | Superseded / completed-phase artifacts — the rejected 2026-05-31 plans, the Phase-A drift map, the A-vs-B audit tracks, the reconstructed-PRD drafts, and discovery/options briefs. Kept as decision record + discussion input. |
+
+## The work still owed
+
+See `ROADMAP.md` — it owns the live phase sequence (A–P), the cross-cutting threads, and the decision
+log. The rough 2026-06-01 sequence that used to live here is superseded by the roadmap.
 
 ## Decision log
 
