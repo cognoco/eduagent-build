@@ -5,6 +5,10 @@
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
+## Identity Foundation (re-platform)
+
+- [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to the ratified identity/policy-engine/router/safety ADRs (0007–0016) + the `docs/registers/llm-models/` register. Runway tracked in `_wip/identity-foundation/ROADMAP.md`. Phase F closed; G next. (Path-X 13+ floor supersedes the "Strictly 11+" note below.)
+
 ## Product Constraint — Strictly 11+
 
 Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeBracket.child` (unreachable for 11+ users) and dictation `getLiteraryTheme` ≤7 + ≤10 branches (fairy tales, Narnia). Eval harness fixtures updated to 5 profiles aged 11-17.
