@@ -56,12 +56,14 @@ Realizes `MMT-ADR-0013` (engine), `MMT-ADR-0014` (router), `MMT-ADR-0015` (data-
 
 > **Shape vs data (single source of truth).** This section fixes table/column *shape*. The policy-matrix *content* — regime rows, per-cell `policy_rules`, thresholds, country mappings, vetted `allowed_models` rows — is **DB-mastered data**, populated + maintained by the **C2-B / WP-4 (PM-owned) compliance-population workstream**, which carries the per-datapoint decision trail. Canon never holds a second copy of that data; only the decision trail that led to it. The seed values below are a **point-in-time snapshot**, ratified by the walkthrough's R-2/R-3/R-5, then DB-mastered.
 
+> **Key conventions.** Every surrogate primary key is `uuid` (v7, app-generated via the Drizzle `$defaultFn` pattern per `MMT-ADR-0011`), and every foreign key into `person` / `subscription` is `uuid` to match those tables. The eight baseline tables and these amendment tables share one id convention — there is no `BIGSERIAL`/`BIGINT` surrogate key anywhere in the graph.
+
 ### 2A.1 Policy engine — `regimes`, `policy_cells`, `policy_rules`
 
 ```sql
 -- Regime = DATA (rows), not a Postgres ENUM. Add/retire a regime = INSERT/UPDATE, not a migration.
 CREATE TABLE regimes (
-  id          BIGSERIAL PRIMARY KEY,
+  id          UUID PRIMARY KEY,
   code        TEXT NOT NULL UNIQUE,    -- 'US_COPPA', 'EU_GDPR_16', 'UK_AADC', 'ROW', …
   description TEXT,                     -- live threshold/characteristic; DB-mastered, not frozen in canon
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -72,18 +74,18 @@ CREATE TABLE regimes (
 CREATE TYPE policy_kind AS ENUM ('prohibition_floor', 'consent_edge');
 
 CREATE TABLE policy_cells (
-  id              BIGSERIAL PRIMARY KEY,
+  id              UUID PRIMARY KEY,
   age_band_min    SMALLINT NOT NULL,   -- 0 = "any sub-13"
   age_band_max    SMALLINT NOT NULL,
-  regime_id       BIGINT NOT NULL REFERENCES regimes(id),   -- FK to lookup, not an ENUM column
+  regime_id       UUID NOT NULL REFERENCES regimes(id),   -- FK to lookup, not an ENUM column
   knowledge_axis  TEXT NOT NULL CHECK (knowledge_axis IN ('age','residence')),
   knowledge_value JSONB NOT NULL,      -- {method, confidence}
   UNIQUE (age_band_min, age_band_max, regime_id, knowledge_axis, knowledge_value)
 );
 
 CREATE TABLE policy_rules (
-  id               BIGSERIAL PRIMARY KEY,
-  cell_id          BIGINT NOT NULL REFERENCES policy_cells(id),
+  id               UUID PRIMARY KEY,
+  cell_id          UUID NOT NULL REFERENCES policy_cells(id),
   kind             policy_kind NOT NULL,   -- prohibition_floor = unconditional; consent_edge = consent-gated
   rule_text        TEXT NOT NULL,
   citation_url     TEXT,
@@ -102,14 +104,14 @@ The two-primitive `kind` is the type-safety boundary; the eval-logic split (proh
 
 ```sql
 CREATE TABLE knowledge_assertions (        -- the history (legal audit artifact: COPPA actual-knowledge, Art 8)
-  id          BIGSERIAL PRIMARY KEY,
-  person_id   BIGINT NOT NULL REFERENCES person(id),
+  id          UUID PRIMARY KEY,
+  person_id   UUID NOT NULL REFERENCES person(id),
   axis        TEXT NOT NULL CHECK (axis IN ('age','residence')),
   method      TEXT NOT NULL,               -- 'self_report','parent_reported','geo_ip','billing_address',…
   confidence  DECIMAL(3,2) NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   source      TEXT NOT NULL,               -- 'signup','profile_form','session_start_check'
   asserted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  actor_id    BIGINT REFERENCES person(id),
+  actor_id    UUID REFERENCES person(id),
   revoked_at  TIMESTAMPTZ                  -- non-null = superseded by a later assertion
 );
 CREATE INDEX idx_knowledge_assertions_person_axis ON knowledge_assertions (person_id, axis, asserted_at DESC);
@@ -127,7 +129,7 @@ Determination methods stay small `ENUM`-style value sets (`age_method`: `self_re
 CREATE TYPE model_tier AS ENUM ('primary', 'secondary', 'tertiary');
 
 CREATE TABLE allowed_models (              -- vetting-pipeline output; the ONLY contract vetting↔routing
-  id                   BIGSERIAL PRIMARY KEY,
+  id                   UUID PRIMARY KEY,
   model                TEXT NOT NULL,
   provider_via_service TEXT NOT NULL,       -- 'anthropic-via-azure' (4th vetting axis)
   service              TEXT NOT NULL,
@@ -136,8 +138,9 @@ CREATE TABLE allowed_models (              -- vetting-pipeline output; the ONLY 
   tier                 model_tier NOT NULL DEFAULT 'primary',
   effective_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at           TIMESTAMPTZ,
-  UNIQUE (model, provider_via_service, service, region)
+  UNIQUE (model, provider_via_service, service, region, effective_at)
 );
+CREATE INDEX idx_allowed_models_runtime_key ON allowed_models (model, service, region) WHERE expires_at IS NULL OR expires_at > now();
 ```
 
 Runtime router key is **3-param** (`model · service · region`, filtered by the engine's eligibility output); the 4th axis (`provider_via_service`) is vetting-only. Rows are **DB-mastered** (PM-owned WP-4); the launch provider *set* is the workstream's output, not canon.
@@ -148,8 +151,8 @@ Runtime router key is **3-param** (`model · service · region`, filtered by the
 -- Payer is a sub-field, not a persona: 1 primary (NOT NULL) + ≤1 secondary.
 ALTER TABLE subscription ALTER COLUMN payer_person_id SET NOT NULL;  -- the PRIMARY payer (was nullable snapshot)
 CREATE TABLE subscription_payers (
-  subscription_id BIGINT NOT NULL REFERENCES subscription(id),
-  person_id       BIGINT NOT NULL REFERENCES person(id),
+  subscription_id UUID NOT NULL REFERENCES subscription(id),
+  person_id       UUID NOT NULL REFERENCES person(id),
   role            TEXT NOT NULL CHECK (role IN ('primary','secondary')),
   UNIQUE (subscription_id, person_id)
 );
@@ -276,7 +279,7 @@ For each table: the constraint it exists to satisfy (cite invariant, ADR, counse
 
 - **Constraint it satisfies:** `D5`, `MMT-ADR-0008`, `inv 14` / `inv 19` (never auto-conferred; opt-in); the **`F1-BT-a` — no-self-guardian guard, the attack surface the ratified model bans**.
 - **vs. legacy:** `family_links` (parent→child) is renamed + re-purposed; the consent record lives on this edge; the operational powers do *not* live on this edge.
-- **Validation:** `guardian <> charge`; `UNIQUE (guardian, charge) where revoked_at IS NULL` (partial unique — re-granting after revoke is a new row, preserving history).
+- **Validation:** `guardian <> charge`; `UNIQUE (guardian, charge) where revoked_at IS NULL` (partial unique — re-granting after revoke is a new row, preserving history). **G-3 3a — one active Guardian per charge — is enforced in service code on grant, not as a DB constraint**, so the edge stays structurally N:M for a future co-parent / shared-custody model without a baseline migration (schema-flexible / behavior-gated, cf. Path X).
 - **Indexes:** `(charge_person_id)`, `(guardian_person_id)`.
 
 ### 4.7 `mentorship`
