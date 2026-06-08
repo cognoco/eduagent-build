@@ -4,6 +4,32 @@
 `architecture.md` + `ARCH-N` touch + the canon-authorship process). Tracker:
 `_wip/identity-foundation/ROADMAP.md`.
 
+---
+
+## ▶ SESSION CONTINUATION — START HERE (fresh session, 2026-06-08)
+
+**Everything is committed and pushed; `main` is clean and synced.** No loose ends.
+
+**Read order to resume:**
+1. `_wip/identity-foundation/ROADMAP.md` — status line (top) + Phase I row + Decision log (newest entries at top of that log). **Note the cross-stream block at ~line 341** ("Harness Hygiene", owned by the ZDX stream — *do not edit*; **Phase P is blocked-by Cosmo `WI-530`**).
+2. This handoff (the Phase-I worklist + J(0) reminder below).
+3. The authored canon: `docs/architecture.md` **lines 563–610** (`## Identity Foundation`).
+
+**Phase-H commit lineage (all on `main`):** `68e39b8ca` (author section + markers) → `d11c3fd09` (close: ROADMAP/plan/handoff) → `976a5f58c` (jargon cleanup — see below).
+
+**The immediate open decision (unanswered — ask the user):** **plan Phase I, or pause?**
+Phase H is fully closed; nothing forces Phase I to start. The runway has been run
+phase-by-phase with the user (architect = jjoerg) approving each. Default: **plan Phase I
+first** (same plan-first pattern H used: write the plan to `_wip/identity-foundation/`,
+get approval, then execute) — do **not** auto-start authoring.
+
+**Canon-quality standard (learned this session — enforce in Phase I + Stream 2):**
+top-level canon states rules in **plain, self-explanatory** language. **Never carry
+runway-internal decision/finding IDs into canon prose** (`Path X`, `G-3/4/6`, `F1-BT-a`,
+`I-PB-B2b`, bare `inv NN`, stage codes like `T3`). Inline `MMT-ADR-*` + `data-model.md §`
+trace-cites **are** wanted (ADR-0000 §I.2 north-star). The Phase-H section was cleaned to
+this bar in `976a5f58c`; hold the same bar when rewriting the legacy anchors in Phase I.
+
 ## What H produced
 
 A new **`## Identity Foundation`** section in `docs/architecture.md` (authored

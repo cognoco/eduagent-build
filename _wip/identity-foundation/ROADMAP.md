@@ -430,6 +430,12 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 
 ## Decision log
 
+- **2026-06-08** — **Canon-quality fix + standard set (post-H, commit `976a5f58c`).** The Phase-H `## Identity
+  Foundation` section had leaked runway-internal decision/finding IDs (`Path X`, `G-3/4/6`, `F1-BT-a`, `I-PB-B2b`,
+  bare `inv NN`, stage code `T3`) into canon prose. **Standard ratified:** top-level canon states rules in **plain,
+  self-explanatory** language — never carry internal decision/finding IDs into canon; inline `MMT-ADR-*` +
+  `data-model.md §` trace-cites are kept (ADR-0000 §I.2). Section cleaned to this bar (12 lines, 1:1 rewrites, no
+  content lost). **Enforce the same bar in Phase I** (legacy-anchor rewrites) **and Stream 2** (the full rebuild).
 - **2026-06-08** — **Phase H closed.** `## Identity Foundation` authored into `docs/architecture.md` — the deep
   canonical-authoring phase. **Approach = plop-and-defer** (single doc, no parallel; target-idiom, **relocatable**
   beachhead; full structural rebuild + `ARCH-N` reverse-engineering stays **Stream 2**, its K–P inputs not yet ready).
