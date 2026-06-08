@@ -66,9 +66,9 @@ naming is Cosmo's, not the roadmap's.
 | **I** | Sub-gated pass on the rest of `architecture.md` + `ARCH-N` touch (identity-foundation domain) | edited `architecture.md` + `docs/adr/` promotion/supersession | Claude (you ratify)         | ✅     | H                            | **DONE 2026-06-08** (branch `identity-foundation-phase-i`; handoff `_handoffs/2026-06-08-phase-i-close.md`). **I-a** ✓ 5 `[LEGACY-REVIEW]` anchors resolved + banner/title/preamble/frontmatter — `architecture.md` now self-IDs as L1 canon. **I-b** ✓ `ARCH-9` superseded (→ `MMT-ADR-0014`/`0016`); `ARCH-8` promoted (→ new `MMT-ADR-0017`, citations migrated); `ARCH-7` stands (scope-key note). **I-c** ✓ "How canon is authored" in `adr/README.md` + `MMT-ADR-0000` "no document is the sole system of record" guard (the lasting `0016`↔`0000` reconciliation) |
 | **J** | **Four-gate canon/memory/docs alignment** — full alignment activity, split to avoid overloading | J0 scrub/move plan + memory-disposition inventory + pointer-layer agent docs + docs-tree conformance decisions | Claude (you ratify)          | ⬜     | I **+ the documentation index + the ratified memory↔canon rule** | **J0** canon-shape scrub before domain-canon graduation; **J1** memory pointer alignment; **J2** agent-doctrine reduction + `docs/project_context.md` routing/doctrine pointer cleanup; **J3** docs tree conformance. Each sub-gate has its own exit gate in the Phase J detail below; estate-wide drains remain Stream 2 unless explicitly pulled into J3 |
 | **K** | **Consolidation activity** — produce the consolidated-audit document (includes canon-contradiction check) | `docs/audit/2026-05-29-full-audit/RECONCILED.md` (or similar) | Claude (you ratify)         | ⬜     | J                            | see the *K exit gate* below |
-| **L** | Unified gap analysis                                    | a single delta document            | Claude                      | ⬜     | K                            | one row per finding, tagged `(source-audit, source-finding-id, domain, classification, in-scope?, defer-to-which-workstream?, canonical-set-source)`; reads the consolidated-audit (K's output) + the canonical set (G–J) + the as-is |
+| **L** | Unified gap analysis                                    | a single delta document            | Claude                      | ⬜     | K                            | one row per finding, tagged `(source-audit, source-finding-id, domain, classification, in-scope?, defer-to-which-workstream?, execution-blocking-if-deferred?, canonical-set-source)`; reads the consolidated-audit (K's output) + the canonical set (G–J) + the as-is. The `execution-blocking-if-deferred?` tag feeds the **N.0** Stream-2 pull-forward gate |
 | **M** | Four-bucket triage                                      | the triage outcome, folded into the delta doc | You + Claude                | ⬜     | L                            | every finding lands in one of: (1) already handled in identity-foundation; (2) clear in for master plan; (3) clear out for master plan (named workstream); (4) defer (no workstream yet, or the workstream isn't mature enough) |
-| **N** | Sequencing                                              | the dependency map + critical path, folded into the master plan | Claude (you ratify)         | ⬜     | M                            | sequenced set of work packages with dependencies and bundles; the identity-foundation workstream is sequenced *first* (dogfood) |
+| **N** | Sequencing                                              | the dependency map + critical path, folded into the master plan | Claude (you ratify)         | ⬜     | M                            | **N.0** first rules the Stream-2 pull-forward partition (see *Phase N — detail*); then sequencing proper: a sequenced set of work packages with dependencies and bundles; the identity-foundation workstream is sequenced *first* (dogfood) |
 | **O** | Remediation plan (the master plan)                     | a single document                   | Claude (you sign off)       | ⬜     | N                            | scope (in-scope work packages); out-of-scope workstreams (named, with rationale); sequenced work packages; dependency map; bundle grouping; Cosmo-enablement interface (B+/C− posture; identity-foundation as first dogfood) |
 | **P** | Hand off to execution (Cosmo work-package slicing)     | the Cosmo WIs (sliced from O)       | You + Claude                | ⬜     | O                            | every work package is a Cosmo work item (or grouped into a Cosmo work package); the Cosmo top-down process enablement is the precondition (parallel workstream) |
 
@@ -168,12 +168,16 @@ as a tracked contingency that does not block Phase H). Only then does **Phase F 
 
 ### Phase J — detail (split remediation gates)
 
-**J0 — Canon-shape scrub and domain-canon graduation.** Before the four identity domain docs move from
-`_wip/identity-foundation/` to `docs/canon/`, run the scrub plan at
-`docs/plans/2026-06-08-identity-foundation-canon-shape-scrub.md`. Exit gate: each section in
-`identity-ontology.md`, `domain-model.md`, `data-model.md`, and `identity-foundation-prd.md` has a
-recorded disposition (keep in L1 canon / move to L3 / move to audit-provenance / archive-delete as stale),
-and only standing rules remain in the documents that graduate.
+**J0 — Canon-shape scrub, trapped-canon rescue, rename, and domain-canon graduation.** Run the scrub plan
+at `docs/plans/2026-06-08-identity-foundation-canon-shape-scrub.md`; the T1 disposition inventory
+(`2026-06-08-j0-disposition-inventory.md`) is complete and its decisions are ratified (2026-06-08). J0 now
+owns, in one pass (PM reviews the draft before it lands):
+- **Scrub** — each section of `identity-ontology.md`, `domain-model.md`, `data-model.md`, `identity-foundation-prd.md` carries a recorded disposition (keep L1 / move L3 / move audit / stale); only standing rules graduate. `file:line` cites + vs-legacy diffs → Phase-F runbook (not canon).
+- **Trapped-canon rescue** — the PRD's ~23 Part-10 standing rules are lifted into Parts 1–9 (product/architecture) or into **`docs/compliance/`** (the ~10 compliance rules) **before** Part 10 routes to audit.
+- **`mentor`→`supporter` rename** (definitions unchanged; names only): `mentor`(human)→`supporter`, `mentee`→`supportee`, `mentorship`→`supportership`; AI = `mentor` (formal term), `mate` = product synonym in `CONTEXT.md` only. Edits the four docs + `CONTEXT.md` + `MMT-ADR-0007`/`0008` (ADRs mutable until ~Phase M) + diagrams + memory.
+- **Graduation (Option C layout)** — move to **`docs/canon/identity/`** (`ontology.md`/`domain-model.md`/`data-model.md`/`prd.md`); rewrite citations; update `docs/INDEX.md`/`CANONICAL-SET.md`/the `architecture.md` carve-out banner. Gated on the **ADR-0000 §I.4 amendment** (per-domain `docs/canon/<domain>/` sub-layout; drafted in the inventory).
+
+Exit gate: only standing canon in the graduated bodies; every non-canon section has a named destination; the four docs live at `docs/canon/identity/`; ADR-0000 §I.4 amended in lockstep.
 
 **J1 — Memory pointer alignment.** Retained `.claude/memory/` identity-foundation entries become pointers
 to `docs/INDEX.md`, `CANONICAL-SET.md`, ADRs, or the model register. Exit gate: every retained entry cites
@@ -220,6 +224,14 @@ identity-foundation surface. Exit gate: loose canon and nonstandard docs dirs ha
 
 ---
 
+### Phase N — detail (sequencing + the Stream-2 pull-forward gate)
+
+**N.0 — Stream-2 pull-forward gate (decision point).** Before sequencing the in-scope set, rule the Stream-2 partition. **Inputs:** M's triaged findings + the L `execution-blocking-if-deferred?` tag. **The ruling:** partition every finding assigned to Stream 2 (M buckets 3/4) into **(a)** a *pull-forward prerequisite subset* — documentation-remediation that, left deferred, would block clean implementation execution (e.g. an in-scope work package must cite an `architecture.md` section still in its legacy/wrong state, or slicing a Cosmo WI requires canon that does not yet exist) — and **(b)** the *deferred remainder*, which runs in parallel with or after execution. **Default is defer; pull forward only on a demonstrated, named blocking dependency** (the conservative posture this runway uses elsewhere). Implementation execution is **never gated on Stream 2 *completion*** — only on this minimal, evidence-justified prerequisite subset. The pull-forward subset is sequenced in **Phase O** as pre-execution work and is coordinated under this roadmap's umbrella (see the *Stream 2 commencement* cross-cutting thread); the remainder stays Stream 2. **Relationship to K.6:** if K.6 deferred audit reconciliation, the pull-forward evidence is thinner — N.0 must mark any pull-forward call that rests on an unreconciled finding as lower-confidence. **Exit gate:** every Stream-2-assigned finding is labelled *pull-forward* or *deferred*, each pull-forward carrying a one-line dependency rationale; the pull-forward subset is handed to N.1.
+
+**N.1 — Sequencing proper.** The dependency map + critical path over the in-scope set (including N.0's pull-forward subset); the identity-foundation workstream is sequenced *first* (dogfood).
+
+---
+
 ## Execution model — parallel tracks  *(2026-06-02)*
 
 With **B-tech complete**, the dependency "D depends on B" refines to **D depends on B-*tech* (locked); B-*product*
@@ -245,6 +257,18 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
 
 ## Cross-cutting threads
 
+- **`docs/glossary.md` reconciliation + the `mentor`→`supporter` rename (raised 2026-06-08).** A separate PM
+  activity produced `docs/glossary.md` by reverse-engineering the (drifted) code — a **rogue, non-canonical
+  drift-map** that inverts our actor vocabulary (`mentor`=AI, `guardian` retired, `owner` kept). Marked
+  non-canon 2026-06-08. Disposition: **our canon wins on every definition**; the doc is dismantled to proper
+  homes and **deleted after bucket-2 consumes it**. Three buckets: **(1) identity actors** → discarded, canon
+  owns it (rides J0/J1, harvest drift-evidence into the ontology crosswalk); **(2) naming-convention / structure
+  terms / notes taxonomy / learning-loop / modes** → a **new learning-domain canon design stream, sibling to
+  Stream 2** (not its drain — design, like identity-foundation was; glossary is its primary input); **(3) cards /
+  celebrations** → **Stream 2** (principles → `ux-design-specification.md`; terms → a product-owned per-area
+  `CONTEXT.md`; inventories → L3 register). A ratified **product decision** also swaps `mentor`(human)→`supporter`
+  (+ `mentee`→`supportee`, `mentorship`→`supportership`; AI keeps `mentor`, `mate`=product synonym) — **definitions
+  unchanged, names only**; **executed in J0** (see Phase J0 detail). ⬜ *(bucket 2 = new stream; bucket 3 = Stream 2)*
 - **Policy-engine + router spine (Phase F.1)** — the two new architectural lanes from the "A-vs-B"
   decision (the engine + the router). Full detail in the **Phase F.1** section above; spine ADRs
   (`MMT-ADR-0013` engine · `MMT-ADR-0015` data-model amendment · `MMT-ADR-0014` router) closed before
@@ -328,6 +352,11 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
     finding statuses; pure count/line refreshes were retained. After our controlled sweep, *diff* against the
     quarantined §1 conflict-resolutions and the cleanup plan's STANDS/refuted findings as a backstop, then decide
     final disposition (harvest verified facts / discard). ✅
+- **Stream 2 commencement, parallelism & coordination umbrella — *when* the deferred remediation starts (added 2026-06-08, architect-ratified).** This runway *sequences* Stream 2; it does not *execute* it, and **implementation execution is never gated on Stream 2 completion.** Four rules govern start timing:
+  - **Baseline.** Stream 2 is named and ordered by **Phase O** (the master plan) and sliced into Cosmo WIs at **Phase P**.
+  - **Maximal parallelism — start each fragment at its earliest responsible start.** Stream 2 is *not* a monolith that waits for O; we execute as much as we can in parallel as soon as each fragment *can* start. Gap-analysis-dependent parts (the full `architecture.md` rebuild, the `ARCH-N` reverse-engineering drain) cannot begin before **Phase L**; input-independent parts (e.g. the principles/invariants catalog, the `docs/`→`docs/canon/` reorg) can begin once their input canon is stable. Default posture: *start as soon as you can, in parallel* — not *hold until O*.
+  - **Single coordination umbrella while K–P run.** Any Stream 2 fragment that starts early (or is pulled forward by **N.0**) stays coordinated **under this identity-foundation roadmap** for as long as K–P are still running — one umbrella, one sequencing authority — rather than spinning off into a separate, uncoordinated track. Stream 2 graduates to its own standalone workstream only **after the runway closes (post-P).**
+  - **The pull-forward exception (N.0).** Whatever the **N.0** gate (see *Phase N — detail*) declares a pre-execution prerequisite is sequenced in O as pre-execution work and executed early under the umbrella above; the deferred remainder runs in parallel where its inputs allow, otherwise post-execution. 🟡 *(added 2026-06-08)*
 - **Consent/COPPA spec + legal check (REQ-2 counsel queue)** — spans B/D; gates any code touching consent.
   PM-owned, worked with the lawyer. 🟡 **Split by structural impact — the queue does NOT gate F as a whole:**
   - **→ E (data model) — absorb now as a known constraint:** the legally-mandated **retention carve-out**
@@ -431,7 +460,7 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 - [ ] **K** — consolidation activity (the 14 sub-audits + `.deepsec/`; produce the consolidated-audit doc; the K.0 canon-contradiction check; the K.5 sizing estimate; the K.6 spin-up-or-defer decision). See Phase K — detail above.
 - [ ] **L** — unified gap analysis (one row per finding; the delta document).
 - [ ] **M** — four-bucket triage (handled / clear in / clear out / defer).
-- [ ] **N** — sequencing (dependency map + critical path; identity-foundation workstream first as the dogfood).
+- [ ] **N** — **N.0** Stream-2 pull-forward gate (partition Stream 2 → pull-forward prerequisite subset vs deferred remainder), then **N.1** sequencing proper (dependency map + critical path; identity-foundation workstream first as the dogfood).
 - [ ] **O** — remediation plan (the master plan; architect sign-off).
 - [ ] **P** — hand off to execution (Cosmo work-package slicing; the Cosmo top-down process enablement is the parallel precondition).
 
@@ -452,6 +481,24 @@ The "ready to start implementation" gate is the *P* phase's exit gate, not F's. 
 
 ## Decision log
 
+- **2026-06-08** — **Stream-2 commencement + pull-forward gate added (architect-ratified).** Closed a roadmap gap: Stream 2's *start timing* was scattered in threads and had no decision point for pulling fragments forward. Ratified: **(1)** a *Stream 2 commencement* cross-cutting thread states the rules — execution never gated on Stream 2 *completion*; **maximal parallelism** (each fragment starts at its earliest responsible start — gap-analysis-dependent parts after L, input-independent parts once canon stable); **single coordination umbrella** (early/pulled-forward Stream 2 work stays under this roadmap while K–P run, graduating to a standalone workstream only post-P). **(2)** New **N.0 — Stream-2 pull-forward gate** (Phase N detail): partitions Stream-2-assigned findings (M buckets 3/4) into a *pull-forward prerequisite subset* (default defer; pull forward only on a demonstrated, named blocking dependency) vs the *deferred remainder*; sequenced as pre-execution work in O. **(3)** New L tag `execution-blocking-if-deferred?` feeds N.0. Cross-reference: N.0 lower-confidence where K.6 deferred reconciliation. Spine A–P unchanged (gate added as N.0, not a new phase letter).
+- **2026-06-08** — **Phase J0 scoped + ratified (T1 inventory complete).** The T1 disposition inventory
+  (`2026-06-08-j0-disposition-inventory.md`) mapped all four domain docs section-by-section. Headline finding:
+  the PRD's Part 10 traps **~23 standing rules that exist nowhere else** — routing it to audit as-is would delete
+  live canon, so they must be **lifted first** (rescue, not just scrub). Ratified rulings: **(1)** J0 owns the
+  full scrub + rescue + graduation in one pass, PM reviews the draft. **(2)** Disposition policy adopted (uniform
+  rubric; sole carve-out = keep `data-model.md` §8 invariant→table cross-check). **(3)** `file:line`/vs-legacy
+  cites → Phase-F runbook, canon ships clean. **(4)** Rescued **compliance** rules → `docs/compliance/`; product
+  rules → PRD body. **(5)** Canon layout = **Option C** — graduate to **`docs/canon/identity/`**; estate spine
+  stays at `docs/canon/` root; stream canon = standing peer canon (ADR-0000 §I.4 amendment drafted, applies
+  before the move). **(6) `mentor`→`supporter` rename** (product decision; definitions unchanged, names only):
+  `mentor`(human)→`supporter`, `mentee`→`supportee`, `mentorship`→`supportership`; AI keeps `mentor` (formal),
+  `mate` = product synonym in `CONTEXT.md` only; guardian/owner/charge/admin/Payer untouched; **rides J0**; ADRs
+  `0007`/`0008` edited directly (ADRs mutable until ~Phase M). **(7) `docs/glossary.md`** (rogue, code-derived
+  drift-map) marked non-canon; dismantled — bucket 1 (actors) discarded/harvested, bucket 2 (notes/learning-loop/
+  modes) → **new learning-domain canon stream beside Stream 2**, bucket 3 (cards/celebrations) → Stream 2; doc
+  **deleted after bucket 2 consumes it**. Plan + inventory + this roadmap updated; ADR-0000 amendment pending
+  apply. **Next: execute J0 scrub** (begin on greenlight).
 - **2026-06-08** — **Phase I closed (sub-gated I-a / I-b / I-c).** Executed on branch `identity-foundation-phase-i` as four commits (plan restructure + one per sub-gate); local-only, not yet pushed/merged. **I-a — legacy `architecture.md` anchor cleanup:** the 5 `[LEGACY-REVIEW]` conflicts rewritten to agree with `## Identity Foundation` (minor-consent/age → 13+ floor + sub-13 built-but-gated + three-axis model + append-only consent log; multi-tenancy → org/membership re-derived; authorization → roles primitive `{admin, learner}` + Guardian/Mentor/Payer split; enums example → `verification_type`; NFR-coverage status → "Defined"), `[TRANSITIONAL]` banner marked resolved, carve-out's stale marker reference squared. Scope-by-touching — the adjacent legacy schema-file fossil left for Stream 2. **I-b — identity `ARCH-N` dispositions:** `ARCH-9` superseded by `MMT-ADR-0014` (+ `0016`), pinned model names noted as register data; `ARCH-8` **promoted to new `MMT-ADR-0017`** (`routeAndCall` single LLM entry point, reconstructed) with absorb-forward of its 4 code citations (comment-only) + a lockstep canon cross-ref; `ARCH-7` stands with a `profile_id` → `person_id` scope-key note. `UX-6`/persona and the registry-wide drain explicitly Stream 2. **I-c — canon-authorship process (the governance hinge):** `architecture.md` retitled "Architecture Decision Document" → `# Architecture` with an L1-canon preamble + frontmatter `status: mid-refresh`; a "How canon is authored (ADR ↔ canon ↔ ARCH-N)" operating section added to `adr/README.md`; **`MMT-ADR-0000` amended with the durable "no document is the sole system of record" guard** — the lasting `0016`↔`0000` reconciliation (the divergence *instance* was already removed at the `0016` repurpose; this prevents recurrence). `docs/INDEX.md` bumped (`MMT-ADR-0000` +4 amendments; ADR range `0000`–`0017`). **Not Phase I (→ Phase J):** no canon-shape scrub, no `_wip/`→`docs/canon/` move, no agent-doctrine/memory pointer reduction, no broad terminology cleanup beyond touched lines. **Next: Phase J0** (canon-shape scrub + domain-canon graduation). Handoff: `_handoffs/2026-06-08-phase-i-close.md`.
 - **2026-06-08** — **Canon-quality fix + standard set (post-H, commit `976a5f58c`).** The Phase-H `## Identity
   Foundation` section had leaked runway-internal decision/finding IDs (`Path X`, `G-3/4/6`, `F1-BT-a`, `I-PB-B2b`,
