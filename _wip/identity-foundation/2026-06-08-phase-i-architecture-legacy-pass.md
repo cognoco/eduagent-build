@@ -1,16 +1,16 @@
 ---
-title: Phase I — Light pass on legacy architecture.md + ARCH-N touch + canon-authorship process
+title: Phase I — Legacy Architecture Anchors, Identity ARCH-N Touch, and Canon-Authorship Process
 date: 2026-06-08
 profile: change
 spec: _wip/identity-foundation/ROADMAP.md (Phase I row) · _handoffs/2026-06-08-phase-h-close.md
 status: draft
 ---
 
-# Phase I — Implementation Plan
+# Phase I — Legacy Architecture Anchors, Identity ARCH-N Touch, and Canon-Authorship Process
 
-**Goal:** Resolve the 5 `[LEGACY-REVIEW]` conflicts H flagged in `docs/architecture.md`, give the identity-intersecting `ARCH-N` register entries their terminal disposition (citations migrated), and define the canon-authorship process (incl. the `architecture.md` title fix and the durable `0016`↔`0000` anti-divergence guard).
+**Goal:** Close Phase I's three distinct sub-gates: **I-a** — clean up the flagged legacy `architecture.md` anchors; **I-b** — give the identity-domain `ARCH-N` register entries their terminal dispositions (citations migrated); **I-c** — establish the canon-authorship process and the anti-divergence guard. I-a/I-b are bounded cleanup; **I-c is the structural governance hinge**, not a light cleanup — it is the rules Phase J will obey.
 
-**Approach:** Three independent parts — (a) anchor rewrites, (b) `ARCH-N` touch, (c) canon-authorship process. Each is scope-by-*touching*, not scope-by-coverage: correct what is *directly misleading*, leave *merely incomplete* legacy alone for the Stream-2 rebuild. Hold the Phase-H canon-quality bar — plain self-explanatory rules, **no runway-internal IDs** (`Path X`, `G-3`, `T3`, bare `inv NN`), keep inline `MMT-ADR-*` / `data-model.md §` trace-cites (`MMT-ADR-0000` §I.2).
+**Approach:** Three sub-gates, executed in order, each independently verifiable (see per-sub-gate verification). I-a and I-b are **scope-by-*touching*** — correct what is *directly misleading*, leave *merely incomplete* legacy for the Stream-2 rebuild. I-c authors durable governance and so is held to the full canon bar. Across all three, hold the **Phase-H canon-quality rule**: plain self-explanatory rule language, **no runway-internal IDs** in new canon prose (`Path X`, `G-3`, `T3`, bare `inv NN`, etc.); keep inline `MMT-ADR-*` / `data-model.md §` trace-cites (`MMT-ADR-0000` §I.2).
 
 ## Scope
 
@@ -23,30 +23,40 @@ In scope:
 - `docs/adr/MMT-ADR-0000-documentation-layer-model-and-decisions-layer.md` — anti-divergence amendment (D3)
 - `_wip/identity-foundation/ROADMAP.md` — Phase I row → `[x]`, decision-log entry
 
-Out of scope (deliberately untouched — flag, don't fix):
+Out of scope (Stream 2 / structural — deliberately untouched, flag don't fix):
 - The full `architecture.md` structural rebuild + `ARCH-N` reverse-engineering → **Stream 2**
-- The stale legacy schema-file block at `architecture.md:628-638` (`profiles.ts # profiles, family_links, consent_states`) — adjacent to anchor 4 but a whole-model fossil; Stream 2 rebuilds it (noted in T4)
-- `UX-6` (three-persona theming teen/learner/parent) and other `UX-N` — persona model is superseded by the capability split, but (b) is an **`ARCH-N`** touch; the UX-spec refresh is Stream 2 (noted in T7)
+- The stale legacy schema-file block at `architecture.md:628-638` (`profiles.ts # profiles, family_links, consent_states`) — adjacent to I-a's anchor 4 but a whole-model fossil; Stream 2 rebuilds it (noted in T4)
+- `UX-6` (three-persona theming teen/learner/parent) and other `UX-N` — persona model is superseded by the capability split, but I-b is an **`ARCH-N`** touch; the UX-spec refresh is Stream 2 (noted in T7)
 - The registry-wide `ARCH-N` drain (the other 23 entries) → **Stream 2**
-- Formal L0-glossary definitions of routing nouns (`tutor`/`judge`/`rung`/`tier`/`flow`/`slot`) → **Phase J** (glossary alignment), glossed inline in `0014`/`0016` for now
-- `architecture.md` generator frontmatter (`status: 'complete'`, `user_name: 'Zuzka'`, `workflowType`) — cosmetic; see decision D4
-- Phase J(0) citation rewrite (`_wip/` → `docs/canon/` paths) — flagged in the section banner, executes at J(0)
+
+### Not Phase I — explicit boundary (Phase J, not now)
+
+Phase I prepares the canon-authorship *rules*; it does **not** apply them across the estate. The following are **out of bounds for this plan** and belong to Phase J (see the J-split handoff below):
+
+- **No Phase J canon-shape scrub** — do not sweep terminology/shape across canon broadly. (Phase I touches only the lines it rewrites.)
+- **No `_wip` → `docs/canon/` graduation** — the 4 identity domain-canon docs stay in `_wip/` this phase; their move is **J0** (the `MMT-ADR-0000` §I.4 front-of-J amendment).
+- **No agent-doctrine / memory reduction** — do **not** reduce `CLAUDE.md` / `AGENTS.md` or `.claude/memory/` to pointer-layer; that is **J2** / **J1**.
+- **No broad terminology cleanup** — do not clean temporary terminology (charge/persona/Path-X/etc.) outside the specific Phase-I touched lines; the A-vs-B cleanup sweep is Phase J.
+
+Adjacent items that are explicitly **deferred to Phase J**, recorded here as pointers (not Phase-I tasks):
+- Formal L0-glossary definitions of routing nouns (`tutor`/`judge`/`rung`/`tier`/`flow`/`slot`) → **J0/J2** (glossary alignment); glossed inline in `0014`/`0016` for now.
+- Phase J(0) citation rewrite (`_wip/` → `docs/canon/` paths) once the domain docs graduate → flagged in the carve-out's section banner; executes at **J0**.
 
 ---
 
-## Background — what each part resolves
+## Background — what each sub-gate resolves
 
-**(a)** H *marked* 5 direct conflicts where a legacy line contradicts the new `## Identity Foundation` canon; I *rewrite* them so the legacy line agrees with canon, then delete the now-resolved `[LEGACY-REVIEW]` comment. The carve-out (`architecture.md:563-609`) already states the truth; these rewrites point legacy prose at it.
+**I-a (legacy anchor cleanup).** H *marked* 5 direct conflicts where a legacy line contradicts the new `## Identity Foundation` canon; I-a *rewrites* them so the legacy line agrees with canon, then deletes the now-resolved `[LEGACY-REVIEW]` comment, and squares the banner + title/preamble/frontmatter. The carve-out (`architecture.md:563-609`) already states the truth; these rewrites point legacy prose at it. Scope-by-touching — merely-incomplete legacy is left for Stream 2.
 
-**(b)** Per `MMT-ADR-0000` Part III, every `ARCH-N` owes a terminal disposition, and **no `ARCH-N` is retired without resolving its code citations** (absorb-forward: a promoted entry migrates its own code comments to the new ID in the same change-set). Only the identity/policy-engine-intersecting entries are in Phase-I scope: `ARCH-9` (model routing — **superseded** by `MMT-ADR-0014`/`0016`), `ARCH-8` (orchestrator — **promoted to new `MMT-ADR-0017`**, per decision D2), `ARCH-7` (scoped repo — **stands**, scope-key note). Code-citation census (verified 2026-06-08): `ARCH-9` at 4 sites, `ARCH-8` at 4 sites (3 shared with `ARCH-9`), `ARCH-7` none. Shared sites get both migrations.
+**I-b (identity-domain `ARCH-N` dispositions).** Per `MMT-ADR-0000` Part III, every `ARCH-N` owes a terminal disposition, and **no `ARCH-N` is retired without resolving its code citations** (absorb-forward: a promoted entry migrates its own code comments to the new ID in the same change-set). Only the identity/policy-engine-intersecting entries are in scope: `ARCH-9` (model routing — **superseded** by `MMT-ADR-0014`/`0016`), `ARCH-8` (orchestrator — **promoted to new `MMT-ADR-0017`**, per decision D2), `ARCH-7` (scoped repo — **stands**, scope-key note). Code-citation census (verified 2026-06-08): `ARCH-9` at 4 sites, `ARCH-8` at 4 sites (3 shared with `ARCH-9`), `ARCH-7` none. Shared sites get both migrations. Citation edits are **comment-only** (no logic).
 
-**(c)** The `0016`↔`0000` doctrine-divergence *instance* is already gone (the lockstep-denial line was removed when `0016` was repurposed, 2026-06-08). The surviving root cause is that the canon-authorship *process* was never written down in one place — so two ADRs *could* disagree on what canon is. (c) writes it down + fixes the misleading doc title + adds a durable guard.
+**I-c (canon-authorship process / anti-divergence guard).** The structural governance hinge. The `0016`↔`0000` doctrine-divergence *instance* is already gone (the lockstep-denial line was removed when `0016` was repurposed, 2026-06-08). The surviving root cause is that the canon-authorship *process* was never written down in one place — so two ADRs *could* disagree on what canon is. I-c writes the process down (`adr/README.md`), records the durable guard in the constitution (`MMT-ADR-0000`), and self-identifies `architecture.md` as canon (title + preamble). **These are the rules Phase J will obey** — I-c prepares them; it does not execute J.
 
 ---
 
 ## Tasks
 
-### Part (a) — the 5 anchor rewrites (`docs/architecture.md`)
+### Sub-gate I-a — legacy `architecture.md` anchor cleanup (T1–T6)
 
 - [ ] **T1: NFR table row (~line 68).** Replace the COPPA-adjacent row and delete its `[LEGACY-REVIEW]` comment.
   - Before: `| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile isolation, audit trail | <!-- [LEGACY-REVIEW] … -->|`
@@ -76,7 +86,7 @@ Out of scope (deliberately untouched — flag, don't fix):
   - Change the sentence "Direct conflicts are flagged inline with `<!-- [LEGACY-REVIEW] -->` comments (greppable; resolved in Phase I)." to: "The direct conflicts the carve-out supersedes were flagged inline with `<!-- [LEGACY-REVIEW] -->` comments and **resolved in Phase I (2026-06-08)**; the legacy sections themselves remain pre-refresh, pending the Stream-2 rebuild."
   - done when: banner no longer implies unresolved inline conflicts; `[TRANSITIONAL]`/`[CANON-NEW]` markers still present (Stream 2 owns their removal).
 
-### Part (b) — identity-domain `ARCH-N` touch
+### Sub-gate I-b — identity-domain `ARCH-N` dispositions (T7–T9b)
 
 - [ ] **T7: Stamp `ARCH-9` (model routing) terminal disposition in `docs/specs/epics.md`.** Append the disposition to the entry; do not delete it (retract-in-place).
   - After: `- ARCH-9: Model routing by conversation state (escalation rung): Gemini Flash for rung 1-2, Gemini Pro for standard rung 3+, and advanced providers only from rung 4 upward for entitled profiles. **— → superseded by MMT-ADR-0014 (router/vetting split — the durable routing-by-rung mechanism) + MMT-ADR-0016 (safety/judge); the pinned model names are register data (`docs/registers/llm-models/`), not canon; "Family standard = Gemini-only" superseded by MMT-ADR-0014 §Supersession. Code citations migrated to MMT-ADR-0014 (2026-06-08).**`
@@ -100,7 +110,7 @@ Out of scope (deliberately untouched — flag, don't fix):
   - **Lockstep canon partner:** locate the `routeAndCall`/LLM-orchestration rule in `architecture.md` (legacy LLM section) and add a `(MMT-ADR-0017)` cross-ref to it — promotion graduates the rule into canon while the ADR holds the *why* (`MMT-ADR-0000` §II.3). If the rule is only in legacy prose, the cross-ref is the minimal lockstep touch (no rewrite of the legacy section).
   - done when: `MMT-ADR-0017` exists with the four standard sections; register entry stamped "promoted"; `rg "ARCH-8" apps/ packages/` → 0; the `routeAndCall` canon line cites `MMT-ADR-0017`.
 
-### Part (c) — canon-authorship process + doc title + anti-divergence guard
+### Sub-gate I-c — canon-authorship process + anti-divergence guard (T10–T12) — the governance hinge
 
 - [ ] **T10: Fix the `architecture.md` title + add a "How this document works" preamble.** The title "Architecture Decision Document" conflates canon (the *what*) with the ADR decisions layer (the *why*); `architecture.md` is **L1 canon** (`MMT-ADR-0000` §I.2). Retitle and replace the generator's tagline. Points to `0000`, does not restate it.
   - Frontmatter (D4): `status: 'complete'` → `status: 'mid-refresh'` (stops the metadata contradicting the transitional banner). Leave `completedAt` / `user_name` / `workflowType` untouched.
@@ -122,24 +132,45 @@ Out of scope (deliberately untouched — flag, don't fix):
 
 ### Close-out
 
-- [ ] **T13: Flip ROADMAP Phase I → done + decision-log entry.** In `_wip/identity-foundation/ROADMAP.md`: change the Phase-I row Status `⬜` → `✅` (and the `[ ] I` bullet → `[x]`), add a newest-first decision-log entry summarizing (a)/(b)/(c) outcomes, and write the close handoff `_handoffs/2026-06-08-phase-i-close.md` (pattern of the Phase-H close).
-  - done when: ROADMAP reflects Phase I complete; decision-log entry present; handoff written; **next = Phase J(0)** noted.
+- [ ] **T13: Flip ROADMAP Phase I → done + decision-log entry.** In `_wip/identity-foundation/ROADMAP.md`: change the Phase-I row Status `⬜` → `✅` (and the `[ ] I` bullet → `[x]`), add a newest-first decision-log entry summarizing the **I-a / I-b / I-c** outcomes, and write the close handoff `_handoffs/2026-06-08-phase-i-close.md` (pattern of the Phase-H close).
+  - done when: ROADMAP reflects Phase I complete (by sub-gate); decision-log entry present; handoff written; **next = Phase J0** (canon-shape scrub + `_wip/`→`docs/canon/` graduation) noted, with the J-split (below) recorded.
 
 ---
 
-## Verification (whole plan)
+## Phase J handoff (the J split) — for the next plan, not this one
 
+Phase I delivers only the canon-authorship *rules* (I-c). The estate-wide *application* of those rules is **Phase J, which is being split into four separately-planned sub-phases** so each is independently reviewable:
+
+- **J0 — canon-shape scrub + graduation.** Scrub canon shape/terminology across the identity domain; graduate the 4 ratified domain-canon docs `_wip/identity-foundation/` → `docs/canon/` (per the `MMT-ADR-0000` §I.4 front-of-J amendment); rewrite inbound `_wip/` cites to the `docs/canon/` paths (incl. the carve-out's J(0) citation rewrite and the doc index). Runs first so J1's pointers target final paths.
+- **J1 — memory pointers.** Restructure retained `.claude/memory/` entries into provenance-cited pointers into the doc index (extract-before-cleanup); cull the un-linkable-and-unprovenanced.
+- **J2 — agent doctrine.** Reduce `CLAUDE.md` / `AGENTS.md` to pointer-layer (drain inlined canon); fold the A-vs-B terminology cleanup sweep (charge / 6-persona / capability split / Path-X / routing supersessions); add the routing-noun glossary entries.
+- **J3 — docs-tree conformance.** Conform `docs/` to the `MMT-ADR-0000` §I.4 physical tree (loose root canon → `docs/canon/`; stray artifacts → `assets/` / `_archive/`; near-duplicate dirs consolidated) — per-file decisions required.
+
+**Phase I prepares the rules J obeys; it does not perform any J work.** Any J-flavored cleanup noticed during I execution is recorded as a pointer to the relevant J sub-phase (logged in the T13 handoff's Phase-J worklist), never done inline — mirroring the repo's forward-only interim-governance ratchet (`MMT-ADR-0000` Amendment 2026-06-07 §4).
+
+---
+
+## Verification — per sub-gate
+
+**I-a (legacy anchor cleanup):**
 - `rg -c "LEGACY-REVIEW" docs/architecture.md` → **0** (all 5 resolved).
-- `rg "ARCH-9" apps/ packages/` → **0** and `rg "ARCH-8" apps/ packages/` → **0** (citations migrated); `rg "ARCH-8|ARCH-9" docs/specs/epics.md` → the two disposed register entries only.
-- `ls docs/adr/MMT-ADR-0017-*` → exists; `rg "MMT-ADR-0017" docs/specs/epics.md docs/architecture.md` → register stamp + canon cross-ref present.
-- `rg "Architecture Decision Document" docs/` → **0** (title fixed); `rg "status: 'complete'" docs/architecture.md` → 0.
-- `nx run api:typecheck` and lint on the 4 touched `services/llm/` files → green (comment-only edits).
-- Manual read: each rewritten anchor agrees with `## Identity Foundation`; no runway-internal IDs (`Path X`, `G-3`, `T3`, bare `inv NN`) introduced into canon prose; every rewrite keeps an `MMT-ADR-*`/`data-model.md §` cite.
-- No integration/unit test impact expected (no `apps/api` logic touched — comment-only). Confirm `git diff --stat` shows only comment lines in the 4 `.ts` files.
+- `rg "Architecture Decision Document" docs/` → **0** (title fixed); `rg "status: 'complete'" docs/architecture.md` → **0** (frontmatter fixed).
+- Manual read: each rewritten anchor agrees with `## Identity Foundation`; the banner no longer implies unresolved inline conflicts; no runway-internal IDs (`Path X`, `G-3`, `T3`, bare `inv NN`) introduced; every rewrite keeps an `MMT-ADR-*` / `data-model.md §` cite.
+
+**I-b (identity `ARCH-N` dispositions):**
+- `rg "ARCH-8" apps/ packages/` → **0** and `rg "ARCH-9" apps/ packages/` → **0** (citations migrated; comment-only).
+- `rg "ARCH-7|ARCH-8|ARCH-9" docs/specs/epics.md` → each carries a terminal disposition (`ARCH-7` stands+note · `ARCH-8` → promoted · `ARCH-9` → superseded).
+- `ls docs/adr/MMT-ADR-0017-*` → exists with the 4 standard sections; `rg "MMT-ADR-0017" docs/specs/epics.md docs/architecture.md` → register stamp + canon cross-ref present.
+- `nx run api:typecheck` and lint on the 4 touched `services/llm/` files → green; `git diff --stat` shows only comment lines in the 4 `.ts` files (no logic, no integration/unit-test impact).
+
+**I-c (canon-authorship process / guard):**
+- `docs/adr/README.md` contains the "How canon is authored" subsection explaining the ADR ↔ canon ↔ ARCH-N relationship and the lockstep entry rule.
+- `MMT-ADR-0000` carries the dated "no document is the sole system of record" guard (names the resolved `0016` instance, cites §II.2).
+- `architecture.md` no longer calls itself a decision document; its preamble self-identifies it as L1 canon and points to `adr/README.md` for the entry process.
 
 ## Self-review (done before declaring the plan ready)
 
-1. **Spec coverage** — Phase-I gate (a) 5 anchors → T1–T5; banner consistency → T6; (b) `ARCH-N` touch → T7–T9b (`ARCH-9` superseded, `ARCH-8` promoted to `MMT-ADR-0017`, `ARCH-7` stands); (c) canon-authorship process → T10–T12 (title + frontmatter, README consolidation, `0000` guard); ROADMAP/handoff close → T13. ✅
+1. **Spec coverage** — **I-a:** 5 anchors → T1–T5, banner → T6; **I-b:** `ARCH-N` → T7–T9b (`ARCH-9` superseded, `ARCH-8` promoted to `MMT-ADR-0017`, `ARCH-7` stands); **I-c:** canon-authorship → T10–T12 (title + preamble + frontmatter, README consolidation, `0000` guard); close → T13. The "Not Phase I" boundary + J-split handoff bound the scope. ✅
 2. **Deferred-decision scan** — exact before/after text given for every rewrite; all five open choices closed (D1–D5, resolved 2026-06-08); no TBDs. ✅
 3. **Name/type consistency** — `MMT-ADR-0014` is the citation-migration target throughout (T7/T8); `verification_type` is the swapped enum (T4); `person_id`/`profile_id` used consistently with the carve-out. ✅
 
