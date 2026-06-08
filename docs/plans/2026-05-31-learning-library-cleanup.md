@@ -3,13 +3,36 @@ title: Learning Library Cleanup - Implementation Plan
 date: 2026-05-31
 profile: code
 spec: docs/audits/2026-05-31-logical-gap-audit.md
-status: draft
+status: shipped
 gap_ids: [learn-3]
 ---
 
 # Learning Library Cleanup - Implementation Plan
 
-> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+> **✅ Shipped, then hardened (2026-06-09).** The original plan (T1–T5 below)
+> shipped to `main` as the `deleteSubject` service, `DELETE /v1/subjects/:id`
+> route, `useDeleteSubject` hook, and a delete action in the manage-subjects
+> sheet. A follow-up end-user review then tightened two over-blunt UX
+> decisions, now also shipped:
+>
+> 1. **Archive-first gate.** Delete is no longer offered on active or paused
+>    subjects — it renders only on **archived** subjects
+>    (`library.tsx`, `subject.status === 'archived'`). A subject must first be
+>    archived (a reversible state with a Restore action) before it can be
+>    permanently deleted, so a whole subject's learning history can never be
+>    destroyed in one tap from an in-use subject. Archive stays the safe,
+>    indefinite, recoverable "keep it but set it aside" state; the `paused`
+>    status remains the intermediate "I'll come back soon" grouping. No
+>    auto-empty of the archive was added (it would silently destroy retained
+>    learning history and compound with the existing 30-day auto-archive cron).
+> 2. **Honest confirmation copy.** The destructive confirmation now names the
+>    learner-meaningful losses — mastery progress, flashcard (spaced-repetition)
+>    reviews, and streak — not just books / topics / sessions counts
+>    (`en.json` → `library.manage.deleteConfirmMessage`).
+>
+> The "classification pending / re-triage against identity-foundation" banner
+> that previously sat here is moot: the feature shipped independently and this
+> hardening is a UI-gating + copy change with no identity coupling.
 
 **Goal:** Let learners permanently delete mistakenly-created subjects, with the
 same kind of explicit destructive affordance already available for books and
