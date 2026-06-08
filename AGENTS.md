@@ -170,16 +170,31 @@ real `file:line`; `scripts/check-i18n-keep-rot.ts` fails CI if a cite rots. The
 walker also follows `cond ? 'a' : 'b'`, `x ?? 'a'`, `as` casts, `i18next.t(…)`
 member calls, and `const tr = t` alias rebindings.
 
-### Known gap (tracked separately)
+### Hardcoded-JSX-literal ratchet (Phase 3)
 
 The orphan-key checker only sees strings that pass through `t()`. Hardcoded
-English literals in JSX (e.g. `<Text>Add child</Text>`, `label="Continue"`)
-bypass i18n entirely and render English to every locale. There is no automated
-guard against this today. Phase 3 (TBD) introduces a baseline-allowlist
-ratchet on `JsxText` and JSX-children `StringLiteral` nodes in
-`apps/mobile/src/**`, mirroring the `scripts/no-clinical-copy-baseline.json`
-pattern. Until Phase 3 lands: when adding user-visible copy, route it through
-`t('…')` and add the key to `en.json` in the same PR.
+English literals in JSX (e.g. `<Text>Add child</Text>`) bypass i18n entirely
+and render English to every locale. `scripts/check-i18n-jsx-literals.ts` is the
+read-side guard: a `ts-morph` AST walker that flags `JsxText` nodes and
+JSX-children `StringLiteral` / `NoSubstitutionTemplateLiteral` nodes (including
+through `cond ? 'a' : 'b'`, `x && 'a'`, `x ?? 'a'`, casts/parens) in
+`apps/mobile/src/**/*.tsx`. It is a forward-only baseline ratchet mirroring the
+`no-clinical-copy` pattern: existing literals are grandfathered in
+`scripts/i18n-jsx-literals-baseline.json` (361 entries), and only NEW literals
+fail CI (the `i18n hardcoded-JSX-literal check` step in `ci.yml`). Violations are
+keyed on `{file, kind, text}` — not line number — so reformatting never churns
+the baseline. Run `pnpm check:i18n:jsx-literals --accept` to refresh the
+baseline when you genuinely add non-translatable JSX copy (a code sample, a
+brand token) and justify it in the commit message.
+
+**Scope deliberately excludes JSX *attribute* literals** (`label="Continue"`,
+`title="Delete"`) — that surface mixes real copy with testID/style/a11y-role
+values and needs a per-prop allow/deny model scoped separately
+(`docs/audit/2026-05-29-full-audit/workflow-1/proposed-baseline.json`).
+
+When adding user-visible copy, route it through `t('…')` and add the key to
+`en.json` in the same PR — the ratchet enforces this for the JsxText/child
+surface, but attribute copy still relies on review.
 
 ### Variable-interpolation fallbacks
 
