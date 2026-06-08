@@ -1,13 +1,13 @@
 ---
-name: Freeform chat library filing decision
-description: Product decision for Ask Anything/freeform chats, session history, and Library filing.
+name: Freeform chat notes and library filing decision
+description: Product decision for Ask Anything/freeform chats, bookmarks, learner-notes, and Library filing.
 type: project
 ---
 
-Ask Anything/freeform chat should be low-friction: let the learner ask first, then classify quietly after a few meaningful exchanges.
+Ask Anything/freeform chat should stay low-friction: let the learner ask first, then classify quietly as needed. Do not mint a hidden topic during the chat just to unlock topic-bound features.
 
-**Decision:** Sessions are saved as conversation history by default. Library filing is separate: when a chat becomes meaningful learning, the app should auto-file it into the best subject/book/topic when confident, ask only when ambiguous, and always allow correction. The user may choose to keep the session out of Library; that keeps the session history/summary/transcript but does not create or attach a curriculum topic, does not show as a Library topic, and should not drive topic progress/retention.
+**Decision:** Sessions are saved as conversation history by default. Bookmarks are the instant-save path in freeform because they save mentor replies by session event and do not need a topic. Learner-notes remain Library/topic artifacts: if a learner wants to record a note from an unfiled freeform session, the app asks at the end/session summary whether to add the session to Library first. Accepting Library filing gives the note a real topic; declining means no topic-bound note is saved. Challenge Round stays out of freeform.
 
-**Why:** Users should not be forced through subject setup before getting value, and they should not hit a manual "Add to library?" decision gate after pressing Done. Meaningful learning should not disappear from the self-building Library. "Don't save" copy is misleading because the session remains saved; use language like "Keep out of Library" instead.
+**Why:** Users should not be forced through subject setup before getting value, and a saved note must appear where notes normally live. Hidden provisional topics created trust and privacy confusion: the learner could write something that looked like a note, but it would not appear in normal Library/notes surfaces until filing. The clean boundary is bookmarks during chat, notes after accepted Library filing.
 
-**How to apply:** When implementing this, replace the current post-close `Add to library?` footer prompt with quiet auto-filing plus summary status/opt-out. Reconcile scattered docs in one pass: `LEARN-01` freeform chat, `SUBJECT-03` chat-created subject, `SUBJECT-05` subject resolution, `LEARN-07` session summary/filing, `LEARN-08` Library, `HOME-01` Ask Anything entry, and any supporting specs/tests. Library topics must still belong to subjects.
+**How to apply:** For Ask Anything, do not add freeform Challenge Round, hidden topic anchors, provisional topics, or off-topic learner-notes. Keep bookmarks available during chat. At end/session summary, a "write a note" action may ask the learner to accept Library filing; after filing resolves to a real topic, save through the normal `topic_notes` path. Library topics must still belong to subjects.
