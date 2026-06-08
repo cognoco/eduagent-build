@@ -24,6 +24,9 @@ rows. A master edit without a matching trail record is a governance violation.
 This is the per-datapoint decision-trail discipline (`MMT-ADR-0013` §2) applied to
 each register.
 
+The **procedure** for producing a record (the criteria checklist) lives as a runbook —
+for `llm-models`, `docs/runbooks/llm-model-vetting.md`.
+
 ## Current registers
 
 | Register | Master | Trail | Migrates to | Backing ADR(s) |
