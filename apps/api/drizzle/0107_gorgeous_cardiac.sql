@@ -1,3 +1,14 @@
+-- ============================================================================
+-- REFERENCE ONLY — DO NOT APPLY TO STAGING OR PRODUCTION.
+-- This migration (concept-capture: concepts + concept_mastery, for the B
+-- "mastery star") is superseded by the identity-foundation baseline reset
+-- (MMT-ADR-0012, one-time create-from-empty baseline). Its FKs target
+-- `profiles`, which the reset renames to `person`, so this SQL is
+-- reset-incompatible and will be regenerated against the new baseline.
+-- Status: committed for shape reference, applied nowhere. Iterate in dev via
+-- `db:push:dev`; re-home these tables into the post-reset baseline.
+-- See docs/glossary.md §4 (note marks) and _wip/identity-foundation/data-model.md §1.
+-- ============================================================================
 CREATE TYPE "public"."concept_mastery_status" AS ENUM('solid', 'partial', 'missing', 'misconception');--> statement-breakpoint
 CREATE TABLE "concept_mastery" (
 	"id" uuid PRIMARY KEY NOT NULL,
