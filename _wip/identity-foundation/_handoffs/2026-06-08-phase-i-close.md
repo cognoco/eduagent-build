@@ -33,7 +33,7 @@
 - **Left for Stream 2 (flagged, not fixed):** the adjacent legacy schema-file block (`profiles.ts # profiles, family_links, consent_states`).
 
 **I-b — identity-domain `ARCH-N` dispositions.**
-- `ARCH-9` (model routing) → **superseded** by `MMT-ADR-0014` (+ `0016` safety/judge); pinned model names noted as register data (`docs/registers/llm-models/`). 
+- `ARCH-9` (model routing) → **superseded** by `MMT-ADR-0014` (+ `0016` safety/judge); pinned model names noted as register data (`docs/registers/llm-models/`).
 - `ARCH-8` (orchestrator) → **promoted to new `MMT-ADR-0017`** ("All LLM calls route through a single orchestrator `routeAndCall()`", reconstructed) — absorb-forward migrated its 4 code citations + stamped the register + added a lockstep canon cross-ref to the "No direct LLM API calls" enforcement rule.
 - `ARCH-7` (scoped repo) → **stands**; note that the scope key migrates `profile_id` → `person_id` at the clean-cut baseline.
 - Code-comment citation migration (5 sites in `services/llm/`) was **comment-only**; the `/commit` skill verified via `pnpm eval:llm` that all 366 LLM snapshots are unchanged.
@@ -56,7 +56,7 @@
 
 - **J0** — canon-shape scrub + graduate the 4 domain-canon docs `_wip/` → `docs/canon/`; the J(0) citation rewrite (`_wip/` → `docs/canon/` paths, flagged in the carve-out banner). Plan already drafted: `docs/plans/2026-06-08-identity-foundation-canon-shape-scrub.md`.
 - **J1** — memory entries → provenance-cited pointers; cull unprovenanced orphans.
-- **J2** — `CLAUDE.md`/`AGENTS.md` → pointer-layer; A-vs-B terminology sweep; routing-noun glossary (`tutor`/`judge`/`rung`/`tier`/`flow`/`slot`).
+- **J2** — `CLAUDE.md`/`AGENTS.md` → pointer-layer; `docs/project_context.md` scrubbed of shadow identity/routing canon; A-vs-B terminology sweep; active-looking superseded routing doctrine (`ARCH-9`, Gemini-only / pinned Gemini Flash/Pro wording) repointed to `MMT-ADR-0014`, `MMT-ADR-0017`, and `docs/registers/llm-models/`; routing-noun glossary (`tutor`/`judge`/`rung`/`tier`/`flow`/`slot`).
 - **J3** — `docs/` physical-tree conformance to `MMT-ADR-0000` §I.4.
 
 ## Watch-outs

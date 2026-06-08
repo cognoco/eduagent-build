@@ -70,7 +70,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 **UX Specification Implications:**
 
 - **Coaching model** (Recall → Build → Apply → Close): Requires session state machine with rung tracking and LLM context injection
-- **Socratic Escalation Ladder**: 5 rungs driving model routing — fastest model at rung 1-2, standard Gemini Pro at rung 3+, advanced help from rung 4 for entitled profiles, and GPT-5.4 reserved as the default OpenAI candidate for rung 5+ only. Family standard profiles are Gemini-only, including fallback.
+- **Socratic Escalation Ladder**: 5 rungs provide the pedagogical signal for LLM routing; the runtime router selects an eligible vetted model from `allowed_models`, not hard-coded provider/rung pairs. Concrete model picks live in `docs/registers/llm-models/`, not canon (`MMT-ADR-0014`).
 - **Coaching card two-path loading**: Cached path (<1s, context-hash freshness) vs fresh path (1-2s skeleton) — requires background precomputation pipeline
 - **Age-based theming**: Teal primary + lavender secondary, dark-first default — theme follows system preference, components stay persona-unaware. `personaType` DB column removed in Epic 12.
 - **Confidence scoring**: Per-problem behavioral metrics feeding parent dashboard — time-to-answer, hints needed, escalation rung, difficulty
@@ -111,7 +111,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 | Database | Neon (PostgreSQL) + pgvector | Serverless scale-to-zero, branching for dev/staging |
 | Authentication | Clerk | Expo SDK, social login, multi-tenant, cost-effective |
 | Payments | RevenueCat (native IAP) + Stripe (dormant, for future web) | Mobile: Apple StoreKit 2 + Google Play Billing via RevenueCat. **Stripe will not pass App Store review** for digital services — see Epic 9. Stripe code kept for future web client and B2B. |
-| AI/LLM | Multi-provider (Gemini 2.5 Flash/Pro, OpenAI GPT-5.4, Anthropic Claude Sonnet 4.6) | Routing by conversation state, cost optimization |
+| AI/LLM | Multi-provider LLM orchestration via `routeAndCall()` | Routing through vetted `allowed_models`, cost optimization |
 | Vector Search | pgvector (in Neon) | Per-user embeddings, JOINs with relational data |
 | Backend Framework | Hono (Cloudflare Workers preferred, Railway/Fly fallback) | Edge deployment, scale-to-zero matching Neon, lightweight. Not Express. Same framework either runtime — easy migration if Workers constraints bite. |
 | Real-time Transport | SSE | Unidirectional streaming sufficient for tutoring chat. Student sends POST, AI streams back via SSE. Simpler than WebSockets — no sticky sessions, works through CDNs, native ReadableStream in Expo. |
@@ -1120,9 +1120,9 @@ eduagent/
 │       │   │       ├── types.ts     # ChatMessage, EscalationRung, RouteResult, StreamResult
 │       │   │       ├── index.ts     # Barrel: export { routeAndCall, routeAndStream, registerProvider, parseEnvelope }
 │       │   │       └── providers/
-│       │   │           ├── gemini.ts     # Gemini 2.5 Flash (rung 1-2) + Gemini 2.5 Pro (rung 3+)
-│       │   │           ├── openai.ts     # gpt-4o-mini (rung 1-2) + gpt-4o (rung 3-4) + GPT-5.4 (rung 5+, advanced slot)
-│       │   │           ├── anthropic.ts  # Claude — registered based on config keys
+│       │   │           ├── gemini.ts     # Gemini provider adapter
+│       │   │           ├── openai.ts     # OpenAI provider adapter
+│       │   │           ├── anthropic.ts  # Anthropic provider adapter
 │       │   │           └── mock.ts       # Test provider
 │       │   ├── inngest/
 │       │   │   ├── client.ts             # Inngest client init
@@ -1234,7 +1234,7 @@ eduagent/
 The original `lib/` was accumulating too many unrelated concerns. Replaced with purpose-specific directories:
 
 - **`services/`** — Business logic extracted from route handlers, including the `services/llm/` orchestration sub-module. Cross-service calls go through exported function interfaces (e.g., `exchanges.ts` calls `getTopicSchedules()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
-- **`services/llm/`** — LLM orchestration module, nested inside `services/`. `routeAndCall()` in `router.ts`, exported via `index.ts` barrel. Services import as `from './llm'`. Three providers are fully implemented: Gemini (2.5 Flash/Pro), OpenAI (gpt-4o-mini/gpt-4o for standard rungs, GPT-5.4 for the advanced rung-5+ slot), and Anthropic (Claude Sonnet 4.6). The LLM middleware registers all three based on config keys. Also includes a mock provider for testing. Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
+- **`services/llm/`** — LLM orchestration module, nested inside `services/`. `routeAndCall()` in `router.ts`, exported via `index.ts` barrel. Services import as `from './llm'`. Provider modules are adapters registered by middleware based on config keys; runtime model choice is governed by `MMT-ADR-0014` and the vetted model register, not by provider/rung literals in this architecture document. Also includes a mock provider for testing. Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
 
 **LLM Response Envelope — Structured Output Contract:**
 
@@ -1688,7 +1688,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | NFR | Target | Architectural Support | Status |
 |-----|--------|----------------------|--------|
 | API response (p95) | <200ms excl. LLM | Workers edge deployment, KV caching, scoped repository | Covered |
-| LLM first token | <2s | SSE streaming, model routing (Gemini 2.5 Flash / GPT-4o-mini for simple, Gemini Pro / GPT-4o / Claude for complex) | Covered |
+| LLM first token | <2s | SSE streaming; router selects an eligible low-latency model from the vetted set | Covered |
 | Camera → OCR → first AI | <3s | ML Kit on-device (no network), server fallback behind interface | Covered |
 | App cold start | <3s | Coaching card precompute (KV), Expo bundle optimization | Covered |
 | Uptime | 99.5% | Multi-provider LLM fallback, circuit breakers, Inngest durable jobs | Covered |

@@ -499,13 +499,13 @@ Users can register, authenticate, create family accounts with multiple profiles,
 Users can specify subjects, complete an AI-powered conversational assessment interview, receive a personalized curriculum with confidence levels and time estimates, and begin their learning journey. Parents see a simulated dashboard during onboarding.
 
 **FRs covered:** FR13-FR22 (10 FRs)
-**ARCH requirements:** ARCH-8 (LLM orchestrator `routeAndCall()`), ARCH-9 (model routing by escalation rung), ARCH-12 (SSE streaming)
+**ARCH requirements:** MMT-ADR-0017 (LLM orchestrator `routeAndCall()`), MMT-ADR-0014 (model routing via vetted eligibility), ARCH-12 (SSE streaming)
 **UX requirements:** UX-8 (adaptive entry, cold start 3-button fallback for sessions 1-5), UX-9 (parent simulated dashboard with sample data)
 
 **Implementation notes:**
 - First LLM integration — establishes `routeAndCall()` pattern used by all subsequent AI features
 - Conversational interview requires SSE streaming via Hono `streamSSE()`
-- Curriculum generation uses Gemini Flash (rung 1-2 routing)
+- Curriculum generation uses `routeAndCall()` with a low-complexity routing signal; the router selects an eligible low-latency model from the vetted set.
 - Parent onboarding journey: simulated dashboard with sample data for trust-building
 - Cold start handling: sessions 1-5 use coaching-voiced three-button fallback (UX-8)
 
@@ -519,7 +519,7 @@ Users can specify subjects, complete an AI-powered conversational assessment int
 Users can learn through real-time AI tutoring sessions with Socratic guidance, get homework help via camera capture and OCR, and have session-scoped retention features (mandatory summaries, parking lot, understanding checks, prior learning references).
 
 **FRs covered:** FR23-FR42 (20 FRs)
-**ARCH requirements:** ARCH-8 (LLM orchestrator), ARCH-9 (model routing), ARCH-12 (SSE streaming), ARCH-14 (ML Kit OCR + server fallback), ARCH-16 (pgvector embeddings — spike story)
+**ARCH requirements:** MMT-ADR-0017 (LLM orchestrator), MMT-ADR-0014 (model routing via vetted eligibility), ARCH-12 (SSE streaming), ARCH-14 (ML Kit OCR + server fallback), ARCH-16 (pgvector embeddings — spike story)
 **UX requirements:** UX-1 (camera MVP), UX-2 (Homework Fast Lane UI), UX-3 (Parallel Example Pattern), UX-4 (Socratic Escalation Ladder), UX-5 (coaching card two-path loading), UX-7 (BaseCoachingCard hierarchy), UX-10 (session length caps), UX-11 ("Not Yet" feedback), UX-12 (silence & re-engagement), UX-15 (recall warmup after homework), UX-16 ("I don't know" valid input), UX-18 (behavioral confidence scoring)
 
 **Implementation notes:**
@@ -1308,8 +1308,8 @@ So that my curriculum is personalized to where I actually am.
 **Given** user has selected a subject
 **When** interview begins
 **Then** AI asks about learning goals, prior experience, and current knowledge level via streamed conversational exchange (ARCH-12: SSE via Hono `streamSSE()`)
-**And** all LLM calls go through `routeAndCall()` — establishing the orchestrator pattern for all subsequent AI features (ARCH-8)
-**And** interview uses Gemini Flash (rung 1-2 routing, ARCH-9) — this is a low-complexity conversational task
+**And** all LLM calls go through `routeAndCall()` — establishing the orchestrator pattern for all subsequent AI features (MMT-ADR-0017)
+**And** interview passes a low-complexity routing signal; the router selects an eligible low-latency model from the vetted set (MMT-ADR-0014)
 
 **Given** user responds to interview questions
 **When** AI has enough signal (typically 3-5 exchanges)
@@ -1319,7 +1319,7 @@ So that my curriculum is personalized to where I actually am.
 **When** AI detects insufficient signal
 **Then** AI asks targeted follow-up questions (not open-ended repetition)
 
-**Given** primary LLM provider (Gemini Flash) is unavailable
+**Given** the primary eligible LLM provider/model is unavailable
 **When** `routeAndCall()` attempts the call
 **Then** automatic failover to configured backup provider succeeds and interview continues (provider failover test required in DoD — not just happy path)
 **And** `routeAndCall()` logs provider switch with correlation ID for observability (ARCH-26)
@@ -1484,7 +1484,7 @@ So that I can learn interactively.
 **Given** session is active
 **When** learner sends a message
 **Then** AI responds via SSE streaming (ARCH-12, builds on Epic 1's `streamSSE()` pattern)
-**And** all LLM calls routed through `routeAndCall()` with model selection by escalation rung (ARCH-8, ARCH-9)
+**And** all LLM calls route through `routeAndCall()` with model selection delegated to the router's vetted eligibility flow (MMT-ADR-0017, MMT-ADR-0014)
 
 **Given** AI has responded
 **When** learner asks a follow-up question
@@ -1505,7 +1505,7 @@ So that I can learn interactively.
 **And** exchange processing pipeline implemented in `services/exchanges.ts` with explicit stages:
 1. **Load context:** session exchange history, current topic metadata, escalation rung state, learner profile
 2. **Assemble prompt:** system prompt template with persona voice (from profile theme/age), topic scope (from curriculum), escalation state (current rung), prior exchange summary (sliding window or full history within token budget), and any injected context (worked example level from 2.2, behavioral tracking from 2.3)
-3. **Route to model:** `routeAndCall()` with escalation rung determining model selection (ARCH-9)
+3. **Route to model:** `routeAndCall()` passes the escalation rung as a routing signal; the router selects from the eligible vetted model set (MMT-ADR-0014)
 4. **Stream response:** SSE via `streamSSE()`, chunks forwarded to client in real-time
 5. **Persist event:** each exchange (user message + AI response) saved to `session_events` with metadata (model used, token count, latency, escalation rung)
 6. **Update state:** session summary updated, escalation rung adjusted if triggered
@@ -1660,7 +1660,7 @@ So that I can get guided help without typing complex problems.
 **When** result is displayed
 **Then** learner can confirm, edit, or retake before proceeding
 
-**And** camera → OCR → **initial AI acknowledgment** ("I see a quadratic equation, let me help you work through this") completes in <3s (NFR7). This is the acknowledgment, not the first substantive Socratic question — that arrives via normal SSE streaming with <2s first token (NFR2). Budget: ~500ms OCR + ~300ms SSE setup + ~2.2s for acknowledgment token. Achievable with Gemini Flash (rung 1-2). If escalation to reasoning model happens later in conversation, the 3s target does not apply to those responses.
+**And** camera → OCR → **initial AI acknowledgment** ("I see a quadratic equation, let me help you work through this") completes in <3s (NFR7). This is the acknowledgment, not the first substantive Socratic question — that arrives via normal SSE streaming with <2s first token (NFR2). Budget: ~500ms OCR + ~300ms SSE setup + ~2.2s for acknowledgment token. Achievable with an eligible low-latency model selected by the router. If escalation to deeper reasoning happens later in conversation, the 3s target does not apply to those responses.
 
 **Given** learner completes a homework help session
 **When** session ends
@@ -1701,7 +1701,7 @@ So that I actually learn how to solve similar problems.
 **When** AI processes the request
 **Then** AI acknowledges the frustration empathetically and redirects to the current escalation rung ("I get that this is frustrating. Let's try it from a different angle..."). AI never provides the direct answer regardless of persistence. If learner persists after rung 5 (Teaching Mode Pivot), AI teaches the full method and asks learner to apply the final step themselves — the learner always does the last mile.
 
-**And** model routing escalates: Gemini Flash for rung 1-2, Gemini Pro for standard rung 3+, and advanced providers only from rung 4 upward for entitled profiles (ARCH-9)
+**And** model routing escalates by pedagogical rung and entitlement while selecting only from eligible vetted models (MMT-ADR-0014)
 **And** Homework Fast Lane UI throughout — no gamification elements visible (UX-2)
 
 **FRs:** FR31 | **UX:** UX-2, UX-3, UX-4, UX-16
@@ -5104,7 +5104,7 @@ So that the correct subject can be inferred without manual selection.
 **Implementation notes:**
 - New endpoint: `POST /v1/subjects/classify` in `subjectRoutes`
 - New service: `services/subject-classify.ts` — follows `subject-resolve.ts` pattern
-- Uses `routeAndCall()` at rung 1 (Gemini Flash — fast/cheap classification)
+- Uses `routeAndCall()` with a low-complexity routing signal; the router selects an eligible low-latency model.
 - Input: `{ text: string }` — profile's subjects fetched server-side
 - New schemas in `packages/schemas/src/subjects.ts`: `SubjectClassifyInput`, `SubjectClassifyResult`
 - Performance target: <500ms classification (within the <3s camera pipeline budget)
