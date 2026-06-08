@@ -20,24 +20,29 @@ work reads against.
 restructure any member (that is Phase J) and does **not** author new canon (that is
 Phase H). Membership is the deliverable.
 
-**Why the members live where they do (and why G moves nothing).** Per
-`MMT-ADR-0000` §I.4 — the physical-placement rule — the layers land in different
-homes *on different timelines*:
+**Why the members live where they do (and what moves when).** Per
+`MMT-ADR-0000` §I.4 — the physical-placement rule, **as revised by the 2026-06-08
+amendment** ("domain canon graduates at *ratification*, not at clean cut") — the
+layers land in `docs/` on different timelines:
 
 - **ADRs (L2) are global from birth** → already at `docs/adr/`. ✅ placed.
 - **Registers (L3, type-named)** → already at `docs/registers/`. ✅ placed.
-- **A stream's domain canon (L1) incubates in `_wip/<slug>/` until its clean cut,
-  *then* folds into `docs/canon/`.** So the four domain docs below are *correctly*
-  in `_wip/identity-foundation/` right now — moving them to `docs/canon/` during the
-  planning runway would **violate** §I.4. They graduate at the **clean-cut build
-  (after Phase P)**, not in G–P.
+- **A stream's domain canon (L1) incubates in `_wip/<slug>/` only until it is
+  *ratified and stable*, then folds into `docs/canon/` — within the runway.** The
+  four domain docs below are ratified (Phase D/E), so they are scheduled to graduate
+  to `docs/canon/` at the **front of Phase J** (before J's memory-pointer work, so
+  pointers + the doc index target final paths). They are in `_wip/` *right now* only
+  because the move executes at J(0); this Phase-G doc still cites their current `_wip/`
+  paths and those citations update at the move.
+- **Runway-control docs stay in `_wip/`** — this `CANONICAL-SET.md`, `ROADMAP.md`,
+  the handoffs, and the immutable A-vs-B memo are not domain canon; they remain.
 
-The **only** physical relocation the runway performs is **Phase J step (c)** — and
-it touches *different* files: the **loose root estate canon** (`architecture.md`,
-`PRD.md`, `ux-design-specification.md`) → `docs/canon/`, plus the artifact drains.
-That step is **gated on this Phase-G lock** (you can't sort loose docs into
-canon/L3/archive until "the canonical set" is a closed list — which this file makes
-it). So G is the *prerequisite* that unblocks the move, not the move itself.
+**Phase G itself moves nothing** — it *names* the set; **Phase J(0)** performs the
+domain-canon graduation, and **Phase J(c)** separately drains the loose root estate
+canon (`architecture.md`, `PRD.md`, `ux-design-specification.md`) → `docs/canon/`.
+Both J steps are **gated on this Phase-G lock** (you can't sort or graduate canon
+until "the canonical set" is a closed list — which this file makes it). So G is the
+*prerequisite* that unblocks the moves, not the move itself.
 
 ---
 
