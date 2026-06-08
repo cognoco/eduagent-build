@@ -993,7 +993,7 @@
       "delete": "Usuń",
       "deleting": "Usuwanie...",
       "deleteConfirmTitle": "Usunąć {{subject}}?",
-      "deleteConfirmMessage": "Spowoduje to trwałe usunięcie {{subject}}, w tym {{books}}, {{startedTopics}} i {{sessions}} z historią nauki. Tej operacji nie można cofnąć.",
+      "deleteConfirmMessage": "To trwale usunie {{subject}} — w tym {{books}}, {{startedTopics}} i {{sessions}} z historią nauki, wraz z całym postępem w nauce, powtórkami fiszek i serią dla tego przedmiotu. Tej operacji nie można cofnąć.",
       "deleteConfirmAction": "Usuń",
       "deleteScopeBooks_one": "{{count}} książka",
       "deleteScopeBooks_other": "{{count}} książek",
