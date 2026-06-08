@@ -274,17 +274,15 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   birth-year floor must still ship **with a documented rationale in the same change** (likely a UK
   Crime & Policing Act 2026 statutory expectation). Product + counsel owned; lands in the H carve-out
   for completeness. ⬜
-- **Canon-authorship process + ADR ↔ `architecture.md` ↔ `ARCH-N` relationship — undefined; a live
-  contradiction exists (instance resolved 2026-06-08; root cause survives).** `MMT-ADR-0016` *originally* asserted
-  "ADRs are the decision system of record — there is no `architecture.md` register to sync," which **diverged in
-  essence** from `MMT-ADR-0000`'s lockstep model (ADR = *why*, canon = *what*, they move together). That line was
-  **removed** when `0016` was repurposed (2026-06-08), so the live contradiction is gone — but the **root cause
-  remains** and is the real work: two ADRs *could* disagree on what canon *is* because the process was never defined.
-  Root cause: `MMT-ADR-0000` defined the *layers* but not a crisp **process** for (a) how content gets *into*
-  `architecture.md`, (b) how an ADR relates to the `architecture.md` it changes, (c) how both relate to the
-  frozen `ARCH-N` register. **Scope:** define this as part of the `architecture.md` refresh (Phase H/I) — the
-  refresh must be *wider than the document*, making the authorship/relationship process crystal-clear to
-  agents and humans, and reconciling the `0016`↔`0000` divergence. 🟡 *(raised 2026-06-07)*
+- **Canon-authorship process + ADR ↔ `architecture.md` ↔ `ARCH-N` relationship — RESOLVED in Phase I-c
+  (2026-06-08).** The `MMT-ADR-0016`↔`MMT-ADR-0000` divergence *instance* was already gone (the offending
+  "ADRs are the sole decision system of record" line was removed at the `0016` repurpose); the surviving **root
+  cause** — the canon-authorship *process* was never written down, so two ADRs *could* disagree on what canon
+  *is* — is now closed: (a) how content enters `architecture.md`, (b) how an ADR relates to the canon it changes,
+  and (c) how both relate to the frozen `ARCH-N` register are stated in one place in **`docs/adr/README.md` §
+  "How canon is authored (ADR ↔ canon ↔ ARCH-N)"**, and the recurrence guard — **"no document is the sole system
+  of record"** — is recorded as an amendment to **`MMT-ADR-0000`**. `architecture.md` also now self-identifies as
+  L1 canon (title + preamble), no longer "Architecture Decision Document". ✅ *(raised 2026-06-07; resolved 2026-06-08, Phase I-c)*
 - **Documentation index — the boot-flow linchpin.** The intended agent boot-flow is
   `CLAUDE.md`/`AGENTS.md` (pointer layer) → `docs/INDEX.md` → the layered canon. Per-layer indexes
   exist (`docs/adr/README.md`, `docs/audit/INDEX.md`); the unifying index is now seeded and wired
