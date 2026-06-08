@@ -66,8 +66,8 @@ backfill, no compatibility shims, no V0/V1 parallel run).
 |---|---|
 | `_handoffs/` | Session-continuity handoff docs. |
 | `_walkthroughs/` | Facilitated rulings sessions — `policy-engine-spine-`, `counsel-`, `b-product-`, `phase-e-fillers-` walkthroughs (packages + capture ledgers). |
-| `_research/` | Investigations still consulted — `age-consent-landscape/`, `gemini-minors-zdr.md`, `age-consent-spike.md`, plus `raw/`. |
-| `archive/` | Superseded / completed-phase artifacts — the rejected 2026-05-31 plans, the Phase-A drift map, the A-vs-B audit tracks, the reconstructed-PRD drafts, and discovery/options briefs. Kept as decision record + discussion input. |
+| `_research/` | Investigations + analyses **still consulted** (incl. forward inputs to later phases) — the **Phase-A drift map** (`drift-map.md` + exec-summary; a live input to Phase K's cross-check), `age-consent-landscape/`, `gemini-minors-zdr.md`, `age-consent-spike.md`, plus `raw/`. |
+| `archive/` | Superseded / completed artifacts — the rejected 2026-05-31 plans, the A-vs-B audit tracks, the reconstructed-PRD drafts, and discovery/options briefs. Kept as decision record + discussion input. |
 
 ## The work still owed
 
