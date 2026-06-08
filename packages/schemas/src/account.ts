@@ -90,6 +90,37 @@ export type AccountEmailUpdateResponse = z.infer<
   typeof accountEmailUpdateResponseSchema
 >;
 
+/**
+ * [CRITICAL-2a] Client-triggerable account security events. The mobile client
+ * pings the server after a successful Clerk-side credential mutation it
+ * performs directly (password add / change) so the server can send an
+ * out-of-band security-notification email. `email_changed` is NOT in this set:
+ * it is dispatched server-side from `updateAccountEmailFromClerk`, never from a
+ * client request, so a caller cannot spoof a "your email changed" alert.
+ */
+export const accountSecurityEventSchema = z.enum([
+  'password_added',
+  'password_changed',
+]);
+
+export type AccountSecurityEvent = z.infer<typeof accountSecurityEventSchema>;
+
+export const accountSecurityEventRequestSchema = z.object({
+  event: accountSecurityEventSchema,
+});
+
+export type AccountSecurityEventRequest = z.infer<
+  typeof accountSecurityEventRequestSchema
+>;
+
+export const accountSecurityEventResponseSchema = z.object({
+  ok: z.literal(true),
+});
+
+export type AccountSecurityEventResponse = z.infer<
+  typeof accountSecurityEventResponseSchema
+>;
+
 export const dataExportConsentSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
