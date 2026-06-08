@@ -9,6 +9,7 @@ import {
   SectionHeader,
   SettingsRow,
 } from '../../../components/more/settings-rows';
+import { useEmailReconciliation } from '../../../hooks/use-email-reconciliation';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   i18next,
@@ -29,6 +30,10 @@ export default function AccountScreen(): React.ReactElement {
   const { user } = useUser();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationContract();
+  // [CRITICAL-1] Heal any Clerk-primary ↔ accounts.email divergence left by an
+  // email change that was interrupted between Clerk promotion and server sync.
+  // Owner-gated to match the owner-only GET it calls.
+  useEmailReconciliation(navigationContract.gates.showAccountSecurity);
   const { data: subscription } = useSubscription();
   const { t } = useTranslation();
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);

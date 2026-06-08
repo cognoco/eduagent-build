@@ -8,6 +8,7 @@ import {
   isClerkRequestTimeoutError,
   withClerkTimeout,
 } from '../lib/clerk-timeout';
+import { useApiClient } from '../lib/api-client';
 import { PasswordInput } from './common/PasswordInput';
 
 function getSsoProviderLabel(
@@ -26,6 +27,7 @@ export function AddPassword({
   onPasswordAdded: () => void;
 }): React.JSX.Element {
   const { user } = useUser();
+  const api = useApiClient();
   const { t } = useTranslation();
   // [CRITICAL-2b] First-time password set on an SSO-only account is a
   // credential mutation with no current-password gate — require Clerk step-up
@@ -71,6 +73,11 @@ export function AddPassword({
         'user.updatePassword',
       );
       await withClerkTimeout(user.reload(), 'user.reload');
+      // [CRITICAL-2a] Fire-and-forget security notification to the account
+      // email. Must never block or fail the password add on a notify error.
+      void api.account['security-event']
+        .$post({ json: { event: 'password_added' } })
+        .catch(() => undefined);
       setNewPassword('');
       setConfirmPassword('');
       onPasswordAdded();
@@ -84,6 +91,7 @@ export function AddPassword({
       setIsSubmitting(false);
     }
   }, [
+    api,
     confirmPassword,
     newPassword,
     onPasswordAdded,
