@@ -65,7 +65,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Uptime | 99.5% | Multi-provider LLM fallback, circuit breaker with defined thresholds |
 | Data durability | 99.99% | Neon managed backups, point-in-time recovery |
 | GDPR compliance | Full | Consent state machine, deletion orchestrator, data residency |
-| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile isolation, audit trail | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — Path X: 13+ consent-capacity floor (was 11), sub-13 built-but-gated; MMT-ADR-0015. Rewrite → Phase I. -->|
+| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile isolation, audit trail | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — 13+ consent-capacity floor (was 11), sub-13 built-but-gated; MMT-ADR-0015. Rewrite → Phase I. -->|
 
 **UX Specification Implications:**
 
@@ -570,29 +570,29 @@ This section is the authoritative architecture of the app's identity / tenancy /
 
 - **We own the identity/tenancy graph; Clerk is authentication only.** Clerk supplies authenticated user identity; everything else — the person, tenancy, roles, consent, and billing state — is owned in our store (`MMT-ADR-0001`).
 - **Person ≠ Login.** `person` is the human and the **scope key for all learning data**; `login` is a thin Clerk binding (a nullable `person.login_id`), not a Clerk mirror. A managed child is a `person` with **no** `login` (`MMT-ADR-0007`; `data-model.md` §4.1–4.2).
-- **Roles are a primitive, distinct from capacities.** `membership.roles` is a non-empty array over `{admin, learner}` on the person↔org link. The capabilities — consent authority, billing control, data visibility — are **separate edges/fields, never fused into the role** (`MMT-ADR-0007`; `inv 22`; `data-model.md` §4.4).
+- **Roles are a primitive, distinct from capacities.** `membership.roles` is a non-empty array over `{admin, learner}` on the person↔org link. The capabilities — consent authority, billing control, data visibility — are **separate edges/fields, never fused into the role** (`MMT-ADR-0007`; `data-model.md` §4.4).
 - **Organization and membership are re-derived, not inherited.** `organization` is the thin container that owns the billing + consent + quota anchor; `membership` is the person↔org link (`UNIQUE (person, org)`; first member is `admin`). Neither carries over from the legacy fused-`accounts` / `family_links` shape — both are re-derived from the model (`MMT-ADR-0010`; `data-model.md` §4.3–4.4). v1 is a single home org per family.
 - **`is_owner` is gone** — ownership is *derived* (admin role + Payer self-reference), not stored (`data-model.md` §4.1).
-- **Scoping is the future RLS surface (`T3`).** `person_id` is the scope key for learning data; `organization_id` for membership/subscription; the `person_retain` legal tier is **role-gated, not RLS-default** — a deliberate exception recorded so the RLS rollout does not flatten the audit trail (`data-model.md` §5.1).
+- **Scoping is the future row-level-security (RLS) surface.** `person_id` is the scope key for learning data; `organization_id` for membership/subscription; the `person_retain` legal tier is **role-gated, not RLS-default** — a deliberate exception recorded so the RLS rollout does not flatten the audit trail (`data-model.md` §5.1).
 
 ### Capability split — Guardian / Mentor / Payer
 
-The three capabilities are split and never fused (`inv 22`). Profile-management authority bundles with the **Subscription-administrator** (`{admin}` role + the Payer field) — no separate column.
+The three capabilities are split and never fused. Profile-management authority bundles with the **Subscription-administrator** (`{admin}` role + the Payer field) — no separate column.
 
-- **Guardian = consent only.** A global edge (`guardianship`) carrying the consent record and consent authority; operational powers do **not** live on it. Never auto-conferred; `guardian <> charge` (no self-guardian — the `F1-BT-a` attack the model bans); a `qualification` ENUM names the relationship (G-4) (`MMT-ADR-0008`; `data-model.md` §4.6, §2A.4).
-- **Mentor = data access only.** An opt-in edge (`mentorship`), **never auto-conferred** (`inv 19`; `data-model.md` §4.7).
+- **Guardian = consent only.** A global edge (`guardianship`) carrying the consent record and consent authority; operational powers do **not** live on it. Never auto-conferred; `guardian <> charge` (no self-guardian); a `qualification` ENUM names the relationship (`MMT-ADR-0008`; `data-model.md` §4.6, §2A.4).
+- **Mentor = data access only.** An opt-in edge (`mentorship`), **never auto-conferred** (`data-model.md` §4.7).
 - **Payer = a subscription sub-field, not a persona.** 1 primary (`payer_person_id`, NOT NULL) + ≤1 secondary (`subscription_payers`). The secondary may read state, view invoices, and **update the payment method only** — no cancel/upgrade/plan-change; the primary is notified on every change (`MMT-ADR-0002`; `MMT-ADR-0015` §5; `data-model.md` §2A.4).
-- **Charge terminology.** The human a Guardian acts for is a **charge** (the term "ward" is retired). The consent key is `(charge × purpose × organization)`. Exactly one Guardian per charge (G-3); the birthday-crossing takeover branches on `person.has_own_account` (G-6) (`MMT-ADR-0015`; `data-model.md` §2A.4).
+- **Charge terminology.** The human a Guardian acts for is a **charge** (the term "ward" is retired). The consent key is `(charge × purpose × organization)`. Exactly one Guardian per charge; the birthday-crossing takeover branches on `person.has_own_account` (`MMT-ADR-0015`; `data-model.md` §2A.4).
 
-### Consent & the age model (Path X)
+### Consent & the age model
 
 - **The age model is three-axis** — age × residence × knowledge-state — not a single age number (`MMT-ADR-0015`; `data-model.md` §2A.2, §2A.5).
-- **`AgeBracket` is `child | adolescent | adult`** — the `'child'` value is additive, required for the launch-floor logic and v1.1 sub-13 ungating (`data-model.md` §2A.5).
-- **Path X — the v1 launch floor is a 13+ consent-capacity floor.** `birthYearSchema` floors at 13 (raised from 11), backend-enforced. Sub-13 is **built-but-gated**: the data model future-proofs it, a backend kill-switch gates it, and the knowingly-under-13 delete-path stays warm. v1 closes the 13+ load-bearing gaps; **v1.1** ungates sub-13 (`MMT-ADR-0015`; `data-model.md` §2A.5; `identity-foundation-prd.md`). *(This supersedes the legacy "11–15" framing.)*
+- **`AgeBracket` is `child | adolescent | adult`** — the `'child'` value is additive, required for the 13+ launch-floor logic and the later sub-13 ungating (`data-model.md` §2A.5).
+- **The v1 launch floor is 13+.** `birthYearSchema` enforces a 13+ floor (raised from 11), backend-enforced. Sub-13 support is **built but gated off**: the data model accommodates it (the `AgeBracket 'child'` value), a backend kill-switch disables it, and the knowingly-under-13 deletion path stays active. v1 ships the 13+ floor; v1.1 ungates sub-13 (`MMT-ADR-0015`; `data-model.md` §2A.5; `identity-foundation-prd.md`).
 - **`regimes` are data rows, not a Postgres `ENUM`** — a regime change is an `INSERT`, not a migration. v1 seed: `US_COPPA`, `EU_GDPR_16/15/14/13`, `UK_AADC`, `ROW` (`MMT-ADR-0013` §2; `data-model.md` §2A.1).
 - **Consent is an append-only event log** (`consent_grant`), per-purpose, keyed `(charge × purpose × organization)`. The current requirement is *computed*; the record is *stored*; history is preserved. The legacy stamped-status `consent_states` is gone — and with it the `UNIQUE(profile, consentType)` constraint that blocked org-scoped consent (`MMT-ADR-0011` §3; `data-model.md` §4.8).
 - **Knowledge is an append-only audit history** (`knowledge_assertions`: method × confidence) with a cached current state on `person`; **default-for-unknown is most-restrictive** (engine behavior, not a column) (`data-model.md` §2A.2).
-- **The gate is direction-aware.** Protection-*adding* edits are trusted instantly; protection-*lowering* edits (DOB later, laxer regime, age crossing up) succeed in the input layer but do **not** lower protection until a verification clears — the more-protective state persists meanwhile (`I-PB-B2b`; `data-model.md` §6.2).
+- **The gate is direction-aware.** Protection-*adding* edits are trusted instantly; protection-*lowering* edits (DOB later, laxer regime, age crossing up) succeed in the input layer but do **not** lower protection until a verification clears — the more-protective state persists meanwhile (`data-model.md` §6.2).
 
 ### Policy-engine spine, router/vetting, safety & judge
 
@@ -1695,7 +1695,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | Data durability | 99.99% | Neon managed backups, point-in-time recovery | Covered |
 | Rate limiting | 100 req/min | Cloudflare Workers rate limiting (wrangler.toml) + quota metering middleware | Covered |
 | GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
-| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile-scoped data access | Covered | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — Path X: 13+ floor, sub-13 built-but-gated; three-axis age model; MMT-ADR-0015. Rewrite → Phase I. -->|
+| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile-scoped data access | Covered | <!-- [LEGACY-REVIEW] superseded by § Identity Foundation — 13+ floor, sub-13 built-but-gated; three-axis age model; MMT-ADR-0015. Rewrite → Phase I. -->|
 | i18n | 7 locales | English source + 6 LLM-translated locales (de/es/ja/nb/pl/pt) registered in `apps/mobile/src/i18n/index.ts`. LLM `preferredLanguage` in system prompt for learning language. | Covered |
 | Accessibility | WCAG 2.1 AA | Phased per UX spec (MVP free, v1.1 moderate, v2.0 operational). NativeWind supports accessibility props. | Phased |
 | Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
