@@ -17,6 +17,17 @@
 3. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
 4. For the cross-layer map of canon / ADRs / specs / registers, see the documentation index: [`docs/INDEX.md`](docs/INDEX.md). *(Seeded 2026-06-08 — identity-foundation canon is fully indexed; estate-wide population is in progress.)*
 
+<!-- ZDX-PROJECT-RULES:BEGIN v1 -->
+## Cosmo work-item operating rules
+
+Non-negotiable when working any Cosmo Work Item (WI). Each rule is a **trigger → action** — it fires at the named moment **regardless of which skill or entry point** you came through (don't rely on a lifecycle skill's description to carry it).
+
+- **Claim before you execute.** WHEN you begin work on a WI (any transition into build/execute mode) → claim it first via the sanctioned execute-side writer (`execute.ts fetch --supervised` + `claim --claimant`) and set `Stage=Executing`, **before any implementation**. Never start unclaimed; if a live claim (`Claimed By` set **and** `Claim Expires > now`) holds it, pick another item.
+- **Complete → Reviewing; never self-close.** WHEN your implementation is done → move the WI to `Stage=Reviewing` with a completion summary and **release your claim**. Do not close it yourself.
+- **Close only via review + QA.** WHEN a WI is to be closed → only through `/cosmo:review` incorporating `/cosmo:qa` verification evidence. No agent-asserted closes.
+- **Reference WIs as ID + name.** WHEN you reference a WI in user-facing output (table, list, prose) → include **both** the `WI-NN` ID **and** a brief name in the same reference (e.g. `WI-529 (Cosmo agent-op rules snippet)`). Format is your judgment — column, inline, list, whatever fits — but both pieces must be present so the reader can act without a lookup. Bare IDs are uncopyable; bare names unactionable. See the ZDX standard's *Agent output conventions* (conformance) for examples.
+<!-- ZDX-PROJECT-RULES:END -->
+
 ## Output Conventions
 
 How to talk to the users: they run 7–8 parallel sessions and cannot hold opaque IDs in their head, and they lose time digging the signal out of long replies. These two rules fix that. (Trialed here project-local; promote to global config if it works.)
