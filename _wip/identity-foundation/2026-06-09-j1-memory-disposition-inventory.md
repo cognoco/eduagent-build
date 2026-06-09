@@ -2,7 +2,7 @@
 title: Phase J1 — Memory Disposition Inventory
 date: 2026-06-09
 phase: J1
-status: EXECUTED 2026-06-09 — ratified + applied (1 delete, 3 repoints, 1 keep); see exit-gate at bottom
+status: EXECUTED 2026-06-09 — ratified + applied (1 delete, 3 repoints, 1 keep); post-review direct cleanup applied 2026-06-09
 scope: .claude/memory/ (90 active + 28 archived), identity-foundation surface only
 ---
 
@@ -11,8 +11,8 @@ scope: .claude/memory/ (90 active + 28 archived), identity-foundation surface on
 **What this is.** The triage J1 actually owes (the ROADMAP J1 row presupposes "retained
 identity-foundation entries" but no triage existed). Every active + archived `.claude/memory/`
 entry was screened for identity-foundation coupling via its frontmatter `description`; coupled
-candidates were read in full. **No memory file has been edited.** Dispositions below are proposals
-for ratify.
+candidates were read in full. The table preserves the original disposition record; the exit-gate and
+post-review notes below capture what was actually applied.
 
 **Disposition vocabulary**
 - **REPOINT** — entry duplicates ratified canon → replace the duplicated content with a thin,
@@ -24,7 +24,7 @@ for ratify.
 
 **Canonical targets (all verified to exist 2026-06-09):**
 `docs/canon/identity/{ontology,domain-model,data-model,prd}.md` · `docs/compliance/identity-compliance-register.md`
-· `docs/adr/MMT-ADR-0007…0017` · `docs/registers/llm-models/master.md` · `docs/INDEX.md`
+· `docs/adr/MMT-ADR-0007…0018` · `docs/registers/llm-models/master.md` · `docs/INDEX.md`
 · `_wip/identity-foundation/CANONICAL-SET.md`
 
 ---
@@ -44,7 +44,7 @@ for ratify.
 | Entry | Why it looks coupled | Why OUT |
 |---|---|---|
 | `feedback_never_force_add_child.md` | guardian / zero-linked-children gate | **UX-resilience product rule** (dead-end escape), not a copy of identity canon. KEEP as-is. |
-| `pricing_dual_cap.md` | model-router rung clause (rung 4+/5+, Family Gemini-only) | Pricing/quota is not identity. The routing-rung overlap belongs to the **model-router/llm-models workstream** (`MMT-ADR-0014/0016` + register), not identity-foundation memory. KEEP; revisit there. |
+| `pricing_dual_cap.md` | model-router rung clause (rung 4+/5+, Family Gemini-only) | Pricing/quota is not identity. The routing-rung overlap belongs to the **model-router/llm-models workstream** (`MMT-ADR-0014/0016` + register), not identity-foundation memory. Originally ruled OUT of J1; post-review direct cleanup repointed the active routing clause to `MMT-ADR-0014` + `docs/registers/llm-models/master.md` while preserving quota facts. |
 | `billing-payments.md` | Payer is an identity capability | Payment-**provider infra** (RevenueCat/Stripe), not the identity model. **Billing workstream.** KEEP. |
 | `project_agent_doc_and_memory_architecture_revisit.md` | memory↔agent-doc governance | Meta-governance question → **feeds J2** (agent-doctrine reduction), not a J1 identity-content repoint. KEEP; tag J2. |
 
@@ -78,6 +78,10 @@ archived + superseded by clean-cut. **No J1 action**; candidates for tombstone-c
   - **0016 filename ⊥ title** → `git mv` to `MMT-ADR-0016-safety-and-judge-architecture.md`; 3 inbound filename refs + INDEX `:54` label corrected.
   - **CLAUDE.md nav path** → repointed to the live impl `apps/mobile/src/lib/navigation-contract.ts` + archived spec.
   - **Live forward-instruction** `ROADMAP.md:191` (J2 target) corrected 0017 → 0018.
+- [x] **Post-review direct cleanup applied 2026-06-09**:
+  - Removed the stale live `.claude/memory/MEMORY.md` "Strictly 11+" constraint named in `CANONICAL-SET.md` as a Phase-J cleanup target.
+  - Added `MMT-ADR-0018` to `.claude/memory/project_identity_foundation_decisions.md`.
+  - Repointed active routing-memory wording in `pricing_dual_cap.md`, `project_book_generation_pass.md`, and `project_enduser_session_pass.md` to `MMT-ADR-0014` + `docs/registers/llm-models/master.md`; old Gemini-only / GPT-5.4 assertions are now explicitly superseded.
 
 **Deferred-sweep decision (per CLAUDE.md "sweep when you fix").** The remaining `MMT-ADR-0017` /
 old-orchestrator-filename references all live in **dated historical records** under `_wip/identity-foundation/`
@@ -95,3 +99,16 @@ renumber is now recorded in live INDEX/README/ROADMAP. Residual: those internal 
 4. **CLAUDE.md stale nav-contract path.** CLAUDE.md (Profile Shapes §) cites
    `docs/specs/2026-05-21-navigation-contract.md`, but that spec was archived to
    `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`. Out of J1 scope; noted so it isn't lost.
+
+## Deferral closed post-QA (added 2026-06-09)
+
+Section B ruled `pricing_dual_cap.md` OUT of J1 and **deferred its routing-rung / Family-Gemini-only
+wording to "the model-router/llm-models workstream … revisit there."** That workstream does not run
+inside Phase J, so the deferral would not have been actioned during the runway. A QA pass (2026-06-09)
+also surfaced the same stale "Gemini-only / GPT-5.4" routing wording in two memories J1's
+*identity-coupling* lens never flagged (they aren't identity-coupled): `project_book_generation_pass.md`
+and `project_enduser_session_pass.md`. The coordinator has repointed **all three** to `MMT-ADR-0014` +
+`docs/registers/llm-models/master.md`, **closing the J1 deferral**. This is the correct home for it —
+routing is the model-router workstream's content, not identity canon — handled as post-review fallout
+rather than re-opening J1. Cross-ref: `2026-06-09-j2-doctrine-routing-disposition.md` § Post-QA
+reconciliation.

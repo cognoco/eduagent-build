@@ -68,8 +68,11 @@ Shapes clarifying it is the *current* system and the *target* identity model liv
 ## Exit-gate checklist — EXECUTED 2026-06-09
 
 - [x] Clause (b): 5 repoints applied (4 in `project_context.md`, 1 in `CLAUDE.md`); every superseded
-      "Gemini-only / pinned Flash-Pro / GPT-5.4" assertion now survives only inside an explicit
-      "…wording is **superseded**" flag pointing at `MMT-ADR-0014` + the register.
+      "Gemini-only / pinned Flash-Pro / GPT-5.4" assertion **in the three doctrine files** now survives
+      only inside an explicit "…wording is **superseded**" flag pointing at `MMT-ADR-0014` + the register.
+      **(Scope: the three doctrine files only — `.claude/memory/` is J1's surface, not J2's. The original
+      wording of this line said "every … assertion" without that scope; corrected 2026-06-09 — see the
+      Post-QA reconciliation below.)**
 - [x] Clause (a): no identity-canon duplicates existed to repoint; Profile Shapes kept (current-state
       impl, not canon) + a scope note added so it isn't conflated with the target canon.
 - [x] Repo-wide engineering rules intact (`routeAndCall()` rule, the test-gate rule, scoping rules,
@@ -77,3 +80,30 @@ Shapes clarifying it is the *current* system and the *target* identity model liv
 - [x] `ARCH-9` already absent; AGENTS.md needed no edit (divergence flagged, not fixed in J2).
 - [x] Every new pointer resolves: `docs/registers/llm-models/master.md` exists; `MMT-ADR-0014` /
       `MMT-ADR-0018` exist on disk.
+
+## Post-QA reconciliation (added 2026-06-09)
+
+**Finding (QA pass, 2026-06-09).** After J2, stale "Gemini-only / GPT-5.4" routing assertions remained
+in **active `.claude/memory/` files** — `pricing_dual_cap.md`, `project_book_generation_pass.md`,
+`project_enduser_session_pass.md`. The coordinator has repointed all three to `MMT-ADR-0014` +
+`docs/registers/llm-models/master.md`.
+
+**Was memory routing cleanup out of J2 scope, or was the exit gate overstated? — Both, precisely:**
+
+- **J2's scope was correct.** J2's file scope is the three doctrine files (the `scope:` frontmatter at
+  the top of this doc). `.claude/memory/` is **J1's surface** ("Memory pointer alignment"), never J2's.
+  Not repointing memory in J2 was therefore *not* a J2 miss.
+- **But J2's verification *wording* was overstated.** The original clause-(b) checklist line claimed
+  "*every* superseded … assertion now survives only inside a flag" — an unscoped "every" that reads
+  estate-wide when it was only verified across the three doctrine files. Corrected above to "in the
+  three doctrine files."
+- **And there was a real J1↔J2 seam.** Routing-doctrine-in-memory *was* J1's surface, but J1's triage
+  lens was *identity-foundation coupling* — so it flagged only `pricing_dual_cap.md` (J1 inventory §B
+  ruled it OUT and **deferred it to "the model-router/llm-models workstream … revisit there"** — a
+  workstream that does not run inside Phase J) and never surfaced the two non-identity-coupled runner
+  memories at all. The cleanup thus fell into the gap between J1's deferral and J2's doctrine-only scope.
+
+**Disposition.** The QA pass correctly caught it; the coordinator's repoint **closes the deferral J1
+recorded** — it is *completion of deferred J1 fallout*, not a J2 re-scope. J2's verified deliverable
+(the three doctrine files) is unchanged. The memory repoints are logged here and in the ROADMAP J1/J2
+notes for traceability.
