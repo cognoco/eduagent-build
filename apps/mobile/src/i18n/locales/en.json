@@ -1061,7 +1061,7 @@
       "delete": "Delete",
       "deleting": "Deleting...",
       "deleteConfirmTitle": "Delete {{subject}}?",
-      "deleteConfirmMessage": "This permanently deletes {{subject}}, including {{books}}, {{startedTopics}}, and {{sessions}} with learning history. This cannot be undone.",
+      "deleteConfirmMessage": "This permanently deletes {{subject}} — including {{books}}, {{startedTopics}}, and {{sessions}} with learning history, along with all mastery progress, flashcard reviews, and streak for this subject. This cannot be undone.",
       "deleteConfirmAction": "Delete",
       "deleteScopeBooks_one": "{{count}} book",
       "deleteScopeBooks_other": "{{count}} books",

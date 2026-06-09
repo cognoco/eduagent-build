@@ -1,12 +1,14 @@
 ---
 name: Pricing — Dual-Cap Free Tier + Plus tier entitlement
-description: Free tier: 10/day + 100/month. Plus tier: 700/month, no daily limit, advanced help from rung 4+; GPT-5.4 default OpenAI candidate only rung 5+.
+description: Free tier: 10/day + 100/month. Plus tier: 700/month, no daily limit. Model routing details are canonical in MMT-ADR-0014 + docs/registers/llm-models/master.md.
 type: project
 ---
 
 Free tier uses a **dual-cap model: 10 questions/day AND 100 questions/month** (changed from 50/month on 2026-03-25).
 
-**Plus tier: 700 questions/month, no daily limit, one serious-study profile with advanced help from rung 4+** — quota confirmed 2026-04-09 when integration test expected 500 but account had 700. User explicitly stated "699 for plus program" (meaning X-Quota-Remaining shows 699 after 1 message consumed from 700). Premium profile clarified 2026-05-18: Plus is for one person who wants serious studying, but easy and medium turns remain on Gemini; advanced help starts at rung 4, while GPT-5.4 is the default OpenAI candidate and is reserved for rung 5+ only.
+**Plus tier: 700 questions/month, no daily limit, one serious-study profile.** Quota confirmed 2026-04-09 when integration test expected 500 but account had 700. User explicitly stated "699 for plus program" (meaning X-Quota-Remaining shows 699 after 1 message consumed from 700). Premium profile clarified 2026-05-18: Plus is for one person who wants serious studying.
+
+Model/provider routing is not canonical in this memory. The old Gemini-only / GPT-5.4 rung wording is superseded; use `MMT-ADR-0014` plus `docs/registers/llm-models/master.md` for current per-tier/per-rung model policy.
 
 **Why free tier dual-cap:**
 - 50 monthly was too stingy for users to experience the "aha" moment (needs ~7-10 exchanges)
@@ -17,9 +19,10 @@ Free tier uses a **dual-cap model: 10 questions/day AND 100 questions/month** (c
 
 **Tier config:**
 - Free tier: `monthlyQuota: 100, dailyLimit: 10`
-- Plus: `monthlyQuota: 700, dailyLimit: null, premiumModelProfiles: 1, llmTier: 'standard'`; session exchange routing promotes Plus to advanced help from rung 4, but the OpenAI candidate defaults to GPT-5.4 and is only eligible from rung 5.
-- Family: `monthlyQuota: 1500, dailyLimit: null, premiumModelProfiles: 0, llmTier: 'standard'`; Gemini-only including fallback unless the optional $15/profile advanced add-on is active, which follows the same rung 4+ advanced-help rule and the same OpenAI rung 5+ restriction.
-- Pro: `monthlyQuota: 3000, dailyLimit: null, premiumModelProfiles: 2, llmTier: 'standard'`; advanced seats follow the same rung 4+ / OpenAI rung 5+ rule.
+- Plus: `monthlyQuota: 700, dailyLimit: null, premiumModelProfiles: 1, llmTier: 'standard'`
+- Family: `monthlyQuota: 1500, dailyLimit: null, premiumModelProfiles: 0, llmTier: 'standard'`
+- Pro: `monthlyQuota: 3000, dailyLimit: null, premiumModelProfiles: 2, llmTier: 'standard'`
+- Per-tier/per-rung model routing: `MMT-ADR-0014` + `docs/registers/llm-models/master.md` are canonical.
 - Daily reset via Inngest cron at 01:00 UTC
 
 **How to apply:**

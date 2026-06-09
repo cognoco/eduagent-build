@@ -16,11 +16,11 @@ status: parked
 > so `note_correctness` and `topic_notes.source` are born on `person`. Any migration
 > step here follows the 0107 posture — `db:push:dev` / author into the baseline at
 > reset — **never generate a numbered migration into the pre-reset chain.** See
-> `_wip/identity-foundation/data-model.md §1` and `docs/adr/MMT-ADR-0012`.
+> `docs/canon/identity/data-model.md §1` and `docs/adr/MMT-ADR-0012`.
 >
 > **Boundary with freeform Ask Anything:** this plan is topic-bound. It covers
 > `topic_notes` and Challenge-Round-derived notes for sessions that already have a
-> real `topicId`. It does not amend `MMT-ADR-0018`: freeform Ask Anything still
+> real `topicId`. It does not amend `MMT-ADR-0019`: freeform Ask Anything still
 > has no Challenge Round and no learner-note flow.
 
 **Goal:** Give a `learner-note` at most one provenance mark — a **green checkmark**

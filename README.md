@@ -42,7 +42,7 @@ apps/api     →  @eduagent/schemas, @eduagent/database, @eduagent/retention
 | Real-time | SSE streaming |
 | Monorepo | Nx 22, pnpm, TypeScript 5.9 (strict) |
 | Testing | Jest 30, co-located tests |
-| CI/CD | GitHub Actions, Nx Cloud, EAS Build |
+| CI/CD | GitHub Actions, EAS Build |
 
 ## Quick Start
 

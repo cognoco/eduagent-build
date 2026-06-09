@@ -968,7 +968,7 @@
       "delete": "Slett",
       "deleting": "Sletter ...",
       "deleteConfirmTitle": "Slette {{subject}}?",
-      "deleteConfirmMessage": "Dette sletter {{subject}} permanent, inkludert {{books}}, {{startedTopics}} og {{sessions}} med læringshistorikk. Dette kan ikke angres.",
+      "deleteConfirmMessage": "Dette sletter {{subject}} permanent – inkludert {{books}}, {{startedTopics}} og {{sessions}} med læringshistorikk, sammen med all mestringsfremgang, kortgjennomganger og streak for dette emnet. Dette kan ikke angres.",
       "deleteConfirmAction": "Slett",
       "deleteScopeBooks_one": "{{count}} bok",
       "deleteScopeBooks_other": "{{count}} bøker",

@@ -94,7 +94,9 @@ Skills under a **group directory** (currently `tech/`) are an exception to the 1
 
 ## Profile Shapes (Two Tab Shapes + isOwner Gating)
 
-**For full audience matrix** (which screens/APIs/Inngest jobs serve which user mode, with file:line citations and known gating gaps F1-F14), see `docs/audience-matrix.md`. For the *target* state — one `resolveNavigationContract()` function owning all UI gating — see `docs/specs/2026-05-21-navigation-contract.md`. The short version is below.
+> **Scope.** This section describes the **current** nav/gating system (live in `apps/mobile/src/lib/navigation-contract.ts`). The **target** identity model being designed in the identity-foundation runway (6-persona set, capability split, "charge" terminology) is **not** this — it lives in `docs/canon/identity/` + `_wip/identity-foundation/CANONICAL-SET.md`. Don't conflate the two.
+
+**For full audience matrix** (which screens/APIs/Inngest jobs serve which user mode, with file:line citations and known gating gaps F1-F14), see `docs/audience-matrix.md`. For the *target* state — one `resolveNavigationContract()` function owning all UI gating — see the now-implemented contract in `apps/mobile/src/lib/navigation-contract.ts` (design rationale archived at `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`). The short version is below.
 
 > **Hard constraint for the V0 → V1 migration.** Today's 5-tab production mode (active when `MODE_NAV_V0_ENABLED=false` in Doppler) is supported product behavior and **must not regress** across any nav-contract PR. The V0 helpers (`resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` in `apps/mobile/src/app/(app)/_layout.tsx:122-185`) and the V0-off short-circuits in `app-context.tsx:53-61, 70` stay alive when V1 ships. `resolveNavigationContract` wiring is gated behind a separate `MODE_NAV_V1_ENABLED` flag and never replaces the V0-off fallback. See the "Hard Constraint" section of the navigation-contract spec for the full flag matrix and test requirement.
 
@@ -175,16 +177,31 @@ real `file:line`; `scripts/check-i18n-keep-rot.ts` fails CI if a cite rots. The
 walker also follows `cond ? 'a' : 'b'`, `x ?? 'a'`, `as` casts, `i18next.t(…)`
 member calls, and `const tr = t` alias rebindings.
 
-### Known gap (tracked separately)
+### Hardcoded-JSX-literal ratchet (Phase 3)
 
 The orphan-key checker only sees strings that pass through `t()`. Hardcoded
-English literals in JSX (e.g. `<Text>Add child</Text>`, `label="Continue"`)
-bypass i18n entirely and render English to every locale. There is no automated
-guard against this today. Phase 3 (TBD) introduces a baseline-allowlist
-ratchet on `JsxText` and JSX-children `StringLiteral` nodes in
-`apps/mobile/src/**`, mirroring the `scripts/no-clinical-copy-baseline.json`
-pattern. Until Phase 3 lands: when adding user-visible copy, route it through
-`t('…')` and add the key to `en.json` in the same PR.
+English literals in JSX (e.g. `<Text>Add child</Text>`) bypass i18n entirely
+and render English to every locale. `scripts/check-i18n-jsx-literals.ts` is the
+read-side guard: a `ts-morph` AST walker that flags `JsxText` nodes and
+JSX-children `StringLiteral` / `NoSubstitutionTemplateLiteral` nodes (including
+through `cond ? 'a' : 'b'`, `x && 'a'`, `x ?? 'a'`, casts/parens) in
+`apps/mobile/src/**/*.tsx`. It is a forward-only baseline ratchet mirroring the
+`no-clinical-copy` pattern: existing literals are grandfathered in
+`scripts/i18n-jsx-literals-baseline.json` (361 entries), and only NEW literals
+fail CI (the `i18n hardcoded-JSX-literal check` step in `ci.yml`). Violations are
+keyed on `{file, kind, text}` — not line number — so reformatting never churns
+the baseline. Run `pnpm check:i18n:jsx-literals --accept` to refresh the
+baseline when you genuinely add non-translatable JSX copy (a code sample, a
+brand token) and justify it in the commit message.
+
+**Scope deliberately excludes JSX *attribute* literals** (`label="Continue"`,
+`title="Delete"`) — that surface mixes real copy with testID/style/a11y-role
+values and needs a per-prop allow/deny model scoped separately
+(`docs/audit/2026-05-29-full-audit/workflow-1/proposed-baseline.json`).
+
+When adding user-visible copy, route it through `t('…')` and add the key to
+`en.json` in the same PR — the ratchet enforces this for the JsxText/child
+surface, but attribute copy still relies on review.
 
 ### Variable-interpolation fallbacks
 
@@ -206,7 +223,7 @@ Example: instead of `t('rowSubject', { subject: subject || '…' })`, prefer
 - LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
 - When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook only checks that snapshot files are staged — it does NOT run the harness. Harness code: `apps/api/eval-llm/`.
 - Subagents may run `/commit` only from within an isolated worktree they own (see Worktree Placement above). When operating in the coordinator's working tree (no worktree isolation), subagents must NOT run `git add`/`git commit`/`git push` — the coordinator handles all git operations there.
-- Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `assessments.mastery_challenge_verified_at` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to `needs_deepening_topics` with `source = 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. Challenge Round LLM calls must still route through `resolveExchangeLlmRouting()`; accepted/active/drafting turns may apply a routing-only rung-4 floor (mechanism planned — `ExchangeContext.llmRoutingRung` field not yet in source), Family standard remains Gemini-only, and the OpenAI advanced candidate stays rung 5+ only. The persistent Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed in Phase 0 (PR #325); today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
+- Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `assessments.mastery_challenge_verified_at` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to `needs_deepening_topics` with `source = 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. Challenge Round LLM calls must still route through `resolveExchangeLlmRouting()`; accepted/active/drafting turns may apply a routing-only rung-4 floor (mechanism planned — `ExchangeContext.llmRoutingRung` field not yet in source), and per-tier model routing (incl. minor/Family) follows `MMT-ADR-0014` + `docs/registers/llm-models/master.md` (the prior "Family = Gemini-only" wording is superseded — Gemini is excluded under-18). The persistent Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed in Phase 0 (PR #325); today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
 
 ## Known Exceptions to Engineering Rules
 

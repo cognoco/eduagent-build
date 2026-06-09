@@ -1,12 +1,12 @@
 ---
-name: CI infrastructure — NX Cloud, path filters, E2E APK caching
-description: CI optimizations merged 2026-04-03. NX Cloud connected, E2E APK caching cuts 20 min, path filters skip irrelevant jobs. Husky pre-commit runs tsc --build.
+name: CI infrastructure — path filters, E2E APK caching, .nx/cache
+description: CI optimizations merged 2026-04-03. E2E APK caching cuts 20 min, path filters skip irrelevant jobs, Husky pre-commit runs tsc --build. (NX Cloud was connected 2026-04-03 but DISCONNECTED 2026-06-01, IID-792 — see project_eas_build.md.)
 type: project
 ---
 
 **CI/CD optimizations (PRs #100, #103, merged 2026-04-03):**
 
-1. **NX Cloud** connected to dedicated project — enables remote caching and task distribution for CI
+1. **NX Cloud** — **DISCONNECTED 2026-06-01 (IID-792)**; see project_eas_build.md. Was connected 2026-04-03 (id-only, no access token); distributed task execution was never enabled. CI now uses GitHub Actions `actions/cache` for `.nx/cache` at $0; `nx affected`/`run-many` are cloud-independent.
 2. **E2E APK caching** (PR #100) — cache debug APK keyed on mobile source + schemas + lock file. On cache hit, skips prebuild + JS bundle + Gradle (~20 min saved). Maestro starts in ~5 min instead of ~25.
 3. **Maestro CLI caching** across runs
 4. **Concurrency group** — cancels stale E2E runs on new push

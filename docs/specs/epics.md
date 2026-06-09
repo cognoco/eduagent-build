@@ -319,7 +319,7 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 **From Architecture — Technical Patterns:**
 
 - ARCH-7: Scoped repository pattern (`createScopedRepository(profileId)`) for all data access. Never raw `WHERE profile_id =` clauses. **— stands; the scope key migrates `profile_id` → `person_id` at the clean-cut baseline (the pattern is unchanged). See § Identity Foundation / `data-model.md` §5.1.**
-- ARCH-8: LLM orchestration module (`routeAndCall()`) — all LLM calls must go through this. No direct provider API calls. **— → promoted to MMT-ADR-0017 (2026-06-08, reconstructed; code citations migrated). `routeAndCall()` remains the single LLM entry point; the router/vetting split (MMT-ADR-0014) sits downstream.**
+- ARCH-8: LLM orchestration module (`routeAndCall()`) — all LLM calls must go through this. No direct provider API calls. **— → promoted to MMT-ADR-0018 (2026-06-08, reconstructed; code citations migrated). `routeAndCall()` remains the single LLM entry point; the router/vetting split (MMT-ADR-0014) sits downstream.**
 - ARCH-9: Model routing by conversation state (escalation rung): Gemini Flash for rung 1-2, Gemini Pro for standard rung 3+, and advanced providers only from rung 4 upward for entitled profiles. **— → superseded by MMT-ADR-0014 (router/vetting split — the durable routing-by-rung mechanism) + MMT-ADR-0016 (safety/judge). The pinned model names are register data (`docs/registers/llm-models/`), not canon; "Family standard = Gemini-only" is superseded by MMT-ADR-0014 §Supersession. Code citations migrated to MMT-ADR-0014 (2026-06-08).**
 - ARCH-10: SM-2 as pure math library in `packages/retention/` (~50 lines, zero deps)
 - ARCH-11: ~~Workers KV~~ DB-backed cache (`home_surface_cache` table) for coaching cards (write on Inngest precompute, read on app open) and subscription status (write on Stripe/RevenueCat webhook, read on metering). _Original spec said Workers KV; implementation uses DB table as conscious adaptation — acceptable at current scale._
@@ -499,7 +499,7 @@ Users can register, authenticate, create family accounts with multiple profiles,
 Users can specify subjects, complete an AI-powered conversational assessment interview, receive a personalized curriculum with confidence levels and time estimates, and begin their learning journey. Parents see a simulated dashboard during onboarding.
 
 **FRs covered:** FR13-FR22 (10 FRs)
-**ARCH requirements:** MMT-ADR-0017 (LLM orchestrator `routeAndCall()`), MMT-ADR-0014 (model routing via vetted eligibility), ARCH-12 (SSE streaming)
+**ARCH requirements:** MMT-ADR-0018 (LLM orchestrator `routeAndCall()`), MMT-ADR-0014 (model routing via vetted eligibility), ARCH-12 (SSE streaming)
 **UX requirements:** UX-8 (adaptive entry, cold start 3-button fallback for sessions 1-5), UX-9 (parent simulated dashboard with sample data)
 
 **Implementation notes:**
@@ -519,7 +519,7 @@ Users can specify subjects, complete an AI-powered conversational assessment int
 Users can learn through real-time AI tutoring sessions with Socratic guidance, get homework help via camera capture and OCR, and have session-scoped retention features (mandatory summaries, parking lot, understanding checks, prior learning references).
 
 **FRs covered:** FR23-FR42 (20 FRs)
-**ARCH requirements:** MMT-ADR-0017 (LLM orchestrator), MMT-ADR-0014 (model routing via vetted eligibility), ARCH-12 (SSE streaming), ARCH-14 (ML Kit OCR + server fallback), ARCH-16 (pgvector embeddings — spike story)
+**ARCH requirements:** MMT-ADR-0018 (LLM orchestrator), MMT-ADR-0014 (model routing via vetted eligibility), ARCH-12 (SSE streaming), ARCH-14 (ML Kit OCR + server fallback), ARCH-16 (pgvector embeddings — spike story)
 **UX requirements:** UX-1 (camera MVP), UX-2 (Homework Fast Lane UI), UX-3 (Parallel Example Pattern), UX-4 (Socratic Escalation Ladder), UX-5 (coaching card two-path loading), UX-7 (BaseCoachingCard hierarchy), UX-10 (session length caps), UX-11 ("Not Yet" feedback), UX-12 (silence & re-engagement), UX-15 (recall warmup after homework), UX-16 ("I don't know" valid input), UX-18 (behavioral confidence scoring)
 
 **Implementation notes:**
@@ -1308,7 +1308,7 @@ So that my curriculum is personalized to where I actually am.
 **Given** user has selected a subject
 **When** interview begins
 **Then** AI asks about learning goals, prior experience, and current knowledge level via streamed conversational exchange (ARCH-12: SSE via Hono `streamSSE()`)
-**And** all LLM calls go through `routeAndCall()` — establishing the orchestrator pattern for all subsequent AI features (MMT-ADR-0017)
+**And** all LLM calls go through `routeAndCall()` — establishing the orchestrator pattern for all subsequent AI features (MMT-ADR-0018)
 **And** interview passes a low-complexity routing signal; the router selects an eligible low-latency model from the vetted set (MMT-ADR-0014)
 
 **Given** user responds to interview questions
@@ -1484,7 +1484,7 @@ So that I can learn interactively.
 **Given** session is active
 **When** learner sends a message
 **Then** AI responds via SSE streaming (ARCH-12, builds on Epic 1's `streamSSE()` pattern)
-**And** all LLM calls route through `routeAndCall()` with model selection delegated to the router's vetted eligibility flow (MMT-ADR-0017, MMT-ADR-0014)
+**And** all LLM calls route through `routeAndCall()` with model selection delegated to the router's vetted eligibility flow (MMT-ADR-0018, MMT-ADR-0014)
 
 **Given** AI has responded
 **When** learner asks a follow-up question

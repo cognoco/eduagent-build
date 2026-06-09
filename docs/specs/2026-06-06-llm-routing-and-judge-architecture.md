@@ -86,7 +86,7 @@ No model enters a rule row until it has passed the eval harness (`pnpm eval:llm 
 
 ### 1.5 Ratified pinning (MMT-ADR-0016)
 
-The concrete model assignments the rule table encodes. **Ratified by the owner 2026-06-07.** The *why*, evidence, and rejected alternatives are in [`MMT-ADR-0016`](../adr/MMT-ADR-0016-llm-provider-model-selection-and-routing.md); eval evidence is in the model-selection memo §6 (the §7 tables there are superseded evidence-stage picks — route from *this* table, not from the memo).
+The concrete model assignments the rule table encodes. **Ratified by the owner 2026-06-07.** The *why*, evidence, and rejected alternatives are in [`MMT-ADR-0016`](../adr/MMT-ADR-0016-safety-and-judge-architecture.md); eval evidence is in the model-selection memo §6 (the §7 tables there are superseded evidence-stage picks — route from *this* table, not from the memo).
 
 **Roles in one line:** gpt-oss is everyone's default text brain. When the business-rule layer routes away from US-hosted Cerebras — EU-residency required *or* Cerebras unavailable (one merged branch) — each tier falls to its secondary: **free → Mistral, paid → GPT-5 mini**, and that same secondary also handles the tier's **vision** (gpt-oss is text-only). gpt-5.4 is the deep-reasoning model for paying non-Family users; Haiku judges.
 

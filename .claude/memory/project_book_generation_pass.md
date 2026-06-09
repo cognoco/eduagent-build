@@ -6,7 +6,7 @@ type: project
 
 The repo has a durable live book-generation quality gate at `scripts/book-generation-pass.ts`, exposed as `pnpm test:llm:book-generation`.
 
-It calls the app's real book-generation services directly, not the emulator, and writes results under `tmp/book-generation/results/`. The default cases cover broad subject classification, narrow subject classification, language learning, serious history, adult biology, and middle-school science. Book generation routes at rung 3 with Gemini-only provider policy, so the model is Gemini 2.5 Pro rather than Flash and it cannot fall back to GPT/Claude. The runner has one default whole-case retry for transient provider overloads/timeouts; real quality and source-safety failures still block.
+It calls the app's real book-generation services directly, not the emulator, and writes results under `tmp/book-generation/results/`. The default cases cover broad subject classification, narrow subject classification, language learning, serious history, adult biology, and middle-school science. Book/topic-map generation uses a strong tier and must not silently fall back to a weaker model; the concrete provider/model policy lives in `MMT-ADR-0014` + `docs/registers/llm-models/master.md`. The old Gemini-only / Gemini 2.5 Pro wording is superseded. The runner has one default whole-case retry for transient provider overloads/timeouts; real quality and source-safety failures still block.
 
 **Why:** Added after the 2026-05-18 decision that book generation is upstream of the tutoring spine. The generated book/topic map can make a session weak even when the session reply logic is good.
 

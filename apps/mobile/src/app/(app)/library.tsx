@@ -1292,22 +1292,29 @@ function LibraryScreenContent({
                         </Pressable>
                       )}
                     </View>
-                    <Pressable
-                      onPress={() => handleDeleteSubjectPress(subject)}
-                      disabled={isDeleteDisabled}
-                      className={
-                        isDeleteDisabled
-                          ? 'mt-2 rounded-button border border-danger/20 bg-danger/5 py-2.5 items-center opacity-60'
-                          : 'mt-2 rounded-button border border-danger/30 bg-danger/10 py-2.5 items-center'
-                      }
-                      testID={`delete-subject-${subject.id}`}
-                    >
-                      <Text className="text-body-sm font-semibold text-danger">
-                        {isDeleting
-                          ? t('library.manage.deleting')
-                          : t('library.manage.delete')}
-                      </Text>
-                    </Pressable>
+                    {/* Archive-first: a subject must be archived (a reversible
+                        state with a Restore action) before it can be permanently
+                        deleted. Delete is intentionally unavailable on active /
+                        paused subjects so it can never be reached in one tap from
+                        an in-use subject. */}
+                    {subject.status === 'archived' && (
+                      <Pressable
+                        onPress={() => handleDeleteSubjectPress(subject)}
+                        disabled={isDeleteDisabled}
+                        className={
+                          isDeleteDisabled
+                            ? 'mt-2 rounded-button border border-danger/20 bg-danger/5 py-2.5 items-center opacity-60'
+                            : 'mt-2 rounded-button border border-danger/30 bg-danger/10 py-2.5 items-center'
+                        }
+                        testID={`delete-subject-${subject.id}`}
+                      >
+                        <Text className="text-body-sm font-semibold text-danger">
+                          {isDeleting
+                            ? t('library.manage.deleting')
+                            : t('library.manage.delete')}
+                        </Text>
+                      </Pressable>
+                    )}
                   </View>
                 );
               })}

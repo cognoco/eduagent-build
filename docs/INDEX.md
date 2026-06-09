@@ -26,7 +26,7 @@ in one read. The five-layer model itself is defined in
 
 | Layer | Holds | Physical home (§I.4) | Per-layer index |
 |---|---|---|---|
-| **L1 — Canon** | The *what*: contracts, invariants, target models, product truth | `docs/canon/` (identity domain canon graduates here front-of-J; loose root docs drain here in Phase J/Stream 2 — `MMT-ADR-0000` §I.4) | *(this index, § Canon)* |
+| **L1 — Canon** | The *what*: contracts, invariants, target models, product truth | `docs/canon/` (identity domain canon lives in `docs/canon/identity/`; loose root docs drain here in Phase J/Stream 2 — `MMT-ADR-0000` §I.4) | *(this index, § Canon)* |
 | **L2 — Decisions** | The *why*: ADRs (`MMT-ADR-NNNN`) | `docs/adr/` | [`docs/adr/README.md`](adr/README.md) |
 | **L3 — Operational** | Specs, plans, runbooks, **registers** (governed data masters + trails) | `docs/specs/`, `docs/plans/`, `docs/runbooks/`, `docs/registers/` | [`docs/registers/README.md`](registers/README.md) |
 | **Meta / audit** | Work *about* the repo (audits, cleanup), not product docs | `docs/audit/` | [`docs/audit/INDEX.md`](audit/INDEX.md) |
@@ -49,8 +49,9 @@ file is the authoritative list; this index points at it rather than duplicating 
 
 The members, at a glance (full roles + status in the canonical-set doc):
 
-- **Domain docs (L1):** [`identity-ontology.md`](../_wip/identity-foundation/identity-ontology.md) · [`domain-model.md`](../_wip/identity-foundation/domain-model.md) · [`data-model.md`](../_wip/identity-foundation/data-model.md) · [`identity-foundation-prd.md`](../_wip/identity-foundation/identity-foundation-prd.md) — *ratified; scheduled to graduate `_wip/` → `docs/canon/` at the front of Phase J (`MMT-ADR-0000` §I.4 amendment, 2026-06-08). These links update at that move.*
-- **Decisions (L2):** [`MMT-ADR-0000`](adr/MMT-ADR-0000-documentation-layer-model-and-decisions-layer.md) (+ 4 amendments) · `MMT-ADR-0007`–`0010` (domain) · `MMT-ADR-0011`/`0012` (data) · `MMT-ADR-0013`–`0016` (policy-engine spine) — all under [`docs/adr/`](adr/)
+- **Domain docs (L1):** [`ontology.md`](canon/identity/ontology.md) · [`domain-model.md`](canon/identity/domain-model.md) · [`data-model.md`](canon/identity/data-model.md) · [`prd.md`](canon/identity/prd.md) — *graduated `_wip/` → `docs/canon/identity/` in Phase J0 (2026-06-08), per the `MMT-ADR-0000` §I.4 domain-canon sub-layout amendment; filenames dropped the domain prefix.*
+- **Compliance (L1):** [`identity-compliance-register.md`](compliance/identity-compliance-register.md) — the binding compliance obligations rescued from the PRD decision queue in J0.
+- **Decisions (L2):** [`MMT-ADR-0000`](adr/MMT-ADR-0000-documentation-layer-model-and-decisions-layer.md) (+ 5 amendments) · `MMT-ADR-0007`–`0010` (domain) · `MMT-ADR-0011`/`0012`/`0015` (data) · `MMT-ADR-0013`/`0014` (policy-engine + router) · `MMT-ADR-0016` (safety/judge) · `MMT-ADR-0018` (LLM orchestrator) — all under [`docs/adr/`](adr/)
 - **Registers (L3, not canon):** [`docs/registers/llm-models/`](registers/llm-models/) — vetted-model master + vetting trail
 - **Audit trail:** [`2026-06-XX-a-vs-b-decision-capture.md`](../_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md) — the A-vs-B grilling record (Option III, immutable)
 - **Supporting specs (L3, not canon):** the two `2026-06-06` LLM-routing specs in [`docs/specs/`](specs/)
@@ -72,8 +73,8 @@ root and in `docs/`.
 ## L2 — All decisions (ADRs)
 
 The full ADR register and the significance gate live in
-[`docs/adr/README.md`](adr/README.md). Current ADR files run through `MMT-ADR-0018`
-(`0003` is unused — number gap, not a live record; `0017` currently has a numbering collision to clean separately). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
+[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0019`
+(`0003` is unused — number gap, not a live record; `0017` records the concept-capture additive layer; `0018` promotes the legacy `ARCH-8` LLM-orchestrator entry; `0019` records the freeform Library-filing threshold). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
 draining to ADRs as Stream-2 work) is described in `MMT-ADR-0000` Part III.
 
 ## L3 — Operational
@@ -96,8 +97,10 @@ These are not product documentation.
 
 1. **Estate-wide canon is not indexed** — only identity-foundation. The rest is
    Phase J / Stream 2.
-2. **No `docs/canon/` population** — that directory exists but is empty; the loose
-   root canon docs drain into it in Phase J.
+2. **`docs/canon/` is seeded, not full** — the identity domain canon is graduated into
+   `docs/canon/identity/` (Phase J0, 2026-06-08); the loose root estate canon
+   (`architecture.md`, `PRD.md`, `ux-design-specification.md`) still drains into
+   `docs/canon/` in Phase J / Stream 2.
 3. **Near-duplicate / non-standard `docs/` dirs** (`audit`/`audits`, `analysis`,
    `_scratch`, `_vault`, `superpowers`, `E2Edocs`) are **not** reconciled here — their
    per-file fate is a Phase-J decision.
