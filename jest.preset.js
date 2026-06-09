@@ -31,8 +31,5 @@ module.exports = {
     '[/\\\\]\\.worktrees',
     '<rootDir>/.tmp/',
     '[/\\\\]\\.tmp',
-    // WI-536 flaky-test quarantine: skip registered flaky files from the gate
-    // (returns [] under QUARANTINE_MODE=report so the report lane runs them).
-    ...require('./tools/quarantine/registry.cjs').jestIgnorePatterns(),
   ],
 };

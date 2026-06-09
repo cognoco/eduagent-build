@@ -1,8 +1,0 @@
-# Claude Code harness frontmatter, injected into .claude/skills/commit/SKILL.md
-# by scripts/sync-skills.mjs (WI-454). The runtime-neutral body lives in
-# ../SKILL.md; these keys make the commit skill run as a forked sub-agent with
-# only the git tools it needs. Codex reads ./openai.yaml instead.
-context: fork
-agent: general-purpose
-model: sonnet
-allowed-tools: Bash, Read, Grep
