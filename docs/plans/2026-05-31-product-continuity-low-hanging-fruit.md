@@ -2,12 +2,23 @@
 title: Product Continuity Low-Hanging Fruit Implementation Plan
 date: 2026-05-31
 profile: ui
-status: draft
+status: reviewed-not-started — phased (copy layer do-now; proxy-coupled tasks parked)
+last_reviewed: 2026-06-09
+implemented: 0 of 7 tasks
 ---
 
 # Product Continuity Low-Hanging Fruit Implementation Plan
 
-> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+> **STATUS AT A GLANCE** (updated 2026-06-09 — read this before acting)
+>
+> - **What this is:** seven *small* UX-continuity improvements that surface already-shipped learning value — better next-step copy, a post-session "saved" receipt, My Notes previews, recap "coming up" hints, context-aware parent nudges, constructive retention copy, and deferred mic permission. **Not a new learning engine.**
+> - **Implemented?** **No — 0 of 7 tasks built.** Verified 2026-06-09 on branch `new-llm`: none of the proposed files exist (`learner-next-step.ts`, `session-summary-artifacts.ts`, `RecapComingUpCard`), `CoachBand` still lacks `body`/`ctaLabel`, `NudgeActionSheet` has no `recommendedTemplate`/`contextLine`, the mount-time mic request still lives at `ChatShell.tsx:319-321`, and "starting to fade" is still live at `LearnerScreen.tsx:367`. Every "Current Code Evidence" claim below still describes live state.
+> - **Should it be implemented?** **Partially, and phased — not as a 7-task batch.** Pre-launch with no users, building all seven on a hunch risks polishing the wrong surfaces, and three tasks depend on a parent-proxy model that is being reworked. The recommendation:
+>     - **Phase A — do now (Tasks 1 + 6):** the copy layer. Identity-independent, no new data fetching, no privacy surface, safe to ship blind; these are the plan's own #1 and #6 user-pain items, at ~15–20% of total cost.
+>     - **Phase B — parked (Tasks 2, 3, 5):** all depend on `isProxyMode` / parent-proxy / child-profile gating that the **identity-foundation clean-cut — the ratified identity rebuild that dissolves the `owner` role, reverts the empty `T1` org/membership tables, and re-homes `profiles` FKs onto a new `person` table** — is rewriting. Building proxy gating now = throwaway work. Re-cost after that migration lands.
+>     - **Phase C — small guarded follow-ups (Tasks 4, 7):** each is cheap but carries one trap (Task 4 newly exposes LLM text to mentors with no guard; Task 7 trades instant voice for a first-use permission dialog). Do each on its own small PR with the attached guard/test.
+> - **Blocked by:** identity-foundation clean-cut for Phase B. This supersedes the earlier "Classification pending" banner — the re-triage is done and lives in "80/20 Analysis & Phasing" below.
+> - **Adversarial end-user review (2026-06-09):** findings folded into the tasks inline (marked **Review finding**) and summarised in "80/20 Analysis & Phasing."
 
 ## Goal
 
@@ -224,6 +235,25 @@ This is the user-pain ranking, separate from implementation order:
 
 The implementation order still groups related code changes, but this ranking is the product rationale for why these seven beat other possible low-hanging improvements.
 
+## 80/20 Analysis & Phasing
+
+This section is the decision layer added after the 2026-06-09 end-user review. It answers "what is worth building, when, and why" so the plan can be picked up later without re-deriving the trade-offs.
+
+**The 80/20:** the plan ranks "best next-step copy" (#1) and "constructive retention copy" (#6) as the two highest user-pain items. Those are also the *only* parts that are identity-independent, add no data fetching, open no privacy surface, and are safe to ship before launch (copy cannot break trust the way a privacy leak can). So **the copy layer captures most of the felt value for a fraction of the cost.** The structural tasks (receipt, previews, nudges) are perceived-value bets that, with zero users today, are better validated by the first cohort than built on a hunch.
+
+| Phase | Tasks | Status | Rationale |
+|---|---|---|---|
+| **A — do now** | 1 (next-step copy + CoachBand `body`/`ctaLabel`), 6 (constructive retention copy) | **Recommended, unstarted** | Identity-independent, no proxy/privacy surface, ~15–20% of total effort, delivers the #1 and #6 ranked items. Minimum slice if even this feels heavy: just the two visible deficit strings (`LearnerScreen.tsx:367` + `en.json:159`). |
+| **B — parked** | 2 (session receipt), 3 (My Notes previews), 5 (context-aware nudges) | **Parked — identity-blocked** | All lean on `isProxyMode` / parent-proxy / child-profile gating that the identity-foundation clean-cut is rewriting (owner dissolved, `profiles`→`person`). Task 3 additionally has a live privacy risk (child note/saved-reply snippets to a proxy parent). Re-cost after the migration lands; do **not** build proxy gating against the old model. |
+| **C — small guarded follow-ups** | 4 (recap "coming up"), 7 (defer mic permission) | **Optional, each guarded** | Cheap and identity-independent, but each carries one trap (see the task bodies). Ship on separate small PRs with the attached guard/test; not "free." |
+
+**Why phasing and not all-in:**
+
+- **No users to validate against** — five of seven tasks are perceived-value bets; you cannot tell which continuity gaps actually bite until a real cohort hits them.
+- **Identity coupling** — Tasks 2/3/5 would be written twice if built before the clean-cut.
+- **Aggregate cost** — 7 tasks × ~14 files, each carrying i18n (translate across 7 locales, orphan-key + keep-rot guards, source-baseline) and colocated tests. "Low-hanging" individually, a real chunk together.
+- **One task can actively harm** — Task 3 (privacy), versus the rest which only under-deliver. Keep it out of any "quick win" framing.
+
 ## Tasks
 
 - [ ] 1. Make Learner Home's coach band a specific "best next step" card.
@@ -262,18 +292,18 @@ The implementation order still groups related code changes, but this ranking is 
     id: 'library' | 'reflection' | 'bookmarks' | 'transcript' | 'memory' | 'nextTopic';
     label: string;
     value: string;
-    status: 'saved' | 'available' | 'skipped' | 'notSaved';
+    status: 'saved' | 'available';
   };
   ```
 
-  Inputs should come from existing summary state only: library filing status, bookmark count, reflection submitted/skipped state, transcript availability or purge state, mentor memory cue visibility, and `nextTopicTitle`.
+  Inputs should come from existing summary state only: library filing status, bookmark count, reflection submitted/skipped state, transcript availability or purge state, mentor memory cue visibility, and `nextTopicTitle`. (A real `status === 'skipped'` signal exists at `[sessionId].tsx:211`, but the **student-facing** receipt deliberately does not surface skip/not-saved states — see the done-when below.)
 
   Render the card near the top of `apps/mobile/src/app/session-summary/[sessionId].tsx`, after the closing line/library filing controls and before the longer "What happened" section. The card should answer "what did the app keep for me?" without adding new persistence.
 
   Done when:
 
   - A completed session summary shows library, reflection, bookmark, transcript, memory, and next-topic rows only when those signals apply.
-  - Empty or unavailable artifacts are omitted or shown as explicit "not saved" only when that prevents confusion.
+  - Empty or unavailable artifacts are **omitted entirely**, never shown as "skipped" or "not saved" — the receipt celebrates what was kept and must not read as a failure scorecard to an anxious learner (positive-framing rule; cf. the parent-copy banned-phrase guard in `parent-card-copy.test.ts:254-265`). If a "you can still add a reflection" affordance is wanted, frame it as an opportunity CTA, not a status label.
   - Tests cover a filed-library session, a no-bookmark session, and a skipped reflection session.
   - Parent proxy summaries still respect existing transcript/privacy behavior.
 
@@ -289,6 +319,8 @@ The implementation order still groups related code changes, but this ranking is 
 
   `useAllNotes` and `useBookmarks` read the active profile internally; `useProfileSessionsArchive` requires the active profile id. Do not add backend totals for this slice. If exact totals are unavailable, change the hub count pill to accept a string such as `3+` or hide the count and show the latest preview.
 
+  > **Review finding (2026-06-09) — privacy gate, Phase B blocker.** `useAllNotes`/`useBookmarks` key on `activeProfile?.id` with **no** parent-proxy guard (`use-notes.ts:40-43`, `use-bookmarks.ts:27-39`), unlike `useProfileSessionsArchive` which gates on `profileId === viewerProfileId` (`use-progress.ts:551`). The session-summary screen deliberately hides child chat content from a proxy parent (`[sessionId].tsx:966,1000`). Before building, **verify whether My Notes is reachable in parent-proxy mode.** If it is, gate the note/saved-reply **snippet previews** behind the same `isProxyMode` / `showLearningActions` contract the summary uses (`[sessionId].tsx:156`) — surfacing child-private snippets on the hub landing is a privacy regression. This is the main reason Task 3 sits in parked Phase B.
+
   Add one latest preview line per card: latest session title/date, latest note snippet, latest saved reply snippet. Keep `my-notes/[kind].tsx` as the full searchable archive.
 
   Done when:
@@ -297,6 +329,7 @@ The implementation order still groups related code changes, but this ranking is 
   - Each card can show one recent preview when data exists.
   - Empty states are specific: no sessions, no notes, no saved replies.
   - Tests cover data-present and data-empty hub states.
+  - **Proxy-mode My Notes shows no child note/saved-reply snippet previews** (test asserts this), or My Notes is confirmed unreachable in proxy mode.
 
 - [ ] 4. Surface recap "Coming up" fields for family mentors.
 
@@ -314,6 +347,8 @@ The implementation order still groups related code changes, but this ranking is 
   ```
 
   In `apps/mobile/src/app/(app)/recaps/index.tsx`, add a short row line such as `Coming up: Fractions with unlike denominators` when `nextTopicTitle` exists.
+
+  > **Review finding (2026-06-09) — unguarded LLM text crosses to mentors.** Today `nextTopicReason` is **learner-only** (`[sessionId].tsx:1143-1146`); parent surfaces use only `nextTopicTitle` (`parent-card-copy.ts:157-159`). Rendering `reason={recap.nextTopicReason}` in the mentor-facing recap detail makes it the **first** LLM-generated reason text shown to a parent. It is neutral *by prompt only* (`session-recap.ts:131-136`), with no enforced guard like the parent-copy banned-phrase test. Either (a) show mentors only the **title** (consistent with `parent-card-copy.ts` today), or (b) extend the `parent-card-copy.test.ts:254-265` banned-phrase guard to cover `nextTopicReason` fixtures so a future prompt drift cannot leak deficit language to a parent.
 
   Done when:
 
@@ -346,6 +381,8 @@ The implementation order still groups related code changes, but this ranking is 
 
   In the sheet, place the recommended template first or mark it with a small "Recommended" label, and show the `contextLine` above the template list.
 
+  > **Review finding (2026-06-09) — `contextLine` needs a guard.** The existing positive-language guard (`parent-card-copy.test.ts:254-265`) covers authored card/pulse templates but **not** a new free-form `contextLine`, which is derived from attention/review-due state and so signals to the parent that something is wrong. Route `contextLine` strings through authored i18n keys and add them to the banned-phrase guard test so contextual nudges cannot drift into surveillance/deficit phrasing.
+
   Done when:
 
   - Opening nudge from a child card can explain why one message is suggested.
@@ -371,6 +408,8 @@ The implementation order still groups related code changes, but this ranking is 
   - "needs a fresh pass"
   - "keep it warm"
 
+  > **Review finding (2026-06-09) — scope is smaller than it looks.** The only *visible* learner-facing deficit strings are `en.json:159` ("Review what is fading…") and the **hardcoded** template at `LearnerScreen.tsx:367` ("…it's starting to fade."). The retention status labels are **already** softened ("Getting fuzzy" `en.json:1754`, "Needs a quick refresh" `:1757`, "Needs a fresh pass" `:1760`); "weak"/"forgotten" survive only as internal/enum keys and must be left alone. Note that `LearnerScreen.tsx:367` is a hardcoded template literal today — it must be **migrated into i18n** (it currently bypasses the orphan-key checker), not edited in place.
+
   Be careful not to rename enum values, fixture keys, or analytics identifiers. Add or update copy tests where the repo already has parent positive-language coverage.
 
   Done when:
@@ -390,7 +429,9 @@ The implementation order still groups related code changes, but this ranking is 
   - The session is explicitly launched in voice mode.
   - Existing voice-start logic requires permission before recording.
 
-  Inspect the voice hook before editing so the permission call is not duplicated. If `startListening()` already requests permission, prefer using that single path.
+  Inspect the voice hook before editing so the permission call is not duplicated. If `startListening()` already requests permission, prefer using that single path. (It does: `use-speech-recognition.ts:181` already calls `requestPermissionsAsync()` before `start()` at `:193`, so removing the mount-time request leaves a single, intentional request — the right end state.)
+
+  > **Review finding (2026-06-09) — this is a trade, not a free win; frame it honestly.** The mount-time request is *deliberate* — `ChatShell.tsx:314-318` documents that Android forbids silent `RECORD_AUDIO` grants, so the on-entry dialog is "the closest thing to allowed-by-default." Removing it helps text-first learners (the goal) but means a voice-first learner's **first** mic tap fires the OS permission dialog at the moment of intent. The flow still ends in recording (`startListening` awaits the grant, then `start()`s), so no utterance is lost — but it is a new first-use interruption, not pure upside. Supersede the `ChatShell.tsx:314-318` rationale explicitly in the code comment when you make the change.
 
   Done when:
 
@@ -398,6 +439,7 @@ The implementation order still groups related code changes, but this ranking is 
   - Tapping the mic still requests permission and starts the current voice flow.
   - Voice-mode sessions still prepare voice intentionally.
   - Existing mic-in-pill UI remains discoverable.
+  - The first intentional voice tap flows dialog → grant → record in **one** gesture with no lost utterance (asserted by test), so deferring the prompt does not make first-use voice feel broken.
 
 ## Verification
 
@@ -433,6 +475,8 @@ If selectors or visible flows change in tested areas, update and run the relevan
 
 ## Implementation Order
 
+> Supersession note (2026-06-09): the phasing in "80/20 Analysis & Phasing" governs *whether/when* each task is built (Phase A now, B parked, C guarded). The sequence below is the code-grouping order **within** whatever phases you action.
+
 1. Do tasks 1 and 6 together because both touch learner next-step and retention copy.
 2. Do task 2 next because it improves the post-session moment students see most.
 3. Do tasks 4 and 5 together because both improve mentor follow-through after a child session.
@@ -455,3 +499,16 @@ If selectors or visible flows change in tested areas, update and run the relevan
 
 - Risk: Session summary gains another dense module.
   Mitigation: The new card should replace confusion, not add detail. Keep rows short and link out to Library, My Notes, or Mentor Memory only when useful.
+
+- Risk: My Notes previews leak child-private notes/saved replies to a proxy parent (Task 3).
+  Mitigation: Gate previews behind the existing `isProxyMode` contract, or confirm My Notes is unreachable in proxy mode. Tracked as the Phase B blocker. See Task 3 review finding.
+
+- Risk: A post-session "receipt" listing skipped/not-saved artifacts reads as a failure scorecard (Task 2).
+  Mitigation: Show only positive saved/available rows; omit the rest. See Task 2 review finding.
+
+- Risk: Recap "coming up" surfaces unguarded LLM reason text to mentors (Task 4).
+  Mitigation: Show title only, or extend the parent-copy banned-phrase guard to cover `nextTopicReason`. See Task 4 review finding.
+
+## Review History
+
+- **2026-06-09 — adversarial end-user review.** All 7 tasks verified unstarted on branch `new-llm`. Three HIGH end-user findings (Task 7 voice-permission framing, Task 2 deficit-framed receipt, Task 3 proxy privacy) and three MEDIUM (Task 4 unguarded mentor text, Task 6 overstated scope, Task 5 unguarded `contextLine`) folded into the task bodies as **Review finding** notes. Added the status banner, the 80/20 analysis, and phasing (A do-now / B parked-identity-blocked / C guarded follow-ups). The earlier "Classification pending" banner is resolved into the phasing.

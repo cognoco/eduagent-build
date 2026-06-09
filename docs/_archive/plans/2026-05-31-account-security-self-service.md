@@ -3,13 +3,39 @@ title: Account Security Self-Service - Implementation Plan
 date: 2026-05-31
 profile: code
 spec: docs/audits/2026-05-31-logical-gap-audit.md
-status: draft
+status: archived
+archived: 2026-06-08
 gap_ids: [auth-2, auth-3, auth-4]
 ---
 
 # Account Security Self-Service - Implementation Plan
 
-> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+> **📦 Archived 2026-06-08 — SHIPPED.** Every task in this plan is implemented:
+> `ChangeEmail`, `AddPassword`, `ChangePassword`, the `security-sessions` screen,
+> and the `PATCH /account/email` route all exist in source. The `status: draft`
+> and "Classification pending" framing below are historical and no longer
+> reflect reality.
+>
+> **Open end-user gaps (to be closed in a separate session).** An adversarial
+> end-user review (2026-06-08) found holes the shipped code does *not* address.
+> Tracked for follow-up, not yet fixed:
+> - **CRITICAL — email-change strand:** app-kill between Clerk primary promotion
+>   and the server sync (`change-email.tsx:164-168`) leaves Clerk and
+>   `accounts.email` permanently divergent with no in-app recovery (re-running
+>   ChangeEmail rejects on an already-owned email). Corrupts the GDPR export
+>   identity. Needs a lifecycle-independent startup reconciliation.
+> - **CRITICAL — silent takeover:** a live unlocked-phone session can change the
+>   email, `destroy()` the old one (`change-email.tsx:111`), and lock out the
+>   owner with no security notification and no reverification/step-up.
+> - **HIGH — no "sign out everywhere":** `security-sessions.tsx` revokes one row
+>   at a time; the lost-phone emergency (auth-4) has no bulk action.
+> - **HIGH — indistinguishable device rows:** `formatSessionTitle`
+>   (`security-sessions.tsx:26-34`) renders only `deviceType - browserName`, so
+>   the user often can't tell which session is the lost device.
+> - MEDIUM/LOW: revoke-latency expectation, silent non-owner redirect,
+>   cross-profile sign-out unwarned, current-session has no sign-out affordance.
+
+> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
 
 **Goal:** Give signed-in users a complete in-app security surface for changing
 their login email, adding a backup password to SSO-only accounts, and reviewing

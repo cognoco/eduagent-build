@@ -31,7 +31,7 @@ import { platformAlert } from '../../lib/platform-alert';
 // ─── Boundary mocks (external/native runtime only) ──────────────────────
 //
 // Everything else (lib/profile via ProfileContext, the subjects / progress /
-// all-books / library-retention / library-search / failed-filing hooks, the
+// all-books / library-retention / library-search hooks, the
 // api-client, ShelfRow / LibrarySearchBar / LibrarySearchResults / ShimmerSkeleton)
 // now runs for real against the routed mock fetch supplied by `renderScreen`
 // (or the local proxy-aware wrapper). See CONVERT notes in the diff.
@@ -252,13 +252,6 @@ interface RouteOptions {
   allBooksLoading?: boolean;
   allBooksError?: boolean;
   search?: unknown;
-  /** Sessions surfaced by useFailedFreeformLibraryFilingSessions. */
-  failedFilingSessions?: Array<{
-    sessionId: string;
-    subjectId: string;
-    topicId: string | null;
-    startedAt: string;
-  }>;
 }
 
 const NEVER = () => new Promise<never>(() => undefined);
@@ -282,9 +275,6 @@ function errorResponse(status = 503): Response {
  *   useUpdateSubject                    → PATCH /subjects/:id                → { subject }
  *   useDeleteSubject                    → DELETE /subjects/:id               → { deleted, subjectId }
  *   useProgressInventory                → GET /progress/inventory            → KnowledgeInventory
- *   useFailedFreeformLibraryFilingSessions
- *        → GET /progress/sessions?limit=50  → { sessions, nextCursor }
- *          then GET /sessions/:id            → { session } (LearningSession)
  */
 function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
   const subjectsBody = { subjects: opts.subjects ?? [] };
@@ -320,11 +310,6 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
   };
   const allBooksBody = opts.allBooks ?? { subjects: [] };
 
-  // Failed-filing detail: each session id resolves to a freeform,
-  // filing_failed LearningSession so the real hook surfaces it.
-  const failed = opts.failedFilingSessions ?? [];
-  const failedById = new Map(failed.map((s) => [s.sessionId, s]));
-
   const routes: Record<
     string,
     unknown | ((url: string, init?: RequestInit) => unknown | Promise<unknown>)
@@ -352,65 +337,12 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
       if (opts.fallbackSubjectsError) return errorResponse();
       return fallbackBody;
     },
-    '/progress/sessions': {
-      // Shape validated by childSessionsPageResponseSchema in the real hook.
-      sessions: failed.map((s) => ({
-        sessionId: s.sessionId,
-        subjectId: s.subjectId,
-        subjectName: 'Subject',
-        topicId: s.topicId,
-        topicTitle: null,
-        sessionType: 'learning',
-        startedAt: s.startedAt,
-        endedAt: null,
-        exchangeCount: 0,
-        escalationRung: 1,
-        durationSeconds: 0,
-        wallClockSeconds: 0,
-        displayTitle: 'Session',
-        displaySummary: null,
-        homeworkSummary: null,
-        highlight: null,
-        narrative: null,
-        conversationPrompt: null,
-        engagementSignal: null,
-        drills: [],
-      })),
-      nextCursor: null,
-    },
     '/progress/overview': opts.progressError
       ? () => errorResponse()
       : progressBody,
     '/progress/inventory': opts.inventoryLoading
       ? () => NEVER()
       : inventoryBody,
-    '/sessions/': (url: string) => {
-      const id = url.split('/sessions/')[1]?.split(/[?/]/)[0] ?? '';
-      const meta = failedById.get(id);
-      return {
-        session: {
-          id,
-          subjectId: meta?.subjectId ?? '22222222-2222-7222-8222-222222222222',
-          topicId: meta?.topicId ?? null,
-          sessionType: 'learning',
-          inputMode: 'text',
-          verificationType: null,
-          status: 'completed',
-          escalationRung: 1,
-          exchangeCount: 0,
-          startedAt: meta?.startedAt ?? '2026-05-25T10:00:00.000Z',
-          lastActivityAt: meta?.startedAt ?? '2026-05-25T10:00:00.000Z',
-          endedAt: null,
-          durationSeconds: 0,
-          wallClockSeconds: 0,
-          metadata: { effectiveMode: 'freeform' },
-          rawInput: null,
-          filedAt: null,
-          filingStatus: 'filing_failed',
-          filingRetryCount: 0,
-        },
-      };
-    },
     '/library/retention': retentionBody,
     '/library/books': opts.allBooksLoading
       ? () => NEVER()
@@ -834,81 +766,6 @@ describe('LibraryScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
-    });
-  });
-
-  describe('failed Library filing attention', () => {
-    const POPULATED: SubjectFixture[] = [
-      { id: 'sub-1', name: 'Math', status: 'active' },
-    ];
-
-    it('renders a small attention row and count when failed freeform Library additions exist', async () => {
-      active = mount({
-        subjects: POPULATED,
-        failedFilingSessions: [
-          {
-            sessionId: '11111111-1111-7111-8111-111111111111',
-            subjectId: '22222222-2222-7222-8222-222222222222',
-            topicId: null,
-            startedAt: '2026-05-25T10:00:00.000Z',
-          },
-          {
-            sessionId: '33333333-3333-7333-8333-333333333333',
-            subjectId: '22222222-2222-7222-8222-222222222222',
-            topicId: null,
-            startedAt: '2026-05-25T10:05:00.000Z',
-          },
-        ],
-      });
-
-      await waitFor(() => {
-        active!.result.getByTestId('library-filing-attention-row');
-      });
-      active.result.getByText('Topic placement needs attention');
-      expect(
-        active.result.getByTestId('library-filing-attention-count').props
-          .children,
-      ).toBe(2);
-    });
-
-    it('does not render the attention row when no failed freeform Library additions exist', async () => {
-      active = mount({ subjects: POPULATED });
-
-      await waitFor(() => {
-        active!.result.getByTestId('shelf-row-header-sub-1');
-      });
-      expect(
-        active.result.queryByTestId('library-filing-attention-row'),
-      ).toBeNull();
-    });
-
-    it('routes the attention row to the first failed session summary so retry is available', async () => {
-      active = mount({
-        subjects: POPULATED,
-        failedFilingSessions: [
-          {
-            sessionId: '11111111-1111-7111-8111-111111111111',
-            subjectId: '22222222-2222-7222-8222-222222222222',
-            topicId: null,
-            startedAt: '2026-05-25T10:00:00.000Z',
-          },
-        ],
-      });
-
-      await waitFor(() => {
-        active!.result.getByTestId('library-filing-attention-row');
-      });
-      fireEvent.press(
-        active.result.getByTestId('library-filing-attention-row'),
-      );
-
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/session-summary/[sessionId]',
-        params: {
-          sessionId: '11111111-1111-7111-8111-111111111111',
-          subjectId: '22222222-2222-7222-8222-222222222222',
-        },
-      });
     });
   });
 

@@ -1708,19 +1708,19 @@ describe('SessionSummaryScreen', () => {
       }
     });
 
-    it('renders Add to Library for a null below-threshold session', async () => {
+    it('does not offer Library filing for a 4-exchange freeform session', async () => {
       mockSessionData = makeFreeformSession({
-        exchangeCount: 1,
+        exchangeCount: 4,
         filingStatus: null,
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      const action = await screen.findByText('Add to Library');
-      await pressAsync(action);
-
+      await expect(screen.findByText('Add to Library')).rejects.toThrow();
+      expect(screen.queryByTestId('session-summary-library-filing')).toBeNull();
+      expect(screen.queryByText('Add to Library')).toBeNull();
       expect(fetchCallsMatching(mockFetch, '/library-filing/add')).toHaveLength(
-        1,
+        0,
       );
     });
 
