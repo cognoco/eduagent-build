@@ -38,9 +38,9 @@ fi
 # execution (the default) spawns simultaneous `node --stack-size=65536`
 # processes that exhaust process handles / memory → SIGKILL on large staged
 # sets, so Windows forces serial. macOS/Linux use the parallel default (a few
-# seconds faster). Windows is the primary dev platform (¾ of machines) — the
-# serial path must stay. husky runs under Git-Bash on Windows, so uname -s is
-# MINGW*/MSYS*/CYGWIN* there.
+# seconds faster). Windows (native + WSL) is an OS in active use — the serial
+# path must stay for it (see MMT-ADR-0019). husky runs under Git-Bash on
+# Windows, so uname -s is MINGW*/MSYS*/CYGWIN* there.
 case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) LINT_STAGED_CONCURRENCY="--concurrent false" ;;
   *) LINT_STAGED_CONCURRENCY="" ;;
