@@ -88,29 +88,52 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 ---
 
-## Emerging — candidate streams from the audit triage
+## Emerging — clear-out workstreams from the audit triage (firm @ Phase M)
 
-> **Provisional.** Counts/clusters below are from the **Phase K** reconciliation
-> (`docs/audit/2026-05-29-full-audit/RECONCILED.md`: 183 findings, 5 in
-> identity-scope, 166 routed out, 12 deferred). **Phase M is closing now**
-> (`…/M-triage-closure.md`, parallel session) and may merge/drop/re-cluster these.
-> **Do not firm these rows until Phase M lands** — then reconcile against
-> `M-triage-closure.md` + `L-gap-delta.md`. These are catalogued (not converted to
-> Cosmo) purely to convert the "166 unhomed findings" anxiety into a managed list.
+> **Firm from committed Phase M** (`docs/audit/2026-05-29-full-audit/M-triage-closure.md`,
+> 2026-06-09). Four-bucket triage of 183 findings → **bucket 1 = 0** (already handled,
+> demonstrated-empty), **bucket 2 = 49** (clear-in — these are **PRG-01's own
+> obligations, NOT emerging streams**), **bucket 3 = 125** (clear-out, named workstream
+> — *these are the emerging streams below*), **bucket 4 = 9** (defer; 7 no-owner, 2
+> architecture). Per-finding home is `L-gap-delta.md` (**do not** copy findings here).
+> Counts tallied from its `Defer-to-workstream` column (123 of 125 parsed cleanly; ~2
+> rows have embedded pipes — immaterial at this altitude).
+>
+> **`Activate-when` is being set by Phase N right now** (forked session `fb669557…`):
+> N.0 partitions bucket 3/4 into pull-forward-prerequisite vs deferred; N.1 sequences.
+> Until N lands, `activate-when = pending N.0`. `Blast-radius` (does PRG-01's clean-cut
+> rewrite this area?) is also an N input — provisional below.
 
-Each cluster's findings live in `docs/audit/2026-05-29-full-audit/L-gap-delta.md`
-(the backlog home — **do not** copy them here). `Blast-radius` = does PRG-01's
-clean-cut rewrite/delete this area? (inside → serialize behind execution; outside
-→ parallel-safe). Marked `TBD` until Phase M/O rules.
+### Substantial clusters
 
-| ID | Candidate stream | ~Findings (K) | Blast-radius vs PRG-01 | Activate-when |
+| ID | Clear-out workstream | Findings (bucket 3) | Blast-radius vs PRG-01 (prov.) | Activate-when |
 |---|---|---|---|---|
-| PRG-10 | security-pii-api | 61 | TBD | M/O names pull-forward, OR picked up |
-| PRG-11 | architecture | 42 | likely **inside** (TBD) | after execution unless M flags pull-forward |
-| PRG-12 | l10n-a11y-mobile | 35 | likely **outside** → parallel-safe (TBD) | picked up |
-| PRG-13 | security-pii-inngest | 20 | TBD | M/O names pull-forward, OR picked up |
-| PRG-14 | agent-instructions | 16 | partial **inside** (overlaps PRG-03) | with PRG-03 / M ruling |
-| PRG-15 | errors-api | 9 | likely **outside** → parallel-safe (TBD) | picked up |
+| PRG-10 | security-pii-api | 27 | TBD (N) | pending N.0 partition |
+| PRG-11 | architecture | 24 | likely **inside** | pending N.0; likely behind execution |
+| PRG-12 | l10n-a11y-mobile | 33 | likely **outside** → parallel-safe | pending N.0; likely free |
+| PRG-13 | security-pii-inngest | 6 | TBD (N) | pending N.0 partition |
+| PRG-14 | agent-instructions | 10 | partial **inside** (overlaps PRG-03) | with PRG-03 / N ruling |
+| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | pending N.0; likely free |
+
+### PRG-16 · Singleton tail — ~15 single-finding labels, unnormalized
+One-finding "workstreams" with drifted/duplicative labels — `ci-cd-hardening` ≈
+`platform-security / ci-cd-hardening`; `platform-infra` ≈ `infrastructure /
+database-performance` ≈ `backend-performance`; `test-infrastructure` ≈
+`mobile-testing-infra`; plus `secrets-hygiene`, `reliability-and-correctness`,
+`navigation/audience-matrix`, `mobile-cache-data-fetching`, `learning-engine`,
+`content / curriculum data quality`, `billing-subscriptions`, `agent-infrastructure`.
+**Do not enshrine as 15 workstreams** — these are orphan findings the master plan (O)
+should merge into the substantial clusters or a catch-all. Tracked as one row pending
+N/O consolidation. `activate-when`: N/O normalization.
+
+**Carry-forward (from M):** F-113/114/116 → **PRG-14 (agent-instructions)** must dedupe
+against the `tech/*` skill-group (`tech/zod`, `tech/drizzle-atomicity`,
+`tech/neon-postgres`, `tech/gha-hardening`; commit `e4c23f0c8`) before building —
+coverage is partial, so *reduce-and-extend*, not build-from-scratch.
+
+**Note on bucket 2 (49 in-IF):** these carry domain tags too (security-pii-api 23,
+security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they are
+**PRG-01's acceptance criteria**, owned by the runway — not emerging rows.
 
 ---
 
@@ -169,3 +192,12 @@ PRG-10/12/13/15 (out-of-blast-radius findings)  ──▶  parallel-safe (throug
   move pending) + PRG-21 (learning-canon, no trigger) linked. Stream-2 extraction
   HELD: ROADMAP under concurrent M-triage edit; extraction is consolidate-then-
   repoint, not a clean cut.
+- **2026-06-09 — Stream-2 extracted + glossary resolved + emerging rows firmed from M.**
+  (1) Stream 2 moved to `stream-2-backlog.md`; PRG-20 repointed; runway ROADMAP left a
+  pointer + N.0 repointed (commit `1cc701d56`). (2) PRG-21 enriched (glossary bucket-2
+  = primary input) + proposed trigger; PRG-20 gains glossary bucket-3. (3) Emerging
+  section re-derived from committed Phase M (`M-triage-closure.md` + `L-gap-delta.md`
+  `Defer-to-workstream` tally): bucket 2 (49) = PRG-01 obligations (not emerging);
+  bucket 3 (125) clear-out = PRG-10–15 (6 substantial) + PRG-16 (singleton tail). All
+  `activate-when` deferred to Phase N (forked session `fb669557…`), which is setting the
+  pull-forward partition + sequencing now.
