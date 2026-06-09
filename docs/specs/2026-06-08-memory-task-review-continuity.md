@@ -269,6 +269,18 @@ Tier 1, FEEL → CORRECT order: **Flow 2 (log) → Flow 1 (opener)** (the opener
 
 ---
 
+## Forward direction — this queue as the Library front door (design-only, not tier-1 scope)
+
+A 2026-06-09 Library/Home restructure exploration (`project_library_home_subject_hub_direction`) converged on **inverting** the Library's model: the front door becomes a **single adaptive queue** ("your next thing, and the two after it") and the subject/book/topic tree is demoted to an **opt-in "explore" lens** organized by knowledge state. The unified relearn queue specced in Flow 3 is the **engine behind that front door** — surfacing it as primary navigation (plus a "resume in-progress" lane and a "study something new" lane) is the restructure's main lift, not a new ranking system.
+
+Two consequences worth recording here so Flow 3 is built front-door-ready:
+- **Reason tags become first-class, learner-facing copy.** EU-6 already requires neutral wording; a front-door queue actively *shows* why each item surfaced ("worth another look", "carry on where you left off"), so the server-side `reason` tag is the copy source, not just an internal classifier.
+- **The queue must degrade to a non-empty, motivating state.** A front door can't be blank. The honest-yield note (queue ≈ today's overdue list until RR-12) is exactly why the un-specced "study something new" lane matters: when nothing is overdue/flagged, the front door offers new learning rather than an empty list.
+
+Design-direction only; does not expand tier-1 scope. Flow 3 ships the engine; the front-door surfacing is a separate, later Library-restructure work item.
+
+---
+
 ## End-User Findings Map (2026-06-08)
 
 Adversarial pass from the learner's seat — where the engineering review didn't reach. The learner-felt value of this spec concentrates almost entirely in the Flow 1 opener (Flow 2 is invisible plumbing; Flow 3 is ~empty in production until RR-12), so the opener's failure modes carry the spec's emotional risk.
