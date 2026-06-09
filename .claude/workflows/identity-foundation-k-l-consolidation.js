@@ -85,6 +85,16 @@ const AUDIT_DIR = args?.auditDir || 'docs/audit/2026-05-29-full-audit/';
 // Round-2 actionable set ONLY. The handover is emphatic: everything else under .deepsec/ is
 // Round-1 history (WI-76…89, already remediated — "the #1 trap") or tooling exhaust. Do NOT widen.
 const DEEPSEC_DIR = args?.deepsecDir || '.deepsec/findings/';
+// Deterministic DeepSec coverage floor (round-4.2): the inline pre-step globs
+// `.deepsec/findings/**/*.md` and passes the count here. If set, a shortfall of represented
+// findings vs this count BLOCKS — DeepSec is the one source with a knowable file-level denominator.
+// Null → check skipped (no false block on a checkout where findings/ is absent).
+// Default 78 = the verified committed count of `.deepsec/findings/**/*.md` on this checkout. The
+// args.deepsecExpectedCount plumbing returned null on run wf_875e3fa8-4bf, so we pin the known floor
+// here. The singleton-backfill in the dedupe assembly guarantees every extracted DeepSec finding
+// becomes ≥1 row, so this floor passes by construction unless extraction itself dropped a file. A
+// run on a checkout WITHOUT .deepsec/findings/ must explicitly pass deepsecExpectedCount: null.
+const DEEPSEC_EXPECTED_COUNT = args?.deepsecExpectedCount ?? 78;
 const DRIFT_MAP_PATH = args?.driftMapPath || '_wip/identity-foundation/_research/drift-map.md';
 const DRIFT_SECTIONS = args?.driftMapSections || ['2.1', '2.2', '2.3', '2.4', '2.5', '2.6', '2.7'];
 // PROVISIONAL pre-J0 lens. POST-J0: pass args.scopeLensBriefPath = the graduated canonical surface.
@@ -143,7 +153,9 @@ const SOURCES = args?.sources || [
       'DEEPSEC SCOPE GUARD: extract ONLY the Round-2 open findings under .deepsec/findings/ ' +
       '(BUG/HIGH/HIGH_BUG/MEDIUM subdirs, ~78 items). IGNORE Round-1 history — anything referencing ' +
       'WI-76…89, the 236-finding total, the May-16 run, or deepsec-to-wi-map.md is ALREADY REMEDIATED; ' +
-      'do NOT extract it. If .deepsec/findings/ is absent on this checkout (gitignored; committed on ' +
+      'do NOT extract it. Set the source_path of each finding to the EXACT .deepsec/findings/<SEV>/<file>.md ' +
+      'it came from (this drives the deterministic file-level coverage check). ' +
+      'If .deepsec/findings/ is absent on this checkout (gitignored; committed on ' +
       'PR #625), extract nothing from deepsec and say so in completeness_note (it surfaces as a gap).' },
 ];
 
@@ -191,7 +203,8 @@ THE CANONICAL FINDING ROW (the K=L=M union schema — every finding becomes one 
 - scope_class           in-IF-scope | in-other-workstream | deferred           ← K.2
 - canonical_set_source  WHICH named brief member/ADR justifies the scope call (or "" → auto-flag) ← L + QA
 - in_scope              boolean (for the master plan)                          ← L
-- defer_to_workstream   populated iff deferred                                 ← L
+- target_workstream     the workstream that OWNS remediation — set for in-other-workstream;
+                        empty for in-IF-scope; for deferred only if a future owner is already known ← L
 - verify_status         confirmed | contested                                 ← QA
 - contest_note          the refuter's argument, iff contested
 
@@ -241,10 +254,16 @@ const COVERAGE_SCHEMA = {
     missing: {
       type: 'array',
       items: { type: 'object', additionalProperties: false,
-        required: ['title', 'verbatim_quote', 'why_missed'],
+        // A recovered miss carries its OWN source_path — it may have come from readPaths[1..] or a
+        // findings/ file, NOT readPaths[0]. Without it the quote-check opens the wrong file.
+        required: ['title', 'source_path', 'verbatim_quote', 'source_severity', 'normalized_priority', 'evidence_loc', 'why_missed'],
         properties: {
           title: { type: 'string', maxLength: 300 },
+          source_path: { type: 'string', maxLength: 300 },
           verbatim_quote: { type: 'string', maxLength: 1200 },
+          source_severity: { type: 'string', maxLength: 40 },
+          normalized_priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'unknown'] },
+          evidence_loc: { type: 'string', maxLength: 300 },
           why_missed: { type: 'string', maxLength: 400 },
         } },
     },
@@ -265,66 +284,58 @@ const INVENTORY_ROW_SCHEMA = {
     evidence_loc: { type: 'string', maxLength: 300 },
   },
 };
+// Compact, index-referenced plan (see the dedupe section for why). The agent does NOT re-emit
+// quotes/provenance — only routing for every idx + the few merge groups + the few contradictions.
+// Output is linear-small and bounded regardless of corpus size (the 64k-blowout fix).
 const DEDUPE_SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['rows', 'contradictions', 'merge_ledger'],
+  required: ['routing', 'merges', 'contradictions'],
   properties: {
-    rows: {
+    // Every raw finding's workstream, by idx. Exactly one entry per idx (omission drops a finding).
+    routing: {
       type: 'array',
       items: { type: 'object', additionalProperties: false,
-        required: ['finding_id', 'provenance', 'verbatim_quote', 'title', 'domain', 'workstream', 'source_severity', 'normalized_priority'],
+        required: ['idx', 'workstream'],
         properties: {
-          finding_id: { type: 'string', maxLength: 60 },
-          provenance: {
-            type: 'array',
-            items: { type: 'object', additionalProperties: false,
-              required: ['source_audit', 'source_finding_id', 'source_path', 'evidence_loc'],
-              properties: {
-                source_audit: { type: 'string', maxLength: 120 },
-                source_finding_id: { type: 'string', maxLength: 120 },
-                source_path: { type: 'string', maxLength: 300 }, // F1: carried through so the quote-check can open the file
-                evidence_loc: { type: 'string', maxLength: 300 },
-              } },
-          },
-          verbatim_quote: { type: 'array', items: { type: 'string', maxLength: 1200 } },
-          title: { type: 'string', maxLength: 300 },
-          domain: { type: 'string', maxLength: 120 },
+          idx: { type: 'integer' },
           workstream: { type: 'string', maxLength: 60 },
-          source_severity: { type: 'string', maxLength: 200 }, // join of merged sources' verbatim ratings
-          normalized_priority: { type: 'string', enum: ['P0', 'P1', 'P2', 'unknown'] }, // max across merged
         } },
     },
+    // Only ACTUAL duplicates (2+ findings asserting the SAME defect). Singletons are backfilled by
+    // the caller, so they must NOT appear here.
+    merges: {
+      type: 'array',
+      items: { type: 'object', additionalProperties: false,
+        required: ['member_indices', 'title', 'workstream', 'justification'],
+        properties: {
+          member_indices: { type: 'array', items: { type: 'integer' } }, // length >= 2
+          title: { type: 'string', maxLength: 200 },
+          workstream: { type: 'string', maxLength: 60 },
+          justification: { type: 'string', maxLength: 500 },
+        } },
+    },
+    // CONFLICTS (assert incompatible things) — NOT merged. Reference the conflicting findings by idx.
     contradictions: {
       type: 'array',
       items: { type: 'object', additionalProperties: false,
-        required: ['finding_ids', 'workstream', 'axis', 'note'],
+        required: ['member_indices', 'workstream', 'axis', 'note'],
         properties: {
-          finding_ids: { type: 'array', items: { type: 'string', maxLength: 60 } },
+          member_indices: { type: 'array', items: { type: 'integer' } },
           workstream: { type: 'string', maxLength: 60 },
           axis: { type: 'string', maxLength: 200 },
           note: { type: 'string', maxLength: 600 },
-        } },
-    },
-    merge_ledger: {
-      type: 'array',
-      items: { type: 'object', additionalProperties: false,
-        required: ['finding_id', 'merged_from', 'justification'],
-        properties: {
-          finding_id: { type: 'string', maxLength: 60 },
-          merged_from: { type: 'array', items: { type: 'string', maxLength: 120 } },
-          justification: { type: 'string', maxLength: 500 },
         } },
     },
   },
 };
 const CLASSIFY_SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['scope_class', 'canonical_set_source', 'in_scope', 'defer_to_workstream', 'rationale'],
+  required: ['scope_class', 'canonical_set_source', 'in_scope', 'target_workstream', 'rationale'],
   properties: {
     scope_class: { type: 'string', enum: ['in-IF-scope', 'in-other-workstream', 'deferred'] },
     canonical_set_source: { type: 'string', maxLength: 300 }, // "" if none → auto-flag
     in_scope: { type: 'boolean' },
-    defer_to_workstream: { type: 'string', maxLength: 60 },
+    target_workstream: { type: 'string', maxLength: 60 },
     rationale: { type: 'string', maxLength: 600 },
   },
 };
@@ -502,10 +513,11 @@ Try to REFUTE the claim — i.e. show the canon conclusion IS in fact supported 
 Set upheld=true only if the claim survives (the canon genuinely over-concluded). Default to
 upheld=false if the evidence is ambiguous.`,
         { label: `drift-refute:${pr.section}`, phase: 'DriftCheck', schema: DRIFT_VERDICT_SCHEMA, model: 'opus' },
-      ).then((v) => ({ ...pr, upheld: v?.upheld ?? false, refuter_argument: v?.argument || '' })),
+      // FAIL-CLOSED: a dead refuter KEEPS the premature-resolution claim for human review (upheld=true).
+      ).then((v) => ({ ...pr, upheld: v?.upheld ?? true, refuter_failed: !v, refuter_argument: v?.argument || '' })),
     ),
   );
-  return { live_defects: check?.live_defects || [], premature_resolutions: premature.filter(Boolean) };
+  return { live_defects: check?.live_defects || [], premature_resolutions: premature.filter(Boolean), driftCheckFailed: !check };
 })();
 
 // ── LANE A ① EXTRACT (pipeline: extract → per-source coverage critic) ─────────────────────────
@@ -539,15 +551,18 @@ describing anything ambiguous.`,
     agent(
       `${SHARED_PREAMBLE}
 
-TASK (coverage critic) — re-read sub-audit "${src.id}" at ${src.readPaths.join(', ')} and check
-whether the extraction below missed any finding. Return verdict=complete if nothing material was
-missed, else verdict=gaps with each missed finding (title + verbatim_quote + why it was missed).
-Be a skeptic: assume the extractor was lazy until you confirm otherwise.
+TASK (coverage critic) — re-read sub-audit "${src.id}" at ${src.readPaths.join(', ')}${src.alsoRead ? ` AND the findings under ${src.alsoRead}` : ''} and
+check whether the extraction below missed any finding. You MUST cover the SAME surface the extractor
+read (including any findings/ directory), not just the handover.${src.extraGuard ? `\n${src.extraGuard}` : ''}
+Return verdict=complete if nothing material was missed, else verdict=gaps; for each missed finding give
+title + the EXACT source_path it came from + verbatim_quote + source_severity + normalized_priority +
+evidence_loc + why_missed. Be a skeptic: assume the extractor was lazy until you confirm otherwise.
 
 EXTRACTION TO CHECK (titles + ids):
 ${JSON.stringify((extracted.findings || []).map((f) => ({ id: f.source_finding_id, title: f.title })), null, 0)}`,
       { label: `coverage:${src.id}`, phase: 'Coverage', schema: COVERAGE_SCHEMA, model: 'sonnet' },
-    ).then((cov) => ({ src, extracted, coverage: cov || { verdict: 'complete', missing: [] } })),
+    // FAIL-CLOSED: a dead coverage critic must NOT read as 'complete' (Finding round-3.1).
+    ).then((cov) => ({ src, extracted, coverage: cov || { verdict: 'gaps', missing: [], coverageFailed: true } })),
 );
 
 // Inventory side-lane — ONE class-row each (parallel; not a per-finding pipeline).
@@ -576,49 +591,111 @@ for (const r of perSource.filter(Boolean)) {
   (r.coverage?.missing || []).forEach((m, i) => {
     allRaw.push({
       source_finding_id: `${r.src.id}-critic-${i + 1}`,
-      source_path: r.src.readPaths[0],
+      source_path: m.source_path || r.src.readPaths[0], // the critic's real path, not a blind [0]
       title: m.title, verbatim_quote: m.verbatim_quote, domain: 'unknown',
-      source_severity: 'unknown', normalized_priority: 'unknown',
-      evidence_loc: r.src.readPaths[0], source_audit: r.src.sourceAudit,
+      source_severity: m.source_severity || 'unknown',
+      normalized_priority: m.normalized_priority || 'unknown',
+      evidence_loc: m.evidence_loc || r.src.readPaths[0], source_audit: r.src.sourceAudit,
     });
   });
 }
+// Stable integer index per raw finding — the compact dedupe plan references findings by idx.
+allRaw.forEach((f, i) => { f.idx = i; });
 
-// ── ② DEDUPE + CLUSTER (the one real barrier — needs all findings together) ───────────────────
+// ── ② DEDUPE + CLUSTER (compact index-referenced plan; rows hydrated deterministically below) ──
+// REWORKED 2026-06-09 (run wf_875e3fa8-4bf post-mortem): the original single agent emitted fully-
+// hydrated rows (provenance + verbatim_quote[] per finding) for the WHOLE corpus in one JSON. At
+// 211 raw findings that output exceeded the 64k output-token cap, the agent died, and the entire
+// classify lane was starved (only the 2 inventory rows survived). The agent now emits only a
+// COMPACT, index-referenced plan — workstream routing for every finding + the (few) merge groups +
+// the (few) contradictions. Rows are hydrated DETERMINISTICALLY in the caller from allRaw[idx], in
+// the spirit of the file's own rule ("tables are rendered deterministically; transcription is a QA
+// hole"). A singleton-backfill turns every unmerged finding into its own row, so nothing is
+// silently dropped — which also satisfies the DeepSec file-level floor by construction.
 const metaContext = await metaContextP; // F6: advisory hints + coverage oracle, ready before clustering
 phase('Dedupe');
+// Slim projection for the prompt — the agent routes/spots-dups on title+short-quote+domain; it does
+// NOT need (and must not re-emit) the full quotes, which stay in allRaw for deterministic hydration.
+const dedupInput = allRaw.map((f) => ({
+  idx: f.idx, source_audit: f.source_audit, title: f.title,
+  quote: (f.verbatim_quote || '').slice(0, 300), domain: f.domain,
+  source_severity: f.source_severity, normalized_priority: f.normalized_priority,
+}));
 const dedup = await agent(
   `${SHARED_PREAMBLE}
 
-TASK (K.1 cluster + dedupe) — you have the full flat list of raw findings across all sub-audits.
-Do THREE things and keep them distinct:
-1. CLUSTER each finding into one of the workstreams [${WORKSTREAMS.join(', ')}] (the count may
-   collapse to 5 if the two security workstreams merge, or grow to 7 if a finding fits none — if
-   none fits, assign workstream "unassigned" and say why in the merge_ledger).
-2. MERGE duplicates — when two+ findings assert the SAME defect, emit ONE row whose provenance[]
-   lists all sources and whose verbatim_quote[] keeps each source's quote. Record every merge in
-   merge_ledger with a justification.
-3. FLAG contradictions — when two findings CONFLICT (assert incompatible things), do NOT merge.
-   Emit both as separate rows and record the pair in contradictions[] with the axis of conflict.
-   This is K.5's raw material — never collapse a conflict into a merge.
-Assign each row a stable finding_id (e.g. "F-001"). For EACH provenance entry, carry source_path
-and evidence_loc through from the raw finding verbatim (the quote-check opens source_path — do not
-drop it). For source_severity, join the merged sources' verbatim ratings; for normalized_priority,
-take the HIGHEST across the merged set.
+TASK (K.1 route + dedupe) — you have the full flat list of raw findings, each with a stable integer
+"idx". Produce a COMPACT plan — do NOT re-emit quotes or provenance (the caller hydrates rows
+deterministically from idx). Do THREE things:
+1. ROUTE every finding to a workstream — emit one routing entry {idx, workstream} for EACH idx
+   below, workstream ∈ [${WORKSTREAMS.join(', ')}] (or "unassigned" if none fits). Every idx MUST
+   appear exactly once in routing — omitting an idx silently drops that finding.
+2. MERGE duplicates — when 2+ findings assert the SAME defect, emit ONE merges[] entry listing all
+   their member_indices (length ≥ 2) + a representative title + workstream + justification. Do NOT
+   list singletons here; the caller backfills every unmerged finding as its own row.
+3. FLAG contradictions — when findings CONFLICT (assert incompatible things), do NOT merge; record
+   their member_indices in contradictions[] with the axis of conflict. This is K.5's raw material —
+   never collapse a conflict into a merge.
 
-WORKSTREAM-DISCOVERY HINTS (advisory, from meta-outputs — NOT findings; use only to refine clustering):
+WORKSTREAM-DISCOVERY HINTS (advisory, from meta-outputs — NOT findings; use only to refine routing):
 ${JSON.stringify(metaContext.workstream_hints, null, 0)}
 
-RAW FINDINGS:
-${JSON.stringify(allRaw, null, 0)}`,
+RAW FINDINGS (idx-keyed):
+${JSON.stringify(dedupInput, null, 0)}`,
   { label: 'dedupe-cluster', phase: 'Dedupe', schema: DEDUPE_SCHEMA, model: 'opus' },
 );
 
-// Inventory rows enter classification pre-clustered (each is its own unique class — no dedupe).
-const dedupRows = (dedup?.rows || []);
+// ── Deterministic hydration: build canonical rows from the compact plan + allRaw. Every raw
+//    finding becomes ≥1 row (merged or singleton) — nothing is silently dropped. ────────────────
+const routeByIdx = new Map((dedup?.routing || []).map((r) => [r.idx, r.workstream]));
+const PRIO_ORDER = ['P0', 'P1', 'P2', 'unknown'];
+const hydrateMembers = (indices, wsHint) => {
+  const members = (indices || []).map((i) => allRaw[i]).filter(Boolean);
+  const normalized = members.map((m) => m.normalized_priority).filter(Boolean)
+    .sort((a, b) => PRIO_ORDER.indexOf(a) - PRIO_ORDER.indexOf(b))[0] || 'unknown';
+  return {
+    provenance: members.map((m) => ({
+      source_audit: m.source_audit, source_finding_id: m.source_finding_id,
+      source_path: m.source_path, evidence_loc: m.evidence_loc,
+    })),
+    verbatim_quote: members.map((m) => m.verbatim_quote),
+    workstream: wsHint || routeByIdx.get((indices || [])[0]) || 'unassigned',
+    source_severity: [...new Set(members.map((m) => m.source_severity).filter(Boolean))].join(' | ') || 'unknown',
+    normalized_priority: normalized,
+  };
+};
+const mergedIdxSet = new Set();
+const idxToFindingId = new Map();
+const mergeRows = (dedup?.merges || []).map((m, i) => {
+  const fid = `F-${String(i + 1).padStart(3, '0')}`;
+  (m.member_indices || []).forEach((idx) => { mergedIdxSet.add(idx); idxToFindingId.set(idx, fid); });
+  const head = allRaw[(m.member_indices || [])[0]] || {};
+  return { finding_id: fid, title: m.title || head.title || 'untitled', domain: head.domain || 'unknown',
+    ...hydrateMembers(m.member_indices, m.workstream) };
+});
+// Singleton backfill — every raw finding not in a merge becomes its own row (guarantees coverage).
+let singletonSeq = 0;
+const singletonRows = allRaw.filter((f) => !mergedIdxSet.has(f.idx)).map((f) => {
+  const fid = `F-${String(mergeRows.length + (++singletonSeq)).padStart(3, '0')}`;
+  idxToFindingId.set(f.idx, fid);
+  return { finding_id: fid, title: f.title, domain: f.domain || 'unknown', ...hydrateMembers([f.idx]) };
+});
+const dedupRows = [...mergeRows, ...singletonRows];
+// Translate the compact plan's idx-referenced ledger/contradictions back to finding_ids.
+const contradictionsOut = (dedup?.contradictions || []).map((c) => ({
+  finding_ids: [...new Set((c.member_indices || []).map((idx) => idxToFindingId.get(idx)).filter(Boolean))],
+  workstream: c.workstream, axis: c.axis, note: c.note,
+}));
+const mergeLedgerOut = (dedup?.merges || []).map((m, i) => ({
+  finding_id: `F-${String(i + 1).padStart(3, '0')}`,
+  merged_from: (m.member_indices || []).map((idx) => {
+    const f = allRaw[idx]; return f ? `${f.source_audit}::${f.source_finding_id}` : `idx-${idx}`;
+  }),
+  justification: m.justification,
+}));
 const classifyInput = [
   ...dedupRows,
-  ...inventoryRows.filter(Boolean).map((x, i) => ({
+  ...inventoryRows.filter((x) => x?.row).map((x, i) => ({
     finding_id: `INV-${i + 1}`,
     provenance: [{ source_audit: x.inv.sourceAudit, source_finding_id: x.inv.id,
       source_path: x.row?.source_path || x.inv.path, evidence_loc: x.row?.evidence_loc || x.inv.path }],
@@ -643,16 +720,19 @@ const classified = await pipeline(
 TASK (K.2 + L tagging) — classify ONE finding against the scope lens at ${SCOPE_LENS_BRIEF_PATH}.
 FINDING: ${JSON.stringify({ finding_id: row.finding_id, title: row.title, workstream: row.workstream, quote: row.verbatim_quote }, null, 0)}
 Decide scope_class:
-  - in-IF-scope        the finding is owned by the identity-foundation canonical surface → cite the
-                       SPECIFIC brief member (doc/ADR) that makes it in-scope in canonical_set_source.
-  - in-other-workstream it belongs to another workstream's remit → set defer_to_workstream.
-  - deferred           real but no workstream is ready to own it yet → set defer_to_workstream="".
+  - in-IF-scope        identity-foundation owns it → cite the SPECIFIC brief member (doc/ADR) in
+                       canonical_set_source; leave target_workstream="".
+  - in-other-workstream another workstream owns it → set target_workstream to that owner.
+  - deferred           real but no workstream is ready to own it yet → leave target_workstream=""
+                       UNLESS a future owner is already known, in which case name it.
 Set in_scope = (scope_class == "in-IF-scope"). If you cannot cite a specific brief member for an
 in-IF-scope call, leave canonical_set_source="" (it will be flagged). Give a one-paragraph rationale.`,
       { label: `classify:${row.finding_id}`, phase: 'Classify', schema: CLASSIFY_SCHEMA, model: 'sonnet' },
-    ).then((c) => ({ row, classification: c || { scope_class: 'deferred', canonical_set_source: '', in_scope: false, defer_to_workstream: '', rationale: 'agent returned null' } })),
+    // FAIL-CLOSED: a dead classifier is NOT a real 'deferred' decision (Finding round-3.3) — the
+    // fallback is flagged so the verify stage forces verify_status='contested'.
+    ).then((c) => ({ row, classification: c || { scope_class: 'deferred', canonical_set_source: '', in_scope: false, target_workstream: '', rationale: 'CLASSIFIER FAILED' }, classificationFailed: !c })),
   // Stage 2 — Adversarial refutation + provenance check, in parallel. FLAG, never auto-resolve.
-  ({ row, classification }) =>
+  ({ row, classification, classificationFailed }) =>
     parallel([
       // (a) scope skeptic — prompted to argue the OPPOSITE of the classifier (opus).
       () =>
@@ -683,20 +763,23 @@ Map provenance[i] ↔ verbatim_quote[i]. Set all_quotes_found=false and list any
           { label: `prov:${row.finding_id}`, phase: 'Verify', schema: PROVENANCE_SCHEMA, model: 'haiku' },
         ),
     ]).then(([refute, prov]) => {
+      // FAIL-CLOSED: parallel() yields null on a thrown thunk; agent() yields null on terminal
+      // failure. A null/failed verifier must CONTEST, never silently confirm.
       const noCite = classification.scope_class === 'in-IF-scope' && !classification.canonical_set_source;
-      const quoteMiss = prov && prov.all_quotes_found === false;
-      const scopeRefuted = refute && refute.refuted === true;
-      const contested = noCite || quoteMiss || scopeRefuted;
+      const quoteMiss = !prov || prov.all_quotes_found !== true;
+      const scopeRefuted = !refute || refute.refuted === true;
+      const contested = noCite || quoteMiss || scopeRefuted || classificationFailed;
       const notes = [];
-      if (scopeRefuted) notes.push(`scope-refuted(${refute.confidence}): ${refute.argument}`);
+      if (classificationFailed) notes.push('classifier-FAILED (fail-closed → contested)');
+      if (scopeRefuted) notes.push(refute ? `scope-refuted(${refute.confidence}): ${refute.argument}` : 'scope-verifier-FAILED (fail-closed → contested)');
       if (noCite) notes.push('no-canonical-citation for in-IF-scope call');
-      if (quoteMiss) notes.push(`quote-not-found: ${(prov.missing || []).join(' ; ')}`);
+      if (quoteMiss) notes.push(prov ? `quote-not-found: ${(prov.missing || []).join(' ; ')}` : 'provenance-verifier-FAILED (fail-closed → contested)');
       return {
         ...row,
         scope_class: classification.scope_class,
         canonical_set_source: classification.canonical_set_source,
         in_scope: classification.in_scope,
-        defer_to_workstream: classification.defer_to_workstream,
+        target_workstream: classification.target_workstream,
         rationale: classification.rationale,
         verify_status: contested ? 'contested' : 'confirmed',
         contest_note: contested ? notes.join(' | ') : '',
@@ -706,6 +789,9 @@ Map provenance[i] ↔ verbatim_quote[i]. Set all_quotes_found=false and list any
 
 // ── K.5 SIZING (consumes the contradiction inventory; produces K.6's input) ───────────────────
 phase('Sizing');
+// Round-4.1: the sizing universe is the ACTUAL clustered set (dedupe may add a 7th or "unassigned"),
+// not the original seed — otherwise a newly-discovered cluster is silently absent from K.6's input.
+const actualWorkstreams = [...new Set(classified.map((r) => r.workstream).filter(Boolean))];
 const sizing = await agent(
   `${SHARED_PREAMBLE}
 
@@ -714,12 +800,13 @@ actually resolving the contradictions within a workstream, NOT the light classif
 have). NOTE: this runs BEFORE the contested-row ruling (Gate 1); ruling a contested limb can dissolve
 a contradiction, so these counts are an UPPER-BOUND pre-gate read that the architect re-runs post-gate.
 For each
-of [${WORKSTREAMS.join(', ')}], give: contradiction_count (from the list below), effort_estimate on
+of [${actualWorkstreams.join(', ')}] (the ACTUAL clustered set — includes any 7th cluster or
+"unassigned"), give: contradiction_count (from the list below), effort_estimate on
 the session-count scale (XS<1, S=1-2, M=3-5, L=6-10, XL>10 sessions), canon_dependency
 (none|partial|blocking — does reconciling need canonical-set-building first?), readiness
 (has-partial-canon|from-scratch), and a one-paragraph note.
 
-CONTRADICTIONS: ${JSON.stringify(dedup?.contradictions || [], null, 0)}
+CONTRADICTIONS: ${JSON.stringify(contradictionsOut, null, 0)}
 ROW COUNTS BY WORKSTREAM: ${JSON.stringify(
     classified.reduce((acc, r) => { acc[r.workstream] = (acc[r.workstream] || 0) + 1; return acc; }, {}), null, 0)}`,
   { label: 'sizing', phase: 'Sizing', schema: SIZING_SCHEMA, model: 'opus' },
@@ -730,22 +817,51 @@ phase('Assemble');
 const drift = await driftLaneP;
 const contested = classified.filter((r) => r.verify_status === 'contested');
 
+// QA-failure sweep — any DEAD agent in a load-bearing lane BLOCKS finalization; it must never
+// degrade silently into a passing state. (Generalizes the round-3 fail-open findings.)
+const qaFailures = {
+  coverage_critic_failed: perSource.filter(Boolean).filter((r) => r.coverage?.coverageFailed).map((r) => r.src.id),
+  inventory_extraction_failed: inventoryRows.filter((x) => x && !x.row).length,
+  dedupe_failed: !dedup,
+  drift_check_failed: drift.driftCheckFailed === true,
+  // Round-4.2: deterministic DeepSec file-level coverage. Count distinct findings/ source_paths that
+  // made it into a row; if fewer than the pre-step's expected file count, BLOCK (one source row no
+  // longer satisfies DeepSec coverage). Skipped when the expected count was not supplied.
+  deepsec_coverage_shortfall: (() => {
+    if (DEEPSEC_EXPECTED_COUNT == null) return null;
+    const represented = new Set(
+      classified.flatMap((r) => (r.provenance || []).map((p) => p.source_path))
+        .filter((p) => p && p.includes('.deepsec/findings/'))).size;
+    return represented < DEEPSEC_EXPECTED_COUNT ? { expected: DEEPSEC_EXPECTED_COUNT, represented } : null;
+  })(),
+  meta_oracle_unavailable: (metaContext.meta_report_findings || []).length === 0, // advisory: weakens the oracle cross-check, does not block
+};
+const hasBlockingQaFailure =
+  qaFailures.coverage_critic_failed.length > 0 || qaFailures.inventory_extraction_failed > 0 ||
+  qaFailures.dedupe_failed || qaFailures.drift_check_failed || !!qaFailures.deepsec_coverage_shortfall;
+
 const qaDashboard = {
+  qa_failures: qaFailures,
   per_source: perSource.filter(Boolean).map((r) => ({
     source: r.src.id,
     extracted: r.extracted.extracted_count ?? (r.extracted.findings || []).length,
     coverage: r.coverage?.verdict,
+    coverage_failed: r.coverage?.coverageFailed === true,
     critic_recovered: (r.coverage?.missing || []).length,
   })),
-  inventory_rows: inventoryRows.filter(Boolean).length,
+  inventory_rows: inventoryRows.filter((x) => x?.row).length,
   total_rows: classified.length,
-  merged: (dedup?.merge_ledger || []).length,
-  contradictions: (dedup?.contradictions || []).length,
+  merged: mergeLedgerOut.length,
+  contradictions: contradictionsOut.length,
   contested: contested.length,
   contested_breakdown: {
-    scope_refuted: contested.filter((r) => /scope-refuted/.test(r.contest_note)).length,
+    scope_refuted: contested.filter((r) => /scope-refuted\(/.test(r.contest_note)).length,
     no_citation: contested.filter((r) => /no-canonical-citation/.test(r.contest_note)).length,
     quote_missing: contested.filter((r) => /quote-not-found/.test(r.contest_note)).length,
+    // fail-closed buckets so the breakdown sums to `contested` (Finding round-3.4):
+    scope_verifier_failed: contested.filter((r) => /scope-verifier-FAILED/.test(r.contest_note)).length,
+    provenance_verifier_failed: contested.filter((r) => /provenance-verifier-FAILED/.test(r.contest_note)).length,
+    classifier_failed: contested.filter((r) => /classifier-FAILED/.test(r.contest_note)).length,
   },
   drift_live_defects: drift.live_defects.length,
   drift_premature_upheld: drift.premature_resolutions.filter((p) => p.upheld).length,
@@ -787,9 +903,14 @@ ROWS (id, source, workstream): ${JSON.stringify(classified.map((r) => ({ id: r.f
   { label: 'coverage-critic', phase: 'Assemble', schema: FINAL_CRITIC_SCHEMA, model: 'opus' },
 );
 
-// F4: the completeness critic GATES finalization. A 'gaps' verdict means a source is
-// unrepresented or an oracle finding is unrecovered → caller must NOT write final files.
-const workflowStatus = finalCritic?.verdict === 'gaps' ? 'blocked_on_gaps' : 'complete';
+// FAIL-CLOSED finalization gate, tri-state (round-4.3). 'complete' requires an explicit 'complete'
+// verdict, no blocking QA-lane failure, AND the independent META-REPORT oracle to have run.
+// 'complete_without_oracle' = otherwise-clean but the oracle cross-check did not run (advisory loss,
+// not blocking). 'blocked_on_gaps' = a 'gaps' verdict / null critic / any dead load-bearing agent.
+const workflowStatus =
+  (finalCritic?.verdict === 'complete' && !hasBlockingQaFailure)
+    ? (qaFailures.meta_oracle_unavailable ? 'complete_without_oracle' : 'complete')
+    : 'blocked_on_gaps';
 
 // ── RETURN — the caller writes the two files, rendering tables deterministically from `rows`. ──
 // Caller responsibilities (documented so the structured source-of-truth is never re-typed by an LLM):
@@ -802,17 +923,21 @@ const workflowStatus = finalCritic?.verdict === 'gaps' ? 'blocked_on_gaps' : 'co
 //     · K.5 sizing table (from `sizing`) → the input the architect rules on at Gate 2 (K.6)
 //   L-gap-delta.md (Phase L):
 //     · one row per finding from `rows`, full tags (source_audit, source_finding_id, domain,
-//       classification, in_scope, defer_to_workstream, canonical_set_source) — the M/N/O input.
+//       classification, in_scope, target_workstream, canonical_set_source) — the M/N/O input.
 return {
-  // F4: caller MUST NOT write the final files if workflowStatus !== 'complete'. Resolve
-  // finalCritic.gaps (re-extract the unrepresented source / recover the missing oracle finding),
-  // then re-run (resumeFromRunId caches the unchanged prefix).
+  // FAIL-CLOSED: caller writes final files only when workflowStatus startsWith 'complete'.
+  //  · 'blocked_on_gaps'         → resolve finalCritic.gaps / qaFailures, then re-run
+  //                                 (resumeFromRunId caches the unchanged prefix).
+  //  · 'complete_without_oracle' → safe to write, but the independent META-REPORT cross-check did
+  //                                 NOT run; record the reduced-confidence caveat in the doc.
+  //  · 'complete'                → all completeness mechanisms ran.
   workflowStatus,
+  qaFailures, // dead-lane sweep; non-empty members explain a 'blocked_on_gaps' status
   outputPaths: { reconciled: OUTPUT_PATH, lDelta: L_DELTA_PATH },
   rows: classified,
-  inventoryRows: inventoryRows.filter(Boolean).map((x) => x.row),
-  contradictions: dedup?.contradictions || [],
-  mergeLedger: dedup?.merge_ledger || [],
+  inventoryRows: inventoryRows.filter((x) => x?.row).map((x) => x.row),
+  contradictions: contradictionsOut,
+  mergeLedger: mergeLedgerOut,
   drift,
   // F3: PRE-GATE — computed before the contested ruling; architect re-runs after Gate 1.
   pre_gate_sizing: sizing?.per_workstream || [],
