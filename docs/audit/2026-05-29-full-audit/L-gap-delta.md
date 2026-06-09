@@ -1,9 +1,11 @@
-# Unified Gap Delta — Identity-Foundation Phase L (GATE-1 FINALIZED)
+# Unified Gap Delta — Identity-Foundation Phase L (GATE-1 FINALIZED) + Phase M (FOUR-BUCKET TRIAGE)
 
-_Generated 2026-06-09 · one row per finding · 183 findings · derived from RECONCILED.md_
+_Generated 2026-06-09 (L) · Phase-M fold 2026-06-09 (hand-authored) · one row per finding · 183 findings · derived from RECONCILED.md_
 
 
 > Gate 1 closed. Every row carries a final **Disposition** (M-bucket seed: in-IF-scope / in-other-workstream / deferred), **Interim owner**, and **Blk** (execution-blocking-if-deferred → the N.0 pull-forward input).
+
+> **Phase M (2026-06-09) — four-bucket triage folded in below.** M maps every row to one of four buckets; the per-row `Disposition` column already encodes buckets 2/3/4 deterministically, so no per-row column was added. See the *Phase M — four-bucket triage outcome* section. Decision record: [`M-triage-closure.md`](M-triage-closure.md).
 
 
 ## Scope tally (M-bucket seed)
@@ -15,6 +17,23 @@ _Generated 2026-06-09 · one row per finding · 183 findings · derived from REC
 | deferred (no owner yet — M bucket 4) | 9 |
 | execution-blocking (N.0 pull-forward) | 11 |
 | contested | 0 |
+
+
+## Phase M — four-bucket triage outcome
+
+M sorts every finding into exactly one of four buckets. The `Disposition` column above is the seed; the mapping is deterministic, **plus** a bucket-1 carve-out determined by the Phase-M scan (evidence-gated: a finding is "already handled" only with `file:line` proof its fix shipped during identity-foundation phases A–J).
+
+| M bucket | Meaning | Mapping rule | Count |
+| --- | --- | --- | --- |
+| **1 — already handled in identity-foundation** | fix verifiably shipped in A–J; master plan carries nothing | bucket-1 scan promotions only | **0** |
+| **2 — clear-in for master plan** | model obligation; the rewrite must satisfy it (acceptance criterion) | `Disposition = in-IF-scope` | **49** |
+| **3 — clear-out for master plan (named workstream)** | real, but owned by another named workstream | `Disposition = in-other-workstream` | **125** |
+| **4 — defer (no mature workstream yet)** | no owner / workstream not ready | `Disposition = deferred` | **9** |
+| | | **Total** | **183** |
+
+> **Bucket 1 is empty — demonstrated, not asserted.** A–J produced canon, design, ADRs, and doc alignment, not code; every finding carries `Verify = confirmed` (still-live). The candidate doc/instruction-class findings were each checked against the current tree and none qualified: F-012 (warning still in `architecture.md:765,896`), F-037 (explicitly deferred at `CLAUDE.md:93`), F-041 (`_layout.tsx:122` is still `TabIcon` — citation un-fixed; J2 kept Profile Shapes current-state), F-036 (setting absent from repo `.claude/` — inconclusive, no positive A–J fix). F-113/114/116 ("no repo-local zod/drizzle/GHA skill") are likely *partially* covered by the independent tech-skill-group (commit `e4c23f0c8`, 2026-05-31) — **not** A–J work, so they stay bucket 3; the agent-instructions workstream should dedupe against that group rather than rebuild. Full evidence: [`M-triage-closure.md`](M-triage-closure.md).
+
+> **The 11 execution-blocking rows are a cross-cut on bucket 2, not a fifth bucket** — they feed the **N.0** Stream-2 pull-forward gate (see `gate1-closure.md` patch-now list).
 
 
 ## Full delta table
