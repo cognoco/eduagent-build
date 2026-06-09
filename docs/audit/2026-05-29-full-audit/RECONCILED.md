@@ -35,7 +35,7 @@ The primary L input. One row per consolidated finding. `Scope`/`In-IF`/`Target W
 
 | ID | Pri | Severity | Title | Scope | In-IF | Target WS | Canon cite | Verify |
 |---|---|---|---|---|---|---|---|---|
-| F-035 | P0 | CRITICAL | Plaintext Logfire secret-key pair embedded in .claude/settings.local.json | in-other-workstream |  | secrets-hygiene |  | confirmed |
+| F-035 | P0 | CRITICAL | Plaintext Logfire secret-key pair embedded in .claude/settings.local.json | in-other-workstream |  | secrets-hygiene |  | confirmed → **REMEDIATED 2026-06-09** (file cleaned + Logfire key rotated, operator-confirmed; rotated → historical-commit copies are dead keys, history-scrub optional). Closed. |
 | F-036 | P1 | HIGH | autoMemoryDirectory points at a different filesystem tree than the live repo | in-other-workstream |  | agent-infrastructure |  | contested |
 | F-037 | P1 | HIGH | CLAUDE.md and AGENTS.md diverge on skill paths and content beyond cosmetic differences | in-other-workstream |  | agent-instructions |  | contested |
 | F-038 | P2 | MEDIUM | Skill description: fields for code-review and thermo-nuclear-code-quality-review violate the repo's trigger-o… | in-other-workstream |  | agent-instructions |  | contested |
