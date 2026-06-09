@@ -4,9 +4,9 @@
 // that already pass through `t()`. Hardcoded English in JSX —
 // `<Text>Add child</Text>` or `<Text>{'Continue'}</Text>` — bypasses i18n
 // entirely and renders English to every locale. There was no guard against
-// this class until now (see CLAUDE.md → "Known gap").
+// this class until now (see AGENTS.md → "Known gap").
 //
-// Scope (deliberately narrow — matches the CLAUDE.md Phase 3 definition):
+// Scope (deliberately narrow — matches the AGENTS.md Phase 3 definition):
 //   1. JsxText nodes: the literal text between JSX tags
 //      (`<Text>Add child</Text>` → "Add child").
 //   2. JSX-children StringLiteral / NoSubstitutionTemplateLiteral nodes: a

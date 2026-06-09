@@ -55,9 +55,9 @@ pnpm exec lint-staged $LINT_STAGED_CONCURRENCY
 # SKIP_SKILLS in scripts/sync-skills.mjs) where direct edits are valid and
 # should not be auto-staged. Status messages go to stderr in this mode; stdout
 # is one repo-relative path per line.
-# (AGENTS.md <-> CLAUDE.md sync is intentionally not productionized in this
-# PR — see .claude/memory/project_agent_doc_and_memory_architecture_revisit.md
-# for the future work item.)
+# (AGENTS.md <-> CLAUDE.md no longer need syncing: as of WI-386 AGENTS.md is the
+# single source and CLAUDE.md is a thin `@AGENTS.md` pointer, so divergence is
+# structurally impossible — there is nothing to sync between them.)
 SYNC_CHANGES=$(node scripts/sync-skills.mjs --print-changed)
 if [ -n "$SYNC_CHANGES" ]; then
   echo "pre-commit: auto-staging sync-generated changes:"
@@ -67,7 +67,7 @@ fi
 
 # Eval-harness guard: prompt-touching files require an accompanying snapshot
 # diff. Without this, prompt drift ships silently (the eval harness only
-# catches it post-hoc on the next manual run). See CLAUDE.md "When changing
+# catches it post-hoc on the next manual run). See AGENTS.md "When changing
 # LLM prompts, run the eval harness".
 #
 # Triggers on staged changes to:
@@ -139,7 +139,7 @@ fi
 # new relative-path `jest.mock('./...')` / `jest.mock('../...')` unless the
 # factory follows Pattern A (spreads `jest.requireActual(<same path>)`), or
 # the line carries an on-line `gc1-allow: <reason>` escape hatch. See
-# CLAUDE.md → "No new internal jest.mock() (GC1 ratchet)" and
+# AGENTS.md → "No new internal jest.mock() (GC1 ratchet)" and
 # scripts/check-gc1-pattern-a.ts (the structural check that replaced the
 # previous textual-only grep — BUG-1051).
 STAGED_TESTS=$(git diff --cached --name-only --diff-filter=d -- '*.test.ts' '*.test.tsx')

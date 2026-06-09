@@ -2,7 +2,7 @@
 //
 // Walks the English source locale (apps/mobile/src/i18n/locales/en.json) and
 // fails CI on banned tone words in learner-visible strings. Banned set comes
-// from CLAUDE.md "feedback_positive_framing_no_struggle" and the Challenge
+// from AGENTS.md "feedback_positive_framing_no_struggle" and the Challenge
 // Round prompt at services/challenge-round/prompts.ts:27 — never use
 // "failed", "wrong", "incorrect", "struggle", "weak", "declining", etc.
 //
