@@ -30,7 +30,7 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | Surface class | Count / shape | Startup-loaded? | Primary owner | Default disposition |
 |---|---:|---|---|---|
 | Root agent doctrine | `AGENTS.md`, `CLAUDE.md` | Yes | `WI-386` | Converge: `AGENTS.md` source, `CLAUDE.md` adapter/import |
-| Memory index + active files | 89 active `.claude/memory/*.md` incl. `MEMORY.md` at inventory start; 82 after B1/B2 pruning | Yes for index; topic files by link/load | `WI-387` after `WI-531` | Prune aggressively after extraction |
+| Memory index + active files | 89 active `.claude/memory/*.md` incl. `MEMORY.md` at inventory start; 78 after B1/B2 pruning | Yes for index; topic files by link/load | `WI-387` after `WI-531` | Prune aggressively after extraction |
 | Memory archive | 29 `.claude/memory/_archive/*.md` | No unless linked | `WI-387` | Purge unless a live reason remains |
 | Claude commands | 23 `.claude/commands/my/*.md` | On command use | Harness/ZDX skills | Replace with skill or ZDX command stubs |
 | Master skills | 45 `.agents/skills/**/SKILL.md` | On skill use | Repo-local skill owners | Master source; classify as canonical / overlay / obsolete |
@@ -60,7 +60,7 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 |---|---|---|---|
 | B0 - already applied | Stale Phase-J fallout | Done in current QA stream | Removed live `Strictly 11+` memory; repointed stale routing memories; added `MMT-ADR-0018` pointer |
 | B1 - no-blocker tombstones | Active memories whose content is already duplicated by current `AGENTS.md`/skills/runbooks or says only "resolved/vaulted/tracked elsewhere" | Must verify no unique current fact | DONE 2026-06-09 for 3 files: deleted `feedback_emulator_issues_doc.md`, `feedback_no_suppression.md`, `feedback_precommit_typecheck.md`; removed index links |
-| B2 - only-home footguns | Expo Router bracket pathspecs, stash semantics, platform command traps, Notion query mode | Extract first | PARTIAL DONE 2026-06-09: commit/notion target homes already contained `feedback_git_pathspec_literal_brackets.md`, `feedback_git_stash_pop_kept.md`, `feedback_stash_untracked_protection.md`, and `feedback_notion_rest_for_queries.md`; deleted those memories and index links |
+| B2 - only-home footguns | Expo Router bracket pathspecs, stash semantics, platform/build/E2E command traps, Notion query mode | Extract first | PARTIAL DONE 2026-06-09: target homes already contained 8 footguns/pointers; deleted duplicate memories and index links; collapsed OTA implementation memory to docs pointer |
 | B3 - harness left-ratchet | Commit/pre-commit/pre-push/CI/manual review rules in memory and doctrine | Wait for owning substrate where named | `WI-531` extracts, then `WI-387` prunes |
 | B4 - agent-doc convergence | `AGENTS.md` / `CLAUDE.md` divergence | After `.agents -> .claude` transform and L2 rules placement | `WI-386` |
 | B5 - generated/runtime surfaces | `.claude/skills`, `.claude/commands`, workflows, hooks/settings | Do not edit generated copies directly unless declared skip | Skills/workflows normalized after B3/B4 |
@@ -124,7 +124,7 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | `feedback_audit_check_deleted_concepts.md` | Check whether apparent violations are deleted concepts | Review/audit skill | MOVE-OP; keep only if no better home | Review skill / Stream 2 |
 | `feedback_autonomous_speccing.md` | Decide small spec choices autonomously | User preference | KEEP if current | none |
 | `feedback_batch_pr_fixes.md` | Batch PR review fixes before push | PR/ship/fix-ci workflow | MOVE-OP or DELETE if superseded | `WI-398` |
-| `feedback_build_dedup.md` | Avoid duplicate EAS builds after merge | Build skill/runbook | MOVE-OP | build skill / `WI-455` |
+| `feedback_build_dedup.md` | Avoid duplicate EAS builds after merge | Build skill/runbook | DELETE - target home already in `.agents/skills/build/SKILL.md`; applied B2 2026-06-09 | done |
 | `feedback_comment_not_delete.md` | Comment out unreleased UI instead of deleting | User preference, scoped | VERIFY; keep only scoped to UI feature hiding | none |
 | `feedback_commit_skip_failing.md` | Classify pre-commit failures and skip unrelated files | Commit CORE | Presume obsolete; MOVE-OP only if CORE needs it | `WI-447`, `WI-450` |
 | `feedback_doppler_secrets.md` | All secrets via Doppler; mobile env sync | Secrets governance / AGENTS | VERIFY; REPOINT to current secrets model | Secrets governance |
@@ -132,8 +132,8 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | `feedback_e2e_cascade_root_cause.md` | Treat same-day Notion E2E cascades as one infra bug | E2E runbook / Notion skill | MOVE-OP | E2E runbook |
 | `feedback_e2e_never_skip.md` | Always run E2E after features | Validation policy | Presume obsolete as blanket rule; replace with change-class policy | `WI-456` |
 | `feedback_e2e_release_gate.md` | Release-blocking E2E loop | E2E runbook | MOVE-OP / REPOINT | E2E runbook |
-| `feedback_e2e_runbook.md` | Read E2E runbook before E2E/emulator work | E2E skill/runbook | REPOINT minimal pointer or DELETE if skill covers | E2E skill |
-| `feedback_eas_no_retry.md` | Never retry EAS build without dashboard/root cause | Build skill/runbook | MOVE-OP | build skill |
+| `feedback_e2e_runbook.md` | Read E2E runbook before E2E/emulator work | E2E skill/runbook | DELETE - target home already in `.agents/skills/e2e/SKILL.md` + `docs/E2Edocs/e2e-runbook.md`; applied B2 2026-06-09 | done |
+| `feedback_eas_no_retry.md` | Never retry EAS build without dashboard/root cause | Build skill/runbook | DELETE - target home already in `.agents/skills/build/SKILL.md`; applied B2 2026-06-09 | done |
 | `feedback_emulator_issues_doc.md` | Old emulator doc vaulted; runbook authoritative | none; runbook already exists | DELETE - applied B1 2026-06-09 | done |
 | `feedback_fast_iteration.md` | User rejects 60-min feedback loops | User preference / validation-scope contract | KEEP short; ensure not used to bypass gates | `WI-456` |
 | `feedback_git_pathspec_literal_brackets.md` | Use literal pathspec for Expo Router `[id]` files | Commit skill footguns / git runbook | DELETE - target home already in `.agents/skills/commit/SKILL.md` + `references/failure-recovery.md`; applied B2 2026-06-09 | done |
@@ -152,7 +152,7 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | `feedback_notion_resolution_recording.md` | Record resolution when closing Notion items | Notion/work-items skill | MOVE-OP | work-items skill |
 | `feedback_notion_rest_for_queries.md` | REST for exhaustive Notion queries | Notion skill | DELETE - target home already in `.agents/skills/notion/SKILL.md`; applied B2 2026-06-09 | done |
 | `feedback_nx_reset_before_commit.md` | Nx cache causes phantom lint failures | Nx cache work item / dev runbook | MOVE-OP or DELETE after fix | `WI-451` |
-| `feedback_ota_env_vars.md` | OTA env vars do not read `eas.json` profile env | Build/OTA runbook | MOVE-OP | build skill |
+| `feedback_ota_env_vars.md` | OTA env vars do not read `eas.json` profile env | `docs/deployment-and-secrets.md` + `.github/workflows/ci.yml` | DELETE - target homes already cover explicit OTA env vars; `project_eas_update_ota.md` collapsed to pointer; applied B2 2026-06-09 | done |
 | `feedback_partial_staging_stash.md` | Partial commits need stash trick | Commit CORE | Presume obsolete; extract only if still needed | `WI-447`, `WI-531` |
 | `feedback_persona_vs_role.md` | Use role resolver, not birth-year persona | Identity/current-code pointer | KEEP pointer for now | J1 handled |
 | `feedback_pr_required_checks.md` | Missing PR checks can be branch-protection drift | PR/CI protocol | MOVE-OP | `WI-398`, `WI-452` |
@@ -188,8 +188,8 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | `project_commit_skill_drift.md` | Commit skill drift and sync skip | Commit CORE/adoption state | MOVE-OP then DELETE/REPOINT | `WI-447`, `WI-388` |
 | `project_deploy_safety.md` | Deploy uses migrations, not push | Deploy docs | REPOINT/MOVE-OP | Deploy docs |
 | `project_dev_schema_drift_trap.md` | Dev schema drift fix path | DB runbook | MOVE-OP/REPOINT | DB docs |
-| `project_eas_build.md` | EAS build config/issues | Build skill/runbook | MOVE-OP/REPOINT | build skill |
-| `project_eas_update_ota.md` | OTA implemented and operational notes | Build/OTA docs | VERIFY then REPOINT/MOVE-OP | build skill |
+| `project_eas_build.md` | EAS build config/issues | Build skill/runbook | REPOINT/PARTIAL - deleted `feedback_eas_no_retry.md`; memory now points no-retry/duplicate-build rules to `.agents/skills/build/SKILL.md`; broader EAS facts still need build-doc consolidation | build skill / Stream 2 |
+| `project_eas_update_ota.md` | OTA implemented and operational notes | `docs/deployment-and-secrets.md` + `.github/workflows/ci.yml` | REPOINT - applied B2 2026-06-09; memory now pointer-only and preserves manual-OTA user guard pointer | done |
 | `project_enduser_session_pass.md` | Live end-user LLM quality gate | LLM eval runbook | MOVE-OP/REPOINT | LLM eval docs |
 | `project_eval_llm_harness.md` | Eval-LLM harness details | Eval docs/runbook | MOVE-OP/REPOINT | LLM eval docs |
 | `project_eval_llm_signal_metrics.md` | Signal distribution regression guard | Eval docs/CI roster | MOVE-OP/REPOINT | `WI-452` |
@@ -202,7 +202,7 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | `project_language_assessments_production_first.md` | Language reviews must test production behavior | Product/LLM eval docs | PROMOTE/REPOINT | Stream 2 |
 | `project_language_pedagogy.md` | `four_strands` mode active | Product/learning canon | PROMOTE/REPOINT | Stream 2 |
 | `project_llm_source_provenance.md` | Private source provenance and audit rules | LLM architecture/eval docs | PROMOTE/REPOINT | LLM architecture |
-| `project_nx_expo_plugin_bug.md` | Nx Expo plugin stack overflow workaround | Dev runbook if still current | VERIFY; likely DELETE if stale | Dev infra |
+| `project_nx_expo_plugin_bug.md` | Nx Expo plugin stack overflow workaround | Dev runbook if still current | KEEP/REDUCE - still referenced by `scripts/pre-commit-tests.sh`; removed stale `--no-verify` workaround in B2 2026-06-09 | Dev infra |
 | `project_playwright_e2e_setup.md` | Playwright E2E commands and seed secret caveat | E2E runbook | MOVE-OP/REPOINT | E2E docs |
 | `project_product_roles_students_any_age.md` | Identity/audience role pointer | Identity canon + nav docs | KEEP as pointer for now | J1 handled |
 | `project_revenuecat_setup.md` | RevenueCat setup status | Billing/store tracker | VERIFY then REPOINT/DELETE | Billing/store |
@@ -245,11 +245,14 @@ From the tracker on 2026-06-09:
    `feedback_emulator_issues_doc.md`, `feedback_no_suppression.md`, and
    `feedback_precommit_typecheck.md` against current AGENTS/CLAUDE/runbook
    surfaces; removed the live memory files and index links.
-2. **B2 extraction prep - PARTIAL DONE 2026-06-09.** Verified the four candidate
-   footgun memories already had target homes in `.agents/skills/commit/SKILL.md`,
-   `.agents/skills/commit/references/failure-recovery.md`, and
-   `.agents/skills/notion/SKILL.md`; removed those duplicate memory files and
-   index links. Continue B2 for platform/build/E2E footguns.
+2. **B2 extraction prep - PARTIAL DONE 2026-06-09.** Verified eight candidate
+   footgun/pointer memories already had target homes in `.agents/skills/commit/SKILL.md`,
+   `.agents/skills/commit/references/failure-recovery.md`,
+   `.agents/skills/notion/SKILL.md`, `.agents/skills/build/SKILL.md`, and
+   `.agents/skills/e2e/SKILL.md`, plus OTA docs in `docs/deployment-and-secrets.md`
+   and `.github/workflows/ci.yml`; removed duplicate memory files and index
+   links. Collapsed `project_eas_update_ota.md` to a pointer. Continue B2 for
+   remaining platform/build/E2E footguns that are not already covered.
 3. **B3 harness cluster handoff.** Feed commit/pre-commit/pre-push memory rows to
    `WI-531`; do not broadly prune them in this stream before extraction.
 4. **B5 command/skill verification.** Diff `.claude/commands/my/*` against

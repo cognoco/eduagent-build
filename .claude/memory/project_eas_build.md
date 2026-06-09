@@ -23,6 +23,6 @@ EAS Build is the primary path for Android APK builds (alternative to WSL2 Gradle
 
 **Runtime version policy (2026-04-05):** Switched from `fingerprint` to `appVersion` policy. Fingerprint policy breaks in pnpm monorepo because `.pnpm` store paths differ between Windows and Linux (EAS). See `project_fingerprint_pnpm_mismatch.md` for full analysis.
 
-**Build status (2026-03-29):** `eas build` CLI reports "Build request failed" locally due to `@expo/fingerprint` ExpoConfigLoader failing (Unicode path issue with `c` in Windows username). BUT the build IS actually submitted to EAS servers — the error is misleading. See `feedback_eas_no_retry.md`.
+**Build status (2026-03-29):** `eas build` CLI reports "Build request failed" locally due to `@expo/fingerprint` ExpoConfigLoader failing (Unicode path issue with `c` in Windows username). BUT the build IS actually submitted to EAS servers — the error is misleading. Current no-retry and duplicate-build rules live in `.agents/skills/build/SKILL.md`.
 
 **How to apply:** When building APKs, use `npx eas build --platform android --profile preview`. Don't suggest WSL2 Gradle as first option — WSL2 is unreliable (hung completely 2026-03-27). If EAS build fails, check build logs at the Expo dashboard URL in the output.

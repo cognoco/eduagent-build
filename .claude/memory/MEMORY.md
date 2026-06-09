@@ -76,7 +76,6 @@
 - [feedback_doppler_secrets.md](feedback_doppler_secrets.md) — All secrets via Doppler. EXPO_PUBLIC vars synced via `pnpm env:sync`.
 - [doppler-secrets.md](doppler-secrets.md) — Test secret resolution: project `mentomate`, configs `dev/stg/prd`. `DATABASE_URL` and friends needed by `*.test.ts` files that include integration paths. Archon's validate/push wrap via `doppler run`.
 - [load-database-env-windows-hardcode.md](load-database-env-windows-hardcode.md) — `packages/test-utils/.../load-database-env.ts` hardcodes Windows Doppler path; macOS/Linux must use external `doppler run` wrap.
-- [feedback_ota_env_vars.md](feedback_ota_env_vars.md) — Manual OTA must set target env vars explicitly.
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`). Staging synced 2026-04-17.
 - [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.
 
@@ -120,8 +119,6 @@
 - [feedback_e2e_never_skip.md](feedback_e2e_never_skip.md) — Never skip E2E tests.
 - [feedback_e2e_release_gate.md](feedback_e2e_release_gate.md) — Release-blocking E2E means full suite, failure ledger, investigate each failure, fix real bugs or stale tests, repeat until green.
 - [feedback_batch_pr_fixes.md](feedback_batch_pr_fixes.md) — Batch PR fixes, validate locally, push once.
-- [feedback_eas_no_retry.md](feedback_eas_no_retry.md) — NEVER retry eas build without checking dashboard first.
-- [feedback_build_dedup.md](feedback_build_dedup.md) — After merge/build trigger, wait 3 min + check before triggering.
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
 - [feedback_verify_full_ci.md](feedback_verify_full_ci.md) — On CI failure, run full validation.
 - [feedback_pr_required_checks.md](feedback_pr_required_checks.md) — Missing required PR checks can be branch-protection/workflow-trigger drift; diagnose before changing product tests.
@@ -139,11 +136,10 @@
 - [nativewind-windows.md](nativewind-windows.md) — pnpm patchedDependencies + metro forceWriteFileSystem.
 - Template repo extraction plan — tracked in Notion (archived from memory 2026-05-04).
 - [feedback_notion_resolution_recording.md](feedback_notion_resolution_recording.md) — Record resolution on Done items. Never reopen.
-- [feedback_e2e_runbook.md](feedback_e2e_runbook.md) — Read `docs/E2Edocs/e2e-runbook.md` (OS-aware) BEFORE any E2E/emulator/Maestro debugging.
 
 ## Custom Skills
 
-- `/e2e`, `/ship`, `/fix-ci`, `/dispatch`, `/notion`, `/build`, `/commit` — all operational. **`/e2e` OS-aware (macOS/Windows/Linux) since 2026-05-14**, default flow `app-launch-devclient.yaml` — see `feedback_e2e_runbook.md`.
+- `/e2e`, `/ship`, `/fix-ci`, `/dispatch`, `/notion`, `/build`, `/commit` — all operational. **`/e2e` OS-aware (macOS/Windows/Linux) since 2026-05-14**, default flow `app-launch-devclient.yaml` — see `.agents/skills/e2e/SKILL.md`.
 - Husky pre-commit: `tsc --build` (incremental) + lint-staged + surgical tests
 
 ## Cross-Project Assets
