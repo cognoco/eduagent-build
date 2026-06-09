@@ -37,18 +37,23 @@ scripts/check-change-class.sh --branch     # check all changes vs main
 | **eval-harness** | `apps/api/eval-llm/**` (non-snapshots) | `eval:llm` | — | |
 | **test-infra** | `packages/test-utils/**`, `packages/factory/**` | `test:api:unit`, `test:mobile:unit` | `test:api:integration` | |
 
-## What the Pre-Commit Hook Already Covers
+## What the Commit / Push Hooks Already Cover
 
-The hook (`scripts/pre-commit-tests.sh` + `.husky/pre-commit`) runs automatically:
+The **pre-commit** hook (`.husky/pre-commit`) runs cheap, staged-only guards:
 
 - **lint-staged** — ESLint + Prettier on staged files
-- **tsc --build** — incremental typecheck (when `.ts/.tsx` staged)
-- **Surgical jest** — `--findRelatedTests` per project for staged files
+- **Secret / large-file scan** — blocks staged secret-pattern files (`.env*`, `.dev.vars`, `*.pem`, `*.key`, `credentials.json`, …) and >5 MB blobs
 - **Eval snapshot guard** — blocks commit if prompt files lack companion snapshots
 - **i18n staleness guard** — runs when `en.json` staged
 - **GC1 ratchet** — blocks new internal `jest.mock()` without `gc1-allow`
 
-**Not covered by pre-commit** (the change-class script catches these):
+The **pre-push** hook (`.husky/pre-push` → `scripts/pre-push-tests.sh`) is the local type/test gate, run on the push delta (working tree ≈ HEAD, so whole-tree checks are valid here):
+
+- **tsc --build** — incremental cross-file typecheck
+- **Surgical jest** — `--findRelatedTests` per project on the delta
+- **Tier-1 eval / i18n** — when prompt or i18n files are in the delta
+
+**Not covered by either hook** (the change-class script catches these):
 
 - Integration tests (`*.integration.test.*` are intentionally skipped)
 - Cross-package integration tests (`tests/integration/`)

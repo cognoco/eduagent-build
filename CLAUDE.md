@@ -242,7 +242,12 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 
 ## Required Validation
 
-Pre-commit and pre-push hooks enforce lint, typecheck, and surgical tests automatically. See `docs/change-classes.md` for what each hook covers. Focus on what hooks do NOT cover:
+Local hooks are fast feedback; **CI is the authoritative gate that protects `main`**. The checks are split by where each is valid:
+
+- **pre-commit** — cheap, staged-only guards: lint-staged (ESLint+Prettier), the eval-snapshot / i18n / GC1 structural guards, skills-sync, and a secret/large-file scan. It does **not** run whole-tree `tsc` or tests.
+- **pre-push** — the local type/test gate: `tsc --build` + surgical `--findRelatedTests` jest on the push delta (working tree ≈ HEAD there, so the check is valid), plus Tier-1 eval and i18n on the delta.
+
+See `docs/change-classes.md` for the per-hook coverage table. Focus on what hooks do NOT cover:
 
 - Run integration tests before any commit that touches `apps/api/` or `tests/integration/`: `pnpm exec nx test:integration api`. The pre-commit and pre-push hooks both intentionally skip `.integration.test.` files, so unit tests don't catch DB/auth-scoping/Inngest-flow regressions.
 - Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
