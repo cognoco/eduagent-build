@@ -73,7 +73,7 @@ export default function AccommodationScreen(): React.ReactElement {
   const fallbackHref =
     canEditChildPreferences && childProfileId
       ? (`/(app)/child/${childProfileId}?mode=settings` as Href)
-      : ('/(app)/more/learning-preferences' as Href);
+      : ('/(app)/more' as Href);
 
   const handleBack = useCallback(() => {
     goBackOrReplace(router, fallbackHref);

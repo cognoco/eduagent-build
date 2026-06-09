@@ -87,7 +87,6 @@ describe('getParentMetricTooltip', () => {
     ['sessions-this-week', 'Sessions this week'],
     ['engagement-trend', 'Engagement trend'],
     ['exchange-delta', 'Exchanges this week'],
-    ['guided-ratio', 'Guided practice'],
     ['streak-xp', 'Streak and XP'],
     ['review-status', 'Memory check'],
     ['milestone', 'Milestones'],

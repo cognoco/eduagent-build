@@ -296,15 +296,13 @@
     "active": "Aktywny",
     "accommodation": {
       "sectionHeader": "Twoje dostosowanie nauki",
-      "viewAndManage": "Wyświetl i zarządzaj",
       "notSureWhichToPick": "Nie wiesz, które wybrać?",
       "guideActive": "Aktywny",
       "childScreenTitle": "Preferencje nauki — {{name}}"
     },
     "learningPreferences": {
       "sectionHeader": "Twoja nauka",
-      "rowLabel": "Preferencje",
-      "screenTitle": "Preferencje nauki"
+      "rowLabel": "Preferencje"
     },
     "mentorMemory": {
       "sectionHeader": "Co wie Twój mentor"
@@ -919,7 +917,6 @@
       "prepareErrorMessage": "Nie można przygotować dyktanda. Spróbować ponownie?",
       "tryAgain": "Spróbuj ponownie",
       "title": "Sprawdź tekst",
-      "subtitleFromPhoto": "Popraw błędy ze zdjęcia, a następnie rozpocznij dyktando.",
       "subtitleManual": "Przejrzyj swój tekst, a następnie rozpocznij dyktando.",
       "inputPlaceholder": "Wpisz lub wklej tutaj swój tekst...",
       "inputLabel": "Tekst dyktanda",
@@ -1818,7 +1815,6 @@
       "manageMentorMemoryForChild": "Zarządzaj tym, co mentor pamięta o {{name}}",
       "profileDetails": "Szczegóły profilu",
       "childProfileJoined": "Dodano {{date}}",
-      "learningAccommodationTitle": "Dostosowanie nauki dla {{name}}",
       "noLearningPreferenceSet": "Nie ustawiono preferencji nauki",
       "consentTitle": "Zgoda",
       "consentDescription": "Zarządzaj zgodą rodzica dla {{name}}.",
@@ -1998,10 +1994,6 @@
       "exchangeDelta": {
         "title": "Wymiany wiadomości w tym tygodniu",
         "body": "Ile tur wiadomości miało miejsce w tym tygodniu w porównaniu z poprzednim. To prosty sygnał aktywności w nauce."
-      },
-      "guidedRatio": {
-        "title": "Ćwiczenia z prowadzeniem",
-        "body": "Udział odpowiedzi mentora, w których Twoje dziecko potrzebowało rozpisanego przykładu lub silniejszej wskazówki zamiast lekkiej podpowiedzi."
       },
       "streakXp": {
         "title": "Passa i XP",

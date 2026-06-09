@@ -271,15 +271,13 @@
     "active": "Aktiv",
     "accommodation": {
       "sectionHeader": "Deine Lernanpassung",
-      "viewAndManage": "Anzeigen & verwalten",
       "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
       "guideActive": "Aktiv",
       "childScreenTitle": "{{name}}s Lernpräferenzen"
     },
     "learningPreferences": {
       "sectionHeader": "Dein Lernen",
-      "rowLabel": "Präferenzen",
-      "screenTitle": "Lernpräferenzen"
+      "rowLabel": "Präferenzen"
     },
     "proxyPreview": {
       "title": "Einstellungen sind in der Elternvorschau gesperrt",
@@ -894,7 +892,6 @@
       "prepareErrorMessage": "Dein Diktat konnte nicht vorbereitet werden. Erneut versuchen?",
       "tryAgain": "Erneut versuchen",
       "title": "Text überprüfen",
-      "subtitleFromPhoto": "Korrigiere Fehler aus dem Foto und starte dann dein Diktat.",
       "subtitleManual": "Überprüfe deinen Text und starte dann dein Diktat.",
       "inputPlaceholder": "Gib deinen Text hier ein oder füge ihn ein...",
       "inputLabel": "Diktattext",
@@ -1793,7 +1790,6 @@
       "manageMentorMemoryForChild": "Verwalte, was der Mentor sich über {{name}} merkt",
       "profileDetails": "Profildetails",
       "childProfileJoined": "Hinzugefügt {{date}}",
-      "learningAccommodationTitle": "Lernanpassung für {{name}}",
       "noLearningPreferenceSet": "Keine Lernpräferenz festgelegt",
       "consentTitle": "Zustimmung",
       "consentDescription": "Verwalte die elterliche Zustimmung für {{name}}.",
@@ -1973,10 +1969,6 @@
       "exchangeDelta": {
         "title": "Nachrichten diese Woche",
         "body": "Wie viele Nachrichten diese Woche im Vergleich zur Vorwoche ausgetauscht wurden. Ein einfaches Signal für die Lernaktivität."
-      },
-      "guidedRatio": {
-        "title": "Geführtes Üben",
-        "body": "Der Anteil der Mentor-Antworten, bei denen dein Kind ein ausgearbeitetes Beispiel oder mehr Anleitung statt nur einen kleinen Anstoß brauchte."
       },
       "streakXp": {
         "title": "Serie und XP",

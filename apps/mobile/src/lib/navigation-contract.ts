@@ -92,7 +92,6 @@ export interface NavigationGates {
   showProgressProfilePicker: boolean;
   showAccommodationChildEditor: boolean;
   showCelebrationsChildEditor: boolean;
-  showMentorMemoryChildConsent: boolean;
   showInlineStudyInvite: boolean;
   showLearnThisToo: boolean;
   progressScope: 'self' | 'children';
@@ -369,7 +368,6 @@ export function resolveNavigationContract(
     showProgressProfilePicker: childEditorGate,
     showAccommodationChildEditor: moreScreenChildEditorGate,
     showCelebrationsChildEditor: moreScreenChildEditorGate,
-    showMentorMemoryChildConsent: childEditorGate,
     showInlineStudyInvite: ownerRole && familyCapable && !context.isParentProxy,
     showLearnThisToo: learnThisTooGate,
     progressScope: familyShape ? 'children' : 'self',

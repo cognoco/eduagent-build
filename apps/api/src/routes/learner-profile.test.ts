@@ -4,8 +4,7 @@
 // Covers the four critical paths called out by the Epic 16 code review:
 // (1) cross-family parent cannot access another family's child (403)
 // (2) self delete-all triggers the hard-delete service and returns 200
-// (3) memory-enabled toggle persists via the service
-// (4) parent-only /:profileId/consent and /:profileId/item guards fire on
+// (3) parent-only /:profileId/consent and /:profileId/item guards fire on
 //     unauthorized access, and succeed only with a valid family link
 // ---------------------------------------------------------------------------
 
@@ -103,7 +102,6 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
 const mockGetOrCreateLearningProfile = jest.fn();
 const mockDeleteAllMemory = jest.fn();
 const mockDeleteMemoryItem = jest.fn();
-const mockToggleMemoryEnabled = jest.fn();
 const mockToggleMemoryCollection = jest.fn();
 const mockToggleMemoryInjection = jest.fn();
 const mockGrantMemoryConsent = jest.fn();
@@ -123,8 +121,6 @@ jest.mock(
         mockGetOrCreateLearningProfile(...args),
       deleteAllMemory: (...args: unknown[]) => mockDeleteAllMemory(...args),
       deleteMemoryItem: (...args: unknown[]) => mockDeleteMemoryItem(...args),
-      toggleMemoryEnabled: (...args: unknown[]) =>
-        mockToggleMemoryEnabled(...args),
       toggleMemoryCollection: (...args: unknown[]) =>
         mockToggleMemoryCollection(...args),
       toggleMemoryInjection: (...args: unknown[]) =>
@@ -216,7 +212,6 @@ describe('learner-profile routes', () => {
     mockGetOrCreateLearningProfile.mockResolvedValue(MINIMAL_PROFILE);
     mockDeleteAllMemory.mockResolvedValue(undefined);
     mockDeleteMemoryItem.mockResolvedValue(undefined);
-    mockToggleMemoryEnabled.mockResolvedValue(undefined);
     mockToggleMemoryCollection.mockResolvedValue(undefined);
     mockToggleMemoryInjection.mockResolvedValue(undefined);
     mockGrantMemoryConsent.mockResolvedValue(undefined);
@@ -280,21 +275,6 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(403);
       expect(mockDeleteMemoryItem).not.toHaveBeenCalled();
-    });
-
-    it('returns 403 on PATCH /learner-profile/:profileId/memory-enabled for another family', async () => {
-      const res = await app.request(
-        `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/memory-enabled`,
-        {
-          method: 'PATCH',
-          headers: PARENT_HEADERS,
-          body: JSON.stringify({ memoryEnabled: false }),
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(403);
-      expect(mockToggleMemoryEnabled).not.toHaveBeenCalled();
     });
 
     it('returns 403 on POST /learner-profile/:profileId/consent for another family', async () => {
@@ -418,26 +398,6 @@ describe('learner-profile routes', () => {
         'granted',
       );
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
-    });
-
-    it('calls toggleMemoryEnabled on PATCH /learner-profile/memory-enabled', async () => {
-      const res = await app.request(
-        '/v1/learner-profile/memory-enabled',
-        {
-          method: 'PATCH',
-          headers: PARENT_HEADERS,
-          body: JSON.stringify({ memoryEnabled: false }),
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(200);
-      expect(mockToggleMemoryEnabled).toHaveBeenCalledWith(
-        expect.anything(),
-        PARENT_PROFILE_ID,
-        'test-account-id',
-        false,
-      );
     });
 
     it('calls deleteMemoryItem with suppress flag on DELETE /learner-profile/item', async () => {
@@ -616,23 +576,6 @@ describe('learner-profile routes', () => {
       expect(mockDeleteAllMemory).not.toHaveBeenCalled();
     });
 
-    it('[BREAK] PATCH /learner-profile/memory-enabled returns 403 for minor non-owner profile', async () => {
-      const res = await app.request(
-        '/v1/learner-profile/memory-enabled',
-        {
-          method: 'PATCH',
-          headers: MINOR_NON_OWNER_HEADERS,
-          body: JSON.stringify({ memoryEnabled: false }),
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(403);
-      const body = await res.json();
-      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
-      expect(mockToggleMemoryEnabled).not.toHaveBeenCalled();
-    });
-
     it('[BREAK] PATCH /learner-profile/collection returns 403 for minor non-owner profile', async () => {
       const res = await app.request(
         '/v1/learner-profile/collection',
@@ -720,7 +663,6 @@ describe('learner-profile routes', () => {
       );
       mockDeleteAllMemory.mockResolvedValue(undefined);
       mockGrantMemoryConsent.mockResolvedValue(undefined);
-      mockToggleMemoryEnabled.mockResolvedValue(undefined);
       mockToggleMemoryCollection.mockResolvedValue(undefined);
       mockToggleMemoryInjection.mockResolvedValue(undefined);
     });
@@ -803,23 +745,6 @@ describe('learner-profile routes', () => {
       expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
       // Gate must block before service is called.
       expect(mockDeleteAllMemory).not.toHaveBeenCalled();
-    });
-
-    it('[BREAK] PATCH /learner-profile/memory-enabled returns 403 for minor non-owner profile', async () => {
-      const res = await app.request(
-        '/v1/learner-profile/memory-enabled',
-        {
-          method: 'PATCH',
-          headers: MINOR_NON_OWNER_HEADERS,
-          body: JSON.stringify({ memoryEnabled: false }),
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(403);
-      const body = await res.json();
-      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
-      expect(mockToggleMemoryEnabled).not.toHaveBeenCalled();
     });
 
     it('[BREAK] PATCH /learner-profile/collection returns 403 for minor non-owner profile', async () => {
@@ -909,7 +834,6 @@ describe('learner-profile routes', () => {
       );
       mockDeleteAllMemory.mockResolvedValue(undefined);
       mockGrantMemoryConsent.mockResolvedValue(undefined);
-      mockToggleMemoryEnabled.mockResolvedValue(undefined);
       mockToggleMemoryCollection.mockResolvedValue(undefined);
       mockToggleMemoryInjection.mockResolvedValue(undefined);
     });
