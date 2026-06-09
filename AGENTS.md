@@ -418,3 +418,14 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 ```
 
 Last updated: 2026-06-09
+
+<!-- BEGIN ZDX:project-rules (managed — source: zdx-marketplace cosmo plugin reference/project-rules-snippet.md; synced by the WI-448 PROP engine. Do not hand-edit inside these markers.) -->
+## Working a Cosmo Work Item
+
+When you pick up a Work Item (`WI-NN`):
+
+- **Claim it at the start** — `/cosmo:execute claim` (sets `Stage=Executing`, `Started`, claim props). Don't start substantive work on an unclaimed item.
+- **Finalize it when the work is committed and pushed** — `/cosmo:execute complete`. This self-gates on the mechanical DoD, then authors `Fixed In` (from the landed commit), the completion summary (lifecycle template: *What was done / What changed / Verification / Caveats / Follow-ups*), the `Stage=Reviewing` transition, and `Resolved`.
+- **Never hand-edit** a Work Item's `Stage` or `Fixed In`, and **never move an item to Reviewing without running `complete`** — it refuses to finalize an item missing its close-artifacts, so producing them is not optional.
+- Reviewing and closing are separate, deliberate gates (`/cosmo:review`), not part of execute.
+<!-- END ZDX:project-rules -->
