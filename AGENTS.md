@@ -365,6 +365,8 @@ Before declaring a PR ready to merge:
 3. Always read the Claude Code Review comment and triage its findings — the check colour does not surface them: `gh api repos/{owner}/{repo}/pulls/<number>/reviews` and `gh api repos/{owner}/{repo}/pulls/<number>/comments`. Fix MUST_FIX / SHOULD_FIX before merge.
 4. Never dismiss advisory findings just because the check is green — advisory means triage it yourself, not ignore it.
 
+A required check stuck on "Waiting for status to be reported" (never red, never green) is usually **workflow-trigger drift, not failing code** — the check is required in branch protection but its workflow only runs on `push`/`workflow_dispatch`, not `pull_request`. Fix the trigger (a small PR-only job that reports the required check name; guard deploy/build jobs with `github.event_name == 'push' || github.event_name == 'workflow_dispatch'` so PRs can't deploy), not the code. For a Playwright web-smoke failure, read `error-context.md` + the `0-trace.network` log before touching selectors: `net::ERR_FAILED`/CORS in the trace means fix the staging/API target, not the assertion.
+
 When rebasing PRs:
 
 - After rebase, always verify the PR diff.

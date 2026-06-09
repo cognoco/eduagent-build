@@ -78,3 +78,27 @@ candidate above, either:
 - the target canonical/operational home and the commit that moved the rule, or
 - an explicit decision that the memory was stale or left-ratchet material and
   should be deleted.
+
+---
+
+## WI-531 disposition table (executed 2026-06-09, Hex — Reviewing)
+
+Each candidate resolved to **EXTRACTED** (rule moved to a canonical home, with the commit), **COVERED** (home already exists, no move), **STALE** (left-ratchet / superseded — delete with no extraction), or **HOLD** (still load-bearing, no safe home yet — do not delete). WI-531 does **not** delete files; the rows below are the mechanical instruction set for WI-387.
+
+| Memory file | Disposition | Canonical home / reason | WI-387 action |
+|---|---|---|---|
+| `feedback_agents_commit_push` | **COVERED** | AGENTS.md § Git Commits (subagent-worktree rule) + `/zdx-core:commit` own-work-scope | delete |
+| `feedback_partial_staging_stash` | **STALE** | R1 fixed by WI-450/D1 — pre-commit is staged-only now, no whole-tree `tsc`/jest, so the stash trick is obsolete (its sibling stash memories were already deleted in B1) | delete |
+| `feedback_commit_skip_failing` | **COVERED** | `/zdx-core:commit` one-retry failure ladder (related → stop+report; unrelated → unstage+retry) | delete |
+| `feedback_nx_reset_before_commit` | **HOLD** | The `@nx/enforce-module-boundaries` eslint project-graph phantom — a **different** cache from WI-451's `.tsbuildinfo`/TS6305 typecheck fix, so NOT covered by it. Still a live debugging footgun. | **keep**; re-evaluate alongside WI-451 net-retirement after the WI-388 CI proof — extract to a CI-troubleshooting note or delete then |
+| `feedback_pr_required_checks` | **EXTRACTED** | → AGENTS.md § PR Review & CI Protocol (required-check-stuck = trigger drift; deploy-job event guard; Playwright trace-before-selector). Commit `<this WI>`. | delete |
+| `feedback_testing_no_mocks` | **COVERED** | AGENTS.md § Code Quality Guards (GC1 ratchet + GC6 + no-internal-mocks) | delete |
+| `feedback_e2e_never_skip` | **STALE** | Blanket never-skip superseded by the change-class E2E gate (E2E is routed, not blanket-manual); the don't-silently-skip honesty essence is in completion-honesty doctrine + the `/e2e` skill preflight | delete |
+| `feedback_e2e_release_gate` | **COVERED** | `.agents/skills/e2e/SKILL.md` § Failure Triage owns release E2E (infra-vs-real-bug, fix the right layer); the `/e2e` skill is the owning substrate | delete |
+| `project_commit_skill_drift` | **STALE** | Resolved by WI-388 — the commit skill is unified onto one master; `SKIP_SKILLS` is now **empty** (the comment names WI-388). The described drift no longer exists. | delete |
+| `project_ci_infrastructure` | **STALE** | Durable CI facts self-document in `ci.yml` + `docs/change-classes.md`; NX-Cloud-disconnect already noted; and its "Husky pre-commit runs `tsc --build`" claim is now **false** (WI-450 moved that to pre-push) — keeping it would misinform | delete |
+| `project_sync_script_extension` | **STALE** | The "generalize at N=3" premise is moot — WI-386's reference model retired `sync-agent-docs.mjs` (gone); only `sync-skills.mjs` remains, so there is no second doc-sync script to triple | delete |
+| `feedback_batch_pr_fixes` | **EXTRACTED** | → AGENTS.md § Required Validation ("run what CI runs / batch fixes into one validated push"). Commit `511e4aeac` (WI-455). | delete |
+| `feedback_verify_full_ci` | **EXTRACTED** | → AGENTS.md § Required Validation (same "run what CI runs" line, WITH the recovered ~30-min cost rationale). Commit `511e4aeac` (WI-455). | delete |
+
+**Outcome:** every pipeline-operating rule now has a non-memory home **except** the one **HOLD** (`feedback_nx_reset_before_commit`), which is explicitly tied to the in-flight WI-451 cache-net retirement (gated on the WI-388 CI proof). No rule is silently stranded. **WI-387 stays blocked-by WI-531 until it consumes this table**; when it runs it may delete all 12 `delete`-rows and must resolve the single HOLD (extract-or-delete) after the WI-388 proof lands.
