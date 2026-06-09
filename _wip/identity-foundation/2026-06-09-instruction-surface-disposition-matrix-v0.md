@@ -100,9 +100,10 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 
 | Surface | Current role | Likely home | Action | Blocker / owner |
 |---|---|---|---|---|
-| `.claude/workflows/identity-foundation-k-l-consolidation.js` | Active K-L consolidation workflow | Identity Foundation K/L control | KEEP while K/L in flight; archive with output when landed | Identity K/L |
-| `.claude/workflows/identity-foundation-k-l-consolidation.RUNBOOK.md` | Runbook for active K-L workflow | Identity K/L runbook or archive | KEEP while K/L in flight; move/link to `_wip` if durable | Identity K/L |
-| `.claude/workflows/identity-foundation-k-l-render.mjs` | Renderer for K-L output | Identity K/L tooling | KEEP while K/L in flight; archive after output lands | Identity K/L |
+| `.claude/workflows/identity-foundation-k-l-consolidation.js` | K-L consolidation workflow (**K/L landed 2026-06-09**) | Identity Foundation K/L control | **KEEP** — committed; reproduces the consolidation from corpus | Identity K/L |
+| `.claude/workflows/identity-foundation-k-l-consolidation.RUNBOOK.md` | Runbook (updated to the finalize/`--render-l` path, **tracked 2026-06-09**) | Identity K/L runbook | **KEEP** — current operating guide for the reproducible pipeline | Identity K/L |
+| `.claude/workflows/identity-foundation-k-l-render.mjs` | Renderer (owns the full pre/post-gate L column set) | Identity K/L tooling | **KEEP** — committed; `--render` (pre-gate) + `--render-l` (finalized) | Identity K/L |
+| `.claude/workflows/identity-foundation-gate1-finalize.mjs` | Deterministic Gate-1 finalize (applies `gate1-disposition.json`) | Identity K/L tooling | **KEEP** — committed; emits finalized L + K.5 reconciliation + closure | Identity K/L |
 | `audit-a-vs-b-track-*.js` | Older A-vs-B audit workflows | Historical audit trail | ARCHIVE after confirming outputs are captured | Identity Phase B/F history |
 | `full-codebase-review-15-lens.js` | Broad review workflow | Review skill / archive | VERIFY; likely MOVE-OP or ARCHIVE | Review skill |
 
