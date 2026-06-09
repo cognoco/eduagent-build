@@ -378,13 +378,27 @@ export function LearnerScreen({
         headline: quizDiscovery.title,
         onContinue: () => {
           markQuizDiscoveryHandled();
-          router.push({
-            pathname: '/(app)/quiz',
-            params: {
-              activityType: quizDiscovery.activityType,
-              ...returnParams,
-            },
-          } as Href);
+          // [QUIZ-16] capitals/guess_who carry no subject, so route straight to
+          // /quiz/launch — it honors the activityType route param and starts the
+          // round the card advertised. Pushing /quiz (the picker) dropped
+          // activityType and forced the learner to re-pick. Vocabulary rounds
+          // need a language subject the discovery card doesn't carry
+          // (generate-round throws VocabularyContextError without languageCode),
+          // so those still land on the picker to choose the subject.
+          router.push(
+            quizDiscovery.activityType === 'vocabulary'
+              ? ({
+                  pathname: '/(app)/quiz',
+                  params: { ...returnParams },
+                } as Href)
+              : ({
+                  pathname: '/(app)/quiz/launch',
+                  params: {
+                    activityType: quizDiscovery.activityType,
+                    ...returnParams,
+                  },
+                } as Href),
+          );
         },
       };
     }
