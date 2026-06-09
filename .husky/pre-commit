@@ -1,5 +1,39 @@
 #!/usr/bin/env sh
 set -e
+
+# Secret / large-file guard (WI-450 / gate-spec D3). Relocated out of the commit
+# skill into the hook so it runs for EVERY committer (human, agent, /commit, raw
+# git), not just when a skill chooses to scan. .gitignore is the primary control;
+# this is the backstop for files force-added (`git add -f`) or slipping a
+# gitignore gap. Path/extension-based and deterministic — no content scanning, so
+# no false positives. Genuine false positive: unstage, or `git commit --no-verify`.
+STAGED_ALL=$(git diff --cached --name-only --diff-filter=d)
+if [ -n "$STAGED_ALL" ]; then
+  SECRET_HITS=$(echo "$STAGED_ALL" \
+    | grep -E '(^|/)(\.env(\.|$)|\.dev\.vars$|\.env\.tokens$|credentials\.json$)|\.(pem|key|p8|p12|jks|mobileprovision)$' \
+    | grep -vE '(^|/)\.env\.example$' || true)
+  if [ -n "$SECRET_HITS" ]; then
+    echo ""
+    echo "pre-commit: refusing to commit likely secret/credential file(s):"
+    echo "$SECRET_HITS" | sed 's/^/  /'
+    echo ""
+    echo "These match secret patterns. Unstage them, or add to .gitignore."
+    echo "Genuine false positive: git commit --no-verify."
+    exit 1
+  fi
+  # Large-file guard — block staged blobs > 5 MB (accidental binaries / dumps).
+  echo "$STAGED_ALL" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    sz=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+    if [ "$sz" -gt 5242880 ]; then
+      echo ""
+      echo "pre-commit: staged file exceeds 5 MB ($((sz / 1048576)) MB): $f"
+      echo "Large binaries belong in Git LFS or .gitignore. Bypass: --no-verify."
+      exit 1
+    fi
+  done
+fi
+
 # --concurrent false: On Windows, parallel chunk execution (the default) runs 8
 # simultaneous `node --stack-size=65536` processes which exhausts process
 # handles / memory and causes SIGKILL on large staged sets. Serial execution is
@@ -105,14 +139,9 @@ if [ -n "$STAGED_TESTS" ]; then
   pnpm exec tsx scripts/check-gc1-pattern-a.ts || exit 1
 fi
 
-# Full project-reference type-check (incremental via composite tsconfig).
-# Emits .d.ts to dist/ (gitignored) + .tsbuildinfo (gitignored) for incremental caching.
-# Skip if no .ts/.tsx files are staged — docs/config-only commits need no tsc.
-STAGED_TS=$(git diff --cached --name-only --diff-filter=d -- '*.ts' '*.tsx')
-if [ -n "$STAGED_TS" ]; then
-  echo "pre-commit: running tsc --build (incremental)..."
-  pnpm exec tsc --build || exit 1
-fi
-
-# Surgical tests — only tests related to staged files (see scripts/pre-commit-tests.sh)
-bash scripts/pre-commit-tests.sh
+# Whole-tree `tsc --build` + surgical jest moved to pre-push (WI-450 / gate-spec
+# D1). At a partial commit the working tree != the index, so whole-tree type/test
+# checks are structurally wrong here (an unrelated in-progress file breaks an
+# otherwise-clean partial commit). They are valid at pre-push, where the working
+# tree ≈ HEAD — see .husky/pre-push -> scripts/pre-push-tests.sh. CI is the
+# authoritative backstop regardless.
