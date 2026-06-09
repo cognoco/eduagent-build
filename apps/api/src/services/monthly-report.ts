@@ -417,3 +417,27 @@ export async function markMonthlyReportViewed(
       ),
     );
 }
+
+// [LEARN-29] Self-view mark-viewed: the learner marks their OWN monthly report
+// read. Scoped on childProfileId = the active profile (the subject of the
+// report), mirroring getMonthlyReportForProfile — so a guessed/foreign reportId
+// updates nothing. Returns whether a row matched so the route can answer 404
+// instead of silently 404ing the client (the previous behaviour: the self
+// route did not exist at all, so every open POSTed into the void).
+export async function markMonthlyReportViewedForProfile(
+  db: Database,
+  profileId: string,
+  reportId: string,
+): Promise<boolean> {
+  const updated = await db
+    .update(monthlyReports)
+    .set({ viewedAt: new Date() })
+    .where(
+      and(
+        eq(monthlyReports.id, reportId),
+        eq(monthlyReports.childProfileId, profileId),
+      ),
+    )
+    .returning({ id: monthlyReports.id });
+  return updated.length > 0;
+}

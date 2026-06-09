@@ -280,3 +280,24 @@ export async function markWeeklyReportViewed(
       ),
     );
 }
+
+// [LEARN-29] Self-view mark-viewed for the learner's OWN weekly report. Scoped
+// on childProfileId = the active profile (mirrors getWeeklyReportForProfile), so
+// a foreign reportId matches nothing. Returns whether a row was updated.
+export async function markWeeklyReportViewedForProfile(
+  db: Database,
+  profileId: string,
+  reportId: string,
+): Promise<boolean> {
+  const updated = await db
+    .update(weeklyReports)
+    .set({ viewedAt: new Date() })
+    .where(
+      and(
+        eq(weeklyReports.id, reportId),
+        eq(weeklyReports.childProfileId, profileId),
+      ),
+    )
+    .returning({ id: weeklyReports.id });
+  return updated.length > 0;
+}
