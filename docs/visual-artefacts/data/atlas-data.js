@@ -1793,7 +1793,7 @@ globalThis.MENTOMATE_ATLAS_DATA = {
       risks: ['Green builds do not automatically mean production Neon migrations are applied.'],
       relatedBoards: ['delivery-quality'],
     }),
-    node('nx-cloud', 'Nx Cloud', 'delivery', 'Current', 'Remote caching/task distribution integration for CI performance.', {
+    node('nx-cloud', 'Nx Cloud', 'delivery', 'Dormant', 'DISCONNECTED 2026-06-01 (IID-792). Was a remote-cache integration; CI now uses GitHub Actions cache for .nx/cache. Distributed task execution was never enabled.', {
       inbound: ['github-actions'],
       dataTouched: ['build cache metadata'],
       repoPaths: ['nx.json', '.github/workflows/ci.yml'],
