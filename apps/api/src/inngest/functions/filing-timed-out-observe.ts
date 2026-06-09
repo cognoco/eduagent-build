@@ -261,38 +261,52 @@ export const filingTimedOutObserve = inngest.createFunction(
         { sessionId, profileId },
       );
 
-      // [H-2] Wrap parse + sendEvent inside step.run so that a Zod parse error
-      // is contained within the step rather than escaping as a function-level
-      // throw that would trigger a full function retry. The CAS guard already
-      // fired and mark-failed returned 0 rows — retrying from scratch would
-      // re-enter this same branch and re-emit indefinitely. [CR-FIL-RACE-01]
+      // [H-2 / INNGEST-NESTED-STEP] Re-read the row inside one `step.run` that
+      // returns only data — NO step tooling is invoked inside it. Inngest's
+      // step tools (`step.sendEvent`, `step.run`, ...) must run at the top
+      // level of the function body; calling `step.sendEvent` inside a
+      // `step.run` callback throws a nesting error on the real executor. The
+      // earlier [H-2] revision nested the send inside this run step (and
+      // reused the same step id), which would throw whenever the CAS no-op
+      // branch was hit. Here the re-read step returns `{ shouldEmit }` and the
+      // dispatch is hoisted to the function-body level below.
       //
-      // [line-243] Re-read the row inside this step to confirm the session is
-      // genuinely in filing_recovered before emitting 'filing.recovered_after_window'.
-      // The CAS no-op could also occur if the row was deleted or transitioned to
-      // some other terminal state — emitting 'recovered_after_window' in those
-      // cases would be incorrect.
-      await step.run('emit-resolved-recovered-after-window', async () => {
-        const db = getStepDatabase();
-        const currentRow = await db.query.learningSessions.findFirst({
-          where: and(
-            eq(learningSessions.id, sessionId),
-            eq(learningSessions.profileId, profileId),
-          ),
-        });
+      // [line-243] The CAS no-op could also occur if the row was deleted or
+      // transitioned to some other terminal state — only emit
+      // 'recovered_after_window' when the row is genuinely filing_recovered.
+      const recoveredAfterWindow = await step.run(
+        're-read-recovered-after-window',
+        async () => {
+          const db = getStepDatabase();
+          const currentRow = await db.query.learningSessions.findFirst({
+            where: and(
+              eq(learningSessions.id, sessionId),
+              eq(learningSessions.profileId, profileId),
+            ),
+          });
 
-        if (currentRow?.filingStatus !== 'filing_recovered') {
-          logger.warn(
-            '[filing-timed-out-observe] CAS no-op but row is not filing_recovered — skipping recovered_after_window emit',
-            {
-              sessionId,
-              profileId,
-              filingStatus: currentRow?.filingStatus ?? 'row_missing',
-            },
-          );
-          return { emitted: false, reason: 'not_recovered' };
-        }
+          if (currentRow?.filingStatus !== 'filing_recovered') {
+            logger.warn(
+              '[filing-timed-out-observe] CAS no-op but row is not filing_recovered — skipping recovered_after_window emit',
+              {
+                sessionId,
+                profileId,
+                filingStatus: currentRow?.filingStatus ?? 'row_missing',
+              },
+            );
+            return { shouldEmit: false, reason: 'not_recovered' as const };
+          }
 
+          return { shouldEmit: true, reason: 'recovered' as const };
+        },
+      );
+
+      if (recoveredAfterWindow.shouldEmit) {
+        // The payload is fixed/deterministic, so a Zod parse throw here cannot
+        // loop forever — Inngest would retry the whole function but the CAS
+        // re-read above is replay-stable (memoized) and the parse input never
+        // changes. Wrap the parse defensively so a malformed schema surfaces
+        // via Sentry rather than escaping as an opaque function failure.
         try {
           const payload = filingResolvedEventSchema.parse({
             sessionId,
@@ -304,22 +318,20 @@ export const filingTimedOutObserve = inngest.createFunction(
             name: 'app/session.filing_resolved',
             data: payload,
           });
-          return { emitted: true };
         } catch (parseErr) {
           captureException(parseErr as Error, {
             profileId,
             extra: {
               sessionId,
-              hint: 'filingResolvedEventSchema parse failed in recovered_after_window step',
+              hint: 'filingResolvedEventSchema parse failed in recovered_after_window emit',
             },
           });
           logger.warn(
             '[filing-timed-out-observe] filingResolvedEventSchema parse failed — recovered_after_window event not emitted',
             { sessionId, profileId },
           );
-          return { emitted: false, reason: 'parse_error' };
         }
-      });
+      }
 
       return { resolution: 'recovered_after_window' as const, snapshot };
     }

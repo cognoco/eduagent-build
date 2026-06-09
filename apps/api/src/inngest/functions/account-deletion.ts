@@ -7,6 +7,10 @@ import {
   getAccountClerkUserId,
 } from '../../services/deletion';
 import { deleteClerkUser } from '../../services/clerk-user';
+import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
+
+const logger = createLogger();
 
 export const scheduledDeletion = inngest.createFunction(
   {
@@ -20,6 +24,55 @@ export const scheduledDeletion = inngest.createFunction(
     // can deduplicate them.
     idempotency: 'event.data.accountId',
     concurrency: { key: 'event.data.accountId', limit: 1 },
+    // [INNGEST-DELETION-ONFAILURE] GDPR Art 17 erasure-completeness guard.
+    // Inngest calls onFailure once, after all `retries` are exhausted. Without
+    // it, a terminally-failed run (sustained Clerk outage, persistent non-404
+    // 5xx, missing CLERK_SECRET_KEY) can leave the DB cascade complete but the
+    // external Clerk login identity (email/credentials/OAuth) alive, with no
+    // queryable, GDPR-relevant terminal signal — only a generic dashboard
+    // failure. This handler escalates to Sentry with a dedicated surface tag so
+    // ops can query "how many erasures terminally failed?" and recover the
+    // half-completed deletion manually. Mirrors the terminal-failure handlers on
+    // auto-file-session.ts and topic-probe-extract.ts.
+    onFailure: async ({
+      event,
+      error,
+    }: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => {
+      const accountId =
+        (event.data.event?.data as { accountId?: string } | undefined)
+          ?.accountId ?? null;
+
+      logger.error('account_deletion.terminal_failure', {
+        event: 'account_deletion.terminal_failure',
+        accountId,
+        runId: event.data.run_id ?? null,
+        reason: 'handler_retries_exhausted',
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+
+      captureException(
+        error instanceof Error
+          ? error
+          : new Error(
+              `scheduled-account-deletion: all retries exhausted${
+                accountId ? ` for account ${accountId}` : ''
+              }`,
+            ),
+        {
+          extra: {
+            surface: 'account-deletion.terminal_failure',
+            accountId,
+            runId: event.data.run_id ?? null,
+            hint: 'DB cascade may have completed while the Clerk login identity (email/credentials/OAuth) survives — GDPR Art 17 erasure half-completed. Inspect the Inngest run to determine which step failed and finish the erasure manually.',
+          },
+        },
+      );
+
+      return { status: 'terminal_failure', accountId };
+    },
   },
   { event: 'app/account.deletion-scheduled' },
   async ({ event, step }) => {

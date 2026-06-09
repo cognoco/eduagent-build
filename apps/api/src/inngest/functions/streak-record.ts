@@ -9,6 +9,14 @@ export const streakRecord = inngest.createFunction(
     id: 'streak-record',
     name: 'Durable streak activity recording',
     retries: 3,
+    // [INNGEST-IDEMPOTENCY] Defence-in-depth: a cron re-fire or operator replay
+    // can deliver the same (profileId, date) twice. recordSessionActivity is
+    // already date-keyed/idempotent at the data layer, but an explicit
+    // function-level key dedups duplicate events within the Inngest runtime
+    // before the handler runs, matching the rest of the codebase's
+    // defence-in-depth posture (review-due-send, recall-nudge-send,
+    // dailySnapshotRefresh).
+    idempotency: 'event.data.profileId + "-" + event.data.date',
   },
   { event: 'app/streak.record' },
   async ({ event, step }) => {

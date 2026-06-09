@@ -280,6 +280,11 @@ describe('transcriptPurgeHandler', () => {
     mockGetStepVoyageApiKey.mockReturnValue('voyage-key');
   });
 
+  it('[INNGEST-IDEMPOTENCY] declares idempotency keyed on sessionSummaryId', () => {
+    const opts = (transcriptPurgeHandler as any).opts;
+    expect(opts.idempotency).toBe('event.data.sessionSummaryId');
+  });
+
   it('emits app/session.transcript.purged on a successful purge', async () => {
     mockPurgeSessionTranscript.mockResolvedValue({
       status: 'purged',
