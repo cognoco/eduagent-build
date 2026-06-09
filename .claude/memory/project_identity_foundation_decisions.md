@@ -16,6 +16,7 @@ not here.
 - `docs/adr/MMT-ADR-0014` — router runtime (3-param) ⟂ vetting (4-axis, offline); fail-closed; separately-routable tutor/judge roles.
 - `docs/adr/MMT-ADR-0015` — pre-baseline data-model amendments.
 - `docs/adr/MMT-ADR-0016` — safety/judge architecture (no app-owned denylist; vendor-independent, non-reasoning judge).
+- `docs/adr/MMT-ADR-0018` — all LLM calls route through the single orchestrator (`routeAndCall()`).
 
 **Live data (not canon, DB-bound):** `docs/registers/llm-models/` — vetted model master + per-change vetting trail. Procedure: `docs/runbooks/llm-model-vetting.md`.
 
