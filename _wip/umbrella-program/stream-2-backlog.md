@@ -141,11 +141,13 @@ coverage requirement without that category error, every one of the 134 is accoun
 | **Bucket-4 deferred (Population C)** | 9 | mixed (hygiene/test/doc) | **DEFER** (no mature workstream) |
 | **Total** | **134** | | pull-forward subset = **0** |
 
-> **⚑ Live-exposure flag — F-035.** `F-035` (plaintext Logfire secret-key pair in
-> `.claude/settings.local.json`, → `secrets-hygiene`) is **not** an identity pull-forward
-> (category-excluded), but it is a **live secret leak** and should be rotated/removed promptly
-> in its own right — surfaced here so it does not get lost in a "defer to workstream" bucket.
-> (It is *not* one of the 11 Gate-1 execution-blocking rows; this is a standalone hygiene flag.)
+> **✓ RESOLVED — F-035 (was a live-exposure flag).** `F-035` (plaintext Logfire secret-key
+> pair in `.claude/settings.local.json`, → `secrets-hygiene`) is **REMEDIATED as of
+> 2026-06-09**: the live file no longer contains the secret AND the Logfire key was rotated
+> on the provider side (operator-confirmed). It was gitignored + present in ≥3 historical
+> commits, but rotation makes those copies dead keys, so a git-history scrub is optional, not
+> urgent. **Closed — do not re-surface as live exposure.** (It was never one of the 11 Gate-1
+> execution-blocking rows; it was a standalone hygiene flag.)
 
 ### K.6 caveat — handled
 
