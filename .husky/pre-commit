@@ -34,11 +34,19 @@ if [ -n "$STAGED_ALL" ]; then
   done
 fi
 
-# --concurrent false: On Windows, parallel chunk execution (the default) runs 8
-# simultaneous `node --stack-size=65536` processes which exhausts process
-# handles / memory and causes SIGKILL on large staged sets. Serial execution is
-# slower but reliable. Harmless on macOS/Linux (cost is a few extra seconds).
-pnpm exec lint-staged --concurrent false
+# lint-staged concurrency is OS-gated (WI-537). On Windows, parallel chunk
+# execution (the default) spawns simultaneous `node --stack-size=65536`
+# processes that exhaust process handles / memory → SIGKILL on large staged
+# sets, so Windows forces serial. macOS/Linux use the parallel default (a few
+# seconds faster). Windows is the primary dev platform (¾ of machines) — the
+# serial path must stay. husky runs under Git-Bash on Windows, so uname -s is
+# MINGW*/MSYS*/CYGWIN* there.
+case "$(uname -s)" in
+  MINGW* | MSYS* | CYGWIN*) LINT_STAGED_CONCURRENCY="--concurrent false" ;;
+  *) LINT_STAGED_CONCURRENCY="" ;;
+esac
+# shellcheck disable=SC2086 # intentional word-splitting of the flag
+pnpm exec lint-staged $LINT_STAGED_CONCURRENCY
 
 # Cross-runtime sync: .claude/skills/ is generated from .agents/skills/. Use
 # --print-changed so we stage exactly the files this sync run touched, not
