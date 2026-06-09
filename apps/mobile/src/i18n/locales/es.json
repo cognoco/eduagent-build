@@ -1073,6 +1073,9 @@
       "mastered": "Dominado",
       "reviewDue": "Repaso listo",
       "topicProgressThreeState": "{{mastered}} dominados · {{learning}} aprendiendo · {{total}} en total"
+    },
+    "inactiveFallbackBanner": {
+      "message": "No se pudieron cargar tus asignaturas pausadas y archivadas. Toca para reintentar — no han desaparecido."
     }
   },
   "topic": {

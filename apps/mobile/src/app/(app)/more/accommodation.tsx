@@ -114,9 +114,13 @@ export default function AccommodationScreen(): React.ReactElement {
     );
   }, [canEditChildPreferences, childProfileId, router]);
 
+  // [ACCOUNT-06] The hub row that opens this screen is labelled "Preferences";
+  // title the self view to match ("Your learning preferences") instead of the
+  // jargon-y "Your learning accommodation" so the destination reads as the same
+  // thing the learner tapped. Reuses the existing (already-translated) key.
   const title = canEditChildPreferences
     ? t('more.accommodation.childScreenTitle', { name: childName })
-    : t('more.accommodation.sectionHeader');
+    : t('more.learningPreferences.screenTitle');
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

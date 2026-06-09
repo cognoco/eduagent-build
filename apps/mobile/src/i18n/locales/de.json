@@ -1073,6 +1073,9 @@
       "mastered": "Gemeistert",
       "reviewDue": "Wiederholung bereit",
       "topicProgressThreeState": "{{mastered}} gemeistert · {{learning}} im Lernen · {{total}} gesamt"
+    },
+    "inactiveFallbackBanner": {
+      "message": "Deine pausierten und archivierten Fächer konnten nicht geladen werden. Tippe zum Wiederholen – sie sind nicht weg."
     }
   },
   "topic": {

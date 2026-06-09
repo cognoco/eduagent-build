@@ -1098,6 +1098,9 @@
       "mastered": "Dominado",
       "reviewDue": "Revisão pronta",
       "topicProgressThreeState": "{{mastered}} dominados · {{learning}} em aprendizagem · {{total}} no total"
+    },
+    "inactiveFallbackBanner": {
+      "message": "Não foi possível carregar as tuas matérias pausadas e arquivadas. Toca para tentar de novo — elas não desapareceram."
     }
   },
   "topic": {

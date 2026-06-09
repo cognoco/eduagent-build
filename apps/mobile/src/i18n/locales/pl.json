@@ -1098,6 +1098,9 @@
       "mastered": "Opanowane",
       "reviewDue": "Powtórka gotowa",
       "topicProgressThreeState": "{{mastered}} opanowane · {{learning}} w nauce · {{total}} razem"
+    },
+    "inactiveFallbackBanner": {
+      "message": "Nie udało się wczytać wstrzymanych i zarchiwizowanych przedmiotów. Stuknij, aby spróbować ponownie — nie zniknęły."
     }
   },
   "topic": {

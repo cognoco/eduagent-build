@@ -1073,6 +1073,9 @@
       "mastered": "習得済み",
       "reviewDue": "復習できます",
       "topicProgressThreeState": "習得{{mastered}}・学習中{{learning}}・全{{total}}"
+    },
+    "inactiveFallbackBanner": {
+      "message": "一時停止中・アーカイブ済みの科目を読み込めませんでした。タップして再試行 — データは消えていません。"
     }
   },
   "topic": {

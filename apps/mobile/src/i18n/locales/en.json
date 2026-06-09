@@ -1014,6 +1014,9 @@
     "staleBanner": {
       "message": "Showing your saved library. Tap to refresh."
     },
+    "inactiveFallbackBanner": {
+      "message": "Couldn't load your paused and archived subjects. Tap to retry — they're not gone."
+    },
     "empty": {
       "title": "Your library will grow as you learn",
       "message": "Start with homework help or learn something new. Books and topics will appear here afterward.",

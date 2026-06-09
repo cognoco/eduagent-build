@@ -1073,6 +1073,9 @@
       "mastered": "Mestret",
       "reviewDue": "Klar for repetisjon",
       "topicProgressThreeState": "{{mastered}} mestret · {{learning}} lærer · {{total}} totalt"
+    },
+    "inactiveFallbackBanner": {
+      "message": "Kunne ikke laste inn de pausede og arkiverte emnene dine. Trykk for å prøve igjen – de er ikke borte."
     }
   },
   "topic": {
