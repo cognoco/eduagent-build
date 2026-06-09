@@ -19,7 +19,6 @@ export type ParentMetricKey =
   | 'sessions-this-week'
   | 'engagement-trend'
   | 'exchange-delta'
-  | 'guided-ratio'
   | 'streak-xp'
   | 'understanding'
   | 'review-status'
@@ -30,7 +29,6 @@ const PARENT_METRIC_KEYS: readonly ParentMetricKey[] = [
   'sessions-this-week',
   'engagement-trend',
   'exchange-delta',
-  'guided-ratio',
   'streak-xp',
   'understanding',
   'review-status',
@@ -59,10 +57,6 @@ const METRIC_TOOLTIP_I18N_KEYS = {
   'exchange-delta': {
     title: 'parentView.metricTooltips.exchangeDelta.title',
     body: 'parentView.metricTooltips.exchangeDelta.body',
-  },
-  'guided-ratio': {
-    title: 'parentView.metricTooltips.guidedRatio.title',
-    body: 'parentView.metricTooltips.guidedRatio.body',
   },
   'streak-xp': {
     title: 'parentView.metricTooltips.streakXp.title',

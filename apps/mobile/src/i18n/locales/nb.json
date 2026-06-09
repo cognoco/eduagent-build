@@ -271,15 +271,13 @@
     "active": "Aktiv",
     "accommodation": {
       "sectionHeader": "Din læringstilpasning",
-      "viewAndManage": "Vis og administrer",
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "guideActive": "Aktiv",
       "childScreenTitle": "{{name}}s læringsinnstillinger"
     },
     "learningPreferences": {
       "sectionHeader": "Din læring",
-      "rowLabel": "Preferanser",
-      "screenTitle": "Læringsinnstillinger"
+      "rowLabel": "Preferanser"
     },
     "mentorMemory": {
       "sectionHeader": "Hva mentoren din vet"
@@ -894,7 +892,6 @@
       "prepareErrorMessage": "Kunne ikke forberede diktatet ditt. Prøve igjen?",
       "tryAgain": "Prøv igjen",
       "title": "Sjekk teksten",
-      "subtitleFromPhoto": "Rediger eventuelle feil fra bildet, og start deretter diktatet.",
       "subtitleManual": "Gjennomgå teksten din, og start deretter diktatet.",
       "inputPlaceholder": "Skriv eller lim inn teksten din her ...",
       "inputLabel": "Diktattekst",
@@ -1790,7 +1787,6 @@
       "manageMentorMemoryForChild": "Administrer hva mentoren husker om {{name}}",
       "profileDetails": "Profildetaljer",
       "childProfileJoined": "Lagt til {{date}}",
-      "learningAccommodationTitle": "Læringstilpasning for {{name}}",
       "noLearningPreferenceSet": "Ingen læringspreferanse er satt",
       "consentTitle": "Samtykke",
       "consentDescription": "Administrer foreldresamtykke for {{name}}.",
@@ -1970,10 +1966,6 @@
       "exchangeDelta": {
         "title": "Meldinger denne uken",
         "body": "Hvor mange meldinger som ble utvekslet denne uken sammenlignet med forrige uke. Et enkelt signal om læringsaktivitet."
-      },
-      "guidedRatio": {
-        "title": "Veiledet øving",
-        "body": "Andelen mentorsvar der barnet ditt trengte et utarbeidet eksempel eller mer veiledning i stedet for et lett dytt."
       },
       "streakXp": {
         "title": "Rekke og XP",

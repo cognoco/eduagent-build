@@ -34,8 +34,6 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-let mockFetchRoundData: QuizRoundResponse | null = null;
-
 // safe-area-context: native-only.
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -45,13 +43,6 @@ jest.mock(
   '../../../components/common/BrandCelebration' /* gc1-allow: native-boundary; BrandCelebration uses native animation/SVG modules in JSDOM */,
   () => ({
     BrandCelebration: () => null,
-  }),
-);
-
-jest.mock(
-  '../../../hooks/use-quiz' /* gc1-allow: native-boundary; use-quiz transitively loads native-only API/profile modules in JSDOM */,
-  () => ({
-    useFetchRound: () => ({ data: mockFetchRoundData, isLoading: false }),
   }),
 );
 
@@ -350,10 +341,9 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
   // lock the safety useEffect would fire on the re-render, see completionResult
   // is null, and call goBackOrReplace — overriding the user's intent. Native
   // is unaffected because the screen unmounts during navigation.
-  it('Play Again navigates to /quiz/play and the safety useEffect does not override (BUG-925)', () => {
+  it('Play Again navigates to /quiz/launch and the safety useEffect does not override (BUG-925)', () => {
     mockCanGoBack = true; // simulate web with browser history available
     const round = buildCapitalsRound();
-    mockFetchRoundData = round; // prefetch hook returns hydrated data
 
     renderWithFlow({
       round,
@@ -386,14 +376,14 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
 
     fireEvent.press(screen.getByTestId('quiz-results-play-again'));
 
-    // The user's intent: replace to /quiz/play. Exactly once.
+    // The user's intent: replace to /quiz/launch (re-generate a round).
+    // Exactly once.
     expect(mockRouterReplace).toHaveBeenCalledTimes(1);
-    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/quiz/play');
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/quiz/launch');
     // The safety useEffect must NOT race in and call back/replace to /practice.
     expect(mockRouterBack).not.toHaveBeenCalled();
     expect(mockRouterReplace).not.toHaveBeenCalledWith('/(app)/practice');
 
-    mockFetchRoundData = null;
     mockCanGoBack = false;
   });
 

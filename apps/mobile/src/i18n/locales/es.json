@@ -271,15 +271,13 @@
     "active": "Activo",
     "accommodation": {
       "sectionHeader": "Tu adaptación de aprendizaje",
-      "viewAndManage": "Ver y gestionar",
       "notSureWhichToPick": "¿No estás seguro de cuál elegir?",
       "guideActive": "Activo",
       "childScreenTitle": "Preferencias de aprendizaje de {{name}}"
     },
     "learningPreferences": {
       "sectionHeader": "Tu aprendizaje",
-      "rowLabel": "Preferencias",
-      "screenTitle": "Preferencias de aprendizaje"
+      "rowLabel": "Preferencias"
     },
     "mentorMemory": {
       "sectionHeader": "Lo que tu mentor sabe"
@@ -894,7 +892,6 @@
       "prepareErrorMessage": "No se pudo preparar tu dictado. ¿Intentar de nuevo?",
       "tryAgain": "Intentar de nuevo",
       "title": "Revisa el texto",
-      "subtitleFromPhoto": "Edita cualquier error de la foto, luego empieza tu dictado.",
       "subtitleManual": "Revisa tu texto, luego empieza tu dictado.",
       "inputPlaceholder": "Escribe o pega tu texto aquí...",
       "inputLabel": "Texto del dictado",
@@ -1790,7 +1787,6 @@
       "manageMentorMemoryForChild": "Gestiona lo que el mentor recuerda sobre {{name}}",
       "profileDetails": "Detalles del perfil",
       "childProfileJoined": "Añadido {{date}}",
-      "learningAccommodationTitle": "Adaptación de aprendizaje para {{name}}",
       "noLearningPreferenceSet": "No se ha establecido preferencia de aprendizaje",
       "consentTitle": "Consentimiento",
       "consentDescription": "Gestiona el consentimiento parental de {{name}}.",
@@ -1970,10 +1966,6 @@
       "exchangeDelta": {
         "title": "Intercambios esta semana",
         "body": "Cuántos turnos de mensajes hubo esta semana comparado con la semana pasada. Es una señal ligera de actividad de aprendizaje."
-      },
-      "guidedRatio": {
-        "title": "Práctica guiada",
-        "body": "La proporción de respuestas del mentor en las que tu hijo necesitó un ejemplo desarrollado o más orientación en lugar de un pequeño empujón."
       },
       "streakXp": {
         "title": "Racha y XP",
