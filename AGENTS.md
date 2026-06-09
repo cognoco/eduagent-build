@@ -90,9 +90,9 @@ Sorting test: **DECISIONS** = "I can't responsibly continue until you choose"; *
 
 ## Git Commits
 
-Always use the repo commit skill for every commit and push — `/commit` in Claude Code, or load `.agents/skills/commit/SKILL.md` in Codex. It is the single source of truth for staging, message format, hook handling, and push behavior. Never use ad-hoc commit flows, `--no-verify`, broad staging without first checking scope, `/zdx:commit`, `/my:commit-old`, or the runtime's built-in commit protocol.
+Always use the repo commit skill for every commit and push — `/commit` in Claude Code, or load `.agents/skills/commit/SKILL.md` in Codex. It is the single source of truth for staging, message format, hook handling, and push behavior (a thin overlay over the global `/zdx-core:commit`). Never hand-roll a commit flow, use the runtime's built-in commit protocol, or stage broadly without first checking scope. The skill lets hooks run and never bypasses them autonomously; the `--no-verify` doctrine lives in Required Validation below.
 
-Subagents may run `/commit` only from within an isolated worktree they own (see Worktree Placement below). When operating in the coordinator's working tree (no worktree isolation), subagents must NOT run `git add`/`git commit`/`git push` — the coordinator handles all git operations there.
+Agents perform code changes in isolated worktrees they own (see Worktree Placement below) and commit from there. In the residual shared-tree case, commit only your own session's work — own-work scope, which the commit skill enforces — and never stage files another session modified.
 
 ## Pull Requests
 
@@ -288,9 +288,11 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 
 ## Required Validation
 
-Local hooks are fast feedback; **CI is the authoritative gate that protects `main`**. **pre-commit** runs cheap staged-only guards (`lint-staged`, the eval-snapshot / i18n / GC1 guards, skills-sync, a secret/large-file scan) — **not** whole-tree `tsc`/tests. **pre-push** is the local type/test gate (`tsc --build` + surgical `--findRelatedTests` jest on the push delta, plus Tier-1 eval + i18n). Verify locally while iterating, and focus on what hooks do not cover:
+Local hooks are fast feedback; **CI is the authoritative gate that protects `main`**. **pre-commit** runs cheap staged-only guards (`lint-staged`, the eval-snapshot / i18n / GC1 guards, skills-sync, a secret/large-file scan) — **not** whole-tree `tsc`/tests. **pre-push** is the local type/test gate (`tsc --build` + surgical `--findRelatedTests` jest on the push delta, plus Tier-1 eval + i18n). **CI routes the slow suites by change class** — `scripts/check-change-class.sh` is the single routing source (see `docs/change-classes.md`). Verify locally while iterating, and focus on what hooks do not cover:
 
-- Run integration tests before any commit that touches `apps/api/` or `tests/integration/`: `pnpm exec nx test:integration api`. The pre-commit and pre-push hooks both intentionally skip `.integration.test.` files, so unit tests don't catch DB/auth-scoping/Inngest-flow regressions.
+- **Run what CI runs.** When diagnosing a CI failure or addressing review findings, run the affected projects' typecheck + lint + tests locally — the full set CI would run, not just the file named in the error — and batch fixes into one validated push. A failure that first surfaces in CI costs a ~30-minute push-fix-push round trip (Insights analysis 2026-03-27 measured 3–4 such cycles in single sessions).
+- Integration tests (`pnpm exec nx test:integration api`) are **routed by the CI change-class router** and run whenever the diff could affect them (api / db-schema / shared-schemas / lockfile classes). Running them locally before a commit is **advisory** — useful fast feedback for `apps/api/` or `tests/integration/` changes, but local stg-DB runs can drift; CI is the gate. The pre-commit and pre-push hooks intentionally skip `.integration.test.` files.
+- **`--no-verify`, two levels.** *Doctrine:* default is to let hooks run; a **narrow, deliberate** bypass of a local hook is acceptable **because CI backstops it** (a comment/type-only prompt change that cannot alter generation; a genuinely broken local harness via `SKIP_PRE_PUSH`) and is not a violation — but needing to bypass the same check repeatedly means the check is **mis-placed: fix the gate, don't normalise the bypass**. One platform-scoped accommodation stands: `nx affected` is broken on Windows by an upstream `@nx/expo` bug, so the documented `--no-verify` escape for large staged sets remains for human Windows devs until the upstream fix lands (MMT-ADR-0019; watch-item WI-542). *Skill behavior is stricter than doctrine:* the automated commit agent never bypasses hooks autonomously — on a hook failure it stops and reports.
 - Do not call work complete if related tests, lint, typecheck, required migrations, or required eval snapshots are still failing.
 - No suppression, no shortcuts. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the code or improve the lint rule.
 
