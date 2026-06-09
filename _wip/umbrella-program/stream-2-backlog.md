@@ -62,6 +62,110 @@ start timing:
 
 ---
 
+## N.0 partition result — RULED 2026-06-09
+
+> **Outcome in one line: the pull-forward subset is EMPTY. Default-defer holds across
+> the board. Implementation execution depends on no parked Stream-2 doc-work.**
+> Ruled by the Phase-N session (`Claude`, you ratify). Inputs: M's four-bucket triage
+> (`docs/audit/2026-05-29-full-audit/M-triage-closure.md`), the L
+> `execution-blocking-if-deferred?` tag (`L-gap-delta.md`), and a mechanical check that
+> every canon artifact the in-scope obligations cite already exists in-tree.
+
+### The reconciliation N.0 had to make first
+
+The runway frames N.0 as "partition every finding assigned to Stream 2 (M buckets
+3/4)." That shorthand conflates three distinct populations; the data does not support
+the equivalence. Buckets 3/4 (134 findings) spread across **21+ named workstreams**,
+overwhelmingly *code/mobile/infra* (`l10n-a11y-mobile` 34, `security-pii-api` 27,
+`architecture`-as-code 27, `errors-api` 8, `security-pii-inngest` 6, …). **Stream 2 (the
+estate-canon drain) is barely present in the audit at all** — its real body is the
+C/J-deferred canon inventory catalogued below, not audit findings. So N.0 rules three
+populations separately:
+
+**Population A — the doc/canon-class *audit* findings (buckets 3/4).** The only
+doc/instruction-class slice of the clear-out set. **All non-blocking (`Blk = —`). All DEFER.**
+
+| Finding | Defer-to (L) | Why it does **not** pull forward |
+|---|---|---|
+| F-037, F-038, F-039, F-040, F-042, F-045, F-046 | `agent-instructions` | CLAUDE/AGENTS divergence, skill-description trigger-rule violations, hook/sync-skills hygiene. **Owned by Harness Hygiene / roster PRG-03, not Stream 2** — already sequenced pre-P (`WI-531` extract → `WI-387` prune). Not an identity-execution prerequisite. |
+| F-113, F-114 | `agent-instructions` | "No repo-local zod / drizzle-neon skill." Partially covered by the independent tech-skill-group (`e4c23f0c8`); dedupe-and-extend, owned by agent-instructions. Doesn't gate the rewrite. |
+| F-012 | `architecture` | `architecture.md` warns of a non-existent DB→schemas cycle (`:765,896`). Doc-rot in a **non-identity** section; the in-scope obligation that *does* cite `architecture.md` (F-078) cites `:135` and is supported-by, not blocked-by, this rot. Moot-by-refactor / non-blocking. |
+| F-036 | `agent-infrastructure` | `autoMemoryDirectory` path mismatch — harness/config, not canon. Not blocking. |
+| F-041 | `agent-instructions` | Stale CLAUDE.md *Profile-Shapes* citations — that section documents the **current** nav system the rewrite **replaces** (moot-by-refactor). Not blocking. |
+| F-176 | `navigation/audience-matrix` | Sticky proxy-flag UI state — a *code* bug, not canon. Not blocking. |
+
+**Population B — the parked Stream-2 canon inventory (the § Inventory below).** Ruled
+**en bloc: DEFER.** The pull-forward test the runway specifies is *"an in-scope work
+package must cite an `architecture.md` section still legacy, or slicing a Cosmo WI
+requires canon that does not yet exist."* Mechanically checked and **false**: every
+canon artifact the 49 in-scope obligations cite — `MMT-ADR-0001/0002/0007/0008/0009/0011/0013/0014/0015/0016`,
+`docs/canon/identity/{data-model,domain-model,ontology,prd}.md`,
+`docs/compliance/identity-compliance-register.md`, `CANONICAL-SET.md`, and the `inv N`
+invariants — **already exists in-tree** (delivered D/E/F.1/G/H/I/J). The parked work (the
+~70-decision ADR backfill, the *non-identity* `architecture.md` rebuild, the `ARCH-N`
+drain, the principles catalog, the `docs/`→`docs/canon/` reorg, glossary bucket 3) is
+all **outside the clean-cut's blast radius** (moot-by-refactor) and unneeded to execute
+or to slice Cosmo WIs (identity canon already lives at stable `docs/canon/identity/`
+paths since J0). Nothing here is a prerequisite.
+
+**Population C — the 9 bucket-4 deferrals** (`F-008, F-013, F-033, F-043, F-044, F-100,
+F-101, F-102, F-115`). **All non-blocking, all DEFER** — code-hygiene / test-coverage /
+doc-quality with no mature workstream. *(`F-043` .deepsec/AGENTS.md prompt-injection
+surface and `F-044` stale `/my:commit-old`+`/zdx:commit` guard are
+harness/agent-instruction-adjacent → PRG-03 / Harness Hygiene territory, still not an
+identity-execution prerequisite.)*
+
+### Complete-coverage accounting — all 134 bucket-3/4 findings
+
+The pull-forward *test* is meaningful only for the **canon/doc population** (Populations A/B)
+plus the 11 execution-blocking rows. Asking whether a code/infra/mobile finding (an l10n-a11y
+bug, a god-module split, a Neon pool fix) "pulls forward into the identity rewrite's
+*doc*-prerequisites" is a **category error** — those are owned by named workstreams and
+*dispositioned by N.1/O via blast-radius*, not by this gate. To meet the N.0 exit gate's
+coverage requirement without that category error, every one of the 134 is accounted for below
+(disposition is uniformly **defer-from-N.0** since the pull-forward subset is empty; the
+*reason* differs by class):
+
+| Workstream group (L `Defer-to`) | Count | Class | N.0 disposition |
+|---|---|---|---|
+| `agent-instructions` | 10 | canon/doc | pull-forward test applied → **DEFER** (Pop A; owned by PRG-03/Harness Hygiene) |
+| `agent-infrastructure` (F-036) | 1 | canon/doc (harness/config) | test applied → **DEFER** (Pop A) |
+| `navigation/audience-matrix` (F-176) | 1 | code bug + doc-relocation | test applied → **DEFER** (Pop A; matrix relocation feeds Stream-2 inbound) |
+| `platform-security / ci-cd-hardening` (F-116) | 1 | skill/doc-ish | test applied → **DEFER** (own workstream; dedupe vs tech-skill-group) |
+| `architecture` (incl. F-012 doc-rot) | 25 | 1 canon/doc (F-012, Pop A) + 24 code-structural | F-012 test-applied DEFER; the 24 are **category-excluded** → own workstream, N.1/O blast-radius (some in-radius) |
+| `l10n-a11y-mobile` | 34 | code/mobile (UI/i18n/a11y) | **category-excluded** → out-of-radius, parallel-safe |
+| `security-pii-api` | 27 | code (the non-IF remainder) | **category-excluded** → own workstream, blast-radius (IF slice already bucket-2) |
+| `errors-api` | 8 | code | **category-excluded** → own workstream |
+| `security-pii-inngest` | 6 | code | **category-excluded** → own workstream |
+| singletons: `secrets-hygiene` (F-035 ⚑), `test-infrastructure`, `reliability-and-correctness`, `platform-infra`, `mobile-testing-infra`, `mobile-cache-data-fetching`, `learning-engine`, `infrastructure/database-performance`, `content/curriculum`, `ci-cd-hardening`, `billing-subscriptions`, `backend-performance` | 12 | code/infra | **category-excluded** → own workstream |
+| **Bucket-4 deferred (Population C)** | 9 | mixed (hygiene/test/doc) | **DEFER** (no mature workstream) |
+| **Total** | **134** | | pull-forward subset = **0** |
+
+> **⚑ Live-exposure flag — F-035.** `F-035` (plaintext Logfire secret-key pair in
+> `.claude/settings.local.json`, → `secrets-hygiene`) is **not** an identity pull-forward
+> (category-excluded), but it is a **live secret leak** and should be rotated/removed promptly
+> in its own right — surfaced here so it does not get lost in a "defer to workstream" bucket.
+> (It is *not* one of the 11 Gate-1 execution-blocking rows; this is a standalone hygiene flag.)
+
+### K.6 caveat — handled
+
+K.6 deferred audit reconciliation, so the runway requires any pull-forward resting on an
+unreconciled finding to be marked lower-confidence. **The pull-forward subset is empty,
+so there is no such call to flag** — and an empty pull-forward is precisely the
+*conservative-correct* outcome when reconciliation was deferred (we pull nothing forward
+on thin evidence). No low-confidence pull-forward exists.
+
+### Handoff to N.1
+
+The **11 execution-blocking rows** (`gate1-closure.md` patch-now list:
+`F-019/020/092/117/118/121/122/130/133/144/145`) are **not** a Stream-2 partition output —
+they are **bucket-2 (in-IF-scope) live code defects** (IDOR / proxy / deletion-atomicity /
+age-gate / trial-downgrade). N.0 confirms **none of them depends on any parked Stream-2
+doc-work**, so they flow to N.1 to be sequenced **earliest** (a "stop-the-bleeding"
+pre-execution wave that closes live exposure ahead of the rewrite that supersedes them).
+
+---
+
 ## Inventory — the deferred work
 *(moved from ROADMAP "Documentation architecture / decisions layer (Phase C → Stream 2)" thread)*
 
