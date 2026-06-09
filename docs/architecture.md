@@ -372,7 +372,7 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 
 **Mobile → API auth flow:** Clerk JWT verification. Mobile obtains JWT from Clerk SDK, sends as `Authorization: Bearer` header. Hono middleware verifies via Clerk's JWKS endpoint (cacheable in Workers KV). Profile ID extracted from Clerk session metadata, injected into request context for scoped repository.
 
-**Authorization model:** Custom authorization in our own store, not Clerk Organizations. Clerk orgs are built for B2B multi-tenancy (team invites, role-management UI) — the wrong abstraction for family accounts. Clerk supplies authenticated user identity only; the person, tenancy, roles, consent, and billing state are owned in Neon. Roles are a primitive — a non-empty array over {admin, learner} on the person↔org membership — and the capabilities (consent authority, data visibility, billing control) are separate Guardian / Mentor / Payer edges, never fused into the role. Application middleware maps the Clerk identity to the person and enforces access. See § Identity Foundation (MMT-ADR-0007/0008/0015).
+**Authorization model:** Custom authorization in our own store, not Clerk Organizations. Clerk orgs are built for B2B multi-tenancy (team invites, role-management UI) — the wrong abstraction for family accounts. Clerk supplies authenticated user identity only; the person, tenancy, roles, consent, and billing state are owned in Neon. Roles are a primitive — a non-empty array over {admin, learner} on the person↔org membership — and the capabilities (consent authority, data visibility, billing control) are separate Guardian / Supporter / Payer edges, never fused into the role. Application middleware maps the Clerk identity to the person and enforces access. See § Identity Foundation (MMT-ADR-0007/0008/0015).
 
 **Rate limiting:** Cloudflare Workers built-in rate limiting (100 req/min per user per PRD). Configuration in `wrangler.toml`, not code. For the quota system (questions/month), `decrementQuota()` in `services/billing.ts` is the enforcement point (conditional UPDATE via Drizzle ORM).
 
@@ -562,7 +562,7 @@ The `(app)/` group contains all authenticated screens. View differences between 
 
 ## Identity Foundation
 
-> **[CANON-NEW · ratified]** Authored Phase H (2026-06-08) from the locked identity-foundation canonical set (`_wip/identity-foundation/CANONICAL-SET.md` — 19 members). Stated as **outcomes, not whys** (`MMT-ADR-0000` §I.2); every claim cites its ADR or `data-model.md` §. This is a **relocatable unit** — the eventual `architecture.md` rebuild (Stream 2) re-homes it intact. Citations to `data-model.md` / `domain-model.md` / `identity-foundation-prd.md` reference the ratified canon currently in `_wip/identity-foundation/` (graduates to `docs/canon/` at Phase J(0); paths update there).
+> **[CANON-NEW · ratified]** Authored Phase H (2026-06-08) from the locked identity-foundation canonical set (`_wip/identity-foundation/CANONICAL-SET.md`, updated by J0 to include the `docs/canon/identity/` domain canon + compliance register). Stated as **outcomes, not whys** (`MMT-ADR-0000` §I.2); every claim cites its ADR or `docs/canon/identity/data-model.md` §. This is a **relocatable unit** — the eventual `architecture.md` rebuild (Stream 2) re-homes it intact. Citations to `data-model.md` / `domain-model.md` / `prd.md` reference the ratified canon now at `docs/canon/identity/`.
 
 This section is the authoritative architecture of the app's identity / tenancy / role / consent / policy-engine foundation. It supersedes the legacy identity content elsewhere in this document (the direct conflicts were flagged `[LEGACY-REVIEW]` and resolved in Phase I). The decision trail (the *why*) lives in `MMT-ADR-0001`, `0002`, `0007`–`0016`; the schema realization in `data-model.md`.
 
@@ -575,12 +575,12 @@ This section is the authoritative architecture of the app's identity / tenancy /
 - **`is_owner` is gone** — ownership is *derived* (admin role + Payer self-reference), not stored (`data-model.md` §4.1).
 - **Scoping is the future row-level-security (RLS) surface.** `person_id` is the scope key for learning data; `organization_id` for membership/subscription; the `person_retain` legal tier is **role-gated, not RLS-default** — a deliberate exception recorded so the RLS rollout does not flatten the audit trail (`data-model.md` §5.1).
 
-### Capability split — Guardian / Mentor / Payer
+### Capability split — Guardian / Supporter / Payer
 
 The three capabilities are split and never fused. Profile-management authority bundles with the **Subscription-administrator** (`{admin}` role + the Payer field) — no separate column.
 
 - **Guardian = consent only.** A global edge (`guardianship`) carrying the consent record and consent authority; operational powers do **not** live on it. Never auto-conferred; `guardian <> charge` (no self-guardian); a `qualification` ENUM names the relationship (`MMT-ADR-0008`; `data-model.md` §4.6, §2A.4).
-- **Mentor = data access only.** An opt-in edge (`mentorship`), **never auto-conferred** (`data-model.md` §4.7).
+- **Supporter = data access only.** An opt-in edge (`supportership`), **never auto-conferred** (`data-model.md` §4.7). The AI tutor owns the term `mentor`; the human helper edge is Supportership.
 - **Payer = a subscription sub-field, not a persona.** 1 primary (`payer_person_id`, NOT NULL) + ≤1 secondary (`subscription_payers`). The secondary may read state, view invoices, and **update the payment method only** — no cancel/upgrade/plan-change; the primary is notified on every change (`MMT-ADR-0002`; `MMT-ADR-0015` §5; `data-model.md` §2A.4).
 - **Charge terminology.** The human a Guardian acts for is a **charge** (the term "ward" is retired). The consent key is `(charge × purpose × organization)`. v1 enforces one active Guardian per charge in service code (the `guardianship` edge stays structurally N:M for a future co-parent / shared-custody model); the birthday-crossing takeover branches on `person.has_own_account` (`MMT-ADR-0015`; `data-model.md` §2A.4).
 

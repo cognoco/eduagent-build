@@ -20,7 +20,7 @@ status: parked
 > baseline at reset time, FKs targeting `person`. The note-correctness nudge
 > (this plan's T11–T13) is **superseded** by
 > `2026-06-08-note-correctness-and-challenge-draft.md` (also parked). See
-> `_wip/identity-foundation/data-model.md §1`, `docs/adr/MMT-ADR-0012`, and the
+> `docs/canon/identity/data-model.md §1`, `docs/adr/MMT-ADR-0012`, and the
 > `0107` reference-only header.
 
 **Goal:** Add an additive concept-grain mastery layer that durably records **every** per-concept Challenge-Round verdict (solid *and* weak), and derives a read-time note "star," a neutral topic-level tutor-addition affordance, concept-focused review, and a note-correctness nudge — without re-keying the topic-grained spine.

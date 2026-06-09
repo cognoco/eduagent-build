@@ -26,7 +26,7 @@ in one read. The five-layer model itself is defined in
 
 | Layer | Holds | Physical home (§I.4) | Per-layer index |
 |---|---|---|---|
-| **L1 — Canon** | The *what*: contracts, invariants, target models, product truth | `docs/canon/` (identity domain canon graduates here front-of-J; loose root docs drain here in Phase J/Stream 2 — `MMT-ADR-0000` §I.4) | *(this index, § Canon)* |
+| **L1 — Canon** | The *what*: contracts, invariants, target models, product truth | `docs/canon/` (identity domain canon lives in `docs/canon/identity/`; loose root docs drain here in Phase J/Stream 2 — `MMT-ADR-0000` §I.4) | *(this index, § Canon)* |
 | **L2 — Decisions** | The *why*: ADRs (`MMT-ADR-NNNN`) | `docs/adr/` | [`docs/adr/README.md`](adr/README.md) |
 | **L3 — Operational** | Specs, plans, runbooks, **registers** (governed data masters + trails) | `docs/specs/`, `docs/plans/`, `docs/runbooks/`, `docs/registers/` | [`docs/registers/README.md`](registers/README.md) |
 | **Meta / audit** | Work *about* the repo (audits, cleanup), not product docs | `docs/audit/` | [`docs/audit/INDEX.md`](audit/INDEX.md) |

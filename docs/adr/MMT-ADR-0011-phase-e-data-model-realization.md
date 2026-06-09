@@ -71,7 +71,7 @@ The Phase-E baseline creates **eight tables** (six active + two edge + the `cons
 - `store_customer_ref` `text NULL` *(RevenueCat / store customer id; the link to the store; never authoritative on its own).*
 - `started_at` / `period_end` / `created_at` / `updated_at`.
 
-### 2. Edges — `guardianship` / `mentorship`
+### 2. Edges — `guardianship` / `supportership`
 
 **`guardianship`** *(D5, ADR-0008 — global edge, derived operation)*
 
@@ -84,14 +84,14 @@ The Phase-E baseline creates **eight tables** (six active + two edge + the `cons
 - `UNIQUE (guardian_person_id, ward_person_id)` *where `revoked_at IS NULL`* *(a partial unique; re-granting after revoke is allowed only via a new row, preserving the append-only history of guardian links).*
 - Operate / manage / view powers are *not* columns on this edge. Per `ADR-0008` they are derived at query time: `guardian-link ∧ shared-org-membership ∧ charge-has-no-Login` — a single named resolver function in services (the successor to the buggy `getFamilyOwnerProfileId`).
 
-**`mentorship`** *(D5, `inv 19` — opt-in grant, never auto-conferred)*
+**`supportership`** *(D5, `inv 19` — opt-in grant, never auto-conferred; originally named `mentorship`)*
 
 - `id` `uuid PK`.
-- `mentor_person_id` `uuid NOT NULL → person.id ON DELETE CASCADE`.
-- `mentee_person_id` `uuid NOT NULL → person.id ON DELETE CASCADE`.
+- `supporter_person_id` `uuid NOT NULL → person.id ON DELETE CASCADE`.
+- `supportee_person_id` `uuid NOT NULL → person.id ON DELETE CASCADE`.
 - `granted_at` `timestamptz NOT NULL`, `revoked_at` `timestamptz NULL`.
-- `CHECK (mentor_person_id <> mentee_person_id)`, `UNIQUE (mentor, mentee) where revoked_at IS NULL`.
-- `family_links` (the current `parent_profile_id → child_profile_id` table) migrates into `guardianship`; `mentor` as a role value is dissolved (mentorship is now an edge, not a role).
+- `CHECK (supporter_person_id <> supportee_person_id)`, `UNIQUE (supporter, supportee) where revoked_at IS NULL`.
+- `family_links` (the current `parent_profile_id → child_profile_id` table) migrates into `guardianship`; the legacy `mentor` role value is dissolved (Supportership is now an edge, not a role).
 
 ### 3. Consent — `consent_grant` (append-only event log)
 
@@ -145,7 +145,7 @@ The deletion seam is **structural, not column-based.** Learning data and the `pe
 
 - The `membership_role` enum is restated as `{admin, learner}`. `student`→`learner`. `owner` is dissolved; the `is_owner` column is dropped.
 - "Owner" is *derived*: the `admin` role (for management powers) + the `payer_person_id == self` self-reference (for the billing-attribution half). Every `isOwner`-gated screen in the app rekeys to an `admin`-role check.
-- `mentor` and `guardian` are not roles. They are capacities on the `mentorship` and `guardianship` edges respectively.
+- `supporter` and `guardian` are not roles. They are capacities on the `supportership` and `guardianship` edges respectively. The term `mentor` now denotes the AI tutor in product/canon language.
 
 ## Consequences
 
@@ -157,7 +157,7 @@ The deletion seam is **structural, not column-based.** Learning data and the `pe
 - **Every `isOwner` gate in the app rekeys to an `admin`-role check.** Tracked in the Phase-F handoff as a build-time sweep, not a schema change.
 - **`controller-role` is deferred entirely, not parked as a dormant column** — `D6e` slimmed. The clean baseline makes the later add a clean forward migration; a dormant column would have been the half-migration anti-pattern.
 - **Dormant accounts still age.** The sweep is per-person, not per-active, so the `I-C4` refresh and the `I-PB-B2b` direction gate fire even for accounts no one is using.
-- **`family_links` migrates into `guardianship`; `mentor` as a role value is dissolved**; the existing `accounts.isOwner` boolean is dropped.
+- **`family_links` migrates into `guardianship`; `mentor` as a legacy role value is dissolved into Supportership**; the existing `accounts.isOwner` boolean is dropped.
 
 ## Alternatives considered
 
@@ -166,7 +166,7 @@ The deletion seam is **structural, not column-based.** Learning data and the `pe
 3. **`is_owner` preserved as a denormalised cache.** Rejected — a column meaning two things is the inverse of the derived-admin-role pattern; the cache is always stale relative to the role truth.
 4. **Stamped `consent_status` column** (the `consent_states` shape, evolved). Rejected — by counsel ruling, by canon (consent is computed not stamped), and by the `I-D1` structural blocker.
 5. **Soft-delete only (`deleted_at` column).** Rejected — the `I-C1` finding verifies that this *is* the current defect, not a fix for it.
-6. **Single polymorphic `relationship` table for guardianship + mentorship.** Rejected — the two edges differ in payload, in invariants, and in their governing ADRs; fusing them buys speculative flexibility for YAGNI complexity. (See D5 grill.)
+6. **Single polymorphic `relationship` table for guardianship + supportership.** Rejected — the two edges differ in payload, in invariants, and in their governing ADRs; fusing them buys speculative flexibility for YAGNI complexity. (See D5 grill.)
 7. **Dormancy `max(session.created_at)` derived at sweep time.** Rejected — the dormancy check is a hot, repeated read; a denormalized column is the honest shape.
 8. **Dedicated `transition_run_log` for sweep idempotency.** Rejected — `MMT-ADR-0009` already specifies the `personId+day` Inngest-native key; a run-log table is only worth it if observability needs to query run history, which nothing here asks for (addable later).
 9. **Build the `controller-role` column now, no logic.** Rejected — a dormant column reads as "handled" to the next contributor (the half-migration pattern); YAGNI for v1's single-org world.

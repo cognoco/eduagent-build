@@ -50,7 +50,7 @@ The MMT-ADR-0011 baseline is **amended** with the following additions, all pre-b
 
 **G-3 3a — one active Guardian per charge (v1):** enforced in **service code** on grant, *not* as a DB constraint. The `guardianship` edge keeps its natural `UNIQUE (guardian_person_id, charge_person_id) WHERE revoked_at IS NULL` (blocks duplicate edges, preserves re-grant history) and stays structurally N:M — so a future co-parent / shared-custody model needs only a relaxation of the service rule, no baseline migration. This is the schema-flexible / behavior-gated posture also used for sub-13 (Path X). MMT-ADR-0008's "guardianship is a global edge" is preserved.
 
-**Mentor N-per-charge:** the `mentorship` table has no UNIQUE constraint on `charge_person_id` (a charge can have multiple mentors). The N-per-charge is the default; v1.1 may add caps if a UX reason emerges.
+**Supporter N-per-charge:** the `supportership` table has no UNIQUE constraint on `supportee_person_id` (a charge can have multiple supporters). The N-per-charge is the default; v1.1 may add caps if a UX reason emerges.
 
 **Downstream impact:** all code that reads/writes `ward_person_id` (and the legacy `family_links` rows) updates to `charge_person_id` on the `guardianship` edge. The sweep report is the audit trail.
 
@@ -121,7 +121,7 @@ Both cases end with the Guardian edge transitioning to *historical* (read-only a
 
 **Store-IAP identity (PRD Part IX open item):** the IAP identity (Apple/Google account owner) may differ from the Payer field. The store-payer ↔ `payer_person_id` mapping is an open legal item; this ADR does not close it.
 
-**Downstream impact:** the Subscription administrator persona's UX (the unified multi-role surface per PRD Part IX) is the place where Payer + `{admin}` + profile-mgmt + Guardian edge + Mentor edge + `{student}` stack. The data-model changes here are the *capability* surface; the UX surface is post-walkthrough.
+**Downstream impact:** the Subscription administrator persona's UX (the unified multi-role surface per PRD Part IX) is the place where Payer + `{admin}` + profile-mgmt + Guardian edge + Supporter edge + `{student}` stack. The data-model changes here are the *capability* surface; the UX surface is post-walkthrough.
 
 ### Amendment 6: Subscription administrator as profile-mgmt authority (Sub admin C, §1.5)
 
@@ -131,9 +131,9 @@ Both cases end with the Guardian edge transitioning to *historical* (read-only a
 
 - **Profile management** moves from the Guardian edge (per MMT-ADR-0008) to the **Subscription administrator's** membership role + Payer field. The `subscription_admins` membership role (or the implicit `{admin}` role on the family org) carries the profile-mgmt authority.
 - The **Guardian edge** is now *consent only* — does not imply profile mgmt. The edge is a person-to-person relationship; profile mgmt is an org-level concern.
-- The **Mentor edge** is *data access only* — does not imply consent or profile mgmt. The edge is a person-to-person relationship for visibility into the charge's learning data.
+- The **Supporter edge** is *data access only* — does not imply consent or profile mgmt. The edge is a person-to-person relationship for visibility into the charge's learning data.
 
-**The "full parent" case** (typical v1): the Subscription administrator is the Payer + `{admin}` + holds the Guardian edge + holds a Mentor edge. Same human, four capabilities stacked. The UX surfaces the current hat (the family operator's "manage my family" surface vs. the household mentor's "help my kid with homework" surface).
+**The "full parent" case** (typical v1): the Subscription administrator is the Payer + `{admin}` + holds the Guardian edge + holds a Supporter edge. Same human, four capabilities stacked. The UX surfaces the current hat (the family operator's "manage my family" surface vs. the household supporter/helper's "help my kid with homework" surface).
 
 **The split cases (off-ICP for v1, designed-for-later):** a grandparent who is the Payer but not the Guardian; a court-appointed guardian who is the Guardian but not the Payer. The data model supports the splits; the v1 UX doesn't surface them.
 
@@ -302,12 +302,12 @@ The pre-baseline migration lands as a single atomic migration per the MMT-ADR-00
 ## Consequences
 
 - **The pre-baseline window is used.** All amendments land in the baseline migration; post-baseline is append-only. The MMT-ADR-0012 ratifies the window; this ADR uses it.
-- **The capability matrix is updated.** Guardian = consent only. Mentor = data access only. Profile mgmt = Subscription administrator. Payer = sub field. The matrix in `domain-model.md` and the `CONTEXT.md` glossary entry update lockstep.
+- **The capability matrix is updated.** Guardian = consent only. Supporter = data access only. Profile mgmt = Subscription administrator. Payer = sub field. The matrix in `domain-model.md` and the `CONTEXT.md` glossary entry update lockstep.
 - **Charge terminology is canonical.** The sweep report is the audit trail; the new schema columns and table names use "charge" / "guardianship" / "charge_person_id" exclusively.
 - **The Payer architecture is permissive at the data layer, restrictive at the UX layer.** The data model supports 3d/3e Payer-holders; the v1 UX surfaces only 3a/3b/3c. v1.1 (or a phase-2 11+ flip) re-evaluates.
 - **The `allowed_models` table is the contract between vetting and routing.** Per MMT-ADR-0014's A1 hard split, the two workstreams share the table schema and nothing else.
 - **The `knowledge_assertions` table is the legal artifact.** The audit trail for COPPA actual-knowledge + GDPR Art 8 reasonable-efforts verification + ICO Children's Code best-interests audit. The history is the *legal* artifact, not just a debugging nicety.
-- **The 6-persona set is expressible in the data model.** Adult self-directed learner (Persona 1) + Self-consenting minor (Persona 2) + Non-consenting minor / managed profile (Persona 3) + Subscription administrator (Persona 4) + Household mentor (Persona 5) + Non-familial mentor (Persona 6) all map to first-class data-model primitives.
+- **The 6-persona set is expressible in the data model.** Adult self-directed learner (Persona 1) + Self-consenting minor (Persona 2) + Non-consenting minor / managed profile (Persona 3) + Subscription administrator (Persona 4) + Household supporter (Persona 5) + Non-familial supporter (Persona 6) all map to first-class data-model primitives.
 
 ## Supersession / amendment relationships
 

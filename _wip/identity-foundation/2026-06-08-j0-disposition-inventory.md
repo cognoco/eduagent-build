@@ -3,16 +3,16 @@ title: Phase J0 — Canon-Shape Disposition Inventory (Task T1)
 date: 2026-06-08
 phase: J0
 plan: docs/plans/2026-06-08-identity-foundation-canon-shape-scrub.md
-status: draft — awaiting architect ratification of §Open Decisions
+status: complete — ratified and executed in J0
 ---
 
 # Phase J0 — Disposition Inventory
 
-**What this is.** Task **T1** of the canon-shape scrub plan: a section-by-section disposition
-map for the four identity-foundation domain docs scheduled to graduate `_wip/identity-foundation/`
-→ `docs/canon/`. Each section gets exactly one disposition; non-canon material gets a named
-destination; standing rules trapped in working-state get flagged for rescue. **No document is
-edited yet** — this inventory is the input the architect ratifies before any scrub/move runs.
+**What this is.** Task **T1** of the canon-shape scrub plan: the section-by-section disposition
+map used by J0 to graduate the four identity-foundation domain docs into `docs/canon/identity/`.
+Each section got exactly one disposition; non-canon material got a named destination; standing rules
+trapped in working-state were flagged for rescue. This inventory is now the provenance for the
+completed scrub/move, not a pending-edit plan.
 
 **Disposition rule (one per section):**
 - **KEEP-L1** — standing rule (the *what*: contract / invariant / target model / vocabulary).

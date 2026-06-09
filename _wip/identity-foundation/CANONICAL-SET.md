@@ -1,11 +1,11 @@
-# Identity-Foundation Canonical Set — locked 2026-06-08 (Phase G)
+# Identity-Foundation Canonical Set — locked 2026-06-08 (Phase G), updated by J0
 
 **What this is.** The *explicit, named* set of documents that constitute the ratified
-canon of the identity-foundation carve-out as of the close of Phase F. Phase G is
-**confirmation only** — every document below already exists and was ratified in its
-own phase; this file does the one thing the runway had not yet done: state the set
-*as a set*, name each member's **role**, and fix it as the **lens** the downstream
-work reads against.
+canon of the identity-foundation carve-out. Phase G locked the initial set; **J0
+graduated the four L1 domain docs to `docs/canon/identity/` and added the rescued
+compliance register as an L1 member**. This file states the set *as a set*, names
+each member's **role**, and fixes it as the **lens** the downstream work reads
+against.
 
 **Why it exists (its two jobs).**
 1. **Lens for the gap analysis (Phase L).** L tags every audit finding with a
@@ -16,9 +16,9 @@ work reads against.
    cited to ADRs + the data model. H may cite **only** what is in this set; anything
    not here is not yet canon and must not be load-bearing in H.
 
-**Boundary.** This file *names and confirms*; it does **not** edit, re-home, or
-restructure any member (that is Phase J) and does **not** author new canon (that is
-Phase H). Membership is the deliverable.
+**Boundary.** This file *names and confirms*; it does not itself author new canon.
+J0 changed physical homes and rescued the compliance register; future set changes
+after J0 remain ADR-class events.
 
 **Why the members live where they do (and what moves when).** Per
 `MMT-ADR-0000` §I.4 — the physical-placement rule, **as revised by the 2026-06-08
@@ -28,21 +28,15 @@ layers land in `docs/` on different timelines:
 - **ADRs (L2) are global from birth** → already at `docs/adr/`. ✅ placed.
 - **Registers (L3, type-named)** → already at `docs/registers/`. ✅ placed.
 - **A stream's domain canon (L1) incubates in `_wip/<slug>/` only until it is
-  *ratified and stable*, then folds into `docs/canon/` — within the runway.** The
-  four domain docs below are ratified (Phase D/E), so they are scheduled to graduate
-  to `docs/canon/` at the **front of Phase J** (before J's memory-pointer work, so
-  pointers + the doc index target final paths). They are in `_wip/` *right now* only
-  because the move executes at J(0); this Phase-G doc still cites their current `_wip/`
-  paths and those citations update at the move.
+  *ratified and stable*, then folds into `docs/canon/` — within the runway.** J0
+  executed this for identity: the four domain docs now live in `docs/canon/identity/`
+  with prefix-dropped filenames.
 - **Runway-control docs stay in `_wip/`** — this `CANONICAL-SET.md`, `ROADMAP.md`,
   the handoffs, and the immutable A-vs-B memo are not domain canon; they remain.
 
-**Phase G itself moves nothing** — it *names* the set; **Phase J(0)** performs the
-domain-canon graduation, and **Phase J(c)** separately drains the loose root estate
-canon (`architecture.md`, `PRD.md`, `ux-design-specification.md`) → `docs/canon/`.
-Both J steps are **gated on this Phase-G lock** (you can't sort or graduate canon
-until "the canonical set" is a closed list — which this file makes it). So G is the
-*prerequisite* that unblocks the moves, not the move itself.
+**Phase G itself moved nothing** — it named the set. **J0 performed the
+domain-canon graduation.** The loose root estate canon (`architecture.md`, `PRD.md`,
+`ux-design-specification.md`) still drains separately in Phase J / Stream 2.
 
 ---
 
@@ -61,7 +55,7 @@ relative to the repo root.
 | 2 | `docs/canon/identity/domain-model.md` | The **domain model** — entities / roles / consent model / tenancy; org & membership **re-derived, not inherited**. | Phase D · 2026-06-03 · graduated J0 |
 | 3 | `docs/canon/identity/data-model.md` | The **target schema** — 8 tables + cut strategy + the F.1 lockstep SQL for the `MMT-ADR-0015` amendments (`kind` column, seam columns, `allowed_models`). | Phase E · 2026-06-04, amended F.1 · 2026-06-08 · graduated J0 |
 | 4 | `docs/canon/identity/prd.md` | The **product layer** — personas (6), the three-axis age model, 13+ launch floor with sub-13 built-but-gated, ICP-vs-persona distinction; Part 10 settled product/UX rulings. | Phase B · 2026-06-02 (Part 10 ripple) · graduated J0 |
-| + | `docs/compliance/identity-compliance-register.md` | The **compliance obligations** rescued from the PRD decision queue in J0 — binding rules (COPPA / GDPR / EU AI-Act / OSA / DPIA) + locked product parameters. **New J0 member** (set was 17 at Phase-G lock; now 18). | Phase J0 · 2026-06-08 |
+| + | `docs/compliance/identity-compliance-register.md` | The **compliance obligations** rescued from the PRD decision queue in J0 — binding rules (COPPA / GDPR / EU AI-Act / OSA / DPIA) + locked product parameters. **New J0 member** (set was 19 at Phase-G lock after the 0001/0002 correction; now 20). | Phase J0 · 2026-06-08 |
 
 ### L2 — Decisions (the *why*: ADRs)
 
@@ -132,15 +126,18 @@ the only outstanding signature — **HW-2**, a tracked contingency, not launch-b
 
 ## Status
 
-**Phase G canonical set: LOCKED 2026-06-08.** Membership is closed at **19 entries**
-(17 canon L1/L2 + 1 register-by-reference + 1 audit-trail memo; 2 supporting specs
-named-but-not-members). This is the lens for Phase L and the citation boundary for
-Phase H. Changes to the set after this point are themselves ADR-class events.
+**Canonical set status: LOCKED 2026-06-08; J0 placement update applied 2026-06-08.**
+Membership is now **20 entries** (18 L1/L2 canon entries, including the J0-added
+compliance register, + 1 register-by-reference + 1 audit-trail memo; 2 supporting
+specs named-but-not-members). This is the lens for Phase K/L and the citation
+boundary for the identity architecture carve-out. Changes to the set after J0 are
+themselves ADR-class events.
 
 > **Correction (2026-06-08, post-lock).** The initial lock listed 17 entries; it
 > **omitted `MMT-ADR-0001`** (own the identity/tenancy graph — the tenancy foundation
 > `0007` builds on) **and `MMT-ADR-0002`** (Payer capacity store-delegated). Both are
 > `Accepted`, scoped *Identity Foundation*, and load-bearing for the carve-out — the
 > omission was an error caught by the Phase-H plan's citation self-review, not a
-> re-decision. Set corrected to 19. (`MMT-ADR-0004` mobile-IAP rails remain *out* —
+> re-decision. Set corrected to 19, then J0 added the compliance register as the
+> 20th member. (`MMT-ADR-0004` mobile-IAP rails remain *out* —
 > billing mechanism, not core identity canon, like the routing specs.)

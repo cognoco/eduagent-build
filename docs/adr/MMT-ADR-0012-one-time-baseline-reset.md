@@ -33,7 +33,7 @@ design doc are **one artifact**; (b) no four-file-per-table archaeology for any 
 Concretely:
 
 1. The migration **`0106` and its backfill** (and any consent-revoke shape carried by `consent_states` that the target schema doesn't reproduce) are **removed from the effective chain** — not undone with a follow-up migration. This is the "documented reset" — recorded in the migrations directory README and in the Phase-F handoff.
-2. **One** baseline migration in Phase F creates the eight target tables (`person`, `organization`, `membership`, `subscription`, `guardianship`, `mentorship`, `consent_grant`, and the `person_retain` set) from empty. The design doc (`data-model.md` §1, §2) and the first migration are the *same* statement.
+2. **One** baseline migration in Phase F creates the eight target tables (`person`, `organization`, `membership`, `subscription`, `guardianship`, `supportership`, `consent_grant`, and the `person_retain` set) from empty. The design doc (`data-model.md` §1, §2) and the first migration are the *same* statement.
 3. **From this baseline forward, append-only migrations are absolute.** No future squash, rewrite, or carve-out. The reset is the only exception — ever.
 4. The reset is **visible to a future contributor**: a `## Baseline` section in the migrations dir, dated 2026-06-04, pointing at this ADR; the next contributor sees the cutoff and trusts the chain after it.
 
