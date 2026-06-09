@@ -1,7 +1,7 @@
 ---
 title: Phase N.1 — Sequencing (dependency map + critical path)
 date: 2026-06-09
-status: DRAFT — awaiting architect ratification (Phase N is `Claude — you ratify`)
+status: RATIFIED 2026-06-09 (architect sign-off; committed 13770b7c7)
 phase: N.1 (follows N.0; feeds Phase O master plan)
 inputs:
   - docs/audit/2026-05-29-full-audit/M-triage-closure.md (four-bucket triage)
@@ -199,8 +199,10 @@ The 125 clear-out + 9 deferred findings are owned elsewhere. Listed for complete
 ordering is O's job, governed by the blast-radius axis (in clean-cut radius → serialize
 behind execution; outside → parallel-safe):
 
-- **Clear-out (125), by owner spread (21+ workstreams):** l10n-a11y-mobile (34 — mostly
-  outside radius, parallel-safe), security-pii-api / -inngest (the non-IF code remainder),
+- **Clear-out (125), by owner spread (21+ workstreams):** l10n-a11y-mobile (**34 rows =
+  33 `F-` findings + `INV-1`**; mostly outside radius, parallel-safe — note the roster's
+  PRG-12 "33" counts findings only and omits the invariant row, so reconcile it *up* to 34),
+  security-pii-api / -inngest (the non-IF code remainder),
   architecture-as-code (god-modules, package-boundaries — partly in radius), errors-api,
   agent-instructions (10 — owned by Harness Hygiene / roster **PRG-03**, sequenced pre-P),
   plus singletons (backend-performance, platform-infra, secrets-hygiene, ci-cd-hardening,

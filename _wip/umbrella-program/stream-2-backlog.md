@@ -133,7 +133,7 @@ coverage requirement without that category error, every one of the 134 is accoun
 | `navigation/audience-matrix` (F-176) | 1 | code bug + doc-relocation | test applied → **DEFER** (Pop A; matrix relocation feeds Stream-2 inbound) |
 | `platform-security / ci-cd-hardening` (F-116) | 1 | skill/doc-ish | test applied → **DEFER** (own workstream; dedupe vs tech-skill-group) |
 | `architecture` (incl. F-012 doc-rot) | 25 | 1 canon/doc (F-012, Pop A) + 24 code-structural | F-012 test-applied DEFER; the 24 are **category-excluded** → own workstream, N.1/O blast-radius (some in-radius) |
-| `l10n-a11y-mobile` | 34 | code/mobile (UI/i18n/a11y) | **category-excluded** → out-of-radius, parallel-safe |
+| `l10n-a11y-mobile` | 34 (33 findings + INV-1) | code/mobile (UI/i18n/a11y) | **category-excluded** → out-of-radius, parallel-safe |
 | `security-pii-api` | 27 | code (the non-IF remainder) | **category-excluded** → own workstream, blast-radius (IF slice already bucket-2) |
 | `errors-api` | 8 | code | **category-excluded** → own workstream |
 | `security-pii-inngest` | 6 | code | **category-excluded** → own workstream |
