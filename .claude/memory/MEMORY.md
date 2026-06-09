@@ -62,7 +62,6 @@
 - Windows paths: Emulator/ADB at `C:\Android\Sdk`, Doppler at `C:\Tools\doppler\doppler.exe`. macOS/Linux: standard PATH.
 - [project_eas_build.md](project_eas_build.md) — EAS Build config, OTA operational, NX Cloud disconnected (2026-06-01, IID-792), Sentry upload disabled.
 - [project_eas_update_ota.md](project_eas_update_ota.md) — OTA IMPLEMENTED. JS-only changes deploy in ~5 min via expo-updates.
-- [project_fingerprint_pnpm_mismatch.md](project_fingerprint_pnpm_mismatch.md) — Fingerprint policy fails in pnpm monorepo. Using appVersion policy.
 - [project_ci_infrastructure.md](project_ci_infrastructure.md) — path filters, E2E APK caching, .nx/cache (NX Cloud disconnected, IID-792), Husky pre-commit.
 
 ## Testing Infrastructure
@@ -75,7 +74,6 @@
 
 - [feedback_doppler_secrets.md](feedback_doppler_secrets.md) — All secrets via Doppler. EXPO_PUBLIC vars synced via `pnpm env:sync`.
 - [doppler-secrets.md](doppler-secrets.md) — Test secret resolution: project `mentomate`, configs `dev/stg/prd`. `DATABASE_URL` and friends needed by `*.test.ts` files that include integration paths. Archon's validate/push wrap via `doppler run`.
-- [load-database-env-windows-hardcode.md](load-database-env-windows-hardcode.md) — `packages/test-utils/.../load-database-env.ts` hardcodes Windows Doppler path; macOS/Linux must use external `doppler run` wrap.
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`). Staging synced 2026-04-17.
 - [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.
 
@@ -133,7 +131,6 @@
 
 - [reference_notion_workspace.md](reference_notion_workspace.md) — Issue Tracker split 2026-05-18: NEW bugs → Open `3598bce9...`; Resolved archive `b8ce802f...`. REST via Doppler.
 - [project_expo_web_preview.md](project_expo_web_preview.md) — `.claude/launch.json` `mobile` target. Cold bundle ~18s. Auth-walled past sign-in.
-- [nativewind-windows.md](nativewind-windows.md) — pnpm patchedDependencies + metro forceWriteFileSystem.
 - Template repo extraction plan — tracked in Notion (archived from memory 2026-05-04).
 - [feedback_notion_resolution_recording.md](feedback_notion_resolution_recording.md) — Record resolution on Done items. Never reopen.
 
