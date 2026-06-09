@@ -37,7 +37,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [project_llm_source_provenance.md](project_llm_source_provenance.md) — Private source provenance, sourceAudit metadata, and 0.88-gated general knowledge for ordinary rung 1-4 tutoring exchanges.
 - [billing-payments.md](billing-payments.md) — Mobile IAP (RevenueCat), Stripe dormant for future web. Epic 9 COMPLETE.
 - [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit, advanced help from rung 4+, GPT-5.4 default OpenAI candidate only rung 5+.
-- [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). Consent/geography now governed by age-floor decision doc.
+- [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). Consent/age-floor → `docs/compliance/identity-compliance-register.md` (canon).
 - [project_themekey_removed.md](project_themekey_removed.md) — NEVER use key={themeKey} OR Animated.View opacity on root layout.
 - [feedback_drizzle_transaction_cast.md](feedback_drizzle_transaction_cast.md) — PgTransaction → Database cast pattern for transactions.
 
@@ -94,13 +94,12 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Brand & UX Decisions
 
 - [project_brand_dark_first.md](project_brand_dark_first.md) — Teal primary + lavender secondary. No accent picker. Dark default.
-- [project_product_roles_students_any_age.md](project_product_roles_students_any_age.md) — MentoMate is for students of any age; parent/family mode is layered on top, and parents can also study for themselves.
+- [project_product_roles_students_any_age.md](project_product_roles_students_any_age.md) — Pointer: role/persona/login model → `docs/canon/identity/` (ontology + prd Part 10); nav IA → navigation-contract/audience-matrix. Caution: not a kids-only app.
 - Coaching cards REMOVED, intent cards in place (archived from memory 2026-05-04).
 
 ## Persona Architecture (Epic 12 — COMPLETE, ThemeContext cleaned 2026-04-15)
 
-- [project_persona_removal.md](project_persona_removal.md) — personaType DB enum removed. Tokens flat by colorScheme.
-- [feedback_persona_vs_role.md](feedback_persona_vs_role.md) — Server-side: use family_links role, not birthYear age.
+- [feedback_persona_vs_role.md](feedback_persona_vs_role.md) — Server-side: use `resolveProfileRole` (relationship-derived), not birthYear age. (`personaFromBirthYear` is a removed fossil.)
 
 ## Core Learning Philosophy
 

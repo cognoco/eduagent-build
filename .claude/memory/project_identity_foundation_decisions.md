@@ -19,6 +19,12 @@ not here.
 
 **Live data (not canon, DB-bound):** `docs/registers/llm-models/` — vetted model master + per-change vetting trail. Procedure: `docs/runbooks/llm-model-vetting.md`.
 
-**Stream canon + tracker:** `_wip/identity-foundation/` — `ROADMAP.md` (live status, phases A–P), `identity-ontology.md`, `domain-model.md`, `data-model.md`, `identity-foundation-prd.md`, the signed A-vs-B memo.
+**Graduated canon (L1 — system of record; J0 moved these out of `_wip/`):**
+`docs/canon/identity/{ontology,domain-model,data-model,prd}.md` + the compliance member
+`docs/compliance/identity-compliance-register.md`. Canon membership: `_wip/identity-foundation/CANONICAL-SET.md`;
+cross-layer map: `docs/INDEX.md`.
+
+**Stream tracker (working state, NOT canon):** `_wip/identity-foundation/ROADMAP.md` (live status,
+phases A–P) + the signed A-vs-B memo (`_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md`).
 
 **Current state pointer:** read `_wip/identity-foundation/ROADMAP.md` for phase status and `_wip/identity-foundation/CANONICAL-SET.md` for canon membership. Carried contingency remains R-1 (COPPA) provisional posture — real counsel sign-off (HW-2) owed before any sub-13/v2 build, not launch-blocking for the runway.
