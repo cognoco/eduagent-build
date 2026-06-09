@@ -57,7 +57,14 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **Depends-on:** **Phase P (Cosmo slicing / execution start) is blocked-by
   Harness-Hygiene exit-gate `WI-530`** (mirrored by boundary node `WI-533`).
 - **Decomposition:** `_wip/identity-foundation/ROADMAP.md` (the top-down delivery
-  doc; Phases A–J done, K/L/M in flight).
+  doc; Phases A–O done 2026-06-09 — master plan `2026-06-09-phase-o-master-plan.md`
+  ratified; Phase P awaits `WI-530`).
+- **W0 decoupled (2026-06-09):** the 11 patch-now security defects ship immediately
+  on the current harness, ungated by `WI-530`/Phase P (O §7 decision 4). Instantiated
+  in Cosmo: **`WI-549`** (api bundle, 7 findings, WP) · **`WI-550`** (inngest bundle,
+  3 findings, WP) · **`WI-551`** (billing F-121, Item) — all `Ready`/`Assisted`,
+  project MentoMate. Live state is Cosmo's; this is a pointer. (Baseline reset stays
+  gated with W1.)
 - **Activate-when:** — (active)
 
 ### PRG-02 · Harness Hygiene — `active`
