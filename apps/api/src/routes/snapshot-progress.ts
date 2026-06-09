@@ -73,7 +73,11 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
       // [F-144] listRecentMilestones backfills (writes) missed milestones. In
       // proxy mode (a parent acting on a child via X-Profile-Id, isOwner=false)
       // the read is allowed but the write must not fire on the child's behalf.
-      const allowBackfill = c.get('profileMeta')?.isOwner !== false;
+      // Fail CLOSED on unknown ownership: only an explicitly-confirmed owner
+      // profile may trigger the backfill write (mirrors assertNotProxyMode,
+      // which treats absent profileMeta as proxy — BUG-975). Suppressing the
+      // write on unknown meta is the safe direction (the read still returns).
+      const allowBackfill = c.get('profileMeta')?.isOwner === true;
 
       const milestones = await listRecentMilestones(
         db,
