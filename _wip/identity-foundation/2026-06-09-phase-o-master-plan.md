@@ -457,11 +457,13 @@ this section reproduces its accounting for completeness and must not diverge fro
 **Bucket-1 (already-handled): 0** — demonstrated empty by the evidence-gated doc-fix scan
 (`M-triage-closure.md`).
 
-**Live-exposure flag — F-035 (⚑).** `secrets-hygiene` owns a plaintext Logfire secret-key pair in
-`.claude/settings.local.json` (gitignored — verify/rotate on the deploying machine, not via a repo
-clone). It is **not** an identity pull-forward and **not** one of the 11
-execution-blocking rows — but it is a **live secret leak** that should be rotated/removed promptly
-in its own right, surfaced here so it is not lost in a defer bucket. Independent of this runway.
+**Live-exposure flag — F-035 (⚑) — RESOLVED post-ratification (2026-06-09).** `secrets-hygiene`
+owned a plaintext Logfire secret-key pair in `.claude/settings.local.json` (gitignored). It was
+**not** an identity pull-forward and **not** one of the 11 execution-blocking rows, but was
+flagged here as a live secret leak so it would not be lost in a defer bucket. **Remediated the
+same day this plan was ratified:** file cleaned + Logfire key rotated on the provider side
+(operator-confirmed) — closure record in `L-gap-delta.md` F-035 row. Treat all "rotate now"
+language for F-035 in this doc (incl. the blast-radius table below) as satisfied.
 
 ### Blast-radius ordering (the Phase-O mandate over the out-of-scope set)
 
