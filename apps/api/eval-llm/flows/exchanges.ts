@@ -368,7 +368,12 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     id: 'S20-challenge-offered',
     purpose:
       'Challenge Round offered — challengeEligible true, no active round; prompt should include offer block',
-    history: HISTORY_S1_RUNG1,
+    // HISTORY_S3_RUNG3, not the empty S1 history [WI-556]: exchangeCount=5
+    // means buildPrompt derives the user turn from history, and an empty
+    // history made runLive throw ("messages.user is undefined") — the only
+    // 5 items of the 232-item envelope matrix with no live sample. The
+    // challenge family (S21/S22) already uses mid-session histories.
+    history: HISTORY_S3_RUNG3,
     contextOverrides: {
       escalationRung: 3,
       sessionType: 'learning',
@@ -680,6 +685,12 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
       ageBracket: resolveAgeBracket(input.context.birthYear),
       conversationLanguage: input.context.conversationLanguage,
       pronouns: input.context.pronouns,
+      // Production fidelity [WI-556]: processExchange requests JSON-mode
+      // output (exchanges.ts responseFormat: 'json'). Without it the model
+      // answers in prose on ~35% of turns and the harness measures its own
+      // omission, not production envelope compliance — observed as
+      // envelopeOk 0.65 here vs 1.0 on the probes flow (which passes it).
+      responseFormat: 'json',
     });
   },
 };

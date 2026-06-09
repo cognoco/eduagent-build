@@ -59,7 +59,7 @@ them to a checked-in `baseline.json`.
 |---|---|---|---|
 | `pnpm eval:llm -- --validate-baseline` | **No** | **Yes** | CI/PR guard: fails if `baseline.json` is a placebo (`flows: {}` / `n=0`). No Doppler, no credits. |
 | `doppler run -- pnpm eval:llm -- --live --update-baseline` | Yes | No | **One-time seed / intentional re-baseline.** Writes real metrics to `baseline.json`; commit after. |
-| `doppler run -- pnpm eval:llm -- --live --check-baseline` | Yes | No | Compare a live run against the committed baseline; exits 1 on drift > tolerance (default 5pp). Run manually / on a schedule, never on every PR (it burns credits and is noisy by nature). |
+| `doppler run -- pnpm eval:llm -- --live --check-baseline` | Yes | No | Compare a live run against the committed baseline; exits 1 on drift > tolerance (default 5pp, widened to 2/n for small flows). Run manually / on a schedule, never on every PR (it burns credits and is noisy by nature). |
 
 > **Why the split.** `--check-baseline` needs live, non-deterministic LLM
 > output, so it cannot run key-free on every PR without flakiness. The
@@ -68,6 +68,32 @@ them to a checked-in `baseline.json`.
 > hides drift). **`baseline.json` must be seeded once** with
 > `--live --update-baseline` against staging keys before `--validate-baseline`
 > will pass; until then it intentionally fails to flag the missing baseline.
+
+### Seeding semantics (WI-556)
+
+The seed run must cover **every** `emitsEnvelope` flow with enough budget:
+
+```bash
+doppler run -- pnpm eval:llm -- --live \
+  --flow exchanges --flow probes --flow safety-probes --flow language-quality \
+  --max-live-calls 250 --update-baseline
+```
+
+- **Structural guard:** `--update-baseline` refuses to write a baseline whose
+  flows map is empty or missing any envelope-emitting flow (the same rule set
+  as `--validate-baseline`). A budget-starved run cannot produce the placebo
+  baseline the validator exists to catch.
+- **Quality failures do not block the write — but they are never silent.**
+  The baseline tracks envelope-signal *distribution*; failed samples are part
+  of that distribution (`envelopeOk < 1.0` is itself a tracked rate). When a
+  seed run has scenario-level quality failures, `baseline.json` IS written,
+  the failures are printed, and the run still **exits 1** — triage each
+  failure (fix the prompt/evaluator, or file a work item) before committing
+  the seeded baseline.
+- **Small-sample tolerance:** the drift comparison widens its tolerance to
+  `2/n` per flow, so a flow with n=6 samples (language-quality) does not flag
+  16.7pp "drift" every time a single sample flakes, while large flows keep
+  the flat 5pp sensitivity.
 
 Snapshots land in `apps/api/eval-llm/snapshots/<flow-id>/<profile-id>.md`.
 

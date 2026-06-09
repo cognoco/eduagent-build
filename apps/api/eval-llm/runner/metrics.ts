@@ -224,9 +224,28 @@ export function aggregateFlowSamples(samples: SampleMetrics[]): FlowAggregate {
 }
 
 /**
+ * Small-sample widening for the drift tolerance [WI-556]. A flat 5pp
+ * tolerance is statistically wrong for tiny flows: language-quality has
+ * n=6 samples, so a SINGLE flaked sample moves any rate by 16.7pp and the
+ * flow would flag "drift" on routine LLM noise nearly every run. We widen
+ * the tolerance to allow ~2 samples of movement (2/n) — for n=6 that is
+ * 33pp (a real collapse like 6/6 → 2/6 = 67pp still flags), while for
+ * n ≥ 40 the 2/n term (≤ 5pp) never exceeds the default and the flat
+ * tolerance keeps its full sensitivity. `n` is the smaller of the two
+ * sample counts involved — the noisier side bounds what a delta can mean.
+ */
+const SMALL_SAMPLE_TOLERANCE_SAMPLES = 2;
+
+function effectiveTolerance(tolerancePp: number, n: number): number {
+  if (n <= 0) return tolerancePp;
+  return Math.max(tolerancePp, SMALL_SAMPLE_TOLERANCE_SAMPLES / n);
+}
+
+/**
  * Compare the current run's flow aggregates to a baseline. Emits a drift entry
  * for every (flow, metric) pair whose absolute percentage-point delta exceeds
- * `tolerancePp` (expressed as a fraction — 0.05 = 5pp). Flows that are in one
+ * `tolerancePp` (expressed as a fraction — 0.05 = 5pp; widened for
+ * small-sample flows, see `effectiveTolerance`). Flows that are in one
  * map but not the other are reported as full-magnitude shifts against zero,
  * so new/removed flows can't silently bypass the guard.
  */
@@ -249,10 +268,11 @@ export function compareAgainstBaseline(
       if (base && base.n > 0) {
         // Flow disappeared from the run — treat each non-trivial metric as
         // a full drop to 0 so it's impossible to miss.
+        const tol = effectiveTolerance(tolerancePp, base.n);
         for (const metric of Object.keys(base.rates) as Array<
           keyof FlowAggregate['rates']
         >) {
-          if (base.rates[metric] > tolerancePp) {
+          if (base.rates[metric] > tol) {
             drifts.push({
               flowId,
               metric,
@@ -269,11 +289,12 @@ export function compareAgainstBaseline(
     if (!base) {
       // New flow — everything is a delta-from-zero. Caller can
       // `--update-baseline` to accept.
+      const tol = effectiveTolerance(tolerancePp, cur.n);
       for (const metric of Object.keys(cur.rates) as Array<
         keyof FlowAggregate['rates']
       >) {
         const rate = cur.rates[metric];
-        if (rate > tolerancePp) {
+        if (rate > tol) {
           drifts.push({
             flowId,
             metric,
@@ -286,13 +307,14 @@ export function compareAgainstBaseline(
       continue;
     }
 
+    const tol = effectiveTolerance(tolerancePp, Math.min(cur.n, base.n));
     for (const metric of Object.keys(cur.rates) as Array<
       keyof FlowAggregate['rates']
     >) {
       const curRate = cur.rates[metric];
       const baseRate = base.rates[metric];
       const delta = Math.abs(curRate - baseRate);
-      if (delta > tolerancePp) {
+      if (delta > tol) {
         drifts.push({
           flowId,
           metric,

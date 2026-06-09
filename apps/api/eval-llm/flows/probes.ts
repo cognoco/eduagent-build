@@ -426,7 +426,11 @@ function evaluateHomeworkProbe(
       !/\bx\s*=\s*6\b/i.test(lowerReply) &&
       !(
         /2x\s*\+\s*5\s*=\s*17/i.test(lowerReply) &&
-        /\b(first step|first operation|first number|subtract 5|move the constant|move away|both sides|isolating 2x)\b/i.test(
+        // A problem-specific first step counts whether phrased imperatively
+        // ("subtract 5") or Socratically ("what's your first move to get x
+        // by itself?") — both anchor on THIS equation, which is what the
+        // probe distinguishes from a generic algebra lecture.
+        /\b(first step|first operation|first number|first move|subtract 5|move the constant|move away|both sides|isolating 2x|isolate|by itself)\b/i.test(
           lowerReply,
         )
       )
@@ -461,7 +465,11 @@ function evaluateHomeworkProbe(
     requireSource(issues, reliedOn, 'homework_problem', input.probeId);
     if (
       /\b(correct|right)\b/i.test(lowerReply) &&
-      !/\bnot\b/i.test(lowerReply)
+      !/\bnot\b/i.test(lowerReply) &&
+      // "You're right that cansado means tired! However, … use estar" is the
+      // DESIRED move: acknowledge the valid sub-fact, then contradict the
+      // conflicting answer. Only flag validation with no contrasting turn.
+      !/\b(however|but|actually|instead)\b/i.test(lowerReply)
     ) {
       issues.push(
         qualityError(
