@@ -291,7 +291,9 @@ describeIfDbF122(
       return row != null;
     }
 
-    // 40 days ago — comfortably past the 30-day retention window.
+    // Cutoff = now − 30 days; a profile archived at/before this date is past
+    // the retention window and eligible for hard-delete. Each test below seeds
+    // its profile with archivedAt = now − 40 days (comfortably past this cutoff).
     const RETENTION_CUTOFF = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     it('deletes an archived, non-consented profile past retention (happy path)', async () => {
