@@ -51,6 +51,7 @@ export function ModeSwitcher(): React.ReactElement | null {
           onPress={() => switchMode('study')}
           disabled={isSwitching}
           accessibilityRole="button"
+          accessibilityLabel={t('tabs.myLearning')}
           accessibilityState={{
             selected: currentMode === 'study',
             disabled: isSwitching,
@@ -84,6 +85,7 @@ export function ModeSwitcher(): React.ReactElement | null {
           onPress={() => switchMode('family')}
           disabled={isSwitching}
           accessibilityRole="button"
+          accessibilityLabel={t('tabs.children')}
           accessibilityState={{
             selected: currentMode === 'family',
             disabled: isSwitching,
@@ -123,24 +125,24 @@ export function ModeSwitcher(): React.ReactElement | null {
           className="flex-row items-center justify-between px-4 py-2 bg-error-soft border-t border-error/30"
         >
           <Text className="flex-1 text-body-sm text-error me-3">
-            Couldn't switch. Tap to try again.
+            {t('chrome.modeSwitcher.switchError')}
           </Text>
           <Pressable
             testID="mode-switcher-error-retry"
             onPress={() => switchMode(switchError)}
             accessibilityRole="button"
-            accessibilityLabel="Retry mode switch"
+            accessibilityLabel={t('chrome.modeSwitcher.retry')}
             className="px-3 py-1 rounded-full bg-error"
           >
             <Text className="text-body-sm font-semibold text-on-error">
-              Retry
+              {t('chrome.modeSwitcher.retry')}
             </Text>
           </Pressable>
           <Pressable
             testID="mode-switcher-error-dismiss"
             onPress={dismissError}
             accessibilityRole="button"
-            accessibilityLabel="Dismiss"
+            accessibilityLabel={t('chrome.modeSwitcher.dismiss')}
             className="ms-2 px-2 py-1"
           >
             <Text className="text-body-sm text-text-secondary">✕</Text>

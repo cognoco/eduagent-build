@@ -27,6 +27,43 @@
       "message": "Isso está demorando mais que o esperado. Verifique sua conexão e tente novamente."
     }
   },
+  "chrome": {
+    "modeSwitcher": {
+      "switchError": "Não foi possível alternar. Toque para tentar novamente.",
+      "retry": "Tentar novamente",
+      "dismiss": "Dispensar"
+    }
+  },
+  "myNotes": {
+    "titleNotes": "Notas",
+    "titleBookmarks": "Marcadores",
+    "titleSessions": "Sessões",
+    "subtitleNotes_one": "{{count}} nota",
+    "subtitleNotes_other": "{{count}} notas",
+    "subtitleBookmarks_one": "{{count}} resposta salva",
+    "subtitleBookmarks_other": "{{count}} respostas salvas",
+    "subtitleSessions_one": "{{count}} sessão",
+    "subtitleSessions_other": "{{count}} sessões",
+    "searchNotes": "Pesquisar notas",
+    "searchBookmarks": "Pesquisar marcadores",
+    "searchSessions": "Pesquisar sessões",
+    "back": "Voltar",
+    "loadMore": "Carregar mais",
+    "tryAgain": "Tentar novamente",
+    "errorNotes": "Não foi possível carregar as notas",
+    "errorBookmarks": "Não foi possível carregar os marcadores",
+    "errorSessions": "Não foi possível carregar as sessões",
+    "emptyNotes": "Ainda não há notas",
+    "emptyBookmarks": "Ainda não há marcadores",
+    "emptySessions": "Ainda não há sessões",
+    "emptyHint": "Eles aparecerão aqui conforme você aprende.",
+    "typeNote": "Nota",
+    "typeBookmark": "Marcador",
+    "typeHomework": "Tarefa",
+    "typeReview": "Revisão",
+    "typeLearning": "Aprendizado",
+    "unknownSubject": "Matéria desconhecida"
+  },
   "quota": {
     "parent": {
       "childCapHit": {
@@ -399,6 +436,20 @@
     }
   },
   "session": {
+    "timer": {
+      "accessibilityLabel": "Tempo de sessão: {{time}}"
+    },
+    "errorBoundary": {
+      "title": "Esta tela teve um problema",
+      "body": "Algo deu errado ao carregar esta tela. Você pode tentar novamente ou voltar ao início."
+    },
+    "challengeAlerts": {
+      "couldNotStart": "Não foi possível iniciar a rodada de desafio",
+      "couldNotUpdate": "Não foi possível atualizar a rodada de desafio",
+      "couldNotSaveNote": "Não foi possível salvar a nota",
+      "noteSaved": "Nota salva.",
+      "couldNotSkipWarmup": "Não foi possível pular o aquecimento"
+    },
     "challenge": {
       "offerTitle": "Pronto para uma rodada de desafio?",
       "tryIt": "Tentar",
@@ -854,7 +905,6 @@
       "reviewFailedTitle": "Falha na revisão",
       "tryAgain": "Tentar novamente",
       "skip": "Pular",
-      "couldNotSaveDictation": "Não conseguimos salvar o resultado do seu ditado.",
       "couldNotSaveTitle": "Não foi possível salvar seu resultado",
       "continueWithoutSaving": "Continuar sem salvar",
       "tookTooLong": "Isso demorou muito — tente novamente",
@@ -892,7 +942,6 @@
       "exit": "Sair"
     },
     "review": {
-      "couldNotSaveResult": "Não conseguimos salvar o resultado da sua revisão.",
       "couldNotSaveTitle": "Não foi possível salvar o resultado",
       "continueWithoutSaving": "Continuar sem salvar",
       "noDataFound": "Dados da revisão não encontrados.",
@@ -1186,8 +1235,7 @@
     "deleteDialog": {
       "title": "Excluir palavra",
       "message": "Remover esta palavra do seu vocabulário?",
-      "errorTitle": "Não foi possível excluir",
-      "errorFallback": "Algo deu errado. Tente novamente."
+      "errorTitle": "Não foi possível excluir"
     },
     "noSubject": {
       "title": "Nenhuma matéria selecionada",
@@ -1439,7 +1487,8 @@
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
-    "microphoneUnavailableTitle": "Microfone indisponível"
+    "microphoneUnavailableTitle": "Microfone indisponível",
+    "microphoneUnavailableBody": "Não foi possível usar o microfone agora. Verifique se o app tem acesso ao microfone e tente novamente, ou digite."
   },
   "progress": {
     "pageTitleMine": "Meu progresso",
@@ -1450,7 +1499,6 @@
     "startLearning": "Começar a aprender",
     "keepLearning": "Continuar aprendendo",
     "refreshFailedTitle": "Falha na atualização",
-    "refreshFailed": "Não conseguimos atualizar seu progresso agora.",
     "hero": {
       "sessionsCompleted": "{{count}} sessão concluída",
       "sessionsCompleted_other": "{{count}} sessões concluídas",
@@ -1554,7 +1602,6 @@
       "deleteConfirm": "Remover",
       "deleteErrorTitle": "Não foi possível remover o marcador",
       "errorLoad": "Não foi possível carregar suas respostas salvas.",
-      "errorNetwork": "Por favor, verifique sua conexão e tente novamente.",
       "retryLabel": "Tentar carregar marcadores salvos novamente",
       "emptyTitle": "Nada salvo ainda",
       "emptySubtitle": "Marque páginas durante as sessões para encontrá-las aqui.",

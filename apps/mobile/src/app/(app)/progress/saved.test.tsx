@@ -275,10 +275,17 @@ describe('SavedBookmarksScreen', () => {
       screen.getByText("We couldn't load your saved items");
     });
 
-    it('shows the network error message from the thrown error', () => {
+    it('shows the classified (formatApiError) message, not the raw error', () => {
+      // The screen now routes the thrown error through formatApiError instead
+      // of rendering err.message verbatim. A plain Error whose message contains
+      // "network" classifies as a network error, so the friendly networkError
+      // copy is shown and the raw "Network failure" string never reaches the UI.
       mockHooks({ isError: true });
       render(<SavedBookmarksScreen />);
-      screen.getByText('Network failure');
+      expect(screen.queryByText('Network failure')).toBeNull();
+      screen.getByText(
+        "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
+      );
     });
 
     it('shows retry button with correct testID', () => {
