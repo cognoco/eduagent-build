@@ -307,14 +307,14 @@
     "screenTitle": "Más",
     "active": "Activo",
     "accommodation": {
-      "sectionHeader": "Tu adaptación de aprendizaje",
       "notSureWhichToPick": "¿No estás seguro de cuál elegir?",
       "guideActive": "Activo",
       "childScreenTitle": "Preferencias de aprendizaje de {{name}}"
     },
     "learningPreferences": {
       "sectionHeader": "Tu aprendizaje",
-      "rowLabel": "Preferencias"
+      "rowLabel": "Preferencias",
+      "screenTitle": "Preferencias de aprendizaje"
     },
     "mentorMemory": {
       "sectionHeader": "Lo que tu mentor sabe"

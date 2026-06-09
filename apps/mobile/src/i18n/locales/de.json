@@ -307,14 +307,14 @@
     "screenTitle": "Mehr",
     "active": "Aktiv",
     "accommodation": {
-      "sectionHeader": "Deine Lernanpassung",
       "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
       "guideActive": "Aktiv",
       "childScreenTitle": "{{name}}s Lernpräferenzen"
     },
     "learningPreferences": {
       "sectionHeader": "Dein Lernen",
-      "rowLabel": "Präferenzen"
+      "rowLabel": "Präferenzen",
+      "screenTitle": "Lernpräferenzen"
     },
     "proxyPreview": {
       "title": "Einstellungen sind in der Elternvorschau gesperrt",

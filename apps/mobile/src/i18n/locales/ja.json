@@ -307,14 +307,14 @@
     "screenTitle": "その他",
     "active": "アクティブ",
     "accommodation": {
-      "sectionHeader": "あなたの学習サポート",
       "notSureWhichToPick": "どれを選べばいいかわからない？",
       "guideActive": "アクティブ",
       "childScreenTitle": "{{name}}の学習設定"
     },
     "learningPreferences": {
       "sectionHeader": "あなたの学習",
-      "rowLabel": "設定"
+      "rowLabel": "設定",
+      "screenTitle": "学習設定"
     },
     "mentorMemory": {
       "sectionHeader": "メンターが知っていること"

@@ -323,14 +323,14 @@
     "screenTitle": "More",
     "active": "Active",
     "accommodation": {
-      "sectionHeader": "Your learning accommodation",
       "notSureWhichToPick": "Not sure which to pick?",
       "guideActive": "Active",
       "childScreenTitle": "{{name}}'s learning preferences"
     },
     "learningPreferences": {
       "sectionHeader": "Your learning",
-      "rowLabel": "Preferences"
+      "rowLabel": "Preferences",
+      "screenTitle": "Your learning preferences"
     },
     "proxyPreview": {
       "title": "Settings are paused in parent preview",

@@ -307,14 +307,14 @@
     "screenTitle": "Mer",
     "active": "Aktiv",
     "accommodation": {
-      "sectionHeader": "Din læringstilpasning",
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "guideActive": "Aktiv",
       "childScreenTitle": "{{name}}s læringsinnstillinger"
     },
     "learningPreferences": {
       "sectionHeader": "Din læring",
-      "rowLabel": "Preferanser"
+      "rowLabel": "Preferanser",
+      "screenTitle": "Læringsinnstillinger"
     },
     "mentorMemory": {
       "sectionHeader": "Hva mentoren din vet"

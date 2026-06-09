@@ -332,14 +332,14 @@
     "screenTitle": "Więcej",
     "active": "Aktywny",
     "accommodation": {
-      "sectionHeader": "Twoje dostosowanie nauki",
       "notSureWhichToPick": "Nie wiesz, które wybrać?",
       "guideActive": "Aktywny",
       "childScreenTitle": "Preferencje nauki — {{name}}"
     },
     "learningPreferences": {
       "sectionHeader": "Twoja nauka",
-      "rowLabel": "Preferencje"
+      "rowLabel": "Preferencje",
+      "screenTitle": "Preferencje nauki"
     },
     "mentorMemory": {
       "sectionHeader": "Co wie Twój mentor"
