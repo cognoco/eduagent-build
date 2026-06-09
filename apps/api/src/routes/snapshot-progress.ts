@@ -74,9 +74,10 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
       // proxy mode (a parent acting on a child via X-Profile-Id, isOwner=false)
       // the read is allowed but the write must not fire on the child's behalf.
       // Fail CLOSED on unknown ownership: only an explicitly-confirmed owner
-      // profile may trigger the backfill write (mirrors assertNotProxyMode,
-      // which treats absent profileMeta as proxy — BUG-975). Suppressing the
-      // write on unknown meta is the safe direction (the read still returns).
+      // profile may trigger the backfill write. This is stricter than
+      // assertNotProxyMode (which only treats absent profileMeta as proxy) —
+      // here even a present-but-non-true isOwner suppresses the write, the safe
+      // direction for a write-on-read (the read itself still returns).
       const allowBackfill = c.get('profileMeta')?.isOwner === true;
 
       const milestones = await listRecentMilestones(
