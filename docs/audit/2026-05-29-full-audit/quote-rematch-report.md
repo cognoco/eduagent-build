@@ -134,5 +134,5 @@ Each of the 17 residual rows was read against its cited source file. **Verdict: 
 | **Total** | **75** | **All real and correctly sourced** |
 
 ### Carry-forward
-- This does NOT resolve scope: 9 of the 17 are also scope-disputed and still go to Gate 1 for the in/out question.
+- This pass resolved **provenance only**, not scope. The 9 of 17 residuals that were also scope-disputed were ruled at **Gate 1 (closed 2026-06-09)** — see `gate1-closure.md` for their in/out disposition; none remain contested.
 - Workflow fix for future runs: enforce literal copying in the extract prompt + re-extract loop when the provenance check fails (today it only flags).

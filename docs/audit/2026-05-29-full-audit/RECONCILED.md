@@ -307,9 +307,9 @@ None. All 2 candidate premature-resolution claims were **refuted** by the advers
 - **§2.6 ACG-02** — claim: prd.md (L1, member #4) asserts graduation as a ratified working invariant: R4 — 'Graduation (managed → credentialed) exists and preserves identity (inv 20)' (p… → *refuted:* REFUTED. prd.md is L1 target canon, not as-built status. R4 sits in Part 7 "Required transitions & flows," whose intro states the invariants "force these flows to exist... each as a requirement with its anchor" (prd.md:227-229). R4's "exists" is requirement-grammar ("shall exist"), uniform with R1/R5/R6. "Preserves id…
 - **§8 forks 2,8** — claim: CANONICAL-SET.md Status (line 135) declares the canon 'LOCKED … membership closed at 19 entries' and Memo sign-off (110-115) 'PM sign-off hereby confirmed … th… → *refuted:* REFUTED. Canon "LOCKED" scopes decision-ratification + set-membership, NOT code-resolution; the brief concedes live code still drifts (line 39). RC-07 "no matrix" and isOwner authz are as-built CODE gaps; the ratified ADRs (0007, 0013/0014/0015) ARE the decision — unimplemented code != unratified decision. The drift m…
 
-## K.5 — per-workstream reconciliation sizing (PRE-GATE; re-run after Gate 1)
+## K.5 — per-workstream reconciliation sizing (PRE-GATE — SUPERSEDED by K.5 (POST-GATE) below)
 
-Input to Gate 2 (K.6 reconcile-now-vs-defer). Counts are an upper-bound pre-gate read — ruling contested rows at Gate 1 can dissolve contradictions and lower these.
+Input to Gate 2 (K.6 reconcile-now-vs-defer). Counts are an upper-bound pre-gate read — ruling contested rows at Gate 1 can dissolve contradictions and lower these. **This table is the pre-gate upper bound; the authoritative post-Gate-1 re-size is in the K.5 (POST-GATE) section immediately following.**
 
 | Workstream | Contradictions | Effort | Canon dependency | Readiness | Note |
 |---|---|---|---|---|---|
@@ -319,6 +319,23 @@ Input to Gate 2 (K.6 reconcile-now-vs-defer). Counts are an upper-bound pre-gate
 | security-pii-api | 1 | L | blocking | has-partial-canon | Heaviest: 61 rows (largest volume) + the age-model contradiction. F-130/F-145 are DIFFERENT gates sharing one root weakness (birthYear-only): idx155 fails OPEN by over-aging (a still-10 child passes as 11) at min-age consent; idx174 fails open the pronouns gate when birthYear is… |
 | l10n-a11y-mobile | 0 | S | none | from-scratch | 35 rows, no contradictions. l10n + a11y findings (i18n orphan/untranslated strings, hardcoded JSX English, a11y label/contrast gaps) are almost entirely OUTSIDE IF scope — the canonical set has no l10n/a11y member, so nearly every row classifies in-other-workstream or deferred w… |
 | agent-instructions | 0 | S | none | from-scratch | 16 rows, no contradictions, but carries the corpus's one P0 (C1 — plaintext Logfire sk-lf- secret in settings.local.json, gitignored but in git history). Subject is the agent-instruction surface (CLAUDE.md/AGENTS.md/skills/hooks/memory) — meta-governance, NOT IF domain — so rows… |
+
+## K.5 (POST-GATE) — reconciliation sizing after Gate 1
+
+> Generated 2026-06-09 by `identity-foundation-gate1-finalize.mjs`. Supersedes the pre-gate K.5 upper-bound above. The **cost/value input to K.6** — per IF-obligation-bearing workstream: contradictions resolved, IF-slice effort (the IN work only, after clear-out rows route away), canon dependency, readiness. Qualitative axes carried from the pre-gate sizing; contradiction-resolution + obligation/blocking counts recomputed from the Gate-1 dispositions.
+
+| Workstream | IF obligations | Blocking | Contradictions (pre→post) | IF-slice effort | Canon dependency | Readiness | Note |
+|---|---|---|---|---|---|---|---|
+| security-pii-api | 23 | 7 | 1 → 0 (resolved at Gate 1) | L | blocking | has-partial-canon | Heaviest IF surface: IDOR/proxy/deletion-atomicity + age-gate. F-130/F-145 age-gate-direction contradiction resolved — both ruled IN. |
+| security-pii-inngest | 14 | 3 | 2 → 0 (resolved at Gate 1) | M | blocking | has-partial-canon | F-028/F-019 (mitigation-vs-defect) + F-093/F-122 (deletion-guard) resolved — F-019 ruled live defect, F-093/F-122 both IN. IN work = step-state minor-PII + freeform-filing GDPR guard. |
+| architecture | 7 | 0 | 0 | M | partial | has-partial-canon | Structural: session-exchange.ts decomposition + consent/settings/family SCC + Inngest-registration. Per-item heavy though only 7 obligations. |
+| billing-subscriptions | 2 | 1 | 0 | S | partial | has-partial-canon | Trial-expiry downgrade (blocking) + stranded top-up credits; ADR-0002 store-delegation is the canon hook. |
+| errors-api | 1 | 0 | 0 | XS | none | has-partial-canon | Single envelope hard-fail obligation; all-PASS rule-verification source. |
+| l10n-a11y-mobile | 1 | 0 | 0 | XS | none | from-scratch | One obligation (child sees parent accommodation); the other 34 rows route out as i18n/a11y mechanism. |
+| billing-and-quotas | 1 | 0 | 0 | XS | partial | has-partial-canon | Untested billing/quota/idempotency — payer-model coherence. |
+| **Total (IF obligations)** | **49** | **11** | **3 → 0** | — | — | — | All 3 pre-gate contradictions dissolved by Gate-1 rulings |
+
+> Secondary routing/defer counts (clear-out 125 across 21 named owners; 9 deferred = 7 unassigned + 2 owned) and the full machine-generated table are in `gate1-k5-postgate.md`.
 
 ## QA dashboard
 
@@ -525,5 +542,11 @@ Each row's scope call was flagged by an independent mechanism (adversarial scope
 
 ## Human gates
 
-1. **Gate 1 — contested-set ruling.** Rule the contested rows FIRST — a contested in/out ruling can invalidate one limb of a contradiction, dropping its count.
-2. **Gate 2 — K.6 reconcile-now-vs-defer.** K.6 reconcile-now-vs-defer — architect ruling, fed by the RE-RUN (post-Gate-1) sizing. This is K's exit gate.
+1. **Gate 1 — contested-set ruling. ✅ CLOSED 2026-06-09.** All 125 contested rows ruled under the **layered** policy → 49 in-IF model obligations, 125 in-other-workstream, 9 deferred, 0 contested. Decision record: [`gate1-closure.md`](gate1-closure.md); finalized delta: [`L-gap-delta.md`](L-gap-delta.md); disposition map: [`gate1-disposition.json`](gate1-disposition.json).
+2. **Gate 2 — K.6 reconcile-now-vs-defer. ✅ RATIFIED 2026-06-09.** Fed by **K.5 (POST-GATE)** above. Ratified partition (follows deterministically from the layered ruling):
+   - **Now — N.0 pull-forward: 11 execution-blocking** — live defects fixed independent of the rewrite (patch-now list in `gate1-closure.md`).
+   - **Defer-to-rewrite: 49 in-IF model obligations** — satisfied by construction; the non-blocking live sites are patched opportunistically by their interim owners.
+   - **Route-out: 125 in-other-workstream** — named owners (see K.5 POST-GATE); each workstream owns its own now-vs-defer call.
+   - **Defer-entirely: 9** — no mature owner yet (M bucket 4; 7 fully unassigned, 2 architecture).
+
+   **Phase K is closed.** M (four-bucket triage) may start, seeded by the finalized `L-gap-delta.md` Disposition column.
