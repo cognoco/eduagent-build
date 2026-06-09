@@ -221,6 +221,47 @@ describe('useRevenueCatIdentity', () => {
 
     expect(Purchases.logIn).toHaveBeenCalled();
   });
+
+  // [error-observability H-2] When all retries are exhausted, RevenueCat stays
+  // anonymous and billing receipts would be mis-attributed. The pre-fix code
+  // only added a breadcrumb on exhaustion (invisible unless another exception
+  // fires the same session). The fix escalates to captureException.
+  it('captures to Sentry when identity sync retries are exhausted', async () => {
+    jest.useFakeTimers();
+    const Sentry = require('@sentry/react-native');
+    (Sentry.captureException as jest.Mock).mockClear();
+    // Every attempt fails — initial + MAX_RETRIES(2) retries = 3 logIn calls.
+    (Purchases.logIn as jest.Mock).mockRejectedValue(
+      new Error('Network error'),
+    );
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
+    });
+
+    renderHook(() => useRevenueCatIdentity());
+
+    // Drain the initial attempt + both 3s-delayed retries.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+      await jest.advanceTimersByTimeAsync(3000);
+      await jest.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(Purchases.logIn).toHaveBeenCalledTimes(3);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          surface: 'revenuecat_identity',
+          reason: 'max_retries_exhausted',
+        }),
+      }),
+    );
+
+    jest.useRealTimers();
+  });
 });
 
 // ---------------------------------------------------------------------------
