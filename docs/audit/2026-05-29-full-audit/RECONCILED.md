@@ -2,6 +2,8 @@
 
 > Generated 2026-06-09 by `identity-foundation-k-l-consolidation.js` (run `wf_875e3fa8-4bf`). Tables are rendered deterministically from the workflow's verified structured rows — not re-typed by an LLM. Status: **complete** · 183 findings + 2 inventory classes · final-critic verdict **complete** (0 gaps).
 
+> **⚠️ SCOPE SUPERSEDED — Gate 1 closed 2026-06-09.** The scope counts below are the *pre-gate* machine classification (5 in-IF, 125 contested). Final scope is in [`gate1-closure.md`](gate1-closure.md) (**49 in-IF**, 0 contested) and the finalized [`L-gap-delta.md`](L-gap-delta.md). Provenance of contested rows verified in [`quote-rematch-report.md`](quote-rematch-report.md).
+
 ## Executive summary
 
 This document consolidates a FIXED, CLOSED audit corpus — 10 sub-audit sources plus the deepsec handover, 183 raw findings — into one classified, deduplicated findings table the master plan (M/N/O) reads against. This was a classify-and-reconcile pass, NOT new auditing: every row anchors to a verbatim quote from a cited source. The corpus self-consistency is high — only 3 contradictions survived (two audits asserting CONFLICTING things, deliberately NOT merged), and 28 duplicate assertions collapsed into single merged rows.
