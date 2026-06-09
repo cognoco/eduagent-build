@@ -606,33 +606,6 @@ describe('BookScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('does not automatically expand a read-only thin topic list', () => {
-    mockSearchParams = () => ({
-      subjectId: 'sub-1',
-      bookId: 'book-1',
-      readOnly: 'true',
-    });
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          ...makeBookQuery().data,
-          topics: [
-            makeTopic({
-              id: 'topic-1',
-              title: 'Introduction to Programming',
-              sortOrder: 1,
-            }),
-          ],
-        },
-      }),
-    );
-
-    const { queryByTestId } = render(<BookScreen />);
-
-    expect(queryByTestId('book-thin-path-card')).toBeNull();
-    expect(mockGenerateMutate).not.toHaveBeenCalled();
-  });
-
   it('renders continue now and started from in-progress sessions', () => {
     const topics = [
       makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1 }),
@@ -1176,40 +1149,6 @@ describe('BookScreen', () => {
     expect(queryByTestId('book-build-path-link')).toBeNull();
   });
 
-  it('hides the sticky CTA in read-only mode', () => {
-    mockSearchParams = () => ({
-      subjectId: 'sub-1',
-      bookId: 'book-1',
-      readOnly: 'true',
-    });
-
-    const { queryByTestId } = render(<BookScreen />);
-
-    expect(queryByTestId('book-start-learning')).toBeNull();
-  });
-
-  it('auto-starts the up-next topic when autoStart is true', async () => {
-    mockSearchParams = () => ({
-      subjectId: 'sub-1',
-      bookId: 'book-1',
-      autoStart: 'true',
-    });
-
-    render(<BookScreen />);
-
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/(app)/session',
-        params: {
-          mode: 'learning',
-          subjectId: 'sub-1',
-          topicId: 'topic-1',
-          topicName: 'Linear Equations',
-        },
-      });
-    });
-  });
-
   it('shows the generating state while topics are being created', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
@@ -1501,18 +1440,6 @@ describe('BookScreen', () => {
         params: { subjectId: 'sub-1' },
       });
     });
-  });
-
-  it('hides deletion in read-only mode', () => {
-    mockSearchParams = () => ({
-      subjectId: 'sub-1',
-      bookId: 'book-1',
-      readOnly: 'true',
-    });
-
-    const { queryByTestId } = render(<BookScreen />);
-
-    expect(queryByTestId('book-delete-button')).toBeNull();
   });
 
   it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', () => {

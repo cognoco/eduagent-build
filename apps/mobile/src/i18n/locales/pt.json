@@ -333,15 +333,13 @@
     "active": "Ativo",
     "accommodation": {
       "sectionHeader": "Sua acomodação de aprendizagem",
-      "viewAndManage": "Ver e gerenciar",
       "notSureWhichToPick": "Não tem certeza de qual escolher?",
       "guideActive": "Ativo",
       "childScreenTitle": "Preferências de aprendizagem de {{name}}"
     },
     "learningPreferences": {
       "sectionHeader": "Seu aprendizado",
-      "rowLabel": "Preferências",
-      "screenTitle": "Preferências de aprendizagem"
+      "rowLabel": "Preferências"
     },
     "mentorMemory": {
       "sectionHeader": "O que seu mentor sabe"
@@ -968,7 +966,6 @@
       "prepareErrorMessage": "Não foi possível preparar seu ditado. Tentar novamente?",
       "tryAgain": "Tentar novamente",
       "title": "Verifique o texto",
-      "subtitleFromPhoto": "Edite quaisquer erros da foto e, em seguida, comece seu ditado.",
       "subtitleManual": "Revise seu texto e, em seguida, comece seu ditado.",
       "inputPlaceholder": "Digite ou cole seu texto aqui...",
       "inputLabel": "Texto do ditado",
@@ -1147,6 +1144,9 @@
       "mastered": "Dominado",
       "reviewDue": "Revisão pronta",
       "topicProgressThreeState": "{{mastered}} dominados · {{learning}} em aprendizagem · {{total}} no total"
+    },
+    "inactiveFallbackBanner": {
+      "message": "Não foi possível carregar as tuas matérias pausadas e arquivadas. Toca para tentar de novo — elas não desapareceram."
     }
   },
   "topic": {
@@ -1862,7 +1862,6 @@
       "manageMentorMemoryForChild": "Gerenciar o que o mentor lembra sobre {{name}}",
       "profileDetails": "Detalhes do perfil",
       "childProfileJoined": "Adicionado {{date}}",
-      "learningAccommodationTitle": "Acomodação de aprendizado para {{name}}",
       "noLearningPreferenceSet": "Nenhuma preferência de aprendizagem definida",
       "consentTitle": "Consentimento",
       "consentDescription": "Gerencie o consentimento dos pais para {{name}}.",
@@ -2042,10 +2041,6 @@
       "exchangeDelta": {
         "title": "Trocas nesta semana",
         "body": "Quantas trocas de mensagens aconteceram nesta semana em comparação com a semana passada. É um sinal leve de atividade de aprendizagem."
-      },
-      "guidedRatio": {
-        "title": "Prática guiada",
-        "body": "A proporção de respostas do mentor em que seu filho precisou de um exemplo desenvolvido ou de uma orientação mais forte em vez de apenas um empurrãozinho."
       },
       "streakXp": {
         "title": "Sequência e XP",

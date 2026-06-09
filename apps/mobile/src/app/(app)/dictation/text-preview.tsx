@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { usePrepareHomework } from '../../../hooks/use-dictation-api';
-import { firstParam } from '../../../lib/route-params';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import * as Crypto from 'expo-crypto';
@@ -17,16 +16,7 @@ export default function TextPreviewScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  // [WI-269 / DS-180] Expo Router returns `string | string[]` when the same
-  // query key appears more than once in the URL (e.g. a crafted deep link).
-  // Without `firstParam`, the render path's `text.trim()` would throw on an
-  // array, crashing the screen — a client-side denial of the dictation
-  // preview via a deep link.
-  const { ocrText: rawOcrText } = useLocalSearchParams<{
-    ocrText?: string | string[];
-  }>();
-  const ocrText = firstParam(rawOcrText);
-  const [text, setText] = useState(ocrText ?? '');
+  const [text, setText] = useState('');
   const prepareMutation = usePrepareHomework();
   const { setData } = useDictationData();
 
@@ -128,9 +118,7 @@ export default function TextPreviewScreen(): React.ReactElement {
       </View>
 
       <Text className="text-body-sm text-text-secondary mb-3">
-        {ocrText
-          ? t('dictation.textPreview.subtitleFromPhoto')
-          : t('dictation.textPreview.subtitleManual')}
+        {t('dictation.textPreview.subtitleManual')}
       </Text>
 
       <TextInput

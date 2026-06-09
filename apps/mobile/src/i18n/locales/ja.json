@@ -308,15 +308,13 @@
     "active": "アクティブ",
     "accommodation": {
       "sectionHeader": "あなたの学習サポート",
-      "viewAndManage": "表示・管理",
       "notSureWhichToPick": "どれを選べばいいかわからない？",
       "guideActive": "アクティブ",
       "childScreenTitle": "{{name}}の学習設定"
     },
     "learningPreferences": {
       "sectionHeader": "あなたの学習",
-      "rowLabel": "設定",
-      "screenTitle": "学習設定"
+      "rowLabel": "設定"
     },
     "mentorMemory": {
       "sectionHeader": "メンターが知っていること"
@@ -943,7 +941,6 @@
       "prepareErrorMessage": "ディクテーションを準備できませんでした。もう一度試しますか？",
       "tryAgain": "再試行",
       "title": "テキストを確認",
-      "subtitleFromPhoto": "写真からの間違いを編集してから、ディクテーションを開始してください。",
       "subtitleManual": "テキストを確認してから、ディクテーションを開始してください。",
       "inputPlaceholder": "ここにテキストを入力または貼り付け...",
       "inputLabel": "ディクテーションテキスト",
@@ -1122,6 +1119,9 @@
       "mastered": "習得済み",
       "reviewDue": "復習できます",
       "topicProgressThreeState": "習得{{mastered}}・学習中{{learning}}・全{{total}}"
+    },
+    "inactiveFallbackBanner": {
+      "message": "一時停止中・アーカイブ済みの科目を読み込めませんでした。タップして再試行 — データは消えていません。"
     }
   },
   "topic": {
@@ -1837,7 +1837,6 @@
       "manageMentorMemoryForChild": "{{name}}についてメンターが覚えておく内容を管理",
       "profileDetails": "プロフィール詳細",
       "childProfileJoined": "{{date}}に追加",
-      "learningAccommodationTitle": "{{name}}さんのための学習サポート",
       "noLearningPreferenceSet": "学習設定はまだありません",
       "consentTitle": "同意",
       "consentDescription": "{{name}}の保護者同意を管理します。",
@@ -2017,10 +2016,6 @@
       "exchangeDelta": {
         "title": "今週のやり取り",
         "body": "今週と先週を比較したメッセージのやり取り数。学習活動の手軽な目安です。"
-      },
-      "guidedRatio": {
-        "title": "ガイド付き練習",
-        "body": "お子さまが軽い促しではなく、解き方の例やより強いガイドを必要とした返答の割合。"
       },
       "streakXp": {
         "title": "連続記録とXP",

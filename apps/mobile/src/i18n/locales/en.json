@@ -324,15 +324,13 @@
     "active": "Active",
     "accommodation": {
       "sectionHeader": "Your learning accommodation",
-      "viewAndManage": "View & manage",
       "notSureWhichToPick": "Not sure which to pick?",
       "guideActive": "Active",
       "childScreenTitle": "{{name}}'s learning preferences"
     },
     "learningPreferences": {
       "sectionHeader": "Your learning",
-      "rowLabel": "Preferences",
-      "screenTitle": "Your learning preferences"
+      "rowLabel": "Preferences"
     },
     "proxyPreview": {
       "title": "Settings are paused in parent preview",
@@ -1029,7 +1027,6 @@
       "prepareErrorMessage": "Could not prepare your dictation. Try again?",
       "tryAgain": "Try again",
       "title": "Check the text",
-      "subtitleFromPhoto": "Edit any mistakes from the photo, then start your dictation.",
       "subtitleManual": "Review your text, then start your dictation.",
       "inputPlaceholder": "Type or paste your text here...",
       "inputLabel": "Dictation text",
@@ -1062,6 +1059,9 @@
     },
     "staleBanner": {
       "message": "Showing your saved library. Tap to refresh."
+    },
+    "inactiveFallbackBanner": {
+      "message": "Couldn't load your paused and archived subjects. Tap to retry — they're not gone."
     },
     "empty": {
       "title": "Your library will grow as you learn",
@@ -1939,7 +1939,6 @@
       "manageMentorMemoryForChild": "Manage what the mentor remembers about {{name}}",
       "profileDetails": "Profile details",
       "childProfileJoined": "Added {{date}}",
-      "learningAccommodationTitle": "Learning accommodation for {{name}}",
       "noLearningPreferenceSet": "No learning preference set",
       "consentTitle": "Consent",
       "consentDescription": "Manage parental consent for {{name}}.",
@@ -2110,10 +2109,6 @@
       "exchangeDelta": {
         "title": "Exchanges this week",
         "body": "How many message turns happened this week compared with last week. It is a lightweight signal for learning activity."
-      },
-      "guidedRatio": {
-        "title": "Guided practice",
-        "body": "The share of mentor replies where your child needed a worked example or stronger guidance instead of light prompting."
       },
       "streakXp": {
         "title": "Streak and XP",

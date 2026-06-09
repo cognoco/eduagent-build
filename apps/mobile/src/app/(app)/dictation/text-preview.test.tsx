@@ -13,11 +13,6 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 
-// [WI-269] Per-test override for route params so we can simulate Expo Router
-// returning `string[]` when the same query key appears more than once in the
-// URL (e.g. a crafted deep link with duplicate ocrText params).
-let mockOcrTextParam: string | string[] | undefined = undefined;
-
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -25,7 +20,6 @@ jest.mock('expo-router', () => ({
     back: mockBack,
     canGoBack: mockCanGoBack,
   }),
-  useLocalSearchParams: () => ({ ocrText: mockOcrTextParam }),
 }));
 
 const mockPrepareMutateAsync = jest.fn();
@@ -100,7 +94,6 @@ describe('TextPreviewScreen', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     mockPrepareIsPending = false;
-    mockOcrTextParam = undefined;
   });
 
   afterEach(() => {
@@ -201,50 +194,6 @@ describe('TextPreviewScreen', () => {
     });
 
     expect(mockPush).not.toHaveBeenCalled();
-  });
-
-  // -----------------------------------------------------------------------
-  // [WI-269 / DS-180] Duplicate `ocrText` deep-link param must not crash.
-  //
-  // Expo Router returns `string | string[]` when the same query key appears
-  // multiple times in the URL. Pre-fix, the screen used `ocrText` directly as
-  // a string, and the render path's `text.trim()` (button disabled state +
-  // class name) threw "text.trim is not a function" on array input — a
-  // client-side denial of the dictation preview screen via a crafted deep
-  // link. Wrap params with `firstParam` so the screen receives a single
-  // string regardless of how the deep link was constructed.
-  // -----------------------------------------------------------------------
-
-  it('[WI-269] does not crash and seeds the input from the first array element when ocrText arrives as string[]', () => {
-    mockOcrTextParam = ['first deep-linked text', 'second'];
-
-    const { getByTestId } = render(<TextPreviewScreen />);
-
-    const input = getByTestId('text-preview-input');
-    // Pre-fix, render itself threw because `(['first', 'second']).trim()`
-    // ran in the disabled-state expression. The render-without-throw is the
-    // primary assertion; the seeded value is a secondary correctness check.
-    expect(input.props.value).toBe('first deep-linked text');
-  });
-
-  it('[WI-269] uses firstParam normalised value for the subtitle photo-vs-manual conditional', () => {
-    // Ensures both render-path callsites pull from the normalised value
-    // rather than the raw param — i.e. the subtitle treats array input as a
-    // present value (subtitleFromPhoto), not undefined/empty.
-    mockOcrTextParam = ['from-photo'];
-
-    const { queryByText } = render(<TextPreviewScreen />);
-
-    // i18n is initialised against the real English catalog in test-setup.ts,
-    // so query by the rendered English strings (not the raw keys).
-    expect(
-      queryByText(
-        'Edit any mistakes from the photo, then start your dictation.',
-      ),
-    ).toBeTruthy();
-    expect(
-      queryByText('Review your text, then start your dictation.'),
-    ).toBeNull();
   });
 
   it('[BUG-692] does not push to playback when 20s timeout fires before response arrives', async () => {

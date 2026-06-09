@@ -117,7 +117,7 @@ Every in-app surface that starts a path. `mode:` is the route param pushed to `/
 | 4 Practice/Review | topic detail "Review this topic" (overdue) | `/(app)/session` `{mode:'review'}` | ✅ | owner | `topic/[topicId].tsx:458-462` |
 | 5 Relearn | Practice hub "Best next step"; book "review"; CoachBand "Revisit … fading" | `/(app)/topic/relearn` → `{mode:'relearn'}` | ✅ | owner | `practice/index.tsx:513-518`; `book/[bookId].tsx:1184`; `LearnerScreen.tsx:367-372`; `topic/relearn.tsx:316-318` |
 | 6 Recitation | Practice hub `practice-recitation` (Beta) | `/(app)/session` `{mode:'recitation'}` | ✅ | owner | `practice/index.tsx:920-924` |
-| 7 Quiz | Practice hub "Quiz" / vocab cards; CoachBand quiz-discovery; quiz/history "Play again" | `/(app)/quiz` | ✅ | owner | `practice/index.tsx:397-423,832-839`; `LearnerScreen.tsx:381-387` |
+| 7 Quiz | Practice hub "Quiz" / vocab cards; CoachBand quiz-discovery (capitals/guess_who → `/(app)/quiz/launch`, vocabulary → `/(app)/quiz` picker, fixed 2026-06-10); quiz/history "Play again" | `/(app)/quiz` | ✅ | owner | `practice/index.tsx:397-423,832-839`; `LearnerScreen.tsx:391-401` |
 | 8 Dictation | Practice hub `practice-dictation` | `/(app)/dictation` | ✅ | owner | `practice/index.tsx:879-883` |
 | Assessment | Practice hub "Assessment" | `/(app)/practice/assessment-picker` → `/(app)/practice/assessment` | ✅ | owner | `practice/index.tsx:425-440` |
 | Supporter-only | "Learn together → Add to my learning" (clone child topic) | `POST /curriculum/clone-from-child` → `/(app)/topic/relearn` (study mode) | — | ✅ (as self) | `LearnTogetherSheet.tsx`; `use-clone-from-child.ts:200-218` |

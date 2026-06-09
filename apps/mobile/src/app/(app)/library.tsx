@@ -772,11 +772,21 @@ function LibraryScreenContent({
     }
 
     const isSearching = debouncedQuery.trim().length > 0;
+    // [LEARN-32] When the includeInactive query fails we fall back to an
+    // active-only list (subjectsQuery line ~200), which silently drops the
+    // learner's paused/archived subjects. Detect that exact case so we can tell
+    // them those rows are temporarily hidden (not deleted) instead of letting
+    // them vanish with no explanation.
+    const showingActiveOnlyFallback =
+      subjectsQuery.isError &&
+      !Array.isArray(subjectsQuery.data) &&
+      Array.isArray(activeSubjectsFallbackQuery.data);
     const showingStaleCachedData =
       (subjectsQuery.isError ||
         activeSubjectsFallbackQuery.isError ||
         progressQuery.isError) &&
-      subjects.length > 0;
+      subjects.length > 0 &&
+      !showingActiveOnlyFallback;
     const shelfGroups = SUBJECT_STATUS_GROUPS.map((status) => ({
       status,
       subjects: visibleSubjects.filter((subject) => subject.status === status),
@@ -794,6 +804,25 @@ function LibraryScreenContent({
           >
             <Text className="text-body-sm text-text-secondary flex-1">
               {t('library.staleBanner.message')}
+            </Text>
+            <Text className="text-body-sm font-semibold text-primary ms-3">
+              {t('common.retry')}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* [LEARN-32] Active-only fallback banner — the full subject list
+            (including paused/archived) failed to load, so only active subjects
+            are shown. Say so honestly so the hidden rows read as "retry to see
+            them", not "they're gone". */}
+        {showingActiveOnlyFallback && (
+          <Pressable
+            onPress={handleRetry}
+            className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+            testID="library-inactive-fallback-banner"
+          >
+            <Text className="text-body-sm text-text-secondary flex-1">
+              {t('library.inactiveFallbackBanner.message')}
             </Text>
             <Text className="text-body-sm font-semibold text-primary ms-3">
               {t('common.retry')}

@@ -109,7 +109,6 @@ export default function QuizIndexScreen(): React.ReactElement {
     setLanguageName,
     setReturnTo,
     setRound,
-    setPrefetchedRoundId,
     setCompletionResult,
   } = useQuizFlow();
   const languageSubjects =
@@ -158,7 +157,6 @@ export default function QuizIndexScreen(): React.ReactElement {
     setLanguageName(languageName);
     setReturnTo(returnTarget);
     setRound(null);
-    setPrefetchedRoundId(null);
     setCompletionResult(null);
     // Pass activityType as route param so launch.tsx can start generation even
     // if the context update hasn't propagated by first render (web timing gap).
@@ -264,7 +262,6 @@ export default function QuizIndexScreen(): React.ReactElement {
               setLanguageName(null);
               setReturnTo(returnTarget);
               setRound(null);
-              setPrefetchedRoundId(null);
               setCompletionResult(null);
               router.push({
                 pathname: '/(app)/quiz/launch',
@@ -321,7 +318,6 @@ export default function QuizIndexScreen(): React.ReactElement {
               setLanguageName(null);
               setReturnTo(returnTarget);
               setRound(null);
-              setPrefetchedRoundId(null);
               setCompletionResult(null);
               router.push({
                 pathname: '/(app)/quiz/launch',

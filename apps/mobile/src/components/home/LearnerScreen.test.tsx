@@ -993,7 +993,7 @@ describe('LearnerScreen', () => {
       expect(body?.activityType).toBe('capitals');
     });
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/quiz',
+      pathname: '/(app)/quiz/launch',
       params: { activityType: 'capitals', ...HOME_RETURN_PARAMS },
     });
     await waitFor(() => {

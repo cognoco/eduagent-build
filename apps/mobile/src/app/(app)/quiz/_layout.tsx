@@ -19,7 +19,6 @@ interface QuizFlowState {
   languageName: string | null;
   returnTo: string | null;
   round: QuizRoundResponse | null;
-  prefetchedRoundId: string | null;
   completionResult: CompleteRoundResponse | null;
 }
 
@@ -29,7 +28,6 @@ interface QuizFlowContextType extends QuizFlowState {
   setLanguageName: (languageName: string | null) => void;
   setReturnTo: (returnTo: string | null) => void;
   setRound: (round: QuizRoundResponse | null) => void;
-  setPrefetchedRoundId: (id: string | null) => void;
   setCompletionResult: (result: CompleteRoundResponse | null) => void;
   clear: () => void;
 }
@@ -42,7 +40,6 @@ const INITIAL_STATE: QuizFlowState = {
   languageName: null,
   returnTo: null,
   round: null,
-  prefetchedRoundId: null,
   completionResult: null,
 };
 
@@ -77,12 +74,6 @@ export function QuizFlowProvider({
   const setRound = useCallback((round: QuizRoundResponse | null) => {
     setState((current) => ({ ...current, round }));
   }, []);
-  const setPrefetchedRoundId = useCallback(
-    (prefetchedRoundId: string | null) => {
-      setState((current) => ({ ...current, prefetchedRoundId }));
-    },
-    [],
-  );
   const setCompletionResult = useCallback(
     (completionResult: CompleteRoundResponse | null) => {
       setState((current) => ({ ...current, completionResult }));
@@ -102,7 +93,6 @@ export function QuizFlowProvider({
         setLanguageName,
         setReturnTo,
         setRound,
-        setPrefetchedRoundId,
         setCompletionResult,
         clear,
       }}

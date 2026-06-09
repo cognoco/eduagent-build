@@ -217,3 +217,68 @@ For traceability — all ruled in conversation with the product owner:
 8. Supporters never reach supportee artifacts (notes/Journal/memory/chats) in everyday UI; structural "grades layer" + mentor reports only; two-way transparency; safety crosses all walls.
 9. Managed (under-13 only option) vs credentialized accounts carry the visibility tier; graduation is a designed moment.
 10. App-open = Mentor tab card feed (second-opinion fork ruled A).
+
+---
+
+## Annex A — Doc disposition: what parks if this spec is built
+
+**Status:** Analysis · 2026-06-10 · produced by a 14-agent sweep of every doc in `docs/specs/` and `docs/plans/` (36 docs, excluding this spec), each classified against §3/§4/§7/§9/§11.
+
+**Method.** Each doc was read in full alongside this spec and assigned exactly one relationship label. Classifications are evidence-cited per doc in the source sweep; this annex is the rolled-up ledger. It is **direction, not a status flip** — no doc's `status:` header is changed by this annex. Flipping headers (or annotating `epics.md`) is a follow-up action, owner: product.
+
+**Headline.** Building this spec does **not** park the backlog wholesale. Because the redesign is a strangle that keeps the backend and data model (§8: "everything else backend stays as-is"), only the **shell / nav / parent-surface** docs die. The recurring shape for feature plans is *identity-independent slice ships now (S0–S3); proxy/parent/identity-coupled half folds into S4/S5*.
+
+**Disposition tally:** 6 fully park · 15 partial · 1 folds in · 2 feed in as prerequisites · 11 survive untouched · 1 needs annotation (epics.md). (Some "partial" docs also carry a prerequisite half — counted once under partial.)
+
+### A.1 — Fully park (superseded by §7 "what dies")
+
+These design the exact constructs §7 demolishes (Study/Family ModeSwitcher, tab-shape matrix, `ParentHomeScreen` as a special shell, old `family_links`/org-membership RLS).
+
+| Doc | Why it parks |
+|---|---|
+| `specs/2026-05-19-study-and-family-mode-navigation-FULL` | Study/Family mode + tab-shape matrix → replaced by scope chip (§4) |
+| `plans/2026-05-19-study-and-family-mode-navigation-FULL` | Implementation of same; shipped infra (migration `0089`, recaps API) becomes an S4 strangle target, not a foundation |
+| `specs/2026-05-13-parent-child-surfaces-information-architecture` | `ParentHomeScreen`-launcher model; heir is the Support-hub feed (§6.3) |
+| `plans/2026-05-30-parent-home-mentor-briefing` | Redesigns the very `ParentHomeScreen` §7 deletes |
+| `plans/2026-05-31-identity-t3-access-control-rls` | Built on the reverted old-identity `T1` org/membership schema; dead under the ratified `_wip/identity-foundation/` clean-cut |
+| `plans/2026-04-15-S06-rls-phase-2-4-enforcement` | `family_links`-based RLS; the person/edge model removes `family_links` |
+
+> Parking the two nav-mode docs does **not** mean deleting shipped V0/V1 nav — §7's hard constraint keeps `MODE_NAV_V0_ENABLED=false` from regressing until the §13 S6 retirement ruling. Park the *plan* ≠ delete the *flag-isolated shipped code*.
+
+### A.2 — Partial (do-now slice survives; feature-half parks or folds to S4/S5)
+
+| Doc | Survives now | Parks / folds |
+|---|---|---|
+| `plans/2026-06-09-more-off-nav-home-launched` | Practice-tab promotion | "More off-nav" — superseded by S3 avatar split |
+| `plans/2026-05-09-progress-tab-currently-working-on` | backend helper + report-card bugfixes | new card + section reorder → S2 hub |
+| `specs/2026-05-12-chat-notes-bookmarks` | Steps 1–4 (shipped) | Step 5 (Library search) → folds into Subjects/Journal |
+| `specs/2026-06-08-memory-task-review-continuity` | `retrieval_events` + relearn queue = prereq plumbing for `/now` | standalone "opener" surface → S3 |
+| `plans/2026-05-31-product-continuity-low-hanging-fruit` | recap/mic copy items (Phase C) | proxy-coupled tasks (Phase B) park; copy layer folds into feed |
+| `specs/2026-05-18-trial-intent-save-onboarding` | intent/preview/claim mechanics | parent-landing routing (§4.2) |
+| `specs/2026-05-27-warm-chat-greeting` | greeting template (UI-only) | "auto-open into chat" framing → superseded by card-feed (§3 option A) |
+| `plans/2026-05-31-notification-reachability-nudges` | reachability bugfix `T1`–`T3` | child→parent nudges `T4`–`T6` → S4/S5 |
+| `plans/2026-05-31-billing-recovery-learner-capacity` | payment-failed alerts `T1`–`T2` | child-capacity/top-up `T3`–`T5` → S4/S5 |
+| `specs/2026-04-07-epic-17-voice-first-design` | session-layer STT/TTS on the bar (Phase A/B) | home-entry framing superseded; hands-free/time-limits identity-coupled |
+| `specs/2026-05-06-hidden-wins-phase-1-2-prereqs` | consent-redaction + push-classification (2A/2B, shipped) | Phase 1 `ParentHomeScreen` types superseded (already shipped) |
+| `specs/2026-06-03-owner-impact-audit-top-10` | ~all items survive as backlog | 2 nav-collapse runners-up gate on S6 |
+| `plans/2026-05-29-layered-codebase-risk-audit` | backend findings | `T9` parent/family/tab-matrix findings target soon-deleted screens |
+| `plans/2026-05-30-topic-mastery-three-states` | backend (mastery columns/API) = prereq for S2 hub | library-UI tasks re-home into the S2 plan |
+
+### A.3 — Feeds in (the spec needs these; doesn't replace them)
+
+- `specs/2026-06-08-forever-notebook-north-star` — **folds in** as the design invariants for the Journal tab (S3) + Subjects-hub notes (S2).
+- `specs/2026-06-08-concept-capture-layer-design` — **prerequisite** data layer (concepts/mastery tables) the Journal/Subjects note-states render; gated on the identity baseline reset.
+
+### A.4 — Survives untouched (parallel, no shell coupling)
+
+`specs/2026-06-06-llm-routing-and-judge-architecture` · `specs/2026-06-06-llm-routing-gpt-oss-cerebras-build` · `specs/2026-05-26-commit-pr-pipeline-gates` · `plans/2026-05-12-shared-test-utility-framework-plan` · `plans/2026-05-19-mobile-lab-macos-setup-plan` · `plans/2026-05-25-agents-claude-md-merge-plan` · `plans/2026-05-24-pending-notices-type-pgenum-migration` · `plans/2026-05-31-resumable-practice-state` · `plans/2026-05-31-profile-setup-personalization-corrections` · `plans/2026-06-08-note-correctness-and-challenge-draft` (already parked on identity, not by this spec) · `specs/2026-06-03-review-relearn-findings-and-high-impact-todos` (findings; survives as reference).
+
+Already **done/shipped** (nothing to park): `plans/2026-05-31-learning-library-cleanup` · `plans/2026-06-08-identity-foundation-canon-shape-scrub`.
+
+### A.5 — Needs annotation, not parking
+
+- `specs/epics.md` (living register + frozen ARCH-N): annotate superseded items — Epic 12 (Home/Book/More target shell), Epic 4 parent-dashboard/UX-13, Epic 7 Library-as-tab, `FR6` ("switch into child's profile" — conflicts directly with the §6.1 artifact wall), `WEB-A` parent-control-center stories. Epics 15/16 (visible progress, adaptive memory) become *more* load-bearing as activity-ledger inputs (§8.2).
+
+### A.6 — Sequencing signal
+
+The clean split across all 36 docs: **proxy / parent-home / scope** work waits for identity-foundation (S4/S5); **backend-data or read-rendering** work can proceed now (S0–S3). Three docs are already parked for *identity* reasons independent of this spec (`note-correctness`, `resumable-practice` re-triage, `billing-recovery`) — this spec doesn't change their verdict, it gives them a destination.

@@ -1490,11 +1490,6 @@
     "text": "Debug details (screenshot this)"
   },
   {
-    "file": "apps/mobile/src/components/common/ProfileSwitcher.tsx",
-    "kind": "jsx-child-string",
-    "text": "Profile"
-  },
-  {
     "file": "apps/mobile/src/components/home/CoachBand.tsx",
     "kind": "jsx-text",
     "text": "min"
