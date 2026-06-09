@@ -324,17 +324,17 @@ All secrets are managed through **Doppler**. Never suggest `wrangler secret put`
 ### Before Declaring a PR "Ready to Merge"
 
 1. **Read the actual PR diff** — run `gh pr diff <number>` to see what files are actually changed relative to the base branch. Do NOT assume from commit messages alone.
-2. **Check all CI checks** — run `gh pr checks <number>`. ALL checks must pass, including automated code reviews (Claude Code Review, etc.).
-3. **Read automated code review findings** — if a code review check exists, fetch and triage findings:
+2. **Check all CI checks** — run `gh pr checks <number>`. The **deterministic** checks (lint, typecheck, test, build, quality gate) must pass to merge. **Claude Code Review is advisory** (gate-spec D4 / WI-378): it is **green when it _ran_**, regardless of findings — a green check does **not** mean "no findings." It only goes **red when it did not run** (token exhaustion / timeout / crash; "silence is never approval"). So a red Claude Code Review = re-run or investigate the run, **not** "findings to fix."
+3. **Always read the Claude Code Review comment and triage its findings** — the check colour does not surface them. Fetch and triage:
    ```bash
    gh pr checks <number>
    gh api repos/{owner}/{repo}/pulls/<number>/reviews
    gh api repos/{owner}/{repo}/pulls/<number>/comments
    ```
-   - **High (Must fix):** Security issues, data loss risks, correctness bugs — MUST be fixed before merge
-   - **Medium:** Best practice violations, missing validation, config issues — SHOULD be fixed before merge
-   - **Low:** Style, docs, minor improvements — can be deferred but note them
-4. **NEVER dismiss review failures as "OK to merge."** Automated code review catches real bugs, security issues, and architectural violations. Treat findings with the same weight as a senior engineer's review.
+   - **MUST_FIX:** Security issues, data loss risks, correctness bugs, architectural violations — fix before merge
+   - **SHOULD_FIX:** Missing validation/coverage, convention drift, incomplete error handling — fix before merge
+   - **CONSIDER:** Style, clarity, minor improvements — can be deferred but note them
+4. **NEVER dismiss advisory findings just because the check is green.** Advisory means "triage it yourself," not "ignore it." Treat MUST_FIX / SHOULD_FIX findings with the same weight as a senior engineer's review; the green check only tells you the review _ran_.
 
 ### When Rebasing PRs
 
