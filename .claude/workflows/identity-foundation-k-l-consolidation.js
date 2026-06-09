@@ -207,6 +207,16 @@ THE CANONICAL FINDING ROW (the K=L=M union schema — every finding becomes one 
                         empty for in-IF-scope; for deferred only if a future owner is already known ← L
 - verify_status         confirmed | contested                                 ← QA
 - contest_note          the refuter's argument, iff contested
+- interim_owner         the workstream that PATCHES the live site now (layered policy). null pre-gate;
+                        set at Gate-1 finalize (identity-foundation-gate1-finalize.mjs)             ← Gate 1
+- execution_blocking_if_deferred   yes | no | null — the N.0 Stream-2 pull-forward input. null
+                        pre-gate; set at Gate-1 finalize                                            ← Gate 1
+
+NOTE: interim_owner + execution_blocking_if_deferred are Gate-1 OUTPUTS (a human-ratified scope
+ruling happens after this workflow runs). The workflow emits them as null; the renderer
+(identity-foundation-k-l-render.mjs) owns the column set for both pre- and post-gate states so a
+re-render never drops them. The Gate-1 ruling itself is applied deterministically from a committed
+disposition map — see identity-foundation-gate1-finalize.mjs + gate1-disposition.json.
 
 HARD CONSTRAINTS
 - Every row anchors to a verbatim quote from its cited source (with its source_path). No quote → no row.
