@@ -1,6 +1,41 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import { defineConfig } from '@playwright/test';
 import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
+
+// WI-536 flaky-test quarantine: exclude registered flaky web-e2e specs from the
+// PR gate. The single source of truth is tools/quarantine/quarantine.json. The
+// canonical path->regex helper is tools/quarantine/registry.cjs (shared by the
+// Jest configs); it is mirrored inline here because this config loads in ESM
+// mode, where a CommonJS require of the helper would flip the module mode and
+// break the CJS imports above. Returns [] under QUARANTINE_MODE=report so the
+// non-gating report lane runs exactly the specs the gate skips.
+function quarantineIgnore(): RegExp[] {
+  if (process.env.QUARANTINE_MODE === 'report') return [];
+  try {
+    const file = path.join(
+      process.cwd(),
+      'tools',
+      'quarantine',
+      'quarantine.json',
+    );
+    const reg = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+      entries?: Array<{ runner?: string; path?: string }>;
+    };
+    return (reg.entries ?? [])
+      .filter((e) => e && e.runner === 'playwright' && e.path)
+      .map(
+        (e) =>
+          new RegExp(
+            String(e.path)
+              .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              .replace(/\//g, '[/\\\\]') + '$',
+          ),
+      );
+  } catch {
+    return [];
+  }
+}
 
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const mobileDir = path.join(process.cwd(), 'apps', 'mobile');
@@ -50,6 +85,8 @@ const usesRateLimitedApi: boolean =
 
 export default defineConfig({
   testDir: e2eWebDir,
+  // WI-536 flaky-test quarantine: exclude registered flaky specs from the gate.
+  testIgnore: quarantineIgnore(),
   outputDir: path.join(e2eWebDir, 'test-results'),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

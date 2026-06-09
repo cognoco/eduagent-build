@@ -1,0 +1,80 @@
+# WI-536 — Flaky-test quarantine report lane.
+#
+# NON-GATING by construction: this is a separate workflow (not part of the
+# required CI checks) and its run step is continue-on-error. Its job is to keep
+# the quarantined tests VISIBLE and measured — it runs the exact set that the PR
+# gate skips (via QUARANTINE_MODE=report, which clears the quarantine ignore so
+# the files are NOT skipped) and reports the result without ever blocking main.
+#
+# Do NOT add this workflow to branch-protection required checks.
+name: Quarantine report (non-gating)
+
+on:
+  pull_request:
+    paths:
+      - 'tools/quarantine/**'
+      - '.github/workflows/quarantine-report.yml'
+  schedule:
+    # Nightly, offset from the e2e nightly (03:00) to avoid runner contention.
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: eduagent
+          POSTGRES_PASSWORD: eduagent
+          POSTGRES_DB: tests
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
+      CI: true
+      NX_DAEMON: false
+      QUARANTINE_MODE: report
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      # Registry must be valid even on this lane (cheap, deterministic).
+      - name: Validate quarantine registry
+        run: node tools/quarantine/validate.cjs
+
+      # Jest quarantines may include integration tests → give them a database.
+      - name: Enable pgvector extension
+        run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+
+      - name: Apply database migrations
+        working-directory: packages/database
+        run: pnpm exec drizzle-kit migrate
+
+      # Run the quarantined set. continue-on-error: a flaky test failing here is
+      # the whole point — it must never gate. report.cjs always exits 0 anyway;
+      # continue-on-error is belt-and-suspenders against setup failures.
+      - name: Run quarantined tests (report only)
+        continue-on-error: true
+        run: node tools/quarantine/report.cjs
