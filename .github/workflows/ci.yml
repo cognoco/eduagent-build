@@ -119,6 +119,14 @@ jobs:
       # to verify source-output consistency. Nx remote cache can restore stale dist/ and
       # .tsbuildinfo from a previous build, causing TS6305 false positives when source files
       # change. Removing these forces tsc --build to regenerate declarations from scratch.
+      #
+      # WI-451 (D5): the typecheck cache now excludes .tsbuildinfo from cached outputs
+      # (nx.json targetDefaults.typecheck.outputs + apps/mobile/project.json), so the remote
+      # cache can no longer restore incremental TS state — the TS6305 root cause is fixed at
+      # the cache level. This step is now redundant belt-and-suspenders. RETIRE it (and the
+      # local `nx reset` dance) only after several real CI builds confirm zero TS6305 with the
+      # nets removed — never delete a net before the fix is proven (D5 sequencing). Tracked by
+      # the harness-hygiene activity; first proof rides WI-388's real-PR adoption.
       - name: Clean stale TypeScript build artifacts
         run: |
           find . -name '*.tsbuildinfo' -not -path '*/node_modules/*' -delete
