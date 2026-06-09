@@ -365,6 +365,25 @@ describe('PronounsScreen', () => {
     expect(queryByTestId('pronouns-continue')).toBeNull();
   });
 
+  // [F-145] Break-test: the gate must fail CLOSED when the profile is resolved
+  // but birthYear is missing/zero (anomalous data). Age cannot be verified, so
+  // a possibly-sub-13 learner must NOT see the pronouns field. Previously
+  // learnerAge === null made `ageGated` false and the form rendered (fail-open).
+  it.each([null, 0, undefined])(
+    'fails closed: hides the pronouns field when birthYear is %s on a resolved profile',
+    (birthYear) => {
+      mockProfileIsLoading = false;
+      mockActiveProfile = {
+        id: 'profile-1',
+        birthYear: birthYear as unknown as number,
+        pronouns: null,
+      };
+      const { queryByTestId } = renderPronouns();
+      expect(queryByTestId('pronouns-option-she-her')).toBeNull();
+      expect(queryByTestId('pronouns-continue')).toBeNull();
+    },
+  );
+
   it('pre-populates preset choice from existing profile pronouns', () => {
     mockActiveProfile = {
       id: 'profile-1',

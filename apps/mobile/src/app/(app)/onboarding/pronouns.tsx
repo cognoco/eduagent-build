@@ -68,10 +68,13 @@ export default function PronounsScreen(): React.ReactElement {
     if (!activeProfile?.birthYear) return null;
     return new Date().getFullYear() - activeProfile.birthYear;
   }, [activeProfile?.birthYear]);
+  // [F-145] Fail CLOSED. Once the profile is resolved, a missing/zero birthYear
+  // (learnerAge === null) means age cannot be verified — treat as gated so a
+  // possibly-sub-13 learner never sees the pronouns field. Previously the
+  // `learnerAge !== null` term made the gate fail OPEN on unknown age.
   const ageGated =
     profileResolved &&
-    learnerAge !== null &&
-    learnerAge < PRONOUNS_PROMPT_MIN_AGE;
+    (learnerAge === null || learnerAge < PRONOUNS_PROMPT_MIN_AGE);
 
   // Initialize from existing pronouns value so Settings-triggered edits
   // pre-populate. Preset match ignores case and whitespace.
