@@ -239,7 +239,7 @@ Stream 2). **Phase J (J0–J3) complete.**
 
 ### Phase N — detail (sequencing + the Stream-2 pull-forward gate)
 
-**N.0 — Stream-2 pull-forward gate (decision point).** Before sequencing the in-scope set, rule the Stream-2 partition. **Inputs:** M's triaged findings + the L `execution-blocking-if-deferred?` tag. **The ruling:** partition every finding assigned to Stream 2 (M buckets 3/4) into **(a)** a *pull-forward prerequisite subset* — documentation-remediation that, left deferred, would block clean implementation execution (e.g. an in-scope work package must cite an `architecture.md` section still in its legacy/wrong state, or slicing a Cosmo WI requires canon that does not yet exist) — and **(b)** the *deferred remainder*, which runs in parallel with or after execution. **Default is defer; pull forward only on a demonstrated, named blocking dependency** (the conservative posture this runway uses elsewhere). Implementation execution is **never gated on Stream 2 *completion*** — only on this minimal, evidence-justified prerequisite subset. The pull-forward subset is sequenced in **Phase O** as pre-execution work and is coordinated under this roadmap's umbrella (see the *Stream 2 commencement* cross-cutting thread); the remainder stays Stream 2. **Relationship to K.6:** if K.6 deferred audit reconciliation, the pull-forward evidence is thinner — N.0 must mark any pull-forward call that rests on an unreconciled finding as lower-confidence. **Exit gate:** every Stream-2-assigned finding is labelled *pull-forward* or *deferred*, each pull-forward carrying a one-line dependency rationale; the pull-forward subset is handed to N.1.
+**N.0 — Stream-2 pull-forward gate (decision point).** Before sequencing the in-scope set, rule the Stream-2 partition. **Inputs:** M's triaged findings + the L `execution-blocking-if-deferred?` tag. **The ruling:** partition every finding assigned to Stream 2 (M buckets 3/4) into **(a)** a *pull-forward prerequisite subset* — documentation-remediation that, left deferred, would block clean implementation execution (e.g. an in-scope work package must cite an `architecture.md` section still in its legacy/wrong state, or slicing a Cosmo WI requires canon that does not yet exist) — and **(b)** the *deferred remainder*, which runs in parallel with or after execution. **Default is defer; pull forward only on a demonstrated, named blocking dependency** (the conservative posture this runway uses elsewhere). Implementation execution is **never gated on Stream 2 *completion*** — only on this minimal, evidence-justified prerequisite subset. The pull-forward subset is sequenced in **Phase O** as pre-execution work and is coordinated under the umbrella program (PRG-20; see `_wip/umbrella-program/stream-2-backlog.md` § Commencement); the remainder stays Stream 2. **Relationship to K.6:** if K.6 deferred audit reconciliation, the pull-forward evidence is thinner — N.0 must mark any pull-forward call that rests on an unreconciled finding as lower-confidence. **Exit gate:** every Stream-2-assigned finding is labelled *pull-forward* or *deferred*, each pull-forward carrying a one-line dependency rationale; the pull-forward subset is handed to N.1.
 
 **N.1 — Sequencing proper.** The dependency map + critical path over the in-scope set (including N.0's pull-forward subset); the identity-foundation workstream is sequenced *first* (dogfood).
 
@@ -337,39 +337,7 @@ Gate order is unchanged (B-product → D-ratify → E-ratify → F); only the *w
   **(3)** `CLAUDE.md`/`AGENTS.md` stay pointer-layer — new canon is not inlined into agent-doctrine; **(4)**
   cleanup debt noticed in passing is logged to a Phase-J worklist, not fixed ad hoc. Mirrors the repo's
   forward-only-ratchet pattern (GC1, `decision-adr-link`). 🟡 *(added 2026-06-07)*
-- **Documentation architecture / decisions layer (Phase C → Stream 2)** — `MMT-ADR-0000` ratified the 5-layer
-  model, the first-class `MMT-ADR-NNNN` decisions layer, the **significance gate** (when a decision needs an
-  ADR), the lockstep lifecycle, and the **physical layout** (§I.4: `docs/canon|adr|specs|plans|runbooks` +
-  `assets/`/`_archive/` drains). **Forward mechanism shipped** (convention, lockstep, the `decision-adr-link`
-  ratchet, `ARCH-N` freeze) + 3 seed ADRs; ADRs now homed at `docs/adr/`. **Deferred backfill = Stream 2
-  (structural remediation):** drain the ~70 censused decisions to ADRs repo-wide. **MoSCoW:** MUST =
-  memory-only **or** ≥2-source (drifting); SHOULD = single canon spot needing extraction; NICE =
-  stable/low-confidence; SKIP/tombstone = obsolete/superseded/mechanical. The **identity slice rides this
-  roadmap's tail** (re-baseline = Prong A new ADRs + Prong B supersession/tombstones — touch identity canon
-  once); constraint: **extract-before-cleanup** (no decision-bearing memory file is relocated before its ADR
-  exists). Also Stream 2: **build the principles/invariants catalog** (`docs/canon/principles.md` — promote the
-  CLAUDE.md Non-Negotiable Rules); the **`ARCH-N` drain** (incl. the `ARCH-3` "plain wrong" fix); the
-  agent-doctrine/memory pointer cleanup. The **reduced `docs/` reorg** (canon→`docs/canon/` + the drains — what
-  remains of F-PLACEMENT once the ADR home is settled) gates the bulk relocation. Estate-level generalisation to
-  the **ZDX standard** is parked as **WI-519**. 🟡
-  - **Parallel ungoverned ADR audit (sealed cross-reference — do NOT build on).** In the same window another
-    session pushed an ADR register draft + a cleanup plan to `main`, plus stale-fact "citation fixes" to
-    `architecture.md` / `project_context.md` / `audience-matrix.md` / `CLAUDE.md`. Its **producing workflow is not
-    in the repo**, so its selection criteria, coverage, and importance-weighting are unverifiable; it covers only
-    archived specs and applies **no significance gate**. **Do not seed Stream 2 from it** (anchoring risk).
-    **Disposition executed 2026-06-03:** the two draft docs are **quarantined** at
-    `docs/_archive/parallel-adr-audit-2026-06-03/` (see its `README.md` for provenance) — kept *only* as a
-    completeness backstop to diff against after our controlled sweep, not as input. The material canon/doctrine
-    edits from the citation-fix commits (`944d87a`, `1039bb217`) were **reverted** — they softened the LLM-envelope
-    Non-Negotiable Rule, re-characterized `isOwner`/owner-based gating that C2 dissolves, and flipped nav-contract
-    finding statuses; pure count/line refreshes were retained. After our controlled sweep, *diff* against the
-    quarantined §1 conflict-resolutions and the cleanup plan's STANDS/refuted findings as a backstop, then decide
-    final disposition (harvest verified facts / discard). ✅
-- **Stream 2 commencement, parallelism & coordination umbrella — *when* the deferred remediation starts (added 2026-06-08, architect-ratified).** This runway *sequences* Stream 2; it does not *execute* it, and **implementation execution is never gated on Stream 2 completion.** Four rules govern start timing:
-  - **Baseline.** Stream 2 is named and ordered by **Phase O** (the master plan) and sliced into Cosmo WIs at **Phase P**.
-  - **Maximal parallelism — start each fragment at its earliest responsible start.** Stream 2 is *not* a monolith that waits for O; we execute as much as we can in parallel as soon as each fragment *can* start. Gap-analysis-dependent parts (the full `architecture.md` rebuild, the `ARCH-N` reverse-engineering drain) cannot begin before **Phase L**; input-independent parts (e.g. the principles/invariants catalog, the `docs/`→`docs/canon/` reorg) can begin once their input canon is stable. Default posture: *start as soon as you can, in parallel* — not *hold until O*.
-  - **Single coordination umbrella while K–P run.** Any Stream 2 fragment that starts early (or is pulled forward by **N.0**) stays coordinated **under this identity-foundation roadmap** for as long as K–P are still running — one umbrella, one sequencing authority — rather than spinning off into a separate, uncoordinated track. Stream 2 graduates to its own standalone workstream only **after the runway closes (post-P).**
-  - **The pull-forward exception (N.0).** Whatever the **N.0** gate (see *Phase N — detail*) declares a pre-execution prerequisite is sequenced in O as pre-execution work and executed early under the umbrella above; the deferred remainder runs in parallel where its inputs allow, otherwise post-execution. 🟡 *(added 2026-06-08)*
+- **Stream 2 — deferred estate-canon drain (EXTRACTED to the umbrella program 2026-06-09).** The Stream-2 **inventory** (the `MMT-ADR-0000` decisions-layer backfill / ~70-decision ADR drain, principles/invariants catalog, `ARCH-N` drain, agent-doctrine/memory pointer cleanup, the `docs/`→`docs/canon/` reorg, WI-519) **and its commencement / parallelism / coordination governance** now live in the umbrella program: **`_wip/umbrella-program/stream-2-backlog.md`** (roster row **PRG-20**). That doc is where additional deferred, non-identity-blocking work is captured. The runway still *feeds* Stream 2 (J3 deferrals, glossary bucket 3, the ADR-drain identity-slice tail) and **N.0** still rules the pull-forward partition — those references resolve to the backlog doc. *(Moved from two cross-cutting threads that lived here; one semantic reconciliation — coordination authority "under this roadmap" → "under the umbrella" — recorded in the backlog doc's provenance note.)* 🟡
 - **Consent/COPPA spec + legal check (REQ-2 counsel queue)** — spans B/D; gates any code touching consent.
   PM-owned, worked with the lawyer. 🟡 **Split by structural impact — the queue does NOT gate F as a whole:**
   - **→ E (data model) — absorb now as a known constraint:** the legally-mandated **retention carve-out**
