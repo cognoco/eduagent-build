@@ -188,7 +188,7 @@ boot instructions, not identity-foundation canon copies; `docs/project_context.m
 not a shadow routing/identity canon. Exit gate: identity-foundation facts duplicated from canon are replaced
 with pointers to `docs/INDEX.md` / `CANONICAL-SET.md`, while repo-wide engineering rules remain intact. The
 same pass removes or repoints active-looking superseded routing doctrine (`ARCH-9`, Gemini-only / pinned
-Gemini Flash/Pro wording) to `MMT-ADR-0014`, `MMT-ADR-0017`, and `docs/registers/llm-models/` as appropriate.
+Gemini Flash/Pro wording) to `MMT-ADR-0014`, `MMT-ADR-0018` (LLM orchestrator — renumbered from 0017 on 2026-06-09), and `docs/registers/llm-models/` as appropriate.
 
 **J3 — Docs tree conformance.** Apply ADR-0000 §I.4 physical-tree decisions that are reachable from the
 identity-foundation surface. Exit gate: loose canon and nonstandard docs dirs have per-file decisions

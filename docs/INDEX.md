@@ -51,7 +51,7 @@ The members, at a glance (full roles + status in the canonical-set doc):
 
 - **Domain docs (L1):** [`ontology.md`](canon/identity/ontology.md) · [`domain-model.md`](canon/identity/domain-model.md) · [`data-model.md`](canon/identity/data-model.md) · [`prd.md`](canon/identity/prd.md) — *graduated `_wip/` → `docs/canon/identity/` in Phase J0 (2026-06-08), per the `MMT-ADR-0000` §I.4 domain-canon sub-layout amendment; filenames dropped the domain prefix.*
 - **Compliance (L1):** [`identity-compliance-register.md`](compliance/identity-compliance-register.md) — the binding compliance obligations rescued from the PRD decision queue in J0.
-- **Decisions (L2):** [`MMT-ADR-0000`](adr/MMT-ADR-0000-documentation-layer-model-and-decisions-layer.md) (+ 5 amendments) · `MMT-ADR-0007`–`0010` (domain) · `MMT-ADR-0011`/`0012` (data) · `MMT-ADR-0013`–`0016` (policy-engine spine) — all under [`docs/adr/`](adr/)
+- **Decisions (L2):** [`MMT-ADR-0000`](adr/MMT-ADR-0000-documentation-layer-model-and-decisions-layer.md) (+ 5 amendments) · `MMT-ADR-0007`–`0010` (domain) · `MMT-ADR-0011`/`0012`/`0015` (data) · `MMT-ADR-0013`/`0014` (policy-engine + router) · `MMT-ADR-0016` (safety/judge) · `MMT-ADR-0018` (LLM orchestrator) — all under [`docs/adr/`](adr/)
 - **Registers (L3, not canon):** [`docs/registers/llm-models/`](registers/llm-models/) — vetted-model master + vetting trail
 - **Audit trail:** [`2026-06-XX-a-vs-b-decision-capture.md`](../_wip/identity-foundation/2026-06-XX-a-vs-b-decision-capture.md) — the A-vs-B grilling record (Option III, immutable)
 - **Supporting specs (L3, not canon):** the two `2026-06-06` LLM-routing specs in [`docs/specs/`](specs/)
@@ -73,8 +73,8 @@ root and in `docs/`.
 ## L2 — All decisions (ADRs)
 
 The full ADR register and the significance gate live in
-[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0017`
-(`0003` is unused — number gap, not a live record; `0017` promotes the legacy `ARCH-8` LLM-orchestrator entry). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
+[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0018`
+(`0003` is unused — number gap, not a live record; `0018` promotes the legacy `ARCH-8` LLM-orchestrator entry; `0017` records the concept-capture additive layer). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
 draining to ADRs as Stream-2 work) is described in `MMT-ADR-0000` Part III.
 
 ## L3 — Operational

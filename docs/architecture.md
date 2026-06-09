@@ -891,7 +891,7 @@ Both client and server import the same Zod schemas — single source of truth pr
 6. Write co-located tests for every new route handler and component
 7. Use Drizzle relational queries for CRUD, `sql` template tag for complex aggregations
 8. Return typed `ApiError` envelope for all error responses, never ad-hoc JSON
-9. **No direct LLM API calls.** Every LLM call goes through the orchestration module (`routeAndCall`). Ensures metering, logging, provider fallback, and cost tracking. A direct `fetch` to Anthropic/OpenAI bypasses metering and blinds the cost dashboard. (`MMT-ADR-0017`; the router/vetting split downstream is `MMT-ADR-0014`.)
+9. **No direct LLM API calls.** Every LLM call goes through the orchestration module (`routeAndCall`). Ensures metering, logging, provider fallback, and cost tracking. A direct `fetch` to Anthropic/OpenAI bypasses metering and blinds the cost dashboard. (`MMT-ADR-0018`; the router/vetting split downstream is `MMT-ADR-0014`.)
 10. **Typed config object, never raw env reads.** All env vars accessed via typed config validated with Zod at startup (`apps/api/src/config.ts`). Missing var → fail immediately with clear error. Critical on Workers where env comes from `wrangler.toml` bindings.
 11. **Respect dependency direction.** `packages/` never imports from `apps/`. `schemas` never imports from `database`. Circular dependencies are build-breaking errors.
 12. **Named exports only.** No default exports except framework-required (Expo Router pages).

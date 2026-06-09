@@ -3,7 +3,7 @@ title: Gemini-Exit Interactive Routing Build — Implementation Spec
 date: 2026-06-06
 profile: code
 spec: docs/specs/2026-06-06-llm-routing-and-judge-architecture.md
-adr: docs/adr/MMT-ADR-0016-llm-provider-model-selection-and-routing.md
+adr: docs/adr/MMT-ADR-0016-safety-and-judge-architecture.md
 status: draft
 ---
 
