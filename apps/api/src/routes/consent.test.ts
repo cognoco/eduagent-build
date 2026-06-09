@@ -1644,6 +1644,42 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
     expect(mockResendConsent).not.toHaveBeenCalled();
   });
 
+  // [F-118] The destructive variant the finding names: a same-account NON-OWNER
+  // profile targeting the OWNER (or any adult/sibling) profile. On consent
+  // denial, processConsentResponse hard-deletes the target profile and cascades
+  // its children — so a successful request here would let a non-owner delete the
+  // account owner. The active-profile gate must reject it BEFORE requestConsent
+  // runs. Red-green: revert assertCanRequestConsentForChild in consent.ts → 201.
+  it('[F-118][BREAK] POST /v1/consent/request returns 403 when a non-owner targets the OWNER profile (account-destroying variant)', async () => {
+    const OWNER_PROFILE_ID = 'b2222222-2222-4222-8222-222222222222';
+    const { requestConsent: mockRequestConsent } = jest.requireMock(
+      '../services/consent',
+    ) as { requestConsent: jest.Mock };
+    mockRequestConsent.mockClear();
+
+    const res = await app.request(
+      '/v1/consent/request',
+      {
+        method: 'POST',
+        headers: {
+          ...makeAuthHeaders(),
+          'X-Profile-Id': SIBLING_PROFILE_ID,
+        },
+        body: JSON.stringify({
+          childProfileId: OWNER_PROFILE_ID,
+          parentEmail: 'attacker@example.com',
+          consentType: 'GDPR',
+        }),
+      },
+      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(mockRequestConsent).not.toHaveBeenCalled();
+  });
+
   it('legitimate self-service still works: a profile requesting consent for ITSELF returns 201', async () => {
     const { requestConsent: mockRequestConsent } = jest.requireMock(
       '../services/consent',

@@ -303,6 +303,43 @@ export async function deleteProfile(
   await db.delete(profiles).where(eq(profiles.id, profileId));
 }
 
+/**
+ * [F-122] Atomically hard-delete an archived profile ONLY if it is still
+ * eligible — archived (`archived_at` set and at/before the retention cutoff)
+ * AND no `CONSENTED` GDPR consent state.
+ *
+ * The archive-cleanup Inngest job previously read consent status + `archivedAt`
+ * in separate queries and then called the unconditional `deleteProfile`. A
+ * `restoreConsent()` landing between the eligibility read and the delete —
+ * which sets `status = 'CONSENTED'` and clears `archived_at` — would still lose
+ * the profile (TOCTOU). Folding the eligibility predicate into the DELETE's
+ * WHERE makes the check and the delete a single atomic statement, mirroring the
+ * `deleteProfileIfNoConsent` / `deleteProfileIfConsentWithdrawn` pattern.
+ *
+ * FK cascades remove all child records. Returns true if the profile was
+ * deleted, false if it was retained (consent restored / un-archived / not yet
+ * past retention / already gone).
+ */
+export async function deleteArchivedProfileIfStillEligible(
+  db: Database,
+  profileId: string,
+  retentionCutoff: Date,
+): Promise<boolean> {
+  const result = await db.execute(sql`
+    DELETE FROM profiles
+    WHERE id = ${profileId}
+      AND archived_at IS NOT NULL
+      AND archived_at <= ${retentionCutoff}
+      AND NOT EXISTS (
+        SELECT 1 FROM consent_states
+        WHERE consent_states.profile_id = ${profileId}
+          AND consent_states.consent_type = 'GDPR'
+          AND consent_states.status = 'CONSENTED'
+      )
+  `);
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function deleteProfileIfConsentWithdrawn(
   db: Database,
   profileId: string,

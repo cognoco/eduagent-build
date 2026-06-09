@@ -18,6 +18,7 @@ import { sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
+  consentStates,
   createDatabase,
   generateUUIDv7,
   learningSessions,
@@ -28,7 +29,13 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { cancelDeletion, executeDeletion, scheduleDeletion } from './deletion';
+import { eq } from 'drizzle-orm';
+import {
+  cancelDeletion,
+  deleteArchivedProfileIfStillEligible,
+  executeDeletion,
+  scheduleDeletion,
+} from './deletion';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -208,6 +215,146 @@ describeIfDb(
         sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${profileId}`,
       );
       expect((events.rows as Array<{ c: number }>)[0]!.c).toBe(0);
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// [F-122] Archive-cleanup deletion atomicity — restore-race guard.
+//
+// Scenario: a profile is archived (past retention) with a non-CONSENTED consent
+// state. The archive-cleanup job reads eligibility, then a restoreConsent()
+// lands (status → CONSENTED, archivedAt cleared) BEFORE the final delete. The
+// atomic delete must NOT remove the now-restored profile.
+//
+// Red→green: the old archive-cleanup called the unconditional deleteProfile,
+// which would delete regardless of the restore. deleteArchivedProfileIfStillEligible
+// folds the eligibility predicate into the DELETE's WHERE, so the restore wins.
+// ---------------------------------------------------------------------------
+const F122_RUN_ID = generateUUIDv7();
+const describeIfDbF122 = hasDatabaseUrl ? describe : describe.skip;
+
+describeIfDbF122(
+  '[F-122] deleteArchivedProfileIfStillEligible — restore-race atomicity',
+  () => {
+    let db: Database;
+    let seq = 0;
+
+    beforeAll(() => {
+      db = createDatabase(process.env.DATABASE_URL!);
+    });
+
+    afterAll(async () => {
+      await db.execute(
+        sql`DELETE FROM accounts WHERE clerk_user_id LIKE ${`clerk_f122_${F122_RUN_ID}%`}`,
+      );
+    });
+
+    async function seedArchivedProfile(opts: {
+      consentStatus: 'PENDING' | 'WITHDRAWN' | 'CONSENTED';
+      archivedAt: Date | null;
+    }): Promise<string> {
+      const idx = ++seq;
+      const [account] = await db
+        .insert(accounts)
+        .values({
+          clerkUserId: `clerk_f122_${F122_RUN_ID}_${idx}`,
+          email: `f122_${F122_RUN_ID}_${idx}@test.invalid`,
+        })
+        .returning({ id: accounts.id });
+
+      const [profile] = await db
+        .insert(profiles)
+        .values({
+          accountId: account!.id,
+          displayName: `F122 Test ${idx}`,
+          birthYear: 2013,
+          isOwner: false,
+          archivedAt: opts.archivedAt,
+        })
+        .returning({ id: profiles.id });
+
+      await db.insert(consentStates).values({
+        profileId: profile!.id,
+        consentType: 'GDPR',
+        status: opts.consentStatus,
+      });
+
+      return profile!.id;
+    }
+
+    async function profileExists(profileId: string): Promise<boolean> {
+      const row = await db.query.profiles.findFirst({
+        where: (p, { eq: eqFn }) => eqFn(p.id, profileId),
+        columns: { id: true },
+      });
+      return row != null;
+    }
+
+    // 40 days ago — comfortably past the 30-day retention window.
+    const RETENTION_CUTOFF = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    it('deletes an archived, non-consented profile past retention (happy path)', async () => {
+      const archivedAt = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+      const profileId = await seedArchivedProfile({
+        consentStatus: 'WITHDRAWN',
+        archivedAt,
+      });
+
+      const deleted = await deleteArchivedProfileIfStillEligible(
+        db,
+        profileId,
+        RETENTION_CUTOFF,
+      );
+
+      expect(deleted).toBe(true);
+      expect(await profileExists(profileId)).toBe(false);
+    });
+
+    it('does NOT delete when consent was restored after the eligibility read (TOCTOU race)', async () => {
+      const archivedAt = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+      const profileId = await seedArchivedProfile({
+        consentStatus: 'WITHDRAWN',
+        archivedAt,
+      });
+
+      // Simulate restoreConsent() landing in the race window: status → CONSENTED
+      // and archivedAt cleared.
+      await db
+        .update(consentStates)
+        .set({ status: 'CONSENTED' })
+        .where(eq(consentStates.profileId, profileId));
+      await db
+        .update(profiles)
+        .set({ archivedAt: null })
+        .where(eq(profiles.id, profileId));
+
+      const deleted = await deleteArchivedProfileIfStillEligible(
+        db,
+        profileId,
+        RETENTION_CUTOFF,
+      );
+
+      // The restored profile must survive.
+      expect(deleted).toBe(false);
+      expect(await profileExists(profileId)).toBe(true);
+    });
+
+    it('does NOT delete when only the consent state was restored (archivedAt still set)', async () => {
+      const archivedAt = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+      const profileId = await seedArchivedProfile({
+        consentStatus: 'CONSENTED',
+        archivedAt,
+      });
+
+      const deleted = await deleteArchivedProfileIfStillEligible(
+        db,
+        profileId,
+        RETENTION_CUTOFF,
+      );
+
+      expect(deleted).toBe(false);
+      expect(await profileExists(profileId)).toBe(true);
     });
   },
 );

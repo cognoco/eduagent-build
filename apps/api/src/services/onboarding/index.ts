@@ -64,13 +64,17 @@ export class OnboardingNotFoundError extends Error {
  * the client gate (`use-consent`/pronouns screen). A parent setting pronouns
  * for a child uses the separate parent-managed route, which is intentionally
  * exempt. Throws `ForbiddenError` (→ 403) when the profile is under the minimum
- * age. A null/unknown `birthYear` is allowed (birthYear is NOT NULL in practice;
- * this mirrors the prior route behavior and fails open only on impossible input).
+ * age.
+ *
+ * [F-145] Fail CLOSED on missing/unknown `birthYear`. `birthYear` is NOT NULL in
+ * the DB, so a null/undefined/0 value is anomalous input — but age cannot be
+ * verified, and a possibly-sub-13 learner must never be permitted to self-set
+ * pronouns. (Previously this returned without throwing, failing open.)
  */
 export function assertPronounsSelfEditAllowed(
   birthYear: number | null | undefined,
 ): void {
-  if (birthYear != null && calculateAge(birthYear) < PRONOUNS_PROMPT_MIN_AGE) {
+  if (!birthYear || calculateAge(birthYear) < PRONOUNS_PROMPT_MIN_AGE) {
     throw new ForbiddenError(
       'Pronouns cannot be self-set for profiles under the minimum age.',
     );
