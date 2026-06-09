@@ -33,7 +33,7 @@
 ## Failure modes considered
 
 <!--
-  For non-trivial features/fixes: fill in the table. Required by CLAUDE.md
+  For non-trivial features/fixes: fill in the table. Required by AGENTS.md
   "UX Resilience Rules" — if the Recovery column can't be filled, the design
   isn't complete. Delete this block only for pure-infra / refactor PRs.
 
@@ -52,7 +52,7 @@
 <!--
   If your commit message or PR title claims "swept all sites" / "everywhere"
   / "remaining surfaces", paste the grep query and result list here.
-  CLAUDE.md "Sweep when you fix": fix one of N without either sweeping all or
+  AGENTS.md "Sweep when you fix": fix one of N without either sweeping all or
   documenting a tracked deferral is not acceptable.
 -->
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# validate-doc-versions.sh — Compare actual codebase counts against CLAUDE.md claims
+# validate-doc-versions.sh — Compare actual codebase counts against AGENTS.md claims
 # Exit 0 if all match (within tolerance), exit 1 if any mismatch.
 set -euo pipefail
 
@@ -37,10 +37,10 @@ report() {
   fi
 }
 
-# Extract claimed numbers from the current CLAUDE.md snapshot format.
+# Extract claimed numbers from the current AGENTS.md snapshot format.
 parse_snapshot_line() {
   local label="$1"
-  grep -m1 "^- ${label}:" "$REPO_ROOT/CLAUDE.md" || true
+  grep -m1 "^- ${label}:" "$REPO_ROOT/AGENTS.md" || true
 }
 
 parse_snapshot_value() {
@@ -69,7 +69,7 @@ strip_claimed_count() {
 }
 
 echo ""
-echo "CLAUDE.md Validation Report"
+echo "AGENTS.md Validation Report"
 echo "==========================="
 
 # API tests
@@ -77,7 +77,7 @@ claimed_raw=$(parse_snapshot_value "API" '~?[0-9][0-9,]* tests' last)
 if [ -n "$claimed_raw" ]; then
   report "API tests" "$(count_api_tests)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
-  printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "API tests"
+  printf "  ? %-25s  (pattern not found in AGENTS.md)\n" "API tests"
   failures=$((failures + 1))
 fi
 
@@ -86,7 +86,7 @@ claimed_raw=$(parse_snapshot_value "Mobile" '~?[0-9][0-9,]* tests' last)
 if [ -n "$claimed_raw" ]; then
   report "Mobile tests" "$(count_mobile_tests)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
-  printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Mobile tests"
+  printf "  ? %-25s  (pattern not found in AGENTS.md)\n" "Mobile tests"
   failures=$((failures + 1))
 fi
 
@@ -95,7 +95,7 @@ claimed_raw=$(parse_snapshot_value "Cross-package integration tests" '[0-9][0-9,
 if [ -n "$claimed_raw" ]; then
   report "Integration suites" "$(count_integration_suites)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
-  printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Integration suites"
+  printf "  ? %-25s  (pattern not found in AGENTS.md)\n" "Integration suites"
   failures=$((failures + 1))
 fi
 
@@ -104,7 +104,7 @@ claimed_raw=$(parse_snapshot_value "API" '[0-9][0-9,]* route groups')
 if [ -n "$claimed_raw" ]; then
   report "Route groups" "$(count_route_groups)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
-  printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Route groups"
+  printf "  ? %-25s  (pattern not found in AGENTS.md)\n" "Route groups"
   failures=$((failures + 1))
 fi
 
@@ -113,7 +113,7 @@ claimed_raw=$(parse_snapshot_value "Mobile" '[0-9][0-9,]* test suites')
 if [ -n "$claimed_raw" ]; then
   report "Mobile suites" "$(count_mobile_suites)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
-  printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Mobile suites"
+  printf "  ? %-25s  (pattern not found in AGENTS.md)\n" "Mobile suites"
   failures=$((failures + 1))
 fi
 
@@ -122,7 +122,7 @@ claimed_raw=$(parse_snapshot_value "API" '[0-9][0-9,]* Inngest functions')
 if [ -n "$claimed_raw" ]; then
   report "Inngest functions" "$(count_inngest_functions)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
-  printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Inngest functions"
+  printf "  ? %-25s  (pattern not found in AGENTS.md)\n" "Inngest functions"
   failures=$((failures + 1))
 fi
 
@@ -132,6 +132,6 @@ if [ "$failures" -gt 0 ]; then
   echo "$failures mismatch(es) found. Run: bash scripts/update-claude-md.sh"
   exit 1
 else
-  echo "All counts match. CLAUDE.md is up to date."
+  echo "All counts match. AGENTS.md is up to date."
   exit 0
 fi

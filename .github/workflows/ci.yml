@@ -173,7 +173,7 @@ jobs:
 
       # Forbid [MARKER] tokens in LLM prompt builders. State-machine signals
       # must use the structured `signals` envelope (services/llm/envelope.ts),
-      # not free-text marker tokens. See CLAUDE.md → "LLM Response Envelope".
+      # not free-text marker tokens. See AGENTS.md → "LLM Response Envelope".
       - name: Prompt marker-token check
         run: bash scripts/check-prompt-markers.sh
 
@@ -182,7 +182,7 @@ jobs:
       # jest.requireActual of the same specifier) or the line carries a
       # `// gc1-allow: <reason>` sticker. Same TypeScript detector the
       # pre-commit hook in `.husky/pre-commit` uses, so rules can't drift.
-      # See CLAUDE.md → "Code Quality Guards" → "No new internal jest.mock()".
+      # See AGENTS.md → "Code Quality Guards" → "No new internal jest.mock()".
       - name: GC1 — no new internal jest.mock
         if: github.event_name == 'pull_request'
         env:
@@ -246,8 +246,8 @@ jobs:
         if: steps.changes.outputs.api == 'true'
         run: pnpm exec nx run api:test:integration
 
-      # Advisory check: flag stale counts in CLAUDE.md (does not block PRs)
-      - name: Validate CLAUDE.md counts
+      # Advisory check: flag stale counts in AGENTS.md (does not block PRs)
+      - name: Validate AGENTS.md counts
         if: always()
         continue-on-error: true
         run: bash scripts/validate-doc-versions.sh
