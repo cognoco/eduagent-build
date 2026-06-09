@@ -108,21 +108,27 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 > Counts tallied from its `Defer-to-workstream` column (123 of 125 parsed cleanly; ~2
 > rows have embedded pipes — immaterial at this altitude).
 >
-> **`Activate-when` is being set by Phase N right now** (forked session `fb669557…`):
-> N.0 partitions bucket 3/4 into pull-forward-prerequisite vs deferred; N.1 sequences.
-> Until N lands, `activate-when = pending N.0`. `Blast-radius` (does PRG-01's clean-cut
-> rewrite this area?) is also an N input — provisional below.
+> **Phase N has landed (2026-06-09).** **N.0 ruled the pull-forward subset EMPTY** —
+> across the 125 clear-out + 9 deferred findings AND the parked Stream-2 canon body,
+> *nothing* is a pre-execution prerequisite of PRG-01; default-defer holds everywhere
+> (source of truth: `stream-2-backlog.md § N.0 partition`, committed). **N.1** sequenced
+> only the *in-scope* 49 bucket-2 obligations into waves W0–W4 (that's PRG-01's internal
+> plan, not these rows) and explicitly left the clear-out/deferred rows for **Phase O to
+> order by blast-radius** (`2026-06-09-phase-n-sequencing.md § Out-of-scope`). So every
+> row below now reads `activate-when = deferred (N.0 empty); Phase O orders by
+> blast-radius`. `Blast-radius` is sharpened from N.1's out-of-scope notes where it gave
+> signal, but O is the authority.
 
 ### Substantial clusters
 
-| ID | Clear-out workstream | Findings (bucket 3) | Blast-radius vs PRG-01 (prov.) | Activate-when |
+| ID | Clear-out workstream | Findings (bucket 3) | Blast-radius vs PRG-01 (N.1 signal; O is authority) | Activate-when |
 |---|---|---|---|---|
-| PRG-10 | security-pii-api | 27 | TBD (N) | pending N.0 partition |
-| PRG-11 | architecture | 24 | likely **inside** | pending N.0; likely behind execution |
-| PRG-12 | l10n-a11y-mobile | 33 | likely **outside** → parallel-safe | pending N.0; likely free |
-| PRG-13 | security-pii-inngest | 6 | TBD (N) | pending N.0 partition |
-| PRG-14 | agent-instructions | 10 | partial **inside** (overlaps PRG-03) | with PRG-03 / N ruling |
-| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | pending N.0; likely free |
+| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | deferred (N.0 empty); Phase O orders by blast-radius |
+| PRG-11 | architecture | 24 | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | deferred (N.0 empty); Phase O orders by blast-radius |
+| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | deferred (N.0 empty); Phase O orders by blast-radius |
+| PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | deferred (N.0 empty); Phase O orders by blast-radius |
+| PRG-14 | agent-instructions | 10 | partial **inside** (overlaps PRG-03) | N.0: routed to HH / PRG-03, sequenced **pre-P** (not Stream 2); defer |
+| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | deferred (N.0 empty); Phase O orders by blast-radius |
 
 ### PRG-16 · Singleton tail — ~15 single-finding labels, unnormalized
 One-finding "workstreams" with drifted/duplicative labels — `ci-cd-hardening` ≈
@@ -168,8 +174,10 @@ security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they
 - **Outcome:** *design* (not drain) the learning-domain canon — naming
   conventions, notes taxonomy, the learning-loop, learning modes. A sibling-to-
   Stream-2 **design** stream (like the identity-foundation runway was), not a drain.
-- **Owner:** (unassigned — likely product (Zuzana) + agent)
-- **Depends-on:** —
+- **Owner:** product (Zuzana) + agent.
+- **Depends-on:** — (blast-radius-independent of PRG-01: the identity clean-cut
+  does not rewrite notes / cards / mastery / learning-loop, so this is
+  parallel-safe if product pulls it early).
 - **Primary input:** `docs/glossary.md` **bucket 2** (the rogue, non-canon
   drift-map's learning/structure terms). Sibling buckets already routed:
   bucket 1 (actors/roles) absorbed by PRG-01 in Phase J0/J1; bucket 3
@@ -177,9 +185,10 @@ security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they
 - **Decomposition:** disposition in `_wip/identity-foundation/ROADMAP.md`
   cross-cutting thread (≈ L271–282) + decision log (L498, L511–513); **no design
   doc yet.**
-- **Activate-when:** *proposed* — when the learning-domain canon is scheduled for
-  design (post-PRG-01 execution, OR when product picks up the learning-vocabulary
-  work). ⟵ ratify this to clear the phantom flag.
+- **Activate-when:** *ratified 2026-06-09 (hardened-B).* Product begins any
+  learning-domain feature work (notes / cards / mastery / learning-loop), **OR**
+  `docs/glossary.md` is scheduled for deletion — whichever first. Default-defer
+  behind PRG-01 until then; parallel-safe if product pulls it early.
 
 ---
 
@@ -210,3 +219,13 @@ PRG-10/12/13/15 (out-of-blast-radius findings)  ──▶  parallel-safe (throug
   bucket 3 (125) clear-out = PRG-10–15 (6 substantial) + PRG-16 (singleton tail). All
   `activate-when` deferred to Phase N (forked session `fb669557…`), which is setting the
   pull-forward partition + sequencing now.
+- **2026-06-09 — PRG-21 ratified + Phase N ingested.** (1) **PRG-21** trigger ratified
+  (hardened-B): owner pinned (product Zuzana + agent); `activate-when` = product begins
+  learning-domain feature work OR glossary scheduled for deletion, whichever first;
+  blast-radius-independent → parallel-safe. (2) **Phase N landed** (committed `13770b7c7`
+  N.1 + N.0 in `stream-2-backlog.md`): N.0 ruled pull-forward **EMPTY**, so PRG-10/11/12/
+  13/15 `activate-when` flipped `pending N.0` → `deferred (N.0 empty); Phase O orders by
+  blast-radius`; PRG-14 records the agent-instructions → HH/PRG-03 pre-P routing; blast-
+  radius cells sharpened from N.1's out-of-scope notes (O remains authority). Emerging
+  banner updated to "Phase N landed." Note: N.1 cites l10n clear-out as **34** vs roster's
+  33 (±1 pipe-parse drift, footnoted) — `L-gap-delta.md` remains the per-finding authority.
