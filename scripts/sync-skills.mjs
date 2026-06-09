@@ -80,12 +80,11 @@ const GROUP_DIRS = new Set(['tech']);
 // content can be unified, remove from this set and run sync; the .agents/
 // master will then propagate.
 const SKIP_SKILLS = new Set([
-  // .claude/skills/commit/SKILL.md has Claude Code-specific harness
-  // directives (context: fork, agent, model, allowed-tools) and a richer
-  // ruleset (~278 lines vs ~70 in .agents/). Unifying requires migrating
-  // the Claude-specific content into the master and deciding which parts
-  // are runtime-neutral vs Claude-specific. Deferred to a follow-up.
-  'commit',
+  // (empty) — `commit` was unified onto one master in WI-388: the
+  // runtime-neutral body lives in .agents/skills/commit/SKILL.md and the
+  // Claude harness frontmatter is injected from agents/claude.yaml by the
+  // frontmatter-merge above. Add a skill here only when its .claude/ and
+  // .agents/ copies must intentionally diverge — with a comment saying why.
 ]);
 
 const mode = process.argv.includes('--check') ? 'check' : 'sync';
