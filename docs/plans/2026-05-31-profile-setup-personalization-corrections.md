@@ -3,13 +3,23 @@ title: Profile Setup, Personalization, and Corrections - Implementation Plan
 date: 2026-05-31
 profile: code
 spec: docs/audits/2026-05-31-logical-gap-audit.md
-status: draft
+status: draft — NOT IMPLEMENTED; parked pending identity re-triage
+implementation_status: none (verified 2026-06-09 — T1/T2/T3/T4/T5 all absent from source)
+recommendation: ship 80/20 slice (T1+T2+T3+T5) AFTER identity re-triage; DEFER T4 (birth-date correction)
 gap_ids: [onboard-1, onboard-2, onboard-3, onboard-4]
 ---
 
 # Profile Setup, Personalization, and Corrections - Implementation Plan
 
-> **⚠️ Classification pending** (added 2026-06-01) — re-triage against the identity-foundation clean-cut target before acting on this plan. Not yet classified as identity-coupled vs. independent. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage".
+> ## 🧭 STATUS AT A GLANCE (read this first — updated 2026-06-09)
+>
+> - **What this is:** make learner personalization (pronouns, tutor-prose language, interests, birth-date correction) reachable in first-run *and* editable later. Closes audit gaps `onboard-1..4`.
+> - **Implemented?** **No — nothing.** Verified against source 2026-06-09: the birth-year route/schema/service (`onboardingBirthYearPatchSchema`, `updateBirthYear`) exist only in docs; `useUpdateConversationLanguage` is not wired into any settings screen; `create-profile.tsx` still has no push into `/onboarding/*`. All six tasks are genuinely unstarted.
+> - **Should it be implemented?** **Not as one unit, and not before the identity re-triage.** Split it:
+>   - **Do (80/20 slice):** `T1`+`T2`+`T3`+`T5` — wire already-built primitives (pronouns screen, language hook+live API, interests editor) into first-run and settings. Low risk, no new mutable PII, no migration, no authorization minefield. Delivers `onboard-1/-2/-4` and ~80% of the felt value. See [§ 80/20 Analysis](#8020-analysis--what-to-build-and-what-to-defer).
+>   - **Defer:** `T4` (birth-date correction) — ~70% of the risk for ~20% of the value; defines new bracket-crossing authorization on the `owner` concept that the identity reset *dissolves*, and ships a known UX dead-end ([H-EU-1](#failure-modes)) with no in-plan escape. Revisit after the identity reset + a real correction-flow decision.
+> - **Hard gate:** re-triage against the identity-foundation clean-cut target before acting. The `owner`-gating that `T3`/`T5` consume and `T4` extends is being reshaped. See [`_wip/identity-foundation/ROADMAP.md`](../../_wip/identity-foundation/ROADMAP.md) § "Sibling-plan re-triage" and memory `project_identity_foundation_reconstruction.md`.
+> - **End-user critique:** this plan was additionally red-teamed from the *end-user* perspective on 2026-06-08; findings (IDs `*-EU-*`) are folded into Product Decisions, Tasks, and Failure Modes below.
 
 **Goal:** Make learner personalization reachable during first-run and editable
 later: pronouns, tutor-prose language, birth date corrections, and interests
@@ -96,8 +106,14 @@ Out of scope:
   - A **self-edit that raises the caller's own eligibility/age bracket** is
     **rejected** server-side (the caller cannot promote themselves). A genuine
     correction in that direction is a support/guardian path, not a tap-through.
+    **[H-EU-1]** Note this is the dead-end risk: a self-registered minor has no
+    guardian, so the "support/guardian path" must be a *real, reachable* escape —
+    see the T4 end-user blockers. A flat 403 is not acceptable on its own.
   - A guardian may change a **managed child's** bracket-crossing date (both
-    directions) with a legal-impact confirmation.
+    directions) with a legal-impact confirmation. **[M-EU-4]** The confirmation
+    must be **concrete**, not abstract — state exactly what the child gains or
+    loses ("Your child will now be able to … / will no longer …"), not just
+    "eligibility impact".
   - An **owner with linked children** editing self adult→minor is **rejected**
     (it would strand guardianship and break family writes —
     `profile.ts:627-636`); they must remove children first.
@@ -105,6 +121,33 @@ Out of scope:
     audit FK, `schema/profiles.ts:89`).
 - Interests use the existing `InterestEntry` shape and support context values
   `school`, `free_time`, and `both`.
+
+## 80/20 Analysis — What to build, and what to defer
+
+The value and the cost/risk in this plan are **not** evenly spread. `T4`
+(birth-date correction) carries the majority of the risk, the only new mutable
+PII surface, the only new authorization logic, and the tightest coupling to the
+`owner` concept the identity reset dissolves — for a modest, rarely-needed
+feature. The other tasks mostly *wire primitives that already exist* into
+surfaces users can reach.
+
+**Recommended split:**
+
+| Bucket | Tasks | Delivers | Risk | Verdict |
+|---|---|---|---|---|
+| **80/20 slice** | `T1`, `T2`, `T3`, `T5` (+ new-strings slice of `T6`) | `onboard-1` (pronouns reachable), `onboard-2` (tutor-language picker), `onboard-4` (interests in first-run); ~80% of felt "I can personalize my tutor" value | Low — reuses built code (pronouns screen, `useUpdateConversationLanguage` + live owner-gated API, interests editor), no new mutable PII, **no migration**, no bracket-crossing authorization. Only *consumes* current `owner`-gating, doesn't define new logic → survives identity reset with a re-point. | **Do, after re-triage.** |
+| **Defer** | `T4` | `onboard-3` (birth-date correction) | High — turns an immutable field mutable (privilege-escalation surface), defines new bracket-crossing authorization on the soon-dissolved `owner` concept, and ships the [H-EU-1](#failure-modes) dead-end whose real fix (support SOP / verification flow) is a separate project. Value is modest: signup birth-year typos are rare and the under-stated direction self-corrects as the user ages in real time. | **Defer** until identity reset lands **and** a correction-flow decision exists. |
+
+**Why the split is clean (no hidden dependency):** birth date is already
+collected at profile creation (`create-profile.tsx` sends `birthYear`/
+`birthMonth`/`birthDay`), so `T4` is purely the *later edit*. Nothing in
+`T1`/`T2`/`T3`/`T5` needs it. Deferring `T4` also defers its unsolved dead-end
+rather than shipping it.
+
+**Sequencing:** the re-triage is a cheap *classification* decision (is each task
+identity-coupled or independent?), not implementation. Do it first; it will
+almost certainly bless `T1`/`T2`/`T3`/`T5` as independent and flag `T4` as
+coupled — exactly this split.
 
 ## Tasks
 
@@ -122,6 +165,18 @@ Out of scope:
   and re-openable from settings; tutor language is treated as always-defaulted
   (never a blocking step). Do **not** promise "resume at the exact incomplete
   step" unless a dedicated onboarding-progress marker is added (out of scope).
+  **End-user [M-EU-6 — re-entry trigger]:** "re-entrant checklist re-opens"
+  needs a concrete trigger, since there is no progress marker. Define one
+  explicit account-level flag (e.g. `hasSeenFirstRunChecklist`, set on first
+  exit of the sequence) so the checklist re-opens after an app-kill but does
+  **not** nag a user who deliberately skipped every step. Without it the
+  behaviour is undefined (lost checklist *or* forever-nag).
+  **End-user [M-EU-5 — fatigue + framing]:** create → pronouns → language →
+  interests → subject → session front-loads 3-4 gates before any value. Keep
+  every step genuinely skippable, add a one-line "why we ask" rationale to each
+  (birth date especially feels invasive at first run), and instrument first-run
+  drop-off so we can later decide whether to defer steps to *after* a first
+  session.
 
 - [ ] **T2: Wire pronouns into first-run and settings.** Done when:
   `onboarding/pronouns.tsx` has production entry points from first-run and
@@ -142,8 +197,28 @@ Out of scope:
   selecting a conversation-only locale, verify UI language is unchanged, **and
   assert the row is absent / the self route is denied for a non-owner child.**
   Covers `onboard-2`.
+  **End-user [H-EU-2 — managed children stranded on English]:** `create-profile.tsx`
+  seeds `conversationLanguage` from device UI locale **only for self-creates**;
+  parent-creates-child omits it, so a managed child on the parent's account who
+  never self-signs-in keeps an English-speaking tutor forever. The guardian
+  picker is the fix surface, but the gap is silent. In the first-run guardian
+  checklist, **proactively surface the child's resolved tutor language** with an
+  explicit "change" affordance — do not hide it behind the default. Also: T1's
+  "always-defaulted to `en`" framing must **preserve, not flatten**, the existing
+  self-create UI-locale seeding (don't re-default to `en`).
+  **End-user [M-EU-3 — hidden row confuses the child]:** rather than rendering
+  *nothing* for a non-owner child, render a disabled/explanatory row
+  ("Ask whoever set up your account to change this") so the child understands the
+  setting exists and is guardian-controlled.
+  **End-user [L-EU-2 — set expectations at selection]:** when a learner picks a
+  conversation-only locale (`cs`/`fr`/`it`), label it in the picker itself
+  ("Tutor speaks Italian; the app stays in English"), not only as a post-hoc
+  failure mode.
 
-- [ ] **T4: Add a birth-date correction API and UI.** Decided contract (not a
+- [ ] **T4: Add a birth-date correction API and UI. ⛔ DEFERRED** (see
+  [§ 80/20 Analysis](#8020-analysis--what-to-build-and-what-to-defer)) — do
+  **not** build until the identity reset lands and the end-user blockers below
+  are resolved. Decided contract (not a
   fork): a **dedicated route**, `PATCH /onboarding/birth-year` (self) and
   `PATCH /onboarding/:profileId/birth-year` (guardian), mirroring the existing
   onboarding dimension routes — keeps `profileUpdateSchema` `.strict()` untouched
@@ -177,6 +252,39 @@ Out of scope:
   -promotion denial (write test, watch pass, revert guard, watch fail, restore),
   and add a `tests/integration/` case for the auth scoping. Covers `onboard-3`.
 
+  **End-user blockers (must resolve before T4 is un-deferred):**
+  - **[H-EU-1 — the 403 is a dead-end].** Age brackets are computed live from
+    `birthYear`, so real-world aging auto-promotes a user without any edit;
+    therefore raising your own `birthYear` is **only ever** correcting a signup
+    typo, never a legitimate "I aged up" event. A flat 403 rejects 100% of
+    honest typo-corrections, and a self-registered minor has **no guardian**
+    (they are their own owner) to fall back to. The only escape is the
+    `mailto:support@mentomate.app` row under More→Help (`more/help.tsx:18`),
+    which this plan neither links from the error nor backs with a defined
+    support-side correction SOP. This **violates the CLAUDE.md UX Resilience
+    rule** ("never dead-end states with no actionable escape"). Resolve by EITHER
+    (a) replacing the flat 403 with a **bounded verified self-correction**
+    (re-enter full birth date behind soft friction), OR (b) making the 403 a
+    real escape: deep-link it to a prefilled support composer **and** specify the
+    support-side correction process in this plan. A typo'd minor must have a
+    tap-path out.
+  - **[M-EU-2 — year-only edit is inconsistent and loses precision].** Creation
+    collects a **full date** via the date-picker and sends
+    `birthYear`/`birthMonth`/`birthDay` for exact-age computation
+    (`create-profile.tsx`), but this contract is **year-only** (`{ birthYear }`).
+    So the user picks a full date to sign up but corrects only a year, and the
+    age-gate result can **flip** relative to the exact-age signup computation
+    (year-only overestimates age). Either accept a full date on the edit (compute
+    bracket, persist year) or explicitly tell the user the correction is
+    year-granularity. Do **not** silently degrade precision on a "correction".
+  - **[M-EU-1 — error copy is system-speak].** "can't change your own age bracket
+    here" is meaningless to a teen who typed a birthday. Rewrite to human terms
+    + the concrete next action (the H-EU-1 support deep-link).
+  - **[L-EU-3 — guardian entry point unpinned].** Scope lists
+    `child/[profileId]/mentor-memory.tsx` but no child-settings birth-date
+    surface. Pin where the guardian finds the child birth-date edit, or the
+    flow is undiscoverable.
+
 - [ ] **T5: Put interests in the first-run chain without duplicating mentor
   memory.** Done when: the interests-context editor — today inline in
   `mentor-memory.tsx` (`:60`) and duplicated in
@@ -204,14 +312,42 @@ Out of scope:
 |---|---|---|---|
 | User skips pronouns | Taps skip | Neutral confirmation that this can be edited later | Settings entry remains available |
 | Tutor language unsupported by UI shell | Selects `cs`, `fr`, or `it` | Tutor-language value updates, UI remains current shell language | Change either setting independently |
-| Non-owner child opens tutor-language [H-3] | Active profile is a non-owner child | Row is hidden; no self route attempted | Guardian changes it from the child's profile via the `:profileId` route |
+| Non-owner child opens tutor-language [H-3, M-EU-3] | Active profile is a non-owner child | **Disabled/explanatory row** ("Ask whoever set up your account to change this") — not a silent absence; no self route attempted | Guardian changes it from the child's profile via the `:profileId` route |
+| Managed child left on English tutor [H-EU-2] | Parent-created child, language omitted at create, child never self-signs-in | Guardian first-run checklist surfaces the child's resolved tutor language with a "change" affordance | Guardian sets it via the `:profileId` route; not left silently defaulted |
+| Picks a conversation-only locale [L-EU-2] | Learner selects `cs`/`fr`/`it` | Picker labels it at selection ("Tutor speaks Italian; app stays in English") | Change either setting independently |
 | Birth-date edit crosses consent threshold (managed child) | Guardian changes a child's date across a bracket | Confirmation explaining consent + eligibility impact | Confirm to save or cancel |
-| Self minor→adult birth-date promotion [C-2] | A user raises their own `birthYear` across a bracket | Typed 403 ("can't change your own age bracket here") | Contact support / guardian path; no self-promotion |
+| Self minor→adult birth-date promotion [C-2, H-EU-1, M-EU-1] | A user raises their own `birthYear` across a bracket (always a signup typo — real aging auto-promotes) | Human-readable copy (not "age bracket") explaining why + a **reachable next action** | **Real escape required**: bounded verified self-correction, or a 403 that deep-links to a prefilled support composer backed by a defined correction SOP. A flat dead-end 403 is **not acceptable** (no guardian exists for a self-registered minor) |
 | Owner with children edits self → minor [H-1] | Adult owner with linked children lowers own date below adult | Typed error: remove children first | Cancel, or remove/relink children before retry |
-| Crosses pronouns age gate (13) [H-1] | Edit moves a profile across `PRONOUNS_PROMPT_MIN_AGE` | Pronouns step appears/disappears accordingly | Re-open pronouns from settings if newly eligible |
+| Crosses pronouns age gate (13) [H-1, L-EU-1] | Edit moves a profile across `PRONOUNS_PROMPT_MIN_AGE` | Pronouns step appears/disappears accordingly **+ a one-time hint when newly eligible** (don't rely on the user noticing) | Re-open pronouns from settings if newly eligible |
 | Unauthorized guardian edits child birth date | Wrong relationship/profile | Typed permission error (`assertOwnerAndParentAccess`) | Switch to an authorized profile or stop |
 | Interests save fails | Network/API error | Inline retry state | Retry without losing local entries |
 | First-run interrupted [H-4] | App killed during sequence | Re-entrant checklist re-opens with steps still skippable (no exact-step resume) | Continue or skip any remaining step |
+
+## End-User Findings (red-teamed 2026-06-08, folded in)
+
+This plan was reviewed a second time from the **end-user perspective** (the first
+red-team, 2026-05-31, covered code/security correctness → `C-*`/`H-*`). The lived
+experience of the learner and guardian surfaced the findings below. All are
+folded into the sections cited; this table is the index.
+
+| ID | Sev | Finding | Folded into |
+|---|---|---|---|
+| H-EU-1 | HIGH | Self minor→adult 403 is a dead-end — every hit is an honest typo, and a self-registered minor has no guardian; support path unwired + no correction SOP. Violates UX Resilience rule. | T4 blockers; Product Decisions; Failure Modes |
+| H-EU-2 | HIGH | Parent-created children stay on an English tutor forever with no signal; core value-prop miss. | T3; Failure Modes |
+| M-EU-1 | MED | Error copy ("can't change your own age bracket") is system-speak with no next action. | T4 blockers; Failure Modes |
+| M-EU-2 | MED | Year-only correction is inconsistent with full-date creation and can flip the age gate (precision loss). | T4 blockers |
+| M-EU-3 | MED | Hidden tutor-language row leaves the child confused; prefer a disabled/explanatory row. | T3; Failure Modes |
+| M-EU-4 | MED | Guardian bracket-cross confirmation is vague; needs concrete gain/lose copy. | Product Decisions |
+| M-EU-5 | MED | Onboarding fatigue — 3-4 gates before any value; needs skippability + "why we ask" + drop-off instrumentation. | T1 |
+| M-EU-6 | MED | First-run re-entry trigger undefined (no progress marker) → lost-checklist vs forever-nag. | T1 |
+| L-EU-1 | LOW | Crossing the pronouns gate gives no notification that pronouns are newly available. | Failure Modes |
+| L-EU-2 | LOW | Conversation-only locales should set expectations at selection time. | T3; Failure Modes |
+| L-EU-3 | LOW | Guardian entry point for child birth-date edit not pinned in UI. | T4 blockers |
+
+**Gets right (no change needed):** the security *rationale* for blocking
+self-promotion is sound (the issue is the missing escape, not the block);
+skip-with-neutral-confirmation, interests retry-without-losing-entries, and
+tutor/UI language separation are all handled well.
 
 ## Verification
 
