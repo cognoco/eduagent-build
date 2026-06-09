@@ -72,19 +72,28 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   (the durable entry point; Cosmo `WI-530` exit-gate WP holds live per-item state).
 - **Activate-when:** — (active)
 
-### PRG-03 · Instruction-surface / memory-doctrine cleanup — `embryo`
+### PRG-03 · Instruction-surface / memory-doctrine cleanup — `in-progress`
 - **Outcome:** the `.claude/memory` + `AGENTS.md`/`CLAUDE.md` + doctrine surface
   cleaned and partitioned — operational/harness content extracted to canonical
   homes (owned here, pre-P), product-canon content left for the Stream-2 drain
   (post-execution). Prevents the three-stream collision on the same files.
-- **Owner:** (unassigned — cross-stream QA)
-- **Depends-on:** sequenced inside PRG-02 (operational class: `WI-531` extract →
-  `WI-387` prune, hard-pinned last). Canon class → PRG-20.
-- **Decomposition:** `_wip/identity-foundation/2026-06-09-instruction-surface-disposition-matrix-v0.md`
-  + `…-cleanup-checklist.md` (both currently marked NOT RATIFIED).
-- **Activate-when:** the matrix's per-surface *owner verdict* (operational→HH-now
-  vs canon→Stream-2-later) is promoted out of the NOT-RATIFIED doc into an
-  authoritative list.
+- **Owner:** cross-stream QA (Identity Foundation + Harness Hygiene + ZDX), driven
+  via the disposition matrix.
+- **Control doc / decomposition:** `_wip/identity-foundation/2026-06-09-instruction-surface-disposition-matrix-v0.md`
+  (internally **v1**, status "AGREED DEFAULTS"; batch model B0–B6 + per-row
+  owner/blocker). **This is the source of truth — do not duplicate it here.**
+- **Status (2026-06-09):** B0 (Phase-J fallout) + **B1 (no-blocker tombstones — 3
+  memories deleted) DONE**; **B2 (only-home footgun extraction) PARTIAL** (8
+  duplicates deleted, homes verified); memory 89 → 78. Remaining: B3 (harness
+  left-ratchet) → `WI-531` extract then `WI-387` prune; B4 (AGENTS/CLAUDE converge)
+  → `WI-386`; B5 (skills/commands/hooks); B6 (archive purge) → `WI-387` last.
+- **Depends-on:** B3/B4/B6 sequenced inside PRG-02 (HH owns `WI-531`/`WI-387`/`WI-386`);
+  canon-class rows → PRG-20 (Stream 2).
+- **N.0 routing (Phase N, 2026-06-09):** the audit `agent-instructions` doc-findings
+  (F-037/038/039/040/041/042/045/046, F-113/114) were ruled to HH / PRG-03 (not
+  Stream 2), all non-blocking → default-defer.
+- **Activate-when:** active — the matrix already *is* the agreed owner-map; no
+  promotion gate remains. Formal status-flip (if wanted) is the QA-stream owner's call.
 
 ---
 
