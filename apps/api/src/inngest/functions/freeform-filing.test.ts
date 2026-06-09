@@ -397,6 +397,37 @@ describe('freeformFilingRetry', () => {
       expect(mockResolveFilingResult).not.toHaveBeenCalled();
       expect(sendEventCalls).toHaveLength(0);
     });
+
+    it('[WI-550/F-019] skips transcript and filing work when GDPR consent is withdrawn between Inngest steps', async () => {
+      mockDb.query.consentStates.findFirst
+        .mockResolvedValueOnce({ status: 'CONSENTED' })
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      mockGetSessionTranscript.mockResolvedValue({
+        session: { sessionId: 'session-001' },
+        exchanges: [
+          {
+            role: 'user',
+            content: 'What is gravity?',
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const { result, sendEventCalls, runNames } =
+        await executeSteps(createEventData());
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+      expect(runNames).toContain('check-gdpr-consent');
+      expect(runNames).toContain('retry-filing');
+      expect(mockGetSessionTranscript).not.toHaveBeenCalled();
+      expect(mockBuildLibraryIndex).not.toHaveBeenCalled();
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+      expect(mockResolveFilingResult).not.toHaveBeenCalled();
+      expect(sendEventCalls).toHaveLength(0);
+    });
   });
 
   // -------------------------------------------------------------------------
