@@ -38,7 +38,12 @@ if (!match) {
 // The shell regex uses POSIX ERE which JS RegExp accepts for these constructs.
 // We unescape the shell-escaped backslashes (\\. -> \.) and rebuild as JS RegExp.
 const promptRegex = new RegExp(match[1]);
-const excludeMatch = hookSrc.match(/\| grep -vE '([^']+)'/);
+// Anchor the exclusion search AFTER the PROMPT_CHANGED grep: the secret/large-file
+// guard (WI-450) higher up in the hook has its own `grep -vE`, and a whole-file
+// first-match would capture that one instead of the eval-guard exclusion.
+const excludeMatch = hookSrc
+  .slice(hookSrc.indexOf(match[0]))
+  .match(/\| grep -vE '([^']+)'/);
 if (!excludeMatch) {
   throw new Error(
     'Could not locate PROMPT_CHANGED exclusion regex in .husky/pre-commit. ' +

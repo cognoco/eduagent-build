@@ -14,14 +14,14 @@ Over months, CI failures (flaky tests, type drift, prompt drift) were remediated
 ### Two root causes that explain most of the sediment
 
 - **R1 — pre-commit validates the full working tree, not the staged snapshot.** `tsc --build` and `jest` run *after* lint-staged restores unstaged files, so any unrelated in-progress file breaks an otherwise-clean partial commit. Root cause of the stash-gymnastics cluster, much of the 496-line commit skill, and the pressure toward `git add -A`.
-- **R2 — a Windows-only tooling bug normalized `--no-verify`.** `@nx/expo/plugin` stack-overflows on Windows (`project_nx_expo_plugin_bug`), and the workaround tells agents to `--no-verify`. CI is Ubuntu; dev is macOS. This is dead weight that undermines the gate model.
+- **R2 — a Windows-only tooling bug normalized `--no-verify`.** `@nx/expo/plugin` stack-overflows on Windows (`project_nx_expo_plugin_bug`), and the workaround tells agents to `--no-verify`. CI is Ubuntu. ~~dev is macOS. This is dead weight that undermines the gate model.~~ **CORRECTED 2026-06-09 (WI-537; canonical rationale in MMT-ADR-0019): dev spans Windows (native + WSL), macOS, and Linux — Windows is an OS in active use, so this is NOT dead weight. `nx affected` is genuinely broken on Windows; the `--no-verify` escape is load-bearing there and is kept until `@nx/expo/plugin` is fixed upstream (watch-item, WI-542). The defect is "Windows is degraded," not "Windows is unsupported." See A2 (corrected).**
 
 ---
 
 ## 2. Design assumptions
 
 - **A1 — agents work in isolated worktrees** (≥90% of significant work; `.worktrees/<branch>/`). Shared-tree work is the exception and is kept functionally non-overlapping. ⇒ concurrency-damage-control machinery becomes legacy, not core.
-- **A2 — fleet is macOS (dev) + Linux (CI).** Windows-specific workarounds are removed, not preserved.
+- **A2 — fleet is macOS (dev) + Linux (CI). Windows-specific workarounds are removed, not preserved.** ~~[original assumption]~~ **CORRECTED 2026-06-09 (WI-537; canonical rationale in MMT-ADR-0019): the premise is false. Development spans Windows (native + WSL), macOS, and Linux; CI is Linux. There is no single dev OS.** Policy is therefore inverted — _default to OS-agnostic tooling; where a portable form is genuinely impractical, an OS-specific workaround is accepted and kept, never stripped._ **Never "remove support" for an OS in use.** Disposition by the 5-category taxonomy (full form in MMT-ADR-0019): **(1) incidental non-portable** → make portable; **(2) workaround imposed on all OSes** → OS-gate it; **(3) workaround for a break _on_ an OS in use** → keep (fix the tool, don't remove the accommodation); **(4) OS-specific knowledge/docs** → keep; **(5) already portable / dual-documented** → leave.
 - **A3 — commit scope defaults to session/own-work**, never `git add -A`.
 
 ---
@@ -64,7 +64,7 @@ Over months, CI failures (flaky tests, type drift, prompt drift) were remediated
 | `feedback_partial_staging_stash`, `_stash_pop_kept`, `_stash_untracked_protection`, `_git_pathspec_literal_brackets` | R1 (full-tree validation) + shared tree | **Obsolete/archive** once R1 fixed + A1 |
 | commit-skill batched mode, scope-splitting, `refs/preserved/` stash safety-net | R1 + shared tree | **Collapse** — thin the skill |
 | `feedback_nx_reset_before_commit`, stale-`dist/` scars | cache-input correctness | **Delete after** §4(e) fix |
-| `project_nx_expo_plugin_bug` (`--no-verify` for >20 files) | R2 (Windows) | **Remove** — Windows not supported |
+| `project_nx_expo_plugin_bug` (`--no-verify` for >20 files) | R2 (Windows) | ~~**Remove** — Windows not supported~~ → **KEEP (corrected 2026-06-09, WI-537):** Cat-3 — Windows is an OS in active use; the `nx affected` break degrades it. Keep the escape + memory until `@nx/expo` is fixed upstream (watch-item, WI-542). See MMT-ADR-0019. |
 | `feedback_precommit_typecheck`, `feedback_batch_pr_fixes`, `feedback_verify_full_ci` | slow CI loop / parity gaps | **Fold into CLAUDE.md** as "run what CI runs"; less needed under fast affected CI + parity |
 | `feedback_commit_skip_failing` (relatedness classification) | partial-commit pain | **Keep** (slimmed) — still useful |
 | `feedback_no_pr_unless_asked`, `_use_gh_cli_for_prs`, `_never_switch_branch`, `_no_suppression`, `_pr_required_checks` | user policy / hard-won triage | **Keep as policy** |
@@ -75,7 +75,7 @@ Over months, CI failures (flaky tests, type drift, prompt drift) were remediated
 
 - **commit skill: 496 → thin.** No batched mode, no scope-splitting, no stash safety-net, no `nx reset` dance once A1 + R1-fix + cache-correctness land. Also resolves the `.agents` (100-line, `git add -A` default) vs `.claude` (496-line, batched) **contradiction** — one unified, isolation-aware skill (runtime-neutral body + Claude-only `context: fork` harness adapter).
 - **Stash-hazard memory cluster → archived.**
-- **Windows workarounds → removed.**
+- ~~**Windows workarounds → removed.**~~ **CORRECTED 2026-06-09 (WI-537): Windows is an OS in active use — workarounds are made OS-agnostic or kept, never blanket-removed. See A2 (corrected) + MMT-ADR-0019.**
 
 ---
 
@@ -97,7 +97,7 @@ Over months, CI failures (flaky tests, type drift, prompt drift) were remediated
 
 - **D5 (was Q5) — cache correctness: fix properly, don't paper over.** Root cause = TS6305 false positives from Nx restoring stale `.tsbuildinfo` + composite `dist/*.d.ts` (incremental *state*, not deterministic output). Fix = **never restore TS incremental state from cache**; cache only deterministic, fully-input-keyed outputs. **Payoff:** delete the CI nuke-step (`ci.yml:113-118`) *and* the local `nx reset` dance (retire `feedback_nx_reset_before_commit`; closes D3's "keep `nx reset` until cache fix"). **Sequencing:** fix → verify several CI builds + local commits with zero TS6305 → *then* delete the nets (never remove nets before proving the fix). Exact target/output adjustment is implementation-time diagnosis. Also a CI-time win (restores real incremental `tsc`).
 
-- **D6 (was Q6) — `--no-verify` restatement, two levels.** *Doctrine* (CLAUDE.md/AGENTS.md): local hooks are fast feedback; **CI protects `main`**; default = let hooks run; a *narrow, deliberate* bypass is acceptable **because CI backstops it** (comment/type-only prompt change; broken harness via `SKIP_PRE_PUSH`) and is not a violation; **needing to bypass repeatedly = the check is mis-placed → fix the gate.** *Skill behavior:* the automated commit agent **never bypasses autonomously** (let hooks run; on failure stop+report). The Windows ">20 files → `--no-verify`" escape dies with R2.
+- **D6 (was Q6) — `--no-verify` restatement, two levels.** *Doctrine* (CLAUDE.md/AGENTS.md): local hooks are fast feedback; **CI protects `main`**; default = let hooks run; a *narrow, deliberate* bypass is acceptable **because CI backstops it** (comment/type-only prompt change; broken harness via `SKIP_PRE_PUSH`) and is not a violation; **needing to bypass repeatedly = the check is mis-placed → fix the gate.** *Skill behavior:* the automated commit agent **never bypasses autonomously** (let hooks run; on failure stop+report). ~~The Windows ">20 files → `--no-verify`" escape dies with R2.~~ **CORRECTED 2026-06-09 (WI-537): the Windows ">20 files → `--no-verify`" escape is RETAINED for human Windows devs (an OS in active use) — `nx affected` is broken there by `@nx/expo` upstream. It is a deliberate, platform-scoped bypass (not a violation) and retires only when the upstream bug is fixed (watch-item). The automated agent still never bypasses autonomously.**
 
 ### Open
 

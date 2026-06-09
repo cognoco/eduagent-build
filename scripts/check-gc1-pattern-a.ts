@@ -242,7 +242,7 @@ function runCli(): void {
   console.error('');
   console.error('Fix one of three ways:');
   console.error(
-    '  1. Convert to Pattern A (preferred — see CLAUDE.md GC1 ratchet).',
+    '  1. Convert to Pattern A (preferred — see AGENTS.md GC1 ratchet).',
   );
   console.error("  2. Use a bare specifier if it's a true external boundary.");
   console.error('  3. If you genuinely need a full mock, add');

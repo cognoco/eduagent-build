@@ -180,6 +180,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 ## Development Workflow Rules
 
+- **Supported dev platforms — OS-agnostic by default (MMT-ADR-0019):** development happens on Windows (native), WSL, macOS, and Linux; CI is Linux. Developer tooling (hooks, scripts, CI invocations, local-dev docs) must work on every OS in active use — write it portably first. Where portability is genuinely impractical, an OS-specific workaround is accepted and **kept**, not removed; "it only matters on one OS" is never on its own a reason to strip it. Never assume a single dev OS.
 - **Commit quality:** Husky + lint-staged + commitlint enforced from forked repo.
 - **CI matrix:** lint → typecheck → test → build → deploy. Nx Cloud for remote caching and affected-only builds.
 - **Neon branching** for dev/staging databases. No local PostgreSQL.
