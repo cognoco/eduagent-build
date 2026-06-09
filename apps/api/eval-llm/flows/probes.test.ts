@@ -54,6 +54,18 @@ describe('probes quality heuristics — HW03 (conflicting learner answer)', () =
     });
     expect(issues.some((i) => i.code === 'HW03.conflict')).toBe(true);
   });
+
+  it('still flags direct validation even when a contrast word follows', async () => {
+    // Codex review on PR #820: a contrast-anywhere exemption would let
+    // "That's correct! But …" pass. Only the sub-fact acknowledgment form
+    // ("right that/about …") is exempt; direct validation stays flagged.
+    const issues = await evaluate('13yo-spanish-beginner', 'HW03', {
+      reply:
+        'That is correct! But let\'s also practice a few more examples with "ser".',
+      private_sources: { relied_on: ['homework_problem'], insufficient: false },
+    });
+    expect(issues.some((i) => i.code === 'HW03.conflict')).toBe(true);
+  });
 });
 
 describe('probes quality heuristics — HW01 (solvable problem, first step)', () => {

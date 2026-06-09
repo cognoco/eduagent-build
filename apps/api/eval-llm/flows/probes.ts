@@ -467,9 +467,11 @@ function evaluateHomeworkProbe(
       /\b(correct|right)\b/i.test(lowerReply) &&
       !/\bnot\b/i.test(lowerReply) &&
       // "You're right that cansado means tired! However, … use estar" is the
-      // DESIRED move: acknowledge the valid sub-fact, then contradict the
-      // conflicting answer. Only flag validation with no contrasting turn.
-      !/\b(however|but|actually|instead)\b/i.test(lowerReply)
+      // DESIRED move: acknowledging a valid SUB-FACT ("right that …" /
+      // "right about …") before contradicting the conflicting answer. Only
+      // that acknowledgment form is exempt — a direct validation ("that's
+      // correct!") stays flagged even when followed by a contrast word.
+      !/\b(correct|right)\s+(that|about)\b/i.test(lowerReply)
     ) {
       issues.push(
         qualityError(

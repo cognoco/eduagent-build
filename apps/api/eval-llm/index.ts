@@ -165,6 +165,18 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Usage gate, before the (potentially long) harness run: --check-baseline /
+  // --update-baseline are only meaningful after a live run. Tier-1 runs emit
+  // an empty envelopeMetrics map and would trip the baseline for the wrong
+  // reason — and a misspelled invocation should not burn a full matrix run
+  // before erroring (CodeRabbit on PR #820).
+  if ((options.updateBaseline || options.checkBaseline) && !options.live) {
+    console.error(
+      '--check-baseline / --update-baseline require --live (envelope metrics are only collected from live LLM responses)',
+    );
+    process.exit(2);
+  }
+
   // Candidate-model gate (--openrouter-model): reroutes every live call to
   // the named model via the eval-only OpenRouter adapter. Guard rails:
   // pointless without --live, and a candidate's envelope metrics must never
@@ -243,16 +255,6 @@ async function main(): Promise<void> {
     }
   }
   console.log('─────────────────────────────────────────');
-
-  // Usage gate first: --check-baseline / --update-baseline are only
-  // meaningful after a live run. Tier-1 runs emit an empty envelopeMetrics
-  // map and would trip the baseline for the wrong reason.
-  if ((options.updateBaseline || options.checkBaseline) && !options.live) {
-    console.error(
-      '--check-baseline / --update-baseline require --live (envelope metrics are only collected from live LLM responses)',
-    );
-    process.exit(2);
-  }
 
   // Baseline seed (--update-baseline) runs BEFORE the quality-gate exit
   // [WI-556]: the baseline tracks envelope-signal *distribution*, which
