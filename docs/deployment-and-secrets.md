@@ -570,7 +570,7 @@ push to main (native change — rare)
 | 5-second launch delay on slow networks | Falls back to cached bundle after timeout |
 | Native dep bump without version bump | OTA clients silently receive incompatible JS — see appVersion trade-off above |
 
-> **Restoring fingerprint policy:** Re-evaluate when `@expo/fingerprint` gains support for ignoring `type: "dir"` autolinking sources in `.fingerprintignore` (blocked in ≤0.15.4). Also blocked by the ExpoConfigLoader Unicode-path error on Windows (`ZuzanaKopečná` username). Check `docs/known-issues/` or memory `project_fingerprint_pnpm_mismatch.md` before re-attempting.
+> **Restoring fingerprint policy:** Re-evaluate when `@expo/fingerprint` gains support for ignoring `type: "dir"` autolinking sources in `.fingerprintignore` (blocked in <=0.15.4). Also blocked by the ExpoConfigLoader Unicode-path error on Windows (`ZuzanaKopečná` username). Check this runtime-version section, `apps/mobile/.fingerprintignore`, and `docs/known-issues/` before re-attempting.
 
 ---
 

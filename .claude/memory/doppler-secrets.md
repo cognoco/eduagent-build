@@ -28,7 +28,7 @@ Wrap with `doppler run`:
 doppler run --project mentomate --config dev -- pnpm test:api:unit
 ```
 
-The `pnpm test` umbrella script and several `test:llm:*` scripts already include `doppler run` (look for `C:/Tools/doppler/doppler.exe run --project mentomate --config <env>` in `package.json` — note the Windows hardcode, which has its own memory entry).
+The `pnpm test` umbrella script and several `test:llm:*` scripts already include `doppler run` (look for `C:/Tools/doppler/doppler.exe run --project mentomate --config <env>` in `package.json`). Those package scripts are Windows-path-specific; `packages/test-utils/src/lib/load-database-env.ts` separately probes `DOPPLER_CLI`, PATH, and common platform install paths.
 
 ## How Archon picks it up
 
@@ -40,4 +40,4 @@ When Archon runs `execute-workitem` against this repo, the validate and push bas
 
 ## Operator note (macOS)
 
-Doppler CLI on macOS: `/opt/homebrew/bin/doppler` (Homebrew). The repo's `packages/test-utils/src/lib/load-database-env.ts` resolver hardcodes the Windows path — see `load-database-env-windows-hardcode.md` memory.
+Doppler CLI on macOS: `/opt/homebrew/bin/doppler` (Homebrew). `loadDatabaseEnv()` now checks this path automatically after env files and PATH lookup.

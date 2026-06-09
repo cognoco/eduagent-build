@@ -30,7 +30,7 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | Surface class | Count / shape | Startup-loaded? | Primary owner | Default disposition |
 |---|---:|---|---|---|
 | Root agent doctrine | `AGENTS.md`, `CLAUDE.md` | Yes | `WI-386` | Converge: `AGENTS.md` source, `CLAUDE.md` adapter/import |
-| Memory index + active files | 89 active `.claude/memory/*.md` incl. `MEMORY.md` at inventory start; 78 after B1/B2 pruning | Yes for index; topic files by link/load | `WI-387` after `WI-531` | Prune aggressively after extraction |
+| Memory index + active files | 89 active `.claude/memory/*.md` incl. `MEMORY.md` at inventory start; 75 after B1/B2 pruning | Yes for index; topic files by link/load | `WI-387` after `WI-531` | Prune aggressively after extraction |
 | Memory archive | 29 `.claude/memory/_archive/*.md` | No unless linked | `WI-387` | Purge unless a live reason remains |
 | Claude commands | 23 `.claude/commands/my/*.md` | On command use | Harness/ZDX skills | Replace with skill or ZDX command stubs |
 | Master skills | 45 `.agents/skills/**/SKILL.md` | On skill use | Repo-local skill owners | Master source; classify as canonical / overlay / obsolete |
@@ -60,8 +60,8 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 |---|---|---|---|
 | B0 - already applied | Stale Phase-J fallout | Done in current QA stream | Removed live `Strictly 11+` memory; repointed stale routing memories; added `MMT-ADR-0018` pointer |
 | B1 - no-blocker tombstones | Active memories whose content is already duplicated by current `AGENTS.md`/skills/runbooks or says only "resolved/vaulted/tracked elsewhere" | Must verify no unique current fact | DONE 2026-06-09 for 3 files: deleted `feedback_emulator_issues_doc.md`, `feedback_no_suppression.md`, `feedback_precommit_typecheck.md`; removed index links |
-| B2 - only-home footguns | Expo Router bracket pathspecs, stash semantics, platform/build/E2E command traps, Notion query mode | Extract first | PARTIAL DONE 2026-06-09: target homes already contained 8 footguns/pointers; deleted duplicate memories and index links; collapsed OTA implementation memory to docs pointer |
-| B3 - harness left-ratchet | Commit/pre-commit/pre-push/CI/manual review rules in memory and doctrine | Wait for owning substrate where named | `WI-531` extracts, then `WI-387` prunes |
+| B2 - only-home footguns | Expo Router bracket pathspecs, stash semantics, platform/build/E2E command traps, Notion query mode | Extract first | DONE 2026-06-09 for 11 footguns/pointers: deleted duplicate memories and index links; collapsed OTA implementation memory to docs pointer; moved NativeWind Windows notes to `docs/runbooks/nativewind-windows.md` |
+| B3 - harness left-ratchet | Commit/pre-commit/pre-push/CI/manual review rules in memory and doctrine | Wait for owning substrate where named | Handoff created at `_wip/identity-foundation/2026-06-09-wi-531-pipeline-rule-memory-handoff.md`; `WI-531` extracts, then `WI-387` prunes |
 | B4 - agent-doc convergence | `AGENTS.md` / `CLAUDE.md` divergence | After `.agents -> .claude` transform and L2 rules placement | `WI-386` |
 | B5 - generated/runtime surfaces | `.claude/skills`, `.claude/commands`, workflows, hooks/settings | Do not edit generated copies directly unless declared skip | Skills/workflows normalized after B3/B4 |
 | B6 - archive purge | `.claude/memory/_archive` | After live index is clean | `WI-387` terminal cleanup |
@@ -112,7 +112,7 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | Surface | Current role | Likely home | Action | Blocker / owner |
 |---|---|---|---|---|
 | `.claude/memory/MEMORY.md` | Startup index plus a few inline facts | Thin index only | PRUNE aggressively; no inline canon/history | `WI-387` last |
-| Active memory files | 88 topic files after B0 cleanup | Pointers or operational notes | Row-level dispositions below | `WI-531` before broad `WI-387` |
+| Active memory files | 74 topic files plus `MEMORY.md` after B1/B2 cleanup | Pointers or operational notes | Row-level dispositions below | `WI-531` before broad `WI-387` |
 | `.claude/memory/_archive/*.md` | 29 historical files | Git history unless specifically cited | PURGE review; archive only with live reason | `WI-387` |
 | Archived links in `MEMORY.md` | A few archived entries still startup-visible | Git history or current docs | Remove live index links unless needed | `WI-387` |
 
@@ -174,9 +174,9 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | `billing-payments.md` | Mobile IAP via RevenueCat, Stripe dormant | Billing architecture/product docs | PROMOTE/REPOINT | Billing stream |
 | `doppler-secrets.md` | Real DB tests need Doppler secrets | Secrets/test runbook | VERIFY; REPOINT/MOVE-OP | Secrets governance |
 | `google_play_publishing.md` | Google Play account available | Store publishing tracker/docs | VERIFY then DELETE/REPOINT | Store stream |
-| `load-database-env-windows-hardcode.md` | Windows-only Doppler probe | Test-utils/runbook or code fix | VERIFY/MOVE-OP | Test infra |
+| `load-database-env-windows-hardcode.md` | Windows-only Doppler probe | Current code | DELETE - stale; `packages/test-utils/src/lib/load-database-env.ts` now probes `DOPPLER_CLI`, PATH, Windows, Homebrew, `/usr/local/bin`, and `~/.local/bin`; applied B2 2026-06-09 | done |
 | `market_language_pivot.md` | English UI, language teaching active, consent pointer | Product/i18n/compliance docs | SPLIT; consent already repointed by J1 | Stream 2 |
-| `nativewind-windows.md` | NativeWind Windows patches | Native dev runbook | MOVE-OP/REPOINT | Dev runbook |
+| `nativewind-windows.md` | NativeWind Windows patches | Native dev runbook | MOVE-OP then DELETE - moved to `docs/runbooks/nativewind-windows.md`; applied B2 2026-06-09 | done |
 | `pricing_dual_cap.md` | Free/Plus caps; routing now pointer-only | Pricing canon + model register | REPOINT/PROMOTE pricing later | Pricing/router |
 | `project_agent_doc_and_memory_architecture_revisit.md` | Agent-doc and shared-memory architecture revisit | Shared-memory stream + `WI-386` | REPOINT; remove stale script references | Shared-memory activity, `WI-386` |
 | `project_apple_enrollment.md` | Apple Developer account available | Store publishing tracker/docs | VERIFY then DELETE/REPOINT | Store stream |
@@ -195,7 +195,7 @@ Captured 2026-06-09 from `/Users/vetinari/nexus/_dev/eduagent-build`.
 | `project_eval_llm_harness.md` | Eval-LLM harness details | Eval docs/runbook | MOVE-OP/REPOINT | LLM eval docs |
 | `project_eval_llm_signal_metrics.md` | Signal distribution regression guard | Eval docs/CI roster | MOVE-OP/REPOINT | `WI-452` |
 | `project_expo_web_preview.md` | Expo web preview launch target | Dev/testing runbook | MOVE-OP/REPOINT | Devex docs |
-| `project_fingerprint_pnpm_mismatch.md` | EAS fingerprint policy issue | Build docs | VERIFY then REPOINT/MOVE-OP | build skill |
+| `project_fingerprint_pnpm_mismatch.md` | EAS fingerprint policy issue | Build docs | DELETE - covered by `docs/deployment-and-secrets.md`, `apps/mobile/app.json`, and `apps/mobile/.fingerprintignore`; applied B2 2026-06-09 | done |
 | `project_freeform_library_filing_decision.md` | Ask Anything library filing decision | Product canon | PROMOTE/REPOINT | Stream 2 |
 | `project_identity_foundation_decisions.md` | Identity Foundation pointer | Identity docs/INDEX/CANONICAL-SET | KEEP as pointer until shared-memory design | J1 handled |
 | `project_inngest_staging.md` | Staging Inngest sync URL | Deploy/Inngest runbook | MOVE-OP/REPOINT | Deploy docs |
@@ -246,16 +246,18 @@ From the tracker on 2026-06-09:
    `feedback_emulator_issues_doc.md`, `feedback_no_suppression.md`, and
    `feedback_precommit_typecheck.md` against current AGENTS/CLAUDE/runbook
    surfaces; removed the live memory files and index links.
-2. **B2 extraction prep - PARTIAL DONE 2026-06-09.** Verified eight candidate
+2. **B2 extraction prep - DONE 2026-06-09.** Verified eleven candidate
    footgun/pointer memories already had target homes in `.agents/skills/commit/SKILL.md`,
    `.agents/skills/commit/references/failure-recovery.md`,
    `.agents/skills/notion/SKILL.md`, `.agents/skills/build/SKILL.md`, and
    `.agents/skills/e2e/SKILL.md`, plus OTA docs in `docs/deployment-and-secrets.md`
-   and `.github/workflows/ci.yml`; removed duplicate memory files and index
-   links. Collapsed `project_eas_update_ota.md` to a pointer. Continue B2 for
-   remaining platform/build/E2E footguns that are not already covered.
-3. **B3 harness cluster handoff.** Feed commit/pre-commit/pre-push memory rows to
-   `WI-531`; do not broadly prune them in this stream before extraction.
+   and `.github/workflows/ci.yml`; moved NativeWind Windows notes to
+   `docs/runbooks/nativewind-windows.md`; removed duplicate memory files and
+   index links. Collapsed `project_eas_update_ota.md` to a pointer.
+3. **B3 harness cluster handoff - DONE 2026-06-09.** Feed
+   `_wip/identity-foundation/2026-06-09-wi-531-pipeline-rule-memory-handoff.md`
+   to `WI-531`; do not broadly prune those rows in this stream before
+   extraction.
 4. **B5 command/skill verification.** Diff `.claude/commands/my/*` against
    `.agents/skills/*` and ZDX replacements; mark thin adapters vs obsolete
    scaffolding.
