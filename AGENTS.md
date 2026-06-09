@@ -94,6 +94,13 @@ Always use the repo commit skill for every commit and push — `/commit` in Clau
 
 Subagents may run `/commit` only from within an isolated worktree they own (see Worktree Placement below). When operating in the coordinator's working tree (no worktree isolation), subagents must NOT run `git add`/`git commit`/`git push` — the coordinator handles all git operations there.
 
+## Pull Requests
+
+The commit skill ends at push — creating a PR is a separate, deliberate act (this is the PR-creation side of the `superpowers:finishing-a-development-branch` override above):
+
+- **Never create a PR unless explicitly asked.** A PR is visible to others; the user controls when a branch goes up for review. After pushing, stop.
+- **When asked, `gh pr create` is the canonical path** — the `gh` CLI is the default for all PR operations (create, view, diff, checks, review triage), never browser-first or hand-rolled API calls.
+
 ## Worktree Placement
 
 All isolated worktrees go under `.worktrees/<branch-name>/` at the repo root. The path is gitignored.

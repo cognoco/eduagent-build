@@ -1,6 +1,6 @@
 # Flaky-test quarantine (WI-536)
 
-> **Determinism precondition** (`docs/specs/2026-05-26-commit-pr-pipeline-gates.md`):
+> **Determinism precondition** (canonical: `ZDX-ADR-0005`, nexus repo; repo gate model: `docs/specs/2026-05-26-commit-pr-pipeline-gates.md`):
 > *a flaky or nondeterministic check gates nothing. Fix or quarantine flakiness;
 > never relocate it.* This is the **quarantine** half of that rule — the mechanism
 > that lets a known-flaky test stop gating `main` **without** going silently dark.
