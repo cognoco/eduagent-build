@@ -37,4 +37,12 @@ describe('enforceChallengeQuestionCap', () => {
     expect(enforceChallengeQuestionCap(0)).toBe(1);
     expect(enforceChallengeQuestionCap(-3)).toBe(1);
   });
+
+  it('clamps NaN/Infinity to the MAX so the hard cap is total over all inputs', () => {
+    expect(enforceChallengeQuestionCap(NaN)).toBe(MAX_CHALLENGE_QUESTIONS);
+    expect(enforceChallengeQuestionCap(Infinity)).toBe(MAX_CHALLENGE_QUESTIONS);
+    expect(enforceChallengeQuestionCap(-Infinity)).toBe(
+      MAX_CHALLENGE_QUESTIONS,
+    );
+  });
 });

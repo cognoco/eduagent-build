@@ -10,24 +10,32 @@ function createUpdateDb() {
     whereArg?: unknown;
   }> = [];
 
+  const update = jest.fn((table: unknown) => {
+    const call = { table } as (typeof updateCalls)[number];
+    updateCalls.push(call);
+
+    return {
+      set: jest.fn((setArg: unknown) => {
+        call.setArg = setArg;
+
+        return {
+          where: jest.fn((whereArg: unknown) => {
+            call.whereArg = whereArg;
+            return Promise.resolve(undefined);
+          }),
+        };
+      }),
+    };
+  });
+
   const db = {
-    update: jest.fn((table: unknown) => {
-      const call = { table } as (typeof updateCalls)[number];
-      updateCalls.push(call);
-
-      return {
-        set: jest.fn((setArg: unknown) => {
-          call.setArg = setArg;
-
-          return {
-            where: jest.fn((whereArg: unknown) => {
-              call.whereArg = whereArg;
-              return Promise.resolve(undefined);
-            }),
-          };
-        }),
-      };
-    }),
+    update,
+    // stampMasteryOnVerify wraps the card + book stamps in a single
+    // transaction so the book-completeness check sees the committed card stamp.
+    // The fake tx delegates to the same `update` tracker.
+    transaction: jest.fn(
+      async (cb: (tx: unknown) => Promise<unknown>) => await cb({ update }),
+    ),
   } as unknown as Database;
 
   return { db, updateCalls };

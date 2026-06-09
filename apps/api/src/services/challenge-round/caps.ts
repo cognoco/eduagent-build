@@ -19,6 +19,13 @@ export const CHALLENGE_OFFER_COOLDOWN_HOURS = 24;
 export const MIN_LEXICAL_OVERLAP_NOTE_DRAFT = 0.4;
 
 export function enforceChallengeQuestionCap(requested: number): number {
+  // This is the documented server-side hard cap (CLAUDE.md: every envelope
+  // signal must have a hard cap so the flow terminates). NaN passes both the
+  // `< 1` and `> MAX` comparisons (both are false for NaN), so without an
+  // explicit guard a NaN totalQuestions would flow through and defeat the
+  // `nextIndex >= total` terminal check. Clamp non-finite input to the cap so
+  // the floor is total over all inputs.
+  if (!Number.isFinite(requested)) return MAX_CHALLENGE_QUESTIONS;
   if (requested < 1) return 1;
   if (requested > MAX_CHALLENGE_QUESTIONS) return MAX_CHALLENGE_QUESTIONS;
   return requested;

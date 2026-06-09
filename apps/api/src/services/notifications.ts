@@ -132,6 +132,24 @@ export async function sendPushNotification(
     });
 
     if (!response.ok) {
+      // [C-1] An HTTP error from the Expo Push API (rate-limit, malformed
+      // token, service outage) is a silent push-delivery failure. Mirror the
+      // network-error path below: escalate to Sentry + structured log so the
+      // failure is queryable, not just a reason string the caller swallows.
+      logger.error('[push] Expo API error', {
+        event: 'notification.push.expo_api_error',
+        profileId: payload.profileId,
+        type: payload.type,
+        status: response.status,
+      });
+      captureException(new Error(`Expo Push API ${response.status}`), {
+        profileId: payload.profileId,
+        tags: {
+          surface: 'push_notification',
+          reason: `http_${response.status}`,
+        },
+        extra: { type: payload.type },
+      });
       return { sent: false, reason: `expo_api_error_${response.status}` };
     }
 
@@ -332,7 +350,18 @@ export async function sendEmail(
     if (!response.ok) {
       // Log only status code — error body may contain PII (echoed email addresses)
       // [logging sweep] structured logger so PII fields land as JSON context
-      logger.error('[email] Resend API error', { status: response.status });
+      // [C-2] Escalate via Sentry too — `logger.error` alone is not queryable
+      // for the "how often did this fire in 24h" question, the same reason the
+      // network-error path below captures. Status only, no PII in tags.
+      logger.error('[email] Resend API error', {
+        event: 'notification.email.resend_api_error',
+        type: payload.type,
+        status: response.status,
+      });
+      captureException(new Error(`Resend API ${response.status}`), {
+        tags: { surface: 'email', reason: `http_${response.status}` },
+        extra: { type: payload.type },
+      });
       return { sent: false, reason: `resend_api_error_${response.status}` };
     }
 
