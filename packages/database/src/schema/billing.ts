@@ -10,7 +10,7 @@ import {
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { accounts, organizations, profiles } from './profiles';
+import { accounts, profiles } from './profiles';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
@@ -38,13 +38,6 @@ export const subscriptions = pgTable(
       .notNull()
       .unique()
       .references(() => accounts.id, { onDelete: 'cascade' }),
-    // [Identity T1] Nullable org FK; the backfill sets it = accountId (org.id
-    // reuses account.id). It becomes the billing key in T4, when accountId is
-    // dropped. Not made unique in T1 — the de-facto 1:1 comes from the unique
-    // accountId it is derived from; the unique constraint moves here in T4.
-    organizationId: uuid('organization_id').references(() => organizations.id, {
-      onDelete: 'cascade',
-    }),
     stripeCustomerId: text('stripe_customer_id').unique(),
     stripeSubscriptionId: text('stripe_subscription_id').unique(),
     tier: subscriptionTierEnum('tier').notNull().default('free'),

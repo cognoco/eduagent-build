@@ -211,13 +211,8 @@ describeIntegration(
       expect(await rolesFor(ownerSolo)).toEqual(['owner', 'student']);
     });
 
-    it('(e) points each subscription at its account org (== account_id)', async () => {
-      const [sub] = await db
-        .select({ organizationId: subscriptions.organizationId })
-        .from(subscriptions)
-        .where(eq(subscriptions.accountId, acctFamily));
-      expect(sub!.organizationId).toBe(acctFamily);
-    });
+    // (e) WI-569: subscriptions.organizationId removed (was T1 column from 0106,
+    //     now removed from effective chain). Test removed pending W1 rewrite.
 
     it('(f) archived child gets {student} and its archived_at is untouched', async () => {
       expect(await rolesFor(archivedChild)).toEqual(['student']);
