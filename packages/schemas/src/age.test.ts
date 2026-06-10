@@ -7,15 +7,15 @@ import {
 import { birthYearSchema } from './profiles.js';
 
 describe('computeAgeBracket', () => {
-  // [BUG-577] 'child' removed — ages under 11 clamp to 'adolescent'
-  it('returns adolescent for ages under 11 (product is strictly 11+; no child bracket)', () => {
-    expect(computeAgeBracket(2016, 2026)).toBe('adolescent'); // age 10
-    expect(computeAgeBracket(2020, 2026)).toBe('adolescent'); // age 6
+  // WI-570 (data-model.md §2A.5): three-way model; 'child' < 13, 'adolescent' 13–17, 'adult' 18+.
+
+  it('returns child for ages under 13', () => {
+    expect(computeAgeBracket(2016, 2026)).toBe('child'); // age 10
+    expect(computeAgeBracket(2020, 2026)).toBe('child'); // age 6
+    expect(computeAgeBracket(2014, 2026)).toBe('child'); // age 12
   });
 
-  it('returns adolescent for ages 11 to 17 inclusive', () => {
-    expect(computeAgeBracket(2015, 2026)).toBe('adolescent'); // age 11
-    expect(computeAgeBracket(2014, 2026)).toBe('adolescent'); // age 12
+  it('returns adolescent for ages 13 to 17 inclusive', () => {
     expect(computeAgeBracket(2013, 2026)).toBe('adolescent'); // age 13
     expect(computeAgeBracket(2012, 2026)).toBe('adolescent'); // age 14
     expect(computeAgeBracket(2009, 2026)).toBe('adolescent'); // age 17
@@ -30,41 +30,37 @@ describe('computeAgeBracket', () => {
     const thisYear = new Date().getFullYear();
     expect(computeAgeBracket(thisYear - 20)).toBe('adult');
     expect(computeAgeBracket(thisYear - 15)).toBe('adolescent');
-    // [BUG-577] sub-11 ages clamp to adolescent rather than returning removed 'child'
-    expect(computeAgeBracket(thisYear - 8)).toBe('adolescent');
+    expect(computeAgeBracket(thisYear - 8)).toBe('child');
   });
 
-  it('[CR-2026-05-19-H11] no in-product age (11-17) maps to the child bracket', () => {
-    // Product is strictly 11+. 'child' was removed from the AgeBracket union.
-    // Every birth year must map to either 'adolescent' or 'adult'.
-    for (let age = 11; age <= 17; age++) {
-      const birthYear = 2026 - age;
-      const bracket = computeAgeBracket(birthYear, 2026);
-      expect(bracket).not.toBe('child');
-      expect(['adolescent', 'adult']).toContain(bracket);
-    }
-  });
-
-  it('AgeBracket is the two-way union (D-C4-2) — child removed in BUG-577', () => {
-    // [BUG-577] 'child' dropped from the union; only two valid values remain.
-    const all: ReadonlyArray<AgeBracket> = ['adolescent', 'adult'];
-    expect(all).toHaveLength(2);
+  it('AgeBracket is the three-way union (WI-570 / data-model.md §2A.5)', () => {
+    const all: ReadonlyArray<AgeBracket> = ['child', 'adolescent', 'adult'];
+    expect(all).toHaveLength(3);
+    expect(all).toContain('child');
     expect(all).toContain('adolescent');
     expect(all).toContain('adult');
   });
 
-  it('[BUG-577] AgeBracket does NOT include child — TypeScript-level contract', () => {
-    // The contract is now structural: 'child' is intentionally absent from
-    // the union. The runtime assertions above pin behaviour; here we just
-    // assert the literal members at runtime.
-    const literals: AgeBracket[] = ['adolescent', 'adult'];
-    expect(literals).not.toContain('child' as unknown as AgeBracket);
+  it('boundary: age 13 = adolescent, age 12 = child', () => {
+    expect(computeAgeBracket(2026 - 13, 2026)).toBe('adolescent');
+    expect(computeAgeBracket(2026 - 12, 2026)).toBe('child');
+  });
+
+  it('boundary: age 18 = adult, age 17 = adolescent', () => {
+    expect(computeAgeBracket(2026 - 18, 2026)).toBe('adult');
+    expect(computeAgeBracket(2026 - 17, 2026)).toBe('adolescent');
   });
 });
 
 // ── birthYearSchema minimum-age gate ──────────────────────────────────────
 
-describe('[BUG-577] birthYearSchema minimum-age gate (strictly 11+)', () => {
+describe('birthYearSchema minimum-age gate (v1 13+ launch floor, WI-570)', () => {
+  it('rejects a birth year that yields age 12 (currentYear - 12)', () => {
+    const currentYear = new Date().getFullYear();
+    const result = birthYearSchema.safeParse(currentYear - 12);
+    expect(result.success).toBe(false);
+  });
+
   it('rejects a birth year that yields age 10 (currentYear - 10)', () => {
     const currentYear = new Date().getFullYear();
     const result = birthYearSchema.safeParse(currentYear - 10);
@@ -77,9 +73,9 @@ describe('[BUG-577] birthYearSchema minimum-age gate (strictly 11+)', () => {
     expect(result.success).toBe(false);
   });
 
-  it('accepts a birth year that yields age 11 (currentYear - 11)', () => {
+  it('accepts a birth year that yields age 13 (currentYear - 13)', () => {
     const currentYear = new Date().getFullYear();
-    const result = birthYearSchema.safeParse(currentYear - 11);
+    const result = birthYearSchema.safeParse(currentYear - 13);
     expect(result.success).toBe(true);
   });
 
@@ -89,9 +85,14 @@ describe('[BUG-577] birthYearSchema minimum-age gate (strictly 11+)', () => {
     expect(result.success).toBe(true);
   });
 
-  it('[BUG-577] computeAgeBracket(currentYear - 11) returns adolescent, not child', () => {
+  it('computeAgeBracket(currentYear - 13) returns adolescent (13-floor boundary)', () => {
     const currentYear = new Date().getFullYear();
-    expect(computeAgeBracket(currentYear - 11)).toBe('adolescent');
+    expect(computeAgeBracket(currentYear - 13)).toBe('adolescent');
+  });
+
+  it('computeAgeBracket(currentYear - 12) returns child (just below 13-floor)', () => {
+    const currentYear = new Date().getFullYear();
+    expect(computeAgeBracket(currentYear - 12)).toBe('child');
   });
 });
 
