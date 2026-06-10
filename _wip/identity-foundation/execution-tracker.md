@@ -76,6 +76,21 @@ tables/readers dropped, full project grep clean, tests green post-drop.
   for Ready+Assisted items (filed as WI-552). Ignore it; trust the **Validity**
   formula.
 
+### Operator rulings (standing for this initiative)
+
+- **2026-06-10 — WP DoR bridging is pre-approved, blanket (Jorn).** Top-down-sliced
+  WPs fail the bottom-up WP DoR mechanically (see WI-593). For every remaining IF
+  WP (WI-571…586), the shepherd applies the bridge **without asking per WP**:
+  (1) transcribe the frozen master-plan WP block into the page body as the bundle
+  brief; (2) capture **2 thin provenance children** (stubs marked "absorbed
+  provenance — lifecycle rides the parent, never claim/execute standalone", findings
+  mapped across them; full finding detail stays in the brief's findings table);
+  (3) set the `Sub-item` relation; (4) `refine --to-ready`. A zero-children full
+  bypass was considered and rejected: `review.ts` `dod.wp.bulk_ready` mechanically
+  requires ≥1 child at the operator's close gate, so bypassing refine would just
+  move the friction to every `/cosmo:review`. Standing until WI-593 lands a
+  substrate fix (DoR amendment or slicer tooling).
+
 ---
 
 ## 3. Pointers / index
@@ -173,7 +188,8 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   **WI-593** (Hygiene, project Nexus). Interim bridge used on WI-570: transcribe
   the frozen master-plan WP block into the body, capture the provenance children
   (WI-591 schema-build, WI-592 F-032 scoped-repo), hand-set `Sub-item`, then
-  refine `--to-ready`. Repeat per WP until WI-593 is ruled.
+  refine `--to-ready`. **Blanket-approved by operator 2026-06-10** — see §2
+  Operator rulings; apply per WP without asking.
 - **Shepherd protocol:** executor agents work in `.worktrees/WI-NN` (worktree-setup
   skill), one PR per WP, claim via `execute.ts fetch --supervised` + `claim
   --claimant`, complete → Stage=Reviewing + release claim; close only via
