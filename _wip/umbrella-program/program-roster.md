@@ -205,20 +205,36 @@ security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they
 
 ---
 
-## Post-P operating model — two streams (ruled 2026-06-09)
+## Vocabulary — what a roster row IS (fixed 2026-06-10)
+
+Each PRG row is an **Initiative** — the root `CONTEXT.md` term: *an in-flight effort
+with its own lifecycle (start → active → graduated / parked / killed), typically with a
+`_wip/<slug>/` workspace*. The roster is the umbrella's **Initiative roster**.
+- **Do NOT call rows "workstreams"** — the glossary's _Avoid_ list locks that word to
+  the ZDX/Cosmo object (ZDX-ADR-0001). A Cosmo **Workstream** is the substrate
+  container an Initiative **creates at activation**, mapping **0..n per Initiative**
+  (PRG-01 → "Identity Foundation"; PRG-02 → "Harness hygiene"; PRG-20 → none) — never
+  assume 1:1. "Work track" / "work stream" are also _Avoid_-listed.
+- **Do NOT call anything new a "stream"** — "Stream 2" is the historical proper name
+  of **PRG-20 only** (the estate-canon drain) and stays reserved for it.
+- `PRG-NN` IDs are unchanged (roster-local IDs, not a competing noun).
+
+## Post-P operating model — execution + activation planning (ruled 2026-06-09; vocabulary fixed 2026-06-10)
 
 Once Phase P lands (IF Workstream + WPs in Cosmo + execution tracker), the umbrella
-splits into **two concurrent streams** — there is **no** "IF executes end-to-end before
+runs **two concurrent activities** — there is **no** "IF executes end-to-end before
 anything else" rule:
 
-1. **IF execution** — W0→W1→…→tail per the IF execution tracker. Owns the critical
-   path and most human attention.
-2. **Everything-else planning** — umbrella activity: normalize the PRG-16 singleton
-   tail, charter PRG-10–15 (outcome / size / owner), run PRG-14's `tech/*` dedupe,
-   convert `activate-when` into an **activation queue**. Planning consumes agent
-   capacity, not execution throughput — it never waits on IF.
+1. **IF execution** (PRG-01) — W0→W1→…→tail per the IF execution tracker. Owns the
+   critical path and most human attention.
+2. **Activation planning** — the umbrella activity over all *other* Initiatives:
+   normalize the PRG-16 singleton tail, charter PRG-10–15 (outcome / size / owner),
+   run PRG-14's `tech/*` dedupe, convert `activate-when` into an **activation
+   queue**. Planning consumes agent capacity, not execution throughput — it never
+   waits on IF.
 
-A planned stream then starts **executing in parallel with IF** when, per stream:
+A planned Initiative then starts **executing in parallel with IF** when, per
+Initiative:
 - **Blast-radius class allows it** (O §2): parallel-safe (l10n, singletons,
   agent-instructions) → anytime; serialize-class (security-pii remainders,
   errors-api) → only after W2/W3 land, regardless of plan readiness.
@@ -226,9 +242,11 @@ A planned stream then starts **executing in parallel with IF** when, per stream:
   close cleanly (realistically during W0/W1) — not IF completion.
 - **Attention budget allows it** (the honest 2-person constraint; per-fortnight call).
 
-First parallel activation will likely be a parallel-safe, agent-heavy, low-supervision
-stream (l10n-a11y is the archetype). Serialize-class streams get planned early so they
-launch the moment W2/W3 clears them.
+First parallel activation will likely be a parallel-safe, agent-heavy,
+low-supervision Initiative (l10n-a11y is the archetype). Serialize-class Initiatives
+get planned early so they launch the moment W2/W3 clears them. Activating an
+Initiative = create its tracker + its Cosmo Workstream + slice — the template PRG-01
+dogfooded at Phase P.
 
 ## Cross-program gates (the edges that matter)
 
