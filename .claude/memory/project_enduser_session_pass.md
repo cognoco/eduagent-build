@@ -17,8 +17,10 @@ The runner is a conventional quality gate, not only a transcript collector. Norm
 As of 2026-05-25, `package.json` does not register `test:llm:premium-routing`; run the Plus/Family hard-topic routing pass directly:
 
 ```bash
-C:/Tools/doppler/doppler.exe run --project mentomate --config stg -- pnpm exec tsx scripts/premium-routing-pass.ts
+doppler run --project mentomate --config stg -- pnpm exec tsx scripts/premium-routing-pass.ts
 ```
+
+Note: `C:/Tools/doppler/doppler.exe` is a per-machine Windows path; use the portable `doppler` form above on macOS/Linux.
 
 The runner accepts `--cases=...`, `--providers=openai,anthropic`, `--openai-model=gpt-5.5`, `--run-id=<id>`, `--results-dir=<path>`, `--allow-missing-provider`, `--allow-quality-failures`, and `--list-cases`. When validating model picks, compare the observed routing to `MMT-ADR-0014` + `docs/registers/llm-models/master.md`, not old hardcoded provider assumptions. The change-class script lists it as a slow required validation for LLM routing/subscription changes.
 

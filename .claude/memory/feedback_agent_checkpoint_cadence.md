@@ -9,7 +9,7 @@ When dispatching any long-running agent or subagent, explicitly instruct it to s
 **Why:** A 2026-05-15 investigation lost practical momentum because two read-only subagents returned useful findings only in chat. The repo stayed clean, so there was no file artifact to resume from if the thread/context failed or the user wanted the work preserved.
 
 **How to apply:**
-- Do not make subagents commit, stage, or push by default. The no-git rule in `feedback_agents_commit_push.md` still wins.
+- Do not make subagents commit, stage, or push by default. Per AGENTS.md § Git Commits: "Agents perform code changes in isolated worktrees they own … and commit from there. In the residual shared-tree case, commit only your own session's work … and never stage files another session modified."
 - For implementation agents, "save" means write actual code/test/docs changes to their assigned files as they work, plus report modified paths.
 - For research/review/explorer agents, "save" means write a short checkpoint note to a coordinator-approved durable file, such as a task-specific doc under `docs/audit/`, `docs/plans/`, or a scratch checkpoint path provided in the prompt.
 - If no checkpoint file is appropriate, the coordinator should create or name one before dispatching agents.

@@ -9,14 +9,18 @@ Self-improvement Layer 1 for the eval harness. Catches envelope-signal distribut
 ## Where it lives
 
 - `apps/api/eval-llm/runner/metrics.ts` — `extractSampleMetrics`, `aggregateFlowSamples`, `compareAgainstBaseline`, `buildBaseline`/`parseBaseline`, `formatDriftReport`
-- `apps/api/eval-llm/runner/metrics.test.ts` — 18 tests
+- `apps/api/eval-llm/runner/metrics.test.ts` — 28 tests
 - `FlowDefinition.emitsEnvelope?: boolean` in `runner/types.ts` — opt-in per flow
 - `RunSummary.envelopeMetrics` accumulated in `runHarness`
-- CLI flags `--check-baseline`, `--update-baseline`, `--baseline-tolerance <fraction>` in `parseCliArgs`
+- `.github/workflows/eval-live.yml` — automates weekly scheduled drift check (cron + `run-live-evals` label trigger)
+- CLI flags `--check-baseline`, `--update-baseline`, `--baseline-tolerance <fraction>`, `--validate-baseline` in `parseCliArgs`
 - Baseline stored at `apps/api/eval-llm/baseline.json` (seed with `--update-baseline` on first Tier 2 run)
 
 Flows opted in so far:
 - `exchangesFlow` (`emitsEnvelope: true` + `expectedResponseSchema: llmResponseEnvelopeSchema`)
+- `probesFlow`
+- `safetyProbesFlow`
+- `languageQualityFlow`
 
 Future interview streaming flow + any new envelope-returning flow should set both flags.
 
@@ -35,6 +39,7 @@ Default `--baseline-tolerance 0.05` = 5pp. At the current ~30-sample harness mat
 
 - **Seed baseline**: `doppler run -- pnpm eval:llm -- --live --update-baseline` — commit the resulting `baseline.json` alongside the prompt version it reflects.
 - **Guard runs**: `doppler run -- pnpm eval:llm -- --live --check-baseline` — exits 1 on drift, prints a before/after table per (flow, metric).
+- **Validate baseline (CI-blocking, key-free)**: `pnpm eval:llm -- --validate-baseline` — deterministic structural check; no LLM call, no Doppler required. CI-blocking in `api-quality-gate` since WI-556.
 - **After intentional prompt changes**: re-seed the baseline in the same commit as the prompt change so the diff reviewer sees both.
 - **Never tighten tolerance without increasing N first** — small-N + tight tolerance = flaky CI.
 

@@ -19,9 +19,9 @@ Model/provider routing is not canonical in this memory. The old Gemini-only / GP
 
 **Tier config:**
 - Free tier: `monthlyQuota: 100, dailyLimit: 10`
-- Plus: `monthlyQuota: 700, dailyLimit: null, premiumModelProfiles: 1, llmTier: 'standard'`
-- Family: `monthlyQuota: 1500, dailyLimit: null, premiumModelProfiles: 0, llmTier: 'standard'`
-- Pro: `monthlyQuota: 3000, dailyLimit: null, premiumModelProfiles: 2, llmTier: 'standard'`
+- Plus: `monthlyQuota: 700, dailyLimit: null, llmTier: 'standard'`
+- Family: `monthlyQuota: 1500, dailyLimit: null, llmTier: 'standard'`
+- Pro: `monthlyQuota: 3000, dailyLimit: null, llmTier: 'standard'`
 - Per-tier/per-rung model routing: `MMT-ADR-0014` + `docs/registers/llm-models/master.md` are canonical.
 - Daily reset via Inngest cron at 01:00 UTC
 
