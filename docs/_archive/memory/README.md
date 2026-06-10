@@ -34,9 +34,11 @@ resolved/stale entries.
 | project_apple_enrollment | STALE | resolved-blocker tombstone (account available 2026-05-15) |
 | feedback_persona_vs_role | STALE | names removed `personaFromBirthYear` (persona-fossil-guard forbids reintroduction) |
 
-**Held back (NOT archived):** `feedback_nx_reset_before_commit` — WI-531 `HOLD`. The
-`@nx/enforce-module-boundaries` eslint project-graph footgun is a different cache from
-WI-451's TS6305 fix, so it is genuinely uncovered; retire only after the WI-388 CI proof.
+**Held back (NOT archived):** `feedback_nx_reset_before_commit` — **KEEP in place** (was a
+WI-531 `HOLD`). The `@nx/enforce-module-boundaries` eslint project-graph footgun is a
+different cache from WI-451's TS6305 fix, so it is genuinely uncovered. Reclassified out of
+WI-387 into its own tracked follow-up **WI-561** (blocked-by WI-388): extract to a
+cross-runtime CI-troubleshooting doc or archive, after the WI-388 CI proof.
 
 ## Batch 2 — 2026-06-10 (table-D `Archive` comb)
 
