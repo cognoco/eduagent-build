@@ -300,7 +300,14 @@ the reference's Appendix.
 
 Post-P operating posture (per reference §6.4): **two concurrent activities** —
 IF execution (PRG-01) + activation planning over all other Initiatives; planned
-Initiatives start executing in parallel as their §6.3 gates clear.
+Initiatives start executing in parallel as their §6.3 gates clear. Session
+model per reference §2.5–2.7: program session · per-Initiative shepherd ·
+executors.
+
+**Generated view:** [`dashboard.html`](dashboard.html) — the "Flight Deck"
+(board / gate-rail / field-guide over initiatives × bundles × gates, for
+Jorn + Zuzka). A view, **never a home**: regenerated at umbrella touches; on
+any disagreement this roster and Cosmo win.
 
 ## Cross-program gates (the edges that matter)
 
@@ -317,6 +324,11 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-10 — Session model + Flight Deck registered.** Planning-reference
+  bumped to v1.1 (§2.5–2.7: program session / per-Initiative shepherd /
+  executor altitudes; disposable-shepherd invariant; model tiering). IF W1
+  shepherd is the first instance. `dashboard.html` (Flight Deck) added as a
+  generated view — view-never-home, regenerated at umbrella touches.
 - **2026-06-10 — Full-forward-view amendment pass (ratified).** (1) **Activation
   queue** added as a roster section (its home per the planning-reference document
   map) — 11 gate-ordered entries covering *every* Initiative incl. the late ones.

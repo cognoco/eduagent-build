@@ -76,6 +76,31 @@ not deferred to execution.
 slice-time field), so slicing is pure transcription. A field the plan omits
 becomes a judgment call at slice time — record the derivation rule used.
 
+2.5 **Session model — one session per altitude.** Coordination mirrors the
+artifact hierarchy: a **program session** steers the roster / queue / gates; a
+**shepherd session** per executing Initiative runs its day-to-day (pick →
+refine → brief → hand off → track) against its tracker + the substrate; and
+**executor agents** build individual WPs in isolated worktrees. Do not collapse
+altitudes: the program session never shepherds WP-level detail, and a shepherd
+never reaches into another Initiative — the two talk only in boundary events
+(§5.2). Standing orchestration *daemons* are banned; shepherds are interactive
+sessions.
+
+2.6 **Shepherd sessions are disposable by construction.** A shepherd is a
+reader/writer of the durable artifacts, never their replacement: every state
+change is written back (substrate immediately; tracker at checkpoint cadence).
+The test: kill the session at any moment and a fresh one pointed at the
+tracker loses nothing but warm cache. Kickoff brief = three pointers (tracker ·
+ratified plan · substrate operating rules) + the checkpoint duty + the boundary
+events to report upward. Briefs are pointers, never pasted content — pasted
+briefs go stale.
+
+2.7 **Model tiering by leverage.** Shepherds and critical-path executors run on
+the top model tier — low-volume but high-leverage (a wrong pick, brief, or
+review costs an executor-day). Routine sub-agents (state syncs, lookups,
+mechanical sweeps) run on mid/low tiers. Tier follows the role; effort follows
+the turn.
+
 ## 3. Planning method — reconcile-and-route
 
 3.1 **The roster is the standing hypothesis.** Planning passes do not start
@@ -216,11 +241,22 @@ the same change-set as the event they record.
   "W1 landed", "W2/W3 authority+PII model landed", "clean-cut tail done".
 - **Dogfood instance:** identity-foundation (Phase P, 2026-06-10) — first full
   top-down slice; the IF pattern (tracker + Workstream + direct-to-WP slice) is
-  the activation template (§2.1).
+  the activation template (§2.1). The **IF W1 shepherd** (kicked off
+  2026-06-10) is the first per-Initiative shepherd session (§2.5–2.7).
+- **Generated views:** `dashboard.html` ("Flight Deck") — board / gate-rail /
+  field-guide over initiatives × bundles × gates, for Jorn + Zuzka. A **view,
+  never a home** (it states so itself); regenerated at umbrella touches; on
+  disagreement, roster/Cosmo win. Doubles as the hand-built prototype for
+  PRG-04 / WI-590.
 - **ZDX top-down embryo:** this document + the roster's proto-epic schema are
   the primary inputs to PRG-04 (Cosmo top-down delivery layer).
 
 ## Change log
+- **2026-06-10 — v1.1.** Added §2.5–2.7 (session model: program session /
+  per-Initiative shepherd / executors; disposable-shepherd invariant + kickoff
+  brief shape; model tiering by leverage) — agreed at the IF W1 kickoff
+  discussion. Appendix: IF W1 shepherd registered as first instance;
+  `dashboard.html` registered as a generated view (view-never-home).
 - **2026-06-10 — v1.** Extracted and generalized from the planning sessions of
   2026-06-09/10 (vocabulary ruling, reconcile-and-route method, routing rule,
   dependency model, activation gates, operating principles). Ratified by Jorn
