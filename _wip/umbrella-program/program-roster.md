@@ -56,15 +56,21 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **Owner:** Jorn (+ runway session agents)
 - **Depends-on:** **Phase P (Cosmo slicing / execution start) is blocked-by
   Harness-Hygiene exit-gate `WI-530`** (mirrored by boundary node `WI-533`).
-- **Decomposition:** `_wip/identity-foundation/ROADMAP.md` (the top-down delivery
-  doc; Phases A–O done 2026-06-09 — master plan `2026-06-09-phase-o-master-plan.md`
-  ratified; Phase P awaits `WI-530`).
+- **Decomposition:** `_wip/identity-foundation/execution-tracker.md` (the durable
+  execution entry point — charter / WI map / wave sequence / coarse status; created
+  by Phase-P slicing 2026-06-10). `_wip/identity-foundation/ROADMAP.md` is now the
+  **historical record** of the A–P planning runway (master plan
+  `2026-06-09-phase-o-master-plan.md` ratified 2026-06-09).
+- **P sliced (2026-06-10):** all 21 O units live in Cosmo (WI-569…WI-586 + the W0
+  trio below) under the new Cosmo **Workstream "Identity Foundation"**
+  (`37b8bce9-1f7c-81c2-bb42-cf7f47f839cc`), with native dependency edges per O §4.
+  **Execution start of W1+ remains gated on `WI-530`.** Live state is Cosmo's.
 - **W0 decoupled (2026-06-09):** the 11 patch-now security defects ship immediately
   on the current harness, ungated by `WI-530`/Phase P (O §7 decision 4). Instantiated
   in Cosmo: **`WI-549`** (api bundle, 7 findings, WP) · **`WI-550`** (inngest bundle,
-  3 findings, WP) · **`WI-551`** (billing F-121, Item) — all `Ready`/`Assisted`,
-  project MentoMate. Live state is Cosmo's; this is a pointer. (Baseline reset stays
-  gated with W1.)
+  3 findings, WP) · **`WI-551`** (billing F-121, Item) — project MentoMate;
+  WI-549/550 Closed/Done (PRs #817/#818, merged 2026-06-10), WI-551 still Ready.
+  Live state is Cosmo's; this is a pointer. (Baseline reset stays gated with W1.)
 - **Activate-when:** — (active)
 
 ### PRG-02 · Harness Hygiene — `active`
@@ -199,6 +205,31 @@ security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they
 
 ---
 
+## Post-P operating model — two streams (ruled 2026-06-09)
+
+Once Phase P lands (IF Workstream + WPs in Cosmo + execution tracker), the umbrella
+splits into **two concurrent streams** — there is **no** "IF executes end-to-end before
+anything else" rule:
+
+1. **IF execution** — W0→W1→…→tail per the IF execution tracker. Owns the critical
+   path and most human attention.
+2. **Everything-else planning** — umbrella activity: normalize the PRG-16 singleton
+   tail, charter PRG-10–15 (outcome / size / owner), run PRG-14's `tech/*` dedupe,
+   convert `activate-when` into an **activation queue**. Planning consumes agent
+   capacity, not execution throughput — it never waits on IF.
+
+A planned stream then starts **executing in parallel with IF** when, per stream:
+- **Blast-radius class allows it** (O §2): parallel-safe (l10n, singletons,
+  agent-instructions) → anytime; serialize-class (security-pii remainders,
+  errors-api) → only after W2/W3 land, regardless of plan readiness.
+- **Pipeline is proven, not finished:** a few IF WIs through claim→execute→review→
+  close cleanly (realistically during W0/W1) — not IF completion.
+- **Attention budget allows it** (the honest 2-person constraint; per-fortnight call).
+
+First parallel activation will likely be a parallel-safe, agent-heavy, low-supervision
+stream (l10n-a11y is the archetype). Serialize-class streams get planned early so they
+launch the moment W2/W3 clears them.
+
 ## Cross-program gates (the edges that matter)
 
 ```
@@ -211,6 +242,13 @@ PRG-10/12/13/15 (out-of-blast-radius findings)  ──▶  parallel-safe (throug
 ---
 
 ## Change log
+- **2026-06-10 — PRG-01 Phase-P slicing landed; decomposition repointed.** All 21
+  identity-foundation units now live in Cosmo (WI-569…WI-586 created; W0 trio
+  549/550/551 pre-existing) under the new Cosmo Workstream **"Identity Foundation"**
+  with O §4 dependency edges. PRG-01 `Decomposition` repointed to
+  `_wip/identity-foundation/execution-tracker.md` (ROADMAP → historical record).
+  W1+ execution start still gated on `WI-530`; W0 patches decoupled (549/550
+  already Closed/Done via PRs #817/#818).
 - **2026-06-09 — seeded (EMBRYO).** Roster created in `_wip/umbrella-program/`.
   Active rows PRG-01/02/03 populated; emerging clusters PRG-10–15 seeded as
   provisional from RECONCILED.md (firm at Phase M close); backlog PRG-20 (Stream 2,
