@@ -569,6 +569,91 @@ describe('account routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // GET /v1/account/email  — [CRITICAL-1] reconciler source
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/account/email', () => {
+    it('returns the persisted account email for the owner', async () => {
+      const res = await app.request(
+        '/v1/account/email',
+        { headers: makeAuthHeaders() },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({ email: 'test@example.com' });
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request('/v1/account/email', {}, TEST_ENV);
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/account/security-event  — [CRITICAL-2a] password-change ping
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/account/security-event', () => {
+    const inngestMock = jest.requireMock('../inngest/client') as {
+      inngest: { send: jest.Mock };
+    };
+
+    beforeEach(() => {
+      inngestMock.inngest.send.mockClear();
+      inngestMock.inngest.send.mockResolvedValue(undefined);
+    });
+
+    it('dispatches a security-event to the current account email for the owner', async () => {
+      const res = await app.request(
+        '/v1/account/security-event',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ event: 'password_added' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({ ok: true });
+      expect(inngestMock.inngest.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/account.security-event',
+          data: expect.objectContaining({
+            type: 'password_added',
+            to: 'test@example.com',
+          }),
+        }),
+      );
+    });
+
+    it('returns 400 for an unknown event type', async () => {
+      const res = await app.request(
+        '/v1/account/security-event',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ event: 'email_changed' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(inngestMock.inngest.send).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/account/security-event',
+        { method: 'POST', body: JSON.stringify({ event: 'password_added' }) },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // [CR-2026-05-19-H1] Break tests — non-owner profile must be rejected from
   // all owner-gated account routes. Uses X-Profile-Id to exercise the explicit
   // path in profileScopeMiddleware (which reads isOwner from DB / mock).
@@ -669,6 +754,47 @@ describe('account routes', () => {
         message: 'Only the account owner can change account email.',
       });
       expect(mockUpdateAccountEmailFromClerk).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK CRITICAL-1] GET /v1/account/email returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/account/email',
+        { headers: nonOwnerHeaders },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can view the account email.',
+      });
+    });
+
+    it('[BREAK CRITICAL-2a] POST /v1/account/security-event returns 403 for non-owner profile', async () => {
+      const inngestMock = jest.requireMock('../inngest/client') as {
+        inngest: { send: jest.Mock };
+      };
+      inngestMock.inngest.send.mockClear();
+
+      const res = await app.request(
+        '/v1/account/security-event',
+        {
+          method: 'POST',
+          headers: nonOwnerHeaders,
+          body: JSON.stringify({ event: 'password_added' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can manage account security.',
+      });
+      // The non-owner must not be able to trigger a notification dispatch.
+      expect(inngestMock.inngest.send).not.toHaveBeenCalled();
     });
   });
 });

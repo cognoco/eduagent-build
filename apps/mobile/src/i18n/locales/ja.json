@@ -2571,7 +2571,6 @@
     "errorSendCodeFirst": "先に新しいメールアドレスへコードを送信してください。",
     "errorCodeRequired": "確認コードを入力してください",
     "errorSyncFailed": "ログイン用メールは変更されましたが、アカウント記録は更新されませんでした。{{message}}",
-    "warningOldEmailStillActive": "メールは更新されましたが、古いメールはまだ有効です。",
     "successMessage": "メールを更新しました"
   },
   "securitySessions": {
@@ -2588,7 +2587,14 @@
     "currentBadge": "このデバイス",
     "revokeLabel": "{{device}}のセッションを取り消す",
     "revoking": "取り消し中...",
-    "revokeButton": "取り消す"
+    "revokeButton": "取り消す",
+    "ipAddress": "IPアドレス {{ip}}",
+    "signOutAllButton": "他のすべてのデバイスからサインアウトする ({{count}})",
+    "signOutAllLabel": "他のすべてのデバイスからサインアウトする",
+    "signingOutAll": "他のデバイスからサインアウトしています...",
+    "signOutAllTitle": "他のすべてのデバイスからサインアウトしますか？",
+    "signOutAllConfirm": "これにより、他の{{count}}個のセッションが終了します。このデバイスはサインインしたままになります。",
+    "signOutAllConfirmButton": "すべてサインアウト"
   },
   "changePassword": {
     "errorCurrentRequired": "現在のパスワードを入力してください",

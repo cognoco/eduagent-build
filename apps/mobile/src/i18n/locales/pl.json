@@ -2571,7 +2571,6 @@
     "errorSendCodeFirst": "Najpierw wyślij kod na nowy e-mail.",
     "errorCodeRequired": "Wpisz kod weryfikacyjny",
     "errorSyncFailed": "E-mail logowania został zmieniony, ale rekord konta nie został zaktualizowany. {{message}}",
-    "warningOldEmailStillActive": "E-mail zaktualizowany, ale stary e-mail nadal jest aktywny.",
     "successMessage": "E-mail zaktualizowany"
   },
   "securitySessions": {
@@ -2588,7 +2587,14 @@
     "currentBadge": "To urządzenie",
     "revokeLabel": "Unieważnij sesję na {{device}}",
     "revoking": "Unieważnianie...",
-    "revokeButton": "Unieważnij"
+    "revokeButton": "Unieważnij",
+    "ipAddress": "IP {{ip}}",
+    "signOutAllButton": "Wyloguj wszystkie inne urządzenia ({{count}})",
+    "signOutAllLabel": "Wyloguj wszystkie inne urządzenia",
+    "signingOutAll": "Wylogowywanie pozostałych urządzeń...",
+    "signOutAllTitle": "Wylogować wszystkie inne urządzenia?",
+    "signOutAllConfirm": "Spowoduje to zakończenie {{count}} innych sesji. To urządzenie pozostanie zalogowane.",
+    "signOutAllConfirmButton": "Wyloguj wszystkie"
   },
   "changePassword": {
     "errorCurrentRequired": "Wprowadź aktualne hasło",

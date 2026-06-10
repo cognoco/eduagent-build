@@ -16,6 +16,8 @@ jest.mock('@clerk/clerk-expo', () => ({
       updatePassword: mockUpdatePassword,
     },
   }),
+  // [CRITICAL-2b] Passthrough: the wrapped updatePassword runs directly.
+  useReverification: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 describe('AddPassword', () => {

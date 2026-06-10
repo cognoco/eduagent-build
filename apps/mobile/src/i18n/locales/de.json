@@ -2571,7 +2571,6 @@
     "errorSendCodeFirst": "Sende zuerst einen Code an deine neue E-Mail.",
     "errorCodeRequired": "Gib den Bestätigungscode ein",
     "errorSyncFailed": "Deine Login-E-Mail wurde geändert, aber der Kontoeintrag wurde nicht aktualisiert. {{message}}",
-    "warningOldEmailStillActive": "E-Mail aktualisiert, aber deine alte E-Mail ist noch aktiv.",
     "successMessage": "E-Mail aktualisiert"
   },
   "securitySessions": {
@@ -2588,7 +2587,14 @@
     "currentBadge": "Dieses Gerät",
     "revokeLabel": "Sitzung von {{device}} widerrufen",
     "revoking": "Widerrufen...",
-    "revokeButton": "Widerrufen"
+    "revokeButton": "Widerrufen",
+    "ipAddress": "IP {{ip}}",
+    "signOutAllButton": "Alle anderen Geräte abmelden ({{count}})",
+    "signOutAllLabel": "Alle anderen Geräte abmelden",
+    "signingOutAll": "Andere Geräte werden abgemeldet...",
+    "signOutAllTitle": "Alle anderen Geräte abmelden?",
+    "signOutAllConfirm": "Hiermit werden {{count}} andere Sitzungen beendet. Dieses Gerät bleibt angemeldet.",
+    "signOutAllConfirmButton": "Alle abmelden"
   },
   "changePassword": {
     "errorCurrentRequired": "Aktuelles Passwort eingeben",

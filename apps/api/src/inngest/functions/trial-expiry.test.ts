@@ -45,8 +45,11 @@ jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockFindExpiredTrials = jest.fn().mockResolvedValue([]);
 const mockFindSubscriptionsByTrialDateRange = jest.fn().mockResolvedValue([]);
-const mockTransitionToExtendedTrial = jest.fn().mockResolvedValue(undefined);
+const mockTransitionToExtendedTrial = jest.fn().mockResolvedValue(true);
 const mockDowngradeQuotaPool = jest.fn().mockResolvedValue(undefined);
+const mockDowngradeExtendedTrialQuotaIfStillExpired = jest
+  .fn()
+  .mockResolvedValue(true);
 const mockFindExpiredTrialsByDaysSinceEnd = jest.fn().mockResolvedValue([]);
 
 jest.mock(
@@ -64,6 +67,8 @@ jest.mock(
         mockTransitionToExtendedTrial(...args),
       downgradeQuotaPool: (...args: unknown[]) =>
         mockDowngradeQuotaPool(...args),
+      downgradeExtendedTrialQuotaIfStillExpired: (...args: unknown[]) =>
+        mockDowngradeExtendedTrialQuotaIfStillExpired(...args),
       findExpiredTrialsByDaysSinceEnd: (...args: unknown[]) =>
         mockFindExpiredTrialsByDaysSinceEnd(...args),
     };
@@ -228,6 +233,43 @@ describe('trialExpiry', () => {
     expect(mockDowngradeQuotaPool).not.toHaveBeenCalled();
   });
 
+  it('[F-121] does not count stale trial selections skipped by the guarded transition', async () => {
+    const consoleWarnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const staleTrial = {
+      id: 'sub-stale',
+      accountId: 'acc-stale',
+      status: 'trial',
+      trialEndsAt: '2025-01-14T23:00:00.000Z',
+    };
+
+    mockFindExpiredTrials.mockResolvedValueOnce([staleTrial]);
+    mockTransitionToExtendedTrial.mockResolvedValueOnce(false);
+
+    const { result } = await executeSteps();
+
+    expect(result.expiredCount).toBe(0);
+    expect(mockTransitionToExtendedTrial).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub-stale',
+      450,
+    );
+    expect(
+      consoleWarnSpy.mock.calls.map(([entry]) => JSON.parse(String(entry))),
+    ).toContainEqual(
+      expect.objectContaining({
+        message: 'billing.trial_expiry_stale_selection_skipped',
+        context: expect.objectContaining({
+          step: 'process-expired-trials',
+          trialId: 'sub-stale',
+          metric: 'billing_trial_expiry_stale_selection_skipped',
+        }),
+      }),
+    );
+    consoleWarnSpy.mockRestore();
+  });
+
   it('transitions extended trials to free tier after 14-day soft landing', async () => {
     const extendedTrial = {
       id: 'sub-2',
@@ -241,12 +283,53 @@ describe('trialExpiry', () => {
     const { result } = await executeSteps();
 
     expect(result.extendedExpiredCount).toBe(1);
-    expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
+    expect(mockDowngradeExtendedTrialQuotaIfStillExpired).toHaveBeenCalledWith(
       expect.anything(),
       'sub-2',
       getTierConfig('free').monthlyQuota,
       getTierConfig('free').dailyLimit,
     );
+    expect(mockDowngradeQuotaPool).not.toHaveBeenCalled();
+  });
+
+  it('[F-121] does not count stale extended-trial selections skipped by the guarded quota downgrade', async () => {
+    const consoleWarnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const staleExtendedTrial = {
+      id: 'sub-extended-stale',
+      accountId: 'acc-extended-stale',
+      status: 'expired',
+      trialEndsAt: '2025-01-01T00:00:00.000Z',
+    };
+
+    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValueOnce([
+      staleExtendedTrial,
+    ]);
+    mockDowngradeExtendedTrialQuotaIfStillExpired.mockResolvedValueOnce(false);
+
+    const { result } = await executeSteps();
+
+    expect(result.extendedExpiredCount).toBe(0);
+    expect(mockDowngradeExtendedTrialQuotaIfStillExpired).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub-extended-stale',
+      getTierConfig('free').monthlyQuota,
+      getTierConfig('free').dailyLimit,
+    );
+    expect(
+      consoleWarnSpy.mock.calls.map(([entry]) => JSON.parse(String(entry))),
+    ).toContainEqual(
+      expect.objectContaining({
+        message: 'billing.trial_expiry_stale_selection_skipped',
+        context: expect.objectContaining({
+          step: 'process-extended-trial-expiry',
+          trialId: 'sub-extended-stale',
+          metric: 'billing_trial_expiry_stale_selection_skipped',
+        }),
+      }),
+    );
+    consoleWarnSpy.mockRestore();
   });
 
   // [BUG-843 / F-SVC-011] Per-trial errors must escalate, not silently
@@ -285,7 +368,7 @@ describe('trialExpiry', () => {
 
       mockFindExpiredTrials.mockResolvedValueOnce([okTrial, failingTrial]);
       mockTransitionToExtendedTrial
-        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(true)
         .mockRejectedValueOnce(new Error('DB constraint violation'));
 
       const { result, sendEventCalls } = await executeSteps();
@@ -516,12 +599,13 @@ describe('trialExpiry', () => {
       'sub-5',
       450,
     );
-    expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
+    expect(mockDowngradeExtendedTrialQuotaIfStillExpired).toHaveBeenCalledWith(
       expect.anything(),
       'sub-6',
       getTierConfig('free').monthlyQuota,
       getTierConfig('free').dailyLimit,
     );
+    expect(mockDowngradeQuotaPool).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

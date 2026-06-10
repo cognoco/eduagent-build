@@ -16,10 +16,44 @@ import { getTierConfig } from './subscription';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { safeSend } from './safe-non-core';
+import type { SecurityNotificationType } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../errors';
 
 const logger = createLogger();
+
+/**
+ * [CRITICAL-2a] Dispatch a non-core account-security event so the
+ * `account-security-notification` Inngest function can email the affected
+ * address out-of-band. Failures are captured but never thrown — a notification
+ * problem must not break the credential change the user just made.
+ */
+export async function notifyAccountSecurityEvent(args: {
+  accountId: string;
+  to: string;
+  type: SecurityNotificationType;
+  /**
+   * Null for the server-side `email_changed` dispatch
+   * (`updateAccountEmailFromClerk` runs without a profile context).
+   */
+  profileId: string | null;
+}): Promise<void> {
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/account.security-event',
+        data: {
+          type: args.type,
+          to: args.to,
+          accountId: args.accountId,
+          profileId: args.profileId,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    `account.security_event.${args.type}`,
+    { accountId: args.accountId },
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -351,31 +385,58 @@ export async function updateAccountEmailFromClerk(
   }
 
   try {
-    const updated = await db.transaction(async (tx) => {
-      const existingByEmail = await tx.query.accounts.findFirst({
-        where: eq(accounts.email, requestedEmail),
-      });
+    const { account: updated, previousEmail } = await db.transaction(
+      async (tx) => {
+        const existingByEmail = await tx.query.accounts.findFirst({
+          where: eq(accounts.email, requestedEmail),
+        });
 
-      if (existingByEmail && existingByEmail.clerkUserId !== args.clerkUserId) {
-        throw new ConflictError(
-          'An account with this email already exists. Contact support to recover access.',
-        );
-      }
+        if (
+          existingByEmail &&
+          existingByEmail.clerkUserId !== args.clerkUserId
+        ) {
+          throw new ConflictError(
+            'An account with this email already exists. Contact support to recover access.',
+          );
+        }
 
-      const [row] = await tx
-        .update(accounts)
-        .set({ email: requestedEmail, updatedAt: new Date() })
-        .where(eq(accounts.clerkUserId, args.clerkUserId))
-        .returning();
+        // Capture the prior login email before overwriting it so the
+        // security-notification can be sent to the address losing access.
+        const current = await tx.query.accounts.findFirst({
+          where: eq(accounts.clerkUserId, args.clerkUserId),
+        });
 
-      if (!row) {
-        throw new NotFoundError('Account');
-      }
+        const [row] = await tx
+          .update(accounts)
+          .set({ email: requestedEmail, updatedAt: new Date() })
+          .where(eq(accounts.clerkUserId, args.clerkUserId))
+          .returning();
 
-      return mapAccountRow(row);
-    });
+        if (!row) {
+          throw new NotFoundError('Account');
+        }
+
+        return {
+          account: mapAccountRow(row),
+          previousEmail: current?.email ?? null,
+        };
+      },
+    );
 
     invalidateVerifiedClerkEmailCache(args.clerkUserId);
+
+    // [CRITICAL-2a] Alert the OLD address out-of-band that the login email
+    // changed. Non-core (safeSend): a delivery failure must never undo a
+    // completed email change.
+    if (previousEmail && normalizeEmail(previousEmail) !== requestedEmail) {
+      await notifyAccountSecurityEvent({
+        accountId: updated.id,
+        to: previousEmail,
+        type: 'email_changed',
+        profileId: null,
+      });
+    }
+
     return updated;
   } catch (error) {
     if (isUniqueViolation(error)) {
