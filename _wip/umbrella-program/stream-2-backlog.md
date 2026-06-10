@@ -229,7 +229,34 @@ Recorded in their runway context; they resolve here:
 
 ---
 
+## Inbound — WI-387 memory-drain capture (2026-06-10)
+
+Nine `.claude/memory/` files hold **documentation-grade truth absent from every counting
+doc** (canon / ADRs / AGENTS.md / CONTEXT.md / spine trio). Dispositioned DRAIN by the
+WI-387 triage workflow (adversarially verified; full evidence + per-file rationale:
+nexus `_WIP/zdx-productionization/_state/2026-06-10-wi-387-memory-triage-results.md`
+§ DRAIN backlog) and operator-confirmed 2026-06-10. **Extract-before-cleanup applies:**
+each memory stays in place until its content lands in the named target; WI-387 then
+archives it or reduces it to a pointer.
+
+| # | Memory (`.claude/memory/`) | Target | Content to drain |
+|---|---|---|---|
+| 1 | `feedback_human_override_everywhere` | L1 — `PRD.md` or `ux-design-specification.md` (design principles) | every AI decision human-overridable (manual subject input; advisory ordering; session redirect/skip/challenge; coaching = suggestions) + the "AI is a guide, not an authority" rationale |
+| 2 | `project_language_pedagogy` | `architecture.md` Epic-6 section (still future-tense at :1357) | as-built language-teaching architecture: `pedagogyModeSchema`/`languageCode`/CEFR/`Vocabulary` (`packages/schemas/src/language.ts`); `pedagogyMode` required on Subject; `nativeLanguage` on `teachingPreferences` (per-subject, unique `profileId+subjectId`); vocabulary + `languageProgress` routes; language-setup onboarding |
+| 3 | `project_llm_source_provenance` | `architecture.md` § LLM Response Envelope (no `private_sources` coverage today) | `private_sources` sub-contract (`relied_on`/`insufficient`/`reason`/`factual_confidence`); the 0.88 confidence gate for `general_knowledge`; source-bound categories; `sourceAudit` persistence; streaming replace-frame alignment; tripwire principle. Assess whether the 0.88 gate clears the MMT-ADR-0000 significance gate → companion ADR |
+| 4 | `project_known_bug_patterns` | `AGENTS.md` ## Code Quality Guards (alongside GC1–GC6) | Pattern 1 silent fallbacks (`?? []` on `.data`; success-shaped catch; `void mutateAsync` without `.catch`; raw LLM text fallbacks) · Pattern 2 React state timing (`isPending` insufficient as concurrency guard; require `useRef(false)` lock) |
+| 5 | `project_brand_dark_first` | canon (brand section) or a new `MMT-ADR` on brand theming | hex palette (#1a1a3e/#faf5ee/#2dd4bf/#a78bfa); no-accent-picker decision + rationale; dark/light/system override mechanic; dark-mode-is-brand framing; post-launch neutral/slate contingency |
+| 6 | `project_eas_update_ota` | `architecture.md` deployment section | CI `ota-update` job owns normal preview OTA publishing; `eas update` does not read `eas.json` build-profile env (set `EXPO_PUBLIC_*` explicitly); manual OTA only on explicit instruction |
+| 7 | `project_freeform_library_filing_decision` | `PRD.md` (Library / Ask-Anything filing policy) | sessions save to history by default; filing separate: auto-file when confident, ask only when ambiguous, always correctable; "Keep out of Library" copy (never "Don't save"); keep-out retains history/summary/transcript but no curriculum topic / Library entry / progress; no blocking post-close prompt |
+| 8 | `project_language_assessments_production_first` | `PRD.md` or `docs/canon/identity/prd.md` (assessment design) | language reviews target usable production (target-language words/chunks, spelling tolerance, tiny exchanges), never meta-knowledge; concrete tasks ("say hello in Italian"); avoid "main ideas" / culture-ish questions unless explicitly taught |
+| 9 | `project_session_lifecycle_decisions` | `architecture.md` Session Lifecycle section | wall-clock vs active-time rationale; `computeActiveSeconds()` gap-cap algorithm (FR210); UI rule (`wallClockSeconds` display, `durationSeconds` analytics-only); hard-cap removal rationale; LLM-adaptive silence detection design |
+
+---
+
 ## Change log
+- **2026-06-10 — WI-387 memory-drain capture added.** Nine memory files dispositioned
+  DRAIN by the WI-387 triage workflow (operator-confirmed) recorded as inbound items —
+  see § Inbound — WI-387 memory-drain capture. Extract-before-cleanup binds their removal.
 - **2026-06-09 — created by extraction.** Moved the inventory + commencement threads out
   of `_wip/identity-foundation/ROADMAP.md` (consolidate-then-repoint); the runway was left
   a pointer and its N.0 gate repointed here. One semantic reconciliation: coordination
