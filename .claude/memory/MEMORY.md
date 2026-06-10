@@ -35,7 +35,6 @@
 - [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit; model routing details live in `MMT-ADR-0014` + `docs/registers/llm-models/master.md`.
 - [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). Consent/age-floor → `docs/compliance/identity-compliance-register.md` (canon).
 - [project_themekey_removed.md](project_themekey_removed.md) — NEVER use key={themeKey} OR Animated.View opacity on root layout.
-- [feedback_drizzle_transaction_cast.md](feedback_drizzle_transaction_cast.md) — PgTransaction → Database cast pattern for transactions.
 
 ## Workflow Preferences
 
@@ -115,7 +114,6 @@
 - [reference_notion_workspace.md](reference_notion_workspace.md) — Issue Tracker split 2026-05-18: NEW bugs → Open `3598bce9...`; Resolved archive `b8ce802f...`. REST via Doppler.
 - [project_expo_web_preview.md](project_expo_web_preview.md) — `.claude/launch.json` `mobile` target. Cold bundle ~18s. Auth-walled past sign-in.
 - Template repo extraction plan — tracked in Notion (archived from memory 2026-05-04).
-- [feedback_notion_resolution_recording.md](feedback_notion_resolution_recording.md) — Record resolution on Done items. Never reopen.
 
 ## Custom Skills
 

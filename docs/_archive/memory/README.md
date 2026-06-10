@@ -37,3 +37,10 @@ resolved/stale entries.
 **Held back (NOT archived):** `feedback_nx_reset_before_commit` — WI-531 `HOLD`. The
 `@nx/enforce-module-boundaries` eslint project-graph footgun is a different cache from
 WI-451's TS6305 fix, so it is genuinely uncovered; retire only after the WI-388 CI proof.
+
+## Batch 2 — 2026-06-10 (table-D `Archive` comb)
+
+| File | Disposition | Home / reason |
+|---|---|---|
+| feedback_drizzle_transaction_cast | STALE | cast pattern (`tx as unknown as Database`) is live in 200+ code sites; memory duplicates what code already carries |
+| feedback_notion_resolution_recording | STALE | rule fully owned by `.agents/skills/notion/SKILL.md` §§ "Done Requires Resolution" + "Regressions" |
