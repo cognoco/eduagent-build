@@ -46,13 +46,8 @@
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
-- [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.
-- [feedback_no_pr_unless_asked.md](feedback_no_pr_unless_asked.md) — NEVER create a PR unless explicitly asked.
-- [feedback_use_gh_cli_for_prs.md](feedback_use_gh_cli_for_prs.md) — Use `gh` CLI for PR status, checks, logs, reviews, and conflict triage by default; keep small PR fixes lightweight.
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
-- [feedback_partial_staging_stash.md](feedback_partial_staging_stash.md) — Pre-commit tests full working tree; stash in-progress files before partial commits.
-- [feedback_commit_skip_failing.md](feedback_commit_skip_failing.md) — If pre-commit fails on some files, unstage them, commit+push what passes, fix failures after.
 - [feedback_test_receipts.md](feedback_test_receipts.md) — Stale `.test-receipts/*` push-hook failures: record, verify, then commit receipt-only follow-up.
 - [feedback_testing_tracking_only.md](feedback_testing_tracking_only.md) — When testing flows, track silently — surface flows tested + bugs at the end, not play-by-play.
 
@@ -62,7 +57,6 @@
 - Windows paths: Emulator/ADB at `C:\Android\Sdk`, Doppler at `C:\Tools\doppler\doppler.exe`. macOS/Linux: standard PATH.
 - [project_eas_build.md](project_eas_build.md) — EAS Build config, OTA operational, NX Cloud disconnected (2026-06-01, IID-792), Sentry upload disabled.
 - [project_eas_update_ota.md](project_eas_update_ota.md) — OTA IMPLEMENTED. JS-only changes deploy in ~5 min via expo-updates.
-- [project_ci_infrastructure.md](project_ci_infrastructure.md) — path filters, E2E APK caching, .nx/cache (NX Cloud disconnected, IID-792), Husky pre-commit.
 
 ## Testing Infrastructure
 
@@ -80,7 +74,6 @@
 ## Store Publishing
 
 - [project_apple_enrollment.md](project_apple_enrollment.md) — Apple Developer account available as of 2026-05-15; old enrollment blocker resolved.
-- [google_play_publishing.md](google_play_publishing.md) — Google Play account available as of 2026-05-15; old flagged-account blocker resolved.
 - [project_revenuecat_setup.md](project_revenuecat_setup.md) — RevenueCat project exists; remaining work is store product/connection/webhook setup.
 
 ## Brand & UX Decisions
@@ -91,7 +84,6 @@
 
 ## Persona Architecture (Epic 12 — COMPLETE, ThemeContext cleaned 2026-04-15)
 
-- [feedback_persona_vs_role.md](feedback_persona_vs_role.md) — Server-side: use `resolveProfileRole` (relationship-derived), not birthYear age. (`personaFromBirthYear` is a removed fossil.)
 
 ## Core Learning Philosophy
 
@@ -108,18 +100,10 @@
 
 ## Development Process & Feedback
 
-- [project_commit_skill_drift.md](project_commit_skill_drift.md) — `.claude/skills/commit/` and `.agents/skills/commit/` diverged before sync existed; sync skips it. Follow-up to unify.
-- [project_sync_script_extension.md](project_sync_script_extension.md) — Two narrow sync scripts today. Generalize when a third sync need arises (N=3 trigger). Don't preemptively refactor.
 - [project_agent_doc_and_memory_architecture_revisit.md](project_agent_doc_and_memory_architecture_revisit.md) — Open: AGENTS.md/CLAUDE.md content profile + cross-agent memory architecture. Memories currently Claude-only; Cortex (Nexus repo) is prior art for shared memory.
 - [feedback_audit_check_deleted_concepts.md](feedback_audit_check_deleted_concepts.md) — Before governance posture on rule violations, check if the concept was deleted by an epic. Literal grep misses aliases.
 - [feedback_comment_not_delete.md](feedback_comment_not_delete.md) — Comment out, don't delete unreleased UI features.
-- [feedback_testing_no_mocks.md](feedback_testing_no_mocks.md) — No new internal `jest.mock()` (GC1 ratchet). External-boundary mocks (Stripe, Clerk JWKS, Inngest, LLM providers) OK per CLAUDE.md.
-- [feedback_e2e_never_skip.md](feedback_e2e_never_skip.md) — Never skip E2E tests.
-- [feedback_e2e_release_gate.md](feedback_e2e_release_gate.md) — Release-blocking E2E means full suite, failure ledger, investigate each failure, fix real bugs or stale tests, repeat until green.
-- [feedback_batch_pr_fixes.md](feedback_batch_pr_fixes.md) — Batch PR fixes, validate locally, push once.
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
-- [feedback_verify_full_ci.md](feedback_verify_full_ci.md) — On CI failure, run full validation.
-- [feedback_pr_required_checks.md](feedback_pr_required_checks.md) — Missing required PR checks can be branch-protection/workflow-trigger drift; diagnose before changing product tests.
 - [feedback_e2e_cascade_root_cause.md](feedback_e2e_cascade_root_cause.md) — 20+ same-day Notion bugs with "Cascading X" in Found In = ONE infra bug. Fix upstream, don't close N individually.
 - [feedback_nx_reset_before_commit.md](feedback_nx_reset_before_commit.md) — NX cache causes phantom `@nx/enforce-module-boundaries` errors. Run `pnpm exec nx reset` to clear.
 
