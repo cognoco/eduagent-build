@@ -296,6 +296,46 @@ describe('consentMiddleware', () => {
     expect(body.details.consentType).toBe('GDPR');
   });
 
+  // [F-130] Break test: an UNRESOLVED consent obligation must be enforced even
+  // when the year-only age recomputed here over-estimates the learner's age
+  // past the consent threshold. The obligation was created from an EXACT
+  // birth-date check at profile creation (WI-297); a late-year-born 16yo whose
+  // year-only age reads 17 ("not required") must NOT slip past a PENDING gate.
+  it.each([
+    { name: 'PENDING', consentStatus: 'PENDING' as const },
+    {
+      name: 'PARENTAL_CONSENT_REQUESTED',
+      consentStatus: 'PARENTAL_CONSENT_REQUESTED' as const,
+    },
+  ])(
+    'returns 403 for a $name profile whose year-only age reads as not-required (over-17)',
+    async ({ consentStatus }) => {
+      const meta: ProfileMeta = {
+        // year-only age 18 → checkConsentRequired() returns required=false
+        birthYear: new Date().getFullYear() - 18,
+        location: null,
+        consentStatus,
+        hasPremiumLlm: false,
+        isOwner: false,
+      };
+      const app = createApp({ profileId: 'p-1', profileMeta: meta });
+      const res = await app.request('/v1/subjects');
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('CONSENT_REQUIRED');
+    },
+  );
+
+  // [F-130] Companion: a genuine adult (no consent state) must still pass even
+  // though the new block runs before the !required early-out — the gate keys on
+  // an UNRESOLVED consent state, which adults never have.
+  it('[F-130] still allows an adult with consentStatus=null (no over-block)', async () => {
+    const app = createApp({ profileId: 'p-1', profileMeta: ADULT_META });
+    const res = await app.request('/v1/subjects');
+    expect(res.status).toBe(200);
+  });
+
   it('returns 403 for child with WITHDRAWN consent', async () => {
     const app = createApp({
       profileId: 'p-1',

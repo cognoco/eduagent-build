@@ -36,7 +36,20 @@
     "topicTitle": "Camus — L'Étranger",
     "sessionType": "learning",
     "escalationRung": 3,
-    "exchangeHistory": [],
+    "exchangeHistory": [
+      {
+        "role": "assistant",
+        "content": "Say more about how you'd approach Camus — L'Étranger — walk me through your thinking."
+      },
+      {
+        "role": "user",
+        "content": "I'd start from the definition and work through an example."
+      },
+      {
+        "role": "assistant",
+        "content": "Okay — but what if the example is a special case? How would you know?"
+      }
+    ],
     "birthYear": 2009,
     "priorLearningContext": "Recently completed topics: French subjunctive, essay structure. Demonstrated strength in: reading comprehension, essay argument structure.",
     "crossSubjectContext": "Recent work in other subjects: Enlightenment thinkers.",
@@ -257,10 +270,16 @@ Signal guidance:
 - Set `signals.crisis_redirect` to true when the SAFETY crisis rule fired this turn — the learner expressed distress, self-harm ideation, bullying, abuse, or another safeguarding concern and your reply redirected them to a parent, guardian, trusted adult, or helpline. Observational only — it never changes what you say to the learner. Do NOT set it for ordinary frustration with the schoolwork itself.
 ```
 
+## Generated prompt — user
+
+```
+I'd start from the definition and work through an example.
+```
+
 ## Builder notes
 
 - Scenario: S20-challenge-offered — Challenge Round offered — challengeEligible true, no active round; prompt should include offer block
 - Rung: 3, sessionType: learning, verification: standard
-- History turns: 0, exchangeCount: 5
+- History turns: 3, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

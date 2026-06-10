@@ -245,6 +245,64 @@ describe('compareAgainstBaseline', () => {
     ).toBe(true);
   });
 
+  it('widens tolerance for small-sample flows (one flake at n=6 is not drift)', () => {
+    // language-quality runs n=6 — a single flaked sample moves envelopeOk by
+    // 16.7pp. With the flat 5pp tolerance that would flag every routine run;
+    // the 2/n widening (33pp at n=6) absorbs it. [WI-556]
+    const base = makeBaseline({
+      'language-quality': makeAggregate({ envelopeOk: 1 }, 6),
+    });
+    const drifts = compareAgainstBaseline(
+      { 'language-quality': makeAggregate({ envelopeOk: 5 / 6 }, 6) },
+      base,
+      0.05,
+    );
+    expect(drifts.filter((d) => d.metric === 'envelopeOk')).toEqual([]);
+  });
+
+  it('still flags a real collapse on a small-sample flow', () => {
+    const base = makeBaseline({
+      'language-quality': makeAggregate({ envelopeOk: 1 }, 6),
+    });
+    const drifts = compareAgainstBaseline(
+      // 6/6 → 2/6 = 67pp drop — far beyond the widened 33pp tolerance.
+      { 'language-quality': makeAggregate({ envelopeOk: 2 / 6 }, 6) },
+      base,
+      0.05,
+    );
+    const envelopeDrift = drifts.find((d) => d.metric === 'envelopeOk');
+    expect(envelopeDrift).not.toBeUndefined();
+  });
+
+  it('does not widen tolerance for large-sample flows', () => {
+    const base = makeBaseline({
+      exchanges: makeAggregate({ envelopeOk: 1 }, 102),
+    });
+    const drifts = compareAgainstBaseline(
+      // 8pp drop at n=102: 2/n = 2pp, so the flat 5pp tolerance governs and
+      // the drop must be flagged.
+      { exchanges: makeAggregate({ envelopeOk: 0.92 }, 102) },
+      base,
+      0.05,
+    );
+    const envelopeDrift = drifts.find((d) => d.metric === 'envelopeOk');
+    expect(envelopeDrift).not.toBeUndefined();
+  });
+
+  it('uses the smaller sample count when widening tolerance', () => {
+    const base = makeBaseline({
+      'language-quality': makeAggregate({ envelopeOk: 1 }, 100),
+    });
+    const drifts = compareAgainstBaseline(
+      // Current run only collected 6 samples — its noise floor governs, so a
+      // one-sample flake (16.7pp) stays below the widened tolerance.
+      { 'language-quality': makeAggregate({ envelopeOk: 5 / 6 }, 6) },
+      base,
+      0.05,
+    );
+    expect(drifts.filter((d) => d.metric === 'envelopeOk')).toEqual([]);
+  });
+
   it('sorts drifts by largest delta first', () => {
     const base = makeBaseline({
       exchanges: makeAggregate({ partialProgress: 0.2, notePromptShow: 0.1 }),

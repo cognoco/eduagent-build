@@ -737,6 +737,9 @@ function buildMonthlyMockDb(
 
   return {
     query: {
+      familyLinks: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'link-001' }),
+      },
       consentStates: {
         findFirst: jest.fn().mockResolvedValue(
           consentOverride === undefined

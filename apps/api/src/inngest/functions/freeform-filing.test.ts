@@ -26,6 +26,7 @@ const mockDb = {
     },
     curriculumTopics: { findFirst: mockCurriculumTopicsFindFirst },
     curriculumBooks: { findFirst: mockCurriculumBooksFindFirst },
+    consentStates: { findFirst: jest.fn().mockResolvedValue(null) },
   },
 };
 
@@ -50,6 +51,11 @@ const mockDatabaseModule = createDatabaseModuleMock({
       title: col('title'),
     },
     curriculumBooks: { id: col('id') },
+    consentStates: {
+      profileId: col('profileId'),
+      consentType: col('consentType'),
+      requestedAt: col('requestedAt'),
+    },
   },
 });
 
@@ -151,16 +157,24 @@ const testSessionId = '00000000-0000-4000-8000-000000000002';
 async function executeSteps(
   eventData: Record<string, unknown>,
   fn: unknown = freeformFilingRetry,
-): Promise<{ result: unknown; sendEventCalls: InngestStepSendEventCall[] }> {
-  const { step, sendEventCalls } = createInngestStepRunner();
+): Promise<{
+  result: unknown;
+  sendEventCalls: InngestStepSendEventCall[];
+  runNames: string[];
+}> {
+  const runner = createInngestStepRunner();
 
   const handler = (fn as any).fn;
   const result = await handler({
     event: { data: eventData, name: 'app/filing.retry' },
-    step,
+    step: runner.step,
   });
 
-  return { result, sendEventCalls };
+  return {
+    result,
+    sendEventCalls: runner.sendEventCalls,
+    runNames: runner.runNames(),
+  };
 }
 
 function createEventData(
@@ -184,6 +198,7 @@ describe('freeformFilingRetry', () => {
     // Re-establish the default session row after clearAllMocks wipes implementations.
     // Tests that need a null row (missing-session abort) override this in their own beforeEach.
     mockDb.query.learningSessions.findFirst.mockResolvedValue(mockSessionRow);
+    mockDb.query.consentStates.findFirst.mockResolvedValue(null);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -305,6 +320,29 @@ describe('freeformFilingRetry', () => {
       expect(result).toMatchObject({ status: 'completed' });
     });
 
+    it('[WI-550/F-019] does not memoize the transcript in a separate fetch-transcript step', async () => {
+      mockGetSessionTranscript.mockResolvedValue({
+        session: { sessionId: 'session-001' },
+        exchanges: [
+          {
+            role: 'user',
+            content: 'What is gravity?',
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+          {
+            role: 'assistant',
+            content: 'Gravity is a force.',
+            timestamp: '2026-01-01T00:00:01Z',
+          },
+        ],
+      });
+
+      const { runNames } = await executeSteps(createEventData());
+
+      expect(runNames).toContain('retry-filing');
+      expect(runNames).not.toContain('fetch-transcript');
+    });
+
     it('throws NonRetriableError when DB returns null transcript (unresolvable — no retry)', async () => {
       mockGetSessionTranscript.mockResolvedValue(null);
 
@@ -327,6 +365,68 @@ describe('freeformFilingRetry', () => {
       );
 
       expect(mockFileToLibrary).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GDPR consent gate', () => {
+    it('[WI-550/F-019] skips filing and LLM work when GDPR consent is not granted', async () => {
+      mockDb.query.consentStates.findFirst.mockResolvedValue({
+        status: 'WITHDRAWN',
+      });
+      mockGetSessionTranscript.mockResolvedValue({
+        session: { sessionId: 'session-001' },
+        exchanges: [
+          {
+            role: 'user',
+            content: 'What is gravity?',
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const { result, sendEventCalls, runNames } =
+        await executeSteps(createEventData());
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+      expect(runNames).not.toContain('retry-filing');
+      expect(mockBuildLibraryIndex).not.toHaveBeenCalled();
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+      expect(mockResolveFilingResult).not.toHaveBeenCalled();
+      expect(sendEventCalls).toHaveLength(0);
+    });
+
+    it('[WI-550/F-019] skips transcript and filing work when GDPR consent is withdrawn between Inngest steps', async () => {
+      mockDb.query.consentStates.findFirst
+        .mockResolvedValueOnce({ status: 'CONSENTED' })
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      mockGetSessionTranscript.mockResolvedValue({
+        session: { sessionId: 'session-001' },
+        exchanges: [
+          {
+            role: 'user',
+            content: 'What is gravity?',
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const { result, sendEventCalls, runNames } =
+        await executeSteps(createEventData());
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+      expect(runNames).toContain('check-gdpr-consent');
+      expect(runNames).toContain('retry-filing');
+      expect(mockGetSessionTranscript).not.toHaveBeenCalled();
+      expect(mockBuildLibraryIndex).not.toHaveBeenCalled();
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+      expect(mockResolveFilingResult).not.toHaveBeenCalled();
+      expect(sendEventCalls).toHaveLength(0);
     });
   });
 
