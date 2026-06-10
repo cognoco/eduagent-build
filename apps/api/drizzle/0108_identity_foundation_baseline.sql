@@ -15,18 +15,6 @@
 -- Custom ENUMs / composite types
 -- ----------------------------------------------------------------------------
 
-CREATE TYPE "public"."guardian_qualification" AS ENUM(
-  'biological_parent',
-  'adoptive_parent',
-  'stepparent',
-  'grandparent',
-  'court_appointed_guardian',
-  'foster_parent',
-  'kinship_caregiver',
-  'sibling_with_custody',
-  'other'
-);--> statement-breakpoint
-
 CREATE TYPE "public"."policy_kind" AS ENUM(
   'prohibition_floor',
   'consent_edge'
@@ -178,7 +166,10 @@ CREATE TABLE "public"."guardianship" (
   "id"                  uuid   PRIMARY KEY NOT NULL,
   "guardian_person_id"  uuid   NOT NULL,
   "charge_person_id"    uuid   NOT NULL,
-  "qualification"       "public"."guardian_qualification" NOT NULL DEFAULT 'biological_parent',
+  "qualification"       text NOT NULL DEFAULT 'biological_parent'
+                          CHECK ("qualification" IN ('biological_parent','adoptive_parent',
+                            'stepparent','grandparent','court_appointed_guardian',
+                            'foster_parent','kinship_caregiver','sibling_with_custody','other')),
   "granted_at"          timestamptz NOT NULL DEFAULT now(),
   "revoked_at"          timestamptz,
   "created_at"          timestamptz NOT NULL DEFAULT now(),
