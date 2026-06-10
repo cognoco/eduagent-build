@@ -230,9 +230,9 @@ export async function transitionToExtendedTrial(
   db: Database,
   subscriptionId: string,
   extendedMonthlyQuota: number,
-): Promise<void> {
+): Promise<boolean> {
   const freeTierConfig = getTierConfig('free');
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [updated] = await tx
       .update(subscriptions)
       .set({
@@ -249,7 +249,7 @@ export async function transitionToExtendedTrial(
       .returning({ id: subscriptions.id });
 
     if (!updated) {
-      return;
+      return false;
     }
 
     await tx
@@ -262,6 +262,55 @@ export async function transitionToExtendedTrial(
         updatedAt: new Date(),
       })
       .where(eq(quotaPools.subscriptionId, subscriptionId));
+
+    return true;
+  });
+}
+
+/**
+ * Downgrades an extended-trial quota pool only if the subscription is still in
+ * the soft-landing state selected by the cron. This closes the stale-selection
+ * race where a user can convert to a paid plan after the cron query but before
+ * the day-28 quota downgrade executes.
+ */
+export async function downgradeExtendedTrialQuotaIfStillExpired(
+  db: Database,
+  subscriptionId: string,
+  monthlyLimit: number,
+  dailyLimit: number | null = null,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const currentPool = await findQuotaPool__unscoped(txDb, subscriptionId);
+    if (
+      currentPool &&
+      currentPool.monthlyLimit === monthlyLimit &&
+      currentPool.dailyLimit === dailyLimit
+    ) {
+      return false;
+    }
+
+    const rows = await tx
+      .update(quotaPools)
+      .set({
+        monthlyLimit,
+        usedThisMonth: 0,
+        dailyLimit,
+        usedToday: 0,
+        updatedAt: new Date(),
+      })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(quotaPools.subscriptionId, subscriptionId),
+          eq(subscriptions.id, subscriptionId),
+          eq(subscriptions.status, 'expired'),
+          eq(subscriptions.tier, 'free'),
+        ),
+      )
+      .returning({ id: quotaPools.id });
+
+    return rows.length > 0;
   });
 }
 

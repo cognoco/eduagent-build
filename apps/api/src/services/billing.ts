@@ -41,6 +41,7 @@ export {
 export {
   expireTrialSubscription,
   downgradeQuotaPool,
+  downgradeExtendedTrialQuotaIfStillExpired,
   expireTrialAndDowngradeQuota,
   resetDailyQuotas,
   resetExpiredQuotaCycles,

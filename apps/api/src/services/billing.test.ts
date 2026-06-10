@@ -1309,8 +1309,9 @@ describe('transitionToExtendedTrial', () => {
   it('updates subscription status and tier', async () => {
     const db = createMockDb({ updateReturning: [{ id: subscriptionId }] });
 
-    await transitionToExtendedTrial(db, subscriptionId, 450);
+    const result = await transitionToExtendedTrial(db, subscriptionId, 450);
 
+    expect(result).toBe(true);
     // update called twice: subscription + quota pool
     expect(db.update).toHaveBeenCalledTimes(2);
   });
@@ -1318,8 +1319,9 @@ describe('transitionToExtendedTrial', () => {
   it('skips quota changes when the subscription is no longer a trial', async () => {
     const db = createMockDb({ updateReturning: [] });
 
-    await transitionToExtendedTrial(db, subscriptionId, 450);
+    const result = await transitionToExtendedTrial(db, subscriptionId, 450);
 
+    expect(result).toBe(false);
     expect(db.update).toHaveBeenCalledTimes(1);
   });
 

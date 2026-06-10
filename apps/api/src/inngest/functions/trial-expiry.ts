@@ -68,7 +68,7 @@ import {
   findExpiredTrials,
   findSubscriptionsByTrialDateRange,
   transitionToExtendedTrial,
-  downgradeQuotaPool,
+  downgradeExtendedTrialQuotaIfStillExpired,
   findExpiredTrialsByDaysSinceEnd,
 } from '../../services/billing';
 import {
@@ -159,12 +159,20 @@ export const trialExpiry = inngest.createFunction(
       const failures: TrialExpiryFailureEvent[] = [];
       for (const trial of expiredTrials) {
         try {
-          await transitionToExtendedTrial(
+          const applied = await transitionToExtendedTrial(
             db,
             trial.id,
             EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
           );
-          count++;
+          if (applied) {
+            count++;
+          } else {
+            logger.warn('billing.trial_expiry_stale_selection_skipped', {
+              step: 'process-expired-trials',
+              trialId: trial.id,
+              metric: 'billing_trial_expiry_stale_selection_skipped',
+            });
+          }
         } catch (err) {
           // [J-5] captureException keeps the raw stack queryable in Sentry.
           captureException(err, {
@@ -217,13 +225,21 @@ export const trialExpiry = inngest.createFunction(
 
         for (const trial of extendedTrials) {
           try {
-            await downgradeQuotaPool(
+            const applied = await downgradeExtendedTrialQuotaIfStillExpired(
               db,
               trial.id,
               freeTier.monthlyQuota,
               freeTier.dailyLimit,
             );
-            count++;
+            if (applied) {
+              count++;
+            } else {
+              logger.warn('billing.trial_expiry_stale_selection_skipped', {
+                step: 'process-extended-trial-expiry',
+                trialId: trial.id,
+                metric: 'billing_trial_expiry_stale_selection_skipped',
+              });
+            }
           } catch (err) {
             // [J-5] captureException keeps the raw stack queryable in Sentry.
             captureException(err, {

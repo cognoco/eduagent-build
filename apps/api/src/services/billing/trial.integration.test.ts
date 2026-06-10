@@ -26,6 +26,7 @@ import {
   resetDailyQuotas,
   resetExpiredQuotaCycles,
   transitionToExtendedTrial,
+  downgradeExtendedTrialQuotaIfStillExpired,
   transitionToExtendedTrialFromRevenuecatEvent,
   expireTrialAndDowngradeQuota,
 } from '../billing';
@@ -64,6 +65,8 @@ const TEST_ACCOUNTS = [
   { clerkUserId: `${PREFIX}-m3-01`, email: `${PREFIX}-m3-01@integration.test` },
   { clerkUserId: `${PREFIX}-m3-02`, email: `${PREFIX}-m3-02@integration.test` },
   { clerkUserId: `${PREFIX}-m3-03`, email: `${PREFIX}-m3-03@integration.test` },
+  { clerkUserId: `${PREFIX}-m3-04`, email: `${PREFIX}-m3-04@integration.test` },
+  { clerkUserId: `${PREFIX}-m3-05`, email: `${PREFIX}-m3-05@integration.test` },
 ];
 const ALL_EMAILS = TEST_ACCOUNTS.map((a) => a.email);
 const ALL_CLERK_IDS = TEST_ACCOUNTS.map((a) => a.clerkUserId);
@@ -374,6 +377,106 @@ describe('transitionToExtendedTrial atomicity [CR-2026-05-19-M3 SITE 2a]', () =>
 
     const pool = await loadQuotaPool(subscription.id);
     expect(pool!.monthlyLimit).toBe(quotaPool.monthlyLimit);
+    expect(pool!.usedThisMonth).toBe(quotaPool.usedThisMonth);
+    expect(pool!.usedToday).toBe(quotaPool.usedToday);
+  });
+
+  it('[BREAK / F-121] returns false when a trial converted to paid after cron selection', async () => {
+    const account = await seedAccount(6);
+    const { subscription } = await seedTrialSubscriptionWithPlusQuota(
+      account.id,
+      'trial',
+    );
+    const db = createIntegrationDb();
+
+    await db
+      .update(subscriptions)
+      .set({
+        status: 'active',
+        tier: 'plus',
+        trialEndsAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, subscription.id));
+
+    await expect(
+      transitionToExtendedTrial(db, subscription.id, 450),
+    ).resolves.toBe(false);
+  });
+});
+
+describe('downgradeExtendedTrialQuotaIfStillExpired atomicity [F-121]', () => {
+  it('downgrades extended-trial quota when the subscription is still expired/free', async () => {
+    const account = await seedAccount(5);
+    const { subscription } = await seedTrialSubscriptionWithPlusQuota(
+      account.id,
+      'trial',
+    );
+    const db = createIntegrationDb();
+    const freeTier = getTierConfig('free');
+
+    await transitionToExtendedTrial(db, subscription.id, 450);
+
+    await expect(
+      downgradeExtendedTrialQuotaIfStillExpired(
+        db,
+        subscription.id,
+        freeTier.monthlyQuota,
+        freeTier.dailyLimit,
+      ),
+    ).resolves.toBe(true);
+
+    const pool = await loadQuotaPool(subscription.id);
+    expect(pool!.monthlyLimit).toBe(freeTier.monthlyQuota);
+    expect(pool!.dailyLimit).toBe(freeTier.dailyLimit);
+    expect(pool!.usedThisMonth).toBe(0);
+    expect(pool!.usedToday).toBe(0);
+  });
+
+  it('[BREAK / F-121] does not downgrade quota for an extended trial that converted to paid after cron selection', async () => {
+    const account = await seedAccount(7);
+    const { subscription, quotaPool } =
+      await seedTrialSubscriptionWithPlusQuota(account.id, 'trial');
+    const db = createIntegrationDb();
+    const freeTier = getTierConfig('free');
+
+    await transitionToExtendedTrial(db, subscription.id, 450);
+    await db
+      .update(subscriptions)
+      .set({
+        status: 'active',
+        tier: 'plus',
+        trialEndsAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, subscription.id));
+    await db
+      .update(quotaPools)
+      .set({
+        monthlyLimit: quotaPool.monthlyLimit,
+        dailyLimit: quotaPool.dailyLimit,
+        usedThisMonth: quotaPool.usedThisMonth,
+        usedToday: quotaPool.usedToday,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotaPools.subscriptionId, subscription.id));
+
+    await expect(
+      downgradeExtendedTrialQuotaIfStillExpired(
+        db,
+        subscription.id,
+        freeTier.monthlyQuota,
+        freeTier.dailyLimit,
+      ),
+    ).resolves.toBe(false);
+
+    const sub = await loadSubscriptionById(subscription.id);
+    expect(sub!.status).toBe('active');
+    expect(sub!.tier).toBe('plus');
+
+    const pool = await loadQuotaPool(subscription.id);
+    expect(pool!.monthlyLimit).toBe(quotaPool.monthlyLimit);
+    expect(pool!.dailyLimit).toBe(quotaPool.dailyLimit);
     expect(pool!.usedThisMonth).toBe(quotaPool.usedThisMonth);
     expect(pool!.usedToday).toBe(quotaPool.usedToday);
   });
