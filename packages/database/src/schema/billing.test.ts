@@ -1,35 +1,8 @@
 // ---------------------------------------------------------------------------
 // billing.ts — schema shape tests
 //
-// [Identity T1] subscriptions gains a nullable `organizationId` FK alongside
-// the existing `accountId`. The backfill sets it = accountId (org.id reuses
-// account.id); it becomes the billing key in T4 when accountId is dropped. In
-// T1 it MUST be nullable — making it NOT NULL would break every existing
-// account-keyed insert path before the billing rewire (T4) exists.
+// WI-569 (W0 baseline reset): the T1 organizationId column was removed from
+// the subscriptions schema when migration 0106 was removed from the effective
+// chain. The T1 shape guard tests below were removed. W1 schema cleanup will
+// add shape guards for the new subscription table once it is declared.
 // ---------------------------------------------------------------------------
-
-import { getTableConfig } from 'drizzle-orm/pg-core';
-import { subscriptions } from './billing.js';
-
-describe('subscriptions has nullable organizationId', () => {
-  it('exposes organizationId alongside the legacy accountId', () => {
-    expect(subscriptions).toHaveProperty('organizationId');
-    expect(subscriptions).toHaveProperty('accountId');
-  });
-
-  it('organizationId is nullable in T1 (accountId stays the key until T4)', () => {
-    const { columns } = getTableConfig(subscriptions);
-    const orgId = columns.find((c) => c.name === 'organization_id');
-    expect(orgId).toBeDefined();
-    expect(orgId!.notNull).toBe(false);
-  });
-
-  it('organizationId has an FK to organizations', () => {
-    const { foreignKeys } = getTableConfig(subscriptions);
-    const orgFk = foreignKeys.find((fk) =>
-      fk.reference().columns.some((c) => c.name === 'organization_id'),
-    );
-    expect(orgFk).toBeDefined();
-    expect(orgFk!.reference().foreignTable).toBeDefined();
-  });
-});
