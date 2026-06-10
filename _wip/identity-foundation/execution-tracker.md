@@ -1,7 +1,7 @@
 # Identity Foundation — Execution Tracker
 
 **Stream:** identity-foundation (umbrella roster **PRG-01**) · **Activity:** clean-cut execution (waves W0–W4 + tail)
-**Last updated:** 2026-06-10 (Phase-P slicing) · **Owner:** Jorn (+ runway session agents)
+**Last updated:** 2026-06-10 (W1 execution start — shepherd session) · **Owner:** Jorn (+ runway session agents)
 
 > **This is the durable entry point for this activity.** Point a fresh session here:
 > it should be enough to know *what this is*, *where the detail lives*, and *where to
@@ -83,6 +83,7 @@ tables/readers dropped, full project grep clean, tests green post-drop.
 | What | Where |
 | --- | --- |
 | **Master plan** (THE source — units, deps §4, waves §5, decisions §7) | `_wip/identity-foundation/2026-06-09-phase-o-master-plan.md` @ `23d0c01ad` |
+| **Executor protocol** (standard process scaffold every executor brief points at) | `_wip/identity-foundation/executor-protocol.md` |
 | **N.1 sequencing skeleton** (five-wave model O decomposes) | `_wip/identity-foundation/2026-06-09-phase-n-sequencing.md` |
 | **Per-finding satellite** (one row per finding, 183) | `docs/audit/2026-05-29-full-audit/L-gap-delta.md` |
 | **Runway ROADMAP** (phases A–P, historical record) | `_wip/identity-foundation/ROADMAP.md` |
@@ -105,14 +106,14 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-549 | WP-W0-patch-api | close 7 live api security defects (F-117/118/122/130/133/144/145) | WP | P0 | — | **done** — Closed/Done, PR #817 (merged 2026-06-10) |
 | WI-550 | WP-W0-patch-inngest | close 3 live inngest security defects (F-019/020/092) | WP | P1 | — | **done** — Closed/Done, PR #818 (merged 2026-06-10) |
-| WI-551 | IT-W0-patch-billing | trial-expiry standalone patch (F-121) | Item | P0 | — | **ready-decoupled** — executable now on the current harness |
-| WI-569 | WP-W0-baseline | migration-chain baseline reset (`MMT-ADR-0012`) | WP | P1 | — (W0-labeled but travels with the gated rewrite) | **ready-gated** — DoR met; execution start awaits WI-530 |
+| WI-551 | IT-W0-patch-billing | trial-expiry standalone patch (F-121) | Item | P0 | — | **done** — Closed/Done, fixed in `c5c9b39bb` (2026-06-10) |
+| WI-569 | WP-W0-baseline | migration-chain baseline reset (`MMT-ADR-0012`) | WP | P1 | — (W0-labeled but travels with the gated rewrite) | **ready** — DoR met (Ready + Assisted); WI-530 wait **waived by operator 2026-06-10**, proceed shepherded |
 
 ### W1 — structural foundation (critical-path ROOT)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | backlog-gated |
+| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **ready** — refined 2026-06-10 (Ready + Assisted; brief in body, children WI-591/592); starts when WI-569 lands |
 | WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | backlog-gated |
 | WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | backlog-gated |
 | WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | backlog-gated |
@@ -154,15 +155,29 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 ## 5. Current position — pick up here
 
-- **Executable now (decoupled from WI-530):** **WI-551** (trial-expiry patch,
-  P0) — the last open W0 patch. WI-549/550 are already Closed/Done (PRs #817/#818,
-  merged 2026-06-10). Claim in Cosmo before starting.
-- **Everything else waits on WI-530.** WI-569 (baseline reset) is Ready (DoR met,
-  front of the gated queue) but its execution start — and all of W1+ — awaits the
-  Harness-Hygiene exit-gate `WI-530` = done (boundary node WI-533). Ready = DoR
-  met, **not** "go".
-- **First moves once WI-530 clears:** WI-569 (baseline reset), then WI-570
-  (schema) once the full W0 hard gate is green (WI-551 included).
+- **W0 is fully done on the patch side:** WI-549/550 Closed/Done (PRs #817/#818,
+  merged 2026-06-10) and WI-551 Closed/Done (`c5c9b39bb`, resolved 2026-06-10).
+- **WI-530 gate: operator-waived 2026-06-10.** WI-530 itself is still open in
+  Cosmo (Backlog, 15 open blockers), but the operator has waived waiting for the
+  rewrite's execution start — W1 proceeds **shepherded** (a shepherd session runs
+  pick/refine/brief/track; executors in isolated worktrees).
+- **In execution: WI-569 (baseline reset)** — executor sub-agent dispatched
+  2026-06-10 (`wi569-executor`, Sonnet, `.worktrees/WI-569`), running the
+  executor protocol with a hard pre-reset stop: it must report the exact dev/
+  staging reset commands to the shepherd and wait for go before executing them.
+- **Refined and queued: WI-570 (schema)** — Ready + Assisted as of 2026-06-10.
+  Claimable the moment WI-569 lands (last open entry of its W0 hard gate).
+- **Known refine friction (affects every remaining WP, WI-571…586):** top-down-
+  sliced WPs mechanically fail the WP DoR (`wp.children` + `wp.brief` — blank
+  bodies, no Sub-items; `/cosmo:bundle` absent from cosmo plugin 0.6.0). Filed as
+  **WI-593** (Hygiene, project Nexus). Interim bridge used on WI-570: transcribe
+  the frozen master-plan WP block into the body, capture the provenance children
+  (WI-591 schema-build, WI-592 F-032 scoped-repo), hand-set `Sub-item`, then
+  refine `--to-ready`. Repeat per WP until WI-593 is ruled.
+- **Shepherd protocol:** executor agents work in `.worktrees/WI-NN` (worktree-setup
+  skill), one PR per WP, claim via `execute.ts fetch --supervised` + `claim
+  --claimant`, complete → Stage=Reviewing + release claim; close only via
+  `/cosmo:review` (operator).
 - **First dogfood:** this workstream is the first whole workstream through the
   top-down proto-epic → waves → Cosmo-WI pipeline (O §6, B+/C− posture). Expect
   process friction; capture substrate bugs as Hygiene WIs against project Nexus
@@ -172,6 +187,19 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 ## 6. Change log
 
+- **2026-06-10 (evening) — WI-569 dispatched; WI-570 refined to Ready.**
+  Executor protocol landed (`executor-protocol.md`, from the operator's
+  wi-execute template: work-type-parameterized planning, review loop capped at
+  3, green-PR DoD → `/cosmo:execute complete` seam, announce-before-destructive-
+  step). WI-569 executor sub-agent launched against it. WI-570 refine bump hit
+  the top-down-WP DoR friction (first-dogfood prediction confirmed) — bridged
+  via body brief + provenance children WI-591/592 + hand-set Sub-item relation;
+  WI-570 now Ready+Assisted. Substrate gap filed as WI-593 (Hygiene, Nexus).
+- **2026-06-10 (later) — W1 execution start; shepherd session opened.** Synced
+  tracker to Cosmo: WI-551 found Closed/Done (`c5c9b39bb`) — entire W0 patch trio
+  now done. Recorded the operator's waiver of the WI-530 wait (gate still open in
+  Cosmo; execution proceeds shepherded). Current position rewritten: WI-569 next
+  (Ready+Assisted, unclaimed), WI-570 to be refine-bumped in parallel.
 - **2026-06-10 — Phase-P slicing executed; tracker created.** The 18 remaining
   O units instantiated in Cosmo via headless `/cosmo:capture` (18 created, 0
   failed: WI-569…WI-586), joining the pre-existing W0 patch WIs 549/550/551.
