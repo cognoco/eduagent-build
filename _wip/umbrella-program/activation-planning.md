@@ -1,8 +1,8 @@
 ---
 title: Activation Planning — Umbrella Program
-status: DRAFT — proposals for orchestrator ratification
+status: RATIFIED 2026-06-10 (see § Ratification record) — analysis + charters; queue's home is the roster
 date: 2026-06-10
-owner: umbrella (orchestrator ratifies)
+owner: umbrella (orchestrator ratified 2026-06-10)
 note: >
   POINTERS, NEVER COPIES. This document holds proposals and analysis only.
   Per-finding detail lives exclusively in L-gap-delta.md. Program state lives
@@ -11,10 +11,35 @@ note: >
 
 # Activation Planning — Umbrella Program
 
-> **What this is.** The activation planning working document for the emerging
+> **What this is.** The activation planning analysis for the emerging
 > Initiatives PRG-10 through PRG-15, plus normalization of the PRG-16 singleton
-> tail. All content is PROPOSALS — nothing here modifies the roster, any tracker,
-> or Cosmo. Ratification is the orchestrator's call.
+> tail. Authored as proposals; **ratified 2026-06-10** — see the Ratification
+> record below for what changed at ratification.
+
+## Ratification record (2026-06-10)
+
+Ratified by the orchestrator with these amendments:
+
+1. **CI/Platform pair (F-151 + F-157): FOLDED into PRG-14 as a named subset** —
+   the §1 "standalone mini-batch" alternative is rejected; no new row.
+2. **The activation queue's home is the roster** (`program-roster.md`
+   § Activation queue), per the planning-reference document map — and it was
+   amended at ratification from the §4 six-entry near-term ranking to the
+   **full forward view** (11 entries: adds the PRG-02 tail quick-land batch,
+   the PRG-03 WI-587 ruling session, PRG-04, PRG-20, PRG-21). §4 below is the
+   surviving *readiness analysis* behind the emerging-Initiative entries — read
+   the roster for the operative queue.
+3. **PRG-16 normalization verdicts ratified as proposed** (1 DROP / 7 MERGE /
+   7 PARK, counting the CI/Platform fold as two PRG-14 merges) — recorded on
+   the roster's PRG-16 row (DISSOLVED).
+4. **PRG-04 instantiated** — Cosmo design WI `WI-590` (project Nexus) captured;
+   related capability (WI-519/441/462/468, precedent WI-532) referenced, not
+   absorbed.
+5. **Per-charter open questions stay open** — each is settled at that
+   Initiative's activation (most need execution-time evidence: file-touch
+   scans, W-wave landings), not now. Exception already ruled: the PRG-03/PRG-14
+   boundary split (PRG-03 owns F-037/F-045; PRG-14 owns
+   F-038/039/040/041/042/046/113/114) **stands as proposed**.
 >
 > **Parse note.** L-gap-delta.md is a pipe-delimited markdown table with ~183 rows
 > (183 findings + INV-1/INV-2 synthetic rows). Counts in this document were derived
@@ -83,7 +108,8 @@ Propose creating a micro-cluster (not a full Initiative) of 2 findings:
 Both are CI/workflow correctness findings, both are O §2 out-of-radius / parallel-safe,
 both are low-execution-cost (1-2 PRs each). Proposal: add as a named subset of PRG-14's
 scope OR treat as a standalone 2-item mini-batch executed during any available agent
-slot (no new Initiative row needed — too small). Orchestrator to decide.
+slot (no new Initiative row needed — too small).
+**RULED 2026-06-10: folded into PRG-14 as a named subset** (see Ratification record).
 
 ### Summary after normalization
 
@@ -497,12 +523,14 @@ to avoid writing to a diverged surface. Proposed: PRG-14 skill-description fixes
 
 ---
 
-## Section 4 — Proposed Activation Queue (DRAFT — orchestrator ratifies)
+## Section 4 — Activation Queue analysis (readiness ranking behind the roster queue)
 
-> **PROPOSAL.** The ranking below applies the three gates from the roster Post-P
-> operating model: blast-radius class / pipeline-proven / attention budget. Agent-
-> leverage and risk-value are secondary sort keys. This is not a schedule — it is a
-> readiness ranking.
+> **Status (2026-06-10).** The operative queue now lives in
+> **`program-roster.md` § Activation queue** (full forward view, 11 entries) —
+> this section survives as the *readiness analysis* behind the six emerging-
+> Initiative entries. The ranking applies the three standard gates
+> (planning-reference §6.3): blast-radius class / pipeline-proven / attention
+> budget. Agent-leverage and risk-value are secondary sort keys. Not a schedule.
 
 ### Activation queue table
 

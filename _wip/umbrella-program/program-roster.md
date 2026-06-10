@@ -1,6 +1,6 @@
 ---
 title: Umbrella Program Roster
-status: EMBRYO (seeded 2026-06-09)
+status: ACTIVE (seeded 2026-06-09 as embryo · fully operational 2026-06-10)
 owner: Jorn (human orchestrator)
 scope: cross-program index for the eduagent-build pre-launch effort — spans the
   identity-foundation runway, the Harness Hygiene program (executed from nexus),
@@ -73,17 +73,26 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   Live state is Cosmo's; this is a pointer. (Baseline reset stays gated with W1.)
 - **Activate-when:** — (active)
 
-### PRG-02 · Harness Hygiene — `active`
+### PRG-02 · Harness Hygiene — `tail`
 - **Outcome:** eduagent-build's dev-execution harness (commit → pre-commit →
   pre-push → CI → review → merge tail) rewired and ZDX/cosmo-skill-backed to
   replacement-parity (80/20), so PRG-01 Phase P can begin on a trustworthy
   harness. Bar is parity, NOT finishing ZDX.
 - **Owner:** Hex + Vetinari (joint)
-- **Depends-on:** — (no upstream program). **Gates → PRG-01 Phase P** via
-  `WI-530` → `WI-533`.
+- **Depends-on:** — (no upstream program). **Gates → PRG-01 W1+ execution start**
+  via `WI-530` → `WI-533`.
 - **Decomposition:** `nexus:_WIP/zdx-productionization/harness-hygiene-tracker.md`
   (the durable entry point; Cosmo `WI-530` exit-gate WP holds live per-item state).
-- **Activate-when:** — (active)
+- **Tail posture (2026-06-10):** build is done; what remains is **(a) gate
+  close-out** — the Reviewing stack (`WI-378`/`WI-388`/`WI-398`/`WI-387`) clears
+  via review + the real-PR merge, then `WI-530` closes and `WI-533` unparks — and
+  **(b) the parked residue**: ~10 non-gating items deliberately left off the
+  critical path (branch protection `WI-538` Manual/HITL, pointer-sweep `WI-543`,
+  nx-reset memory `WI-561`, upstream-watch `WI-542`, ADR-facet `WI-548`, the
+  validation-scope impl cluster `WI-457`–`460`, Codex coverage `WI-534`), most of
+  which should land as a **quick-land batch soon after the HH PR merges** — see
+  the activation queue. Per-item state: tracker §4/§5 + Cosmo.
+- **Activate-when:** — (tail; queue entry 3)
 
 ### PRG-03 · Instruction-surface / memory-doctrine cleanup — `in-progress`
 - **Outcome:** the `.claude/memory` + `AGENTS.md`/`CLAUDE.md` + doctrine surface
@@ -105,8 +114,39 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **N.0 routing (Phase N, 2026-06-09):** the audit `agent-instructions` doc-findings
   (F-037/038/039/040/041/042/045/046, F-113/114) were ruled to HH / PRG-03 (not
   Stream 2), all non-blocking → default-defer.
+- **WI-587 residue (registered 2026-06-10):** the 19 residual `WI-387`
+  memory-triage dispositions de-scoped from the HH exit gate (10 user-KEEPs ·
+  8 product/user/mixed REVISEs · 1 CONFLICT — `feedback_never_lock_topics`,
+  incl. the PRD FR119-vs-FR124 self-contradiction) → Cosmo **`WI-587`**
+  (Captured, MentoMate). Evidence base:
+  `supporting-artefacts/memory-cleanup.md` (full 55-memory triage results;
+  adopted from nexus 2026-06-10 — now a registered PRG-03 artifact, no longer
+  rogue). Needs a **~20-min operator ruling session** (queue entry 4).
+- **Singleton merge (2026-06-10):** F-036 (`autoMemoryDirectory` mis-point)
+  merged in from the dissolved PRG-16 tail.
 - **Activate-when:** active — the matrix already *is* the agreed owner-map; no
   promotion gate remains. Formal status-flip (if wanted) is the QA-stream owner's call.
+
+### PRG-04 · Cosmo top-down delivery layer — `embryo`
+- **Outcome:** Cosmo gains its missing top-down delivery layer (Program /
+  Initiative → Workstream → WP), making this hand-built roster mechanically
+  harvestable (the harvest-ahead intent above, made real).
+- **Owner:** Hex + Jorn
+- **Embryo inputs:** `planning-reference.md` (the generalized rules, ratified
+  2026-06-10) + this roster's proto-epic row schema + the IF activation dogfood
+  (tracker + Workstream + direct-to-WP slice).
+- **Decomposition:** Cosmo **`WI-590`** (design WI, Captured, project Nexus) —
+  carries the design questions (Initiative object shape, where `Activate-when`
+  lives, boundary-node export mechanics, roster harvest path) and the
+  related-capability map: `WI-519` (doc/decisions-layer → ZDX standard, parked) ·
+  `WI-441` (route-aware planning gate, parked) · `WI-462`/`WI-468` (zdx-hq
+  dependency visualization) · `WI-532` (closed — the manual roadmap-seam
+  precedent). **Referenced, not absorbed** — survey found no existing WI that
+  *is* the top-down layer; each related item keeps distinct scope, dispositioned
+  per-item inside WI-590's design work.
+- **Activate-when:** orchestrator pull, once ≥1 full Initiative cycle has run on
+  the IF pattern (dogfood evidence in hand). Earlier parallel build allowed if
+  ZDX-side capacity appears.
 
 ---
 
@@ -131,28 +171,35 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 > row below now reads `activate-when = deferred (N.0 empty); Phase O orders by
 > blast-radius`. `Blast-radius` is sharpened from N.1's out-of-scope notes where it gave
 > signal, but O is the authority.
+>
+> **Activation planning ratified (2026-06-10).** `activation-planning.md` holds
+> the ratified per-Initiative charters (PRG-10–15, with size/supervision profiles
+> and per-charter open questions) and the PRG-16 dissolution analysis. The
+> ratified gates are in the `Activate-when` column below; the program-wide
+> ordering lives in **§ Activation queue**.
 
 ### Substantial clusters
 
-| ID | Clear-out workstream | Findings (bucket 3) | Blast-radius vs PRG-01 (N.1 signal; O is authority) | Activate-when |
+| ID | Initiative (clear-out) | Findings (bucket 3) | Blast-radius vs PRG-01 (N.1 signal; O is authority) | Activate-when (ratified 2026-06-10) |
 |---|---|---|---|---|
-| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | deferred (N.0 empty); Phase O orders by blast-radius |
-| PRG-11 | architecture | 24 | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | deferred (N.0 empty); Phase O orders by blast-radius |
-| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | deferred (N.0 empty); Phase O orders by blast-radius |
-| PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | deferred (N.0 empty); Phase O orders by blast-radius |
-| PRG-14 | agent-instructions | 10 | partial **inside** (overlaps PRG-03) | N.0: routed to HH / PRG-03, sequenced **pre-P** (not Stream 2); defer |
-| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | deferred (N.0 empty); Phase O orders by blast-radius |
+| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **split** — out-of-radius subset (CI/GHA + input-validation) at pipeline-proven; auth/PII remainder after IF "W2/W3 landed" |
+| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | after IF "W1 landed" + moot-by-refactor scan vs the W1 file-touch set |
+| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | pipeline-proven — **first parallel activation** (queue entry 1) |
+| PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | after IF W1-inngest-wiring + W3 land |
+| PRG-14 | agent-instructions | 10 (+3 merged: F-116 + the F-151/F-157 CI/Platform fold) | partial **inside** (overlaps PRG-03) | light thread (skill-description/sync fixes) **now**; skill-building after PRG-03 B4 (AGENTS/CLAUDE converge) |
+| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | after IF "W3 envelope-router landed"; F-110 mobile prep parallel-safe sooner |
 
-### PRG-16 · Singleton tail — ~15 single-finding labels, unnormalized
-One-finding "workstreams" with drifted/duplicative labels — `ci-cd-hardening` ≈
-`platform-security / ci-cd-hardening`; `platform-infra` ≈ `infrastructure /
-database-performance` ≈ `backend-performance`; `test-infrastructure` ≈
-`mobile-testing-infra`; plus `secrets-hygiene`, `reliability-and-correctness`,
-`navigation/audience-matrix`, `mobile-cache-data-fetching`, `learning-engine`,
-`content / curriculum data quality`, `billing-subscriptions`, `agent-infrastructure`.
-**Do not enshrine as 15 workstreams** — these are orphan findings the master plan (O)
-should merge into the substantial clusters or a catch-all. Tracked as one row pending
-N/O consolidation. `activate-when`: N/O normalization.
+### PRG-16 · Singleton tail — `DISSOLVED 2026-06-10`
+The ~15 one-finding labels are normalized per `activation-planning.md` §1
+(ratified): **1 DROP** (F-035 — remediated + key rotated; closed everywhere) ·
+**7 MERGE** (F-036 → PRG-03 · F-116 + F-151 + F-157 → PRG-14, the CI/Platform
+pair folded as a **named subset** per orchestrator ruling 2026-06-10 ·
+F-169/170/171 → PRG-11) · **7 PARK** (F-002/F-006 performance — no urgency
+gate, merge if both activate · F-155/F-159 test-infra minor · F-149 content —
+needs content-team input · F-173 billing — after IF W4 · F-176 nav — revisit at
+PRG-11 activation). Per-finding home stays `L-gap-delta.md`; parked findings
+get **no roster row** by design (high bar for new rows — planning-reference
+§3.2) and re-enter via the intake routing rule if their trigger fires.
 
 **Carry-forward (from M):** F-113/114/116 → **PRG-14 (agent-instructions)** must dedupe
 against the `tech/*` skill-group (`tech/zod`, `tech/drizzle-atomicity`,
@@ -181,7 +228,8 @@ security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they
   from the runway ROADMAP 2026-06-09; the runway now carries a pointer + a repointed N.0
   gate). Inbound feed-in (J3 deferrals, glossary bucket 3, ADR-drain identity tail) is
   listed there.
-- **Activate-when:** post-execution, OR Phase O names its first pull-forward cluster.
+- **Activate-when:** IF boundary "clean-cut tail done" (post-execution), OR a
+  first pull-forward cluster is named earlier — whichever first (queue entry 10).
 
 ### PRG-21 · Learning-domain canon design stream — `backlog`
 - **Outcome:** *design* (not drain) the learning-domain canon — naming
@@ -201,9 +249,41 @@ security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they
 - **Activate-when:** *ratified 2026-06-09 (hardened-B).* Product begins any
   learning-domain feature work (notes / cards / mastery / learning-loop), **OR**
   `docs/glossary.md` is scheduled for deletion — whichever first. Default-defer
-  behind PRG-01 until then; parallel-safe if product pulls it early.
+  behind PRG-01 until then; parallel-safe if product pulls it early (queue entry 11).
 
 ---
+
+## Intake (routing per planning-reference §4)
+
+New work routes by class to an existing row — the current routing rule lives in
+the planning-reference **Appendix**. Additions change row *contents*, never
+program *structure*. What fits nothing lands here and is triaged at the next
+umbrella touch:
+
+**Unrouted intake:** — (empty)
+
+## Activation queue — the full forward view (ratified 2026-06-10)
+
+Gate-ordered, not date-ordered (planning-reference §6). **Every** Initiative
+appears with its gate — including the "much later" ones. Readiness analysis
+behind entries 1/2/5–8: `activation-planning.md` §4.
+
+| # | Initiative | Gate (activate / proceed when) |
+|---|---|---|
+| 1 | **PRG-12** l10n-a11y-mobile | pipeline-proven (a few IF WIs through claim→execute→review→close cleanly) — **first parallel activation** |
+| 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
+| 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
+| 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
+| 5 | **PRG-15** errors-api | IF boundary "W3 envelope-router landed"; F-110 mobile prep parallel-safe sooner |
+| 6 | **PRG-13** security-pii-inngest | IF W1-inngest-wiring + W3 landed |
+| 7 | **PRG-10** security-pii-api | split: out-of-radius subset (CI/GHA + input-validation) at pipeline-proven; auth/PII remainder after IF "W2/W3 landed" |
+| 8 | **PRG-11** architecture | IF "W1 landed" + moot-by-refactor scan of the W1 file-touch set |
+| 9 | **PRG-04** Cosmo top-down delivery layer | orchestrator pull on dogfood evidence (≥1 full Initiative cycle on the IF pattern) |
+| 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
+| 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
+
+Attention budget is evaluated per activation window when a gate clears — it is
+never an edge (planning-reference §5.3/§6.3).
 
 ## The rules of the game → `planning-reference.md`
 
@@ -225,15 +305,36 @@ Initiatives start executing in parallel as their §6.3 gates clear.
 ## Cross-program gates (the edges that matter)
 
 ```
-PRG-02 Harness Hygiene  ──(WI-530 exit-gate → WI-533 boundary)──▶  PRG-01 Phase P (execution start)
-PRG-03 operational-memory cleanup  ──(sequenced inside)──▶  PRG-02 (WI-531 → WI-387 last)
-PRG-20 Stream 2 (canon class) + PRG-11/14 (in-blast-radius findings)  ──(moot-by-refactor)──▶  follow PRG-01 execution
-PRG-10/12/13/15 (out-of-blast-radius findings)  ──▶  parallel-safe (throughput limit = 2 people, not deps)
+PRG-02 Harness Hygiene (tail)  ──(WI-530 exit-gate → WI-533 boundary)──▶  PRG-01 W1+ execution start
+PRG-03 operational-memory cleanup  ──(sequenced inside)──▶  PRG-02 (WI-531 → WI-387, both delivered; WI-587 residue ungated)
+PRG-01 IF exported boundary nodes (planning-reference Appendix):
+  "W1 landed"                ──▶  PRG-11 · PRG-13(part)
+  "W2/W3 landed"             ──▶  PRG-10 in-radius remainder · PRG-15 (envelope-router half)
+  "clean-cut tail done"      ──▶  PRG-20 bulk
+PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe (queue gates only — never edges)
 ```
 
 ---
 
 ## Change log
+- **2026-06-10 — Full-forward-view amendment pass (ratified).** (1) **Activation
+  queue** added as a roster section (its home per the planning-reference document
+  map) — 11 gate-ordered entries covering *every* Initiative incl. the late ones.
+  (2) **Intake section** added (routing rule binding lives in the reference
+  Appendix; unrouted-intake line seeded empty). (3) **PRG-16 DISSOLVED** per
+  ratified `activation-planning.md` §1 — 1 DROP / 7 MERGE / 7 PARK; the
+  F-151+F-157 CI/Platform pair **folded into PRG-14 as a named subset**
+  (orchestrator ruling). (4) **PRG-02 flipped to `tail`** — gate close-out +
+  ~10-item parked-residue quick-land batch documented. (5) **PRG-03 registers
+  `WI-587`** (19 residual memory-triage dispositions) + adopts
+  `supporting-artefacts/memory-cleanup.md` as its evidence artifact (de-rogued);
+  F-036 merged in. (6) **PRG-04 created** (Cosmo top-down delivery layer,
+  embryo) — design WI **`WI-590`** captured in Cosmo (project Nexus) linking
+  WI-519/441/462/468 + precedent WI-532; survey confirmed no existing WI *is*
+  the top-down layer, so related items are referenced, not absorbed. (7)
+  PRG-10–15 `Activate-when` flipped from "Phase O orders" to the **ratified
+  gates**; cross-program gates block now lists the IF exported boundary nodes.
+  Roster status EMBRYO → ACTIVE.
 - **2026-06-10 — PRG-01 Phase-P slicing landed; decomposition repointed.** All 21
   identity-foundation units now live in Cosmo (WI-569…WI-586 created; W0 trio
   549/550/551 pre-existing) under the new Cosmo Workstream **"Identity Foundation"**
