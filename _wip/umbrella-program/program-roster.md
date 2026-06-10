@@ -199,6 +199,31 @@ security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they
 
 ---
 
+## Post-P operating model — two streams (ruled 2026-06-09)
+
+Once Phase P lands (IF Workstream + WPs in Cosmo + execution tracker), the umbrella
+splits into **two concurrent streams** — there is **no** "IF executes end-to-end before
+anything else" rule:
+
+1. **IF execution** — W0→W1→…→tail per the IF execution tracker. Owns the critical
+   path and most human attention.
+2. **Everything-else planning** — umbrella activity: normalize the PRG-16 singleton
+   tail, charter PRG-10–15 (outcome / size / owner), run PRG-14's `tech/*` dedupe,
+   convert `activate-when` into an **activation queue**. Planning consumes agent
+   capacity, not execution throughput — it never waits on IF.
+
+A planned stream then starts **executing in parallel with IF** when, per stream:
+- **Blast-radius class allows it** (O §2): parallel-safe (l10n, singletons,
+  agent-instructions) → anytime; serialize-class (security-pii remainders,
+  errors-api) → only after W2/W3 land, regardless of plan readiness.
+- **Pipeline is proven, not finished:** a few IF WIs through claim→execute→review→
+  close cleanly (realistically during W0/W1) — not IF completion.
+- **Attention budget allows it** (the honest 2-person constraint; per-fortnight call).
+
+First parallel activation will likely be a parallel-safe, agent-heavy, low-supervision
+stream (l10n-a11y is the archetype). Serialize-class streams get planned early so they
+launch the moment W2/W3 clears them.
+
 ## Cross-program gates (the edges that matter)
 
 ```
