@@ -113,7 +113,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | backlog-gated |
+| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **ready** — refined 2026-06-10 (Ready + Assisted; brief in body, children WI-591/592); starts when WI-569 lands |
 | WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | backlog-gated |
 | WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | backlog-gated |
 | WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | backlog-gated |
@@ -161,11 +161,19 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   Cosmo (Backlog, 15 open blockers), but the operator has waived waiting for the
   rewrite's execution start — W1 proceeds **shepherded** (a shepherd session runs
   pick/refine/brief/track; executors in isolated worktrees).
-- **Next up: WI-569 (baseline reset)** — Stage=Ready, Execution Path=Assisted,
-  unclaimed, no open Blocked-by. It is the last W0 hard-gate entry for WI-570.
-  Risky: resets shared dev + staging DBs (safe pre-launch, but coordinate).
-- **Then WI-570 (schema)** — Backlog/Unset today; needs the refine bump to
-  Ready + Execution Path before claim. Refine can run while WI-569 executes.
+- **In execution: WI-569 (baseline reset)** — executor sub-agent dispatched
+  2026-06-10 (`wi569-executor`, Sonnet, `.worktrees/WI-569`), running the
+  executor protocol with a hard pre-reset stop: it must report the exact dev/
+  staging reset commands to the shepherd and wait for go before executing them.
+- **Refined and queued: WI-570 (schema)** — Ready + Assisted as of 2026-06-10.
+  Claimable the moment WI-569 lands (last open entry of its W0 hard gate).
+- **Known refine friction (affects every remaining WP, WI-571…586):** top-down-
+  sliced WPs mechanically fail the WP DoR (`wp.children` + `wp.brief` — blank
+  bodies, no Sub-items; `/cosmo:bundle` absent from cosmo plugin 0.6.0). Filed as
+  **WI-593** (Hygiene, project Nexus). Interim bridge used on WI-570: transcribe
+  the frozen master-plan WP block into the body, capture the provenance children
+  (WI-591 schema-build, WI-592 F-032 scoped-repo), hand-set `Sub-item`, then
+  refine `--to-ready`. Repeat per WP until WI-593 is ruled.
 - **Shepherd protocol:** executor agents work in `.worktrees/WI-NN` (worktree-setup
   skill), one PR per WP, claim via `execute.ts fetch --supervised` + `claim
   --claimant`, complete → Stage=Reviewing + release claim; close only via
@@ -179,6 +187,14 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 ## 6. Change log
 
+- **2026-06-10 (evening) — WI-569 dispatched; WI-570 refined to Ready.**
+  Executor protocol landed (`executor-protocol.md`, from the operator's
+  wi-execute template: work-type-parameterized planning, review loop capped at
+  3, green-PR DoD → `/cosmo:execute complete` seam, announce-before-destructive-
+  step). WI-569 executor sub-agent launched against it. WI-570 refine bump hit
+  the top-down-WP DoR friction (first-dogfood prediction confirmed) — bridged
+  via body brief + provenance children WI-591/592 + hand-set Sub-item relation;
+  WI-570 now Ready+Assisted. Substrate gap filed as WI-593 (Hygiene, Nexus).
 - **2026-06-10 (later) — W1 execution start; shepherd session opened.** Synced
   tracker to Cosmo: WI-551 found Closed/Done (`c5c9b39bb`) — entire W0 patch trio
   now done. Recorded the operator's waiver of the WI-530 wait (gate still open in
