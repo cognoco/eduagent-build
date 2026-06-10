@@ -21,8 +21,8 @@ describe('resolveJudgeConfig', () => {
 
   it('vendorConstraint encodes that judge must differ from tutorVendor', () => {
     const result = resolveJudgeConfig({ tutorVendor: 'anthropic' });
-    // vendorConstraint must encode the exclusion of the tutor's vendor
-    expect(result.vendorConstraint).toContain('anthropic');
+    // vendorConstraint must be exactly the exclusion token, not just contain the vendor
+    expect(result.vendorConstraint).toBe('!anthropic');
   });
 
   it('different tutorVendor → different vendorConstraint', () => {

@@ -30,6 +30,8 @@ describe('resolveExchangeRouter', () => {
     };
     const result = resolveExchangeRouter({ eligibleRows: [MOCK_ROW, second] });
     expect(result.model).toBe(MOCK_ROW.model);
+    expect(result.serviceProvider).toBe(MOCK_ROW.serviceProvider);
+    expect(result.servingRegion).toBe(MOCK_ROW.servingRegion);
   });
 
   it('throws NoEligibleModelError when eligibility set is empty (fail-closed)', () => {
