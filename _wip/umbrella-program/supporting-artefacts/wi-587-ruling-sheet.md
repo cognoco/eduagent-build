@@ -17,10 +17,11 @@ handled already (stale ones archived, wrong facts corrected). **These 19 need a
 human ruling** because they record *your preferences* or *product facts* that
 an agent shouldn't confirm on its own behalf.
 
-**How to use it:** work top-down, tick a box per item (or write a line where
-you disagree). Part 1 is the only item that needs real thought. Parts 2 and 3
-should each take a few minutes — every item has a recommendation, and "agree"
-is a fine answer. ~20 minutes total.
+**How to use it:** work top-down and write your ruling in the right-hand
+column of each row — a simple **"agree"** (or ✓) is enough; where you
+disagree, a short note on what should change instead. Part 1 is the only item
+that needs real thought; every other row has a recommendation. ~20 minutes
+total.
 
 **What happens after:** an agent executes your rulings (small file edits +
 one PRD fix). Nothing is edited until the in-flight harness-hygiene branch
@@ -72,10 +73,9 @@ PRD). If instead you now want hard locking, we'd fix FR124 the other way and
 archive the memory. Either ruling also triggers a quick check of what the app
 *actually does* today, so code, PRD, and memory end up aligned.
 
-> **Decide 1 — topic locking:**
-> ☐ **A — never lock** (advisory REQUIRED; fix FR119 wording; keep memory) *(recommended)*
-> ☐ **B — hard lock** (FR119 stands; fix FR124; archive memory)
-> ☐ Other: ___________
+| # | Decision | Options | Your ruling |
+|---|---|---|---|
+| 1.1 | Topic locking — what does REQUIRED mean? | **A** — never lock: advisory REQUIRED, fix FR119 wording, keep memory *(recommended)* · **B** — hard lock: FR119 stands, fix FR124, archive memory · or describe a third way | |
 
 ---
 
@@ -85,79 +85,48 @@ These ten notes record preferences and lessons the agents follow every day.
 The audit verified each one is still factually accurate and written down
 nowhere else — so if a rule is wrong or outdated, **this is the only place it
 can be fixed**. For each: *this is the rule the agents follow — is it still
-right?* Expected answer for most or all: yes.
+right?* Expected answer for most or all: "agree" (= keep following it).
 
-| # | The rule the agents follow | Worth knowing |
-|---|---|---|
-| 2.1 | **Never push an over-the-air app update to users unless explicitly asked.** | Your product-risk guard on OTA releases. |
-| 2.2 | **Never switch git branches mid-session unless explicitly told** (applies to sub-agents too). | Prevents agents trampling each other's work. |
-| 2.3 | **All user-facing text in plain language — no app jargon — for all ages.** Includes six concrete banned-jargon examples ("Coaching card", "Retention", "Curriculum"…) and the "say the moment, not the system" heuristic. | The examples exist only here; the UX spec has the general principle but not the list. |
-| 2.4 | **Quiet defaults over friction:** infer from sustained behavior, don't nag with settings or confirmations; surveillance and friction are both UX bugs. | From three of your spec reviews. |
-| 2.5 | **When testing app flows, track findings silently and report at the end** — no play-by-play commentary. | Your stated working preference. |
-| 2.6 | **Use the cheaper Sonnet model for sub-tasks; reserve Opus for deep reasoning.** | Cost control you requested. |
-| 2.7 | **Layouts must be checked against a small phone — Galaxy S10e, 5.8".** | True as long as that's still the test device. If you've changed devices, say so and we update it. |
-| 2.8 | **Agents decide small things themselves; ask only on genuinely big trade-offs.** | Your "don't gate on confirmations" instruction. |
-| 2.9 | **Audit methodology: before flagging a "rule violation", check whether a later epic deleted the concept** (greps miss renames/removals). | A lesson from a real false alarm. |
-| 2.10 | **LLM injection checklist: any flow where the AI reads one user's text and shows output to another user is an injection vector** — five required mitigations (structured output, delimiter wrapping, allowlist validation, a break test, DPA scope note). | Security pattern from a real incident; in no other doc. |
-
-> **Decide 2 — standing rules:**
-> ☐ **Confirm all ten as still-current** *(recommended)*
-> ☐ Confirm all EXCEPT: #____ — what changed: ___________
+| # | The rule the agents follow | Worth knowing | Your ruling |
+|---|---|---|---|
+| 2.1 | **Never push an over-the-air app update to users unless explicitly asked.** | Your product-risk guard on OTA releases. | |
+| 2.2 | **Never switch git branches mid-session unless explicitly told** (applies to sub-agents too). | Prevents agents trampling each other's work. | |
+| 2.3 | **All user-facing text in plain language — no app jargon — for all ages.** Includes six concrete banned-jargon examples ("Coaching card", "Retention", "Curriculum"…) and the "say the moment, not the system" heuristic. | The examples exist only here; the UX spec has the general principle but not the list. | |
+| 2.4 | **Quiet defaults over friction:** infer from sustained behavior, don't nag with settings or confirmations; surveillance and friction are both UX bugs. | From three of your spec reviews. | |
+| 2.5 | **When testing app flows, track findings silently and report at the end** — no play-by-play commentary. | Your stated working preference. | |
+| 2.6 | **Use the cheaper Sonnet model for sub-tasks; reserve Opus for deep reasoning.** | Cost control you requested. | |
+| 2.7 | **Layouts must be checked against a small phone — Galaxy S10e, 5.8".** | True as long as that's still the test device. If you've changed devices, write the new one here. | |
+| 2.8 | **Agents decide small things themselves; ask only on genuinely big trade-offs.** | Your "don't gate on confirmations" instruction. | |
+| 2.9 | **Audit methodology: before flagging a "rule violation", check whether a later epic deleted the concept** (greps miss renames/removals). | A lesson from a real false alarm. | |
+| 2.10 | **LLM injection checklist: any flow where the AI reads one user's text and shows output to another user is an injection vector** — five required mitigations (structured output, delimiter wrapping, allowlist validation, a break test, DPA scope note). | Security pattern from a real incident; in no other doc. | |
 
 ---
 
-## Part 3 — Eight factual corrections: approve the edits (batch)
+## Part 3 — Eight factual corrections: approve the edits
 
 These notes have the right *idea* but contain specific stale facts the audit
-verified against the codebase. The proposed edit is listed per item; nothing
-else in each note changes. These are corrections, not judgment calls — the
-ruling asked of you is "go ahead" (or pull one out if something looks off).
+verified against the codebase. Each row shows what the note wrongly says today
+and exactly what we'll change it to. Nothing else in each note changes. These
+are corrections, not judgment calls — expected ruling is "agree" per row, with
+the column there to pull any one out.
 
-**Two product-relevant ones, spelled out:**
-
-- **3.1 — Voice is critical.** The core principle stays untouched: voice
-  input AND output are product-critical because young learners don't type.
-  Two stale facts get fixed: (a) the note says TTS "should be the default
-  output mode" — what actually shipped (FR144) is a per-session Text/Voice
-  toggle, with voice-on default only in Teach-Back mode (FR142); (b) it still
-  frames Epic 8 as upcoming — it shipped in April. A pointer to the Epic 17
-  voice-first design (the actual next phase, not started) is added.
-- **3.2 — Never force add-child.** The principle stays untouched: a parent
-  account must never be forced to add a child; solo/skip path always
-  available. One paragraph gets deleted: the "how to apply" block names a
-  screen (`AddFirstChildScreen`) and a code check that no longer exist
-  anywhere in the codebase.
-
-**Six mechanical ones, one line each:**
-
-- **3.3 — Login keys (Clerk).** Note says the mobile key is "baked into
-  eas.json"; in reality it's injected at build time via EAS environment
-  variables. Fix the wording; drop a resolved-incident history block.
-- **3.4 — Build setup (EAS).** Two sections duplicate the deployment doc —
-  replaced with pointers; one detail with no other home (where the Sentry
-  upload token lives) is explicitly kept.
-- **3.5 — LLM test harness.** Says "all 10 LLM flows wired" — there are now
-  23. Fix the count; remove a paragraph describing a file that doesn't exist;
-  point to the harness README instead of paraphrasing it.
-- **3.6 — Windows build bug (nx/expo).** References a script that was retired
-  in the pipeline rework; updated to the current script and the current
-  (sanctioned, narrow) bypass policy.
-- **3.7 — Secrets how-to (Doppler).** Removes a claim the code contradicts (a
-  test it says needs a live database explicitly doesn't) and old PR history;
-  the verified how-to table stays.
-- **3.8 — Secrets rule (Doppler/EAS).** Fixes a wrong command name (`eas
-  env:create`, not `eas secret:create`) and a wrongly-named variable; points
-  to the canonical secrets doc; the Windows CLI path stays.
-
-> **Decide 3 — corrections:**
-> ☐ **Approve all eight** *(recommended)*
-> ☐ Approve all EXCEPT: #____ — concern: ___________
+| # | Note (what it's about) | What it wrongly says today | Proposed correction | Your ruling |
+|---|---|---|---|---|
+| 3.1 | **Voice is critical** — voice input AND output are product-critical because young learners don't type. *The principle itself stays untouched.* | (a) "TTS should be the **default** output mode"; (b) frames Epic 8 (voice) as upcoming — it shipped in April. | (a) Reword to what shipped: voice is a **per-session Text/Voice toggle** (FR144), voice-on by default only in Teach-Back mode (FR142). (b) Drop the Epic 8 framing; add a pointer to the Epic 17 voice-first design (the real next phase, not started). | |
+| 3.2 | **Never force add-child** — a parent account must never be forced to add a child; solo/skip path always available. *Principle and rationale stay untouched.* | The "how to apply" paragraph names a screen (`AddFirstChildScreen`) and a code check that no longer exist anywhere in the codebase. | Delete that one paragraph. Nothing else changes. | |
+| 3.3 | **Login keys (Clerk)** — which authentication key belongs to which environment. | Says the mobile key is "baked into eas.json" (the committed build config). | Reword to the real mechanism: the key is **injected at build time via EAS environment variables**. Also delete a resolved-incident history block (old PR/commit references) and add a pointer to the deployment doc's EAS-variables section. | |
+| 3.4 | **Build setup (EAS)** — notes on how mobile builds are configured. | Two sections (secrets sync, runtime-version policy) duplicate the deployment doc — duplicated text drifts. | Replace both sections with pointers to the deployment doc, **explicitly keeping** the one detail that exists nowhere else (where the Sentry upload token is stored). Everything else (NX Cloud status, WSL2 note, build quirk) stays. | |
+| 3.5 | **LLM test harness** — how the prompt-quality test suite works. | (a) "All **10** LLM flows wired" — there are now **23**; (b) describes a file that doesn't exist; (c) paraphrases the harness README at length. | (a) Correct to 23 and point at the flow list in the code as the authoritative count; (b) delete the dead-file paragraph; (c) replace the paraphrase with a README pointer. The genuinely unique bits (snapshot trap, fixture profile IDs, CLI commands) stay. | |
+| 3.6 | **Windows build bug (nx/expo)** — a known toolchain crash on Windows and how to work around it. | (a) Cites a helper script that was retired in the pipeline rework; (b) contains a blanket "never use `--no-verify`" ban that contradicts the now-agreed policy (a narrow, sanctioned Windows escape exists). | (a) Point at the current script that holds the workaround; (b) align the bypass wording with the agreed two-level policy (narrow deliberate use sanctioned for this exact condition, until the upstream fix lands). | |
+| 3.7 | **Secrets how-to (Doppler)** — the operational guide for fetching secrets in dev/test. | (a) Claims a specific test fails without a live database — the test file itself says it runs without one; (b) carries resolved PR/session history. | Delete the false claim and the history. The verified how-to (project/config table, command wrappers, file pointers, macOS/Windows paths) stays. | |
+| 3.8 | **Secrets rule (Doppler/EAS)** — the "all secrets via Doppler" rule and how mobile build secrets flow. | (a) Names a wrong command (`eas secret:create` — the real one is `eas env:create`); (b) names the wrong variable in a denylist note. | Fix the command and the variable name; route the rule text through pointers to the canonical secrets docs; keep the Windows CLI path (documented nowhere else). | |
 
 ---
 
 ## After you rule
 
-1. Hand this sheet back (ticked boxes are enough; margin notes welcome).
+1. Hand this sheet back with the ruling columns filled ("agree" / ✓ is
+   enough; margin notes welcome).
 2. An agent executes: the 8 edits + the Part 1 outcome (PRD fix + memory
    update **in the same change**, so the contradiction can't reopen), then
    marks the 10 confirmations as re-confirmed today.
