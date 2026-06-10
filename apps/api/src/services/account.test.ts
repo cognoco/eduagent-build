@@ -159,6 +159,13 @@ function createEmailUpdateDb({
   emailLookupResult = undefined as
     | ReturnType<typeof mockAccountRow>
     | undefined,
+  // [CRITICAL-2a] The service now does TWO findFirst calls inside the tx:
+  // (1) the by-email collision check → emailLookupResult, then
+  // (2) the by-clerkUserId lookup of the CURRENT row (to capture the old
+  // email for the security-notification) → currentAccountRow.
+  currentAccountRow = undefined as
+    | ReturnType<typeof mockAccountRow>
+    | undefined,
   updateReturning = [] as ReturnType<typeof mockAccountRow>[],
 } = {}): {
   db: Database;
@@ -174,7 +181,11 @@ function createEmailUpdateDb({
   const tx = {
     query: {
       accounts: {
-        findFirst: jest.fn().mockResolvedValue(emailLookupResult),
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(emailLookupResult)
+          .mockResolvedValueOnce(currentAccountRow)
+          .mockResolvedValue(currentAccountRow),
       },
     },
     update,
@@ -782,6 +793,10 @@ describe('updateAccountEmailFromClerk', () => {
     });
     const { db, tx } = createEmailUpdateDb({
       emailLookupResult: undefined,
+      currentAccountRow: mockAccountRow({
+        clerkUserId: 'user_test',
+        email: 'old@example.com',
+      }),
       updateReturning: [updatedRow],
     });
     const fetchImpl = clerkUserFetch('new@example.com');
@@ -795,7 +810,8 @@ describe('updateAccountEmailFromClerk', () => {
 
     expect(result.email).toBe('new@example.com');
     expect(db.transaction).toHaveBeenCalledTimes(1);
-    expect(tx.query.accounts.findFirst).toHaveBeenCalledTimes(1);
+    // Two lookups now: by-email collision check + by-clerkUserId current row.
+    expect(tx.query.accounts.findFirst).toHaveBeenCalledTimes(2);
     expect(tx.update).toHaveBeenCalledTimes(1);
     expect(fetchImpl).toHaveBeenCalledWith(
       'https://api.clerk.com/v1/users/user_test',
@@ -803,6 +819,59 @@ describe('updateAccountEmailFromClerk', () => {
         headers: { Authorization: 'Bearer sk_test' },
       }),
     );
+  });
+
+  it('[BREAK CRITICAL-2a] dispatches app/account.security-event to the OLD email on a real change', async () => {
+    const updatedRow = mockAccountRow({
+      clerkUserId: 'user_test',
+      email: 'new@example.com',
+    });
+    const { db } = createEmailUpdateDb({
+      emailLookupResult: undefined,
+      currentAccountRow: mockAccountRow({
+        clerkUserId: 'user_test',
+        email: 'old@example.com',
+      }),
+      updateReturning: [updatedRow],
+    });
+
+    await updateAccountEmailFromClerk(db, {
+      clerkUserId: 'user_test',
+      requestedEmail: 'new@example.com',
+      clerkSecretKey: 'sk_test',
+      fetchImpl: clerkUserFetch('new@example.com'),
+    });
+
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/account.security-event',
+        data: expect.objectContaining({
+          type: 'email_changed',
+          to: 'old@example.com',
+        }),
+      }),
+    );
+  });
+
+  it('does NOT dispatch a security notification when the email is unchanged', async () => {
+    const sameRow = mockAccountRow({
+      clerkUserId: 'user_test',
+      email: 'same@example.com',
+    });
+    const { db } = createEmailUpdateDb({
+      emailLookupResult: undefined,
+      currentAccountRow: sameRow,
+      updateReturning: [sameRow],
+    });
+
+    await updateAccountEmailFromClerk(db, {
+      clerkUserId: 'user_test',
+      requestedEmail: 'same@example.com',
+      clerkSecretKey: 'sk_test',
+      fetchImpl: clerkUserFetch('same@example.com'),
+    });
+
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
   it('[BREAK auth-2] rejects when the requested email belongs to another account', async () => {

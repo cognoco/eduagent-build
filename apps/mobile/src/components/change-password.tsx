@@ -8,11 +8,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PasswordInput } from './common';
 import { extractClerkError } from '../lib/clerk-error';
 import { signOutWithCleanup } from '../lib/sign-out';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { Sentry } from '../lib/sentry';
 
 export function ChangePassword(): React.JSX.Element {
   const { user } = useUser();
   const { signOut } = useAuth();
+  const api = useApiClient();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { profiles } = useProfile();
@@ -60,12 +63,26 @@ export function ChangePassword(): React.JSX.Element {
       setNewPassword('');
       setConfirmPassword('');
       setSuccess(true);
+      // [CRITICAL-2a] Fire-and-forget security notification to the account
+      // email. Must never block or fail the password change on a notify error.
+      void api.account['security-event']
+        .$post({ json: { event: 'password_changed' } })
+        .catch((err) =>
+          // A lost notification is the takeover-alert gap [CRITICAL-2a] —
+          // never block the password change, but keep the failure queryable.
+          Sentry.captureException(err, {
+            tags: {
+              feature: 'security_notification',
+              event: 'password_changed',
+            },
+          }),
+        );
     } catch (err) {
       setError(extractClerkError(err));
     } finally {
       setIsSubmitting(false);
     }
-  }, [user, currentPassword, newPassword, confirmPassword, t]);
+  }, [api, user, currentPassword, newPassword, confirmPassword, t]);
 
   const handleForgotPassword = useCallback(async () => {
     setIsSigningOut(true);
@@ -86,7 +103,7 @@ export function ChangePassword(): React.JSX.Element {
       setIsSigningOut(false);
     }
     router.replace('/(auth)/sign-in' as Href);
-  }, [signOut, router, queryClient, profiles, t]);
+  }, [signOut, router, queryClient, profiles, t, user?.id]);
 
   return (
     <View className="mt-3">

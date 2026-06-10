@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, TextInput, Pressable, View } from 'react-native';
-import { useUser } from '@clerk/clerk-expo';
+import { useUser, useReverification } from '@clerk/clerk-expo';
 
 import { assertOk } from '../lib/assert-ok';
 import { formatApiError } from '../lib/format-api-error';
@@ -20,15 +20,8 @@ interface EmailAddressResource {
   prepareVerification: (params: { strategy: 'email_code' }) => Promise<unknown>;
 }
 
-interface DestroyableEmailAddress {
-  destroy: () => Promise<unknown>;
-  emailAddress?: string | null;
-  id?: string | null;
-}
-
 interface EmailSyncCandidate {
   emailAddress: string;
-  oldPrimaryEmail: DestroyableEmailAddress | null;
 }
 
 export function ChangeEmail(): React.JSX.Element {
@@ -42,13 +35,24 @@ export function ChangeEmail(): React.JSX.Element {
     null,
   );
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [syncCandidate, setSyncCandidate] = useState<EmailSyncCandidate | null>(
     null,
   );
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+
+  // [CRITICAL-2b] Promoting a new address to primary is a credential mutation —
+  // gate it behind Clerk step-up reverification. If the instance requires it,
+  // the enhanced fetcher prompts for re-confirmation and retries on success;
+  // otherwise it passes through. Defends against an unattended unlocked phone
+  // silently taking over the login email.
+  const reverifiedSetPrimary = useReverification(
+    (primaryEmailAddressId: string) => {
+      if (!user) throw new Error('User not ready');
+      return user.update({ primaryEmailAddressId });
+    },
+  );
 
   const handleClerkError = useCallback(
     (err: unknown): string =>
@@ -61,7 +65,6 @@ export function ChangeEmail(): React.JSX.Element {
   const handleSendCode = useCallback(async () => {
     const trimmedEmail = email.trim();
     setError(null);
-    setWarning(null);
     setSuccess(false);
     setSyncCandidate(null);
 
@@ -104,25 +107,18 @@ export function ChangeEmail(): React.JSX.Element {
     [api],
   );
 
-  const completeEmailChange = useCallback(
-    async (candidate: EmailSyncCandidate) => {
-      try {
-        await withClerkTimeout(
-          candidate.oldPrimaryEmail?.destroy?.() ?? Promise.resolve(),
-          'oldEmail.destroy',
-        );
-      } catch {
-        setWarning(t('changeEmail.warningOldEmailStillActive'));
-      } finally {
-        setEmail('');
-        setCode('');
-        setPendingEmail(null);
-        setSyncCandidate(null);
-        setSuccess(true);
-      }
-    },
-    [t],
-  );
+  // [CRITICAL-2c] The old address is intentionally NOT destroyed. It remains a
+  // verified, non-primary recovery identifier so a mistaken or hostile email
+  // change does not strip the real owner of their last out-of-band way back in.
+  // The server also emails a security notification to the old address on change
+  // (see updateAccountEmailFromClerk).
+  const completeEmailChange = useCallback(() => {
+    setEmail('');
+    setCode('');
+    setPendingEmail(null);
+    setSyncCandidate(null);
+    setSuccess(true);
+  }, []);
 
   const formatSyncError = useCallback(
     (err: unknown): string =>
@@ -135,7 +131,6 @@ export function ChangeEmail(): React.JSX.Element {
   const handleVerify = useCallback(async () => {
     const trimmedCode = code.trim();
     setError(null);
-    setWarning(null);
     setSuccess(false);
 
     if (!user || !pendingEmail) {
@@ -148,11 +143,8 @@ export function ChangeEmail(): React.JSX.Element {
       return;
     }
 
-    const oldPrimaryEmail =
-      user.primaryEmailAddress as DestroyableEmailAddress | null;
     const candidate: EmailSyncCandidate = {
       emailAddress: pendingEmail.emailAddress,
-      oldPrimaryEmail,
     };
 
     setIsVerifying(true);
@@ -162,7 +154,7 @@ export function ChangeEmail(): React.JSX.Element {
         'email.attemptVerification',
       );
       await withClerkTimeout(
-        user.update({ primaryEmailAddressId: pendingEmail.id }),
+        reverifiedSetPrimary(pendingEmail.id),
         'user.update',
       );
       await withClerkTimeout(user.reload(), 'user.reload');
@@ -181,7 +173,7 @@ export function ChangeEmail(): React.JSX.Element {
       return;
     }
 
-    await completeEmailChange(candidate);
+    completeEmailChange();
     setIsVerifying(false);
   }, [
     code,
@@ -189,6 +181,7 @@ export function ChangeEmail(): React.JSX.Element {
     formatSyncError,
     handleClerkError,
     pendingEmail,
+    reverifiedSetPrimary,
     syncEmailToBackend,
     t,
     user,
@@ -201,12 +194,11 @@ export function ChangeEmail(): React.JSX.Element {
     }
 
     setError(null);
-    setWarning(null);
     setSuccess(false);
     setIsVerifying(true);
     try {
       await syncEmailToBackend(syncCandidate);
-      await completeEmailChange(syncCandidate);
+      completeEmailChange();
     } catch (err) {
       setError(formatSyncError(err));
     } finally {
@@ -313,11 +305,6 @@ export function ChangeEmail(): React.JSX.Element {
       {success ? (
         <Text className="text-xs text-success mt-2" accessibilityRole="alert">
           {t('changeEmail.successMessage')}
-        </Text>
-      ) : null}
-      {warning ? (
-        <Text className="text-xs text-warning mt-2" accessibilityRole="alert">
-          {warning}
         </Text>
       ) : null}
     </View>

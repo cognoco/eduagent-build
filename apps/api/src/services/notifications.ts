@@ -5,7 +5,11 @@
 // ---------------------------------------------------------------------------
 
 import { eq } from 'drizzle-orm';
-import type { ConsentType, NotificationPayload } from '@eduagent/schemas';
+import type {
+  ConsentType,
+  NotificationPayload,
+  SecurityNotificationType,
+} from '@eduagent/schemas';
 import {
   familyLinks,
   profiles,
@@ -267,7 +271,8 @@ export interface EmailPayload {
     | 'subscribe_request'
     | 'feedback'
     | 'weekly_progress'
-    | 'monthly_progress';
+    | 'monthly_progress'
+    | 'security_notification';
 }
 
 export interface EmailOptions {
@@ -388,6 +393,58 @@ export function formatConsentReminderEmail(
     subject: `Reminder: Consent pending for ${childName}'s MentoMate account`,
     body: `We're still waiting for your consent for ${childName}'s MentoMate account. You have ${daysRemaining} days remaining to respond before the account is automatically removed.\n\nClick here to approve or deny: ${tokenUrl}`,
     type: 'consent_reminder',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Account Security Notification — [CRITICAL-2a]
+// ---------------------------------------------------------------------------
+
+// The credential-change event union (`SecurityNotificationType`) lives in
+// `@eduagent/schemas` (multi-file shared contract). `email_changed` mails the
+// OLD address (alerting whoever may be losing access); password events mail
+// the current account address.
+
+/**
+ * Formats a security-notification email. The body always tells the recipient
+ * what changed and what to do if it wasn't them — the recovery path is the
+ * point of the notification (a silent credential change is the takeover risk
+ * this guards against).
+ */
+export function formatSecurityNotificationEmail(
+  to: string,
+  type: SecurityNotificationType,
+): EmailPayload {
+  const supportLine =
+    "If you didn't make this change, your account may be compromised. " +
+    'Contact support@mentomate.com right away.';
+
+  let subject: string;
+  let lead: string;
+  switch (type) {
+    case 'email_changed':
+      subject = 'Your MentoMate login email was changed';
+      lead =
+        'The login email for your MentoMate account was just changed. This ' +
+        'address is still kept as a verified recovery email.';
+      break;
+    case 'password_added':
+      subject = 'A password was added to your MentoMate account';
+      lead =
+        'A password was just added to your MentoMate account, which until now ' +
+        'used only social sign-in.';
+      break;
+    case 'password_changed':
+      subject = 'Your MentoMate password was changed';
+      lead = 'The password for your MentoMate account was just changed.';
+      break;
+  }
+
+  return {
+    to,
+    subject,
+    body: `${lead}\n\n${supportLine}`,
+    type: 'security_notification',
   };
 }
 
