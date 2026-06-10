@@ -2548,7 +2548,7 @@
     "ipAddress": "IP-adresse {{ip}}",
     "signOutAllButton": "Logg ut alle andre enheter ({{count}})",
     "signOutAllLabel": "Logg ut alle andre enheter",
-    "signingOutAll": "Logger ut alle enheter ...",
+    "signingOutAll": "Logger ut andre enheter ...",
     "signOutAllTitle": "Logge ut alle andre enheter?",
     "signOutAllConfirm": "Dette vil avslutte {{count}} andre økt(er). Denne enheten forblir pålogget.",
     "signOutAllConfirmButton": "Logg ut alle"

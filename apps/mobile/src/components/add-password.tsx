@@ -9,6 +9,7 @@ import {
   withClerkTimeout,
 } from '../lib/clerk-timeout';
 import { useApiClient } from '../lib/api-client';
+import { Sentry } from '../lib/sentry';
 import { PasswordInput } from './common/PasswordInput';
 
 function getSsoProviderLabel(
@@ -77,7 +78,16 @@ export function AddPassword({
       // email. Must never block or fail the password add on a notify error.
       void api.account['security-event']
         .$post({ json: { event: 'password_added' } })
-        .catch(() => undefined);
+        .catch((err) =>
+          // A lost notification is the takeover-alert gap [CRITICAL-2a] —
+          // never block the password add, but keep the failure queryable.
+          Sentry.captureException(err, {
+            tags: {
+              feature: 'security_notification',
+              event: 'password_added',
+            },
+          }),
+        );
       setNewPassword('');
       setConfirmPassword('');
       onPasswordAdded();

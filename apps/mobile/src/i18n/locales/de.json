@@ -2548,7 +2548,7 @@
     "ipAddress": "IP {{ip}}",
     "signOutAllButton": "Alle anderen Geräte abmelden ({{count}})",
     "signOutAllLabel": "Alle anderen Geräte abmelden",
-    "signingOutAll": "Alle Geräte werden abgemeldet...",
+    "signingOutAll": "Andere Geräte werden abgemeldet...",
     "signOutAllTitle": "Alle anderen Geräte abmelden?",
     "signOutAllConfirm": "Hiermit werden {{count}} andere Sitzungen beendet. Dieses Gerät bleibt angemeldet.",
     "signOutAllConfirmButton": "Alle abmelden"

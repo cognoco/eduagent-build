@@ -5,6 +5,7 @@ import { cleanupScreen, renderScreen } from '../test-utils/screen-render';
 import { SecuritySessions } from './security-sessions';
 
 const mockGetSessions = jest.fn();
+const mockRevokeCurrent = jest.fn();
 const mockRevokeOther = jest.fn();
 const mockRevokeOther2 = jest.fn();
 
@@ -41,7 +42,7 @@ function sessionsFixture() {
         country: 'NO',
         ipAddress: '192.0.2.10',
       },
-      revoke: jest.fn(),
+      revoke: mockRevokeCurrent,
     },
     {
       id: 'session-other',
@@ -142,9 +143,7 @@ describe('SecuritySessions', () => {
       expect(mockGetSessions).toHaveBeenCalledTimes(2);
     });
     // The current session's own revoke is never invoked by the bulk action.
-    const [current] = sessionsFixture();
-    if (!current) throw new Error('sessionsFixture must be non-empty');
-    expect(current.revoke).not.toHaveBeenCalled();
+    expect(mockRevokeCurrent).not.toHaveBeenCalled();
   });
 
   it('[HIGH-2] surfaces the IP address so identical device labels can be told apart', async () => {

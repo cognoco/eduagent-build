@@ -2548,7 +2548,7 @@
     "ipAddress": "IP {{ip}}",
     "signOutAllButton": "Terminar sessão nos outros dispositivos ({{count}})",
     "signOutAllLabel": "Terminar sessão nos outros dispositivos",
-    "signingOutAll": "A terminar sessão em todos os dispositivos...",
+    "signingOutAll": "A terminar sessão noutros dispositivos...",
     "signOutAllTitle": "Terminar sessão nos outros dispositivos?",
     "signOutAllConfirm": "Isto vai terminar {{count}} outra(s) sessão(ões). Este dispositivo mantém a sessão iniciada.",
     "signOutAllConfirmButton": "Terminar todas"

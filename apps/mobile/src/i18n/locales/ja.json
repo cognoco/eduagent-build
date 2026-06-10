@@ -2548,7 +2548,7 @@
     "ipAddress": "IPアドレス {{ip}}",
     "signOutAllButton": "他のすべてのデバイスからサインアウトする ({{count}})",
     "signOutAllLabel": "他のすべてのデバイスからサインアウトする",
-    "signingOutAll": "すべてのデバイスからサインアウトしています...",
+    "signingOutAll": "他のデバイスからサインアウトしています...",
     "signOutAllTitle": "他のすべてのデバイスからサインアウトしますか？",
     "signOutAllConfirm": "これにより、他の{{count}}個のセッションが終了します。このデバイスはサインインしたままになります。",
     "signOutAllConfirmButton": "すべてサインアウト"

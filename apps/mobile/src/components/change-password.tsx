@@ -10,6 +10,7 @@ import { extractClerkError } from '../lib/clerk-error';
 import { signOutWithCleanup } from '../lib/sign-out';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { Sentry } from '../lib/sentry';
 
 export function ChangePassword(): React.JSX.Element {
   const { user } = useUser();
@@ -66,7 +67,16 @@ export function ChangePassword(): React.JSX.Element {
       // email. Must never block or fail the password change on a notify error.
       void api.account['security-event']
         .$post({ json: { event: 'password_changed' } })
-        .catch(() => undefined);
+        .catch((err) =>
+          // A lost notification is the takeover-alert gap [CRITICAL-2a] —
+          // never block the password change, but keep the failure queryable.
+          Sentry.captureException(err, {
+            tags: {
+              feature: 'security_notification',
+              event: 'password_changed',
+            },
+          }),
+        );
     } catch (err) {
       setError(extractClerkError(err));
     } finally {

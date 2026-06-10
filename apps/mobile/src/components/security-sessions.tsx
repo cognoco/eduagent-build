@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, Pressable, ScrollView, View } from 'react-native';
 import { useAuth, useUser, useReverification } from '@clerk/clerk-expo';
@@ -148,7 +148,10 @@ export function SecuritySessions(): React.JSX.Element {
     [formatClerkError, loadSessions, reverifiedRevoke, sessionId],
   );
 
-  const otherSessions = sessions.filter((s) => s.id !== sessionId && s.revoke);
+  const otherSessions = useMemo(
+    () => sessions.filter((s) => s.id !== sessionId && s.revoke),
+    [sessions, sessionId],
+  );
 
   // [HIGH-1] The headline emergency action: revoke every session except the
   // current device in one tap. This is the safe default when the user has lost

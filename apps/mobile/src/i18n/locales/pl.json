@@ -2548,7 +2548,7 @@
     "ipAddress": "IP {{ip}}",
     "signOutAllButton": "Wyloguj wszystkie inne urządzenia ({{count}})",
     "signOutAllLabel": "Wyloguj wszystkie inne urządzenia",
-    "signingOutAll": "Wylogowywanie wszystkich urządzeń...",
+    "signingOutAll": "Wylogowywanie pozostałych urządzeń...",
     "signOutAllTitle": "Wylogować wszystkie inne urządzenia?",
     "signOutAllConfirm": "Spowoduje to zakończenie {{count}} innych sesji. To urządzenie pozostanie zalogowane.",
     "signOutAllConfirmButton": "Wyloguj wszystkie"
