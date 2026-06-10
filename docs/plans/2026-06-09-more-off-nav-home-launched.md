@@ -102,13 +102,12 @@ the Practice tab and make its nested activities hide the bar themselves (Part B)
    `router.replace('/(app)/more')`.
 5. **Supporter flow:** unchanged — child settings are pushed from `child/[profileId]`
    with `childProfileId`, not via the More tab.
-6. **Practice promotion is learner/study-shell only.** `STUDY_TABS` gains
-   `'practice'`; `FAMILY_TABS` does **not**. An adult-owner-with-children
-   practices their own subjects in *study* mode (the learner shell, reached via
-   the mentor/student switcher), so family mode stays mentoring-only
-   (`home, recaps, progress`). (If product later wants Practice in family mode,
-   it is a one-line add to `FAMILY_TABS` + an entry in T8's test — recorded as the
-   only open product lever, defaulted to "no".)
+6. **Practice promotion is learner/study-shell only — ruled, not open.**
+   `STUDY_TABS` gains `'practice'`; `FAMILY_TABS` does **not** (confirmed by
+   product 2026-06-10). An adult-owner-with-children practices their own subjects
+   in *study* mode (the learner shell, reached via the mentor/student switcher),
+   so family mode stays mentoring-only (`home, recaps, progress`). T8's test
+   asserts `FAMILY_TABS` never contains `'practice'` to lock this in.
 7. **Keep the Home Practice action.** `home-action-practice`
    (`LearnerScreen.tsx:87,91`) stays; with Practice now a tab it simply deep-links
    into that tab (the proposed "contextual entries deep-link into the Practice

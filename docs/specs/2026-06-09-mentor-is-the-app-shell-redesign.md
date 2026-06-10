@@ -1,8 +1,8 @@
 # Mentor-Is-The-App — Shell Redesign Spec
 
-**Status:** Draft · 2026-06-09 (adversarial-review amendments 2026-06-10, see Annex B; end-user-lens amendments 2026-06-10, see Annex C) · **Branch:** `new-llm` · **Profile:** design
+**Status:** Draft · 2026-06-09 (adversarial-review amendments 2026-06-10, see Annex B; end-user-lens amendments 2026-06-10, see Annex C; cold-start / motivation / interaction-law rulings folded in 2026-06-10, see §2.1, §3.1–3.2, §15.14–19, Annex D) · **Branch:** `new-llm` · **Profile:** design
 **Problem source:** ~90 screens exist; most users never discover more than ~10. This is a **discovery problem, not a navigation problem** — the goal is to serve users what they don't know exists, at the right time. **Evidence caveat:** the "<10 screens" figure is inferred from the [codebase atlas](../reviews/2026-06-09-codebase-atlas/INDEX.md) (a code inventory), **not** from production usage telemetry — the app is pre-launch. The discovery thesis is a hypothesis to validate, not a measured fact; §11 treats S1–S2 as the bet that *buys* the evidence (S2→S3 evidence gate).
-**Inputs:** [30-agent codebase atlas](../reviews/2026-06-09-codebase-atlas/INDEX.md) · [One-screen second opinion](../reviews/2026-06-09-codebase-atlas/one-screen-second-opinion.md) (frequencies synthesis — this spec rules its open fork, see §10) · ratified identity model (`_wip/identity-foundation/`, person-based, edge-scoped mentor) · [audience matrix](../audience-matrix.md)
+**Inputs:** [30-agent codebase atlas](../reviews/2026-06-09-codebase-atlas/INDEX.md) · the one-screen second opinion and the interim DIRECTION-one-surface record (both fully dissolved into this spec — §2/§2.1/§3.1/§3.2/Annex D — and deleted 2026-06-10; the second opinion is recoverable from git history, the DIRECTION record was never committed and lives on only here) · ratified identity model (`_wip/identity-foundation/`, person-based, edge-scoped mentor) · [audience matrix](../audience-matrix.md)
 **What this spec is:** the converged product direction from the 2026-06-09 brainstorm — vision, shell, scope model, privacy contract, backend primitives, strangle sequencing. It is **not** an implementation plan; each phase in §11 gets its own plan under `docs/plans/` before build.
 **ADR obligations:** §12 lists the ADR-class decisions inside this spec. None is ratified until its `MMT-ADR` lands in lockstep with the canon change (per MMT-ADR-0000). Until then this document is direction, not law.
 
@@ -24,10 +24,30 @@ Each principle has a mechanism and a checkable form:
 | P2 | **Moments, not screens** — value arrives as a moment in the feed, not a destination to discover | Activity ledger rows → feed cards | No new feature ships as a destination screen if its value is a moment |
 | P3 | **Park-and-return is the magic** — "I don't get this, later" is honored and comes back | Existing primitives (parking lot, due-queue, `needs_deepening_topics`) surfaced through the feed + conversation | Park-and-return scenarios in the eval harness (`pnpm eval:llm`) **before** the exit funnel is dissolved; one scenario asserts a parked item surfaces within its window **even while higher-priority cards compete for the ≤3 feed slots** (backed by the §8.1 overflow affordance, EU-3); deterministic backstop in `/now` ranking (§8.1) |
 | P4 | **The mentor narrates the invisible machine** — the 58+ Inngest functions become visible as mentor activity | Activity ledger, **template-rendered by default; LLM only when genuinely personal** | Every ledger `templateKey` renders without an LLM call; LLM narration is an explicit opt-in per row kind |
+| P5 | **One input, two fates** — the bar and the mentor chat are one field; typed/spoken text is intent-matched **locally first** (confident match → instant deterministic jump, zero LLM/quota/latency; miss → mentor turn). The LLM never stands between the user and their data or a feature | Local intent-matcher in front of the bar; jumps resolve through the closed route catalog (§8.1); safety tripwire + metering tax only the conversational path | Every capability keeps a deterministic tap-path; bar jumps cost no LLM call; intent classification falls back to buttons when uncertain |
+| P6 | **Module discipline is a hard budget** — the feed is one anchor + ≤2 modules (the §8.1 ≤3 highlight ceiling), and **every module is an action, not an announcement** ("You were shaky on X" is banned; "Patch up X — 5 min" is a module). Non-actionable narration goes to the ledger, never the feed | `/now` ranking + overflow affordance (§8.1); ledger (§8.2) for narration | No card ships that cannot be phrased as a tappable next step; **the anchor is visually unique** — no module, *especially* the quota/upgrade module (the 402 path), ever shares its color, size, or focal position (for a minors product this is a compliance posture — vulnerable-consumer exploitation — not taste; Wizz's same-magenta "Add auto check-in" upsell is the canonical violation) |
+| P7 | **Reward by noticing, never by tokens** — motivation comes from a true state change witnessed by someone who remembers, never from anything countable (§2.1) | The noticing loop (§2.1): suggestion-loop closure, visible journey advancement, audible plan upgrades, momentary mentor-voiced celebration | No counters, streak pressure, leaderboards, or XP on the new shell; every celebratory beat traces to a real event (ledger row / retention delta); no engineered-random praise schedules |
 
 P2 and P4 share one mechanism (the ledger): P2 is what the user experiences, P4 is how the machine produces it.
 
 P3 is the one principle the deterministic floor cannot protect — re-weaving lives in the conversation layer and degrades silently. Hence the eval-coverage gate and the deterministic backstop.
+
+> **Superseded idea (recorded so it isn't re-proposed):** an earlier direction draft had the LLM ranking the feed ("LLM as mastermind"). §8.1's adversarially-reviewed ruling stands: **no LLM in the ranking path** — ranking is deterministic and template-rendered; the LLM's home is the teaching conversation. LLM-assisted ranking could only ever return as a later, separately-ruled rung.
+
+### 2.1 The noticing loop (P7 expanded) — ruled 2026-06-10
+
+The happiness kick for following the mentor's advice comes from **a true state change, witnessed by someone who remembers** — never from anything countable. Four channels, all backed by data that already exists:
+
+1. **The mentor closes its own suggestion loop with specific, memory-based noticing.** *"I asked you to patch up photosynthesis — you did, and it held. Last week you needed three hints; today, none."* Generic praise is worthless and kids smell it; specificity — proof someone was paying attention — is the kick. (The suggestion is in the activity ledger; the before/after is in retention data.)
+2. **The journey moves under their finger.** Complete the suggested review and the anchor card's arc advances *at that moment* — the node lights, "review due" steps toward "mastered." Not points: the real learning object changing state. Competence made visible can't be hollow, because it isn't a token *about* the learning — it *is* the learning.
+3. **Following advice audibly upgrades the plan.** *"Since that held, we can skip the easy run and go straight at the hard part Thursday."* Trust compounds visibly: doing what the mentor suggested makes the next suggestion better, and the learner is told why.
+4. **An embodied micro-celebration — the mentor visibly delights.** Warmth comes from the *mentor*, not system confetti: confetti is the app paying you; the dance is someone being happy about you. One-shot, tied to the event. Interim carrier (no avatar exists): the conversation surface itself — the celebratory message *arrives joyfully* (bubble motion, a small warm burst around the mentor's words) in the same beat as the journey node lighting. **Ruled: a mentor character WILL be built** — it grows out of the logo, requirement *"real and feel alive"*; owner: Zuzana, as a separate deliberate brand project, never a side effect of a feature. Two constraints ride into that brand work: (a) **"alive" means truth-caused** — the character's delight and reactions must be caused by real learner events; randomized idle cuteness pretending to be reaction kills "real"; (b) **the character never performs guilt, sadness, or disappointment to compel behavior** (the Duolingo owl's dark side = the minors-manipulation floor, DSA Art 25/28 / AADC). It may celebrate, think, wonder, wait — it does not sulk.
+
+**Credit flows to the learner, always.** Praise attributes the win to the learner's **own choice** — *"you decided to tackle it today; that was your call, and it paid off"* — never to obedience ("good job doing what I said"). The mentor celebrates *with*, never *at*, and gives the credit away every time; the learner should leave feeling "I make good choices," not "I follow instructions well."
+
+**Governing law:** rewards are **narrative and momentary, never accumulative, fungible, or comparable** — no counters, collections, or leaderboards — and every reward must reflect a *true* state change. Noticing is event-driven and honest, never an engineered-random schedule (variable-ratio praise = slot-machine mechanics). Truth-based feedback is pedagogy; token schedules engineered for compulsion are not.
+
+**Supersessions:** the calm **"on track" badge replaces streak display** on the new shell (no streak pressure on the feed), and the **backend-only XP system is killed, not wired** (resolves the atlas wire-or-kill flag → kill; the §8.3 retention-gate plan inherits the cleanup since XP status rides on `retention_cards` writers). Two motivation systems must not coexist and fight. **Dial-independence:** the assertiveness dial (§13.7) changes how firmly the mentor *proposes*; the noticing loop is how warmly it *responds* — strict mode never withholds warmth.
 
 ## 3. The shell — three tabs, every scope, no exceptions
 
@@ -49,6 +69,98 @@ Everyone sees the same three tabs. Tab *shape* never varies by role, age, mode, 
 **App-open lands on the Mentor tab as a card feed** (deterministic, instant), not auto-opened into chat. This rules the second-opinion doc's open fork as **option A** — the proposal is glanceable and the conversation is opt-in per session, preserving the deterministic floor.
 
 **Layout floor for the homework affordance (EU-5).** Option A foregrounds *app-proposed* work, but homework is the homework-kid's actual reason for opening the app (§4.1) — so the input bar's **camera + Homework chip must be reachable without scrolling past the feed** on app-open (pinned input bar; on a school-day / weekday-evening heuristic the Homework chip may surface above the card stack). The glanceable proposal and one-tap homework coexist; the feed must never bury the bar beneath the app's own agenda.
+
+### 3.1 Cold start — learner (ruled 2026-06-10)
+
+Day one, the **cold-start card takes the anchor slot** — one container (the Wizz one-card-one-live-object pattern) holding the input bar and three example chips as a single unit. With zero state the conversation *is* the best next action; the anchor slot is never empty and never shows a fake proposal. **Self-destruction is keyed to *first real state created*** (first subject or first completed exchange) — **not** to first app-open and not to "zero state": the kid who opens, stares, and closes gets the same warm elicitation tomorrow; once real state exists the card dies forever and proposals own the slot (an established learner who later archives everything is *not* re-greeted as a newbie — they have history, and the feed speaks to emptiness in its own voice).
+
+```
+        Hi — what do you want to work on?
+
+  ┌───────────────────────────────────────────┐
+  │  ┌─────────────────────────────────────┐  │
+  │  │ 🎤  Tell me anything…           [→] │  │
+  │  └─────────────────────────────────────┘  │
+  │   Not sure? Try one of these — or just    │
+  │   type:                                   │
+  │   [ 📷 Homework help ]                    │
+  │   [ ✨ Learn something ]                  │
+  │   [ 💬 Ask a question ]                   │
+  └───────────────────────────────────────────┘
+    one card = the anchor; input and chips
+    visually equal weight inside it
+```
+
+Rules (inline teaching, never a modal/coach-mark wall):
+
+1. **One card, equal weight inside — permitted *only because* chips fill, never fire.** Tapping a chip types its words into the input and lights the send arrow; the kid completes the send themselves — type-then-send enacted with training wheels. Under fill-semantics the chips are pre-typed phrases of the *one* control (autocomplete made visible), so equal size is honest. If chips ever became direct navigation, equal weight would silently turn the card into a four-way first-screen choice — the Duolingo failure this direction is built on. **The two decisions are coupled; never decouple them.**
+2. One caption: *"Tell me anything — homework, a question, or something you want to learn. I'll take you there."*
+3. The chips sit under an explicit *"…or just type"* — so chips read as **examples**, not as the boundary of what's possible.
+4. The chips **persist until the cold-start state dies** (first real state) — not a one-shot splash that vanishes on first tap or first keystroke.
+5. **Voice input everywhere** — the mic sits on this input and on every input in the product (typing is a barrier for exactly the audience the elicitation serves). Compliance invariant rides along: **voice is transcription-only — never tone/emotion analysis** (AI Act Art 5(1)(f) posture).
+
+**Homework path (the fill-don't-fire stress test).** "📷 Homework help" fills and sends like the others; the mentor's reply is **instant and dual-path**: *"Sure thing — snap a picture of it 📷. Or if you'd rather just ask, tell me about it here."* — camera as a big tappable affordance inside the reply, chat continuing underneath, so the kid taps the camera *or* keeps talking. No conversational preamble before the camera is offered ("what subject is it?" first = the failure mode). **Latency/directness here is an acceptance criterion, not styling**: slow, this is a worse homework app than a direct camera button would have been; fast, it *is* the thesis enacted — say what you need, the mentor takes you there.
+
+**Teaching durability (one demo is not assumed sufficient) — three ambient reinforcements, none modal:**
+
+1. **Chips fill, cards fire — forever.** Proposal cards (the anchor) stay one-tap direct actions — fill-friction there would be wrong. But any small suggestion chip near the input, on any day, fills — later with state-aware content (*"Review photosynthesis"* appearing as words in the box). The mechanic recurs for the life of the product; the kid sees their own situation phrased as something *they could have typed* every week, not once.
+2. **The placeholder rotates examples, including navigational ones** (*"Try: show my progress"*) — the breadth lesson, the only part chat doesn't teach by itself: after one session the kid knows they can type *to the mentor*; the placeholder teaches that the box also *goes places*.
+3. **The mentor says it once, in character, at the natural moment** — end of the first session: *"next time, just tell me what you need — anything."* Conversational, never a coach-mark.
+
+**Pre-committed tripwire (feeds the §11 S2 evidence gate):** the bet is named — *relationship-formation over job-completion at first touch* (a blank-box-first screen, against the Duolingo choice-hurts evidence). Measure cold-start activation: time-to-first-action + freeze-bounce rate (opened, no action, closed). If 13-year-olds stall at the box, the correction is **pre-agreed and limited**: an emphasis flip (chips become the visual lead, typing stays the escape) — not a redesign.
+
+Onboarding is thereby the product itself: the first subject is created through the first conversation, not a setup form.
+
+### 3.2 Cold start — supporter (ruled 2026-06-10)
+
+Branch on the child's **account state, not just type** — the managed/credentialized tier distinction (§6.2) is a real, deterministic fact the cold start reads for free: no LLM, no topology guessing, fully inside the deterministic floor. Three variants, each rendering **one anchor action**:
+
+| Child's account state | What it means | Supporter cold-start anchor |
+|---|---|---|
+| **Managed** | Profile the supporter created under their own account — no separate login, this device, profile-switch; consent granted inline at creation, never pending | **Handoff — a standing state, not an expiring command.** "Emma's all set — whenever she's ready, hand her the phone" (tap switches to Emma's learner scope; she lands on her own learner cold start, §3.1). Phrased as standing so the parent setting up while the child is at school hits no dead-end anchor; the card persists until Emma's first session. Remote-kickstart is meaningless — the child uses this device. |
+| **Credentialized · consent pending** | Child self-registered with own login/device; waiting on the parent's GDPR/COPPA approval | **Approve.** "Emma's waiting — approve her account so she can start →" — the legally-blocking action outranks everything and must be the anchor. (Fixes the atlas finding that consent actions hide behind buried screens.) |
+| **Credentialized · granted · no activity** | Own login/device, approved, hasn't started | **Remote kickstart + reassurance.** "Help Emma get started" + the honest line "Her recaps and progress appear here once she begins." **Kickstart never creates state in the child's account**: it sends a suggestion/encouragement into the kid's own feed, which the kid can act on or ignore — a parent-built subject in a teen's account would be the same agency violation Handoff guards against, one tier up. |
+
+Once a credentialized child has activity it is no longer cold start — the warm hub feed takes over. Rules baked in:
+
+- **No topology bet.** Don't pick a dominant device topology and optimize for it — detect the account state and serve the matching variant.
+- **Still one anchor per child** — the branching is server-side and invisible; the supporter always sees a single clear action (the P6 budget holds). The complexity lives in the selector, not the surface.
+- **Handoff hands off cleanly.** The managed child getting the phone gets their *own* learner elicitation, never a journey the parent pre-built — pre-picking the kid's subject quietly removes the learner agency the whole direction protects. (Optional supporter-side secondary: "…or set up her first subject first" — subordinate, never the anchor.)
+- **The branch is per child, not per supporter.** A supporter can have a managed 9-year-old and a credentialized 15-year-old; the hub composes one card per child, each with its state-appropriate action — these cards are just the empty-state instances of the hub's per-person modules, under the §8.1 per-edge fairness rule.
+- *Launch note:* per §6.2, only the credentialized tier is live at the 13+ launch, so **Approve** and **Kickstart** are the day-one variants; **Handoff** ships with managed-tier activation.
+
+**Variant zero — the supporter with no child yet** (the true day-one screen; this is §4.2 lifecycle state 1 made concrete). One anchor: add your child. Trust copy is **positive-only** — say what they get, never what they don't:
+
+```
+        Hi — who are you supporting?
+
+  ┌───────────────────────────────────────────┐
+  │            [ + Add my child ]             │   ← the anchor
+  │                                           │
+  │  You'll see her recaps, progress          │
+  │  and wins. And she always knows           │
+  │  what you see.                            │
+  └───────────────────────────────────────────┘
+```
+
+The artifact wall ("never her chats/notes") is deliberately **not** stated at the door — the full visibility contract, wall included, is disclosed in the **linking ceremony** (§6.2), where informed consent actually lives. Door sells, ceremony informs; nothing hidden, just sequenced.
+
+- **Parent-language tier dispatch.** Inside the add-child flow, one plain question does the managed/credentialized branch: *"Does Emma use her own phone and login?"* → yes → invite (→ linking ceremony → consent-pending card); no → create a profile on this device (managed path; ships with managed-tier activation). The parent never sees the words "managed" or "credentialized."
+- **One morphing card per child, not three screens** — the Wizz flight-card lifecycle: the same live object advances `invite sent → "Emma's waiting — review & approve" → "Help Emma get started" → warm feed (recaps)`. One card per child, one anchor on it, the anchor morphing with state.
+- **Approve reads as *review & approve*.** Urgency lives on the card ("Emma's waiting" — it genuinely blocks her); deliberateness lives in the flow: the tap lands in the linking ceremony (both sides shown the same contract), never a one-tap consent.
+- **Kickstart composes with the chips law (P5/§15.15).** "Help Emma get started" opens a short composer — pick/write/speak an encouragement, optionally attach a subject suggestion — delivered into **Emma's cold-start card as one more fillable chip**: `[ 💛 Zuzana suggested: French ]`, labeled with the **supporter's display name as established at the linking ceremony** (supporters are relationship-agnostic: parent, grandparent, coach — never assume "Mum"). Tapped, it types *"I want to learn French"* into **her** input for **her** to send: visible, warm, entirely hers to ignore. Kickstart creates a **chip, not a subject**. Existing nudge rate limits (4/24h, quiet hours) apply unchanged.
+- **Ghost preview in the empty state.** Alongside the reassurance line, one greyed sample recap card clearly labeled *"Example — this is what you'll see after her first session"* — teaches the value proposition at the moment the parent wonders what they signed up for, without faking data.
+- **Relation captured at linking (supporter-onboarding TO-DO).** The add-child/linking flow asks one more question: *"What's your relation to Emma?"* — **Parent / Sibling / Teacher / Other**. Stored as structured metadata **per-edge** (one person can be parent to one child and teacher to another; the identity-foundation edge model carries this for free). The child sees the claimed relation at the linking ceremony (*"Zuzana wants to support you as your teacher"*), which is what validates it. Uses: warmer kid-side rendering (*"Zuzana — your teacher — suggested: French"*), mentor context, disambiguation among several supporters; display name is the carrier for **Other** and the universal fallback. **Not wired to permissions or reporting tiers** — capture now; gating by relation would be a separate ruled decision.
+
+**Stale-idle arc — the card de-escalates; the screen's energy redirects to the supporter.** When a credentialized child stays inactive, escalation would route pressure through the parent onto the kid and poison the relationship the product depends on. Instead, by **visit count** in the granted-idle state:
+
+- **Visit 2–3 — status honesty, Wizz-style.** *"Your encouragement reached Emma. She hasn't started yet — most teens start within the first week, usually when homework gets hard."* Honest, expectation-setting, quietly coaching the parent on the realistic trigger. The nudge button is **not** re-armed as the anchor.
+- **Visit ~3 — "Start together."** *"Next time you're with her, open her first session side by side."* Converts the stalled remote kickstart into the Handoff pattern's co-presence move — the only honest escalation available.
+- **Visit 4 — "Try the learning experience yourself — and help Emma get on board."** The parent's own trial framed as helping Emma: they experience exactly what she'll see and become a credible advocate.
+- **Visit 5+ — if they still haven't tried it, nudge the supporter's own learning.** *"While you wait — learn something yourself?"* Their first session activates their **Me scope** (§4.2 state 3) and converts them into the adult self-directed learner persona (§4.1). The empty dashboard becomes their own product.
+- **Throughout and after — the quiet promise.** *"We'll let you know the moment Emma starts"* — and a push genuinely fires on her first session, so the parent doesn't need to keep checking an empty app. The ghost preview stays.
+- **Granularity is binary.** The parent sees only "hasn't started yet" — never "opened the app and bounced." Peek-level telemetry about a kid who hasn't entered the relationship reads as surveillance, invites "I saw you opened it!" confrontations, and brushes the chilling effect the §6 contract exists to prevent. The system may use the distinction **silently** to pick which guidance to show; it is never reported.
+- **Never:** guilt copy, streak-style pressure, an escalating nudge ladder, or the card growing louder with age.
 
 ## 4. Scope model — the chip
 
@@ -74,6 +186,8 @@ Today's matrix — guardian/learner tab shapes × V0/V1 × proxy mode × isOwner
 **Ruled: a supporter has no personal learner space until they actively start studying.** "Parent is a learner too by default" was rejected as behaviorally false — most supporters won't study, and a default scope with empty learner furniture is the design apologizing for itself.
 
 Keep hub and person scopes separate even with a single linked person — the hub answers "what should I, the supporter, know or do?" (addressed to me); the person scope answers "what is my relationship with Emma's learning?". Collapsing them re-creates parent-flavored re-renderings that drift.
+
+**Cross-scope attention in Me scope — a pointer, not a duplicate.** The dual-role adult (serious learner + supporter) who lands in Me by last-active default (state 3 above) must not *miss* a struggling child by virtue of studying diligently. Reconciliation: the Me feed may carry one compact **pointer module** — *"1 thing needs you in the Support hub"* — under the standard P6 budget, linking into the hub. It points, never duplicates, so the hub/Me separation holds while the signal can't be starved. (This resolves the earlier direction-draft idea of blending family-attention items directly into the Me feed — superseded by the hub model + pointer.)
 
 **Link revocation is a fourth lifecycle state (EU-7).** Because a credentialized person owns their own rights (§6.2), they can **end sharing** at any time — and today the *only* revocation path in code is guardian-initiated for managed under-13 accounts (`apps/api/src/inngest/functions/consent-revocation.ts`), so kid-initiated revocation is net-new for the 13+ tier. When a supportee revokes: the supporter sees a plain hub card ("Emma ended sharing") — **never a silent disappearance** — the person scope retires from the chip, and an S5-specced grace/notice window governs the handoff. The supportee-side flow (kid-initiated unlink, confirmation, exactly what the supporter will be told) is an S5 deliverable and a **safety/autonomy** surface, not merely an admin action. Managed-tier revocation stays guardian-initiated per the existing consent-revocation flow.
 
@@ -181,9 +295,9 @@ The scope chip, edges, managed/credentialized types, and the visibility contract
 
 **Concrete contract for "identity-independent."** The S0 ledger uses `profileId` (not `personId`/`edgeId`) precisely so it ships before identity-foundation (§8.2). The only identity-foundation touch in the early phases is a **mechanical column repoint** (`profileId → personId`, add `edgeId`) folded into the S4 identity migration — no early phase reads or writes `person`/`edge`/`membership` tables, which do not yet exist in code (they are ratified *design only* in `docs/canon/identity/`; execution is blocked on the baseline reset + `WI-530`). If any S0–S3 deliverable is found to need an edge/person read, it is **misclassified** and must move to S4.
 
-## 10. Rulings imported from / exported to the second-opinion doc
+## 10. Rulings imported from the second-opinion / DIRECTION lineage
 
-The [frequencies synthesis](../reviews/2026-06-09-codebase-atlas/one-screen-second-opinion.md) is adopted whole: proposal+chat is the product, the registry/route-catalog is the engine, the palette is demoted to search-first Library surfaces, progressive disclosure is hygiene, Pulse-style proactive outreach waits (passive cards only — pushing nudges at minors brushes the DSA Art 25/28 manipulation floor). Its open fork (A: Home-with-card vs B: open-into-chat) is **ruled A** by this spec (§3).
+The frequencies synthesis (and the interim DIRECTION-one-surface record that consolidated it; both dissolved into this spec and deleted 2026-06-10) is adopted whole: proposal+chat is the product, the registry/route-catalog is the engine, the palette is demoted to search-first Library surfaces, progressive disclosure is hygiene, Pulse-style proactive outreach waits (passive cards only — pushing nudges at minors brushes the DSA Art 25/28 manipulation floor; rung-2 proactive outreach is deferred with its own future consent/annoyance budget, and rung-1 passive cards do **not** assume it). Its open fork (A: Home-with-card vs B: open-into-chat) is **ruled A** by this spec (§3). Annex D records the evidence base and the two superseded ideas from that lineage.
 
 ## 11. Strangle sequencing
 
@@ -220,6 +334,7 @@ ADR-class decisions in this spec (per the MMT-ADR-0000 significance gate), to be
 4. **Journal naming + trust copy (EU-9)** — "Journal" vs "Notebook" (kid-test at S3; default Journal). **Test the name together with the kid-facing trust copy** ("your space is private, unless you're not safe," §6.1) — the privacy promise only lands if the kid reads the named surface as legibly *theirs*.
 5. **Managed-tier launch activation** — the managed (under-13) tier is *built* in S5 but its **go-live is gated on the separate 10–12 audience decision** (launch floor is 13+; §6.2 launch-audience note). Owner: product. Blocks managed-tier *activation*, not the S5 build.
 6. **Evidence-gate threshold (S2 → S3)** — the exact discovery/engagement metric and bar that authorizes S3+ (e.g. feed-card engagement vs V1 baseline, screens-reached delta). Owner: product. Blocks S3, not S0–S2.
+7. **Assertiveness dial** — the default tone of the mentor's proposals and who moves it. Recommendation on the table (not yet ruled): **calm default** (invitation, not summons — no deadline means "study now" reads as nagging); a **two-position user-set dial** (*relaxed / push me*) set conversationally — the mentor asks at a natural moment ("want me to be strict with you?") — and mirrored in settings; **never age-inferred** (profiling-adjacent for minors); mechanics are dial-independent (honesty, P6 budget, no guilt copy — and per §2.1, strict never withholds warmth). Two positions, not a slider: each extra position multiplies copy templates across 10 conversation languages. Owner: product (Zuzana). Blocks S1 copy templates only.
 
 ## 14. Failure modes
 
@@ -259,6 +374,12 @@ For traceability — all ruled in conversation with the product owner:
 11. **One-surface vs three-tab fork — ruled three tabs (2026-06-10).** A minimal "Mentor surface only, with Subjects/Journal as mentor-summoned sheets" variant was considered and **rejected** on two grounds: (a) **build cost** — it is *more* expensive, not less; the content surfaces are built either way, but the sheet-summon chassis is bespoke and fights both the repo's cross-stack-push guardrail and the `GET /now` ancestor-chain deep-link design (§8.1), whereas three tabs use the platform's standard, already-spoken container; (b) **persona coverage** — the adult self-directed learner (§4.1) wants Subjects and Journal as full, persistent tabs. The homework-kid's "one surface" feel is delivered instead via **content/proactivity defaults** (let the feed carry everything; don't push the unused tabs), not via a custom chassis — user benefit without the engineering cost.
 12. **Adult self-directed learner is a first-class persona (2026-06-10)** — not kid-plus-parent only; the segment served worst by today's family-shaped matrix and the primary justification for the three-tab shell (§4.1).
 13. **Program is not committed as a unit (2026-06-10)** — S1+S2 ship-and-measure behind the flag; S3–S6 gated on discovery evidence + (for S4+) identity-foundation (§11 evidence gate). The discovery thesis is atlas-inferred, not telemetry-measured.
+14. **Cold start — both sides ruled (2026-06-10).** Learner: one cold-start card — input bar + three example chips (📷 homework / ✨ learn / 💬 ask) at equal visual weight, chips **fill** the input rather than fire; homework chip answered by an instant dual-path mentor reply (camera affordance + keep-chatting, no preamble — latency is an acceptance criterion); self-destructs on **first real state created**, not first run. Supporter: per-child deterministic branch on account state — **Handoff** (managed; standing phrasing, persists until the child's first session) / **Approve** (consent-pending; the legally-blocking anchor) / **Kickstart** (granted-idle; **never creates state in the child's account**). Pre-committed S2 tripwire: freeze-bounce + time-to-first-action; correction limited to an emphasis flip. Fine-tuned same day: variant-zero add-child screen (parent-language tier dispatch — "does she use her own phone and login?"; **positive-only trust copy at the door**, full contract incl. the artifact wall disclosed at the linking ceremony); one **morphing per-child card** (Wizz flight-card lifecycle: invite → approve → kickstart → warm feed); Kickstart delivers a **fillable chip into the child's cold-start card** (creates a chip, not a subject); labeled ghost-preview recap in the empty state; relation captured at linking (Parent/Sibling/Teacher/Other, stored **per-edge**, child-validated at the ceremony, not wired to permissions). Full text: **§3.1 (learner) / §3.2 (supporter)**.
+15. **"Chips fill, cards fire" is a permanent interaction law (2026-06-10)** — suggestion chips near the input always type into it (the teaching mechanic recurs with state-aware content for the life of the product); proposal cards stay one-tap direct actions. Equal chip/input visual weight is **coupled** to fill-semantics — never decouple. Placeholder rotates examples incl. navigational ones; the mentor teaches "just type anything" once, in character, at end of first session.
+16. **Voice input everywhere (2026-06-10)** — a mic on every text input in the product; **transcription-only, never tone/emotion analysis** (AI Act Art 5(1)(f) posture).
+17. **Motivation = the noticing loop, not gamification (2026-06-10, P7/§2.1).** Reward for following the mentor's advice comes from a true state change witnessed by someone who remembers: the mentor closes its own suggestion loop with specific memory-based noticing, the journey arc advances at the completion moment, following advice audibly upgrades the plan, plus a momentary mentor-voiced celebration (interim: lives in the conversation surface — message arrives joyfully; **ruled same day: a logo-derived mentor character WILL be built** — separate brand project, owner Zuzana, requirement "real and feel alive," constraints: emotions truth-caused only, never guilt/sulk-to-compel). **Credit always attributed to the learner's own choice, never obedience.** Governing law: narrative + momentary, never accumulative/fungible/comparable; truth-based only; no engineered-random praise schedules (DSA 25/28 posture). Implies: "on track" badge replaces streak display on the new Home; backend-only XP is **killed, not wired**. Dial-independent (strict ≠ cold).
+18. **Supporter stale-idle arc (2026-06-10)** — when a linked child stays inactive, the per-child card **de-escalates by visit count** instead of escalating: status honesty (v2–3) → "Start together" (v3) → "Try it yourself and help her get on board" (v4) → nudge the supporter's own learning (v5+, activates their Me scope per ruling 6) → quiet card + "we'll tell you the moment she starts" push promise. Parent-visible state is **binary** ("hasn't started") — opened-vs-never-opened is never reported, only used silently to select guidance. No guilt copy, no nudge ladder. Full text: **§3.2**.
+19. **Role-noun stays "mentor" everywhere; no age-split "mate" (2026-06-10).** An under-18 rename to "mate" was considered and rejected: the mentor/mate pun exists only in English (dies across the other 9 conversation languages → per-locale invented nouns or an English-only feature); "mate" claims peer-intimacy the product must *earn* through behavior (the §2.1 noticing loop) — teens are maximally try-hard-sensitive; and renaming the relationship's other party at the 18th birthday breaks the continuity the retention thesis rests on. The warmth the rename reached for is delivered instead by the **mentor character's name** (§2.1 — kids bond with named characters, not role-nouns); "mentor" remains the single role-noun in contracts, supporter copy, and settings. (The brand name **MentoMate** carries the pun globally as a *name*, where it needs no translation.)
 
 ---
 
@@ -364,3 +485,22 @@ Applied after an adversarial pass taken from the **learner's chair** and the **s
 | EU-7 | Medium | Credentialized kid's right to revoke the link is unspecced; today's only revocation is guardian-initiated for managed under-13 (`consent-revocation.ts`) | §4.2 (fourth lifecycle state — kid-initiated unlink, non-silent supporter notice, grace window), §14 (ends-sharing row) |
 | EU-8 | Low | Supporter "decline" (P1) semantics undefined — could silently clear a real attention signal | §6.3 (decline = acknowledge/snooze, re-surfaces while condition persists) |
 | EU-9 | Low | Journal/Notebook name (§13.4) deferred separately from the kid-facing trust copy it has to carry | §13.4 (test name + trust copy together) |
+
+---
+
+## Annex D — Design evidence & DIRECTION-doc dissolution (2026-06-10)
+
+The interim direction record (`docs/reviews/2026-06-09-codebase-atlas/DIRECTION-one-surface.md`) was fully dissolved into this spec on 2026-06-10 and deleted (it was never committed; this spec is its sole record). Disposition: its P1–P8 principles became §2 P5–P7 + §2.1 (P1/P3/P4 were already covered by §3/§8.1/§7); its cold-start rulings became §3.1/§3.2; its scope-model section was already §4 (its "deliberate blend" superseded by the §4.2 pointer module); its build order is subsumed by §11. Two ideas from that lineage are **superseded, recorded so they aren't re-proposed**: LLM-ranked feed (→ §2 note: ranking is deterministic) and family-attention items blended directly into the Me feed (→ §4.2 pointer module).
+
+**Evidence base — what each researched app taught, and what we reject:**
+
+| Pattern | Exemplar | What we take | What we reject |
+|---|---|---|---|
+| Server-driven **modular home** | **Vipps** | one anchor action + contextual modules, reorderable with no app release; rare stuff pushed away, not deleted | org-driven module free-for-all (their driver was team autonomy) |
+| **Live-object home** | **Wizz Air** | home built around the one live journey-object + its single time-stamped next action ("Check in now · 2 days left"); status surfaced proactively ("on-time" → our "on track" badge); deep features inside the object; tiny nav; cheap warmth; the **morphing lifecycle card** (§3.2) | airline-grade upsell on the home ("Add auto check-in", same magenta as the real action — the §2 P6 anchor-uniqueness anti-pattern). *Limit of the analogy:* a flight is one linear object with a deadline; learning is many concurrent threads with none — so we must **rank which object is live** (Wizz gets it free) and **can't borrow its assertiveness** (no deadline = "study now" reads as nagging; see §13.7) |
+| **Single guided path** | **Duolingo** | Home = one proposed next step, not a menu (they killed their explorable tree because choice hurt learners) | the curriculum prison / zero agency — our proposal is always escapable into conversation; and the owl's guilt mechanics (§2.1: the character never sulks) |
+| **Command palette** | Notion / Linear / Slack | search-first archive surfaces; the *one-input* fusion (§2 P5) | palette as centerpiece — a desktop power-user pattern; on mobile for a 13-year-old it degrades to "a search bar" |
+| **Contextual home + progressive disclosure** | super-apps / NN-g | show by relevance, hide by infrequency (admin behind the avatar, §3) | nothing — hygiene, adopted silently |
+| **Proactive AI** | ChatGPT Pulse / Meta brief | passive cards drawn from data that already exists (rung 1) | unprompted push to **minors** — foundation-killer; rung-2 outreach deferred with its own consent budget (§10) |
+
+The differentiator neither Duolingo nor ChatGPT has: **Duolingo's home without its prison** — a proposed next step that is always escapable into a steerable mentor relationship.

@@ -116,3 +116,6 @@ The agents' discovery was excellent (real files, real line numbers, real issues)
 
 ### Full domain summaries
 See each `atlas/*.md` for screen→task→backend(file:line) maps, navigation-depth tables, and per-domain consolidation targets. The 15 summaries are the substrate for the one-screen redesign.
+
+### Redesign direction (2026-06-10)
+- The canonical direction now lives in the [mentor-is-the-app spec](../../specs/2026-06-09-mentor-is-the-app-shell-redesign.md). Two interim records produced during the 2026-06-09/10 brainstorm — the parallel-session frequencies synthesis (`one-screen-second-opinion.md`) and the direction record (`DIRECTION-one-surface.md`) — were **fully dissolved into the spec** (§2 P5–P7, §2.1 noticing loop, §3.1/§3.2 cold starts, §4.2 pointer module, §13.7, §15.14–19, Annex D) and deleted on 2026-06-10; both are recoverable from git history. Open in the spec's §13: the assertiveness dial (13.7) plus six phase-gates.
