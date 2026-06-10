@@ -10,14 +10,86 @@
 
 > Counts verified 2026-06-01. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
+## How to Work
+
+Universal operating rules, harness-agnostic. They bias toward caution over speed — for genuinely trivial tasks (typo, one-line doc fix), use judgment and skip the ceremony.
+
+### Think before acting
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### Simplicity first
+
+**Minimum solution that addresses the problem. Nothing speculative.**
+
+- No features beyond what was asked. No abstractions for single-use code. No "flexibility" or "configurability" that wasn't agreed.
+- Test: would a senior practitioner call this overcomplicated? If yes, simplify.
+
+### Surgical changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+- Don't "improve" adjacent code, comments, or formatting. Don't refactor what isn't broken. Match existing style, even if you'd do it differently.
+- Notice unrelated dead code or stale text? Mention it — don't delete it.
+- Remove imports/variables/functions that *your* changes orphaned; leave pre-existing dead code.
+- Test: every changed line traces directly to the request.
+
+### Goal-driven execution
+
+**Define success criteria. Loop until verified.**
+
+- Turn tasks into verifiable goals: "fix the bug" → "write a test that reproduces it, make it pass"; "refactor X" → "tests green before and after".
+- For multi-step work, state a brief plan with a check per step.
+- Never assume your changes work — verify before claiming done.
+
+### Output conventions
+
+How to talk to the users: they run 7–8 parallel sessions and cannot hold opaque IDs in their head, and they lose time digging the signal out of long replies. These rules fix that.
+
+#### Naming opaque references
+
+On the **first mention per message** of any identifier whose meaning isn't reconstructable from context — migration numbers, stage/phase codes (`T1`, `E3`), ADR/WI/ticket IDs, feature flags, history-laden table/column names — never write the bare token. Expand it telegraphically, caveman style (dense fragments, dashes, no filler verbs):
+
+> **`ID` — what it is; where it sits in any sequence; what it does / why it matters; current state**
+
+Example — not "deferred to T1 revert" but "deferred to **`T1` — stage 1 of the old 6-stage identity migration; wired no readers; now being reverted**." Later mentions of the same token in the same message stay bare. Don't expand self-describing names; don't re-expand a token twice in one message.
+
+#### Closing summary
+
+End every substantive reply with a roundup block so the signal isn't buried in prose, using bracketed-caps headers so each section reads as a distinct element. Skip only for trivial one-line exchanges.
+
+Four standard buckets (below). **Show a bucket only when something genuinely fits it** — omit empty ones, never pad with "N/A". The four are defaults, **not a cage**: add another bracketed section (e.g. `[ RISK ]`, `[ BLOCKED ON ]`) whenever real content fits a category these four don't cover. Be conservative, and don't create elements just to fill up a bucket. Only genuinely useful information or required actions or decisions should be listed. **Never repeat the same information in several buckets**; an output is either informational, requires action or requires decision
+
+```
+---
+**[ BOTTOM LINE ]** <one sentence — the conclusion or current state>
+
+**[ FYI ]** <no action needed; omit if empty>
+- <happened / worth knowing / bears watching>
+
+**[ ACTIONS ]** <things to do that aren't forks — run X, approve Y, optional; omit if none>
+1. <concrete, actionable without rereading the body>
+
+**[ DECISIONS ]** <forks that block progress until ruled; omit if none>
+1. <the choice to rule on — name the recommended option>
+```
+
+Sorting test: **DECISIONS** = "I can't responsibly continue until you choose"; **ACTIONS** = "a task or option that doesn't gate the main thread." `[ DECISIONS ]` goes **last** (the gate, under the cursor at reply time); number DECISIONS and ACTIONS independently so "Decision 2" and "Action 1" never collide. Don't pad — one honest sentence beats three hedged ones.
+
 ## Initialization
 
 1. Read this file before editing.
 2. Start with the relevant plan/spec if one exists for the task.
-3. Use `docs/project_context.md` for repo-specific implementation rules.
-4. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
-5. For the cross-layer map of canon / ADRs / specs / registers, see the documentation index: [`docs/INDEX.md`](docs/INDEX.md). *(Seeded 2026-06-08 — identity-foundation canon is fully indexed; estate-wide population is in progress.)*
-6. For substantial repo work, durable decisions, repeated feedback, or any request involving "memory", load the project-memory skill from `.agents/skills/project-memory/SKILL.md` and follow its workflow. Memory lives in `.claude/memory/MEMORY.md` plus topic files.
+3. Use [`CONTEXT.md`](CONTEXT.md) for standard terminology.
+4. Use `docs/project_context.md` for repo-specific implementation rules.
+5. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
+6. For the cross-layer map of canon / ADRs / specs / registers, see the documentation index: [`docs/INDEX.md`](docs/INDEX.md). *(Seeded 2026-06-08 — identity-foundation canon is fully indexed; estate-wide population is in progress.)*
+7. For substantial repo work, durable decisions, repeated feedback, or any request involving "memory", load the project-memory skill from `.agents/skills/project-memory/SKILL.md` and follow its workflow. Memory lives in `.claude/memory/MEMORY.md` plus topic files.
 
 Memory is context, not law. If memory conflicts with this file, current docs, code, or explicit user instructions, follow the higher-priority source and update/archive the stale memory when appropriate.
 
@@ -53,40 +125,6 @@ Non-negotiable when working any Cosmo Work Item (WI). Each rule is a **trigger �
 - **Close only via review + QA.** WHEN a WI is to be closed → only through `/cosmo:review` incorporating `/cosmo:qa` verification evidence. No agent-asserted closes.
 - **Reference WIs as ID + name.** WHEN you reference a WI in user-facing output (table, list, prose) → include **both** the `WI-NN` ID **and** a brief name in the same reference (e.g. `WI-529 (Cosmo agent-op rules snippet)`). Format is your judgment — column, inline, list, whatever fits — but both pieces must be present so the reader can act without a lookup. Bare IDs are uncopyable; bare names unactionable. See the ZDX standard's *Agent output conventions* (conformance) for examples.
 <!-- ZDX-PROJECT-RULES:END -->
-
-## Output Conventions
-
-How to talk to the users: they run 7–8 parallel sessions and cannot hold opaque IDs in their head, and they lose time digging the signal out of long replies. These two rules fix that. (Trialed here project-local; promote to global config if it works.)
-
-### Naming opaque references
-
-On the **first mention per message** of any identifier whose meaning isn't reconstructable from context — migration numbers, stage/phase codes (`T1`, `E3`), ADR/WI/ticket IDs, feature flags, history-laden table/column names — never write the bare token. Expand it telegraphically, caveman style (dense fragments, dashes, no filler verbs):
-
-> **`ID` — what it is; where it sits in any sequence; what it does / why it matters; current state**
-
-Example — not "deferred to T1 revert" but "deferred to **`T1` — stage 1 of the old 6-stage identity migration; shipped empty org/membership tables, wired no readers; now being reverted**." Later mentions of the same token in the same message stay bare. Don't expand self-describing names; don't re-expand a token twice in one message.
-
-### Closing summary
-
-End every substantive reply with a roundup block so the signal isn't buried in prose, using bracketed-caps headers so each section reads as a distinct element. Skip only for trivial one-line exchanges.
-
-Four standard buckets (below). **Show a bucket only when something genuinely fits it** — omit empty ones, never pad with "N/A". The four are defaults, **not a cage**: add another bracketed section (e.g. `[ RISK ]`, `[ BLOCKED ON ]`) whenever real content fits a category these four don't cover. Be conservative, and don't create elements just to fill up a bucket. Only genuinely useful information or required actions or decisions should be listed.
-
-```
----
-**[ BOTTOM LINE ]** <one sentence — the conclusion or current state>
-
-**[ FYI ]** <no action needed; omit if empty>
-- <happened / worth knowing / bears watching>
-
-**[ ACTIONS ]** <things to do that aren't forks — run X, approve Y, optional; omit if none>
-1. <concrete, actionable without rereading the body>
-
-**[ DECISIONS ]** <forks that block progress until ruled; omit if none>
-1. <the choice to rule on — name the recommended option>
-```
-
-Sorting test: **DECISIONS** = "I can't responsibly continue until you choose"; **ACTIONS** = "a task or option that doesn't gate the main thread." `[ DECISIONS ]` goes **last** (the gate, under the cursor at reply time); number DECISIONS and ACTIONS independently so "Decision 2" and "Action 1" never collide. Don't pad — one honest sentence beats three hedged ones.
 
 ## Git Commits
 
@@ -354,7 +392,9 @@ Contested, hard-to-reverse architecture/product decisions are recorded as **Arch
 
 ## Secrets Management
 
-All secrets are managed through Doppler. Assume the `doppler` CLI is installed and on PATH. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or platform-specific secret management. When secrets need to be set, say "add to Doppler."
+All project secrets are managed through Doppler. Do not confuse with Zwizzly/ZDX secrets (e.g. `NOTION_TOKEN`), which are managed through Infisical.
+
+Assume the `doppler` CLI is installed and on PATH. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or platform-specific secret management. When secrets need to be set, say "add to Doppler."
 
 ## PR Review & CI Protocol
 
@@ -428,7 +468,7 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-06-09
+Last updated: 2026-06-10
 
 <!-- BEGIN ZDX:project-rules (managed — source: zdx-marketplace cosmo plugin reference/project-rules-snippet.md; synced by the WI-448 PROP engine. Do not hand-edit inside these markers.) -->
 ## Working a Cosmo Work Item
