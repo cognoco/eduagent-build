@@ -22,7 +22,11 @@ const BACKFILL_SQL = readFileSync(
 );
 
 const databaseUrl = process.env.DATABASE_URL ?? null;
-const describeIntegration = databaseUrl ? describe : describe.skip;
+// WI-569 (W0 baseline reset): migration 0106 (identity_t1_org_membership) was removed
+// from the effective chain. These tests validate T1 invariants against organizations/
+// memberships which no longer exist in the effective chain. Skipped until W1 schema
+// cleanup rewrites them against the new identity tables (person/login/organization/membership).
+const describeIntegration = databaseUrl ? describe.skip : describe.skip;
 
 describeIntegration('[Identity T1] membership invariants', () => {
   let db: Database;
