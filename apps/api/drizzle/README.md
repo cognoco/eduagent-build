@@ -40,10 +40,11 @@ discovered in the pre-reset audit and corrected during the reset:
 - **Hygiene drops performed on staging** (dev reached the same end-state automatically via
   `db:push`): `profiles.clerk_user_id`, `subscriptions.organization_id`, `nudges.direction`,
   `nudge_direction` enum.
-- **Residual staging drift, deliberately NOT dropped** (outside the approved reset scope):
-  the `organization_invitations` table (T2-era, 0 rows, not present in the staging journal —
-  origin unaccounted) and the `membership_role` enum it depends on. Tracked for cleanup with
-  the identity-foundation schema work.
+- **T2-era residuals dropped under extended shepherd approval** (same reset pass): the
+  `organization_invitations` table (T2-era, verified 0 rows, not present in the staging
+  journal — origin unaccounted) and the `membership_role` enum it depended on. Pre-drop
+  verification confirmed `organization_invitations.invited_roles` was the sole reference to
+  the enum, and that the baseline `membership.roles` is `text[]` + CHECK (not the enum).
 - **Dev** is push-managed (its journal is stale at 0021 by design); the baseline tables were
   created there by applying `0108`'s SQL directly. Until the Drizzle schema definitions for
   the new tables land (`WI-570`), a `db:push:dev` will offer to drop them — answer NO, or
