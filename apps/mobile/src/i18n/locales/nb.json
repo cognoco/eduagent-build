@@ -309,7 +309,8 @@
     "accommodation": {
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "guideActive": "Aktiv",
-      "childScreenTitle": "{{name}}s læringsinnstillinger"
+      "childScreenTitle": "{{name}}s læringsinnstillinger",
+      "sectionHeader": "Din læringstilpasning"
     },
     "learningPreferences": {
       "sectionHeader": "Din læring",

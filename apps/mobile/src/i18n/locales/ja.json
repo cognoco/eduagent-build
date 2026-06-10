@@ -309,7 +309,8 @@
     "accommodation": {
       "notSureWhichToPick": "どれを選べばいいかわからない？",
       "guideActive": "アクティブ",
-      "childScreenTitle": "{{name}}の学習設定"
+      "childScreenTitle": "{{name}}の学習設定",
+      "sectionHeader": "あなたの学習サポート"
     },
     "learningPreferences": {
       "sectionHeader": "あなたの学習",

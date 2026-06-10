@@ -309,7 +309,8 @@
     "accommodation": {
       "notSureWhichToPick": "¿No estás seguro de cuál elegir?",
       "guideActive": "Activo",
-      "childScreenTitle": "Preferencias de aprendizaje de {{name}}"
+      "childScreenTitle": "Preferencias de aprendizaje de {{name}}",
+      "sectionHeader": "Tu adaptación de aprendizaje"
     },
     "learningPreferences": {
       "sectionHeader": "Tu aprendizaje",

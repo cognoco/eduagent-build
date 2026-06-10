@@ -334,7 +334,8 @@
     "accommodation": {
       "notSureWhichToPick": "Não tem certeza de qual escolher?",
       "guideActive": "Ativo",
-      "childScreenTitle": "Preferências de aprendizagem de {{name}}"
+      "childScreenTitle": "Preferências de aprendizagem de {{name}}",
+      "sectionHeader": "Sua acomodação de aprendizagem"
     },
     "learningPreferences": {
       "sectionHeader": "Seu aprendizado",
