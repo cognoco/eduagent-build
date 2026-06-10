@@ -176,10 +176,15 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   Cosmo (Backlog, 15 open blockers), but the operator has waived waiting for the
   rewrite's execution start — W1 proceeds **shepherded** (a shepherd session runs
   pick/refine/brief/track; executors in isolated worktrees).
-- **In execution: WI-569 (baseline reset)** — executor sub-agent dispatched
-  2026-06-10 (`wi569-executor`, Sonnet, `.worktrees/WI-569`), running the
-  executor protocol with a hard pre-reset stop: it must report the exact dev/
-  staging reset commands to the shepherd and wait for go before executing them.
+- **In execution: WI-569 (baseline reset)** — PR #845 GREEN (9/9 checks, commit
+  `3fd5b85c8`); chain shape shepherd-verified against MMT-ADR-0012 + master plan
+  (0106 AND 0107 out of the journal, 0108 single baseline; legacy tables retained
+  for the tail by design). Pre-reset HARD STOP passed 2026-06-10: shepherd issued
+  **conditional go** — read-only journal/T1-table verification on dev + staging
+  first, decision matrix (clean → proceed; stale empty plural T1 tables → drop
+  only `"organizations"`/`"memberships"`; anything else → stop), post-reset
+  evidence (staging migrate clean re-run), then `/cosmo:execute complete`.
+  PR #845 stays UNMERGED — merge is an operator/shepherd seam at review.
 - **Refined and queued: ALL of W1** — WI-570, WI-571, WI-572, WI-573 are
   Ready + Assisted as of 2026-06-10 (570/571/572 bridged per the §2 ruling;
   children WI-591/592, WI-594/595, WI-596/597). Execution order on dependency
