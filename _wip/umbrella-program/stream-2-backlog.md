@@ -234,8 +234,8 @@ Recorded in their runway context; they resolve here:
 Nine `.claude/memory/` files hold **documentation-grade truth absent from every counting
 doc** (canon / ADRs / AGENTS.md / CONTEXT.md / spine trio). Dispositioned DRAIN by the
 WI-387 triage workflow (adversarially verified; full evidence + per-file rationale:
-nexus `_WIP/zdx-productionization/_state/2026-06-10-wi-387-memory-triage-results.md`
-§ DRAIN backlog) and operator-confirmed 2026-06-10. **Extract-before-cleanup applies:**
+`supporting-artefacts/memory-cleanup.md`
+§ DRAIN backlog — moved into this repo 2026-06-10) and operator-confirmed 2026-06-10. **Extract-before-cleanup applies:**
 each memory stays in place until its content lands in the named target; WI-387 then
 archives it or reduces it to a pointer.
 
