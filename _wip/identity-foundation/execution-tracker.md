@@ -78,6 +78,15 @@ tables/readers dropped, full project grep clean, tests green post-drop.
 
 ### Operator rulings (standing for this initiative)
 
+- **2026-06-10 — Merge authority granted to the shepherd (Jorn), conditional.**
+  The shepherd may merge an IF work-item PR once the WI has reached
+  `Stage=Reviewing` via `/cosmo:execute complete`, **provided the shepherd
+  independently re-verifies the PR is really green at merge time** — not from
+  the executor's report: run `gh pr checks` (all checks pass, none pending),
+  confirm no unresolved blocker/must-fix/should-fix review findings, and sanity-
+  check `gh pr diff` shape against the WI scope. Merge ≠ close: `/cosmo:review`
+  remains the operator's gate.
+
 - **2026-06-10 — WP DoR bridging is pre-approved, blanket (Jorn).** Top-down-sliced
   WPs fail the bottom-up WP DoR mechanically (see WI-593). For every remaining IF
   WP (WI-571…586), the shepherd applies the bridge **without asking per WP**:
