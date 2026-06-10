@@ -1,3 +1,4 @@
+export * from './identity';
 export * from './profiles';
 export * from './subjects';
 export * from './sessions';

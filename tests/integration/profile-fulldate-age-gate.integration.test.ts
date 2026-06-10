@@ -1,14 +1,16 @@
 /**
  * Integration: WI-297 — Exact-age gate at profile creation using full birth date
  *
- * Today (year-only): birthYear = currentYear - 11 computes as age 11 (allowed).
- * With full date: if birthday is later this year, exact age is still 10 (blocked).
+ * Today (year-only): birthYear = currentYear - 13 computes as age 13 (allowed).
+ * With full date: if birthday is later this year, exact age is still 12 (blocked).
+ *
+ * WI-570: v1 13+ floor replaces the original 11+ floor. All boundary values updated.
  *
  * Validates:
- * 1. [BREAK] POST /v1/profiles with full birth date where child is still 10
- *    (birthYear = currentYear-11 but birthMonth/birthDay > today) → 422 / age violation
- * 2. POST /v1/profiles with full birth date where child is exactly 11 today → 201
- * 3. POST /v1/profiles without birthMonth/birthDay (year-only fallback) → 201 for year-11
+ * 1. [BREAK] POST /v1/profiles with full birth date where child is still 12
+ *    (birthYear = currentYear-13 but birthMonth/birthDay > today) → 400 / age violation
+ * 2. POST /v1/profiles with full birth date where child is exactly 13 today → 201
+ * 3. POST /v1/profiles without birthMonth/birthDay (year-only fallback) → 201 for year-13+
  *
  * No internal mocks — real DB via doppler run -c dev DATABASE_URL.
  */
@@ -49,23 +51,23 @@ afterAll(async () => {
 });
 
 describe('Integration: WI-297 — profile creation full-date age gate', () => {
-  it('[break-test] child still 10 by exact date (year-only=11) is rejected as below minimum age', async () => {
-    // birthYear = currentYear - 11, but with a future birthday (Dec 31)
-    // → exact age is 10 (birthday not yet reached this year).
-    // Year-only would compute 11 (allowed), but full-date must catch this.
+  it('[break-test] child still 12 by exact date (year-only=13) is rejected as below minimum age', async () => {
+    // WI-570: v1 13+ floor. birthYear = currentYear - 13, but with a future birthday (Dec 31)
+    // → exact age is 12 (birthday not yet reached this year).
+    // Year-only would compute 13 (allowed), but full-date must catch this.
     const today = todayUTC();
 
     // Only run the "future birthday" assertion when today is before Dec 31.
-    // On Dec 31 itself, birthday-this-year = today, so exact age = 11 (not under).
+    // On Dec 31 itself, birthday-this-year = today, so exact age = 13 (not under).
     // We need a birthday that is strictly after today.
     const birthMonth = today.month === 12 && today.day === 31 ? 12 : 12;
     const birthDay = today.month === 12 && today.day === 31 ? 31 : 31;
-    const birthYear = today.year - 11;
+    const birthYear = today.year - 13;
 
     // Edge: if today IS Dec 31, the birthday is not in the future — skip this specific test.
     if (today.month === 12 && today.day === 31) {
-      // Today is the child's 11th birthday — exact age = 11, not blocked.
-      // This edge is covered by the "exactly 11" test below. Skip the break-test today.
+      // Today is the child's 13th birthday — exact age = 13, not blocked.
+      // This edge is covered by the "exactly 13" test below. Skip the break-test today.
       return;
     }
 
@@ -75,7 +77,7 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: USER.userId, email: USER.email }),
         body: JSON.stringify({
-          displayName: 'WI297 Under10',
+          displayName: 'WI297 Under13',
           birthYear,
           birthMonth,
           birthDay,
@@ -84,7 +86,7 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
       TEST_ENV,
     );
 
-    // Must be rejected — child is still 10 by exact date.
+    // Must be rejected — child is still 12 by exact date.
     // ProfileValidationError maps to 400 VALIDATION_ERROR via validationError() in profiles.ts.
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -93,9 +95,10 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
     expect(JSON.stringify(body.details)).toContain('birthYear');
   });
 
-  it('child exactly 11 today (birthday = today) is accepted', async () => {
+  it('child exactly 13 today (birthday = today) is accepted', async () => {
+    // WI-570: 13+ floor; exactly 13 on their birthday is allowed.
     const today = todayUTC();
-    const birthYear = today.year - 11;
+    const birthYear = today.year - 13;
 
     const res = await app.request(
       '/v1/profiles',
@@ -103,7 +106,7 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: USER.userId, email: USER.email }),
         body: JSON.stringify({
-          displayName: 'WI297 Exactly11',
+          displayName: 'WI297 Exactly13',
           birthYear,
           birthMonth: today.month,
           birthDay: today.day,
@@ -120,8 +123,8 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
     expect(body.profile.birthDay).toBeUndefined();
   });
 
-  it('year-only path (no birthMonth/birthDay) still works for age >= 11', async () => {
-    // Must clean up first since "exactly 11" test above may have created a profile for this user.
+  it('year-only path (no birthMonth/birthDay) still works for age >= 13', async () => {
+    // Must clean up first since "exactly 13" test above may have created a profile for this user.
     await cleanupAccounts({
       emails: [USER.email],
       clerkUserIds: [USER.userId],

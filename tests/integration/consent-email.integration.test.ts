@@ -32,7 +32,7 @@ import { app } from '../../apps/api/src/index';
 const CONSENT_USER_ID = 'integration-consent-email';
 const CONSENT_EMAIL = 'consent-email@integration.test';
 const PARENT_EMAIL = 'parent@integration.test';
-const CHILD_BIRTH_YEAR = 2015; // Age 11 in 2026 — requires GDPR consent
+const CHILD_BIRTH_YEAR = 2013; // Age 13 in 2026 — minimum v1 age; still requires GDPR parental consent under 16 (WI-570)
 const FAKE_RESEND_KEY = 're_test_integration_consent';
 
 async function createChildProfile(): Promise<string> {

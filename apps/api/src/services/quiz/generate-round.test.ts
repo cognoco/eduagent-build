@@ -24,9 +24,8 @@ describe('buildCapitalsPrompt', () => {
     expect(prompt).toContain('Paris');
     expect(prompt).toContain('Berlin');
     expect(prompt).toContain('Central Europe');
-    // [CR-2026-05-19-H11] Adolescent bracket spans 11-17 since the strictly-11+
-    // product reclassified 11-12 out of the 'child' bracket.
-    expect(prompt).toContain('11-17');
+    // [WI-570] Adolescent bracket spans 13-17 (v1 13+ floor).
+    expect(prompt).toContain('13-17');
   });
 
   it('works without a theme preference', () => {
