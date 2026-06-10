@@ -46,3 +46,19 @@ cross-runtime CI-troubleshooting doc or archive, after the WI-388 CI proof.
 |---|---|---|
 | feedback_drizzle_transaction_cast | STALE | cast pattern (`tx as unknown as Database`) is live in 200+ code sites; memory duplicates what code already carries |
 | feedback_notion_resolution_recording | STALE | rule fully owned by `.agents/skills/notion/SKILL.md` §§ "Done Requires Resolution" + "Regressions" |
+
+## Batch 3 — 2026-06-10 (operator-confirmed triage decisions, workflow-verified)
+
+Dispositions from the WI-387 triage workflow (results + per-file rationale:
+`nexus _WIP/zdx-productionization/_state/2026-06-10-wi-387-memory-triage-results.md`),
+operator-confirmed via the Decision column. Coverage claims verified against the
+ratified counting roster (canon / ADRs / AGENTS.md / CONTEXT.md / spine trio) only.
+
+| File | Disposition | Home / reason |
+|---|---|---|
+| billing-payments | COVERED | MMT-ADR-0004 (provenance note names this file as its source) + architecture.md:113 |
+| project_deploy_safety | COVERED | AGENTS.md § Schema And Deploy Safety; its two residual factual claims were stale (CI uses drizzle-kit migrate; DEPLOY_ENV live in deploy.yml) |
+| project_archon_spike_merge_rule | STALE | time-bounded process exception expired by its own sunset terms (consistency2 branch gone, PR #176 closed 2026-05-07) |
+| feedback_comment_not_delete | SUPERSEDED | operator ruling 2026-06-10 (triage CONFLICT 1): AGENTS.md:334 clean-removal guard stands unqualified |
+| feedback_homework_not_socratic | COVERED | PRD FR31 (PRD:1041) carries the full rule verbatim |
+| project_dev_schema_drift_trap | MERGED | durable content (env naming-trap table + do-not-do list) absorbed into `project_schema_drift_pattern.md`; incident narrative + expired follow-ups archived here |

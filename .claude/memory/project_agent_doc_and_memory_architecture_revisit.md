@@ -22,4 +22,3 @@ Surfaced during the worktree-rules PR (May 2026). The AGENTS.md → CLAUDE.md sy
 - `scripts/sync-skills.mjs` (skills sync — still active; could extend to memory). `scripts/sync-agent-docs.mjs` is **not revived** (reference model made doc-sync unnecessary — WI-386)
 - `../../CLAUDE.md` (Nexus content control plane doctrine — memory schemas, Cortex description)
 - `../../Cortex/` (Nexus, Supabase pgvector estate-wide memory)
-- `project_sync_script_extension.md` (related — generalize sync mechanism when N=3+)
