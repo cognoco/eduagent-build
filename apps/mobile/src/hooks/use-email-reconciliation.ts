@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import * as Sentry from '@sentry/react-native';
 import { useUser } from '@clerk/clerk-expo';
 
 import { useApiClient } from '../lib/api-client';
@@ -21,8 +22,9 @@ import { assertOk } from '../lib/assert-ok';
  * the requested email against the caller's verified Clerk primary, so a client
  * cannot push an arbitrary address through this path.
  *
- * It runs once per mount and stays silent on failure (it simply retries the
- * next time the account surface mounts) so it never blocks or disrupts the UI.
+ * It runs once per mount and stays non-blocking on failure (captured to
+ * Sentry, then it simply retries the next time the account surface mounts) so
+ * it never blocks or disrupts the UI.
  *
  * @param enabled gate to the owner surface (showAccountSecurity) — the GET is
  *   owner-only, so running it for a non-owner would just 403.
@@ -57,6 +59,11 @@ export function useEmailReconciliation(enabled: boolean): void {
         });
         await assertOk(patchRes);
       } catch (err) {
+        // Auth-adjacent silent recovery must stay queryable in production
+        // (the hook itself remains non-blocking; it retries on next mount).
+        Sentry.captureException(err, {
+          tags: { feature: 'email_reconciliation', surface: 'account_screen' },
+        });
         if (__DEV__) {
           console.warn(
             '[email-reconciliation] sync skipped — will retry on next mount:',

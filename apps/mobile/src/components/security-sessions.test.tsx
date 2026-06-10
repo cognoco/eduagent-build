@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { cleanupScreen, renderScreen } from '../test-utils/screen-render';
@@ -19,18 +20,14 @@ jest.mock('@clerk/clerk-expo', () => ({
 }));
 
 // Auto-confirm the destructive "sign out all" alert so the handler proceeds.
-jest.mock('../lib/platform-alert', () => ({
-  platformAlert: (
-    _title: string,
-    _message: string,
-    buttons?: Array<{ style?: string; onPress?: () => void }>,
-  ) => {
-    const confirm =
-      buttons?.find((b) => b.style === 'destructive') ??
-      buttons?.[buttons.length - 1];
-    confirm?.onPress?.();
-  },
-}));
+// The real platformAlert runs (Platform.OS is 'ios' under jest, so it routes
+// to Alert.alert); only RN's Alert — the true native boundary — is spied.
+jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+  const confirm =
+    buttons?.find((b) => b.style === 'destructive') ??
+    buttons?.[buttons.length - 1];
+  confirm?.onPress?.();
+});
 
 function sessionsFixture() {
   return [
