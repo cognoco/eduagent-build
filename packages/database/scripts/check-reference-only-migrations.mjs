@@ -100,8 +100,10 @@ function main() {
       '',
       'These must be removed from the effective migration chain before a live',
       'migrate is safe. This is the one-time baseline reset — see',
-      'docs/adr/MMT-ADR-0012-one-time-baseline-reset.md and',
-      'docs/reviews/2026-06-09-codebase-atlas/bugs/db-migration.md (Critical #1).',
+      'docs/adr/MMT-ADR-0012-one-time-baseline-reset.md and the 2026-06-09',
+      'codebase-atlas db-migration report, Critical #1 (bug register retired from',
+      'HEAD 2026-06-10; in git history at',
+      'docs/reviews/2026-06-09-codebase-atlas/bugs/db-migration.md).',
       '',
     ].join('\n'),
   );
