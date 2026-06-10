@@ -205,48 +205,22 @@ security-pii-inngest 14, architecture 7, billing 2/1, l10n 1, errors 1) but they
 
 ---
 
-## Vocabulary — what a roster row IS (fixed 2026-06-10)
+## The rules of the game → `planning-reference.md`
 
-Each PRG row is an **Initiative** — the root `CONTEXT.md` term: *an in-flight effort
-with its own lifecycle (start → active → graduated / parked / killed), typically with a
-`_wip/<slug>/` workspace*. The roster is the umbrella's **Initiative roster**.
-- **Do NOT call rows "workstreams"** — the glossary's _Avoid_ list locks that word to
-  the ZDX/Cosmo object (ZDX-ADR-0001). A Cosmo **Workstream** is the substrate
-  container an Initiative **creates at activation**, mapping **0..n per Initiative**
-  (PRG-01 → "Identity Foundation"; PRG-02 → "Harness hygiene"; PRG-20 → none) — never
-  assume 1:1. "Work track" / "work stream" are also _Avoid_-listed.
-- **Do NOT call anything new a "stream"** — "Stream 2" is the historical proper name
-  of **PRG-20 only** (the estate-canon drain) and stays reserved for it.
-- `PRG-NN` IDs are unchanged (roster-local IDs, not a competing noun).
+**All planning rules are canonical in
+[`planning-reference.md`](planning-reference.md)** (extracted 2026-06-10):
+hierarchy + vocabulary (rows are **Initiatives**; "workstream"/"stream" banned at
+this altitude — §1), the per-Initiative delivery pattern (§2), the
+reconcile-and-route method + intake routing rule (§3–4), the dependency model
+(granularity-by-altitude, boundary nodes, no resource edges — §5), activation
+gates + queue semantics (§6), and the cross-cutting operating principles (§7).
+This roster holds **state only**: the rows below and the activation queue.
+Program-specific bindings (current routing rule, boundary-node exports) live in
+the reference's Appendix.
 
-## Post-P operating model — execution + activation planning (ruled 2026-06-09; vocabulary fixed 2026-06-10)
-
-Once Phase P lands (IF Workstream + WPs in Cosmo + execution tracker), the umbrella
-runs **two concurrent activities** — there is **no** "IF executes end-to-end before
-anything else" rule:
-
-1. **IF execution** (PRG-01) — W0→W1→…→tail per the IF execution tracker. Owns the
-   critical path and most human attention.
-2. **Activation planning** — the umbrella activity over all *other* Initiatives:
-   normalize the PRG-16 singleton tail, charter PRG-10–15 (outcome / size / owner),
-   run PRG-14's `tech/*` dedupe, convert `activate-when` into an **activation
-   queue**. Planning consumes agent capacity, not execution throughput — it never
-   waits on IF.
-
-A planned Initiative then starts **executing in parallel with IF** when, per
-Initiative:
-- **Blast-radius class allows it** (O §2): parallel-safe (l10n, singletons,
-  agent-instructions) → anytime; serialize-class (security-pii remainders,
-  errors-api) → only after W2/W3 land, regardless of plan readiness.
-- **Pipeline is proven, not finished:** a few IF WIs through claim→execute→review→
-  close cleanly (realistically during W0/W1) — not IF completion.
-- **Attention budget allows it** (the honest 2-person constraint; per-fortnight call).
-
-First parallel activation will likely be a parallel-safe, agent-heavy,
-low-supervision Initiative (l10n-a11y is the archetype). Serialize-class Initiatives
-get planned early so they launch the moment W2/W3 clears them. Activating an
-Initiative = create its tracker + its Cosmo Workstream + slice — the template PRG-01
-dogfooded at Phase P.
+Post-P operating posture (per reference §6.4): **two concurrent activities** —
+IF execution (PRG-01) + activation planning over all other Initiatives; planned
+Initiatives start executing in parallel as their §6.3 gates clear.
 
 ## Cross-program gates (the edges that matter)
 
