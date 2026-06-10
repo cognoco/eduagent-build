@@ -129,9 +129,9 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **ready** — refined 2026-06-10 (Ready + Assisted; brief in body, children WI-591/592); starts when WI-569 lands |
-| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | backlog-gated |
-| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | backlog-gated |
-| WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | backlog-gated |
+| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **ready** — refined 2026-06-10 (Assisted; brief in body, children WI-594/595) |
+| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **ready** — refined 2026-06-10 (Assisted; brief in body, children WI-596/597) |
+| WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **ready** — refined 2026-06-10 (Assisted; framing checklist confirmed) |
 
 ### W2 — identity / consent / proxy / age (critical path)
 
@@ -180,8 +180,11 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   2026-06-10 (`wi569-executor`, Sonnet, `.worktrees/WI-569`), running the
   executor protocol with a hard pre-reset stop: it must report the exact dev/
   staging reset commands to the shepherd and wait for go before executing them.
-- **Refined and queued: WI-570 (schema)** — Ready + Assisted as of 2026-06-10.
-  Claimable the moment WI-569 lands (last open entry of its W0 hard gate).
+- **Refined and queued: ALL of W1** — WI-570, WI-571, WI-572, WI-573 are
+  Ready + Assisted as of 2026-06-10 (570/571/572 bridged per the §2 ruling;
+  children WI-591/592, WI-594/595, WI-596/597). Execution order on dependency
+  edges: WI-570 claims when WI-569 lands → then WI-571 ∥ WI-572 in parallel →
+  WI-573 after WI-571.
 - **Known refine friction (affects every remaining WP, WI-571…586):** top-down-
   sliced WPs mechanically fail the WP DoR (`wp.children` + `wp.brief` — blank
   bodies, no Sub-items; `/cosmo:bundle` absent from cosmo plugin 0.6.0). Filed as
@@ -203,6 +206,10 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 ## 6. Change log
 
+- **2026-06-10 (late) — whole of W1 refined to Ready.** WI-571/572 bridged
+  under the §2 standing ruling (briefs in body; children WI-594/595, WI-596/597);
+  WI-573 (Item, no bridge) refined with framing checklist confirmed. All four W1
+  units now Ready+Assisted, claimable in dependency order behind WI-569/570.
 - **2026-06-10 (evening) — WI-569 dispatched; WI-570 refined to Ready.**
   Executor protocol landed (`executor-protocol.md`, from the operator's
   wi-execute template: work-type-parameterized planning, review loop capped at
