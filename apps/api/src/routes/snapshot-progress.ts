@@ -12,7 +12,11 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import {
+  requireProfileId,
+  requireAccount,
+  type ProfileMeta,
+} from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { apiError } from '../errors';
 import {
@@ -30,6 +34,7 @@ type SnapshotProgressRouteEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -65,10 +70,21 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const query = c.req.valid('query');
 
+      // [F-144] listRecentMilestones backfills (writes) missed milestones. In
+      // proxy mode (a parent acting on a child via X-Profile-Id, isOwner=false)
+      // the read is allowed but the write must not fire on the child's behalf.
+      // Fail CLOSED on unknown ownership: only an explicitly-confirmed owner
+      // profile may trigger the backfill write. This is stricter than
+      // assertNotProxyMode (which only treats absent profileMeta as proxy) —
+      // here even a present-but-non-true isOwner suppresses the write, the safe
+      // direction for a write-on-read (the read itself still returns).
+      const allowBackfill = c.get('profileMeta')?.isOwner === true;
+
       const milestones = await listRecentMilestones(
         db,
         profileId,
         query.limit ?? 5,
+        allowBackfill,
       );
       return c.json(milestonesResponseSchema.parse({ milestones }));
     },

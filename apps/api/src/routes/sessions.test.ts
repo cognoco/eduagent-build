@@ -3481,6 +3481,20 @@ describe('[WI-371 / DS-194] sessions proxy-mode guard — remaining write routes
       },
     },
     { name: 'recall-bridge', path: `/sessions/${SID}/recall-bridge` },
+    // [F-117] Library-filing writes were not swept by WI-371; a proxy caller
+    // could mutate filing state (and trigger Inngest auto-file) on a child.
+    {
+      name: 'library-filing/keep-out',
+      path: `/sessions/${SID}/library-filing/keep-out`,
+    },
+    {
+      name: 'library-filing/add',
+      path: `/sessions/${SID}/library-filing/add`,
+    },
+    {
+      name: 'library-filing/restore',
+      path: `/sessions/${SID}/library-filing/restore`,
+    },
   ];
 
   it.each(cases)(

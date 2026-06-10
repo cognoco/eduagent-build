@@ -186,4 +186,31 @@ describeIfDb('child-cap notification service', () => {
       listActiveChildCapNotifications(db, familyA.owner.id),
     ).resolves.toEqual([]);
   });
+
+  it('[WI-550/F-020] rejects a subscription paired with a child profile from another account', async () => {
+    const familyA = await seedFamily('mismatch-a');
+    const familyB = await seedFamily('mismatch-b');
+
+    const result = await recordChildCapNotificationForSubscription(db, {
+      subscriptionId: familyA.subscription.id,
+      childProfileId: familyB.child.id,
+      kind: 'daily_exceeded',
+      resetsAt: '2026-05-27T01:00:00.000Z',
+      occurredAt: '2026-05-26T12:00:00.000Z',
+    });
+
+    expect(result).toEqual({
+      inserted: false,
+      reason: 'child_not_in_subscription_account',
+    });
+
+    const rows = await db
+      .select()
+      .from(childCapNotifications)
+      .where(eq(childCapNotifications.childProfileId, familyB.child.id));
+    expect(rows).toHaveLength(0);
+    await expect(
+      listActiveChildCapNotifications(db, familyA.owner.id),
+    ).resolves.toEqual([]);
+  });
 });

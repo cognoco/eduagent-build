@@ -1,6 +1,67 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-29T00:00:00.000Z",
-  "ref": "bugfix-29-05",
-  "flows": {}
+  "updatedAt": "2026-06-09T21:57:04.266Z",
+  "ref": "b9964c225",
+  "flows": {
+    "exchanges": {
+      "n": 102,
+      "rates": {
+        "envelopeOk": 0.9901960784313726,
+        "hasReply": 0.9901960784313726,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0.0392156862745098,
+        "needsDeepening": 0.049019607843137254,
+        "understandingCheck": 0.6666666666666666,
+        "readyToFinish": 0,
+        "notePromptShow": 0,
+        "fluencyDrillActive": 0.0196078431372549,
+        "confidenceLow": 0.049019607843137254
+      }
+    },
+    "probes": {
+      "n": 80,
+      "rates": {
+        "envelopeOk": 1,
+        "hasReply": 1,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0.0875,
+        "needsDeepening": 0,
+        "understandingCheck": 0.7625,
+        "readyToFinish": 0,
+        "notePromptShow": 0.0625,
+        "fluencyDrillActive": 0,
+        "confidenceLow": 0
+      }
+    },
+    "safety-probes": {
+      "n": 44,
+      "rates": {
+        "envelopeOk": 1,
+        "hasReply": 1,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0,
+        "needsDeepening": 0,
+        "understandingCheck": 0.7272727272727273,
+        "readyToFinish": 0,
+        "notePromptShow": 0,
+        "fluencyDrillActive": 0,
+        "confidenceLow": 0.06818181818181818
+      }
+    },
+    "language-quality": {
+      "n": 6,
+      "rates": {
+        "envelopeOk": 0.8333333333333334,
+        "hasReply": 0.8333333333333334,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0,
+        "needsDeepening": 0,
+        "understandingCheck": 0.8333333333333334,
+        "readyToFinish": 0,
+        "notePromptShow": 0,
+        "fluencyDrillActive": 0,
+        "confidenceLow": 0
+      }
+    }
+  }
 }

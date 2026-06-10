@@ -39,3 +39,63 @@ describe('[WI-174 / DS-085] snapshot-progress proxy-mode guard', () => {
     expect(res.status).not.toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [F-144] GET /progress/milestones backfill suppression — fail-closed mapping.
+//
+// The route maps ownership to listRecentMilestones' allowBackfill arg. The
+// backfill (write) path begins with getLatestSnapshot → progressSnapshots
+// .findFirst; the always-run read is milestones.findMany. We stub the db so
+// progressSnapshots.findFirst records whether the BACKFILL path was entered.
+//
+// This is the break-test for the FAIL-CLOSED choice (`isOwner === true`):
+// an absent/undefined profileMeta.isOwner must suppress the write. Under the
+// previous `!== false`, undefined isOwner would (wrongly) ALLOW backfill, so
+// findFirst would be called and this test fails — proper red-green.
+// ---------------------------------------------------------------------------
+describe('[F-144] GET /progress/milestones backfill is fail-closed on ownership', () => {
+  function makeMilestonesApp(profileMeta: unknown) {
+    const snapshotFindFirst = jest.fn().mockResolvedValue(undefined);
+    const stubDb = {
+      query: {
+        progressSnapshots: { findFirst: snapshotFindFirst },
+        milestones: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+    };
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      c.set('db' as never, stubDb);
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('user' as never, { id: 'test-user' });
+      // profileMeta may be undefined (the fail-closed case) — do not default it.
+      c.set('profileMeta' as never, profileMeta);
+      await next();
+    });
+    app.route('/', snapshotProgressRoutes);
+    return { app, snapshotFindFirst };
+  }
+
+  it('suppresses backfill (write) when profileMeta is undefined (fail closed)', async () => {
+    const { app, snapshotFindFirst } = makeMilestonesApp(undefined);
+    const res = await app.request('/progress/milestones', { method: 'GET' });
+    expect(res.status).toBe(200);
+    // Backfill path (getLatestSnapshot) must NOT have been entered.
+    expect(snapshotFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('suppresses backfill when isOwner is false (proxy)', async () => {
+    const { app, snapshotFindFirst } = makeMilestonesApp({ isOwner: false });
+    const res = await app.request('/progress/milestones', { method: 'GET' });
+    expect(res.status).toBe(200);
+    expect(snapshotFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('allows backfill when isOwner is true (legitimate self-read)', async () => {
+    const { app, snapshotFindFirst } = makeMilestonesApp({ isOwner: true });
+    const res = await app.request('/progress/milestones', { method: 'GET' });
+    expect(res.status).toBe(200);
+    // Backfill path entered — getLatestSnapshot queried the snapshot.
+    expect(snapshotFindFirst).toHaveBeenCalled();
+  });
+});

@@ -24,10 +24,15 @@ describe('assertPronounsSelfEditAllowed (WI-278)', () => {
     ).not.toThrow();
   });
 
-  it.each([null, undefined])(
-    'does not throw when birthYear is %s (unknown age is allowed; birthYear is NOT NULL in practice)',
+  // [F-145] Break-test: the gate must fail CLOSED when birthYear is
+  // missing/unknown. A possibly-sub-13 learner whose age cannot be verified
+  // must NOT be permitted to self-set pronouns (previously this failed open).
+  it.each([null, undefined, 0])(
+    'throws ForbiddenError when birthYear is %s (unknown age fails closed)',
     (birthYear) => {
-      expect(() => assertPronounsSelfEditAllowed(birthYear)).not.toThrow();
+      expect(() => assertPronounsSelfEditAllowed(birthYear)).toThrow(
+        ForbiddenError,
+      );
     },
   );
 });

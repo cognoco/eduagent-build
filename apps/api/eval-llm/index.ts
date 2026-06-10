@@ -165,6 +165,18 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Usage gate, before the (potentially long) harness run: --check-baseline /
+  // --update-baseline are only meaningful after a live run. Tier-1 runs emit
+  // an empty envelopeMetrics map and would trip the baseline for the wrong
+  // reason — and a misspelled invocation should not burn a full matrix run
+  // before erroring (CodeRabbit on PR #820).
+  if ((options.updateBaseline || options.checkBaseline) && !options.live) {
+    console.error(
+      '--check-baseline / --update-baseline require --live (envelope metrics are only collected from live LLM responses)',
+    );
+    process.exit(2);
+  }
+
   // Candidate-model gate (--openrouter-model): reroutes every live call to
   // the named model via the eval-only OpenRouter adapter. Guard rails:
   // pointless without --live, and a candidate's envelope metrics must never
@@ -244,33 +256,60 @@ async function main(): Promise<void> {
   }
   console.log('─────────────────────────────────────────');
 
+  // Baseline seed (--update-baseline) runs BEFORE the quality-gate exit
+  // [WI-556]: the baseline tracks envelope-signal *distribution*, which
+  // legitimately includes failed samples (envelopeOk < 1.0 is itself a
+  // tracked rate). Scenario-level quality failures are triaged separately —
+  // and NOT silently bypassed: they are printed below and the run still
+  // exits 1, so an operator must look at them before committing the seeded
+  // baseline. See README § Signal-distribution baseline.
+  if (options.updateBaseline) {
+    const baseline = buildBaseline(summary.envelopeMetrics, {
+      ref: process.env.GIT_COMMIT,
+    });
+    // Seed-path guard: refuse to write a baseline that would itself fail
+    // --validate-baseline. A budget-starved run (envelope flows skipped)
+    // produces an empty/partial flows map — exactly the placebo state the
+    // structural check exists to catch. Same rule set, same source of truth.
+    const requiredFlows = FLOWS.filter((f) => f.emitsEnvelope).map((f) => f.id);
+    const issues = validateBaselineStructure(baseline, requiredFlows);
+    if (issues.length > 0) {
+      console.error(
+        `Refusing to write baseline — this run did not collect envelope metrics for every envelope-emitting flow:`,
+      );
+      for (const issue of issues) {
+        console.error(`  [${issue.flowId}] ${issue.message}`);
+      }
+      console.error('');
+      console.error(
+        `Include all envelope-emitting flows and raise the budget, e.g.:\n` +
+          `  doppler run -- pnpm eval:llm -- --live ${requiredFlows
+            .map((id) => `--flow ${id}`)
+            .join(' ')} --max-live-calls 250 --update-baseline`,
+      );
+      process.exit(1);
+    }
+    await writeBaseline(baseline);
+    console.log(`Baseline updated → ${BASELINE_PATH}`);
+  }
+
   if (options.live && summary.qualityFailures > 0) {
     console.error(
       'Quality gate failed. Open the snapshots with "Quality issues" sections for the scenario-level failures.',
     );
+    if (options.updateBaseline) {
+      console.error(
+        'NOTE: baseline.json WAS written (signal distributions include the failed samples). Triage the quality failures above before committing it.',
+      );
+    }
     process.exit(1);
   }
 
-  // Baseline regression guard — only meaningful after a live run. Tier-1
-  // runs emit an empty envelopeMetrics map and would trip the baseline for
-  // the wrong reason, so we gate explicitly on --live here.
-  if (options.updateBaseline || options.checkBaseline) {
-    if (!options.live) {
-      console.error(
-        '--check-baseline / --update-baseline require --live (envelope metrics are only collected from live LLM responses)',
-      );
-      process.exit(2);
-    }
+  if (options.updateBaseline) {
+    return;
+  }
 
-    if (options.updateBaseline) {
-      const baseline = buildBaseline(summary.envelopeMetrics, {
-        ref: process.env.GIT_COMMIT,
-      });
-      await writeBaseline(baseline);
-      console.log(`Baseline updated → ${BASELINE_PATH}`);
-      return;
-    }
-
+  if (options.checkBaseline) {
     const baseline = await readBaseline();
     if (!baseline) {
       console.error(
