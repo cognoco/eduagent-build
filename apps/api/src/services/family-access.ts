@@ -93,7 +93,7 @@ export function assertCanManageOwnConsent<
     );
   }
   // Use the canonical calculateAge() (getUTCFullYear-based) so this consent
-  // age-gate shares one definition with calculateAge (consent.ts) and
+  // age-gate shares one definition with calculateAge (age-utils.ts) and
   // getProfileAge (profile.ts). A local getFullYear() could disagree by a
   // year at the 18 boundary depending on host timezone.
   const age = calculateAge(birthYear);
