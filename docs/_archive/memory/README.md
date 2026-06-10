@@ -31,6 +31,7 @@ resolved/stale entries.
 | feedback_no_pr_unless_asked | EXTRACTED | AGENTS.md § Pull Requests (WI-398/G8) |
 | feedback_use_gh_cli_for_prs | EXTRACTED | AGENTS.md § Pull Requests (WI-398/G8) |
 | google_play_publishing | STALE | resolved-blocker tombstone (account available 2026-05-15) |
+| project_apple_enrollment | STALE | resolved-blocker tombstone (account available 2026-05-15) |
 | feedback_persona_vs_role | STALE | names removed `personaFromBirthYear` (persona-fossil-guard forbids reintroduction) |
 
 **Held back (NOT archived):** `feedback_nx_reset_before_commit` — WI-531 `HOLD`. The

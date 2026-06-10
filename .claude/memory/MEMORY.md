@@ -73,7 +73,6 @@
 
 ## Store Publishing
 
-- [project_apple_enrollment.md](project_apple_enrollment.md) — Apple Developer account available as of 2026-05-15; old enrollment blocker resolved.
 - [project_revenuecat_setup.md](project_revenuecat_setup.md) — RevenueCat project exists; remaining work is store product/connection/webhook setup.
 
 ## Brand & UX Decisions
