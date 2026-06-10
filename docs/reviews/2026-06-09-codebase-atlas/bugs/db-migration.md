@@ -1,5 +1,7 @@
 # Database & migration safety — Bug Review
 
+> **Pruned 2026-06-10** — findings verified FIXED against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 Lens: Database & migration safety. Owned area: `packages/database/**`, drizzle migrations (`apps/api/drizzle/**`), transaction usage, neon-serverless patterns, FK/index coverage, migration immutability.
 
 Branch reviewed: `new-llm`. Migration set walked: 0000–0107 plus `meta/_journal.json`, `meta/*_snapshot.json`, the deploy pipeline (`.github/workflows/deploy.yml`), and the baseline/target-verification guard scripts.
@@ -10,19 +12,7 @@ Headline: two committed, journaled migrations (`0106`, `0107`) are marked "REFER
 
 ## Critical
 
-### [Critical] Reference-only migrations 0106/0107 will be auto-applied by `drizzle-kit migrate` — only a comment stops them
-
-- File: `apps/api/drizzle/0106_identity_t1_org_membership.sql:1-130`, `apps/api/drizzle/0107_gorgeous_cardiac.sql:1-50`, journaled at `apps/api/drizzle/meta/_journal.json:746-760` (idx 106, 107), snapshots present (`meta/0106_snapshot.json`, `meta/0107_snapshot.json`).
-- What: Both files open with `-- REFERENCE ONLY — DO NOT APPLY TO STAGING OR PRODUCTION.` They are nonetheless full, hashed entries in `_journal.json` with matching snapshots. `drizzle-kit migrate` (run at `.github/workflows/deploy.yml:251` for staging/prod and `:98` in the quality gate) compares the journal hashes against the `drizzle.__drizzle_migrations` table and runs every entry not yet recorded. The "REFERENCE ONLY" text is a SQL comment — drizzle does not read it. Per the project memory (`project_stars_parked_until_baseline_reset.md`) and the file headers, these migrations are "applied nowhere live," which means `__drizzle_migrations` on staging/prod does NOT contain their hashes — so the next migrate run WILL execute them.
-- Impact: The next deploy that reaches the migrate step would: create `organizations` + `memberships` tables and the `membership_role` enum; `ALTER TABLE subscriptions ADD organization_id`; `ALTER TABLE profiles ADD clerk_user_id` + a unique constraint; run the T1 backfill DML (org-per-account, membership-per-profile, clerk credential copy, subscription re-point); and create `concepts` + `concept_mastery` tables with FKs to `profiles`. This is exactly the schema the identity-foundation reconstruction (`MMT-ADR-0012`, `_wip/identity-foundation/`) deliberately reverted. It re-introduces the T1 tables the team is mid-removing, and `0107`'s FKs target `profiles` which the planned baseline reset renames to `person`, so the schema would then be incompatible with the reset. The backfill `RAISE EXCEPTION` at `0106:52-59` can also hard-fail the whole migrate step (and thus the deploy) if any account has >1 `is_owner` profile.
-- Fix direction: Do NOT rely on a comment. Either (a) remove 0106/0107 from `_journal.json` + delete the SQL/snapshots (rewrites history but they were "never applied", so safe per the file headers), or (b) add a committed CI/preflight guard that scans every journaled `.sql` for a `REFERENCE ONLY` / `DO NOT APPLY` marker and fails the deploy (and `drizzle-kit migrate` wrapper) if such a file is not already recorded in `__drizzle_migrations`. Verify the real `__drizzle_migrations` contents on each environment before the next deploy to confirm they are genuinely absent (the dangerous case) vs. already-recorded-as-applied.
-
-### [Critical] Live challenge-round code writes to `concepts`/`concept_mastery`, tables that exist in no deployed environment
-
-- File: `apps/api/src/services/concept-capture.ts:3,100,141` (imports + inserts `concepts`/`conceptMastery`); wired at `apps/api/src/services/session/session-exchange.ts:829`; schema declared + exported at `packages/database/src/schema/concept-mastery.ts:23-92` and `packages/database/src/schema/index.ts:25`.
-- What: `captureConceptMastery()` is invoked inside the live challenge-round completion path (`session-exchange.ts:826-840`). The tables it writes to are only created by migration `0107`, which is "REFERENCE ONLY — applied nowhere live." So on staging/prod the insert hits `relation "concepts" does not exist`. The call is wrapped in `safeWrite()` (`safe-non-core.ts:111-128`), which catches the error, reports to Sentry, and returns — so it does not crash the user flow.
-- Impact: Every completed challenge round on staging/prod throws a `relation does not exist` exception that is swallowed and reported to Sentry (recurring noise that can mask real failures), and the "mastery star" concept-capture data silently never persists. This is a wired-but-unsupported feature: it looks live in code but is a guaranteed no-op in every real environment. It also means the schema package (`schema/index.ts` re-export) advertises tables that do not exist, so any other consumer that queries them inherits the same latent failure.
-- Fix direction: Decide consistently with the parking decision. If concept-capture is parked, gate the `session-exchange.ts:826` call behind the same flag/condition that gates the feature so it is not invoked until `0107` (or its post-reset successor) is actually applied; if it is meant to be live, the tables must be created by an applied migration. Do not leave live code writing to non-existent tables behind a swallow.
+_All previously-listed items verified fixed on 2026-06-10 and pruned._
 
 ---
 
@@ -85,7 +75,3 @@ Headline: two committed, journaled migrations (`0106`, `0107`) are marked "REFER
 - [Security / RLS lens] `concepts` and `concept_mastery` declare `enableRLS()` (`schema/concept-mastery.ts`) and the migration `0107:49-50` enables RLS, but since the migration is reference-only the RLS policies for these tables exist in no live DB. The RLS-coverage static test (`packages/database/src/rls-coverage.test.ts`) may report these tables as "covered" from schema source while they are absent at runtime — a potential false-positive in the RLS audit. Worth the security lens confirming RLS coverage is measured against applied DB state, not just schema declarations.
 
 - [Billing lens] The `0102_tier_server_rework` tables (`profile_quota_usage`, `top_up_credits`) drive quota enforcement; the FK-index gaps above are a billing-path performance concern on account deletion. Also confirm the billing lens checks the `profile_quota_usage` unique `(subscription_id, profile_id)` constraint matches the upsert conflict target used in `services/billing/`.
-
-- [Inngest / background-jobs lens] `concept-capture.ts` failures are swallowed by `safeWrite()` and reported to Sentry. The recurring `relation does not exist` exceptions (Critical #2) will appear as Inngest/session-flow Sentry noise; the observability lens should confirm this isn't drowning real alerts.
-
-- [API correctness lens] The `captureConceptMastery` wiring at `session-exchange.ts:829` is a concrete instance of the "wired-but-untriggered / wired-but-unsupported code" anti-pattern called out in CLAUDE.md → UX Resilience ("End-to-end feature tracing"). Flagging for the lens auditing feature completeness.

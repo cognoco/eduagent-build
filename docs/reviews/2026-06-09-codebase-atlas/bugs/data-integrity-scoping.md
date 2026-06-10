@@ -1,5 +1,7 @@
 # Data integrity & profileId scoping — Bug Review
 
+> **Pruned 2026-06-10** — findings verified FIXED against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 **Lens:** Data integrity & profileId scoping
 **Owned area:** `apps/api/src/services/**`, `packages/database/**`
 **Branch:** new-llm
@@ -30,12 +32,7 @@ None found.
 
 ## Medium
 
-### [MEDIUM] `loadNextTopicMap` resolves next-topic titles via an unscoped curriculum_topics join
-
-- File: `apps/api/src/services/recaps.ts:84-97`
-- What: The aliased `leftJoin(nextTopic, eq(sessionSummaries.nextTopicId, nextTopic.id))` resolves the "Coming up" topic title with no `subjects.profileId` predicate on the joined topic row. The query filters `sessionSummaries.profileId IN childProfileIds` and `sessionSummaries.sessionId IN sessionIds`, but the title itself is pulled from whatever `curriculum_topics` row `next_topic_id` points at, regardless of which profile owns that topic.
-- Impact: If a `session_summaries.next_topic_id` value ever pointed at a foreign profile's topic (data-corruption, a future bug in summary generation, or a cross-clone path like `family-bridge`), the foreign topic title would render on a parent's recap card. Today `next_topic_id` is written from the same profile's own next-topic resolution, so this is latent rather than live — but it is the one read in the recap pipeline that does not re-anchor ownership through the `subjects.profileId` chain that every sibling query uses.
-- Fix direction: Add `curriculum_books` + `subjects` joins to the aliased next-topic resolution and constrain `subjects.profileId = sessionSummaries.profileId` (or `IN childProfileIds`), mirroring the parent-chain pattern in `recall-bridge.ts:57-72`. Alternatively, resolve next-topic titles through `findOwnedCurriculumTopics(db, { profileId, topicIds })`.
+_All previously-listed items verified fixed on 2026-06-10 and pruned._
 
 ## Low
 

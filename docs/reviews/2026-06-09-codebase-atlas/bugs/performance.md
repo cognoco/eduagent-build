@@ -1,5 +1,7 @@
 # Performance & Hot Paths — Bug Review
 
+> **Pruned 2026-06-10** — findings verified FIXED/MOOT against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 **Date:** 2026-06-09
 **Lens:** Performance & hot paths
 **Scope:** `apps/api/src/services/**` (queries), `apps/mobile/src/app/**`, `apps/mobile/src/components/**`, `apps/mobile/src/hooks/**`
@@ -7,21 +9,6 @@
 ---
 
 ## Critical
-
-### [CRITICAL] N+1: `useFailedFreeformLibraryFilingSessions` fetches 50 sessions then issues 50 individual detail requests
-
-**File:** `apps/mobile/src/hooks/use-sessions.ts:653–665`
-
-**What:**
-The hook first fetches a page of up to 50 sessions from `progress.sessions` (one HTTP request), then issues a `Promise.all()` of up to 50 individual `sessions/:sessionId` GET requests — one per session. These fire in parallel but each incurs a full round-trip to the API/DB. The `filingStatus` and `effectiveMode` filter that discards most of them is applied client-side *after* all 50 detail fetches complete. A user with 50 sessions triggers 51 HTTP calls and 50+ DB reads on every cache miss. The hook has `staleTime: 30_000` which helps on re-renders but the initial load and every 30-second expiry is expensive.
-
-**Impact:**
-On every Library load (or after 30s), up to 50 concurrent API requests hit the Worker simultaneously from a single user. Under load this degrades API response times for all users. On the mobile side, 50 parallel fetches compete for the same device HTTP connection pool (typically 6 connections), adding sequential batching latency on top.
-
-**Fix direction:**
-Add an API endpoint or query parameter (`filingStatus=filing_failed&effectiveMode=freeform`) to `GET /progress/sessions` so filtering happens in SQL. Alternatively, extend the progress sessions response to include `filingStatus` and `effectiveMode` so no detail fetch is needed at all. The `Promise.all` pattern is then eliminated.
-
----
 
 ### [CRITICAL] `getSnapshotsInRange` fetches ALL snapshots for a profile then filters in JavaScript
 
@@ -106,21 +93,6 @@ Move the `failedImages` check inside `MessageBubble` or a dedicated `ImageWithFa
 
 ---
 
-### [HIGH] ~101 `useQuery` hooks missing `staleTime` — unnecessary refetch storms on window focus
-
-**File:** `apps/mobile/src/hooks/` (all hooks files)
-
-**What:**
-A grep of all hooks in `apps/mobile/src/hooks/` finds 261 `useQuery`/`useInfiniteQuery`/`useSuspenseQuery`/`useApiQuery` call sites across 44 files, but only 23 `staleTime` entries across 13 files. The 18 hooks files with zero `staleTime` entries include high-traffic hooks: `use-books.ts` (7 calls), `use-bookmarks.ts` (7 calls), `use-curriculum.ts` (8 calls), `use-assessments.ts` (7 calls), `use-learner-profile.ts` (12 calls), `use-vocabulary.ts` (5 calls), `use-settings.ts` (16 calls), `use-streaks.ts` (3 calls), `use-celebrations.ts` (4 calls), `use-notes.ts` (13 calls). TanStack Query default `staleTime=0` means every window-focus event refetches all these queries simultaneously.
-
-**Impact:**
-When a user returns to the app from background (extremely common on mobile), every mounted component re-fetches simultaneously. This produces a burst of 15–30 concurrent API requests on every app-foreground event. On a complex screen like the Library or Progress tab, this is a fan-out of parallel API calls that hammers the Cloudflare Worker and Neon connection pool together.
-
-**Fix direction:**
-Set a project-wide default in the TanStack Query `QueryClient` configuration (e.g., `defaultOptions: { queries: { staleTime: 60_000 } }`). This single change covers all call sites. Overrides for genuinely real-time data (sessions in progress, subscription status) can set `staleTime: 0` explicitly at those call sites. See `apps/mobile/src/lib/query-client.ts` (or equivalent) for where to add this default.
-
----
-
 ## Medium
 
 ### [MEDIUM] `listRecentMilestones` issues 3–4 sequential DB round-trips
@@ -166,24 +138,6 @@ db.query.progressSnapshots.findFirst({
 })
 ```
 This returns exactly one row from the index.
-
----
-
-### [MEDIUM] `useSubjects` combines 3-second polling with no `staleTime`
-
-**File:** `apps/mobile/src/hooks/use-subjects.ts:71–108`
-
-**What:**
-When any subject has `curriculumStatus === 'preparing'`, `refetchInterval` returns 3000ms (line 107). There is no `staleTime` set on this query. This means:
-- Every 3 seconds the query is considered stale and refetches from the server.
-- Additionally, every window-focus event triggers a refetch regardless of the 3-second interval.
-- During curriculum preparation (which can take minutes), the app issues one API call every 3 seconds plus additional focus-triggered calls.
-
-**Impact:**
-During onboarding (when the first subject is being prepared), `useSubjects` drives an aggressive polling loop that can produce 20+ API calls per minute from a single user. This is the most-used hook in the app (mounted on the Shelf tab, which is the default home).
-
-**Fix direction:**
-Set `staleTime` equal to or slightly less than `refetchInterval` to prevent focus-triggered duplicate fetches during polling: `staleTime: PREPARING_POLL_MS - 500`. This ensures the interval drives polling but window focus does not add extra calls.
 
 ---
 
@@ -275,5 +229,3 @@ Accept as-is if subjects are reliably cached. If deep-link performance is a conc
 - **Error Handling / UX lens:** `animateResponse` (High above) runs `setMessages` with `prev.map()` inside a `setInterval` callback. If the component unmounts while the interval is running (user navigates away mid-stream), the state update fires after unmount. The returned cleanup function handles `clearInterval`, but only if the caller stores and calls it. Assessment, session, and drill screens all call `animateResponse` — each must properly clean up on unmount to avoid the "Can't perform a React state update on an unmounted component" warning. This is a latent bug vector, not just a performance issue.
 
 - **Data Integrity lens:** The `previousSnapshotForToday` unbounded fetch (Medium above) is used in the snapshot backfill path. If the backfill is triggered while a snapshot write is in flight (race condition), the unbounded fetch might return stale data and the backfill might overwrite a valid snapshot. Addressing the unbounded fetch with a targeted query and a proper `updatedAt` guard would also close this race window.
-
-- **Testing lens:** `animateResponse` has no unit tests visible in `ChatShell.tsx`'s co-located test file. The O(n×m) degradation and the post-unmount state update are both runtime-only bugs that static typing cannot catch. A test that runs `animateResponse` with a 100-token response and asserts the interval count and final state would document the current behavior and guard the fix.

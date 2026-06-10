@@ -1,5 +1,7 @@
 # Dependencies & supply chain — Bug Review
 
+> **Pruned 2026-06-10** — findings verified FIXED/MOOT against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 **Scope:** `package.json` (root + apps + packages), `pnpm-lock.yaml`
 **Date:** 2026-06-09
 **Branch reviewed:** new-llm
@@ -32,24 +34,6 @@ _(No Critical findings: no publicly exploited zero-days in production-runtime co
 
 ---
 
-### [High] `@xmldom/xmldom@0.8.11` deprecated with self-described "critical issues"
-
-- **File:** `pnpm-lock.yaml:5827-5830`
-- **What:** The registry deprecation message for this version reads: `"this version has critical issues, please update to the latest version"`. It is pulled in by `@expo/plist@0.3.5`, `@expo/plist@0.4.8` (lines 15584-15594), and `plist@3.1.0` (line 26825-26829). These `plist` libraries are used during build-time iOS provisioning/plist manipulation by Expo config plugins.
-- **Impact:** Build-time XML parsing of iOS plist files. Malformed or adversarial plist data (e.g., in a dependency's `app.json` or native config) could trigger the known issue. The exact CVE is not disclosed in the npm message, but the maintainer's own deprecation suggests memory corruption or DoS-class risk.
-- **Fix direction:** Upgrade `@expo/plist` and `plist` to their latest versions. If `@expo/config-plugins@54.0.4` locks an older `@expo/plist` version, consider a `pnpm.overrides` entry for `@xmldom/xmldom` to pin to `>=0.9.0`.
-
----
-
-### [High] `@ungap/structured-clone@1.3.0` — self-annotated CVE-502 (prototype pollution)
-
-- **File:** `pnpm-lock.yaml:5563-5565`
-- **What:** The lockfile records `deprecated: Potential CWE-502 - Update to 1.3.1 or higher` for this version. It is consumed by `expo@54.0.29` (lines 23106, 23141) and `jest-worker@30.2.0` (line 24905).
-- **Impact:** CWE-502 is unsafe deserialization / prototype pollution. The `expo` runtime uses structured-clone in its module resolver and dev-server communication. A malicious module or crafted response in the Expo dev environment could potentially corrupt the JS runtime's prototype chain. The `jest-worker` usage is test-only; the Expo runtime usage is more relevant.
-- **Fix direction:** Add `pnpm.overrides` entry `"@ungap/structured-clone": ">=1.3.1"`. Verify that `expo@54` does not have a hard pin on 1.3.0.
-
----
-
 ### [High] `@sentry/react-native@8.1.0` — significantly outdated (current: 5.x)
 
 - **File:** `apps/mobile/package.json:43`, `pnpm-lock.yaml:4868`
@@ -60,15 +44,6 @@ _(No Critical findings: no publicly exploited zero-days in production-runtime co
 ---
 
 ## Medium
-
-### [Medium] Multiple `@tanstack/query-core` versions (4 copies: 5.87.4, 5.100.9, 5.100.10, 5.100.11)
-
-- **File:** `pnpm-lock.yaml:5264-5274`, `apps/mobile/package.json:43-45`
-- **What:** Four distinct `@tanstack/query-core` versions are installed simultaneously. The `apps/mobile/package.json` specifies `"@tanstack/react-query": "^5.100.10"`, `"@tanstack/query-async-storage-persister": "^5.100.10"`, and `"@tanstack/react-query-persist-client": "^5.100.10"`. Despite the aligned specifier, the lockfile resolves `@tanstack/react-query@5.100.11` (line 5285) with core 5.100.11, while the persist libraries resolve to core 5.100.10 and `@clerk/clerk-js@5.123.0` pulls `@tanstack/query-core@5.87.4` (line 14386). The old `@clerk/clerk-js` internal version (5.87.4) is the most likely root.
-- **Impact:** Duplicate TanStack Query core instances can break cross-boundary cache sharing (a `QueryClient` created by one copy of the core is not compatible with another copy). In a mobile app where auth (Clerk) and app data (TanStack Query) need to share cache invalidation events, this can cause stale auth state or missed re-fetches. The `@tanstack/react-query-persist-client` version mismatch (5.100.10 core vs 5.100.11 react-query) is the most operationally risky.
-- **Fix direction:** Add `pnpm.overrides` for `"@tanstack/query-core": "5.100.11"` to collapse all consumers to the latest version. Verify Clerk does not break with the overridden version.
-
----
 
 ### [Medium] Deprecated `@clerk/clerk-react` and `@clerk/types` (Core 3 EOL packages)
 
@@ -97,30 +72,12 @@ _(No Critical findings: no publicly exploited zero-days in production-runtime co
 
 ---
 
-### [Medium] `inflight@1.0.6` — deprecated with memory-leak warning, used by old glob versions
-
-- **File:** `pnpm-lock.yaml:8787-8789`
-- **What:** `inflight@1.0.6` is deprecated: `"This module is not supported, and leaks memory."` It is a transitive dependency of `glob@7.2.3` and `glob@8.1.0` (pulled in by `rimraf@3.0.2` via `chromium-edge-launcher@0.2.0`, and by React Native's codegen tooling). All of these are build/test-only tools.
-- **Impact:** Memory leak in long-running build processes. No production runtime impact. Long CI jobs running React Native codegen or Playwright setup could gradually exhaust memory.
-- **Fix direction:** Upgrade `rimraf` to v4+ (which uses `glob@10+` without `inflight`). For React Native's codegen usage, track upstream RN updates; `@react-native/codegen@0.81.5` currently pins `glob: 7.2.3` (line 18589).
-
----
-
 ### [Medium] `rimraf@2.4.5` and `rimraf@3.0.2` — deprecated in lockfile
 
 - **File:** `pnpm-lock.yaml:11641-11648`, `pnpm-lock.yaml:27890-27898`
 - **What:** The npm registry marks rimraf versions prior to v4 as no longer supported. `rimraf@2.4.5` is brought in by `mv@2.1.1` (optional dep, line 26141-26146). `rimraf@3.0.2` is brought in by `chromium-edge-launcher@0.2.0` (line 21270-21279), a Playwright/dev-tools transitive dependency.
 - **Impact:** Build tooling only; no production runtime exposure.
 - **Fix direction:** These versions come from third-party dev tooling. Track `chromium-edge-launcher` and `mv` for updates. For now, acceptable as-is given the build-only scope.
-
----
-
-### [Medium] `glob@6.0.4`, `glob@7.2.3`, `glob@8.1.0` — deprecated versions carry security advisory
-
-- **File:** `pnpm-lock.yaml:8468-8486`, `pnpm-lock.yaml:8475-8483`
-- **What:** The npm registry deprecation for these versions reads: `"Old versions of glob are not supported, and contain widely publicized security vulnerabilities"`. `glob@6.0.4` is used by `rimraf@2.4.5` (line 27892). `glob@7.2.3` is used by `rimraf@3.0.2` (line 27897), `@react-native/codegen@0.81.5` (line 18589), and `@react-native-community/cli@18.0.1` (line 27590). `glob@8.1.0` is used by `detox@20.46.0` (line 21899) and `@react-native/community-cli-plugin@0.81.5` (line 18829).
-- **Impact:** Glob's "security vulnerabilities" in old versions relate to ReDoS and path traversal. All usage is in build/test/dev tools, not production API code. Low production risk, but ReDoS in dev tooling can hang CI or developer machines.
-- **Fix direction:** Add `pnpm.overrides` for `"glob@<9": "^10.0.0"` to force these consumers to glob 10. Validate that nothing uses the old glob callback API (v10 is promise-based).
 
 ---
 
@@ -160,33 +117,6 @@ _(No Critical findings: no publicly exploited zero-days in production-runtime co
 
 ---
 
-### [Medium] Expo SDK 54 project installs SDK 55 packages (`expo-haptics@55`, `expo-localization@55`, `expo-sensors@55`, `expo-speech@55`)
-
-- **File:** `apps/mobile/package.json:55,59,66,67`, `pnpm-lock.yaml:7878,7919,7991,8008`
-- **What:** The Expo SDK version is pinned to 54 (`"expo": "~54.0.29"`), but four packages use `^55.x` specifiers: `expo-haptics@^55.0.11`, `expo-localization@^55.0.13`, `expo-sensors@^55.0.13`, `expo-speech@^55.0.8`. Expo's compatibility matrix requires all `expo-*` packages to be on the same SDK major for native layer compatibility.
-- **Impact:** SDK 55 modules link against Expo SDK 55 native APIs. When built with the SDK 54 native binary (EAS build profile targets SDK 54), the JS-side SDK 55 API calls may reference non-existent native module methods, producing runtime crashes (`Module not found`, `Unimplemented method`) or silent no-ops. This is particularly risky for `expo-sensors` (accelerometer/gyroscope) and `expo-speech` (TTS).
-- **Fix direction:** Downgrade the four packages to their SDK 54-compatible versions (e.g., `expo-haptics@~0.9.0` for SDK 54, etc.), or complete an explicit SDK 55 upgrade for the whole project. Check the Expo SDK changelog for the correct version pins.
-
----
-
-### [Medium] No automated vulnerability scanning in CI
-
-- **File:** `.github/workflows/ci.yml` (all workflow files checked)
-- **What:** None of the CI workflows (`ci.yml`, `api-quality-gate.yml`, `docs-checks.yml`, etc.) run `pnpm audit`, `npm audit`, or any Snyk/Dependabot/OSV scan step. The only dependency-related check in CI is `pnpm run check:root-deps` (line 138), which guards against the NativeWind root-package split but does not scan for known CVEs.
-- **Impact:** Known vulnerabilities in transitive dependencies (like the deprecated `ws@6`, `@xmldom/xmldom`, `@ungap/structured-clone` issues above) are not surfaced automatically. Fixes will only happen when someone runs `pnpm audit` manually.
-- **Fix direction:** Add a `pnpm audit --audit-level=high` step to `ci.yml`. Consider enabling GitHub Dependabot alerts for the repository. At minimum, add a weekly scheduled job that runs `pnpm audit` and posts to Slack/email on new highs.
-
----
-
-### [Medium] `@anthropic-ai/sdk@0.92.0` is a devDependency at root but only used by scripts
-
-- **File:** `package.json:60`, `pnpm-lock.yaml:513`
-- **What:** `@anthropic-ai/sdk@0.92.0` is declared in root `devDependencies`. It is a heavyweight SDK (~600 kB installed) used by translate scripts (`scripts/translate-gemini.ts` and similar). The current version (0.92.0) is 0.1.0 behind the specifier `^0.92.0` maximum, so upgrades happen freely.
-- **Impact:** Minor. The Anthropic SDK in devDependencies does not ship to production. However, if a version with a breaking change is auto-upgraded by pnpm (within the `^0.92.0` range), translation scripts could silently fail. Additionally, the SDK name `translate-gemini.ts` (file name) uses the Gemini name yet imports Anthropic — potential confusion for future developers.
-- **Fix direction:** Low priority. Pin to an exact version if script stability is a concern. Rename the file or add a comment if it genuinely calls Anthropic (not Gemini).
-
----
-
 ## Low
 
 ### [Low] `node-ipc@9.2.1` present in lockfile — historically supply-chain-attacked package
@@ -217,13 +147,6 @@ _(No Critical findings: no publicly exploited zero-days in production-runtime co
 - **Impact:** Bloated node_modules (~30 MB overhead for extra esbuild binaries on Windows). No production impact.
 - **Fix direction:** Upgrading drizzle-kit (Medium finding above) resolves the 0.18.20 entry. The other three versions (0.25.5 for `@expo/metro`, 0.25.12 for NX, 0.27.3 for wrangler) are all current within their respective toolchain constraints.
 
-### [Low] `@types/node` has 4 concurrent versions (12.20.55, 22.19.1, 22.19.17, 25.6.0)
-
-- **File:** `pnpm-lock.yaml:5433-5443`
-- **What:** `@types/node@12.20.55` is pulled by `jayson@4.3.0` (via `@solana/web3.js`, a `@clerk/clerk-js` transitive dep, line 24333). `@types/node@22.19.1` is the project's primary version. `22.19.17` is pulled by some NX packages. `@types/node@25.6.0` is pulled by `stripe@20.3.1` as an optional types peer (line 28669).
-- **Impact:** Multiple `@types/node` versions can cause TypeScript inference gaps if Node API types differ across versions. The `12.x` version is significantly outdated (Node 12 is EOL since 2022). This is purely a devDependency; no runtime impact.
-- **Fix direction:** Add `pnpm.overrides` for `"@types/node@^12": "^22.0.0"` to consolidate the v12 version. The `v25` entry from Stripe is in an optional slot and is not harmful.
-
 ### [Low] `@solana/web3.js` and associated Solana packages — unexpected in non-blockchain app
 
 - **File:** `pnpm-lock.yaml:4928-5046`, `pnpm-lock.yaml:14342`
@@ -238,26 +161,9 @@ _(No Critical findings: no publicly exploited zero-days in production-runtime co
 - **Impact:** Markdown rendering bugs in the tutor chat interface will not be upstream-fixed. The `react-native: '*'` peer in pnpm-lock line 11364 means RN API changes could silently break rendering.
 - **Fix direction:** Evaluate a maintained alternative (e.g., `react-native-marked` or `@nozbe/watermelondb`'s text renderer). If staying with this package, add a custom fork or patch.
 
-### [Low] `check:root-deps` guard does not run in pre-commit hook
-
-- **File:** `.husky/pre-commit` (all lines), `scripts/check-no-mobile-deps-at-root.cjs`
-- **What:** The `check:root-deps` script (`scripts/check-no-mobile-deps-at-root.cjs`) prevents the NativeWind double-copy bug (mobile deps placed at root `package.json`). It runs in CI (`ci.yml:138`) but NOT in the pre-commit hook (`.husky/pre-commit` — checked all 119 lines). A developer could commit a `package.json` change that adds a mobile dep to root and the error would only surface in CI.
-- **Impact:** Fast feedback gap. The NativeWind styling breakage (documented in `.claude/memory/feedback_nativewind_root_pkg_split.md`) would be introduced and pushed to the remote branch before the guard fires.
-- **Fix direction:** Add `pnpm run check:root-deps` to `.husky/pre-commit`, before the `pnpm exec tsc --build` step, since it is instantaneous.
-
-### [Low] `verify:postinstall-safety` script exists but runs nowhere in CI or hooks
-
-- **File:** `package.json:46`, `scripts/verify-no-secret-postinstall.cjs`
-- **What:** The root `package.json` defines a `"verify:postinstall-safety"` script, but it is not invoked in any `.husky/` hook or `.github/workflows/` step (checked all 10 workflow files).
-- **Impact:** The postinstall-safety check — presumably verifying that no dependency's `postinstall` script can exfiltrate secrets — is dead. If a malicious package is added with a `postinstall` that reads `process.env`, no automated gate catches it.
-- **Fix direction:** Add `pnpm run verify:postinstall-safety` to the `pnpm install` step in CI (or as a separate CI step after install). This guards the supply chain attack vector of malicious `postinstall` hooks.
-
 ---
 
 ## Cross-lens findings
 
 - **Security/AuthZ lens:** The Clerk Core 2 → Core 3 migration affects auth session handling. The `@clerk/shared` version split (v3 vs v4) may affect token parsing logic across the auth boundary. Relevant to the auth/authz review.
 - **Architecture lens:** `next@14.2.35` pulled transitively by `@naxodev/nx-cloudflare` represents a phantom framework dependency — this project is Hono + Expo, not Next.js. The installed Next.js creates a fake `pages/` module that could confuse NX's dependency-graph inference.
-- **Performance lens:** The 4 copies of `@tanstack/query-core` (5.87.4 + 5.100.9 + 5.100.10 + 5.100.11) inflate the JS bundle. Metro's tree-shaking won't deduplicate different-versioned package copies, so all four are bundled.
-- **Mobile/native lens:** The Expo SDK 54 project declaring SDK 55 packages (`expo-haptics`, `expo-localization`, `expo-sensors`, `expo-speech`) is a build-time compatibility risk. The native layer mismatch will only surface on device, not in unit tests.
-- **Config/secrets lens:** The `verify:postinstall-safety` script being unwired from CI is a supply chain / secrets hygiene gap directly relevant to how secrets are handled in the build environment.

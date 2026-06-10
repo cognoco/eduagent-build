@@ -1,5 +1,7 @@
 # Architecture & conventions — Bug Review
 
+> **Pruned 2026-06-10** — findings verified FIXED against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 Lens: Architecture & conventions. Owned area: `apps/api/src/routes/**` vs `services/**`, `packages/**`, and the `eslint.config.mjs` governance rules (G1/G3/G4/G5/G8 + GC1/GC4/GC5). Branch: `new-llm`.
 
 ## Summary of posture
@@ -30,24 +32,6 @@ None.
 
 ## Medium
 
-### [Medium] Rate-limiting business logic defined in a route file and imported by another route
-- File: `apps/api/src/routes/consent.ts:76-137` (definitions); imported at `apps/api/src/routes/consent-web.ts:7-11` and used at `consent-web.ts:327-329`
-- What: `CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS`, `consentRespondTimestamps` (an in-memory `Map` rate limiter with LRU-style eviction), `resolveRateLimitIp()`, and `isConsentRespondRateLimited()` are defined in the `consent.ts` *route* file and re-imported by the `consent-web.ts` route. This is route-to-route coupling of shared stateful logic — the only such cross-route import in `routes/` (`grep "from './" routes/`).
-- Impact: Violates the route/service boundary — shared, stateful business logic (a rate limiter) lives in a route module and is depended on by a second route. Route handlers should be thin; cross-cutting logic shared by two endpoints belongs in `services/`. Coupling two route files also means a change to the consent route file can break the consent-web route at compile time.
-- Fix direction: Move the rate-limiter (window, map, eviction, `isRateLimited`, `resolveRateLimitIp`) into a `services/consent-rate-limit.ts` (or a generic `services/rate-limit.ts`) and have both routes import from there. Do NOT apply.
-
-### [Medium] Duplicated in-memory rate-limiter implementation across two route files
-- File: `apps/api/src/routes/consent.ts:76-137` and `apps/api/src/routes/feedback.ts:36-55`
-- What: `feedback.ts` defines its own `FEEDBACK_RATE_LIMIT_WINDOW_MS`, `FEEDBACK_RATE_LIMIT_MAX`, `feedbackTimestamps = new Map<string, number[]>()` and eviction loop — a near-identical reimplementation of the consent rate limiter. Two copies of the same windowed-Map rate-limit pattern now live in two route files.
-- Impact: Duplicated logic in route handlers (CLAUDE.md "Sweep when you fix": a drift with 2 sibling locations, trending toward 3+). A fix to one (e.g. eviction-bound bug) will not reach the other. Both also encode the same latent reliability assumption (in-process `Map` is per-isolate on Cloudflare Workers and resets on cold start) — see cross-lens.
-- Fix direction: Consolidate into a single shared `services/rate-limit.ts` helper parameterised by window/max/map; both routes call it. Do NOT apply.
-
-### [Medium] SSE `done` frame is a client contract built from a local interface, not a `@eduagent/schemas` Zod schema
-- File: `apps/api/src/routes/sessions.ts:144-182`
-- What: `interface DoneFrameSource` + `buildDoneFramePayload()` assemble the SSE `done` frame the mobile client consumes. The sibling `done`-path error and fallback frames ARE schematized in the shared contract package — `streamErrorFrameSchema` / `streamFallbackFrameSchema` in `packages/schemas/src/stream-fallback.ts:24,32` — and are `.parse()`d before emission (`sessions.ts:865,929`). The `done` frame has no equivalent: no `doneFrameSchema` / `streamDoneFrameSchema` exists in `packages/schemas/src` (verified by grep). Several fields are typed `unknown` (`fluencyDrill`, `challengeRound`, `draftedNote` at lines 151,154,156) and the `confidence` enum is redeclared locally (line 152).
-- Impact: A client-facing payload contract is defined and shaped inside a route handler with loose types, inconsistent with the rest of the same file and with the "`@eduagent/schemas` is the shared contract; do not redefine API-facing types locally" rule. There is no runtime validation that the emitted `done` frame matches what the mobile client expects, so a field rename/shape drift ships silently.
-- Fix direction: Add a `streamDoneFrameSchema` to `packages/schemas/src/stream-fallback.ts` (or a `stream-frames.ts`), type the `unknown` fields properly (reuse the existing fluency-drill / challenge-round / drafted-note schemas), and `.parse()` the payload before emitting — matching the error/fallback frames. Do NOT apply.
-
 ### [Medium] Stream completion fallback policy (stream → non-streaming retry, quota refund) is orchestrated in the route handler
 - File: `apps/api/src/routes/sessions.ts:697-1224`
 - What: The `POST /sessions/:sessionId/stream` handler contains the full failure-recovery policy inline: drain the LLM stream, on error decide whether to attempt a non-streaming `processMessage` fallback (skipping only `RateLimitedError`/safety-filter), classify the error into a stable `errorCode`, and conditionally call `safeRefundQuota` against the same pool the metering middleware decremented (`c.get('quotaDecrementSource')` etc., repeated at lines 844-846, 944-946, 1066-1068, 1213-1215). The zero-token-recovery branch and the fallback-frame branch each re-implement the refund call.
@@ -61,12 +45,6 @@ None.
 - What: `family-access.ts` is under `services/` but imports `Context, Env, Input` from `hono` (type-only) and several exports (`assertCanManageOwnConsent`, `assertOwnerAndParentAccess`, `assertOwnerProfile`) take a Hono `Context` and read `c.get('profileMeta')`.
 - Impact: A service reaching into the web framework's request context blurs the route/service boundary — these are really middleware/guard helpers, not framework-agnostic business logic. It is a minor smell, type-only, and documented in-file as a deliberate ergonomic tradeoff (each route keeps its own env type while the helper preserves the concrete shape). Low because it does not break any rule and the alternative (passing `profileMeta` explicitly) is a readability wash.
 - Fix direction: Optionally accept the resolved `profileMeta` (and `db`) as plain arguments instead of the whole `Context`, so the guards are pure functions. Defer / leave as-is unless the file is touched anyway.
-
-### [Low] In-code TODO acknowledging missing param validation across an endpoint family
-- File: `apps/api/src/routes/sessions.ts:184-187`
-- What: A `// [BUG-CONT-DEPTH-SWEEP]` comment notes that `zValidator('param', sessionIdParamsSchema)` should be applied to ALL `/:sessionId` endpoints (`/transcript`, `/evaluate-depth`, `/recall-bridge`, `/close`, …) for consistent UUID validation, but currently is not.
-- Impact: Inconsistent input-validation discipline across sibling endpoints in the same route file — some `:sessionId` handlers validate the UUID param via zod, others do not. Not a security hole on its own (downstream `getSession` is profile-scoped) but a convention gap that the comment itself flags as unfinished.
-- Fix direction: Apply `zValidator('param', sessionIdParamsSchema)` uniformly to every `/:sessionId` endpoint in `sessions.ts`. Do NOT apply.
 
 ## Cross-lens findings
 

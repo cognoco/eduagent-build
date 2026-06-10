@@ -1,5 +1,7 @@
 # Configuration & Secrets — Bug Review
 
+> **Pruned 2026-06-10** — findings verified FIXED against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 **Lens:** Configuration & secrets  
 **Owned area:** `apps/api/src/**` (process.env), config objects, eas.json, app.config, wrangler/doppler usage  
 **Reviewed:** 2026-06-09 on branch `new-llm`  
@@ -14,19 +16,6 @@ _No Critical findings._
 ---
 
 ## High
-
-### H1 — Staging API accessible via `*.workers.dev`, bypassing WAF and rate-limiting
-
-**File:** `apps/api/wrangler.toml:142`  
-**Code:** `workers_dev = true`
-
-The staging environment (`[env.staging]`) has `workers_dev = true`, which means Cloudflare auto-publishes the worker on `mentomate-api-stg.<subdomain>.workers.dev` in addition to the custom domain `api-stg.mentomate.com`. The `*.workers.dev` route bypasses any Cloudflare WAF, rate-limiting, or IP-allowlist rules that apply to the custom domain. Attackers and scrapers can reach staging auth, LLM, and data endpoints directly. Production correctly sets `workers_dev = false` (line 179).
-
-There is no guard test for the staging value. `apps/api/src/wrangler-config.test.ts` guards only production (`workers_dev = false`); staging is unguarded.
-
-**Fix direction:** Set `workers_dev = false` in `[env.staging]` and add a test assertion parallel to the production guard.
-
----
 
 ### H2 — `Bindings` type in `index.ts` is stale — missing 10+ bindings actually used at runtime
 
@@ -63,57 +52,7 @@ Because `c.env` uses the stale `Bindings` type, TypeScript silently allows `c.en
 
 ---
 
-### H3 — IDEMPOTENCY_KV missing for staging and production — replay deduplication is not operational
-
-**File:** `apps/api/wrangler.toml:121-130, 162-167`  
-**Config:** `apps/api/src/config.ts:125` (`ALLOW_MISSING_IDEMPOTENCY_KV`)
-
-The IDEMPOTENCY_KV KV namespace binding is commented out for all three environments with a TODO `[BUG-12]`. The namespace has not been created in the Cloudflare account. This means:
-
-- Billing webhooks (`apps/api/src/routes/resend-webhook.ts:322`) cannot deduplicate replayed events — a webhook replay can double-charge or double-credit a user.
-- RevenueCat webhooks similarly have no replay protection.
-- Production will refuse to start unless `ALLOW_MISSING_IDEMPOTENCY_KV="true"` is set in Doppler (the pre-launch override path). If that flag has been flipped to get staging/production running, the billing replay window is fully open.
-
-**Fix direction:** Create the IDEMPOTENCY_KV namespace in Cloudflare (Workers & Pages → KV → Create) for both staging and production. Uncomment the three bindings in `wrangler.toml`. Clear `ALLOW_MISSING_IDEMPOTENCY_KV` from Doppler. Add a wrangler-config.test.ts guard asserting IDEMPOTENCY_KV is bound in staging and production after it's wired.
-
----
-
 ## Medium
-
-### M1 — Hardcoded test seed password committed to repository
-
-**File:** `apps/api/src/services/test-seed.ts:62`  
-**Code:** `const DEFAULT_SEED_PASSWORD = 'Mentomate2026xK';`
-
-A concrete password string is committed to source. The comment acknowledges it must not appear in HaveIBeenPwned, but the risk is credential leakage through:
-1. Anyone with git clone access has the password.
-2. If any staging seed user is inadvertently created in production (wrong DB URL, schema drift), the password is known.
-3. If the same password is reused anywhere by a developer, that account is now exposed to anyone who reads this file.
-
-The code already reads from `SEED_PASSWORD` env var when available — the fallback exists solely for local convenience, but the convenience value is committed.
-
-**Fix direction:** Remove the hardcoded default. Require `SEED_PASSWORD` to be set from the environment; throw if absent in the seed routes rather than falling back to a committed value.
-
----
-
-### M2 — `EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1` not injected in OTA update step
-
-**File:** `.github/workflows/ci.yml:304-323`  
-**Related:** `apps/mobile/src/lib/analytics.ts:113`
-
-The OTA bundle step in CI injects `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`, `EXPO_PUBLIC_SENTRY_DSN`, and feature flags — but not `EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1`. Because `EXPO_PUBLIC_*` variables are baked into the bundle at build time, any OTA update published without this key will produce bundles that fall through to the unkeyed code path in `analytics.ts`:
-
-```
-// analytics.ts:113 (approximate) — falls through to 'unkeyed_' prefix
-```
-
-Profiles hashed with `unkeyed_` cannot be correlated across events in analytics, breaking attribution. More critically, if the unkeyed output ever reaches a logging pipeline expecting consistent profile identifiers, the privacy boundary (HMAC keying) is silently absent.
-
-The key is correctly excluded from `eas.json` via `EAS_JSON_DENYLIST` in `scripts/setup-env.js`, but the OTA CI step does not re-inject it from GitHub Secrets.
-
-**Fix direction:** Add `EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1: ${{ secrets.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 }}` to the OTA update step env block in `ci.yml`. Add the GitHub secret in the repository settings (via Doppler sync or manual entry).
-
----
 
 ### M3 — New-routing LLM vendor keys (Cerebras, Mistral, OpenAI) have no production boot-time guard
 
@@ -125,19 +64,6 @@ The key is correctly excluded from `eas.json` via `EAS_JSON_DENYLIST` in `script
 `GEMINI_API_KEY` remains required even though Gemini is blocked for under-18 users (per `project_google_gemini_vendor_under18_blocked.md`). This is a latent correctness issue: the required-key gate enforces the presence of a banned provider while not enforcing the presence of the replacement.
 
 **Fix direction:** When `LLM_ROUTING_V2_ENABLED` is set to `true` in production, `CEREBRAS_API_KEY` (and whichever secondary provider is chosen) should be required. Consider adding a conditional required-keys check in `validateProductionKeys()` that reads the routing flag and enforces the correct provider key set. At minimum, add `CEREBRAS_API_KEY` to `PRODUCTION_REQUIRED_KEYS` before flipping the v2 flag.
-
----
-
-### M4 — `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS/ANDROID` not injected in OTA update step
-
-**File:** `.github/workflows/ci.yml:304-323`  
-**Related:** `apps/mobile/src/lib/revenuecat.ts:18-21`
-
-Like M2, the OTA update CI step does not inject `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` or `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`. These are baked `EXPO_PUBLIC_*` vars excluded from `eas.json` via `EAS_JSON_DENYLIST`. An OTA update deployed without them will produce a bundle where `Purchases.configure()` receives empty strings, silently disabling in-app purchases for all users on that OTA channel until they reinstall a native build.
-
-`apps/mobile/src/lib/revenuecat.ts:18-21` returns `''` (empty string) with only a `console.error` when keys are missing — there is no hard fail that would surface the misconfiguration at configuration time.
-
-**Fix direction:** Add both RevenueCat key secrets to the OTA CI step env block. Add GitHub secrets. Additionally, harden `revenuecat.ts` to throw (or at least warn via Sentry) in non-development environments when the keys are absent.
 
 ---
 
@@ -171,16 +97,6 @@ Like M2, the OTA update CI step does not inject `EXPO_PUBLIC_REVENUECAT_API_KEY_
 The production required key gate enforces `GEMINI_API_KEY`. This is correct for the current (V1-off) routing posture. However, when `LLM_ROUTING_V2_ENABLED` flips on and Cerebras becomes the universal default, `GEMINI_API_KEY` should either be removed from `PRODUCTION_REQUIRED_KEYS` or remain only as long as Gemini is still in the fallback path. Keeping a banned-for-users key as a hard required key is confusing and will cause deployment failures if the Gemini key is intentionally rotated out.
 
 **Fix direction:** Document the intent in the required-keys list with a comment. Track removal in the LLM v2 cutover checklist.
-
----
-
-### L4 — Dev environment `workers_dev` not explicitly set to `false`; relies on Cloudflare default
-
-**File:** `apps/api/wrangler.toml` (top-level `[env]`, no explicit `workers_dev`)
-
-The dev environment (top-level wrangler config) does not set `workers_dev` explicitly. The Cloudflare default is `true` for dev environments. While this is intentional for local testing, it means dev workers are also published on `*.workers.dev` — developers testing against staging data or API keys over the dev route could expose secrets unintentionally.
-
-**Fix direction:** Add `workers_dev = true` explicitly with a comment "intentional for dev-tier testing" so future reviewers don't assume this is an oversight.
 
 ---
 
@@ -236,33 +152,15 @@ Silent degradation in billing configuration when `EXPO_PUBLIC_REVENUECAT_API_KEY
 
 **Owner suggestion:** billing lens.
 
-### XL3 — Webhook replay deduplication gap in billing webhook handler [billing/security lens]
-
-**File:** `apps/api/src/routes/resend-webhook.ts:322` (cross-reference of H3)
-
-H3 documents that IDEMPOTENCY_KV is not yet wired. The primary risk is in webhook replay on billing/RevenueCat routes. The security implication of an open replay window on billing webhooks belongs in both the config/infra lens (wrangler binding) and the billing/security lens (replay attack vector).
-
-**Owner suggestion:** security lens for the threat model; billing lens for RevenueCat webhook handler hardening.
-
-### XL4 — Hardcoded seed password in test-seed.ts may share namespace with real Clerk accounts [auth lens]
-
-**File:** `apps/api/src/services/test-seed.ts:62` (cross-reference of M1)
-
-If `SEED_CLERK_PREFIX` users are ever created in a non-test Clerk instance (wrong `DATABASE_URL` or wrong `CLERK_SECRET_KEY`), the committed password is known to anyone with repo access. The auth scoping of seed routes belongs with the auth or test-infrastructure lens.
-
-**Owner suggestion:** auth lens.
-
 ---
 
 ## Summary
 
 The configuration posture is generally sound: Doppler manages secrets, `config.ts` provides Zod-validated typed access, `scripts/setup-env.js` prevents sensitive keys from leaking into committed `eas.json`, and the deploy pipeline has explicit DATABASE_URL guards. The G4 ESLint rule is correctly enforced and raw `process.env` reads in production code are limited to explicitly-allowed files.
 
-The most significant gaps are:
+The most significant remaining gaps are:
 
-1. **Staging WAF bypass** (H1): `workers_dev = true` on staging exposes auth and LLM endpoints on an unguarded URL.
-2. **Bindings type staleness** (H2): 20+ active bindings are absent from the TypeScript `Bindings` type, eliminating compile-time safety for all middleware and route handlers accessing `c.env`.
-3. **IDEMPOTENCY_KV** (H3): Replay deduplication for billing webhooks is not operational in any environment; production requires an explicit prelaunch override to even boot.
-4. **OTA injection gaps** (M2, M4): RevenueCat and analytics HMAC keys are not injected in the OTA CI step, silently degrading in-app purchases and analytics privacy on OTA-updated builds.
+1. **Bindings type staleness** (H2): 20+ active bindings are absent from the TypeScript `Bindings` type, eliminating compile-time safety for all middleware and route handlers accessing `c.env`.
+2. **New vendor keys no boot guard** (M3): `CEREBRAS_API_KEY` absent from `PRODUCTION_REQUIRED_KEYS`; flipping `LLM_ROUTING_V2_ENABLED` without the key causes silent routing failure.
 
-Counts: Critical 0, High 3, Medium 4, Low 7.
+Counts: Critical 0, High 1, Medium 1, Low 6 (L1–L3, L5–L7). Cross-lens: XL1 (partial), XL2 (partial).

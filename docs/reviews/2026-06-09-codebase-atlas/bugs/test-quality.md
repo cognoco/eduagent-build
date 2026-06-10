@@ -1,5 +1,7 @@
 # Test Quality & Coverage — Review Report
 
+> **Pruned 2026-06-10** — findings verified FIXED/MOOT against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 **Lens:** Test quality & coverage  
 **Branch reviewed:** `new-llm`  
 **Date:** 2026-06-09  
@@ -143,52 +145,6 @@ jest.mock(
 
 ---
 
-### MEDIUM-2 — Weak `toBeTruthy()` assertions on security headers in CORS test
-
-**File:** `apps/api/src/middleware/cors.test.ts:145–153`
-
-```ts
-it('sets X-Frame-Options', async () => {
-  const res = await app.request('/v1/health');
-  expect(res.headers.get('X-Frame-Options')).toBeTruthy(); // any truthy value passes
-});
-
-it('sets Referrer-Policy', async () => {
-  const res = await app.request('/v1/health');
-  expect(res.headers.get('Referrer-Policy')).toBeTruthy(); // same
-});
-```
-
-Compare with line 142 which correctly asserts `toBe('nosniff')` for `X-Content-Type-Options`.
-
-**Impact:** A clickjacking protection regression (e.g., `X-Frame-Options: ALLOWALL` or an unexpected value) would pass these tests. Security header tests should assert the exact value.
-
-**Recommendation:** Replace `toBeTruthy()` with `toBe('DENY')` (or `'SAMEORIGIN'`, whatever the middleware actually sets) for `X-Frame-Options`, and `toBe('strict-origin-when-cross-origin')` (or the actual value) for `Referrer-Policy`.
-
----
-
-### MEDIUM-3 — Bare `toHaveBeenCalled()` on deletion and notification dispatch in critical flows
-
-**Files and lines:**
-
-- `apps/api/src/inngest/functions/consent-reminders.test.ts:397`
-  ```ts
-  expect(mockDeleteProfileIfNoConsent).toHaveBeenCalled();
-  // no argument check — wrong profileId would not be detected
-  ```
-
-- `apps/api/src/inngest/functions/daily-reminder-send.test.ts:304,392`
-  ```ts
-  expect(mockSendPushNotification).toHaveBeenCalled();
-  // no argument check — notification sent to wrong user would pass
-  ```
-
-**Impact:** Account deletion (`deleteProfileIfNoConsent`) and push notification dispatch (`sendPushNotification`) are verified to be called, but not that they are called with the correct profileId or recipient token. A scoping bug where the wrong profileId is used in the call would not be caught.
-
-**Recommendation:** Replace bare `toHaveBeenCalled()` with `toHaveBeenCalledWith(expect.objectContaining({ profileId: 'expected-id' }))` (or equivalent) for deletion calls. For push notifications, assert at minimum the target profile or device token.
-
----
-
 ### MEDIUM-4 — 20 integration test suites silently skip when `DATABASE_URL` is not set
 
 **Pattern:** 20 files use:
@@ -256,25 +212,11 @@ Mocking at the hook level skips all of: query key logic, cache invalidation beha
 
 ---
 
-### LOW-2 — Positive LLM routing tests on `new-llm` branch (cross-lens: positive)
-
-**Files:**
-- `apps/api/src/services/llm/router.fallback-compliance.test.ts` (173 lines) — proper `[BREAK]` tests for Gemini fallback exclusion with a documented RED-GREEN note
-- `apps/api/src/services/llm/router.v2-matrix.test.ts` (156 lines) — V2 routing matrix tests including Family-standard Gemini exclusion
-
-These are new on `new-llm` and follow Fix Development Rules correctly. Noting as positive evidence that the new-llm branch's security contract is properly tested.
-
----
-
 ## Cross-Lens Issues
 
 1. **Architecture/module-boundary lens:** `apps/api/src/services/llm/index.ts` exports `getFallbackConfigForTest`, `getModelConfigForTest`, `mockProvider`, `createMockProvider`, `_setOpenAIAdvancedModelForTesting`, `_getLlmRoutingV2Enabled` — test-only artifacts in the production barrel. This is both a test quality finding and an architecture finding.
 
-2. **Security lens:** `cors.test.ts` weak `toBeTruthy()` on `X-Frame-Options` and `Referrer-Policy` headers means a regression in clickjacking / referrer-leakage protection would pass CI. The security lens should flag this as an untested invariant.
-
-3. **Inngest/jobs lens:** `recall-nudge-send.test.ts` and `review-due-send.test.ts` mock `drizzle-orm` itself. The inngest-jobs lens should confirm whether either function has real integration test coverage exercising the multi-table join.
-
-4. **Error observability lens:** `consent-reminders.test.ts:397` and `daily-reminder-send.test.ts:304,392` have bare `toHaveBeenCalled()` on deletion and push-notification dispatch. If the error-observability lens covers incorrect-profileId dispatch patterns, these belong there too.
+2. **Inngest/jobs lens:** `recall-nudge-send.test.ts` and `review-due-send.test.ts` mock `drizzle-orm` itself. The inngest-jobs lens should confirm whether either function has real integration test coverage exercising the multi-table join.
 
 ---
 
@@ -284,8 +226,8 @@ These are new on `new-llm` and follow Fix Development Rules correctly. Noting as
 |----------|-------|
 | Critical | 0 |
 | High | 4 |
-| Medium | 6 |
-| Low | 2 |
+| Medium | 4 |
+| Low | 1 |
 
 ---
 

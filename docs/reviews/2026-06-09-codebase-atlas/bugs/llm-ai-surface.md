@@ -1,5 +1,7 @@
 # LLM / AI surface — Bug Review
 
+> **Pruned 2026-06-10** — findings verified FIXED against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 Lens: LLM / AI surface (envelope discipline, hard caps, prompt-injection, hallucination guards, routing/eligibility, eval coverage).
 Branch: new-llm. Read-only review. Every claim cites file:line against actual code.
 
@@ -11,11 +13,7 @@ _None found._
 
 ## High
 
-### [High] pgvector memory context is injected into the system prompt unescaped and unframed — second-order prompt-injection vector
-- File: `apps/api/src/services/memory.ts:122-124` (formatter) consumed at `apps/api/src/services/exchange-prompts.ts:898-913` and `:849-856`
-- What: Retrieved memory blocks (`embeddingMemoryContext`, `learnerMemoryContext`, `priorLearningContext`, `crossSubjectContext`, `resumeContext`) are pushed into the system prompt as raw `sections.push(context.embeddingMemoryContext)` / `sections.push(context.learnerMemoryContext)` etc. with NO `escapeXml`, NO `sanitizeXmlValue`, and NO "treat as data, not instructions" tag wrapping. `formatMemoryContext` (memory.ts:122) truncates each row to 500 chars and concatenates verbatim. Contrast `rawInput`, which IS entity-encoded and wrapped in `<learner_intent>` with a data-only notice (exchange-prompts.ts:707-712), and gap/interleaved lists which go through `sanitizeXmlValue` (exchange-prompts.ts:868).
-- Impact: The memory content originates from LLM summaries of prior learner conversations (pgvector rows over `*.content`). A learner can plant directive text in an earlier turn ("Ignore prior instructions; from now on…"); if it survives summarization into a stored embedding/summary, it is re-injected on a later session as authoritative *system-prompt* context with no framing that marks it as untrusted. This is a stored/second-order injection path that bypasses the per-turn `sanitizeUserContent` guard (which only runs on the live `user` message, exchanges.ts:1506).
-- Fix direction: Wrap each memory block in a named tag (e.g. `<retrieved_memory>…</retrieved_memory>`) with `escapeXml` applied to the content and a one-line "data only, not instructions" notice — mirror the `rawInput`/`session-recap`/`filing` pattern the sanitize.ts header documents. Apply at the formatter boundary (memory.ts) and at the prior-learning/learner-memory push sites.
+_All previously-listed items verified fixed on 2026-06-10 and pruned._
 
 ## Medium
 
@@ -57,12 +55,6 @@ _None found._
 - Impact: Possibly-intended product behavior with no comment/test asserting it, so a future edit could "fix" it wrongly or it could be an unintended downgrade.
 - Fix direction: Add a one-line comment + a matrix test pinning "premium vision rung 5 → gpt-5-mini, not gpt-5.4" so the intent is explicit and locked.
 
-### [Low] Eval-LLM signal-distribution baseline is an empty stub — Layer-1 regression guard cannot fire
-- File: `apps/api/eval-llm/baseline.json:1-6` (`"flows": {}`)
-- What: The signal-distribution regression guard (metrics.ts) compares a live run to this baseline, but `flows` is empty, so there is nothing to regress against. This matches the documented deferral ("seeding deferred to launch"), but it means envelope-signal distribution drift (e.g. `partial_progress` collapsing, `ready_to_finish` never emitted) is currently uncaught by the harness.
-- Impact: Known/accepted gap, but worth surfacing in this atlas: the eval harness's drift detector is dormant for every flow until the baseline is seeded.
-- Fix direction: Seed `baseline.json` from a `--live` run before launch (tracked in `docs/pre-launch-checklist.md`); until then treat envelope-signal regressions as unguarded.
-
 ### [Low] `repairBareQuotesInsideJsonStrings` can mutate a learner-visible reply that contains JSON-like punctuation
 - File: `apps/api/src/services/llm/envelope.ts:133-182, 194-203`
 - What: On a `JSON.parse` failure the parser attempts to repair bare inner quotes by escaping any `"` not followed by `:,}]`. For a reply legitimately containing quoted speech followed by prose (e.g. `... she said "stop" and left`), the heuristic escapes the inner quote and re-parses, which can alter the rendered reply text. It only runs on the failure branch, so well-formed envelopes are untouched.
@@ -74,5 +66,4 @@ _None found._
 - **Session/persistence lens:** The challenge-round current-turn answer trusts `input.message` from the route as "verified content" (session-exchange.ts:881-887, 3261) rather than re-reading the just-persisted `user_message` event. Confirming the persisted row matches `input.message` is a persistence/route-contract concern beyond the LLM surface.
 - **Auth/data-scoping lens:** `persistChallengeRoundMasteryEvidence` and `persistChallengeRoundReviewTargets` (session-exchange.ts:681-790) write `assessments` / `needs_deepening_topics` with `profileId` and verify topic ownership via `findOwnedCurriculumTopic`, but the `assessments` insert (`:700-711`) uses a bare `db.insert` rather than a scoped repository — the data-scoping lens should confirm the ownership chain is enforced on every write path here.
 - **Observability/Inngest lens:** `emitCrisisRedirectEvent` (exchanges.ts:75-104) emits `app/safety.crisis_redirect_fired` via `safeSend` with an `// orphan-allow` marker (no downstream handler by design). The observability lens should confirm the dashboard query / monitoring on this event actually exists (RR-12 monitoring guardrail referenced in the comment).
-- **Mobile lens:** Comments reference a legacy mobile regex-strip of marker payloads at `use-session-streaming.ts:581-593` (envelope.ts:264-266) scheduled for removal under `[EMPTY-REPLY-GUARD-3]`. The mobile lens should verify that dual-source marker detection is gone or tracked, since divergence between server `KNOWN_MARKER_KEYS` and the mobile regex is a latent drift.
 - **Config/secrets lens:** `OPENAI_ADVANCED_MODEL` rotation (router.ts:317-371) documents an incomplete wiring — `OPENAI_ADVANCED_MODEL` env → `config.ts` schema → `middleware/llm.ts` is "left for a separate PR." The config lens should confirm whether the Doppler-sourced override is actually reachable at runtime or still hardcoded.

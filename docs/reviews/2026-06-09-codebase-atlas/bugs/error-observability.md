@@ -1,5 +1,7 @@
 # Error Handling & Observability Audit
 
+> **Pruned 2026-06-10** — findings verified FIXED against `new-llm` HEAD were removed in this pass; only still-live findings remain below. Full original review is in git history.
+
 **Lens:** Error handling & observability  
 **Scope:** `apps/api/src/**`, `apps/mobile/src/**`  
 **Date:** 2026-06-09  
@@ -16,42 +18,6 @@ However, six specific sites violate the CLAUDE.md rule "silent recovery without 
 ---
 
 ## Critical Findings
-
-### C-1 — Push notification Expo API HTTP errors silently dropped
-**File:** `apps/api/src/services/notifications.ts:134-136`
-
-```ts
-if (!response.ok) {
-  return { sent: false, reason: `expo_api_error_${response.status}` };
-}
-```
-
-Neither `logger.error` nor `captureException` is called on a non-2xx response from the Expo Push API. The network-error path immediately below (line 142-153) correctly logs and captures. The HTTP-error path returns a reason string that is consumed by callers but never surfaced in Sentry. Push delivery failures due to Expo API rejections (rate-limit on the push API, malformed tokens, service outages) are completely invisible.
-
-**Impact:** Push notifications silently fail for users. No Sentry alert, no structured metric. Violates CLAUDE.md "silent recovery without escalation is banned."
-
-**Fix direction:** Mirror the network-error catch block — add `logger.error('[push] Expo API error', { event: 'notification.push.expo_api_error', status: response.status, ... })` and `captureException(new Error(...), ...)` before the return.
-
----
-
-### C-2 — Email (Resend API) HTTP errors: logger only, no Sentry capture
-**File:** `apps/api/src/services/notifications.ts:332-336`
-
-```ts
-if (!response.ok) {
-  // Log only status code — error body may contain PII
-  logger.error('[email] Resend API error', { status: response.status });
-  return { sent: false, reason: `resend_api_error_${response.status}` };
-}
-```
-
-The comment acknowledges a logging sweep happened, but unlike the network-error path at lines 341-353 which adds `captureException`, the HTTP-error branch only calls `logger.error`. A structured log alone cannot be queried "how often did this fire in the last 24 hours" without a log-aggregation query — the same concern the comment on the network-error path cites as the reason for adding Sentry there. Email delivery failures from API errors (wrong API key, Resend rate-limit, service outage) generate no Sentry alert.
-
-**Impact:** Email notifications silently fail on HTTP errors. No Sentry alert. Violates CLAUDE.md "if you can't query how many times the fallback fired in the last 24 hours, the 'recovery' is invisible."
-
-**Fix direction:** Add `captureException(new Error(\`Resend API ${response.status}\`), { tags: { surface: 'email', reason: \`http_${response.status}\` } })` after the `logger.error` call, matching the network-error pattern.
-
----
 
 ### C-3 — MeteringError from quota decrement returns 500 with no Sentry capture
 **File:** `apps/api/src/middleware/metering.ts:748-751`
@@ -77,27 +43,6 @@ The global `onError` at `apps/api/src/index.ts:479-500` only fires for uncaught 
 
 ---
 
-### C-4 — Clerk API non-2xx on email lookup swallowed without log or capture
-**File:** `apps/api/src/services/clerk-user.ts:173-179`
-
-```ts
-if (!res.ok) {
-  return {
-    ok: false,
-    reason: 'lookup-unavailable',
-    message: 'We could not verify your account right now...',
-  };
-}
-```
-
-The network-error path immediately above (lines 155-170) correctly calls `logger.warn` and `captureException`. The HTTP-error branch returns `lookup-unavailable` silently. Any Clerk API degradation (4xx from Clerk — bad key, user not found on a webhook-created account, Clerk rate-limit, 5xx) produces no log entry and no Sentry event. Since this function gates email verification in the auth middleware, auth failures from Clerk API errors are invisible.
-
-**Impact:** Auth email-verification failures from Clerk API errors are unobservable. Contrast with the deletion path in the same file (`deleteClerkUser`, lines 277-285) which correctly throws + captures. Inconsistent treatment of the same API for a higher-severity operation (auth gating vs. post-deletion cleanup).
-
-**Fix direction:** Add `logger.warn('[clerk-user] verified-email lookup failed', { event: 'clerk_user.lookup.http_error', userId, status: res.status })` and `captureException(new Error(...), { userId, tags: { surface: 'clerk_lookup', reason: \`http_${res.status}\` } })` before the return, matching the network-error pattern.
-
----
-
 ## High Findings
 
 ### H-1 — Env validation failure: logger only, no Sentry capture
@@ -116,33 +61,6 @@ A misconfigured Worker deployment (missing required env var, wrong type) logs to
 **Impact:** Misconfigured deployments generate no Sentry alert. Operational incident triage is blind.
 
 **Fix direction:** Add `captureException(err instanceof Error ? err : new Error(message), { tags: { surface: 'env_validation' } })` after `logger.error`.
-
----
-
-### H-2 — RevenueCat identity sync: breadcrumb-only on MAX_RETRIES exhaustion
-**File:** `apps/mobile/src/hooks/use-revenuecat.ts:83-101`
-
-```ts
-} catch (error) {
-  Sentry.addBreadcrumb({
-    category: 'revenuecat',
-    message: `Identity sync failed: ...`,
-    level: 'warning',
-    data: { userId, attempt: retryCountRef.current + 1 },
-  });
-  if (retryCountRef.current < MAX_RETRIES) {
-    retryCountRef.current += 1;
-    retryTimerRef.current = setTimeout(() => void syncIdentity(), 3000);
-  }
-  // No action when MAX_RETRIES exhausted — identity stays anonymous
-}
-```
-
-When all retries are exhausted the catch block does nothing beyond the breadcrumb that was already added on the first attempt. RevenueCat silently remains in anonymous mode. Billing receipts from this session will be attributed to the anonymous ID, not the user. Since `captureException` is never called, the breadcrumb only surfaces if a different exception later triggers a Sentry event in the same session. There is no alert on retry exhaustion.
-
-**Impact:** Silent billing identity mismatch — RevenueCat stays anonymous after MAX_RETRIES, breadcrumb-only evidence. CLAUDE.md "silent recovery without escalation is banned" in billing code.
-
-**Fix direction:** After the `retryCountRef.current < MAX_RETRIES` branch, add an `else` block: `Sentry.captureException(error instanceof Error ? error : new Error(String(error)), { tags: { surface: 'revenuecat_identity', reason: 'max_retries_exhausted' }, extra: { userId } })`.
 
 ---
 
@@ -233,17 +151,6 @@ The retry wrapper adds an `addBreadcrumb` on each retry attempt and throws the f
 
 ---
 
-### L-2 — clerk-user.ts resolveVerifiedClerkEmail: res.json() catch discards parse error
-**File:** `apps/api/src/services/clerk-user.ts:182`
-
-```ts
-const payload = await res.json().catch(() => null);
-```
-
-A JSON parse failure on a 2xx Clerk response returns `null` silently. `extractVerifiedPrimaryEmail(null)` returns `null`, triggering the `email-missing` branch. There is no log or capture to distinguish "Clerk returned malformed JSON" from "Clerk returned a user with no email." Very low probability but structurally invisible.
-
----
-
 ## Confirmed-Good Patterns (for reference)
 
 The following were audited and found correctly implemented:
@@ -262,7 +169,7 @@ The following were audited and found correctly implemented:
 - `apps/mobile/src/app/(app)/session/_components/SessionErrorBoundary.tsx` — Session crash → captureException with screen/crashLocation tags.
 - `apps/mobile/src/providers/OutboxDrainProvider.tsx` — Replay + escalate failures → captureException.
 - `apps/mobile/src/lib/sign-out.ts` — `ClerkSignOutTimeoutError` → captureMessage on timeout.
-- `apps/api/src/services/clerk-user.ts:deleteClerkUser` — Non-2xx + network error both throw + capture (correct pattern; contrast with `resolveVerifiedClerkEmail` finding C-4).
+- `apps/api/src/services/clerk-user.ts:deleteClerkUser` — Non-2xx + network error both throw + capture.
 
 ---
 
@@ -270,16 +177,11 @@ The following were audited and found correctly implemented:
 
 | ID  | Severity | File | Lines | Rule Violated |
 |-----|----------|------|-------|---------------|
-| C-1 | Critical | `apps/api/src/services/notifications.ts` | 134-136 | Silent recovery in notification code |
-| C-2 | Critical | `apps/api/src/services/notifications.ts` | 332-336 | Silent recovery in notification code |
 | C-3 | Critical | `apps/api/src/middleware/metering.ts` | 748-751 | Silent recovery in billing code |
-| C-4 | Critical | `apps/api/src/services/clerk-user.ts` | 173-179 | Silent recovery in auth code |
 | H-1 | High | `apps/api/src/middleware/env-validation.ts` | 74-82 | Missing captureException on operational failure |
-| H-2 | High | `apps/mobile/src/hooks/use-revenuecat.ts` | 83-101 | Silent billing identity exhaustion |
 | H-3 | High | `apps/mobile/src/app/_layout.tsx` | 81-94 | No MutationCache.onError global handler |
 | M-1 | Medium | `apps/api/src/route-utils/sse-utf8.ts` | 66-88 | SSE primary error no-onError path invisible |
 | M-2 | Medium | `apps/api/src/routes/assessments.ts` | 277-287 | captureException without logger.error |
 | M-3 | Medium | `apps/api/src/inngest/functions/trial-expiry-failure-observe.ts` | 48 | Deferred retry with no actionability |
 | M-4 | Medium | `apps/mobile/src/app/(app)/quiz/play.tsx` | 254, 340, 588 | Bare captureException without context |
 | L-1 | Low | `apps/api/src/services/transient-db-retry.ts` | 84-95 | Final throw not self-captured by wrapper |
-| L-2 | Low | `apps/api/src/services/clerk-user.ts` | 182 | Silent JSON parse failure on 2xx response |
