@@ -1,0 +1,54 @@
+<svg viewBox="0 0 230 185" xmlns="http://www.w3.org/2000/svg">
+  <!-- The Mentor — LOCKED character design (brainstorm v13, 2026-06-10).
+       Spec: docs/specs/2026-06-10-mentor-mascot-and-birth-animation.md
+       Code mirror: apps/mobile/src/components/common/mentor-mascot-geometry.ts (MASCOT_HERO)
+       Brand-fixed colors by design: body gradient #14b8a6→#0d9488, arms #0d9488/#0f766e,
+       suckers #99f6e4, beanie #8b5cf6/#a78bfa, pupils/smirk #1a1a3e, lid crease #0a5d55. -->
+  <defs>
+    <linearGradient id="body" x1="0" y1="8" x2="0" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#0d9488"/>
+    </linearGradient>
+  </defs>
+  <!-- arms: tapered closed shapes, tucked under the body, alternating depths -->
+  <path d="M74,76 C48,66 38,92 8,52 C2,68 22,98 76,92 Z" fill="#0d9488"/>
+  <path d="M80,88 C54,100 44,116 26,136 C22,142 28,150 34,144 C50,126 64,112 86,100 Z" fill="#0f766e"/>
+  <path d="M92,96 C84,120 74,134 64,156 C61,164 70,170 74,162 C84,142 94,120 102,100 Z" fill="#0d9488"/>
+  <path d="M106,98 C104,124 96,142 104,164 C107,172 116,170 114,161 C110,142 116,120 118,100 Z" fill="#0f766e"/>
+  <path d="M122,96 C132,120 144,132 154,152 C158,160 150,166 146,158 C136,138 122,118 112,100 Z" fill="#0d9488"/>
+  <path d="M132,88 C158,100 174,104 192,124 C198,131 192,140 186,133 C170,114 148,104 128,98 Z" fill="#0f766e"/>
+  <path d="M138,74 C166,64 186,90 222,50 C228,66 206,96 142,92 Z" fill="#0d9488"/>
+  <!-- body: head circle + skirt ellipse sharing one userSpaceOnUse gradient (seamless) -->
+  <circle cx="110" cy="54" r="46" fill="url(#body)"/>
+  <ellipse cx="110" cy="86" rx="46" ry="16" fill="url(#body)"/>
+  <!-- beanie: the permanent violet identity tell -->
+  <path d="M76,32 a34,24 0 0 1 68,0 z" fill="#8b5cf6"/>
+  <rect x="72" y="24" width="76" height="9" rx="4.5" fill="#a78bfa"/>
+  <!-- suckers: graduated, larger near body, smaller toward tips -->
+  <ellipse cx="52" cy="76" rx="3.5" ry="2.4" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="32" cy="72" rx="2.8" ry="2" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="16" cy="62" rx="2" ry="1.4" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="58" cy="108" rx="3" ry="2.2" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="40" cy="126" rx="2.2" ry="1.6" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="80" cy="128" rx="3" ry="2.2" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="70" cy="150" rx="2" ry="1.5" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="106" cy="130" rx="3" ry="2.2" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="106" cy="152" rx="2" ry="1.5" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="136" cy="130" rx="3" ry="2.2" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="146" cy="150" rx="2" ry="1.5" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="162" cy="110" rx="3" ry="2.2" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="180" cy="124" rx="2.2" ry="1.6" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="172" cy="76" rx="3.5" ry="2.4" fill="#99f6e4" opacity=".9"/>
+  <ellipse cx="200" cy="68" rx="2.5" ry="1.8" fill="#99f6e4" opacity=".9"/>
+  <!-- eyes: deadpan — white ball, low pupil, flat skin-gradient lid over the top third, crease line -->
+  <circle cx="94" cy="46" r="11" fill="#ffffff"/>
+  <circle cx="94" cy="48" r="5" fill="#1a1a3e"/>
+  <path d="M83.4,43 A11,11 0 1 1 104.6,43 Z" fill="url(#body)"/>
+  <path d="M83.4,43 H104.6" stroke="#0a5d55" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="126" cy="46" r="11" fill="#ffffff"/>
+  <circle cx="126" cy="48" r="5" fill="#1a1a3e"/>
+  <path d="M115.4,43 A11,11 0 1 1 136.6,43 Z" fill="url(#body)"/>
+  <path d="M115.4,43 H136.6" stroke="#0a5d55" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- smirk -->
+  <path d="M100,66 q10,6 19,-1" fill="none" stroke="#1a1a3e" stroke-width="3" stroke-linecap="round"/>
+</svg>
