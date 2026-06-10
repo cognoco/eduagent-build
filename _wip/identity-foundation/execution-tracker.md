@@ -139,7 +139,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **review** — Stage=Reviewing 2026-06-10, PR #855 MERGED 23:01Z (shepherd-verified: 6/6 green; age changes canon-backed by data-model §2A.5 + compliance register; loginId-FK P2 dispositioned in-thread); awaiting `/cosmo:review` |
 | WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **in-progress** — executor dispatched 2026-06-11 (`wi571-executor`, `.worktrees/WI-571`, parallel with WI-572) |
-| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **in-progress** — executor dispatched 2026-06-11 (`wi572-executor`, `.worktrees/WI-572`, parallel with WI-571) |
+| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **review** — Stage=Reviewing 2026-06-11, PR #859 MERGED 23:33Z (shepherd-verified: 6/6 green, 0 open threads, SCC break independently verified — import graph now a DAG via `age-utils` leaf + `notifications/email` extraction); no reintroduction guard test added (consider for W2); awaiting `/cosmo:review` |
 | WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **ready** — refined 2026-06-10 (Assisted; framing checklist confirmed) |
 
 ### W2 — identity / consent / proxy / age (critical path)
