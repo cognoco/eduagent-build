@@ -185,6 +185,17 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   only `"organizations"`/`"memberships"`; anything else → stop), post-reset
   evidence (staging migrate clean re-run), then `/cosmo:execute complete`.
   PR #845 stays UNMERGED — merge is an operator/shepherd seam at review.
+  **Step-0 verification fired matrix (c) and stopped (correctly):** T1 tables
+  populated on BOTH DBs (dev 1339/1332 rows = 0106-backfill mirror of accounts;
+  staging 49/28 = spillover-test artifacts), 0106 WAS applied to staging
+  (journal id=107 — the "never applied" premise was wrong), plus an orphaned
+  early-0107 `sturdy_monster_badoon` journal row + `nudge_direction` enum from
+  a since-deleted migration. Shepherd ruled GO 2026-06-10 late: dev
+  `db:push:dev --force`; staging `DROP TABLE IF EXISTS organizations,
+  memberships CASCADE` → migrate; hygiene drops of the four orphan artifacts
+  (`profiles.clerk_user_id`, `subscriptions.organization_id`,
+  `nudges.direction`, `nudge_direction` type) approved with IF EXISTS guards;
+  erratum recorded in migrations README + completion summary (NOT in the ADR).
 - **Refined and queued: ALL of W1** — WI-570, WI-571, WI-572, WI-573 are
   Ready + Assisted as of 2026-06-10 (570/571/572 bridged per the §2 ruling;
   children WI-591/592, WI-594/595, WI-596/597). Execution order on dependency
