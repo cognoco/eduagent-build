@@ -30,7 +30,7 @@ Flag reality (build-time, `feature-flags.ts:30-31`): **production build ships `M
 | ACCOUNT-34 | Brand-new signup with preview state | Save wizard child/both targets: adult-owner gate (`ADULT_OWNER_GATE_ENABLED=true`) blocks child creation unless owner birthYear computes adult; child-POST failure keeps parent + inline retry; child branch lands home. |
 | ACCOUNT-03 | Adult owner (18+ via `isAdultOwner`) only | Add child: More hub `add-child-link` (gated `gates.showAddChild`), ParentHomeScreen "Add child", or auto-chain after first profile. Inline consent grant (parent is consenting adult); parent stays on own profile. Server enforces 11+ floor. Child/proxy blocked (ACCOUNT-36 blocked screen). |
 | ACCOUNT-05, ACCOUNT-35 | Owner at tier cap | More hub does NO tier check — enforcement is server 402 `PROFILE_LIMIT_EXCEEDED` → "Upgrade required" alert → "See plans" → `/(app)/subscription` (BUG-947). |
-| ACCOUNT-04 | All profiles on account; owner-special behavior | Profile switching = `/profiles` modal via More → Account (sole switching UI; `ProfileSwitcher` component is orphaned, rendered nowhere). Owner tapping a child row does NOT switch — sets mode=family + pushes child settings (BUG-774). Plain switch always clears proxy; no production UI passes `proxyMode:true`. |
+| ACCOUNT-04 | All profiles on account; owner-special behavior | Profile switching = `/profiles` modal via More → Account (sole switching UI). Owner tapping a child row does NOT switch — sets mode=family + pushes child settings (BUG-774). Plain switch always clears proxy; no production UI passes `proxyMode:true`. |
 | ACCOUNT-37 | Owner renames anyone; non-owner self only | Inline rename modal in `/profiles`. |
 | ACCOUNT-25, ACCOUNT-41 | Owner with linked child only | GDPR consent management: child detail `?mode=settings` → `ConsentManagementSection`. Withdraw (destructive confirm) → `PUT /consent/:childId/revoke` → WITHDRAWN + 7-day deletion grace; restore (`410` if grace expired). WITHDRAWN child detail short-circuits to `consent-withdrawn-empty-state` + restore CTA; `grace-period-banner` shows days remaining; home shows per-child `WithdrawalCountdownBanner` with one-tap Reverse. E2E `parent/consent-management.yaml`. |
 | ACCOUNT-27 | Parent OUTSIDE the app | Consent approve/deny is **server-web only**: email link → `GET /v1/consent-page` → server-rendered pages; denial cascade-DELETES the child profile. No mobile route. Mobile JSON twin dormant. |
@@ -108,7 +108,7 @@ Owned by `docs/flows/student-flow-access-inventory.md`, not duplicated here: AUT
 - Contract route-key mismatch: `FAMILY_CHILD_ROUTES` key `child/[profileId]/reports/weekly` has no matching screen file (actual: `weekly-report/[weeklyReportId].tsx`).
 - PARENT-23: demo-dashboard fallback at zero children can mask a genuine empty state.
 - E2E holes: no YAML for ModeSwitcher switching (HOME-11), proxy shell (HOME-12), Learn Together sheet (PARENT-20), child-cap banners (PARENT-21), in-chat quota card (BILLING-13).
-- Orphans relevant here: `guided-ratio` vocab copy (PARENT-09), `ProfileSwitcher` component (ACCOUNT-04), child-paywall subscription mode (BILLING-06), proxy shell itself (HOME-12).
+- Orphans relevant here: `guided-ratio` vocab copy (PARENT-09), child-paywall subscription mode (BILLING-06), proxy shell itself (HOME-12).
 
 ## Historical walkthrough evidence (pre-2026-06-09, unverified)
 

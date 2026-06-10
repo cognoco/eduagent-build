@@ -1,7 +1,7 @@
 # Mentor-Is-The-App — Shell Redesign Spec
 
-**Status:** Draft · 2026-06-09 · **Branch:** `new-llm` · **Profile:** design
-**Problem source:** ~88 screens exist; most users never discover more than ~10. This is a **discovery problem, not a navigation problem** — the goal is to serve users what they don't know exists, at the right time.
+**Status:** Draft · 2026-06-09 (adversarial-review amendments 2026-06-10, see Annex B; end-user-lens amendments 2026-06-10, see Annex C) · **Branch:** `new-llm` · **Profile:** design
+**Problem source:** ~90 screens exist; most users never discover more than ~10. This is a **discovery problem, not a navigation problem** — the goal is to serve users what they don't know exists, at the right time. **Evidence caveat:** the "<10 screens" figure is inferred from the [codebase atlas](../reviews/2026-06-09-codebase-atlas/INDEX.md) (a code inventory), **not** from production usage telemetry — the app is pre-launch. The discovery thesis is a hypothesis to validate, not a measured fact; §11 treats S1–S2 as the bet that *buys* the evidence (S2→S3 evidence gate).
 **Inputs:** [30-agent codebase atlas](../reviews/2026-06-09-codebase-atlas/INDEX.md) · [One-screen second opinion](../reviews/2026-06-09-codebase-atlas/one-screen-second-opinion.md) (frequencies synthesis — this spec rules its open fork, see §10) · ratified identity model (`_wip/identity-foundation/`, person-based, edge-scoped mentor) · [audience matrix](../audience-matrix.md)
 **What this spec is:** the converged product direction from the 2026-06-09 brainstorm — vision, shell, scope model, privacy contract, backend primitives, strangle sequencing. It is **not** an implementation plan; each phase in §11 gets its own plan under `docs/plans/` before build.
 **ADR obligations:** §12 lists the ADR-class decisions inside this spec. None is ratified until its `MMT-ADR` lands in lockstep with the canon change (per MMT-ADR-0000). Until then this document is direction, not law.
@@ -10,9 +10,9 @@
 
 ## 1. Vision
 
-**The mentor is the app.** Today the app is 88 rooms and the mentor lives in one of them. The redesign inverts this: the user's primary surface is the mentoring relationship, and screens exist only where a persistent surface genuinely beats a conversation moment. Target: ~88 screens → ~25.
+**The mentor is the app.** Today the app is ~90 rooms and the mentor lives in one of them. The redesign inverts this: the user's primary surface is the mentoring relationship, and screens exist only where a persistent surface genuinely beats a conversation moment. Target: ~90 screens → ~25 (the ~25 is **aspirational**, pending the per-phase collapse inventory in §11/Annex A — not a committed count).
 
-Executed as a **strangle, not a greenfield rewrite**: every step in §11 is independently shippable, independently reversible, and independently valuable. The existing 88 screens remain the deterministic floor until evidence retires them.
+Executed as a **strangle, not a greenfield rewrite**: every step in §11 is independently shippable, independently reversible, and independently valuable. The existing ~90 screens remain the deterministic floor until evidence retires them.
 
 ## 2. Principles (acceptance criteria, not vibes)
 
@@ -22,7 +22,7 @@ Each principle has a mechanism and a checkable form:
 |---|---|---|---|
 | P1 | **Mentor drives, user steers** — at every layer the mentor proposes, the user can always decline or redirect | `GET /now` ranked feed + ever-present input bar | Every proposal surface has a decline; the input bar is reachable from every scope |
 | P2 | **Moments, not screens** — value arrives as a moment in the feed, not a destination to discover | Activity ledger rows → feed cards | No new feature ships as a destination screen if its value is a moment |
-| P3 | **Park-and-return is the magic** — "I don't get this, later" is honored and comes back | Existing primitives (parking lot, due-queue, `needs_deepening_topics`) surfaced through the feed + conversation | Park-and-return scenarios in the eval harness (`pnpm eval:llm`) **before** the exit funnel is dissolved; deterministic backstop in `/now` ranking (§8.1) |
+| P3 | **Park-and-return is the magic** — "I don't get this, later" is honored and comes back | Existing primitives (parking lot, due-queue, `needs_deepening_topics`) surfaced through the feed + conversation | Park-and-return scenarios in the eval harness (`pnpm eval:llm`) **before** the exit funnel is dissolved; one scenario asserts a parked item surfaces within its window **even while higher-priority cards compete for the ≤3 feed slots** (backed by the §8.1 overflow affordance, EU-3); deterministic backstop in `/now` ranking (§8.1) |
 | P4 | **The mentor narrates the invisible machine** — the 58+ Inngest functions become visible as mentor activity | Activity ledger, **template-rendered by default; LLM only when genuinely personal** | Every ledger `templateKey` renders without an LLM call; LLM narration is an explicit opt-in per row kind |
 
 P2 and P4 share one mechanism (the ledger): P2 is what the user experiences, P4 is how the machine produces it.
@@ -48,28 +48,34 @@ Everyone sees the same three tabs. Tab *shape* never varies by role, age, mode, 
 
 **App-open lands on the Mentor tab as a card feed** (deterministic, instant), not auto-opened into chat. This rules the second-opinion doc's open fork as **option A** — the proposal is glanceable and the conversation is opt-in per session, preserving the deterministic floor.
 
+**Layout floor for the homework affordance (EU-5).** Option A foregrounds *app-proposed* work, but homework is the homework-kid's actual reason for opening the app (§4.1) — so the input bar's **camera + Homework chip must be reachable without scrolling past the feed** on app-open (pinned input bar; on a school-day / weekday-evening heuristic the Homework chip may surface above the card stack). The glanceable proposal and one-tap homework coexist; the feed must never bury the bar beneath the app's own agenda.
+
 ## 4. Scope model — the chip
 
-**A scope is not a person's world — it is a relationship lens.** Me scope = my relationship with my own learning. Emma scope = my relationship with *Emma's* learning, rendered from edge-data the mentor maintains for me — never from Emma's private space. Scope-switching is never impersonation and never proxy. Same chip, same three tabs in every scope; only the lens changes.
+**A scope is not a person's world — it is a relationship lens.** Me scope = my relationship with my own learning. Emma scope = my relationship with *Emma's* learning. Its **structural layer** (subjects, mastery, activity, next-up) is read **live from Emma's data through a server-enforced permission mask** — not a separate edge-replicated copy — and **never her artifacts** (notes, Journal, mentor memory, chats), for which **no supporter read path exists on any edge**. The phrase "never from Emma's private space" scopes precisely to those artifacts, not to the grades layer (this resolves the §4↔§6.3 tension; see §6.1). Scope-switching is never impersonation and never proxy. Same chip, same three tabs in every scope; only the lens changes.
 
 ### 4.1 Two account shapes, one shell
 
 | Shape | Chip | Default scope |
 |---|---|---|
-| **Learner** (solo, or credentialized teen) | No chip (single implicit Me) | Me |
+| **Learner** (solo **adult self-directed learner**, solo child, or credentialized teen) | No chip (single implicit Me) | Me |
 | **Supporter** | `[ Support hub ] [ <person> ]… [ Me — only if/when they study ]` | Support hub |
 
 Today's matrix — guardian/learner tab shapes × V0/V1 × proxy mode × isOwner branching — collapses into chip scopes. "Supporter" is role-generic (parent, grandparent, any adult with an edge to a "charge" in the identity canon's terms); nothing in the model assumes "family".
+
+**The adult self-directed learner is a first-class persona, not an afterthought.** A motivated adult (language, exam/cert prep, upskilling) is the segment with the most standalone and revenue value, and is served *worst* by today's family/guardian-shaped matrix (they get a degraded family layout). In this model they are simply a Learner shape, no chip, default Me — full Mentor/Subjects/Journal. This persona is the **primary justification for keeping Subjects and Journal as full, persistent tabs** (§3): adults navigate to subjects deliberately and revisit their own notes/Journal as a matter of course. The homework-kid persona naturally collapses into Mentor-tab-only usage and harmlessly ignores the other two tabs — so one shell serves both without forcing either (this is the resolved one-surface-vs-three-tab fork; see §15.11).
 
 ### 4.2 Supporter lifecycle (three states)
 
 1. **Signed up, nothing linked.** Chip shows Support hub only; the hub's content *is* the linking flow ("who are you supporting?" → invite/link). No Me scope, no empty learner furniture.
 2. **Linked.** Hub + one scope per linked person. Hub = everything *addressed to the supporter*; person scopes = the relationship lens on each person (§6). The hub never duplicates a person's world; a person's scope never contains things addressed to the supporter.
-3. **Supporter starts studying.** A **Me** scope appears in the chip — full learner experience. Default scope **stays the Support hub**. If they stop studying, Me persists (their Journal record remains) but goes quiet.
+3. **Supporter starts studying.** A **Me** scope appears in the chip — full learner experience. **Default scope = last-active scope (or a user-set preference), not a hardwired Support-hub default (EU-4).** The "supporter who only dabbles" still lands in the hub because that is where they last were; the **adult who is both a serious learner and a supporter** (the §4.1 high-value persona) lands in Me without paying a scope-switch tax on their own studying at every app-open. If they stop studying, Me persists (their Journal record remains) but goes quiet.
 
 **Ruled: a supporter has no personal learner space until they actively start studying.** "Parent is a learner too by default" was rejected as behaviorally false — most supporters won't study, and a default scope with empty learner furniture is the design apologizing for itself.
 
 Keep hub and person scopes separate even with a single linked person — the hub answers "what should I, the supporter, know or do?" (addressed to me); the person scope answers "what is my relationship with Emma's learning?". Collapsing them re-creates parent-flavored re-renderings that drift.
+
+**Link revocation is a fourth lifecycle state (EU-7).** Because a credentialized person owns their own rights (§6.2), they can **end sharing** at any time — and today the *only* revocation path in code is guardian-initiated for managed under-13 accounts (`apps/api/src/inngest/functions/consent-revocation.ts`), so kid-initiated revocation is net-new for the 13+ tier. When a supportee revokes: the supporter sees a plain hub card ("Emma ended sharing") — **never a silent disappearance** — the person scope retires from the chip, and an S5-specced grace/notice window governs the handoff. The supportee-side flow (kid-initiated unlink, confirmation, exactly what the supporter will be told) is an S5 deliverable and a **safety/autonomy** surface, not merely an admin action. Managed-tier revocation stays guardian-initiated per the existing consent-revocation flow.
 
 ## 5. The Subjects tab — hub anatomy
 
@@ -78,7 +84,7 @@ One hub per subject, merging today's shelf + `progress/[subjectId]` + scattered 
 1. **"Next up" block on top** — the computed continuation (same source as the `/now` card), so a learner who just wants to keep going never reads the tree.
 2. **Chapter sections below** — collapsible sections on the hub screen (not separate screens), topics inside with mastery state.
 3. **Topic detail = sheet**, slid up over the hub, with detail and actions.
-4. Subject-scoped notes live on the hub; the cross-subject notes view lives in Journal. **One store, two origins (my notes vs saved-from-mentor, authorship always visible), two views.**
+4. Subject-scoped notes live on the hub; the cross-subject notes view lives in Journal. **One store, two origins (my notes vs saved-from-mentor, authorship always visible), two views.** The Journal cross-subject view is **browsable, not search-only (EU-6)** — a scannable "everything I've saved" surface — since the Library tab's demotion to search-first (§7) otherwise drops the *browse* mode the adult self-directed learner relies on (§4.1). Search serves "I know what I want"; it does not serve "show me everything I have."
 5. If a subject grows past ~10 chapters / ~50 topics, the hub gains a search/filter line; the structure holds.
 
 The Mentor-feed card never lists topics — it shows exactly one next action. Twenty physics topics never float anywhere.
@@ -89,10 +95,11 @@ The brainstorm's strongest ruling: **the supportee must never feel a supporter p
 
 ### 6.1 The contract
 
-- **Structural data ("the grades layer") — visible to supporters:** subjects, mastery per chapter, streaks, activity level, next-up. Kids already live under this contract at school.
-- **Artifacts — never reachable in everyday UI, on any edge:** the supportee's notes, Journal content, mentor memory, chat transcripts. Not "hidden by default" — *no screen exists* on which a supporter renders them.
-- **The mentor is the channel:** the supporter's input bar in a person scope talks to the *supporter's own mentor* about that person ("how is Emma really doing in math?") and gets a curated, pedagogically-relevant answer from her data — interpretation, not raw exhaust.
-- **Two-way transparency:** everything the mentor reports to a supporter about a person, that person can read. The supporter's per-person Journal (shared record, §6.3) and the supportee's "what was shared with your supporter" view are **one document read from two sides**. Nothing exists about you that you can't see.
+- **Structural data ("the grades layer") — visible to supporters:** subjects, mastery per chapter, streaks, activity level, next-up. Kids already live under this contract at school. **Mechanism (resolves the §4↔§6.3 tension):** the supporter scope reads this layer **live from the supportee's own tables through a server-enforced permission mask** — the same hub component, server-filtered to the structural columns. It is *not* an edge-replicated shadow copy the mentor maintains (no duplication, no sync burden). The "edge-data the mentor maintains" framing applies to *interpretation/reports* (below), not to the structural read.
+- **Artifacts — never reachable in everyday UI, on any edge:** the supportee's notes, Journal content, mentor memory, chat transcripts. Not "hidden by default" — **no read path exists** on any supporter edge on which these render. This is the only sense in which "never from the supportee's private space" holds; the grades layer above *is* read from their space, masked.
+- **The mentor is the channel — with a release valve (EU-2):** the supporter's input bar in a person scope talks to the *supporter's own mentor* about that person ("how is Emma really doing in math?") and gets a curated, pedagogically-relevant answer from her data — interpretation, not raw exhaust. Because the supporter has *no* path to the underlying work, a supporter who distrusts the curated read (mentor keeps saying "fine," the grades say otherwise) must have an **appeal affordance**: a deliberate, logged "request a detailed attention report" that still respects the artifact wall — richer *structural* detail plus a fuller mentor write-up, never raw notes/chats/memory. Without it, "no browse" reads as "no recourse," which is a churn/trust failure. The appeal affordance is an S5 acceptance criterion.
+- **Two-way transparency — same facts, side-appropriate rendering:** everything the mentor reports to a supporter about a person, that person can also see. The shared record is the **same underlying facts** read from two sides (§6.3), **rendered for each audience** — the supporter sees the advisor-framed report; the supportee sees the same facts in their own voice/framing. It is *not* necessarily byte-identical text (adult-framed curation should not be shown verbatim to a child), but **nothing is reported about you that you cannot see the substance of**. The render-equivalence guarantee is an S5 acceptance criterion.
+- **The sealed-confession class — reportability is narrower than the artifact wall (EU-1):** the artifact wall and two-way transparency protect *browsing*, but they do not by themselves stop the confession space from being chilled. If the mentor narrates the supportee's emotional disclosures upward ("Emma is anxious about the exam / avoiding the topic"), the supportee — *by the transparency guarantee itself* — sees that what they confided became a supporter-facing report, and learns that confiding in the mentor is a channel to their supporter. That re-creates the perform-don't-confess behavior the whole contract exists to prevent, caused by the transparency mechanism, not by browsing. So the contract draws a line *inside* what the mentor knows: **mastery, effort, and observable engagement are reportable; the supportee's confided affect and self-doubt (confession-of-confusion) are never reported in the first place** — not merely walled from browsing. Two-way transparency then means "everything *reported* is mirrorable," over a deliberately narrowed reportable set. This **non-reportable class is an S5 acceptance criterion** alongside render-equivalence, enforced server-side at report-generation time.
 - **Safety escalations cross every wall**, regardless of account type or contract — the existing tripwire design (escalate-not-refuse). Kid-visible contract wording: "your space is private, *unless you're not safe*."
 - **Rights-exercise ≠ everyday visibility:** a guardian's GDPR rights on a managed account (export, deletion) live in the admin layer (avatar → privacy), deliberate and logged — never as ambient daily browsing.
 
@@ -100,7 +107,9 @@ The brainstorm's strongest ruling: **the supportee must never feel a supporter p
 
 Two account types replace any age-banded permission matrix:
 
-| | **Managed** (under-13: managed only) | **Credentialized** (13+, own login) |
+> **Launch-audience note:** the **managed** tier exists for under-13 users, but the ratified launch floor is **13+** (`docs/canon/identity/prd.md`; memory `project_age_floor_launch_13plus_defer_11plus` — block US under-13, serve non-US 10–12 later under lighter GDPR). So at launch the **only live tier is credentialized**; managed-tier *activation* is gated on the separate 10–12 audience decision (§13.5), even though S5 builds the tier mechanism. Don't read "two account types" as "both live day one."
+
+| | **Managed** (under-13: managed only; **activation deferred — see launch-audience note**) | **Credentialized** (13+, own login; **the only live tier at launch**) |
 |---|---|---|
 | Created by | Supporter; supporter holds consent + full admin | The person themselves |
 | Contract event | Account creation *is* the ceremony | **Linking ceremony** — both sides see and accept the same visibility contract |
@@ -115,10 +124,12 @@ Two account types replace any age-banded permission matrix:
 | Tab | Learner Me scope | Supporter — Support hub | Supporter — person scope (e.g. Emma) |
 |---|---|---|---|
 | **Mentor** | My feed (`/now` + moments) + my bar | Aggregated feed across all my people (attention items, milestones, family-wide recap) + bar to my mentor as advisor | *My feed about Emma* (attention items, milestones for her) + bar to *my* mentor *about* her — never her conversations |
-| **Subjects** | My hubs, full | Overview rows grouped by person (subject, health, last activity) deep-linking into person scopes | Emma's hubs in the **structural rendering** — same hub component, permission-masked: chapters, mastery, activity, next-up; no notes, no artifacts |
-| **Journal** | My recaps, notes, mentor memory | Family/cross-person recap archive + mentor memory *of me as supporter* | **The shared record**: every report ever made to me about Emma — mirrored readably on Emma's side |
+| **Subjects** | My hubs, full | Overview rows grouped by person (subject, health, last activity) deep-linking into person scopes | Emma's hubs in the **structural rendering** — same hub component, **server-masked to structural columns** (read live from her tables per §6.1): chapters, mastery, activity, next-up; no notes, no artifacts |
+| **Journal** | My recaps, notes, mentor memory | Family/cross-person recap archive + mentor memory *of me as supporter* | **The shared record**: every report ever made to me about Emma — the **same facts mirrored on Emma's side, rendered for her** (§6.1 two-way transparency, not necessarily byte-identical) |
 
 A person scope must *read* as "the mentor reporting to you about Emma" — never as a redacted copy of her app. The poking feeling returns or stays away on that rendering choice alone.
+
+**Supporter-scope "decline" is acknowledge/snooze, not dismiss (EU-8).** P1 (§2) gives every proposal a decline; for a learner that is harmless, but a supporter attention item is a signal about a real person's struggle. Declining one **snoozes or marks-acknowledged** and re-surfaces while the underlying condition persists — it never silently clears a flag that the supportee is falling behind.
 
 ## 7. What dies (target state; nothing dies before §11 says so)
 
@@ -127,7 +138,7 @@ A person scope must *read* as "the mentor reporting to you about Emma" — never
 - **`ParentHomeScreen`** as a special shell — its heir is the Support-hub Mentor feed.
 - The **More tab** and the **You-tab hodgepodge** — admin moves behind the avatar.
 - The **3-screen session exit funnel** — dissolves into the mentor's wrap-up conversation turn, **only after** P3 park-and-return eval coverage exists (§2).
-- The **Library tab** as a destination — search-first archive surfaces inside Subjects hubs and Journal.
+- The **Library tab** as a destination — search-first archive surfaces inside Subjects hubs and Journal. **The tab dies, not the browse:** a scannable cross-subject archive survives inside Journal (§5.4, EU-6) so "show me everything I have" is never reduced to a search box.
 - Most of the ~78 redundant front doors the atlas catalogued — the feed and bar are the front door; collapse follows usage evidence, not precedes it.
 
 **Hard constraint until explicitly retired:** the V0 5-tab production shape (`MODE_NAV_V0_ENABLED=false` state) must not regress. The new shell rides behind its own flag (working name `MODE_NAV_V2_ENABLED`) alongside V0/V1, same staging pattern as the V1 guardian redesign. Retiring the constraint is a §13 open decision with a designated milestone, not a side effect.
@@ -136,21 +147,39 @@ A person scope must *read* as "the mentor reporting to you about Emma" — never
 
 ### 8.1 `GET /now` — deterministic ranked feed
 
-Server-computed, **no LLM in the ranking path**, template-rendered copy. Inputs per scope: unfinished session, due retention cards, parked items (with an aging rule so a parked item is *guaranteed* to surface within a bounded window even if the conversation layer never re-weaves it — the P3 deterministic backstop), challenge-readiness, ledger moments pending surfacing; for supporter scopes: attention items per edge. Output: 1–3 ranked cards `{ kind, templateKey, params, deepLink, scope }`. Deep links resolve through a **closed, server-validated route catalog** and push full ancestor chains (per the cross-stack-push rule).
+Server-computed, **no LLM in the ranking path**, template-rendered copy. Inputs per scope: unfinished session, due retention cards, parked items, challenge-readiness, ledger moments pending surfacing; for supporter scopes: attention items per edge. Output: 1–3 ranked cards `{ kind, templateKey, params, deepLink, scope }`. Deep links resolve through a **closed, server-validated route catalog** and push full ancestor chains (per the cross-stack-push rule).
+
+**The ≤3 cap is a highlight ceiling, not a reachability ceiling (EU-3).** Two starvation modes fall out of a hard cap, and each gets a mechanism:
+
+- *Learner park-and-return starvation:* parked items compete with due-work for the ≤3 slots and lose every active day, so the aging window becomes the *only* thing that ever surfaces them and P3's "magic" degrades to "eventually, by timeout." Mitigation: an **overflow affordance** under the card stack — a "more / everything waiting" entry so the ≤3 are the *highlight*, not the ceiling on what is reachable. The P3 eval (§2) asserts a parked item surfaces within its window even under card competition.
+- *Supporter multi-person starvation:* a supporter's aggregated feed (§6.3) ranks attention items across all linked people through the same cap, so one person can permanently outrank another and the supporter concludes "no news" while a second child is struggling. Mitigation: a **per-edge fairness rule** — each linked person is guaranteed representation in the stack (or the overflow) before any one person takes a second slot.
+
+**P3 deterministic backstop — names its two stores.** "Parked items" is two distinct tables with different lifecycles, and the backstop must cover both: `parking_lot_items` (`packages/database/src/schema/sessions.ts` — `explored` boolean, **no expiry**) and `needs_deepening_topics` (`packages/database/src/schema/assessments.ts` — `status` enum + **`pendingExpiresAt`**). The aging rule guarantees surfacing within a bounded window for `parking_lot_items`; for `needs_deepening_topics` it must **reconcile with the existing `pendingExpiresAt`** (surface *before* expiry rather than inventing a competing clock). The S0 `/now` plan specifies the exact window and the precedence between the two stores.
 
 ### 8.2 Activity ledger — append-only mentor activity
 
-One table (working name `mentor_activity_ledger`): `id, personId, edgeId|null, actorJob, kind, templateKey, params jsonb, visibility ('self'|'supporter'|'both'), createdAt, surfacedAt|null`. Every Inngest function that does user-relevant work writes a row via a helper wrapping `safeSend` semantics (a ledger write failure never breaks the job). The ledger feeds: feed moment cards, the supporter shared record (§6.3), GDPR-timer countdowns, and the graduation narration. **Rows render from `templateKey` + `params` with no LLM call; LLM narration is per-kind opt-in for genuinely personal moments only** — otherwise every background job becomes an LLM bill and a latency.
+One table (working name `mentor_activity_ledger`): `id, profileId, actorJob, kind, templateKey, params jsonb, visibility ('self'|'supporter'|'both'), createdAt, surfacedAt|null`.
 
-### 8.3 Retention gate
+> **Identity-column note (resolves the S0-vs-identity coupling).** S0 ships **against today's profile model** — the column is `profileId`, not `personId`/`edgeId`, which **do not exist in today's schema** (they are identity-foundation concepts; live model is `profiles` + `family_links`). Earlier drafts named `personId, edgeId|null`; that would make S0 secretly identity-coupled and break the §9 "identity-independent phases first" guarantee at step one. The S4 plan **repoints** `profileId → personId` and **adds `edgeId`** as part of the identity-foundation migration, not before. Until then, supporter-visibility on a row is carried by the `visibility` enum + `actorJob`/`params`, not by an edge column.
 
-`applyRetentionUpdate()` as the single chokepoint unifying the ~5 existing write paths into `retention_cards`, so the feed's due-work ranking has one consistent source of truth.
+Every Inngest function that does user-relevant work writes a row through a best-effort helper: the insert is **Sentry-captured and non-throwing — the same posture as `safeSend`, applied to a DB write** (note: `safeSend` itself is for non-core *Inngest dispatch*, not DB inserts; this is the analogous pattern, not a literal `safeSend` call). A ledger write failure never breaks the job. The ledger feeds: feed moment cards, the supporter shared record (§6.3), GDPR-timer countdowns, and the graduation narration. **Rows render from `templateKey` + `params` with no LLM call; LLM narration is per-kind opt-in for genuinely personal moments only** — otherwise every background job becomes an LLM bill and a latency.
 
-Everything else backend stays as-is. The shell change is deliberately read-heavy.
+### 8.3 Retention gate — a core-SRS refactor, NOT a read-side change
+
+`applyRetentionUpdate()` (a **new** function — it does not exist today) as a single chokepoint unifying the existing write paths into `retention_cards`, so the feed's due-work ranking has one consistent source of truth.
+
+**Scope correction (do not under-read this).** This is **not** "read-heavy shell" work — it is a refactor of the spaced-repetition core with a large blast radius. There are **~9–10 distinct writers**, not ~5, across **7 files** — verified: `services/retention-data.ts` (`ensureRetentionCard`, recall-test cooldown + SM-2, `updateRetentionFromSession`), `inngest/functions/review-calibration-grade.ts`, `services/verification-completion.ts` + `services/evaluate-data.ts` (`evaluateDifficultyRung`), `services/retention-mastery.ts` (`masteredAt`), `inngest/functions/topic-probe-extract.ts` (seed). They carry SM-2 state, XP status, mastery stamping, and EVALUATE difficulty rungs. Consequences:
+
+- It gets **its own implementation plan** with break-tests (red-green per finding) and a **`## Rollback` section** — it touches mastery/XP/review correctness, not just rendering.
+- **It is carved OUT of the S0 validation slice (§11).** The discovery feed needs a consistent *read* of due-work — it does **not** strictly require collapsing every *writer* first. The gate ships on its own track (S0-R), not as a blocker on S1/S2. The feed reads `retention_cards` as-is in the interim; the gate hardens consistency afterward.
+
+Everything else backend stays as-is. The shell change is read-heavy **except** for the retention gate, which is explicitly the one write-side refactor and is sequenced to not block the validation bet.
 
 ## 9. Identity coupling
 
 The scope chip, edges, managed/credentialized types, and the visibility contract **require the identity-foundation model to land** (person-based, edge-scoped mentor). The early strangle steps deliberately do not: `GET /now`, the activity ledger, the subject hub, and the Journal/avatar split all work against today's profile model. Sequencing in §11 keeps identity-independent phases first so the redesign never blocks on (and never blocks) the identity runway.
+
+**Concrete contract for "identity-independent."** The S0 ledger uses `profileId` (not `personId`/`edgeId`) precisely so it ships before identity-foundation (§8.2). The only identity-foundation touch in the early phases is a **mechanical column repoint** (`profileId → personId`, add `edgeId`) folded into the S4 identity migration — no early phase reads or writes `person`/`edge`/`membership` tables, which do not yet exist in code (they are ratified *design only* in `docs/canon/identity/`; execution is blocked on the baseline reset + `WI-530`). If any S0–S3 deliverable is found to need an edge/person read, it is **misclassified** and must move to S4.
 
 ## 10. Rulings imported from / exported to the second-opinion doc
 
@@ -162,13 +191,17 @@ Each phase ships independently, behind flags, and is valuable alone. Per-phase i
 
 | Phase | Ships | Identity-coupled? | Independently valuable because |
 |---|---|---|---|
-| **S0** | Activity ledger table + writer helper; `GET /now` endpoint; retention gate. Dark — no UI change. | No | Ledger starts accumulating history immediately; `/now` testable against real data |
+| **S0** | Activity ledger table (`profileId`-keyed, §8.2) + writer helper; `GET /now` endpoint reading `retention_cards` as-is. Dark — no UI change. | No | Ledger starts accumulating history immediately; `/now` testable against real data |
+| **S0-R** | Retention gate (`applyRetentionUpdate()` core-SRS refactor, §8.3) — **own plan, break-tests, rollback**. Parallel track, **does not block S1/S2**. | No | Consistency hardening of due-work source; sequenced off the critical path because the feed only needs reads |
 | **S1** | New Mentor home (card feed + bar + camera/homework chip) behind `MODE_NAV_V2_ENABLED`, as "screen #89" — old nav untouched | No | The single highest-frequency surface; cheapest validation of the whole direction |
 | **S2** | Subject hub (shelf + progress merge, §5) — also linkable from the *current* nav | No | Kills the worst redundancy cluster even if nothing else ships |
+| **— EVIDENCE GATE —** | **S1+S2 ship behind the flag and are *measured* before S3+ proceeds** (see gate note below) | — | Buys the data that justifies the expensive, identity-blocked back half |
 | **S3** | Journal tab + avatar admin split; park-and-return eval scenarios into `pnpm eval:llm` | No | You-tab hodgepodge dies; P3 gate satisfied |
 | **S4** | Scope chip, Support hub, person scopes, structural rendering mask | **Yes** — needs identity-foundation | Mode/proxy/tab-matrix collapse |
 | **S5** | Visibility contract surfaces: linking ceremony, two-way transparency views, managed/credentialized tiers, graduation moment | **Yes** | The trust layer |
 | **S6** | Cutover & deletions: exit funnel dissolves (gated on S3 evals), old tabs retire, V0 constraint retirement **ruling executed** (§13) | — | The ~25-screen end state |
+
+**Evidence gate (S2 → S3) — justify per-phase, not the whole program.** The discovery thesis is a hypothesis sourced from a code atlas, not usage telemetry (§Problem source), and the program's most valuable phases (S4/S5: chip collapse, privacy contract) are *blocked* on the identity runway anyway. So the program is **not** committed as a unit. S1+S2 are the cheap bet that buys evidence: ship them behind `MODE_NAV_V2_ENABLED` and measure whether the feed + hub actually move discovery/engagement against the V1 baseline. **S3–S6 proceed only on that evidence** (and, for S4+, identity-foundation landing). If the feed does not move discovery, the redesign stops at a validated S2 having spent two phases, not six. This is the strangle's whole point made explicit — the back half must earn its commitment, it is not pre-authorized by this spec.
 
 ## 12. ADR obligations
 
@@ -184,7 +217,9 @@ ADR-class decisions in this spec (per the MMT-ADR-0000 significance gate), to be
 1. **V0-preservation constraint retirement** — when (which S6 evidence threshold) does the `MODE_NAV_V0_ENABLED` no-regress constraint formally retire? Owner: product (Zuzana). Blocks S6 only.
 2. **Identity-foundation sequencing confirmation** — S4/S5 assume the ratified `_wip/identity-foundation/` model lands first; confirm the runway's own timeline tolerates this consumer. Blocks S4.
 3. **Managed-tier reporting richness** — exactly which extra granularity managed supporters get over credentialized (specced per-phase in S5's plan; the §6.1 artifact wall is not negotiable within it).
-4. **Journal naming** — "Journal" vs "Notebook" (kid-test at S3; default Journal).
+4. **Journal naming + trust copy (EU-9)** — "Journal" vs "Notebook" (kid-test at S3; default Journal). **Test the name together with the kid-facing trust copy** ("your space is private, unless you're not safe," §6.1) — the privacy promise only lands if the kid reads the named surface as legibly *theirs*.
+5. **Managed-tier launch activation** — the managed (under-13) tier is *built* in S5 but its **go-live is gated on the separate 10–12 audience decision** (launch floor is 13+; §6.2 launch-audience note). Owner: product. Blocks managed-tier *activation*, not the S5 build.
+6. **Evidence-gate threshold (S2 → S3)** — the exact discovery/engagement metric and bar that authorizes S3+ (e.g. feed-card engagement vs V1 baseline, screens-reached delta). Owner: product. Blocks S3, not S0–S2.
 
 ## 14. Failure modes
 
@@ -193,11 +228,15 @@ ADR-class decisions in this spec (per the MMT-ADR-0000 significance gate), to be
 | Feed unavailable | `GET /now` errors or >2s | Cached last feed + a deterministic local "continue where you left off" card; tabs fully functional | Pull-to-refresh; standard `ErrorFallback` (retry primary, Subjects secondary) |
 | Empty feed | New account, nothing started | Onboarding proposal card ("let's set up your first subject") | Tap into onboarding conversation |
 | LLM down | Provider outage | Bar replies with honest unavailable message; feed, hubs, Journal, review flows all still work (deterministic floor) | Automatic when provider recovers; nothing else degrades |
+| LLM down — supporter scope (EU-2) | Provider outage while in a person/hub scope | Structural layer (mastery, attention items, milestones) still renders, but the **interpretive channel** (bar Q&A — the supporter's primary value-add) returns an honest "I can't give you a read right now" instead of silently degrading to bare grades | Automatic when provider recovers; the structural feed never went down |
 | Homework photo fails | Upload error / offline | Photo retained locally, inline retry on the card | Retry; or continue by typing |
-| Parked item never re-woven | Conversation layer fails to resurface it | Item still appears as a `/now` card within the bounded aging window (§8.1 backstop) | None needed — backstop is automatic |
+| Parked item never re-woven | Conversation layer fails to resurface it **— or the backstop fires but loses the ≤3 feed slots to higher-priority cards every active day (EU-3)** | Item still appears within the bounded aging window via the §8.1 backstop; the **overflow affordance** (§8.1) keeps it reachable before the window expires | None needed — backstop + overflow are automatic |
 | Ledger write fails | DB/transient error in an Inngest job | Nothing — the job's core work completes; the moment card is simply absent | Sentry capture per safe-non-core pattern; no user action |
 | Supporter, no links yet | Fresh supporter account | Support hub = linking flow, not an empty dashboard | Send/re-send invite |
 | Link invite expired/declined | Time or supportee action | Hub card stating status plainly | Re-invite; or remove pending link |
+| Supportee ends sharing (credentialized) | Supportee revokes the link (EU-7) | Plain hub card ("Emma ended sharing") — **never** a silent disappearance; person scope retires from the chip after the S5 grace/notice window | None forced; re-invite is possible but requires a fresh linking ceremony |
+| Multiple people, one starves the feed | Supporter has ≥2 linked people, one consistently outranks another (EU-3) | Per-edge fairness guarantees each person representation in the stack or the overflow; no person is invisible because another ranks higher | None needed — fairness rule is automatic |
+| Supportee stops confiding | Mentor would narrate confided affect upward; supportee would see it via the transparency mirror (EU-1) | (Prevented by design) confided affect/self-doubt is in the **non-reportable class** (§6.1) — only mastery/effort/engagement is reportable, so confiding never becomes a supporter-facing report | None needed — the reportability line is enforced server-side at report-generation; non-reportable class + render-equivalence are S5 acceptance criteria |
 | Person-scope fetch fails | Edge-data endpoint error | Scope-level `ErrorFallback`: retry primary, "back to Support hub" secondary | Retry |
 | Turned 13, not yet graduated | Birthday passes on a managed account | Managed experience continues unchanged; graduation prompt card for supporter + child | Run graduation flow when ready; no forced cutover |
 | Safety escalation, supporter unreachable | Tripwire fires, no reachable supporter channel | (Internal) escalation follows existing tripwire fallback policy | Per tripwire design; out of this spec's scope |
@@ -217,6 +256,9 @@ For traceability — all ruled in conversation with the product owner:
 8. Supporters never reach supportee artifacts (notes/Journal/memory/chats) in everyday UI; structural "grades layer" + mentor reports only; two-way transparency; safety crosses all walls.
 9. Managed (under-13 only option) vs credentialized accounts carry the visibility tier; graduation is a designed moment.
 10. App-open = Mentor tab card feed (second-opinion fork ruled A).
+11. **One-surface vs three-tab fork — ruled three tabs (2026-06-10).** A minimal "Mentor surface only, with Subjects/Journal as mentor-summoned sheets" variant was considered and **rejected** on two grounds: (a) **build cost** — it is *more* expensive, not less; the content surfaces are built either way, but the sheet-summon chassis is bespoke and fights both the repo's cross-stack-push guardrail and the `GET /now` ancestor-chain deep-link design (§8.1), whereas three tabs use the platform's standard, already-spoken container; (b) **persona coverage** — the adult self-directed learner (§4.1) wants Subjects and Journal as full, persistent tabs. The homework-kid's "one surface" feel is delivered instead via **content/proactivity defaults** (let the feed carry everything; don't push the unused tabs), not via a custom chassis — user benefit without the engineering cost.
+12. **Adult self-directed learner is a first-class persona (2026-06-10)** — not kid-plus-parent only; the segment served worst by today's family-shaped matrix and the primary justification for the three-tab shell (§4.1).
+13. **Program is not committed as a unit (2026-06-10)** — S1+S2 ship-and-measure behind the flag; S3–S6 gated on discovery evidence + (for S4+) identity-foundation (§11 evidence gate). The discovery thesis is atlas-inferred, not telemetry-measured.
 
 ---
 
@@ -282,3 +324,43 @@ Already **done/shipped** (nothing to park): `plans/2026-05-31-learning-library-c
 ### A.6 — Sequencing signal
 
 The clean split across all 36 docs: **proxy / parent-home / scope** work waits for identity-foundation (S4/S5); **backend-data or read-rendering** work can proceed now (S0–S3). Three docs are already parked for *identity* reasons independent of this spec (`note-correctness`, `resumable-practice` re-triage, `billing-recovery`) — this spec doesn't change their verdict, it gives them a destination.
+
+---
+
+## Annex B — 2026-06-10 adversarial-review amendments
+
+Applied after a codebase-grounded challenge pass. Each finding cited to where it landed. No vision change — the edits make the document tell the truth about what's blocked, unmeasured, or write-heavy.
+
+| ID | Severity | Issue | Resolved in |
+|---|---|---|---|
+| HIGH-1 | High | S0 activity ledger specced with identity-foundation columns (`personId`/`edgeId`) that don't exist today, yet ships first as "identity-independent" — broke the §9 sequencing guarantee | §8.2 (column → `profileId`, S4 repoint note), §9 (concrete "identity-independent" contract), §11 (S0 row) |
+| HIGH-2 | High | Privacy contradiction: "never from Emma's private space" (§4/§6.1) vs "Emma's hubs, permission-masked, same component" (§6.3) | §4 (artifacts-only scoping), §6.1 (live-read-behind-mask mechanism), §6.3 (Subjects/Journal cells) |
+| HIGH-3 | High | Retention gate framed as "read-heavy"; actually a core-SRS refactor of ~9–10 write paths (not ~5), `applyRetentionUpdate()` doesn't exist | §8.3 (relabel + count + rollback/break-test + carve-out), §11 (new S0-R off-critical-path track) |
+| MED-1 | Medium | Managed tier (under-13) built for an audience deferred at a 13+ launch | §6.2 (launch-audience note), §13.5 |
+| MED-2 | Medium | P3 backstop conflated two stores with different lifecycles (`parking_lot_items` vs `needs_deepening_topics`/`pendingExpiresAt`) | §8.1 (names both, reconciles aging with expiry) |
+| MED-3 | Medium | "One document read from two sides" vs "curated interpretation for the supporter" tension | §6.1 (same-facts/side-appropriate render; render-equivalence = S5 criterion), §6.3 |
+| LOW-1 | Low | Count drift (~88 vs ~90); ~25 target unsubstantiated | §Problem-source, §1 (~90; ~25 marked aspirational) |
+| LOW-2 | Low | "wrapping `safeSend`" mislabel — `safeSend` is for Inngest dispatch, not DB writes | §8.2 (reworded to "same posture as `safeSend`, applied to a DB write") |
+| STRAT-1 | — | Program presented as one commitment despite unmeasured premise + blocked back half | §11 (S2→S3 evidence gate), §13.6, §15.13, §Problem-source caveat |
+| STRAT-2 | — | Adult self-directed learner absent as a first-class persona | §4.1 (persona added), §15.12 |
+| STRAT-3 | — | One-surface-vs-three-tab fork unrecorded; minimal variant wrongly assumed cheaper | §15.11 (ruled three tabs; build-cost + persona reasoning), §4.1 |
+
+---
+
+## Annex C — 2026-06-10 end-user-lens amendments
+
+Applied after an adversarial pass taken from the **learner's chair** and the **supporter's chair** (the codebase-grounded pass is Annex B). These findings are experiential — trust, dead-ends, persona coverage — not shipped bugs; the top tier is **HIGH** rather than CRITICAL because each names a failure mode whose Recovery column was previously unfillable, not a runtime defect. No vision change — the edits make the document honest about how the design *feels* to the two people who live in it.
+
+**The throughline:** four design rulings quietly collide when you sit in a user's seat — (1) the confession wall vs the transparency mirror, (2) "no browse" for supporters vs "no appeal," (3) the 1–3 card cap vs park-and-return and multi-child fairness, (4) "first-class adult learner" vs the supporter-default scope. Each is now reconciled in-place.
+
+| ID | Severity | Issue | Resolved in |
+|---|---|---|---|
+| EU-1 | High | Two-way transparency (§6.1) can chill the kid's confession the artifact wall is built to protect: confided affect narrated upward, then mirrored back, teaches the kid that confiding reaches the supporter | §6.1 (sealed **non-reportable class** — affect/self-doubt never reported, only mastery/effort/engagement; S5 criterion), §14 (prevention row) |
+| EU-2 | High | Anxious supporter has no work-level visibility, no appeal against the curated interpretation, and loses the interpretation entirely on LLM outage — the deterministic-floor reassurance was written from the learner's seat | §6.1 (**appeal affordance** — logged "request detailed attention report," artifact wall intact), §14 (supporter-scope LLM-down row) |
+| EU-3 | High | The 1–3 card `/now` cap starves park-and-return for active learners and starves the weaker child for multi-person supporters; the P3 eval never tested slot competition | §8.1 (**overflow affordance** + **per-edge fairness**), §2 P3 (competition assertion), §14 (amended park row + multi-person row) |
+| EU-4 | High | The adult-who-also-parents — the §4.1 highest-value persona — is hardwired into the Support-hub default, reimposing the scope-switch tax the redesign removes for everyone else | §4.2 state 3 (default = **last-active / user-set** scope, not hardwired hub) |
+| EU-5 | Medium | App-open foregrounds app-proposed cards; the homework kid must reach past the feed to the one thing they opened the app to do | §3 (layout floor — camera + Homework chip reachable without scrolling) |
+| EU-6 | Medium | Demoting Library to "search-first" drops the *browse* mode the adult learner relies on; search ≠ "show me everything I have" | §5.4 + §7 (browsable cross-subject archive survives in Journal; only the tab dies) |
+| EU-7 | Medium | Credentialized kid's right to revoke the link is unspecced; today's only revocation is guardian-initiated for managed under-13 (`consent-revocation.ts`) | §4.2 (fourth lifecycle state — kid-initiated unlink, non-silent supporter notice, grace window), §14 (ends-sharing row) |
+| EU-8 | Low | Supporter "decline" (P1) semantics undefined — could silently clear a real attention signal | §6.3 (decline = acknowledge/snooze, re-surfaces while condition persists) |
+| EU-9 | Low | Journal/Notebook name (§13.4) deferred separately from the kid-facing trust copy it has to carry | §13.4 (test name + trust copy together) |

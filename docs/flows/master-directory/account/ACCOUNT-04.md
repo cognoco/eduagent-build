@@ -32,7 +32,6 @@ Profile switching is shared by profile-capable accounts, but the expected scope 
 | --- | --- | --- | --- | --- |
 | More -> Account/Profile -> Profile row | `/profiles` | Yes | Yes | Current More hub routes Profile through `/(app)/more/account`; `more-row-profile` lives on Account/Profile. |
 | Direct profile manager | `/profiles` | Reachable | Reachable | Root-level route, not inside `(app)`. It has its own Clerk auth gate. |
-| Learner/parent home profile affordances | Profile switcher/home profile controls | Yes | Yes | Inventory references `ProfileSwitcher` from learner and parent home; current code also has profile switching from the Profiles screen. |
 | Owner taps child profile | `/profiles` -> `proxy-confirm-modal` -> `switchProfile(childId)` | Compatibility path | Compatibility path | Current UI asks the owner to confirm "Viewing X's account" before entering child profile/proxy mode. |
 | Child/non-owner taps owner profile | `/profiles` -> `switchProfile(ownerId)` | Yes | No | Switches immediately without the proxy confirmation modal. |
 | Add profile | `/profiles` -> `/create-profile` | Owner only | Owner only | Button is hidden for non-owner active profiles and gated by subscription/max-profile checks. |
