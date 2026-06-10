@@ -238,6 +238,15 @@ const raw: readonly KeepPattern[] = [
       'selected via VERIFICATION_BADGE_KEY[verificationBadge] at ' +
       'apps/mobile/src/components/session/MessageBubble.tsx:274',
   },
+  {
+    pattern: 'more.accommodation.sectionHeader',
+    reason:
+      'consumed cross-package by the API app-help map (the help prompt + its ' +
+      'in-sync guard test assert this exact en.json label) at ' +
+      'apps/api/src/services/app-help-map.ts:28; no mobile t() call references ' +
+      'it (the accommodation screen title moved to learningPreferences.screenTitle), ' +
+      'so the mobile-only orphan walker cannot see the API consumer',
+  },
 ];
 
 export const KEEP_PATTERNS: readonly KeepPattern[] = raw.map((p) =>
