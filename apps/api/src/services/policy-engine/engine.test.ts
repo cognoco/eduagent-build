@@ -31,10 +31,13 @@ describe('evaluatePolicyCell', () => {
     expect(result.consentRequired).toBe(true);
   });
 
-  it('both known → no prohibition or consent required (scaffold default)', () => {
+  it('both known → still fail-closed until policy_cells populated (scaffold default)', () => {
+    // The `known` flags only signal presence, not actual age/regime values.
+    // Without populated policy_cells, the scaffold stays consentRequired: true.
+    // W2/W3 replaces this with real DB reads.
     const result = evaluatePolicyCell({ age: 'known', residence: 'known' });
     expect(result.prohibited).toBe(false);
-    expect(result.consentRequired).toBe(false);
+    expect(result.consentRequired).toBe(true);
   });
 });
 

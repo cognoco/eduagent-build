@@ -13,6 +13,16 @@
 // router never sees vetting criteria — only the filtered eligibility set.
 // ---------------------------------------------------------------------------
 
+/**
+ * Thrown when the policy-filtered eligibility set is empty (fail-closed).
+ *
+ * **Wiring note (W3 obligation):** when this router is wired into the LLM call
+ * path in WP-W3-envelope-router, callers must map `NoEligibleModelError` to
+ * `CircuitOpenError` (or replace it) so the existing `503 LLM_UNAVAILABLE`
+ * handlers at `apps/api/src/index.ts:394` and `routes/sessions.ts` continue to
+ * handle this case correctly. The policy-engine router is not wired into those
+ * handlers in this WP-W1 scaffold — the mapping is W3 scope.
+ */
 export class NoEligibleModelError extends Error {
   constructor(reason?: string) {
     super(reason ?? 'No eligible model in the policy-filtered set');

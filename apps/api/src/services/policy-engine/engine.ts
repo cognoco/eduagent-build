@@ -38,6 +38,13 @@ export interface PolicyCellResult {
  *   - unknown age → treat as sub-13 → consentRequired: true
  *   - unknown residence → treat as strictest regime → consentRequired: true
  *
+ * Scaffold default (before C2-B populates policy_cells):
+ *   - Even `known` inputs are treated as requiring consent — the `known` flag
+ *     only signals that age/residence information is present, not its actual
+ *     value. Without a populated `policy_cells` table the engine cannot
+ *     determine the correct prohibition-floor or consent-edge, so it stays
+ *     fail-closed until W2/W3 wires real DB reads.
+ *
  * W2/W3 will wire real DB reads into this function once the policy tables
  * are populated by the C2-B compliance-population workstream.
  */
@@ -47,6 +54,7 @@ export function evaluatePolicyCell(
   if (knowledge.age === 'unknown' || knowledge.residence === 'unknown') {
     return { prohibited: false, consentRequired: true };
   }
-  // Future: query policy_cells / policy_rules tables for this (age × residence) cell.
-  return { prohibited: false, consentRequired: false };
+  // Scaffold: policy_cells / policy_rules tables not yet populated.
+  // Stay fail-closed until W2/W3 wires real DB reads.
+  return { prohibited: false, consentRequired: true };
 }
