@@ -9,6 +9,9 @@ status: draft
 # S0 — Backend Primitives — Implementation Plan
 
 **Goal:** Ship three identity-independent, dark backend primitives the mentor-is-the-app shell needs — an append-only `mentor_activity_ledger` table keyed by `profileId`, a best-effort non-throwing writer helper, and a deterministic `GET /now` ranked feed (no LLM in the ranking path) that reads `retention_cards` / `parking_lot_items` / `needs_deepening_topics` / `learning_sessions` / `assessments` / the ledger as-is.
+
+> Synced to spec amendment 2026-06-10 (§2 P5 route-catalog target, §2 superseded LLM-ranked-feed note).
+
 **Approach:** Additive Drizzle table + migration; reuse the existing `safeWrite` posture (already in `apps/api/src/services/safe-non-core.ts:111`) for the ledger writer; build `GET /now` as a Hono route group delegating to a pure ranking service. The retention gate (`applyRetentionUpdate()`) is **explicitly carved out** to a separate plan (S0-R) per spec §8.3 / §11 and is **not** in this plan. No UI, no `person`/`edge` reads.
 
 ## Scope
@@ -320,7 +323,10 @@ Out of scope (must not change):
   **done when:** `packages/schemas/src/now-feed.test.ts` (T5a) asserts `nowResponseSchema` rejects a `cards` array of length 4 (the `.max(3)` ceiling), accepts length 0–3, that every `nowCardKindSchema` member is present, and that `nowDeepLinkSchema` requires `route` to be a catalog key (rejects an arbitrary string). `pnpm exec nx run schemas:typecheck` passes.
 
 - [ ] **T6: Implement the deterministic ranking service `buildNowFeed()`.**
-  Create `apps/api/src/services/now-feed.ts`. **No LLM call anywhere in this file.** It gathers candidates from five live sources + the ledger, scores them by a fixed priority, sorts with deterministic tie-breaks, slices the top 3, and reports the overflow count. The full algorithm is specified in `## Ranking algorithm` below — implement it exactly. All reads enforce `profileId`: single-table reads use `createScopedRepository(db, profileId)` (`packages/database/src/repository.ts:71`); the parent-chain joins (retention/needs-deepening through `subjects.profileId`) follow the sanctioned `db.select()` parent-chain pattern already used in `services/retention-data.ts:494-526` (enforce `eq(subjects.profileId, profileId)` in the WHERE).
+  Create `apps/api/src/services/now-feed.ts`. **No LLM call anywhere in this file.** It gathers candidates from five live sources + the ledger, scores them by a fixed priority, sorts with deterministic tie-breaks, slices the top 3, and reports the overflow count.
+  > **Superseded (spec §2 / Annex D — do not re-propose):** an earlier direction had the LLM ranking the feed ("LLM as mastermind"). This is ruled out: ranking is deterministic and template-rendered; the LLM's home is the teaching conversation. LLM-assisted ranking can only return as a later, separately-ruled rung.
+
+  The full algorithm is specified in `## Ranking algorithm` below — implement it exactly. All reads enforce `profileId`: single-table reads use `createScopedRepository(db, profileId)` (`packages/database/src/repository.ts:71`); the parent-chain joins (retention/needs-deepening through `subjects.profileId`) follow the sanctioned `db.select()` parent-chain pattern already used in `services/retention-data.ts:494-526` (enforce `eq(subjects.profileId, profileId)` in the WHERE).
   Business logic lives here (not in the route) per eslint G1/G5. The route (T7) only validates, calls `buildNowFeed`, and parses the response.
   **done when:** `apps/api/src/services/now-feed.test.ts` (T6a, unit) drives `buildNowFeed` with hand-built candidate sets and asserts: (a) ordering follows the priority table for a mixed set; (b) the deterministic tie-break (older `createdAt`/`nextReviewAt` first, then `id` asc) holds for same-priority items; (c) the result is capped at 3 and `overflowCount` equals `candidates.length - 3`; (d) a parked item that loses all 3 slots to higher-priority cards still appears in `buildNowOverflow` output (EU-3 reachability). `pnpm exec nx run api:typecheck` passes.
 
@@ -346,7 +352,9 @@ Out of scope (must not change):
   **done when:** `apps/api/src/routes/now.integration.test.ts` (T7a, integration — real Hono app, real DB, only Clerk JWKS + Neon passthrough mocked per the GC1 pattern in `routes/sessions.integration.test.ts:17-54`) asserts: (a) a seeded profile with an active session + a due retention card + a parked item gets a `200` with `cards` ranked per the priority table, each card carrying a valid catalog `deepLink`; (b) `overflowCount` is correct when >3 items wait; (c) **profileId scoping** — a second profile's due cards / parked items / sessions never appear in the first profile's `/now` (seed two profiles, assert isolation); (d) `GET /now?scope=person` returns `400`. `pnpm exec nx test:integration api` passes for this suite.
 
 - [ ] **T8: Define the closed, server-validated route catalog with ancestor chains.**
-  Inside `apps/api/src/services/now-feed.ts`, define `resolveDeepLink()` and a frozen `ROUTE_CATALOG` mapping each `NowDeepLinkRoute` key to (a) the required param names and (b) the ordered ancestor `chain`. The server only ever emits a `NowDeepLink` produced by this function — never an interpolated path string — so the mobile client receives a closed key + params + chain and pushes the **full ancestor chain** (cross-stack-push rule: a leaf push from another tab synthesizes a 1-deep stack and `router.back()` falls through to Home). Catalog (final):
+  Inside `apps/api/src/services/now-feed.ts`, define `resolveDeepLink()` and a frozen `ROUTE_CATALOG` mapping each `NowDeepLinkRoute` key to (a) the required param names and (b) the ordered ancestor `chain`. The server only ever emits a `NowDeepLink` produced by this function — never an interpolated path string — so the mobile client receives a closed key + params + chain and pushes the **full ancestor chain** (cross-stack-push rule: a leaf push from another tab synthesizes a 1-deep stack and `router.back()` falls through to Home).
+  > **Additional consumer (spec §2 P5 — no new S0 code needed):** the S1 bar-jump intent-matcher also resolves confident matches through this same closed catalog. The catalog's closed-set invariant (`nowDeepLinkRouteSchema` + `ROUTE_CATALOG` parity) must hold for bar jumps too. No new keys or code are added in S0; the intent-matcher itself is an S1 deliverable. Keep the set closed and deterministic.
+  Catalog (final):
   ```ts
   const ROUTE_CATALOG = {
     'session.resume':   { params: ['sessionId'],                    chain: [] },

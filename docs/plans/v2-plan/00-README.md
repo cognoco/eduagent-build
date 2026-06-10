@@ -1,7 +1,7 @@
 # Mentor-Is-The-App (V2 shell) — Implementation Plan Set
 
-**Date:** 2026-06-10 · **Status:** draft (8 phase plans + 1 anchor reference)
-**Spec:** [`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`](../../specs/2026-06-09-mentor-is-the-app-shell-redesign.md) (incl. Annexes B/C — the adversarial + end-user review amendments these plans are written against)
+**Date:** 2026-06-10 · **Status:** draft (8 phase plans + 1 anchor reference) · synced to the 2026-06-10 spec amendment (cold-start / motivation / interaction-law rulings)
+**Spec:** [`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`](../../specs/2026-06-09-mentor-is-the-app-shell-redesign.md) (incl. Annexes B/C/D — the adversarial + end-user review amendments **and** the 2026-06-10 cold-start/motivation/interaction-law fold-in: §2 P5/P6/P7, §2.1 noticing loop, §3.1 learner cold-start, §3.2 supporter cold-start, §4.2 cross-scope pointer, §13.7 assertiveness dial, §15.14–19, Annex D — these plans are written against all of it)
 **Planner:** `.claude/skills/writing-plans/SKILL.md`
 
 This folder decomposes the mentor-is-the-app shell redesign into **per-phase implementation plans** (spec §11 requires one plan per strangle phase before build). It is a *strangle, not a rewrite*: every phase ships behind `MODE_NAV_V2_ENABLED` alongside the existing V0/V1 nav, and nothing in the shipped V0 5-tab shape may regress until the §13.1 retirement ruling (see S6).
@@ -93,6 +93,8 @@ Latest ADR on disk is `MMT-ADR-0019`; this set reserves the next four (the `deci
 5. **S4 reconciliation gaps vs the identity canon** (recorded as S4 OPEN ITEMs with defaults, flagged to the identity-foundation owner — not invented silently):
    - `edgeId` has no canon column (canon has separate `supportership.id`/`guardianship.id`, no polymorphic edge). Default: nullable FK to `supportership.id`; confirm whether a typed `edge_id` + `edge_kind` discriminator is preferred **before the ledger repoint migration lands**.
    - Whether a managed charge's *guardian* also gets a chip scope (vs supportership-derived scopes only) — deferred to S5; S4 surfaces supportership-derived scopes only (launch tier = credentialized).
+6. **§4.2 cross-scope pointer module (S4 ↔ S1).** S4 emits a single compact "1 thing needs you in the Support hub" pointer card into the **Me-scope** feed that S1 renders — it *points* into the hub, never *duplicates* a family-attention item (the hub/Me separation holds while the dual-role adult's signal can't be starved). It rides under the standard P6 ≤3 budget on the S1 home; S1 renders whatever `/now?scope=self` returns, so the pointer is a server-emitted `NowCard`, not a new S1 component.
+7. **XP kill spans S0-R + the V0 no-regress constraint (spec §2.1 / §15.17).** The spec ruled the XP system "killed, not wired" — but the codebase audit (see `01-codebase-anchors.md` §6 + S0-R T12 findings) found XP is **live end-to-end with shipped UI readers** (Practice-hub `totalXp`, session-summary bonus copy, progress topic list), not "backend-only." Consequences the plans honor: (a) S0-R owns only the **code-only retention-path side-effect strip** (behavior-preserving for SRS); (b) the new V2 shell simply **never wires XP** (S1 renders the calm "on track" badge in place of streak/XP); (c) the shipped V0/V1 XP/streak UI **must not be removed before its host surface retires** (the §7 / §13.1 no-regress constraint). At cutover, S6 surfaces it deletes (e.g. the session-summary screen → F-XP-1) carry their XP readers with them; the XP label on a surface S6 *keeps* (the `practice/` hub → F-XP-2) plus the `xp_ledger`/`xpStatus` schema drop is an **owner-flagged follow-up** (migration after the last reader is gone), not S0-R and not silent. Two motivation systems must not coexist *on the new shell*; the old shell keeps its until it retires.
 
 ---
 
@@ -106,6 +108,7 @@ Latest ADR on disk is `MMT-ADR-0019`; this set reserves the next four (the `deci
 | §13.4 | "Journal" vs "Notebook" name — kid-tested **with** the trust copy | product | S3 (name only) |
 | §13.5 | Managed-tier launch activation (launch floor is 13+) | product | managed *activation*, not the S5 build |
 | §13.6 | Evidence-gate metric + bar (S2 → S3) | product | S3 |
+| §13.7 | Assertiveness dial — mentor proposal tone + who moves it (recommendation on the table: calm default, two-position conversational dial, never age-inferred) | product (Zuzana) | S1 copy templates only (not the S1 build) |
 
 ---
 

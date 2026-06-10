@@ -6,6 +6,8 @@ spec: docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md
 status: draft
 ---
 
+<!-- Synced to spec amendment 2026-06-10 (§16 voice, §3.1 cold-start tripwire → evidence gate, §2.1 chips-fill law). -->
+
 # S2 — Subject Hub — Implementation Plan
 
 **Goal:** Build ONE per-subject hub screen that merges today's `shelf/[subjectId]` + `progress/[subjectId]` + the scattered per-subject surfaces into a single max-depth-2 surface — a **Next-up block on top** (same continuation source as the `/now` card), **collapsible chapter sections on the hub itself** (not separate screens) with per-topic mastery state, a **topic-detail sheet** slid up over the hub, and **subject-scoped notes** (one store, two origins — my-notes vs saved-from-mentor — authorship always visible, two views). The hub mounts in the V2 three-tab shell behind `MODE_NAV_V2_ENABLED` **and** is linkable from today's nav so it ships value even if nothing else does.
@@ -141,9 +143,10 @@ Out of scope (must not change):
 
 - [ ] **T2: `<SubjectHub>` — the persona-unaware, mask-ready composition.**
   Create `components/subject-hub/SubjectHub.tsx`. It takes ONE prop `data: SubjectHubData` (the shape `use-subject-hub.ts` produces — see T6) plus callbacks; it renders header (subject name + aggregate three-segment progress bar, lifting the two-segment pattern at `shelf/[subjectId]/index.tsx:341-381` and adding the mastered segment per `book/[bookId].tsx:1612-1656`), then `<SubjectHubNextUp>`, then `<SubjectHubSearchFilter>` (only when `data.showSearchFilter`), then the chapter sections, then `<SubjectHubNotes>`. It owns `openTopicId` state and renders `<TopicDetailSheet>`.
+  **Voice input on `<SubjectHubSearchFilter>` (§16):** the search/filter text input must carry a mic button (spec §16: voice input everywhere). Compliance invariant: transcription-only — never tone or emotion analysis (AI Act Art 5(1)(f) posture). Reuse the same mic/STT affordance as the bar.
   **Hard rule (mask-ready): no `isOwner`, `role`, `mode`, `useProfile`, `useNavigationContract`, or persona/ageBracket read anywhere in this file or its children.** Visibility of every element is driven by fields on `data` (e.g. `data.canStudy`, `data.notes`, `data.nextUp.kind`). This is what lets S4 hand the same component a server-masked `SubjectHubData` (structural columns only, `notes: []`, `canStudy: false`) for a supporter person-scope without a client-side branch. Add a top-of-file comment block stating this rule and citing spec §6.3 ("same hub component, server-masked to structural columns").
   Use semantic tokens only (`bg-surface`, `text-text-primary`, `text-h2`, `useSubjectTint` for the subject accent) — no hardcoded hex.
-  **done when:** `SubjectHub.test.tsx` (T2a) renders with a hand-built `SubjectHubData` fixture and asserts: the subject name + aggregate `subjectHub.progress.threeState` line render; Next-up, the chapter sections, and the notes section all render; with `data.canStudy: false` + `data.notes: []` (the masked shape) the component still renders structure (chapters + mastery) and renders NO notes section and NO study action — proving mask-readiness without a client ownership check. A grep assertion in the test file's companion guard (T2b, see Tests) confirms `SubjectHub.tsx` contains none of `isOwner|useProfile|useNavigationContract|computeAgeBracket`. `pnpm exec jest --findRelatedTests src/components/subject-hub/SubjectHub.tsx --no-coverage` passes.
+  **done when:** `SubjectHub.test.tsx` (T2a) renders with a hand-built `SubjectHubData` fixture and asserts: the subject name + aggregate `subjectHub.progress.threeState` line render; Next-up, the chapter sections, and the notes section all render; when `data.showSearchFilter` is true the `<SubjectHubSearchFilter>` renders a mic button (assert `testID="search-mic"` or equivalent) and the mic is transcription-only (assert against the STT call — no tone/emotion-analysis flag); with `data.canStudy: false` + `data.notes: []` (the masked shape) the component still renders structure (chapters + mastery) and renders NO notes section and NO study action — proving mask-readiness without a client ownership check. A grep assertion in the test file's companion guard (T2b, see Tests) confirms `SubjectHub.tsx` contains none of `isOwner|useProfile|useNavigationContract|computeAgeBracket`. `pnpm exec jest --findRelatedTests src/components/subject-hub/SubjectHub.tsx --no-coverage` passes.
 
 - [ ] **T3: Next-up block — single continuation, same source as the `/now` card.**
   Create `components/subject-hub/SubjectHubNextUp.tsx`. Renders `data.nextUp` (the `HubNextUp` from T1, resolved in T6 from `useLearningResumeTarget` — the SAME resume-target read the `/now` `unfinished_session` card uses, per the S0 plan ranking input table). One card, one primary action labeled by `kind` (`subjectHub.nextUp.resume` / `.upNext` / `.review` / for `kind:'none'` an empty-state `subjectHub.nextUp.allCaughtUp`). The action navigates via the cross-stack-safe push to the session/topic (T8 deep-link rule). **Never lists topics** (spec §5.1 + §5: "the Mentor-feed card never lists topics; twenty physics topics never float anywhere" — the hub Next-up holds the same discipline). When `data.canStudy === false` (masked supporter view) the action is omitted and the block renders the structural "where they are" sentence only.
@@ -188,7 +191,8 @@ Out of scope (must not change):
   }
   ```
   Create `components/subject-hub/SubjectHubNotes.tsx`: renders the normalized list with a two-view toggle (segmented control: `subjectHub.notes.viewMine` / `subjectHub.notes.viewSaved`) filtering by `origin`, and **every row shows its `authorLabel`** (never inferred from position). Reuse `components/library/InlineNoteCard.tsx` / `NoteDisplay.tsx` for the row, adding the authorship label. Notes are subject-scoped here; the cross-subject "everything I've saved" browse view is S3/Journal (out of scope).
-  **done when:** `SubjectHubNotes.test.tsx` (T7a) asserts: a mixed list renders both a `self` row and a `mentor` row each with its distinct author label; the "Saved from mentor" view shows only `origin:'mentor'` rows and "My notes" shows only `origin:'self'`; an empty list renders the `subjectHub.notes.empty` state (not a dead end — includes an add-note affordance when `canStudy`). `use-subject-notes.test.tsx` (T7b) asserts a learner note normalizes to `origin:'self'` and a bookmark normalizes to `origin:'mentor'` with the correct `authorLabel`. `pnpm exec jest --findRelatedTests src/components/subject-hub/SubjectHubNotes.tsx src/hooks/use-subject-notes.ts --no-coverage` passes.
+  **Voice input (§16):** the add-note text input in the notes section must carry a mic button (spec §16: voice input everywhere). Compliance invariant: the mic triggers speech-to-text transcription only — never tone or emotion analysis (AI Act Art 5(1)(f) posture). Reuse whatever mic/STT affordance the bar uses in S1; do not introduce a new STT dependency. The mic is omitted when `canStudy === false` (the masked supporter view has no note input to attach it to).
+  **done when:** `SubjectHubNotes.test.tsx` (T7a) asserts: a mixed list renders both a `self` row and a `mentor` row each with its distinct author label; the "Saved from mentor" view shows only `origin:'mentor'` rows and "My notes" shows only `origin:'self'`; an empty list renders the `subjectHub.notes.empty` state (not a dead end — includes an add-note affordance when `canStudy`); when `canStudy` is true the add-note input renders a mic button (assert `testID="notes-mic"` or equivalent); with `canStudy:false` no mic renders; the mic button does NOT trigger tone/emotion analysis (assert by inspecting the STT call: transcription-only flag or equivalent, per the existing S1 STT integration pattern). `use-subject-notes.test.tsx` (T7b) asserts a learner note normalizes to `origin:'self'` and a bookmark normalizes to `origin:'mentor'` with the correct `authorLabel`. `pnpm exec jest --findRelatedTests src/components/subject-hub/SubjectHubNotes.tsx src/hooks/use-subject-notes.ts --no-coverage` passes.
 
 - [ ] **T8: The hub page + nested layout + linkable-from-current-nav wiring + cross-stack deep links.**
   Create `subject-hub/[subjectId]/index.tsx` (default export; reads `subjectId` param, runs the loading/error gate via `use-subject-hub.ts`, renders `<SubjectHub data={…} />`). Create `subject-hub/[subjectId]/_layout.tsx` exporting `unstable_settings = { initialRouteName: 'index' }` (the repo guardrail for any nested layout with an index + deeper dynamic child, mirroring `shelf/[subjectId]/_layout.tsx:8-10`). All in-hub navigations (Next-up action, "see full topic page", review-due) push the **full ancestor chain** via the route-catalog keys (`subject.hub` → `subject.topic` / `retention.review` / `challenge.start`, chain `['subject.hub']` per S0 plan T8) so `router.back()` from a deep target lands on the hub, never Home.
@@ -207,11 +211,13 @@ Out of scope (must not change):
   subjectHub.nextUp.heading, subjectHub.nextUp.resume, subjectHub.nextUp.upNext,
   subjectHub.nextUp.review, subjectHub.nextUp.allCaughtUp, subjectHub.nextUp.structuralOnly,
   subjectHub.search.placeholder, subjectHub.search.noResults,
+  subjectHub.search.micLabel ("Search by voice"),
   subjectHub.topic.mastered, subjectHub.topic.done, subjectHub.topic.continueNow,
   subjectHub.topic.started, subjectHub.topic.upNext, subjectHub.topic.later,
   subjectHub.notes.heading, subjectHub.notes.viewMine, subjectHub.notes.viewSaved,
   subjectHub.notes.authorSelf, subjectHub.notes.authorMentor,
   subjectHub.notes.empty, subjectHub.notes.addNote,
+  subjectHub.notes.micLabel ("Add note by voice"),
   subjectHub.sheet.masteryLine, subjectHub.sheet.study, subjectHub.sheet.review,
   subjectHub.sheet.seeFullTopic, subjectHub.sheet.close,
   subjectHub.error.title, subjectHub.error.message, subjectHub.error.missingParam,
@@ -271,6 +277,23 @@ All co-located (`*.test.tsx` next to source, no `__tests__/`). No internal `jest
 
 ---
 
+## Evidence gate — S1+S2 ship-and-measure (S2 → S3)
+
+S2 is the second half of the validation bet: S1+S2 ship behind `MODE_NAV_V2_ENABLED` and are **measured** before S3+ proceeds (spec §11). S3–S6 proceed only if the feed + hub move discovery/engagement against the V1 baseline.
+
+**Primary metric (discovery/engagement):** feed-card engagement rate on the Mentor tab (S1) and hub-reach rate from the Subjects tab (S2) vs. the V1 baseline. Owner: product (per §13.6).
+
+**Cold-start activation tripwire — named metric for the evidence gate (spec §3.1):**
+The §3.1 pre-committed tripwire measures the learner cold-start card built in S1 (surface: S1's cold-start anchor slot — input bar + three example chips). This tripwire is **measured during the S1+S2 ship-and-measure window** and feeds the S2→S3 gate decision.
+
+- **Metric:** time-to-first-action + freeze-bounce rate (opened the app, took no action, closed).
+- **Threshold:** if 13-year-olds stall at the blank box (elevated freeze-bounce), the correction is pre-agreed and **limited to an emphasis flip**: chips become the visual lead, typing stays the escape — not a redesign. (This is the §3.1 ruling; do not re-open it.)
+- **S2's role:** carry the measurement/reporting obligation for this tripwire alongside the hub engagement metric in the gate report — the cold-start card itself is S1 (§3.1), but the evidence gate is shared.
+
+**Chips-fill law (spec §2.1):** the subject hub does not currently render suggestion chips near a text input. If any near-input suggestion chips are added to the hub (e.g. autocomplete chips on the search/filter bar or the add-note input), they must **fill the input** (type their words into the box, let the user send) rather than fire as direct actions — per the permanent "chips fill, cards fire" interaction law (§2.1 / §15.15). Proposal cards (Next-up, study action) remain one-tap direct actions and are unaffected by this rule.
+
+---
+
 ## Self-review
 
 **Spec coverage** (each §5 / §11 requirement → task):
@@ -285,6 +308,9 @@ All co-located (`*.test.tsx` next to source, no `__tests__/`). No internal `jest
 - Annex A.2 prereq `topic-mastery-three-states` backend read → data-sources table + T1 (`masteredAt`-driven `'mastered'` state) + T4 render.
 - Annex A.3 `concept-capture-layer` baseline-gated, design hub against today's model first, concept-grain later non-blocking → T11 + `## Concept-grain forward-compat`.
 - §11 S2 also linkable from current nav + "kills the worst redundancy cluster" + feeds S2→S3 evidence gate → T8 flag-gated redirect + `subjectHub.linkLabel` live entry point.
+- §11 / §3.1 S2→S3 evidence gate + cold-start activation tripwire → `## Evidence gate` section above (cold-start card is S1/§3.1; S2 carries the measurement obligation for the shared gate, including the pre-agreed emphasis-flip correction).
+- §16 voice input on hub text inputs (notes + search/filter) → T2 (`SubjectHubSearchFilter` mic, transcription-only done-when) + T7 (`SubjectHubNotes` add-note mic, transcription-only done-when) + T10 (`subjectHub.search.micLabel`, `subjectHub.notes.micLabel` keys added).
+- §2.1 / §15.15 "chips fill, cards fire" interaction law → `## Evidence gate` section above (hub has no current near-input chips; law applies if any are added; proposal cards stay one-tap direct).
 - §7 / V0 no-regress floor → T8 (redirect flag-gated; flag-off renders today's screens unchanged).
 - Failure modes via `ErrorFallback` → Failure-modes table + T8a (missing-param working exit).
 - i18n via `t()` + `en.json` same PR → T10 (exhaustive key list, ratchets enforced).

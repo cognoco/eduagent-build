@@ -5,6 +5,8 @@
 **Honor:** §7 hard constraint — `MODE_NAV_V0_ENABLED=false` (production V0 5-tab shape) must not regress; V2 rides its own flag alongside V0/V1, mirroring the V1 staging pattern.
 
 > All paths are repo-relative from the monorepo root. Expo Router root is `apps/mobile/src/app/`. Line anchors verified 2026-06-10 against the working tree on the checked-out branch.
+>
+> **Updated 2026-06-10 for spec amendment** (XP-kill anchors, streak-display anchor, voice/mic input anchor — see §6).
 
 ---
 
@@ -168,3 +170,48 @@ Per-phase merge/retire ledger. "Strangle" = kept flag-isolated until §7/S6 exec
 - **Default exports** only for Expo Router page components.
 - **Tests co-located** (no `__tests__/`); package imports through the barrel (`@nx/enforce-module-boundaries`).
 - **`@eduagent/schemas` is the shared contract** — no locally-redefined API-facing types.
+
+---
+
+## 6. Spec-amendment anchors (2026-06-10)
+
+Added for the 2026-06-10 spec amendment — three surfaces the new S0-R / S1 / S2 / S3 plan tasks reference. All line anchors verified by reading the target on the checked-out branch 2026-06-10.
+
+### Backend XP system (S0-R kill target)
+
+> **Audit 2026-06-10: a LIVE end-to-end XP system exists** — schema columns, a server writer wired into a passed-assessment hook, and at least one live mobile UI reader. P7 (§2.1) and §13 explicitly kill it ("no … XP on the new shell"); the spec routes the kill into its own implementation plan with break-tests + a `## Rollback` section because it touches mastery/review correctness. S0-R cites these anchors to scope the kill.
+
+| File | Anchor | What it is | Disposition |
+|---|---|---|---|
+| `packages/database/src/schema/progress.ts` | `xpLedger` table `:49-93`; `amount` `:64`; `status: xpStatusEnum` `:65`; `verifiedAt` `:69`; `reflectionMultiplierApplied` `:73-75`; `(profile_id, topic_id)` unique index `:89-92` | **XP store** — one ledger row per (profile, topic), with reflection-multiplier bookkeeping. Imports `xpStatusEnum` from `./assessments` `:20`. | strangle-target (S0-R kill; migration drops a table → needs `## Rollback`) |
+| `packages/database/src/schema/assessments.ts` | `xpStatusEnum = pgEnum('xp_status', …)` `:35-39` (`pending`/`verified`/`decayed`); `assessments.xpStatus` column `:134` | XP-status enum + the per-assessment `xp_status` column it gates. | strangle-target (S0-R) |
+| `packages/database/src/schema/quiz.ts` | `quizRounds` table `:28`; `xpEarned: integer('xp_earned')` `:46` | Second XP-bearing column — per quiz-round XP earned (the source aggregated into the practice-hub `totalXp` reader below). | strangle-target (S0-R) |
+| `apps/api/src/services/xp.ts` | `calculateTopicXp` `:35`; `REFLECTION_XP_MULTIPLIER = 1.5` `:22`; `insertSessionXpEntry` `:84-105` (insert `:121-122`, `onConflictDoNothing` target `:132`); `applyReflectionMultiplier` `:168` | **The XP writer service** (Story 4.5). `insertSessionXpEntry` computes + inserts a verified XP row when a topic assessment passes; `applyReflectionMultiplier` 1.5×'s it on accepted reflection. | strangle-target (S0-R — remove writer; break-tests assert no XP rows written) |
+| `apps/api/src/routes/assessments.ts` | `import { insertSessionXpEntry }` `:35`; call site `:231-236` (guarded by `newStatus === 'passed'` `:230`) | **The only production XP write trigger** — fires on a newly-passed assessment inside the assessment-submit transaction. | strangle-target (S0-R — the dispatch point the kill removes) |
+| `apps/mobile/src/app/(app)/practice/index.tsx` | `totalXp` aggregate `:335` ([F-035] comment `:334`); rendered via `t('practiceHub.xpLabel', { xp: totalXp })` `:355,:362,:364,:493,:703` | **Live UI reader #1** — the Practice hub sums per-activity `totalXp` and renders it as a label ("the main gamification metric"). The most visible XP surface. | strangle-target (S0-R / S1 — practice hub copy drops the XP label) |
+| `apps/mobile/src/hooks/use-streaks.ts` | `useXpSummary()` `:29-48` (reads `GET /xp` `:38`) | **Live UI reader #2** — TanStack hook fetching the XP summary (`XpSummary` from `@eduagent/schemas`). | strangle-target (S0-R — hook + endpoint removed) |
+| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/_view-models/book-derived-state.ts` | `xpStatus?: string \| null` field `:21`; `xpStatus === 'verified'` gate `:113` | **Live UI reader #3** — book-detail derived state branches on a topic's `xpStatus`. | strangle-target (S0-R — replace with retention/mastery signal) |
+| `apps/mobile/src/components/progress/AccordionTopicList.tsx` | `topic.xpStatus === 'verified'` `:29`; `=== 'decayed'` `:33` | **Live UI reader #4** — progress topic list maps `xpStatus` to a visual badge. | strangle-target (S0-R) |
+| `packages/schemas/src/progress.ts` | `xpSummarySchema` `:93-101` (`totalXp`/`verifiedXp`/`pendingXp`/`decayedXp`); `topicProgressSchema.xpStatus` `:293`; `dashboardChildSchema.totalXp` `:377`; `challengeCardSchema.xpReward` `:465`; `xpSummaryEndpointResponseSchema` `:757-761` | The shared XP contract (response shapes the readers above consume). | strangle-target (S0-R — remove XP fields from the contract) |
+
+### Streak display (S1 "on track" badge replaces this)
+
+> S1 replaces the day-count streak with an "on track" badge. These anchors are what it supersedes. (Streak data itself stays — `streaks` table `packages/database/src/schema/progress.ts:29`, `useStreaks()` hook `apps/mobile/src/hooks/use-streaks.ts:8`; only the count *display* changes.)
+
+| File | Anchor | What it is | Disposition |
+|---|---|---|---|
+| `apps/mobile/src/app/(app)/progress/_components/ProgressStatsChips.tsx` | streak chip `:64-73` (`testID="progress-streak-count"` `:65`; renders `t('progress.stats.streak', { count: inventory.global.currentStreak })` `:69-71`) | **The primary streak-count display** — a pill in the Progress-tab stats row showing the current day-streak count. | replace-by-S1 (the "on track" badge supersedes this count pill) |
+| `apps/mobile/src/components/home/MentorSlot.tsx` | `streakCelebration = child.currentStreak >= STREAK_CELEBRATION_THRESHOLD` `:102`; `t('home.parent.mentorSlot.celebrationStreak', …)` `:108-111` | Parent-home Mentor slot fires a streak-milestone celebration line off a child's streak count. | replace-by-S1 (P7 — celebrate the true state change, not the counter) |
+
+### Voice / mic input (§16 — mic on every input)
+
+> **Audit 2026-06-10: a session-layer voice/mic stack ALREADY EXISTS** (epic-17 voice-first), wired into the conversation composer. §16's "mic on every input" is NOT net-new infra — it generalizes this existing STT button + hook from the session bar to every text input. Deps `expo-speech` + `expo-speech-recognition` are in `apps/mobile/package.json:64-65`. Compliance invariant rides along: transcription-only, never tone/emotion (AI Act Art 5(1)(f); §3.1, §15.16).
+
+| File | Anchor | What it is | Disposition |
+|---|---|---|---|
+| `apps/mobile/src/components/session/VoiceRecordButton.tsx` | `VoiceRecordButton` `:27` (mic icon `:86`, `testID="voice-record-button"` `:77`); `VoiceTranscriptPreview` `:109` (editable transcript before send `:132-142`) | **The existing mic button** — tap-to-record STT control + a transcript-correction preview. The reusable affordance §16 generalizes. | reuse (the §16 mic on every input is this component, lifted out of the session composer) |
+| `apps/mobile/src/hooks/use-speech-recognition.ts` | `useSpeechRecognition` (file); `SpeechRecognitionStatus` `:9-14`; `requestMicrophonePermission` `:30`; `getMicrophonePermissionStatus` `:35` | **The STT hook** — `expo-speech-recognition` wrapper (manual tap start/stop, no VAD); owns mic-permission lifecycle. | reuse (the transcription engine behind every-input mic) |
+| `apps/mobile/src/components/session/ChatShell.tsx` | `import { VoiceRecordButton, VoiceTranscriptPreview }` `:24`; `import { useSpeechRecognition }` `:27`; `inputMode` prop `:81`; mount `:1050-1058`; voice/text toggle `:980-998` | **Where voice is wired today** — the conversation composer. This is where the bar lands, so the §16 mic is already present here; S1/S2/S3 extend the same pattern to non-session inputs. | keep/reuse (the existing integration the every-input rollout mirrors) |
+| `apps/mobile/src/components/session/SessionInputModeToggle.tsx` | `SessionInputModeToggle` `:16`; `testID="session-input-mode-toggle"` `:25` | Session-start Text/Voice mode selector (FR144). | keep/reuse (the input-mode precedent) |
+| `apps/mobile/src/hooks/use-text-to-speech.ts` | (file) | TTS playback companion (voice *output*; not the §16 mic, but part of the same voice stack). | keep |
+| `packages/schemas/src/sessions.ts` | `inputModeSchema = z.enum(['text', 'voice'])` `:88`; `InputMode` type `:89` | The shared `text`/`voice` input-mode contract the mic flips. | reuse (don't redefine; new inputs adopt this enum) |

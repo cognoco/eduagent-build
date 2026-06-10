@@ -8,6 +8,8 @@ status: draft
 
 # S0-R Retention Gate — `applyRetentionUpdate()` core-SRS chokepoint — Implementation Plan
 
+> Synced to spec amendment 2026-06-10 (§2.1 supersession — backend-only XP killed, not wired; cleanup rides the retention_cards writers). See **T12** + the `## Rollback` "XP kill" subsection.
+
 **Goal:** Introduce a single new chokepoint function `applyRetentionUpdate()` in
 `apps/api/src/services/` that all ~9–10 existing writers into `retention_cards`
 route through, so the `GET /now` feed's due-work ranking reads one consistent
@@ -21,9 +23,22 @@ column set, optimistic-lock predicate, cooldown predicate, and mastery/XP side
 effects exactly. Finally re-point each writer at the chokepoint, re-running the
 same break-tests (still green) plus a negative test per writer that fails if a
 column write is dropped. No SM-2 math, no quality mapping, no rung policy, and no
-mastery/XP rule changes — those stay in their current pure modules
+mastery/XP *scheduling* rule changes — those stay in their current pure modules
 (`services/retention.ts`, `services/evaluate.ts`, `@eduagent/retention`,
 `services/retention-mastery.ts`, `services/xp.ts`).
+
+**One deliberate exception — the XP kill (T12).** The consolidation itself is
+behavior-preserving for SRS. Riding on top of it, this plan also executes the
+spec §2.1 supersession ruling that **backend-only XP is killed, not wired** — the
+cleanup lands here because XP status (`retention_cards.xpStatus`) is a column on
+the very writers this plan consolidates, and the `syncXpLedgerStatus` side effect
+fires from inside two of those writers (W3/W5). The XP kill **strips the XP
+side-effect from the retention write path while leaving the SRS/retention
+semantics byte-identical** — `xpStatus` is a side-effect column to neutralize,
+not core retention state. It is sequenced **after** T1–T11 land the consolidation,
+so the chokepoint is in place and the XP removal is a clean strip rather than an
+edit smeared across ten inline writers. See **T12** and the `## Rollback` "XP
+kill" subsection.
 
 ## Scope
 
@@ -47,6 +62,12 @@ In scope:
   write in `seedRetentionCard`.
 - Co-located `*.test.ts` for each writer above (extend, do not weaken existing
   assertions) + one new integration test asserting cross-writer consistency.
+- **XP kill (T12, rides the retention writers):** remove the two
+  `syncXpLedgerStatus` side-effect call sites that fire from inside the retention
+  write path — `apps/api/src/services/retention-data.ts:989` (W3) and
+  `apps/api/src/inngest/functions/review-calibration-grade.ts:38` (W5) — and
+  update their co-located XP-sync tests to assert the side effect no longer fires.
+  This is behavior-preserving for SRS (see "One deliberate exception" above).
 
 Out of scope (MUST NOT change):
 - Any read-side / feed / `GET /now` / UI code. The feed reads `retention_cards`
@@ -59,7 +80,19 @@ Out of scope (MUST NOT change):
 - `packages/database/src/schema/assessments.ts` — no schema change; no migration.
   The chokepoint writes the existing columns only.
 - `services/retention.ts`, `services/evaluate.ts`, `services/teach-back.ts`,
-  `@eduagent/retention`, `services/xp.ts` internals — used as-is.
+  `@eduagent/retention` — used as-is. `services/xp.ts` internals are likewise not
+  rewritten; T12 only removes the two retention-path *call sites* of
+  `syncXpLedgerStatus` (the function itself may be left dead-but-unwired). The
+  `xpChange` *computation* in `retention.ts` stays (it doubles as the W9 mastery
+  signal `xpChange === 'verified'`); only its `xp_ledger` propagation is severed.
+- **Dropping the `xpStatus` column / `xp_ledger` table / `GET /xp` route /
+  `services/xp.ts` / the XP UI readers (F-XP-1/F-XP-2/F-XP-3)** — a
+  schema-migration + cutover job, NOT this code-only plan. Sequencing is fixed by
+  the **V0/V1 no-regress hard constraint** (§7 / §13.1): the **new V2 shell (S1)
+  never wires XP** (it renders the "on track" badge instead), but the **shipped
+  V0/V1 XP UI must not be removed before cutover**, so the old-shell reader +
+  schema removal is **S6 cutover work** owned by the spec owner (§2.1
+  supersession). T12 hands these off as recorded findings.
 - The `needs_deepening_topics` writers in `retention-data.ts`
   (`startRelearn`, `updateNeedsDeepeningProgress`) — different table, not
   in the retention-card chokepoint.
@@ -344,6 +377,23 @@ when `updated === false`.
 
 - [ ] **T11: Full validation sweep.** — done when: `pnpm exec nx run api:lint`, `pnpm exec nx run api:typecheck`, `pnpm exec nx run api:test`, and `pnpm exec nx test:integration api` all pass; `git grep -n "db.update(retentionCards)\|.insert(retentionCards)" apps/api/src` returns only sites inside `apply-retention-update.ts` (+ the intentional `curriculum_books`/`xp_ledger` writes, which are not `retention_cards`).
 
+- [ ] **T12: Kill the backend-only XP system (spec §2.1 supersession — *killed, not wired*; §15 item 17).** Sequenced **after** T1–T11 so the strip rides the already-consolidated retention write path. This is the §8.3 retention-gate plan inheriting the XP cleanup because XP status rides on the `retention_cards` writers this plan owns (W1/W3/W5/W9 set `xpStatus`; the `syncXpLedgerStatus` side effect fires from inside W3 and W5). **Behavior-preserving for SRS** — only the XP side-effect comes off the write path; every `easeFactor`/`intervalDays`/`repetitions`/`nextReviewAt`/`lastReviewedAt`/`masteredAt`/`evaluateDifficultyRung` write and every guard the chokepoint enforces stays byte-identical.
+
+  Sub-steps:
+  1. **(a) Grep + confirm the XP surface (done — anchors below).** The audit found a **live, shipped, UI-wired** XP system — *not* the "backend-only" one the spec assumed, and not a sunset/inert one (this is why the kill is gated, not a clean delete; see the Handling rule in (b)). Write-path side effect on the retention writers:
+     - `apps/api/src/services/xp.ts:141-166` `syncXpLedgerStatus` — UPDATE `xp_ledger.status`, called from inside two retention writers: `retention-data.ts:989` (inside W3's `processRecallTest`) and `review-calibration-grade.ts:38` (inside W5's grade step). This is the side-effect riding on the retention path.
+     - `retention_cards.xpStatus` column — `packages/database/src/schema/assessments.ts:134` (enum `xpStatusEnum` at `:35-39`), default `'pending'`, set by W1 (`retention-data.ts:207`), W3 (`:900`), W5 (`review-calibration-grade.ts:105`).
+     - Points ledger (the "XP" the user would see): `xp_ledger` table `packages/database/src/schema/progress.ts:49-89`; writers `insertSessionXpEntry` (`xp.ts:84-134`, called from `assessments.ts:231` + `session-completed.ts:1658`), `applyReflectionMultiplier` (`xp.ts:168-216`, called from `session-summary.ts:268`), `calculateTopicXp`/`verifyXp`/`decayXp` (`xp.ts:35-70`); summary read `getXpSummary` (`streaks.ts:233-277`) behind route `GET /xp` (`streaks.ts:31-37`).
+  2. **(b) UI-reader confirmation — FINDING, do NOT silently delete.** The spec's "backend-only" premise is **stale**: the audit found *live shipped UI surfaces that read XP*. Record them, do not delete them in this task:
+     - **F-XP-1 (session summary):** `apps/mobile/src/app/session-summary/[sessionId].tsx:368-373,1265-1294` renders "Base: {baseXp} XP → With reflection: …", "+{reflectionBonusXp} bonus XP earned!". Fed by `session-summary.ts:35-41` (`baseXp`/`reflectionBonusXp`) via `use-sessions.ts:154-155`.
+     - **F-XP-2 (`GET /xp` → totalXp):** `streaks.ts:31-37` → `use-streaks.ts:38-41` → consumed by `ChildPaywall.tsx:203,231-234` (`totalXp`) and practice hub `practice/index.tsx:334-362` ("[F-035] Surface totalXp — the main gamification metric").
+     - **F-XP-3 (quiz XP — OUT OF SCOPE, separate system):** quiz `xpEarned`/`pointsEarned` (`quiz/complete-round.ts:511,548,563` `calculateXp`; results screen `quiz/results.tsx:56,173-176`) is a **distinct** `quiz_rounds.pointsEarned` mechanic that does **not** ride on `retention_cards` — flag it as a sibling-but-separate gamification surface; T12 does NOT touch it. (Its supersession is for the S1 shell/owner, not this gate.)
+     - **Handling rule:** removing the live XP UI is **gated to cutover (S6) by the V0/V1 no-regress hard constraint** (§7 / §13.1) — the **new V2 shell (S1) simply never wires XP** (the noticing loop + "on track" badge replace it — §2.1 supersession; do NOT build the badge here, see cross-ref below), but the **shipped V0/V1 XP screens must not be torn out before they retire at cutover**. T12's mandate is only the **write-path side-effect**, not the screens. So: T12 **neutralizes the side effect on the retention write path** (sub-step c) and **flags F-XP-1/F-XP-2/F-XP-3 to the spec owner** for the S6 cutover-deletion sweep. The XP UI surfaces stay rendering their current (now-frozen) values until cutover removes them; nothing user-visible changes in this task.
+  3. **(c) Neutralize the XP side-effect on the retention write path (the actual kill in scope here).** Remove the `syncXpLedgerStatus` call sites that fire from inside the retention writers — `retention-data.ts:989` (W3) and `review-calibration-grade.ts:38` (W5) — together with their `safeNonCore`/Sentry wrapping (`retention-data.ts:1003`, `review-calibration-grade.ts:50`), so a retention update no longer drives an `xp_ledger` status write. Leave `xpStatus` writes on the `retention_cards` rows **in place for now** (they are columns on the consolidated `set`; dropping the column is a schema migration out of this code-only plan's scope — record as deferred, see Rollback). Do **not** wire any new XP behavior. Keep `retention.ts`'s `xpChange` *computation* unchanged (it is also the mastery signal `xpChange === 'verified'` that W9 depends on — see §"Writer → columns map" W9 trigger); only its `xp_ledger` *propagation* is severed.
+     - done when: the two `syncXpLedgerStatus` invocations are gone from the retention path; `git grep -n "syncXpLedgerStatus" apps/api/src` shows no call site inside `retention-data.ts`/`review-calibration-grade.ts` (the function may remain defined in `xp.ts` as dead-but-unwired pending the F-XP-2 ledger-read removal, or be removed if no caller remains).
+  4. **(d) Break-test (red-green) — retention state unchanged after the XP strip.** Add a test asserting that running `processRecallTest` (verify path) and the calibration grade step produces the **identical `retention_cards` row** (all SM-2 columns + `xpStatus` + `masteredAt`) with the `syncXpLedgerStatus` side effect removed as it did with it present. Red-green proof: write the assertion, confirm green on the post-strip code; restore the `syncXpLedgerStatus` call, confirm the retention-row assertion **still passes** (it must — XP sync never wrote `retention_cards`), and add the paired negative that fails if the strip accidentally altered an `xpStatus`/SM-2 write on the card. The point the test pins: **severing the XP ledger sync does not perturb retention state**.
+     - done when: the new assertion in `retention-data.test.ts` / `review-calibration-grade.test.ts` passes; the prior XP-sync expectations (`retention-data.test.ts:1000-1194`, `review-calibration-grade.test.ts` xp-sync step) are updated to assert the side effect **no longer fires** (matching current real behavior — not weakened); `pnpm exec nx test:integration api` green.
+
 ---
 
 ## Tests
@@ -414,6 +464,22 @@ produced by running the same sequence on `HEAD~` writers (capture the baseline
 as an inline fixture constant in the test, derived from the pre-refactor run, so
 the assertion is self-contained). Real DB; no internal mocks.
 
+### T12 — XP-strip break-test (retention state unchanged)
+Real DB; no internal mocks (the existing `retention-data.test.ts` XP-sync cases
+currently `jest.mock('./xp')` under a `gc1-allow` at `:48` — when T12 removes the
+call sites those mocks become dead and must be deleted per the GC6 boy-scout rule,
+not left dangling). Drive the verify path through `processRecallTest` and the
+calibration grade step **with the `syncXpLedgerStatus` side effect removed**, and
+assert the resulting `retention_cards` row (`easeFactor`, `intervalDays`,
+`repetitions`, `nextReviewAt`, `lastReviewedAt`, `failureCount`,
+`consecutiveSuccesses`, `xpStatus`, `masteredAt`, `evaluateDifficultyRung`) is
+byte-identical to the row the same input produced **before** the strip (capture
+the pre-strip row as an inline baseline fixture). Update the prior expectations
+that asserted `syncXpLedgerStatus` *was* called (`retention-data.test.ts:1000-1194`)
+to assert it is **no longer called** — matching current real behavior, not a
+weakened assertion. Negative: re-introducing an accidental `xpStatus` mutation in
+the strip makes the row-identity assertion go red.
+
 ---
 
 ## Rollback
@@ -466,6 +532,38 @@ correctness-bearing axes:
 red-green proof that no column write was dropped or added; the chokepoint cannot
 ship green if any writer's column set or guard drifted.
 
+### Rollback — the XP kill (T12)
+
+**Is rollback possible?** Yes — code-only. T12 deletes two `syncXpLedgerStatus`
+call sites from the retention write path; it adds no migration, drops no column,
+and backfills nothing. Rollback = `git revert` of the T12 commit; the two call
+sites and their Sentry-wrapped dispatches return verbatim and `xp_ledger.status`
+resumes tracking retention status changes.
+
+**What is lost?** Essentially nothing user-visible, because the system was
+**backend-only**: after T12, `retention_cards.xpStatus` keeps its value but stops
+propagating to `xp_ledger.status` on recall/calibration verify. The XP point
+*totals* (`xp_ledger.amount`) are still written by the session-completed /
+reflection paths (`insertSessionXpEntry`, `applyReflectionMultiplier`) until the
+F-XP-2 ledger read is removed at cutover (S6) — so the frozen UI surfaces (F-XP-1
+session-summary bonus copy, F-XP-2 `totalXp`) keep rendering their last values
+rather than going blank. The only behavioral loss is that a *decay/re-verify*
+status flip no longer reflects into the ledger; since the spec rules XP is dead
+(replaced by the §2.1 noticing loop + "on track" badge), this drift is intended,
+not a regression to recover.
+
+**What is deferred (NOT in this plan's scope):** dropping the `xpStatus` column,
+the `xp_ledger` table, the `GET /xp` route, `services/xp.ts`, and the F-XP-1/F-XP-2
+UI readers are a **schema-migration + S6 cutover** job, owned by the spec owner per
+the §2.1 supersession — gated by the V0/V1 no-regress constraint (the shipped XP
+screens retire with the old shell, not before). T12 records F-XP-1/F-XP-2/F-XP-3 as
+the handoff. Recovering from a premature column/table drop would NOT be code-only —
+hence it is explicitly excluded here; this code-only plan never touches the schema.
+
+**Pre-ship guard:** the T12 break-test proves severing the XP ledger sync leaves
+the `retention_cards` row byte-identical, so the kill cannot silently corrupt SRS
+scheduling, mastery stamping, or the on-card `xpStatus` value.
+
 ---
 
 ## Sequencing note
@@ -480,6 +578,20 @@ S0-R can land before, during, or after S1/S2 without coordination. It is
 identity-independent (writes the existing `profileId`-keyed table; no
 `person`/`edge` columns — consistent with §9's identity-independent-phases-first
 guarantee).
+
+**T12 / XP-kill ordering and the S1 boundary.** T12 runs **last** in this plan
+(after the T1–T11 consolidation is green). It is what makes the §2.1 invariant
+"two motivation systems must not coexist and fight" true on the backend by
+severing the XP ledger from the retention path. The replacement motivation
+surface — the calm **"on track" badge** that replaces the streak display (§2.1
+supersession) — is an **S1 shell surface and is explicitly NOT built here**; this
+plan only removes the backend XP side-effect so S1 can land the badge without a
+competing point system underneath it. The F-XP-1/F-XP-2 UI-reader removals are
+**gated to cutover (S6)** by the V0/V1 no-regress constraint, not done in S1 or
+S0-R — the new V2 shell simply never wires XP; the old XP screens retire with the
+old shell. Cross-ref: spec **§2.1 (Supersessions)** and
+**§15 item 17** (the XP-kill ruling); the read-side feed/badge work lives in the
+S1 track per spec §8.3.
 
 ## Validation note
 
