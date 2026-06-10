@@ -193,8 +193,12 @@ export function calculateAge(birthYear: number): number {
   return new Date().getUTCFullYear() - birthYear;
 }
 
-/** Minimum age to use the platform (PRD line 386: "Ages 6-10 Out of Scope") */
-export const MINIMUM_AGE = 11;
+/**
+ * Minimum age to use the platform.
+ * WI-570 (data-model.md §2A.5): v1 launch floor is 13+ (was 11+, per "Ages 6-10 Out of Scope"
+ * from PRD line 386). Updated in lockstep with birthYearSchema floor in @eduagent/schemas.
+ */
+export const MINIMUM_AGE = 13;
 
 /**
  * Calculates exact age from a full birth date (year, month 1-based, day) and

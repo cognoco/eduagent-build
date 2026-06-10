@@ -283,7 +283,7 @@ describe('checkConsentRequired', () => {
     expect(result.consentType).toBeNull();
   });
 
-  it('flags belowMinimumAge for child under 11', () => {
+  it('flags belowMinimumAge for child under 13 (WI-570: v1 13+ floor)', () => {
     const result = checkConsentRequired(CURRENT_YEAR - 9);
 
     expect(result.required).toBe(true);
@@ -1253,23 +1253,25 @@ describe('checkConsentRequiredFromDate', () => {
     jest.useRealTimers();
   });
 
-  it('[break-test] child still 10 (birthday later this year) is flagged belowMinimumAge', () => {
-    // birthYear = currentYear - 11, but birthday is Dec 31 → exact age still 10
+  it('[break-test] child still 12 by exact date (year-only=13) is flagged belowMinimumAge (WI-570)', () => {
+    // WI-570: 13+ floor. birthYear = currentYear - 13, but birthday is Dec 31 → exact age still 12.
+    // Year-only says 13 (passes Zod), but full-date catches the 12th birthday hasn't arrived yet.
     jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
-    const birthYear = 2015; // 2026 - 2015 = 11 by year-only, but birthday Dec 31 → exact 10
+    const birthYear = 2013; // 2026 - 2013 = 13 by year-only, but birthday Dec 31 → exact 12
     const result = checkConsentRequiredFromDate(birthYear, 12, 31);
     expect(result.belowMinimumAge).toBe(true);
     expect(result.required).toBe(true);
-    expect(result.age).toBe(10);
+    expect(result.age).toBe(12);
   });
 
-  it('child exactly 11 today (birthday today) is allowed with GDPR required', () => {
+  it('child exactly 13 today (birthday today) is allowed with GDPR required (WI-570)', () => {
+    // WI-570: 13+ floor. Exactly 13 on their birthday is the minimum allowed age.
     jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
-    const result = checkConsentRequiredFromDate(2015, 5, 24);
+    const result = checkConsentRequiredFromDate(2013, 5, 24);
     expect(result.belowMinimumAge).toBeUndefined();
     expect(result.required).toBe(true);
     expect(result.consentType).toBe('GDPR');
-    expect(result.age).toBe(11);
+    expect(result.age).toBe(13);
   });
 
   it('child aged 16 with full date is still consent-required', () => {
@@ -1287,13 +1289,13 @@ describe('checkConsentRequiredFromDate', () => {
     expect(result.consentType).toBeNull();
   });
 
-  it('falls back to year-only when month/day not supplied', () => {
+  it('falls back to year-only when month/day not supplied (WI-570: 13+ floor)', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
-    // year-only: 2026 - 2015 = 11 → belowMinimumAge is NOT set (age >= MINIMUM_AGE)
-    const result = checkConsentRequiredFromDate(2015);
+    // year-only: 2026 - 2013 = 13 → belowMinimumAge is NOT set (age >= MINIMUM_AGE=13)
+    const result = checkConsentRequiredFromDate(2013);
     expect(result.belowMinimumAge).toBeUndefined();
     expect(result.required).toBe(true);
-    expect(result.age).toBe(11);
+    expect(result.age).toBe(13);
   });
 });
 
