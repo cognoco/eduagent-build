@@ -137,9 +137,9 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **in-progress** — executor dispatched 2026-06-10 (`wi570-executor`, `.worktrees/WI-570`); gate note: WI-569 at Reviewing (not yet Closed), work merged — proceeding under shepherd direction |
-| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **ready** — refined 2026-06-10 (Assisted; brief in body, children WI-594/595) |
-| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **ready** — refined 2026-06-10 (Assisted; brief in body, children WI-596/597) |
+| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **review** — Stage=Reviewing 2026-06-10, PR #855 MERGED 23:01Z (shepherd-verified: 6/6 green; age changes canon-backed by data-model §2A.5 + compliance register; loginId-FK P2 dispositioned in-thread); awaiting `/cosmo:review` |
+| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **in-progress** — executor dispatched 2026-06-11 (`wi571-executor`, `.worktrees/WI-571`, parallel with WI-572) |
+| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **in-progress** — executor dispatched 2026-06-11 (`wi572-executor`, `.worktrees/WI-572`, parallel with WI-571) |
 | WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **ready** — refined 2026-06-10 (Assisted; framing checklist confirmed) |
 
 ### W2 — identity / consent / proxy / age (critical path)
@@ -186,9 +186,16 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   `WHERE revoked_at IS NULL`). Dev + staging hold the 17 baseline tables, verified;
   full evidence in the WI-569 completion summary. **Awaiting `/cosmo:review WI-569`
   (operator) — that close is program gate G2.**
-- **WI-570 dispatched** (`wi570-executor`, 2026-06-10 ~21:40 UTC) — TS schema must
-  match landed 0108 SQL exactly; scoped-repo (F-032) via TDD; db:push-parity check
-  is a hard-stop boundary if destructive.
+- **WI-570 DONE (executor side), merged 2026-06-10 23:01 UTC** — PR #855: 17-table
+  TS schema (parity-verified: `db:push:dev` dry-check zero changes), scoped-repo
+  break tests, canon-mandated AgeBracket 3-way + 13-floor (data-model §2A.5).
+  Known limitation dispositioned: `person.loginId` FK undeclared in TS (Drizzle
+  circular-type issue), constraint live from 0108 SQL, JSDoc'd. Awaiting
+  `/cosmo:review`.
+- **WI-571 ∥ WI-572 dispatched 2026-06-11** (parallel executors, own worktrees,
+  sibling-surface notices exchanged). WI-573 queued behind WI-571.
+- **W2 pre-bridging is the shepherd's next idle-time task** (WI-574/575/576 per
+  the §2 ruling).
 
 - **W0 is fully done on the patch side:** WI-549/550 Closed/Done (PRs #817/#818,
   merged 2026-06-10) and WI-551 Closed/Done (`c5c9b39bb`, resolved 2026-06-10).
