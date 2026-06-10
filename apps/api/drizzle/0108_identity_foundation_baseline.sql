@@ -110,7 +110,8 @@ CREATE TABLE "public"."membership" (
   "created_at"       timestamptz NOT NULL DEFAULT now(),
   "updated_at"       timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT "membership_person_org_unique" UNIQUE ("person_id", "organization_id"),
-  CONSTRAINT "membership_roles_non_empty"   CHECK (cardinality("membership"."roles") >= 1)
+  CONSTRAINT "membership_roles_non_empty"   CHECK (cardinality("membership"."roles") >= 1),
+  CONSTRAINT "membership_roles_valid"       CHECK ("roles" <@ ARRAY['admin', 'learner']::text[])
 );--> statement-breakpoint
 
 CREATE INDEX "membership_organization_id_idx" ON "public"."membership" ("organization_id");--> statement-breakpoint
@@ -135,7 +136,7 @@ CREATE TABLE "public"."subscription" (
   "organization_id"  uuid   NOT NULL,
   "plan_tier"        text   NOT NULL,
   "status"           text   NOT NULL,
-  "payer_person_id"  uuid,
+  "payer_person_id"  uuid   NOT NULL,
   "store_product_id" text,
   "store_platform"   text,
   "period_start_at"  timestamptz,
@@ -154,7 +155,7 @@ ALTER TABLE "public"."subscription"
 ALTER TABLE "public"."subscription"
   ADD CONSTRAINT "subscription_payer_person_id_person_id_fk"
   FOREIGN KEY ("payer_person_id") REFERENCES "public"."person" ("id")
-  ON DELETE SET NULL ON UPDATE NO ACTION;--> statement-breakpoint
+  ON DELETE RESTRICT ON UPDATE NO ACTION;--> statement-breakpoint
 
 -- ----------------------------------------------------------------------------
 -- 6. guardianship  (replaces family_links)
@@ -349,7 +350,9 @@ CREATE TABLE "public"."policy_cells" (
   "knowledge_axis"   text     NOT NULL CHECK ("knowledge_axis" IN ('age', 'residence')),
   "knowledge_value"  jsonb    NOT NULL,
   CONSTRAINT "policy_cells_unique"
-    UNIQUE ("age_band_min", "age_band_max", "regime_id", "knowledge_axis", "knowledge_value")
+    UNIQUE ("age_band_min", "age_band_max", "regime_id", "knowledge_axis", "knowledge_value"),
+  CONSTRAINT "policy_cells_age_band_valid"
+    CHECK ("age_band_min" >= 0 AND "age_band_min" <= "age_band_max")
 );--> statement-breakpoint
 
 ALTER TABLE "public"."policy_cells"

@@ -5,7 +5,7 @@ This directory contains Drizzle ORM migration SQL files and their associated met
 ## Baseline
 
 **Date:** 2026-06-10  
-**ADR:** [`docs/adr/MMT-ADR-0012-one-time-baseline-reset.md`](../docs/adr/MMT-ADR-0012-one-time-baseline-reset.md)  
+**ADR:** [`docs/adr/MMT-ADR-0012-one-time-baseline-reset.md`](../../../docs/adr/MMT-ADR-0012-one-time-baseline-reset.md)  
 **Migration:** `0108_identity_foundation_baseline.sql`
 
 Migration `0108` is the **one-time documented baseline reset** for the Identity Foundation

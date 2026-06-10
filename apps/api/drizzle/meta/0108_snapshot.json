@@ -8314,6 +8314,10 @@
         "membership_roles_non_empty": {
           "name": "membership_roles_non_empty",
           "value": "(cardinality(membership.roles) >= 1)"
+        },
+        "membership_roles_valid": {
+          "name": "membership_roles_valid",
+          "value": "(roles <@ ARRAY['admin', 'learner']::text[])"
         }
       },
       "isRLSEnabled": false
@@ -8350,7 +8354,7 @@
           "name": "payer_person_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "store_product_id": {
           "name": "store_product_id",
@@ -8426,7 +8430,7 @@
           "schemaTo": "public",
           "columnsFrom": ["payer_person_id"],
           "columnsTo": ["id"],
-          "onDelete": "set null",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -9293,6 +9297,10 @@
         "policy_cells_knowledge_axis_check": {
           "name": "policy_cells_knowledge_axis_check",
           "value": "(knowledge_axis IN ('age', 'residence'))"
+        },
+        "policy_cells_age_band_valid": {
+          "name": "policy_cells_age_band_valid",
+          "value": "((age_band_min >= 0) AND (age_band_min <= age_band_max))"
         }
       },
       "isRLSEnabled": false
