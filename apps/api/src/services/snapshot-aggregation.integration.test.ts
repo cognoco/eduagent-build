@@ -21,14 +21,18 @@ import {
   accounts,
   createDatabase,
   generateUUIDv7,
+  milestones,
   progressSnapshots,
   profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { like } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 import type { SubjectInventory } from '@eduagent/schemas';
-import { buildKnowledgeInventory } from './snapshot-aggregation';
+import {
+  buildKnowledgeInventory,
+  listRecentMilestones,
+} from './snapshot-aggregation';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -177,5 +181,81 @@ describe('[BUG-872] buildKnowledgeInventory includes subjects added after the ca
     expect(
       inventory.subjects.map((s: SubjectInventory) => s.subjectId),
     ).toEqual([mathId]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-144] listRecentMilestones performs a write-on-read: it backfills missed
+// session_count milestones. A parent proxy session (acting on a child via
+// X-Profile-Id) reaching GET /progress/milestones would otherwise MUTATE the
+// child's milestone rows. The route passes allowBackfill=false in proxy mode;
+// this verifies the suppression actually prevents the write while the read
+// still returns existing rows.
+// ---------------------------------------------------------------------------
+
+async function seedSnapshotWithSessions(
+  profileId: string,
+  totalSessions: number,
+): Promise<void> {
+  await db.insert(progressSnapshots).values({
+    profileId,
+    snapshotDate: new Date().toISOString().slice(0, 10),
+    metrics: {
+      totalSessions,
+      totalActiveMinutes: 0,
+      totalWallClockMinutes: 0,
+      totalExchanges: 0,
+      topicsAttempted: 0,
+      topicsMastered: 0,
+      topicsInProgress: 0,
+      vocabularyTotal: 0,
+      vocabularyMastered: 0,
+      vocabularyLearning: 0,
+      vocabularyNew: 0,
+      retentionCardsDue: 0,
+      retentionCardsStrong: 0,
+      retentionCardsFading: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      subjects: [],
+    },
+  });
+}
+
+async function countSessionMilestones(profileId: string): Promise<number> {
+  const rows = await db.query.milestones.findMany({
+    where: and(
+      eq(milestones.profileId, profileId),
+      eq(milestones.milestoneType, 'session_count'),
+    ),
+    columns: { id: true },
+  });
+  return rows.length;
+}
+
+describe('[F-144] listRecentMilestones backfill suppression in proxy mode', () => {
+  it('does NOT backfill milestones when allowBackfill=false (proxy read)', async () => {
+    const profileId = await seedProfile();
+    // 5 sessions → thresholds 1, 3, 5 missed; zero milestone rows exist.
+    await seedSnapshotWithSessions(profileId, 5);
+    expect(await countSessionMilestones(profileId)).toBe(0);
+
+    const result = await listRecentMilestones(db, profileId, 5, false);
+
+    // No write happened — the child's milestone state is untouched.
+    expect(await countSessionMilestones(profileId)).toBe(0);
+    expect(result).toEqual([]);
+  });
+
+  it('DOES backfill when allowBackfill=true (self read) — suppression is proxy-scoped, not a blanket disable', async () => {
+    const profileId = await seedProfile();
+    await seedSnapshotWithSessions(profileId, 5);
+    expect(await countSessionMilestones(profileId)).toBe(0);
+
+    const result = await listRecentMilestones(db, profileId, 5, true);
+
+    // Backfill wrote the missed thresholds (1, 3, 5).
+    expect(await countSessionMilestones(profileId)).toBe(3);
+    expect(result.length).toBe(3);
   });
 });

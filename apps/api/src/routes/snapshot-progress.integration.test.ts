@@ -95,6 +95,63 @@ async function clearProgressSnapshots(profileId: string): Promise<void> {
     .where(eq(progressSnapshots.profileId, profileId));
 }
 
+// [F-144] Creates a second profile on the SAME account — the first profile is
+// the owner, so the second is a non-owner child. Used to exercise the proxy
+// (X-Profile-Id = child, authed as owner) path on GET /progress/milestones.
+async function createChildProfile(): Promise<{ id: string }> {
+  const profile = await createProfileViaRoute({
+    app,
+    env: TEST_ENV,
+    user: { userId: AUTH_USER_ID, email: AUTH_EMAIL },
+    displayName: 'Snapshot Progress Child',
+    birthYear: 2014,
+  });
+  expect(profile.isOwner).toBe(false);
+  return { id: profile.id };
+}
+
+// Seeds a progress snapshot whose totalSessions is past the lower backfill
+// thresholds (1, 3, 5) while zero milestone rows exist — so a milestones read
+// WOULD backfill unless suppressed.
+async function seedSnapshotWithSessions(
+  profileId: string,
+  totalSessions: number,
+): Promise<void> {
+  const db = createIntegrationDb();
+  await db.insert(progressSnapshots).values({
+    profileId,
+    snapshotDate: new Date().toISOString().slice(0, 10),
+    metrics: {
+      totalSessions,
+      totalActiveMinutes: 0,
+      totalWallClockMinutes: 0,
+      totalExchanges: 0,
+      topicsAttempted: 0,
+      topicsMastered: 0,
+      topicsInProgress: 0,
+      vocabularyTotal: 0,
+      vocabularyMastered: 0,
+      vocabularyLearning: 0,
+      vocabularyNew: 0,
+      retentionCardsDue: 0,
+      retentionCardsStrong: 0,
+      retentionCardsFading: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      subjects: [],
+    },
+  });
+}
+
+async function countMilestones(profileId: string): Promise<number> {
+  const db = createIntegrationDb();
+  const rows = await db.query.milestones.findMany({
+    where: eq(milestones.profileId, profileId),
+    columns: { id: true },
+  });
+  return rows.length;
+}
+
 // Seeds N notification_log rows of type 'progress_refresh' for the profile
 // so that the (N+1)th call is rate-limited.
 async function seedRateLimitRows(
@@ -455,5 +512,55 @@ describe('Integration: snapshot-progress routes', () => {
       TEST_ENV,
     );
     expect(res.status).toBe(401);
+  });
+
+  // -------------------------------------------------------------------------
+  // [F-144] GET /v1/progress/milestones — write-on-read backfill must be
+  // suppressed in proxy mode. listRecentMilestones backfills missed
+  // session_count milestones; a parent acting on a child (X-Profile-Id =
+  // childId, isOwner resolves false) must be able to READ the child's
+  // milestones but must NOT mutate the child's rows. The route maps proxy mode
+  // (profileMeta.isOwner !== true) to allowBackfill=false. This is the
+  // end-to-end wiring test for that mapping (the service-level suppression is
+  // covered in snapshot-aggregation.integration.test.ts).
+  // -------------------------------------------------------------------------
+  it('[F-144] proxy read of child milestones does NOT backfill (mutate) the child rows', async () => {
+    await createOwnerProfile();
+    const { id: childId } = await createChildProfile();
+
+    // Child is behind on milestones: 5 sessions, zero milestone rows.
+    await seedSnapshotWithSessions(childId, 5);
+    expect(await countMilestones(childId)).toBe(0);
+
+    // Owner proxies into the child via X-Profile-Id (resolves isOwner=false).
+    const res = await app.request(
+      '/v1/progress/milestones',
+      { method: 'GET', headers: await authHeaders(childId) },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { milestones: unknown[] };
+    expect(Array.isArray(body.milestones)).toBe(true);
+    // The read succeeded but no backfill write fired — child rows untouched.
+    expect(await countMilestones(childId)).toBe(0);
+  });
+
+  it('[F-144] self (owner) read DOES backfill — suppression is proxy-scoped, not a blanket disable', async () => {
+    const { id: ownerId } = await createOwnerProfile();
+
+    // Owner is behind on milestones: 5 sessions, zero milestone rows.
+    await seedSnapshotWithSessions(ownerId, 5);
+    expect(await countMilestones(ownerId)).toBe(0);
+
+    const res = await app.request(
+      '/v1/progress/milestones',
+      { method: 'GET', headers: await authHeaders(ownerId) },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    // The owner's own read backfilled the missed thresholds (1, 3, 5).
+    expect(await countMilestones(ownerId)).toBe(3);
   });
 });
