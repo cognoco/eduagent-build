@@ -1307,7 +1307,7 @@ describe('activateSubscriptionFromCheckout', () => {
 
 describe('transitionToExtendedTrial', () => {
   it('updates subscription status and tier', async () => {
-    const db = createMockDb();
+    const db = createMockDb({ updateReturning: [{ id: subscriptionId }] });
 
     await transitionToExtendedTrial(db, subscriptionId, 450);
 
@@ -1315,9 +1315,18 @@ describe('transitionToExtendedTrial', () => {
     expect(db.update).toHaveBeenCalledTimes(2);
   });
 
+  it('skips quota changes when the subscription is no longer a trial', async () => {
+    const db = createMockDb({ updateReturning: [] });
+
+    await transitionToExtendedTrial(db, subscriptionId, 450);
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+  });
+
   it('sets quota pool to extended trial monthly equivalent', async () => {
+    const returningMock = jest.fn().mockResolvedValue([{ id: subscriptionId }]);
     const updateWhere = jest.fn().mockReturnValue({
-      returning: jest.fn().mockResolvedValue([]),
+      returning: returningMock,
     });
     const updateSetMock = jest.fn().mockReturnValue({ where: updateWhere });
 

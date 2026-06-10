@@ -348,6 +348,35 @@ describe('transitionToExtendedTrial atomicity [CR-2026-05-19-M3 SITE 2a]', () =>
     expect(pool!.usedThisMonth).toBe(0);
     expect(pool!.usedToday).toBe(0);
   });
+
+  it('[BREAK / F-121] does not downgrade a trial that converted to paid after cron selection', async () => {
+    const account = await seedAccount(5);
+    const { subscription, quotaPool } =
+      await seedTrialSubscriptionWithPlusQuota(account.id, 'trial');
+    const db = createIntegrationDb();
+
+    await db
+      .update(subscriptions)
+      .set({
+        status: 'active',
+        tier: 'plus',
+        trialEndsAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, subscription.id));
+
+    await transitionToExtendedTrial(db, subscription.id, 450);
+
+    const sub = await loadSubscriptionById(subscription.id);
+    expect(sub!.status).toBe('active');
+    expect(sub!.tier).toBe('plus');
+    expect(sub!.trialEndsAt).toBeNull();
+
+    const pool = await loadQuotaPool(subscription.id);
+    expect(pool!.monthlyLimit).toBe(quotaPool.monthlyLimit);
+    expect(pool!.usedThisMonth).toBe(quotaPool.usedThisMonth);
+    expect(pool!.usedToday).toBe(quotaPool.usedToday);
+  });
 });
 
 describe('transitionToExtendedTrialFromRevenuecatEvent [WI-78 review]', () => {

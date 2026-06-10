@@ -233,14 +233,24 @@ export async function transitionToExtendedTrial(
 ): Promise<void> {
   const freeTierConfig = getTierConfig('free');
   await db.transaction(async (tx) => {
-    await tx
+    const [updated] = await tx
       .update(subscriptions)
       .set({
         status: 'expired',
         tier: 'free',
         updatedAt: new Date(),
       })
-      .where(eq(subscriptions.id, subscriptionId));
+      .where(
+        and(
+          eq(subscriptions.id, subscriptionId),
+          eq(subscriptions.status, 'trial'),
+        ),
+      )
+      .returning({ id: subscriptions.id });
+
+    if (!updated) {
+      return;
+    }
 
     await tx
       .update(quotaPools)
