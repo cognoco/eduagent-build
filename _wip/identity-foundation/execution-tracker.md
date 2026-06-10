@@ -146,9 +146,9 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | backlog-gated |
-| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | backlog-gated |
-| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | backlog-gated |
+| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-598/599) |
+| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-600/601) |
+| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-602/603) |
 
 ### W3 — PII-handling + envelope/router (critical path)
 
@@ -194,8 +194,10 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   `/cosmo:review`.
 - **WI-571 ∥ WI-572 dispatched 2026-06-11** (parallel executors, own worktrees,
   sibling-surface notices exchanged). WI-573 queued behind WI-571.
-- **W2 pre-bridging is the shepherd's next idle-time task** (WI-574/575/576 per
-  the §2 ruling).
+- **W2 fully pre-bridged 2026-06-11** — WI-574/575/576 Ready+Assisted (children
+  WI-598…603). Dispatch order when W1 lands: WI-574 first (deps 570 ✓ + 571),
+  then WI-575 ∥ WI-576 (deps 572 + 574). Next shepherd idle-time task: W3
+  pre-bridging (WI-577…582).
 
 - **W0 is fully done on the patch side:** WI-549/550 Closed/Done (PRs #817/#818,
   merged 2026-06-10) and WI-551 Closed/Done (`c5c9b39bb`, resolved 2026-06-10).
