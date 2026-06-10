@@ -216,7 +216,11 @@ function getSafetyPreamble(ageBracket?: AgeBracket): string {
   switch (ageBracket) {
     case 'adult':
       return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
+    case 'child':
     case 'adolescent':
+      // WI-570: 'child' (sub-13) uses the same young-learner preamble as 'adolescent'.
+      // Sub-13 users cannot currently reach this path (birthYearSchema enforces 13-floor);
+      // the case exists for forward-compatibility with the v1.1 ungating path.
       return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
     default: {
       const exhaustive: never = ageBracket;

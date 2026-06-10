@@ -63,15 +63,18 @@ export type { AgeBracket };
 /**
  * Human-readable description of an age bracket for LLM prompt injection.
  *
- * [CR-2026-05-19-H11] Product is strictly 11+. 'child' was removed from the
- * AgeBracket union in BUG-577 — `computeAgeBracket` now returns 'adolescent'
- * for any age under 18, so sub-11 birth years (rejected by `birthYearSchema`)
- * can never reach this function via a real user action.
+ * WI-570 (data-model.md §2A.5): 'child' (sub-13) added to AgeBracket for
+ * the v1 13+ floor and future v1.1 sub-13 ungating. Sub-13 users cannot
+ * currently reach this path (birthYearSchema enforces 13-floor); the case
+ * exists for forward-compatibility.
  */
 export function describeAgeBracket(ageBracket: AgeBracket): string {
   switch (ageBracket) {
+    case 'child':
+      // WI-570: sub-13 bracket; currently unreachable (birthYearSchema 13-floor).
+      return 'under-13';
     case 'adolescent':
-      return '11-17';
+      return '13-17';
     case 'adult':
       return '18+';
     default: {
