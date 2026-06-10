@@ -8,7 +8,7 @@
 import { and, eq } from 'drizzle-orm';
 import { familyLinks, type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
-import { calculateAge } from './consent';
+import { calculateAge } from './age-utils';
 import type { Context, Env, Input } from 'hono';
 import type { ProfileMeta } from '../middleware/profile-scope';
 
