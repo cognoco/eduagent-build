@@ -176,14 +176,6 @@ describeIntegration(
       return o;
     }
 
-    async function clerkIdFor(profileId: string): Promise<string | null> {
-      const [p] = await db
-        .select({ clerkUserId: profiles.clerkUserId })
-        .from(profiles)
-        .where(eq(profiles.id, profileId));
-      return p?.clerkUserId ?? null;
-    }
-
     it('(a) creates exactly one organization per account (id == account.id)', async () => {
       for (const id of [acctFamily, acctSolo, acctArchChild, acctArchOwner]) {
         const org = await orgFor(id);
@@ -213,15 +205,6 @@ describeIntegration(
       ]);
       expect(await rolesFor(childFamily)).toEqual(['student']);
       expect(await rolesFor(ownerSolo)).toEqual(['owner', 'student']);
-    });
-
-    it('(d) copies clerk_user_id to the owner profile only; child stays null', async () => {
-      const [acct] = await db
-        .select({ clerkUserId: accounts.clerkUserId })
-        .from(accounts)
-        .where(eq(accounts.id, acctFamily));
-      expect(await clerkIdFor(ownerFamily)).toBe(acct!.clerkUserId);
-      expect(await clerkIdFor(childFamily)).toBeNull();
     });
 
     it('(e) points each subscription at its account org (== account_id)', async () => {

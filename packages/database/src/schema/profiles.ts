@@ -77,12 +77,6 @@ export const profiles = pgTable(
     accountId: uuid('account_id')
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
-    // [Identity T1] Per-person Clerk credential. Nullable + unique: null = a
-    // managed person (no login), set = a credentialed person. Identity moves
-    // off `accounts` (T2+); in T1 the backfill copies it down to the owner
-    // profile only. Multiple emails/OAuth providers live inside one Clerk user,
-    // so a single id per person suffices.
-    clerkUserId: text('clerk_user_id').unique(),
     displayName: text('display_name').notNull(),
     avatarUrl: text('avatar_url'),
     birthYear: integer('birth_year').notNull(),

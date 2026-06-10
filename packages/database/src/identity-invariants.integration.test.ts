@@ -274,12 +274,6 @@ describeIntegration('[Identity T1] membership invariants', () => {
       .where(eq(memberships.personId, p!.id));
     expect((m?.roles ?? []).slice().sort()).toEqual(['student']);
 
-    const [prof] = await db
-      .select({ clerkUserId: profiles.clerkUserId })
-      .from(profiles)
-      .where(eq(profiles.id, p!.id));
-    expect(prof!.clerkUserId).toBeNull();
-
     const [org] = await db
       .select({ name: organizations.name })
       .from(organizations)

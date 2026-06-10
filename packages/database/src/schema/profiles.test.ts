@@ -50,16 +50,6 @@ describe('profiles + accounts schema shape', () => {
     expect(accounts).toHaveProperty('id');
     expect(accounts).not.toHaveProperty('profileId');
   });
-
-  // [Identity T1] The credential column lives on the person, nullable + unique.
-  it('profiles.clerkUserId is present, nullable, and unique', () => {
-    expect(profiles).toHaveProperty('clerkUserId');
-    const { columns } = getTableConfig(profiles);
-    const clerk = columns.find((c) => c.name === 'clerk_user_id');
-    expect(clerk).toBeDefined();
-    expect(clerk!.notNull).toBe(false); // null = managed person
-    expect(clerk!.isUnique).toBe(true);
-  });
 });
 
 // [Identity T1] organizations + memberships schema shape.
