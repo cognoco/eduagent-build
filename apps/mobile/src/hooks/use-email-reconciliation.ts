@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import * as Sentry from '@sentry/react-native';
 import { useUser } from '@clerk/clerk-expo';
 
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { Sentry } from '../lib/sentry';
 
 /**
  * [CRITICAL-1] App-side reconciliation of the Clerk primary email against the
