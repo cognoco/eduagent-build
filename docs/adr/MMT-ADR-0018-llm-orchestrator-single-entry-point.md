@@ -1,8 +1,8 @@
-# MMT-ADR-0017 — All LLM calls route through a single orchestrator (`routeAndCall()`)
+# MMT-ADR-0018 — All LLM calls route through a single orchestrator (`routeAndCall()`)
 
 **Status:** Accepted (Architecture decision, Epic 2 era) · **Reconstructed:** 2026-06-08 (Phase I-b promotion — MMT-ADR-0000 Part III) · **Scope:** All production LLM calls · **Deciders:** PM + Architect (jjoerg) + Claude · **aka** `ARCH-8` · **Relates to:** MMT-ADR-0014 (router/vetting split — downstream of the orchestrator), MMT-ADR-0016 (safety/judge architecture — downstream roles)
 
-> **Provenance note:** this promotes the pre-existing register entry `ARCH-8` to a full decision record, exercising the **`ARCH-N` freeze + absorb-forward** mechanism (MMT-ADR-0000 Part III). Per absorb-forward, the same change-set migrates `ARCH-8`'s four code citations (`services/llm/router.ts`, `services/llm/types.ts`, `services/llm/providers/openai.ts`, `services/llm/providers/gemini.ts` — three shared with `ARCH-9`, which migrates to `MMT-ADR-0014`) to `MMT-ADR-0017`, and stamps the `ARCH-8` line in `docs/specs/epics.md` with its disposition (`→ MMT-ADR-0017`). No standing `ARCH-8` alias remains. Reconstructed after the fact: the decision is recorded as built, without inventing a contemporaneous rationale beyond what the code and register attest.
+> **Provenance note:** this promotes the pre-existing register entry `ARCH-8` to a full decision record, exercising the **`ARCH-N` freeze + absorb-forward** mechanism (MMT-ADR-0000 Part III). Per absorb-forward, the same change-set migrates `ARCH-8`'s four code citations (`services/llm/router.ts`, `services/llm/types.ts`, `services/llm/providers/openai.ts`, `services/llm/providers/gemini.ts` — three shared with `ARCH-9`, which migrates to `MMT-ADR-0014`) to `MMT-ADR-0018`, and stamps the `ARCH-8` line in `docs/specs/epics.md` with its disposition (`→ MMT-ADR-0018`). No standing `ARCH-8` alias remains. Reconstructed after the fact: the decision is recorded as built, without inventing a contemporaneous rationale beyond what the code and register attest.
 
 ## Context
 

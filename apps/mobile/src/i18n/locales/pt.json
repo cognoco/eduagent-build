@@ -993,7 +993,7 @@
       "delete": "Excluir",
       "deleting": "Excluindo...",
       "deleteConfirmTitle": "Excluir {{subject}}?",
-      "deleteConfirmMessage": "Isto exclui permanentemente {{subject}}, incluindo {{books}}, {{startedTopics}} e {{sessions}} com o histórico de aprendizagem. Esta ação não pode ser desfeita.",
+      "deleteConfirmMessage": "Isto apaga permanentemente {{subject}} — incluindo {{books}}, {{startedTopics}} e {{sessions}} com o histórico de aprendizagem, juntamente com todo o progresso de domínio, revisões de flashcards e a sequência desta matéria. Esta ação não pode ser desfeita.",
       "deleteConfirmAction": "Excluir",
       "deleteScopeBooks_one": "{{count}} livro",
       "deleteScopeBooks_other": "{{count}} livros",

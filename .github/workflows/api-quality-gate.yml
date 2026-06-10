@@ -64,12 +64,9 @@ jobs:
       # (--check-baseline --live) stays a manual/scheduled gate because it needs
       # live, non-deterministic LLM output.
       #
-      # continue-on-error until the baseline is seeded once with
-      #   doppler run -- pnpm eval:llm -- --live --update-baseline
-      # (committed afterward). The step logs the failure so the gap is visible
-      # on every PR; flip continue-on-error to false in the same PR that commits
-      # the seeded baseline to make this blocking. See apps/api/eval-llm/README.md.
+      # Blocking since WI-556: the baseline was seeded (2026-06-09, all four
+      # envelope-emitting flows) and committed in the same PR that removed
+      # continue-on-error here. See apps/api/eval-llm/README.md § Seeding.
       - name: LLM eval harness — validate signal baseline (deterministic)
         if: steps.prompt-changes.outputs.prompts == 'true'
-        continue-on-error: true
         run: pnpm eval:llm -- --validate-baseline

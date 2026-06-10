@@ -28,7 +28,12 @@ jest.mock(
   },
 );
 
-const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
+// [F-122] archive-cleanup now performs an ATOMIC conditional delete via
+// deleteArchivedProfileIfStillEligible (eligibility folded into the DELETE's
+// WHERE) instead of the unconditional deleteProfile. Mock the atomic helper.
+const mockDeleteArchivedProfileIfStillEligible = jest
+  .fn()
+  .mockResolvedValue(true);
 jest.mock(
   '../../services/deletion' /* gc1-allow: pattern-a conversion */,
   () => {
@@ -37,7 +42,8 @@ jest.mock(
     ) as typeof import('../../services/deletion');
     return {
       ...actual,
-      deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
+      deleteArchivedProfileIfStillEligible: (...args: unknown[]) =>
+        mockDeleteArchivedProfileIfStillEligible(...args),
     };
   },
 );
@@ -91,12 +97,15 @@ describe('archiveCleanup', () => {
     });
   });
 
-  it('hard-deletes after consent remains withdrawn and 30 days elapsed', async () => {
+  it('hard-deletes (atomically) after consent remains withdrawn and 30 days elapsed', async () => {
     await executeArchiveCleanup('profile-delete');
 
-    expect(mockDeleteProfile).toHaveBeenCalledWith(
+    // [F-122] The terminal delete is the atomic helper, called with the
+    // profileId and a retention-cutoff Date.
+    expect(mockDeleteArchivedProfileIfStillEligible).toHaveBeenCalledWith(
       expect.anything(),
       'profile-delete',
+      expect.any(Date),
     );
   });
 
@@ -105,7 +114,7 @@ describe('archiveCleanup', () => {
 
     await executeArchiveCleanup('profile-restored');
 
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
   });
 
   it('does not delete when archivedAt was cleared', async () => {
@@ -117,7 +126,7 @@ describe('archiveCleanup', () => {
 
     await executeArchiveCleanup('profile-active');
 
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
   });
 
   it('does not delete when archivedAt is younger than 30 days', async () => {
@@ -129,6 +138,6 @@ describe('archiveCleanup', () => {
 
     await executeArchiveCleanup('profile-too-new');
 
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
   });
 });

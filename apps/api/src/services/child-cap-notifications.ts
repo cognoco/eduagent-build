@@ -20,7 +20,7 @@ type RecordChildCapNotificationInput = {
 
 type RecordChildCapNotificationResult = {
   inserted: boolean;
-  reason?: 'owner_not_found';
+  reason?: 'owner_not_found' | 'child_not_in_subscription_account';
 };
 
 function toIsoString(value: Date | string): string {
@@ -71,6 +71,26 @@ async function findOwnerProfileIdBySubscription(
     .limit(1);
 
   return owner?.id ?? null;
+}
+
+async function childBelongsToSubscriptionAccount(
+  db: Database,
+  subscriptionId: string,
+  childProfileId: string,
+): Promise<boolean> {
+  const [child] = await db
+    .select({ id: profiles.id })
+    .from(subscriptions)
+    .innerJoin(profiles, eq(profiles.accountId, subscriptions.accountId))
+    .where(
+      and(
+        eq(subscriptions.id, subscriptionId),
+        eq(profiles.id, childProfileId),
+      ),
+    )
+    .limit(1);
+
+  return child != null;
 }
 
 async function findOwnerProfileIdByAccount(
@@ -186,6 +206,18 @@ export async function recordChildCapNotificationForSubscription(
     input.subscriptionId,
   );
   if (!ownerProfileId) return { inserted: false, reason: 'owner_not_found' };
+  if (
+    !(await childBelongsToSubscriptionAccount(
+      db,
+      input.subscriptionId,
+      input.childProfileId,
+    ))
+  ) {
+    return {
+      inserted: false,
+      reason: 'child_not_in_subscription_account',
+    };
+  }
 
   return insertChildCapNotification(db, ownerProfileId, input);
 }

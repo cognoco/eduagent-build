@@ -1078,26 +1078,33 @@ export async function listRecentMilestones(
   db: Database,
   profileId: string,
   limit = 5,
+  // [F-144] When false, suppress the write-on-read backfill below. A parent
+  // proxy session (acting on a child via X-Profile-Id) must be able to READ a
+  // child's milestones but must NOT mutate the child's milestone rows. The
+  // route passes allowBackfill = (caller is the owner profile).
+  allowBackfill = true,
 ): Promise<MilestoneRecord[]> {
   // [F-PV-10] Backfill missed session_count milestones, but only when the
   // user has fewer session_count milestones than expected for their total.
   // This avoids a DB write attempt on every milestone list fetch for users
   // who are already fully caught up.
-  const latestSnapshot = await getLatestSnapshot(db, profileId);
-  const totalSessions = latestSnapshot?.metrics.totalSessions ?? 0;
-  if (totalSessions > 0) {
-    const expectedCount = SESSION_BACKFILL_THRESHOLDS.filter(
-      (t) => totalSessions >= t,
-    ).length;
-    const existingSessionMilestones = await db.query.milestones.findMany({
-      where: and(
-        eq(milestones.profileId, profileId),
-        eq(milestones.milestoneType, 'session_count'),
-      ),
-      columns: { id: true },
-    });
-    if (existingSessionMilestones.length < expectedCount) {
-      await backfillSessionMilestones(db, profileId, totalSessions);
+  if (allowBackfill) {
+    const latestSnapshot = await getLatestSnapshot(db, profileId);
+    const totalSessions = latestSnapshot?.metrics.totalSessions ?? 0;
+    if (totalSessions > 0) {
+      const expectedCount = SESSION_BACKFILL_THRESHOLDS.filter(
+        (t) => totalSessions >= t,
+      ).length;
+      const existingSessionMilestones = await db.query.milestones.findMany({
+        where: and(
+          eq(milestones.profileId, profileId),
+          eq(milestones.milestoneType, 'session_count'),
+        ),
+        columns: { id: true },
+      });
+      if (existingSessionMilestones.length < expectedCount) {
+        await backfillSessionMilestones(db, profileId, totalSessions);
+      }
     }
   }
 

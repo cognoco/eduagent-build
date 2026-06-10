@@ -4,7 +4,7 @@ import {
   getConsentStatus,
   getProfileForConsentRevocation,
 } from '../../services/consent';
-import { deleteProfile } from '../../services/deletion';
+import { deleteArchivedProfileIfStillEligible } from '../../services/deletion';
 
 const ARCHIVE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -30,10 +30,10 @@ export const archiveCleanup = inngest.createFunction(
     await step.run('hard-delete-archived-profile', async () => {
       const db = getStepDatabase();
 
-      // Defence-in-depth (C1): if consent was restored after archive was
-      // scheduled, bail. The restoreConsent() transaction already cleared
-      // archivedAt, so the profile-existence check below would also catch
-      // this — but an explicit consent-status guard is clearer and cheaper.
+      // Cheap early-outs for observability (these read-then-return reasons let
+      // the dashboard distinguish WHY a run was a no-op). They do NOT guard the
+      // delete on their own — a restoreConsent() landing after these reads but
+      // before the delete is the F-122 TOCTOU.
       const consentStatus = await getConsentStatus(db, profileId);
       if (consentStatus === 'CONSENTED') {
         return { deleted: false, reason: 'consent_restored' };
@@ -47,8 +47,19 @@ export const archiveCleanup = inngest.createFunction(
         return { deleted: false, reason: 'retention_window_not_elapsed' };
       }
 
-      await deleteProfile(db, profileId);
-      return { deleted: true };
+      // [F-122] The terminal delete is ATOMIC: the eligibility predicate
+      // (still archived, past retention, not CONSENTED) is folded into the
+      // DELETE's WHERE so a concurrent restoreConsent() between the reads above
+      // and this statement cannot lose a restored profile.
+      const retentionCutoff = new Date(Date.now() - ARCHIVE_RETENTION_MS);
+      const deleted = await deleteArchivedProfileIfStillEligible(
+        db,
+        profileId,
+        retentionCutoff,
+      );
+      return deleted
+        ? { deleted: true }
+        : { deleted: false, reason: 'consent_restored_or_unarchived' };
     });
 
     return { status: 'complete', profileId };

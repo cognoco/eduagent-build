@@ -3,16 +3,16 @@ title: Phase J0 — Canon-Shape Disposition Inventory (Task T1)
 date: 2026-06-08
 phase: J0
 plan: docs/plans/2026-06-08-identity-foundation-canon-shape-scrub.md
-status: draft — awaiting architect ratification of §Open Decisions
+status: complete — ratified and executed in J0
 ---
 
 # Phase J0 — Disposition Inventory
 
-**What this is.** Task **T1** of the canon-shape scrub plan: a section-by-section disposition
-map for the four identity-foundation domain docs scheduled to graduate `_wip/identity-foundation/`
-→ `docs/canon/`. Each section gets exactly one disposition; non-canon material gets a named
-destination; standing rules trapped in working-state get flagged for rescue. **No document is
-edited yet** — this inventory is the input the architect ratifies before any scrub/move runs.
+**What this is.** Task **T1** of the canon-shape scrub plan: the section-by-section disposition
+map used by J0 to graduate the four identity-foundation domain docs into `docs/canon/identity/`.
+Each section got exactly one disposition; non-canon material got a named destination; standing rules
+trapped in working-state were flagged for rescue. This inventory is now the provenance for the
+completed scrub/move, not a pending-edit plan.
 
 **Disposition rule (one per section):**
 - **KEEP-L1** — standing rule (the *what*: contract / invariant / target model / vocabulary).
@@ -54,6 +54,14 @@ These patterns recur across all four docs. Proposed uniform handling:
 | **Transition identifiers `T1`–`T6`** (domain §5) | domain-model | KEEP-L1 — these are *domain vocabulary*, not stage codes (do NOT scrub) |
 
 ---
+
+**Refinement (2026-06-08) — references: keep what graduates, strip what dies.** The canon-quality
+standard's "strip bare `inv NN`" bar was written for `architecture.md` citing the *ungraduated* runway.
+Within the identity-canon **set** (all four docs graduate together), a reference resolves to canon iff
+its target graduates. So: **KEEP** `MMT-ADR-*` cites, cross-doc `§` cites, and **`inv N` invariant cites**
+(the ontology's §4 is their permanent home — they are first-class like ADR numbers). **STRIP** the
+homeless working/finding IDs that live only in soon-to-be-provenance docs: `E7`/`D1`/`E1`–`E13`,
+`FLAG-2`, `REQ-2`, `G7`, `Path X`, `F1-BT-a`, `I-PB-*`, `I-C*`, `I-E*` → plain language.
 
 ## Per-doc section maps
 
@@ -202,6 +210,20 @@ The current §I.4 layout line lists canon flat (`canon/ — architecture.md, prd
 
 ## Acceptance-check status (plan §Acceptance Checks)
 
-Not yet run as pass/fail — the scrub has not executed. The stale-token scans were run as *discovery*
-(results folded into the per-doc maps above). The plan's two `rg` gates become the exit check **after**
-the scrub edits land; right now they still report the pre-scrub hits by design.
+**Scrub executed 2026-06-08; gates run GREEN.**
+
+- **Gate 1 (stale-token scan across the four canon docs + compliance register):** CLEAN — zero hits for
+  `Status: DRAFT` / `Decision Queue` / `Path X` / `G-[0-9]` / `F1-` / `I-PB-` / `I-C[0-9]` / `T[0-9]` /
+  sign-off markers. Runway IDs prose-ified; `inv N` / `MMT-ADR-*` / `§` / `CONTEXT:` / `R1–R13` cites kept.
+- **Gate 2 (in-progress markers in INDEX/ROADMAP/memory):** one hit — `ROADMAP.md` "17 members" — which
+  is a **dated Phase-G decision-log entry** (the permitted "retained historical decision-log entry"
+  carve-out), not a stale marker. The canonical-set census itself updates at graduation landing (adds the
+  compliance register; repoints the 4 docs to `docs/canon/identity/`).
+- **Rename:** complete and verified — 0 human `mentor/mentee/mentorship` in any canon doc (residual hits
+  are the deliberate AI-`mentor` entity definition + one legacy-code reference); `supporter`/`supportee`/
+  `supportership` present throughout.
+
+**Remaining J0 steps (gated on PM review of the scrubbed drafts, per Resolved Decision 1):** apply the
+`MMT-ADR-0000` §I.4 domain-canon sub-layout amendment (T10); graduate the four docs → `docs/canon/identity/`
+and the compliance register → `docs/compliance/`, repoint citations + update `docs/INDEX.md` / `ROADMAP.md`
+/ `CANONICAL-SET.md` (T11).

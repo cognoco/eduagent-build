@@ -968,7 +968,7 @@
       "delete": "削除",
       "deleting": "削除中...",
       "deleteConfirmTitle": "{{subject}}を削除しますか？",
-      "deleteConfirmMessage": "{{subject}}を完全に削除します。これには、{{books}}、{{startedTopics}}、学習履歴を含む{{sessions}}が含まれます。この操作は元に戻せません。",
+      "deleteConfirmMessage": "{{subject}}を完全に削除します。これには学習履歴のある{{books}}、{{startedTopics}}、{{sessions}}のほか、この科目のすべての習熟度、フラッシュカードの復習、ストリークも含まれ、元に戻すことはできません。",
       "deleteConfirmAction": "削除",
       "deleteScopeBooks_one": "{{count}}冊の本",
       "deleteScopeBooks_other": "{{count}}冊の本",

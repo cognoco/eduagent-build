@@ -6,7 +6,7 @@
 -- "Replaces (T1, inert)", and the baseline reset (MMT-ADR-0012) rebuilds the
 -- schema create-from-empty. Do not apply or build on this.
 -- Status: committed for history reference, superseded; applied nowhere live.
--- See _wip/identity-foundation/data-model.md §2 and docs/adr/MMT-ADR-0012.
+-- See docs/canon/identity/data-model.md §2 and docs/adr/MMT-ADR-0012.
 -- ============================================================================
 CREATE TYPE "public"."membership_role" AS ENUM('owner', 'mentor', 'student');--> statement-breakpoint
 CREATE TABLE "memberships" (

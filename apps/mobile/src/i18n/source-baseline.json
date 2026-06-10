@@ -584,7 +584,7 @@
     "library.manage.closeAccessibilityLabel": "sha256:e3667da364fe8efd11df3280cfeee99187edf40442e15972b041b2918338562e",
     "library.manage.delete": "sha256:e2d0a54968ead24efc0dffa6ac78fc606dceec34a0f586177a74a54cc2272cf8",
     "library.manage.deleteConfirmAction": "sha256:e2d0a54968ead24efc0dffa6ac78fc606dceec34a0f586177a74a54cc2272cf8",
-    "library.manage.deleteConfirmMessage": "sha256:998971fdad3923f09e694e865181159080625ddd9ae6f797ee3df729ae77da8f",
+    "library.manage.deleteConfirmMessage": "sha256:a32c5028090030d4c73de19115af06fff17680732cb7a3e8d5e5e9236475861d",
     "library.manage.deleteConfirmTitle": "sha256:8feb2246716a3cc6e5e4eefb665b5723600d1e1b935bdbc9e7b116ba9a457ee1",
     "library.manage.deleteErrorTitle": "sha256:34ef139b6fdcdf49a6cc0015c020826a4ff4c19cdf1859cc2db7d12530205be3",
     "library.manage.deleteScopeBooks_one": "sha256:438fa5784530b8f712d92b2235284a7270044f708f8593e8283fa6e682ed2f6a",

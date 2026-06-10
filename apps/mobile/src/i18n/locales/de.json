@@ -968,7 +968,7 @@
       "delete": "Löschen",
       "deleting": "Wird gelöscht...",
       "deleteConfirmTitle": "{{subject}} löschen?",
-      "deleteConfirmMessage": "Dadurch werden {{subject}} und alle zugehörigen Daten, einschließlich {{books}}, {{startedTopics}} und {{sessions}} mit Lernverlauf, dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "deleteConfirmMessage": "Dies löscht {{subject}} dauerhaft – einschließlich {{books}}, {{startedTopics}} und {{sessions}} mit Lernverlauf sowie den gesamten Lernfortschritt, die Karteikarten-Wiederholungen und den Streak für dieses Fach. Dies kann nicht rückgängig gemacht werden.",
       "deleteConfirmAction": "Löschen",
       "deleteScopeBooks_one": "{{count}} Buch",
       "deleteScopeBooks_other": "{{count}} Bücher",

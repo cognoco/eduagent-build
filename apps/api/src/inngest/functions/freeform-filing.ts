@@ -15,6 +15,7 @@ import {
 } from '../../services/filing';
 import { getSessionTranscript } from '../../services/session';
 import { routeAndCall } from '../../services/llm';
+import { isGdprProcessingAllowed } from '../../services/consent';
 
 interface FilingStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
@@ -64,6 +65,14 @@ async function runFreeformFiling({
   });
 
   const alreadyFiled = sessionSnapshot.alreadyFiled;
+
+  const consentAllowed = await step.run('check-gdpr-consent', async () => {
+    const db = getStepDatabase();
+    return isGdprProcessingAllowed(db, profileId);
+  });
+  if (!consentAllowed) {
+    return { status: 'skipped', reason: 'consent_not_granted' };
+  }
 
   if (alreadyFiled) {
     // [CR-FIL-CONSISTENCY-02] Look up topicTitle and bookId from the existing
@@ -145,50 +154,65 @@ async function runFreeformFiling({
     };
   }
 
-  // Self-heal: fetch transcript from DB if the caller did not supply it
-  let sessionTranscript = (event.data as { sessionTranscript?: string })
+  const eventSessionTranscript = (event.data as { sessionTranscript?: string })
     .sessionTranscript;
-  if (!sessionTranscript && sessionId) {
-    const fetched = await step.run('fetch-transcript', async () => {
-      const db = getStepDatabase();
-      const transcript = await getSessionTranscript(db, profileId, sessionId);
-      if (!transcript || transcript.archived) return null;
-      return transcript.exchanges
-        .map((e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`)
-        .join('\n');
-    });
-    sessionTranscript = fetched ?? undefined;
-  }
-
-  if (!sessionTranscript) {
-    throw new NonRetriableError(
-      `Cannot file session: transcript unavailable (sessionId=${sessionId}, profileId=${profileId})`,
-    );
-  }
 
   const result = await step.run('retry-filing', async () => {
     const db = getStepDatabase();
+    // Re-check inside the consuming step. The earlier consent step is memoized
+    // by Inngest, so a withdrawal between steps must still block transcript
+    // use, LLM filing, and derived library writes.
+    if (!(await isGdprProcessingAllowed(db, profileId))) {
+      return { status: 'skipped' as const, reason: 'consent_not_granted' };
+    }
+
+    let sessionTranscript = eventSessionTranscript;
+    if (!sessionTranscript && sessionId) {
+      const transcript = await getSessionTranscript(db, profileId, sessionId);
+      if (transcript && !transcript.archived) {
+        sessionTranscript = transcript.exchanges
+          .map(
+            (e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`,
+          )
+          .join('\n');
+      }
+    }
+
+    if (!sessionTranscript) {
+      throw new NonRetriableError(
+        `Cannot file session: transcript unavailable (sessionId=${sessionId}, profileId=${profileId})`,
+      );
+    }
+
     const libraryIndex = await buildLibraryIndex(db, profileId);
     const filingResponse = await fileToLibrary(
       { sessionTranscript, sessionMode: effectiveSessionMode },
       libraryIndex,
       routeAndCall,
     );
-    return resolveFilingResult(db, {
-      profileId,
-      filingResponse,
-      filedFrom: 'freeform_filing',
-      sessionId,
-    });
+    return {
+      status: 'filed' as const,
+      filingResult: await resolveFilingResult(db, {
+        profileId,
+        filingResponse,
+        filedFrom: 'freeform_filing',
+        sessionId,
+      }),
+    };
   });
+
+  if (result.status === 'skipped') {
+    return result;
+  }
+  const filingResult = result.filingResult;
 
   // Fire completion event so session-completed waitForEvent resolves
   const timestamp = new Date().toISOString();
   await step.sendEvent('notify-filing-completed', {
     name: 'app/filing.completed',
     data: {
-      bookId: result.bookId,
-      topicTitle: result.topicTitle,
+      bookId: filingResult.bookId,
+      topicTitle: filingResult.topicTitle,
       profileId,
       sessionId,
       timestamp,
@@ -210,7 +234,7 @@ async function runFreeformFiling({
 
   return {
     status: 'completed',
-    ...result,
+    ...filingResult,
     timestamp,
   };
 }

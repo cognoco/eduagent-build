@@ -159,8 +159,12 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       return;
     }
 
-    // Check if consent is required for this profile's age (GDPR-everywhere)
-    const { required, consentType } = checkConsentRequired(meta.birthYear);
+    // Resolve the consent type for this profile's age (GDPR-everywhere). The
+    // `required` flag is intentionally not consulted: enforcement keys on the
+    // stored consentStatus (WITHDRAWN / PENDING / PARENTAL_CONSENT_REQUESTED),
+    // which is authoritative over the year-only age recompute (F-130). Adults
+    // and resolved (CONSENTED) profiles simply have no blocking status.
+    const { consentType } = checkConsentRequired(meta.birthYear);
 
     // GDPR Art. 7(3): block WITHDRAWN profiles regardless of age — must come
     // before the !required guard so adult profiles with WITHDRAWN status are
@@ -177,12 +181,15 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       );
     }
 
-    if (!required) {
-      await next();
-      return;
-    }
-
-    // Block if consent status is PENDING or PARENTAL_CONSENT_REQUESTED
+    // [F-130] Block an UNRESOLVED consent obligation regardless of the year-only
+    // recomputed age — must come BEFORE the !required early-out (mirroring the
+    // WITHDRAWN block above). The obligation was created from an EXACT birth-date
+    // check at profile creation (WI-297); month/day are not persisted, so the
+    // year-only `checkConsentRequired` here can over-estimate age (a late-year-
+    // born 16yo reads as 17 → required=false) and must not be allowed to skip a
+    // PENDING/PARENTAL_CONSENT_REQUESTED gate. A consent state only exists for
+    // profiles that genuinely required consent at creation, so this never
+    // over-blocks adults (consentStatus is null for them).
     if (
       meta.consentStatus === 'PENDING' ||
       meta.consentStatus === 'PARENTAL_CONSENT_REQUESTED'
@@ -198,6 +205,9 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       );
     }
 
+    // Past this point the request is allowed: either consent is not required
+    // (adult / over-threshold) or it is required and already CONSENTED. The
+    // unresolved-obligation and WITHDRAWN cases were both handled above.
     await next();
     return;
   },

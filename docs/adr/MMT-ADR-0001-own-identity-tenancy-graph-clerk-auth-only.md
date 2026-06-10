@@ -28,7 +28,7 @@ Seam principle: *anything that must work for a person with no login (the managed
 
 - A `Person` may have **0 or 1** Credential (Clerk User). The managed child is `Person` with **no** Credential — the case that forced this decision.
 - We maintain memberships / roles / invitations / seats ourselves. This is **not** a net cost: we'd own them for the managed cohort regardless, so adopting Clerk Orgs for the credentialed half only would buy a *second* membership representation (the exact two-schema split that caused today's drift).
-- Our authorization is **edge-scoped + attribute-driven** (visibility per guardianship/mentorship edge; consent by age × jurisdiction), which Clerk's org-role RBAC could not express anyway.
+- Our authorization is **edge-scoped + attribute-driven** (visibility per guardianship/supportership edge; consent by age × jurisdiction), which Clerk's org-role RBAC could not express anyway.
 - **Supersedes** the `age-consent-spike.md` §F/G "Clerk Orgs for access" line — to be reconciled when that spike is folded in.
 - **B2B/schools future stays compatible:** teacher/admin authentication could later federate via Clerk enterprise SSO *without* making Clerk the roster system of record (students are minors, often credential-less, so the roster is ours either way).
 

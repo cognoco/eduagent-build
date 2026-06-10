@@ -87,6 +87,7 @@ const mockMonthlyReportDb = createTransactionalMockDb({
   query: {
     familyLinks: {
       findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
     },
     profiles: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -459,6 +460,9 @@ beforeEach(() => {
   (
     mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
   ).mockResolvedValue([]);
+  (
+    mockMonthlyReportDb.query.familyLinks.findFirst as jest.Mock
+  ).mockResolvedValue({ id: 'link-1' });
   // [L7-F3] select(...).from(familyLinks).where(...) — derives from
   // familyLinks.findMany AND intersects with the selectDistinct result
   // (active children), mirroring the real `inArray(childProfileId,
@@ -834,6 +838,37 @@ describe('monthlyReportGenerate', () => {
       await executeGenerateSteps(makeGenerateEvent());
 
       expect(mockInsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('[WI-550/F-092] parent-child link guard', () => {
+    it('skips forged monthly-report events when parentId is not linked to childId', async () => {
+      (
+        mockMonthlyReportDb.query.familyLinks.findFirst as jest.Mock
+      ).mockResolvedValueOnce(null);
+      (
+        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+      ).mockResolvedValue({
+        displayName: 'Emma',
+      });
+      mockGetSnapshotsInRange
+        .mockResolvedValueOnce([
+          { snapshotDate: '2026-03-29', metrics: SAMPLE_METRICS },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const { result } = await executeGenerateSteps(makeGenerateEvent());
+
+      expect(result).toEqual({
+        status: 'skipped',
+        parentId: 'parent-001',
+        childId: 'child-001',
+        reason: 'parent_child_link_missing',
+      });
+      expect(mockGenerateMonthlyReportData).not.toHaveBeenCalled();
+      expect(mockInsert).not.toHaveBeenCalled();
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
     });
   });
 

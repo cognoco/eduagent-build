@@ -303,6 +303,56 @@ export async function deleteProfile(
   await db.delete(profiles).where(eq(profiles.id, profileId));
 }
 
+/**
+ * [F-122] Atomically hard-delete an archived profile ONLY if it is still
+ * eligible — archived (`archived_at` set and at/before the retention cutoff)
+ * AND no `CONSENTED` GDPR consent state.
+ *
+ * The archive-cleanup Inngest job previously read consent status + `archivedAt`
+ * in separate queries and then called the unconditional `deleteProfile`. A
+ * `restoreConsent()` landing between the eligibility read and the delete —
+ * which sets `status = 'CONSENTED'` and clears `archived_at` — would still lose
+ * the profile (TOCTOU). Folding the eligibility predicate into the DELETE's
+ * WHERE makes the check and the delete a single atomic statement, mirroring the
+ * `deleteProfileIfNoConsent` / `deleteProfileIfConsentWithdrawn` pattern.
+ *
+ * The GDPR consent row is taken `FOR UPDATE` before the delete. `restoreConsent`
+ * runs `UPDATE consent_states (→CONSENTED)` then `UPDATE profiles (archived_at=NULL)`
+ * in one transaction — i.e. it locks the consent row, then the profile row. Locking
+ * the consent row here first means this DELETE and a concurrent restore acquire locks
+ * in the SAME order (consent → profile), which (a) prevents the deadlock that a bare
+ * `NOT EXISTS` subquery (no lock) would risk, and (b) forces this statement to wait for
+ * any in-flight restore to commit/rollback and then re-read the up-to-date status —
+ * closing the stale-`WITHDRAWN`-read window. Mirrors `deleteProfileIfConsentWithdrawn`.
+ *
+ * FK cascades remove all child records. Returns true if the profile was
+ * deleted, false if it was retained (consent restored / un-archived / not yet
+ * past retention / already gone).
+ */
+export async function deleteArchivedProfileIfStillEligible(
+  db: Database,
+  profileId: string,
+  retentionCutoff: Date,
+): Promise<boolean> {
+  const result = await db.execute(sql`
+    WITH locked_consent AS (
+      SELECT consent_states.status
+      FROM consent_states
+      WHERE consent_states.profile_id = ${profileId}
+        AND consent_states.consent_type = 'GDPR'
+      FOR UPDATE
+    )
+    DELETE FROM profiles
+    WHERE id = ${profileId}
+      AND archived_at IS NOT NULL
+      AND archived_at <= ${retentionCutoff}
+      AND NOT EXISTS (
+        SELECT 1 FROM locked_consent WHERE locked_consent.status = 'CONSENTED'
+      )
+  `);
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function deleteProfileIfConsentWithdrawn(
   db: Database,
   profileId: string,

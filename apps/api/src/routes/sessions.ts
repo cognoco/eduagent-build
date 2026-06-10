@@ -408,6 +408,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/library-filing/keep-out',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
+      // [F-117] Server-derived proxy-mode write guard — a non-owner proxy
+      // caller must not mutate a child's library-filing state.
+      assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -426,6 +429,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/library-filing/add',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
+      // [F-117] Server-derived proxy-mode write guard — also blocks the
+      // Inngest auto-file dispatch below from firing on a child's behalf.
+      assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -453,6 +459,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/library-filing/restore',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
+      // [F-117] Server-derived proxy-mode write guard — also blocks the
+      // Inngest auto-file dispatch below from firing on a child's behalf.
+      assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 

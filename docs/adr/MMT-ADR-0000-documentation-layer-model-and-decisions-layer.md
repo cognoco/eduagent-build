@@ -66,7 +66,8 @@ repo root
   CONTEXT.md                     L0 glossary — root anchor (+ per-area CONTEXT.md, distributed)
   CLAUDE.md  AGENTS.md           cross-cutting agent doctrine (lives where the harness loads it)
 docs/                            ← root holds only subdirectories; never loose canon
-  canon/                         L1 — architecture.md, prd.md, ux-design-specification.md, principles.md
+  canon/                         L1 — spine: architecture.md, prd.md, ux-design-specification.md, principles.md
+    <domain>/                    L1 — a stream's domain canon, prefix-dropped (first: identity/ — ontology.md, domain-model.md, data-model.md, prd.md)
   adr/                           L2 — decisions (README.md authoring guide + MMT-ADR-*.md)
   specs/                         L3 — feature definitions + acceptance (domain nests within)
   plans/                         L3 — implementation plans
@@ -207,6 +208,19 @@ Memory is **not a rung in the §I.1 hierarchy** in the copy-of-knowledge sense �
 **Why this is recorded, not merely implied.** §II.2 already *describes* the lockstep relationship, but never stated the negative invariant — and the absence was load-bearing: `MMT-ADR-0016` (pre-repurpose) carried a line asserting "ADRs are the decision system of record — there is no `architecture.md` register to sync," which diverged in essence from this ADR's model. That line was removed when `0016` was repurposed (2026-06-08), so the **instance is resolved**; this amendment records the **guard** so a future ADR cannot re-introduce it. The canon-authorship process this protects is written up operationally in `docs/adr/README.md` § "How canon is authored."
 
 **basis:** §I.2 (canon = the *what*, the ADR north-star); §II.2 (the lockstep lifecycle this makes non-negotiable); the 2026-06-07 `_wip/identity-foundation/ROADMAP.md` canon-authorship thread (the divergence this closes); identity-foundation Phase I-c (the runway step that authored it).
+
+## Amendment (2026-06-08, architect) — domain-canon sub-layout under `docs/canon/`
+
+**What changes.** §I.4's tree showed `docs/canon/` holding a flat set of spine docs. This amendment fixes how a **stream's domain canon** sits under `docs/canon/`: the **estate spine** (`architecture.md`, `PRD.md`, `ux-design-specification.md`, `principles.md`) stays at the **`docs/canon/` root**, and a stream's domain canon lives in a **per-domain subfolder `docs/canon/<domain>/`** (first instance: `docs/canon/identity/`). The §I.4 tree is edited in lockstep. This applies §I.4's existing **type-first, domain-second** rule one level deeper (canon is the type; the domain nests within) — the same nesting §I.4 already grants `specs/` ("domain nests within").
+
+**The rules it adds.**
+- **Stream domain canon is standing peer canon**, indexed by `principles.md` / `docs/INDEX.md` — it is **not** merged into the spine docs, and the spine is the cross-cutting index *over* it, not its container.
+- **Filenames inside a domain folder drop the domain prefix** — the folder supplies the scope (so `identity-ontology.md` → `docs/canon/identity/ontology.md`). A doc whose home is `docs/compliance/` (a sibling type directory, not a `canon/<domain>/` folder) keeps its scoping prefix.
+- This **refines** the §I.4 physical-layout rule and the "graduates at ratification" amendment above; it does **not** change the five-layer model.
+
+**Significance.** Like the `docs/registers/` amendment, this is the §I.4 type-first rule applied to a sub-case the tree hadn't yet shown explicitly. It is recorded for visibility and to keep the §I.4 model current; the placement was already governed by the existing rule.
+
+**basis:** §I.4 (type-first, domain-second — the principle applied one level deeper); §I.5 (folder structure is reactive editorial); the "graduates at ratification" amendment above (the trigger this refines the layout for); `_wip/identity-foundation/ROADMAP.md` Phase J(0) (the first execution — the identity domain canon graduating to `docs/canon/identity/`).
 
 ## Alternatives considered
 

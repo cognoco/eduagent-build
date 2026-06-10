@@ -52,7 +52,7 @@ Over months, CI failures (flaky tests, type drift, prompt drift) were remediated
 | **CI — scheduled / labeled (`main`)** | Tier-2 `--live` evals + Layer-1 drift; full e2e (Maestro); full integration; (portability-fixed, Linux) | $$ / nondeterministic | non-blocking; alerts on drift/break |
 | **PR review** | automated review findings triage; human review (see Q4) | — | policy |
 
-**Key moves:** (a) promote the `change-class` matrix from advisory (`continue-on-error`) to a **router** that scopes slow suites; (b) promote deterministic **Tier-1 eval** into required CI (closes the `--no-verify`/Codex hole); (c) push **Tier-2 live + Layer-1 drift** to scheduled-against-`main` + label-on-demand (today they run *nowhere* automated, Windows-pathed); (d) enable the **Nx Cloud DTE** already paid for, scoped to long-pole jobs; (e) fix **remote-cache input correctness** (kills phantom failures + the `nx reset` dance); (f) **quarantine flaky tests**.
+**Key moves:** (a) promote the `change-class` matrix from advisory (`continue-on-error`) to a **router** that scopes slow suites; (b) promote deterministic **Tier-1 eval** into required CI (closes the `--no-verify`/Codex hole); (c) push **Tier-2 live + Layer-1 drift** to scheduled-against-`main` + label-on-demand (today they run *nowhere* automated, Windows-pathed); (d) ~~enable the **Nx Cloud DTE** already paid for, scoped to long-pole jobs~~ — **STRUCK 2026-06-09: Nx Cloud was disconnected 2026-06-01 (IID-792); DTE was never enabled. CI-speed now rides (a) the change-class router + (e) cache correctness only;** (e) fix **remote-cache input correctness** (kills phantom failures + the `nx reset` dance); (f) **quarantine flaky tests**.
 
 ---
 
@@ -116,7 +116,7 @@ Dimension-2 decisions (this doc) are **upstream** of Dimension-1 CLAUDE.md conte
 - **pre-push (`pre-push-tests.sh`):** now the primary local type/test gate — already runs delta `tsc` + surgical jest; confirm + keep.
 - **Commit skill:** rewrite slim; master in `.agents/`, transform-inject the Claude frontmatter, remove from `SKIP_SKILLS`; global-core + repo-overlay (D3).
 - **`.gitignore`:** list secret patterns as the primary control (D3).
-- **`ci.yml`:** change-class matrix advisory→router (stratification); Tier-1 eval required on the prompt change-class; enable scoped Nx DTE; fix cache inputs + delete the nuke-step after proof (D5).
+- **`ci.yml`:** change-class matrix advisory→router (stratification); Tier-1 eval required on the prompt change-class; ~~enable scoped Nx DTE~~ (struck — no Nx Cloud, IID-792); fix cache inputs + delete the nuke-step after proof (D5).
 - **Live evals:** schedule-against-`main` + label trigger; fix the Windows Doppler paths (portability).
 - **CODEOWNERS:** new file, high-risk paths only (D4).
 - **Flaky-test quarantine:** mechanism (determinism precondition).

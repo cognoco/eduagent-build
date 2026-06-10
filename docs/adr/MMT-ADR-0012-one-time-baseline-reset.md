@@ -2,7 +2,7 @@
 
 **Status:** Accepted · 2026-06-04 · **Scope:** the pre-launch, one-time collapse of the migration
 chain to a fresh baseline (Phase E ruling **D1**). · **Deciders:** Architect (jjoerg) + Claude
-· **Realizes:** `_wip/identity-foundation/data-model.md` §1 (the cut) · **Builds on:**
+· **Realizes:** `docs/canon/identity/data-model.md` §1 (the cut) · **Builds on:**
 `MMT-ADR-0000` §I.4 (lockstep lifecycle); the project rule that staging/prod use committed,
 append-only migrations.
 
@@ -33,7 +33,7 @@ design doc are **one artifact**; (b) no four-file-per-table archaeology for any 
 Concretely:
 
 1. The migration **`0106` and its backfill** (and any consent-revoke shape carried by `consent_states` that the target schema doesn't reproduce) are **removed from the effective chain** — not undone with a follow-up migration. This is the "documented reset" — recorded in the migrations directory README and in the Phase-F handoff.
-2. **One** baseline migration in Phase F creates the eight target tables (`person`, `organization`, `membership`, `subscription`, `guardianship`, `mentorship`, `consent_grant`, and the `person_retain` set) from empty. The design doc (`data-model.md` §1, §2) and the first migration are the *same* statement.
+2. **One** baseline migration in Phase F creates the eight target tables (`person`, `organization`, `membership`, `subscription`, `guardianship`, `supportership`, `consent_grant`, and the `person_retain` set) from empty. The design doc (`data-model.md` §1, §2) and the first migration are the *same* statement.
 3. **From this baseline forward, append-only migrations are absolute.** No future squash, rewrite, or carve-out. The reset is the only exception — ever.
 4. The reset is **visible to a future contributor**: a `## Baseline` section in the migrations dir, dated 2026-06-04, pointing at this ADR; the next contributor sees the cutoff and trusts the chain after it.
 

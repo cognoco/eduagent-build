@@ -272,6 +272,22 @@ export const monthlyReportGenerate = inngest.createFunction(
           return { status: 'skipped' as const, reason: 'consent_not_granted' };
         }
 
+        if (!isSelfReport) {
+          const parentChildLink = await db.query.familyLinks.findFirst({
+            where: and(
+              eq(familyLinks.parentProfileId, parentId),
+              eq(familyLinks.childProfileId, childId),
+            ),
+            columns: { id: true },
+          });
+          if (!parentChildLink) {
+            return {
+              status: 'skipped' as const,
+              reason: 'parent_child_link_missing',
+            };
+          }
+        }
+
         const child = await db.query.profiles.findFirst({
           where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
           columns: { displayName: true },
