@@ -6,82 +6,16 @@
 
 ---
 
-## PART 1 — BUG REGISTER (record-only)
+## PART 1 — BUG REGISTER → migrated to Notion (2026-06-10)
 
-### Raw agent counts (before coordinator re-grade)
+The bug register (the 15 `bugs/*.md` lens reports) has been **retired from the repo so bugs live in one place only.** Findings were re-verified against `new-llm` HEAD on 2026-06-10: ~36% were already fixed (pruned), the rest were triaged, de-duplicated against the existing tracker rows, and the still-live findings filed as **25 theme-grouped items** in the Notion **"Issue Tracker – Open"** database.
 
-| Lens | Crit | High | Med | Low | Report |
-|---|---|---|---|---|---|
-| Correctness & logic | 0 | 1 | 3 | 6 | [bugs/correctness.md](bugs/correctness.md) |
-| Security — authn/authz | 0 | 1 | 3 | 3 | [bugs/security-authz.md](bugs/security-authz.md) |
-| Data integrity & scoping | 0 | 0 | 1 | 4 | [bugs/data-integrity-scoping.md](bugs/data-integrity-scoping.md) |
-| Test quality | 0 | 4 | 6 | 2 | [bugs/test-quality.md](bugs/test-quality.md) |
-| Architecture & conventions | 0 | 1 | 4 | 2 | [bugs/architecture.md](bugs/architecture.md) |
-| UX & failure modes | 0 | 1 | 6 | 4 | [bugs/ux-failure-modes.md](bugs/ux-failure-modes.md) |
-| Performance | 2 | 4 | 4 | 3 | [bugs/performance.md](bugs/performance.md) |
-| Schema contract & API types | 1 | 5 | 7 | 4 | [bugs/schema-contract.md](bugs/schema-contract.md) |
-| Background jobs & Inngest | 0 | 1 | 3 | 5 | [bugs/inngest-jobs.md](bugs/inngest-jobs.md) |
-| DB & migration safety | 2 | 2 | 2 | 2 | [bugs/db-migration.md](bugs/db-migration.md) |
-| Error handling & observability | 4 | 3 | 4 | 2 | [bugs/error-observability.md](bugs/error-observability.md) |
-| Accessibility & i18n | 2 | 5 | 9 | 7 | [bugs/a11y-i18n.md](bugs/a11y-i18n.md) |
-| Dependencies & supply chain | 0 | 5 | 10 | 10 | [bugs/deps-supply-chain.md](bugs/deps-supply-chain.md) |
-| Configuration & secrets | 0 | 3 | 4 | 7 | [bugs/config-secrets.md](bugs/config-secrets.md) |
-| LLM / AI surface | 0 | 1 | 4 | 4 | [bugs/llm-ai-surface.md](bugs/llm-ai-surface.md) |
-| **TOTAL** | **11** | **37** | **70** | **65** | |
+- **Notion DB:** https://www.notion.so/cognix/3598bce91f7c807086ebe012bd99f184
+- **Excluded as already-tracked:** trial-expiry single-`step.run`; recall-nudge / review-due dedup races; RevenueCat `SUBSCRIBER_ALIAS` merge; `lodash`-via-detox; the 340 `gc1-allow` internal-mock backlog (228-jest.mock + GC6 rows); CI EAS / Worker-deploy approval gaps; `GET /usage` family leak; consent-page rate-limit.
+- **Dropped as inert:** the data-integrity defense-in-depth Lows (self-rated negligible) + CANNOT-VERIFY cross-lens hand-offs.
+- **Full original per-finding detail** (all severities, all 15 lenses, with the coordinator re-grade of the 11 "Criticals") remains in **git history** at `docs/reviews/2026-06-09-codebase-atlas/bugs/` — deleted from HEAD in the same change.
 
-### Coordinator re-grade of the 11 "Criticals" (verified against code)
-
-The agents' discovery was excellent (real files, real line numbers, real issues) but several severities were optimistic. Verified verdicts:
-
-| # | Agent's Critical | Verified | True severity |
-|---|---|---|---|
-| 1 | Migrations `0106`/`0107` are in `_journal.json` (751,758); their DDL is **live SQL** under a `-- REFERENCE ONLY` comment → `drizzle-kit migrate` will execute them on any behind environment. 0107 FKs target `profiles` (reset renames to `person`) so it's also reset-incompatible. | ✅ confirmed live | **CRITICAL (latent deploy landmine)** — the only real Critical |
-| 2 | Live challenge-round writes to non-existent `concepts`/`concept_mastery` | ✅ but wrapped in `safeWrite` (catches→Sentry→log) | High — silent dead feature + Sentry noise per round, not a crash |
-| 3 | N+1: `useFailedFreeformLibraryFilingSessions` 1+50 fetches (use-sessions:653) | ✅ confirmed | High — edge recovery path, not hot |
-| 4 | `getSnapshotsInRange` fetches all then JS-filters (snapshot-aggregation:934) | ✅ confirmed | High |
-| 5 | `sessionDonePayloadSchema` 4 fields vs 12+ on wire (sessions:455) | ✅ schema is thin; Zod strips extras | High — silent data loss, not crash |
-| 6–9 | 4× observability gaps (notifications x2, metering 500 no-Sentry, clerk-user) | ✅ real; metering+notifications are true gaps; clerk-user/notifications return **typed** failures to caller (graceful, just unlogged) | High (metering, push, email) / Medium (clerk-user) |
-| 10 | Auth screens hardcoded English, no i18n (sign-in:1) | ✅ confirmed hardcoded English present | High — **already a known untracked gap** in CLAUDE.md |
-| 11 | ~216 locale strings untranslated (de.json) | ✅ confirmed | High — i18n process gap |
-
-**Honest headline: 1 true Critical (the migration journal landmine), ~46 High-class findings.** Full per-finding detail with fix directions in the 15 lens reports.
-
-### High + (re-graded Critical) findings — quick register
-
-| Sev | Lens | Location | Finding |
-|---|---|---|---|
-| **CRIT** | db-migration | `apps/api/drizzle/_journal.json:746-760` + `0106/0107.sql` | Reference-only migrations are journaled with live DDL; `drizzle-kit migrate` will apply them. Only a comment + manual discipline stops it. |
-| High | correctness | `use-post-session-notification-ask.ts:39` | Push-primer guard latched **before** async work → transient throw permanently suppresses the prompt |
-| High | security-authz | `middleware/profile-scope.ts:113-166` | Owner-only account/billing routes bypassable by **omitting** `X-Profile-Id` (auto-resolve elevates caller to owner). Header-omission path untested. |
-| High | architecture | `routes/assessments.ts:135-248` | Terminal-assessment orchestration (txn + SM-2 + XP/retention) lives in the route handler, not a service |
-| High | ux | `child/[profileId]/index.tsx:552,638` | Raw `err.message` leaked to parents on consent withdraw/restore |
-| High | performance | `ChatShell.tsx:120-156` | `animateResponse` does O(n·m) work every 40ms tick (full array map + token slice) |
-| High | performance | `ChatShell.tsx:233-284` | `renderMessageItem` captures `failedImages` Set in closure → defeats FlatList memoization |
-| High | performance | ~101 hook files | ~101 `useQuery` hooks missing `staleTime` → refetch storms on app-foreground |
-| High | schema | 77 mobile call sites | `(await res.json()) as {...}` bypasses runtime validation across 18 hook files |
-| High | schema | `routes/challenge-round.ts`, `sessions.ts:545`, `session-crud.ts:1552` | Multiple endpoints return `c.json` with no schema parse; shapes not in `@eduagent/schemas` |
-| High | inngest | `filing-timed-out-observe.ts:303` | `step.sendEvent` nested inside a `step.run` callback — **illegal Inngest step nesting, throws at runtime** |
-| High | db | `deploy.yml:251` | No migration-immutability guard; pipeline trusts journal hashes with no drift detection |
-| High | db | `0088_bug363_*.sql:37` | TRUNCATE + PK swap with no explicit BEGIN/COMMIT wrapper |
-| High | error-obs | `notifications.ts:134,332` / `metering.ts:748` | Push/email HTTP errors + Metering 500 with no `captureException` |
-| High | error-obs | `_layout.tsx:81` | No `MutationCache.onError` → mobile mutation failures not globally reported |
-| High | error-obs | `use-revenuecat.ts:83` | RevenueCat identity-sync exhaustion is breadcrumb-only |
-| High | a11y | `relearn.tsx`, `create-profile.tsx:230`, `profiles.tsx:278`, `ModeSwitcher.tsx:126` | Multiple screens with hardcoded English (role labels, validation, errors) |
-| High | a11y | `i18n/index.ts:122` | `accessibilityLanguage` never set → screen-reader mispronounces non-EN content |
-| High | deps | `mobile/package.json:32,43` | Deprecated `@clerk/clerk-expo` (no more security patches); outdated `@sentry/react-native@8.1.0` |
-| High | deps | `pnpm-lock.yaml` | `ws@6.2.3`, `@xmldom/xmldom@0.8.11` (self-described "critical"), `@ungap/structured-clone` (CWE-502) |
-| High | config | `wrangler.toml:142` | Staging API reachable via `*.workers.dev`, bypassing WAF + rate-limiting |
-| High | config | `index.ts:93` / `wrangler.toml:121` | Stale `Bindings` type (20+ missing); `IDEMPOTENCY_KV` commented out in all envs — replay dedup not operational |
-| High | llm | `memory.ts:122` → `exchange-prompts.ts:898` | pgvector memory injected into system prompt unescaped → second-order prompt-injection vector |
-
-### Notable cross-lens items (handed off in agent reports)
-- **Billing refund edge:** `metering.ts:1006-1029` top-up refund decrements `usedToday` even when the credit UPDATE matches 0 rows → refunds a daily slot without refunding the credit.
-- **Safety tripwire:** `safety-tripwire.ts:43` doesn't normalize homoglyphs/zero-width/leetspeak before regex → trivial obfuscation bypass (documented precision-over-recall tradeoff).
-- **Duplicated 402 classifiers:** `api-client.ts:285` and `sse.ts:408` classify quota separately → drift risk.
-- **Hand-written invalidation key tuples** must stay byte-aligned with `query-keys.ts` → silent stale-UI on drift.
-- **Stranded guard:** `validateNoteDraft` (note-draft.ts:117) hallucination guard is fully built but **UNWIRED** — no production caller (notes.ts:237) — in the #2 product pillar.
-
-*Confirmed already-fixed: the prior-memory navcontract `isAdultOwner` null bug is fixed at `age.ts:60`.*
+> The review's honest headline stands: **1 true Critical** (the `0106`/`0107` migration-journal landmine — since fixed and pruned) and **~46 High-class findings**. The prior-memory navcontract `isAdultOwner` null bug was confirmed fixed at `age.ts:60`.
 
 ---
 
