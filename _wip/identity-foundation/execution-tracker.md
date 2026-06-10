@@ -131,13 +131,13 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-549 | WP-W0-patch-api | close 7 live api security defects (F-117/118/122/130/133/144/145) | WP | P0 | — | **done** — Closed/Done, PR #817 (merged 2026-06-10) |
 | WI-550 | WP-W0-patch-inngest | close 3 live inngest security defects (F-019/020/092) | WP | P1 | — | **done** — Closed/Done, PR #818 (merged 2026-06-10) |
 | WI-551 | IT-W0-patch-billing | trial-expiry standalone patch (F-121) | Item | P0 | — | **done** — Closed/Done, fixed in `c5c9b39bb` (2026-06-10) |
-| WI-569 | WP-W0-baseline | migration-chain baseline reset (`MMT-ADR-0012`) | WP | P1 | — (W0-labeled but travels with the gated rewrite) | **ready** — DoR met (Ready + Assisted); WI-530 wait **waived by operator 2026-06-10**, proceed shepherded |
+| WI-569 | WP-W0-baseline | migration-chain baseline reset (`MMT-ADR-0012`) | WP | P1 | — (W0-labeled but travels with the gated rewrite) | **review** — Stage=Reviewing 2026-06-10, Fixed In `a16642538`, PR #845 MERGED (shepherd-verified green); dev+staging reset + verified; awaiting `/cosmo:review` (operator) |
 
 ### W1 — structural foundation (critical-path ROOT)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **ready** — refined 2026-06-10 (Ready + Assisted; brief in body, children WI-591/592); starts when WI-569 lands |
+| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **in-progress** — executor dispatched 2026-06-10 (`wi570-executor`, `.worktrees/WI-570`); gate note: WI-569 at Reviewing (not yet Closed), work merged — proceeding under shepherd direction |
 | WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **ready** — refined 2026-06-10 (Assisted; brief in body, children WI-594/595) |
 | WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **ready** — refined 2026-06-10 (Assisted; brief in body, children WI-596/597) |
 | WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **ready** — refined 2026-06-10 (Assisted; framing checklist confirmed) |
@@ -178,6 +178,17 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 ---
 
 ## 5. Current position — pick up here
+
+- **WI-569 DONE (executor side), 2026-06-10 ~21:35 UTC:** Stage=Reviewing, Fixed In
+  `a16642538`, PR #845 merged after independent shepherd green-verification (9/9
+  checks; all review threads fixed-or-deferred-with-rationale; the unreplied Codex
+  P1 on the `now()` partial index verified fixed in the landed SQL — predicate is
+  `WHERE revoked_at IS NULL`). Dev + staging hold the 17 baseline tables, verified;
+  full evidence in the WI-569 completion summary. **Awaiting `/cosmo:review WI-569`
+  (operator) — that close is program gate G2.**
+- **WI-570 dispatched** (`wi570-executor`, 2026-06-10 ~21:40 UTC) — TS schema must
+  match landed 0108 SQL exactly; scoped-repo (F-032) via TDD; db:push-parity check
+  is a hard-stop boundary if destructive.
 
 - **W0 is fully done on the patch side:** WI-549/550 Closed/Done (PRs #817/#818,
   merged 2026-06-10) and WI-551 Closed/Done (`c5c9b39bb`, resolved 2026-06-10).
