@@ -5,6 +5,8 @@ import {
   accountDeletionStatusResponseSchema,
   accountEmailUpdateRequestSchema,
   accountEmailUpdateResponseSchema,
+  accountSecurityEventRequestSchema,
+  accountSecurityEventResponseSchema,
   cancelDeletionResponseSchema,
   dataExportSchema,
   ERROR_CODES,
@@ -14,7 +16,10 @@ import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireAccount } from '../middleware/profile-scope';
 
-import { updateAccountEmailFromClerk } from '../services/account';
+import {
+  notifyAccountSecurityEvent,
+  updateAccountEmailFromClerk,
+} from '../services/account';
 import {
   scheduleDeletion,
   cancelDeletion,
@@ -37,6 +42,7 @@ type AccountRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
 };
@@ -56,6 +62,44 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       }
       return c.json({ code: 'NOT_FOUND', message: 'Account not found' }, 404);
     }
+  })
+  // [CRITICAL-1] Source of truth for the client-side email reconciler: returns
+  // the persisted account email so the mobile app can detect a Clerk-vs-server
+  // divergence (e.g. the app died after Clerk promotion but before the sync)
+  // and re-fire PATCH /account/email — independent of the ChangeEmail screen.
+  .get('/account/email', async (c) => {
+    const account = requireAccount(c.get('account'));
+    assertOwnerProfile(c, 'Only the account owner can view the account email.');
+    return c.json(
+      accountEmailUpdateResponseSchema.parse({ email: account.email }),
+    );
+  })
+  // [CRITICAL-2a] Client ping after a Clerk-side credential mutation the mobile
+  // app performs directly (password add / change). The server emails an
+  // out-of-band security notification to the current account address. The
+  // `email_changed` event is NOT accepted here — it is dispatched server-side
+  // from updateAccountEmailFromClerk so it cannot be spoofed by a client.
+  .post('/account/security-event', async (c) => {
+    const account = requireAccount(c.get('account'));
+    assertOwnerProfile(
+      c,
+      'Only the account owner can manage account security.',
+    );
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = accountSecurityEventRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return validationError(c, parsed.error.issues);
+    }
+
+    await notifyAccountSecurityEvent({
+      accountId: account.id,
+      to: account.email,
+      type: parsed.data.event,
+      profileId: c.get('profileId') ?? null,
+    });
+
+    return c.json(accountSecurityEventResponseSchema.parse({ ok: true }));
   })
   .patch('/account/email', async (c) => {
     const db = c.get('db');

@@ -2559,7 +2559,6 @@
     "errorSendCodeFirst": "Send a code to your new email first.",
     "errorCodeRequired": "Enter the verification code",
     "errorSyncFailed": "Your login email changed, but the account record was not updated. {{message}}",
-    "warningOldEmailStillActive": "Email updated, but your old email is still active.",
     "successMessage": "Email updated"
   },
   "securitySessions": {
@@ -2573,10 +2572,17 @@
     "emptyTitle": "No other devices",
     "emptyDescription": "Only this session is active right now.",
     "lastActive": "Last active: {{value}}",
+    "ipAddress": "IP {{ip}}",
     "currentBadge": "This device",
     "revokeLabel": "Revoke {{device}} session",
     "revoking": "Revoking...",
-    "revokeButton": "Revoke"
+    "revokeButton": "Revoke",
+    "signOutAllButton": "Sign out all other devices ({{count}})",
+    "signOutAllLabel": "Sign out all other devices",
+    "signingOutAll": "Signing out other devices...",
+    "signOutAllTitle": "Sign out all other devices?",
+    "signOutAllConfirm": "This will end {{count}} other session(s). This device stays signed in.",
+    "signOutAllConfirmButton": "Sign out all"
   },
   "changePassword": {
     "errorCurrentRequired": "Enter your current password",

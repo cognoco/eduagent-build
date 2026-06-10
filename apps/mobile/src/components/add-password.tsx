@@ -1,13 +1,15 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, Pressable, View } from 'react-native';
-import { useUser } from '@clerk/clerk-expo';
+import { useUser, useReverification } from '@clerk/clerk-expo';
 
 import { extractClerkError } from '../lib/clerk-error';
 import {
   isClerkRequestTimeoutError,
   withClerkTimeout,
 } from '../lib/clerk-timeout';
+import { useApiClient } from '../lib/api-client';
+import { Sentry } from '../lib/sentry';
 import { PasswordInput } from './common/PasswordInput';
 
 function getSsoProviderLabel(
@@ -26,7 +28,18 @@ export function AddPassword({
   onPasswordAdded: () => void;
 }): React.JSX.Element {
   const { user } = useUser();
+  const api = useApiClient();
   const { t } = useTranslation();
+  // [CRITICAL-2b] First-time password set on an SSO-only account is a
+  // credential mutation with no current-password gate — require Clerk step-up
+  // reverification so an unattended unlocked phone cannot silently add a
+  // password and create a second way in.
+  const reverifiedUpdatePassword = useReverification(
+    (params: { newPassword: string }) => {
+      if (!user) throw new Error('User not ready');
+      return user.updatePassword(params);
+    },
+  );
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +70,24 @@ export function AddPassword({
     setIsSubmitting(true);
     try {
       await withClerkTimeout(
-        user.updatePassword({ newPassword }),
+        reverifiedUpdatePassword({ newPassword }),
         'user.updatePassword',
       );
       await withClerkTimeout(user.reload(), 'user.reload');
+      // [CRITICAL-2a] Fire-and-forget security notification to the account
+      // email. Must never block or fail the password add on a notify error.
+      void api.account['security-event']
+        .$post({ json: { event: 'password_added' } })
+        .catch((err) =>
+          // A lost notification is the takeover-alert gap [CRITICAL-2a] —
+          // never block the password add, but keep the failure queryable.
+          Sentry.captureException(err, {
+            tags: {
+              feature: 'security_notification',
+              event: 'password_added',
+            },
+          }),
+        );
       setNewPassword('');
       setConfirmPassword('');
       onPasswordAdded();
@@ -73,7 +100,15 @@ export function AddPassword({
     } finally {
       setIsSubmitting(false);
     }
-  }, [confirmPassword, newPassword, onPasswordAdded, t, user]);
+  }, [
+    api,
+    confirmPassword,
+    newPassword,
+    onPasswordAdded,
+    reverifiedUpdatePassword,
+    t,
+    user,
+  ]);
 
   return (
     <View className="mt-3">
