@@ -8,6 +8,7 @@
 
 import { createHash } from 'crypto';
 import { z } from 'zod';
+import { securityNotificationTypeSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepResendApiKey, getStepEmailFrom } from '../helpers';
 import {
@@ -21,9 +22,12 @@ import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 const logger = createLogger();
 
 const eventDataSchema = z.object({
-  type: z.enum(['email_changed', 'password_added', 'password_changed']),
+  type: securityNotificationTypeSchema,
   to: z.string().email(),
   accountId: z.string().min(1),
+  // Null for the server-side email_changed dispatch (no profile context);
+  // optional so events emitted before this field existed still parse.
+  profileId: z.string().nullable().optional(),
   timestamp: z.string().min(1),
 });
 

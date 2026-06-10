@@ -105,6 +105,22 @@ export const accountSecurityEventSchema = z.enum([
 
 export type AccountSecurityEvent = z.infer<typeof accountSecurityEventSchema>;
 
+/**
+ * Server-side superset of `accountSecurityEventSchema`: adds `email_changed`,
+ * which is dispatched only from the server (`updateAccountEmailFromClerk`) and
+ * is never accepted in a client request — so a caller cannot spoof a
+ * "your email changed" alert. Drives the security-notification email pipeline.
+ */
+export const securityNotificationTypeSchema = z.enum([
+  'email_changed',
+  'password_added',
+  'password_changed',
+]);
+
+export type SecurityNotificationType = z.infer<
+  typeof securityNotificationTypeSchema
+>;
+
 export const accountSecurityEventRequestSchema = z.object({
   event: accountSecurityEventSchema,
 });

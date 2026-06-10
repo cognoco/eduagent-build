@@ -42,6 +42,7 @@ type AccountRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
 };
@@ -95,6 +96,7 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       accountId: account.id,
       to: account.email,
       type: parsed.data.event,
+      profileId: c.get('profileId') ?? null,
     });
 
     return c.json(accountSecurityEventResponseSchema.parse({ ok: true }));

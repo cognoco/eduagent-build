@@ -16,7 +16,7 @@ import { getTierConfig } from './subscription';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { safeSend } from './safe-non-core';
-import type { SecurityNotificationType } from './notifications';
+import type { SecurityNotificationType } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../errors';
 
@@ -32,6 +32,11 @@ export async function notifyAccountSecurityEvent(args: {
   accountId: string;
   to: string;
   type: SecurityNotificationType;
+  /**
+   * Null for the server-side `email_changed` dispatch
+   * (`updateAccountEmailFromClerk` runs without a profile context).
+   */
+  profileId: string | null;
 }): Promise<void> {
   await safeSend(
     () =>
@@ -41,6 +46,7 @@ export async function notifyAccountSecurityEvent(args: {
           type: args.type,
           to: args.to,
           accountId: args.accountId,
+          profileId: args.profileId,
           timestamp: new Date().toISOString(),
         },
       }),
@@ -427,6 +433,7 @@ export async function updateAccountEmailFromClerk(
         accountId: updated.id,
         to: previousEmail,
         type: 'email_changed',
+        profileId: null,
       });
     }
 

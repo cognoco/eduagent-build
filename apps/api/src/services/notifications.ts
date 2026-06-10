@@ -5,7 +5,11 @@
 // ---------------------------------------------------------------------------
 
 import { eq } from 'drizzle-orm';
-import type { ConsentType, NotificationPayload } from '@eduagent/schemas';
+import type {
+  ConsentType,
+  NotificationPayload,
+  SecurityNotificationType,
+} from '@eduagent/schemas';
 import {
   familyLinks,
   profiles,
@@ -396,15 +400,10 @@ export function formatConsentReminderEmail(
 // Account Security Notification — [CRITICAL-2a]
 // ---------------------------------------------------------------------------
 
-/**
- * The credential-change events that trigger an out-of-band security email.
- * `email_changed` mails the OLD address (alerting whoever may be losing
- * access); password events mail the current account address.
- */
-export type SecurityNotificationType =
-  | 'email_changed'
-  | 'password_added'
-  | 'password_changed';
+// The credential-change event union (`SecurityNotificationType`) lives in
+// `@eduagent/schemas` (multi-file shared contract). `email_changed` mails the
+// OLD address (alerting whoever may be losing access); password events mail
+// the current account address.
 
 /**
  * Formats a security-notification email. The body always tells the recipient
