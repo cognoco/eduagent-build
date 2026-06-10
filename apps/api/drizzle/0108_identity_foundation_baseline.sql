@@ -422,8 +422,7 @@ CREATE TABLE "public"."allowed_models" (
 );--> statement-breakpoint
 
 CREATE INDEX "idx_allowed_models_runtime_key"
-  ON "public"."allowed_models" ("model", "service", "region")
-  WHERE "expires_at" IS NULL OR "expires_at" > now();--> statement-breakpoint
+  ON "public"."allowed_models" ("model", "service", "region");--> statement-breakpoint
 
 -- 2A.4 Capability split — subscription_payers
 

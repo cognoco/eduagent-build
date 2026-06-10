@@ -9617,8 +9617,7 @@
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
-          "with": {},
-          "where": "(expires_at IS NULL OR expires_at > now())"
+          "with": {}
         }
       },
       "foreignKeys": {},
