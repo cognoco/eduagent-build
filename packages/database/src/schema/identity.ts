@@ -80,7 +80,18 @@ export const person = pgTable(
     displayName: text('display_name').notNull(),
     birthDate: date('birth_date').notNull(),
     residenceJurisdiction: text('residence_jurisdiction').notNull(),
-    /** Nullable FK to login — null = managed child (no Clerk credential yet). */
+    /**
+     * Nullable FK to login — null = managed child (no Clerk credential yet).
+     *
+     * The FK constraint (person_login_id_login_id_fk, ON DELETE SET NULL) exists
+     * at the DB layer — see 0108_identity_foundation_baseline.sql lines 77-81.
+     * It is NOT declared here because login is defined after person, creating a
+     * circular TS reference that causes TS7022/TS7024 (Drizzle circular-FK issue).
+     * Since the repo uses migration-based deploys (not drizzle-kit push in prod),
+     * the constraint is applied by the SQL migration and Drizzle drift checks will
+     * not drop it. Future schema migrations should add `.references(() => login.id,
+     * { onDelete: 'set null' })` if Drizzle resolves the circular-type issue.
+     */
     loginId: uuid('login_id'),
     /** Birthday-crossing takeover branch — set when a managed child creates their own account. */
     hasOwnAccount: boolean('has_own_account').notNull().default(false),
