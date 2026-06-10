@@ -6,7 +6,7 @@ inputs:
     description: 'Claude Code OAuth token (secrets must be passed explicitly to composite actions)'
     required: true
   review_rules_path:
-    description: 'Trusted checkout path containing CLAUDE.md and docs/project_context.md'
+    description: 'Trusted checkout path containing AGENTS.md and docs/project_context.md'
     required: true
 
 runs:
@@ -35,7 +35,7 @@ runs:
              gh pr view ${{ github.event.pull_request.number }}
           3. Read the review rules from the trusted base checkout, not the PR workspace
              (both files, in full):
-             - ${{ inputs.review_rules_path }}/CLAUDE.md
+             - ${{ inputs.review_rules_path }}/AGENTS.md
              - ${{ inputs.review_rules_path }}/docs/project_context.md
 
           Use this context to understand what the author intended, what is explicitly
@@ -50,52 +50,52 @@ runs:
 
           **Architecture & contracts:**
           - @eduagent/schemas is the shared contract — no local redefinition of API-facing types
-            (CLAUDE.md § Non-Negotiable Engineering Rules)
+            (AGENTS.md § Non-Negotiable Engineering Rules)
           - Business logic in services/, not route handlers — routes must not import ORM primitives
-            (CLAUDE.md § Non-Negotiable Engineering Rules; eslint G1/G5)
+            (AGENTS.md § Non-Negotiable Engineering Rules; eslint G1/G5)
           - Reads use createScopedRepository(profileId) or the parent-chain pattern
-            (CLAUDE.md § Non-Negotiable Engineering Rules)
+            (AGENTS.md § Non-Negotiable Engineering Rules)
           - Writes include explicit profileId protection or parent-chain ownership verification
-            (CLAUDE.md § Non-Negotiable Engineering Rules)
+            (AGENTS.md § Non-Negotiable Engineering Rules)
           - Shared mobile components are persona-unaware — semantic tokens, not persona checks
-            or hardcoded hex colors (CLAUDE.md § Non-Negotiable Engineering Rules)
+            or hardcoded hex colors (AGENTS.md § Non-Negotiable Engineering Rules)
 
           **Async & LLM:**
           - Durable async work through Inngest — no fire-and-forget from route handlers
-            (CLAUDE.md § Non-Negotiable Engineering Rules)
+            (AGENTS.md § Non-Negotiable Engineering Rules)
           - LLM state-machine responses use the structured envelope, not marker tokens
-            (CLAUDE.md § Non-Negotiable Engineering Rules)
+            (AGENTS.md § Non-Negotiable Engineering Rules)
 
           **Code quality guards:**
           - No new internal jest.mock — GC1 ratchet. Only flag NEW violations in the diff,
             not pre-existing ones. gc1-allow annotations are legitimate exemptions
-            (CLAUDE.md § Code Quality Guards)
+            (AGENTS.md § Code Quality Guards)
           - Default exports only for Expo Router page components
-            (CLAUDE.md § Repo-Specific Guardrails)
+            (AGENTS.md § Repo-Specific Guardrails)
           - Tests co-located with source — no __tests__/ folders
-            (CLAUDE.md § Repo-Specific Guardrails)
+            (AGENTS.md § Repo-Specific Guardrails)
           - Package imports through the barrel — not direct file imports across packages
-            (CLAUDE.md § Repo-Specific Guardrails)
+            (AGENTS.md § Repo-Specific Guardrails)
           - Cross-tab router.push must push the full ancestor chain, not just the leaf
-            (CLAUDE.md § Repo-Specific Guardrails)
+            (AGENTS.md § Repo-Specific Guardrails)
           - No eslint-disable or warning suppression to make lint pass — fix the actual code
-            (CLAUDE.md § Required Validation)
+            (AGENTS.md § Required Validation)
 
           **Security (OWASP surface):**
           - Auth boundary enforcement — profileId scoping on all data access
           - No secrets or tokens in Inngest event payloads
           - No raw process.env reads in API code — use the typed config object
-            (CLAUDE.md § Repo-Specific Guardrails; eslint G4)
+            (AGENTS.md § Repo-Specific Guardrails; eslint G4)
           - Input validation (Zod) on every route handler
           - SQL injection vectors in raw sql`` template usage
 
           **Schema & deploy safety:**
           - Migrations that drop columns, tables, or types must include a Rollback section
-            (CLAUDE.md § Schema And Deploy Safety)
+            (AGENTS.md § Schema And Deploy Safety)
 
           ## STEP 3 — DO NOT flag these (prevents false positives, saves time)
 
-          - Patterns listed in CLAUDE.md § "Known Exceptions to Engineering Rules"
+          - Patterns listed in AGENTS.md § "Known Exceptions to Engineering Rules"
           - Style, formatting, whitespace — Prettier and ESLint handle these in CI
           - TypeScript type errors — tsc strict mode catches these in CI
           - Missing tests — pre-commit hooks enforce test co-location
@@ -134,7 +134,7 @@ runs:
 
           | File | Line | Issue | Rule | Suggested Fix |
           |------|------|-------|------|---------------|
-          | `path/file.ts` | L42 | description | CLAUDE.md § section | fix description |
+          | `path/file.ts` | L42 | description | AGENTS.md § section | fix description |
 
           ### SHOULD FIX
 
@@ -152,7 +152,7 @@ runs:
 
           - Verdict: {VERDICT}
           - Files in diff: {count}
-          - Rules source: trusted base checkout CLAUDE.md, docs/project_context.md
+          - Rules source: trusted base checkout AGENTS.md, docs/project_context.md
 
           </details>
 
@@ -168,7 +168,7 @@ runs:
 
           - Verdict: APPROVED
           - Files in diff: {count}
-          - Rules source: trusted base checkout CLAUDE.md, docs/project_context.md
+          - Rules source: trusted base checkout AGENTS.md, docs/project_context.md
 
           </details>
 
@@ -189,5 +189,5 @@ runs:
           </pr_metadata>
 
         claude_args: >-
-          --max-turns 10
+          --max-turns 30
           --allowedTools "Write,Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
