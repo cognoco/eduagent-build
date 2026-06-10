@@ -97,6 +97,23 @@ export function useRevenueCatIdentity(): void {
         if (retryCountRef.current < MAX_RETRIES) {
           retryCountRef.current += 1;
           retryTimerRef.current = setTimeout(() => void syncIdentity(), 3000);
+        } else {
+          // [error-observability H-2] Retries exhausted — RevenueCat stays in
+          // anonymous mode and billing receipts from this session would be
+          // mis-attributed. A breadcrumb alone is invisible unless a later
+          // exception fires in the same session, so escalate to a real Sentry
+          // event (CLAUDE.md: silent recovery without escalation is banned in
+          // billing code).
+          Sentry.captureException(
+            error instanceof Error ? error : new Error(String(error)),
+            {
+              tags: {
+                surface: 'revenuecat_identity',
+                reason: 'max_retries_exhausted',
+              },
+              extra: { userId },
+            },
+          );
         }
       }
     };

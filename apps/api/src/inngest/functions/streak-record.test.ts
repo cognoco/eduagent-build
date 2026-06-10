@@ -61,6 +61,13 @@ describe('streakRecord', () => {
     expect(opts.retries).toBe(3);
   });
 
+  it('[INNGEST-IDEMPOTENCY] declares idempotency keyed on profileId + date', () => {
+    const opts = (streakRecord as any).opts;
+    expect(opts.idempotency).toBe(
+      'event.data.profileId + "-" + event.data.date',
+    );
+  });
+
   it('throws NonRetriableError on missing payload', async () => {
     const { step } = createInngestStepRunner();
     await expect(handler({ event: { data: {} }, step })).rejects.toThrow(

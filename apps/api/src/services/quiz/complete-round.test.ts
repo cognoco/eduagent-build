@@ -155,6 +155,13 @@ describe('inferVocabularyTypeFromTerm', () => {
     expect(inferVocabularyTypeFromTerm('Guten Morgen')).toBe('chunk');
     expect(inferVocabularyTypeFromTerm('Va bene')).toBe('chunk');
   });
+
+  // Correctness-lens finding: the English pronoun "I" must not be treated as the
+  // Italian plural article 'i', which would misclassify English 2-word terms.
+  it('treats an English term beginning with "I" as a chunk, not a word', () => {
+    expect(inferVocabularyTypeFromTerm('I think')).toBe('chunk');
+    expect(inferVocabularyTypeFromTerm('I understand')).toBe('chunk');
+  });
 });
 
 describe('getCapitalsSm2Quality', () => {

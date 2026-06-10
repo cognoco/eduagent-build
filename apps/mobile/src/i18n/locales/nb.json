@@ -27,6 +27,43 @@
       "message": "Dette tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen."
     }
   },
+  "chrome": {
+    "modeSwitcher": {
+      "switchError": "Kunne ikke bytte. Trykk for å prøve igjen.",
+      "retry": "Prøv igjen",
+      "dismiss": "Avvis"
+    }
+  },
+  "myNotes": {
+    "titleNotes": "Notater",
+    "titleBookmarks": "Bokmerker",
+    "titleSessions": "Økter",
+    "subtitleNotes_one": "{{count}} notat",
+    "subtitleNotes_other": "{{count}} notater",
+    "subtitleBookmarks_one": "{{count}} lagret svar",
+    "subtitleBookmarks_other": "{{count}} lagrede svar",
+    "subtitleSessions_one": "{{count}} økt",
+    "subtitleSessions_other": "{{count}} økter",
+    "searchNotes": "Søk i notater",
+    "searchBookmarks": "Søk i bokmerker",
+    "searchSessions": "Søk i økter",
+    "back": "Tilbake",
+    "loadMore": "Last inn mer",
+    "tryAgain": "Prøv igjen",
+    "errorNotes": "Kunne ikke laste notater",
+    "errorBookmarks": "Kunne ikke laste bokmerker",
+    "errorSessions": "Kunne ikke laste økter",
+    "emptyNotes": "Ingen notater ennå",
+    "emptyBookmarks": "Ingen bokmerker ennå",
+    "emptySessions": "Ingen økter ennå",
+    "emptyHint": "De vises her etter hvert som du lærer.",
+    "typeNote": "Notat",
+    "typeBookmark": "Bokmerke",
+    "typeHomework": "Lekser",
+    "typeReview": "Repetisjon",
+    "typeLearning": "Læring",
+    "unknownSubject": "Ukjent fag"
+  },
   "quota": {
     "parent": {
       "childCapHit": {
@@ -270,14 +307,15 @@
     "screenTitle": "Mer",
     "active": "Aktiv",
     "accommodation": {
-      "sectionHeader": "Din læringstilpasning",
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "guideActive": "Aktiv",
-      "childScreenTitle": "{{name}}s læringsinnstillinger"
+      "childScreenTitle": "{{name}}s læringsinnstillinger",
+      "sectionHeader": "Din læringstilpasning"
     },
     "learningPreferences": {
       "sectionHeader": "Din læring",
-      "rowLabel": "Preferanser"
+      "rowLabel": "Preferanser",
+      "screenTitle": "Læringsinnstillinger"
     },
     "mentorMemory": {
       "sectionHeader": "Hva mentoren din vet"
@@ -372,6 +410,20 @@
     }
   },
   "session": {
+    "timer": {
+      "accessibilityLabel": "Økttid: {{time}}"
+    },
+    "errorBoundary": {
+      "title": "Det oppstod et problem med denne skjermen",
+      "body": "Noe gikk galt under lasting av denne skjermen. Du kan prøve igjen eller gå tilbake til hjem."
+    },
+    "challengeAlerts": {
+      "couldNotStart": "Kunne ikke starte øvingsrunden",
+      "couldNotUpdate": "Kunne ikke oppdatere øvingsrunden",
+      "couldNotSaveNote": "Kunne ikke lagre notatet",
+      "noteSaved": "Notat lagret.",
+      "couldNotSkipWarmup": "Kunne ikke hoppe over oppvarmingen"
+    },
     "challenge": {
       "offerTitle": "Klar for en utfordringsrunde?",
       "tryIt": "Prøv det",
@@ -827,7 +879,6 @@
       "reviewFailedTitle": "Gjennomgang mislyktes",
       "tryAgain": "Prøv igjen",
       "skip": "Hopp over",
-      "couldNotSaveDictation": "Vi kunne ikke lagre diktatresultatet ditt.",
       "couldNotSaveTitle": "Kunne ikke lagre resultatet ditt",
       "continueWithoutSaving": "Fortsett uten å lagre",
       "tookTooLong": "Det tok for lang tid – prøv igjen",
@@ -865,7 +916,6 @@
       "exit": "Avslutt"
     },
     "review": {
-      "couldNotSaveResult": "Vi kunne ikke lagre gjennomgangsresultatet ditt.",
       "couldNotSaveTitle": "Kunne ikke lagre resultat",
       "continueWithoutSaving": "Fortsett uten å lagre",
       "noDataFound": "Gjennomgangsdata ikke funnet.",
@@ -1161,8 +1211,7 @@
     "deleteDialog": {
       "title": "Slett ord",
       "message": "Fjerne dette ordet fra vokabularet ditt?",
-      "errorTitle": "Kunne ikke slette",
-      "errorFallback": "Noe gikk galt. Prøv igjen."
+      "errorTitle": "Kunne ikke slette"
     },
     "noSubject": {
       "title": "Ingen emne valgt",
@@ -1414,7 +1463,8 @@
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
-    "microphoneUnavailableTitle": "Mikrofon utilgjengelig"
+    "microphoneUnavailableTitle": "Mikrofon utilgjengelig",
+    "microphoneUnavailableBody": "Vi kunne ikke bruke mikrofonen akkurat nå. Sjekk at appen har tilgang til mikrofonen og prøv igjen, eller skriv i stedet."
   },
   "progress": {
     "pageTitleMine": "Min fremgang",
@@ -1425,7 +1475,6 @@
     "startLearning": "Start læring",
     "keepLearning": "Fortsett å lære",
     "refreshFailedTitle": "Oppdatering mislyktes",
-    "refreshFailed": "Vi kunne ikke oppdatere fremgangen din akkurat nå.",
     "hero": {
       "sessionsCompleted": "{{count}} økt fullført",
       "sessionsCompleted_other": "{{count}} økter fullført",
@@ -1529,7 +1578,6 @@
       "deleteConfirm": "Fjern",
       "deleteErrorTitle": "Kunne ikke fjerne bokmerke",
       "errorLoad": "Kunne ikke laste dine lagrede svar.",
-      "errorNetwork": "Sjekk tilkoblingen din og prøv igjen.",
       "retryLabel": "Prøv å laste lagrede bokmerker på nytt",
       "emptyTitle": "Ingenting lagret ennå",
       "emptySubtitle": "Bokmerk sider under økter for å finne dem her.",

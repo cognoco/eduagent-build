@@ -18,6 +18,7 @@
 //   CF_ACCOUNT_ID                                  (single value, all envs)
 //   CF_KV_SUBSCRIPTION_ID_DEV / _STG / _PRD
 //   CF_KV_COACHING_ID_DEV    / _STG / _PRD
+//   CF_KV_IDEMPOTENCY_ID_DEV / _STG / _PRD        (H3 / BUG-12)
 //
 // Usage:
 //   node scripts/render-wrangler-kv.mjs [wrangler.toml]    # writes in place
@@ -35,6 +36,12 @@ const PLACEHOLDERS = {
   __COACHING_KV_DEV__: 'CF_KV_COACHING_ID_DEV',
   __COACHING_KV_STG__: 'CF_KV_COACHING_ID_STG',
   __COACHING_KV_PRD__: 'CF_KV_COACHING_ID_PRD',
+  // [H3 / BUG-12] IDEMPOTENCY_KV — webhook replay deduplication. Namespaces
+  // must be created in Cloudflare (Workers & Pages → KV → Create) and the IDs
+  // added to Doppler (project: mentomate, configs: dev/stg/prd).
+  __IDEMPOTENCY_KV_DEV__: 'CF_KV_IDEMPOTENCY_ID_DEV',
+  __IDEMPOTENCY_KV_STG__: 'CF_KV_IDEMPOTENCY_ID_STG',
+  __IDEMPOTENCY_KV_PRD__: 'CF_KV_IDEMPOTENCY_ID_PRD',
 };
 
 // Real Cloudflare KV namespace IDs and CF account_ids are 32-char lowercase

@@ -27,6 +27,43 @@
       "message": "Esto está tardando más de lo esperado. Revisa tu conexión e inténtalo de nuevo."
     }
   },
+  "chrome": {
+    "modeSwitcher": {
+      "switchError": "No se pudo cambiar. Toca para reintentar.",
+      "retry": "Reintentar",
+      "dismiss": "Descartar"
+    }
+  },
+  "myNotes": {
+    "titleNotes": "Notas",
+    "titleBookmarks": "Marcadores",
+    "titleSessions": "Sesiones",
+    "subtitleNotes_one": "{{count}} nota",
+    "subtitleNotes_other": "{{count}} notas",
+    "subtitleBookmarks_one": "{{count}} respuesta guardada",
+    "subtitleBookmarks_other": "{{count}} respuestas guardadas",
+    "subtitleSessions_one": "{{count}} sesión",
+    "subtitleSessions_other": "{{count}} sesiones",
+    "searchNotes": "Buscar notas",
+    "searchBookmarks": "Buscar marcadores",
+    "searchSessions": "Buscar sesiones",
+    "back": "Atrás",
+    "loadMore": "Cargar más",
+    "tryAgain": "Reintentar",
+    "errorNotes": "No se pudieron cargar las notas",
+    "errorBookmarks": "No se pudieron cargar los marcadores",
+    "errorSessions": "No se pudieron cargar las sesiones",
+    "emptyNotes": "Aún no hay notas",
+    "emptyBookmarks": "Aún no hay marcadores",
+    "emptySessions": "Aún no hay sesiones",
+    "emptyHint": "Aparecerán aquí a medida que aprendas.",
+    "typeNote": "Nota",
+    "typeBookmark": "Marcador",
+    "typeHomework": "Tarea",
+    "typeReview": "Repaso",
+    "typeLearning": "Aprendizaje",
+    "unknownSubject": "Materia desconocida"
+  },
   "quota": {
     "parent": {
       "childCapHit": {
@@ -270,14 +307,15 @@
     "screenTitle": "Más",
     "active": "Activo",
     "accommodation": {
-      "sectionHeader": "Tu adaptación de aprendizaje",
       "notSureWhichToPick": "¿No estás seguro de cuál elegir?",
       "guideActive": "Activo",
-      "childScreenTitle": "Preferencias de aprendizaje de {{name}}"
+      "childScreenTitle": "Preferencias de aprendizaje de {{name}}",
+      "sectionHeader": "Tu adaptación de aprendizaje"
     },
     "learningPreferences": {
       "sectionHeader": "Tu aprendizaje",
-      "rowLabel": "Preferencias"
+      "rowLabel": "Preferencias",
+      "screenTitle": "Preferencias de aprendizaje"
     },
     "mentorMemory": {
       "sectionHeader": "Lo que tu mentor sabe"
@@ -372,6 +410,20 @@
     }
   },
   "session": {
+    "timer": {
+      "accessibilityLabel": "Tiempo de sesión: {{time}}"
+    },
+    "errorBoundary": {
+      "title": "Esta pantalla tuvo un problema",
+      "body": "Algo salió mal al cargar esta pantalla. Puedes reintentar o volver al inicio."
+    },
+    "challengeAlerts": {
+      "couldNotStart": "No se pudo iniciar la ronda de práctica",
+      "couldNotUpdate": "No se pudo actualizar la ronda de práctica",
+      "couldNotSaveNote": "No se pudo guardar la nota",
+      "noteSaved": "Nota guardada.",
+      "couldNotSkipWarmup": "No se pudo omitir el calentamiento"
+    },
     "challenge": {
       "offerTitle": "¿Lista para una ronda de práctica?",
       "tryIt": "Intentarlo",
@@ -827,7 +879,6 @@
       "reviewFailedTitle": "Falló la revisión",
       "tryAgain": "Intentar de nuevo",
       "skip": "Omitir",
-      "couldNotSaveDictation": "No pudimos guardar el resultado de tu dictado.",
       "couldNotSaveTitle": "No se pudo guardar tu resultado",
       "continueWithoutSaving": "Continuar sin guardar",
       "tookTooLong": "Eso tardó demasiado — inténtalo de nuevo",
@@ -865,7 +916,6 @@
       "exit": "Salir"
     },
     "review": {
-      "couldNotSaveResult": "No pudimos guardar el resultado de tu revisión.",
       "couldNotSaveTitle": "No se pudo guardar el resultado",
       "continueWithoutSaving": "Continuar sin guardar",
       "noDataFound": "No se encontraron datos de la revisión.",
@@ -1161,8 +1211,7 @@
     "deleteDialog": {
       "title": "Eliminar palabra",
       "message": "¿Quitar esta palabra de tu vocabulario?",
-      "errorTitle": "No se pudo eliminar",
-      "errorFallback": "Algo salió mal. Inténtalo de nuevo."
+      "errorTitle": "No se pudo eliminar"
     },
     "noSubject": {
       "title": "No se seleccionó ninguna materia",
@@ -1414,7 +1463,8 @@
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
-    "microphoneUnavailableTitle": "Micrófono no disponible"
+    "microphoneUnavailableTitle": "Micrófono no disponible",
+    "microphoneUnavailableBody": "No pudimos usar el micrófono en este momento. Comprueba que la app tenga acceso al micrófono e inténtalo de nuevo, o escribe en su lugar."
   },
   "progress": {
     "pageTitleMine": "Mi progreso",
@@ -1425,7 +1475,6 @@
     "startLearning": "Empezar a aprender",
     "keepLearning": "Seguir aprendiendo",
     "refreshFailedTitle": "Falló la actualización",
-    "refreshFailed": "No pudimos actualizar tu progreso en este momento.",
     "hero": {
       "sessionsCompleted": "{{count}} sesión completada",
       "sessionsCompleted_other": "{{count}} sesiones completadas",
@@ -1529,7 +1578,6 @@
       "deleteConfirm": "Quitar",
       "deleteErrorTitle": "No se pudo quitar el marcador",
       "errorLoad": "No se pudieron cargar tus respuestas guardadas.",
-      "errorNetwork": "Revisa tu conexión e inténtalo de nuevo.",
       "retryLabel": "Reintentar carga de marcadores guardados",
       "emptyTitle": "Nada guardado todavía",
       "emptySubtitle": "Marca páginas durante las sesiones para encontrarlas aquí.",

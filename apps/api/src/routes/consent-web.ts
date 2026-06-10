@@ -5,10 +5,13 @@ import {
   getChildNameByToken,
 } from '../services/consent';
 import {
+  // The consent-respond limiter is a SHARED in-memory instance: the unauth
+  // web POST and the authed JSON endpoint must throttle against the same map,
+  // so this stays sourced from the consent route that owns the instance.
   isConsentRespondRateLimited,
   CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS,
-  resolveRateLimitIp,
 } from './consent';
+import { resolveRateLimitIp } from '../services/rate-limit';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 
 // ---------------------------------------------------------------------------

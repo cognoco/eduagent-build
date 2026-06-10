@@ -140,36 +140,6 @@
     "text": "Subject"
   },
   {
-    "file": "apps/mobile/src/app/(app)/my-notes/[kind].tsx",
-    "kind": "jsx-text",
-    "text": "Couldn't load"
-  },
-  {
-    "file": "apps/mobile/src/app/(app)/my-notes/[kind].tsx",
-    "kind": "jsx-text",
-    "text": "Load more"
-  },
-  {
-    "file": "apps/mobile/src/app/(app)/my-notes/[kind].tsx",
-    "kind": "jsx-text",
-    "text": "No"
-  },
-  {
-    "file": "apps/mobile/src/app/(app)/my-notes/[kind].tsx",
-    "kind": "jsx-text",
-    "text": "They'll show up here as you learn."
-  },
-  {
-    "file": "apps/mobile/src/app/(app)/my-notes/[kind].tsx",
-    "kind": "jsx-text",
-    "text": "Try again"
-  },
-  {
-    "file": "apps/mobile/src/app/(app)/my-notes/[kind].tsx",
-    "kind": "jsx-text",
-    "text": "yet"
-  },
-  {
     "file": "apps/mobile/src/app/(app)/my-notes/index.tsx",
     "kind": "jsx-text",
     "text": "My Notes"
@@ -303,21 +273,6 @@
     "file": "apps/mobile/src/app/(app)/session/_components/SessionErrorBoundary.tsx",
     "kind": "jsx-child-string",
     "text": "Unknown error"
-  },
-  {
-    "file": "apps/mobile/src/app/(app)/session/_components/SessionErrorBoundary.tsx",
-    "kind": "jsx-text",
-    "text": "Go Home"
-  },
-  {
-    "file": "apps/mobile/src/app/(app)/session/_components/SessionErrorBoundary.tsx",
-    "kind": "jsx-text",
-    "text": "Session screen crashed"
-  },
-  {
-    "file": "apps/mobile/src/app/(app)/session/_components/SessionErrorBoundary.tsx",
-    "kind": "jsx-text",
-    "text": "Try Again"
   },
   {
     "file": "apps/mobile/src/app/(app)/session/_components/SessionScreenChrome.tsx",
@@ -1498,16 +1453,6 @@
     "file": "apps/mobile/src/components/AnimatedSplash.tsx",
     "kind": "jsx-text",
     "text": "ment"
-  },
-  {
-    "file": "apps/mobile/src/components/chrome/ModeSwitcher.tsx",
-    "kind": "jsx-text",
-    "text": "Couldn't switch. Tap to try again."
-  },
-  {
-    "file": "apps/mobile/src/components/chrome/ModeSwitcher.tsx",
-    "kind": "jsx-text",
-    "text": "Retry"
   },
   {
     "file": "apps/mobile/src/components/ClerkGate.tsx",

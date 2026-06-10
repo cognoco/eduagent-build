@@ -227,6 +227,14 @@ export const transcriptPurgeHandler = inngest.createFunction(
     name: 'Purge one transcript after retention window',
     concurrency: { limit: 5 },
     retries: 3,
+    // [INNGEST-IDEMPOTENCY] Defence-in-depth: a cron re-fire or operator replay
+    // can deliver the same (profileId, sessionSummaryId) twice. The purge is
+    // already idempotent at the data layer (purgeSessionTranscript's purgedAt
+    // guard), but without a function-level key a duplicate run still emits a
+    // duplicate app/session.transcript.purged observability event and skews SLO
+    // counters. Matches the sibling fan-out receivers (review-due-send,
+    // recall-nudge-send, dailySnapshotRefresh).
+    idempotency: 'event.data.sessionSummaryId',
   },
   { event: 'app/session.transcript.purge' },
   async ({ event, step }) => {

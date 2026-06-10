@@ -79,14 +79,38 @@ function characterNgrams(text: string, n = 2): Set<string> {
   return grams;
 }
 
-function tokenize(text: string): Set<string> {
-  const wordTokens = new Set(
+function wordTokens(text: string): Set<string> {
+  return new Set(
     normalize(text)
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .split(/\s+/)
       .filter((t) => t.length > 2 && !STOPWORDS.has(t)),
   );
-  return wordTokens.size > 1 ? wordTokens : characterNgrams(text);
+}
+
+/**
+ * Tokenize the draft and the learner source into the SAME alphabet.
+ *
+ * The mode (word-tokens vs character-bigrams) is decided ONCE from both sides
+ * combined: word mode is used only when BOTH sides yield >1 word-token,
+ * otherwise both fall back to bigrams. Deciding per-side independently could put
+ * the two sets in different alphabets — e.g. a long English draft (word mode)
+ * vs a short/CJK learner answer (bigram fallback) — making overlap structurally
+ * 0 and fail-closing a legitimately learner-grounded draft.
+ */
+function tokenizePair(
+  draft: string,
+  source: string,
+): { draftTokens: Set<string>; sourceTokens: Set<string> } {
+  const draftWords = wordTokens(draft);
+  const sourceWords = wordTokens(source);
+  if (draftWords.size > 1 && sourceWords.size > 1) {
+    return { draftTokens: draftWords, sourceTokens: sourceWords };
+  }
+  return {
+    draftTokens: characterNgrams(draft),
+    sourceTokens: characterNgrams(source),
+  };
 }
 
 export type DraftValidationReason =
@@ -122,10 +146,6 @@ export function validateNoteDraft(
   if (!draft.trim()) {
     return { ok: false, overlapRatio: 0, reason: 'empty' };
   }
-  const draftTokens = tokenize(draft);
-  if (draftTokens.size === 0) {
-    return { ok: false, overlapRatio: 0, reason: 'no_content_tokens' };
-  }
   // [BUG-483] Use verified event content for tokenization when available.
   // If verifiedEventContents is supplied, the guard measures overlap against
   // actual learner words from the DB — not the LLM's own paraphrase.
@@ -133,7 +153,15 @@ export function validateNoteDraft(
     verifiedEventContents != null && verifiedEventContents.length > 0
       ? verifiedEventContents
       : solidLearnerQuotes;
-  const learnerTokens = tokenize(sourceForTokenization.join(' '));
+  // Tokenize both sides with a single shared mode so word-vs-bigram never
+  // compares across alphabets (see tokenizePair).
+  const { draftTokens, sourceTokens: learnerTokens } = tokenizePair(
+    draft,
+    sourceForTokenization.join(' '),
+  );
+  if (draftTokens.size === 0) {
+    return { ok: false, overlapRatio: 0, reason: 'no_content_tokens' };
+  }
 
   let overlap = 0;
   for (const tok of draftTokens) {

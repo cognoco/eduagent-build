@@ -329,6 +329,7 @@ describe('seedScenario', () => {
     await expect(
       seedScenario(db, 'onboarding-complete', 'real@example.com', {
         CLERK_SECRET_KEY: 'sk_test',
+        SEED_PASSWORD: 'TestPassword123xK',
       }),
     ).rejects.toThrow('Refusing to reuse non-seed Clerk user');
 
@@ -415,6 +416,7 @@ describe('seedScenario', () => {
       'seed@example.com',
       {
         CLERK_SECRET_KEY: 'sk_test',
+        SEED_PASSWORD: 'TestPassword123xK',
       },
     );
 
