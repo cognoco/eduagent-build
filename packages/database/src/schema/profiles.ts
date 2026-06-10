@@ -39,14 +39,6 @@ export const pendingNoticeTypeEnum = pgEnum('pending_notice_type', [
   'consent_archived',
 ]);
 
-// [Identity T1] A membership carries a SET of roles, so the column is
-// `membership_role[]`. See docs/plans/2026-05-31-identity-t1-data-model.md.
-export const membershipRoleEnum = pgEnum('membership_role', [
-  'owner',
-  'mentor',
-  'student',
-]);
-
 export const accounts = pgTable('accounts', {
   id: uuid('id')
     .primaryKey()
@@ -77,12 +69,6 @@ export const profiles = pgTable(
     accountId: uuid('account_id')
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
-    // [Identity T1] Per-person Clerk credential. Nullable + unique: null = a
-    // managed person (no login), set = a credentialed person. Identity moves
-    // off `accounts` (T2+); in T1 the backfill copies it down to the owner
-    // profile only. Multiple emails/OAuth providers live inside one Clerk user,
-    // so a single id per person suffices.
-    clerkUserId: text('clerk_user_id').unique(),
     displayName: text('display_name').notNull(),
     avatarUrl: text('avatar_url'),
     birthYear: integer('birth_year').notNull(),
@@ -132,75 +118,11 @@ export const profiles = pgTable(
   ],
 );
 
-// [Identity T1] Organizations + memberships — additive, alongside the legacy
-// accounts/profiles/family_links/isOwner model. No reader/writer is rewired in
-// T1 (that is T2–T6); these exist so the backfill can map current data into the
-// new shape. The backfill REUSES accounts.id as organizations.id so the
-// account→org mapping is implicit. See the T1 plan for the full rationale.
-//
-// NOTE: `memberships` is person-scoped (person_id → profiles.id) but has no RLS
-// in T1 by design; rls-coverage.test.ts does not flag it because its column is
-// `person_id`, not `profile_id`. RLS for memberships is a T3 obligation, not a
-// freebie — do not read the green coverage test as "RLS handled."
-export const organizations = pgTable('organizations', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  name: text('name').notNull(),
-  timezone: text('timezone'),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  deletionScheduledAt: timestamp('deletion_scheduled_at', {
-    withTimezone: true,
-  }),
-  deletionCancelledAt: timestamp('deletion_cancelled_at', {
-    withTimezone: true,
-  }),
-});
-
-export type Organization = typeof organizations.$inferSelect;
-export type NewOrganization = typeof organizations.$inferInsert;
-
-export const memberships = pgTable(
-  'memberships',
-  {
-    id: uuid('id')
-      .primaryKey()
-      .$defaultFn(() => generateUUIDv7()),
-    personId: uuid('person_id')
-      .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
-    organizationId: uuid('organization_id')
-      .notNull()
-      .references(() => organizations.id, { onDelete: 'cascade' }),
-    roles: membershipRoleEnum('roles').array().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    unique('memberships_person_org_unique').on(
-      table.personId,
-      table.organizationId,
-    ),
-    index('memberships_organization_id_idx').on(table.organizationId),
-    // Must be cardinality(), NOT array_length(roles, 1): array_length on an
-    // empty array returns NULL, so `NULL >= 1` is UNKNOWN and the CHECK passes
-    // on anything but FALSE — an empty '{}' would slip through. cardinality()
-    // returns 0 for '{}', so `0 >= 1` is FALSE and the row is rejected.
-    check('memberships_roles_non_empty', sql`cardinality(${table.roles}) >= 1`),
-  ],
-);
-
-export type Membership = typeof memberships.$inferSelect;
-export type NewMembership = typeof memberships.$inferInsert;
+// [WI-569] The T1 `organizations` / `memberships` tables (migration 0106,
+// REFERENCE ONLY) were removed here as part of the MMT-ADR-0012 baseline
+// reset. The replacement singular `organization` / `membership` tables are
+// created by 0108_identity_foundation_baseline.sql; their Drizzle schema
+// definitions land with the identity-foundation schema work (WI-570).
 
 export const withdrawalArchivePreferences = pgTable(
   'withdrawal_archive_preferences',
