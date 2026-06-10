@@ -4,6 +4,7 @@ import { View, Text, Pressable, ScrollView } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { tokens } from '../../../../lib/design-tokens';
 import { Sentry } from '../../../../lib/sentry';
+import { i18next } from '../../../../i18n';
 
 /**
  * Session-specific error boundary with visible diagnostics.
@@ -61,7 +62,7 @@ export class SessionErrorBoundary extends Component<
               marginBottom: 12,
             }}
           >
-            Session screen crashed
+            {i18next.t('session.errorBoundary.title')}
           </Text>
           <Text
             style={{
@@ -71,10 +72,21 @@ export class SessionErrorBoundary extends Component<
               fontWeight: '600',
             }}
           >
-            {this.state.error?.message ?? 'Unknown error'}
+            {i18next.t('session.errorBoundary.body')}
           </Text>
           {__DEV__ && (
             <>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: tokens.light.colors.danger,
+                  fontFamily: 'monospace',
+                  marginBottom: 12,
+                }}
+                selectable
+              >
+                {this.state.error?.message ?? 'Unknown error'}
+              </Text>
               <Text
                 style={{
                   fontSize: 11,
@@ -132,7 +144,7 @@ export class SessionErrorBoundary extends Component<
                 fontWeight: '600',
               }}
             >
-              Try Again
+              {i18next.t('recovery.tryAgain')}
             </Text>
           </Pressable>
           {/* [UX-DE-M3] Secondary escape so a crash-loop doesn't trap the user.
@@ -156,7 +168,7 @@ export class SessionErrorBoundary extends Component<
             }}
             testID="session-error-boundary-go-home"
             accessibilityRole="button"
-            accessibilityLabel="Go Home"
+            accessibilityLabel={i18next.t('recovery.goHome')}
           >
             <Text
               style={{
@@ -165,7 +177,7 @@ export class SessionErrorBoundary extends Component<
                 fontWeight: '600',
               }}
             >
-              Go Home
+              {i18next.t('recovery.goHome')}
             </Text>
           </Pressable>
         </ScrollView>

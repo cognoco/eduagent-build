@@ -393,8 +393,14 @@ describe('consentReminder', () => {
 
     // No emails sent because parentEmail lookup returns null
     expect(mockSendEmail).not.toHaveBeenCalled();
-    // Atomic delete still happens because consent status is PENDING
-    expect(mockDeleteProfileIfNoConsent).toHaveBeenCalled();
+    // Atomic delete still happens because consent status is PENDING — and it
+    // must target the correct profile + the request's requestedAt boundary, not
+    // just "be called" (a wrong-profile scoping bug must fail this test).
+    expect(mockDeleteProfileIfNoConsent).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-1',
+      new Date('2026-05-01T00:00:00.000Z'),
+    );
   });
 
   it('[WI-84 DS-021] skips stale reminder runs when latest consent request has a newer requestedAt', async () => {

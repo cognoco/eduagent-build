@@ -142,14 +142,16 @@ describe('CORS middleware', () => {
       expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
     });
 
-    it('sets X-Frame-Options', async () => {
+    it('sets X-Frame-Options: DENY', async () => {
       const res = await app.request('/v1/health');
-      expect(res.headers.get('X-Frame-Options')).toBeTruthy();
+      expect(res.headers.get('X-Frame-Options')).toBe('DENY');
     });
 
-    it('sets Referrer-Policy', async () => {
+    it('sets Referrer-Policy: strict-origin-when-cross-origin', async () => {
       const res = await app.request('/v1/health');
-      expect(res.headers.get('Referrer-Policy')).toBeTruthy();
+      expect(res.headers.get('Referrer-Policy')).toBe(
+        'strict-origin-when-cross-origin',
+      );
     });
   });
 

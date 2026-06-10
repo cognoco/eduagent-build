@@ -171,6 +171,19 @@ export async function resolveVerifiedClerkEmail({
   }
 
   if (!res.ok) {
+    // [C-4] A non-2xx from the Clerk API (bad key, user-not-found, rate-limit,
+    // 5xx) gates email verification in the auth path. Mirror the network-error
+    // branch above: escalate so auth-verification degradation is observable,
+    // not a silently-returned `lookup-unavailable`.
+    logger.warn('[clerk-user] verified-email lookup failed', {
+      event: 'clerk_user.lookup.http_error',
+      userId,
+      status: res.status,
+    });
+    captureException(new Error(`Clerk lookup ${res.status}`), {
+      userId,
+      tags: { surface: 'clerk_lookup', reason: `http_${res.status}` },
+    });
     return {
       ok: false,
       reason: 'lookup-unavailable',
@@ -179,7 +192,21 @@ export async function resolveVerifiedClerkEmail({
     };
   }
 
-  const payload = await res.json().catch(() => null);
+  // [L-2] A JSON parse failure on a 2xx response (malformed Clerk body) is
+  // otherwise indistinguishable downstream from "user has no verified email".
+  // Capture so the two cases can be told apart in triage.
+  const payload = await res.json().catch((err: unknown) => {
+    logger.warn('[clerk-user] verified-email lookup returned malformed JSON', {
+      event: 'clerk_user.lookup.parse_error',
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err instanceof Error ? err : new Error(String(err)), {
+      userId,
+      tags: { surface: 'clerk_lookup', reason: 'parse_error' },
+    });
+    return null;
+  });
   const verifiedEmail = extractVerifiedPrimaryEmail(payload);
   if (!verifiedEmail) {
     return {

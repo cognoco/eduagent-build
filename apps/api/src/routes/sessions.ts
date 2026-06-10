@@ -21,6 +21,7 @@ import {
   RateLimitedError,
   recallBridgeResultSchema,
   SafetyFilterError,
+  streamDoneFrameSchema,
   streamErrorFrameSchema,
   streamFallbackFrameSchema,
   sessionAutoFileRequestedEventSchema,
@@ -160,9 +161,15 @@ interface DoneFrameSource {
  * [BUG-797] Single source of truth for the SSE `done` frame payload so the
  * normal streaming completion and both non-streaming fallback paths cannot
  * drift in which completion/UI signals they forward to the client.
+ *
+ * The assembled payload is validated through `streamDoneFrameSchema` (the
+ * canonical `@eduagent/schemas` contract) before it is returned, mirroring the
+ * `.parse()` guards on the sibling `error`/`fallback` frames. This converts a
+ * silent client-contract drift (a renamed/reshaped field shipping unnoticed)
+ * into a server-side error that surfaces in staging.
  */
 function buildDoneFramePayload(source: DoneFrameSource) {
-  return {
+  return streamDoneFrameSchema.parse({
     type: 'done' as const,
     exchangeCount: source.exchangeCount,
     escalationRung: source.escalationRung,
@@ -178,13 +185,14 @@ function buildDoneFramePayload(source: DoneFrameSource) {
     challengeRound: source.challengeRound,
     challengeOffer: source.challengeOffer,
     draftedNote: source.draftedNote,
-  };
+  });
 }
 
-// [BUG-CONT-DEPTH-SWEEP] Follow-up: apply zValidator('param', sessionIdParamsSchema)
-// to ALL /:sessionId endpoints in this file (GET /sessions/:sessionId,
-// /transcript, /evaluate-depth, /recall-bridge, /close, etc.) for consistent
-// UUID validation and early rejection of malformed IDs.
+// [BUG-CONT-DEPTH-SWEEP] DONE: every /:sessionId endpoint in this file now
+// applies zValidator('param', sessionIdParamsSchema) for consistent UUID
+// validation and early rejection of malformed IDs (verified 2026-06-09 — all
+// of GET /sessions/:sessionId, /transcript, /evaluate-depth, /recall-bridge,
+// /close, /messages, /stream, /summary, etc. carry the param validator).
 
 // retryFilingParamsSchema was byte-identical to sessionIdParamsSchema; consolidated.
 const sessionIdParamsSchema = z.object({

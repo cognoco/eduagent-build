@@ -301,7 +301,16 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
       streakDays: 3,
     });
 
-    expect(mockSendPushNotification).toHaveBeenCalled();
+    // Must target the correct profile + notification type — a wrong-recipient
+    // scoping bug must fail this test, not slip past a bare toHaveBeenCalled().
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: 'p-1',
+        type: 'daily_reminder',
+      }),
+      { skipRateLimitLog: true },
+    );
     expect(result).toEqual({
       status: 'sent',
       profileId: 'p-1',
@@ -389,7 +398,15 @@ describe('[BUG-976 / BUG-838] daily-reminder-send checkAndLogRateLimitInternal D
     });
 
     expect(mockCaptureException).not.toHaveBeenCalled();
-    expect(mockSendPushNotification).toHaveBeenCalled();
+    // Must target the correct profile + notification type, not just "be called".
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: 'p-ok',
+        type: 'daily_reminder',
+      }),
+      { skipRateLimitLog: true },
+    );
     // Happy path must not emit the suppression escalation event.
     expect(sendEventCalls).toHaveLength(0);
   });

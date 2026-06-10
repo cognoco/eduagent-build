@@ -27,6 +27,43 @@
       "message": "Trwa to dłużej niż oczekiwano. Sprawdź połączenie i spróbuj ponownie."
     }
   },
+  "chrome": {
+    "modeSwitcher": {
+      "switchError": "Nie udało się przełączyć. Dotknij, aby spróbować ponownie.",
+      "retry": "Ponów",
+      "dismiss": "Odrzuć"
+    }
+  },
+  "myNotes": {
+    "titleNotes": "Notatki",
+    "titleBookmarks": "Zakładki",
+    "titleSessions": "Sesje",
+    "subtitleNotes_one": "{{count}} notatka",
+    "subtitleNotes_other": "{{count}} notatki",
+    "subtitleBookmarks_one": "{{count}} zapisana odpowiedź",
+    "subtitleBookmarks_other": "{{count}} zapisane odpowiedzi",
+    "subtitleSessions_one": "{{count}} sesja",
+    "subtitleSessions_other": "{{count}} sesje",
+    "searchNotes": "Szukaj notatek",
+    "searchBookmarks": "Szukaj zakładek",
+    "searchSessions": "Szukaj sesji",
+    "back": "Wstecz",
+    "loadMore": "Wczytaj więcej",
+    "tryAgain": "Spróbuj ponownie",
+    "errorNotes": "Nie można załadować notatek",
+    "errorBookmarks": "Nie można załadować zakładek",
+    "errorSessions": "Nie można załadować sesji",
+    "emptyNotes": "Brak notatek",
+    "emptyBookmarks": "Brak zakładek",
+    "emptySessions": "Brak sesji",
+    "emptyHint": "Pojawią się tutaj w miarę nauki.",
+    "typeNote": "Notatka",
+    "typeBookmark": "Zakładka",
+    "typeHomework": "Zadanie domowe",
+    "typeReview": "Powtórka",
+    "typeLearning": "Nauka",
+    "unknownSubject": "Nieznany przedmiot"
+  },
   "quota": {
     "parent": {
       "childCapHit": {
@@ -295,14 +332,15 @@
     "screenTitle": "Więcej",
     "active": "Aktywny",
     "accommodation": {
-      "sectionHeader": "Twoje dostosowanie nauki",
       "notSureWhichToPick": "Nie wiesz, które wybrać?",
       "guideActive": "Aktywny",
-      "childScreenTitle": "Preferencje nauki — {{name}}"
+      "childScreenTitle": "Preferencje nauki — {{name}}",
+      "sectionHeader": "Twoje dostosowanie nauki"
     },
     "learningPreferences": {
       "sectionHeader": "Twoja nauka",
-      "rowLabel": "Preferencje"
+      "rowLabel": "Preferencje",
+      "screenTitle": "Preferencje nauki"
     },
     "mentorMemory": {
       "sectionHeader": "Co wie Twój mentor"
@@ -397,6 +435,20 @@
     }
   },
   "session": {
+    "timer": {
+      "accessibilityLabel": "Czas sesji: {{time}}"
+    },
+    "errorBoundary": {
+      "title": "Wystąpił problem z tym ekranem",
+      "body": "Coś poszło nie tak podczas ładowania tego ekranu. Możesz spróbować ponownie lub wrócić do ekranu głównego."
+    },
+    "challengeAlerts": {
+      "couldNotStart": "Nie udało się rozpocząć rundy ćwiczeń",
+      "couldNotUpdate": "Nie udało się zaktualizować rundy ćwiczeń",
+      "couldNotSaveNote": "Nie udało się zapisać notatki",
+      "noteSaved": "Notatka zapisana.",
+      "couldNotSkipWarmup": "Nie udało się pominąć rozgrzewki"
+    },
     "challenge": {
       "offerTitle": "Gotowy na rundę wyzwań?",
       "tryIt": "Spróbuj",
@@ -852,7 +904,6 @@
       "reviewFailedTitle": "Sprawdzanie nieudane",
       "tryAgain": "Spróbuj ponownie",
       "skip": "Pomiń",
-      "couldNotSaveDictation": "Nie mogliśmy zapisać wyniku Twojego dyktanda.",
       "couldNotSaveTitle": "Nie można zapisać wyniku",
       "continueWithoutSaving": "Kontynuuj bez zapisywania",
       "tookTooLong": "To trwało zbyt długo — spróbuj ponownie",
@@ -890,7 +941,6 @@
       "exit": "Wyjdź"
     },
     "review": {
-      "couldNotSaveResult": "Nie mogliśmy zapisać wyniku Twojej recenzji.",
       "couldNotSaveTitle": "Nie można zapisać wyniku",
       "continueWithoutSaving": "Kontynuuj bez zapisywania",
       "noDataFound": "Nie znaleziono danych recenzji.",
@@ -1186,8 +1236,7 @@
     "deleteDialog": {
       "title": "Usuń słowo",
       "message": "Usunąć to słowo ze swojego słownictwa?",
-      "errorTitle": "Nie można usunąć",
-      "errorFallback": "Coś poszło nie tak. Spróbuj ponownie."
+      "errorTitle": "Nie można usunąć"
     },
     "noSubject": {
       "title": "Nie wybrano przedmiotu",
@@ -1439,7 +1488,8 @@
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
-    "microphoneUnavailableTitle": "Mikrofon niedostępny"
+    "microphoneUnavailableTitle": "Mikrofon niedostępny",
+    "microphoneUnavailableBody": "Nie mogliśmy teraz użyć mikrofonu. Sprawdź, czy aplikacja ma dostęp do mikrofonu, i spróbuj ponownie lub wpisz tekst."
   },
   "progress": {
     "pageTitleMine": "Moje postępy",
@@ -1450,7 +1500,6 @@
     "startLearning": "Rozpocznij naukę",
     "keepLearning": "Kontynuuj naukę",
     "refreshFailedTitle": "Odświeżanie nie powiodło się",
-    "refreshFailed": "Nie mogliśmy teraz odświeżyć Twoich postępów.",
     "hero": {
       "sessionsCompleted": "Ukończono {{count}} sesję",
       "sessionsCompleted_other": "Ukończono {{count}} sesji",
@@ -1554,7 +1603,6 @@
       "deleteConfirm": "Usuń",
       "deleteErrorTitle": "Nie można usunąć zakładki",
       "errorLoad": "Nie można załadować zapisanych odpowiedzi.",
-      "errorNetwork": "Sprawdź połączenie i spróbuj ponownie.",
       "retryLabel": "Spróbuj ponownie załadować zapisane zakładki",
       "emptyTitle": "Jeszcze nic nie zapisano",
       "emptySubtitle": "Dodawaj zakładki do stron podczas sesji, aby je tutaj znaleźć.",

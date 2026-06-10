@@ -313,13 +313,20 @@ describe('DictationReviewScreen', () => {
         await Promise.resolve();
       });
 
+      // The save-failure body now routes through formatApiError (classify
+      // before format) instead of rendering err.message verbatim. A plain
+      // Error whose message contains "network" classifies as a network error,
+      // so the friendly networkError copy is shown and the raw "Network error"
+      // string never leaks to the user.
       expect(mockPlatformAlert).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('Network error'),
+        expect.stringContaining("you're offline"),
         expect.arrayContaining([
           expect.objectContaining({ text: expect.any(String) }),
         ]),
       );
+      const body = mockPlatformAlert.mock.calls.at(-1)?.[1] as string;
+      expect(body).not.toBe('Network error');
     });
   });
 

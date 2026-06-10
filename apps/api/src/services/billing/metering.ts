@@ -846,7 +846,7 @@ async function attemptProfileDecrementInTx(
  */
 export interface IncrementResult {
   success: boolean;
-  reason?: 'profile_mismatch';
+  reason?: 'profile_mismatch' | 'topup_credit_not_found';
 }
 
 export interface IncrementQuotaOptions {
@@ -1002,61 +1002,88 @@ async function incrementProfileQuota(
 
   const source = options?.source ?? 'monthly';
 
-  await db.transaction(async (tx) => {
-    if (source === 'top_up' && options?.topUpCreditId) {
-      await tx
-        .update(topUpCredits)
-        .set({ remaining: sql`${topUpCredits.remaining} + 1` })
-        .where(
-          and(
-            eq(topUpCredits.id, options.topUpCreditId),
-            eq(topUpCredits.subscriptionId, subscriptionId),
-            eq(topUpCredits.profileId, profileId),
-          ),
-        );
+  const txResult = await db.transaction(
+    async (tx): Promise<IncrementResult> => {
+      if (source === 'top_up' && options?.topUpCreditId) {
+        const refundedCredits = await tx
+          .update(topUpCredits)
+          .set({ remaining: sql`${topUpCredits.remaining} + 1` })
+          .where(
+            and(
+              eq(topUpCredits.id, options.topUpCreditId),
+              eq(topUpCredits.subscriptionId, subscriptionId),
+              eq(topUpCredits.profileId, profileId),
+            ),
+          )
+          .returning({ id: topUpCredits.id });
 
-      await tx
-        .update(profileQuotaUsage)
-        .set({
-          usedToday: sql`GREATEST(${profileQuotaUsage.usedToday} - 1, 0)`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(profileQuotaUsage.subscriptionId, subscriptionId),
-            eq(profileQuotaUsage.profileId, profileId),
-          ),
-        );
-    } else {
-      if (source === 'top_up') {
-        logger.warn(
-          '[metering] incrementQuota top_up refund missing topUpCreditId - falling back to monthly refund',
-          {
-            event: 'metering.refund.missing_topup_id',
+        // Billing-integrity guard: if the credit UPDATE matched no row (the
+        // topUpCreditId does not belong to this subscription+profile), do NOT
+        // proceed to decrement the daily slot — that would silently refund a
+        // daily slot without refunding the credit the caller asked for. Escalate
+        // instead (CLAUDE.md: silent recovery in billing must be observable).
+        if (refundedCredits.length === 0) {
+          logger.error('[metering] top_up refund matched no credit row', {
+            event: 'metering.refund.topup_credit_not_found',
             subscriptionId,
             profileId,
-          },
-        );
+            topUpCreditId: options.topUpCreditId,
+          });
+          captureException(
+            new Error('top_up quota refund matched no top_up_credits row'),
+            {
+              profileId,
+              tags: { surface: 'metering', reason: 'topup_credit_not_found' },
+              extra: { subscriptionId, topUpCreditId: options.topUpCreditId },
+            },
+          );
+          return { success: false, reason: 'topup_credit_not_found' };
+        }
+
+        await tx
+          .update(profileQuotaUsage)
+          .set({
+            usedToday: sql`GREATEST(${profileQuotaUsage.usedToday} - 1, 0)`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(profileQuotaUsage.subscriptionId, subscriptionId),
+              eq(profileQuotaUsage.profileId, profileId),
+            ),
+          );
+      } else {
+        if (source === 'top_up') {
+          logger.warn(
+            '[metering] incrementQuota top_up refund missing topUpCreditId - falling back to monthly refund',
+            {
+              event: 'metering.refund.missing_topup_id',
+              subscriptionId,
+              profileId,
+            },
+          );
+        }
+        await tx
+          .update(profileQuotaUsage)
+          .set({
+            usedThisMonth: sql`GREATEST(${profileQuotaUsage.usedThisMonth} - 1, 0)`,
+            usedToday: sql`GREATEST(${profileQuotaUsage.usedToday} - 1, 0)`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(profileQuotaUsage.subscriptionId, subscriptionId),
+              eq(profileQuotaUsage.profileId, profileId),
+            ),
+          );
       }
-      await tx
-        .update(profileQuotaUsage)
-        .set({
-          usedThisMonth: sql`GREATEST(${profileQuotaUsage.usedThisMonth} - 1, 0)`,
-          usedToday: sql`GREATEST(${profileQuotaUsage.usedToday} - 1, 0)`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(profileQuotaUsage.subscriptionId, subscriptionId),
-            eq(profileQuotaUsage.profileId, profileId),
-          ),
-        );
-    }
 
-    await recordUsageEvent(tx, subscriptionId, profileId, -1);
-  });
+      await recordUsageEvent(tx, subscriptionId, profileId, -1);
+      return { success: true };
+    },
+  );
 
-  return { success: true };
+  return txResult;
 }
 
 // ---------------------------------------------------------------------------

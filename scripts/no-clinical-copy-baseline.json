@@ -134,9 +134,5 @@
   {
     "path": "topic.recallTest.errorTitle",
     "term": "wrong"
-  },
-  {
-    "path": "vocabulary.deleteDialog.errorFallback",
-    "term": "wrong"
   }
 ]

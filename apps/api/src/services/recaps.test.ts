@@ -144,6 +144,10 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       {
         sessionId: RECAP_ID,
         nextTopicTitle: 'Comparing fractions',
+        // ownedSubjectId is non-null → the curriculum_topics → curriculum_books
+        // → subjects ownership chain resolved for the same profile, so the
+        // title is allowed to surface.
+        ownedSubjectId: 'c0000000-0000-4000-8000-000000000001',
         nextTopicReason: 'Build on equivalent fractions',
       },
     ]);
@@ -156,6 +160,30 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       nextTopicTitle: 'Comparing fractions',
       nextTopicReason: 'Build on equivalent fractions',
     });
+  });
+
+  it('suppresses a next-topic title whose ownership chain does not resolve to the same profile', async () => {
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessions.mockResolvedValue([sessionRow(RECAP_ID)]);
+
+    // The aliased topic matched (title present) but the owned-subject join did
+    // NOT resolve (ownedSubjectId null) — e.g. next_topic_id points at a foreign
+    // profile's topic. The title must be suppressed, not leaked onto the card.
+    const enrichedDb = fakeDbReturning([
+      {
+        sessionId: RECAP_ID,
+        nextTopicTitle: 'Foreign profile topic',
+        ownedSubjectId: null,
+        nextTopicReason: 'Build on equivalent fractions',
+      },
+    ]);
+
+    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+
+    expect(recaps).toHaveLength(1);
+    expect(recaps[0]?.nextTopicTitle).toBeNull();
   });
 
   it('returns null next-topic for a recap with no stored next topic', async () => {
@@ -188,11 +216,13 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       {
         sessionId: RECAP_ID,
         nextTopicTitle: 'Comparing fractions',
+        ownedSubjectId: 'c0000000-0000-4000-8000-000000000001',
         nextTopicReason: 'On topic',
       },
       {
         sessionId: FOREIGN_SESSION,
         nextTopicTitle: 'Another family secret',
+        ownedSubjectId: 'c0000000-0000-4000-8000-000000000002',
         nextTopicReason: 'Should never appear',
       },
     ]);

@@ -80,6 +80,22 @@ describe('wrangler.toml config guards', () => {
     });
   });
 
+  describe('[CFG-H1] staging workers_dev', () => {
+    // Staging must also set workers_dev = false to prevent the worker being
+    // reachable at *.workers.dev — which bypasses WAF and rate-limiting rules
+    // applied on the custom-domain route. See H1 in config-secrets review.
+    it('staging block contains workers_dev = false', () => {
+      const stagingSection = content.match(
+        /\[env\.staging\]([\s\S]*?)(?=^\[env\.|$(?![\r\n]))/m,
+      );
+      expect(stagingSection).not.toBeNull();
+
+      const workersDev = stagingSection![1]!.match(/^workers_dev\s*=\s*(\S+)/m);
+      expect(workersDev).not.toBeNull();
+      expect(workersDev![1]).toBe('false');
+    });
+  });
+
   describe('[CFG-4] root kv_namespaces preview_id !== id', () => {
     function getRootSection(toml: string): string {
       const firstEnvIdx = toml.search(/^\[env\./m);

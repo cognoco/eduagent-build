@@ -13,6 +13,7 @@ import type { Bookmark } from '@eduagent/schemas';
 import { ThemedMarkdown } from '../../../components/common';
 import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
 import { platformAlert } from '../../../lib/platform-alert';
+import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useRelativeDate } from '../../../hooks/use-time-format';
@@ -118,7 +119,7 @@ export default function SavedBookmarksScreen() {
               void deleteBookmark.mutateAsync(bookmark.id).catch((error) => {
                 platformAlert(
                   t('progress.saved.deleteErrorTitle'),
-                  error instanceof Error ? error.message : t('common.tryAgain'),
+                  formatApiError(error),
                 );
               });
             },
@@ -206,9 +207,7 @@ export default function SavedBookmarksScreen() {
                 {t('progress.saved.errorLoad')}
               </Text>
               <Text className="text-body-sm text-text-secondary text-center mb-4">
-                {bookmarksQuery.error instanceof Error
-                  ? bookmarksQuery.error.message
-                  : t('progress.saved.errorNetwork')}
+                {formatApiError(bookmarksQuery.error)}
               </Text>
               <Pressable
                 onPress={() => void bookmarksQuery.refetch()}

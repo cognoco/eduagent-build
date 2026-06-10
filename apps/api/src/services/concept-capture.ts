@@ -3,6 +3,21 @@ import { sql } from 'drizzle-orm';
 import { conceptMastery, concepts, type Database } from '@eduagent/database';
 import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
 
+/**
+ * Concept-capture (the Challenge-Round "mastery star" feature) is PARKED in code
+ * until the identity baseline reset (MMT-ADR-0012) applies the `concepts` /
+ * `concept_mastery` tables. Migration 0107, which creates them, is REFERENCE-ONLY
+ * and applied in no deployed environment, so every live call throws
+ * `relation "concepts" does not exist` — swallowed by safeWrite() into recurring
+ * Sentry noise that can mask real failures (db-migration.md Critical #2).
+ *
+ * Gate is applied at the single live call site (session-exchange.ts) rather than
+ * inside captureConceptMastery, so the function and its integration tests still
+ * exercise the real write path against a DB that has the tables. Flip to `true`
+ * (and remove this note) once the tables exist post-reset to re-home the feature.
+ */
+export const CONCEPT_CAPTURE_ENABLED = false;
+
 export interface ConceptCaptureSession {
   id: string;
   subjectId: string | null;

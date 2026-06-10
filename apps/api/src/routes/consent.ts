@@ -45,6 +45,10 @@ import {
 } from '../services/family-access';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
+import {
+  createSlidingWindowRateLimiter,
+  resolveRateLimitIp,
+} from '../services/rate-limit';
 
 // [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
 // emailed link, no session). The token is a 122-bit UUID so brute-force is
@@ -76,66 +80,26 @@ import { safeSend } from '../services/safe-non-core';
 export const CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const CONSENT_RESPOND_RATE_LIMIT_MAX = 30;
 const CONSENT_RESPOND_MAP_MAX_ENTRIES = 10_000;
-const consentRespondTimestamps = new Map<string, number[]>();
+
+// Shared windowed-Map limiter (see services/rate-limit.ts). The LRU-by-touch
+// eviction policy and IP-resolution rationale documented above now live in the
+// service; this route just configures and calls it.
+const consentRespondLimiter = createSlidingWindowRateLimiter({
+  windowMs: CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS,
+  max: CONSENT_RESPOND_RATE_LIMIT_MAX,
+  maxEntries: CONSENT_RESPOND_MAP_MAX_ENTRIES,
+});
 
 export function __resetConsentRespondRateLimit(): void {
-  consentRespondTimestamps.clear();
+  consentRespondLimiter.reset();
 }
 
-// [BUG-648 / FCR-2026-05-23-L2.M2.5] Extract the canonical client IP for
-// rate-limiting. Prefer Cloudflare's `cf-connecting-ip` (always the real
-// client at the edge), then fall back to the FIRST token of
-// `x-forwarded-for`. The previous implementation used the entire XFF header
-// verbatim as the bucket key — any unique proxy chain (e.g.
-// "1.2.3.4, 10.0.0.1, 10.0.0.2") produced its own bucket, allowing an
-// attacker rotating intermediate proxies to bypass the per-IP rate limit.
-// We deliberately use the LEFTMOST token (the original client) rather than
-// the rightmost, because at the Cloudflare edge `cf-connecting-ip` is
-// already the trusted value when present; the XFF fallback only fires in
-// non-CF environments (local dev, tests). The first token is what RFC 7239
-// defines as the originating client.
-export function resolveRateLimitIp(
-  cfConnectingIp: string | null | undefined,
-  xForwardedFor: string | null | undefined,
-): string {
-  const cf = cfConnectingIp?.trim();
-  if (cf) return cf;
-  const xff = xForwardedFor?.trim();
-  if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
-  }
-  return 'unknown';
-}
+// Re-exported so existing consumers (consent-web route, tests) keep their
+// `from './consent'` import path while the implementation lives in the service.
+export { resolveRateLimitIp };
 
 export function isConsentRespondRateLimited(ipKey: string): boolean {
-  const now = Date.now();
-  const cutoff = now - CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS;
-  const existing = consentRespondTimestamps.get(ipKey);
-  const timestamps = (existing ?? []).filter((t) => t > cutoff);
-
-  // [CR-2026-05-21-094] LRU touch: delete before re-set so the key moves to
-  // the insertion-order tail. This makes keys().next().value the true
-  // least-recently-touched IP rather than the first-ever inserted one.
-  if (existing !== undefined) {
-    consentRespondTimestamps.delete(ipKey);
-  }
-
-  const isNewKey = timestamps.length === 0;
-  if (
-    isNewKey &&
-    consentRespondTimestamps.size >= CONSENT_RESPOND_MAP_MAX_ENTRIES
-  ) {
-    const oldest = consentRespondTimestamps.keys().next().value;
-    if (oldest !== undefined) consentRespondTimestamps.delete(oldest);
-  }
-  if (timestamps.length >= CONSENT_RESPOND_RATE_LIMIT_MAX) {
-    consentRespondTimestamps.set(ipKey, timestamps);
-    return true;
-  }
-  timestamps.push(now);
-  consentRespondTimestamps.set(ipKey, timestamps);
-  return false;
+  return consentRespondLimiter.isLimited(ipKey);
 }
 
 function maskEmail(email: string | null): string | null {

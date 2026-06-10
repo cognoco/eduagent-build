@@ -27,6 +27,43 @@
       "message": "Das dauert länger als erwartet. Bitte überprüfe deine Verbindung und versuche es erneut."
     }
   },
+  "chrome": {
+    "modeSwitcher": {
+      "switchError": "Wechsel fehlgeschlagen. Zum erneuten Versuch tippen.",
+      "retry": "Erneut versuchen",
+      "dismiss": "Schließen"
+    }
+  },
+  "myNotes": {
+    "titleNotes": "Notizen",
+    "titleBookmarks": "Lesezeichen",
+    "titleSessions": "Sitzungen",
+    "subtitleNotes_one": "{{count}} Notiz",
+    "subtitleNotes_other": "{{count}} Notizen",
+    "subtitleBookmarks_one": "{{count}} gespeicherte Antwort",
+    "subtitleBookmarks_other": "{{count}} gespeicherte Antworten",
+    "subtitleSessions_one": "{{count}} Sitzung",
+    "subtitleSessions_other": "{{count}} Sitzungen",
+    "searchNotes": "Notizen durchsuchen",
+    "searchBookmarks": "Lesezeichen durchsuchen",
+    "searchSessions": "Sitzungen durchsuchen",
+    "back": "Zurück",
+    "loadMore": "Mehr laden",
+    "tryAgain": "Erneut versuchen",
+    "errorNotes": "Notizen konnten nicht geladen werden",
+    "errorBookmarks": "Lesezeichen konnten nicht geladen werden",
+    "errorSessions": "Sitzungen konnten nicht geladen werden",
+    "emptyNotes": "Noch keine Notizen",
+    "emptyBookmarks": "Noch keine Lesezeichen",
+    "emptySessions": "Noch keine Sitzungen",
+    "emptyHint": "Sie erscheinen hier, während du lernst.",
+    "typeNote": "Notiz",
+    "typeBookmark": "Lesezeichen",
+    "typeHomework": "Hausaufgaben",
+    "typeReview": "Wiederholung",
+    "typeLearning": "Lernen",
+    "unknownSubject": "Unbekanntes Fach"
+  },
   "quota": {
     "parent": {
       "childCapHit": {
@@ -270,14 +307,15 @@
     "screenTitle": "Mehr",
     "active": "Aktiv",
     "accommodation": {
-      "sectionHeader": "Deine Lernanpassung",
       "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
       "guideActive": "Aktiv",
-      "childScreenTitle": "{{name}}s Lernpräferenzen"
+      "childScreenTitle": "{{name}}s Lernpräferenzen",
+      "sectionHeader": "Deine Lernanpassung"
     },
     "learningPreferences": {
       "sectionHeader": "Dein Lernen",
-      "rowLabel": "Präferenzen"
+      "rowLabel": "Präferenzen",
+      "screenTitle": "Lernpräferenzen"
     },
     "proxyPreview": {
       "title": "Einstellungen sind in der Elternvorschau gesperrt",
@@ -372,6 +410,20 @@
     }
   },
   "session": {
+    "timer": {
+      "accessibilityLabel": "Sitzungsdauer: {{time}}"
+    },
+    "errorBoundary": {
+      "title": "Bei diesem Bildschirm ist ein Problem aufgetreten",
+      "body": "Beim Laden dieses Bildschirms ist etwas schiefgelaufen. Du kannst es erneut versuchen oder zur Startseite zurückkehren."
+    },
+    "challengeAlerts": {
+      "couldNotStart": "Übungsrunde konnte nicht gestartet werden",
+      "couldNotUpdate": "Übungsrunde konnte nicht aktualisiert werden",
+      "couldNotSaveNote": "Notiz konnte nicht gespeichert werden",
+      "noteSaved": "Notiz gespeichert.",
+      "couldNotSkipWarmup": "Aufwärmen konnte nicht übersprungen werden"
+    },
     "challenge": {
       "offerTitle": "Bereit für eine Übungsrunde?",
       "tryIt": "Ausprobieren",
@@ -827,7 +879,6 @@
       "reviewFailedTitle": "Überprüfung fehlgeschlagen",
       "tryAgain": "Erneut versuchen",
       "skip": "Überspringen",
-      "couldNotSaveDictation": "Wir konnten dein Diktatergebnis nicht speichern.",
       "couldNotSaveTitle": "Dein Ergebnis konnte nicht gespeichert werden",
       "continueWithoutSaving": "Ohne Speichern fortfahren",
       "tookTooLong": "Das hat zu lange gedauert – versuche es erneut",
@@ -865,7 +916,6 @@
       "exit": "Beenden"
     },
     "review": {
-      "couldNotSaveResult": "Wir konnten dein Überprüfungsergebnis nicht speichern.",
       "couldNotSaveTitle": "Ergebnis konnte nicht gespeichert werden",
       "continueWithoutSaving": "Ohne Speichern fortfahren",
       "noDataFound": "Überprüfungsdaten nicht gefunden.",
@@ -1161,8 +1211,7 @@
     "deleteDialog": {
       "title": "Wort löschen",
       "message": "Dieses Wort aus deinem Vokabular entfernen?",
-      "errorTitle": "Konnte nicht gelöscht werden",
-      "errorFallback": "Etwas ist schiefgelaufen. Versuche es erneut."
+      "errorTitle": "Konnte nicht gelöscht werden"
     },
     "noSubject": {
       "title": "Kein Fach ausgewählt",
@@ -1414,7 +1463,8 @@
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
-    "microphoneUnavailableTitle": "Mikrofon nicht verfügbar"
+    "microphoneUnavailableTitle": "Mikrofon nicht verfügbar",
+    "microphoneUnavailableBody": "Das Mikrofon konnte gerade nicht verwendet werden. Prüfe, ob die App Zugriff auf das Mikrofon hat, und versuche es erneut, oder tippe stattdessen."
   },
   "progress": {
     "pageTitleMine": "Mein Fortschritt",
@@ -1425,7 +1475,6 @@
     "startLearning": "Lernen starten",
     "keepLearning": "Weiterlernen",
     "refreshFailedTitle": "Update fehlgeschlagen",
-    "refreshFailed": "Wir konnten deinen Fortschritt gerade nicht aktualisieren.",
     "hero": {
       "sessionsCompleted": "{{count}} Sitzung abgeschlossen",
       "sessionsCompleted_other": "{{count}} Sitzungen abgeschlossen",
@@ -1529,7 +1578,6 @@
       "deleteConfirm": "Entfernen",
       "deleteErrorTitle": "Lesezeichen konnte nicht entfernt werden",
       "errorLoad": "Deine gespeicherten Antworten konnten nicht geladen werden.",
-      "errorNetwork": "Bitte überprüfe deine Verbindung und versuche es erneut.",
       "retryLabel": "Gespeicherte Lesezeichen erneut laden",
       "emptyTitle": "Noch nichts gespeichert",
       "emptySubtitle": "Setze während der Sitzungen Lesezeichen, um sie hier zu finden.",

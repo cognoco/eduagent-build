@@ -353,7 +353,9 @@ export function inferVocabularyTypeFromTerm(term: string): 'word' | 'chunk' {
     'il',
     'lo',
     'gli',
-    'i',
+    // The Italian plural article 'i' is intentionally omitted: it collides with
+    // the English pronoun "I", which would misclassify English 2-word terms
+    // beginning with "I" (e.g. "I think") as a word+article instead of a chunk.
   ]);
 
   if (

@@ -96,6 +96,7 @@ jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
 
 // Import AFTER mocks are set up
 import { filingTimedOutObserve } from './filing-timed-out-observe';
+import { filingResolvedEventSchema } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -144,7 +145,7 @@ async function executeHandler(
   // Defaults to [] (0 rows) — CAS guard fires, recovered_after_window path.
   // Pass [{ id: SESSION_ID }] to exercise the 1-row / unrecoverable path.
   markFailedRows: unknown[] = [],
-  // Controls what findFirst returns when the emit-resolved-recovered-after-window
+  // Controls what findFirst returns when the re-read-recovered-after-window
   // step re-reads the row to verify filing_recovered status. Defaults to a
   // filing_recovered row so existing CAS no-op tests keep passing.
   recheckRow: Partial<Record<string, unknown>> | null = {
@@ -182,7 +183,7 @@ async function executeHandler(
   // findFirst is called multiple times across steps:
   //   call 1: capture-diagnostic-snapshot  → snapshotSession
   //   call 2: re-read-session              → snapshotSession
-  //   call 3: emit-resolved-recovered-after-window re-read → recheckRow
+  //   call 3: re-read-recovered-after-window re-read → recheckRow
   // Use mockResolvedValueOnce for the first two, then fall through to the
   // persistent mockResolvedValue (recheckRow) for all subsequent calls.
   const findFirstMock = jest
@@ -543,76 +544,174 @@ describe('[BUG-699-FOLLOWUP] filing-timed-out-observe 24h push dedup', () => {
 });
 
 // ---------------------------------------------------------------------------
-// [H-2] Break tests for the emit-resolved-recovered-after-window step
+// [H-2 / INNGEST-NESTED-STEP] Break tests for the recovered_after_window path
 //
-// 1. Zod parse failure inside the new step.run → captureException called,
-//    function does NOT retry (step returns gracefully).
-// 2. CAS recheck: row in non-recovered terminal state → no event emitted,
-//    warn logged.
-// 3. sendPushNotification throw → captureException called, function continues
-//    to completion.
+// The recovered_after_window branch was refactored to fix an illegal nested
+// step-tool call: the previous revision invoked `step.sendEvent` INSIDE the
+// `step.run('emit-resolved-recovered-after-window', ...)` callback, which
+// throws on the real Inngest executor (step tools must run at the function
+// body's top level). The re-read now happens in a data-only
+// `step.run('re-read-recovered-after-window', ...)` that returns
+// `{ shouldEmit }`, and the dispatch is hoisted to the top level.
+//
+// 1. NESTING GUARD: the re-read step body must NOT itself call step.sendEvent;
+//    the emit fires only at the function-body top level.
+// 2. Zod parse failure at the hoisted emit → captureException called, function
+//    does NOT throw (resolves normally to recovered_after_window).
+// 3. CAS recheck: row in non-recovered terminal state → no event emitted.
+// 4. sendPushNotification throw → captureException called, function continues.
 // ---------------------------------------------------------------------------
 
-describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => {
+describe('[H-2] filing-timed-out-observe — recovered_after_window safety guards', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockInngestTransport.clear();
   });
 
   // -------------------------------------------------------------------------
-  // Break test 1: Zod parse failure is captured to Sentry, function does NOT
-  // retry (step.run returns normally with { emitted: false, reason: 'parse_error' }).
-  //
-  // We simulate a parse failure by overriding the step to run the real body
-  // but passing a bad sessionId (non-UUID). filingResolvedEventSchema.parse()
-  // will throw a ZodError. The step body must catch it, call captureException,
-  // and return — not re-throw — so the function resolves normally.
+  // Break test 1a (NESTING REGRESSION GUARD): the re-read step must not nest a
+  // step.sendEvent inside its step.run callback. We model the real executor
+  // constraint by making step.sendEvent throw if it is ever invoked from
+  // within a step.run callback — exactly what Inngest does at runtime. On the
+  // fixed code the emit is hoisted to the top level so no nesting occurs and
+  // the function resolves normally; on the buggy (nested) code this throws.
   // -------------------------------------------------------------------------
-  it('[H-2] Zod parse failure inside emit-resolved-recovered-after-window step is captured, not re-thrown', async () => {
-    // We need to exercise the real step body with a schema that will fail.
-    // Use a bad profileId that bypasses the UUID check by mocking
-    // filingResolvedEventSchema.parse to throw. We do this by providing a
-    // stepRunOverrides entry that manually runs the parse-failure code path.
-    //
-    // Actual mechanism: override the step to simulate what happens when Zod
-    // throws, which verifies the try/catch container — the real function
-    // should handle it gracefully.
-    const zodError = new Error('ZodError: invalid_string at sessionId');
-
-    const { result } = await executeHandler(
-      {
+  it('[INNGEST-NESTED-STEP] does not invoke step.sendEvent from inside a step.run callback', async () => {
+    const runner = createInngestStepRunner({
+      runResults: {
         'mark-pending-and-claim-retry-slot': async () => null,
-        // Simulate the real step body returning from a parse failure:
-        // The step.run for emit-resolved-recovered-after-window catches the Zod
-        // error, calls captureException, and returns { emitted: false }.
-        // We verify captureException is called AND the function returns normally.
-        'emit-resolved-recovered-after-window': async () => {
-          // Simulate the parse throw being caught inside the step
-          try {
-            throw zodError;
-          } catch (err) {
-            // This mirrors the real try/catch in the step body
-            mockCaptureException(err as Error, {
-              profileId: PROFILE_ID,
-              extra: {
-                sessionId: SESSION_ID,
-                hint: 'filingResolvedEventSchema parse failed in recovered_after_window step',
-              },
-            });
-            return { emitted: false, reason: 'parse_error' };
-          }
-        },
       },
-      null,
-      undefined,
-      [], // markFailedRows = [] → CAS no-op → enters recovered_after_window branch
-    );
+    });
 
+    // Wrap the runner's step to detect nesting: set a flag for the duration of
+    // any step.run callback; if step.sendEvent fires while the flag is set the
+    // call is illegal (mirrors Inngest's "no step tools inside step.run").
+    let insideRun = false;
+    const guardedStep = {
+      run: async (name: string, cb: () => Promise<unknown>) => {
+        const prev = insideRun;
+        insideRun = true;
+        try {
+          return await runner.step.run(name, cb);
+        } finally {
+          insideRun = prev;
+        }
+      },
+      sendEvent: async (name: string, payload: unknown) => {
+        if (insideRun) {
+          throw new Error(
+            `Illegal nested step.sendEvent("${name}") inside a step.run callback`,
+          );
+        }
+        return runner.step.sendEvent(name, payload);
+      },
+      sleep: runner.step.sleep,
+      waitForEvent: runner.step.waitForEvent,
+    };
+
+    // Default db: findFirst returns filing_recovered on the re-read so the
+    // recovered_after_window emit path is exercised.
+    const mockUpdateChain = {
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockResolvedValue([]), // CAS no-op
+    };
+    const findFirstMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        filedAt: null,
+        filingStatus: 'filing_pending',
+        filingRetryCount: 0,
+        topicId: 'topic-001',
+        exchangeCount: 3,
+        updatedAt: new Date(),
+      })
+      .mockResolvedValueOnce({
+        filedAt: null,
+        filingStatus: 'filing_pending',
+        filingRetryCount: 0,
+        topicId: 'topic-001',
+        exchangeCount: 3,
+        updatedAt: new Date(),
+      })
+      .mockResolvedValue({ filingStatus: 'filing_recovered' });
+    const mockSelectWhere = jest.fn().mockResolvedValue([]);
+    const mockDb = {
+      query: {
+        learningSessions: { findFirst: findFirstMock },
+        sessionEvents: { findFirst: jest.fn().mockResolvedValue(null) },
+      },
+      update: jest.fn().mockReturnValue(mockUpdateChain),
+      select: jest
+        .fn()
+        .mockReturnValue({ from: () => ({ where: mockSelectWhere }) }),
+    };
+    mockGetStepDatabase.mockReturnValue(mockDb);
+
+    const handler = (filingTimedOutObserve as any).fn;
+    const result = await handler({ event: makeEvent(), step: guardedStep });
+
+    // No nesting error thrown → the function resolves normally.
     expect(result.resolution).toBe('recovered_after_window');
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      zodError,
-      expect.objectContaining({ profileId: PROFILE_ID }),
+
+    // The emit fired exactly once, at the top level (not nested).
+    const recoveredEmit = runner.sendEventCalls.filter(
+      (c) => c.name === 'emit-resolved-recovered-after-window',
     );
+    expect(recoveredEmit).toHaveLength(1);
+    expect(recoveredEmit[0]!.payload).toMatchObject({
+      name: 'app/session.filing_resolved',
+      data: expect.objectContaining({ resolution: 'recovered_after_window' }),
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Break test 1b: Zod parse failure at the hoisted emit is captured to Sentry
+  // and the function does NOT throw (resolves to recovered_after_window).
+  //
+  // The parse now runs at the function-body top level, after the data-only
+  // re-read step returns { shouldEmit: true }. We force the throw by spying on
+  // filingResolvedEventSchema.parse for the recovered_after_window payload.
+  // -------------------------------------------------------------------------
+  it('[H-2] Zod parse failure at the hoisted recovered_after_window emit is captured, not re-thrown', async () => {
+    const zodError = new Error('ZodError: invalid_string at sessionId');
+    const parseSpy = jest
+      .spyOn(filingResolvedEventSchema, 'parse')
+      .mockImplementation((input: unknown) => {
+        if (
+          (input as { resolution?: string })?.resolution ===
+          'recovered_after_window'
+        ) {
+          throw zodError;
+        }
+        return input as never;
+      });
+
+    try {
+      const { result, runner } = await executeHandler(
+        {
+          'mark-pending-and-claim-retry-slot': async () => null,
+        },
+        null,
+        undefined,
+        [], // markFailedRows = [] → CAS no-op → recovered_after_window branch
+        { filingStatus: 'filing_recovered' }, // re-read confirms recovered
+      );
+
+      // Function resolves normally — the parse throw is contained.
+      expect(result.resolution).toBe('recovered_after_window');
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        zodError,
+        expect.objectContaining({ profileId: PROFILE_ID }),
+      );
+      // No emit-resolved-recovered-after-window event should have been sent.
+      const recoveredEmit = runner.sendEventCalls.find(
+        (c) => c.name === 'emit-resolved-recovered-after-window',
+      );
+      expect(recoveredEmit).toBeUndefined();
+    } finally {
+      parseSpy.mockRestore();
+    }
   });
 
   // -------------------------------------------------------------------------

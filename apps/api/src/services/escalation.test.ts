@@ -315,6 +315,46 @@ describe('partial progress detection', () => {
     expect(decision.newRung).toBe(2);
   });
 
+  // Correctness-lens false-positive-escalation finding: conversational filler
+  // ("can you explain") inside a genuinely engaged answer must NOT be treated as
+  // stuck. The learner is making real progress; the ladder should hold.
+  it('does not treat an engaged answer containing "can you explain" as stuck', () => {
+    const decision = evaluateEscalation(
+      baseState,
+      "Can you explain why the mitochondria does X — I think it's because the membrane keeps the gradient up",
+    );
+
+    expect(decision.shouldEscalate).toBe(false);
+    expect(decision.newRung).toBe(1);
+    expect(decision.reason).toContain('Partial progress');
+  });
+
+  it('does not treat an engaged answer containing "help me" as stuck', () => {
+    const decision = evaluateEscalation(
+      baseState,
+      'Help me check my reasoning: the cell needs ATP so the mitochondria must be doing the work here',
+    );
+
+    expect(decision.shouldEscalate).toBe(false);
+    expect(decision.newRung).toBe(1);
+  });
+
+  // ...but a short message dominated by the filler phrase IS a stuck signal.
+  it('treats a short "help me" message as stuck', () => {
+    const decision = evaluateEscalation(baseState, 'help me');
+
+    expect(decision.shouldEscalate).toBe(true);
+    expect(decision.newRung).toBe(2);
+    expect(decision.reason).toContain('stuck');
+  });
+
+  it('treats a short "no idea" message as stuck', () => {
+    const decision = evaluateEscalation(baseState, 'no idea');
+
+    expect(decision.shouldEscalate).toBe(true);
+    expect(decision.newRung).toBe(2);
+  });
+
   it('escalates after MAX_PARTIAL_PROGRESS_HOLDS consecutive holds (cap)', () => {
     const state: EscalationState = {
       ...baseState,
