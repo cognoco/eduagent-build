@@ -50,10 +50,12 @@ export function NudgeBanner(): React.ReactElement | null {
           badge
             ? t('nudge.banner.bannerLabel', {
                 fromDisplayName: top.fromDisplayName,
+                message: t(`nudge.templates.${top.template}`),
                 count: nudges.length,
               })
             : t('nudge.banner.bannerLabelSingle', {
                 fromDisplayName: top.fromDisplayName,
+                message: t(`nudge.templates.${top.template}`),
               })
         }
         testID="nudge-banner"

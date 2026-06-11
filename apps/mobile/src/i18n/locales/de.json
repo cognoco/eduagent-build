@@ -2549,8 +2549,8 @@
       "title": "{{fromDisplayName}} hat dir einen Nudge gesendet",
       "unreadCount": "{{count}} neu",
       "modalTitle": "Neue Nudges",
-      "bannerLabel": "{{fromDisplayName}} hat dich angestupst, {{count}} neue",
-      "bannerLabelSingle": "{{fromDisplayName}} hat dich angestupst"
+      "bannerLabel": "{{fromDisplayName}} hat dich angestupst: {{message}}, {{count}} neu",
+      "bannerLabelSingle": "{{fromDisplayName}} hat dich angestupst: {{message}}"
     }
   },
   "practiceHub": {

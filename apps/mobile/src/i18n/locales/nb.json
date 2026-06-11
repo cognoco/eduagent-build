@@ -2549,8 +2549,8 @@
       "title": "{{fromDisplayName}} sendte deg en nudge",
       "unreadCount": "{{count}} nye",
       "modalTitle": "Nye nudger",
-      "bannerLabel": "{{fromDisplayName}} sendte deg et puff, {{count}} nye",
-      "bannerLabelSingle": "{{fromDisplayName}} sendte deg et puff"
+      "bannerLabel": "{{fromDisplayName}} sendte deg et dytt: {{message}}, {{count}} nye",
+      "bannerLabelSingle": "{{fromDisplayName}} sendte deg et dytt: {{message}}"
     }
   },
   "practiceHub": {

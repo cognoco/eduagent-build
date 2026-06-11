@@ -112,10 +112,23 @@ describe('NudgeBanner', () => {
     // Badge text is visually rendered but hidden from accessibility tree (F-058:
     // count is surfaced via the parent Pressable's accessibilityLabel instead).
     screen.getByText('2 new', { includeHiddenElements: true });
-    // Confirm the count is also in the accessible label.
-    expect(
-      screen.getByTestId('nudge-banner').props.accessibilityLabel,
-    ).toContain('2');
+    // The accessible label must carry BOTH the nudge message and the count —
+    // an explicit accessibilityLabel replaces the synthesized child-text label,
+    // so omitting the message would silence it for screen-reader users.
+    const label = screen.getByTestId('nudge-banner').props.accessibilityLabel;
+    expect(label).toContain('You got this');
+    expect(label).toContain('2');
+  });
+
+  it('accessible label carries the nudge message when only 1 unread nudge', () => {
+    mockUnreadNudgesData = [NUDGE_A];
+    mockActiveProfileConsentStatus = null;
+
+    render(<NudgeBanner />);
+
+    const label = screen.getByTestId('nudge-banner').props.accessibilityLabel;
+    expect(label).toContain('Dad');
+    expect(label).toContain('You got this');
   });
 
   it('does not show badge when exactly 1 unread nudge', () => {

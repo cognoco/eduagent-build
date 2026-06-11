@@ -348,8 +348,8 @@
       "title": "{{fromDisplayName}} wysłał(a) ci zachętę",
       "unreadCount": "{{count}} nowe",
       "modalTitle": "Nowe zachęty",
-      "bannerLabel": "{{fromDisplayName}} przesyła Ci zaczepkę, {{count}} nowych",
-      "bannerLabelSingle": "{{fromDisplayName}} przesyła Ci zaczepkę"
+      "bannerLabel": "Masz zaczepkę od {{fromDisplayName}}: {{message}}, {{count}} nowych",
+      "bannerLabelSingle": "Masz zaczepkę od {{fromDisplayName}}: {{message}}"
     }
   },
   "family": {

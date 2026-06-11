@@ -2549,8 +2549,8 @@
       "title": "{{fromDisplayName}}さんからナッジが届きました",
       "unreadCount": "{{count}}件の新着",
       "modalTitle": "新しいナッジ",
-      "bannerLabel": "{{fromDisplayName}}さんからつっつきが届きました（新着{{count}}件）",
-      "bannerLabelSingle": "{{fromDisplayName}}さんからつっつきが届きました"
+      "bannerLabel": "{{fromDisplayName}}さんからナッジ：「{{message}}」（新着{{count}}件）",
+      "bannerLabelSingle": "{{fromDisplayName}}さんからナッジ：「{{message}}」"
     }
   },
   "practiceHub": {

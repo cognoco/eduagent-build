@@ -2549,8 +2549,8 @@
       "title": "{{fromDisplayName}} te envio un nudge",
       "unreadCount": "{{count}} nuevos",
       "modalTitle": "Nuevos nudges",
-      "bannerLabel": "{{fromDisplayName}} te envió un toque, {{count}} nuevos",
-      "bannerLabelSingle": "{{fromDisplayName}} te envió un toque"
+      "bannerLabel": "{{fromDisplayName}} te ha enviado un toque: {{message}}, {{count}} nuevos",
+      "bannerLabelSingle": "{{fromDisplayName}} te ha enviado un toque: {{message}}"
     }
   },
   "practiceHub": {

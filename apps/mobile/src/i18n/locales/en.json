@@ -2679,8 +2679,8 @@
       "title": "{{fromDisplayName}} sent you a nudge",
       "unreadCount": "{{count}} new",
       "modalTitle": "New nudges",
-      "bannerLabel": "{{fromDisplayName}} sent you a nudge, {{count}} new",
-      "bannerLabelSingle": "{{fromDisplayName}} sent you a nudge"
+      "bannerLabel": "{{fromDisplayName}} sent you a nudge: {{message}}, {{count}} new",
+      "bannerLabelSingle": "{{fromDisplayName}} sent you a nudge: {{message}}"
     }
   },
   "learnerHomeTimeout": {
