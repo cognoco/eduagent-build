@@ -39,12 +39,18 @@ describe('[WI-581] policy-engine exchange-router wiring', () => {
     expect(picked.responseFormat).toBe('json');
   });
 
-  it.each(['gemini'] as const)(
+  // 'vertex' is in FALLBACK_FORBIDDEN but is not (yet) a member of the
+  // ModelConfig provider union — no production config can carry it today.
+  // The cast exercises the forward-looking ban entry so the FULL forbidden
+  // set is locked, not just its currently-constructible half (CodeRabbit
+  // PR-915).
+  it.each(['gemini', 'vertex'] as const)(
     'fail-closed: a banned vendor (%s) yields CircuitOpenError, never a silent serve',
     (provider) => {
       const config: ModelConfig = {
-        provider,
-        model: 'gemini-2.5-pro',
+        provider: provider as ModelConfig['provider'],
+        model:
+          provider === 'vertex' ? 'vertex-gemini-2.5-pro' : 'gemini-2.5-pro',
         maxTokens: 1024,
       };
       expect(() => pickThroughExchangeRouter(config)).toThrow(CircuitOpenError);
