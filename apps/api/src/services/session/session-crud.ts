@@ -1491,7 +1491,7 @@ export async function recordSystemPrompt(
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {
@@ -1511,7 +1511,7 @@ export async function recordSessionEvent(
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {
@@ -1532,7 +1532,7 @@ export async function flagContent(
   // Look up the session to get its subjectId
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {

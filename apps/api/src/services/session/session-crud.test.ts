@@ -1,8 +1,11 @@
 import {
   __sessionCrudTestHooks,
   buildTopicIntentMatcherMessages,
+  flagContent,
   matchTopicByIntent,
   projectAiResponseContent,
+  recordSessionEvent,
+  recordSystemPrompt,
   runTopicIntentMatcher,
   startFirstCurriculumSession,
   stripMarkdownFence,
@@ -19,6 +22,7 @@ import * as sentryModule from '../sentry';
 import {
   childSessionSchema,
   MAX_EXCHANGES_PER_SESSION,
+  NotFoundError,
 } from '@eduagent/schemas';
 import type { LearningSession } from '@eduagent/schemas';
 
@@ -1050,5 +1054,65 @@ describe('runTopicIntentMatcher — malformed LLM response logging (errors-api F
       { extra: { context: string } },
     ];
     expect(context?.extra?.context).toBe('session.topic_intent_matcher.parse');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-015] recordSystemPrompt / recordSessionEvent / flagContent —
+// typed NotFoundError for missing session
+//
+// Red-green evidence: before the fix, these functions threw a raw Error whose
+// message matched no typed branch in the global onError handler → 500 + Sentry.
+// After the fix, they throw NotFoundError → onError maps it to 404.
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal db stub: session lookup returns null (session not found).
+ *
+ * getSession → createScopedRepository(db, profileId).sessions.findFirst(...)
+ * → db.query.learningSessions.findFirst({ where }). That is the ONLY db
+ * surface these three functions touch before the !session guard, so the stub
+ * is wired narrowly to it. If getSession ever migrates to a different Drizzle
+ * query style (e.g. db.select()), this stub throws (method missing) and the
+ * test fails loudly instead of silently passing.
+ */
+function makeNullSessionDb() {
+  return {
+    query: {
+      learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
+    },
+  } as never;
+}
+
+describe('[F-015] recordSystemPrompt — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      recordSystemPrompt(db, 'prof-1', 'sess-missing', {
+        kind: 'silence_nudge',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[F-015] recordSessionEvent — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      recordSessionEvent(db, 'prof-1', 'sess-missing', {
+        eventType: 'quick_action',
+        content: 'too_easy',
+        metadata: { chip: 'too_easy' },
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[F-015] flagContent — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      flagContent(db, 'prof-1', 'sess-missing', { eventId: 'evt-1' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

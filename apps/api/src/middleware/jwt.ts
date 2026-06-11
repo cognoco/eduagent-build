@@ -121,7 +121,20 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
     throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`);
   }
 
-  const jwks = (await res.json()) as JWKS;
+  const body = (await res.json()) as unknown;
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !Array.isArray((body as Record<string, unknown>)['keys'])
+  ) {
+    // Error message deliberately contains 'JWKS' so auth.ts classifies this as
+    // an infra failure (→ 503 + Retry-After) rather than a token error (→ 401).
+    // Do NOT cache an invalid response.
+    throw new Error(
+      'JWKS response missing keys array — upstream returned a malformed 200',
+    );
+  }
+  const jwks = body as JWKS;
   jwksCacheByUrl.set(url, { keys: jwks.keys, fetchedAt: now });
   return jwks;
 }
@@ -148,7 +161,17 @@ async function fetchJWKSForced(url: string): Promise<JWKS> {
     if (!res.ok) {
       throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`);
     }
-    const jwks = (await res.json()) as JWKS;
+    const body = (await res.json()) as unknown;
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      !Array.isArray((body as Record<string, unknown>)['keys'])
+    ) {
+      throw new Error(
+        'JWKS response missing keys array — upstream returned a malformed 200',
+      );
+    }
+    const jwks = body as JWKS;
     jwksCacheByUrl.set(url, { keys: jwks.keys, fetchedAt: Date.now() });
     return jwks;
   })().finally(() => {
