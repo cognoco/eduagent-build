@@ -172,6 +172,11 @@ function collectRegisteredFunctionNames(): Set<string> {
 function walkFunctionFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...walkFunctionFiles(abs));
+      continue;
+    }
     if (!entry.isFile()) continue;
     if (!entry.name.endsWith('.ts')) continue;
     if (entry.name.endsWith('.test.ts')) continue;
@@ -179,7 +184,7 @@ function walkFunctionFiles(dir: string): string[] {
     if (entry.name.endsWith('.guard.test.ts')) continue;
     // Skip the test harness helper.
     if (entry.name === '_test-harness.ts') continue;
-    out.push(path.join(dir, entry.name));
+    out.push(abs);
   }
   return out;
 }
