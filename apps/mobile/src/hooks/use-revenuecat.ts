@@ -73,6 +73,7 @@ function getRcSyncedUserId(): string | null {
 /** Test-only: clear module-level identity-sync state between tests. */
 export function resetRevenueCatIdentitySyncForTests(): void {
   rcSyncedUserId = null;
+  rcSyncListeners.clear();
 }
 
 // ---------------------------------------------------------------------------

@@ -234,9 +234,11 @@ describe('useRevenueCatIdentity', () => {
     expect(Purchases.logIn).toHaveBeenCalled();
   });
 
-  it('escalates to Sentry when identity sync fails after all retries', async () => {
+  it('escalates to Sentry and keeps customerInfo gated off when identity sync fails after all retries', async () => {
     // [F-134] Terminal sync failure now gates useCustomerInfo off for the
-    // session — that must be queryable, not just a breadcrumb.
+    // session — that must be queryable, not just a breadcrumb. The gate
+    // HOLDING is the core security property: fail closed, never fetch under
+    // an identity the SDK has not confirmed.
     jest.useFakeTimers();
     try {
       (Purchases.logIn as jest.Mock).mockRejectedValue(
@@ -247,7 +249,13 @@ describe('useRevenueCatIdentity', () => {
         userId: 'clerk_user_123',
       });
 
-      renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
+      renderHook(
+        () => {
+          useRevenueCatIdentity();
+          return useCustomerInfo();
+        },
+        { wrapper: createWrapper() },
+      );
 
       // Initial attempt + 2 retries, 3s apart.
       await act(async () => {
@@ -259,6 +267,9 @@ describe('useRevenueCatIdentity', () => {
         expect.stringContaining('identity sync failed after retries'),
         'warning',
       );
+      // Fail-closed: identity never synced, so the customerInfo query must
+      // never have run — the SDK could still answer for another account.
+      expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
       // The persistent rejection above survives jest.clearAllMocks()
