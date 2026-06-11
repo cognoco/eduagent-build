@@ -216,6 +216,21 @@ productionization implication.
   otherwise the pressure of an autonomous loop will erode the gates one
   inconvenience at a time.
 
+- **2026-06-11 — bounce #4 on WI-583 introduced a new rejection CLASS:
+  evidence-form, not defect.** The reviewer verified everything substantive
+  (merged PR, green CI, focused suites, children aligned) but rejected because
+  the completion summary lacks red-green-REVERT proof for the F-124
+  regression, explicitly offering a human-ruling exit. The shepherd kept the
+  loop autonomous: executor produces the revert-proof in a throwaway worktree
+  and re-completes. Two lessons: (a) the DoD's evidence-form requirements must
+  be in the EXECUTOR's brief from the start — producing revert-proof at build
+  time costs minutes, producing it post-hoc costs a full bounce cycle;
+  (b) reviewer-offered "human ruling" exits are pressure valves the shepherd
+  should decline when the evidence is mechanically producible — rulings spend
+  operator attention and erode the DoD. WI-583's bounce tally: children gate,
+  unmerged PR + children, residual defect (valid), evidence form — four
+  different classes on one WI.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no

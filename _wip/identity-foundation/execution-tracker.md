@@ -158,15 +158,15 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **in-progress (PR open)** — PR #911 (head 3be2e68, CI running): reference-and-rehydrate for all 4 findings, shared scrubber in `packages/schemas/pii-scrub.ts` + Inngest middleware, break tests red-green. Incidental calibration-event leak captured as WI-620. Scrubber-home consolidation with WI-579's log summarizer deliberately deferred to WI-578 |
 | WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready (dispatch held)** — deps met; held until WI-577 merges (shared Inngest-function surface, conflict risk) |
 | WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **reviewing** — PR #902 merged (e6cb6170); `complete` fired, Fixed In 4619ade06, children pre-swept — awaiting reviewer |
-| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **in-progress (round 3)** — PR #900: round 2 made the gate boundary-year-conservative (Codex P1); round 3 moves `isUnambiguouslyAdult` into `@eduagent/schemas` (shared-contract rule) + fixes PR description. Eval-hook gate-gap captured as WI-619 (hit twice) |
+| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **in-progress (round 3 pushed)** — PR #900 head ad08b8c7f, CI running: `isUnambiguouslyAdult` promoted to `@eduagent/schemas` with divergence-pinning test, PR description corrected, cascade verified with schema cites. Eval-hook gate-gap = WI-619 (hit 3×) |
 | WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **in-progress** — executor dispatched 2026-06-11 (`wi581-executor`) immediately on WI-576's merge |
-| WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **merged** — PR #903 merged 2026-06-11 (6ca07824; round 2 APPROVED no issues). Children WI-612/613 pre-swept with Fixed In 03204b1d3; executor firing `complete` |
+| WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **reviewing** — PR #903 merged (6ca07824); `complete` fired, Fixed In 03204b1d3, children pre-swept — awaiting reviewer |
 
 ### W4 — billing + remaining (parallel track)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **reviewing (4th pass)** — PR #897 merged (e6e2af75e); `complete` fired, Fixed In 7bde68edd, children aligned — awaiting reviewer with all prior bounce grounds cleared. WI-618 captured from the sweep |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress (bounce 4: evidence round)** — reviewer verified code/PR/children but demands red-green-revert proof for F-124 (or human ruling). Shepherd chose the autonomous lane: executor producing revert-proof in a throwaway worktree, then re-`complete` with the evidence block. WI-618 captured from the sweep |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer (PR #874). First WI through the full loop with zero human touches |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
