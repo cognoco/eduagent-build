@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>three lanes live</b> — IF (W3 at 5/6, <b>G4 hangs on WI-578 alone</b>) · PRG-12 (shepherd live, WI-621/622 Ready) · <b>PRG-15 ACTIVATED</b> (WI-639/640/641 sliced, shepherd next) · PRG-11 scan done (scope ≈ intact) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>three lanes live, all shepherded</b> — IF (W3 at 5/6, <b>G4 hangs on WI-578 alone</b>) · PRG-12 (WI-621/622 Ready) · PRG-15 (shepherd live, WI-639/640/641) · PRG-11 scan done (scope ≈ intact) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
 </div>
 
 <nav>
@@ -708,7 +708,7 @@ const INIT = [
 
 { id:"PRG-15", name:"Error handling", accent:"var(--teal)", lane:"now", status:"active", q:"#5",
   tagline:"Silent catch blocks in billing & consent code, errors misclassified into wrong status codes. High value per finding.",
-  owner:"Agent-sweep; typed-error work reviewed", gate:"ACTIVATED 06-11 (same evening its gate fired) — tracker + Workstream + WI-639/640/641 sliced; shepherd session next.",
+  owner:"Agent-sweep; typed-error work reviewed", gate:"ACTIVATED 06-11 — shepherd LIVE (joining the shared reviewer watcher, then WI-639 to Ready).",
   outcome:"No silent failures in money/auth/consent paths; errors classified once, at the boundary; 8 findings closed.",
   bundles:[
     {n:"WI-639 · Catch-block hygiene", s:"4 findings", m:"agent", st:"go", note:"P1 — silent recovery in billing/consent/webhook code is a banned pattern, incl. a GDPR-adjacent rollback swallow."},

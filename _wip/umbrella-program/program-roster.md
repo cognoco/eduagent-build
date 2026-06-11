@@ -197,7 +197,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   **WI-639/640/641** (2 WPs + 1 Item, `Stage=Backlog`, order 1–3).
 - **Activated 2026-06-11** — third run of the §2.1 recipe, activated the same
   evening its gate fired; both charter open questions resolved/mooted by the
-  gate event. Shepherd session not yet spawned.
+  gate event. **Shepherd session SPAWNED 2026-06-11 (night)** — first task:
+  join the shared reviewer watcher (add workstream to the config array), then
+  refine WI-639 to Ready.
 - **Activate-when:** — (active)
 
 ---
