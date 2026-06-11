@@ -431,6 +431,73 @@ describe('authMiddleware', () => {
     });
   });
 
+  // [F-021] JWT trust-boundary validation — Zod schema enforces sub is present
+  // and a non-empty string. Without this, a malformed token that passes
+  // cryptographic verification but has no sub (or sub: null / sub: '') could
+  // slip through and produce an AuthUser with an empty userId.
+  //
+  // Red-green: without the clerkJWTClaimsSchema.safeParse() call, a payload
+  // with no sub would reach the `return { sub: claims.data.sub, ... }` block
+  // and produce `userId: undefined`, which would break every downstream guard.
+  describe('[F-021] JWT claims Zod validation', () => {
+    it('[BREAK F-021] returns 401 when JWT payload is missing sub', async () => {
+      // Token passes cryptographic verification but carries no sub
+      jwtMock.verifyJWT.mockResolvedValueOnce({
+        // sub intentionally absent
+        email: 'test@example.com',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer valid.jwt.token' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.code).toBe('UNAUTHORIZED');
+    });
+
+    it('[BREAK F-021] returns 401 when JWT sub is an empty string', async () => {
+      jwtMock.verifyJWT.mockResolvedValueOnce({
+        sub: '',
+        email: 'test@example.com',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer valid.jwt.token' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+    });
+
+    it('accepts a JWT with a valid sub and optional email', async () => {
+      jwtMock.verifyJWT.mockResolvedValueOnce({
+        sub: 'user_f021_test',
+        email: 'claims@test.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer valid.jwt.token' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.userId).toBe('user_f021_test');
+    });
+  });
+
   describe('valid token', () => {
     it('sets user context and proceeds to handler', async () => {
       jwtMock.verifyJWT.mockResolvedValueOnce({
