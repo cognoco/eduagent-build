@@ -1143,6 +1143,32 @@ export async function getLearningProfile(
   });
 }
 
+/**
+ * Reads the learner's current struggle topic names (JSONB order), capped at
+ * `max`. Malformed JSONB yields an empty list — callers on digest paths
+ * degrade gracefully rather than aborting the send.
+ *
+ * Shared by the weekly/monthly parent-digest steps, which rehydrate struggle
+ * topics from the DB at send time instead of round-tripping them through
+ * memoized Inngest step state.
+ */
+export async function listStruggleTopicNames(
+  db: Database,
+  profileId: string,
+  max: number,
+): Promise<string[]> {
+  const learningProfile = await db.query.learningProfiles.findFirst({
+    where: eq(learningProfiles.profileId, profileId),
+    columns: { struggles: true },
+  });
+  const rawStruggles = learningProfile?.struggles;
+  if (!Array.isArray(rawStruggles)) return [];
+  return (rawStruggles as Array<{ topic?: string }>)
+    .map((s) => s.topic)
+    .filter((t): t is string => typeof t === 'string' && t.length > 0)
+    .slice(0, max);
+}
+
 export function cleanCurrentlyWorkingOnLabel(topic: string): string {
   return topic
     .trim()

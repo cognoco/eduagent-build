@@ -16,7 +16,10 @@ import {
   getRecentNotificationCount,
   getWithdrawalArchivePreference,
 } from '../../services/settings';
-import { recordPendingNotice } from '../../services/notices';
+import {
+  getPendingNoticeChildName,
+  recordPendingNotice,
+} from '../../services/notices';
 
 /**
  * Scheduled consent revocation — 7-day grace period then cascade delete.
@@ -109,9 +112,14 @@ export const consentRevocation = inngest.createFunction(
       return { status: 'restored', childProfileId };
     }
 
+    // Minor-PII discipline: step returns are memoized into Inngest's
+    // third-party state store, so this carries an existence marker only —
+    // the display name and birth year are rehydrated from the DB inside the
+    // steps that consume them.
     const childProfile = await step.run('load-child-profile', async () => {
       const db = getStepDatabase();
-      return getProfileForConsentRevocation(db, childProfileId);
+      const profile = await getProfileForConsentRevocation(db, childProfileId);
+      return profile ? { found: true as const } : null;
     });
 
     if (!childProfile) {
@@ -129,7 +137,11 @@ export const consentRevocation = inngest.createFunction(
         db,
         ownerProfileId,
       );
-      const age = calculateAge(childProfile.birthYear);
+      // Rehydrated here instead of riding the load-child-profile step return.
+      // A vanished profile (deleted between steps) conservatively routes to
+      // the delete branch, where the consent-generation guard no-ops safely.
+      const profile = await getProfileForConsentRevocation(db, childProfileId);
+      const age = profile ? calculateAge(profile.birthYear) : null;
       return {
         ownerProfileId,
         preference,
@@ -137,7 +149,7 @@ export const consentRevocation = inngest.createFunction(
         // birthYear granularity, age 13 is treated conservatively as under
         // the COPPA boundary because the birthday may not have happened yet.
         action:
-          age <= 13 || preference === 'never'
+          age === null || age <= 13 || preference === 'never'
             ? ('delete' as const)
             : ('archive' as const),
       };
@@ -218,10 +230,13 @@ export const consentRevocation = inngest.createFunction(
         if (recentCount > 0) {
           return { sent: false, reason: 'dedup_24h' };
         }
+        // Rehydrated in-step: the archived profile row still exists.
+        const childName =
+          (await getProfileDisplayName(db, childProfileId)) ?? 'Your child';
         await sendPushNotification(db, {
           profileId: parentProfileId,
           title: 'Account archived',
-          body: `${childProfile.displayName}'s account is archived for 30 days, then deleted.`,
+          body: `${childName}'s account is archived for 30 days, then deleted.`,
           type: 'consent_archived',
         });
         return { sent: true };
@@ -229,10 +244,12 @@ export const consentRevocation = inngest.createFunction(
 
       await step.run('record-parent-archive-notice', async () => {
         const db = getStepDatabase();
+        const childName =
+          (await getProfileDisplayName(db, childProfileId)) ?? 'Your child';
         await recordPendingNotice(db, {
           ownerProfileId: archiveDecision.ownerProfileId,
           type: 'consent_archived',
-          childName: childProfile.displayName,
+          childName,
         });
       });
 
@@ -281,16 +298,50 @@ export const consentRevocation = inngest.createFunction(
     // the parent-chain account guard — same defence-in-depth as the archive
     // branch (BUG-662 / FCR-2026-05-23-L3.L3.3). The ownerProfileId was
     // resolved before deletion in `choose-final-action` and is safe to reuse.
+    //
+    // The pending delete notice is recorded in this step too: the child name
+    // must be captured BEFORE the row is gone, and it must reach later steps
+    // without riding memoized Inngest step state. The notice row (first-party
+    // DB) is that carrier — this step memoizes only the opaque notice id, and
+    // notify-parent rehydrates the name from it.
+    //
+    // [CR-2026-05-19-H19] Uses the ownerProfileId resolved in
+    // `choose-final-action` BEFORE deletion: after the delete, FK ON DELETE
+    // CASCADE has removed the child's `family_links` rows, so re-running
+    // getFamilyOwnerProfileId would fall back to the event-sender
+    // parentProfileId and could land the notice on the wrong account in
+    // multi-parent families.
     const deleteResult = await step.run('delete-child-profile', async () => {
       const db = getStepDatabase();
-      return deleteProfileIfConsentWithdrawn(
+      const childName =
+        (await getProfileDisplayName(db, childProfileId)) ?? 'Your child';
+      const deleted = await deleteProfileIfConsentWithdrawn(
         db,
         childProfileId,
         revocationRespondedAt,
         archiveDecision.ownerProfileId,
       );
+      if (!deleted) {
+        return { deleted: false as const, noticeId: null };
+      }
+      const noticeId = await recordPendingNotice(db, {
+        ownerProfileId: archiveDecision.ownerProfileId,
+        type: 'consent_deleted',
+        childName,
+      });
+      return { deleted: true as const, noticeId };
     });
-    if (!deleteResult) {
+    // Tolerate the pre-restructure memoized shape (a bare boolean) for runs
+    // that were in flight across the deploy — this function sleeps for days.
+    const deleted =
+      typeof deleteResult === 'object' && deleteResult !== null
+        ? deleteResult.deleted
+        : Boolean(deleteResult);
+    const deleteNoticeId =
+      typeof deleteResult === 'object' && deleteResult !== null
+        ? deleteResult.noticeId
+        : null;
+    if (!deleted) {
       return { status: 'restored', childProfileId };
     }
 
@@ -308,30 +359,19 @@ export const consentRevocation = inngest.createFunction(
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' };
       }
+      // The profile row is gone; rehydrate the name from the pending-notice
+      // row recorded in the delete step (opaque-id reference).
+      const childName = deleteNoticeId
+        ? ((await getPendingNoticeChildName(db, deleteNoticeId)) ??
+          'Your child')
+        : 'Your child';
       await sendPushNotification(db, {
         profileId: parentProfileId,
         title: 'Data deleted',
-        body: `${childProfile.displayName}'s account has been permanently deleted as requested.`,
+        body: `${childName}'s account has been permanently deleted as requested.`,
         type: 'consent_expired',
       });
       return { sent: true };
-    });
-
-    // [CR-2026-05-19-H19] Use the ownerProfileId resolved in `choose-final-action`
-    // BEFORE deletion. After `delete-child-profile` runs, `profiles` row is gone
-    // and FK ON DELETE CASCADE has already removed the child's `family_links`
-    // rows — so re-running getFamilyOwnerProfileId here would return zero rows
-    // and fall back to event-sender parentProfileId. In multi-parent families
-    // where the event-sender is NOT the account owner, that lands the delete
-    // notice on the wrong account. Mirror the archive branch which already uses
-    // the pre-deletion archiveDecision.ownerProfileId.
-    await step.run('record-parent-delete-notice', async () => {
-      const db = getStepDatabase();
-      await recordPendingNotice(db, {
-        ownerProfileId: archiveDecision.ownerProfileId,
-        type: 'consent_deleted',
-        childName: childProfile.displayName,
-      });
     });
 
     return { status: 'deleted', childProfileId };
