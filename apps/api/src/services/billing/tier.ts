@@ -243,9 +243,23 @@ export async function handleTierChange(
   // change and credit re-attribution are atomic.
   // See `reattributeTopUpCreditsOnModelChange` for the full rationale.
   let reattributedCount = 0;
-  const previousTierForMetric = sub.tier;
+  let previousTier: SubscriptionTier = sub.tier;
 
   await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    // [F-124 rework] Re-read the tier INSIDE the transaction so the
+    // tier-change detection and the credit re-attribution below are coherent
+    // with the row this transaction updates — a concurrent tier change for
+    // the same subscription cannot make the compare-and-reattribute act on a
+    // stale tier read before the transaction opened. Mirrors the same fix in
+    // updateSubscriptionAndQuotaFromRevenuecatWebhook (revenuecat.ts).
+    // safe-caller: Stripe webhook tier-change handler — subscriptionId from verified Stripe event
+    const current = await findSubscriptionById__unscoped(txDb, subscriptionId);
+    if (current) {
+      previousTier = current.tier;
+    }
+
     await tx
       .update(subscriptions)
       .set({
@@ -254,18 +268,15 @@ export async function handleTierChange(
       })
       .where(eq(subscriptions.id, subscriptionId));
 
-    await reconcileQuotaStateForSubscription(
-      tx as unknown as Database,
-      subscriptionId,
-      now,
-      { resetExpiredSharedPoolUsage: false },
-    );
+    await reconcileQuotaStateForSubscription(txDb, subscriptionId, now, {
+      resetExpiredSharedPoolUsage: false,
+    });
 
     reattributedCount = await reattributeTopUpCreditsOnModelChange(
-      tx as unknown as Database,
+      txDb,
       subscriptionId,
       sub.accountId,
-      previousTierForMetric,
+      previousTier,
       newTier,
     );
   });
@@ -276,7 +287,7 @@ export async function handleTierChange(
     await emitTopUpCreditsReattributedMetric({
       subscriptionId,
       accountId: sub.accountId,
-      previousTier: previousTierForMetric,
+      previousTier,
       newTier,
       reattributedCount,
       occurredAt: now,
@@ -284,7 +295,7 @@ export async function handleTierChange(
   }
 
   return {
-    previousTier: sub.tier,
+    previousTier,
     newTier,
     usedThisCycle,
     newMonthlyLimit,

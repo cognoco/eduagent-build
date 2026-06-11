@@ -749,3 +749,90 @@ describe('[F-124] RevenueCat webhook path re-attributes top-up credits', () => {
     expect(credits[0]!.profileId).toBe(owner.id); // attributed once, stable
   });
 });
+
+// ---------------------------------------------------------------------------
+// [F-124 rework] Stripe path (handleTierChange) — transaction-coherent
+// previous-tier read
+// ---------------------------------------------------------------------------
+//
+// Third review pass on WI-583: handleTierChange read the previous tier BEFORE
+// the transaction opened (tier.ts pre-fix), so a concurrent tier change could
+// make the compare-and-reattribute act on a stale tier — the same defect class
+// fixed on the RevenueCat path in PR #876. The fix re-reads the tier INSIDE
+// db.transaction. A deterministic concurrency interleaving is not controllable
+// through the Neon HTTP driver, so these tests pin the observable contract:
+// chained sequential tier changes must derive each step's previous tier from
+// the CURRENT row state, with credits tracking the quota model at every hop.
+
+describe('[F-124 rework] Stripe path chained tier changes stay transaction-coherent', () => {
+  it('family→plus→pro→plus: credits track the quota model at every hop, previousTier reflects current row state', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('stripe-tx-chained');
+    const owner = await seedProfile({
+      accountId: acct.id,
+      displayName: 'Owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscriptionWithQuota({
+      accountId: acct.id,
+      tier: 'family',
+    });
+    await seedTopUpCredit({
+      subscriptionId: sub.id,
+      profileId: null,
+      amount: 500,
+      remaining: 400,
+    });
+
+    // Hop 1: family (shared-pool) → plus (per-profile) — attribute to owner
+    const r1 = await handleTierChange(db, sub.id, 'plus');
+    expect(r1!.previousTier).toBe('family');
+    let credits = await loadTopUpCredits(sub.id);
+    expect(credits[0]!.profileId).toBe(owner.id);
+
+    // Hop 2: plus (per-profile) → pro (shared-pool) — nullify.
+    // previousTier MUST be 'plus' (the current row state written by hop 1),
+    // not any earlier snapshot.
+    const r2 = await handleTierChange(db, sub.id, 'pro');
+    expect(r2!.previousTier).toBe('plus');
+    credits = await loadTopUpCredits(sub.id);
+    expect(credits[0]!.profileId).toBeNull();
+
+    // Hop 3: pro (shared-pool) → plus (per-profile) — attribute again
+    const r3 = await handleTierChange(db, sub.id, 'plus');
+    expect(r3!.previousTier).toBe('pro');
+    credits = await loadTopUpCredits(sub.id);
+    expect(credits[0]!.profileId).toBe(owner.id);
+  });
+
+  it('repeated same-tier call after a model change is a no-op for credits (idempotent)', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('stripe-tx-idem');
+    const owner = await seedProfile({
+      accountId: acct.id,
+      displayName: 'Owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscriptionWithQuota({
+      accountId: acct.id,
+      tier: 'family',
+    });
+    await seedTopUpCredit({
+      subscriptionId: sub.id,
+      profileId: null,
+      amount: 500,
+      remaining: 100,
+    });
+
+    await handleTierChange(db, sub.id, 'plus');
+
+    // Second identical call: in-tx read sees tier already 'plus' →
+    // previousTier === newTier → model unchanged → no re-attribution work.
+    const second = await handleTierChange(db, sub.id, 'plus');
+    expect(second!.previousTier).toBe('plus');
+
+    const credits = await loadTopUpCredits(sub.id);
+    expect(credits.length).toBe(1);
+    expect(credits[0]!.profileId).toBe(owner.id); // attributed once, stable
+  });
+});
