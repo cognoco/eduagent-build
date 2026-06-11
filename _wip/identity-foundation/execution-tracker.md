@@ -109,6 +109,8 @@ tables/readers dropped, full project grep clean, tests green post-drop.
 | **Master plan** (THE source — units, deps §4, waves §5, decisions §7) | `_wip/identity-foundation/2026-06-09-phase-o-master-plan.md` @ `23d0c01ad` |
 | **Executor protocol** (standard process scaffold every executor brief points at) | `_wip/identity-foundation/executor-protocol.md` |
 | **Review-loop PoC observations** (shepherd↔reviewer loop meta-log → productionization) | `_wip/identity-foundation/review-loop-observations.md` |
+| **Review-loop mechanics inventory** (all moving parts + ephemerality map, for the productionization agent) | `_wip/identity-foundation/review-loop-mechanics.md` |
+| **Executor dispatch example** (verbatim WI-578 pointer-brief incl. amendments block) | `_wip/identity-foundation/executor-protocol-example.md` |
 | **N.1 sequencing skeleton** (five-wave model O decomposes) | `_wip/identity-foundation/2026-06-09-phase-n-sequencing.md` |
 | **Per-finding satellite** (one row per finding, 183) | `docs/audit/2026-05-29-full-audit/L-gap-delta.md` |
 | **Runway ROADMAP** (phases A–P, historical record) | `_wip/identity-foundation/ROADMAP.md` |
@@ -159,7 +161,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready (dispatch held)** — deps met; held until WI-577 merges (shared Inngest-function surface, conflict risk) |
 | WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #902). Zero bounces — children pre-swept at merge |
 | WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #900, 3 gate rounds). Eval-hook gate-gap = WI-619 (hit 3×) |
-| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **in-progress (round 2)** — PR #915 head 5029b0fc0, CI running: Codex P2 fixed with sibling-gated fail-closed projector (envelope vocabulary present → blank; marker-free historical JSON passes), both considers folded. Also fixed in-PR: jest.preset.js worktree-ignore infra bug |
+| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **merged** — PR #915 merged 2026-06-11 (7bf3bdb7b; 3 rounds: base + sibling-gated projector + conflict-resolve vs #911). Children WI-610/611 pre-swept with Fixed In fa8246c30; executor firing `complete` |
 | WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #903). Zero bounces — third consecutive clean close |
 
 ### W4 — billing + remaining (parallel track)
