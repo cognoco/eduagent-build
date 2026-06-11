@@ -732,6 +732,7 @@ export async function resendConsent(
     } catch (rollbackError) {
       // best-effort rollback — match the sibling catch blocks at :608 and :784
       logger.warn('[consent] Failed to rollback resend counter', {
+        event: 'consent.resend.rollback_failed',
         error:
           rollbackError instanceof Error
             ? rollbackError.message

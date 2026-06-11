@@ -1014,8 +1014,8 @@ describe('runTopicIntentMatcher — malformed LLM response logging (errors-api F
   const MALFORMED_RESPONSE = '{ unquoted_key: "value" }';
 
   beforeEach(() => {
-    // gc1-allow: LLM external boundary — routeAndCall makes real network calls;
-    // no LLM is available in tests; spy intercepts the network call only.
+    // LLM external boundary: routeAndCall makes real network calls; the spy
+    // prevents the call without replacing the module.
     routeAndCallSpy = jest.spyOn(llmModule, 'routeAndCall').mockResolvedValue({
       response: MALFORMED_RESPONSE,
       provider: 'test',
