@@ -62,6 +62,14 @@ productionization implication.
   *Production:* (1),(2) are mechanically checkable (a pre-complete script:
   checks-on-HEAD green + no `_plan-*` in diff); (4) is checkable (executor CWD
   assertion before first edit); only (3) genuinely needs a judgment gate.
+- **2026-06-11 — executors stall at the commit→PR seam (recurring, 2×).**
+  WI-575 and WI-576 both ended their turn right after `/commit` pushed the
+  branch — implementation done, no PR opened, no completion — and needed a
+  shepherd nudge to resume Phase 5. Likely cause: the commit skill runs as a
+  forked execution and its return reads like a natural stopping point.
+  *Production:* the protocol's phase chain needs an explicit "the turn does NOT
+  end at push" instruction, or the dispatch harness should auto-resume an
+  executor whose WI is still claimed but whose turn ended pre-`complete`.
 - **2026-06-11 — bounce protocol is undefined.** If the reviewer rejects, what
   Stage does it set (Ready? Executing?), who holds the claim, and where do the
   findings land (page comment? new child items?)? The shepherd currently plans
