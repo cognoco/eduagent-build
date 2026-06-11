@@ -1,5 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import Purchases from 'react-native-purchases';
@@ -231,6 +232,43 @@ describe('useRevenueCatIdentity', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(Purchases.logIn).toHaveBeenCalled();
+  });
+
+  it('escalates to Sentry when identity sync fails after all retries', async () => {
+    // [F-134] Terminal sync failure now gates useCustomerInfo off for the
+    // session — that must be queryable, not just a breadcrumb.
+    jest.useFakeTimers();
+    try {
+      (Purchases.logIn as jest.Mock).mockRejectedValue(
+        new Error('Network error'),
+      );
+      mockUseAuth.mockReturnValue({
+        isSignedIn: true,
+        userId: 'clerk_user_123',
+      });
+
+      renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
+
+      // Initial attempt + 2 retries, 3s apart.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(Purchases.logIn).toHaveBeenCalledTimes(3);
+      expect(Sentry.captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('identity sync failed after retries'),
+        'warning',
+      );
+    } finally {
+      jest.useRealTimers();
+      // The persistent rejection above survives jest.clearAllMocks()
+      // (implementations are kept) — restore the default so later
+      // describes that rely on a succeeding logIn are not polluted.
+      (Purchases.logIn as jest.Mock).mockResolvedValue({
+        customerInfo: { entitlements: { active: {} } },
+        created: false,
+      });
+    }
   });
 });
 

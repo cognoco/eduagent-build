@@ -148,6 +148,18 @@ export function useRevenueCatIdentity(): void {
         if (retryCountRef.current < MAX_RETRIES) {
           retryCountRef.current += 1;
           retryTimerRef.current = setTimeout(() => void syncIdentity(), 3000);
+        } else {
+          // [F-134] With the identity-sync gate in place, a terminal sync
+          // failure leaves useCustomerInfo disabled for the session
+          // (fail-closed: no RC snapshot beats another account's snapshot;
+          // the subscription screen falls back to the server tier, which is
+          // the access authority). Escalate beyond a breadcrumb so the
+          // failure rate is queryable — silent recovery without escalation
+          // is banned on billing paths.
+          Sentry.captureMessage(
+            '[revenuecat] identity sync failed after retries — customerInfo gated off',
+            'warning',
+          );
         }
       }
     };
