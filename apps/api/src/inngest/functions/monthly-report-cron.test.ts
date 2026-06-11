@@ -152,6 +152,14 @@ const mockDatabaseModule = createDatabaseModuleMock({
       email: col('email'),
     },
     familyLinks: familyLinksTableMock,
+    // listStruggleTopicNames (real implementation, exercised by the email
+    // step) goes through the real scoped repository; the scoped reads land
+    // on this mock db's query.learningProfiles.findFirst.
+    createScopedRepository: (
+      jest.requireActual('@eduagent/database') as {
+        createScopedRepository: unknown;
+      }
+    ).createScopedRepository,
   },
 });
 

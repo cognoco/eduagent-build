@@ -966,7 +966,7 @@ describe('weekly progress generate practice summary', () => {
     expect(prepared).toEqual(
       expect.objectContaining({
         status: 'prepared',
-        childProfileIds: [CHILD_ID_2],
+        childDigests: [expect.objectContaining({ childProfileId: CHILD_ID_2 })],
       }),
     );
     // Minor-PII: the memoized prepare return carries opaque ids only — the
@@ -987,7 +987,9 @@ describe('weekly progress generate practice summary', () => {
             status: 'prepared',
             parentId: PARENT_ID,
             reportWeek: '2026-05-11',
-            childProfileIds: [CHILD_ID],
+            childDigests: [
+              { childProfileId: CHILD_ID, snapshotDate: '2026-05-13' },
+            ],
             shouldSendPush: true,
             shouldSendEmail: true,
             hasParentEmail: true,
@@ -1016,7 +1018,9 @@ describe('weekly progress generate practice summary', () => {
             status: 'prepared',
             parentId: PARENT_ID,
             reportWeek: '2026-05-11',
-            childProfileIds: [CHILD_ID],
+            childDigests: [
+              { childProfileId: CHILD_ID, snapshotDate: '2026-05-13' },
+            ],
             shouldSendPush: true,
             shouldSendEmail: true,
             hasParentEmail: true,
@@ -1214,5 +1218,67 @@ describe('memoized step-state PII break test [F-085]', () => {
     expect(serialized).not.toContain('parent@example.com');
     expect(JSON.stringify(result)).not.toContain('Alex');
     expect(JSON.stringify(result)).not.toContain('parent@example.com');
+  });
+});
+
+// Send-step rebuilds must stay tied to the snapshot the prepare step used:
+// a delayed retry after a newer snapshot exists must not send future
+// activity under the original week's idempotency key (PR #933 review).
+describe('send-step rehydration is pinned to the prepare-time snapshot', () => {
+  it('re-pins a delayed retry to the memoized snapshotDate when a newer snapshot exists', async () => {
+    mockDb.query.profiles.findFirst.mockResolvedValue({
+      id: PARENT_ID,
+      displayName: 'Alex',
+    });
+    // "Now": a newer snapshot has landed since prepare ran.
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-20',
+      metrics: { ...CURRENT_METRICS, topicsMastered: 99 },
+    });
+    // Anchored lookups: the prepare-time snapshot and its previous week.
+    mockGetLatestSnapshotOnOrBefore.mockImplementation(
+      async (_db: unknown, _profileId: unknown, date: unknown) =>
+        date === '2026-05-13'
+          ? { snapshotDate: '2026-05-13', metrics: CURRENT_METRICS }
+          : { snapshotDate: '2026-05-06', metrics: PREVIOUS_METRICS },
+    );
+
+    const result = await executeGenerateSteps(
+      { parentId: PARENT_ID },
+      {
+        runResults: {
+          'prepare-weekly-progress-digest': {
+            status: 'prepared',
+            parentId: PARENT_ID,
+            reportWeek: '2026-05-11',
+            childDigests: [
+              { childProfileId: CHILD_ID, snapshotDate: '2026-05-13' },
+            ],
+            shouldSendPush: true,
+            shouldSendEmail: false,
+            hasParentEmail: false,
+          },
+        },
+      },
+    );
+
+    // The rebuild detected the mismatch and re-fetched at the anchor.
+    expect(mockGetLatestSnapshotOnOrBefore).toHaveBeenCalledWith(
+      expect.anything(),
+      CHILD_ID,
+      '2026-05-13',
+    );
+    // Content reflects the prepare-time snapshot, not the newer one.
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        type: 'weekly_progress',
+        body: expect.stringContaining('+1 topics'),
+      }),
+    );
+    expect(
+      (mockSendPushNotification.mock.calls[0]?.[1] as { body: string }).body,
+    ).not.toContain('+95');
+    expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
   });
 });

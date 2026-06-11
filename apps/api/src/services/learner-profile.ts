@@ -1144,9 +1144,11 @@ export async function getLearningProfile(
 }
 
 /**
- * Reads the learner's current struggle topic names (JSONB order), capped at
- * `max`. Malformed JSONB yields an empty list — callers on digest paths
- * degrade gracefully rather than aborting the send.
+ * Reads the learner's current struggle topic names (JSONB order, via the
+ * scoped repository), capped at `max`. Malformed JSONB — a non-array
+ * column, or array entries that are null/scalars/missing `topic` — yields
+ * an empty or partial list rather than throwing, so callers on digest paths
+ * degrade gracefully instead of aborting the send.
  *
  * Shared by the weekly/monthly parent-digest steps, which rehydrate struggle
  * topics from the DB at send time instead of round-tripping them through
@@ -1157,14 +1159,16 @@ export async function listStruggleTopicNames(
   profileId: string,
   max: number,
 ): Promise<string[]> {
-  const learningProfile = await db.query.learningProfiles.findFirst({
-    where: eq(learningProfiles.profileId, profileId),
-    columns: { struggles: true },
-  });
-  const rawStruggles = learningProfile?.struggles;
+  const scoped = createScopedRepository(db, profileId);
+  const learningProfile = await scoped.learningProfiles.findFirst();
+  const rawStruggles: unknown = learningProfile?.struggles;
   if (!Array.isArray(rawStruggles)) return [];
-  return (rawStruggles as Array<{ topic?: string }>)
-    .map((s) => s.topic)
+  return rawStruggles
+    .map((entry) =>
+      typeof entry === 'object' && entry !== null
+        ? (entry as { topic?: unknown }).topic
+        : undefined,
+    )
     .filter((t): t is string => typeof t === 'string' && t.length > 0)
     .slice(0, max);
 }

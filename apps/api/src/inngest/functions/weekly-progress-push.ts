@@ -85,15 +85,18 @@ const MAX_GENERATE_RETRY_ATTEMPTS = 3;
 
 // Minor-PII discipline: this shape is a memoized Inngest step return
 // (persisted in the third-party state store), so it carries opaque child
-// profile ids and booleans only. The digest content — child names, summary
-// lines, struggle topics, the parent email address — is rebuilt inside the
-// send steps via buildChildWeeklyDigestLine.
+// profile ids, snapshot-date anchors, and booleans only. The digest content
+// — child names, summary lines, struggle topics, the parent email address —
+// is rebuilt inside the send steps via buildChildWeeklyDigestLine. Each
+// child's snapshotDate pins the rebuild to the snapshot the prepare step
+// used, so a delayed send-step retry can never rehydrate a newer week's
+// data under the original week's idempotency key.
 type PreparedWeeklyProgressDigest =
   | {
       status: 'prepared';
       parentId: string;
       reportWeek: string;
-      childProfileIds: string[];
+      childDigests: Array<{ childProfileId: string; snapshotDate: string }>;
       shouldSendPush: boolean;
       shouldSendEmail: boolean;
       hasParentEmail: boolean;
@@ -248,6 +251,12 @@ interface ChildWeeklyDigestLine {
   summaryLine: string | null;
   struggleLine: ChildStruggleLine;
   hasStruggleTopics: boolean;
+  /**
+   * snapshotDate of the snapshot this line was computed from. The prepare
+   * step memoizes it (a date, not PII) so send-step rebuilds pin to the
+   * same snapshot.
+   */
+  snapshotDate: string;
 }
 
 /**
@@ -258,8 +267,10 @@ interface ChildWeeklyDigestLine {
  * eligibility and writes weeklyReports) and again from each send step
  * (persistReport: false — rehydrates the content). The recompute keeps the
  * child's name, summary text, and struggle topics out of memoized Inngest
- * step state; snapshots change at most daily, so back-to-back steps see the
- * same data.
+ * step state. Send-step rebuilds pass `snapshotOnOrBefore` (the
+ * snapshotDate the prepare step memoized): if a newer snapshot landed
+ * before a delayed retry, the rebuild re-pins to the prepare-time snapshot
+ * so the content stays tied to `reportWeek` and its idempotency key.
  *
  * Returns null when the child is consent-blocked, archived/missing, or has
  * no snapshot.
@@ -269,7 +280,7 @@ async function buildChildWeeklyDigestLine(
   parentId: string,
   childProfileId: string,
   reportWeekStart: string,
-  opts: { persistReport: boolean },
+  opts: { persistReport: boolean; snapshotOnOrBefore?: string },
 ): Promise<ChildWeeklyDigestLine | null> {
   if (!(await isGdprProcessingAllowed(db, childProfileId))) {
     return null;
@@ -281,7 +292,21 @@ async function buildChildWeeklyDigestLine(
   });
   if (!child) return null;
 
-  const latest = await getLatestSnapshot(db, childProfileId);
+  let latest = await getLatestSnapshot(db, childProfileId);
+  if (
+    opts.snapshotOnOrBefore &&
+    latest &&
+    latest.snapshotDate !== opts.snapshotOnOrBefore
+  ) {
+    // Delayed retry after a newer snapshot was written: re-pin to the
+    // snapshot the prepare step used so the digest content cannot drift
+    // past the report week.
+    latest = await getLatestSnapshotOnOrBefore(
+      db,
+      childProfileId,
+      opts.snapshotOnOrBefore,
+    );
+  }
   if (!latest) return null;
   const latestMetrics = await filterProgressMetricsToActiveSubjects(
     db,
@@ -408,6 +433,7 @@ async function buildChildWeeklyDigestLine(
     summaryLine,
     struggleLine: { childName: name, topics },
     hasStruggleTopics: topics.length > 0,
+    snapshotDate: latest.snapshotDate,
   };
 }
 
@@ -777,7 +803,10 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           // and memoizes the child ids (opaque references — the content is
           // rebuilt inside the send steps).
           let summaryLineCount = 0;
-          const childProfileIds: string[] = [];
+          const childDigests: Array<{
+            childProfileId: string;
+            snapshotDate: string;
+          }> = [];
           for (const link of links) {
             const line = await buildChildWeeklyDigestLine(
               db,
@@ -789,7 +818,10 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             if (!line) continue;
             if (line.summaryLine) summaryLineCount += 1;
             if (line.summaryLine || line.hasStruggleTopics) {
-              childProfileIds.push(link.childProfileId);
+              childDigests.push({
+                childProfileId: link.childProfileId,
+                snapshotDate: line.snapshotDate,
+              });
             }
           }
 
@@ -867,7 +899,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             status: 'prepared' as const,
             parentId,
             reportWeek,
-            childProfileIds,
+            childDigests,
             shouldSendPush,
             shouldSendEmail,
             hasParentEmail,
@@ -892,7 +924,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             if (!activeParent) {
               return { sent: false, reason: 'profile_archived' as const };
             }
-            for (const childProfileId of prepared.childProfileIds) {
+            for (const { childProfileId } of prepared.childDigests) {
               const activeChild = await db.query.profiles.findFirst({
                 where: and(
                   eq(profiles.id, childProfileId),
@@ -904,16 +936,19 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                 return { sent: false, reason: 'profile_archived' as const };
               }
             }
-            // Rebuild the digest lines in-step (rehydrate-by-reference): the
-            // prepare step memoized only the child ids.
+            // Rebuild the digest lines in-step (rehydrate-by-reference):
+            // the prepare step memoized only child ids + snapshot anchors.
             const childSummaries: string[] = [];
-            for (const childProfileId of prepared.childProfileIds) {
+            for (const digest of prepared.childDigests) {
               const line = await buildChildWeeklyDigestLine(
                 db,
                 parentId,
-                childProfileId,
+                digest.childProfileId,
                 prepared.reportWeek,
-                { persistReport: false },
+                {
+                  persistReport: false,
+                  snapshotOnOrBefore: digest.snapshotDate,
+                },
               );
               if (line?.summaryLine) childSummaries.push(line.summaryLine);
             }
@@ -949,7 +984,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             if (!activeParent) {
               return { sent: false, reason: 'profile_archived' as const };
             }
-            for (const childProfileId of prepared.childProfileIds) {
+            for (const { childProfileId } of prepared.childDigests) {
               const activeChild = await db.query.profiles.findFirst({
                 where: and(
                   eq(profiles.id, childProfileId),
@@ -976,13 +1011,16 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             // Rebuild the digest lines in-step (rehydrate-by-reference).
             const childSummaries: string[] = [];
             const struggleLines: ChildStruggleLine[] = [];
-            for (const childProfileId of prepared.childProfileIds) {
+            for (const digest of prepared.childDigests) {
               const line = await buildChildWeeklyDigestLine(
                 db,
                 parentId,
-                childProfileId,
+                digest.childProfileId,
                 prepared.reportWeek,
-                { persistReport: false },
+                {
+                  persistReport: false,
+                  snapshotOnOrBefore: digest.snapshotDate,
+                },
               );
               if (!line) continue;
               if (line.summaryLine) childSummaries.push(line.summaryLine);
