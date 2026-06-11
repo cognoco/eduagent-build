@@ -8,9 +8,10 @@ Codex review agents to run `cosmo:review`.
 
 - **Active watcher process:** `bun _wip/identity-foundation/review-watcher-v3.ts`
   running from `/Users/vetinari/nexus/_dev/eduagent-build`.
-- **Active process ID at last check:** Bun process `44983`.
+- **Active process ID at last check:** Bun process `54591`.
 - **Current scope:** one watcher covers `Identity Foundation`,
-  `L10n & A11y Mobile`, and `API Error Handling`.
+  `L10n & A11y Mobile`, `API Error Handling`, and
+  `Inngest Security & Correctness`.
 - **Trigger:** work item relation is in monitored Workstream and `Stage`
   transitions into `Reviewing`.
 - **Runner:** launches `codex -a never exec --ephemeral ...` with a generated
@@ -23,12 +24,13 @@ Codex review agents to run `cosmo:review`.
 
 - `_wip/identity-foundation/review-watcher-v3.ts`
   - Current monitor/launcher script.
-  - Monitors `Identity Foundation`, `L10n & A11y Mobile`, and
-    `API Error Handling`.
+  - Monitors `Identity Foundation`, `L10n & A11y Mobile`,
+    `API Error Handling`, and `Inngest Security & Correctness`.
   - Hardcoded workstream page ids:
     `37b8bce9-1f7c-81c2-bb42-cf7f47f839cc` and
     `37c8bce9-1f7c-8169-8ce1-ddcf36b470c9`, and
-    `37c8bce9-1f7c-817c-98ec-d1d4ba0a15e3`.
+    `37c8bce9-1f7c-817c-98ec-d1d4ba0a15e3`, and
+    `37c8bce9-1f7c-81d7-9377-e79356055ff3`.
   - Hardcoded Work Items DB id:
     `f170be9e04ae45d4961828f2438666bd`.
   - Hardcoded special override ids: `WI-585`, `WI-586`.
@@ -138,6 +140,11 @@ const workstreams = [
     id: "37c8bce9-1f7c-817c-98ec-d1d4ba0a15e3",
     overrides: new Map(),
   },
+  {
+    name: "Inngest Security & Correctness",
+    id: "37c8bce9-1f7c-81d7-9377-e79356055ff3",
+    overrides: new Map(),
+  },
 ];
 ```
 
@@ -150,7 +157,7 @@ It includes the workstream name in:
 - review-agent prompts
 - final JSON result once that exists
 
-There should be one watcher process for both workstreams.
+There should be one watcher process for all monitored workstreams.
 
 ## Useful commands
 
