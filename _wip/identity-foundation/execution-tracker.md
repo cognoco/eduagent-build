@@ -140,7 +140,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #855); children WI-591/592 bulk-closed with parent |
 | WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #860); children WI-594/595 bulk-closed by shepherd 2026-06-11 (the review missed them — mirrored the WI-570 pattern) |
 | WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #859); children WI-596/597 closed with parent. No SCC-reintroduction guard test (consider during W2) |
-| WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **in-progress** — executor dispatched 2026-06-11 (`wi573-executor`, parallel with WI-574) |
+| WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **review** — Stage=Reviewing 2026-06-11, PR #867 MERGED 08:32Z (shepherd-verified: 6/6 green; guard triangle complete — registration-sync + pre-existing orphan-dispatcher/orphan-handler cover F-005's AC; recursion fix verified in code); awaiting `/cosmo:review` |
 
 ### W2 — identity / consent / proxy / age (critical path)
 
@@ -192,8 +192,11 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   Known limitation dispositioned: `person.loginId` FK undeclared in TS (Drizzle
   circular-type issue), constraint live from 0108 SQL, JSDoc'd. Awaiting
   `/cosmo:review`.
-- **WI-571 ∥ WI-572 dispatched 2026-06-11** (parallel executors, own worktrees,
-  sibling-surface notices exchanged). WI-573 queued behind WI-571.
+- **G3 TRIPPED 2026-06-11 08:32 UTC — W1 LANDED.** All four W1 units merged to
+  main: WI-570 (#855), WI-571 (#860), WI-572 (#859) all Closed via review;
+  WI-573 (#867) at Reviewing. G2 tripped earlier same day (WI-569 Closed).
+- **In flight: WI-574** (scope-rls, first W2 unit). WI-575/576 dispatch when it
+  lands (their other dep WI-572 is Closed).
 - **W2 fully pre-bridged 2026-06-11** — WI-574/575/576 Ready+Assisted (children
   WI-598…603). Dispatch order when W1 lands: WI-574 first (deps 570 ✓ + 571),
   then WI-575 ∥ WI-576 (deps 572 + 574). Next shepherd idle-time task: W3
