@@ -146,9 +146,9 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **in-progress** — executor dispatched 2026-06-11 (`wi574-executor`, parallel with WI-573; W2 entry under way) |
-| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-600/601) |
-| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-602/603) |
+| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **review** — Stage=Reviewing 2026-06-11, PR #875 MERGED 09:09Z (shepherd-verified: 6/6 green, 0 threads, 6 red-green break-tests); awaiting `/cosmo:review` |
+| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi575-executor`) |
+| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi576-executor`) |
 
 ### W3 — PII-handling + envelope/router (critical path)
 
@@ -196,8 +196,9 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   merged and Closed via review: WI-570 (#855), WI-571 (#860), WI-572 (#859),
   WI-573 (#867). G2 tripped earlier same day (WI-569 Closed). No review
   backlog remains.
-- **In flight: WI-574** (scope-rls, first W2 unit). WI-575/576 dispatch when it
-  lands (their other dep WI-572 is Closed).
+- **In flight (4 executors): WI-575 ∥ WI-576 (W2 tail) ∥ WI-583 ∥ WI-584 (W4).**
+  WI-574 merged (#875) and at Reviewing. After 575/576 land → W3 dispatches
+  (577/578/579/580/582 on 574; 581 also needs 576).
 - **W3 + W4 fully pre-bridged 2026-06-11** — WI-577…584 all Ready+Assisted
   (children WI-604…615). **W4 dispatched immediately** (deps Closed):
   wi583-executor + wi584-executor running parallel to WI-574 — three concurrent
