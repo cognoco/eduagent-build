@@ -799,7 +799,7 @@ function SubscriptionContent(): React.ReactElement | null {
 
           {/* Current plan */}
           <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-4">
-            Current plan
+            {t('subscription.currentPlan')}
           </Text>
           <View
             className="bg-surface rounded-card px-4 py-3.5"
@@ -812,19 +812,19 @@ function SubscriptionContent(): React.ReactElement | null {
               <View className="bg-primary-soft rounded-full px-2.5 py-1">
                 <Text className="text-caption font-semibold text-primary capitalize">
                   {cancelAtPeriodEnd
-                    ? 'Cancelling'
+                    ? t('subscription.statusBadge.cancelling')
                     : status === 'past_due'
-                      ? 'Past due'
+                      ? t('subscription.statusBadge.pastDue')
                       : status === 'expired'
-                        ? 'Expired'
+                        ? t('subscription.statusBadge.expired')
                         : status === 'trial'
                           ? t('subscription.statusBadge.trial')
                           : status === 'active'
-                            ? 'Active'
+                            ? t('subscription.statusBadge.active')
                             : // Don't show a green "Active" badge for unknown
                               // statuses (paused, incomplete, etc.) — surface the
                               // raw status so it's never misrepresented as healthy.
-                              (status ?? 'Unknown')}
+                              (status ?? t('subscription.statusBadge.unknown'))}
                 </Text>
               </View>
             </View>
@@ -892,7 +892,7 @@ function SubscriptionContent(): React.ReactElement | null {
                   accessibilityRole="button"
                 >
                   <Text className="text-body font-semibold text-text-inverse">
-                    Upgrade
+                    {t('subscription.upgrade')}
                   </Text>
                 </Pressable>
               ))}
@@ -902,16 +902,18 @@ function SubscriptionContent(): React.ReactElement | null {
           {cancelAtPeriodEnd && subscription?.currentPeriodEnd && (
             <View className="bg-warning-soft rounded-card px-4 py-3 mt-2">
               <Text className="text-body-sm font-semibold text-warning">
-                Subscription ending
+                {t('subscription.endingTitle')}
               </Text>
               <Text className="text-caption text-text-secondary mt-0.5">
-                Your subscription has been cancelled. You can continue using all
-                features until{' '}
-                {new Date(subscription.currentPeriodEnd).toLocaleDateString(
-                  undefined,
-                  { year: 'numeric', month: 'long', day: 'numeric' },
-                )}
-                . After that, your account will revert to the Free tier.
+                {t('subscription.endingBody', {
+                  date: new Date(
+                    subscription.currentPeriodEnd,
+                  ).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  }),
+                })}
               </Text>
             </View>
           )}
@@ -928,16 +930,19 @@ function SubscriptionContent(): React.ReactElement | null {
           {familySubscription && (
             <View className="mt-4" testID="family-pool-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-                Family pool
+                {t('subscription.familyPool')}
               </Text>
               <View className="bg-surface rounded-card px-4 py-3.5">
                 <Text className="text-body font-semibold text-text-primary">
-                  {familySubscription.profileCount} of{' '}
-                  {familySubscription.maxProfiles} profiles connected
+                  {t('subscription.profilesConnected', {
+                    count: familySubscription.profileCount,
+                    max: familySubscription.maxProfiles,
+                  })}
                 </Text>
                 <Text className="text-caption text-text-secondary mt-1">
-                  {familySubscription.remainingQuestions} shared questions left
-                  this cycle.
+                  {t('subscription.sharedQuestionsLeft', {
+                    count: familySubscription.remainingQuestions,
+                  })}
                 </Text>
                 <View className="mt-3">
                   {familySubscription.members.map((member) => (
@@ -967,8 +972,8 @@ function SubscriptionContent(): React.ReactElement | null {
                         >
                           <Text className="text-caption font-semibold text-danger">
                             {removeFamilyProfile.isPending
-                              ? 'Removing...'
-                              : 'Remove'}
+                              ? t('subscription.removingMember')
+                              : t('subscription.removeMember')}
                           </Text>
                         </Pressable>
                       ) : null}
@@ -988,7 +993,7 @@ function SubscriptionContent(): React.ReactElement | null {
               }}
             >
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-                Plans
+                {t('subscription.plans')}
               </Text>
               {subscriptionPackages.map((pkg) => {
                 // Check if this package matches the user's active entitlement
@@ -1019,7 +1024,7 @@ function SubscriptionContent(): React.ReactElement | null {
                     accessibilityLabel={t('common.loading')}
                   />
                   <Text className="text-body font-semibold text-primary ml-2">
-                    Confirming purchase…
+                    {t('subscription.confirmingPurchase')}
                   </Text>
                 </View>
               )}
@@ -1035,7 +1040,7 @@ function SubscriptionContent(): React.ReactElement | null {
               }}
             >
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-                Plans
+                {t('subscription.plans')}
               </Text>
               <View className="bg-surface rounded-card px-4 py-3.5 mb-3">
                 <Text className="text-body-sm text-text-secondary">
@@ -1172,7 +1177,7 @@ function SubscriptionContent(): React.ReactElement | null {
                   testID="restore-polling-cancel"
                 >
                   <Text className="text-body-sm text-primary font-semibold">
-                    Check later
+                    {t('subscription.checkLater')}
                   </Text>
                 </Pressable>
               )}
@@ -1183,7 +1188,7 @@ function SubscriptionContent(): React.ReactElement | null {
           {isPaidTier && (
             <View className="mt-6" testID="top-up-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-                Need more questions?
+                {t('subscription.needMoreQuestions')}
               </Text>
               <Pressable
                 onPress={handleTopUp}
@@ -1202,16 +1207,18 @@ function SubscriptionContent(): React.ReactElement | null {
                       accessibilityLabel={t('common.loading')}
                     />
                     <Text className="text-body font-semibold text-primary ml-2">
-                      {topUpPolling ? pollMessage : 'Opening store...'}
+                      {topUpPolling
+                        ? pollMessage
+                        : t('subscription.openingStore')}
                     </Text>
                   </View>
                 ) : (
                   <>
                     <Text className="text-body font-semibold text-primary">
-                      Buy 500 credits
+                      {t('subscription.buyCredits')}
                     </Text>
                     <Text className="text-caption text-text-secondary mt-0.5">
-                      One-time purchase. Credits expire in 12 months.
+                      {t('subscription.topUpHint')}
                     </Text>
                   </>
                 )}
@@ -1232,7 +1239,7 @@ function SubscriptionContent(): React.ReactElement | null {
                   testID="top-up-polling-cancel"
                 >
                   <Text className="text-body-sm text-primary font-semibold">
-                    Check later
+                    {t('subscription.checkLater')}
                   </Text>
                 </Pressable>
               )}
@@ -1247,7 +1254,7 @@ function SubscriptionContent(): React.ReactElement | null {
           {canManageBilling && (
             <View className="mt-6" testID="manage-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-                Manage
+                {t('subscription.manage')}
               </Text>
               {/* [BUG-916] Web has no native store deep link — RevenueCat IAP
                   runs on iOS/Android only, Stripe is dormant for web. Render a
@@ -1259,10 +1266,10 @@ function SubscriptionContent(): React.ReactElement | null {
                   testID="manage-billing-web-info"
                 >
                   <Text className="text-body text-text-primary">
-                    Manage billing
+                    {t('subscription.manageBilling')}
                   </Text>
                   <Text className="text-caption text-text-secondary mt-0.5">
-                    Subscription is managed on your mobile device
+                    {t('subscription.manageBillingWebHint')}
                   </Text>
                 </View>
               ) : (
@@ -1274,12 +1281,12 @@ function SubscriptionContent(): React.ReactElement | null {
                   testID="manage-billing-button"
                 >
                   <Text className="text-body text-text-primary">
-                    Manage billing
+                    {t('subscription.manageBilling')}
                   </Text>
                   <Text className="text-caption text-text-secondary mt-0.5">
                     {Platform.OS === 'ios'
-                      ? 'Opens App Store subscriptions'
-                      : 'Opens Google Play subscriptions'}
+                      ? t('subscription.opensAppStore')
+                      : t('subscription.opensGooglePlay')}
                   </Text>
                 </Pressable>
               )}

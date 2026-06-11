@@ -63,7 +63,9 @@ export function CoachBand({
         </Pressable>
         {estimatedMinutes != null && (
           <Text className="text-[11px] text-text-secondary">
-            {estimatedMinutes} min
+            {t('home.coachBand.estimatedMinutes', {
+              minutes: estimatedMinutes,
+            })}
           </Text>
         )}
       </View>

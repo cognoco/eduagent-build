@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
@@ -49,6 +50,7 @@ export function SaveWizardGate({
     child?: Profile;
   } | null>(null);
   const signupCompletionTrackedRef = React.useRef(false);
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   const handleCancel = React.useCallback(() => {
@@ -141,13 +143,13 @@ export function SaveWizardGate({
         </Pressable>
       </View>
       <Text className="text-h1 font-bold text-text-primary mb-2">
-        Great, let&apos;s save this and get you started.
+        {t('saveWizard.title')}
       </Text>
 
       {step === 1 && (
         <View>
           <Text className="text-body text-text-secondary mb-6">
-            Where should we save this?
+            {t('saveWizard.whereSave')}
           </Text>
           {SAVE_TARGETS.map((opt) => {
             const selected = target === opt.target;
@@ -175,7 +177,7 @@ export function SaveWizardGate({
             accessibilityState={{ disabled: !target }}
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Continue
+              {t('common.continue')}
             </Text>
           </Pressable>
         </View>

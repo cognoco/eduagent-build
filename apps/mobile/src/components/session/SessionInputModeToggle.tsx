@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
 import type { InputMode } from '@eduagent/schemas';
@@ -17,6 +18,7 @@ export function SessionInputModeToggle({
   mode,
   onModeChange,
 }: SessionInputModeToggleProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   return (
@@ -51,7 +53,7 @@ export function SessionInputModeToggle({
             mode === 'text' ? 'text-text-inverse' : 'text-text-secondary'
           }`}
         >
-          Text
+          {t('session.inputModeToggle.text')}
         </Text>
       </Pressable>
 
@@ -82,7 +84,7 @@ export function SessionInputModeToggle({
             mode === 'voice' ? 'text-text-inverse' : 'text-text-secondary'
           }`}
         >
-          Voice
+          {t('session.inputModeToggle.voice')}
         </Text>
       </Pressable>
     </View>

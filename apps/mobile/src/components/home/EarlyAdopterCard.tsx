@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from '../../lib/secure-storage';
 import { useProfile } from '../../lib/profile';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useFeedbackContext } from '../feedback/FeedbackProvider';
 
@@ -20,6 +21,7 @@ export function EarlyAdopterCard({
 }: EarlyAdopterCardProps): React.ReactElement | null {
   const { activeProfile } = useProfile();
   const { openFeedback } = useFeedbackContext();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
@@ -82,7 +84,7 @@ export function EarlyAdopterCard({
           />
         </View>
         <Text className="text-body-sm font-semibold text-text-primary ms-2 flex-1">
-          Early user — your feedback shapes MentoMate
+          {t('home.earlyAdopter.badge')}
         </Text>
         <Ionicons name="chevron-forward" size={16} color={colors.primary} />
       </Pressable>

@@ -206,7 +206,9 @@ export function ProfileBasicsStep({
       {needsOwner && (
         <View className="mb-6">
           <Text className="text-h3 font-semibold text-text-primary mb-3">
-            {target === 'self' ? 'Tell us about you' : 'About you (the parent)'}
+            {target === 'self'
+              ? t('saveWizard.aboutYouSelf')
+              : t('saveWizard.aboutYouParent')}
           </Text>
           <TextInput
             placeholder="Your name"
@@ -238,7 +240,7 @@ export function ProfileBasicsStep({
       {needsChild && (
         <View className="mb-6">
           <Text className="text-h3 font-semibold text-text-primary mb-3">
-            About your child
+            {t('saveWizard.aboutChild')}
           </Text>
           <TextInput
             placeholder="Their name or nickname"
@@ -271,9 +273,7 @@ export function ProfileBasicsStep({
           accessibilityLiveRegion="polite"
         >
           <Text className="text-warning text-body-sm">
-            To set up a child&apos;s learning, the account holder must be 18 or
-            older. You can still set up your own learning instead — pick
-            &quot;My learning&quot; on the previous step.
+            {t('saveWizard.ageGate')}
           </Text>
         </View>
       )}
@@ -291,15 +291,16 @@ export function ProfileBasicsStep({
           testID="save-basics-child-error"
         >
           <Text className="text-danger text-body-sm mb-2">
-            We saved your account, but couldn&apos;t add your child yet:{' '}
-            {childError}
+            {t('saveWizard.childSaveError', { error: childError })}
           </Text>
           <Pressable
             onPress={() => void submit()}
             testID="save-basics-retry-child"
             accessibilityRole="button"
           >
-            <Text className="text-primary font-semibold">Retry</Text>
+            <Text className="text-primary font-semibold">
+              {t('common.retry')}
+            </Text>
           </Pressable>
         </View>
       )}
@@ -319,7 +320,7 @@ export function ProfileBasicsStep({
           />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
-            Continue
+            {t('common.continue')}
           </Text>
         )}
       </Pressable>
