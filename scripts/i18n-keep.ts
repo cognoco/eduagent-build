@@ -253,9 +253,9 @@ const raw: readonly KeepPattern[] = [
   {
     pattern: 'sessionSummary.takeaways.*',
     reason:
-      'i18next plural suffixes (_one/_other) appended at runtime by ' +
-      "buildSessionTakeaways() via t('sessionSummary.takeaways.duration', { count }) " +
-      'at apps/mobile/src/app/session-summary/_view-models/session-summary-derived.ts:123',
+      'keys reached through the t function passed as a parameter (args.t), ' +
+      "invisible to the orphan walker: args.t('sessionSummary.takeaways.duration', { count }) " +
+      'at apps/mobile/src/app/session-summary/_view-models/session-summary-derived.ts:127',
   },
   {
     pattern: 'session.messageBubble.escalation.*',

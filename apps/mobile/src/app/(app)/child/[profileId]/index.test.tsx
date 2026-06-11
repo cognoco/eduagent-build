@@ -438,8 +438,12 @@ describe('ChildDetailScreen — profile overview', () => {
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
-      // Key-passthrough mock: t('parentView.index.timeAgo.hours', { count: 2 }) → 'parentView.index.timeAgo.hours:{"count":2}'
-      result.getByText(/2 hours ago|parentView\.index\.timeAgo\.hours/);
+      // Key-passthrough mock: formatLastSession renders
+      // t('parentView.index.timeAgo.hours', { count: 2 }) nested inside the
+      // lastSessionAgo wrapper as 'parentView.index.timeAgo.hours:{\"count\":2}'
+      // — asserting the exact form verifies both the plural key and the
+      // computed count (quotes are escaped by the outer JSON.stringify).
+      result.getByText(/parentView\.index\.timeAgo\.hours:\{\\?"count\\?":2\}/);
     });
 
     cleanup();
