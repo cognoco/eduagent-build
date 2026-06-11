@@ -88,4 +88,21 @@ describe('isSubstantiveCalibrationAnswer', () => {
       ),
     ).toBe(true);
   });
+
+  it('[F-161] still rejects ?-suffixed non-answers (normalizeAnswer retains the ? character)', () => {
+    // normalizeAnswer keeps '?' (the standalone '?' token must stay matchable),
+    // so a trailing '?' sits directly against the token. The word-boundary
+    // guard must treat '?' as a boundary, or these common chat-style
+    // non-answers slip through as "substantive".
+    expect(
+      isSubstantiveCalibrationAnswer(
+        'idk? something with water and light i think',
+      ),
+    ).toBe(false);
+    expect(
+      isSubstantiveCalibrationAnswer(
+        "i don't know? it has to do with plants and sunlight",
+      ),
+    ).toBe(false);
+  });
 });

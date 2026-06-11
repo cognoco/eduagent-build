@@ -84,8 +84,11 @@ function matchesNonAnswerPhrase(normalized: string, token: string): boolean {
   // Latin/Cyrillic/etc.: whole-word/phrase guard. The token must be flanked by
   // string boundaries or whitespace so short tokens like 'nah' don't match
   // inside words like 'nahe', and 'nada' doesn't match inside 'granada'.
+  // `?` is also a boundary: normalizeAnswer retains it (the standalone '?'
+  // token must stay matchable), so ?-suffixed non-answers like 'idk?' would
+  // otherwise slip past the whitespace-only boundary check.
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`).test(normalized);
+  return new RegExp(`(?:^|[\\s?])${escaped}(?:[\\s?]|$)`).test(normalized);
 }
 
 export function isSubstantiveCalibrationAnswer(
