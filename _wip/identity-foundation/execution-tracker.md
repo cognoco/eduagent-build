@@ -166,7 +166,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **reviewing (5th pass)** — red-green-revert proof produced (RED: 10/20 fail with exact F-124 symptom via choke-point neutralization; GREEN on restore) and recorded in the completion summary; re-`complete` with Fixed In pinned at 7bde68edd. WI-618 captured from the sweep |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **done** — Closed/Done 2026-06-11 on the 5th review pass (PRs #876 + #897). 4 bounces, 4 distinct classes (children gate, unmerged PR, residual defect, evidence form); ended with FOR UPDATE serialization both paths + full red-green-revert proof. W4 complete. WI-618 captured from the sweep |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer (PR #874). First WI through the full loop with zero human touches |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
