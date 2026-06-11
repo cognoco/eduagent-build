@@ -371,16 +371,27 @@ describe('[WI-368] weekly progress push GDPR consent helper consolidation', () =
   });
 
   it('uses isGdprProcessingAllowed instead of an inline GDPR consent query', () => {
-    const source = readFileSync(
+    // The per-child consent gate lives in the digest-line builder, which the
+    // should-fix on PR #933 moved to services/weekly-digest.ts; scan both the
+    // Inngest function file and the builder module.
+    const functionSource = readFileSync(
       join(__dirname, 'weekly-progress-push.ts'),
       'utf8',
     );
+    const digestSource = readFileSync(
+      join(__dirname, '..', '..', 'services', 'weekly-digest.ts'),
+      'utf8',
+    );
 
-    expect(source).toContain("from '../../services/consent'");
-    expect(source).toContain('isGdprProcessingAllowed(db, childProfileId)');
-    expect(source).not.toContain('db.query.consentStates.findFirst');
-    expect(source).not.toContain("eq(consentStates.consentType, 'GDPR')");
-    expect(source).not.toContain("status !== 'CONSENTED'");
+    expect(digestSource).toContain("from './consent'");
+    expect(digestSource).toContain(
+      'isGdprProcessingAllowed(db, childProfileId)',
+    );
+    for (const source of [functionSource, digestSource]) {
+      expect(source).not.toContain('db.query.consentStates.findFirst');
+      expect(source).not.toContain("eq(consentStates.consentType, 'GDPR')");
+      expect(source).not.toContain("status !== 'CONSENTED'");
+    }
   });
 
   it.each([
