@@ -1,7 +1,7 @@
 # Identity Foundation — Execution Tracker
 
 **Stream:** identity-foundation (umbrella roster **PRG-01**) · **Activity:** clean-cut execution (waves W0–W4 + tail)
-**Last updated:** 2026-06-10 (W1 execution start — shepherd session) · **Owner:** Jorn (+ runway session agents)
+**Last updated:** 2026-06-11 (WI-578 dispatched, PR #933 open) · **Owner:** Jorn (+ runway session agents)
 
 > **This is the durable entry point for this activity.** Point a fresh session here:
 > it should be enough to know *what this is*, *where the detail lives*, and *where to
@@ -158,7 +158,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #911, 2 gate rounds). WI-620 captured (calibration leak) |
-| WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready (dispatch held)** — deps met; held until WI-577 merges (shared Inngest-function surface, conflict risk) |
+| WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **executing** — PR #933 open (6 review findings: step-return scrub middleware + scrubber consolidation). WI-637/638 captured |
 | WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #902). Zero bounces — children pre-swept at merge |
 | WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #900, 3 gate rounds). Eval-hook gate-gap = WI-619 (hit 3×) |
 | WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **done** — Closed/Done 2026-06-11 on re-review (PR #915, 3 gate rounds + 1 evidence-form bounce fixed shepherd-side). Critical-path W3 unit complete |
@@ -199,9 +199,11 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   merged and Closed via review: WI-570 (#855), WI-571 (#860), WI-572 (#859),
   WI-573 (#867). G2 tripped earlier same day (WI-569 Closed). No review
   backlog remains.
-- **W3 DISPATCHED 2026-06-11 (5 of 6): WI-577 ∥ WI-579 ∥ WI-580 ∥ WI-582 ∥
-  WI-581 (launched on WI-576's merge).** WI-578 held until WI-577 merges
-  (shared Inngest surface). Also in flight: WI-576 fix round (GC6 on PR #888); WI-583 at
+- **WI-578 DISPATCHED 2026-06-11 — PR #933 open.** 6 review findings: step-return
+  scrub middleware approach + scrubber consolidation. WI-637/638 captured from the
+  review. Awaiting executor response to findings.
+- **W3 DISPATCHED 2026-06-11 (6 of 6 — WI-578 now in flight):** WI-577 ∥ WI-579 ∥
+  WI-580 ∥ WI-582 ∥ WI-581 ∥ WI-578. Also in flight: WI-576 fix round (GC6 on PR #888); WI-583 at
   Reviewing (PR #876 admin-merged per operator ruling, children swept).
   W2 closed: WI-574, WI-575. W4: WI-584 closed; WI-583 in re-review.
   Executor briefs now carry the seam amendments (no cross-turn waiters,
@@ -287,6 +289,10 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 ## 6. Change log
 
+- **2026-06-11 — WI-578 dispatched; PR #933 open.** WI-577 merged (unblocking
+  WI-578's hold on shared Inngest surface). Executor launched; PR #933 carries 6
+  review findings (step-return scrub middleware, scrubber consolidation). WI-637/638
+  captured. W3 now fully dispatched (6/6).
 - **2026-06-10 (late) — whole of W1 refined to Ready.** WI-571/572 bridged
   under the §2 standing ruling (briefs in body; children WI-594/595, WI-596/597);
   WI-573 (Item, no bridge) refined with framing checklist confirmed. All four W1
