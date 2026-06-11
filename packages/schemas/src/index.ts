@@ -18,6 +18,8 @@ export * from './bookmarks';
 
 // Assessment & Retention (Epic 3)
 export * from './assessments';
+export * from './activity-ledger';
+export * from './now-feed';
 
 // Progress, Motivation & Dashboard (Epic 4)
 export * from './progress';

@@ -60,6 +60,7 @@ import {
   type MemoryFactRow,
   practiceActivityEvents,
   celebrationEvents,
+  mentorActivityLedger,
 } from './schema/index';
 
 // [BUG-704 / P-8] Single source of truth for the runtime DB enum
@@ -333,6 +334,16 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findFirst(extraWhere?: SQL) {
         return db.query.parkingLotItems.findFirst({
           where: scopedWhere(parkingLotItems, extraWhere),
+        });
+      },
+    },
+
+    mentorActivityLedger: {
+      async findMany(extraWhere?: SQL, orderBy?: SQL | SQL[], limit?: number) {
+        return db.query.mentorActivityLedger.findMany({
+          where: scopedWhere(mentorActivityLedger, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
+          ...(limit !== undefined ? { limit } : {}),
         });
       },
     },

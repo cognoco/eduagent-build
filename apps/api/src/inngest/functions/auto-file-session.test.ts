@@ -15,6 +15,7 @@ const mockRouteAndCall = jest.fn();
 const mockLoggerError = jest.fn();
 const mockLoggerWarn = jest.fn();
 const mockCaptureException = jest.fn();
+const mockWriteActivityMoment = jest.fn();
 
 jest.mock('../helpers' /* gc1-allow: Inngest step DB boundary */, () => {
   const actual = jest.requireActual(
@@ -53,6 +54,14 @@ jest.mock(
 jest.mock('../../services/llm' /* gc1-allow: LLM router boundary */, () => ({
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
+
+jest.mock(
+  '../../services/activity-ledger' /* gc1-allow: non-core ledger writer boundary */,
+  () => ({
+    writeActivityMoment: (...args: unknown[]) =>
+      mockWriteActivityMoment(...args),
+  }),
+);
 
 jest.mock(
   '../../services/logger' /* gc1-allow: logger observability boundary */,
@@ -133,13 +142,19 @@ describe('autoFileSession', () => {
       topic: { title: 'Gravity', description: 'Attraction between masses' },
     });
     mockResolveFilingResult.mockResolvedValue({
+      shelfId: '00000000-0000-4000-8000-000000000009',
+      shelfName: 'Science',
       bookId: '00000000-0000-4000-8000-000000000010',
+      bookName: 'Physics',
+      chapter: 'Forces',
       topicId: '00000000-0000-4000-8000-000000000011',
       topicTitle: 'Gravity',
+      isNew: { shelf: false, book: false, chapter: false },
     });
     mockMarkSessionAutoFiled.mockResolvedValue(true);
     mockMarkSessionAutoFilingFailed.mockResolvedValue(true);
     mockDeleteTopicIfSafe.mockResolvedValue({ deleted: true });
+    mockWriteActivityMoment.mockResolvedValue(undefined);
   });
 
   it('registers the dedicated auto-file handler and leaves legacy retry on app/filing.retry', () => {
@@ -204,6 +219,39 @@ describe('autoFileSession', () => {
       ]),
     );
     expect(result).toMatchObject({ status: 'completed' });
+  });
+
+  it('writes a best-effort ledger moment after filing finalizes', async () => {
+    await execute();
+
+    expect(mockWriteActivityMoment).toHaveBeenCalledWith({
+      db,
+      profileId,
+      actorJob: 'auto-file-session',
+      kind: 'session_filed',
+      templateKey: 'ledger.session_filed.default',
+      params: {
+        topicTitle: 'Gravity',
+        subjectId: '00000000-0000-4000-8000-000000000009',
+        bookId: '00000000-0000-4000-8000-000000000010',
+        topicId: '00000000-0000-4000-8000-000000000011',
+      },
+      visibility: 'self',
+    });
+    const filingFinalizedOrder =
+      mockMarkSessionAutoFiled.mock.invocationCallOrder[0]!;
+    const ledgerWrittenOrder =
+      mockWriteActivityMoment.mock.invocationCallOrder[0]!;
+    expect(filingFinalizedOrder).toBeLessThan(ledgerWrittenOrder);
+  });
+
+  it('does not fail the filing function when the ledger writer throws', async () => {
+    mockWriteActivityMoment.mockRejectedValue(new Error('ledger unavailable'));
+
+    const { result } = await execute();
+
+    expect(result).toMatchObject({ status: 'completed' });
+    expect(mockMarkSessionAutoFiled).toHaveBeenCalled();
   });
 
   it('exits before LLM work when the claim matches 0 rows', async () => {
