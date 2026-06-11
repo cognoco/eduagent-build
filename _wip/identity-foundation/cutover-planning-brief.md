@@ -96,7 +96,11 @@ Write to `_wip/identity-foundation/2026-06-12-cutover-plan.md`.
    verification (actual queries, legacy vs new) → flip mechanism → drop → grep-clean.
    Named flip owner. Neon PITR marker + pre-drop branch steps. A `## Rollback` section
    stating explicitly what is recoverable at each step and what becomes impossible
-   post-drop.
+   post-drop. Grep-clean means **full legacy retirement**, not just symbol removal:
+   legacy tables, legacy reader/writer code, the legacy-securing guards and fail-closed
+   scaffolds the W-waves built that become obsolete once the drop lands, and stale doc
+   references. This plan owns cleanup end-to-end — there is no separate cleanup phase
+   after it.
 
 Open questions you cannot resolve from canon or repo: collect them in an
 **Open Questions** section at the top of the plan doc — do not block on them, do not
