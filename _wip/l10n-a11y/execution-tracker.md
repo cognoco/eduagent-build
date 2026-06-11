@@ -95,6 +95,16 @@ Closed via `/cosmo:review`.
 
 ### Operating patterns inherited from the IF dogfood (apply here)
 
+- **Adjudicate landing-check disputes at CI STEP level, not run level** (program
+  ruling 2026-06-11, from the WI-626 bounce episode): a red run can conflate
+  independent failures (flaky suite, transient upstream 502, chronic deploy
+  config). Identify the failing step and its history at the same SHA before
+  attributing anything.
+- **Staging is stale until the KV deploy gap is fixed** (program-captured infra
+  item): the chronic `IDEMPOTENCY_KV` failure means staging receives no deploys —
+  weight staging-dependent landing checks (e.g. web-smoke against staging)
+  accordingly.
+
 - **WP DoR bridge (top-down-sliced WPs).** Top-down WPs fail the bottom-up WP DoR
   mechanically, and the review gate (`dod.wp.bulk_ready`) requires ≥1 child at close.
   Per the IF operator ruling 2026-06-10 (see IF tracker §2), the shepherd applies the
@@ -139,8 +149,8 @@ overlapping component files — keep adjacent/serial).
 | 3 | WI-623 WP-L12-modal-focus-roles | in-progress — dispatched wi623-executor (jumped queue: WI-625 gated on PR #985's translate-prune fix) |
 | 4 | WI-624 WP-L12-label-prop-strings | ready — bridged (children WI-655/656); after WI-621 lands (same screens, attribute pass) |
 | 5 | WI-625 WP-L12-pluralization | in-progress — dispatched wi625-executor (unblocked by #985's translate-pipeline fix; scope includes the 36 pre-existing families lacking pl few/many) |
-| 6 | WI-626 WP-L12-mobile-logic-bugs | **done** — PR #959 merged `0a7b07dbe` (5 CI rounds, all red-verified); one mis-attributed bounce (red main = cross-stream PR #931) refuted with evidence; CLOSED Done on re-review 2026-06-11 |
-| 7 | WI-627 WP-L12-dates-locale | review — PR #993 **MERGED** `1f5574e63` (3 rounds: vacuous-assertion fix with screen-level red proof, comment hygiene); children WI-659/660 swept; `complete` firing |
+| 6 | WI-626 WP-L12-mobile-logic-bugs | **done** — PR #959 merged `0a7b07dbe` (5 CI rounds, all red-verified); one bounce on a flaky landing check refuted (program adjudication: the session-test red was one-off suite-interference flake on WI-626's own merge run, rerun green; the shepherd's interim "#931 broke main" theory was WRONG — #931 was an innocent comment-only sweep); CLOSED Done on re-review 2026-06-11 |
+| 7 | WI-627 WP-L12-dates-locale | **done** — PR #993 merged `1f5574e63` (3 rounds); children WI-659/660 swept; CLOSED Done 2026-06-11 |
 | 8 | WI-628 WP-L12-decorative-lowvision | ready — bridged (children WI-661/662) |
 
 **Sub-slice watch:** WP-1 absorbs the ~358-string aggregate (F-069) — it is the one
@@ -161,6 +171,14 @@ watching **Identity Foundation + L10n & A11y Mobile**, trigger `Stage=Reviewing`
 review outputs named `<WI>.<ws-slug>.<ts>.*` under `/tmp/cosmo-watch/reviews/`.
 WI-621 and WI-622 bridged (briefs in page bodies; provenance children WI-633/634
 and WI-635/636; Sub-item set) and refined to `Stage=Ready`, `Execution Path=Assisted`.
+**HALF-SLICE REACHED 2026-06-11 (~21:30 CEST): 4 of 8 Closed** — WI-621 (3 PRs,
+baseline 361→12), WI-622, WI-626, WI-627 all Closed/Done. In flight: WI-623 (PR #997,
+rebase+NudgeBanner-label round; executor hit a "Not logged in" auth error ~21:20,
+probe resume sent), WI-625 (building; same auth risk). Queued Ready: WI-624 (after
+WI-623 lands — adjacent surface), WI-628. Program adjudication of the main-red
+incident absorbed (step-level rule + staging-stale weighting added to §2; #931
+mis-scope theory corrected in tracker + WI-626 page comment).
+
 **Token-pool incident 2026-06-11 (~16:50–18:00 CEST), resolved by probe:** the shared
 account pool exhausted twice mid-execution; probes at ~18:00 found it cleared and both
 executors resumed (cron 7c5eda72 @ 21:52 stands as a harmless safety net; it no-ops if
