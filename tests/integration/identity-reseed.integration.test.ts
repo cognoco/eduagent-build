@@ -294,11 +294,16 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
     const c2 = await one<{
       withdrawn_at: Date | string | null;
       lawful_basis: string;
-    }>('SELECT withdrawn_at, lawful_basis FROM consent_grant WHERE id = $1', [
-      CS2,
-    ]);
+      granted: boolean;
+    }>(
+      'SELECT withdrawn_at, lawful_basis, granted FROM consent_grant WHERE id = $1',
+      [CS2],
+    );
     expect(c2?.lawful_basis).toBe('gdpr_parental_consent');
     expect(c2?.withdrawn_at).not.toBeNull();
+    // WITHDRAWN maps to a historical grant (granted=true) that was later
+    // withdrawn — not to granted=false.
+    expect(c2?.granted).toBe(true);
 
     expect(
       await count(

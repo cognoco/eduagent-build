@@ -37,6 +37,8 @@
 --     a user as (current UTC year - birth_year) (services/age-utils.ts
 --     calculateAge); a Jan-1 birth date reproduces exactly that age under
 --     full-date arithmetic, so no user's computed age changes at cutover.
+--     PRECONDITION: profiles.birth_year IS NOT NULL for every row (NOT NULL
+--     by schema; re-asserted by a fail-loud guard in the block).
 --   * person.residence_jurisdiction: location 'US' -> 'US', 'EU' -> 'EU',
 --     'OTHER' -> 'ROW' (positively known to be neither), NULL -> 'UNKNOWN'
 --     (fail-closed: the policy engine treats unknown residence as strictest).
@@ -88,6 +90,15 @@ BEGIN
     RAISE EXCEPTION 'identity reseed: account(s) with >1 is_owner profile';
   END IF;
 
+  -- Guard: person.birth_date is NOT NULL and derives from profiles.birth_year.
+  -- profiles.birth_year is NOT NULL by schema, but dev is push-managed and
+  -- this block also runs unattended at staging deploy — if a NULL ever
+  -- appears, fail with a named precondition instead of a raw constraint
+  -- abort mid-block.
+  IF EXISTS (SELECT 1 FROM profiles WHERE birth_year IS NULL) THEN
+    RAISE EXCEPTION 'identity reseed: profile(s) with NULL birth_year';
+  END IF;
+
   -- 0. Mirror-deletes FIRST: rows whose legacy source row no longer exists
   --    are removed, so a re-run converges on the legacy truth even if legacy
   --    deletions (account/profile deletion flows) happened since the last
@@ -122,6 +133,9 @@ BEGIN
   DELETE FROM membership m
   WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = m.id);
 
+  -- Deleting login before person is safe even while persons still reference
+  --   the login: person.login_id -> login is ON DELETE SET NULL (0108), so
+  --   the surviving persons are unhooked, not blocked.
   DELETE FROM login l
   WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.id = l.id);
 
