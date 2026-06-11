@@ -1,6 +1,6 @@
 import { Inngest, InngestMiddleware } from 'inngest';
 import type { Database } from '@eduagent/database';
-import { scrubPiiPayload } from '@eduagent/schemas';
+import { INNGEST_PII_STEP_KEYS, scrubPiiPayload } from '@eduagent/schemas';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
 import {
@@ -138,6 +138,46 @@ export function scrubOutgoingEventPayloads<
   return { payloads: scrubbed };
 }
 
+/**
+ * PII egress: scrubs denylisted step-state keys from every step return (and
+ * the function-level return) before Inngest memoizes it in its third-party
+ * state store.
+ *
+ * Same belt-and-braces doctrine as `scrubOutgoingEventPayloads`: the primary
+ * fix is that steps no longer return these fields (consumers rehydrate from
+ * the DB by reference), so a scrub firing here means a regression
+ * re-introduced minor-PII into memoized step state — escalated to Sentry,
+ * never silent. Denylist: `INNGEST_PII_STEP_KEYS` in @eduagent/schemas.
+ *
+ * Exported for unit tests.
+ */
+export function scrubStepOutput(
+  data: unknown,
+  stepName: string | undefined,
+): { result: { data: unknown } } | undefined {
+  if (data === undefined || data === null) return undefined;
+  const result = scrubPiiPayload(data, INNGEST_PII_STEP_KEYS);
+  if (result.scrubbedPaths.length === 0) return undefined;
+  const err = new Error(
+    `[pii-scrub] denylisted PII key(s) in memoized Inngest step return: ${result.scrubbedPaths.join(', ')}`,
+  );
+  piiScrubLogger.error(
+    '[inngest] scrubbed PII key(s) from memoized step return',
+    {
+      step: stepName,
+      scrubbedPaths: result.scrubbedPaths,
+    },
+  );
+  captureException(err, {
+    extra: {
+      site: 'inngest.piiScrubMiddleware.stepOutput',
+      step: stepName,
+      scrubbedPaths: result.scrubbedPaths,
+    },
+  });
+  return { result: { data: result.value } };
+}
+
 const piiScrubMiddleware = new InngestMiddleware({
   name: 'PII Scrub Middleware',
   init() {
@@ -146,6 +186,13 @@ const piiScrubMiddleware = new InngestMiddleware({
         return {
           transformInput({ payloads }) {
             return scrubOutgoingEventPayloads(payloads);
+          },
+        };
+      },
+      onFunctionRun() {
+        return {
+          transformOutput({ result, step }) {
+            return scrubStepOutput(result.data, step?.displayName);
           },
         };
       },

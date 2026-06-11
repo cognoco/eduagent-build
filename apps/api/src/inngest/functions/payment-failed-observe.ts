@@ -26,7 +26,7 @@
 import { z } from 'zod';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
-import { summarizeRawPayload } from '../../services/pii-scrub';
+import { summarizeRawPayload } from '@eduagent/schemas';
 
 const logger = createLogger();
 

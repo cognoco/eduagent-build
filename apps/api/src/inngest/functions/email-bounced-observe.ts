@@ -21,10 +21,12 @@
 // reflects the original event type so dashboard queries can filter on it.
 // ---------------------------------------------------------------------------
 
-import { emailBouncedEventSchema } from '@eduagent/schemas';
+import {
+  emailBouncedEventSchema,
+  summarizeRawPayload,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
-import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();

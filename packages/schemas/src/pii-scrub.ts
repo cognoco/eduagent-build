@@ -35,6 +35,27 @@ export const INNGEST_PII_PAYLOAD_KEYS: readonly string[] = [
   'exchangeHistory',
 ];
 
+/**
+ * Step-return keys that must never cross the Inngest trust boundary carrying
+ * minor-PII. Memoized step returns are persisted in Inngest's third-party
+ * state store just like event payloads; the offending steps now return opaque
+ * references (profile/session/notice ids) and the consuming steps rehydrate
+ * from the database.
+ *
+ * Deliberately NOT listed: `parentEmail`. consent-reminders.ts legitimately
+ * memoizes `{ parentEmail, freshToken }` in its day-7/day-14 token-mint steps
+ * (the mint is non-idempotent and must survive replay); converting that flow
+ * is tracked as its own work item, and a denylist hit there would break
+ * reminder emails. Add the key once that flow rehydrates the address.
+ */
+export const INNGEST_PII_STEP_KEYS: readonly string[] = [
+  'childName',
+  'childDisplayName',
+  'childSummaries',
+  'struggleLines',
+  'struggleTopics',
+];
+
 /** Replacement value written over scrubbed payload fields. */
 export const PII_SCRUBBED_PLACEHOLDER = '[pii-scrubbed]';
 
@@ -108,4 +129,42 @@ export function scrubPiiPayload<T>(
   }
 
   return { value: walk(input, '') as T, scrubbedPaths };
+}
+
+// ---------------------------------------------------------------------------
+// Error/observability path — shape-only payload summaries.
+//
+// Error/observability paths must never emit raw, unvalidated payloads (which
+// can carry a minor's transcript, name, or freeform input) via `logger.*` or
+// `captureException` extras. On a schema-drift path the payload is by
+// definition unknown, so the only safe diagnostic is its *shape* — type,
+// field count — never its keys or values. Pattern lifted from
+// ask-gate-observe.ts, which pioneered it. Forward-only guard:
+// apps/api/src/services/pii-scrub.guard.test.ts bans `rawData: event.data`
+// (and the legacy content-slice keys) from non-test API source.
+// ---------------------------------------------------------------------------
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Shape-only summary of an arbitrary payload, safe for logs and Sentry
+ * extras. Never includes keys or values from the input — only its type and,
+ * for plain objects, the number of fields.
+ */
+export interface RawPayloadSummary {
+  payloadType: string;
+  fieldCount?: number;
+}
+
+export function summarizeRawPayload(rawData: unknown): RawPayloadSummary {
+  if (!isRecord(rawData)) {
+    return { payloadType: Array.isArray(rawData) ? 'array' : typeof rawData };
+  }
+
+  return {
+    payloadType: 'object',
+    fieldCount: Object.keys(rawData).length,
+  };
 }

@@ -23,7 +23,7 @@ jest.mock(
 );
 
 import { PII_SCRUBBED_PLACEHOLDER } from '@eduagent/schemas';
-import { scrubOutgoingEventPayloads } from './client';
+import { scrubOutgoingEventPayloads, scrubStepOutput } from './client';
 
 const KNOWN_MINOR_TEXT =
   'Learner: my name is Milo Janssen and I live in Drammen';
@@ -99,5 +99,83 @@ describe('scrubOutgoingEventPayloads [WI-577]', () => {
     const payload = { name: 'app/ping' };
     const { payloads } = scrubOutgoingEventPayloads([payload]);
     expect(payloads[0]).toBe(payload);
+  });
+});
+
+describe('scrubStepOutput (memoized step-state ratchet, F-075/085/086/087/088/089)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('scrubs a regressed childName field before Inngest memoizes the step return', () => {
+    const transformed = scrubStepOutput(
+      {
+        status: 'ok',
+        childName: 'Milo Janssen',
+        latestSessionId: 's-1',
+      },
+      'gather-context',
+    );
+
+    expect(transformed?.result.data).toEqual({
+      status: 'ok',
+      childName: PII_SCRUBBED_PLACEHOLDER,
+      latestSessionId: 's-1',
+    });
+    expect(JSON.stringify(transformed)).not.toContain('Milo Janssen');
+  });
+
+  it('scrubs nested struggleLines / struggleTopics / childSummaries keys', () => {
+    const transformed = scrubStepOutput(
+      {
+        prepared: {
+          childSummaries: ['Milo: +2 topics'],
+          struggleLines: [{ childName: 'Milo Janssen', topics: ['fractions'] }],
+          struggleTopics: ['fractions'],
+        },
+      },
+      'prepare-weekly-progress-digest',
+    );
+
+    const serialized = JSON.stringify(transformed);
+    expect(serialized).not.toContain('Milo');
+    expect(serialized).not.toContain('fractions');
+  });
+
+  it('escalates every scrub to Sentry with the step name', () => {
+    scrubStepOutput(
+      { childDisplayName: 'Milo Janssen' },
+      'generate-monthly-report',
+    );
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          site: 'inngest.piiScrubMiddleware.stepOutput',
+          step: 'generate-monthly-report',
+          scrubbedPaths: ['childDisplayName'],
+        }),
+      }),
+    );
+  });
+
+  it('returns undefined (no mutation) for clean step returns and stays silent', () => {
+    expect(
+      scrubStepOutput(
+        {
+          status: 'prepared',
+          childProfileIds: ['c-1'],
+          reportWeek: '2026-06-08',
+        },
+        'prepare-weekly-progress-digest',
+      ),
+    ).toBeUndefined();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('returns undefined for null/undefined step data', () => {
+    expect(scrubStepOutput(null, 'check-restoration')).toBeUndefined();
+    expect(scrubStepOutput(undefined, undefined)).toBeUndefined();
   });
 });

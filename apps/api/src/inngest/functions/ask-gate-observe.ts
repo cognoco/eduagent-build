@@ -22,13 +22,13 @@
 import {
   askGateDecisionEventSchema,
   askGateTimeoutEventSchema,
+  // summarizeRawPayload: canonical home is @eduagent/schemas (pii-scrub),
+  // shared by every observe handler's drift path.
+  summarizeRawPayload,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
-// summarizeRawPayload moved to its canonical home in
-// services/pii-scrub.ts (shared by every observe handler's drift path).
-import { summarizeRawPayload } from '../../services/pii-scrub';
 
 const logger = createLogger();
 
