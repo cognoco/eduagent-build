@@ -9,6 +9,7 @@ import { formatMinutes } from '../../lib/format-relative-date';
 import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
 import { getSubjectTint } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
+import type { Translate } from '../../i18n';
 
 // 'review' is planned for spaced-repetition scenarios but not yet wired.
 // Add it back here and to ACTION_LABEL + getContextualAction when implemented.
@@ -53,7 +54,7 @@ export function hasSubjectActivity(subject: SubjectInventory): boolean {
 
 function getTopicHeadline(
   subject: SubjectInventory,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): {
   headline: string;
   progressValue: number;

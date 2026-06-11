@@ -1,3 +1,5 @@
+import type { Translate } from '../../../i18n';
+
 export type SessionSummaryMode = 'learning' | 'freeform' | 'homework';
 
 export interface FastCelebrationSummary {
@@ -117,7 +119,7 @@ export function buildSessionTakeaways(args: {
   wallClockMinutes: number;
   exchanges: number;
   rung: number;
-  t: (key: string, opts?: Record<string, unknown>) => string;
+  t: Translate;
 }): string[] {
   const takeaways: string[] = [];
   if (args.hasResolvedDuration) {

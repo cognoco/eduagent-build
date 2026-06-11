@@ -21,6 +21,7 @@ import type {
   CurriculumTopic,
   RetentionStatus,
 } from '@eduagent/schemas';
+import type { Translate } from '../../../i18n';
 import { useBookWithTopics } from '../../../hooks/use-books';
 import {
   useTopicProgress,
@@ -90,7 +91,7 @@ function formatSessionDate(
 
 function formatSessionsSummary(
   sessions: { durationSeconds: number | null }[] | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string | null {
   if (!sessions || sessions.length === 0) return null;
 

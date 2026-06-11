@@ -30,10 +30,11 @@ import { platformAlert } from '../../../../lib/platform-alert';
 import { isNewLearner } from '../../../../lib/progressive-disclosure';
 import { useProfile } from '../../../../lib/profile';
 import { useThemeColors } from '../../../../lib/theme';
+import type { Translate as I18nTranslate } from '../../../../i18n';
 
 function formatLastSession(
   isoDate: string | null | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: I18nTranslate,
 ): string | null {
   if (!isoDate) return null;
   const then = new Date(isoDate);

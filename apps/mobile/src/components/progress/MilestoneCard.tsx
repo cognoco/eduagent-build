@@ -1,6 +1,7 @@
 import { View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { MilestoneRecord } from '@eduagent/schemas';
+import type { Translate } from '../../i18n';
 
 const MILESTONE_COPY: Record<
   MilestoneRecord['milestoneType'],
@@ -8,7 +9,7 @@ const MILESTONE_COPY: Record<
     icon: string;
     label: (
       threshold: number,
-      t: (key: string, opts?: Record<string, unknown>) => string,
+      t: Translate,
       metadata?: Record<string, unknown> | null,
     ) => string;
   }

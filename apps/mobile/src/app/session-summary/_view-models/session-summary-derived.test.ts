@@ -8,10 +8,10 @@ import {
   parseMilestonesParam,
   resolveNumberParam,
 } from './session-summary-derived';
+import type { Translate } from '../../../i18n';
+import { translate } from '../../../test-utils/mock-i18n';
 
-const { translate: t } = require('../../../test-utils/mock-i18n') as {
-  translate: (key: string, opts?: Record<string, unknown>) => string;
-};
+const t = translate as unknown as Translate;
 
 describe('resolveNumberParam', () => {
   it('preserves an explicit zero instead of falling back', () => {

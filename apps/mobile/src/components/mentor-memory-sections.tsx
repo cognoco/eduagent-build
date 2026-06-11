@@ -8,7 +8,7 @@ import type {
   MemorySource,
   FocusAreaEntry,
 } from '@eduagent/schemas';
-import type { TranslateKey } from '../i18n';
+import type { Translate, TranslateKey } from '../i18n';
 
 // Shared helpers used by both the child-facing and parent-facing mentor
 // memory screens. Extracted here to keep both screens in sync.
@@ -59,7 +59,7 @@ export function getLearningStyleRows(style: LearningStyle): LearningStyleRow[] {
 
 export function getFocusAreaProgress(
   entry: FocusAreaEntry,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): {
   progressLabel: string;
   progressValue: number;

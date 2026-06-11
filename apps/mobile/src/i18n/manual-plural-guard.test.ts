@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createInstance } from 'i18next';
+import type { TranslateKey } from './types';
 import en from './locales/en.json';
 import pl from './locales/pl.json';
 
@@ -229,7 +230,7 @@ describe('runtime plural category selection', () => {
     'pl selects one/few/many correctly for %s',
     (family) => {
       for (const [count, suffix] of PL_EXPECTED) {
-        expect(i18n.t(family, { count, lng: 'pl' })).toBe(
+        expect(i18n.t(family as TranslateKey, { count, lng: 'pl' })).toBe(
           raw(plFlat, family, suffix, count),
         );
       }
@@ -239,11 +240,11 @@ describe('runtime plural category selection', () => {
   it.each(SAMPLE_FAMILIES)(
     'en selects one/other correctly for %s',
     (family) => {
-      expect(i18n.t(family, { count: 1, lng: 'en' })).toBe(
+      expect(i18n.t(family as TranslateKey, { count: 1, lng: 'en' })).toBe(
         raw(enFlat, family, '_one', 1),
       );
       for (const count of [2, 5, 22]) {
-        expect(i18n.t(family, { count, lng: 'en' })).toBe(
+        expect(i18n.t(family as TranslateKey, { count, lng: 'en' })).toBe(
           raw(enFlat, family, '_other', count),
         );
       }
