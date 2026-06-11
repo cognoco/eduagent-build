@@ -120,9 +120,9 @@ parallel with either.
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-639 WP-E15-catch-hygiene | review — PR #948 MERGED `f54dd3c0f`; Stage=Reviewing via `complete`; children WI-642/643 swept Closed |
+| 1 | WI-639 WP-E15-catch-hygiene | **done** — Closed/Done by autonomous review 2026-06-11 (PR #948, `f54dd3c0f`; one rework round: PR body child-list, shepherd-fixed) |
 | 2 | WI-640 WP-E15-typed-errors | in-progress — Ready (bridged, children WI-647/648) + executor dispatched 2026-06-11 |
-| 3 | WI-641 IT-E15-mobile-classification | review — PR #943 MERGED `fc52f96f3`; Stage=Reviewing via `complete` |
+| 3 | WI-641 IT-E15-mobile-classification | **done** — Closed/Done by autonomous review 2026-06-11 (PR #943, `fc52f96f3`, first-pass close) |
 
 ---
 
@@ -140,6 +140,16 @@ after WI-639 merges.
 
 ## 6. Change log
 
+- **2026-06-11 (shepherd, first closes)** — **WI-641 and WI-639 both CLOSED (Done)
+  by the autonomous reviewer.** WI-641 closed first-pass. WI-639 took one rework
+  round — the reviewer caught a WP DoD conformance gap (PR #948 body listed finding
+  IDs but not children WI-642/643); shepherd fixed the PR body directly, restored
+  Stage=Reviewing with a `[shepherd:rework]` comment, re-review closed it with full
+  AC mapping. 5 of 8 charter findings resolved (F-022/047/048/049, F-110); the
+  remaining 3 (F-015/016/017) ride WI-640, still executing. *Lesson:* WP briefs /
+  executor briefs should tell executors to list child WIs in the PR body — added to
+  the amendments for future WP dispatches (WI-640's PR will need it too; flagged at
+  its merge gate).
 - **2026-06-11 (shepherd, first merges)** — **WI-641 and WI-639 both MERGED and in
   Reviewing.** WI-641: PR #943 → merge `fc52f96f3` (4 CI rounds: i18n source-baseline
   staleness fix; review round added 2 boundary tests; final verdict APPROVED 0
