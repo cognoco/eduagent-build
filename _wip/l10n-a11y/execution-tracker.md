@@ -1,7 +1,7 @@
 # L10n & A11y Mobile — Execution Tracker
 
 **Stream:** l10n-a11y (umbrella roster **PRG-12**) · **Activity:** mobile localization + accessibility clean-out (agent-heavy sweep)
-**Last updated:** 2026-06-11 (activation — program session) · **Owner:** Jorn (+ shepherd session agents)
+**Last updated:** 2026-06-11 (shepherd session — review loop wired, WI-621/622 Ready) · **Owner:** Jorn (+ shepherd session agents)
 
 > **This is the durable entry point for this activity.** Point a fresh session here:
 > it should be enough to know *what this is*, *where the detail lives*, and *where to
@@ -134,8 +134,8 @@ overlapping component files — keep adjacent/serial).
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-621 WP-L12-jsx-strings | backlog |
-| 2 | WI-622 WP-L12-sr-announcements | backlog |
+| 1 | WI-621 WP-L12-jsx-strings | ready |
+| 2 | WI-622 WP-L12-sr-announcements | ready |
 | 3 | WI-623 WP-L12-modal-focus-roles | backlog |
 | 4 | WI-624 WP-L12-label-prop-strings | backlog |
 | 5 | WI-625 WP-L12-pluralization | backlog |
@@ -152,17 +152,40 @@ PRs or sibling WPs at the shepherd's call. Do not pre-slice.
 
 ## 5. Current position
 
-**2026-06-11 — ACTIVATED (program session).** Tracker created (commit `9570f5b63`);
-Cosmo Workstream **L10n & A11y Mobile** created; 8 WPs sliced as **WI-621…WI-628**
-(all `Stage=Backlog`, `Altitude=WP`, Workstream Order 1–8). Nothing claimed; no
-shepherd session yet. Next: operator spawns the PRG-12 shepherd with the kickoff
-brief; shepherd refines WI-621 + WI-622 to Ready (DoR bridge) and proposes first
-pickup.
+**2026-06-11 — SHEPHERD SESSION LIVE; review loop wired; WI-621 + WI-622 Ready.**
+The autonomous reviewer watcher now covers this workstream: single multi-workstream
+process (`bun _wip/identity-foundation/review-watcher-v3.ts`, detached, parent=1),
+watching **Identity Foundation + L10n & A11y Mobile**, trigger `Stage=Reviewing`,
+60s poll, state keyed by `workstreamName::wiId`. Heartbeat log moved to
+`/tmp/cosmo-watch/logs/cosmo-reviewing-watcher.log` (old per-IF log is historical);
+review outputs named `<WI>.<ws-slug>.<ts>.*` under `/tmp/cosmo-watch/reviews/`.
+WI-621 and WI-622 bridged (briefs in page bodies; provenance children WI-633/634
+and WI-635/636; Sub-item set) and refined to `Stage=Ready`, `Execution Path=Assisted`.
+Nothing claimed. Next: operator go on first pickup (proposed: WI-621 first, WI-622
+in parallel — disjoint surfaces), then dispatch first executor.
+
+**Restart context (if this session dies):** the watcher survives (detached); check it
+with `ps -eo pid,command | rg review-watcher` + the heartbeat log above — never start
+a second one (kill the old first if extending). Stage monitor + CI watchers are
+session-bound — re-arm per IF mechanics §2.1–2.2 (substitute this workstream's page id
+`37c8bce9-1f7c-8169-8ce1-ddcf36b470c9`). Executor briefs: copy
+`_wip/identity-foundation/executor-protocol-example.md` shape + its amendments block
+(maintain a PRG-12 copy as lessons accrete).
 
 ---
 
 ## 6. Change log
 
+- **2026-06-11 (shepherd)** — Review watcher extended to multi-workstream per the
+  productization-handoff recipe: `workstreams[]` config array (IF keeps its
+  WI-585/586 DoD overrides; this workstream has none), all de-dupe/running state
+  keyed `workstreamName::wiId`, workstream name in logs/paths/prompts, ONE process
+  for both workstreams. During the swap, found **two** duplicate watchers running
+  (the documented PoC failure mode — both had double-fired WI-581's 11:56 review);
+  killed both after in-flight WI-581 reviews drained (WI-581 closed Done cleanly),
+  started the single replacement, verified baseline seeded both workstreams without
+  firing. WI-621 + WI-622 taken through the WP DoR bridge → `Ready` (Assisted);
+  provenance children WI-633/634 + WI-635/636 captured at `Captured`.
 - **2026-06-11** — Created at PRG-12 activation (program session). Charter
   transcribed from ratified activation-planning §2; INV-1 pre-check run (ratchet
   exists, 361-entry baseline → scope reframed to burn-down); placement decisions
