@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>IF cutover plan in design</b> — split ruled; dedicated planning session running against <code>cutover-planning-brief.md</code> (seed: <code>wi586-scope-report.md</code>); IF shepherd holding; ratification next · <b>PRG-15 GRADUATED 06-11</b> (second graduation — whole slice closed within a day of activation) · PRG-12 rolling (4/8 closed) · <b>PRG-13 ACTIVATED</b> into the freed lane (WI-665/666; subsumption scan: partial) · CI incident resolved: nothing code-broken — chronic staging-KV deploy red captured as <b>WI-664</b> · WI-587 on Zuzka's desk.</span>
+  <span class="txt"><b>Right now:</b> <b>IF cutover plan in design</b> — split ruled; dedicated planning session running against <code>cutover-planning-brief.md</code> (seed: <code>wi586-scope-report.md</code>); IF shepherd holding; ratification next · <b>PRG-15 GRADUATED 06-11</b> (second graduation — whole slice closed within a day of activation) · PRG-12 rolling (5/8 closed, 3 executing) · <b>PRG-13 shepherd LIVE</b> (WI-665/666; subsumption scan: partial) · CI incident resolved: nothing code-broken — chronic staging-KV deploy red captured as <b>WI-664</b> · WI-587 on Zuzka's desk.</span>
 </div>
 
 <nav>
@@ -651,12 +651,12 @@ const INIT = [
 
 { id:"PRG-12", name:"UI language & accessibility", accent:"var(--teal)", lane:"now", status:"active", q:"#1",
   tagline:"358 hardcoded English strings, silent screen-readers, 13 modals without focus management. The first parallel lane — now open.",
-  owner:"Agent-heavy, low supervision", gate:"Shepherd live — 4 of 8 WPs CLOSED through the autonomous loop (WI-621/622/626/627); WI-623 + WI-625 executing.",
+  owner:"Agent-heavy, low supervision", gate:"Shepherd live — 5 of 8 WPs CLOSED through the autonomous loop (WI-621/622/623/626/627); WI-624/625/628 executing — every WP now started or done.",
   outcome:"Every user-visible string through translation, screen-reader parity on core flows, pluralization & dates locale-correct. 34 findings.",
   bundles:[
     {n:"WI-621 · JSX/auth strings sweep", s:"5 findings · ~358 strings", m:"agent", st:"done", note:"P1. CLOSED 06-11 (sub-sliced; PRs #942/#961) — ratchet burn-down landed."},
     {n:"WI-622 · Screen-reader announcements", s:"5 findings", m:"agent", st:"done", note:"P1. CLOSED 06-11 — first PRG-12 WP through the full autonomous loop."},
-    {n:"WI-623 · Modal focus & roles", s:"5 findings", m:"agent", st:"go"},
+    {n:"WI-623 · Modal focus & roles", s:"5 findings", m:"agent", st:"done", note:"CLOSED 06-11 — reviewer bounce reworked and re-passed (the loop self-correcting)."},
     {n:"WI-624 · A11y-label / prop strings", s:"3 findings", m:"agent", st:"go"},
     {n:"WI-625 · Pluralization model", s:"2 findings", m:"agent", st:"go"},
     {n:"WI-626 · Mobile logic bugs", s:"7 findings", m:"mixed", st:"done", note:"CLOSED 06-11 — reviewer bounce on red main; CI rerun proved the red a flake, closure stands."},
@@ -698,7 +698,7 @@ const INIT = [
 
 { id:"PRG-13", name:"Background-job security", accent:"var(--teal)", lane:"now", status:"active", q:"#6",
   tagline:"Six tight findings: minors' data sitting in job state, plus two correctness bugs. Small and surgical.",
-  owner:"Agent-sweep; PII changes reviewed", gate:"ACTIVATED 06-11 into the lane PRG-15's graduation freed. Subsumption scan vs WI-578: partial — F-028 shrunk 3→2 functions (freeform-filing already fixed); F-091 live. Shepherd kickoff handed.",
+  owner:"Agent-sweep; PII changes reviewed", gate:"Shepherd LIVE 06-11 (lane freed by PRG-15's graduation). Subsumption scan vs WI-578: partial — F-028 shrunk 3→2 functions (freeform-filing already fixed); F-091 live.",
   outcome:"No PII in step state or event payloads on non-rewrite jobs; the two correctness bugs fixed.",
   bundles:[
     {n:"WI-665 · PII step-state & event payloads", s:"3 findings (F-028×2 legs · F-091 · F-090)", m:"mixed", st:"go", note:"P1. Extends WI-578's landed pattern + pii-scrub.ts."},
