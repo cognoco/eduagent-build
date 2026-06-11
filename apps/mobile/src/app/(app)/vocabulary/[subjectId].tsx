@@ -129,6 +129,8 @@ export default function VocabularyListScreen() {
   const { subjectId: rawSubjectId } = useLocalSearchParams<{
     subjectId: string | string[];
   }>();
+  // [F-168] Empty-array case: rawSubjectId[0] yields undefined — same value
+  // as a missing param, handled by the no-subject fallback below.
   const subjectId = Array.isArray(rawSubjectId)
     ? rawSubjectId[0]
     : rawSubjectId;

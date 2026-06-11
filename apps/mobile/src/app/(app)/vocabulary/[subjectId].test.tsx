@@ -40,7 +40,9 @@ const mockUseVocabulary = jest.fn();
 let capturedVocabularySubjectId: string | string[] | undefined;
 jest.mock(
   '../../../hooks/use-vocabulary',
-  // gc1-allow: native-boundary — hook reaches into API client + TanStack Query context unavailable in Jest
+  // gc1-allow: this test only asserts F-168 param normalisation via hook-arg
+  // capture; wiring QueryClientProvider + a mocked network stack to run the
+  // real hook is unrelated scope for this regression test
   () => ({
     useVocabulary: (id: string | string[] | undefined) => {
       capturedVocabularySubjectId = id;
@@ -52,7 +54,8 @@ jest.mock(
 
 jest.mock(
   '../../../hooks/use-subjects',
-  // gc1-allow: native-boundary — hook reaches into API client + TanStack Query context unavailable in Jest
+  // gc1-allow: same as use-vocabulary above — this test asserts param
+  // normalisation only; running the real query hook is unrelated scope
   () => ({
     useSubjects: () => ({
       data: [{ id: 'subject-1', name: 'Biology' }],
