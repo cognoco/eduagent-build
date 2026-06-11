@@ -35,7 +35,8 @@
     "notNow": "後で",
     "active": "アクティブ",
     "goBackAction": "戻る",
-    "tryAgainAction": "再試行"
+    "tryAgainAction": "再試行",
+    "dismiss": "閉じる"
   },
   "quota": {
     "parent": {
@@ -2547,7 +2548,9 @@
     "banner": {
       "title": "{{fromDisplayName}}さんからナッジが届きました",
       "unreadCount": "{{count}}件の新着",
-      "modalTitle": "新しいナッジ"
+      "modalTitle": "新しいナッジ",
+      "bannerLabel": "{{fromDisplayName}}さんからつっつきが届きました（新着{{count}}件）",
+      "bannerLabelSingle": "{{fromDisplayName}}さんからつっつきが届きました"
     }
   },
   "practiceHub": {
@@ -3037,7 +3040,11 @@
     "aboutChild": "お子様について",
     "ageGate": "お子様の学習を設定するには、アカウント所有者が18歳以上である必要があります。代わりに自分の学習を設定することもできます。前のステップで「自分の学習」を選択してください。",
     "childSaveError": "アカウントは保存しましたが、まだお子様を追加できませんでした: {{error}}",
-    "confirmChildReady": "お子様のプロフィールが設定されました。保護者用のホームを開きましょう。"
+    "confirmChildReady": "お子様のプロフィールが設定されました。保護者用のホームを開きましょう。",
+    "yourNameLabel": "名前",
+    "yourBirthYearLabel": "生まれた年",
+    "childNameLabel": "お子様の名前",
+    "childBirthYearLabel": "お子様の生まれた年"
   },
   "myNotes": {
     "title": "マイノート",

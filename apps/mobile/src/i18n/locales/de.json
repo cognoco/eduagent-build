@@ -35,7 +35,8 @@
     "notNow": "Nicht jetzt",
     "active": "Aktiv",
     "goBackAction": "Zurück",
-    "tryAgainAction": "Erneut versuchen"
+    "tryAgainAction": "Erneut versuchen",
+    "dismiss": "Schließen"
   },
   "quota": {
     "parent": {
@@ -2547,7 +2548,9 @@
     "banner": {
       "title": "{{fromDisplayName}} hat dir einen Nudge gesendet",
       "unreadCount": "{{count}} neu",
-      "modalTitle": "Neue Nudges"
+      "modalTitle": "Neue Nudges",
+      "bannerLabel": "{{fromDisplayName}} hat dich angestupst, {{count}} neue",
+      "bannerLabelSingle": "{{fromDisplayName}} hat dich angestupst"
     }
   },
   "practiceHub": {
@@ -3037,7 +3040,11 @@
     "aboutChild": "Über dein Kind",
     "ageGate": "Um das Lernen eines Kindes einzurichten, muss der Kontoinhaber 18 Jahre oder älter sein. Du kannst stattdessen dein eigenes Lernen einrichten – wähle im vorherigen Schritt „Mein Lernen“.",
     "childSaveError": "Wir haben dein Konto gespeichert, konnten aber dein Kind noch nicht hinzufügen: {{error}}",
-    "confirmChildReady": "Das Profil deines Kindes ist eingerichtet. Lass uns die Eltern-Startseite öffnen."
+    "confirmChildReady": "Das Profil deines Kindes ist eingerichtet. Lass uns die Eltern-Startseite öffnen.",
+    "yourNameLabel": "Dein Name",
+    "yourBirthYearLabel": "Dein Geburtsjahr",
+    "childNameLabel": "Name des Kindes",
+    "childBirthYearLabel": "Geburtsjahr des Kindes"
   },
   "myNotes": {
     "title": "Meine Notizen",

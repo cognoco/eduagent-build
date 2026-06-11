@@ -35,7 +35,8 @@
     "notNow": "Agora não",
     "active": "Ativo",
     "goBackAction": "Voltar",
-    "tryAgainAction": "Tentar novamente"
+    "tryAgainAction": "Tentar novamente",
+    "dismiss": "Dispensar"
   },
   "quota": {
     "parent": {
@@ -346,7 +347,9 @@
     "banner": {
       "title": "{{fromDisplayName}} enviou um incentivo para você",
       "unreadCount": "{{count}} novos",
-      "modalTitle": "Novos incentivos"
+      "modalTitle": "Novos incentivos",
+      "bannerLabel": "{{fromDisplayName}} te enviou um toque, {{count}} novos",
+      "bannerLabelSingle": "{{fromDisplayName}} te enviou um toque"
     }
   },
   "family": {
@@ -3037,7 +3040,11 @@
     "aboutChild": "Sobre o/a teu/tua filho/a",
     "ageGate": "Para configurar a aprendizagem de uma criança, o titular da conta deve ter 18 anos ou mais. Podes, em vez disso, configurar a tua própria aprendizagem — escolhe \"A minha aprendizagem\" no passo anterior.",
     "childSaveError": "Guardámos a tua conta, mas ainda não foi possível adicionar o/a teu/tua filho/a: {{error}}",
-    "confirmChildReady": "O perfil do/a teu/tua filho/a está configurado. Vamos abrir a página inicial dos pais."
+    "confirmChildReady": "O perfil do/a teu/tua filho/a está configurado. Vamos abrir a página inicial dos pais.",
+    "yourNameLabel": "Seu nome",
+    "yourBirthYearLabel": "Seu ano de nascimento",
+    "childNameLabel": "Nome da criança",
+    "childBirthYearLabel": "Ano de nascimento da criança"
   },
   "myNotes": {
     "title": "Minhas Notas",

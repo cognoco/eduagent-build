@@ -46,6 +46,16 @@ export function NudgeBanner(): React.ReactElement | null {
         onPress={() => setModalOpen(true)}
         className="mx-5 mt-4 rounded-card bg-primary-soft border border-primary/30 px-4 py-3 flex-row items-center"
         accessibilityRole="button"
+        accessibilityLabel={
+          badge
+            ? t('nudge.banner.bannerLabel', {
+                fromDisplayName: top.fromDisplayName,
+                count: nudges.length,
+              })
+            : t('nudge.banner.bannerLabelSingle', {
+                fromDisplayName: top.fromDisplayName,
+              })
+        }
         testID="nudge-banner"
       >
         <Ionicons name="heart-outline" size={22} color={colors.primary} />
@@ -60,7 +70,11 @@ export function NudgeBanner(): React.ReactElement | null {
           </Text>
         </View>
         {badge ? (
-          <View className="rounded-full bg-primary px-2.5 py-1">
+          <View
+            className="rounded-full bg-primary px-2.5 py-1"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
             <Text className="text-caption font-semibold text-text-inverse">
               {badge}
             </Text>

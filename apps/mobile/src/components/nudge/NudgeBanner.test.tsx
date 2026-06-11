@@ -109,7 +109,13 @@ describe('NudgeBanner', () => {
 
     render(<NudgeBanner />);
 
-    screen.getByText('2 new');
+    // Badge text is visually rendered but hidden from accessibility tree (F-058:
+    // count is surfaced via the parent Pressable's accessibilityLabel instead).
+    screen.getByText('2 new', { includeHiddenElements: true });
+    // Confirm the count is also in the accessible label.
+    expect(
+      screen.getByTestId('nudge-banner').props.accessibilityLabel,
+    ).toContain('2');
   });
 
   it('does not show badge when exactly 1 unread nudge', () => {

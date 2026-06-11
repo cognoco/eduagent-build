@@ -51,7 +51,8 @@
     "notNow": "Not now",
     "active": "Active",
     "goBackAction": "Go back",
-    "tryAgainAction": "Try again"
+    "tryAgainAction": "Try again",
+    "dismiss": "Dismiss"
   },
   "quota": {
     "parent": {
@@ -2677,7 +2678,9 @@
     "banner": {
       "title": "{{fromDisplayName}} sent you a nudge",
       "unreadCount": "{{count}} new",
-      "modalTitle": "New nudges"
+      "modalTitle": "New nudges",
+      "bannerLabel": "{{fromDisplayName}} sent you a nudge, {{count}} new",
+      "bannerLabelSingle": "{{fromDisplayName}} sent you a nudge"
     }
   },
   "learnerHomeTimeout": {
@@ -3037,7 +3040,11 @@
     "aboutChild": "About your child",
     "ageGate": "To set up a child's learning, the account holder must be 18 or older. You can still set up your own learning instead — pick \"My learning\" on the previous step.",
     "childSaveError": "We saved your account, but couldn't add your child yet: {{error}}",
-    "confirmChildReady": "Your child's profile is set up. Let's open parent home."
+    "confirmChildReady": "Your child's profile is set up. Let's open parent home.",
+    "yourNameLabel": "Your name",
+    "yourBirthYearLabel": "Your birth year",
+    "childNameLabel": "Child's name",
+    "childBirthYearLabel": "Child's birth year"
   },
   "myNotes": {
     "title": "My Notes",

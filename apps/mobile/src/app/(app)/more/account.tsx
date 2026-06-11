@@ -116,10 +116,12 @@ export default function AccountScreen(): React.ReactElement {
           animationType="slide"
           transparent
           onRequestClose={() => setShowLanguagePicker(false)}
+          accessibilityViewIsModal
         >
           <Pressable
             className="flex-1 bg-black/50 justify-end"
             onPress={() => setShowLanguagePicker(false)}
+            accessibilityRole="button"
             accessibilityLabel={t('common.close')}
             testID="app-language-backdrop"
           >
@@ -160,6 +162,8 @@ export default function AccountScreen(): React.ReactElement {
                         : 'bg-surface'
                     }`}
                     testID={`language-option-${lang}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: lang === currentLanguage }}
                   >
                     <View>
                       <Text className="text-body font-medium text-text-primary">

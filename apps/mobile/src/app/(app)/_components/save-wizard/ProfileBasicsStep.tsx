@@ -220,6 +220,7 @@ export function ProfileBasicsStep({
                 ? 'save-basics-display-name'
                 : 'save-basics-parent-name'
             }
+            accessibilityLabel={t('saveWizard.yourNameLabel')}
           />
           <TextInput
             placeholder="Birth year (e.g. 1985)"
@@ -233,6 +234,7 @@ export function ProfileBasicsStep({
                 ? 'save-basics-birth-year'
                 : 'save-basics-parent-birth-year'
             }
+            accessibilityLabel={t('saveWizard.yourBirthYearLabel')}
           />
         </View>
       )}
@@ -248,6 +250,7 @@ export function ProfileBasicsStep({
             onChangeText={setChildName}
             className="bg-surface text-text-primary rounded-input px-4 py-3 mb-3"
             testID="save-basics-child-name"
+            accessibilityLabel={t('saveWizard.childNameLabel')}
           />
           <TextInput
             placeholder="Birth year"
@@ -257,6 +260,7 @@ export function ProfileBasicsStep({
             maxLength={4}
             className="bg-surface text-text-primary rounded-input px-4 py-3"
             testID="save-basics-child-birth-year"
+            accessibilityLabel={t('saveWizard.childBirthYearLabel')}
           />
         </View>
       )}

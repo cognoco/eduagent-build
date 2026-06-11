@@ -35,7 +35,8 @@
     "notNow": "Ikke nå",
     "active": "Aktiv",
     "goBackAction": "Gå tilbake",
-    "tryAgainAction": "Prøv igjen"
+    "tryAgainAction": "Prøv igjen",
+    "dismiss": "Avvis"
   },
   "quota": {
     "parent": {
@@ -2547,7 +2548,9 @@
     "banner": {
       "title": "{{fromDisplayName}} sendte deg en nudge",
       "unreadCount": "{{count}} nye",
-      "modalTitle": "Nye nudger"
+      "modalTitle": "Nye nudger",
+      "bannerLabel": "{{fromDisplayName}} sendte deg et puff, {{count}} nye",
+      "bannerLabelSingle": "{{fromDisplayName}} sendte deg et puff"
     }
   },
   "practiceHub": {
@@ -3037,7 +3040,11 @@
     "aboutChild": "Om barnet ditt",
     "ageGate": "For å sette opp læring for et barn, må kontoinnehaveren være 18 år eller eldre. Du kan fortsatt sette opp din egen læring i stedet – velg «Min læring» i forrige trinn.",
     "childSaveError": "Vi lagret kontoen din, men kunne ikke legge til barnet ditt ennå: {{error}}",
-    "confirmChildReady": "Barnets profil er satt opp. La oss åpne foreldrenes hjem."
+    "confirmChildReady": "Barnets profil er satt opp. La oss åpne foreldrenes hjem.",
+    "yourNameLabel": "Ditt navn",
+    "yourBirthYearLabel": "Ditt fødselsår",
+    "childNameLabel": "Barnets navn",
+    "childBirthYearLabel": "Barnets fødselsår"
   },
   "myNotes": {
     "title": "Mine notater",

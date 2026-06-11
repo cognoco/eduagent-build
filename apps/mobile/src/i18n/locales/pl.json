@@ -35,7 +35,8 @@
     "notNow": "Nie teraz",
     "active": "Aktywny",
     "goBackAction": "Wróć",
-    "tryAgainAction": "Spróbuj ponownie"
+    "tryAgainAction": "Spróbuj ponownie",
+    "dismiss": "Odrzuć"
   },
   "quota": {
     "parent": {
@@ -346,7 +347,9 @@
     "banner": {
       "title": "{{fromDisplayName}} wysłał(a) ci zachętę",
       "unreadCount": "{{count}} nowe",
-      "modalTitle": "Nowe zachęty"
+      "modalTitle": "Nowe zachęty",
+      "bannerLabel": "{{fromDisplayName}} przesyła Ci zaczepkę, {{count}} nowych",
+      "bannerLabelSingle": "{{fromDisplayName}} przesyła Ci zaczepkę"
     }
   },
   "family": {
@@ -3043,7 +3046,11 @@
     "aboutChild": "O Twoim dziecku",
     "ageGate": "Aby skonfigurować naukę dziecka, właściciel konta musi mieć ukończone 18 lat. Nadal możesz skonfigurować własną naukę — wybierz „Moja nauka” w poprzednim kroku.",
     "childSaveError": "Zapisaliśmy Twoje konto, ale nie mogliśmy jeszcze dodać Twojego dziecka: {{error}}",
-    "confirmChildReady": "Profil Twojego dziecka jest skonfigurowany. Otwórzmy stronę główną rodzica."
+    "confirmChildReady": "Profil Twojego dziecka jest skonfigurowany. Otwórzmy stronę główną rodzica.",
+    "yourNameLabel": "Twoje imię",
+    "yourBirthYearLabel": "Twój rok urodzenia",
+    "childNameLabel": "Imię dziecka",
+    "childBirthYearLabel": "Rok urodzenia dziecka"
   },
   "myNotes": {
     "title": "Moje notatki",

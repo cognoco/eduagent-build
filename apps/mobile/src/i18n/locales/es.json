@@ -35,7 +35,8 @@
     "notNow": "Ahora no",
     "active": "Activo",
     "goBackAction": "Volver",
-    "tryAgainAction": "Intentar de nuevo"
+    "tryAgainAction": "Intentar de nuevo",
+    "dismiss": "Descartar"
   },
   "quota": {
     "parent": {
@@ -2547,7 +2548,9 @@
     "banner": {
       "title": "{{fromDisplayName}} te envio un nudge",
       "unreadCount": "{{count}} nuevos",
-      "modalTitle": "Nuevos nudges"
+      "modalTitle": "Nuevos nudges",
+      "bannerLabel": "{{fromDisplayName}} te envió un toque, {{count}} nuevos",
+      "bannerLabelSingle": "{{fromDisplayName}} te envió un toque"
     }
   },
   "practiceHub": {
@@ -3037,7 +3040,11 @@
     "aboutChild": "Sobre tu hijo/a",
     "ageGate": "Para configurar el aprendizaje de un niño, el titular de la cuenta debe ser mayor de 18 años. Aún puedes configurar tu propio aprendizaje; elige \"Mi aprendizaje\" en el paso anterior.",
     "childSaveError": "Guardamos tu cuenta, pero aún no pudimos añadir a tu hijo/a: {{error}}",
-    "confirmChildReady": "El perfil de tu hijo/a está configurado. Abramos la página de inicio para padres."
+    "confirmChildReady": "El perfil de tu hijo/a está configurado. Abramos la página de inicio para padres.",
+    "yourNameLabel": "Tu nombre",
+    "yourBirthYearLabel": "Tu año de nacimiento",
+    "childNameLabel": "Nombre del hijo/a",
+    "childBirthYearLabel": "Año de nacimiento del hijo/a"
   },
   "myNotes": {
     "title": "Mis notas",

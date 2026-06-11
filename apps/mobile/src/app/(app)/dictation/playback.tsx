@@ -247,12 +247,13 @@ export default function PlaybackScreen(): React.ReactElement {
         transparent
         animationType="fade"
         onRequestClose={() => setExitConfirmVisible(false)}
+        accessibilityViewIsModal
       >
         <Pressable
           className="flex-1 bg-black/40 justify-center items-center px-6"
           onPress={() => setExitConfirmVisible(false)}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss"
+          accessibilityLabel={t('common.dismiss')}
           testID="dictation-exit-modal-backdrop"
         >
           <Pressable
