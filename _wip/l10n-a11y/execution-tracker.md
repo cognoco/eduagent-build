@@ -139,7 +139,7 @@ overlapping component files — keep adjacent/serial).
 | 3 | WI-623 WP-L12-modal-focus-roles | ready — bridged (children WI-653/654); run adjacent/serial with WI-624 (overlapping surface) |
 | 4 | WI-624 WP-L12-label-prop-strings | ready — bridged (children WI-655/656); after WI-621 lands (same screens, attribute pass) |
 | 5 | WI-625 WP-L12-pluralization | ready — bridged (children WI-657/658); PR #961 left plural-site breadcrumbs |
-| 6 | WI-626 WP-L12-mobile-logic-bugs | review — PR #959 **MERGED** `0a7b07dbe` after 5 CI rounds (matcher finding chain: Codex CJK → CodeRabbit per-token + mount-assert → ?-boundary, all red-verified; gc1-allow wording flip-flop ruled shepherd-side). Children WI-644/645 swept; re-`complete` firing with the F-123 AC deviation note |
+| 6 | WI-626 WP-L12-mobile-logic-bugs | review — PR #959 MERGED `0a7b07dbe` (5 CI rounds, all findings red-verified); children swept; `complete` done. Reviewer bounced on red-main landing checks — **refuted with evidence** (main went red one merge EARLIER at `2e5589cdf` / PR #931; WI-626 touches neither failing surface; KV deploy gap is standing infra) — Stage restored to Reviewing for re-audit |
 | 7 | WI-627 WP-L12-dates-locale | in-progress — dispatched wi627-executor (rolled into WI-626's freed lane) |
 | 8 | WI-628 WP-L12-decorative-lowvision | ready — bridged (children WI-661/662) |
 
