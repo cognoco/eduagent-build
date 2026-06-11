@@ -44,7 +44,7 @@ jest.mock('@expo/vector-icons', () => ({
 const mockFormatApiError = jest.fn((err: unknown) =>
   err instanceof Error ? `classified:${err.message}` : 'classified:unknown',
 );
-const mockClassifyApiError = jest.fn(() => ({
+const mockClassifyApiError = jest.fn((_err: unknown) => ({
   message: 'classified',
   category: 'unknown' as const,
   recovery: 'retry' as const,
