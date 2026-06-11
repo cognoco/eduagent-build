@@ -169,14 +169,17 @@ describe('ask-silent-classify Inngest function', () => {
     // a fully-valid payload must still pass through to classifySubject.
     // [WI-577 / F-083] The db mock answers both step queries: the
     // check-existing metadata read (…where().limit()) and the classify
-    // step's user_message rehydration (…where().orderBy()).
+    // step's user_message rehydration (…where().orderBy().limit(n) —
+    // honors the limit so the staleness-bounding test below is real).
     function stubDb(userMessageRows: Array<{ content: string }>) {
       mockGetStepDatabase.mockReturnValue({
         select: () => ({
           from: () => ({
             where: () => ({
               limit: async () => [{ metadata: {} }],
-              orderBy: async () => userMessageRows,
+              orderBy: () => ({
+                limit: async (n: number) => userMessageRows.slice(0, n),
+              }),
             }),
           }),
         }),
@@ -217,6 +220,33 @@ describe('ask-silent-classify Inngest function', () => {
         expect.anything(),
         TEST_PROFILE_ID,
         'what is photosynthesis?\nand why are leaves green?',
+      );
+    });
+
+    // Codex P2 (PR #911): a delayed/retried run must not classify from
+    // messages the learner sent AFTER the triggering exchange — rehydration
+    // is bounded to the first `exchangeCount` user messages.
+    it('[WI-577] bounds rehydration to the triggering exchange on delayed runs', async () => {
+      mockClassifySubject.mockResolvedValue({ candidates: [] });
+      stubDb([
+        { content: 'what is photosynthesis?' },
+        { content: 'and why are leaves green?' },
+        { content: 'now help me with my history homework instead' },
+      ]);
+
+      await executeHandler({
+        sessionId: TEST_SESSION_ID,
+        profileId: TEST_PROFILE_ID,
+        exchangeCount: 2,
+      });
+
+      expect(mockClassifySubject).toHaveBeenCalledWith(
+        expect.anything(),
+        TEST_PROFILE_ID,
+        'what is photosynthesis?\nand why are leaves green?',
+      );
+      expect(JSON.stringify(mockClassifySubject.mock.calls)).not.toContain(
+        'history homework',
       );
     });
 

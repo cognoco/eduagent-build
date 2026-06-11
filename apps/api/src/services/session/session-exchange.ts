@@ -30,6 +30,7 @@ import type {
   SubscriptionTier,
   VerificationType,
   ChallengeRoundSessionState,
+  TopicProbeRequestedEvent,
 } from '@eduagent/schemas';
 import {
   ConflictError,
@@ -918,16 +919,9 @@ interface ReviewCalibrationDispatchPayload {
 // instead of the learner's raw probe answer / topic title — Inngest persists
 // event payloads in its third-party event store. The consumer
 // (topic-probe-extract) rehydrates both from the DB, scoped by profileId.
-// Keep in sync with `topicProbeRequestedEventSchema` (@eduagent/schemas).
-interface TopicProbeDispatchPayload {
-  version: 1;
-  profileId: string;
-  sessionId: string;
-  subjectId: string;
-  topicId: string;
-  learnerMessageEventId: string;
-  timestamp: string;
-}
+// Aliased to the schema-inferred type so the payload cannot drift from
+// `topicProbeRequestedEventSchema` (@eduagent/schemas).
+type TopicProbeDispatchPayload = TopicProbeRequestedEvent;
 
 async function maybeDispatchReviewCalibration(
   db: Database,

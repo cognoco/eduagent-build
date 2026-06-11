@@ -124,6 +124,12 @@ export const askSilentClassify = inngest.createFunction(
     // PII egress: Rehydrate the learner's user messages from the DB —
     // never from the event payload. The raw text stays a local variable
     // inside this step closure, so it is never serialized into Inngest state.
+    // Bound to the triggering exchange: a delayed or retried run must not
+    // classify from messages the learner sent AFTER the event fired, so the
+    // rehydration takes only the first `exchangeCount` user messages (one
+    // user message per exchange; session_events rows are append-only and
+    // immutable, so that prefix is stable however late the run executes).
+    const messageLimit = Math.max(1, Math.floor(exchangeCount));
     const classification = await step.run('classify', async () => {
       const rows = await db
         .select({ content: sessionEvents.content })
@@ -135,7 +141,8 @@ export const askSilentClassify = inngest.createFunction(
             eq(sessionEvents.eventType, 'user_message'),
           ),
         )
-        .orderBy(asc(sessionEvents.createdAt), asc(sessionEvents.id));
+        .orderBy(asc(sessionEvents.createdAt), asc(sessionEvents.id))
+        .limit(messageLimit);
       const classifyInput = rows
         .map((row) => row.content)
         .filter(Boolean)
