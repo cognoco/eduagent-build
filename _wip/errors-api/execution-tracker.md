@@ -120,9 +120,9 @@ parallel with either.
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-639 WP-E15-catch-hygiene | backlog |
-| 2 | WI-640 WP-E15-typed-errors | backlog |
-| 3 | WI-641 IT-E15-mobile-classification | backlog |
+| 1 | WI-639 WP-E15-catch-hygiene | in-progress — Ready (bridged) + executor dispatched 2026-06-11 |
+| 2 | WI-640 WP-E15-typed-errors | backlog — serial after WI-639 merge |
+| 3 | WI-641 IT-E15-mobile-classification | in-progress — Ready + executor dispatched 2026-06-11 (parallel) |
 
 ---
 
@@ -140,6 +140,19 @@ after WI-639 merges.
 
 ## 6. Change log
 
+- **2026-06-11 (shepherd, post-join)** — **WI-639 + WI-641 Ready and dispatched.**
+  WI-639 bridged per the standing WP DoR ruling: bundle brief written to the page
+  body; provenance children **WI-642** (silence half: F-022/F-047/F-048) and
+  **WI-643** (webhook-context half: F-049) captured, `Parent item`-linked;
+  `refine --to-ready` passed (Assisted, risk recorded). WI-641 refined normally
+  (framing confirmed against existing Description/AC; Assisted). Executors
+  `wi639-executor` + `wi641-executor` launched in parallel (Sonnet, worktrees
+  `.worktrees/WI-639` / `.worktrees/WI-641`); briefs follow the IF
+  protocol-example shape incl. the binding amendments block + merge-before-
+  complete ordering (Fixed In must cite the landed commit; reviewer fires on the
+  Reviewing transition and expects a merged PR). Stage monitor live on this
+  workstream (90s poll, `/tmp/errors-api-wi-stage-state.tsv`). WI-640 held
+  serial behind WI-639's merge (neighboring API surfaces; medium supervision).
 - **2026-06-11 (shepherd session start)** — **Review loop joined.** The watcher
   config entry for **API Error Handling** (`37c8bce9-1f7c-817c-98ec-d1d4ba0a15e3`,
   no overrides) was already present in `review-watcher-v3.ts` when this shepherd
