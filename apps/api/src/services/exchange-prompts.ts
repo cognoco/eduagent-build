@@ -511,9 +511,16 @@ export function buildSystemPrompt(
   // strips \n\r\t"<> and caps length; escapeXml entity-encodes long content
   // (rawInput) without losing information.
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
-  const safeLearnerName = context.learnerName
-    ? sanitizeXmlValue(context.learnerName, 64)
-    : '';
+  // WI-580 (F-076): defense-in-depth at the egress surface — a minor's real
+  // name must never be interpolated into a provider-bound prompt, regardless
+  // of what a caller placed in `context.learnerName`. The construction site
+  // (resolvePromptLearnerName in session-exchange.ts) is the primary gate;
+  // this layer holds even if a future caller bypasses it. Ownership is not
+  // visible here, so this guard gates on age alone.
+  const safeLearnerName =
+    context.learnerName && resolveAgeBracket(context.birthYear) === 'adult'
+      ? sanitizeXmlValue(context.learnerName, 64)
+      : '';
   const safeTopicTitle = context.topicTitle
     ? sanitizeXmlValue(context.topicTitle, 200)
     : '';
