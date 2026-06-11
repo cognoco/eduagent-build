@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Parent email memoized in consent-reminders token-mint step state",
+    "type": "Bug",
+    "priority": "P3",
+    "description": "consent-reminders.ts memoizes { parentEmail, freshToken } in its refresh-day-7-token / refresh-day-14-token step returns (apps/api/src/inngest/functions/consent-reminders.ts ~96-160). The token mint must stay memoized (non-idempotent), but the parent email rides along into Inngest's third-party state store. Same leak class as WP-W3-pii-step-state but parent (not minor) PII and outside that bundle's audited finding set. WI-578 deliberately excluded 'parentEmail' from INNGEST_PII_STEP_KEYS so this flow keeps working; add the key once fixed.",
+    "acceptanceCriteria": "refresh-day-N-token steps memoize the token (and a boolean/handle) only; the send steps rehydrate the email address from consent_states in-step; 'parentEmail' added to INNGEST_PII_STEP_KEYS in packages/schemas/src/pii-scrub.ts; break test asserting no email address in memoized step returns."
+  },
+  {
+    "name": "Full session transcript memoized as fetch-transcript step return in auto-file-session",
+    "type": "Bug",
+    "priority": "P2",
+    "description": "auto-file-session.ts memoizes the formatted full session transcript (a raw string return from the fetch-transcript step, apps/api/src/inngest/functions/auto-file-session.ts ~71-76) into Inngest's third-party state store. This is the same minor-PII step-state leak class as WP-W3-pii-step-state (F-075/085-089) but was not in that bundle's audited finding set. Key-based scrubbing (INNGEST_PII_STEP_KEYS) cannot catch a bare string return. Fix: fetch + format the transcript inside the file-session step (reference-and-rehydrate via sessionId), keeping the existence check as a cheap boolean step if needed.",
+    "acceptanceCriteria": "No transcript text in any memoized step return of auto-file-session; downstream steps rehydrate via getSessionTranscript(db, profileId, sessionId) in-step; break test asserting a known transcript marker never appears in memoized step returns."
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "pageId": "37b8bce9-1f7c-8146-9fc5-c7963fe4f10d",
+  "id": "WI-575",
+  "name": "WP-W2-proxy-authority: apply the central proxy authority guard to remaining unguarded routes",
+  "description": "W2 (identity/consent/proxy/age) — apply the central guardian-act-for authority check (MMT-ADR-0008, inv 7/8) at each remaining unguarded proxy mutation site (library-filing, unmetered route), on the W1 authority model. Subsumes by construction F-117/F-144 (patched in WI-549 / WP-W0-patch-api) — do not re-implement the W0 patches.",
+  "acceptanceCriteria": "Every proxy mutation passes the central authority check; regression AC — the WP-W0-patch-api (WI-549) break-tests for F-117/F-144 still pass against the rebuilt model; do not re-implement the W0 patches. Findings: F-126 (library-filing proxy guard), F-023 (unmetered-route proxy-guard skip). Source of truth: _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 WP-W2-proxy-authority (commit 23d0c01ad)",
+  "riskImpact": "S / standard — proxy mutation paths.",
+  "type": "Bug",
+  "altitude": "WP",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief (WP-W2-proxy-authority)\nTranscribed from the ratified Phase-O master plan _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 → \"WP-W2-proxy-authority\" detail block @ commit 23d0c01ad (eduagent-build) — the frozen source of truth. Children are absorbed provenance (ZDX-ADR-0001).\nBundle rationale\nThe same proxy-write-authority guard applied across the remaining unguarded routes (library-filing, unmetered route), on the W1 authority model.\nStrategy\nCentral guardian-act-for authority check (MMT-ADR-0008, inv 7/8) at each proxy mutation site.\nScope\nIn: F-126 (library-filing proxy guard), F-023 (unmetered-route proxy-guard skip). Out: the W0-patched proxy defects (subsumed — see below).\nFindings table\nSubsumes by construction: F-117, F-144 (patched in WP-W0-patch-api / WI-549).\nAcceptance Criteria (bundle)\nEvery proxy mutation passes the central authority check.\nRegression AC: the WI-549 break-tests for F-117/F-144 still pass against the rebuilt model — do NOT re-implement the W0 patches.\nRisk & blast radius\nS / standard — proxy mutation paths. Depends on WP-W1-authority-graph (WI-572) + WP-W2-scope-rls (WI-574)."
+}

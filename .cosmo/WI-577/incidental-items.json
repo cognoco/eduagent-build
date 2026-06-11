@@ -1,0 +1,9 @@
+[
+  {
+    "name": "Minor's raw learnerMessage/topicTitle in app/review.calibration.requested event payload (W3 PII-egress class, missed by audit finding set)",
+    "type": "Bug",
+    "priority": "P1",
+    "description": "Same leak class as WI-577's findings (F-073/083/084/095) but outside that WP's audited finding set: maybeDispatchReviewCalibration (apps/api/src/services/session/session-exchange.ts) places the learner's raw calibration answer (learnerMessage) and topicTitle into the app/review.calibration.requested Inngest event payload (reviewCalibrationRequestedEventSchema in packages/schemas/src/inngest-events.ts), which Inngest persists in its third-party event store. The consumer (review-calibration-grade.ts) reads both fields for evaluateRecallQuality. Unlike the topic-probe site, this dispatch fires BEFORE the user message is persisted to session_events, so the WI-577 reference-and-rehydrate pattern needs either (a) moving the dispatch post-persist so a session_events row id can be referenced, or (b) consumer-side rehydration with a retriable wait for persistence. Once fixed, add 'learnerMessage'/'topicTitle' to INNGEST_PII_PAYLOAD_KEYS in packages/schemas/src/pii-scrub.ts so the client-boundary scrub middleware covers the keys (deliberately excluded while this legitimate consumer remains — see the note in that module).",
+    "acceptanceCriteria": "app/review.calibration.requested payload carries no raw learner text or topic title (opaque reference only); consumer rehydrates from DB scoped by profileId; break-test asserting a known minor identifier never lands in the dispatched payload; 'learnerMessage' and 'topicTitle' added to INNGEST_PII_PAYLOAD_KEYS with middleware test updated."
+  }
+]

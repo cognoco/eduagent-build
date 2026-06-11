@@ -1,0 +1,17 @@
+{
+  "pageId": "37c8bce9-1f7c-81a6-b38e-d85f187622e4",
+  "id": "WI-641",
+  "name": "IT-E15-mobile-classification: enforce error classification in 6 mobile screens",
+  "description": "F-110: error classification is bypassed in 6 mobile screens — they parse HTTP status codes per-screen, violating the UX Resilience rule (classify at the API client boundary; screens never parse status codes). Route all 6 through the shared classification boundary (classifyApiError) and the shared ErrorFallback/TimeoutLoader patterns. The server envelope contract is FINAL as of 2026-06-11 (WI-581 envelope-router Closed) — read its diff before designing; do not invent new error types outside the landed contract. Full finding text: docs/audit/2026-05-29-full-audit/L-gap-delta.md (label errors-api).",
+  "acceptanceCriteria": "All 6 screens classify via the shared boundary; no per-screen status-code parsing remains in them; fallback actions follow the primary-retry/secondary-back rule; regression test per screen or a shared boundary test covering the 6 call sites.",
+  "riskImpact": "S-M / mobile-only, parallel-safe with the API-side units.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

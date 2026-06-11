@@ -1,0 +1,17 @@
+{
+  "pageId": "37b8bce9-1f7c-819e-a941-ced4c9f97a80",
+  "id": "WI-579",
+  "name": "WP-W3-pii-error-logging: remove minor-PII from logs and Sentry (error/observability path)",
+  "description": "W3 (PII-handling, minor-PII egress) — never emit raw minor-derived text via logger.*, captureException extras, or Sentry breadcrumbs: strip/replace extra.rawSlice / rawResponseTrunc, the fallback-catch subject forwarding, and the schema-drift logger.error(..., { rawData: event.data }) / captureException(..., { extra: { rawData: event.data } }) with redacted equivalents. Shares the four-unit scrubber discipline.",
+  "acceptanceCriteria": "No minor-PII in any logger.* call, captureException extras, or Sentry breadcrumb — explicitly no rawData: event.data in logs or captureException extras on the schema-drift path (F-018); break-test on each error path; shared scrubber exported from a canonical home (bundle-level AC across the four W3 PII units). Findings: F-018 (schema-drift path logs/captures raw event payload), F-074 (truncated LLM output to Sentry extras), F-140 (raw learner subject to Sentry in a fallback catch) (3). Source of truth: _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 WP-W3-pii-error-logging (commit 23d0c01ad)",
+  "riskImpact": "S / standard — logging + error-tracker exposure.",
+  "type": "Bug",
+  "altitude": "WP",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief (WP-W3-pii-error-logging)\nTranscribed from the ratified Phase-O master plan §1 → \"WP-W3-pii-error-logging\" @ 23d0c01ad — frozen source of truth. Children are absorbed provenance (ZDX-ADR-0001): WI-608/609.\nBundle rationale\nSame fix at the error/observability boundary — never emit raw minor-derived text via logger.*, captureException extras, or Sentry breadcrumbs. Covers both the Sentry-extra leaks and the schema-drift error path that logs/captures the raw event payload.\nStrategy\nStrip/replace extra.rawSlice / rawResponseTrunc, the fallback-catch subject forwarding, and the schema-drift logger.error(…, { rawData: event.data }) / captureException(…, { extra: { rawData: event.data } }) with redacted equivalents.\nScope\nIn: F-018 (schema-drift path), F-074 (truncated LLM output to Sentry extras), F-140 (raw learner subject in fallback catch). Out: payloads / step-state / LLM-provider (siblings).\nFindings table\nAcceptance Criteria (bundle)\nNo minor-PII in any logger.* call, captureException extras, or Sentry breadcrumb.\nExplicitly no rawData: event.data in logs or captureException extras on the schema-drift path (F-018).\nBreak-test on each error path.\nRisk & blast radius\nS / standard — logging + error-tracker exposure. Depends on WP-W1-spine (WI-571) + WP-W2-scope-rls (WI-574)."
+}

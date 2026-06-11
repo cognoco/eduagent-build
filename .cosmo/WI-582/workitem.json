@@ -1,0 +1,17 @@
+{
+  "pageId": "37b8bce9-1f7c-8113-9d0f-f0a2a2f35c8f",
+  "id": "WI-582",
+  "name": "WP-W3-entitlement-isolation: isolate entitlement + credit reads to the owning account",
+  "description": "W3 — scope entitlement + credit reads to the owning person/org per the new tenancy model (MMT-ADR-0001/0002/0015): the same cross-account entitlement-leak pattern (RevenueCat entitlement + owner credit balance both leaking across the account/child boundary). Billing-math correctness is out of scope (W4).",
+  "acceptanceCriteria": "Entitlement + credit balance never cross the account/child boundary; break-test attempting a child read of an owner's credit/entitlement. Findings: F-134 (RevenueCat cross-account leak), F-135 (owner credit leaked to child). Source of truth: _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 WP-W3-entitlement-isolation (commit 23d0c01ad)",
+  "riskImpact": "S / standard — credit/entitlement boundary.",
+  "type": "Bug",
+  "altitude": "WP",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief (WP-W3-entitlement-isolation)\nTranscribed from the ratified Phase-O master plan §1 → \"WP-W3-entitlement-isolation\" @ 23d0c01ad — frozen source of truth. Children are absorbed provenance (ZDX-ADR-0001): WI-612/613.\nBundle rationale\nThe same cross-account entitlement-leak pattern (RevenueCat entitlement + owner credit balance both leaking across the account/child boundary) on the new tenancy model.\nStrategy\nScope entitlement + credit reads to the owning person/org per the new tenancy model (MMT-ADR-0001/0002/0015).\nScope\nIn: F-134 (RevenueCat cross-account leak), F-135 (owner credit leaked to child). Out: billing-math correctness (W4 / WI-583).\nFindings table\nAcceptance Criteria (bundle)\nEntitlement + credit balance never cross the account/child boundary.\nBreak-test attempting a child read of an owner's credit/entitlement.\nRisk & blast radius\nS / standard — credit/entitlement boundary. Depends on WP-W2-scope-rls (WI-574)."
+}
