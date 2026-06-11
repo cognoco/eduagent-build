@@ -134,7 +134,7 @@ overlapping component files — keep adjacent/serial).
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-621 WP-L12-jsx-strings | review — ALL 3 PRs MERGED (A #942 `684495a2c` · B #961 `e382a95e6` · C #985 `51452269c`); baseline 361→12 (all retentions justified); translate-pipeline plural-variant bug fixed at 3 sites with live proof; children WI-633/634 swept; `complete` firing |
+| 1 | WI-621 WP-L12-jsx-strings | **done** — 3 PRs (A #942 · B #961 · C #985), baseline 361→12, translate-pipeline plural fix shipped; CLOSED Done first-pass 2026-06-11 |
 | 2 | WI-622 WP-L12-sr-announcements | **done** — PR #940 merged `ce8b10ab9`; children WI-635/636 swept; CLOSED Done by autonomous review 2026-06-11 (first WP through the PRG-12 loop, zero human touches) |
 | 3 | WI-623 WP-L12-modal-focus-roles | in-progress — dispatched wi623-executor (jumped queue: WI-625 gated on PR #985's translate-prune fix) |
 | 4 | WI-624 WP-L12-label-prop-strings | ready — bridged (children WI-655/656); after WI-621 lands (same screens, attribute pass) |
