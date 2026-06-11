@@ -29,19 +29,24 @@ function listMobileTsxSources(): string[] {
     .filter((l) => !/\.test\.tsx$/.test(l));
 }
 
-// Brace-depth-aware: tracks {/} so '>' inside prop expressions doesn't truncate the tag.
+// Brace-depth- and quote-aware: tracks {/} and quote state so '>' inside prop
+// expressions or quoted attribute values doesn't truncate the tag.
 function findModalOpenings(source: string): ModalOpening[] {
   const openings: ModalOpening[] = [];
   const re = /<Modal[\s/>]/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(source)) !== null) {
     let depth = 0;
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
     let end = -1;
     for (let i = match.index; i < source.length; i++) {
       const ch = source[i];
-      if (ch === '{') depth++;
-      else if (ch === '}') depth--;
-      else if (ch === '>' && depth === 0) {
+      if (ch === "'" && !inDoubleQuote) inSingleQuote = !inSingleQuote;
+      else if (ch === '"' && !inSingleQuote) inDoubleQuote = !inDoubleQuote;
+      else if (!inSingleQuote && !inDoubleQuote && ch === '{') depth++;
+      else if (!inSingleQuote && !inDoubleQuote && ch === '}') depth--;
+      else if (!inSingleQuote && !inDoubleQuote && ch === '>' && depth === 0) {
         end = i;
         break;
       }
@@ -55,10 +60,13 @@ function findModalOpenings(source: string): ModalOpening[] {
   return openings;
 }
 
-// A tag violates if the prop is absent, or present but disabled with a literal {false}.
+// A tag violates if the prop is absent, or present but disabled with a literal
+// {false}. Quoted attribute values are stripped first so the prop name inside
+// another attribute's string value cannot satisfy the boundary match.
 function tagViolates(tag: string): boolean {
-  if (!tag.includes('accessibilityViewIsModal')) return true;
-  return /accessibilityViewIsModal\s*=\s*\{\s*false\s*\}/.test(tag);
+  const withoutStrings = tag.replace(/"[^"]*"|'[^']*'/g, '""');
+  if (!/\baccessibilityViewIsModal\b/.test(withoutStrings)) return true;
+  return /accessibilityViewIsModal\s*=\s*\{\s*false\s*\}/.test(withoutStrings);
 }
 
 describe('MODAL-A11Y-GUARD — every <Modal> traps screen-reader focus', () => {
@@ -78,6 +86,22 @@ describe('MODAL-A11Y-GUARD — every <Modal> traps screen-reader focus', () => {
     // 15 Modal instances existed when this guard landed; the population may
     // grow or shrink, but a sudden drop to zero means the scanner is broken.
     expect(total).toBeGreaterThan(0);
+  });
+
+  it('does not terminate the tag at a ">" inside a quoted attribute value', () => {
+    const openings = findModalOpenings(
+      '<Modal title="a > b" accessibilityViewIsModal>',
+    );
+    expect(openings).toHaveLength(1);
+    expect(openings[0]?.tag).toContain('accessibilityViewIsModal');
+  });
+
+  it('prop name inside another attribute string value does not satisfy the guard', () => {
+    expect(
+      tagViolates(
+        '<Modal accessibilityLabel="see accessibilityViewIsModal docs">',
+      ),
+    ).toBe(true);
   });
 
   it('rejects an explicit accessibilityViewIsModal={false} opt-out', () => {
