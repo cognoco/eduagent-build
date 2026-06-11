@@ -134,8 +134,8 @@ export function CelebrationAnimation({
     <Animated.View
       style={[styles.container, containerStyle, { width: size, height: size }]}
       testID={testID}
-      accessibilityLabel="Celebration"
-      accessibilityRole="image"
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
     >
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {PARTICLES.map((p, i) => {

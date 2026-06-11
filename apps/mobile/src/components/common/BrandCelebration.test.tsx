@@ -9,7 +9,7 @@ describe('BrandCelebration', () => {
 
   it('renders with testID', () => {
     const { getByTestId } = render(<BrandCelebration testID="brand-cel" />);
-    getByTestId('brand-cel');
+    getByTestId('brand-cel', { includeHiddenElements: true });
   });
 
   it('accepts size prop', () => {

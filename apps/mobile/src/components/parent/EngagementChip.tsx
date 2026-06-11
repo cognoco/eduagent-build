@@ -62,6 +62,8 @@ export function EngagementChip({ signal }: EngagementChipProps) {
         size={14}
         color={color}
         style={{ marginRight: 6 }}
+        accessible={false}
+        importantForAccessibility="no"
       />
       <Text className="text-body-sm font-semibold" style={{ color }}>
         {label}

@@ -201,8 +201,8 @@ export function DeskLampAnimation({
   return (
     <View
       testID={testID}
-      accessibilityLabel="Thinking"
-      accessibilityRole="image"
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
       style={{ width: svgW, height: size }}
     >
       {/* Wall bloom */}

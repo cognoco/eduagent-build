@@ -581,8 +581,8 @@ export function MagicPenAnimation({
     return (
       <View
         testID={testID}
-        accessibilityLabel="Writing animation"
-        accessibilityRole="image"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
         style={{ width: size, height: size, position: 'relative' }}
       >
         {/* Static ink stroke — full path visible */}
@@ -722,8 +722,8 @@ export function MagicPenAnimation({
   return (
     <View
       testID={testID}
-      accessibilityLabel="Writing animation"
-      accessibilityRole="image"
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
       style={{ width: size, height: size, position: 'relative' }}
     >
       {/* ------------------------------------------------------------------ */}

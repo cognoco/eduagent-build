@@ -301,8 +301,8 @@ export function LightBulbAnimation({
   return (
     <View
       testID={testID}
-      accessibilityLabel="Thinking"
-      accessibilityRole="image"
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
       style={{ width: size, height: svgH, alignItems: 'center' }}
     >
       {/* Warm glow halo — Animated.View BEHIND the SVG (Fabric-safe) */}

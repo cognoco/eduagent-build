@@ -4,14 +4,14 @@ import { LightBulbAnimation } from './LightBulbAnimation';
 describe('LightBulbAnimation', () => {
   it('renders without crashing at default size', () => {
     const { getByTestId } = render(<LightBulbAnimation testID="bulb" />);
-    getByTestId('bulb');
+    getByTestId('bulb', { includeHiddenElements: true });
   });
 
   it('renders at 64px (default size)', () => {
     const { getByTestId } = render(
       <LightBulbAnimation testID="bulb" size={64} />,
     );
-    const el = getByTestId('bulb');
+    const el = getByTestId('bulb', { includeHiddenElements: true });
     // width: size = 64
     expect(el.props.style).toMatchObject({ width: 64 });
   });
@@ -20,7 +20,7 @@ describe('LightBulbAnimation', () => {
     const { getByTestId } = render(
       <LightBulbAnimation testID="bulb" size={96} />,
     );
-    const el = getByTestId('bulb');
+    const el = getByTestId('bulb', { includeHiddenElements: true });
     expect(el.props.style).toMatchObject({ width: 96 });
   });
 
@@ -30,11 +30,12 @@ describe('LightBulbAnimation', () => {
     }).not.toThrow();
   });
 
-  it('has accessibility label "Thinking" and role "image"', () => {
+  it('is hidden from screen readers (decorative animation)', () => {
     const { getByTestId } = render(<LightBulbAnimation testID="bulb" />);
-    const el = getByTestId('bulb');
-    expect(el.props.accessibilityLabel).toBe('Thinking');
-    expect(el.props.accessibilityRole).toBe('image');
+    const el = getByTestId('bulb', { includeHiddenElements: true });
+    // Decorative animation — hidden from SR so users don't hear "image, Thinking"
+    expect(el.props.accessible).toBe(false);
+    expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('renders in reduced motion mode without crashing (static fully-lit bulb)', () => {
@@ -44,7 +45,7 @@ describe('LightBulbAnimation', () => {
 
     try {
       const { getByTestId } = render(<LightBulbAnimation testID="bulb" />);
-      getByTestId('bulb');
+      getByTestId('bulb', { includeHiddenElements: true });
     } finally {
       reanimated.useReducedMotion = original;
     }

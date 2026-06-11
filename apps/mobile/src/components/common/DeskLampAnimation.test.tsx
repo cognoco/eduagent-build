@@ -25,21 +25,22 @@ function hasNodeWithProps(
 describe('DeskLampAnimation', () => {
   it('renders without crashing', () => {
     const { getByTestId } = render(<DeskLampAnimation testID="lamp" />);
-    getByTestId('lamp');
+    getByTestId('lamp', { includeHiddenElements: true });
   });
 
-  it('applies accessibility attributes', () => {
+  it('is hidden from screen readers (decorative animation)', () => {
     const { getByTestId } = render(<DeskLampAnimation testID="lamp" />);
-    const el = getByTestId('lamp');
-    expect(el.props.accessibilityLabel).toBe('Thinking');
-    expect(el.props.accessibilityRole).toBe('image');
+    const el = getByTestId('lamp', { includeHiddenElements: true });
+    // Decorative animation — hidden from SR so users don't hear "image, Thinking"
+    expect(el.props.accessible).toBe(false);
+    expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('accepts custom size and color props', () => {
     const { getByTestId } = render(
       <DeskLampAnimation testID="lamp" size={80} color="#3b82f6" />,
     );
-    getByTestId('lamp');
+    getByTestId('lamp', { includeHiddenElements: true });
   });
 
   it('keeps the lamp base visible on dark backgrounds', () => {
@@ -68,7 +69,7 @@ describe('DeskLampAnimation', () => {
     reanimated.useReducedMotion = () => true;
 
     const { getByTestId } = render(<DeskLampAnimation testID="lamp" />);
-    getByTestId('lamp');
+    getByTestId('lamp', { includeHiddenElements: true });
 
     reanimated.useReducedMotion = original;
   });

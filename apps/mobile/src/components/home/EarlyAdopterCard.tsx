@@ -86,7 +86,14 @@ export function EarlyAdopterCard({
         <Text className="text-body-sm font-semibold text-text-primary ms-2 flex-1">
           {t('home.earlyAdopter.badge')}
         </Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+        {/* decorative trailing chevron — Pressable parent carries the label */}
+        <Ionicons
+          name="chevron-forward"
+          size={16}
+          color={colors.primary}
+          accessible={false}
+          importantForAccessibility="no"
+        />
       </Pressable>
       <Pressable
         onPress={handleDismiss}

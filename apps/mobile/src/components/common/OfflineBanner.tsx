@@ -25,6 +25,8 @@ export function OfflineBanner(): React.ReactElement {
         name="cloud-offline-outline"
         size={16}
         color={colors.background}
+        accessible={false}
+        importantForAccessibility="no"
       />
       <Text
         className="text-caption font-semibold ms-2"

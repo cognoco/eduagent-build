@@ -467,8 +467,8 @@ export function BookPageFlipAnimation({
   return (
     <View
       testID={testID}
-      accessibilityLabel="Loading content"
-      accessibilityRole="image"
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
       style={{ width: size, height: size }}
     >
       {/* Isometric wrapper */}
