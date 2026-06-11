@@ -383,6 +383,8 @@ export async function deleteProfileIfConsentWithdrawn(
 
   // [F-093] Account guard: when a parentProfileId is provided, require that
   // the target profile's account_id matches the parent's account_id.
+  // If parentProfileId no longer exists the subquery returns NULL → guard
+  // blocks delete (fail-safe; caller returns 'restored').
   const accountGuard = parentProfileId
     ? sql`AND profiles.account_id = (SELECT account_id FROM profiles WHERE id = ${parentProfileId})`
     : sql``;
