@@ -49,6 +49,25 @@ function learnerProfileRoute(accommodationMode = 'none') {
   return { '/learner-profile': { profile: { accommodationMode } } };
 }
 
+/**
+ * Routes for child-mode: parent has one accommodation mode, child has another.
+ * The child endpoint is keyed first so it wins the substring match over the
+ * parent-only key ('/learner-profile' would also match '/learner-profile/child-1').
+ */
+function childModeRoutes(
+  childAccommodationMode = 'none',
+  parentAccommodationMode = 'short-burst',
+) {
+  return {
+    '/learner-profile/child-1': {
+      profile: { accommodationMode: childAccommodationMode },
+    },
+    '/learner-profile': {
+      profile: { accommodationMode: parentAccommodationMode },
+    },
+  };
+}
+
 describe('LearningPreferencesScreen', () => {
   let active: ReturnType<typeof renderScreen> | null = null;
 
@@ -126,6 +145,23 @@ describe('LearningPreferencesScreen', () => {
       expect(mockPush).toHaveBeenCalledWith(
         '/(app)/more/accommodation?childProfileId=child-1',
       );
+    });
+
+    // F-163 regression: child mode must show the CHILD's accommodation, not the
+    // parent's. Parent has 'short-burst', child has 'none' — the row label must
+    // show 'None' (child) and NOT 'Short-Burst' (parent).
+    // Wait for 'None' to appear so the assertion runs after the child query
+    // settles, not while responses are still pending.
+    it("shows the child's accommodation mode, not the parent's (F-163)", async () => {
+      active = renderScreen(<LearningPreferencesScreen />, {
+        profile: activeProfile,
+        profiles: [activeProfile, childProfile],
+        routes: childModeRoutes('none', 'short-burst'),
+      });
+
+      // findByText waits for the child query to resolve and render 'None'.
+      await active.result.findByText('None');
+      expect(active.result.queryByText('Short-Burst')).toBeNull();
     });
   });
 });
