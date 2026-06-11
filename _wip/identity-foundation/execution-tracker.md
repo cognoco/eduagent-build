@@ -176,7 +176,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #963). Dev + staging seeded and verified green; prd deferred. Detours: WI-649, CF-secrets fix, BUG-12 P1 capture |
-| WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | **in-progress (plan phase)** — executor dispatched 2026-06-11 (`wi586-executor`) on WI-585's close, with a MANDATORY plan-phase stop before implementation: cutover-scope mapping (no runtime code reads the new tables yet), orphan-column re-homing (conversation_language actively read), ownerless disposal, pre-drop reseed runbook, prod chain via blocked pipeline. Bridged earlier (Assisted; children WI-631/632) |
+| WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | **BLOCKED ON OPERATOR (scope fork)** — plan-phase stop delivered 2026-06-11: "remove legacy readers" = full app identity/billing/consent cutover (~80 runtime files, both payment webhooks, consent-request workflow has NO new-model home, ~190 test files, 57-FK re-point) vs the plan's S estimate. Executor recommends SPLIT: WP-CUT-A (additive model completion: conversation_language→person, store-correlation ids, consent_request table) + WP-CUT-B (domain-wise reader cutover, 2-3 PRs) + WI-586 shrinks to reseed-verify-drop. Claim held, no code written |
 
 ---
 
