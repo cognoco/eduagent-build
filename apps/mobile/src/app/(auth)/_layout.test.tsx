@@ -246,15 +246,19 @@ describe('AuthRoutesLayout', () => {
     });
 
     const { rerender } = render(<AuthLayout />);
-    const callsAfterFirstRender = rememberMock.mock.calls.length;
+
+    // Mount-time persistence MUST happen — the deep-link target is written
+    // exactly once by the mount effect. Without this assertion the test
+    // would also pass if rememberPendingAuthRedirect never ran at all.
+    expect(rememberMock).toHaveBeenCalledTimes(1);
+    expect(rememberMock).toHaveBeenCalledWith('/(app)/foo');
 
     // Rerender with identical params — deps unchanged.
     rerender(<AuthLayout />);
-    const callsAfterSameParamRerender = rememberMock.mock.calls.length;
 
     // With the fix: useEffect deps haven't changed → NOT re-called.
     // With the bug: render-phase block fires on every render → count increases.
-    expect(callsAfterSameParamRerender).toBe(callsAfterFirstRender);
+    expect(rememberMock).toHaveBeenCalledTimes(1);
 
     rememberMock.mockRestore();
   });

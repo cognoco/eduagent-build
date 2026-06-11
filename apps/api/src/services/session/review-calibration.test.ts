@@ -76,4 +76,16 @@ describe('isSubstantiveCalibrationAnswer', () => {
       ),
     ).toBe(true);
   });
+
+  it('[F-161] mixed-script answers keep word-boundary checks for Latin tokens (per-token script decision)', () => {
+    // A substantive German answer that contains a CJK term must NOT lose the
+    // word-boundary guard for its Latin tokens: 'nah' is embedded in 'nahe'
+    // and must not match just because the answer also contains 光合成.
+    expect(
+      isSubstantiveCalibrationAnswer(
+        'Fotosynthese (光合成) ist nahe am Herzen der Biologie und produziert Sauerstoff',
+        'de',
+      ),
+    ).toBe(true);
+  });
 });

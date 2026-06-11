@@ -78,7 +78,9 @@ function matchesNonAnswerPhrase(normalized: string, token: string): boolean {
   // safe because CJK non-answer tokens are distinct phrases (e.g. わかりません)
   // that would only appear embedded in a longer response in a meaningful
   // context (e.g. わかりませんでした already IS a non-answer admission).
-  if (hasCjkText(normalized)) return normalized.includes(token);
+  // Decide per TOKEN script, not per answer: a mixed-script answer (Latin
+  // words + a CJK term) must keep word-boundary checks for Latin tokens.
+  if (hasCjkText(token)) return normalized.includes(token);
   // Latin/Cyrillic/etc.: whole-word/phrase guard. The token must be flanked by
   // string boundaries or whitespace so short tokens like 'nah' don't match
   // inside words like 'nahe', and 'nada' doesn't match inside 'granada'.
