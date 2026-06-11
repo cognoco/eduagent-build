@@ -333,7 +333,17 @@ function parseTopicIntentMatcherResponse(
     const parsed = JSON.parse(jsonStr);
     const result = topicIntentMatcherResponseSchema.safeParse(parsed);
     return result.success ? result.data : null;
-  } catch {
+  } catch (err) {
+    // A parse exception here means the LLM returned structurally invalid JSON
+    // that even the brace-depth walker could not isolate. Log so a systematic
+    // regression (e.g. prompt drift causing malformed output) is queryable.
+    logger.warn('topic_intent_matcher_parse_error', {
+      event: 'session.topic_intent_matcher.parse_error',
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      extra: { context: 'session.topic_intent_matcher.parse' },
+    });
     return null;
   }
 }

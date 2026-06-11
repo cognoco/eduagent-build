@@ -3,6 +3,7 @@ import {
   buildTopicIntentMatcherMessages,
   matchTopicByIntent,
   projectAiResponseContent,
+  runTopicIntentMatcher,
   startFirstCurriculumSession,
   stripMarkdownFence,
   SubjectInactiveError,
@@ -13,6 +14,8 @@ import {
   getSessionMetadata,
   normalizeHomeworkSummary,
 } from './session-crud';
+import * as llmModule from '../llm';
+import * as sentryModule from '../sentry';
 import {
   childSessionSchema,
   MAX_EXCHANGES_PER_SESSION,
@@ -991,5 +994,61 @@ describe('getSessionMetadata', () => {
   it('returns empty object for an empty object', () => {
     const meta = {};
     expect(getSessionMetadata(meta)).toBe(meta);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-022 regression: parseTopicIntentMatcherResponse exception logging
+// ---------------------------------------------------------------------------
+
+describe('runTopicIntentMatcher — malformed LLM response logging (errors-api F-022)', () => {
+  let routeAndCallSpy: jest.SpiedFunction<typeof llmModule.routeAndCall>;
+  let captureExceptionSpy: jest.SpiedFunction<
+    typeof sentryModule.captureException
+  >;
+
+  // LLM response with balanced braces but invalid JSON keys (unquoted) so
+  // extractFirstJsonObject returns the raw balanced-brace substring and
+  // JSON.parse throws inside parseTopicIntentMatcherResponse, triggering
+  // the catch block that was previously bare (errors-api F-022).
+  const MALFORMED_RESPONSE = '{ unquoted_key: "value" }';
+
+  beforeEach(() => {
+    // LLM external boundary: routeAndCall makes real network calls; the spy
+    // prevents the call without replacing the module.
+    routeAndCallSpy = jest.spyOn(llmModule, 'routeAndCall').mockResolvedValue({
+      response: MALFORMED_RESPONSE,
+      provider: 'test',
+      model: 'fixture',
+      latencyMs: 0,
+      stopReason: 'stop',
+    });
+    captureExceptionSpy = jest
+      .spyOn(sentryModule, 'captureException')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    routeAndCallSpy.mockRestore();
+    captureExceptionSpy.mockRestore();
+  });
+
+  it('returns null when LLM response is unparseable JSON', async () => {
+    const result = await runTopicIntentMatcher('learn something', [
+      { id: FALLBACK_TOPIC_ID, title: 'Chemistry' },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('calls captureException when JSON parse throws on malformed LLM response', async () => {
+    await runTopicIntentMatcher('learn something', [
+      { id: FALLBACK_TOPIC_ID, title: 'Chemistry' },
+    ]);
+    expect(captureExceptionSpy).toHaveBeenCalled();
+    const [, context] = captureExceptionSpy.mock.calls[0] as [
+      unknown,
+      { extra: { context: string } },
+    ];
+    expect(context?.extra?.context).toBe('session.topic_intent_matcher.parse');
   });
 });

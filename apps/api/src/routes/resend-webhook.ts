@@ -308,7 +308,13 @@ export const resendWebhookRoute = new Hono<{
   );
 
   if (!isValid) {
-    logger.warn('[resend] Invalid webhook signature');
+    // Include webhook headers for diagnosability — no PII, no secret.
+    // Timestamps let ops distinguish clock-skew failures from forged payloads.
+    logger.warn('[resend] Invalid webhook signature', {
+      event: 'resend.webhook.signature_verification_failed',
+      webhookId,
+      webhookTimestamp,
+    });
     return apiError(
       c,
       401,

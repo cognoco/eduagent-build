@@ -384,6 +384,53 @@ describe('signature verification', () => {
     expect(body.message).toBe('Invalid webhook signature');
   });
 
+  it('logs the failure reason when signature verification throws (errors-api F-049)', async () => {
+    // Verify the catch block now emits a structured log breadcrumb with error
+    // context — previously the catch was bare and ops had no signal to
+    // distinguish a misconfiguration from background-noise probes.
+    const verificationError = new Error('Timestamp outside tolerance window');
+    (verifyWebhookSignature as jest.Mock).mockRejectedValue(verificationError);
+
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      await app.request(
+        '/stripe/webhook',
+        {
+          method: 'POST',
+          headers: { 'stripe-signature': 'v1=stale_sig' },
+          body: '{}',
+        },
+        TEST_ENV,
+      );
+
+      // Must log the reason — structured entry is JSON-serialized to console.warn
+      expect(warnSpy).toHaveBeenCalled();
+      const matchingEntry = warnSpy.mock.calls
+        .map((call) => {
+          try {
+            return JSON.parse(call[0] as string) as {
+              message?: string;
+              context?: { reason?: string };
+            };
+          } catch {
+            return null;
+          }
+        })
+        .find((entry) =>
+          entry?.message?.includes('signature verification failed'),
+        );
+      expect(matchingEntry).not.toBeNull();
+      expect(matchingEntry?.context?.reason).toContain(
+        'Timestamp outside tolerance window',
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('returns 200 when signature is valid', async () => {
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
       makeStripeEvent('customer.subscription.updated', makeSubscription()),
