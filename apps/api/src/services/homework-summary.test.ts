@@ -672,7 +672,8 @@ describe('[F-074 / WI-579] parseHomeworkSummaryResponse failure leaks no content
     try {
       const fallback = {
         problemCount: 0,
-        solvedProblemCount: 0,
+        practicedSkills: [] as string[],
+        independentProblemCount: 0,
         guidedProblemCount: 0,
         summary: 'fallback',
         displayTitle: 'Homework',
