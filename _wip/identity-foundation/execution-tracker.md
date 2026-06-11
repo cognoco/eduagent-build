@@ -149,7 +149,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #875); children WI-598/599 swept with parent |
 | WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **done** — Closed/Done 2026-06-11 (PR #882). First pass bounced on the children gate (WI-600/601 at Captured); shepherd swept + resubmitted; re-review closed it |
-| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **reviewing** — PR #888 merged 2026-06-11 (one fix round; merge 400f2644); `complete` fired, Fixed In 537535c42, children WI-602/603 pre-swept at merge time — first live test of the standing sweep step |
+| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #888, one gate-driven fix round). Children pre-swept at merge time → no children bounce: standing sweep step VALIDATED. W2 complete |
 
 ### W3 — PII-handling + envelope/router (critical path)
 

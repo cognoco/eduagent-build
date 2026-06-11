@@ -175,6 +175,16 @@ productionization implication.
   commit). Applies to WI-576/577/578/579/581/582/585/586. The real fix
   remains: fold the sweep into `complete` itself.
 
+- **2026-06-11 — merge-time children sweep VALIDATED (WI-576); first WP
+  through the fully-autonomous close.** WI-576 closed Done on the reviewer's
+  FIRST pass — no children bounce — with provenance children WI-602/603
+  pre-swept by the shepherd at merge time. Contrast: WI-575 and WI-583, whose
+  children were swept only after a bounce, each cost a full review round.
+  WI-576 is also the first children-bearing WP through the loop with zero
+  human touches end-to-end (executor → shepherd gate caught a GC6 finding →
+  fix round → merge → sweep → reviewer close). *Production:* confirms the
+  sweep belongs before review — fold it into `/cosmo:execute complete`.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no
