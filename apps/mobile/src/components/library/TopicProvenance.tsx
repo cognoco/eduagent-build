@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useLinkedChildren } from '../../lib/profile';
 
@@ -24,6 +25,7 @@ export function TopicProvenance({
   sourceChildProfileId,
   createdAt,
 }: Props): React.ReactElement | null {
+  const { t } = useTranslation();
   const children = useLinkedChildren();
   const childName = useMemo(
     () =>
@@ -45,7 +47,7 @@ export function TopicProvenance({
           testID="topic-provenance-child"
         >
           <Text className="text-caption font-semibold text-primary">
-            From {childName}
+            {t('library.provenanceFrom', { name: childName })}
           </Text>
         </View>
       ) : null}
@@ -55,7 +57,7 @@ export function TopicProvenance({
           testID="topic-provenance-recent"
         >
           <Text className="text-caption font-semibold text-success">
-            Recently added
+            {t('library.recentlyAdded')}
           </Text>
         </View>
       ) : null}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -12,6 +13,7 @@ import { track } from '../../lib/analytics';
 type Variant = 'learner' | 'parent';
 
 export default function ValuePropScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ variant?: Variant }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -74,7 +76,7 @@ export default function ValuePropScreen() {
         accessibilityLabel="Go back"
       >
         <Text className="text-body-sm font-semibold text-primary">
-          Back to sign in
+          {t('preview.backToSignIn')}
         </Text>
       </Pressable>
       {variant === 'learner' ? (
@@ -98,9 +100,9 @@ export default function ValuePropScreen() {
         <Text className="text-body font-semibold text-text-inverse">
           {variant === 'learner'
             ? topic
-              ? `Sign up to start your first lesson on ${topic}`
-              : 'Sign up to start your first lesson'
-            : 'Sign up to set up your child'}
+              ? t('preview.signUpLessonTopic', { topic })
+              : t('preview.signUpLesson')
+            : t('preview.signUpChild')}
         </Text>
       </Pressable>
     </ScrollView>
@@ -108,27 +110,30 @@ export default function ValuePropScreen() {
 }
 
 function SampleMarker() {
+  const { t } = useTranslation();
   return (
     <View
       className="self-start bg-surface rounded-full px-3 py-1 mb-4"
       testID="preview-sample-marker"
     >
-      <Text className="text-caption text-text-muted">Sample</Text>
+      <Text className="text-caption text-text-muted">
+        {t('preview.sampleBadge')}
+      </Text>
     </View>
   );
 }
 
 function LearnerVariant({ topic }: { topic: string }) {
+  const { t } = useTranslation();
   const sample = getLearnerSample(topic);
 
   return (
     <View>
       <Text className="text-h1 font-bold text-text-primary mb-3">
-        Here&apos;s how MentoMate teaches
+        {t('preview.howTeaches')}
       </Text>
       <Text className="text-body text-text-secondary mb-6">
-        A back-and-forth conversation that follows what you actually need — not
-        a fixed lesson plan.
+        {t('preview.conversationPitch')}
       </Text>
       <SampleMarker />
       <View className="bg-surface rounded-card p-4 mb-3 self-start max-w-[85%]">
@@ -195,27 +200,25 @@ function getLearnerSample(topic: string): {
 }
 
 function ParentVariant({ onTryLesson }: { onTryLesson: () => void }) {
+  const { t } = useTranslation();
   return (
     <View>
       <Text className="text-h1 font-bold text-text-primary mb-3">
-        Here&apos;s how MentoMate helps families
+        {t('preview.howHelpsFamilies')}
       </Text>
       <Text className="text-body text-text-secondary mb-6">
-        You set up your child, they learn, and you get a short weekly read on
-        what they&apos;re working on. No surveillance, just signal.
+        {t('preview.weeklyReadPitch')}
       </Text>
       <SampleMarker />
       <View className="bg-surface rounded-card p-5 mb-3">
         <Text className="text-body font-semibold text-text-primary mb-2">
-          Weekly highlight
+          {t('preview.weeklyHighlight')}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-3">
-          Practiced quadratic equations for 45 minutes across three sessions.
-          Getting comfortable with factoring; working on completing the square.
+          {t('preview.sampleWeeklyBody')}
         </Text>
         <Text className="text-caption text-text-muted">
-          Sample data — your child&apos;s real insights appear after their first
-          session.
+          {t('preview.sampleDataNote')}
         </Text>
       </View>
       <Pressable
@@ -225,7 +228,7 @@ function ParentVariant({ onTryLesson }: { onTryLesson: () => void }) {
         accessibilityRole="button"
       >
         <Text className="text-body font-semibold text-primary">
-          Try a sample lesson first
+          {t('preview.trySampleFirst')}
         </Text>
       </Pressable>
     </View>

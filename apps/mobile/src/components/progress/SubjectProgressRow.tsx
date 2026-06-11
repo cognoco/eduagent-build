@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LayoutAnimation, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { SubjectInventory } from '@eduagent/schemas';
 import { AccordionTopicList } from './AccordionTopicList';
 import { ProgressBar } from './ProgressBar';
@@ -98,6 +99,7 @@ export function SubjectProgressRow({
   tint: providedTint,
   testID,
 }: SubjectProgressRowProps): React.ReactElement {
+  const { t } = useTranslation();
   const { colorScheme } = useTheme();
   const tint = providedTint ?? getSubjectTint(subject.subjectId, colorScheme);
   const [expanded, setExpanded] = useState(false);
@@ -179,7 +181,9 @@ export function SubjectProgressRow({
           ) : null}
           {isAccordionMode && hasExpandableTopics ? (
             <Text className="text-caption text-primary">
-              {expanded ? '▴ Hide topics' : '▾ See topics'}
+              {expanded
+                ? t('progress.subjectRow.hideTopics')
+                : t('progress.subjectRow.seeTopics')}
             </Text>
           ) : null}
         </View>

@@ -28,7 +28,7 @@ describe('validateTranslation', () => {
     const result = validateTranslation(source, translated, 'de');
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(
-      expect.objectContaining({ type: 'missing_key', key: 'common.cancel' })
+      expect.objectContaining({ type: 'missing_key', key: 'common.cancel' }),
     );
   });
 
@@ -40,7 +40,38 @@ describe('validateTranslation', () => {
     const result = validateTranslation(source, translated, 'de');
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(
-      expect.objectContaining({ type: 'extra_key', key: 'common.extra' })
+      expect.objectContaining({ type: 'extra_key', key: 'common.extra' }),
+    );
+  });
+
+  it('accepts locale-specific CLDR plural variants of a live en family (WI-621)', () => {
+    const pluralSource = {
+      relearn: {
+        daysOverdue_one: '{{count}} day overdue',
+        daysOverdue_other: '{{count}} days overdue',
+      },
+    };
+    const translated = {
+      relearn: {
+        daysOverdue_one: '{{count}} dzień zaległości',
+        daysOverdue_few: '{{count}} dni zaległości',
+        daysOverdue_many: '{{count}} dni zaległości',
+        daysOverdue_other: '{{count}} dni zaległości',
+      },
+    };
+    const result = validateTranslation(pluralSource, translated, 'pl');
+    expect(result.errors.filter((e) => e.type === 'extra_key')).toHaveLength(0);
+  });
+
+  it('still rejects plural-suffixed keys whose family is gone from en', () => {
+    const pluralSource = { common: { save: 'Save' } };
+    const translated = {
+      common: { save: 'Zapisz' },
+      old: { removed_few: 'x' },
+    };
+    const result = validateTranslation(pluralSource, translated, 'pl');
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'extra_key', key: 'old.removed_few' }),
     );
   });
 
@@ -56,7 +87,7 @@ describe('validateTranslation', () => {
         type: 'missing_variable',
         key: 'errors.generic',
         variable: '{{action}}',
-      })
+      }),
     );
   });
 
@@ -68,7 +99,7 @@ describe('validateTranslation', () => {
     };
     const result = validateTranslation(source, translated, 'de');
     expect(result.warnings).toContainEqual(
-      expect.objectContaining({ type: 'length_warning', key: 'common.save' })
+      expect.objectContaining({ type: 'length_warning', key: 'common.save' }),
     );
   });
 
@@ -80,14 +111,14 @@ describe('validateTranslation', () => {
       glossarySource,
       glossaryTranslated,
       'es',
-      glossary
+      glossary,
     );
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(
       expect.objectContaining({
         type: 'glossary_violation',
         key: 'home.streak',
-      })
+      }),
     );
   });
 
@@ -99,7 +130,7 @@ describe('validateTranslation', () => {
       glossarySource,
       glossaryTranslated,
       'es',
-      glossary
+      glossary,
     );
     expect(result.valid).toBe(true);
   });
@@ -113,7 +144,7 @@ describe('validateTranslation', () => {
     const result = validateTranslation(source, translated, 'de');
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(
-      expect.objectContaining({ type: 'length_exceeded', key: 'common.save' })
+      expect.objectContaining({ type: 'length_exceeded', key: 'common.save' }),
     );
   });
 
@@ -145,7 +176,10 @@ describe('validateTranslation', () => {
     const result = validateTranslation(shortSource, shortTranslated, 'nb');
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(
-      expect.objectContaining({ type: 'length_exceeded', key: 'common.cancel' })
+      expect.objectContaining({
+        type: 'length_exceeded',
+        key: 'common.cancel',
+      }),
     );
   });
 
@@ -189,7 +223,7 @@ describe('validateTranslation', () => {
     const result = validateTranslation(src, tgt, 'pl', glossary);
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(
-      expect.objectContaining({ type: 'glossary_violation', key: 'x.y' })
+      expect.objectContaining({ type: 'glossary_violation', key: 'x.y' }),
     );
   });
 
@@ -207,7 +241,7 @@ describe('validateTranslation', () => {
     const result = validateTranslation(src, tgt, 'de', glossary);
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(
-      expect.objectContaining({ type: 'glossary_violation', key: 'x.y' })
+      expect.objectContaining({ type: 'glossary_violation', key: 'x.y' }),
     );
   });
 
@@ -234,10 +268,10 @@ describe('validateTranslation', () => {
     const result = validateTranslation(src, tgt, 'de');
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(
-      expect.objectContaining({ type: 'missing_key', key: 'common.save' })
+      expect.objectContaining({ type: 'missing_key', key: 'common.save' }),
     );
     expect(result.errors).toContainEqual(
-      expect.objectContaining({ type: 'extra_key', key: 'common.save.label' })
+      expect.objectContaining({ type: 'extra_key', key: 'common.save.label' }),
     );
   });
 
@@ -260,7 +294,7 @@ describe('validateTranslation', () => {
     const result = validateTranslation(src, tgt, 'de');
     // Source has no variables on common.save, so no missing_variable fires.
     expect(
-      result.errors.filter((e) => e.type === 'missing_variable')
+      result.errors.filter((e) => e.type === 'missing_variable'),
     ).toHaveLength(0);
     // Documented gap: extra variables in target are currently silent. If you
     // tighten validateTranslation to flag them, replace this assertion with

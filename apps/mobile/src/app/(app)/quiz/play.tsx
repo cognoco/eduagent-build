@@ -787,7 +787,10 @@ export default function QuizPlayScreen(): React.ReactElement {
           </Text>
           <View className="flex-row items-center gap-3">
             <Text className="text-body-sm font-semibold text-text-secondary">
-              {currentIndex + 1} of {totalQuestions}
+              {t('quiz.play.questionProgress', {
+                current: currentIndex + 1,
+                total: totalQuestions,
+              })}
             </Text>
 
             <View className="flex-row gap-1">

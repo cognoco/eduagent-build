@@ -33,7 +33,9 @@
     "show": "Mostrar",
     "hide": "Ocultar",
     "notNow": "Ahora no",
-    "active": "Activo"
+    "active": "Activo",
+    "goBackAction": "Volver",
+    "tryAgainAction": "Intentar de nuevo"
   },
   "quota": {
     "parent": {
@@ -883,10 +885,18 @@
       "correctAnnounce": "¡Correcto! La respuesta era {{answer}}",
       "correctAnnounceNoAnswer": "¡Correcto!",
       "wrongAnnounce": "Casi. La respuesta era {{answer}}",
-      "wrongAnnounceNoAnswer": "Casi."
+      "wrongAnnounceNoAnswer": "Casi.",
+      "questionProgress": "{{current}} de {{total}}"
     },
     "results": {
-      "viewHistory": "Ver historial"
+      "viewHistory": "Ver historial",
+      "peopleIdentified": "{{score}} de {{total}} personas identificadas",
+      "xpEarned": "+{{xp}} XP",
+      "whatYouMissed": "Lo que te perdiste",
+      "youSaid": "Dijiste: {{answer}}",
+      "youSkipped": "Omitiste esta pregunta",
+      "noAnswer": "No respondiste",
+      "playAgain": "Jugar de nuevo"
     },
     "guessWhoQuestion": {
       "typeAName": "Escribe un nombre",
@@ -896,7 +906,9 @@
       "revealNextClue": "Revelar siguiente pista",
       "revealNextClueLabel": "Revelar siguiente pista",
       "iDontKnow": "No lo sé",
-      "iDontKnowLabel": "No sé la respuesta"
+      "iDontKnowLabel": "No sé la respuesta",
+      "clue": "Pista {{number}}",
+      "fallbackPrompt": "Elige una opción:"
     }
   },
   "dictation": {
@@ -1169,8 +1181,38 @@
       },
       "mastered": "Dominado",
       "reviewDue": "Repaso listo",
-      "topicProgressThreeState": "{{mastered}} dominados · {{learning}} aprendiendo · {{total}} en total"
-    }
+      "topicProgressThreeState": "{{mastered}} dominados · {{learning}} aprendiendo · {{total}} en total",
+      "badge": "Libro",
+      "missingDetails": "Faltan detalles del libro. Vuelve e inténtalo de nuevo.",
+      "writingYourBook": "Escribiendo tu libro...",
+      "takingLonger": "Tardando un poco más de lo habitual...",
+      "notReadyTitle": "Este libro aún no está listo",
+      "notReadyHint": "Configura los temas primero. Luego podrás empezar a aprender paso a paso.",
+      "setUpBook": "Configurar este libro",
+      "finishedTitle": "Terminaste este libro",
+      "startReview": "▶ Empezar repaso",
+      "startFirstLesson": "▶ Empezar primera lección",
+      "finishError": "No se pudo terminar este libro ahora.",
+      "topics": "Temas",
+      "progressError": "No se pudo cargar el progreso.",
+      "progressEmpty": "Empieza tu primera lección para ver tu progreso aquí.",
+      "nothingToShow": "Nada que mostrar todavía.",
+      "pastConversations": "Conversaciones pasadas",
+      "historyError": "No se pudo cargar tu historial.",
+      "noConversations": "Aún no hay conversaciones",
+      "noNotesYet": "Aún no hay notas. Añade una cuando algo te haga clic.",
+      "addNote": "+ Añadir una nota",
+      "addFirstNote": "+ Añade tu primera nota para este libro",
+      "backToSubject": "Volver al tema →",
+      "finishedBody_one": "Has estudiado el único tema de este libro. Repásalo para mantenerlo fresco o vuelve atrás y elige qué aprender a continuación.",
+      "finishedBody_other": "Has estudiado los {{count}} temas de este libro. Repásalos para mantenerlos frescos o vuelve atrás y elige qué aprender a continuación."
+    },
+    "notStartedCount": "{{notStarted}} / {{total}} sin empezar",
+    "chooseTopic": "Elige un tema",
+    "provenanceFrom": "De {{name}}",
+    "recentlyAdded": "Añadido recientemente",
+    "sessionCount_one": "{{count}} sesión",
+    "sessionCount_other": "{{count}} sesiones"
   },
   "topic": {
     "relevance": {
@@ -1196,7 +1238,17 @@
       "timeoutMessage": "Tu respuesta está tardando más de lo habitual en enviarse. Comprueba tu conexión e inténtalo de nuevo."
     },
     "lastStudied": "Estudiado por última vez {{when}}",
-    "neverStudied": "Nunca estudiado"
+    "neverStudied": "Nunca estudiado",
+    "notFoundTitle": "Tema no encontrado",
+    "notFoundMessage": "No se pudo abrir este tema. Vuelve e inténtalo de nuevo.",
+    "loadErrorTitle": "No pudimos cargar este tema",
+    "loadErrorMessage": "Inténtalo de nuevo o vuelve a tu biblioteca.",
+    "removedHint": "Este tema puede haber sido eliminado de tu plan de estudios.",
+    "loadingTopic": "Cargando tema...",
+    "noNotesYet": "Aún no hay notas. Añade una cuando algo te haga clic.",
+    "noSessionsYet": "Aún no hay sesiones. ¡Empieza una abajo!",
+    "addNote": "+ Añadir una nota",
+    "addFirstNote": "+ Añade tu primera nota para este tema"
   },
   "subject": {
     "settings": {
@@ -1784,6 +1836,15 @@
       "secondaryCtaA11y": "Intentar este tema más tarde",
       "libraryLink": "Mientras esperas, explora tu Biblioteca",
       "libraryLinkA11y": "Explorar tu Biblioteca"
+    },
+    "accordion": {
+      "loadErrorRetry": "No se pudieron cargar los temas. Toca para reintentar o cierra la tarjeta para descartar.",
+      "noTopicsYet": "Aún no hay temas",
+      "browseTopics": "Explorar temas"
+    },
+    "subjectRow": {
+      "hideTopics": "▴ Ocultar temas",
+      "seeTopics": "▾ Ver temas"
     }
   },
   "onboarding": {
@@ -2106,7 +2167,8 @@
       "reportGoneTitle": "Este informe ya no está disponible",
       "reportGoneBody": "Puede haber sido archivado o eliminado. Todos tus otros informes siguen a salvo.",
       "testsCompleted": "Pruebas completadas",
-      "testPoints": "Puntos de prueba"
+      "testPoints": "Puntos de prueba",
+      "activeMinutes": "{{count}} min"
     },
     "practiceSummary": {
       "title": "Detalle de pruebas",
@@ -2976,5 +3038,65 @@
     "ageGate": "Para configurar el aprendizaje de un niño, el titular de la cuenta debe ser mayor de 18 años. Aún puedes configurar tu propio aprendizaje; elige \"Mi aprendizaje\" en el paso anterior.",
     "childSaveError": "Guardamos tu cuenta, pero aún no pudimos añadir a tu hijo/a: {{error}}",
     "confirmChildReady": "El perfil de tu hijo/a está configurado. Abramos la página de inicio para padres."
+  },
+  "myNotes": {
+    "title": "Mis notas",
+    "subtitle": "Sesiones, notas y respuestas guardadas",
+    "sortDate": "Fecha",
+    "sortSubject": "Tema",
+    "emptyHint": "Aparecerán aquí a medida que aprendas.",
+    "loadMore": "Cargar más",
+    "noneYetNotes": "Aún no hay notas",
+    "noneYetBookmarks": "Aún no hay marcadores",
+    "noneYetSessions": "Aún no hay sesiones",
+    "loadErrorNotes": "No se pudieron cargar las notas",
+    "loadErrorBookmarks": "No se pudieron cargar los marcadores",
+    "loadErrorSessions": "No se pudieron cargar las sesiones"
+  },
+  "pickBook": {
+    "subjectFallback": "Tema",
+    "pickWhatInterests": "Elige lo que te interesa",
+    "suggestionsFailedTitle": "No se cargaron las sugerencias",
+    "suggestionsFailedHint": "Aún puedes escribir el libro o tema que quieres añadir.",
+    "basedOnStudied": "Basado en lo que has estudiado",
+    "trySomethingNew": "Prueba algo nuevo",
+    "somethingElse": "Algo más...",
+    "settingUp": "Configurando...",
+    "go": "Ir",
+    "skipStart": "Omitir y empezar a aprender",
+    "missingSubject": "Falta el tema. Vuelve e inténtalo de nuevo.",
+    "takingLonger": "Esto está tardando un poco más de lo habitual..."
+  },
+  "relearn": {
+    "title": "Volver a aprender tema",
+    "loadingReviewTopics": "Cargando temas de repaso...",
+    "startingSession": "Iniciando sesión de reaprendizaje...",
+    "overdueTopicCount_one": "{{count}} tema pendiente",
+    "overdueTopicCount_other": "{{count}} temas pendientes",
+    "daysOverdue_one": "{{count}} día de retraso",
+    "daysOverdue_other": "{{count}} días de retraso"
+  },
+  "preview": {
+    "backToSignIn": "Volver a inicio de sesión",
+    "tryMentomate": "Prueba MentoMate",
+    "seeHowItWorks": "Mira cómo funciona, no necesitas registrarte todavía.",
+    "bothQuestion": "¿Qué quieres configurar primero?",
+    "bothHint": "Puedes hacer ambos, elige por dónde empezar.",
+    "intentQuestion": "¿Para quién estás configurando esto?",
+    "intentHint": "Personalizaremos lo que verás a continuación.",
+    "pickSampleLesson": "Elige una lección de muestra",
+    "safePreviews": "Estas son vistas previas seguras. Tu propio tema vendrá después de registrarte.",
+    "signUpChild": "Regístrate para configurar a tu hijo",
+    "signUpLesson": "Regístrate para empezar tu primera lección",
+    "signUpLessonTopic": "Regístrate para empezar tu primera lección sobre {{topic}}",
+    "trySampleFirst": "Prueba primero una lección de muestra",
+    "howTeaches": "Así es como enseña MentoMate",
+    "howHelpsFamilies": "Así es como MentoMate ayuda a las familias",
+    "conversationPitch": "Una conversación interactiva que se adapta a lo que realmente necesitas, no un plan de lección fijo.",
+    "weeklyReadPitch": "Configuras a tu hijo, él aprende y tú recibes un breve informe semanal sobre su progreso. Sin vigilancia, solo información clave.",
+    "weeklyHighlight": "Destacado de la semana",
+    "sampleBadge": "Muestra",
+    "sampleDataNote": "Datos de muestra: los datos reales de tu hijo aparecerán después de su primera sesión.",
+    "sampleWeeklyBody": "Practicó ecuaciones cuadráticas durante 45 minutos en tres sesiones. Se siente cómodo con la factorización; trabajando en completar el cuadrado."
   }
 }

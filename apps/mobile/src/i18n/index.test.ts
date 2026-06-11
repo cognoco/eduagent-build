@@ -190,6 +190,9 @@ const KNOWN_UNTRANSLATED_BASELINE = new Set([
   'subscription.childPaywall.seeProgressAccessibilityLabel',
   'subscription.childPaywall.usedAllQuestions',
   'subscription.childPaywall.waitText',
+  // '+{{xp}} XP' is locale-invariant gaming notation (house style keeps
+  // 'XP' untranslated everywhere — same class as the xpStats entries below).
+  'quiz.results.xpEarned',
   'subscription.childPaywall.xpStats_one',
   'subscription.childPaywall.xpStats_other',
   'subscription.restore.accessibilityLabel',

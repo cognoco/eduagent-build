@@ -197,6 +197,7 @@ function GroupToggle({
   mode: GroupMode;
   onChange: (mode: GroupMode) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View className="flex-row rounded-card bg-surface-elevated p-1 mt-4">
       {(['date', 'subject'] as const).map((value) => {
@@ -217,7 +218,9 @@ function GroupToggle({
                 selected ? 'text-text-primary' : 'text-text-secondary'
               }`}
             >
-              {value === 'date' ? 'Date' : 'Subject'}
+              {value === 'date'
+                ? t('myNotes.sortDate')
+                : t('myNotes.sortSubject')}
             </Text>
           </Pressable>
         );
@@ -494,7 +497,11 @@ export default function MyNotesListScreen(): React.ReactElement {
           ) : activeQuery.isError ? (
             <View className="items-center py-14" testID="my-notes-error">
               <Text className="text-body font-semibold text-text-primary">
-                Couldn't load {titleForKind(kind).toLowerCase()}
+                {kind === 'notes'
+                  ? t('myNotes.loadErrorNotes')
+                  : kind === 'bookmarks'
+                    ? t('myNotes.loadErrorBookmarks')
+                    : t('myNotes.loadErrorSessions')}
               </Text>
               <Pressable
                 onPress={() => void activeQuery.refetch()}
@@ -504,17 +511,21 @@ export default function MyNotesListScreen(): React.ReactElement {
                 testID="my-notes-retry"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  Try again
+                  {t('common.tryAgainAction')}
                 </Text>
               </Pressable>
             </View>
           ) : (
             <View className="items-center py-14" testID="my-notes-empty">
               <Text className="text-body font-semibold text-text-primary">
-                No {titleForKind(kind).toLowerCase()} yet
+                {kind === 'notes'
+                  ? t('myNotes.noneYetNotes')
+                  : kind === 'bookmarks'
+                    ? t('myNotes.noneYetBookmarks')
+                    : t('myNotes.noneYetSessions')}
               </Text>
               <Text className="text-body-sm text-text-secondary mt-1 text-center">
-                They'll show up here as you learn.
+                {t('myNotes.emptyHint')}
               </Text>
             </View>
           )
@@ -533,7 +544,7 @@ export default function MyNotesListScreen(): React.ReactElement {
               testID="my-notes-load-more"
             >
               <Text className="text-body font-semibold text-text-primary">
-                Load more
+                {t('myNotes.loadMore')}
               </Text>
             </Pressable>
           ) : null

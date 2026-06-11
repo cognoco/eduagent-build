@@ -192,7 +192,7 @@ export default function QuizResultsScreen(): React.ReactElement {
       </Text>
       {activityType === 'guess_who' ? (
         <Text className="mt-1 text-body-sm text-text-secondary">
-          {score} of {total} people identified
+          {t('quiz.results.peopleIdentified', { score, total })}
         </Text>
       ) : null}
 
@@ -205,7 +205,7 @@ export default function QuizResultsScreen(): React.ReactElement {
       {xpEarned > 0 ? (
         <View className="mt-4 rounded-full bg-reward-soft px-4 py-2">
           <Text className="text-body-sm font-semibold text-reward">
-            +{xpEarned} XP
+            {t('quiz.results.xpEarned', { xp: xpEarned })}
           </Text>
         </View>
       ) : null}
@@ -217,7 +217,7 @@ export default function QuizResultsScreen(): React.ReactElement {
       {missed.length > 0 && (
         <View className="mt-8 w-full" testID="quiz-results-missed-section">
           <Text className="mb-3 text-body-sm font-semibold tracking-wide text-text-secondary">
-            What you missed
+            {t('quiz.results.whatYouMissed')}
           </Text>
           {missed.map((qr) => {
             // Defensive: skip cards where the server didn't send a
@@ -246,15 +246,15 @@ export default function QuizResultsScreen(): React.ReactElement {
                 {/* [F-Q-03] Three-way guard: real answer, skipped, or missing */}
                 {qr.answerGiven && qr.answerGiven !== '[skipped]' ? (
                   <Text className="mt-1 text-body text-danger opacity-70">
-                    You said: {qr.answerGiven}
+                    {t('quiz.results.youSaid', { answer: qr.answerGiven })}
                   </Text>
                 ) : qr.answerGiven === '[skipped]' ? (
                   <Text className="mt-1 text-body text-text-secondary opacity-70">
-                    You skipped this question
+                    {t('quiz.results.youSkipped')}
                   </Text>
                 ) : (
                   <Text className="mt-1 text-body text-text-secondary opacity-70">
-                    {"You didn't answer"}
+                    {t('quiz.results.noAnswer')}
                   </Text>
                 )}
                 <Text className="mt-0.5 text-body font-semibold text-success">
@@ -278,7 +278,7 @@ export default function QuizResultsScreen(): React.ReactElement {
           testID="quiz-results-play-again"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Play Again
+            {t('quiz.results.playAgain')}
           </Text>
         </Pressable>
 
@@ -288,7 +288,7 @@ export default function QuizResultsScreen(): React.ReactElement {
           testID="quiz-results-done"
         >
           <Text className="text-body font-semibold text-text-primary">
-            Done
+            {t('common.done')}
           </Text>
         </Pressable>
 

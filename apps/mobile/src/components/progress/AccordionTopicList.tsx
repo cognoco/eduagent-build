@@ -1,5 +1,6 @@
 import { useRouter, useSegments, type Href } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { TopicProgress } from '@eduagent/schemas';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
 import { childProfileHref } from '../../lib/navigation';
@@ -47,6 +48,7 @@ export function AccordionTopicList({
   subjectName,
   expanded,
 }: AccordionTopicListProps): React.ReactElement | null {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const isInsideChildStack = segments.includes('child');
@@ -83,8 +85,7 @@ export function AccordionTopicList({
           testID="accordion-topics-retry"
         >
           <Text className="text-caption text-text-secondary text-center py-2">
-            Could not load topics. Tap to retry, or close the subject card to
-            dismiss.
+            {t('progress.accordion.loadErrorRetry')}
           </Text>
         </Pressable>
       ) : topics.length > 0 ? (
@@ -141,7 +142,7 @@ export function AccordionTopicList({
       ) : (
         <View className="items-center py-2" testID="accordion-topics-empty">
           <Text className="text-caption text-text-secondary text-center mb-2">
-            No topics yet
+            {t('progress.accordion.noTopicsYet')}
           </Text>
           <Pressable
             onPress={(event) => {
@@ -153,7 +154,7 @@ export function AccordionTopicList({
             testID="accordion-topics-browse"
           >
             <Text className="text-caption font-semibold text-primary">
-              Browse topics
+              {t('progress.accordion.browseTopics')}
             </Text>
           </Pressable>
         </View>

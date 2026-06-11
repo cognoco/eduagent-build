@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -42,6 +43,7 @@ const SAMPLE_LESSONS: ReadonlyArray<SampleLesson> = [
 ];
 
 export default function PreviewTopicScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [current, setCurrent] = useState<PreviewOnboardingStateV0 | null>(null);
@@ -100,14 +102,14 @@ export default function PreviewTopicScreen() {
         accessibilityLabel="Go back"
       >
         <Text className="text-body-sm font-semibold text-primary">
-          Back to sign in
+          {t('preview.backToSignIn')}
         </Text>
       </Pressable>
       <Text className="text-h1 font-bold text-text-primary mb-2 text-center">
-        Pick a sample lesson
+        {t('preview.pickSampleLesson')}
       </Text>
       <Text className="text-body text-text-secondary mb-6 text-center">
-        These are safe previews. Your own topic comes after signup.
+        {t('preview.safePreviews')}
       </Text>
       {SAMPLE_LESSONS.map((sample) => (
         <Pressable

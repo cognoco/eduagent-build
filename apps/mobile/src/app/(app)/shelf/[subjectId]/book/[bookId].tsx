@@ -1316,7 +1316,7 @@ export default function BookScreen() {
         testID="book-missing-param"
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          Missing book details. Please go back and try again.
+          {t('library.book.missingDetails')}
         </Text>
         <Pressable
           onPress={handleBack}
@@ -1324,7 +1324,7 @@ export default function BookScreen() {
           testID="book-missing-param-back"
         >
           <Text className="text-text-primary text-body font-semibold">
-            Go back
+            {t('common.goBackAction')}
           </Text>
         </Pressable>
       </View>
@@ -1394,7 +1394,7 @@ export default function BookScreen() {
           {/* Topics section shimmer */}
           <View className="px-5 mb-4">
             <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
-              Topics
+              {t('library.book.topics')}
             </Text>
             <ShimmerSkeleton testID="book-topics-loading">
               <View>
@@ -1440,7 +1440,7 @@ export default function BookScreen() {
           testID="book-retry-button"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Retry
+            {t('common.retry')}
           </Text>
         </Pressable>
         <Pressable
@@ -1450,7 +1450,7 @@ export default function BookScreen() {
           testID="book-back-button"
         >
           <Text className="text-text-primary text-body font-semibold">
-            Go back
+            {t('common.goBackAction')}
           </Text>
         </Pressable>
       </View>
@@ -1471,7 +1471,7 @@ export default function BookScreen() {
         />
         {book?.emoji && <Text className="text-3xl mt-4">{book.emoji}</Text>}
         <Text className="text-h2 font-bold text-text-primary mt-3 text-center">
-          {book?.title ?? 'Writing your book...'}
+          {book?.title ?? t('library.book.writingYourBook')}
         </Text>
         {shownBookDescription && (
           <Text className="text-body-sm text-text-secondary mt-2 text-center px-4">
@@ -1479,19 +1479,19 @@ export default function BookScreen() {
           </Text>
         )}
         <Text className="text-body-sm text-text-secondary mt-4">
-          Writing your book...
+          {t('library.book.writingYourBook')}
         </Text>
 
         {genPhase === 'slow' && (
           <Text className="text-body-sm text-text-secondary mt-2 text-center">
-            Taking a little longer than usual...
+            {t('library.book.takingLonger')}
           </Text>
         )}
 
         {genPhase === 'timed_out' && (
           <View className="mt-4 items-center">
             <Text className="text-body text-text-secondary text-center mb-4">
-              Couldn't finish this book right now.
+              {t('library.book.finishError')}
             </Text>
             <Pressable
               onPress={handleRetryGeneration}
@@ -1500,7 +1500,7 @@ export default function BookScreen() {
               testID="book-gen-retry"
             >
               <Text className="text-text-inverse text-body font-semibold">
-                Retry
+                {t('common.retry')}
               </Text>
             </Pressable>
             <Pressable
@@ -1512,7 +1512,7 @@ export default function BookScreen() {
               testID="book-gen-build-path"
             >
               <Text className="text-text-primary text-body font-semibold">
-                Set up this book
+                {t('library.book.setUpBook')}
               </Text>
             </Pressable>
             <Pressable
@@ -1523,7 +1523,7 @@ export default function BookScreen() {
               accessibilityLabel="Go back"
             >
               <Text className="text-body text-primary font-semibold">
-                Go back
+                {t('common.goBackAction')}
               </Text>
             </Pressable>
           </View>
@@ -1538,7 +1538,7 @@ export default function BookScreen() {
             testID="book-gen-back-idle"
           >
             <Text className="text-body text-primary font-semibold">
-              Go back
+              {t('common.goBackAction')}
             </Text>
           </Pressable>
         )}
@@ -1618,7 +1618,7 @@ export default function BookScreen() {
             numberOfLines={3}
             testID="book-hero-title"
           >
-            {book?.title ?? 'Book'}
+            {book?.title ?? t('library.book.badge')}
           </Text>
           {shownBookDescription ? (
             <Text
@@ -1761,7 +1761,7 @@ export default function BookScreen() {
                   className="px-5 py-2 text-body-sm text-text-secondary"
                   testID="book-notes-empty"
                 >
-                  No notes yet. Add one when something clicks.
+                  {t('library.book.noNotesYet')}
                 </Text>
               )}
               {showNoteInput && (
@@ -1786,8 +1786,8 @@ export default function BookScreen() {
               >
                 <Text className="text-body-sm font-medium text-primary">
                   {sortedNotes.length === 0
-                    ? '+ Add your first note for this book'
-                    : '+ Add a note'}
+                    ? t('library.book.addFirstNote')
+                    : t('library.book.addNote')}
                 </Text>
               </Pressable>
             </View>
@@ -1806,7 +1806,7 @@ export default function BookScreen() {
               }}
             >
               <Text className="me-3 flex-1 text-body-sm text-text-primary">
-                Couldn't load your history.
+                {t('library.book.historyError')}
               </Text>
               <Pressable
                 onPress={() => void refetchSessions()}
@@ -1816,7 +1816,7 @@ export default function BookScreen() {
                 className="px-3 py-1"
               >
                 <Text className="text-body-sm font-semibold text-primary">
-                  Retry
+                  {t('common.retry')}
                 </Text>
               </Pressable>
             </View>
@@ -1834,7 +1834,7 @@ export default function BookScreen() {
               }}
             >
               <Text className="me-3 flex-1 text-body-sm text-text-primary">
-                Couldn't load progress.
+                {t('library.book.progressError')}
               </Text>
               <Pressable
                 onPress={() => void refetchRetention()}
@@ -1844,7 +1844,7 @@ export default function BookScreen() {
                 className="px-3 py-1"
               >
                 <Text className="text-body-sm font-semibold text-primary">
-                  Retry
+                  {t('common.retry')}
                 </Text>
               </Pressable>
             </View>
@@ -1855,10 +1855,10 @@ export default function BookScreen() {
         {topics.length === 0 && book?.topicsGenerated && !needsGeneration ? (
           <View className="px-5 py-8" testID="topics-empty-state">
             <Text className="mb-2 text-center text-h3 font-semibold text-text-primary">
-              This book is not ready yet
+              {t('library.book.notReadyTitle')}
             </Text>
             <Text className="mb-4 text-center text-body-sm text-text-secondary">
-              Set up the topics first. Then you can start learning step by step.
+              {t('library.book.notReadyHint')}
             </Text>
             <Pressable
               onPress={handleBuildLearningPath}
@@ -1869,7 +1869,7 @@ export default function BookScreen() {
               accessibilityLabel="Set up this book"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Set up this book
+                {t('library.book.setUpBook')}
               </Text>
             </Pressable>
           </View>
@@ -1923,10 +1923,10 @@ export default function BookScreen() {
           <View className="px-5 mb-3" testID="all-sections-fallback">
             <View className="rounded-card bg-surface-elevated p-5">
               <Text className="mb-2 text-body font-semibold text-text-primary">
-                Nothing to show yet.
+                {t('library.book.nothingToShow')}
               </Text>
               <Text className="mb-3 text-body-sm text-text-secondary">
-                Start your first lesson to see your progress here.
+                {t('library.book.progressEmpty')}
               </Text>
               <Pressable
                 onPress={() => {
@@ -1944,7 +1944,7 @@ export default function BookScreen() {
                 accessibilityLabel="Start first lesson"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  ▶ Start first lesson
+                  {t('library.book.startFirstLesson')}
                 </Text>
               </Pressable>
             </View>
@@ -1981,12 +1981,10 @@ export default function BookScreen() {
                 </View>
               ) : null}
               <Text className="mb-1 text-h3 font-bold text-text-primary">
-                You finished this book
+                {t('library.book.finishedTitle')}
               </Text>
               <Text className="mb-4 text-body-sm text-text-secondary">
-                You've studied all {activeTopics.length} topics in this book.
-                Review them to keep them fresh, or go back and choose what to
-                learn next.
+                {t('library.book.finishedBody', { count: activeTopics.length })}
               </Text>
 
               <Pressable
@@ -1997,7 +1995,7 @@ export default function BookScreen() {
                 accessibilityLabel="Start spaced-repetition review"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  ▶ Start review
+                  {t('library.book.startReview')}
                 </Text>
               </Pressable>
 
@@ -2009,7 +2007,7 @@ export default function BookScreen() {
                 accessibilityLabel="Back to subject to pick what to learn next"
               >
                 <Text className="text-body-sm font-semibold text-primary">
-                  Back to subject →
+                  {t('library.book.backToSubject')}
                 </Text>
               </Pressable>
             </View>
@@ -2030,7 +2028,7 @@ export default function BookScreen() {
             }
           >
             <Text className="text-body-sm font-semibold text-text-secondary">
-              Past conversations
+              {t('library.book.pastConversations')}
               {!sessionsQuery.isLoading && sessions.length > 0
                 ? ` (${sessions.length})`
                 : ''}
@@ -2063,7 +2061,7 @@ export default function BookScreen() {
                 className="px-5 py-2 text-body-sm text-text-secondary"
                 testID="book-sessions-empty"
               >
-                No conversations yet
+                {t('library.book.noConversations')}
               </Text>
             ) : showChapterDividers ? (
               groupedSessions.map((group) => (
@@ -2163,7 +2161,7 @@ export default function BookScreen() {
                     accessibilityLabel="Set up this book"
                   >
                     <Text className="text-body-sm text-text-secondary underline">
-                      Set up this book
+                      {t('library.book.setUpBook')}
                     </Text>
                   </Pressable>
                 ) : null}

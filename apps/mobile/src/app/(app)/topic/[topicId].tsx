@@ -579,10 +579,10 @@ export default function TopicDetailScreen() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-8">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          Topic not found
+          {t('topic.notFoundTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          This topic could not be opened. Please go back and try again.
+          {t('topic.notFoundMessage')}
         </Text>
         <Pressable
           onPress={handleTopicBack}
@@ -592,7 +592,7 @@ export default function TopicDetailScreen() {
           testID="topic-detail-missing-params-back"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Go back
+            {t('common.goBackAction')}
           </Text>
         </Pressable>
       </View>
@@ -606,10 +606,10 @@ export default function TopicDetailScreen() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-8">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          We couldn't load this topic
+          {t('topic.loadErrorTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          Please try again, or go back to your library.
+          {t('topic.loadErrorMessage')}
         </Text>
         <Pressable
           onPress={() => {
@@ -622,7 +622,7 @@ export default function TopicDetailScreen() {
           testID="topic-detail-retry"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Retry
+            {t('common.retry')}
           </Text>
         </Pressable>
         <Pressable
@@ -633,7 +633,7 @@ export default function TopicDetailScreen() {
           testID="topic-detail-go-back"
         >
           <Text className="text-body font-semibold text-text-primary">
-            Go back
+            {t('common.goBackAction')}
           </Text>
         </Pressable>
         <Pressable
@@ -643,7 +643,9 @@ export default function TopicDetailScreen() {
           accessibilityLabel="Go home"
           testID="topic-detail-go-home"
         >
-          <Text className="text-body-sm text-primary">Go Home</Text>
+          <Text className="text-body-sm text-primary">
+            {t('common.goHome')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -685,7 +687,9 @@ export default function TopicDetailScreen() {
               color={colors.muted}
               accessibilityLabel={t('common.loading')}
             />
-            <Text className="text-text-secondary mt-2">Loading topic...</Text>
+            <Text className="text-text-secondary mt-2">
+              {t('topic.loadingTopic')}
+            </Text>
           </View>
           {/* CTA visible but disabled while data loads */}
           <StudyCTA
@@ -702,10 +706,10 @@ export default function TopicDetailScreen() {
           testID="topic-detail-empty"
         >
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            Topic not found
+            {t('topic.notFoundTitle')}
           </Text>
           <Text className="text-body text-text-secondary text-center">
-            This topic may have been removed from your curriculum.
+            {t('topic.removedHint')}
           </Text>
           <Pressable
             onPress={handleTopicBack}
@@ -715,7 +719,7 @@ export default function TopicDetailScreen() {
             accessibilityLabel="Back to previous screen"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Go back
+              {t('common.goBackAction')}
             </Text>
           </Pressable>
         </View>
@@ -868,7 +872,7 @@ export default function TopicDetailScreen() {
                     className="text-body-sm text-text-secondary px-5 py-2"
                     testID="topic-notes-empty"
                   >
-                    No notes yet. Add one when something clicks.
+                    {t('topic.noNotesYet')}
                   </Text>
                 )}
 
@@ -901,8 +905,8 @@ export default function TopicDetailScreen() {
                   >
                     <Text className="text-primary text-body-sm font-medium">
                       {noteCount > 0
-                        ? '+ Add a note'
-                        : '+ Add your first note for this topic'}
+                        ? t('topic.addNote')
+                        : t('topic.addFirstNote')}
                     </Text>
                   </Pressable>
                 )}
@@ -1006,7 +1010,7 @@ export default function TopicDetailScreen() {
                     className="text-body-sm text-text-secondary px-5 py-2"
                     testID="topic-sessions-empty"
                   >
-                    No sessions yet. Start one below!
+                    {t('topic.noSessionsYet')}
                   </Text>
                 )}
               </View>

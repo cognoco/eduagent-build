@@ -33,7 +33,9 @@
     "show": "Pokaż",
     "hide": "Ukryj",
     "notNow": "Nie teraz",
-    "active": "Aktywny"
+    "active": "Aktywny",
+    "goBackAction": "Wróć",
+    "tryAgainAction": "Spróbuj ponownie"
   },
   "quota": {
     "parent": {
@@ -908,10 +910,18 @@
       "correctAnnounce": "Dobrze! Poprawna odpowiedź to {{answer}}",
       "correctAnnounceNoAnswer": "Dobrze!",
       "wrongAnnounce": "Niezupełnie. Poprawna odpowiedź to {{answer}}",
-      "wrongAnnounceNoAnswer": "Niezupełnie."
+      "wrongAnnounceNoAnswer": "Niezupełnie.",
+      "questionProgress": "{{current}} z {{total}}"
     },
     "results": {
-      "viewHistory": "Zobacz historię"
+      "viewHistory": "Zobacz historię",
+      "peopleIdentified": "Zidentyfikowano {{score}} z {{total}} osób",
+      "xpEarned": "+{{xp}} XP",
+      "whatYouMissed": "Co Ci umknęło",
+      "youSaid": "Twoja odpowiedź: {{answer}}",
+      "youSkipped": "Pominięto to pytanie",
+      "noAnswer": "Nie udzielono odpowiedzi",
+      "playAgain": "Zagraj ponownie"
     },
     "guessWhoQuestion": {
       "typeAName": "Wpisz imię",
@@ -921,7 +931,9 @@
       "revealNextClue": "Odkryj kolejną wskazówkę",
       "revealNextClueLabel": "Odkryj kolejną wskazówkę",
       "iDontKnow": "Nie wiem",
-      "iDontKnowLabel": "Nie znam odpowiedzi"
+      "iDontKnowLabel": "Nie znam odpowiedzi",
+      "clue": "Wskazówka {{number}}",
+      "fallbackPrompt": "Potrzebujesz podpowiedzi? Wybierz jedną:"
     }
   },
   "dictation": {
@@ -1194,8 +1206,42 @@
       },
       "mastered": "Opanowane",
       "reviewDue": "Powtórka gotowa",
-      "topicProgressThreeState": "{{mastered}} opanowane · {{learning}} w nauce · {{total}} razem"
-    }
+      "topicProgressThreeState": "{{mastered}} opanowane · {{learning}} w nauce · {{total}} razem",
+      "badge": "Książka",
+      "missingDetails": "Brak szczegółów książki. Wróć i spróbuj ponownie.",
+      "writingYourBook": "Pisanie Twojej książki...",
+      "takingLonger": "Trwa to nieco dłużej niż zwykle...",
+      "notReadyTitle": "Ta książka nie jest jeszcze gotowa",
+      "notReadyHint": "Najpierw skonfiguruj tematy. Potem możesz zacząć naukę krok po kroku.",
+      "setUpBook": "Skonfiguruj tę książkę",
+      "finishedTitle": "Ukończono tę książkę",
+      "startReview": "▶ Rozpocznij powtórkę",
+      "startFirstLesson": "▶ Rozpocznij pierwszą lekcję",
+      "finishError": "Nie udało się teraz ukończyć tej książki.",
+      "topics": "Tematy",
+      "progressError": "Nie udało się wczytać postępów.",
+      "progressEmpty": "Rozpocznij pierwszą lekcję, aby zobaczyć tutaj swoje postępy.",
+      "nothingToShow": "Jeszcze nic do pokazania.",
+      "pastConversations": "Przeszłe rozmowy",
+      "historyError": "Nie udało się wczytać historii.",
+      "noConversations": "Brak rozmów",
+      "noNotesYet": "Brak notatek. Dodaj notatkę, gdy coś zrozumiesz.",
+      "addNote": "+ Dodaj notatkę",
+      "addFirstNote": "+ Dodaj swoją pierwszą notatkę do tej książki",
+      "backToSubject": "Wróć do tematu →",
+      "finishedBody_one": "Ukończono jedyny temat w tej książce. Powtórz go, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
+      "finishedBody_few": "Ukończono wszystkie {{count}} tematy w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
+      "finishedBody_many": "Ukończono wszystkie {{count}} tematów w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
+      "finishedBody_other": "Ukończono wszystkie {{count}} tematów w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej."
+    },
+    "notStartedCount": "{{notStarted}} / {{total}} nierozpoczętych",
+    "chooseTopic": "Wybierz temat",
+    "provenanceFrom": "Od {{name}}",
+    "recentlyAdded": "Ostatnio dodane",
+    "sessionCount_one": "{{count}} sesja",
+    "sessionCount_few": "{{count}} sesje",
+    "sessionCount_many": "{{count}} sesji",
+    "sessionCount_other": "{{count}} sesji"
   },
   "topic": {
     "relevance": {
@@ -1221,7 +1267,17 @@
       "timeoutMessage": "Wysłanie odpowiedzi trwa dłużej niż zwykle. Sprawdź połączenie i spróbuj ponownie."
     },
     "lastStudied": "Ostatnia nauka {{when}}",
-    "neverStudied": "Nigdy nie studiowano"
+    "neverStudied": "Nigdy nie studiowano",
+    "notFoundTitle": "Nie znaleziono tematu",
+    "notFoundMessage": "Nie można otworzyć tego tematu. Wróć i spróbuj ponownie.",
+    "loadErrorTitle": "Nie mogliśmy wczytać tego tematu",
+    "loadErrorMessage": "Spróbuj ponownie lub wróć do swojej biblioteki.",
+    "removedHint": "Ten temat mógł zostać usunięty z Twojego programu nauczania.",
+    "loadingTopic": "Wczytywanie tematu...",
+    "noNotesYet": "Brak notatek. Dodaj notatkę, gdy coś zrozumiesz.",
+    "noSessionsYet": "Brak sesji. Rozpocznij jedną poniżej!",
+    "addNote": "+ Dodaj notatkę",
+    "addFirstNote": "+ Dodaj swoją pierwszą notatkę do tego tematu"
   },
   "subject": {
     "settings": {
@@ -1809,6 +1865,15 @@
       "secondaryCtaA11y": "Spróbuj tego tematu później",
       "libraryLink": "W międzyczasie zajrzyj do swojej Biblioteki",
       "libraryLinkA11y": "Zajrzyj do swojej Biblioteki"
+    },
+    "accordion": {
+      "loadErrorRetry": "Nie udało się wczytać tematów. Dotknij, aby spróbować ponownie, lub zamknij kartę przedmiotu, aby odrzucić.",
+      "noTopicsYet": "Brak tematów",
+      "browseTopics": "Przeglądaj tematy"
+    },
+    "subjectRow": {
+      "hideTopics": "▴ Ukryj tematy",
+      "seeTopics": "▾ Zobacz tematy"
     }
   },
   "onboarding": {
@@ -2131,7 +2196,8 @@
       "reportGoneTitle": "Ten raport nie jest już dostępny",
       "reportGoneBody": "Mógł zostać zarchiwizowany lub usunięty. Wszystkie Twoje inne raporty są nadal bezpieczne.",
       "testsCompleted": "Ukończone testy",
-      "testPoints": "Punkty za testy"
+      "testPoints": "Punkty za testy",
+      "activeMinutes": "{{count}} min"
     },
     "practiceSummary": {
       "title": "Szczegóły testów",
@@ -2483,6 +2549,8 @@
     "backToLibrary": "Powrót do biblioteki",
     "conversation": "Rozmowa",
     "messageCount_one": "{{count}} wiadomość",
+    "messageCount_few": "{{count}} wiadomości",
+    "messageCount_many": "{{count}} wiadomości",
     "messageCount_other": "{{count}} wiadomości",
     "you": "Ty",
     "emptyTitle": "Brak wiadomości",
@@ -2976,5 +3044,69 @@
     "ageGate": "Aby skonfigurować naukę dziecka, właściciel konta musi mieć ukończone 18 lat. Nadal możesz skonfigurować własną naukę — wybierz „Moja nauka” w poprzednim kroku.",
     "childSaveError": "Zapisaliśmy Twoje konto, ale nie mogliśmy jeszcze dodać Twojego dziecka: {{error}}",
     "confirmChildReady": "Profil Twojego dziecka jest skonfigurowany. Otwórzmy stronę główną rodzica."
+  },
+  "myNotes": {
+    "title": "Moje notatki",
+    "subtitle": "Sesje, notatki i zapisane odpowiedzi",
+    "sortDate": "Data",
+    "sortSubject": "Temat",
+    "emptyHint": "Pojawią się tutaj w miarę Twojej nauki.",
+    "loadMore": "Wczytaj więcej",
+    "noneYetNotes": "Brak notatek",
+    "noneYetBookmarks": "Brak zakładek",
+    "noneYetSessions": "Brak sesji",
+    "loadErrorNotes": "Nie udało się wczytać notatek",
+    "loadErrorBookmarks": "Nie udało się wczytać zakładek",
+    "loadErrorSessions": "Nie udało się wczytać sesji"
+  },
+  "pickBook": {
+    "subjectFallback": "Temat",
+    "pickWhatInterests": "Wybierz, co Cię interesuje",
+    "suggestionsFailedTitle": "Nie wczytano sugestii",
+    "suggestionsFailedHint": "Nadal możesz wpisać książkę lub temat, który chcesz dodać.",
+    "basedOnStudied": "Na podstawie tego, czego się uczysz",
+    "trySomethingNew": "Spróbuj czegoś nowego",
+    "somethingElse": "Coś innego...",
+    "settingUp": "Konfigurowanie...",
+    "go": "Dalej",
+    "skipStart": "Pomiń — i tak zacznij naukę",
+    "missingSubject": "Brak tematu. Wróć i spróbuj ponownie.",
+    "takingLonger": "Trwa to nieco dłużej niż zwykle..."
+  },
+  "relearn": {
+    "title": "Powtórz temat",
+    "loadingReviewTopics": "Wczytywanie tematów do powtórki...",
+    "startingSession": "Rozpoczynanie sesji powtórkowej...",
+    "overdueTopicCount_one": "{{count}} zaległy temat",
+    "overdueTopicCount_few": "{{count}} zaległe tematy",
+    "overdueTopicCount_many": "{{count}} zaległych tematów",
+    "overdueTopicCount_other": "{{count}} zaległych tematów",
+    "daysOverdue_one": "{{count}} dzień zaległości",
+    "daysOverdue_few": "{{count}} dni zaległości",
+    "daysOverdue_many": "{{count}} dni zaległości",
+    "daysOverdue_other": "{{count}} dni zaległości"
+  },
+  "preview": {
+    "backToSignIn": "Wróć do logowania",
+    "tryMentomate": "Wypróbuj MentoMate",
+    "seeHowItWorks": "Zobacz, jak to działa — na razie bez rejestracji.",
+    "bothQuestion": "Co chcesz skonfigurować najpierw?",
+    "bothHint": "Możesz zrobić obie rzeczy — wybierz, od czego zacząć.",
+    "intentQuestion": "Dla kogo to konfigurujesz?",
+    "intentHint": "Dopasujemy to, co zobaczysz dalej.",
+    "pickSampleLesson": "Wybierz przykładową lekcję",
+    "safePreviews": "To są bezpieczne wersje demonstracyjne. Twój własny temat pojawi się po rejestracji.",
+    "signUpChild": "Zarejestruj się, aby skonfigurować konto dla dziecka",
+    "signUpLesson": "Zarejestruj się, aby rozpocząć pierwszą lekcję",
+    "signUpLessonTopic": "Zarejestruj się, aby rozpocząć pierwszą lekcję na temat: {{topic}}",
+    "trySampleFirst": "Najpierw wypróbuj przykładową lekcję",
+    "howTeaches": "Oto jak uczy MentoMate",
+    "howHelpsFamilies": "Oto jak MentoMate pomaga rodzinom",
+    "conversationPitch": "Dwustronna rozmowa, która podąża za Twoimi potrzebami, a nie za sztywnym planem lekcji.",
+    "weeklyReadPitch": "Konfigurujesz konto dla dziecka, ono się uczy, a Ty co tydzień otrzymujesz krótkie podsumowanie jego postępów. Bez nadzoru, tylko sygnał.",
+    "weeklyHighlight": "Najważniejsze w tygodniu",
+    "sampleBadge": "Przykład",
+    "sampleDataNote": "Dane przykładowe — prawdziwe informacje o postępach Twojego dziecka pojawią się po jego pierwszej sesji.",
+    "sampleWeeklyBody": "Ćwiczono równania kwadratowe przez 45 minut w trakcie trzech sesji. Coraz lepsze radzenie sobie z rozkładem na czynniki; praca nad uzupełnianiem do kwadratu."
   }
 }

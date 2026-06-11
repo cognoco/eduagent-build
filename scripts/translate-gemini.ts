@@ -221,6 +221,45 @@ export function buildBaselineForKeys(
   return baseline;
 }
 
+// CLDR plural categories: target locales may legitimately carry plural
+// variants the English source does not (e.g. Polish `_few`/`_many` next to
+// en's `_one`/`_other`). Those forms are hand-maintained — they must never be
+// pruned (diff-mode removedKeys) NOR dropped by the merge-write path, as long
+// as the English source still carries ANY member of the same plural family.
+const PLURAL_SUFFIXES = ['zero', 'one', 'two', 'few', 'many', 'other'];
+
+export function isLocalePluralVariant(
+  key: string,
+  sourceFlat: Record<string, string>,
+): boolean {
+  const m = /^(.*)_(zero|one|two|few|many|other)$/.exec(key);
+  if (!m) return false;
+  return PLURAL_SUFFIXES.some((sfx) => `${m[1]}_${sfx}` in sourceFlat);
+}
+
+// Merge freshly-translated keys over the previous locale file, dropping keys
+// that no longer exist in the English source — EXCEPT locale-specific plural
+// variants of a still-live plural family. This is the single write-path merge
+// used after every Gemini call; the same family rule guards diff-mode's
+// removedKeys above. (Regression: hand-authored pl _few/_many were silently
+// deleted by this loop before the guard existed — WI-621 PR #985.)
+export function mergeTranslatedIntoPrevious(
+  previousFlat: Record<string, string>,
+  translatedFlat: Record<string, string>,
+  sourceFlat: Record<string, string>,
+): Record<string, string> {
+  const merged: Record<string, string> = { ...previousFlat };
+  for (const [key, value] of Object.entries(translatedFlat)) {
+    merged[key] = value;
+  }
+  for (const key of Object.keys(merged)) {
+    if (!(key in sourceFlat) && !isLocalePluralVariant(key, sourceFlat)) {
+      delete merged[key];
+    }
+  }
+  return merged;
+}
+
 export function selectGeminiDiffKeys(args: {
   source: NestedStrings;
   target: NestedStrings;
@@ -231,7 +270,7 @@ export function selectGeminiDiffKeys(args: {
   const targetFlat = flattenKeys(args.target);
   const baseline = normalizeSourceBaseline(args.baseline);
   const removedKeys = Object.keys(targetFlat).filter(
-    (key) => !(key in sourceFlat),
+    (key) => !(key in sourceFlat) && !isLocalePluralVariant(key, sourceFlat),
   );
 
   if (args.full) {
@@ -618,15 +657,11 @@ async function main(): Promise<void> {
       let translated: NestedStrings = JSON.parse(translatedJson);
 
       if (previousFlat) {
-        const translatedFlat = flattenKeys(translated);
-        const merged = { ...previousFlat };
-        for (const [key, value] of Object.entries(translatedFlat)) {
-          merged[key] = value;
-        }
-        const sourceFlat = flattenKeys(source);
-        for (const key of Object.keys(merged)) {
-          if (!(key in sourceFlat)) delete merged[key];
-        }
+        const merged = mergeTranslatedIntoPrevious(
+          previousFlat,
+          flattenKeys(translated),
+          flattenKeys(source),
+        );
         translated = unflattenKeys(merged);
       }
 
