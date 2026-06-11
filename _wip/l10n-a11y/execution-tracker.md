@@ -136,10 +136,10 @@ overlapping component files — keep adjacent/serial).
 |---|---|---|
 | 1 | WI-621 WP-L12-jsx-strings | in-progress — PR A #942 MERGED `684495a2c` (89 strings, 361→272); PR B #961 **MERGED** `e382a95e6` (138 strings, 272→134, clean gate). Child WI-634 swept. Group C (final, ~127 strings + 8 `--accept`) building on `WI-621-c` |
 | 2 | WI-622 WP-L12-sr-announcements | **done** — PR #940 merged `ce8b10ab9`; children WI-635/636 swept; CLOSED Done by autonomous review 2026-06-11 (first WP through the PRG-12 loop, zero human touches) |
-| 3 | WI-623 WP-L12-modal-focus-roles | ready — bridged (children WI-653/654); run adjacent/serial with WI-624 (overlapping surface) |
+| 3 | WI-623 WP-L12-modal-focus-roles | in-progress — dispatched wi623-executor (jumped queue: WI-625 gated on PR #985's translate-prune fix) |
 | 4 | WI-624 WP-L12-label-prop-strings | ready — bridged (children WI-655/656); after WI-621 lands (same screens, attribute pass) |
 | 5 | WI-625 WP-L12-pluralization | ready — bridged (children WI-657/658); PR #961 left plural-site breadcrumbs |
-| 6 | WI-626 WP-L12-mobile-logic-bugs | review — PR #959 MERGED `0a7b07dbe` (5 CI rounds, all findings red-verified); children swept; `complete` done. Reviewer bounced on red-main landing checks — **refuted with evidence** (main went red one merge EARLIER at `2e5589cdf` / PR #931; WI-626 touches neither failing surface; KV deploy gap is standing infra) — Stage restored to Reviewing for re-audit |
+| 6 | WI-626 WP-L12-mobile-logic-bugs | **done** — PR #959 merged `0a7b07dbe` (5 CI rounds, all red-verified); one mis-attributed bounce (red main = cross-stream PR #931) refuted with evidence; CLOSED Done on re-review 2026-06-11 |
 | 7 | WI-627 WP-L12-dates-locale | in-progress — dispatched wi627-executor (rolled into WI-626's freed lane) |
 | 8 | WI-628 WP-L12-decorative-lowvision | ready — bridged (children WI-661/662) |
 
