@@ -276,16 +276,19 @@ export const consentRevocation = inngest.createFunction(
       return { sent: true };
     });
 
-    // Delete child profile (FK cascades handle all data)
+    // Delete child profile (FK cascades handle all data).
+    // [F-093] Pass parentProfileId so deleteProfileIfConsentWithdrawn enforces
+    // the parent-chain account guard — same defence-in-depth as the archive
+    // branch (BUG-662 / FCR-2026-05-23-L3.L3.3). The ownerProfileId was
+    // resolved before deletion in `choose-final-action` and is safe to reuse.
     const deleteResult = await step.run('delete-child-profile', async () => {
       const db = getStepDatabase();
-      return revocationRespondedAt
-        ? deleteProfileIfConsentWithdrawn(
-            db,
-            childProfileId,
-            revocationRespondedAt,
-          )
-        : deleteProfileIfConsentWithdrawn(db, childProfileId);
+      return deleteProfileIfConsentWithdrawn(
+        db,
+        childProfileId,
+        revocationRespondedAt,
+        archiveDecision.ownerProfileId,
+      );
     });
     if (!deleteResult) {
       return { status: 'restored', childProfileId };

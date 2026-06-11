@@ -62,22 +62,10 @@ jest.mock(
   },
 );
 
-const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
-const mockDeleteProfileIfConsentWithdrawn = jest.fn().mockResolvedValue(true);
-jest.mock(
-  '../../services/deletion' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/deletion',
-    ) as typeof import('../../services/deletion');
-    return {
-      ...actual,
-      deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
-      deleteProfileIfConsentWithdrawn: (...args: unknown[]) =>
-        mockDeleteProfileIfConsentWithdrawn(...args),
-    };
-  },
-);
+// [GC6] services/deletion is NOT mocked: the real
+// deleteProfileIfConsentWithdrawn runs against the mocked @eduagent/database
+// boundary (db.execute resolves { rowCount: 1 } in beforeEach). Deletion
+// behaviour is asserted at the SQL level via findProfileDeleteSql().
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 jest.mock(
@@ -160,6 +148,18 @@ function extractSqlTextAndValues(
   return values;
 }
 
+/**
+ * [GC6] Returns the lowercased text+values of the first db.execute call whose
+ * SQL is the profile DELETE issued by the real deleteProfileIfConsentWithdrawn,
+ * or undefined when no delete was issued.
+ */
+function findProfileDeleteSql(): string | undefined {
+  const calls = (mockDatabaseModule.db.execute as jest.Mock).mock.calls;
+  return calls
+    .map((call: unknown[]) => extractSqlTextAndValues(call[0]).join(' '))
+    .find((text: string) => text.includes('delete from profiles'));
+}
+
 async function executeRevocation(
   eventData: {
     childProfileId: string;
@@ -198,12 +198,6 @@ beforeEach(() => {
   });
   mockGetFamilyOwnerProfileId.mockResolvedValue('parent-001');
   mockGetWithdrawalArchivePreference.mockResolvedValue('never');
-  mockDeleteProfileIfConsentWithdrawn.mockImplementation(
-    async (...args: unknown[]) => {
-      await mockDeleteProfile(...args);
-      return true;
-    },
-  );
 });
 
 afterEach(() => {
@@ -321,7 +315,7 @@ describe('consentRevocation', () => {
 
     expect(result).toEqual({ status: 'restored', childProfileId: 'child-001' });
     expect(mockSendPushNotification).not.toHaveBeenCalled();
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(findProfileDeleteSql()).toBeUndefined();
   });
 
   it('[WI-78 review] stops before child notifications when the grace-end check sees a newer withdrawal generation', async () => {
@@ -343,7 +337,7 @@ describe('consentRevocation', () => {
         type: 'consent_expired',
       }),
     );
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(findProfileDeleteSql()).toBeUndefined();
   });
 
   describe('happy path — still WITHDRAWN', () => {
@@ -376,11 +370,16 @@ describe('consentRevocation', () => {
           type: 'consent_expired',
         }),
       );
-      // Profile deletion
-      expect(mockDeleteProfile).toHaveBeenCalledWith(
-        expect.anything(),
-        'child-001',
+      // Profile deletion — the real deleteProfileIfConsentWithdrawn issues the
+      // DELETE through the mocked db.execute. [F-093] the SQL must carry the
+      // parent-chain account guard bound to the resolved ownerProfileId.
+      const deleteSql = findProfileDeleteSql();
+      expect(deleteSql).toBeDefined();
+      expect(deleteSql).toContain('child-001');
+      expect(deleteSql).toContain(
+        'account_id = (select account_id from profiles where id =',
       );
+      expect(deleteSql).toContain('parent-001');
       // Parent push
       expect(mockSendPushNotification).toHaveBeenNthCalledWith(
         3,
@@ -423,10 +422,16 @@ describe('consentRevocation', () => {
       status: 'deleted',
       childProfileId: 'child-boundary',
     });
-    expect(mockDeleteProfile).toHaveBeenCalledWith(
-      expect.anything(),
-      'child-boundary',
+    // [F-093] real DELETE SQL carries the account guard; revokedAt absent in
+    // this test path so the generation predicate (responded_at) must be absent.
+    const deleteSql = findProfileDeleteSql();
+    expect(deleteSql).toBeDefined();
+    expect(deleteSql).toContain('child-boundary');
+    expect(deleteSql).toContain(
+      'account_id = (select account_id from profiles where id =',
     );
+    expect(deleteSql).toContain('parent-001');
+    expect(deleteSql).not.toContain('responded_at');
   });
 
   describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
@@ -504,11 +509,15 @@ describe('consentRevocation', () => {
         expect.anything(),
         expect.objectContaining({ type: 'consent_warning' }),
       );
-      // Profile deletion proceeds regardless of push dedup.
-      expect(mockDeleteProfile).toHaveBeenCalledWith(
-        expect.anything(),
-        'child-dup',
+      // Profile deletion proceeds regardless of push dedup. [F-093] the real
+      // DELETE SQL carries the account guard bound to the resolved owner.
+      const deleteSql = findProfileDeleteSql();
+      expect(deleteSql).toBeDefined();
+      expect(deleteSql).toContain('child-dup');
+      expect(deleteSql).toContain(
+        'account_id = (select account_id from profiles where id =',
       );
+      expect(deleteSql).toContain('parent-001');
     });
 
     it('still pushes when no recent consent_expired notifications exist for either party', async () => {
@@ -561,8 +570,8 @@ describe('archive path — auto preference, age 14', () => {
       ]),
     );
 
-    // delete must NOT have been called
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    // delete must NOT have been issued (archive branch only UPDATEs)
+    expect(findProfileDeleteSql()).toBeUndefined();
   });
 
   it('records archive notice against the resolved owner profile', async () => {

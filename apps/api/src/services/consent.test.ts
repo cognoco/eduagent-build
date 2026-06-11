@@ -290,6 +290,34 @@ describe('checkConsentRequired', () => {
     expect(result.consentType).toBe('GDPR');
     expect(result.belowMinimumAge).toBe(true);
   });
+
+  // [F-029-sem][BREAK] The central age-gate must fail CLOSED when birthYear is
+  // unknown (null / undefined / 0). The W0 patch (F-145) closed the
+  // assertPronounsSelfEditAllowed path; the central checkConsentRequired must
+  // carry the same semantic guarantee so no caller can pass a sentinel value
+  // and receive "not required" back.
+  //
+  // Red→green: checkConsentRequired(null) currently computes age as NaN (from
+  // calculateAge(null)) → NaN < 13 is false → NaN <= 16 is false → returns
+  // { required: false }. Fix: accept number | null | undefined and fail closed.
+  it.each([null, undefined, 0])(
+    '[F-029-sem][BREAK] checkConsentRequired(%s) fails closed (required=true, belowMinimumAge=true)',
+    (birthYear) => {
+      const result = checkConsentRequired(birthYear);
+      expect(result.required).toBe(true);
+      expect(result.belowMinimumAge).toBe(true);
+    },
+  );
+
+  // [F-029-sem] checkConsentRequiredFromDate mirrors the fail-closed guarantee.
+  it.each([null, undefined, 0])(
+    '[F-029-sem] checkConsentRequiredFromDate(%s, ...) fails closed',
+    (birthYear) => {
+      const result = checkConsentRequiredFromDate(birthYear, 6, 15);
+      expect(result.required).toBe(true);
+      expect(result.belowMinimumAge).toBe(true);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
