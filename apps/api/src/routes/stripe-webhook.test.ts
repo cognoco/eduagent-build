@@ -484,7 +484,7 @@ describe('test-mode event guard', () => {
   it('escalates test-mode-in-production to Sentry [#830 break test]', async () => {
     // [#830] A test-mode event reaching production with a valid production
     // webhook signature is high-signal: likely secret leak/reuse or endpoint
-    // misconfiguration. logger.warn alone is insufficient — CLAUDE.md mandates
+    // misconfiguration. logger.warn alone is insufficient — AGENTS.md mandates
     // captureException for billing fallback paths so the rate is queryable.
     (verifyWebhookSignature as jest.Mock).mockResolvedValue({
       ...makeStripeEvent('customer.subscription.updated', makeSubscription()),
@@ -1739,7 +1739,7 @@ describe('unmapped Stripe subscription status [#441]', () => {
   // that are not mapped in mapStripeStatus. The previous code silently
   // early-returned with no log, no Sentry, no metric — a user stuck in
   // 'incomplete' for hours was invisible.
-  // CLAUDE.md: "Silent recovery without escalation is banned" in billing.
+  // AGENTS.md: "Silent recovery without escalation is banned" in billing.
   it('emits logger.warn and captureException for unmapped status (incomplete) [#441]', async () => {
     const stripeSub = makeSubscription({
       status: 'incomplete', // not in mapStripeStatus switch — returns null

@@ -3,7 +3,7 @@
 # sees the LEARNER tab shape — 4 tabs: home, library, progress, more — under
 # BOTH V0 and V1 builds.
 #
-# Why this matters (CLAUDE.md, navigation-contract.ts):
+# Why this matters (AGENTS.md, navigation-contract.ts):
 #   The V1 guardian redesign replaces own-learning + library with a recaps tab.
 #   This tab reassignment ONLY applies to the guardian shape (owner + linked
 #   children). A solo owner is classified as "learner" in resolveTabShape() and

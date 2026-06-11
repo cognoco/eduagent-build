@@ -760,7 +760,7 @@ export type BookSuggestion = z.infer<typeof bookSuggestionSchema>;
 //
 // Surfaces to the picker so the user can be told *why* there are no
 // suggestions rather than seeing a silent dead end. Required for the
-// CLAUDE.md "Silent recovery without escalation is banned" rule.
+// AGENTS.md "Silent recovery without escalation is banned" rule.
 export const bookSuggestionsTopupOutcomeSchema = z.enum([
   'success',
   'not_needed',

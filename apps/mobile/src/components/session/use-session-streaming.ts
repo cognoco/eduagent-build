@@ -1227,7 +1227,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
       return [];
     } catch (error) {
-      // BUG-147: Silent recovery without escalation is banned (CLAUDE.md
+      // BUG-147: Silent recovery without escalation is banned (AGENTS.md
       // "Code Quality Guards"). Promote to structured Sentry capture so
       // celebration-fetch failures are queryable in telemetry instead of
       // disappearing into device-local console logs only.

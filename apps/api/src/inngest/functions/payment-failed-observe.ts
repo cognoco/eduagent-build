@@ -8,7 +8,7 @@
 // In practice this meant the events fired into the void — the Inngest
 // dashboard could not query them and there was no structured-log terminus,
 // so a real retry/notify/dunning strategy could not be built without first
-// rediscovering every send site. This violates the CLAUDE.md "Silent
+// rediscovering every send site. This violates the AGENTS.md "Silent
 // recovery without escalation" rule.
 //
 // This handler is the queryable terminus, following the same pattern as

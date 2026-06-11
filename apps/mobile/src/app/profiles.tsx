@@ -168,7 +168,7 @@ export default function ProfilesScreen() {
     } catch (err) {
       // [BUG-822] switchProfile may throw (network failure, Clerk error, etc.)
       // instead of returning {success:false}. Surface the typed server reason
-      // when available rather than a generic "Please try again." per CLAUDE.md
+      // when available rather than a generic "Please try again." per AGENTS.md
       // rule: never replace specific server errors with generic messages.
       clearTimeout(timeoutId);
       // [CR-2026-05-21-107] Same guard as the success path — if the 20s
@@ -336,7 +336,7 @@ export default function ProfilesScreen() {
           })}
 
           {/*
-            [BUG-127] isOwner client-side gate. Per CLAUDE.md Profile Shapes,
+            [BUG-127] isOwner client-side gate. Per AGENTS.md Profile Shapes,
             "Add child" must only be visible to account owners (guardian or
             solo) — children acting on a parent's account must never see the
             add-profile affordance. Server-side enforcement remains the

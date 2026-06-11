@@ -309,7 +309,7 @@ describe('[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (inte
 // ---------------------------------------------------------------------------
 // [OPT-C / HIGH-D3] Adult-owner gate break-tests
 //
-// Red-green regression per CLAUDE.md "Security fixes require a break test."
+// Red-green regression per AGENTS.md "Security fixes require a break test."
 // These tests are the canonical proof that the [OPT-C] server-side rule exists
 // and cannot be silently removed without CI failing.
 // ---------------------------------------------------------------------------

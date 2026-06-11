@@ -339,7 +339,7 @@ async function maybeReplayIdempotentSessionRequest(
       error: errorMessage,
     });
     // [CR-2026-05-21-047] Silent recovery in billing without a structured metric
-    // is banned (CLAUDE.md "Fix Development Rules"). On KV outage every idempotent
+    // is banned (AGENTS.md "Fix Development Rules"). On KV outage every idempotent
     // session request is processed twice if the client retries — including
     // double-decrementing the quota pool. Emit via safeSend so dispatch failure
     // is captured in Sentry but never throws and never breaks the user action.
@@ -347,7 +347,7 @@ async function maybeReplayIdempotentSessionRequest(
     await safeSend(
       () =>
         inngest.send({
-          // orphan-allow: structured telemetry signal required by CLAUDE.md
+          // orphan-allow: structured telemetry signal required by AGENTS.md
           // ("silent recovery in billing must emit a structured metric"). The
           // KV-outage recovery is in-line (returns null → request processed
           // without replay protection); escalation is via logger.warn. The
@@ -492,7 +492,7 @@ async function safeWriteKV(
 // the cache entry — the next request falls through to DB and backfills KV
 // with the post-refund counters via the existing miss path. Silent recovery
 // is banned: on delete failure we emit a structured warn so the failure
-// rate is queryable (CLAUDE.md → "Silent recovery without escalation is
+// rate is queryable (AGENTS.md → "Silent recovery without escalation is
 // banned").
 async function safeDeleteKV(kv: KVNamespace, accountId: string): Promise<void> {
   try {

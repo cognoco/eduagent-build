@@ -45,7 +45,7 @@ async function runFreeformFiling({
     const db = getStepDatabase();
     // [M8b] Use createScopedRepository so the profileId filter is enforced by
     // the shared scoping layer, not an ad-hoc inline eq(). This satisfies
-    // CLAUDE.md: "Reads must use createScopedRepository(profileId)."
+    // AGENTS.md: "Reads must use createScopedRepository(profileId)."
     const repo = createScopedRepository(db, profileId);
     const row = await repo.sessions.findFirst(
       eq(learningSessions.id, sessionId),

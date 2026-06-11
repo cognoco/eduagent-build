@@ -69,7 +69,7 @@ describe('RewardBurst', () => {
   it('uses no hardcoded hex colours — all colours come from semantic tokens (BUG-377)', () => {
     // Forward-only guard: prevents re-introducing raw hex literals into variant
     // colour arrays or any inline style in this shared common component.
-    // Hex is only allowed in brand-fixed celebration components (CLAUDE.md exception).
+    // Hex is only allowed in brand-fixed celebration components (AGENTS.md exception).
     const source = require('fs').readFileSync(
       require('path').join(__dirname, 'RewardBurst.tsx'),
       'utf8',

@@ -191,7 +191,7 @@ export default function SignUpScreen() {
         // handleIncompleteSignIn can guide the user through the right factor.
         // [BUG-510] Emit a structured Sentry event so incomplete-signIn cases
         // are visible in observability — silent redirect alone is banned per
-        // CLAUDE.md "Silent recovery without escalation is banned."
+        // AGENTS.md "Silent recovery without escalation is banned."
         if (ssoSignIn?.status) {
           if (__DEV__)
             console.warn(

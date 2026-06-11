@@ -116,7 +116,7 @@ export default function SessionTranscriptScreen() {
   // user can sit forever on a spinner when the network is slow or the server
   // is down. TimeoutLoader spins for 15s then flips to ErrorFallback with
   // Retry + Back to library — matching the session-summary pattern and the
-  // standard error fallback rule in CLAUDE.md > UX Resilience Rules.
+  // standard error fallback rule in AGENTS.md > UX Resilience Rules.
   if (transcript.isLoading) {
     return (
       <TimeoutLoader

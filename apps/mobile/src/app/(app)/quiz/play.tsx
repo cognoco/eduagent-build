@@ -285,7 +285,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setQuitConfirmVisible(false);
     // [BUG-268 / CCR PR #230] If the round was already submitted in the
     // background (auto-save on final question) submitRound() would silently
-    // no-op via roundSubmittedRef. Per CLAUDE.md "Silent recovery without
+    // no-op via roundSubmittedRef. Per AGENTS.md "Silent recovery without
     // escalation is banned": when the save already happened, route the user
     // to results (the save-and-quit intent is satisfied — they wanted their
     // answers persisted and to leave the play screen). If completion is

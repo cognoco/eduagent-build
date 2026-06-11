@@ -8,7 +8,7 @@
 //     by `app/weekly-progress-push.generate`; parentId comes from the event
 //     payload and all DB reads are scoped to that parent and their children.
 //
-// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// Profile-scoping rules in AGENTS.md ("Reads must use createScopedRepository")
 // do NOT apply to `weeklyProgressPushCron` — this is system-wide work running
 // outside any single profile's request context.
 //

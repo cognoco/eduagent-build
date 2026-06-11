@@ -9,7 +9,7 @@
 # a hard dead end. The expected testID `pick-book-screen` is therefore never
 # mounted.
 #
-# This matches the "UX Resilience Rules" in CLAUDE.md: a transient query
+# This matches the "UX Resilience Rules" in AGENTS.md: a transient query
 # failure should degrade to "no suggestions, type your own" (the manual-entry
 # fallback) rather than a fullscreen 404. The fix is in code — make
 # `canContinueWithoutSuggestions` true for transient query errors (or stop

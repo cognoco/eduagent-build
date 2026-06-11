@@ -65,7 +65,7 @@ export default function DictationReviewScreen(): React.ReactElement {
         mode,
         reviewed: true,
       });
-      // [CRIT-2] Navigate only after successful save — guarded per CLAUDE.md
+      // [CRIT-2] Navigate only after successful save — guarded per AGENTS.md
       router.replace('/(app)/practice' as Href);
     } catch (err) {
       savingRef.current = false;

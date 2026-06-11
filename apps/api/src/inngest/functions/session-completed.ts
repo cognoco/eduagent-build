@@ -1309,7 +1309,7 @@ export const sessionCompleted = inngest.createFunction(
             error: err instanceof Error ? err.message : String(err),
           });
           // Promote to `errored` so the failure event fires below — silent
-          // recovery without escalation is banned by CLAUDE.md.
+          // recovery without escalation is banned by AGENTS.md.
           return {
             outcome: {
               step: 'generate-llm-summary',

@@ -244,7 +244,7 @@ jest.mock(
 // the spy fns on a stable object keyed off __spies so they can be retrieved
 // later via jest.requireMock().
 // [CR-2026-05-21-047] safeSend spy — assertion mechanism for idempotency replay
-// KV failure observability (CLAUDE.md "Fix Development Rules": silent recovery
+// KV failure observability (AGENTS.md "Fix Development Rules": silent recovery
 // in billing without a structured metric is banned).
 const mockSafeSendFn = jest.fn().mockResolvedValue(undefined);
 jest.mock(

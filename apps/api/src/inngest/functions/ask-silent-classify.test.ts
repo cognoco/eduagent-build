@@ -104,7 +104,7 @@ describe('ask-silent-classify Inngest function', () => {
     });
 
     it('emits app/ask.classification_failed for observability', async () => {
-      // Per global CLAUDE.md "Silent Recovery Without Escalation is Banned":
+      // Per global AGENTS.md "Silent Recovery Without Escalation is Banned":
       // the safeParse-fail path must emit a structured event so the case is
       // queryable via dashboards / metrics, not buried in logger.warn.
       // ask-classification-observe.ts:38-66 is the consumer that turns this

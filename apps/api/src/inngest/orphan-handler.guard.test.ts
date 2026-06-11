@@ -11,7 +11,7 @@
  *     where nothing in `apps/api/src/` ever sends `{ name: 'X' }`.
  *
  * A handler nobody triggers is the "wired-but-untriggered" anti-pattern called
- * out in CLAUDE.md: "Wired-but-untriggered code is worse than dead code — it
+ * out in AGENTS.md: "Wired-but-untriggered code is worse than dead code — it
  * creates false confidence." The function shows up in the serve registry, has
  * tests, and looks operational, but no event ever reaches it. The escalation /
  * observability / work it promises silently never runs.
@@ -400,7 +400,7 @@ describe('inverse orphan handler ratchet', () => {
       throw new Error(
         `Found ${orphans.length} inverse-orphan handler(s) — a registered Inngest ` +
           `function triggers on an event that NO production code dispatches ` +
-          `(wired-but-untriggered, worse than dead code per CLAUDE.md).\n` +
+          `(wired-but-untriggered, worse than dead code per AGENTS.md).\n` +
           `Fix by dispatching the event from production code (safeSend for ` +
           `non-core, bare inngest.send with // core-send: for core), OR remove ` +
           `the handler + its registration in apps/api/src/inngest/index.ts, OR ` +

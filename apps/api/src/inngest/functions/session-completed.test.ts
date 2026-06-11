@@ -612,7 +612,7 @@ describe('sessionCompleted', () => {
     );
   });
 
-  // [BUG-146] Per CLAUDE.md "Inngest" rule, every receiver-style function
+  // [BUG-146] Per AGENTS.md "Inngest" rule, every receiver-style function
   // must declare a concurrency cap so a flurry of events cannot stampede
   // the LLM provider and Neon connection pool. session-completed runs
   // heavy LLM work (analyze, insights, recap, summary) plus Voyage
@@ -2232,7 +2232,7 @@ describe('sessionCompleted', () => {
   // [FIX-INNGEST-1] Critical vs soft step break tests
   // Proves that runCritical steps throw (Inngest retries) while runIsolated
   // steps absorb errors (pipeline continues). These tests are the "break tests"
-  // required by CLAUDE.md for every security/correctness fix.
+  // required by AGENTS.md for every security/correctness fix.
   // ---------------------------------------------------------------------------
 
   describe('[FIX-INNGEST-1] critical step break tests', () => {

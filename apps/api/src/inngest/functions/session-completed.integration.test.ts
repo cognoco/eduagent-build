@@ -12,7 +12,7 @@
  *   - memoryConsentStatus='pending' → analyzeSessionTranscript skipped (consent gate)
  *   - exchangeCount=2 → generateSessionInsights skipped (threshold is >=3)
  *
- * External-boundary mocks only (CLAUDE.md § Code Quality Guards):
+ * External-boundary mocks only (AGENTS.md § Code Quality Guards):
  *   1. jest.spyOn(llm, 'routeAndCall') — every LLM call in the chain
  *   2. globalThis.fetch — Anthropic, Voyage, Expo Push, Resend
  */
@@ -1456,7 +1456,7 @@ describe('session-completed integration', () => {
 // the WHERE clause works — only a real query engine can. If the
 // eq(subjects.profileId, ownerProfileId) line is deleted from the join,
 // the cross-account assertion below must start returning the leaked title.
-// See CLAUDE.md § Fix Development Rules — "security fixes require a break test."
+// See AGENTS.md § Fix Development Rules — "security fixes require a break test."
 describe('loadTopicTitle — ownership chain enforcement', () => {
   it('returns title for the owning profile and null for an unrelated profile', async () => {
     const { accountId: accountA } = await seedAccount();

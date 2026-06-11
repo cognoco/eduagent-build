@@ -20,7 +20,7 @@
 #   checkAnswer mutation throws. On a fresh LLM-generated round the mutation succeeds,
 #   so the warning will NOT appear via the normal launch path.
 #
-#   The inline warning text has no testID (play.tsx line 690). Per CLAUDE.md:
+#   The inline warning text has no testID (play.tsx line 690). Per AGENTS.md:
 #   "prefer id: over text: for assertions — text: breaks under i18n." However,
 #   this text is hardcoded English (not via t()), so text: is used as a fallback.
 #

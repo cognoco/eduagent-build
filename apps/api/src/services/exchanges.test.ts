@@ -1366,7 +1366,7 @@ describe('processExchange — readyToFinish surfacing', () => {
   });
 });
 
-// [BUG-92 / CR-2026-05-19-C4] The envelope contract in CLAUDE.md mandates a
+// [BUG-92 / CR-2026-05-19-C4] The envelope contract in AGENTS.md mandates a
 // server-side hard cap per envelope signal so the flow terminates even if
 // the LLM never emits the signal. MAX_INTERVIEW_EXCHANGES is the cap for
 // `signals.ready_to_finish` in interview/onboarding flows. The constant must
@@ -1381,7 +1381,7 @@ describe('MAX_INTERVIEW_EXCHANGES', () => {
   });
 
   it('[BUG-92] is small enough to bound the interview (current contract: 4)', () => {
-    // Lock the cap at 4 to match the CLAUDE.md example and the
+    // Lock the cap at 4 to match the AGENTS.md example and the
     // docs/architecture.md envelope contract. If the product decision changes,
     // update this assertion AND the JSDoc on the constant in the same commit.
     expect(MAX_INTERVIEW_EXCHANGES).toBe(4);

@@ -7,7 +7,7 @@
 //   2. A malformed event payload throws and reports to Sentry — Inngest must
 //      retry / dead-letter rather than silently swallowing schema drift.
 //
-// Reference: CLAUDE.md > Fix Verification Rules — "Silent recovery without
+// Reference: AGENTS.md > Fix Verification Rules — "Silent recovery without
 // escalation is banned".
 // ---------------------------------------------------------------------------
 

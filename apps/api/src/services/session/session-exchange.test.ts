@@ -901,7 +901,7 @@ describe('checkExchangeLimit', () => {
 // resolveReadyToFinish — interview / onboarding hard cap
 // ---------------------------------------------------------------------------
 //
-// [BUG-92 / CR-2026-05-19-C4] The envelope contract in CLAUDE.md mandates a
+// [BUG-92 / CR-2026-05-19-C4] The envelope contract in AGENTS.md mandates a
 // server-side hard cap per envelope signal so the flow terminates even if
 // the LLM never emits the signal. resolveReadyToFinish is the single source
 // of truth for the interview-close decision. These tests pin the contract:

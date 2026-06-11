@@ -60,7 +60,7 @@ async function emitChildQuotaExhaustedEvent(input: {
 /**
  * Emits a structured event on quota ownership mismatch so we can query how
  * often a stale or hostile profileId was sent for a subscription that does
- * not own it. CLAUDE.md requires any silent-recovery branch in billing code
+ * not own it. AGENTS.md requires any silent-recovery branch in billing code
  * to emit a structured signal — bare `logger.warn` cannot answer "how often
  * is this firing in the last 24h" from telemetry.
  */
@@ -75,7 +75,7 @@ async function emitOwnershipMismatchEvent(input: {
   await safeSend(
     () =>
       inngest.send({
-        // orphan-allow: structured telemetry signal required by CLAUDE.md
+        // orphan-allow: structured telemetry signal required by AGENTS.md
         // ("silent recovery in billing must emit a structured metric"). The
         // mismatch is handled in-line (the decrement/increment returns
         // profile_mismatch). The event is a dashboard-queryable signal so ops
@@ -1074,7 +1074,7 @@ async function incrementProfileQuota(
  *  - Logs the failure with the originating context
  *  - Escalates to Sentry so we can query how often refunds fail in prod
  *
- * The escalation is mandatory per CLAUDE.md "Silent Recovery Without
+ * The escalation is mandatory per AGENTS.md "Silent Recovery Without
  * Escalation is Banned" — bare console.warn would not let us measure how
  * often customers are silently overcharged.
  */

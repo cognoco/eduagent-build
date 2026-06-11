@@ -222,7 +222,7 @@ export default function SessionSummaryScreen() {
 
   // [BUG-890] When the 15s recap-loading window elapses without a recap,
   // do NOT silently fall through to a manual "Tap to retry" affordance —
-  // per CLAUDE.md UX Resilience Rules and "Silent recovery without
+  // per AGENTS.md UX Resilience Rules and "Silent recovery without
   // escalation is banned", we must (a) escalate the failure to Sentry so
   // ops can see how often this fires, and (b) trigger one automatic
   // refetch attempt before the user has to discover the manual retry.
@@ -428,7 +428,7 @@ export default function SessionSummaryScreen() {
       router.replace('/(app)/library' as Href);
       InteractionManager.runAfterInteractions(() => {
         // Push full ancestor chain so back-button restores shelf context.
-        // See CLAUDE.md "Cross-tab / cross-stack router.push" rule and
+        // See AGENTS.md "Cross-tab / cross-stack router.push" rule and
         // library.tsx handleBookPress for the canonical two-push pattern.
         router.push({
           pathname: '/(app)/shelf/[subjectId]',
@@ -497,7 +497,7 @@ export default function SessionSummaryScreen() {
   }
 
   // [BUG-139] Classify the transcript-load error through the shared
-  // classifier, not via raw HTTP status duck-typing. Per CLAUDE.md UX
+  // classifier, not via raw HTTP status duck-typing. Per AGENTS.md UX
   // Resilience Rules, "classification happens at the API client boundary"
   // and screens must NEVER parse HTTP status codes. `classifyApiError`
   // handles both typed error classes (NotFoundError, ResourceGoneError)

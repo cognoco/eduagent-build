@@ -176,7 +176,7 @@ function formatDateLabel(
     // hid bad subscription/profile timezone columns from observability, so
     // cycle dates rendered to the wrong day for affected users with no audit
     // trail. Emit a structured log so on-call can query "how many billing
-    // renders fell back to UTC in 24h" — per CLAUDE.md "Silent recovery
+    // renders fell back to UTC in 24h" — per AGENTS.md "Silent recovery
     // without escalation is banned" in billing code.
     logger.warn('[billing] invalid timezone fell back to UTC', {
       event: 'billing.format_date.timezone_fallback',

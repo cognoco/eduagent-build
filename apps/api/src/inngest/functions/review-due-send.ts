@@ -160,7 +160,7 @@ export const reviewDueSend = inngest.createFunction(
       };
     });
 
-    // CLAUDE.md "Silent recovery without escalation is banned": the
+    // AGENTS.md "Silent recovery without escalation is banned": the
     // dedup_check_failed path swallows a DB error and returns skipped.
     // captureException above feeds Sentry exception counts; this
     // app/notification.suppressed event is consumed by

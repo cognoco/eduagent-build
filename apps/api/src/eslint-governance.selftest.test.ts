@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 // ---------------------------------------------------------------------------
 // Lint governance self-tests for the API package.
 //
-// CLAUDE.md "Non-Negotiable Engineering Rules" delegates several invariants to
+// AGENTS.md "Non-Negotiable Engineering Rules" delegates several invariants to
 // flat-config ESLint rules in eslint.config.mjs (root). A self-test that only
 // proves "lint passes clean" verifies absence-of-false-positives but not that
 // the rules actually fire on real violations. This file pipes synthetic

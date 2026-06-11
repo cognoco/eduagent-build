@@ -390,7 +390,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     // [CR-MISSING-EVENT-ID-VISIBILITY] Break test: when event.id is absent the
     // fallback path must emit a structured logger.warn and captureException so
     // ops can count occurrences in log aggregation and Sentry dashboards.
-    // Per CLAUDE.md: "Silent recovery without escalation is banned."
+    // Per AGENTS.md: "Silent recovery without escalation is banned."
     it('[CR-MISSING-EVENT-ID-VISIBILITY] emits logger.warn and captureException with structured tags when event.id is missing', async () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 

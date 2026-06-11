@@ -271,7 +271,7 @@ describe('getProfileOverdueCount SQL correctness (integration) [BUG-473]', () =>
 // belongs to a DIFFERENT profile's subject must be rejected (NotFoundError →
 // HTTP 404) BEFORE any retention state is created for the requesting profile.
 //
-// Red-green regression pattern (CLAUDE.md "Fix Development Rules"):
+// Red-green regression pattern (AGENTS.md "Fix Development Rules"):
 //   PASS with fix in place → FAIL after reverting fix → PASS after restoring.
 // ---------------------------------------------------------------------------
 

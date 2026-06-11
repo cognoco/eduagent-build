@@ -8,7 +8,7 @@
 //     `app/monthly-report.generate`; parentId and childId come from the event
 //     payload and all DB reads are scoped to those two profiles only.
 //
-// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// Profile-scoping rules in AGENTS.md ("Reads must use createScopedRepository")
 // do NOT apply to `monthlyReportCron` — this is system-wide work running
 // outside any single profile's request context.
 //

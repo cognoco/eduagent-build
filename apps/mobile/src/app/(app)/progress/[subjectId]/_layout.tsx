@@ -7,7 +7,7 @@ import { useThemeColors } from '../../../../lib/theme';
 // stack. Without this, `router.back()` from the sessions screen falls through
 // to the Tabs first-route (Home) — a UX dead-end where the user loses their
 // subject context. Same pattern as shelf/[subjectId]/_layout.tsx — see
-// CLAUDE.md > Repo-Specific Guardrails ("Cross-tab / cross-stack router.push"
+// AGENTS.md > Repo-Specific Guardrails ("Cross-tab / cross-stack router.push"
 // and "unstable_settings").
 export const unstable_settings = {
   initialRouteName: 'index',

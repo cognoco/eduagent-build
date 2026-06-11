@@ -310,7 +310,7 @@ app.onError((err, c) => {
   }
 
   // [EP15-I5] Typed-error classification at the boundary (per global
-  // CLAUDE.md "Typed Error Hierarchy" rule). Services throw
+  // AGENTS.md "Typed Error Hierarchy" rule). Services throw
   // ForbiddenError/NotFoundError; this handler converts them to HTTP
   // status codes once, so individual route handlers don't need per-endpoint
   // try/catch. Important: we do NOT captureException for these — they are

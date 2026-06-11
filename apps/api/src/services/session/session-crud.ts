@@ -2123,7 +2123,7 @@ export async function listProfileSessions(
  * summaries, subject names, topic titles and ai_response drill rows would
  * leak across accounts.
  *
- * Per CLAUDE.md: the scoped repository can't express multi-table joins, so we
+ * Per AGENTS.md: the scoped repository can't express multi-table joins, so we
  * use direct `db.select()` / `db.query.*` with explicit
  * `eq(*.profileId, profileId)` predicates. `curriculumTopics` has no
  * `profileId` column — for that table we enforce isolation through the

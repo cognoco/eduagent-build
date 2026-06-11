@@ -7,7 +7,7 @@
 // the comment "Telemetry-only event — no Inngest handler registered; consumed
 // by observability tooling." This meant the event fired into the void — the
 // Inngest dashboard could not query it and there was no structured-log terminus,
-// violating the CLAUDE.md "Silent recovery without escalation" rule.
+// violating the AGENTS.md "Silent recovery without escalation" rule.
 //
 // [SEC-6 / BUG-722] The email payload already masks recipient PII before
 // emitting the event. This handler logs the masked payload only.

@@ -1861,7 +1861,7 @@ describe('LibraryScreen', () => {
   // [BUG-814] LibraryScreen wraps the real content in a navigation-contract
   // canEnter guard. Without these tests, a future contract change can
   // silently flip canEnter('library') for V0 5-tab guardians (a supported
-  // production mode per CLAUDE.md "Profile Shapes" → "Hard constraint")
+  // production mode per AGENTS.md "Profile Shapes" → "Hard constraint")
   // and route the whole library to /home, with no test catching the regression.
   describe('canEnter guard [BUG-814]', () => {
     function renderWith(opts: {
@@ -1923,7 +1923,7 @@ describe('LibraryScreen', () => {
     });
 
     it('renders LibraryScreenContent in V0 5-tab guardian mode (legacy fallback)', async () => {
-      // V0 5-tab production mode is a hard constraint per CLAUDE.md.
+      // V0 5-tab production mode is a hard constraint per AGENTS.md.
       // With both flag envs unset (test default: V0=false + V1=false), a
       // guardian with at least one linked child hits the
       // `legacy-v0-flags-off` branch in resolveNavigationContract

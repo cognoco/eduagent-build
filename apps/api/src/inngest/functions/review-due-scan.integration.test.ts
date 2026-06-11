@@ -9,7 +9,7 @@
  * step.sendEvent calls to only events whose profileId belongs to the seeded set.
  * This isolates assertions from other profiles that may exist in the shared DB.
  *
- * External-boundary mocks only (CLAUDE.md § Code Quality Guards):
+ * External-boundary mocks only (AGENTS.md § Code Quality Guards):
  *   None — this function makes no external calls. The only mock is `step`
  *   (the Inngest step object), which is replaced with a thin fake that runs
  *   step.run fns inline and captures step.sendEvent calls.

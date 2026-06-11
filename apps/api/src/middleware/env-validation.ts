@@ -101,7 +101,7 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
         }
         if (bindingResult.overrideApplied) {
           // Loud structured warning so the override is queryable in
-          // telemetry. CLAUDE.md "Silent recovery without escalation is
+          // telemetry. AGENTS.md "Silent recovery without escalation is
           // banned" applies — running prod without IDEMPOTENCY_KV is a
           // real risk and must be visible.
           logger.warn(

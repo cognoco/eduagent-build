@@ -2,7 +2,7 @@
 //
 // This function is intentionally cross-profile. It scans all profiles with
 // overdue retention cards whose local time is ~8 AM to fan out recall nudge
-// notifications. Profile-scoping rules in CLAUDE.md ("Reads must use
+// notifications. Profile-scoping rules in AGENTS.md ("Reads must use
 // createScopedRepository") do NOT apply here — this is system-wide work
 // running outside any single profile's request context.
 //

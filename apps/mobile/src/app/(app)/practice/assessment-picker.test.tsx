@@ -167,7 +167,7 @@ describe('AssessmentPickerScreen', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  // [BUG-232 / X1-MED / CLAUDE.md Rule 17] Cross-stack screens must not call
+  // [BUG-232 / X1-MED / AGENTS.md Rule 17] Cross-stack screens must not call
   // bare router.back() — when canGoBack is false (deep link, cold start into
   // this leaf), the fallback must route to the practice tab parent. Reverting
   // the goBackOrReplace wiring back to router.back() makes these red.
