@@ -21,9 +21,10 @@ import {
   type SubscriptionRow,
 } from './types';
 import { reconcileQuotaStateForSubscription } from './quota-reconcile';
-import { reattributeTopUpCreditsOnModelChange } from './tier';
-import { safeSend } from '../safe-non-core';
-import { inngest } from '../../inngest/client';
+import {
+  reattributeTopUpCreditsOnModelChange,
+  emitTopUpCreditsReattributedMetric,
+} from './tier';
 
 const logger = createLogger();
 import { getSubscriptionByAccountId } from './subscription-core';
@@ -167,25 +168,18 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
     return updated;
   });
 
-  // Emit queryable metric if credits were re-attributed (silent-recovery-banned rule).
-  if (reattributedCount > 0 && previousTier && updates.tier) {
-    await safeSend(
-      () =>
-        inngest.send({
-          // orphan-allow: structured telemetry required by CLAUDE.md
-          // ("silent recovery in billing must emit a structured metric").
-          name: 'app/billing.topup_credits.reattributed',
-          data: {
-            accountId,
-            previousTier,
-            newTier: updates.tier,
-            reattributedCount,
-            occurredAt: now.toISOString(),
-          },
-        }),
-      'billing.topup_credits.reattributed.revenuecat',
-      { accountId, reattributedCount },
-    );
+  // Emit queryable metric if credits were re-attributed (silent-recovery-banned
+  // rule). Same event name + payload schema as the Stripe path — single source
+  // of truth in emitTopUpCreditsReattributedMetric (tier.ts).
+  if (reattributedCount > 0 && previousTier && updates.tier && result) {
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId: result.id,
+      accountId,
+      previousTier,
+      newTier: updates.tier,
+      reattributedCount,
+      occurredAt: now,
+    });
   }
 
   return result;

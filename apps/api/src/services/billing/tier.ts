@@ -46,6 +46,81 @@ export interface UpgradePrompt {
 }
 
 // ---------------------------------------------------------------------------
+// Top-up credit re-attribution metric — single event name, single schema
+// ---------------------------------------------------------------------------
+
+export interface TopUpCreditsReattributedEventData {
+  subscriptionId: string;
+  accountId: string;
+  previousTier: SubscriptionTier;
+  newTier: SubscriptionTier;
+  previousModel: 'per-profile' | 'shared-pool';
+  newModel: 'per-profile' | 'shared-pool';
+  reattributedCount: number;
+  occurredAt: string;
+}
+
+/**
+ * Pure builder — single source of truth for the
+ * `app/billing.topup_credits.reattributed` payload so the Stripe path
+ * (`handleTierChange`) and the RevenueCat webhook path
+ * (`updateSubscriptionAndQuotaFromRevenuecatWebhook`) emit an identical
+ * schema under the single event name. Exported for the schema-coherence
+ * assertion in tier.integration.test.ts.
+ */
+export function buildTopUpCreditsReattributedEventData(params: {
+  subscriptionId: string;
+  accountId: string;
+  previousTier: SubscriptionTier;
+  newTier: SubscriptionTier;
+  reattributedCount: number;
+  occurredAt: Date;
+}): TopUpCreditsReattributedEventData {
+  return {
+    subscriptionId: params.subscriptionId,
+    accountId: params.accountId,
+    previousTier: params.previousTier,
+    newTier: params.newTier,
+    previousModel: getTierConfig(params.previousTier).quotaModel,
+    newModel: getTierConfig(params.newTier).quotaModel,
+    reattributedCount: params.reattributedCount,
+    occurredAt: params.occurredAt.toISOString(),
+  };
+}
+
+/**
+ * Emits the queryable re-attribution metric (silent-recovery-banned rule).
+ * Both tier-change paths call this — a dispatch failure must never break
+ * the tier change, so it routes through safeSend.
+ */
+export async function emitTopUpCreditsReattributedMetric(params: {
+  subscriptionId: string;
+  accountId: string;
+  previousTier: SubscriptionTier;
+  newTier: SubscriptionTier;
+  reattributedCount: number;
+  occurredAt: Date;
+}): Promise<void> {
+  const data = buildTopUpCreditsReattributedEventData(params);
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: structured telemetry required by CLAUDE.md
+        // ("silent recovery in billing must emit a structured metric").
+        // The re-attribution is handled in-line. This event is a
+        // dashboard-queryable signal so ops can audit credit migration.
+        name: 'app/billing.topup_credits.reattributed',
+        data,
+      }),
+    'billing.topup_credits.reattributed',
+    {
+      subscriptionId: data.subscriptionId,
+      reattributedCount: data.reattributedCount,
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // reattributeTopUpCreditsOnModelChange
 // ---------------------------------------------------------------------------
 
@@ -197,31 +272,15 @@ export async function handleTierChange(
 
   // Emit a queryable metric whenever credits are re-attributed so ops can
   // measure how often this path fires (silent-recovery-banned rule).
-  // Uses safeSend — a dispatch failure must never break the tier change.
   if (reattributedCount > 0) {
-    const oldModel = getTierConfig(previousTierForMetric).quotaModel;
-    const newModel = newConfig.quotaModel;
-    await safeSend(
-      () =>
-        inngest.send({
-          // orphan-allow: structured telemetry required by CLAUDE.md
-          // ("silent recovery in billing must emit a structured metric").
-          // The re-attribution is handled in-line. This event is a
-          // dashboard-queryable signal so ops can audit credit migration.
-          name: 'app/billing.topup_credits.reattributed',
-          data: {
-            subscriptionId,
-            previousTier: previousTierForMetric,
-            newTier,
-            previousModel: oldModel,
-            newModel,
-            reattributedCount,
-            occurredAt: now.toISOString(),
-          },
-        }),
-      'billing.topup_credits.reattributed',
-      { subscriptionId, reattributedCount },
-    );
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId,
+      accountId: sub.accountId,
+      previousTier: previousTierForMetric,
+      newTier,
+      reattributedCount,
+      occurredAt: now,
+    });
   }
 
   return {

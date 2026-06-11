@@ -22,7 +22,10 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
-import { handleTierChange } from './tier';
+import {
+  handleTierChange,
+  buildTopUpCreditsReattributedEventData,
+} from './tier';
 import { getTierConfig } from '../subscription';
 
 // ---------------------------------------------------------------------------
@@ -544,5 +547,73 @@ describe('[BREAK F-124] top-up credits preserved across tier change', () => {
     // Credits stay null — no owner to attribute them to
     const credits = await loadTopUpCredits(sub.id);
     expect(credits[0]!.profileId).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Event-schema coherence — app/billing.topup_credits.reattributed
+// ---------------------------------------------------------------------------
+//
+// Both tier-change paths (Stripe: handleTierChange; RevenueCat:
+// updateSubscriptionAndQuotaFromRevenuecatWebhook) emit the SAME event name
+// through the SAME builder (buildTopUpCreditsReattributedEventData →
+// emitTopUpCreditsReattributedMetric). This block pins the canonical field
+// set so the two paths can never drift into incompatible payload schemas
+// (CodeRabbit Major on PR #876).
+
+describe('topup_credits.reattributed event schema coherence', () => {
+  const CANONICAL_FIELDS = [
+    'accountId',
+    'newModel',
+    'newTier',
+    'occurredAt',
+    'previousModel',
+    'previousTier',
+    'reattributedCount',
+    'subscriptionId',
+  ];
+
+  it('builder emits the identical field set for Stripe-path and RevenueCat-path argument shapes', () => {
+    // Stripe-path shape: handleTierChange (shared-pool → per-profile)
+    const stripeData = buildTopUpCreditsReattributedEventData({
+      subscriptionId: 'sub-stripe',
+      accountId: 'acct-stripe',
+      previousTier: 'family',
+      newTier: 'plus',
+      reattributedCount: 2,
+      occurredAt: new Date('2026-06-11T00:00:00Z'),
+    });
+
+    // RevenueCat-path shape: updateSubscriptionAndQuotaFromRevenuecatWebhook
+    // (per-profile → shared-pool)
+    const revenuecatData = buildTopUpCreditsReattributedEventData({
+      subscriptionId: 'sub-rc',
+      accountId: 'acct-rc',
+      previousTier: 'plus',
+      newTier: 'pro',
+      reattributedCount: 1,
+      occurredAt: new Date('2026-06-11T00:00:00Z'),
+    });
+
+    expect(Object.keys(stripeData).sort()).toEqual(CANONICAL_FIELDS);
+    expect(Object.keys(revenuecatData).sort()).toEqual(CANONICAL_FIELDS);
+    expect(Object.keys(stripeData).sort()).toEqual(
+      Object.keys(revenuecatData).sort(),
+    );
+  });
+
+  it('builder derives previousModel/newModel from tier config (superset schema)', () => {
+    const data = buildTopUpCreditsReattributedEventData({
+      subscriptionId: 'sub-x',
+      accountId: 'acct-x',
+      previousTier: 'family',
+      newTier: 'plus',
+      reattributedCount: 3,
+      occurredAt: new Date('2026-06-11T00:00:00Z'),
+    });
+
+    expect(data.previousModel).toBe('shared-pool');
+    expect(data.newModel).toBe('per-profile');
+    expect(data.occurredAt).toBe('2026-06-11T00:00:00.000Z');
   });
 });
