@@ -695,15 +695,22 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       }
     }
 
-    // 2. Query actual top-up credits for accurate quota check
-    const topUpCreditsRemaining = await getTopUpCreditsRemaining(
-      db,
-      subscriptionId,
-      new Date(),
-      quotaModel === 'per-profile' && profileRole === 'owner'
-        ? profileId
-        : undefined,
-    );
+    // 2. Query actual top-up credits for accurate quota check.
+    // [F-135] On per-profile tiers, top-up credits belong to the owner
+    // profile. Never run the unscoped subscription-wide sum for a non-owner —
+    // it returns the owner's purchased balance, which would leak into the
+    // child's 402 payload and quota fraction. Non-owners get 0 (they cannot
+    // draw on top-ups in decrementQuota either). Mirrors the /usage route
+    // masking in routes/billing.ts.
+    const topUpCreditsRemaining =
+      quotaModel === 'per-profile' && profileRole !== 'owner'
+        ? 0
+        : await getTopUpCreditsRemaining(
+            db,
+            subscriptionId,
+            new Date(),
+            quotaModel === 'per-profile' ? profileId : undefined,
+          );
 
     // 3. Check quota using pure business logic (checks both daily + monthly)
     const result = checkQuota({
@@ -803,16 +810,19 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       c.set('quotaDecrementTopUpCreditId', decrement.topUpCreditId);
     }
 
+    // [F-135] Same owner-only gate as the pre-check read above. A 'top_up'
+    // decrement is only reachable for an owner (consumeOwnerTopUpCredit) or a
+    // shared pool, but keep the invariant explicit rather than rely on that.
     const topUpRemainingAfterDecrement =
       decrement.source === 'top_up'
-        ? await getTopUpCreditsRemaining(
-            db,
-            subscriptionId,
-            new Date(),
-            quotaModel === 'per-profile' && profileRole === 'owner'
-              ? profileId
-              : undefined,
-          )
+        ? quotaModel === 'per-profile' && profileRole !== 'owner'
+          ? 0
+          : await getTopUpCreditsRemaining(
+              db,
+              subscriptionId,
+              new Date(),
+              quotaModel === 'per-profile' ? profileId : undefined,
+            )
         : decrement.remainingTopUp;
     const quotaRemainingTurns =
       decrement.remainingDaily === null
