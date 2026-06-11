@@ -143,6 +143,18 @@ productionization implication.
   caught it. *Production:* the merge gate must always parse the review verdict
   artifact, never the check colour.
 
+- **2026-06-11 — the predicted follow-up-PR cost materialized (WI-583, bounce
+  #3).** The reviewer's third pass found a VALID residual the first rework
+  missed: the stale-previousTier fix was applied to the RevenueCat webhook
+  path but not its Stripe sibling (`handleTierChange`). Because PR #876 was
+  already merged by then, this rework costs a fresh branch + follow-up PR —
+  exactly the cost the post-merge-review entry predicted. Also the reviewer's
+  SECOND disjoint catch on this WI (merge gate verified the reported fix
+  rather than re-deriving all sibling sites). *Production:* (a) sibling-sweep
+  should be an explicit rework-instruction template item, not left to the
+  executor's recall; (b) a reviewer finding that names a code location should
+  flow into the next executor brief verbatim — the relay worked, keep it.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no

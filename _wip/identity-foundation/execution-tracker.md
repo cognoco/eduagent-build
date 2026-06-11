@@ -166,7 +166,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **reviewing (resubmitted)** — PR #876 MERGED 2026-06-11 via operator-ruled `--admin` merge over the billing CODEOWNERS gate (merge commit 38ba2c303; one-off ruling for this PR). Children WI-614/615 swept Closed/Done with Fixed In ae409b565; Stage restored to Reviewing |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress (rework 2, follow-up PR)** — third review pass found a valid residual: `handleTierChange` (Stripe path, tier.ts:216/:246/:264-268) still reads previousTier pre-transaction; only the RevenueCat sibling was fixed. PR #876 already merged (38ba2c303), so rework lands as follow-up PR on branch `WI-583-stripe-tx`; executor also sweeping for further siblings per the 3+-locations rule |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer (PR #874). First WI through the full loop with zero human touches |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
