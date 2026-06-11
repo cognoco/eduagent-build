@@ -241,17 +241,13 @@ export default function PickBookScreen(): React.ReactElement {
       } as Href);
     } catch {
       filingInFlight.current = false;
-      platformAlert(
-        'Something went wrong',
-        "Couldn't set up that book. Try again?",
-        [
-          {
-            text: 'Try again',
-            onPress: () => void handlePickSuggestion(suggestion),
-          },
-          { text: 'Go back', onPress: handleBack },
-        ],
-      );
+      platformAlert(t('pickBook.errorTitle'), t('pickBook.setupErrorMessage'), [
+        {
+          text: t('common.tryAgainAction'),
+          onPress: () => void handlePickSuggestion(suggestion),
+        },
+        { text: t('common.goBackAction'), onPress: handleBack },
+      ]);
     }
   };
 
@@ -296,9 +292,12 @@ export default function PickBookScreen(): React.ReactElement {
       } as Href);
     } catch (err) {
       filingInFlight.current = false;
-      platformAlert('Something went wrong', formatApiError(err), [
-        { text: 'Try again', onPress: () => void handleCustomSubmit() },
-        { text: 'Go back', onPress: handleBack },
+      platformAlert(t('pickBook.errorTitle'), formatApiError(err), [
+        {
+          text: t('common.tryAgainAction'),
+          onPress: () => void handleCustomSubmit(),
+        },
+        { text: t('common.goBackAction'), onPress: handleBack },
       ]);
     }
   };
@@ -354,7 +353,7 @@ export default function PickBookScreen(): React.ReactElement {
         <Pressable
           onPress={handleBack}
           className="mt-10 px-5 py-3 min-h-[44px] items-center justify-center"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBackAction')}
           testID="pick-book-loading-back"
         >
           <Text className="text-body font-semibold text-primary">
@@ -386,12 +385,12 @@ export default function PickBookScreen(): React.ReactElement {
           primaryAction={
             canRetry
               ? {
-                  label: 'Try Again',
+                  label: t('common.tryAgain'),
                   onPress: () => void suggestionsQuery.refetch(),
                   testID: 'pick-book-retry-button',
                 }
               : {
-                  label: 'Go Back',
+                  label: t('common.goBack'),
                   onPress: handleBack,
                   testID: 'pick-book-back-button',
                 }
@@ -399,7 +398,7 @@ export default function PickBookScreen(): React.ReactElement {
           secondaryAction={
             canRetry
               ? {
-                  label: 'Go Back',
+                  label: t('common.goBack'),
                   onPress: handleBack,
                   testID: 'pick-book-back-button',
                 }
@@ -430,7 +429,7 @@ export default function PickBookScreen(): React.ReactElement {
           <Pressable
             onPress={handleBack}
             className="p-2 -ms-2 me-2"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('common.back')}
             testID="pick-book-back"
           >
             <Ionicons name="arrow-back" size={24} color={colors.accent} />
@@ -463,7 +462,7 @@ export default function PickBookScreen(): React.ReactElement {
               className="self-start px-1 py-2 min-h-[40px] justify-center"
               testID="pick-book-inline-retry"
               accessibilityRole="button"
-              accessibilityLabel="Try again"
+              accessibilityLabel={t('common.tryAgainAction')}
             >
               <Text className="text-body font-semibold text-primary">
                 {t('common.tryAgainAction')}
@@ -569,7 +568,7 @@ export default function PickBookScreen(): React.ReactElement {
                 className="mt-3 px-4 py-2 min-h-[40px] justify-center"
                 testID="pick-book-empty-retry"
                 accessibilityRole="button"
-                accessibilityLabel="Try again"
+                accessibilityLabel={t('common.tryAgainAction')}
               >
                 <Text className="text-body font-semibold text-primary">
                   {t('common.tryAgainAction')}
@@ -584,7 +583,7 @@ export default function PickBookScreen(): React.ReactElement {
           <View className="mb-6" testID="pick-book-custom-section">
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-3 border border-border"
-              placeholder="Book or topic to add"
+              placeholder={t('pickBook.customPlaceholder')}
               placeholderTextColor={colors.muted}
               value={customText}
               onChangeText={setCustomText}
@@ -636,7 +635,7 @@ export default function PickBookScreen(): React.ReactElement {
             className="border border-dashed border-border rounded-card px-4 py-4 items-center mb-6"
             testID="pick-book-something-else"
             accessibilityRole="button"
-            accessibilityLabel="Something else"
+            accessibilityLabel={t('pickBook.somethingElse')}
           >
             <Text className="text-body text-text-secondary">
               {t('pickBook.somethingElse')}
@@ -649,7 +648,7 @@ export default function PickBookScreen(): React.ReactElement {
       {filing.isPending ? (
         <LoadingMomentOverlay
           animationTestID="pick-book-filing-animation"
-          message="Organizing your library..."
+          message={t('pickBook.organizingLibrary')}
           panelTestID="pick-book-filing-overlay-panel"
           renderAnimation={({ size, testID }) => (
             <BookPageFlipAnimation
@@ -677,7 +676,7 @@ export default function PickBookScreen(): React.ReactElement {
               }}
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="pick-book-filing-skip"
-              accessibilityLabel="Skip and start learning anyway"
+              accessibilityLabel={t('pickBook.skipStart')}
             >
               <Text className="text-body font-semibold text-text-primary">
                 {t('pickBook.skipStart')}

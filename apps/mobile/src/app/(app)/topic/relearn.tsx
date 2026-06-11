@@ -15,6 +15,7 @@ import {
 } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   useStartRelearn,
   useTeachingPreference,
@@ -33,71 +34,91 @@ import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { firstParam } from '../../../lib/route-params';
 import { Sentry } from '../../../lib/sentry';
 
-const TEACHING_METHODS = [
-  {
-    id: 'visual_diagrams' as const,
-    label: 'Visual Diagrams',
-    description: 'Learn through charts, diagrams, and visual representations',
-  },
-  {
-    id: 'step_by_step' as const,
-    label: 'Step-by-Step',
-    description: 'Break concepts down into clear, sequential steps',
-  },
-  {
-    id: 'real_world_examples' as const,
-    label: 'Real-World Examples',
-    description: 'Connect concepts to practical, everyday situations',
-  },
-  {
-    id: 'practice_problems' as const,
-    label: 'Practice Problems',
-    description: 'Learn by working through guided exercises',
-  },
-];
+type TeachingMethodId =
+  | 'visual_diagrams'
+  | 'step_by_step'
+  | 'real_world_examples'
+  | 'practice_problems';
 
-const TEACHING_METHODS_LEARNER = [
-  {
-    id: 'visual_diagrams' as const,
-    label: 'Show Me Pictures',
-    description: 'Learn with pictures, charts, and drawings',
-  },
-  {
-    id: 'step_by_step' as const,
-    label: 'Walk Me Through It',
-    description: 'Break it down into small, easy steps',
-  },
-  {
-    id: 'real_world_examples' as const,
-    label: 'Show Me How It Works',
-    description: 'Learn with fun, everyday examples',
-  },
-  {
-    id: 'practice_problems' as const,
-    label: 'Let Me Try It',
-    description: 'Learn by solving problems with help',
-  },
-];
+type TeachingMethod = {
+  id: TeachingMethodId;
+  label: string;
+  description: string;
+};
 
-const COPY_DEFAULT = {
-  topicIntro: 'Pick a topic that feels the shakiest right now.',
-  methodIntro: 'Choose a teaching style that feels like your best next step.',
-  subjectIntro: 'Which subject would you like to review first?',
-  emptyTitle: 'Nothing to relearn right now',
-  emptyBody: "You're all caught up on overdue topics. Nice work.",
-  errorTitle: "We couldn't load your review topics right now.",
-  usualMethod: 'Usual method',
-} as const;
+function buildTeachingMethods(
+  t: TFunction,
+  isMinor: boolean,
+): TeachingMethod[] {
+  if (isMinor) {
+    return [
+      {
+        id: 'visual_diagrams',
+        label: t('relearn.methodVisualLabelYoung'),
+        description: t('relearn.methodVisualDescYoung'),
+      },
+      {
+        id: 'step_by_step',
+        label: t('relearn.methodStepsLabelYoung'),
+        description: t('relearn.methodStepsDescYoung'),
+      },
+      {
+        id: 'real_world_examples',
+        label: t('relearn.methodExamplesLabelYoung'),
+        description: t('relearn.methodExamplesDescYoung'),
+      },
+      {
+        id: 'practice_problems',
+        label: t('relearn.methodPracticeLabelYoung'),
+        description: t('relearn.methodPracticeDescYoung'),
+      },
+    ];
+  }
+  return [
+    {
+      id: 'visual_diagrams',
+      label: t('relearn.methodVisualLabel'),
+      description: t('relearn.methodVisualDesc'),
+    },
+    {
+      id: 'step_by_step',
+      label: t('relearn.methodStepsLabel'),
+      description: t('relearn.methodStepsDesc'),
+    },
+    {
+      id: 'real_world_examples',
+      label: t('relearn.methodExamplesLabel'),
+      description: t('relearn.methodExamplesDesc'),
+    },
+    {
+      id: 'practice_problems',
+      label: t('relearn.methodPracticeLabel'),
+      description: t('relearn.methodPracticeDesc'),
+    },
+  ];
+}
 
-const COPY_LEARNER = {
-  topicIntro: 'Pick the topic you want to try again.',
-  methodIntro: 'How would you like to learn this time?',
-  subjectIntro: 'Which subject should we start with?',
-  emptyTitle: 'No review topics right now',
-  emptyBody: "You're all caught up for now. Great job!",
-  errorTitle: "We couldn't load your review topics right now.",
-  usualMethod: 'Usual method',
-} as const;
+function buildCopy(t: TFunction, isMinor: boolean) {
+  return {
+    topicIntro: isMinor
+      ? t('relearn.copyTopicIntroYoung')
+      : t('relearn.copyTopicIntro'),
+    methodIntro: isMinor
+      ? t('relearn.copyMethodIntroYoung')
+      : t('relearn.copyMethodIntro'),
+    subjectIntro: isMinor
+      ? t('relearn.copySubjectIntroYoung')
+      : t('relearn.copySubjectIntro'),
+    emptyTitle: isMinor
+      ? t('relearn.copyEmptyTitleYoung')
+      : t('relearn.copyEmptyTitle'),
+    emptyBody: isMinor
+      ? t('relearn.copyEmptyBodyYoung')
+      : t('relearn.copyEmptyBody'),
+    errorTitle: t('relearn.copyErrorTitle'),
+    usualMethod: t('relearn.copyUsualMethod'),
+  } as const;
+}
 
 type Phase = 'subjects' | 'topics' | 'method';
 
@@ -155,8 +176,8 @@ export default function RelearnScreen() {
       ? computeAgeBracket(activeProfile.birthYear)
       : 'adolescent';
   const isMinor = ageBracket !== 'adult';
-  const methods = isMinor ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
-  const copy = isMinor ? COPY_LEARNER : COPY_DEFAULT;
+  const methods = useMemo(() => buildTeachingMethods(t, isMinor), [isMinor, t]);
+  const copy = useMemo(() => buildCopy(t, isMinor), [isMinor, t]);
 
   const [phase, setPhase] = useState<Phase>(directEntry ? 'method' : 'topics');
   const [selectedSubject, setSelectedSubject] = useState<OverdueSubject | null>(
@@ -405,7 +426,7 @@ export default function RelearnScreen() {
         className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
         testID="relearn-back"
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.goBackAction')}
       >
         <Ionicons name="arrow-back" size={26} className="text-primary" />
       </Pressable>
@@ -428,7 +449,7 @@ export default function RelearnScreen() {
             className="mt-2 self-start min-h-[44px] items-center justify-center px-4"
             testID="relearn-retry"
             accessibilityRole="button"
-            accessibilityLabel="Retry"
+            accessibilityLabel={t('common.retry')}
           >
             <Text className="text-body-sm font-semibold text-primary">
               {t('common.retry')}
@@ -474,7 +495,7 @@ export default function RelearnScreen() {
             className="mt-4 min-h-[44px] rounded-button bg-primary px-6 py-3 items-center justify-center"
             testID="relearn-overdue-retry"
             accessibilityRole="button"
-            accessibilityLabel="Retry"
+            accessibilityLabel={t('common.retry')}
           >
             <Text className="text-body font-semibold text-text-inverse">
               {t('common.retry')}
@@ -508,7 +529,7 @@ export default function RelearnScreen() {
             className="mt-4 min-h-[44px] rounded-button bg-primary px-6 py-3 items-center justify-center"
             testID="relearn-empty-back"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBackAction')}
           >
             <Text className="text-body font-semibold text-text-inverse">
               {t('common.goBackAction')}
@@ -544,7 +565,7 @@ export default function RelearnScreen() {
             className="mt-6 min-h-[44px] rounded-button bg-surface-elevated px-6 py-3 items-center justify-center"
             testID="relearn-cancel"
             accessibilityRole="button"
-            accessibilityLabel="Cancel"
+            accessibilityLabel={t('common.cancel')}
           >
             <Text className="text-body font-semibold text-text-primary">
               {t('common.cancel')}
@@ -576,7 +597,9 @@ export default function RelearnScreen() {
               className="mb-3 rounded-card bg-surface p-4"
               testID={`relearn-subject-${subject.subjectId}`}
               accessibilityRole="button"
-              accessibilityLabel={`Open ${subject.subjectName}`}
+              accessibilityLabel={t('relearn.a11yOpenSubject', {
+                name: subject.subjectName,
+              })}
             >
               <Text className="text-body font-semibold text-text-primary">
                 {subject.subjectName}
@@ -612,7 +635,9 @@ export default function RelearnScreen() {
                   className="mb-3 rounded-card bg-surface p-4"
                   testID={`relearn-topic-${topic.topicId}`}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open ${topic.topicTitle}`}
+                  accessibilityLabel={t('relearn.a11yOpenTopic', {
+                    title: topic.topicTitle,
+                  })}
                 >
                   <Text className="text-body font-semibold text-text-primary">
                     {topic.topicTitle}
@@ -657,7 +682,9 @@ export default function RelearnScreen() {
                 }`}
                 testID={`relearn-method-${method.id}`}
                 accessibilityRole="button"
-                accessibilityLabel={`Learn with ${method.label}`}
+                accessibilityLabel={t('relearn.a11yLearnWith', {
+                  method: method.label,
+                })}
               >
                 <View className="flex-row items-center justify-between">
                   <Text className="text-body font-semibold text-text-primary">

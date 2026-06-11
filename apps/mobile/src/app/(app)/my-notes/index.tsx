@@ -2,6 +2,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   OWN_LEARNING_RETURN_TO,
@@ -23,29 +24,34 @@ function myNotesReturnTo(value: string | string[] | undefined): string {
 
 const HUB_ITEMS: Array<{
   kind: MyNotesKind;
-  title: string;
-  subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
 }> = [
-  {
-    kind: 'sessions',
-    title: 'Sessions',
-    subtitle: 'Conversations you had',
-    icon: 'time-outline',
-  },
-  {
-    kind: 'notes',
-    title: 'Notes',
-    subtitle: 'Things you wrote down',
-    icon: 'document-text-outline',
-  },
-  {
-    kind: 'bookmarks',
-    title: 'Bookmarks',
-    subtitle: 'Mentor replies you saved',
-    icon: 'bookmark-outline',
-  },
+  { kind: 'sessions', icon: 'time-outline' },
+  { kind: 'notes', icon: 'document-text-outline' },
+  { kind: 'bookmarks', icon: 'bookmark-outline' },
 ];
+
+function hubTitle(kind: MyNotesKind, t: TFunction): string {
+  switch (kind) {
+    case 'notes':
+      return t('myNotes.kinds.notes');
+    case 'bookmarks':
+      return t('myNotes.kinds.bookmarks');
+    case 'sessions':
+      return t('myNotes.kinds.sessions');
+  }
+}
+
+function hubSubtitle(kind: MyNotesKind, t: TFunction): string {
+  switch (kind) {
+    case 'notes':
+      return t('myNotes.hub.notesSubtitle');
+    case 'bookmarks':
+      return t('myNotes.hub.bookmarksSubtitle');
+    case 'sessions':
+      return t('myNotes.hub.sessionsSubtitle');
+  }
+}
 
 function CountPill({ value }: { value: number | undefined }) {
   if (value == null) return null;
@@ -88,7 +94,7 @@ export default function MyNotesHubScreen(): React.ReactElement {
             onPress={() => router.replace(homeHref)}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('common.back')}
             testID="my-notes-back"
           >
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
@@ -115,7 +121,7 @@ export default function MyNotesHubScreen(): React.ReactElement {
               }
               className="rounded-card border border-border bg-surface p-4 flex-row items-center"
               accessibilityRole="button"
-              accessibilityLabel={item.title}
+              accessibilityLabel={hubTitle(item.kind, t)}
               testID={`my-notes-${item.kind}`}
             >
               <View className="h-12 w-12 rounded-2xl bg-surface-elevated items-center justify-center me-3">
@@ -123,10 +129,10 @@ export default function MyNotesHubScreen(): React.ReactElement {
               </View>
               <View className="flex-1">
                 <Text className="text-body font-bold text-text-primary">
-                  {item.title}
+                  {hubTitle(item.kind, t)}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-0.5">
-                  {item.subtitle}
+                  {hubSubtitle(item.kind, t)}
                 </Text>
               </View>
               <CountPill value={counts[item.kind]} />

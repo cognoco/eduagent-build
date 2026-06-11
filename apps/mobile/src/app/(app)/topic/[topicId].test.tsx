@@ -840,7 +840,7 @@ describe('TopicDetailScreen rendering details', () => {
     });
   });
 
-  it('shows "Loading…" disabled CTA while critical data is loading', async () => {
+  it('shows "Loading..." disabled CTA while critical data is loading', async () => {
     let resolveProgress!: (r: Response) => void;
     const progressPromise = new Promise<Response>((resolve) => {
       resolveProgress = resolve;
@@ -849,7 +849,7 @@ describe('TopicDetailScreen rendering details', () => {
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
-    screen.getByText('Loading…');
+    screen.getByText('Loading...');
 
     resolveProgress(
       new Response(JSON.stringify({ topic: { ...DEFAULT_TOPIC_PROGRESS } }), {
