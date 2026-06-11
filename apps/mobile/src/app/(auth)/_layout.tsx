@@ -48,9 +48,13 @@ export default function AuthRoutesLayout() {
     redirectTarget ?? undefined,
     '/(app)/home',
   );
+  // [F-175] Initialize ref without calling rememberPendingAuthRedirect (storage
+  // write). The useEffect below handles persistence on mount and on changes.
+  // Use peekPendingAuthRedirect() to restore a pre-existing remembered path
+  // when no redirectTarget is present (e.g. returning to the auth screen).
   const redirectTargetRef = useRef(
     redirectTarget
-      ? rememberPendingAuthRedirect(resolvedRedirectTarget)
+      ? resolvedRedirectTarget
       : (peekPendingAuthRedirect() ?? resolvedRedirectTarget),
   );
   const lastRedirectedPathRef = useRef<string | null>(null);
@@ -61,19 +65,19 @@ export default function AuthRoutesLayout() {
     () => redirectTargetRef.current,
   );
 
-  if (redirectTarget) {
-    // Preserve the original deep-link target across the signed-in transition.
-    // Expo Router clears auth-route search params during the handoff, and
-    // falling back to /home here breaks W-03 deep-link restoration on web.
+  // [F-175] Moved from render phase: rememberPendingAuthRedirect writes to
+  // sessionStorage which is a side-effect and must not run during render.
+  // useEffect fires when the redirectTarget or its resolved form changes and
+  // keeps effectiveTarget + redirectTargetRef in sync without render-phase
+  // storage writes.
+  useEffect(() => {
+    if (!redirectTarget) return;
     const remembered = rememberPendingAuthRedirect(resolvedRedirectTarget);
     if (remembered !== redirectTargetRef.current) {
       redirectTargetRef.current = remembered;
-      // setEffectiveTarget during render (before commit) is the React-approved
-      // pattern for a render-derived state update — avoids an extra paint while
-      // still making the new value visible to the effect below.
       setEffectiveTarget(remembered);
     }
-  }
+  }, [redirectTarget, resolvedRedirectTarget]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) {

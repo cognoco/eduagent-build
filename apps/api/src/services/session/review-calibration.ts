@@ -73,12 +73,27 @@ function hasCjkText(text: string): boolean {
 
 function matchesNonAnswerPhrase(normalized: string, token: string): boolean {
   if (token.length <= 2) return normalized === token;
-  return normalized === token || normalized.includes(token);
+  if (normalized === token) return true;
+  // CJK scripts have no word separators — substring matching is correct and
+  // safe because CJK non-answer tokens are distinct phrases (e.g. わかりません)
+  // that would only appear embedded in a longer response in a meaningful
+  // context (e.g. わかりませんでした already IS a non-answer admission).
+  // Decide per TOKEN script, not per answer: a mixed-script answer (Latin
+  // words + a CJK term) must keep word-boundary checks for Latin tokens.
+  if (hasCjkText(token)) return normalized.includes(token);
+  // Latin/Cyrillic/etc.: whole-word/phrase guard. The token must be flanked by
+  // string boundaries or whitespace so short tokens like 'nah' don't match
+  // inside words like 'nahe', and 'nada' doesn't match inside 'granada'.
+  // `?` is also a boundary: normalizeAnswer retains it (the standalone '?'
+  // token must stay matchable), so ?-suffixed non-answers like 'idk?' would
+  // otherwise slip past the whitespace-only boundary check.
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[\\s?])${escaped}(?:[\\s?]|$)`).test(normalized);
 }
 
 export function isSubstantiveCalibrationAnswer(
   text: string,
-  conversationLanguage?: ConversationLanguage
+  conversationLanguage?: ConversationLanguage,
 ): boolean {
   const normalized = normalizeAnswer(text);
   if (!normalized) return false;

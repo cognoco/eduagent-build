@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getPreviewState,
@@ -52,6 +52,12 @@ export default function PreviewTopicScreen() {
       if (s) setCurrent(s);
     });
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setSubmitting(false);
+    }, []),
+  );
 
   const onSelect = async (sample: SampleLesson) => {
     if (submitting) return;
