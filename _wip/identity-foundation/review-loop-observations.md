@@ -185,6 +185,24 @@ productionization implication.
   fix round → merge → sweep → reviewer close). *Production:* confirms the
   sweep belongs before review — fold it into `/cosmo:execute complete`.
 
+- **2026-06-11 — repo gates teach the fleet mid-wave, but only if the shepherd
+  relays.** GC6 cost two executors a fix round in two different flavors
+  (WI-576: mock not converted; WI-579: mocks gc1-allow'd but no commit-message
+  deferral record). After the second hit the shepherd pushed a brief amendment
+  to the two still-building executors (WI-577/581) covering the precise gap +
+  the two recurring considers (exported return types, no ticket tokens in
+  source comments). *Production:* executor briefs should be generated from a
+  living checklist that accretes each review-gate lesson automatically —
+  the shepherd-as-relay works but doesn't scale past one wave.
+- **2026-06-11 — first CI-infra noise hit the loop (PR #902).** The only red
+  check was a mobile timing test (`create-profile.test.tsx` duplicate-submit
+  lock) on an API-only diff — flake or pre-existing, not the executor's. The
+  loop's risk: an executor that trusts check colour would chase it; a gate
+  that auto-bounces on red would too. Disposition: executor evidences
+  non-causation, shepherd treats recurrence as an infra matter (separate WI),
+  not a rework bounce. *Production:* the merge gate needs a flake/unrelated-
+  failure lane distinct from "fix your PR".
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no
