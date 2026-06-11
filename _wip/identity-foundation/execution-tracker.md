@@ -138,15 +138,15 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **review** — Stage=Reviewing 2026-06-10, PR #855 MERGED 23:01Z (shepherd-verified: 6/6 green; age changes canon-backed by data-model §2A.5 + compliance register; loginId-FK P2 dispositioned in-thread); awaiting `/cosmo:review` |
-| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **review (PR held)** — Stage=Reviewing 2026-06-11, PR #860; shepherd merge pass found: CI pending on final commit (executor reported stale green), committed `_plan-WI-571.md` (protocol violation), 2 P2 threads unreplied. Sent back for cleanup; merge on verified green. Fail-closed engine scaffold verified in code |
+| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **review** — Stage=Reviewing, PR #860 MERGED 2026-06-11 08:00Z after cleanup round (plan file removed, P2 threads dispositioned, true green verified live by shepherd); awaiting `/cosmo:review` |
 | WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **review** — Stage=Reviewing 2026-06-11, PR #859 MERGED 23:33Z (shepherd-verified: 6/6 green, 0 open threads, SCC break independently verified — import graph now a DAG via `age-utils` leaf + `notifications/email` extraction); no reintroduction guard test added (consider for W2); awaiting `/cosmo:review` |
-| WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **ready** — refined 2026-06-10 (Assisted; framing checklist confirmed) |
+| WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **in-progress** — executor dispatched 2026-06-11 (`wi573-executor`, parallel with WI-574) |
 
 ### W2 — identity / consent / proxy / age (critical path)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-598/599) |
+| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **in-progress** — executor dispatched 2026-06-11 (`wi574-executor`, parallel with WI-573; W2 entry under way) |
 | WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-600/601) |
 | WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-602/603) |
 
