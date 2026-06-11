@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>G1 + G2 + G3 all fired 06-11</b> — W0+W1 closed, W2 executing (574 done, 575/576 in flight), W4 underway · <b>PRG-12 first-activation decision is LIVE</b>; PRG-10 safe subset + PRG-11 moot scan unlocked · HH close-out ladder in progress (nexus) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>PRG-02 GRADUATED</b> (first of the program) · G1+G2+G3 fired · <b>IF: W2 fully landed</b>, 5 of 6 W3 units executing — G4 approaching · <b>PRG-12 activation + PRG-11 moot scan: approved, kickoff outlines with operator</b> · HH residue in operator triage (branch) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
 </div>
 
 <nav>
@@ -616,13 +616,13 @@ const INIT = [
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
 
-{ id:"PRG-02", name:"Harness Hygiene", accent:"var(--teal)", lane:"now", status:"tail", q:"#3",
-  tagline:"The pipeline rework that makes everything else safe to execute. MERGED — close-out + residue remain.",
-  owner:"Hex + Vetinari", gate:"G1 FIRED 06-11 (PR #832 merged). Residue batch is live; formal WI-530/533 closes are mechanical.",
-  outcome:"Commit → CI → review → merge tail rewired and ZDX/Cosmo-backed to replacement parity, so the big refactor runs on a trustworthy harness.",
+{ id:"PRG-02", name:"Harness Hygiene", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#3",
+  tagline:"The pipeline rework that made everything else safe to execute. OUTCOME MET — the program's first graduation.",
+  owner:"Hex + Vetinari", gate:"GRADUATED 06-11: WI-530 set closed through review; harness proven by IF W0–W2 running on it.",
+  outcome:"Commit → CI → review → merge tail rewired and ZDX/Cosmo-backed to replacement parity, so the big refactor runs on a trustworthy harness. Met 2026-06-11.",
   bundles:[
-    {n:"Gate close-out · review stack → WI-530 → WI-533", s:"4 WIs", m:"mixed", st:"done", note:"PR #832 MERGED 06-11. Remaining: review the stack in Cosmo, close WI-530, unpark WI-533 — mechanical, nexus side."},
-    {n:"Residue quick-land batch", s:"≈10 items", m:"mixed", st:"go", note:"UNLOCKED by G1: branch protection, pointer sweeps, validation-scope tooling. Batch when HH owners have a slot."}
+    {n:"Critical path · pipeline rewire → WI-530 → WI-533", s:"all WIs", m:"mixed", st:"done", note:"Closed through review 06-11. Done means done."},
+    {n:"Residue (~12–15 WIs)", s:"in triage", m:"mixed", st:"go", note:"Triaged in a separate operator session: quick-land / return-to-ZDX / park / kill. Not all stays under the umbrella."}
   ],
   homes:["nexus: _WIP/zdx-productionization/harness-hygiene-tracker.md","Cosmo · WI-530 exit-gate WP"]},
 

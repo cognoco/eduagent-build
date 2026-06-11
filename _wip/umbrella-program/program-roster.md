@@ -78,7 +78,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   `execution-tracker.md` §5; this is a pointer.
 - **Activate-when:** — (active)
 
-### PRG-02 · Harness Hygiene — `tail`
+### PRG-02 · Harness Hygiene — `graduated` (2026-06-11)
 - **Outcome:** eduagent-build's dev-execution harness (commit → pre-commit →
   pre-push → CI → review → merge tail) rewired and ZDX/cosmo-skill-backed to
   replacement-parity (80/20), so PRG-01 Phase P can begin on a trustworthy
@@ -88,16 +88,16 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   via `WI-530` → `WI-533`.
 - **Decomposition:** `nexus:_WIP/zdx-productionization/harness-hygiene-tracker.md`
   (the durable entry point; Cosmo `WI-530` exit-gate WP holds live per-item state).
-- **Tail posture (updated 2026-06-11 — G1 FIRED):** **HH PR #832 merged
-  2026-06-11 09:27Z.** Remaining: **(a) formal close-out** — review the HH
-  Reviewing stack (`WI-378`/`WI-388`/`WI-398`/`WI-387`) and close `WI-530` →
-  unpark/close `WI-533` (mechanical, nexus side); **(b) the parked residue —
-  NOW UNLOCKED** (queue entry 3 live): ~10 non-gating items (branch protection
-  `WI-538` Manual/HITL, pointer-sweep `WI-543`, nx-reset memory `WI-561`,
-  upstream-watch `WI-542`, ADR-facet `WI-548`, validation-scope impl cluster
-  `WI-457`–`460`, Codex coverage `WI-534`) to land as a quick-land batch.
-  Per-item state: tracker §4/§5 + Cosmo.
-- **Activate-when:** **G1 fired — residue batch may start** (queue entry 3)
+- **GRADUATED 2026-06-11 — outcome met.** HH PR #832 merged 09:27Z; the
+  `WI-530`-related items **closed through review** (critical path complete);
+  the new harness is proven in live use (IF W0–W2 executed on it). The
+  Initiative's program-level interest is closed.
+- **Residue (~12–15 non-critical-path WIs):** being **triaged in a separate
+  operator session** (branched 2026-06-11) into quick-land batch / return-to-
+  ZDX-stream / park / kill — not all of it stays under the umbrella.
+  Dispositions land there; the tracker remains the durable record.
+- **Activate-when:** — (graduated; queue entry 3 = residue batch, scope set by
+  the triage)
 
 ### PRG-03 · Instruction-surface / memory-doctrine cleanup — `in-progress`
 - **Outcome:** the `.claude/memory` + `AGENTS.md`/`CLAUDE.md` + doctrine surface
@@ -319,7 +319,7 @@ any disagreement this roster and Cosmo win.
 ## Cross-program gates (the edges that matter)
 
 ```
-PRG-02 Harness Hygiene (tail)  ──(WI-530 exit-gate → WI-533 boundary)──▶  PRG-01 W1+ execution start
+PRG-02 Harness Hygiene  ──(WI-530 → WI-533)──▶  SATISFIED + CLOSED 2026-06-11 (PRG-02 graduated)
 PRG-03 operational-memory cleanup  ──(sequenced inside)──▶  PRG-02 (WI-531 → WI-387, both delivered; WI-587 residue ungated)
 PRG-01 IF exported boundary nodes (planning-reference Appendix):
   "W1 landed"                ──▶  PRG-11 · PRG-13(part)
@@ -331,6 +331,12 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-11 (afternoon) — PRG-02 GRADUATED.** WI-530-related items closed
+  through review; HH critical path complete; outcome met (harness proven by
+  IF W0–W2 live execution). Residue (~12–15 WIs) triaged in a separate operator
+  session (branched) — quick-land / return-to-ZDX / park / kill; queue entry 3
+  scope set by that triage. Routing-rule binding re-pointed in the
+  planning-reference Appendix. First graduation of the program.
 - **2026-06-11 (midday) — G2 + G3 FIRED; standing Cosmo watch armed.** Operator
   closed the entire W0+W1 set (8 items Closed/Done) and more: W2 `WI-574`
   Closed, `WI-575`/`576` Executing; W4 `WI-583` Executing, `WI-584` Closed.

@@ -230,10 +230,11 @@ the same change-set as the event they record.
   PRG-20 (estate-canon drain) only.
 - **Routing rule (current):** audit-finding-class → its `Defer-to-workstream`
   label in `docs/audit/2026-05-29-full-audit/L-gap-delta.md` → that PRG row ·
-  harness/pipeline-class → PRG-02 (tail) · memory/doctrine/instruction-surface
-  → PRG-03 · product/learning canon → PRG-20 / PRG-21 per glossary bucket ·
-  top-down/delivery-layer tooling → PRG-04 · fits nothing → unrouted-intake
-  line on the roster.
+  harness/pipeline-class → the HH residue triage (operator branch session,
+  2026-06-11; re-bind here when its dispositions land — PRG-02 graduated) ·
+  memory/doctrine/instruction-surface → PRG-03 · product/learning canon →
+  PRG-20 / PRG-21 per glossary bucket · top-down/delivery-layer tooling →
+  PRG-04 · fits nothing → unrouted-intake line on the roster.
 - **Satellite register:** `L-gap-delta.md` (per-finding home; WPs absorb, point,
   never copy).
 - **Boundary nodes (current exports):** HH → `WI-530`/`WI-533` (gates IF W1+
