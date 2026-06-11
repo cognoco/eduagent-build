@@ -376,10 +376,13 @@ describe('consentRevocation', () => {
           type: 'consent_expired',
         }),
       );
-      // Profile deletion
+      // Profile deletion — [F-093] now includes revokedAt + ownerProfileId args
+      // revokedAt not supplied in event data → revocationRespondedAt is undefined
       expect(mockDeleteProfile).toHaveBeenCalledWith(
         expect.anything(),
         'child-001',
+        undefined, // revokedAt (not supplied in event data)
+        'parent-001', // ownerProfileId guard (F-093)
       );
       // Parent push
       expect(mockSendPushNotification).toHaveBeenNthCalledWith(
@@ -423,9 +426,12 @@ describe('consentRevocation', () => {
       status: 'deleted',
       childProfileId: 'child-boundary',
     });
+    // [F-093] now includes revokedAt (undefined here) + ownerProfileId args
     expect(mockDeleteProfile).toHaveBeenCalledWith(
       expect.anything(),
       'child-boundary',
+      undefined, // revokedAt (not supplied in this test path)
+      'parent-001', // ownerProfileId guard (F-093)
     );
   });
 
@@ -505,9 +511,13 @@ describe('consentRevocation', () => {
         expect.objectContaining({ type: 'consent_warning' }),
       );
       // Profile deletion proceeds regardless of push dedup.
+      // [F-093] now includes revokedAt + ownerProfileId args
+      // revokedAt not supplied in event data → revocationRespondedAt is undefined
       expect(mockDeleteProfile).toHaveBeenCalledWith(
         expect.anything(),
         'child-dup',
+        undefined, // revokedAt (not supplied in event data)
+        'parent-001', // ownerProfileId guard (F-093)
       );
     });
 
