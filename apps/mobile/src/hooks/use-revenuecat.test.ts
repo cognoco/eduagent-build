@@ -9,6 +9,7 @@ import {
   useCustomerInfo,
   usePurchase,
   useRestorePurchases,
+  resetRevenueCatIdentitySyncForTests,
 } from './use-revenuecat';
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,12 @@ function createWrapper() {
   return w.wrapper;
 }
 
+// [F-134] The identity-sync gate is module-level state — clear it between
+// tests so no test depends on the sync state a previous test left behind.
+beforeEach(() => {
+  resetRevenueCatIdentitySyncForTests();
+});
+
 // ---------------------------------------------------------------------------
 // useRevenueCatIdentity
 // ---------------------------------------------------------------------------
@@ -137,7 +144,7 @@ describe('useRevenueCatIdentity', () => {
       userId: 'clerk_user_123',
     });
 
-    renderHook(() => useRevenueCatIdentity());
+    renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
 
     await waitFor(() => {
       expect(Purchases.logIn).toHaveBeenCalledWith('clerk_user_123');
@@ -150,7 +157,9 @@ describe('useRevenueCatIdentity', () => {
       userId: 'clerk_user_123',
     });
 
-    const { rerender } = renderHook(() => useRevenueCatIdentity());
+    const { rerender } = renderHook(() => useRevenueCatIdentity(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(Purchases.logIn).toHaveBeenCalledWith('clerk_user_123');
@@ -176,7 +185,7 @@ describe('useRevenueCatIdentity', () => {
       userId: 'clerk_user_123',
     });
 
-    renderHook(() => useRevenueCatIdentity());
+    renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
 
     // Give time for any async effect to complete
     await new Promise((r) => setTimeout(r, 50));
@@ -190,7 +199,9 @@ describe('useRevenueCatIdentity', () => {
       userId: 'clerk_user_123',
     });
 
-    const { rerender } = renderHook(() => useRevenueCatIdentity());
+    const { rerender } = renderHook(() => useRevenueCatIdentity(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(Purchases.logIn).toHaveBeenCalledTimes(1);
@@ -215,7 +226,7 @@ describe('useRevenueCatIdentity', () => {
     });
 
     // Should not throw
-    renderHook(() => useRevenueCatIdentity());
+    renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
 
     await new Promise((r) => setTimeout(r, 50));
 
@@ -326,10 +337,22 @@ describe('useCustomerInfo', () => {
     Object.defineProperty(Platform, 'OS', { value: originalPlatformOS });
   });
 
-  it('fetches customer info from RevenueCat', async () => {
-    const { result } = renderHook(() => useCustomerInfo(), {
-      wrapper: createWrapper(),
+  it('fetches customer info from RevenueCat once identity sync completes', async () => {
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
     });
+    // [F-134] customerInfo is gated on identity sync — mount the identity
+    // hook alongside it, as the authenticated layout does in production.
+    const { result } = renderHook(
+      () => {
+        useRevenueCatIdentity();
+        return useCustomerInfo();
+      },
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -350,6 +373,167 @@ describe('useCustomerInfo', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
+    expect(result.current.data).toBeNull();
+    expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-134] Identity-sync gating — getCustomerInfo() answers for the SDK's
+// CURRENT identity. If the customerInfo query runs while Purchases.logIn for
+// the active Clerk user is still in flight, another account's entitlement
+// snapshot gets cached under the active user's key (cross-account leak on
+// shared devices). The query must stay disabled until sync completes.
+// ---------------------------------------------------------------------------
+
+describe('[F-134] identity-sync gating for customer info', () => {
+  const originalPlatformOS = Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (Purchases.logIn as jest.Mock).mockResolvedValue({
+      customerInfo: { entitlements: { active: {} } },
+      created: false,
+    });
+    (Purchases.getCustomerInfo as jest.Mock).mockResolvedValue({
+      entitlements: { active: {}, all: {} },
+      activeSubscriptions: [],
+      allPurchasedProductIdentifiers: [],
+    });
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+    Object.defineProperty(Platform, 'OS', { value: originalPlatformOS });
+  });
+
+  it('does not fetch customer info while identity sync is still in flight', async () => {
+    let resolveLogin!: (value: unknown) => void;
+    (Purchases.logIn as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveLogin = resolve;
+        }),
+    );
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
+    });
+
+    const { result } = renderHook(
+      () => {
+        useRevenueCatIdentity();
+        return useCustomerInfo();
+      },
+      { wrapper: createWrapper() },
+    );
+
+    // logIn is pending — the SDK may still be logged in as a previous
+    // identity, so the query must not run yet.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveLogin({
+        customerInfo: { entitlements: { active: {} } },
+        created: false,
+      });
+    });
+
+    await waitFor(() => {
+      expect(Purchases.getCustomerInfo).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+  });
+
+  it('does not cache a snapshot under the new user key during an account switch', async () => {
+    // Phase 1: account A fully synced and fetched.
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_A',
+    });
+    const wrapper = createWrapper();
+    const { result, rerender } = renderHook(
+      () => {
+        useRevenueCatIdentity();
+        return useCustomerInfo();
+      },
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Phase 2: switch to account B; logIn(B) hangs — the SDK still answers
+    // as A, so nothing may be fetched/cached under B's key yet.
+    let resolveLogin!: (value: unknown) => void;
+    (Purchases.logIn as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveLogin = resolve;
+        }),
+    );
+    (Purchases.getCustomerInfo as jest.Mock).mockClear();
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_B',
+    });
+    rerender({});
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
+    expect(
+      queryClient.getQueryData(['revenuecat', 'customerInfo', 'clerk_user_B']),
+    ).toBeUndefined();
+
+    // Phase 3: logIn(B) completes — fetching under B's key may now proceed.
+    await act(async () => {
+      resolveLogin({
+        customerInfo: { entitlements: { active: {} } },
+        created: false,
+      });
+    });
+    await waitFor(() => {
+      expect(Purchases.getCustomerInfo).toHaveBeenCalled();
+    });
+  });
+
+  it('invalidates the user-scoped customerInfo query after logIn completes', async () => {
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
+    });
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useRevenueCatIdentity(), { wrapper });
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryKey: ['revenuecat', 'customerInfo', 'clerk_user_123'],
+        }),
+      );
+    });
+  });
+
+  it('keeps customer info ungated on web where RevenueCat is unavailable', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'web' });
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
+    });
+
+    const { result } = renderHook(() => useCustomerInfo(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
     expect(result.current.data).toBeNull();
     expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
   });
