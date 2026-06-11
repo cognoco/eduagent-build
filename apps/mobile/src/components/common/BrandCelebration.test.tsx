@@ -12,6 +12,16 @@ describe('BrandCelebration', () => {
     getByTestId('brand-cel', { includeHiddenElements: true });
   });
 
+  it('is hidden from screen readers (decorative animation)', () => {
+    const { getByTestId } = render(<BrandCelebration testID="brand-cel" />);
+    const el = getByTestId('brand-cel', { includeHiddenElements: true });
+    // Decorative animation — hidden from SR on both platforms:
+    // importantForAccessibility is Android-only; accessibilityElementsHidden is iOS.
+    expect(el.props.accessible).toBe(false);
+    expect(el.props.accessibilityElementsHidden).toBe(true);
+    expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
+  });
+
   it('accepts size prop', () => {
     const { toJSON } = render(<BrandCelebration size={80} />);
     expect(toJSON()).toBeTruthy();

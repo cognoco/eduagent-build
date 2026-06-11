@@ -36,6 +36,7 @@ describe('MagicPenAnimation', () => {
     const el = getByTestId('pen', { includeHiddenElements: true });
     // Decorative animation — hidden from SR so users don't hear "image, Writing animation"
     expect(el.props.accessible).toBe(false);
+    expect(el.props.accessibilityElementsHidden).toBe(true);
     expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
@@ -125,6 +126,7 @@ describe('MagicPenAnimation', () => {
       const el = getByTestId('pen', { includeHiddenElements: true });
       // Decorative even in reduced-motion — hidden from SR
       expect(el.props.accessible).toBe(false);
+      expect(el.props.accessibilityElementsHidden).toBe(true);
       expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
     } finally {
       reanimated.useReducedMotion = original;

@@ -14,6 +14,7 @@ describe('BookPageFlipAnimation', () => {
     const el = getByTestId('book', { includeHiddenElements: true });
     // Decorative animation — hidden from SR so users don't hear "image, Loading content"
     expect(el.props.accessible).toBe(false);
+    expect(el.props.accessibilityElementsHidden).toBe(true);
     expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 

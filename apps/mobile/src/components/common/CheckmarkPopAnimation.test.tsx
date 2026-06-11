@@ -16,6 +16,7 @@ describe('CheckmarkPopAnimation', () => {
     const el = getByTestId('checkmark', { includeHiddenElements: true });
     // Decorative animation — hidden from SR so users don't hear "image, Success"
     expect(el.props.accessible).toBe(false);
+    expect(el.props.accessibilityElementsHidden).toBe(true);
     expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 

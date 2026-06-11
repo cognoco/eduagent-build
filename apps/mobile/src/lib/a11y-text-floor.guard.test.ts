@@ -27,8 +27,12 @@ const EXEMPTED_PATTERNS = [
   /MentomateLogo\.tsx$/,
 ];
 
-/** Match fontSize: 1-10, fontSize={1-10} — values at or below the 10px floor */
-const SUB_FLOOR_REGEX = /fontSize[:\s=]{1,3}\{?([1-9]|10)\}?[^0-9]/g;
+/**
+ * Match fontSize: 1-10, fontSize={1-10} — values at or below the 10px floor.
+ * Terminal class excludes '.' so decimal continuations (e.g. fontSize: 10.5,
+ * which is above the floor) are not falsely flagged.
+ */
+const SUB_FLOOR_REGEX = /fontSize[:\s=]{1,3}\{?(10|[1-9])\}?[^0-9.]/g;
 
 function* walkFiles(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -73,5 +77,19 @@ describe('a11y text-floor guard (F-060)', () => {
     }
 
     expect(violations).toHaveLength(0);
+  });
+
+  it('regex flags at-or-below-floor values but not decimal continuations above it', () => {
+    const flags = (s: string): boolean => {
+      SUB_FLOOR_REGEX.lastIndex = 0;
+      return SUB_FLOOR_REGEX.test(s);
+    };
+    expect(flags('fontSize: 10,')).toBe(true);
+    expect(flags('fontSize: 9,')).toBe(true);
+    expect(flags('fontSize={10}\n')).toBe(true);
+    // 10.5 is above the floor — must not be flagged
+    expect(flags('fontSize: 10.5,')).toBe(false);
+    expect(flags('fontSize: 11,')).toBe(false);
+    expect(flags('fontSize: 12,')).toBe(false);
   });
 });

@@ -33,6 +33,7 @@ describe('DeskLampAnimation', () => {
     const el = getByTestId('lamp', { includeHiddenElements: true });
     // Decorative animation — hidden from SR so users don't hear "image, Thinking"
     expect(el.props.accessible).toBe(false);
+    expect(el.props.accessibilityElementsHidden).toBe(true);
     expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
