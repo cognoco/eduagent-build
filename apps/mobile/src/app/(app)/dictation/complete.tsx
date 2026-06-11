@@ -15,6 +15,7 @@ import {
   useReviewDictation,
   useRecordDictationResult,
 } from '../../../hooks/use-dictation-api';
+import { toLocalDateString } from '../../../lib/local-date';
 
 // RF-09: Dictation result is NOT auto-recorded on mount.
 // "I'm done" is an explicit user action that records the result.
@@ -286,7 +287,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
     const sentences = data?.sentences ?? [];
     const mode = data?.mode ?? 'homework';
-    const localDate = new Date().toISOString().slice(0, 10);
+    const localDate = toLocalDateString();
 
     try {
       await recordResult.mutateAsync({

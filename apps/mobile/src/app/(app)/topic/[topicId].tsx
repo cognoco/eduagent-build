@@ -80,9 +80,12 @@ function getMostRecentSessionCreatedAt(
   }, null);
 }
 
-function formatSessionDate(createdAt: string): string {
+function formatSessionDate(
+  createdAt: string,
+  locale: string | undefined,
+): string {
   const date = new Date(createdAt);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 function formatSessionsSummary(
@@ -102,8 +105,11 @@ function formatSessionsSummary(
   return `${sessions.length} ${sessionLabel} · ${totalMinutes} min total`;
 }
 
-function formatBookmarkSourceLine(bookmark: Bookmark): string {
-  return `From chat · ${formatSessionDate(bookmark.createdAt)}`;
+function formatBookmarkSourceLine(
+  bookmark: Bookmark,
+  locale: string | undefined,
+): string {
+  return `From chat · ${formatSessionDate(bookmark.createdAt, locale)}`;
 }
 
 interface TopicSectionStripProps {
@@ -252,7 +258,7 @@ export default function TopicDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const relativeDate = useRelativeDate();
   const { activeProfile } = useProfile();
   const activeProfileRole = useActiveProfileRole();
@@ -849,7 +855,7 @@ export default function TopicDetailScreen() {
                         noteId={note.id}
                         topicTitle={topicProgress.title}
                         content={note.content}
-                        sourceLine={formatSourceLine(note)}
+                        sourceLine={formatSourceLine(note, i18n?.language)}
                         updatedAt={note.updatedAt}
                         conceptSignal={
                           conceptSignalsQuery.data?.signals?.[note.topicId]
@@ -944,7 +950,10 @@ export default function TopicDetailScreen() {
                       key={bookmark.id}
                       bookmarkId={bookmark.id}
                       content={bookmark.content}
-                      sourceLine={formatBookmarkSourceLine(bookmark)}
+                      sourceLine={formatBookmarkSourceLine(
+                        bookmark,
+                        i18n?.language,
+                      )}
                       onPress={() => handleSessionPress(bookmark.sessionId)}
                     />
                   ))
@@ -994,7 +1003,10 @@ export default function TopicDetailScreen() {
                       <TopicSessionRow
                         key={session.id}
                         sessionId={session.id}
-                        date={formatSessionDate(session.createdAt)}
+                        date={formatSessionDate(
+                          session.createdAt,
+                          i18n?.language,
+                        )}
                         durationSeconds={session.durationSeconds}
                         sessionType={session.sessionType}
                         onPress={handleSessionPress}

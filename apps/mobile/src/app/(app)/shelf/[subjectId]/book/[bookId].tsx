@@ -260,7 +260,7 @@ export default function BookScreen() {
   const activeProfileRole = useActiveProfileRole();
   const proxyChildProfileId =
     activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const params = useLocalSearchParams<{
     subjectId: string;
     bookId: string;
@@ -1737,7 +1737,7 @@ export default function BookScreen() {
                       noteId={note.id}
                       topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
                       content={note.content}
-                      sourceLine={formatSourceLine(note)}
+                      sourceLine={formatSourceLine(note, i18n?.language)}
                       updatedAt={note.updatedAt}
                       conceptSignal={
                         conceptSignalsQuery.data?.signals?.[note.topicId]

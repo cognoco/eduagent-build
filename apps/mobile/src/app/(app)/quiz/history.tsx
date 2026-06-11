@@ -11,6 +11,7 @@ import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useScreenTopInset } from '../../../lib/use-screen-top-inset';
 import { useRelativeDate } from '../../../hooks/use-time-format';
+import { toLocalDateString } from '../../../lib/local-date';
 
 export default function QuizHistoryScreen() {
   const { t } = useTranslation();
@@ -200,7 +201,9 @@ export default function QuizHistoryScreen() {
 
   const grouped = new Map<string, typeof rounds>();
   for (const round of rounds) {
-    const dateKey = round.completedAt.slice(0, 10);
+    // Use local date components (not UTC slice) so rounds completed near midnight
+    // group under the correct local calendar day. See F-178.
+    const dateKey = toLocalDateString(new Date(round.completedAt));
     const group = grouped.get(dateKey) ?? [];
     group.push(round);
     grouped.set(dateKey, group);
