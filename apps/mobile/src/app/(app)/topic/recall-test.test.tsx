@@ -513,6 +513,29 @@ describe('RecallTestScreen', () => {
     expect(mockRecallMutate).toHaveBeenCalledTimes(1);
   });
 
+  it('[F-172] screen is not permanently locked after a dont-remember API error', async () => {
+    // Arrange: first dont-remember call returns an error.
+    queuedRecallResults = [new Error('network error')];
+
+    render(<RecallTestScreen />);
+
+    // Act: press dont-remember — the error handler fires synchronously.
+    fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
+
+    // Assert: the shared gate must have been released — a subsequent
+    // dont-remember press should be accepted (mutate called a second time).
+    queuedRecallResults = [
+      {
+        passed: false,
+        failureCount: 1,
+        failureAction: 'feedback_only',
+        hint: 'Try again.',
+      },
+    ];
+    fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
+    expect(mockRecallMutate).toHaveBeenCalledTimes(2);
+  });
+
   it('[LEARN-14] Relearn CTA still navigates (to picker) when subjectId is fully unresolved — no silent no-op', async () => {
     mockSearchParams = { topicId: 'topic-1' };
     mockResolveResult = undefined;

@@ -273,7 +273,9 @@ export default function RecallTestScreen() {
         },
         onError: (err: Error) => {
           if (token !== submissionTokenRef.current) return;
-          dontRememberPendingRef.current = false;
+          // [F-172] Use releaseDontRememberBlock to also clear the shared
+          // anySubmissionInFlightRef gate; manual flag reset was missing it.
+          releaseDontRememberBlock();
           setDontRememberPending(false);
           setDontRememberCount((prev) => Math.max(prev - 1, 0));
           // UX-DE-L8: error is not an AI reply
