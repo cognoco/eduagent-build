@@ -3530,10 +3530,14 @@ describe('[WI-371 / DS-194] sessions proxy-mode guard — remaining write routes
 // header-bypass attack vector F-126 identifies).
 // ---------------------------------------------------------------------------
 describe('[F-126 / WI-575] library-filing central authority check (server-derived, no header)', () => {
+  // Records any property access on the stub db — the guard must reject BEFORE
+  // the handler touches the DB (mirrors the proxy-guard.test.ts pattern).
+  const dbCalled = jest.fn();
+
   function makeProxyAppNoHeader() {
     const proxyApp = new Hono();
     proxyApp.use('*', async (c, next) => {
-      c.set('db' as never, {});
+      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
       c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
       c.set('user' as never, { id: 'test-user' });
       // isOwner=false is set server-side by profileScopeMiddleware when the
@@ -3548,7 +3552,6 @@ describe('[F-126 / WI-575] library-filing central authority check (server-derive
   }
 
   const SID = '550e8400-e29b-41d4-a716-446655440111';
-  const dbCalled = jest.fn();
 
   beforeEach(() => dbCalled.mockReset());
 
@@ -3561,6 +3564,7 @@ describe('[F-126 / WI-575] library-filing central authority check (server-derive
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('PROXY_MODE');
+    expect(dbCalled).not.toHaveBeenCalled();
   });
 
   it('[BREAK] add: 403 PROXY_MODE even when X-Proxy-Mode header is absent', async () => {
@@ -3571,6 +3575,7 @@ describe('[F-126 / WI-575] library-filing central authority check (server-derive
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('PROXY_MODE');
+    expect(dbCalled).not.toHaveBeenCalled();
   });
 
   it('[BREAK] restore: 403 PROXY_MODE even when X-Proxy-Mode header is absent', async () => {
@@ -3581,5 +3586,6 @@ describe('[F-126 / WI-575] library-filing central authority check (server-derive
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('PROXY_MODE');
+    expect(dbCalled).not.toHaveBeenCalled();
   });
 });
