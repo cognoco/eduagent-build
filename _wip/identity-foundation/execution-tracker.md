@@ -146,7 +146,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **review** — Stage=Reviewing 2026-06-11, PR #875 MERGED 09:09Z (shepherd-verified: 6/6 green, 0 threads, 6 red-green break-tests); awaiting `/cosmo:review` |
+| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #875); children WI-598/599 swept with parent |
 | WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi575-executor`) |
 | WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi576-executor`) |
 
@@ -196,8 +196,13 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   merged and Closed via review: WI-570 (#855), WI-571 (#860), WI-572 (#859),
   WI-573 (#867). G2 tripped earlier same day (WI-569 Closed). No review
   backlog remains.
-- **In flight (3 executors): WI-575 ∥ WI-576 (W2 tail) ∥ WI-583 (W4).** WI-584
-  merged (#874).
+- **In flight (3 executors): WI-575 (PR phase) ∥ WI-576 (worktree recovery) ∥
+  WI-583 (payload-schema rework).** WI-584 merged (#874), at Reviewing.
+- **Reviewing-loop monitor ACTIVE (this session):** a persistent poll (90s) on
+  the workstream emits every Stage transition — a reviewer agent picks up
+  Reviewing items autonomously; the shepherd reacts to Closed (sweep-check
+  children, update tracker, dispatch unblocked work) and to rework bounces
+  (re-engage the executor). If this session dies, restart the monitor.
   WI-574 merged (#875) and at Reviewing. After 575/576 land → W3 dispatches
   (577/578/579/580/582 on 574; 581 also needs 576).
 - **W3 + W4 fully pre-bridged 2026-06-11** — WI-577…584 all Ready+Assisted
