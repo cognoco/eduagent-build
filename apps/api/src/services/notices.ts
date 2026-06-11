@@ -22,29 +22,64 @@ function parsePayload(payload: unknown): PendingNoticePayload {
   return { childName: 'Your child' };
 }
 
+/**
+ * Records a pending notice and returns its id. The id doubles as an opaque
+ * reference for Inngest step state: consent-revocation memoizes the notice id
+ * (never the child's name) and rehydrates the name from this first-party row
+ * via `getPendingNoticeChildName` when composing the parent push.
+ */
 export async function recordPendingNotice(
   db: Database,
   input: {
     ownerProfileId: string;
     type: PendingNoticeType;
     childName: string;
+  },
+): Promise<string> {
+  const [row] = await db
+    .insert(pendingNotices)
+    .values({
+      ownerProfileId: input.ownerProfileId,
+      type: input.type,
+      payloadJson: { childName: input.childName },
+    })
+    .returning({ id: pendingNotices.id });
+  if (!row) {
+    throw new Error('pending_notices insert returned no row');
   }
-): Promise<void> {
-  await db.insert(pendingNotices).values({
-    ownerProfileId: input.ownerProfileId,
-    type: input.type,
-    payloadJson: { childName: input.childName },
+  return row.id;
+}
+
+/**
+ * Rehydrates the child name captured in a pending notice. Used by deletion
+ * flows where the profile row is already gone and the notice payload is the
+ * only first-party copy of the name. Scoped by ownerProfileId (same shape as
+ * markPendingNoticeSeen) so a leaked/forged notice id cannot read another
+ * family's notice payload.
+ */
+export async function getPendingNoticeChildName(
+  db: Database,
+  ownerProfileId: string,
+  noticeId: string,
+): Promise<string | null> {
+  const row = await db.query.pendingNotices.findFirst({
+    where: and(
+      eq(pendingNotices.id, noticeId),
+      eq(pendingNotices.ownerProfileId, ownerProfileId),
+    ),
+    columns: { payloadJson: true },
   });
+  return row ? parsePayload(row.payloadJson).childName : null;
 }
 
 export async function listPendingNotices(
   db: Database,
-  ownerProfileId: string
+  ownerProfileId: string,
 ): Promise<PendingNotice[]> {
   const rows = await db.query.pendingNotices.findMany({
     where: and(
       eq(pendingNotices.ownerProfileId, ownerProfileId),
-      isNull(pendingNotices.seenAt)
+      isNull(pendingNotices.seenAt),
     ),
     orderBy: (table, { asc }) => [asc(table.createdAt)],
   });
@@ -72,7 +107,7 @@ export async function listPendingNotices(
 export async function markPendingNoticeSeen(
   db: Database,
   ownerProfileId: string,
-  noticeId: string
+  noticeId: string,
 ): Promise<boolean> {
   const rows = await db
     .update(pendingNotices)
@@ -81,8 +116,8 @@ export async function markPendingNoticeSeen(
       and(
         eq(pendingNotices.id, noticeId),
         eq(pendingNotices.ownerProfileId, ownerProfileId),
-        isNull(pendingNotices.seenAt)
-      )
+        isNull(pendingNotices.seenAt),
+      ),
     )
     .returning({ id: pendingNotices.id });
   return rows.length > 0;

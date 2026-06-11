@@ -5,7 +5,8 @@
  * Bans the leak patterns this WP removed from `apps/api/src`:
  *   - `rawData: event.data` — raw, unvalidated event payload forwarded to
  *     `logger.*` / `captureException` extras on a schema-drift path. Use
- *     `summarizeRawPayload(event.data)` from `services/pii-scrub.ts`.
+ *     `summarizeRawPayload(event.data)` from `@eduagent/schemas` (pii-scrub,
+ *     the canonical scrubber home).
  *   - `rawSlice:` / `rawResponseTrunc:` — truncated LLM output (derived from
  *     a learner's session) shipped as log/Sentry content. Log shape-only
  *     diagnostics (`responseLength`, Zod `issues`) instead. (`contentSnippet`
@@ -29,8 +30,9 @@ const BANNED_PATTERNS: Array<{ name: string; regex: RegExp }> = [
   { name: 'rawResponseTrunc key', regex: /\brawResponseTrunc\s*:/ },
 ];
 
-// Files allowed to mention the patterns (the scrubber's own docs + this guard).
-const EXCLUDED_BASENAMES = new Set(['pii-scrub.ts', 'pii-scrub.guard.test.ts']);
+// Files allowed to mention the patterns (this guard's own docs). The scrubber
+// itself now lives in packages/schemas (outside the scanned tree).
+const EXCLUDED_BASENAMES = new Set(['pii-scrub.guard.test.ts']);
 
 function shouldScanFile(absPath: string): boolean {
   const rel = path.relative(REPO_ROOT, absPath).replace(/\\/g, '/');

@@ -17,12 +17,12 @@
 
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
-import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 import {
   classificationCompletedEventSchema,
   classificationSkippedEventSchema,
   classificationFailedEventSchema,
+  summarizeRawPayload,
 } from '@eduagent/schemas';
 
 const logger = createLogger();

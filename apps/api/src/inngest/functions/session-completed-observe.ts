@@ -19,10 +19,10 @@ import {
   sessionSummaryFailedEventSchema,
   sessionSummaryGeneratedEventSchema,
   sessionCompletedWithErrorsEventSchema,
+  summarizeRawPayload,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
-import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();

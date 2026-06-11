@@ -152,6 +152,14 @@ const mockDatabaseModule = createDatabaseModuleMock({
       email: col('email'),
     },
     familyLinks: familyLinksTableMock,
+    // listStruggleTopicNames (real implementation, exercised by the email
+    // step) goes through the real scoped repository; the scoped reads land
+    // on this mock db's query.learningProfiles.findFirst.
+    createScopedRepository: (
+      jest.requireActual('@eduagent/database') as {
+        createScopedRepository: unknown;
+      }
+    ).createScopedRepository,
   },
 });
 
@@ -1049,9 +1057,11 @@ describe('monthlyReportGenerate', () => {
         .mockResolvedValueOnce({ displayName: 'Emma' })
         .mockResolvedValueOnce({ id: 'parent-001' })
         .mockResolvedValueOnce({ id: 'parent-001' })
-        .mockResolvedValueOnce({ id: 'child-001' })
+        .mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' })
         .mockResolvedValueOnce({ accountId: 'account-parent' })
-        .mockResolvedValueOnce({ id: 'child-001' });
+        // Email step rehydrates the child name here instead of reading it
+        // from the memoized generate-step return.
+        .mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' });
       (
         mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
       ).mockResolvedValueOnce({ email: 'parent@example.test' });
@@ -1328,9 +1338,7 @@ describe('monthlyReportGenerate', () => {
         runResults: {
           'generate-monthly-report': {
             status: 'completed',
-            childDisplayName: 'Emma',
             reportMonth: '2026-03-01',
-            struggleTopics: [],
             isSelfReport: false,
           },
         },
@@ -1355,9 +1363,7 @@ describe('monthlyReportGenerate', () => {
         runResults: {
           'generate-monthly-report': {
             status: 'completed',
-            childDisplayName: 'Emma',
             reportMonth: '2026-03-01',
-            struggleTopics: [],
             isSelfReport: false,
           },
         },
@@ -1405,9 +1411,7 @@ describe('monthlyReportGenerate', () => {
     // Shared report result that generate-monthly-report would produce.
     const REPORT_RESULT = {
       status: 'completed' as const,
-      childDisplayName: 'Emma',
       reportMonth: '2026-03-01',
-      struggleTopics: [] as string[],
       isSelfReport: false,
     };
 
@@ -1815,5 +1819,75 @@ describe('monthlyReportGenerate', () => {
         expect.anything(),
       );
     });
+  });
+});
+
+// Memoized step returns are persisted in Inngest's third-party state store;
+// they must carry opaque references only, never the child's display name or
+// struggle topics.
+describe('memoized step-state PII break test [F-086]', () => {
+  it('never returns the child name or struggle topics from any step', async () => {
+    (
+      mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+    ).mockResolvedValue({
+      id: 'child-001',
+      displayName: 'Emma',
+      accountId: 'account-parent',
+    });
+    (
+      mockMonthlyReportDb.query.learningProfiles.findFirst as jest.Mock
+    ).mockResolvedValue({ struggles: [{ topic: 'Fractions' }] });
+    (
+      mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+    ).mockResolvedValue(null); // email default on
+    (
+      mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
+    ).mockResolvedValue({ email: 'parent@example.test' });
+    mockGetSnapshotsInRange
+      .mockResolvedValueOnce([
+        { snapshotDate: '2026-03-29', metrics: SAMPLE_METRICS },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const memoized: unknown[] = [];
+    const runner = createInngestStepRunner();
+    const recordingStep = {
+      ...runner.step,
+      run: async (name: string, cb: () => Promise<unknown>) => {
+        const value = await runner.step.run(name, cb);
+        memoized.push(value);
+        return value;
+      },
+    };
+    const handler = (
+      monthlyReportGenerate as unknown as {
+        fn: (ctx: unknown) => Promise<unknown>;
+      }
+    ).fn;
+    const result = await handler({
+      event: { data: makeGenerateEvent(), name: 'app/monthly-report.generate' },
+      step: recordingStep,
+    });
+
+    // Content still flows to the parent-facing channels (rehydrated in-step)…
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ title: expect.stringContaining('Emma') }),
+      expect.anything(),
+    );
+    expect(mockFormatMonthlyProgressEmail).toHaveBeenCalledWith(
+      'parent@example.test',
+      expect.stringContaining('Emma'),
+      expect.arrayContaining([
+        expect.objectContaining({ topics: ['Fractions'] }),
+      ]),
+    );
+
+    // …but never through memoized step state or the run output.
+    const serialized = JSON.stringify(memoized);
+    expect(serialized).not.toContain('Emma');
+    expect(serialized).not.toContain('Fractions');
+    expect(JSON.stringify(result)).not.toContain('Emma');
+    expect(JSON.stringify(result)).not.toContain('Fractions');
   });
 });

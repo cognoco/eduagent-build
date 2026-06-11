@@ -100,7 +100,8 @@ jest.mock(
   },
 );
 
-const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
+const mockRecordPendingNotice = jest.fn().mockResolvedValue('notice-001');
+const mockGetPendingNoticeChildName = jest.fn().mockResolvedValue('Emma');
 jest.mock(
   '../../services/notices' /* gc1-allow: pattern-a conversion */,
   () => {
@@ -111,6 +112,8 @@ jest.mock(
       ...actual,
       recordPendingNotice: (...args: unknown[]) =>
         mockRecordPendingNotice(...args),
+      getPendingNoticeChildName: (...args: unknown[]) =>
+        mockGetPendingNoticeChildName(...args),
     };
   },
 );
@@ -390,7 +393,10 @@ describe('consentRevocation', () => {
         }),
       );
 
-      // Step ordering: notify-child before delete-child-profile before notify-parent
+      // Step ordering: notify-child before delete-child-profile before
+      // notify-parent. The delete notice is recorded inside
+      // delete-child-profile (name captured pre-delete, memoized as an
+      // opaque notice id — never the name itself).
       expect(runner.runNames()).toEqual([
         'clear-unread-nudges',
         'send-warning-push',
@@ -400,7 +406,6 @@ describe('consentRevocation', () => {
         'notify-child',
         'delete-child-profile',
         'notify-parent',
-        'record-parent-delete-notice',
       ]);
     });
   });
@@ -733,5 +738,90 @@ describe('[FIX-INNGEST-3] idempotency and concurrency config', () => {
   it('declares retries: 5 for transient DB failures during consent revocation', () => {
     const opts = (consentRevocation as any).opts;
     expect(opts.retries).toBe(5);
+  });
+});
+
+// Memoized step returns are persisted in Inngest's third-party state store;
+// this is a child-account-deletion flow, so they must never carry the
+// minor's display name or birth year.
+describe('memoized step-state PII break test [F-088]', () => {
+  async function executeRecordingRevocation() {
+    const memoized: unknown[] = [];
+    const runner = createInngestStepRunner();
+    const recordingStep = {
+      ...runner.step,
+      run: async (name: string, cb: () => Promise<unknown>) => {
+        const value = await runner.step.run(name, cb);
+        memoized.push(value);
+        return value;
+      },
+    };
+    const handler = (
+      consentRevocation as unknown as { fn: (ctx: unknown) => Promise<unknown> }
+    ).fn;
+    const result = await handler({
+      event: {
+        data: { childProfileId: 'child-001', parentProfileId: 'parent-001' },
+        name: 'app/consent.revoked',
+      },
+      step: recordingStep,
+    });
+    return { result, memoized };
+  }
+
+  it('delete path: never memoizes the child name or birth year', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('never');
+
+    const { result, memoized } = await executeRecordingRevocation();
+
+    const serialized = JSON.stringify(memoized);
+    expect(serialized).not.toContain('Liam');
+    expect(serialized).not.toContain('2018');
+    expect(JSON.stringify(result)).not.toContain('Liam');
+
+    // The parent completion push still names the child — rehydrated from the
+    // pending-notice row by its opaque id, not from step state.
+    expect(mockRecordPendingNotice).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'consent_deleted', childName: 'Liam' }),
+    );
+    expect(mockGetPendingNoticeChildName).toHaveBeenCalledWith(
+      expect.anything(),
+      'parent-001', // owner-scoped read (same shape as markPendingNoticeSeen)
+      'notice-001',
+    );
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'consent_expired',
+        profileId: 'parent-001',
+        body: expect.stringContaining('Emma'),
+      }),
+    );
+  });
+
+  it('archive path: never memoizes the child name or birth year', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2008,
+      archivedAt: null,
+    });
+
+    const { result, memoized } = await executeRecordingRevocation();
+
+    const serialized = JSON.stringify(memoized);
+    expect(serialized).not.toContain('Liam');
+    expect(serialized).not.toContain('2008');
+    expect(JSON.stringify(result)).not.toContain('Liam');
+
+    // Archive push rehydrates the (still-existing) profile's name in-step.
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'consent_archived',
+        body: expect.stringContaining('Liam'),
+      }),
+    );
   });
 });
