@@ -175,8 +175,8 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **reviewing** — COMPLETE end-to-end 2026-06-11: dev verified (20/20, exceptions 223/4/40) + staging verified (20/20, exceptions 6/1/0; journal 109→110 via local rule-compliant drizzle-kit migrate after the deploy-pipeline blockers); prd deferred by design (empty + schema-stale). PR #963 merged (3 gate rounds); `complete` fired, Fixed In 08c5cf82d, children pre-swept. Detours: WI-649 (dev journal drift), CF-secrets fix + BUG-12 P1 capture (deploy pipeline) |
-| WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | backlog-gated |
+| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #963). Dev + staging seeded and verified green; prd deferred. Detours: WI-649, CF-secrets fix, BUG-12 P1 capture |
+| WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | **in-progress (plan phase)** — executor dispatched 2026-06-11 (`wi586-executor`) on WI-585's close, with a MANDATORY plan-phase stop before implementation: cutover-scope mapping (no runtime code reads the new tables yet), orphan-column re-homing (conversation_language actively read), ownerless disposal, pre-drop reseed runbook, prod chain via blocked pipeline. Bridged earlier (Assisted; children WI-631/632) |
 
 ---
 
