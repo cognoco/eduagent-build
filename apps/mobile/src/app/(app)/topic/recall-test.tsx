@@ -84,11 +84,16 @@ export default function RecallTestScreen() {
   const cleanupRef = useRef<(() => void) | null>(null);
   const dontRememberPendingRef = useRef(false);
   const submissionInFlightRef = useRef(false);
+  // [F-172] Single shared gate that prevents handleSend and handleDontRemember
+  // from racing each other. Both handlers check and set this before firing.
+  const anySubmissionInFlightRef = useRef(false);
   const releaseSubmissionBlock = useCallback(() => {
     submissionInFlightRef.current = false;
+    anySubmissionInFlightRef.current = false;
   }, []);
   const releaseDontRememberBlock = useCallback(() => {
     dontRememberPendingRef.current = false;
+    anySubmissionInFlightRef.current = false;
   }, []);
   // Token bumped whenever the user abandons an in-flight submission (timeout
   // retry). Callbacks captured by an older mutate() check this before applying
@@ -108,7 +113,13 @@ export default function RecallTestScreen() {
   const handleSend = useCallback(
     (text: string) => {
       if (!topicId) return;
-      if (submissionInFlightRef.current || isStreaming) return;
+      if (
+        anySubmissionInFlightRef.current ||
+        submissionInFlightRef.current ||
+        isStreaming
+      )
+        return;
+      anySubmissionInFlightRef.current = true;
       submissionInFlightRef.current = true;
 
       // Add user message
@@ -204,7 +215,13 @@ export default function RecallTestScreen() {
 
   const handleDontRemember = useCallback(() => {
     if (!topicId) return;
-    if (dontRememberPendingRef.current || isStreaming) return;
+    if (
+      anySubmissionInFlightRef.current ||
+      dontRememberPendingRef.current ||
+      isStreaming
+    )
+      return;
+    anySubmissionInFlightRef.current = true;
     dontRememberPendingRef.current = true;
     setDontRememberPending(true);
 

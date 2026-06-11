@@ -126,7 +126,12 @@ export default function VocabularyListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
+  const { subjectId: rawSubjectId } = useLocalSearchParams<{
+    subjectId: string | string[];
+  }>();
+  const subjectId = Array.isArray(rawSubjectId)
+    ? rawSubjectId[0]
+    : rawSubjectId;
   const vocabularyQuery = useVocabulary(subjectId ?? '');
   const deleteVocabulary = useDeleteVocabulary(subjectId ?? '');
   const subjectsQuery = useSubjects();

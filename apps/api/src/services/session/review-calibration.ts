@@ -73,12 +73,17 @@ function hasCjkText(text: string): boolean {
 
 function matchesNonAnswerPhrase(normalized: string, token: string): boolean {
   if (token.length <= 2) return normalized === token;
-  return normalized === token || normalized.includes(token);
+  if (normalized === token) return true;
+  // Whole-word/phrase guard: the token must be flanked by string boundaries or
+  // whitespace so short tokens like 'nah' don't match inside words like 'nahe',
+  // and 'nada' doesn't match inside 'granada'. Prevents locale false positives.
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`).test(normalized);
 }
 
 export function isSubstantiveCalibrationAnswer(
   text: string,
-  conversationLanguage?: ConversationLanguage
+  conversationLanguage?: ConversationLanguage,
 ): boolean {
   const normalized = normalizeAnswer(text);
   if (!normalized) return false;

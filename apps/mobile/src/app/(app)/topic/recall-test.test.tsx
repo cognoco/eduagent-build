@@ -496,6 +496,23 @@ describe('RecallTestScreen', () => {
     });
   });
 
+  it('[F-172] pressing dont-remember while handleSend is in-flight fires mutate only once total', async () => {
+    // Arrange: first mutate() is deferred so the in-flight flag stays set.
+    queuedRecallResults = ['defer' as unknown as Record<string, unknown>];
+
+    render(<RecallTestScreen />);
+
+    // Act: fire handleSend (sets submissionInFlightRef) — deferred, stays pending.
+    fireEvent.press(screen.getByTestId('mock-send-button'));
+    expect(mockRecallMutate).toHaveBeenCalledTimes(1);
+
+    // Act: immediately fire handleDontRemember — should be blocked by shared guard.
+    fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
+
+    // Assert: second mutate() must NOT have fired.
+    expect(mockRecallMutate).toHaveBeenCalledTimes(1);
+  });
+
   it('[LEARN-14] Relearn CTA still navigates (to picker) when subjectId is fully unresolved — no silent no-op', async () => {
     mockSearchParams = { topicId: 'topic-1' };
     mockResolveResult = undefined;

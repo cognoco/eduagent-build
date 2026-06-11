@@ -4,8 +4,8 @@ describe('isSubstantiveCalibrationAnswer', () => {
   it('accepts a meaningful recall answer', () => {
     expect(
       isSubstantiveCalibrationAnswer(
-        'Photosynthesis turns sunlight, water, and carbon dioxide into glucose.'
-      )
+        'Photosynthesis turns sunlight, water, and carbon dioxide into glucose.',
+      ),
     ).toBe(true);
   });
 
@@ -29,8 +29,8 @@ describe('isSubstantiveCalibrationAnswer', () => {
   it('rejects longer explicit non-answer phrases', () => {
     expect(
       isSubstantiveCalibrationAnswer(
-        "I don't remember any of this, it's been ages."
-      )
+        "I don't remember any of this, it's been ages.",
+      ),
     ).toBe(false);
   });
 
@@ -38,8 +38,26 @@ describe('isSubstantiveCalibrationAnswer', () => {
     expect(
       isSubstantiveCalibrationAnswer(
         '光合成は植物が光を使って栄養を作る仕組みです',
-        'ja'
-      )
+        'ja',
+      ),
+    ).toBe(true);
+  });
+
+  it('[F-161] does not reject answers whose words merely contain a non-answer token as a substring', () => {
+    // German: 'nah' is a non-answer token but 'nahe' is a legitimate German word (meaning 'close')
+    expect(
+      isSubstantiveCalibrationAnswer(
+        'Fotosynthese ist nahe am Herzen der Biologie und produziert Sauerstoff',
+        'de',
+      ),
+    ).toBe(true);
+
+    // Spanish: 'nada' is a non-answer token but appears inside the word 'granada'
+    expect(
+      isSubstantiveCalibrationAnswer(
+        'En Granada, la arquitectura islamica refleja siglos de historia cultural',
+        'es',
+      ),
     ).toBe(true);
   });
 });
