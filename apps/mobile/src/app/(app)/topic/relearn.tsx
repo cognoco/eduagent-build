@@ -409,7 +409,9 @@ export default function RelearnScreen() {
       >
         <Ionicons name="arrow-back" size={26} className="text-primary" />
       </Pressable>
-      <Text className="text-h2 font-bold text-text-primary">Relearn Topic</Text>
+      <Text className="text-h2 font-bold text-text-primary">
+        {t('relearn.title')}
+      </Text>
     </View>
   );
 
@@ -429,7 +431,7 @@ export default function RelearnScreen() {
             accessibilityLabel="Retry"
           >
             <Text className="text-body-sm font-semibold text-primary">
-              Retry
+              {t('common.retry')}
             </Text>
           </Pressable>
         ) : null}
@@ -449,7 +451,7 @@ export default function RelearnScreen() {
             accessibilityLabel={t('common.loading')}
           />
           <Text className="mt-3 text-body text-text-secondary">
-            Loading review topics...
+            {t('relearn.loadingReviewTopics')}
           </Text>
         </View>
       </View>
@@ -475,7 +477,7 @@ export default function RelearnScreen() {
             accessibilityLabel="Retry"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Retry
+              {t('common.retry')}
             </Text>
           </Pressable>
         </View>
@@ -509,7 +511,7 @@ export default function RelearnScreen() {
             accessibilityLabel="Go back"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Go back
+              {t('common.goBackAction')}
             </Text>
           </Pressable>
         </View>
@@ -530,7 +532,7 @@ export default function RelearnScreen() {
             accessibilityLabel={t('common.loading')}
           />
           <Text className="mt-3 text-body text-text-secondary">
-            Starting relearn session...
+            {t('relearn.startingSession')}
           </Text>
           <Pressable
             onPress={() => {
@@ -545,7 +547,7 @@ export default function RelearnScreen() {
             accessibilityLabel="Cancel"
           >
             <Text className="text-body font-semibold text-text-primary">
-              Cancel
+              {t('common.cancel')}
             </Text>
           </Pressable>
         </View>
@@ -580,8 +582,9 @@ export default function RelearnScreen() {
                 {subject.subjectName}
               </Text>
               <Text className="mt-1 text-body-sm text-text-secondary">
-                {subject.overdueCount} overdue topic
-                {subject.overdueCount === 1 ? '' : 's'}
+                {t('relearn.overdueTopicCount', {
+                  count: subject.overdueCount,
+                })}
               </Text>
             </Pressable>
           ))}
@@ -615,8 +618,7 @@ export default function RelearnScreen() {
                     {topic.topicTitle}
                   </Text>
                   <Text className="mt-1 text-body-sm text-text-secondary">
-                    {topic.overdueDays} day{topic.overdueDays === 1 ? '' : 's'}{' '}
-                    overdue
+                    {t('relearn.daysOverdue', { count: topic.overdueDays })}
                   </Text>
                 </Pressable>
               ))}

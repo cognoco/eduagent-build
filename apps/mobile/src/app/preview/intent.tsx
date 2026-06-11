@@ -1,6 +1,7 @@
 // TODO(telemetry): preview_intent_seen / preview_intent_selected / preview_topic_seen / preview_topic_entered / preview_value_prop_seen / preview_value_prop_cta — see docs/plans/2026-05-19-trial-intent-save-onboarding-v0.md MEDIUM-C3
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -44,6 +45,7 @@ const OPTIONS: ReadonlyArray<Option> = [
 ];
 
 export default function PreviewIntentScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [submitting, setSubmitting] = useState(false);
@@ -122,14 +124,14 @@ export default function PreviewIntentScreen() {
         accessibilityLabel="Go back"
       >
         <Text className="text-body-sm font-semibold text-primary">
-          Back to sign in
+          {t('preview.backToSignIn')}
         </Text>
       </Pressable>
       <Text className="text-h1 font-bold text-text-primary mb-2 text-center">
-        Who are you setting this up for?
+        {t('preview.intentQuestion')}
       </Text>
       <Text className="text-body text-text-secondary mb-8 text-center">
-        We&apos;ll tailor what you see next.
+        {t('preview.intentHint')}
       </Text>
       {OPTIONS.map((opt) => (
         <Pressable

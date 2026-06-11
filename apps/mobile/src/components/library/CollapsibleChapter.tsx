@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
@@ -23,6 +24,7 @@ export function CollapsibleChapter({
   initiallyExpanded,
   onTopicPress,
 }: CollapsibleChapterProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const colors = useThemeColors();
   const sortedTopics = [...topics].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -55,7 +57,10 @@ export function CollapsibleChapter({
               {title}
             </Text>
             <Text className="text-caption text-text-secondary">
-              {topics.length} / {totalTopicCount} not started
+              {t('library.notStartedCount', {
+                count: topics.length,
+                total: totalTopicCount,
+              })}
             </Text>
           </View>
         </View>

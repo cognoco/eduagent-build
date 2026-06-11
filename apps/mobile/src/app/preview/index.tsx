@@ -1,9 +1,11 @@
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MentomateLogo } from '../../components/MentomateLogo';
 
 export default function PreviewLandingScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -21,15 +23,15 @@ export default function PreviewLandingScreen() {
         accessibilityLabel="Go back"
       >
         <Text className="text-body-sm font-semibold text-primary">
-          Back to sign in
+          {t('preview.backToSignIn')}
         </Text>
       </Pressable>
       <MentomateLogo size="lg" />
       <Text className="text-h1 font-bold text-text-primary mt-8 mb-3 text-center">
-        Try MentoMate
+        {t('preview.tryMentomate')}
       </Text>
       <Text className="text-body text-text-secondary mb-10 text-center">
-        See how it works — no sign-up needed yet.
+        {t('preview.seeHowItWorks')}
       </Text>
       <Pressable
         onPress={() => router.push('/preview/intent')}
@@ -39,7 +41,7 @@ export default function PreviewLandingScreen() {
         accessibilityLabel="Continue"
       >
         <Text className="text-body font-semibold text-text-inverse">
-          Continue
+          {t('common.continue')}
         </Text>
       </Pressable>
     </View>

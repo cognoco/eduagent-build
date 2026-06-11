@@ -33,7 +33,9 @@
     "show": "Anzeigen",
     "hide": "Ausblenden",
     "notNow": "Nicht jetzt",
-    "active": "Aktiv"
+    "active": "Aktiv",
+    "goBackAction": "Zurück",
+    "tryAgainAction": "Erneut versuchen"
   },
   "quota": {
     "parent": {
@@ -883,10 +885,18 @@
       "correctAnnounce": "Richtig! Die Antwort war {{answer}}",
       "correctAnnounceNoAnswer": "Richtig!",
       "wrongAnnounce": "Nicht ganz. Die Antwort war {{answer}}",
-      "wrongAnnounceNoAnswer": "Nicht ganz."
+      "wrongAnnounceNoAnswer": "Nicht ganz.",
+      "questionProgress": "{{current}} von {{total}}"
     },
     "results": {
-      "viewHistory": "Verlauf ansehen"
+      "viewHistory": "Verlauf ansehen",
+      "peopleIdentified": "{{score}} von {{total}} Personen erkannt",
+      "xpEarned": "+{{xp}} XP",
+      "whatYouMissed": "Was du verpasst hast",
+      "youSaid": "Deine Antwort: {{answer}}",
+      "youSkipped": "Du hast diese Frage übersprungen",
+      "noAnswer": "Du hast nicht geantwortet",
+      "playAgain": "Nochmal spielen"
     },
     "guessWhoQuestion": {
       "typeAName": "Gib einen Namen ein",
@@ -896,7 +906,9 @@
       "revealNextClue": "Nächsten Hinweis zeigen",
       "revealNextClueLabel": "Nächsten Hinweis zeigen",
       "iDontKnow": "Ich weiß nicht",
-      "iDontKnowLabel": "Ich kenne die Antwort nicht"
+      "iDontKnowLabel": "Ich kenne die Antwort nicht",
+      "clue": "Hinweis {{number}}",
+      "fallbackPrompt": "Brauchst du eine Alternative? Wähle eine:"
     }
   },
   "dictation": {
@@ -1169,8 +1181,37 @@
       },
       "mastered": "Gemeistert",
       "reviewDue": "Wiederholung bereit",
-      "topicProgressThreeState": "{{mastered}} gemeistert · {{learning}} im Lernen · {{total}} gesamt"
-    }
+      "topicProgressThreeState": "{{mastered}} gemeistert · {{learning}} im Lernen · {{total}} gesamt",
+      "badge": "Buch",
+      "missingDetails": "Fehlende Buchdetails. Bitte geh zurück und versuch es erneut.",
+      "writingYourBook": "Dein Buch wird geschrieben ...",
+      "takingLonger": "Dauert etwas länger als gewöhnlich ...",
+      "notReadyTitle": "Dieses Buch ist noch nicht fertig",
+      "notReadyHint": "Richte zuerst die Themen ein. Dann kannst du Schritt für Schritt mit dem Lernen beginnen.",
+      "setUpBook": "Dieses Buch einrichten",
+      "finishedTitle": "Du hast dieses Buch beendet",
+      "finishedBody": "Du hast alle {{count}} Themen in diesem Buch gelernt. Wiederhole sie, um sie frisch zu halten, oder geh zurück und wähle, was du als Nächstes lernen möchtest.",
+      "startReview": "▶ Wiederholung starten",
+      "startFirstLesson": "▶ Erste Lektion starten",
+      "finishError": "Dieses Buch konnte jetzt nicht beendet werden.",
+      "topics": "Themen",
+      "progressError": "Fortschritt konnte nicht geladen werden.",
+      "progressEmpty": "Starte deine erste Lektion, um hier deinen Fortschritt zu sehen.",
+      "nothingToShow": "Noch nichts anzuzeigen.",
+      "pastConversations": "Vergangene Gespräche",
+      "historyError": "Dein Verlauf konnte nicht geladen werden.",
+      "noConversations": "Noch keine Gespräche",
+      "noNotesYet": "Noch keine Notizen. Füge eine hinzu, wenn es Klick macht.",
+      "addNote": "+ Notiz hinzufügen",
+      "addFirstNote": "+ Füge deine erste Notiz für dieses Buch hinzu",
+      "backToSubject": "Zurück zum Thema →"
+    },
+    "notStartedCount": "{{count}} / {{total}} nicht begonnen",
+    "chooseTopic": "Wähle ein Thema",
+    "provenanceFrom": "Von {{name}}",
+    "recentlyAdded": "Kürzlich hinzugefügt",
+    "sessionCount_one": "{{count}} Sitzung",
+    "sessionCount_other": "{{count}} Sitzungen"
   },
   "topic": {
     "relevance": {
@@ -1196,7 +1237,17 @@
       "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal."
     },
     "lastStudied": "Zuletzt gelernt {{when}}",
-    "neverStudied": "Nie gelernt"
+    "neverStudied": "Nie gelernt",
+    "notFoundTitle": "Thema nicht gefunden",
+    "notFoundMessage": "Dieses Thema konnte nicht geöffnet werden. Bitte geh zurück und versuch es erneut.",
+    "loadErrorTitle": "Wir konnten dieses Thema nicht laden",
+    "loadErrorMessage": "Bitte versuch es erneut oder geh zurück zu deiner Bibliothek.",
+    "removedHint": "Dieses Thema wurde möglicherweise aus deinem Lehrplan entfernt.",
+    "loadingTopic": "Thema wird geladen ...",
+    "noNotesYet": "Noch keine Notizen. Füge eine hinzu, wenn es Klick macht.",
+    "noSessionsYet": "Noch keine Sitzungen. Starte unten eine!",
+    "addNote": "+ Notiz hinzufügen",
+    "addFirstNote": "+ Füge deine erste Notiz für dieses Thema hinzu"
   },
   "subject": {
     "settings": {
@@ -1784,6 +1835,15 @@
       "secondaryCtaA11y": "Dieses Thema später nochmal versuchen",
       "libraryLink": "Schau in der Zwischenzeit in deine Bibliothek",
       "libraryLinkA11y": "Deine Bibliothek ansehen"
+    },
+    "accordion": {
+      "loadErrorRetry": "Themen konnten nicht geladen werden. Tippe, um es erneut zu versuchen, oder schließe die Themenkarte.",
+      "noTopicsYet": "Noch keine Themen",
+      "browseTopics": "Themen durchsuchen"
+    },
+    "subjectRow": {
+      "hideTopics": "▴ Themen ausblenden",
+      "seeTopics": "▾ Themen anzeigen"
     }
   },
   "onboarding": {
@@ -2106,7 +2166,8 @@
       "reportGoneTitle": "Dieser Bericht ist nicht mehr verfügbar",
       "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher.",
       "testsCompleted": "Tests abgeschlossen",
-      "testPoints": "Testpunkte"
+      "testPoints": "Testpunkte",
+      "activeMinutes": "{{count}} Min."
     },
     "practiceSummary": {
       "title": "Testdetails",
@@ -2976,5 +3037,61 @@
     "ageGate": "Um das Lernen eines Kindes einzurichten, muss der Kontoinhaber 18 Jahre oder älter sein. Du kannst stattdessen dein eigenes Lernen einrichten – wähle im vorherigen Schritt „Mein Lernen“.",
     "childSaveError": "Wir haben dein Konto gespeichert, konnten aber dein Kind noch nicht hinzufügen: {{error}}",
     "confirmChildReady": "Das Profil deines Kindes ist eingerichtet. Lass uns die Eltern-Startseite öffnen."
+  },
+  "myNotes": {
+    "title": "Meine Notizen",
+    "subtitle": "Sitzungen, Notizen und gespeicherte Antworten",
+    "sortDate": "Datum",
+    "sortSubject": "Thema",
+    "noneYet": "Noch keine {{kind}}",
+    "emptyHint": "Sie werden hier angezeigt, während du lernst.",
+    "loadError": "{{kind}} konnten nicht geladen werden",
+    "loadMore": "Mehr laden"
+  },
+  "pickBook": {
+    "subjectFallback": "Thema",
+    "pickWhatInterests": "Wähle, was dich interessiert",
+    "suggestionsFailedTitle": "Vorschläge konnten nicht geladen werden",
+    "suggestionsFailedHint": "Du kannst trotzdem das Buch oder Thema eingeben, das du hinzufügen möchtest.",
+    "basedOnStudied": "Basierend auf dem, was du gelernt hast",
+    "trySomethingNew": "Probiere was Neues",
+    "somethingElse": "Etwas anderes ...",
+    "settingUp": "Wird eingerichtet ...",
+    "go": "Los",
+    "skipStart": "Überspringen – trotzdem mit dem Lernen beginnen",
+    "missingSubject": "Fehlendes Thema. Bitte geh zurück und versuch es erneut.",
+    "takingLonger": "Das dauert etwas länger als gewöhnlich ..."
+  },
+  "relearn": {
+    "title": "Thema wiederholen",
+    "loadingReviewTopics": "Wiederholungsthemen werden geladen ...",
+    "startingSession": "Wiederholungssitzung wird gestartet ...",
+    "overdueTopicCount_one": "{{count}} überfälliges Thema",
+    "overdueTopicCount_other": "{{count}} überfällige Themen",
+    "daysOverdue_one": "{{count}} Tag überfällig",
+    "daysOverdue_other": "{{count}} Tage überfällig"
+  },
+  "preview": {
+    "backToSignIn": "Zurück zum Anmelden",
+    "tryMentomate": "MentoMate testen",
+    "seeHowItWorks": "Sieh, wie es funktioniert – noch keine Anmeldung nötig.",
+    "bothQuestion": "Was möchtest du zuerst einrichten?",
+    "bothHint": "Du kannst beides tun – wähle, wo du anfangen möchtest.",
+    "intentQuestion": "Für wen richtest du das ein?",
+    "intentHint": "Wir passen die nächsten Schritte für dich an.",
+    "pickSampleLesson": "Wähle eine Probelektion",
+    "safePreviews": "Dies sind sichere Vorschauen. Dein eigenes Thema kommt nach der Anmeldung.",
+    "signUpChild": "Melde dich an, um dein Kind einzurichten",
+    "signUpLesson": "Melde dich an, um deine erste Lektion zu starten",
+    "signUpLessonTopic": "Melde dich an, um deine erste Lektion zu {{topic}} zu starten",
+    "trySampleFirst": "Probiere zuerst eine Probelektion",
+    "howTeaches": "So unterrichtet MentoMate",
+    "howHelpsFamilies": "So hilft MentoMate Familien",
+    "conversationPitch": "Ein Gespräch hin und her, das sich an dem orientiert, was du wirklich brauchst – kein fester Lehrplan.",
+    "weeklyReadPitch": "Du richtest dein Kind ein, es lernt, und du erhältst wöchentlich einen kurzen Bericht darüber, woran es arbeitet. Keine Überwachung, nur ein Signal.",
+    "weeklyHighlight": "Wöchentliches Highlight",
+    "sampleBadge": "Beispiel",
+    "sampleDataNote": "Beispieldaten – die echten Einblicke deines Kindes erscheinen nach der ersten Sitzung.",
+    "sampleWeeklyBody": "Übte quadratische Gleichungen für 45 Minuten in drei Sitzungen. Wird sicherer beim Faktorisieren; arbeitet an der quadratischen Ergänzung."
   }
 }

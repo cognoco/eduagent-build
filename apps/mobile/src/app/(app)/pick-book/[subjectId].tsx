@@ -312,7 +312,7 @@ export default function PickBookScreen(): React.ReactElement {
         testID="pick-book-missing-param"
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          Missing subject. Please go back and try again.
+          {t('pickBook.missingSubject')}
         </Text>
         <Pressable
           onPress={handleBack}
@@ -320,7 +320,7 @@ export default function PickBookScreen(): React.ReactElement {
           testID="pick-book-missing-param-back"
         >
           <Text className="text-text-primary text-body font-semibold">
-            Go back
+            {t('common.goBackAction')}
           </Text>
         </Pressable>
       </View>
@@ -348,7 +348,7 @@ export default function PickBookScreen(): React.ReactElement {
             className="text-body-sm text-text-secondary text-center mt-2"
             testID="pick-book-loading-slow"
           >
-            This is taking a bit longer than usual...
+            {t('pickBook.takingLonger')}
           </Text>
         ) : null}
         <Pressable
@@ -357,7 +357,9 @@ export default function PickBookScreen(): React.ReactElement {
           accessibilityLabel="Go back"
           testID="pick-book-loading-back"
         >
-          <Text className="text-body font-semibold text-primary">Go back</Text>
+          <Text className="text-body font-semibold text-primary">
+            {t('common.goBackAction')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -437,12 +439,12 @@ export default function PickBookScreen(): React.ReactElement {
             className="text-h1 font-bold text-text-primary flex-1"
             numberOfLines={1}
           >
-            {subject?.name ?? 'Subject'}
+            {subject?.name ?? t('pickBook.subjectFallback')}
           </Text>
         </View>
 
         <Text className="text-body text-text-secondary mb-6">
-          Pick what interests you
+          {t('pickBook.pickWhatInterests')}
         </Text>
 
         {canContinueWithoutSuggestions ? (
@@ -451,10 +453,10 @@ export default function PickBookScreen(): React.ReactElement {
             testID="pick-book-suggestions-inline-error"
           >
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Suggestions did not load
+              {t('pickBook.suggestionsFailedTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary mb-3">
-              You can still type the book or topic you want to add.
+              {t('pickBook.suggestionsFailedHint')}
             </Text>
             <Pressable
               onPress={() => void suggestionsQuery.refetch()}
@@ -464,7 +466,7 @@ export default function PickBookScreen(): React.ReactElement {
               accessibilityLabel="Try again"
             >
               <Text className="text-body font-semibold text-primary">
-                Try again
+                {t('common.tryAgainAction')}
               </Text>
             </Pressable>
           </View>
@@ -493,7 +495,7 @@ export default function PickBookScreen(): React.ReactElement {
         {hasAnyBook && relatedSuggestions.length > 0 && (
           <View className="mb-6" testID="pick-book-suggestion-section-related">
             <Text className="text-h3 font-semibold text-text-primary mb-3">
-              Based on what you&apos;ve studied
+              {t('pickBook.basedOnStudied')}
             </Text>
             <View className="flex-row flex-wrap gap-3">
               {relatedSuggestions.map((suggestion) => (
@@ -513,7 +515,7 @@ export default function PickBookScreen(): React.ReactElement {
         {hasAnyBook && exploreSuggestions.length > 0 && (
           <View className="mb-6" testID="pick-book-suggestion-section-explore">
             <Text className="text-h3 font-semibold text-text-primary mb-3">
-              Try something new
+              {t('pickBook.trySomethingNew')}
             </Text>
             <View className="flex-row flex-wrap gap-3">
               {exploreSuggestions.map((suggestion) => (
@@ -570,7 +572,7 @@ export default function PickBookScreen(): React.ReactElement {
                 accessibilityLabel="Try again"
               >
                 <Text className="text-body font-semibold text-primary">
-                  Try again
+                  {t('common.tryAgainAction')}
                 </Text>
               </Pressable>
             ) : null}
@@ -609,7 +611,9 @@ export default function PickBookScreen(): React.ReactElement {
                 testID="pick-book-custom-submit"
               >
                 <Text className="text-text-inverse text-body font-semibold">
-                  {filing.isPending ? 'Setting up...' : 'Go'}
+                  {filing.isPending
+                    ? t('pickBook.settingUp')
+                    : t('pickBook.go')}
                 </Text>
               </Pressable>
               <Pressable
@@ -635,7 +639,7 @@ export default function PickBookScreen(): React.ReactElement {
             accessibilityLabel="Something else"
           >
             <Text className="text-body text-text-secondary">
-              Something else...
+              {t('pickBook.somethingElse')}
             </Text>
           </Pressable>
         )}
@@ -676,7 +680,7 @@ export default function PickBookScreen(): React.ReactElement {
               accessibilityLabel="Skip and start learning anyway"
             >
               <Text className="text-body font-semibold text-text-primary">
-                Skip — start learning anyway
+                {t('pickBook.skipStart')}
               </Text>
             </Pressable>
           )}

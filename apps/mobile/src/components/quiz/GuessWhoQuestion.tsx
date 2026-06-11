@@ -212,7 +212,7 @@ export function GuessWhoQuestion({
             className="rounded-card bg-surface p-4"
           >
             <Text className="text-caption font-semibold text-primary">
-              Clue {index + 1}
+              {t('quiz.guessWhoQuestion.clue', { number: index + 1 })}
             </Text>
             <Text className="mt-1 text-body text-text-primary">{clue}</Text>
           </View>
@@ -292,7 +292,7 @@ export function GuessWhoQuestion({
       {canShowFallback ? (
         <View className="gap-3">
           <Text className="text-body-sm font-semibold text-text-secondary">
-            Need a fallback? Pick one:
+            {t('quiz.guessWhoQuestion.fallbackPrompt')}
           </Text>
           {fallbackOptions.map((option, index) => (
             <Pressable
