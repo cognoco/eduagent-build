@@ -74,9 +74,14 @@ function hasCjkText(text: string): boolean {
 function matchesNonAnswerPhrase(normalized: string, token: string): boolean {
   if (token.length <= 2) return normalized === token;
   if (normalized === token) return true;
-  // Whole-word/phrase guard: the token must be flanked by string boundaries or
-  // whitespace so short tokens like 'nah' don't match inside words like 'nahe',
-  // and 'nada' doesn't match inside 'granada'. Prevents locale false positives.
+  // CJK scripts have no word separators — substring matching is correct and
+  // safe because CJK non-answer tokens are distinct phrases (e.g. わかりません)
+  // that would only appear embedded in a longer response in a meaningful
+  // context (e.g. わかりませんでした already IS a non-answer admission).
+  if (hasCjkText(normalized)) return normalized.includes(token);
+  // Latin/Cyrillic/etc.: whole-word/phrase guard. The token must be flanked by
+  // string boundaries or whitespace so short tokens like 'nah' don't match
+  // inside words like 'nahe', and 'nada' doesn't match inside 'granada'.
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`).test(normalized);
 }

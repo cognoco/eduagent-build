@@ -60,4 +60,20 @@ describe('isSubstantiveCalibrationAnswer', () => {
       ),
     ).toBe(true);
   });
+
+  it('[F-161] still rejects CJK non-answers that contain the token as an embedded substring (no word separators)', () => {
+    // わかりません is a non-answer token for 'ja'. わかりませんでした includes it
+    // as a grammatical extension — still a non-answer admission.
+    expect(isSubstantiveCalibrationAnswer('わかりませんでした', 'ja')).toBe(
+      false,
+    );
+
+    // A substantive Japanese answer that does NOT contain the token is accepted.
+    expect(
+      isSubstantiveCalibrationAnswer(
+        '光合成は植物が太陽の光を使ってエネルギーを作るプロセスです',
+        'ja',
+      ),
+    ).toBe(true);
+  });
 });
