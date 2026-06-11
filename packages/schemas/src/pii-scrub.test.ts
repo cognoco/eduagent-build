@@ -94,4 +94,12 @@ describe('scrubPiiPayload', () => {
     const { value } = scrubPiiPayload({ when });
     expect(value.when).toBe(when);
   });
+
+  it('walks null-prototype objects (no scrub bypass via Object.create(null))', () => {
+    const nullProto = Object.create(null) as Record<string, unknown>;
+    nullProto.sessionTranscript = KNOWN_MINOR_TEXT;
+    const { value, scrubbedPaths } = scrubPiiPayload({ nested: nullProto });
+    expect(scrubbedPaths).toEqual(['nested.sessionTranscript']);
+    expect(JSON.stringify(value)).not.toContain('Milo Janssen');
+  });
 });

@@ -46,13 +46,17 @@ export interface ScrubPiiResult<T> {
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const proto: unknown = Object.getPrototypeOf(value);
+  // Plain = null prototype (Object.create(null)), Object.prototype, or a
+  // cross-realm Object.prototype (whose own prototype is null). Anything
+  // else (Date, Map, class instances) is passed through unwalked.
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) !== null &&
-    (Object.getPrototypeOf(value) === Object.prototype ||
-      Object.getPrototypeOf(Object.getPrototypeOf(value)) === null)
+    proto === null ||
+    proto === Object.prototype ||
+    Object.getPrototypeOf(proto) === null
   );
 }
 
