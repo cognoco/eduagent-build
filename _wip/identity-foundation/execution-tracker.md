@@ -155,11 +155,11 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **reviewing** — PR #911 merged 2026-06-11 (a20a0ad50; 2 rounds incl. Codex P2 staleness bound); `complete` fired, Fixed In abb745632, children WI-604/605 pre-swept — awaiting reviewer. WI-620 captured (calibration leak) |
+| WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #911, 2 gate rounds). WI-620 captured (calibration leak) |
 | WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready (dispatch held)** — deps met; held until WI-577 merges (shared Inngest-function surface, conflict risk) |
 | WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #902). Zero bounces — children pre-swept at merge |
 | WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #900, 3 gate rounds). Eval-hook gate-gap = WI-619 (hit 3×) |
-| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **in-progress (PR open)** — PR #915 (head 8850da2ab, CI running): all 5 findings + policy-router V2 wiring + 4 regression ACs verified. Caught a real infra bug: jest.preset.js worktree-ignore made in-worktree jest runs silently vacuous (fixed in-PR; #911 touches the same file — conflict watch on second merge) |
+| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **in-progress (round 2)** — PR #915 head 5029b0fc0, CI running: Codex P2 fixed with sibling-gated fail-closed projector (envelope vocabulary present → blank; marker-free historical JSON passes), both considers folded. Also fixed in-PR: jest.preset.js worktree-ignore infra bug |
 | WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #903). Zero bounces — third consecutive clean close |
 
 ### W4 — billing + remaining (parallel track)
