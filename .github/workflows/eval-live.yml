@@ -6,6 +6,13 @@ name: Live LLM Evals
 # path: scheduled against main, label-triggered on a PR when an author wants
 # a live read, or manually via workflow_dispatch. Before this workflow they
 # ran nowhere automated (Windows-pathed local invocations only).
+#
+# Required repo labels (create in GitHub settings if missing):
+#   run-live-evals — PR label that triggers this workflow on a PR
+#   ci             — applied to auto-filed failure issues; the de-dup query
+#                    filters on it (an absent label silently breaks de-dup:
+#                    GitHub drops unknown labels on create, so duplicates
+#                    would be filed every week)
 
 on:
   schedule:
@@ -71,18 +78,18 @@ jobs:
           sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
           doppler --version
 
-      # Tier 2: real LLM calls validated against expectedResponseSchema.
-      # Flows without runLive degrade to Tier-1 behavior (see eval-llm/README).
-      - name: Tier-2 live evals
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
-        run: doppler run -- pnpm eval:llm -- --live
-
-      # Layer-1 drift guard: compare live envelope-signal distribution against
-      # the committed baseline (apps/api/eval-llm/baseline.json); exits 1 when
-      # drift exceeds tolerance (default 5pp). Non-deterministic by nature —
-      # that is WHY it lives here and not in a required PR check.
-      - name: Signal-drift check vs baseline
+      # Tier 2 + Layer-1 drift in ONE invocation: --check-baseline requires
+      # --live and runs the full live harness (real LLM calls validated
+      # against expectedResponseSchema), then compares the envelope-signal
+      # distribution against the committed baseline
+      # (apps/api/eval-llm/baseline.json); exits 1 on either a schema failure
+      # or drift beyond tolerance (default 5pp). Deliberately a single step —
+      # a separate plain `--live` step would re-run the whole credit-burning
+      # suite for no extra signal; failure attribution comes from the harness
+      # output, not a step split. Flows without runLive degrade to Tier-1
+      # behavior (see eval-llm/README). Non-deterministic by nature — that is
+      # WHY it lives here and not in a required PR check.
+      - name: Tier-2 live evals + signal-drift check
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: doppler run -- pnpm eval:llm -- --live --check-baseline
