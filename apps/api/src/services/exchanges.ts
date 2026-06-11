@@ -344,7 +344,12 @@ export interface ExchangeContext {
   continuationOpenerPhase?: 'probe' | 'score';
   /** Continuation depth chosen after the opener score. */
   continuationDepth?: 'low' | 'mid' | 'high';
-  /** Learner's display name — used to personalise the mentor's voice */
+  /**
+   * Learner's display name — used to personalise the mentor's voice.
+   * WI-580 (F-076): only populated for adult owner profiles
+   * (resolvePromptLearnerName); a minor's real name must never be sent to a
+   * third-party LLM provider.
+   */
   learnerName?: string;
   /** Interview-derived hints captured during fast-path onboarding. */
   onboardingSignals?: ExtractedInterviewSignals;

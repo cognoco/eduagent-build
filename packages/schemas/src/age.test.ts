@@ -1,6 +1,7 @@
 import {
   computeAgeBracket,
   isAdultOwner,
+  isUnambiguouslyAdult,
   type AgeBracket,
   type AgeGateRole,
 } from './age.js';
@@ -147,5 +148,27 @@ describe('AgeGateRole [BUG-208] — discriminated union, not free-form string', 
     expect(label('owner')).toBe('O');
     expect(label('child')).toBe('C');
     expect(label('impersonated-child')).toBe('I');
+  });
+});
+
+describe('isUnambiguouslyAdult', () => {
+  it('[WI-580 / F-076] treats the birth-year boundary as minor (may still be 17)', () => {
+    // 2026 - 2008 = 18 by year difference, but the learner may not have had
+    // their 18th birthday yet — fail-closed for minor-PII gating.
+    expect(isUnambiguouslyAdult(2008, 2026)).toBe(false);
+  });
+
+  it('returns true only for unambiguously 18+ birth years', () => {
+    expect(isUnambiguouslyAdult(2007, 2026)).toBe(true);
+    expect(isUnambiguouslyAdult(1990, 2026)).toBe(true);
+  });
+
+  it('returns false for clearly minor birth years', () => {
+    expect(isUnambiguouslyAdult(2012, 2026)).toBe(false);
+  });
+
+  it('is stricter than isAdultOwner at the boundary (the intended divergence)', () => {
+    expect(isAdultOwner({ role: 'owner', birthYear: 2008 }, 2026)).toBe(true);
+    expect(isUnambiguouslyAdult(2008, 2026)).toBe(false);
   });
 });

@@ -1,17 +1,22 @@
 // @inngest-admin: parent-chain (learningSessions.profileId enforced in WHERE)
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { learningSessions } from '@eduagent/database';
+import { learningSessions, sessionEvents } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { classifySubject } from '../../services/subject-classify';
 import { createLogger } from '../../services/logger';
 import { SILENT_CLASSIFY_CONFIDENCE_THRESHOLD } from '../../services/session/session-depth.config';
 
+// PII egress: No `classifyInput` field: Inngest persists event payloads
+// in its third-party event store, so the minor's raw "ask" text must never
+// ride in the event. The classify step below rehydrates the learner's
+// persisted user messages from session_events, scoped by profileId.
+// Legacy in-flight events carrying `classifyInput` still parse (z.object
+// strips unknown keys) and the field is ignored.
 const classifySilentlyEventDataSchema = z.object({
   sessionId: z.string(),
   profileId: z.string(),
-  classifyInput: z.string(),
   exchangeCount: z.number(),
 });
 
@@ -82,8 +87,7 @@ export const askSilentClassify = inngest.createFunction(
         issues,
       };
     }
-    const { sessionId, profileId, classifyInput, exchangeCount } =
-      validated.data;
+    const { sessionId, profileId, exchangeCount } = validated.data;
     const db = getStepDatabase();
 
     const existing = await step.run('check-existing', async () => {
@@ -117,9 +121,48 @@ export const askSilentClassify = inngest.createFunction(
       return { skipped: true, reason: 'already_classified' };
     }
 
-    const classification = await step.run('classify', async () =>
-      classifySubject(db, profileId, classifyInput),
-    );
+    // PII egress: Rehydrate the learner's user messages from the DB —
+    // never from the event payload. The raw text stays a local variable
+    // inside this step closure, so it is never serialized into Inngest state.
+    // Bound to the triggering exchange: a delayed or retried run must not
+    // classify from messages the learner sent AFTER the event fired, so the
+    // rehydration takes only the first `exchangeCount` user messages (one
+    // user message per exchange; session_events rows are append-only and
+    // immutable, so that prefix is stable however late the run executes).
+    const messageLimit = Math.max(1, Math.floor(exchangeCount));
+    const classification = await step.run('classify', async () => {
+      const rows = await db
+        .select({ content: sessionEvents.content })
+        .from(sessionEvents)
+        .where(
+          and(
+            eq(sessionEvents.sessionId, sessionId),
+            eq(sessionEvents.profileId, profileId),
+            eq(sessionEvents.eventType, 'user_message'),
+          ),
+        )
+        .orderBy(asc(sessionEvents.createdAt), asc(sessionEvents.id))
+        .limit(messageLimit);
+      const classifyInput = rows
+        .map((row) => row.content)
+        .filter(Boolean)
+        .join('\n');
+      if (!classifyInput) return null;
+      return classifySubject(db, profileId, classifyInput);
+    });
+
+    if (!classification) {
+      await step.sendEvent('classification-no-user-messages', {
+        name: 'app/ask.classification_skipped',
+        data: {
+          sessionId,
+          exchangeCount,
+          reason: 'no_user_messages',
+          topConfidence: 0,
+        },
+      });
+      return { skipped: true, reason: 'no_user_messages' };
+    }
 
     const topCandidate = [...classification.candidates]
       .sort((left, right) => right.confidence - left.confidence)

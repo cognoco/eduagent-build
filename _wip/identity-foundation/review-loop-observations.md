@@ -231,6 +231,18 @@ productionization implication.
   unmerged PR + children, residual defect (valid), evidence form — four
   different classes on one WI.
 
+- **2026-06-11 — WI-583 closed on pass 5: the loop's stress test ended
+  convergent.** Final tally for the hardest WI: 2 PRs (#876 held + reworked,
+  #897 follow-up), 4 bounces in 4 distinct classes, 3 genuinely distinct code
+  defects caught across three independent reviewers (merge-gate: payload
+  divergence; Cosmo reviewer: stale pre-tx read; Codex: missing row-level
+  serialization), 1 evidence-form round. Every bounce made the artifact
+  better; nothing was rubber-stamped; the loop never needed a human after the
+  one CODEOWNERS ruling. Cost: ~5 review passes and ~6 executor rounds for
+  one P1 WP — acceptable for billing-correctness code, far too heavy as a
+  default. *Production:* per-risk-class DoD depth (this WI deserved the full
+  gauntlet; a docs WP does not) is the single highest-leverage tuning knob.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no

@@ -1,5 +1,8 @@
 import { Inngest, InngestMiddleware } from 'inngest';
 import type { Database } from '@eduagent/database';
+import { scrubPiiPayload } from '@eduagent/schemas';
+import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
 import {
   setDatabaseUrl,
   setVoyageApiKey,
@@ -91,7 +94,66 @@ const envBindingMiddleware = new InngestMiddleware({
   },
 });
 
+const piiScrubLogger = createLogger();
+
+/**
+ * PII egress: Scrubs denylisted PII payload keys from every outgoing
+ * event before it reaches Inngest's third-party event store.
+ *
+ * This is a belt-and-braces runtime ratchet, not the primary fix: dispatch
+ * sites no longer construct payloads with these fields (the consumers
+ * rehydrate from the DB by reference). A scrub firing here therefore means a
+ * regression re-introduced raw learner content into an event payload — it is
+ * escalated to Sentry, never silent. Denylist: `INNGEST_PII_PAYLOAD_KEYS`
+ * in @eduagent/schemas (the shared W3 scrubber's canonical home).
+ *
+ * Exported for unit tests.
+ */
+export function scrubOutgoingEventPayloads<
+  T extends { name?: string; data?: unknown },
+>(payloads: ReadonlyArray<T>): { payloads: T[] } {
+  const scrubbed = payloads.map((payload) => {
+    if (payload.data === undefined || payload.data === null) return payload;
+    const result = scrubPiiPayload(payload.data);
+    if (result.scrubbedPaths.length === 0) return payload;
+    const err = new Error(
+      `[pii-scrub] denylisted PII key(s) in outgoing Inngest event payload: ${result.scrubbedPaths.join(', ')}`,
+    );
+    piiScrubLogger.error(
+      '[inngest] scrubbed PII key(s) from outgoing event payload',
+      {
+        event: payload.name,
+        scrubbedPaths: result.scrubbedPaths,
+      },
+    );
+    captureException(err, {
+      extra: {
+        site: 'inngest.piiScrubMiddleware',
+        event: payload.name,
+        scrubbedPaths: result.scrubbedPaths,
+      },
+    });
+    return { ...payload, data: result.value };
+  });
+  return { payloads: scrubbed };
+}
+
+const piiScrubMiddleware = new InngestMiddleware({
+  name: 'PII Scrub Middleware',
+  init() {
+    return {
+      onSendEvent() {
+        return {
+          transformInput({ payloads }) {
+            return scrubOutgoingEventPayloads(payloads);
+          },
+        };
+      },
+    };
+  },
+});
+
 export const inngest = new Inngest({
   id: 'eduagent',
-  middleware: [envBindingMiddleware],
+  middleware: [envBindingMiddleware, piiScrubMiddleware],
 });

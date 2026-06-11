@@ -69,13 +69,14 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **W0 done (2026-06-10):** all 11 patch-now defects shipped — `WI-549`/`WI-550`
   Closed/Done (PRs #817/#818) and `WI-551` Closed/Done (`c5c9b39bb`). Baseline
   reset `WI-569` executed + PR #845 merged (Reviewing).
-- **Execution state (Cosmo-verified 2026-06-11 midday):** **W0 + W1 fully
-  CLOSED** (549/550/551/569/570/571/572/573 all Closed/Done) — **gates G2
-  (pipeline proven) and G3 ("W1 landed") have both FIRED.** W2: `WI-574`
-  (scope-rls) Closed; `WI-575` (proxy-authority) + `WI-576` (consent-deletion)
-  Executing. W3: all six Ready (pre-bridged). W4: `WI-583` Executing, `WI-584`
-  Closed. Tail: Backlog (gated on W2∧W3∧W4). Live state: Cosmo +
-  `execution-tracker.md` §5; this is a pointer.
+- **Execution state (Cosmo-verified 2026-06-11 evening):** **W0 + W1 + W2 + W4
+  fully CLOSED** (549/550/551/569/570/571/572/573 + 574/575/576 + 583/584 all
+  Closed/Done) — **gates G2 (pipeline proven) and G3 ("W1 landed") FIRED.**
+  W3 at **3/6 Closed** (`WI-579` error-logging, `WI-580` llm-provider, `WI-582`
+  entitlement-isolation); in flight: `WI-577` (PR #911) + `WI-581`
+  (envelope-router); `WI-578` Ready. Tail: Backlog (gated on W2∧W3∧W4 — only
+  W3 remains). **G4 ("W2/W3 landed") = W3's 3 remaining units.** Live state:
+  Cosmo + `execution-tracker.md` §5; this is a pointer.
 - **Activate-when:** — (active)
 
 ### PRG-02 · Harness Hygiene — `graduated` (2026-06-11)
@@ -155,6 +156,24 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   the IF pattern (dogfood evidence in hand). Earlier parallel build allowed if
   ZDX-side capacity appears.
 
+### PRG-12 · L10n & A11y Mobile — `active` (2026-06-11)
+- **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
+  English strings routed through `t()`, screen-reader announcements + modal focus
+  + role annotations wired, pluralization on the i18n-native model, date/locale
+  fixed, the small mobile logic-bug batch cleared.
+- **Owner:** Jorn (+ PRG-12 shepherd session; agent-heavy / low-supervision —
+  the program's mechanical-sweep archetype).
+- **Depends-on:** — (out-of-radius of PRG-01, parallel-safe; no boundary events
+  imported).
+- **Decomposition:** `_wip/l10n-a11y/execution-tracker.md` (charter + 8-WP bundle
+  map + slice-time decisions). Cosmo **Workstream "L10n & A11y Mobile"** with
+  **WI-621…WI-628** (8 WPs, `Stage=Backlog`, Workstream Order 1–8).
+- **Activated 2026-06-11** — first parallel activation (queue entry 1); second
+  dogfood of the §2.1 recipe (tracker → Workstream → direct-to-WP slice → shepherd).
+  INV-1 pre-checked at slice (i18n ratchet exists, 361-entry baseline → burn-down
+  scope). Shepherd session not yet spawned.
+- **Activate-when:** — (active)
+
 ---
 
 ## Emerging — clear-out workstreams from the audit triage (firm @ Phase M)
@@ -190,8 +209,8 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 | ID | Initiative (clear-out) | Findings (bucket 3) | Blast-radius vs PRG-01 (N.1 signal; O is authority) | Activate-when (ratified 2026-06-10) |
 |---|---|---|---|---|
 | PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **split** — safe subset (CI/GHA + input-validation) gate **FIRED 06-11** (G2); auth/PII remainder after IF "W2/W3 landed" |
-| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | gate **FIRED 06-11** (G3 "W1 landed") — moot-by-refactor scan unlocked, runs before activation |
-| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | gate **FIRED 06-11** (G2 pipeline-proven) — **first-activation decision LIVE** (queue entry 1) |
+| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | **moot scan DONE 2026-06-11**: 3 moot (F-029/F-010/F-153) · 23 live · 1 partial (F-103) · INV-2 live (~153 sites) — **scope ≈ intact**, all 7 flagged candidates LIVE (`supporting-artefacts/prg-11-moot-scan.md`). Activation = human-led decomposition, ordered behind attention budget |
+| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-621…628 sliced) |
 | PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | after IF W1-inngest-wiring + W3 land |
 | PRG-14 | agent-instructions | 10 (+3 merged: F-116 + the F-151/F-157 CI/Platform fold) | partial **inside** (overlaps PRG-03) | light thread (skill-description/sync fixes) **now**; skill-building after PRG-03 B4 (AGENTS/CLAUDE converge) |
 | PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | after IF "W3 envelope-router landed"; F-110 mobile prep parallel-safe sooner |
@@ -277,14 +296,14 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 
 | # | Initiative | Gate (activate / proceed when) |
 |---|---|---|
-| 1 | **PRG-12** l10n-a11y-mobile | pipeline-proven (a few IF WIs through claim→execute→review→close cleanly) — **first parallel activation** |
+| 1 | **PRG-12** l10n-a11y-mobile | ✅ **ACTIVATED 2026-06-11** (was: pipeline-proven — first parallel activation) |
 | 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
 | 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
 | 5 | **PRG-15** errors-api | IF boundary "W3 envelope-router landed"; F-110 mobile prep parallel-safe sooner |
 | 6 | **PRG-13** security-pii-inngest | IF W1-inngest-wiring + W3 landed |
 | 7 | **PRG-10** security-pii-api | split: out-of-radius subset (CI/GHA + input-validation) at pipeline-proven; auth/PII remainder after IF "W2/W3 landed" |
-| 8 | **PRG-11** architecture | IF "W1 landed" + moot-by-refactor scan of the W1 file-touch set |
+| 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
 | 9 | **PRG-04** Cosmo top-down delivery layer | orchestrator pull on dogfood evidence (≥1 full Initiative cycle on the IF pattern) |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
@@ -331,6 +350,28 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-11 (late evening) — PRG-11 moot scan DONE: hypothesis disproven.**
+  Verdict over 28 scanned (+2 excluded-deferred F-008/F-100): **3 MOOT**
+  (F-029 consent-cycle — delivered by WI-572/576; F-010 billing facade;
+  F-153) · **23 LIVE** · **1 PARTIAL** (F-103 Challenge-Round mastery — new
+  `persistence.ts` exists but `session-exchange.ts` still holds a private
+  copy) · INV-2 LIVE (~153 jest.mock sites). All 7 charter-flagged moot
+  candidates (F-011/031/106/107/108/109/112) are LIVE — the rewrite did not
+  subsume them. PRG-11 scope stands ≈ intact; its gate chain is now fully
+  cleared, activation is an attention-budget + human-led-decomposition call.
+  Report: `supporting-artefacts/prg-11-moot-scan.md`.
+- **2026-06-11 (evening) — PRG-12 ACTIVATED + PRG-11 moot scan launched.**
+  First parallel activation, on operator go. PRG-12: tracker
+  `_wip/l10n-a11y/execution-tracker.md` (commit `9570f5b63`), Cosmo Workstream
+  **L10n & A11y Mobile**, 8 WPs sliced as **WI-621…WI-628** (Backlog, order
+  1–8; 34 findings absorbed exactly once — F-163 excluded as delivered by
+  WI-584, F-026 included, F-123/F-172 ruled to stay). INV-1 pre-check: the
+  jsx-literals ratchet exists (361-entry baseline) → scope reframed to
+  burn-down. Shepherd kickoff prompt handed to operator. PRG-11: read-only
+  moot-by-refactor scan agent launched against the full landed IF file-touch
+  set (15 merged PRs, W0–W2 + early W3/W4); report →
+  `supporting-artefacts/prg-11-moot-scan.md`. Also: IF W2 + W4 fully closed,
+  W3 at 3/6 (`WI-579`/`580`/`582`) — G4 now hangs on W3's 3 remaining units.
 - **2026-06-11 (afternoon) — PRG-02 GRADUATED.** WI-530-related items closed
   through review; HH critical path complete; outcome met (harness proven by
   IF W0–W2 live execution). Residue (~12–15 WIs) triaged in a separate operator
