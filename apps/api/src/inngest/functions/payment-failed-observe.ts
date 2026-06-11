@@ -26,6 +26,7 @@
 import { z } from 'zod';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '../../services/pii-scrub';
 
 const logger = createLogger();
 
@@ -53,7 +54,7 @@ export const paymentFailedObserve = inngest.createFunction(
     if (!parseResult.success) {
       logger.error('billing.payment_failed.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       return { status: 'schema_error' as const };
     }

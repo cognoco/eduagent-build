@@ -17,6 +17,7 @@
 
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 import {
   classificationCompletedEventSchema,
@@ -42,7 +43,12 @@ export const askClassificationCompletedObserve = inngest.createFunction(
         new Error(
           '[ask-classification-completed] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'skipped' as const, reason: 'invalid_payload' };
     }
@@ -78,7 +84,12 @@ export const askClassificationSkippedObserve = inngest.createFunction(
         new Error(
           '[ask-classification-skipped] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'skipped' as const, reason: 'invalid_payload' };
     }
@@ -114,7 +125,12 @@ export const askClassificationFailedObserve = inngest.createFunction(
         new Error(
           '[ask-classification-failed] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'skipped' as const, reason: 'invalid_payload' };
     }

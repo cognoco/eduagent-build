@@ -18,6 +18,7 @@ import {
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
@@ -39,13 +40,18 @@ export const summaryReconciliationScannedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('summary.reconciliation.scanned.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[summary-reconciliation-scanned] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }
@@ -79,13 +85,18 @@ export const summaryReconciliationRequeuedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('summary.reconciliation.requeued.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[summary-reconciliation-requeued] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }

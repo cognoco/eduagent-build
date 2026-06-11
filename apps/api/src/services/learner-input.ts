@@ -131,7 +131,9 @@ async function parseLearnerInputToAnalysis(
       captureException(parseErr, {
         extra: {
           site: 'parseLearnerInputToAnalysis.jsonParse',
-          rawResponseTrunc: result.response.slice(0, 200),
+          // Length only — no learner-derived LLM output
+          // content to Sentry.
+          responseLength: result.response.length,
         },
       });
       return fallbackAnalysis(text, source);
@@ -142,7 +144,9 @@ async function parseLearnerInputToAnalysis(
         extra: {
           site: 'parseLearnerInputToAnalysis.safeParse',
           issues: validated.error.issues,
-          rawResponseTrunc: result.response.slice(0, 200),
+          // Length only — Zod issues already carry field
+          // paths (not values) for debugging.
+          responseLength: result.response.length,
         },
       });
       return fallbackAnalysis(text, source);

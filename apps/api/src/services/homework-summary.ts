@@ -134,7 +134,9 @@ export function parseHomeworkSummaryResponse(
     captureException(err, {
       extra: {
         site: 'parseHomeworkSummaryResponse',
-        rawResponseTrunc: response.slice(0, 80), // Limit raw LLM output in Sentry payload; avoids leaking learner content.
+        // Length only — even a truncated slice of LLM
+        // output can leak learner content to Sentry.
+        responseLength: response.length,
       },
     });
     return fallback;

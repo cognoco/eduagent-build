@@ -26,6 +26,9 @@ import {
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
+// summarizeRawPayload moved to its canonical home in
+// services/pii-scrub.ts (shared by every observe handler's drift path).
+import { summarizeRawPayload } from '../../services/pii-scrub';
 
 const logger = createLogger();
 
@@ -37,17 +40,6 @@ function summarizeReason(reason: unknown) {
   return {
     reasonPresent: typeof reason === 'string' ? reason.length > 0 : false,
     reasonLength: typeof reason === 'string' ? reason.length : 0,
-  };
-}
-
-function summarizeRawPayload(rawData: unknown) {
-  if (!isRecord(rawData)) {
-    return { payloadType: Array.isArray(rawData) ? 'array' : typeof rawData };
-  }
-
-  return {
-    payloadType: 'object',
-    fieldCount: Object.keys(rawData).length,
   };
 }
 

@@ -24,6 +24,7 @@
 import { emailBouncedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
@@ -39,13 +40,18 @@ export const emailBouncedObserve = inngest.createFunction(
     if (!parseResult.success) {
       logger.error('email.bounced.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data, // `to` is pre-masked by sender (resend-webhook.ts:maskEmail)
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[email-bounced] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parseResult.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parseResult.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }

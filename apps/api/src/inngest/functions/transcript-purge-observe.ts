@@ -20,6 +20,7 @@ import {
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
@@ -51,13 +52,18 @@ export const sessionPurgeDelayedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('session.purge.delayed.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[session-purge-delayed] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }
@@ -88,13 +94,18 @@ export const sessionTranscriptPurgedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('session.transcript.purged.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[session-transcript-purged] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }
@@ -131,13 +142,18 @@ export const sessionTranscriptPurgeSkippedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('session.transcript.purge.skipped.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[session-transcript-purge-skipped] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }

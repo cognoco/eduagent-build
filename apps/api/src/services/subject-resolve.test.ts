@@ -296,3 +296,42 @@ describe('resolveSubjectName', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// [F-140 / WI-579] Fallback catch must not forward raw learner input to Sentry
+// ---------------------------------------------------------------------------
+
+describe('[F-140 / WI-579] fallback catch leaks no raw learner input', () => {
+  const SENTINEL = 'My Embarrassing Private Subject About Tommy';
+
+  it('[BREAK] captureException extra carries rawInputLength, never rawInput', async () => {
+    // Balanced braces but invalid JSON (`undefined` is not a JSON token) —
+    // JSON.parse throws and the [BUG-462] catch branch fires.
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: '{"status": undefined}',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+      stopReason: 'stop',
+    });
+
+    const result = await resolveSubjectName(SENTINEL);
+    expect(result.status).toBe('no_match');
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'subject-resolve.fallback',
+          rawInputLength: SENTINEL.length,
+        }),
+      }),
+    );
+    // Neither the Sentry call nor the structured warn log may carry the
+    // learner's raw input.
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain(
+      SENTINEL,
+    );
+    expect(JSON.stringify(mockLoggerWarn.mock.calls)).not.toContain(SENTINEL);
+  });
+});
