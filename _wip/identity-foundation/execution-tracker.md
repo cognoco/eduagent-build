@@ -175,7 +175,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **in-progress** — executor dispatched 2026-06-11 (`wi585-executor`) on WI-578's close; HARD STOP armed before any shared-DB write (verify-first matrix → go/no-go) |
+| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **in-progress (conditional GO issued)** — HARD STOP honored: PR #963 open (migration 0109, idempotent/convergent, rollback=truncate; verify script red-green proven); read-only matrix clean (prd EMPTY + schema-stale → vacuous). Shepherd staged go: dev now → merge gate → merge=staging write → verify; prd deferred. Ownerless-account skip accepted (disposal ruling → WI-586) |
 | WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | backlog-gated |
 
 ---
