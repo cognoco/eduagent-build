@@ -112,6 +112,37 @@ productionization implication.
   *Production:* the shepherd (or harness) should own all cross-turn waits —
   executors report state and end; wake-ups are the coordinator's job.
 
+- **2026-06-11 — the children gate flipped direction (WI-575 bounce).** Earlier
+  reviewer passes (WI-570/572/574) swept provenance children closed themselves;
+  this pass instead REJECTED the parent because WI-600/601 sat at Captured —
+  "DoD requires WP children bulk-closed with the same Fixed In before parent
+  closure" — while explicitly confirming the code evidence was fine. So the
+  children inconsistency logged earlier now has both polarities: sometimes the
+  reviewer sweeps, sometimes it demands pre-swept children. Shepherd swept the
+  two children (Closed/Done, parent's Fixed In) and restored Stage=Reviewing
+  with a `[shepherd:rework]` comment; turnaround minutes. *Production:* same
+  conclusion as before, now stronger — the sweep must be mechanical in ONE
+  place, and the natural place is `/cosmo:execute complete` (executor side),
+  so review always sees children done.
+- **2026-06-11 — delegated merge authority collided with a human-only gate
+  (PR #876, billing).** The WI-583 rework was shepherd-verified green, but the
+  merge failed: `**/billing/**` is CODEOWNERS-matched and branch protection
+  enforces `require_code_owner_reviews` (WI-538 landed) — and the PR author is
+  the same identity the agents operate as, who cannot self-approve. The
+  shepherd correctly stopped rather than `--admin`-bypass a deliberately-
+  installed human gate. Knock-on: the reviewer bounced WI-583 for the unmerged
+  PR — the WI is now in a loop no agent can exit (review demands merged; merge
+  demands a human). *Production:* the orchestration needs a "blocked-on-human"
+  terminal state distinct from rework, and the agent identity model must
+  account for CODEOWNERS self-approval rules (separate reviewer identity, or
+  route such WPs to a human-merge lane from the start).
+- **2026-06-11 — green check ≠ no findings, proven live (PR #888).** The
+  `claude-review` CHECK was green while the review COMMENT carried verdict
+  CHANGES_REQUESTED (GC6 should-fix). A merge gate keyed on checks alone would
+  have merged it; the repo's own protocol (read the comment, triage findings)
+  caught it. *Production:* the merge gate must always parse the review verdict
+  artifact, never the check colour.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no

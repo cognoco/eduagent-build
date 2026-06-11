@@ -148,8 +148,8 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #875); children WI-598/599 swept with parent |
-| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **reviewing** — PR #882 merged 2026-06-11; `complete` fired, Stage=Reviewing, awaiting autonomous reviewer |
-| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **in-progress** — PR #888 open (rebased post-#832), CI running; executor CI-waiter armed |
+| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **reviewing (resubmitted)** — PR #882 merged; first review pass verified code but bounced on the children gate (WI-600/601 still Captured); shepherd swept both to Closed/Done with parent Fixed In and restored Stage=Reviewing 2026-06-11 |
+| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **in-progress (fix round)** — PR #888 CI green but merge gate failed on Claude review CHANGES_REQUESTED (GC6 should-fix: internal mock in consent-revocation.test.ts + 1 consider); executor doing one fix round 2026-06-11 |
 
 ### W3 — PII-handling + envelope/router (critical path)
 
@@ -166,7 +166,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress (rework)** — bounced to Executing 2026-06-11 by BOTH gates: shepherd merge-gate hold (event-name/payload-schema divergence) AND the autonomous reviewer's first live rejection (stale Fixed In + a new finding: previousTier read pre-transaction, concurrency staleness). Executor reworking all of it in one round; PR #876 open |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **blocked on operator** — rework done and shepherd-verified (head ae409b565, 6/6 green, both threads dispositioned, previousTier read moved inside the transaction, unified event payload); PR #876 merge BLOCKED by branch protection: `**/billing/**` is CODEOWNERS-matched and `require_code_owner_reviews` is enforced — needs a code-owner approval (author cannot self-approve). Second review bounce 2026-06-11 cited the unmerged PR + children WI-614/615 (sweep after merge) |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer (PR #874). First WI through the full loop with zero human touches |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
@@ -197,9 +197,10 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   merged and Closed via review: WI-570 (#855), WI-571 (#860), WI-572 (#859),
   WI-573 (#867). G2 tripped earlier same day (WI-569 Closed). No review
   backlog remains.
-- **In flight (3 executors): WI-575 (PR #882 MERGED, firing `complete`) ∥
-  WI-576 (PR #888 open, CI running) ∥ WI-583 (payload-schema rework on held
-  PR #876).** WI-584 CLOSED autonomously (#874).
+- **In flight: WI-575 at Reviewing (resubmitted after children sweep) ∥
+  WI-576 executor fix round (GC6 should-fix on PR #888) ∥ WI-583 DONE but
+  PR #876 merge blocked on a code-owner approval (billing path — operator
+  decision).** WI-584 CLOSED autonomously (#874).
 - **Reviewing-loop monitor ACTIVE (this session):** a persistent poll (90s) on
   the workstream emits every Stage transition — a reviewer agent picks up
   Reviewing items autonomously; the shepherd reacts to Closed (sweep-check
