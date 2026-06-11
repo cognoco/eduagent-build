@@ -56,6 +56,10 @@
     "heading": "Decisions (resolved — no open forks)"
   },
   {
+    "file": "docs/plans/v2-plan/2026-06-10-s1-mentor-home.md",
+    "heading": "Open decision (blocks the copy-template task only)"
+  },
+  {
     "file": "docs/specs/2026-05-13-parent-child-surfaces-information-architecture.md",
     "heading": "Technical Decisions"
   },
@@ -66,9 +70,5 @@
   {
     "file": "docs/specs/2026-05-19-study-and-family-mode-navigation-FULL.md",
     "heading": "Technical Decisions"
-  },
-  {
-    "file": "docs/specs/2026-05-26-commit-pr-pipeline-gates.md",
-    "heading": "7. Decisions"
   }
 ]

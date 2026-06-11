@@ -1,6 +1,6 @@
 # Mentor-Is-The-App (V2 shell) — Implementation Plan Set
 
-**Date:** 2026-06-10 · **Status:** draft (8 phase plans + 1 anchor reference) · synced to the 2026-06-10 spec amendment (cold-start / motivation / interaction-law rulings)
+**Date:** 2026-06-10 · **Status:** draft (8 phase plans + 2 references) · synced to the 2026-06-10 spec amendment (cold-start / motivation / interaction-law rulings)
 **Spec:** [`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`](../../specs/2026-06-09-mentor-is-the-app-shell-redesign.md) (incl. Annexes B/C/D — the adversarial + end-user review amendments **and** the 2026-06-10 cold-start/motivation/interaction-law fold-in: §2 P5/P6/P7, §2.1 noticing loop, §3.1 learner cold-start, §3.2 supporter cold-start, §4.2 cross-scope pointer, §13.7 assertiveness dial, §15.14–19, Annex D — these plans are written against all of it)
 **Planner:** `.claude/skills/writing-plans/SKILL.md`
 
@@ -15,6 +15,7 @@ This folder decomposes the mentor-is-the-app shell redesign into **per-phase imp
 | File | Phase | Profile | Identity-coupled? | Gate | One-line goal |
 |---|---|---|---|---|---|
 | [`01-codebase-anchors.md`](01-codebase-anchors.md) | — | reference | — | — | The current-code anchor map (file:line) every plan cites; V2 flag-wiring recipe; shared-component inventory; screen-collapse ledger |
+| [`02-flow-map.md`](02-flow-map.md) | — | reference | — | — | The mobile-flow trigger map: who/when/why/how each current inventory row is preserved, re-homed, replaced, or retired by V2 |
 | [`2026-06-10-s0-backend-primitives.md`](2026-06-10-s0-backend-primitives.md) | **S0** | code | No | — | `mentor_activity_ledger` (`profileId`-keyed) + `writeActivityMoment()` + deterministic no-LLM `GET /now` (reads `retention_cards` as-is) |
 | [`2026-06-10-s0r-retention-gate.md`](2026-06-10-s0r-retention-gate.md) | **S0-R** | change | No | parallel; must NOT block S1/S2 | `applyRetentionUpdate()` core-SRS chokepoint over 10 writers / 7 files; behavior-preserving; break-tests + rollback |
 | [`2026-06-10-s1-mentor-home.md`](2026-06-10-s1-mentor-home.md) | **S1** | ui | No | — | New Mentor home (≤3 card feed + overflow + ever-present bar + camera + Homework chip) behind the V2 flag as "screen #89" |
@@ -114,7 +115,7 @@ Latest ADR on disk is `MMT-ADR-0019`; this set reserves the next four (the `deci
 
 ## How to use this set
 
-1. **Start with `S0`** — smallest, dark (no UI), foundational; everything else reads from it. Then `S1`/`S2` (the validation bet) with `S0-R` in parallel.
+1. **Start with `02-flow-map.md` + `S0`** — use the flow map as the coverage denominator, then build the smallest dark foundation. Every phase plan should cite the exact flow IDs it preserves, re-homes, replaces, or retires.
 2. **Stop at the evidence gate.** Do not author-execute S3+ until S1+S2's measured discovery result clears §13.6.
 3. **S4–S6 wait on the identity runway** — track `WI-530` → Phase P → baseline reset → W1/W2 before scheduling them.
 4. Each plan's `done when:` lines are the executable contract; the `## Scope` "out of scope" lists are the guardrails against scope bleed between phases.
