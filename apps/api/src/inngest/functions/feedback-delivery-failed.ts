@@ -3,32 +3,32 @@
 // [A-24] The POST /feedback route dispatches app/feedback.delivery_failed
 // when sendEmail returns { sent: false }. This function picks up that event
 // and retries delivery via Resend with up to 2 additional attempts.
+//
+// PII egress: the event carries only an opaque retryId reference — the
+// feedback free-text lives in the first-party feedback_retry_queue row
+// (written by the route in the same failure path) and is rehydrated here,
+// then the row is deleted after a successful send. The support address is
+// re-derived from config (getStepSupportEmail), never carried in the event.
 // ---------------------------------------------------------------------------
 
-import { createHash } from 'crypto';
-import { feedbackSubmissionSchema } from '@eduagent/schemas';
-import { z } from 'zod';
+import { feedbackDeliveryFailedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import {
+  getStepDatabase,
   getStepResendApiKey,
   getStepEmailFrom,
   getStepSupportEmail,
 } from '../helpers';
+import {
+  deleteFeedbackRetry,
+  getFeedbackRetry,
+} from '../../services/feedback-retry';
 import { sendEmail } from '../../services/notifications';
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
 import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 
 const logger = createLogger();
-
-// [BUG-767 / A-24] Compose from the shared route submission schema so the
-// retry consumer cannot drift from the API-facing feedback contract.
-const eventDataSchema = feedbackSubmissionSchema.extend({
-  profileId: z.string().min(1),
-  userId: z.string().min(1),
-  supportTo: z.string().email().optional(),
-  metaLines: z.string().min(1).max(2000),
-});
 
 export const feedbackDeliveryFailed = inngest.createFunction(
   {
@@ -42,7 +42,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
     // the first step.run — bare .parse() would surface as a transient
     // function failure and Inngest would retry (configured retries: 2) on a
     // permanently-bad payload. Same class as BUG-697/J-8.
-    const validated = eventDataSchema.safeParse(event.data);
+    const validated = feedbackDeliveryFailedEventSchema.safeParse(event.data);
     if (!validated.success) {
       const issues = validated.error.issues.map((issue) => ({
         path: issue.path.join('.'),
@@ -68,49 +68,50 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       );
       return { status: 'skipped' as const, reason: 'invalid_payload', issues };
     }
-    const {
-      profileId,
-      userId,
-      category,
-      message,
-      supportTo,
-      metaLines,
-      appVersion,
-      platform,
-      osVersion,
-    } = validated.data;
-
-    const categoryLabel =
-      category === 'bug'
-        ? 'Bug Report'
-        : category === 'suggestion'
-          ? 'Suggestion'
-          : 'Feedback';
+    const { retryId, profileId, userId } = validated.data;
 
     return step.run('retry-delivery', async () => {
+      const db = getStepDatabase();
+
+      // Rehydrate the parked feedback payload by its opaque id, scoped by
+      // profileId so a forged retry id cannot read another user's text.
+      const queued = await getFeedbackRetry(db, profileId, retryId);
+      if (!queued) {
+        // Row already consumed (replay after a successful send) or the
+        // enqueue never landed. Nothing to retry — observable skip per the
+        // global "no silent recovery" rule.
+        logger.warn('[feedback-delivery-failed] retry row missing — skipping', {
+          surface: 'feedback-delivery-failed',
+          reason: 'retry_row_missing',
+          profileId,
+          userId,
+        });
+        return { status: 'skipped' as const, reason: 'retry_row_missing' };
+      }
+
+      const categoryLabel =
+        queued.category === 'bug'
+          ? 'Bug Report'
+          : queued.category === 'suggestion'
+            ? 'Suggestion'
+            : 'Feedback';
+
       const resendApiKey = getStepResendApiKey();
       const emailFrom = getStepEmailFrom();
 
       // [BUG-699-FOLLOWUP] Pass a deterministic idempotency key so Inngest
-      // step retries (retries: 2) cannot deliver the same support email twice.
-      // Resend dedupes calls with matching `Idempotency-Key` within 24h.
-      // The key is bound to (profileId, eventId) so a genuinely new delivery
-      // failure for the same profile in a new run produces a fresh key.
+      // step retries (retries: 2) cannot deliver the same support email
+      // twice. Resend dedupes calls with matching `Idempotency-Key` within
+      // 24h.
       //
-      // [CR-IDEMP-FALLBACK-08] When event.id is missing, fall back to a
-      // deterministic per-payload hash so Inngest retries of the *same* event
-      // are still idempotent without colliding across distinct events.
-      // The previous `event.id ?? 'no-event'` fallback collapsed every distinct
-      // delivery failure for the same profile within Resend's 24h dedup window
-      // onto a single key (silently discarding emails 2..N). The previous fix
-      // dropped the key entirely (risking double-sends on replay). A hash of
-      // stable payload fields satisfies both constraints: no cross-event
-      // collision AND idempotent across retries of the same event.
+      // [CR-IDEMP-FALLBACK-08] When event.id is missing, key on the retryId
+      // instead — it is unique per delivery failure (no cross-event
+      // collision) and stable across retries of the same event.
       //
-      // [CR-MISSING-EVENT-ID-VISIBILITY] Per global "no silent recovery" rule,
-      // the hash-fallback path must be observable so ops can count occurrences.
-      // logger.warn makes it queryable in log aggregation; captureException
-      // surfaces it in Sentry alerts if the rate becomes significant.
+      // [CR-MISSING-EVENT-ID-VISIBILITY] Per global "no silent recovery"
+      // rule, the fallback path must be observable so ops can count
+      // occurrences: logger.warn for log aggregation, captureException for
+      // Sentry alerting at volume.
       let idempotencyKey: string;
       if (event.id) {
         idempotencyKey = buildEmailIdempotencyKey(
@@ -120,40 +121,25 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           'retry-delivery',
         );
       } else {
-        const hashInput = JSON.stringify({
-          profileId,
-          userId,
-          category,
-          message,
-          supportTo,
-          metaLines,
-          appVersion,
-          platform,
-          osVersion,
-        });
-        const hash = createHash('sha256')
-          .update(hashInput)
-          .digest('hex')
-          .slice(0, 16);
         idempotencyKey = buildEmailIdempotencyKey(
           'feedback-delivery-failed',
-          'hash',
-          hash,
+          profileId,
+          retryId,
           'retry-delivery',
         );
         logger.warn(
-          '[feedback-delivery-failed] event.id missing — falling back to payload hash idempotency key',
+          '[feedback-delivery-failed] event.id missing — falling back to retryId idempotency key',
           {
             surface: 'feedback-delivery-failed',
             reason: 'missing_event_id',
             profileId,
             userId,
-            category,
+            category: queued.category,
           },
         );
         captureException(
           new Error(
-            'feedback-delivery-failed: missing event.id — using payload hash idempotency key',
+            'feedback-delivery-failed: missing event.id — using retryId idempotency key',
           ),
           {
             extra: {
@@ -161,7 +147,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
               reason: 'missing_event_id',
               profileId,
               userId,
-              category,
+              category: queued.category,
             },
           },
         );
@@ -169,12 +155,14 @@ export const feedbackDeliveryFailed = inngest.createFunction(
 
       const result = await sendEmail(
         {
-          to: supportTo ?? getStepSupportEmail(),
+          // Re-derived from config — identical chain + default as the
+          // route's supportTo resolution.
+          to: getStepSupportEmail(),
           subject: `[MentoMate ${categoryLabel}] delivery-retry for ${profileId.slice(
             0,
             8,
           )}`,
-          body: `${message}\n\n---\n${metaLines}`,
+          body: `${queued.message}\n\n---\n${queued.metaLines}`,
           type: 'feedback',
         },
         { resendApiKey, emailFrom, idempotencyKey },
@@ -188,7 +176,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
         );
         captureException(err, {
           profileId,
-          extra: { category, reason: result.reason },
+          extra: { category: queued.category, reason: result.reason },
         });
         logger.warn('[feedback-delivery-failed] retry still failed', {
           profileId,
@@ -197,6 +185,11 @@ export const feedbackDeliveryFailed = inngest.createFunction(
         // Re-throw so Inngest retries up to the configured retry limit
         throw err;
       }
+
+      // PII hygiene: the row's purpose is fulfilled — delete it. If this
+      // delete fails the step retries; the re-send is deduped by Resend via
+      // the idempotency key above, then the delete is retried.
+      await deleteFeedbackRetry(db, retryId);
 
       return { ok: true, profileId };
     });

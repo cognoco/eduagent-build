@@ -26,51 +26,85 @@ jest.mock('../helpers' /* gc1-allow: Inngest step DB boundary */, () => {
   };
 });
 
-jest.mock('../../services/session' /* gc1-allow: service boundary */, () => ({
-  claimSessionForAutoFiling: (...args: unknown[]) =>
-    mockClaimSessionForAutoFiling(...args),
-  markSessionAutoFiled: (...args: unknown[]) =>
-    mockMarkSessionAutoFiled(...args),
-  markSessionAutoFilingFailed: (...args: unknown[]) =>
-    mockMarkSessionAutoFilingFailed(...args),
-  getSessionTranscript: (...args: unknown[]) =>
-    mockGetSessionTranscript(...args),
-}));
+jest.mock('../../services/session' /* gc1-allow: service boundary */, () => {
+  const actual = jest.requireActual(
+    '../../services/session',
+  ) as typeof import('../../services/session');
+  return {
+    ...actual,
+    claimSessionForAutoFiling: (...args: unknown[]) =>
+      mockClaimSessionForAutoFiling(...args),
+    markSessionAutoFiled: (...args: unknown[]) =>
+      mockMarkSessionAutoFiled(...args),
+    markSessionAutoFilingFailed: (...args: unknown[]) =>
+      mockMarkSessionAutoFilingFailed(...args),
+    getSessionTranscript: (...args: unknown[]) =>
+      mockGetSessionTranscript(...args),
+  };
+});
 
-jest.mock('../../services/filing' /* gc1-allow: LLM filing boundary */, () => ({
-  buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
-  fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
-  resolveFilingResult: (...args: unknown[]) => mockResolveFilingResult(...args),
-}));
+jest.mock('../../services/filing' /* gc1-allow: LLM filing boundary */, () => {
+  const actual = jest.requireActual(
+    '../../services/filing',
+  ) as typeof import('../../services/filing');
+  return {
+    ...actual,
+    buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
+    fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
+    resolveFilingResult: (...args: unknown[]) =>
+      mockResolveFilingResult(...args),
+  };
+});
 
-jest.mock(
-  '../../services/curriculum' /* gc1-allow: cleanup boundary */,
-  () => ({
+jest.mock('../../services/curriculum' /* gc1-allow: cleanup boundary */, () => {
+  const actual = jest.requireActual(
+    '../../services/curriculum',
+  ) as typeof import('../../services/curriculum');
+  return {
+    ...actual,
     deleteTopicIfSafe: (...args: unknown[]) => mockDeleteTopicIfSafe(...args),
-  }),
-);
+  };
+});
 
-jest.mock('../../services/llm' /* gc1-allow: LLM router boundary */, () => ({
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
+jest.mock('../../services/llm' /* gc1-allow: LLM router boundary */, () => {
+  const actual = jest.requireActual(
+    '../../services/llm',
+  ) as typeof import('../../services/llm');
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
+});
 
 jest.mock(
   '../../services/logger' /* gc1-allow: logger observability boundary */,
-  () => ({
-    createLogger: () => ({
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: (...args: unknown[]) => mockLoggerWarn(...args),
-      error: (...args: unknown[]) => mockLoggerError(...args),
-    }),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/logger',
+    ) as typeof import('../../services/logger');
+    return {
+      ...actual,
+      createLogger: () => ({
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: (...args: unknown[]) => mockLoggerWarn(...args),
+        error: (...args: unknown[]) => mockLoggerError(...args),
+      }),
+    };
+  },
 );
 
 jest.mock(
   '../../services/sentry' /* gc1-allow: Sentry observability boundary */,
-  () => ({
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
 );
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
