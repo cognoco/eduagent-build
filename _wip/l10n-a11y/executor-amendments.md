@@ -67,7 +67,11 @@ itself: `_wip/identity-foundation/executor-protocol.md` (phases 0–7).
     locales need (pl is the multi-category one in en/de/es/ja/nb/pl/pt) — verify the
     generated pl output actually contains `_few`/`_many` after `pnpm translate`.
     Also: `--findRelatedTests` does NOT catch `src/i18n/index.test.ts` (locale
-    parity) — run the full `src/i18n/` suite whenever locale JSONs change.
+    parity) — run the full `src/i18n/` suite whenever locale JSONs change. And it
+    does NOT catch `scripts/translate-gemini.test.ts` (source-baseline hashes) —
+    whenever an en.json VALUE changes (reword, not just addition), regenerate the
+    source-baseline entry via the tooling (never hand-edit hashes) and run the
+    full `scripts/` jest suite (learned 2026-06-11, WI-624 PR-B).
 16. **Cross-cutting sweeps need a forward-only guard from the start (learned
     2026-06-11, WI-623 bounce on `dod.cross_cutting_sweep`):** any fix touching 3+
     sibling sites must EITHER ship a forward-only guard test in the same PR
