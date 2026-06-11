@@ -243,6 +243,13 @@ export async function listFamilyMembers(
       event: 'billing.family.list_members.subscription_not_found',
       subscriptionId,
     });
+    // Sentry, not just console.warn, so the billing fallback rate is queryable.
+    captureException(new Error('listFamilyMembers: subscription not found'), {
+      extra: {
+        context: 'billing.family.list_members.subscription_not_found',
+        subscriptionId,
+      },
+    });
     return [];
   }
 
@@ -602,6 +609,16 @@ export async function downgradeAllFamilyProfiles(
       {
         event: 'billing.family.downgrade_all.subscription_not_found',
         subscriptionId,
+      },
+    );
+    // Sentry, not just console.warn, so the billing fallback rate is queryable.
+    captureException(
+      new Error('downgradeAllFamilyProfiles: subscription not found'),
+      {
+        extra: {
+          context: 'billing.family.downgrade_all.subscription_not_found',
+          subscriptionId,
+        },
       },
     );
     return [];
