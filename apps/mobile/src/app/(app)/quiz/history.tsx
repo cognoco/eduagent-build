@@ -201,8 +201,7 @@ export default function QuizHistoryScreen() {
 
   const grouped = new Map<string, typeof rounds>();
   for (const round of rounds) {
-    // Use local date components (not UTC slice) so rounds completed near midnight
-    // group under the correct local calendar day. See F-178.
+    // Local getters, not UTC slice — rounds near midnight group under the correct local day.
     const dateKey = toLocalDateString(new Date(round.completedAt));
     const group = grouped.get(dateKey) ?? [];
     group.push(round);
