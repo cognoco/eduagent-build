@@ -832,6 +832,7 @@ export default function SessionSummaryScreen() {
     wallClockMinutes,
     exchanges,
     rung,
+    t,
   });
   const milestoneLabels = buildMilestoneLabels(parsedMilestones);
   const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId ?? null;

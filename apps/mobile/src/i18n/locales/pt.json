@@ -819,6 +819,16 @@
     "inputMode": {
       "text": "Modo texto",
       "voice": "Modo voz"
+    },
+    "milestoneDots": {
+      "reached_one": "1 marco alcançado",
+      "reached_other": "{{count}} marcos alcançados"
+    },
+    "livingBook": {
+      "progressLabel_one": "Progresso do livro: {{count}} página",
+      "progressLabel_other": "Progresso do livro: {{count}} páginas",
+      "pageCount_one": "{{count}} página",
+      "pageCount_other": "{{count}} páginas"
     }
   },
   "quiz": {
@@ -1230,7 +1240,9 @@
       "bookmarks": {
         "savedFromChat": "Salvo do chat",
         "emptyShort": "Nenhum chat salvo para este tópico",
-        "emptyLong": "Ainda não há explicações salvas para este tópico."
+        "emptyLong": "Ainda não há explicações salvas para este tópico.",
+        "savedExplanations_one": "{{count}} explicação salva",
+        "savedExplanations_other": "{{count}} explicações salvas"
       },
       "challengeVerifiedBadge": "Desafio verificado",
       "practicedOftenHint": "Você pratica muito este tópico — continue assim!",
@@ -1239,7 +1251,9 @@
       },
       "covers": "Este tópico aborda",
       "mastered": "Dominado",
-      "strongReviewProgress": "{{strong}}/{{total}} revisões fortes"
+      "strongReviewProgress": "{{strong}}/{{total}} revisões fortes",
+      "notesSavedCount_one": "{{count}} nota salva para este tópico",
+      "notesSavedCount_other": "{{count}} notas salvas para este tópico"
     },
     "book": {
       "readyToOpen": "Pronto para abrir",
@@ -1275,7 +1289,9 @@
       "addFirstNote": "+ Adicione sua primeira nota para este livro",
       "backToSubject": "Voltar ao assunto →",
       "finishedBody_one": "Você estudou o único tópico deste livro. Revise-o para manter o conteúdo atualizado, ou volte e escolha o que aprender a seguir.",
-      "finishedBody_other": "Você estudou todos os {{count}} tópicos deste livro. Revise-os para manter o conteúdo atualizado, ou volte e escolha o que aprender a seguir."
+      "finishedBody_other": "Você estudou todos os {{count}} tópicos deste livro. Revise-os para manter o conteúdo atualizado, ou volte e escolha o que aprender a seguir.",
+      "notesSavedCount_one": "{{count}} nota salva para este livro",
+      "notesSavedCount_other": "{{count}} notas salvas para este livro"
     },
     "notStartedCount": "{{notStarted}} / {{total}} por começar",
     "chooseTopic": "Escolha um tópico",
@@ -1305,7 +1321,9 @@
       "stillStuck": "Ainda com dificuldade",
       "errorTitle": "Algo deu errado",
       "timeoutTitle": "Ainda aguardando…",
-      "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente."
+      "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente.",
+      "dontRememberFirst": "Não me lembro.",
+      "dontRememberAgain": "Ainda não sei."
     },
     "lastStudied": "Estudado pela última vez {{when}}",
     "neverStudied": "Nunca estudado",
@@ -1804,7 +1822,9 @@
       "goneSubtitle": "Ela pode ter sido removida ou mesclada com outra matéria.",
       "pastConversations": "Conversas anteriores",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "startedTopicsCount_one": "{{count}} tópico iniciado",
+      "startedTopicsCount_other": "{{count}} tópicos iniciados"
     },
     "vocabulary": {
       "pageTitle": "Seu Vocabulário",
@@ -2041,7 +2061,22 @@
       "subjectRawMentorSummary": "Isso começou com \"{{rawInput}}\", então {{name}} ainda pode estar encontrando o formato certo para {{subject}}.",
       "subjectRawNextStep": "Uma pequena sessão pode transformar esse interesse geral em um tópico concreto.",
       "subjectQuietSummary": "{{subject}} está pronto para quando {{name}} quiser retornar.",
-      "subjectQuietNextStep": "Comece com uma pergunta ou tópico fácil para que o recomeço seja leve."
+      "subjectQuietNextStep": "Comece com uma pergunta ou tópico fácil para que o recomeço seja leve.",
+      "timeAgo": {
+        "justNow": "agora mesmo",
+        "minutes_one": "há {{count}} min",
+        "minutes_other": "há {{count}} min",
+        "hours_one": "há {{count}} hora",
+        "hours_other": "há {{count}} horas",
+        "days_one": "há {{count}} dia",
+        "days_other": "há {{count}} dias",
+        "weeks_one": "há {{count}} semana",
+        "weeks_other": "há {{count}} semanas",
+        "months_one": "há {{count}} mês",
+        "months_other": "há {{count}} meses",
+        "years_one": "há {{count}} ano",
+        "years_other": "há {{count}} anos"
+      }
     },
     "mentorMemory": {
       "title": "Memória do mentor",
@@ -2082,7 +2117,9 @@
         "low": "Sinal inicial",
         "medium": "Padrão repetido",
         "high": "Sinal forte"
-      }
+      },
+      "attemptCount_one": "{{count}} vez notado",
+      "attemptCount_other": "{{count}} vezes notado"
     },
     "reports": {
       "title": "Relatórios",
@@ -2602,7 +2639,13 @@
     "a11yStarters": "Sugestões de início de frase",
     "a11yWriteSummary": "Escreva seu resumo do aprendizado",
     "a11ySkipSummary": "Pular o resumo",
-    "a11yStarterHint": "Toque para usar este início de frase"
+    "a11yStarterHint": "Toque para usar este início de frase",
+    "takeaways": {
+      "duration_one": "{{count}} minuto - ótima sessão!",
+      "duration_other": "{{count}} minutos - ótima sessão!",
+      "exchanges_one": "Você concluiu {{count}} troca",
+      "exchanges_other": "Você concluiu {{count}} trocas"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3176,5 +3219,15 @@
     "sampleBadge": "Amostra",
     "sampleDataNote": "Dados de amostra — os insights reais do seu filho aparecem após a primeira sessão dele.",
     "sampleWeeklyBody": "Praticou equações quadráticas por 45 minutos em três sessões. Está se familiarizando com a fatoração; trabalhando em completar o quadrado."
+  },
+  "milestoneCard": {
+    "wordCount_one": "{{count}} palavra aprendida",
+    "wordCount_other": "{{count}} palavras aprendidas",
+    "topicCount_one": "{{count}} tópico dominado",
+    "topicCount_other": "{{count}} tópicos dominados",
+    "sessionCount_one": "{{count}} sessão de aprendizagem concluída",
+    "sessionCount_other": "{{count}} sessões de aprendizagem concluídas",
+    "hourCount_one": "{{count}} hora de aprendizagem",
+    "hourCount_other": "{{count}} horas de aprendizagem"
   }
 }

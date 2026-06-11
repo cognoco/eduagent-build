@@ -21,6 +21,7 @@ import type {
   CurriculumTopic,
   RetentionStatus,
 } from '@eduagent/schemas';
+import type { Translate } from '../../../i18n';
 import { useBookWithTopics } from '../../../hooks/use-books';
 import {
   useTopicProgress,
@@ -90,6 +91,7 @@ function formatSessionDate(
 
 function formatSessionsSummary(
   sessions: { durationSeconds: number | null }[] | undefined,
+  t: Translate,
 ): string | null {
   if (!sessions || sessions.length === 0) return null;
 
@@ -101,8 +103,7 @@ function formatSessionsSummary(
     totalSeconds > 0 && totalSeconds < 60
       ? '<1'
       : String(Math.floor(totalSeconds / 60));
-  const sessionLabel = sessions.length === 1 ? 'session' : 'sessions';
-  return `${sessions.length} ${sessionLabel} · ${totalMinutes} min total`;
+  return `${t('library.sessionCount', { count: sessions.length })} · ${totalMinutes} min total`;
 }
 
 function formatBookmarkSourceLine(
@@ -403,7 +404,7 @@ export default function TopicDetailScreen() {
   const lastStudiedText = lastReviewedAt
     ? t('topic.lastStudied', { when: relativeDate(lastReviewedAt) })
     : t('topic.neverStudied');
-  const sessionsSummary = formatSessionsSummary(topicSessions);
+  const sessionsSummary = formatSessionsSummary(topicSessions, t);
   const topicBookmarks = useMemo(
     () =>
       bookmarksQuery.data?.pages.flatMap((page) => page.bookmarks ?? []) ?? [],
@@ -416,16 +417,17 @@ export default function TopicDetailScreen() {
     ? 'Loading notes...'
     : noteCount === 0
       ? 'Add your first note for this topic'
-      : noteCount === 1
-        ? '1 note saved for this topic'
-        : `${noteCount} notes saved for this topic`;
+      : t('library.topic.notesSavedCount', { count: noteCount });
   const bookmarkSummary = bookmarksQuery.isLoading
     ? 'Loading saved explanations...'
     : bookmarkCount === 0
       ? t('library.topic.bookmarks.emptyShort')
       : bookmarkCount === 1
-        ? (topicBookmarks[0]?.content ?? '1 saved explanation')
-        : `${bookmarkCount} saved explanations`;
+        ? (topicBookmarks[0]?.content ??
+          t('library.topic.bookmarks.savedExplanations', { count: 1 }))
+        : t('library.topic.bookmarks.savedExplanations', {
+            count: bookmarkCount,
+          });
   const sessionSummaryText = sessionsLoading
     ? 'Loading sessions...'
     : (sessionsSummary ?? 'No sessions yet');

@@ -8,6 +8,10 @@ import {
   parseMilestonesParam,
   resolveNumberParam,
 } from './session-summary-derived';
+import type { Translate } from '../../../i18n';
+import { translate } from '../../../test-utils/mock-i18n';
+
+const t = translate as unknown as Translate;
 
 describe('resolveNumberParam', () => {
   it('preserves an explicit zero instead of falling back', () => {
@@ -112,6 +116,7 @@ describe('buildSessionTakeaways', () => {
         wallClockMinutes: 1,
         exchanges: 0,
         rung: 1,
+        t,
       }),
     ).toEqual(['Great effort today']);
   });
@@ -123,6 +128,7 @@ describe('buildSessionTakeaways', () => {
         wallClockMinutes: 12,
         exchanges: 5,
         rung: 3,
+        t,
       }),
     ).toEqual([
       '12 minutes - great session!',

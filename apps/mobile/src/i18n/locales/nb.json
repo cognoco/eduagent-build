@@ -792,6 +792,16 @@
     "inputMode": {
       "text": "Tekstmodus",
       "voice": "Talemodus"
+    },
+    "milestoneDots": {
+      "reached_one": "1 milepæl nådd",
+      "reached_other": "{{count}} milepæler nådd"
+    },
+    "livingBook": {
+      "progressLabel_one": "Bokfremdrift: {{count}} side",
+      "progressLabel_other": "Bokfremdrift: {{count}} sider",
+      "pageCount_one": "{{count}} side",
+      "pageCount_other": "{{count}} sider"
     }
   },
   "quiz": {
@@ -1203,7 +1213,9 @@
       "bookmarks": {
         "savedFromChat": "Lagret fra chat",
         "emptyShort": "Ingen lagret chat for dette emnet ennå",
-        "emptyLong": "Ingen lagrede forklaringer for dette emnet ennå."
+        "emptyLong": "Ingen lagrede forklaringer for dette emnet ennå.",
+        "savedExplanations_one": "{{count}} lagret forklaring",
+        "savedExplanations_other": "{{count}} lagrede forklaringer"
       },
       "challengeVerifiedBadge": "Utfordring bekreftet",
       "practicedOftenHint": "Du øver ofte på dette emnet — fortsett slik!",
@@ -1212,7 +1224,9 @@
       },
       "covers": "Dette emnet dekker",
       "mastered": "Mestret",
-      "strongReviewProgress": "{{strong}}/{{total}} sterke repetisjoner"
+      "strongReviewProgress": "{{strong}}/{{total}} sterke repetisjoner",
+      "notesSavedCount_one": "{{count}} notat lagret for dette emnet",
+      "notesSavedCount_other": "{{count}} notater lagret for dette emnet"
     },
     "book": {
       "readyToOpen": "Klar til å åpne",
@@ -1248,7 +1262,9 @@
       "addFirstNote": "+ Legg til ditt første notat for denne boken",
       "backToSubject": "Tilbake til emne →",
       "finishedBody_one": "Du har studert det eneste emnet i denne boken. Repeter det for å holde det friskt i minne, eller gå tilbake og velg hva du vil lære neste gang.",
-      "finishedBody_other": "Du har studert alle de {{count}} emnene i denne boken. Repeter dem for å holde dem friske i minne, eller gå tilbake og velg hva du vil lære neste gang."
+      "finishedBody_other": "Du har studert alle de {{count}} emnene i denne boken. Repeter dem for å holde dem friske i minne, eller gå tilbake og velg hva du vil lære neste gang.",
+      "notesSavedCount_one": "{{count}} notat lagret for denne boken",
+      "notesSavedCount_other": "{{count}} notater lagret for denne boken"
     },
     "notStartedCount": "{{notStarted}} / {{total}} ikke startet",
     "chooseTopic": "Velg et tema",
@@ -1278,7 +1294,9 @@
       "stillStuck": "Sitter fortsatt fast",
       "errorTitle": "Noe gikk galt",
       "timeoutTitle": "Venter fortsatt…",
-      "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen."
+      "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen.",
+      "dontRememberFirst": "Jeg husker ikke.",
+      "dontRememberAgain": "Sitter fortsatt fast."
     },
     "lastStudied": "Sist studert {{when}}",
     "neverStudied": "Aldri studert",
@@ -1777,7 +1795,9 @@
       "goneSubtitle": "Det kan ha blitt fjernet eller slått sammen med et annet emne.",
       "pastConversations": "Tidligere samtaler",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "startedTopicsCount_one": "{{count}} emne påbegynt",
+      "startedTopicsCount_other": "{{count}} emner påbegynt"
     },
     "vocabulary": {
       "pageTitle": "Ditt vokabular",
@@ -2014,7 +2034,22 @@
       "subjectRawMentorSummary": "Dette startet fra «{{rawInput}}», så {{name}} prøver kanskje fortsatt å finne den rette formen for {{subject}}.",
       "subjectRawNextStep": "Én liten økt kan gjøre den brede interessen om til et konkret emne.",
       "subjectQuietSummary": "{{subject}} er klar når {{name}} vil vende tilbake til det.",
-      "subjectQuietNextStep": "Start med ett enkelt spørsmål eller emne, så omstarten føles lett."
+      "subjectQuietNextStep": "Start med ett enkelt spørsmål eller emne, så omstarten føles lett.",
+      "timeAgo": {
+        "justNow": "akkurat nå",
+        "minutes_one": "for {{count}} min siden",
+        "minutes_other": "for {{count}} min siden",
+        "hours_one": "for {{count}} time siden",
+        "hours_other": "for {{count}} timer siden",
+        "days_one": "for {{count}} dag siden",
+        "days_other": "for {{count}} dager siden",
+        "weeks_one": "for {{count}} uke siden",
+        "weeks_other": "for {{count}} uker siden",
+        "months_one": "for {{count}} måned siden",
+        "months_other": "for {{count}} måneder siden",
+        "years_one": "for {{count}} år siden",
+        "years_other": "for {{count}} år siden"
+      }
     },
     "mentorMemory": {
       "title": "Mentorens minne",
@@ -2055,7 +2090,9 @@
         "low": "Tidlig signal",
         "medium": "Gjentatt mønster",
         "high": "Sterkt signal"
-      }
+      },
+      "attemptCount_one": "lagt merke til {{count}} gang",
+      "attemptCount_other": "lagt merke til {{count}} ganger"
     },
     "reports": {
       "title": "Rapporter",
@@ -2575,7 +2612,13 @@
     "a11yStarters": "Forslag til setningsstartere",
     "a11yWriteSummary": "Skriv læringssammendraget ditt",
     "a11ySkipSummary": "Hopp over sammendraget",
-    "a11yStarterHint": "Trykk for å bruke denne setningsstarteren"
+    "a11yStarterHint": "Trykk for å bruke denne setningsstarteren",
+    "takeaways": {
+      "duration_one": "{{count}} minutt – flott økt!",
+      "duration_other": "{{count}} minutter – flott økt!",
+      "exchanges_one": "Du jobbet deg gjennom {{count}} utveksling",
+      "exchanges_other": "Du jobbet deg gjennom {{count}} utvekslinger"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3176,5 +3219,15 @@
     "sampleBadge": "Eksempel",
     "sampleDataNote": "Eksempeldata – barnets virkelige innsikt vises etter den første økten.",
     "sampleWeeklyBody": "Øvde på andregradsligninger i 45 minutter over tre økter. Blir komfortabel med faktorisering; jobber med å fullføre kvadratet."
+  },
+  "milestoneCard": {
+    "wordCount_one": "{{count}} ord lært",
+    "wordCount_other": "{{count}} ord lært",
+    "topicCount_one": "{{count}} emne mestret",
+    "topicCount_other": "{{count}} emner mestret",
+    "sessionCount_one": "{{count}} læringsøkt fullført",
+    "sessionCount_other": "{{count}} læringsøkter fullført",
+    "hourCount_one": "{{count}} time med læring",
+    "hourCount_other": "{{count}} timer med læring"
   }
 }

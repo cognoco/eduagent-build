@@ -808,6 +808,16 @@
     "inputMode": {
       "text": "Text mode",
       "voice": "Voice mode"
+    },
+    "milestoneDots": {
+      "reached_one": "1 milestone reached",
+      "reached_other": "{{count}} milestones reached"
+    },
+    "livingBook": {
+      "progressLabel_one": "Book progress: {{count}} page",
+      "progressLabel_other": "Book progress: {{count}} pages",
+      "pageCount_one": "{{count}} page",
+      "pageCount_other": "{{count}} pages"
     }
   },
   "quiz": {
@@ -1289,8 +1299,12 @@
       "bookmarks": {
         "savedFromChat": "Saved from chat",
         "emptyShort": "No saved chat for this topic yet",
-        "emptyLong": "No saved explanations for this topic yet."
+        "emptyLong": "No saved explanations for this topic yet.",
+        "savedExplanations_one": "{{count}} saved explanation",
+        "savedExplanations_other": "{{count}} saved explanations"
       },
+      "notesSavedCount_one": "{{count}} note saved for this topic",
+      "notesSavedCount_other": "{{count}} notes saved for this topic",
       "challengeVerifiedBadge": "Challenge verified",
       "practicedOftenHint": "You practice this topic often — keep it up!",
       "relatedRail": {
@@ -1334,6 +1348,8 @@
       "noNotesYet": "No notes yet. Add one when something clicks.",
       "addNote": "+ Add a note",
       "addFirstNote": "+ Add your first note for this book",
+      "notesSavedCount_one": "{{count}} note saved for this book",
+      "notesSavedCount_other": "{{count}} notes saved for this book",
       "backToSubject": "Back to subject →"
     },
     "notStartedCount": "{{notStarted}} / {{total}} not started",
@@ -1366,7 +1382,9 @@
       "stillStuck": "Still stuck",
       "errorTitle": "Something went wrong",
       "timeoutTitle": "Still waiting…",
-      "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again."
+      "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again.",
+      "dontRememberFirst": "I don't remember.",
+      "dontRememberAgain": "Still stuck."
     },
     "notFoundTitle": "Topic not found",
     "notFoundMessage": "This topic could not be opened. Please go back and try again.",
@@ -1908,7 +1926,9 @@
       "hideErrorTitle": "Could not hide subject",
       "goneTitle": "This subject is no longer available",
       "goneSubtitle": "It may have been removed or merged into another subject.",
-      "pastConversations": "Past conversations"
+      "pastConversations": "Past conversations",
+      "startedTopicsCount_one": "{{count}} topic started",
+      "startedTopicsCount_other": "{{count}} topics started"
     },
     "vocabulary": {
       "pageTitle": "Your Vocabulary",
@@ -2107,7 +2127,22 @@
       "withdrawConsent": "Withdraw consent",
       "withdrawConsentConfirmTitle": "Withdraw consent?",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
-      "confirmWithdrawConsent": "Confirm — withdraw consent"
+      "confirmWithdrawConsent": "Confirm — withdraw consent",
+      "timeAgo": {
+        "justNow": "just now",
+        "minutes_one": "{{count}} min ago",
+        "minutes_other": "{{count}} mins ago",
+        "hours_one": "{{count}} hour ago",
+        "hours_other": "{{count}} hours ago",
+        "days_one": "{{count}} day ago",
+        "days_other": "{{count}} days ago",
+        "weeks_one": "{{count}} week ago",
+        "weeks_other": "{{count}} weeks ago",
+        "months_one": "{{count}} month ago",
+        "months_other": "{{count}} months ago",
+        "years_one": "{{count}} year ago",
+        "years_other": "{{count}} years ago"
+      }
     },
     "mentorMemory": {
       "title": "Mentor memory",
@@ -2148,7 +2183,9 @@
       "whatSeemsWrongDescription": "Describe the correction and the mentor will take it into account",
       "correctionNoted": "Correction noted",
       "couldNotSaveCorrection": "Could not save correction",
-      "submit": "Submit"
+      "submit": "Submit",
+      "attemptCount_one": "{{count}} time noticed",
+      "attemptCount_other": "{{count}} times noticed"
     },
     "reports": {
       "title": "Reports",
@@ -2697,7 +2734,13 @@
     "a11yStarters": "Sentence starter suggestions",
     "a11yWriteSummary": "Write your learning summary",
     "a11ySkipSummary": "Skip the summary",
-    "a11yStarterHint": "Tap to use this sentence starter"
+    "a11yStarterHint": "Tap to use this sentence starter",
+    "takeaways": {
+      "duration_one": "{{count}} minute - great session!",
+      "duration_other": "{{count}} minutes - great session!",
+      "exchanges_one": "You worked through {{count}} exchange",
+      "exchanges_other": "You worked through {{count}} exchanges"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3176,5 +3219,15 @@
     "sampleBadge": "Sample",
     "sampleDataNote": "Sample data — your child's real insights appear after their first session.",
     "sampleWeeklyBody": "Practiced quadratic equations for 45 minutes across three sessions. Getting comfortable with factoring; working on completing the square."
+  },
+  "milestoneCard": {
+    "wordCount_one": "{{count}} word learned",
+    "wordCount_other": "{{count}} words learned",
+    "topicCount_one": "{{count}} topic mastered",
+    "topicCount_other": "{{count}} topics mastered",
+    "sessionCount_one": "{{count}} learning session completed",
+    "sessionCount_other": "{{count}} learning sessions completed",
+    "hourCount_one": "{{count}} hour of learning",
+    "hourCount_other": "{{count}} hours of learning"
   }
 }

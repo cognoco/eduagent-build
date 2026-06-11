@@ -5,6 +5,11 @@ import {
   MILESTONE_DOTS_NARROW_BREAKPOINT_PT,
 } from './MilestoneDots';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock,
+);
+
 const dimsSpy = jest.spyOn(Dimensions, 'get');
 function setWindowWidth(width: number): void {
   dimsSpy.mockReturnValue({ width, height: 800, scale: 2, fontScale: 1 });

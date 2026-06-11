@@ -6,30 +6,13 @@ import {
 } from '../../../test-utils/screen-render';
 import MilestonesListScreen from './milestones';
 
-jest.mock('react-i18next', () => ({
-  initReactI18next: { type: '3rdParty', init: jest.fn() },
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      const map: Record<string, string> = {
-        'progress.milestones.pageTitle': 'Your Milestones',
-        'progress.milestones.earned': `${opts?.count ?? ''} milestone${
-          (opts?.count ?? 0) !== 1 ? 's' : ''
-        } earned`,
-        'progress.milestones.errorTitle': "We couldn't load your milestones",
-        'progress.milestones.errorMessage':
-          'Check your connection and try again.',
-        'progress.milestones.emptyTitle': 'No milestones yet',
-        'progress.milestones.emptySubtitle':
-          'Complete sessions and master topics to earn your first milestone.',
-        'progress.milestones.emptyBackLabel': 'Go back to Journey',
-        'common.tryAgain': 'Try again',
-        'common.goBack': 'Go back',
-      };
-      if (key in map) return map[key]!;
-      return key;
-    },
-  }),
-}));
+// Shared en.json-resolving mock: assertions stay on rendered English and the
+// plural families (milestoneCard.*, progress.milestones.earned) resolve through
+// real _one/_other keys instead of a re-implemented English plural ternary.
+jest.mock(
+  'react-i18next',
+  () => require('../../../test-utils/mock-i18n').i18nMock,
+);
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),

@@ -792,6 +792,16 @@
     "inputMode": {
       "text": "テキストモード",
       "voice": "音声モード"
+    },
+    "milestoneDots": {
+      "reached_one": "マイルストーンを1つ達成",
+      "reached_other": "マイルストーンを{{count}}つ達成"
+    },
+    "livingBook": {
+      "progressLabel_one": "本の進捗：{{count}}ページ",
+      "progressLabel_other": "本の進捗：{{count}}ページ",
+      "pageCount_one": "{{count}}ページ",
+      "pageCount_other": "{{count}}ページ"
     }
   },
   "quiz": {
@@ -1203,7 +1213,9 @@
       "bookmarks": {
         "savedFromChat": "チャットから保存",
         "emptyShort": "このトピックで保存されたチャットはまだありません",
-        "emptyLong": "このトピックで保存された説明はまだありません。"
+        "emptyLong": "このトピックで保存された説明はまだありません。",
+        "savedExplanations_one": "保存した解説 {{count}} 件",
+        "savedExplanations_other": "保存した解説 {{count}} 件"
       },
       "challengeVerifiedBadge": "チャレンジ確認済み",
       "practicedOftenHint": "このトピックをよく練習しています — 続けましょう！",
@@ -1212,7 +1224,9 @@
       },
       "covers": "このトピックの内容",
       "mastered": "習得済み",
-      "strongReviewProgress": "{{strong}}/{{total}}回の強い復習"
+      "strongReviewProgress": "{{strong}}/{{total}}回の強い復習",
+      "notesSavedCount_one": "このトピックで保存したメモ {{count}} 件",
+      "notesSavedCount_other": "このトピックで保存したメモ {{count}} 件"
     },
     "book": {
       "readyToOpen": "開けます",
@@ -1248,7 +1262,9 @@
       "addFirstNote": "+ このブックの最初のノートを追加",
       "backToSubject": "科目に戻る →",
       "finishedBody_one": "この本の唯一のトピックを学習しました。復習して記憶を定着させるか、戻って次に学習することを選びましょう。",
-      "finishedBody_other": "この本の{{count}}個のトピックをすべて学習しました。復習して記憶を定着させるか、戻って次に学習することを選びましょう。"
+      "finishedBody_other": "この本の{{count}}個のトピックをすべて学習しました。復習して記憶を定着させるか、戻って次に学習することを選びましょう。",
+      "notesSavedCount_one": "この本で保存したメモ {{count}} 件",
+      "notesSavedCount_other": "この本で保存したメモ {{count}} 件"
     },
     "notStartedCount": "{{notStarted}} / {{total}} 未開始",
     "chooseTopic": "トピックを選択",
@@ -1278,7 +1294,9 @@
       "stillStuck": "まだわかりません",
       "errorTitle": "問題が発生しました",
       "timeoutTitle": "まだ待機中…",
-      "timeoutMessage": "回答の送信に時間がかかっています。接続を確認してもう一度お試しください。"
+      "timeoutMessage": "回答の送信に時間がかかっています。接続を確認してもう一度お試しください。",
+      "dontRememberFirst": "思い出せません。",
+      "dontRememberAgain": "まだ分かりません。"
     },
     "lastStudied": "最終学習：{{when}}",
     "neverStudied": "未学習",
@@ -1777,7 +1795,9 @@
       "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。",
       "pastConversations": "過去の会話",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "startedTopicsCount_one": "{{count}}個のトピックを開始",
+      "startedTopicsCount_other": "{{count}}個のトピックを開始"
     },
     "vocabulary": {
       "pageTitle": "あなたの語彙",
@@ -2014,7 +2034,22 @@
       "subjectRawMentorSummary": "これは「{{rawInput}}」から始まったので、{{name}}さんはまだ{{subject}}の学習の方向性を探っている段階かもしれません。",
       "subjectRawNextStep": "1回の短いセッションで、その漠然とした興味を具体的なトピックに変えることができます。",
       "subjectQuietSummary": "{{subject}}は、{{name}}さんが再開したいときにいつでも始められます。",
-      "subjectQuietNextStep": "簡単な質問やトピックから始めると、気軽に再開できます。"
+      "subjectQuietNextStep": "簡単な質問やトピックから始めると、気軽に再開できます。",
+      "timeAgo": {
+        "justNow": "たった今",
+        "minutes_one": "{{count}}分前",
+        "minutes_other": "{{count}}分前",
+        "hours_one": "{{count}}時間前",
+        "hours_other": "{{count}}時間前",
+        "days_one": "{{count}}日前",
+        "days_other": "{{count}}日前",
+        "weeks_one": "{{count}}週間前",
+        "weeks_other": "{{count}}週間前",
+        "months_one": "{{count}}か月前",
+        "months_other": "{{count}}か月前",
+        "years_one": "{{count}}年前",
+        "years_other": "{{count}}年前"
+      }
     },
     "mentorMemory": {
       "title": "メンターの記憶",
@@ -2055,7 +2090,9 @@
         "low": "初期のサイン",
         "medium": "繰り返し見られる傾向",
         "high": "強いサイン"
-      }
+      },
+      "attemptCount_one": "{{count}}回注目されました",
+      "attemptCount_other": "{{count}}回注目されました"
     },
     "reports": {
       "title": "レポート",
@@ -2575,7 +2612,13 @@
     "a11yStarters": "書き出しの提案",
     "a11yWriteSummary": "学習のまとめを書く",
     "a11ySkipSummary": "サマリーをスキップ",
-    "a11yStarterHint": "タップしてこの書き出しを使用"
+    "a11yStarterHint": "タップしてこの書き出しを使用",
+    "takeaways": {
+      "duration_one": "{{count}}分 - 素晴らしいセッションでした！",
+      "duration_other": "{{count}}分 - 素晴らしいセッションでした！",
+      "exchanges_one": "{{count}}個のやり取りを完了",
+      "exchanges_other": "{{count}}個のやり取りを完了"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3176,5 +3219,15 @@
     "sampleBadge": "サンプル",
     "sampleDataNote": "これはサンプルデータです。お子様の実際の学習状況は、最初のセッションの後に表示されます。",
     "sampleWeeklyBody": "3回のセッションで45分間、二次方程式を練習しました。因数分解に慣れてきており、平方完成に取り組んでいます。"
+  },
+  "milestoneCard": {
+    "wordCount_one": "単語を{{count}}個学習",
+    "wordCount_other": "単語を{{count}}個学習",
+    "topicCount_one": "トピックを{{count}}個マスター",
+    "topicCount_other": "トピックを{{count}}個マスター",
+    "sessionCount_one": "学習セッションを{{count}}回完了",
+    "sessionCount_other": "学習セッションを{{count}}回完了",
+    "hourCount_one": "学習時間{{count}}時間",
+    "hourCount_other": "学習時間{{count}}時間"
   }
 }
