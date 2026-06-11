@@ -151,7 +151,7 @@ overlapping component files — keep adjacent/serial).
 | 5 | WI-625 WP-L12-pluralization | **done** — PR #1011 `ddf462f3e` (in-PR forward guard caught 3 audit-missed sites; pl 71/71 families complete); CLOSED Done first-pass 2026-06-11 |
 | 6 | WI-626 WP-L12-mobile-logic-bugs | **done** — PR #959 merged `0a7b07dbe` (5 CI rounds, all red-verified); one bounce on a flaky landing check refuted (program adjudication: the session-test red was one-off suite-interference flake on WI-626's own merge run, rerun green; the shepherd's interim "#931 broke main" theory was WRONG — #931 was an innocent comment-only sweep); CLOSED Done on re-review 2026-06-11 |
 | 7 | WI-627 WP-L12-dates-locale | **done** — PR #993 merged `1f5574e63` (3 rounds); children WI-659/660 swept; CLOSED Done 2026-06-11 |
-| 8 | WI-628 WP-L12-decorative-lowvision | review — PR #1014 MERGED `78992f529` (3 rounds incl. iOS accessibilityElementsHidden fix); children WI-661/662 swept; `complete` done. Two human-parks resolved by shepherd evidence/ruling: landing checks (ota-update green on merge SHA; KV failure = program-adjudicated chronic infra) + explicit decorative-guard exception (WI-623 precedent); re-reviewing |
+| 8 | WI-628 WP-L12-decorative-lowvision | **done** — PR #1014 `78992f529` (3 rounds incl. iOS accessibilityElementsHidden); two human-parks resolved by shepherd evidence/ruling (landing checks + decorative-guard exception, WI-623 precedent); CLOSED Done 2026-06-12 |
 
 **Sub-slice watch:** WP-1 absorbs the ~358-string aggregate (F-069) — it is the one
 bundle likely to exceed PR size. Sub-slice on demand at execution (planning-reference
