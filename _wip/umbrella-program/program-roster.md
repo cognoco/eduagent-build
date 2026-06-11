@@ -54,9 +54,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   router, three-axis age model). Pre-launch: build direct, re-seed, delete legacy
   — no dual-model, no backfill.
 - **Owner:** Jorn (+ runway session agents)
-- **Depends-on:** Harness-Hygiene exit-gate `WI-530` → `WI-533` — **operator-waived
-  2026-06-10** for execution start (W1 proceeds shepherded); formal close rides
-  the HH PR (#832, open).
+- **Depends-on:** Harness-Hygiene exit-gate `WI-530` → `WI-533` — execution was
+  operator-waived ahead (2026-06-10); **HH PR #832 merged 2026-06-11 (G1 fired)**,
+  so only the formal Cosmo closes of WI-530/533 remain.
 - **Decomposition:** `_wip/identity-foundation/execution-tracker.md` (the durable
   execution entry point — charter / WI map / wave sequence / coarse status; created
   by Phase-P slicing 2026-06-10). `_wip/identity-foundation/ROADMAP.md` is now the
@@ -69,12 +69,13 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **W0 done (2026-06-10):** all 11 patch-now defects shipped — `WI-549`/`WI-550`
   Closed/Done (PRs #817/#818) and `WI-551` Closed/Done (`c5c9b39bb`). Baseline
   reset `WI-569` executed + PR #845 merged (Reviewing).
-- **Execution underway (2026-06-11, shepherded):** W1 half-landed —
-  `WI-570` (schema) + `WI-572` (authority-graph) merged (PRs #855/#859,
-  Reviewing); `WI-571` (spine) PR #860 held for cleanup; `WI-573` Ready. W2
-  pre-bridged Ready. **Review stack (569/570/572) awaits operator
-  `/cosmo:review` — the first clean closes fire program gate G2** (→ PRG-12
-  activation). Live state: Cosmo + `execution-tracker.md` §5; this is a pointer.
+- **Execution underway (2026-06-11, shepherded):** **W1 fully merged** —
+  `WI-570` (schema, PR #855) · `WI-571` (spine, PR #860 after shepherd-mandated
+  cleanup) · `WI-572` (authority-graph, PR #859); all at Reviewing alongside
+  baseline `WI-569`. `WI-573` (inngest-wiring) Ready and unblocked; W2
+  pre-bridged Ready. **The 4-item review stack awaits operator `/cosmo:review`
+  — first clean closes fire program gate G2** (→ PRG-12 activation). Live
+  state: Cosmo + `execution-tracker.md` §5; this is a pointer.
 - **Activate-when:** — (active)
 
 ### PRG-02 · Harness Hygiene — `tail`
@@ -87,16 +88,16 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   via `WI-530` → `WI-533`.
 - **Decomposition:** `nexus:_WIP/zdx-productionization/harness-hygiene-tracker.md`
   (the durable entry point; Cosmo `WI-530` exit-gate WP holds live per-item state).
-- **Tail posture (2026-06-10):** build is done; what remains is **(a) gate
-  close-out** — the Reviewing stack (`WI-378`/`WI-388`/`WI-398`/`WI-387`) clears
-  via review + the real-PR merge, then `WI-530` closes and `WI-533` unparks — and
-  **(b) the parked residue**: ~10 non-gating items deliberately left off the
-  critical path (branch protection `WI-538` Manual/HITL, pointer-sweep `WI-543`,
-  nx-reset memory `WI-561`, upstream-watch `WI-542`, ADR-facet `WI-548`, the
-  validation-scope impl cluster `WI-457`–`460`, Codex coverage `WI-534`), most of
-  which should land as a **quick-land batch soon after the HH PR merges** — see
-  the activation queue. Per-item state: tracker §4/§5 + Cosmo.
-- **Activate-when:** — (tail; queue entry 3)
+- **Tail posture (updated 2026-06-11 — G1 FIRED):** **HH PR #832 merged
+  2026-06-11 09:27Z.** Remaining: **(a) formal close-out** — review the HH
+  Reviewing stack (`WI-378`/`WI-388`/`WI-398`/`WI-387`) and close `WI-530` →
+  unpark/close `WI-533` (mechanical, nexus side); **(b) the parked residue —
+  NOW UNLOCKED** (queue entry 3 live): ~10 non-gating items (branch protection
+  `WI-538` Manual/HITL, pointer-sweep `WI-543`, nx-reset memory `WI-561`,
+  upstream-watch `WI-542`, ADR-facet `WI-548`, validation-scope impl cluster
+  `WI-457`–`460`, Codex coverage `WI-534`) to land as a quick-land batch.
+  Per-item state: tracker §4/§5 + Cosmo.
+- **Activate-when:** **G1 fired — residue batch may start** (queue entry 3)
 
 ### PRG-03 · Instruction-surface / memory-doctrine cleanup — `in-progress`
 - **Outcome:** the `.claude/memory` + `AGENTS.md`/`CLAUDE.md` + doctrine surface
@@ -125,7 +126,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   (Captured, MentoMate). Evidence base:
   `supporting-artefacts/memory-cleanup.md` (full 55-memory triage results;
   adopted from nexus 2026-06-10 — now a registered PRG-03 artifact, no longer
-  rogue). Needs a **~20-min operator ruling session** (queue entry 4).
+  rogue). Needs a **~20-min operator ruling session** (queue entry 4). The
+  post-HH-merge sequencing hold on executing its edits **lifted 2026-06-11**
+  (PR #832 merged) — only the rulings themselves remain.
 - **Singleton merge (2026-06-10):** F-036 (`autoMemoryDirectory` mis-point)
   merged in from the dissolved PRG-16 tail.
 - **Activate-when:** active — the matrix already *is* the agreed owner-map; no
@@ -328,6 +331,13 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-11 — G1 FIRED (HH PR #832 merged 09:27Z).** PRG-02 → formal
+  close-out only; **residue quick-land batch unlocked** (queue entry 3 live).
+  IF spine PR #860 also merged → **W1 fully merged**, 4-item review stack
+  (569/570/571/572) all at Reviewing — G2 hangs solely on operator
+  `/cosmo:review` closes. WI-587 edit-sequencing hold lifted. Dashboard
+  regenerated. Gate-event watches armed this morning caught both merges
+  (PR watch retired; Cosmo-closes watch for G2 still live).
 - **2026-06-11 — Umbrella touch: IF execution underway.** W0 fully done
   (549/550/551 closed; baseline 569 merged@Reviewing). W1 half-landed (570 + 572
   merged@Reviewing, 571 PR held, 573 Ready); W2 pre-bridged. WI-530 gate
