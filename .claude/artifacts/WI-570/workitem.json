@@ -1,0 +1,17 @@
+{
+  "pageId": "37b8bce9-1f7c-8140-9a34-e2a50338d375",
+  "id": "WI-570",
+  "name": "WP-W1-schema: build the 8-table identity/tenancy/consent schema + scoped-repo enforcement",
+  "description": "W1 (structural foundation, critical-path ROOT) — build the 8 target tables direct (person, organization, membership, subscription, guardianship, supportership, consent_grant, person_retain set) per docs/canon/identity/data-model.md §1 — no dual-model, no backfill — and enforce profileId on every scoped single-table read (F-032: createScopedRepository; parent-chain pattern where joins are needed). The schema and the per-table profileId scoping rule are the same data-model artifact and ship in lockstep. Depends on the full W0 hard gate (WP-W0-baseline + WI-549 + WI-550 + WI-551).",
+  "acceptanceCriteria": "8 tables present per data-model.md §1; every scoped single-table read goes through createScopedRepository(profileId); no unscoped raw db.select() on a scoped table. Findings: F-032 + build-item (schema). Source of truth: _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 WP-W1-schema (commit 23d0c01ad)",
+  "riskImpact": "M / risky — the foundational data model everything binds to.",
+  "type": "Task",
+  "altitude": "WP",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief (WP-W1-schema)\nTranscribed from the ratified Phase-O master plan _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 → \"WP-W1-schema\" detail block @ commit 23d0c01ad (eduagent-build) — the frozen source of truth. Children are absorbed provenance (ZDX-ADR-0001), materialized as WI-591 / WI-592.\nBundle rationale\nThe schema and the per-table profileId scoping rule are the same data-model artifact (docs/canon/identity/data-model.md §5.1) and ship in lockstep — scoping is meaningless without the tables.\nStrategy\nBuild the 8 target tables direct (person, organization, membership, subscription, guardianship, supportership, consent_grant, person_retain set) — no dual-model, no backfill — and enforce profileId on every scoped single-table read (F-032: createScopedRepository; parent-chain pattern where joins are needed, per repo rules).\nScope\nIn: the 8 tables + scoped-repo wiring. Out: readers that consume them (later WPs).\nFindings table\nAcceptance Criteria (bundle)\n8 tables present per data-model.md §1.\nEvery scoped single-table read goes through createScopedRepository(profileId).\nNo unscoped raw db.select() on a scoped table.\nRisk & blast radius\nM / risky — the foundational data model everything binds to. Depends on the full W0 hard gate (WI-569 baseline + WI-549/550/551 patches)."
+}
