@@ -1,6 +1,19 @@
 const path = require('path');
 const nxPreset = require('@nx/jest/preset').default;
 
+// When jest is run from inside a git worktree (.worktrees/<branch>/), the
+// worktree-guard ignore patterns below would match the worktree's own test
+// paths and silently yield "No tests found". Detect that case (the preset's
+// own __dirname sits under .worktrees/) and drop the .worktrees guards —
+// mirrors the same guard in apps/api/jest.config.cjs. The main-checkout run
+// is unaffected: a worktree's rootDir never contains a sibling worktree, so
+// there is no haste-map collision risk to guard against.
+const RUNNING_INSIDE_WORKTREE = __dirname.includes('.worktrees');
+const dropWorktreeGuards = (patterns) =>
+  RUNNING_INSIDE_WORKTREE
+    ? patterns.filter((p) => !/worktrees/i.test(p))
+    : patterns;
+
 // CI-only readability defaults: silence captured console output from passing
 // tests and add the custom CI reporter (GitHub Actions annotations + step
 // summary + end-of-log failure block). See
@@ -20,17 +33,19 @@ module.exports = {
   ...ciDefaults,
   // Prevent haste-map from scanning local scratch copies.
   // The regex entries are cross-platform fallbacks for Windows backslashes.
-  modulePathIgnorePatterns: [
+  modulePathIgnorePatterns: dropWorktreeGuards([
     '<rootDir>/.worktrees/',
     '[/\\\\]\\.worktrees',
     '<rootDir>/.tmp/',
     '[/\\\\]\\.tmp',
-  ],
+  ]),
   testPathIgnorePatterns: [
-    '<rootDir>/.worktrees/',
-    '[/\\\\]\\.worktrees',
-    '<rootDir>/.tmp/',
-    '[/\\\\]\\.tmp',
+    ...dropWorktreeGuards([
+      '<rootDir>/.worktrees/',
+      '[/\\\\]\\.worktrees',
+      '<rootDir>/.tmp/',
+      '[/\\\\]\\.tmp',
+    ]),
     // WI-536 flaky-test quarantine: skip registered flaky files from the gate
     // (returns [] under QUARANTINE_MODE=report so the report lane runs them).
     ...require('./tools/quarantine/registry.cjs').jestIgnorePatterns(),

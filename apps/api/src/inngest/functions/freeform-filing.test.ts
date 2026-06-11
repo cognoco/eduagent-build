@@ -249,22 +249,55 @@ describe('freeformFilingRetry', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Happy path: transcript provided in event
+  // [WI-577 / F-073 / F-095] Break test: the event payload must never be the
+  // transcript source. Legacy in-flight events may still carry a
+  // `sessionTranscript` field — it must be ignored and the transcript
+  // rehydrated from the DB (Inngest persists event payloads in its
+  // third-party event store, so trusting the field would keep the leak
+  // pattern alive on the consumer side).
   // -------------------------------------------------------------------------
 
-  describe('when sessionTranscript is provided in event.data', () => {
-    it('uses provided transcript without fetching from DB', async () => {
+  describe('when a legacy event still carries sessionTranscript [WI-577]', () => {
+    it('ignores the event field and rehydrates the transcript from the DB', async () => {
+      mockGetSessionTranscript.mockResolvedValue({
+        session: { sessionId: testSessionId },
+        archived: false,
+        exchanges: [
+          {
+            role: 'user',
+            content: 'What is gravity?',
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+          {
+            role: 'assistant',
+            content: 'Gravity is a force.',
+            timestamp: '2026-01-01T00:00:01Z',
+          },
+        ],
+      });
+
+      const minorText =
+        'Learner: my name is Milo Janssen and I struggle with fractions';
       const { result } = await executeSteps(
-        createEventData({ sessionTranscript: 'Learner: What is gravity?' }),
+        createEventData({ sessionTranscript: minorText }),
       );
 
-      expect(mockGetSessionTranscript).not.toHaveBeenCalled();
+      expect(mockGetSessionTranscript).toHaveBeenCalledWith(
+        expect.anything(),
+        testProfileId,
+        testSessionId,
+      );
       expect(mockFileToLibrary).toHaveBeenCalledWith(
         expect.objectContaining({
-          sessionTranscript: 'Learner: What is gravity?',
+          sessionTranscript:
+            'Learner: What is gravity?\nTutor: Gravity is a force.',
         }),
         expect.anything(),
         expect.anything(),
+      );
+      // The event-supplied text must never reach the LLM filing call.
+      expect(JSON.stringify(mockFileToLibrary.mock.calls)).not.toContain(
+        'Milo Janssen',
       );
       expect(result).toMatchObject({ status: 'completed', bookId: 'book-001' });
     });
