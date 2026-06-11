@@ -51,7 +51,10 @@ export function hasSubjectActivity(subject: SubjectInventory): boolean {
   );
 }
 
-function getTopicHeadline(subject: SubjectInventory): {
+function getTopicHeadline(
+  subject: SubjectInventory,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): {
   headline: string;
   progressValue: number;
   progressMax: number;
@@ -59,9 +62,9 @@ function getTopicHeadline(subject: SubjectInventory): {
   hideBar: boolean;
 } {
   const startedCount = getStartedTopicsCount(subject);
-  const sessionsLabel = `${subject.sessionsCount} ${
-    subject.sessionsCount === 1 ? 'session' : 'sessions'
-  }`;
+  const sessionsLabel = t('library.sessionCount', {
+    count: subject.sessionsCount,
+  });
   const displayMinutes = formatMinutes(
     subject.wallClockMinutes || subject.activeMinutes,
   );
@@ -75,9 +78,7 @@ function getTopicHeadline(subject: SubjectInventory): {
   // alphabet stable and lets users compare subjects at a glance. Time and
   // session count remain in the subline for both branches.
   return {
-    headline: `${startedCount} ${
-      startedCount === 1 ? 'topic' : 'topics'
-    } started · ${subject.topics.mastered} mastered`,
+    headline: `${t('progress.subject.startedTopicsCount', { count: startedCount })} · ${subject.topics.mastered} mastered`,
     progressValue: subject.topics.mastered,
     progressMax: Math.max(1, subject.topics.total ?? 1),
     subline,
@@ -106,7 +107,7 @@ export function SubjectProgressRow({
   const isAccordionMode = !!childProfileId && !!subjectId && !onPress;
   const hasExpandableTopics =
     subject.sessionsCount > 0 || getStartedTopicsCount(subject) > 0;
-  const topicHeadline = getTopicHeadline(subject);
+  const topicHeadline = getTopicHeadline(subject, t);
   const action = getContextualAction(subject);
 
   const handleToggle = () => {

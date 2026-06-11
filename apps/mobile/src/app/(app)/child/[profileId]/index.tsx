@@ -31,41 +31,44 @@ import { isNewLearner } from '../../../../lib/progressive-disclosure';
 import { useProfile } from '../../../../lib/profile';
 import { useThemeColors } from '../../../../lib/theme';
 
-function formatLastSession(isoDate: string | null | undefined): string | null {
+function formatLastSession(
+  isoDate: string | null | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string | null {
   if (!isoDate) return null;
   const then = new Date(isoDate);
   if (Number.isNaN(then.getTime())) return null;
 
   const diffMs = Date.now() - then.getTime();
-  if (diffMs < 60_000) return 'just now';
+  if (diffMs < 60_000) return t('parentView.index.timeAgo.justNow');
 
   const diffMinutes = Math.floor(diffMs / 60_000);
   if (diffMinutes < 60) {
-    return `${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+    return t('parentView.index.timeAgo.minutes', { count: diffMinutes });
   }
 
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    return t('parentView.index.timeAgo.hours', { count: diffHours });
   }
 
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    return t('parentView.index.timeAgo.days', { count: diffDays });
   }
 
   const diffWeeks = Math.floor(diffDays / 7);
   if (diffWeeks < 5) {
-    return `${diffWeeks} week${diffWeeks === 1 ? '' : 's'} ago`;
+    return t('parentView.index.timeAgo.weeks', { count: diffWeeks });
   }
 
   const diffMonths = Math.floor(diffDays / 30);
   if (diffMonths < 12) {
-    return `${diffMonths} month${diffMonths === 1 ? '' : 's'} ago`;
+    return t('parentView.index.timeAgo.months', { count: diffMonths });
   }
 
   const diffYears = Math.floor(diffDays / 365);
-  return `${diffYears} year${diffYears === 1 ? '' : 's'} ago`;
+  return t('parentView.index.timeAgo.years', { count: diffYears });
 }
 
 function formatJoinedDate(isoDate: string | null | undefined): string | null {
@@ -803,7 +806,7 @@ export default function ChildDetailScreen(): React.ReactElement {
       : undefined,
   );
   const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
-  const lastSessionLabel = formatLastSession(lastSessionAt);
+  const lastSessionLabel = formatLastSession(lastSessionAt, t);
   const joinedLabel = formatJoinedDate(ownedProfile?.createdAt);
   const activeAccommodation = ACCOMMODATION_OPTIONS.find(
     (option) => option.mode === (learnerProfile?.accommodationMode ?? 'none'),

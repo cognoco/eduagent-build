@@ -231,7 +231,10 @@ export default function RecallTestScreen() {
     const userMsg: ChatMessage = {
       id: `user-idr-${Date.now()}`,
       role: 'user',
-      content: nextCount === 1 ? "I don't remember." : 'Still stuck.',
+      content:
+        nextCount === 1
+          ? t('topic.recallTest.dontRememberFirst')
+          : t('topic.recallTest.dontRememberAgain'),
     };
     setMessages((prev) => [...prev, userMsg]);
 

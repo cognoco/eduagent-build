@@ -57,13 +57,16 @@ export function getLearningStyleRows(style: LearningStyle): LearningStyleRow[] {
   return rows;
 }
 
-export function getFocusAreaProgress(entry: FocusAreaEntry): {
+export function getFocusAreaProgress(
+  entry: FocusAreaEntry,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): {
   progressLabel: string;
   progressValue: number;
 } {
-  const attemptsLabel = `${entry.attempts} ${
-    entry.attempts === 1 ? 'time' : 'times'
-  } noticed`;
+  const attemptsLabel = t('parentView.mentorMemory.attemptCount', {
+    count: entry.attempts,
+  });
   const confidenceLabel =
     entry.confidence === 'high'
       ? 'Showing up a lot lately'

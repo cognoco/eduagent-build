@@ -9,6 +9,10 @@ import {
   resolveNumberParam,
 } from './session-summary-derived';
 
+const { translate: t } = require('../../../test-utils/mock-i18n') as {
+  translate: (key: string, opts?: Record<string, unknown>) => string;
+};
+
 describe('resolveNumberParam', () => {
   it('preserves an explicit zero instead of falling back', () => {
     expect(resolveNumberParam('0', 7)).toBe(0);
@@ -112,6 +116,7 @@ describe('buildSessionTakeaways', () => {
         wallClockMinutes: 1,
         exchanges: 0,
         rung: 1,
+        t,
       }),
     ).toEqual(['Great effort today']);
   });
@@ -123,6 +128,7 @@ describe('buildSessionTakeaways', () => {
         wallClockMinutes: 12,
         exchanges: 5,
         rung: 3,
+        t,
       }),
     ).toEqual([
       '12 minutes - great session!',

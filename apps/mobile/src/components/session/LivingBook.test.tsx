@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react-native';
 import { LivingBook } from './LivingBook';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock,
+);
+
 describe('LivingBook', () => {
   it('renders with zero exchanges (no counter text)', () => {
     render(<LivingBook exchangeCount={0} isComplete={false} isExpressive />);

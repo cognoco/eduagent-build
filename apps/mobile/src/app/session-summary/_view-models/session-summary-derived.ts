@@ -117,20 +117,19 @@ export function buildSessionTakeaways(args: {
   wallClockMinutes: number;
   exchanges: number;
   rung: number;
+  t: (key: string, opts?: Record<string, unknown>) => string;
 }): string[] {
   const takeaways: string[] = [];
   if (args.hasResolvedDuration) {
     takeaways.push(
-      `${args.wallClockMinutes} minute${
-        args.wallClockMinutes === 1 ? '' : 's'
-      } - great session!`,
+      args.t('sessionSummary.takeaways.duration', {
+        count: args.wallClockMinutes,
+      }),
     );
   }
   if (args.exchanges > 0) {
     takeaways.push(
-      `You worked through ${args.exchanges} exchange${
-        args.exchanges === 1 ? '' : 's'
-      }`,
+      args.t('sessionSummary.takeaways.exchanges', { count: args.exchanges }),
     );
   }
   if (args.rung >= 3) {

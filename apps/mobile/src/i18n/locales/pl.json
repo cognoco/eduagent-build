@@ -242,7 +242,13 @@
         "profileLimit": "{{count}} z {{max}} profili użytych",
         "addProfileAction": "Dodaj profil",
         "addProfileAccessibilityLabel": "Dodaj profil rodzinny",
-        "whoNeedsYouHeader": "Kto Cię dziś potrzebuje"
+        "whoNeedsYouHeader": "Kto Cię dziś potrzebuje",
+        "nameListWithMore_few": "{{names}} + {{count}} więcej",
+        "nameListWithMore_many": "{{names}} + {{count}} więcej",
+        "withMinutes_few": "{{memberNames}} · {{count}} min w tym tygodniu",
+        "withMinutes_many": "{{memberNames}} · {{count}} min w tym tygodniu",
+        "withSessions_few": "{{memberNames}} · {{count}} sesje w tym tygodniu",
+        "withSessions_many": "{{memberNames}} · {{count}} sesji w tym tygodniu"
       },
       "transitionNoticeTitle": "Teraz mentorujesz {{childNames}}",
       "tonight": {
@@ -819,6 +825,22 @@
     "inputMode": {
       "text": "Tryb tekstowy",
       "voice": "Tryb głosowy"
+    },
+    "milestoneDots": {
+      "reached_one": "Osiągnięto 1 kamień milowy",
+      "reached_other": "Osiągnięto {{count}} kamieni milowych",
+      "reached_few": "Osiągnięto {{count}} kamienie milowe",
+      "reached_many": "Osiągnięto {{count}} kamieni milowych"
+    },
+    "livingBook": {
+      "progressLabel_one": "Postęp w książce: {{count}} strona",
+      "progressLabel_other": "Postęp w książce: {{count}} stron",
+      "pageCount_one": "{{count}} strona",
+      "pageCount_other": "{{count}} stron",
+      "pageCount_few": "{{count}} strony",
+      "pageCount_many": "{{count}} stron",
+      "progressLabel_few": "Postęp w książce: {{count}} strony",
+      "progressLabel_many": "Postęp w książce: {{count}} stron"
     }
   },
   "quiz": {
@@ -956,7 +978,9 @@
       "correctAnnounceNoAnswer": "Dobrze!",
       "wrongAnnounce": "Niezupełnie. Poprawna odpowiedź to {{answer}}",
       "wrongAnnounceNoAnswer": "Niezupełnie.",
-      "questionProgress": "{{current}} z {{total}}"
+      "questionProgress": "{{current}} z {{total}}",
+      "foundThemClues_few": "Zgadłeś po {{count}} wskazówkach!",
+      "foundThemClues_many": "Zgadłeś po {{count}} wskazówkach!"
     },
     "results": {
       "viewHistory": "Zobacz historię",
@@ -1064,7 +1088,11 @@
       "nowTypeCorrect": "Teraz wpisz poprawne zdanie:",
       "typeCorrectedPlaceholder": "Wpisz tutaj poprawne zdanie…",
       "typeCorrectedLabel": "Wpisz poprawione zdanie",
-      "finish": "Zakończ"
+      "finish": "Zakończ",
+      "fixedAll_few": "Poprawiłeś(-aś) {{count}} błędy!",
+      "fixedAll_many": "Poprawiłeś(-aś) {{count}} błędów!",
+      "mistakesFound_few": "Znaleziono {{count}} błędy",
+      "mistakesFound_many": "Znaleziono {{count}} błędów"
     },
     "textPreview": {
       "noTextTitle": "Brak tekstu",
@@ -1155,7 +1183,13 @@
       "deleteScopeStartedTopics_other": "{{count}} rozpoczętych tematów",
       "deleteScopeSessions_one": "{{count}} sesja",
       "deleteScopeSessions_other": "{{count}} sesji",
-      "deleteErrorTitle": "Nie udało się usunąć tematu"
+      "deleteErrorTitle": "Nie udało się usunąć tematu",
+      "deleteScopeBooks_few": "{{count}} książki",
+      "deleteScopeBooks_many": "{{count}} książek",
+      "deleteScopeSessions_few": "{{count}} sesje",
+      "deleteScopeSessions_many": "{{count}} sesji",
+      "deleteScopeStartedTopics_few": "{{count}} rozpoczęte tematy",
+      "deleteScopeStartedTopics_many": "{{count}} rozpoczętych tematów"
     },
     "row": {
       "finished": "Ukończone",
@@ -1174,7 +1208,13 @@
       "shelfSubtitleMastered_one": "{{count}} książka · {{mastered}} opanowane · {{learning}} w nauce",
       "shelfSubtitleMastered_other": "{{count}} książek · {{mastered}} opanowane · {{learning}} w nauce",
       "shelfSubtitleLearningOnly_one": "{{count}} książka · {{learning}} w nauce",
-      "shelfSubtitleLearningOnly_other": "{{count}} książek · {{learning}} w nauce"
+      "shelfSubtitleLearningOnly_other": "{{count}} książek · {{learning}} w nauce",
+      "review_few": "{{count}} do powtórzenia",
+      "review_many": "{{count}} do powtórzenia",
+      "shelfSubtitleLearningOnly_few": "{{count}} książki · {{learning}} w nauce",
+      "shelfSubtitleLearningOnly_many": "{{count}} książek · {{learning}} w nauce",
+      "shelfSubtitleMastered_few": "{{count}} książki · {{mastered}} opanowane · {{learning}} w nauce",
+      "shelfSubtitleMastered_many": "{{count}} książek · {{mastered}} opanowane · {{learning}} w nauce"
     },
     "shelf": {
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",
@@ -1200,7 +1240,9 @@
       "suggestionAdd": "Dodaj do półki",
       "levelSubject": "Przedmiot",
       "levelBook": "Książka",
-      "levelTopic": "Temat"
+      "levelTopic": "Temat",
+      "bookCount_few": "{{count}} książki",
+      "bookCount_many": "{{count}} książek"
     },
     "noteMenu": {
       "title": "Opcje notatki",
@@ -1230,7 +1272,11 @@
       "bookmarks": {
         "savedFromChat": "Zapisano z czatu",
         "emptyShort": "Brak zapisanych czatów w tym temacie",
-        "emptyLong": "Brak zapisanych wyjaśnień w tym temacie."
+        "emptyLong": "Brak zapisanych wyjaśnień w tym temacie.",
+        "savedExplanations_one": "{{count}} zapisane wyjaśnienie",
+        "savedExplanations_few": "{{count}} zapisane wyjaśnienia",
+        "savedExplanations_many": "{{count}} zapisanych wyjaśnień",
+        "savedExplanations_other": "{{count}} zapisanych wyjaśnień"
       },
       "challengeVerifiedBadge": "Wyzwanie potwierdzone",
       "practicedOftenHint": "Często ćwiczysz ten temat — tak trzymaj!",
@@ -1239,7 +1285,11 @@
       },
       "covers": "Ten temat obejmuje",
       "mastered": "Opanowane",
-      "strongReviewProgress": "{{strong}}/{{total}} mocnych powtórek"
+      "strongReviewProgress": "{{strong}}/{{total}} mocnych powtórek",
+      "notesSavedCount_one": "{{count}} notatka zapisana dla tego tematu",
+      "notesSavedCount_few": "{{count}} notatki zapisane dla tego tematu",
+      "notesSavedCount_many": "{{count}} notatek zapisanych dla tego tematu",
+      "notesSavedCount_other": "{{count}} notatek zapisanych dla tego tematu"
     },
     "book": {
       "readyToOpen": "Gotowe do otwarcia",
@@ -1277,7 +1327,11 @@
       "finishedBody_one": "Ukończono jedyny temat w tej książce. Powtórz go, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
       "finishedBody_few": "Ukończono wszystkie {{count}} tematy w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
       "finishedBody_many": "Ukończono wszystkie {{count}} tematów w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
-      "finishedBody_other": "Ukończono wszystkie {{count}} tematów w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej."
+      "finishedBody_other": "Ukończono wszystkie {{count}} tematów w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
+      "notesSavedCount_one": "{{count}} notatka zapisana dla tej książki",
+      "notesSavedCount_few": "{{count}} notatki zapisane dla tej książki",
+      "notesSavedCount_many": "{{count}} notatek zapisanych dla tej książki",
+      "notesSavedCount_other": "{{count}} notatek zapisanych dla tej książki"
     },
     "notStartedCount": "{{notStarted}} / {{total}} nierozpoczętych",
     "chooseTopic": "Wybierz temat",
@@ -1309,7 +1363,9 @@
       "stillStuck": "Nadal nie wiem",
       "errorTitle": "Coś poszło nie tak",
       "timeoutTitle": "Wciąż czekam…",
-      "timeoutMessage": "Wysłanie odpowiedzi trwa dłużej niż zwykle. Sprawdź połączenie i spróbuj ponownie."
+      "timeoutMessage": "Wysłanie odpowiedzi trwa dłużej niż zwykle. Sprawdź połączenie i spróbuj ponownie.",
+      "dontRememberFirst": "Nie pamiętam.",
+      "dontRememberAgain": "Nadal nie wiem."
     },
     "lastStudied": "Ostatnia nauka {{when}}",
     "neverStudied": "Nigdy nie studiowano",
@@ -1637,7 +1693,9 @@
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
-    "microphoneUnavailableTitle": "Mikrofon niedostępny"
+    "microphoneUnavailableTitle": "Mikrofon niedostępny",
+    "skippedFragments_few": "Pominęliśmy {{count}} niejasne fragmenty. Stuknij, aby je dodać z powrotem.",
+    "skippedFragments_many": "Pominęliśmy {{count}} niejasnych fragmentów. Stuknij, aby je dodać z powrotem."
   },
   "progress": {
     "pageTitleMine": "Moje postępy",
@@ -1662,7 +1720,14 @@
       "buildingKnowledgeSubtitle_other": "{{count}} tematów i wciąż rośnie.",
       "masteredTopics": "Opanowałeś(-aś) {{count}} tematów",
       "masteredTopicsSubtitle": "Twoje postępy wciąż się kumulują.",
-      "masteredTopicsAndWords": "I znasz {{words}} słów we wszystkich swoich przedmiotach."
+      "masteredTopicsAndWords": "I znasz {{words}} słów we wszystkich swoich przedmiotach.",
+      "sessionsCompleted_one": "Ukończono {{count}} sesję",
+      "sessionsCompleted_few": "Ukończono {{count}} sesje",
+      "sessionsCompleted_many": "Ukończono {{count}} sesji",
+      "buildingKnowledgeSubtitle_few": "{{count}} tematy i wciąż rośnie.",
+      "buildingKnowledgeSubtitle_many": "{{count}} tematów i wciąż rośnie.",
+      "buildingLanguageSubtitle_few": "{{count}} słowa i wciąż rośnie.",
+      "buildingLanguageSubtitle_many": "{{count}} słów i wciąż rośnie."
     },
     "register": {
       "child": {
@@ -1685,7 +1750,16 @@
         "words": "{{count}} słowo",
         "words_other": "{{count}} słów",
         "topics": "{{count}} temat poruszony",
-        "topics_other": "{{count}} tematów poruszonych"
+        "topics_other": "{{count}} tematów poruszonych",
+        "sessions_one": "{{count}} sesja",
+        "sessions_few": "{{count}} sesje",
+        "sessions_many": "{{count}} sesji",
+        "words_one": "{{count}} słowo",
+        "words_few": "{{count}} słowa",
+        "words_many": "{{count}} słów",
+        "topics_one": "{{count}} temat poruszony",
+        "topics_few": "{{count}} tematy poruszone",
+        "topics_many": "{{count}} tematów poruszonych"
       }
     },
     "empty": {
@@ -1707,7 +1781,9 @@
       "viewVocab": "Zobacz słownictwo",
       "wordsLink": "{{count}} słów →",
       "vocabularyLink": "Słownictwo →",
-      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} tematów opanowanych"
+      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} tematów opanowanych",
+      "practiceLessons_few": "{{count}} ćwiczenia",
+      "practiceLessons_many": "{{count}} ćwiczeń"
     },
     "thisWeek": {
       "title": "W tym tygodniu"
@@ -1719,15 +1795,30 @@
       "strong_one": "{{count}} dobrze opanowany",
       "strong_other": "{{count}} dobrze opanowanych",
       "fading_one": "{{count}} gotowy do powtórki",
-      "fading_other": "{{count}} gotowych do powtórki"
+      "fading_other": "{{count}} gotowych do powtórki",
+      "due_few": "{{count}} zaległe",
+      "due_many": "{{count}} zaległych",
+      "fading_few": "{{count}} gotowe do powtórki",
+      "fading_many": "{{count}} gotowych do powtórki",
+      "strong_few": "{{count}} dobrze opanowane",
+      "strong_many": "{{count}} dobrze opanowanych"
     },
     "weeklyDelta": {
-      "topicsMastered": "+{{count}} topic this week",
-      "topicsMastered_other": "+{{count}} topics this week",
-      "vocabularyTotal": "+{{count}} word this week",
-      "vocabularyTotal_other": "+{{count}} words this week",
-      "topicsExplored": "+{{count}} topic explored this week",
-      "topicsExplored_other": "+{{count}} topics explored this week"
+      "topicsMastered": "+{{count}} temat w tym tygodniu",
+      "topicsMastered_other": "+{{count}} tematów w tym tygodniu",
+      "vocabularyTotal": "+{{count}} słowo w tym tygodniu",
+      "vocabularyTotal_other": "+{{count}} słów w tym tygodniu",
+      "topicsExplored": "+{{count}} temat odkryty w tym tygodniu",
+      "topicsExplored_other": "+{{count}} tematów odkrytych w tym tygodniu",
+      "topicsMastered_one": "+{{count}} temat w tym tygodniu",
+      "topicsMastered_few": "+{{count}} tematy w tym tygodniu",
+      "topicsMastered_many": "+{{count}} tematów w tym tygodniu",
+      "vocabularyTotal_one": "+{{count}} słowo w tym tygodniu",
+      "vocabularyTotal_few": "+{{count}} słowa w tym tygodniu",
+      "vocabularyTotal_many": "+{{count}} słów w tym tygodniu",
+      "topicsExplored_one": "+{{count}} temat odkryty w tym tygodniu",
+      "topicsExplored_few": "+{{count}} tematy odkryte w tym tygodniu",
+      "topicsExplored_many": "+{{count}} tematów odkrytych w tym tygodniu"
     },
     "milestones": {
       "pageTitle": "Twoje kamienie milowe",
@@ -1737,7 +1828,10 @@
       "errorMessage": "Sprawdź połączenie i spróbuj ponownie.",
       "emptyTitle": "Brak jeszcze kamieni milowych",
       "emptySubtitle": "Ukończ sesje i opanuj tematy, aby zdobyć swój pierwszy kamień milowy.",
-      "emptyBackLabel": "Wróć do Podróży"
+      "emptyBackLabel": "Wróć do Podróży",
+      "earned_one": "Zdobyto {{count}} kamień milowy",
+      "earned_few": "Zdobyto {{count}} kamienie milowe",
+      "earned_many": "Zdobyto {{count}} kamieni milowych"
     },
     "saved": {
       "title": "Zapisane",
@@ -1808,7 +1902,17 @@
       "goneSubtitle": "Mógł zostać usunięty lub połączony z innym przedmiotem.",
       "pastConversations": "Poprzednie rozmowy",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "topicsExplored_one": "Odkryto {{count}} temat",
+      "topicsExplored_few": "Odkryto {{count}} tematy",
+      "topicsExplored_many": "Odkryto {{count}} tematów",
+      "sessionsCompleted_one": "Ukończono {{count}} sesję",
+      "sessionsCompleted_few": "Ukończono {{count}} sesje",
+      "sessionsCompleted_many": "Ukończono {{count}} sesji",
+      "startedTopicsCount_one": "Rozpoczęto {{count}} temat",
+      "startedTopicsCount_other": "Rozpoczęto {{count}} tematów",
+      "startedTopicsCount_few": "Rozpoczęto {{count}} tematy",
+      "startedTopicsCount_many": "Rozpoczęto {{count}} tematów"
     },
     "vocabulary": {
       "pageTitle": "Twoje słownictwo",
@@ -1857,7 +1961,15 @@
         "weak_one": "Ready for a refresh after {{count}} day",
         "weak_other": "Ready for a refresh after {{count}} days",
         "forgotten_one": "Last seen {{count}} day ago",
-        "forgotten_other": "Last seen {{count}} days ago"
+        "forgotten_other": "Last seen {{count}} days ago",
+        "fading_few": "Getting fuzzy after {{count}} days",
+        "fading_many": "Getting fuzzy after {{count}} days",
+        "forgotten_few": "Last seen {{count}} days ago",
+        "forgotten_many": "Last seen {{count}} days ago",
+        "remembered_few": "Remembered after {{count}} days",
+        "remembered_many": "Remembered after {{count}} days",
+        "weak_few": "Ready for a refresh after {{count}} days",
+        "weak_many": "Ready for a refresh after {{count}} days"
       }
     },
     "previousReports": {
@@ -1878,7 +1990,11 @@
       "practiceLessons_one": "{{count}} practice lesson",
       "practiceLessons_other": "{{count}} practice lessons",
       "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points"
+      "practicePoints_other": "{{count}} practice points",
+      "practiceLessons_few": "{{count}} practice lessons",
+      "practiceLessons_many": "{{count}} practice lessons",
+      "practicePoints_few": "{{count}} practice points",
+      "practicePoints_many": "{{count}} practice points"
     },
     "recentFocus": {
       "title": "Ostatnie sesje",
@@ -2045,7 +2161,36 @@
       "subjectRawMentorSummary": "Zaczęło się od „{{rawInput}}”, więc {{name}} może wciąż doprecyzowywać temat {{subject}}.",
       "subjectRawNextStep": "Jedna krótka sesja może zmienić to szerokie zainteresowanie w konkretny temat.",
       "subjectQuietSummary": "{{subject}} czeka, aż {{name}} zechce do tego wrócić.",
-      "subjectQuietNextStep": "Zacznij od jednego łatwego pytania lub tematu, aby powrót był lekki."
+      "subjectQuietNextStep": "Zacznij od jednego łatwego pytania lub tematu, aby powrót był lekki.",
+      "timeAgo": {
+        "justNow": "przed chwilą",
+        "minutes_one": "{{count}} minutę temu",
+        "minutes_other": "{{count}} minut temu",
+        "hours_one": "{{count}} godzinę temu",
+        "hours_other": "{{count}} godzin temu",
+        "days_one": "{{count}} dzień temu",
+        "days_other": "{{count}} dni temu",
+        "weeks_one": "{{count}} tydzień temu",
+        "weeks_other": "{{count}} tygodni temu",
+        "months_one": "{{count}} miesiąc temu",
+        "months_other": "{{count}} miesięcy temu",
+        "years_one": "{{count}} rok temu",
+        "years_other": "{{count}} lat temu",
+        "days_few": "{{count}} dni temu",
+        "days_many": "{{count}} dni temu",
+        "hours_few": "{{count}} godziny temu",
+        "hours_many": "{{count}} godzin temu",
+        "minutes_few": "{{count}} minuty temu",
+        "minutes_many": "{{count}} minut temu",
+        "months_few": "{{count}} miesiące temu",
+        "months_many": "{{count}} miesięcy temu",
+        "weeks_few": "{{count}} tygodnie temu",
+        "weeks_many": "{{count}} tygodni temu",
+        "years_few": "{{count}} lata temu",
+        "years_many": "{{count}} lat temu"
+      },
+      "deletionGraceDays_few": "Pozostało {{count}} dni na anulowanie usunięcia.",
+      "deletionGraceDays_many": "Pozostało {{count}} dni na anulowanie usunięcia."
     },
     "mentorMemory": {
       "title": "Pamięć mentora",
@@ -2086,7 +2231,11 @@
         "low": "Wczesny sygnał",
         "medium": "Powtarzający się wzorzec",
         "high": "Silny sygnał"
-      }
+      },
+      "attemptCount_one": "Zauważono {{count}} raz",
+      "attemptCount_other": "Zauważono {{count}} razy",
+      "attemptCount_few": "Zauważono {{count}} razy",
+      "attemptCount_many": "Zauważono {{count}} razy"
     },
     "reports": {
       "title": "Raporty",
@@ -2441,7 +2590,9 @@
         "notifyErrorBody": "Please check your connection and try again.",
         "quotaSentBody": "Powiadomiliśmy rodzica, że limit pytań został wykorzystany.",
         "quotaAskParentBody": "Poproś rodzica, aby otworzył aplikację i sprawdził szczegóły."
-      }
+      },
+      "xpStats_few": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_many": "You learned {{count}} topics and earned {{xp}} XP — great work!"
     },
     "restore": {
       "button": "Restore Purchases",
@@ -2606,7 +2757,17 @@
     "a11yStarters": "Propozycje rozpoczęcia zdania",
     "a11yWriteSummary": "Napisz podsumowanie swojej nauki",
     "a11ySkipSummary": "Pomiń podsumowanie",
-    "a11yStarterHint": "Stuknij, aby użyć tego początku zdania"
+    "a11yStarterHint": "Stuknij, aby użyć tego początku zdania",
+    "takeaways": {
+      "duration_one": "{{count}} minuta - świetna sesja!",
+      "duration_other": "{{count}} minut - świetna sesja!",
+      "exchanges_one": "Udało Ci się ukończyć {{count}} wymianę",
+      "exchanges_other": "Udało Ci się ukończyć {{count}} wymian",
+      "duration_few": "{{count}} minuty - świetna sesja!",
+      "duration_many": "{{count}} minut - świetna sesja!",
+      "exchanges_few": "Udało Ci się ukończyć {{count}} wymiany",
+      "exchanges_many": "Udało Ci się ukończyć {{count}} wymian"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -2657,7 +2818,13 @@
       "timeDays_one": "{{count}} dzień",
       "timeDays_other": "{{count}} dni",
       "hintOpenReview": "Otwiera tematy do powtórki",
-      "couldNotLoad": "Nie udało się wczytać statusu powtórek"
+      "couldNotLoad": "Nie udało się wczytać statusu powtórek",
+      "timeDays_few": "{{count}} dni",
+      "timeDays_many": "{{count}} dni",
+      "timeHours_few": "{{count}} godz.",
+      "timeHours_many": "{{count}} godz.",
+      "topicsReady_few": "{{count}} tematy gotowe",
+      "topicsReady_many": "{{count}} tematów gotowych"
     },
     "assessment": {
       "title": "Udowodnij, że to umiesz",
@@ -2667,7 +2834,9 @@
       "hintOpenPicker": "Otwiera wybór testów",
       "hintOpenLibrary": "Otwiera bibliotekę",
       "couldNotLoad": "Nie udało się wczytać tematów testów",
-      "studySubjectFirst": "Najpierw ucz się {{subject}}, aby to odblokować"
+      "studySubjectFirst": "Najpierw ucz się {{subject}}, aby to odblokować",
+      "topicsReady_few": "{{count}} tematy gotowe do testu",
+      "topicsReady_many": "{{count}} tematów gotowych do testu"
     },
     "quiz": {
       "title": "Szybki quiz",
@@ -2697,7 +2866,9 @@
       "roundsPlayed_one": "{{count}} runda rozegrana",
       "roundsPlayed_other": "{{count}} rund rozegranych",
       "noRoundsYet": "Brak rund",
-      "hintOpenHistory": "Otwiera historię quizów"
+      "hintOpenHistory": "Otwiera historię quizów",
+      "roundsPlayed_few": "{{count}} rundy rozegrane",
+      "roundsPlayed_many": "{{count}} rund rozegranych"
     }
   },
   "recaps": {
@@ -2806,7 +2977,13 @@
       "cooldownMinutes_one": "{{count}} minuta",
       "cooldownMinutes_other": "{{count}} minut",
       "cooldownSeconds_one": "{{count}} sekunda",
-      "cooldownSeconds_other": "{{count}} sekund"
+      "cooldownSeconds_other": "{{count}} sekund",
+      "cooldownHours_few": "{{count}} godziny",
+      "cooldownHours_many": "{{count}} godzin",
+      "cooldownMinutes_few": "{{count}} minuty",
+      "cooldownMinutes_many": "{{count}} minut",
+      "cooldownSeconds_few": "{{count}} sekundy",
+      "cooldownSeconds_many": "{{count}} sekund"
     },
     "alerts": {
       "topUpRetry": "Spróbuj ponownie",
@@ -3186,5 +3363,23 @@
     "sampleBadge": "Przykład",
     "sampleDataNote": "Dane przykładowe — prawdziwe informacje o postępach Twojego dziecka pojawią się po jego pierwszej sesji.",
     "sampleWeeklyBody": "Ćwiczono równania kwadratowe przez 45 minut w trakcie trzech sesji. Coraz lepsze radzenie sobie z rozkładem na czynniki; praca nad uzupełnianiem do kwadratu."
+  },
+  "milestoneCard": {
+    "wordCount_one": "Nauczono się {{count}} słowa",
+    "wordCount_other": "Nauczono się {{count}} słów",
+    "topicCount_one": "Opanowano {{count}} temat",
+    "topicCount_other": "Opanowano {{count}} tematów",
+    "sessionCount_one": "Ukończono {{count}} sesję nauki",
+    "sessionCount_other": "Ukończono {{count}} sesji nauki",
+    "hourCount_one": "{{count}} godzina nauki",
+    "hourCount_other": "{{count}} godzin nauki",
+    "hourCount_few": "{{count}} godziny nauki",
+    "hourCount_many": "{{count}} godzin nauki",
+    "sessionCount_few": "Ukończono {{count}} sesje nauki",
+    "sessionCount_many": "Ukończono {{count}} sesji nauki",
+    "topicCount_few": "Opanowano {{count}} tematy",
+    "topicCount_many": "Opanowano {{count}} tematów",
+    "wordCount_few": "Nauczono się {{count}} słów",
+    "wordCount_many": "Nauczono się {{count}} słów"
   }
 }

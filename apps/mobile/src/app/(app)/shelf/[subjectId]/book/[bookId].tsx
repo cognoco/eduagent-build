@@ -241,9 +241,6 @@ function getStartedTopicsDeleteDetails(
   };
 }
 
-function formatStartedTopicCount(count: number): string {
-  return count === 1 ? '1 started topic' : `${count} started topics`;
-}
 // ---------------------------------------------------------------------------
 // Book Screen
 // ---------------------------------------------------------------------------
@@ -343,9 +340,9 @@ export default function BookScreen() {
       } catch (error) {
         const startedTopicDetails = getStartedTopicsDeleteDetails(error);
         if (!confirmStartedTopics && startedTopicDetails) {
-          const startedLabel = formatStartedTopicCount(
-            startedTopicDetails.startedTopicCount,
-          );
+          const startedLabel = t('library.manage.deleteScopeStartedTopics', {
+            count: startedTopicDetails.startedTopicCount,
+          });
           platformAlert(
             'Delete started topics?',
             `This book has ${startedLabel}. Deleting it will also delete those topics, their learning history, progress, and notes.`,
@@ -592,9 +589,7 @@ export default function BookScreen() {
     ? 'Loading notes...'
     : noteCount === 0
       ? 'Add your first note for this book'
-      : noteCount === 1
-        ? '1 note saved for this book'
-        : `${noteCount} notes saved for this book`;
+      : t('library.book.notesSavedCount', { count: noteCount });
 
   // --- Sessions data ---
   const sessions = useMemo(

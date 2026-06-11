@@ -1,4 +1,5 @@
 import { Dimensions, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 // [BUG-711 / ACC-8] On narrow devices (<380pt) the session header right row
 // (timer | badge | dots | endButton) overflows. MilestoneDots is the
@@ -17,6 +18,7 @@ interface MilestoneDotsProps {
 }
 
 export function MilestoneDots({ count }: MilestoneDotsProps) {
+  const { t } = useTranslation();
   if (count <= 0) return null;
   const { width } = Dimensions.get('window');
   if (width < MILESTONE_DOTS_NARROW_BREAKPOINT_PT) return null;
@@ -24,8 +26,7 @@ export function MilestoneDots({ count }: MilestoneDotsProps) {
   // [BUG-645 / ACC-1] Bare colored dots are invisible to screen readers.
   // The aggregate View carries the label so VoiceOver/TalkBack reads
   // "3 milestones reached" instead of skipping the indicator entirely.
-  const accessibilityLabel =
-    count === 1 ? '1 milestone reached' : `${count} milestones reached`;
+  const accessibilityLabel = t('session.milestoneDots.reached', { count });
 
   return (
     <View

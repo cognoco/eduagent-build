@@ -4,6 +4,11 @@ import type { SubjectInventory } from '@eduagent/schemas';
 import { getSubjectTint } from '../../lib/subject-tints';
 
 jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock,
+);
+
+jest.mock(
   './AccordionTopicList' /* gc1-allow: pre-existing mock carried through PR 7 rename */,
   () => {
     const { Text } = require('react-native');

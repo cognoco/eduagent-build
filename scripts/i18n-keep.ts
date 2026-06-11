@@ -251,6 +251,13 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/hooks/use-notification-response-handler.ts:93',
   },
   {
+    pattern: 'sessionSummary.takeaways.*',
+    reason:
+      'i18next plural suffixes (_one/_other) appended at runtime by ' +
+      "buildSessionTakeaways() via t('sessionSummary.takeaways.duration', { count }) " +
+      'at apps/mobile/src/app/session-summary/_view-models/session-summary-derived.ts:123',
+  },
+  {
     pattern: 'session.messageBubble.escalation.*',
     reason:
       'selected via escalation.labelKey from ESCALATION_STYLES[escalationRung] at ' +

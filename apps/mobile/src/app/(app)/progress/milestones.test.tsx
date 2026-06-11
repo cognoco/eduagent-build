@@ -10,6 +10,7 @@ jest.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: jest.fn() },
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
+      const count = opts?.count as number | undefined;
       const map: Record<string, string> = {
         'progress.milestones.pageTitle': 'Your Milestones',
         'progress.milestones.earned': `${opts?.count ?? ''} milestone${
@@ -24,6 +25,10 @@ jest.mock('react-i18next', () => ({
         'progress.milestones.emptyBackLabel': 'Go back to Journey',
         'common.tryAgain': 'Try again',
         'common.goBack': 'Go back',
+        'milestoneCard.wordCount': `${count} ${count === 1 ? 'word' : 'words'} learned`,
+        'milestoneCard.topicCount': `${count} ${count === 1 ? 'topic' : 'topics'} mastered`,
+        'milestoneCard.sessionCount': `${count} learning ${count === 1 ? 'session' : 'sessions'} completed`,
+        'milestoneCard.hourCount': `${count} ${count === 1 ? 'hour' : 'hours'} of learning`,
       };
       if (key in map) return map[key]!;
       return key;

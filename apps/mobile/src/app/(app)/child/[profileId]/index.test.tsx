@@ -438,7 +438,8 @@ describe('ChildDetailScreen — profile overview', () => {
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
-      result.getByText(/2 hours ago/);
+      // Key-passthrough mock: t('parentView.index.timeAgo.hours', { count: 2 }) → 'parentView.index.timeAgo.hours:{"count":2}'
+      result.getByText(/2 hours ago|parentView\.index\.timeAgo\.hours/);
     });
 
     cleanup();

@@ -792,6 +792,16 @@
     "inputMode": {
       "text": "Textmodus",
       "voice": "Sprachmodus"
+    },
+    "milestoneDots": {
+      "reached_one": "1 Meilenstein erreicht",
+      "reached_other": "{{count}} Meilensteine erreicht"
+    },
+    "livingBook": {
+      "progressLabel_one": "Buchfortschritt: {{count}} Seite",
+      "progressLabel_other": "Buchfortschritt: {{count}} Seiten",
+      "pageCount_one": "{{count}} Seite",
+      "pageCount_other": "{{count}} Seiten"
     }
   },
   "quiz": {
@@ -1203,7 +1213,9 @@
       "bookmarks": {
         "savedFromChat": "Vom Chat gespeichert",
         "emptyShort": "Noch kein gespeicherter Chat für dieses Thema",
-        "emptyLong": "Noch keine gespeicherten Erklärungen für dieses Thema."
+        "emptyLong": "Noch keine gespeicherten Erklärungen für dieses Thema.",
+        "savedExplanations_one": "{{count}} gespeicherte Erklärung",
+        "savedExplanations_other": "{{count}} gespeicherte Erklärungen"
       },
       "challengeVerifiedBadge": "Herausforderung bestätigt",
       "practicedOftenHint": "Du übst dieses Thema oft — weiter so!",
@@ -1212,7 +1224,9 @@
       },
       "covers": "Dieses Thema behandelt",
       "mastered": "Gemeistert",
-      "strongReviewProgress": "{{strong}}/{{total}} starke Wiederholungen"
+      "strongReviewProgress": "{{strong}}/{{total}} starke Wiederholungen",
+      "notesSavedCount_one": "{{count}} Notiz für dieses Thema gespeichert",
+      "notesSavedCount_other": "{{count}} Notizen für dieses Thema gespeichert"
     },
     "book": {
       "readyToOpen": "Bereit zum Öffnen",
@@ -1248,7 +1262,9 @@
       "addFirstNote": "+ Füge deine erste Notiz für dieses Buch hinzu",
       "backToSubject": "Zurück zum Thema →",
       "finishedBody_one": "Du hast das einzige Thema in diesem Buch gelernt. Wiederhole es, damit es frisch im Gedächtnis bleibt, oder gehe zurück und wähle aus, was du als Nächstes lernen möchtest.",
-      "finishedBody_other": "Du hast alle {{count}} Themen in diesem Buch gelernt. Wiederhole sie, damit sie frisch im Gedächtnis bleiben, oder gehe zurück und wähle aus, was du als Nächstes lernen möchtest."
+      "finishedBody_other": "Du hast alle {{count}} Themen in diesem Buch gelernt. Wiederhole sie, damit sie frisch im Gedächtnis bleiben, oder gehe zurück und wähle aus, was du als Nächstes lernen möchtest.",
+      "notesSavedCount_one": "{{count}} Notiz für dieses Buch gespeichert",
+      "notesSavedCount_other": "{{count}} Notizen für dieses Buch gespeichert"
     },
     "notStartedCount": "{{notStarted}} / {{total}} nicht begonnen",
     "chooseTopic": "Wähle ein Thema",
@@ -1278,7 +1294,9 @@
       "stillStuck": "Hängst du fest?",
       "errorTitle": "Etwas ist schiefgelaufen",
       "timeoutTitle": "Noch am Warten…",
-      "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal."
+      "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal.",
+      "dontRememberFirst": "Weiß ich nicht mehr.",
+      "dontRememberAgain": "Stecke immer noch fest."
     },
     "lastStudied": "Zuletzt gelernt {{when}}",
     "neverStudied": "Nie gelernt",
@@ -1777,7 +1795,9 @@
       "goneSubtitle": "Es wurde möglicherweise entfernt oder in ein anderes Fach integriert.",
       "pastConversations": "Vergangene Gespräche",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "startedTopicsCount_one": "{{count}} Thema begonnen",
+      "startedTopicsCount_other": "{{count}} Themen begonnen"
     },
     "vocabulary": {
       "pageTitle": "Deine Vokabeln",
@@ -2014,7 +2034,22 @@
       "subjectRawMentorSummary": "Das begann mit „{{rawInput}}“, also findet {{name}} vielleicht noch die richtige Form für {{subject}}.",
       "subjectRawNextStep": "Eine kleine Sitzung kann dieses breite Interesse in ein konkretes Thema verwandeln.",
       "subjectQuietSummary": "{{subject}} ist bereit, wenn {{name}} dazu zurückkehren möchte.",
-      "subjectQuietNextStep": "Beginne mit einer leichten Frage oder einem Thema, damit der Neustart sich locker anfühlt."
+      "subjectQuietNextStep": "Beginne mit einer leichten Frage oder einem Thema, damit der Neustart sich locker anfühlt.",
+      "timeAgo": {
+        "justNow": "gerade eben",
+        "minutes_one": "vor {{count}} Min.",
+        "minutes_other": "vor {{count}} Min.",
+        "hours_one": "vor {{count}} Stunde",
+        "hours_other": "vor {{count}} Stunden",
+        "days_one": "vor {{count}} Tag",
+        "days_other": "vor {{count}} Tagen",
+        "weeks_one": "vor {{count}} Woche",
+        "weeks_other": "vor {{count}} Wochen",
+        "months_one": "vor {{count}} Monat",
+        "months_other": "vor {{count}} Monaten",
+        "years_one": "vor {{count}} Jahr",
+        "years_other": "vor {{count}} Jahren"
+      }
     },
     "mentorMemory": {
       "title": "Mentor-Gedächtnis",
@@ -2055,7 +2090,9 @@
         "low": "Frühes Signal",
         "medium": "Wiederholtes Muster",
         "high": "Starkes Signal"
-      }
+      },
+      "attemptCount_one": "{{count}} Mal bemerkt",
+      "attemptCount_other": "{{count}} Mal bemerkt"
     },
     "reports": {
       "title": "Berichte",
@@ -2575,7 +2612,13 @@
     "a11yStarters": "Vorschläge für Satzanfänge",
     "a11yWriteSummary": "Deine Lernzusammenfassung schreiben",
     "a11ySkipSummary": "Zusammenfassung überspringen",
-    "a11yStarterHint": "Tippen, um diesen Satzanfang zu verwenden"
+    "a11yStarterHint": "Tippen, um diesen Satzanfang zu verwenden",
+    "takeaways": {
+      "duration_one": "{{count}} Minute – tolle Sitzung!",
+      "duration_other": "{{count}} Minuten – tolle Sitzung!",
+      "exchanges_one": "Du hast {{count}} Austausch geschafft",
+      "exchanges_other": "Du hast {{count}} Austausche geschafft"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3176,5 +3219,15 @@
     "sampleBadge": "Beispiel",
     "sampleDataNote": "Beispieldaten – die echten Einblicke deines Kindes erscheinen nach der ersten Sitzung.",
     "sampleWeeklyBody": "Übte quadratische Gleichungen für 45 Minuten in drei Sitzungen. Wird sicherer beim Faktorisieren; arbeitet an der quadratischen Ergänzung."
+  },
+  "milestoneCard": {
+    "wordCount_one": "{{count}} Wort gelernt",
+    "wordCount_other": "{{count}} Wörter gelernt",
+    "topicCount_one": "{{count}} Thema gemeistert",
+    "topicCount_other": "{{count}} Themen gemeistert",
+    "sessionCount_one": "{{count}} Lernsitzung abgeschlossen",
+    "sessionCount_other": "{{count}} Lernsitzungen abgeschlossen",
+    "hourCount_one": "{{count}} Stunde gelernt",
+    "hourCount_other": "{{count}} Stunden gelernt"
   }
 }
