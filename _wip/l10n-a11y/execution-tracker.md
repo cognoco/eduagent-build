@@ -146,8 +146,8 @@ overlapping component files — keep adjacent/serial).
 |---|---|---|
 | 1 | WI-621 WP-L12-jsx-strings | **done** — 3 PRs (A #942 · B #961 · C #985), baseline 361→12, translate-pipeline plural fix shipped; CLOSED Done first-pass 2026-06-11 |
 | 2 | WI-622 WP-L12-sr-announcements | **done** — PR #940 merged `ce8b10ab9`; children WI-635/636 swept; CLOSED Done by autonomous review 2026-06-11 (first WP through the PRG-12 loop, zero human touches) |
-| 3 | WI-623 WP-L12-modal-focus-roles | in-progress — dispatched wi623-executor (jumped queue: WI-625 gated on PR #985's translate-prune fix) |
-| 4 | WI-624 WP-L12-label-prop-strings | ready — bridged (children WI-655/656); after WI-621 lands (same screens, attribute pass) |
+| 3 | WI-623 WP-L12-modal-focus-roles | review — PR #997 **MERGED** `82dc84c9f` (2 rounds: NudgeBanner composed label fix); children WI-653/654 swept; `complete` firing |
+| 4 | WI-624 WP-L12-label-prop-strings | in-progress — dispatched wi624-executor (adjacency cleared: WI-621 + WI-623 landed); sizing checkpoint mandated at ~120 strings/35 files |
 | 5 | WI-625 WP-L12-pluralization | in-progress — dispatched wi625-executor (unblocked by #985's translate-pipeline fix; scope includes the 36 pre-existing families lacking pl few/many) |
 | 6 | WI-626 WP-L12-mobile-logic-bugs | **done** — PR #959 merged `0a7b07dbe` (5 CI rounds, all red-verified); one bounce on a flaky landing check refuted (program adjudication: the session-test red was one-off suite-interference flake on WI-626's own merge run, rerun green; the shepherd's interim "#931 broke main" theory was WRONG — #931 was an innocent comment-only sweep); CLOSED Done on re-review 2026-06-11 |
 | 7 | WI-627 WP-L12-dates-locale | **done** — PR #993 merged `1f5574e63` (3 rounds); children WI-659/660 swept; CLOSED Done 2026-06-11 |
