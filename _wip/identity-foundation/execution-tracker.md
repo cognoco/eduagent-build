@@ -131,15 +131,15 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-549 | WP-W0-patch-api | close 7 live api security defects (F-117/118/122/130/133/144/145) | WP | P0 | — | **done** — Closed/Done, PR #817 (merged 2026-06-10) |
 | WI-550 | WP-W0-patch-inngest | close 3 live inngest security defects (F-019/020/092) | WP | P1 | — | **done** — Closed/Done, PR #818 (merged 2026-06-10) |
 | WI-551 | IT-W0-patch-billing | trial-expiry standalone patch (F-121) | Item | P0 | — | **done** — Closed/Done, fixed in `c5c9b39bb` (2026-06-10) |
-| WI-569 | WP-W0-baseline | migration-chain baseline reset (`MMT-ADR-0012`) | WP | P1 | — (W0-labeled but travels with the gated rewrite) | **review** — Stage=Reviewing 2026-06-10, Fixed In `a16642538`, PR #845 MERGED (shepherd-verified green); dev+staging reset + verified; awaiting `/cosmo:review` (operator) |
+| WI-569 | WP-W0-baseline | migration-chain baseline reset (`MMT-ADR-0012`) | WP | P1 | — (W0-labeled but travels with the gated rewrite) | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #845, `a16642538`). **G2 tripped** — first WP through the full lifecycle |
 
 ### W1 — structural foundation (critical-path ROOT)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **review** — Stage=Reviewing 2026-06-10, PR #855 MERGED 23:01Z (shepherd-verified: 6/6 green; age changes canon-backed by data-model §2A.5 + compliance register; loginId-FK P2 dispositioned in-thread); awaiting `/cosmo:review` |
-| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **review** — Stage=Reviewing, PR #860 MERGED 2026-06-11 08:00Z after cleanup round (plan file removed, P2 threads dispositioned, true green verified live by shepherd); awaiting `/cosmo:review` |
-| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **review** — Stage=Reviewing 2026-06-11, PR #859 MERGED 23:33Z (shepherd-verified: 6/6 green, 0 open threads, SCC break independently verified — import graph now a DAG via `age-utils` leaf + `notifications/email` extraction); no reintroduction guard test added (consider for W2); awaiting `/cosmo:review` |
+| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #855); children WI-591/592 bulk-closed with parent |
+| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #860); children WI-594/595 bulk-closed by shepherd 2026-06-11 (the review missed them — mirrored the WI-570 pattern) |
+| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #859); children WI-596/597 closed with parent. No SCC-reintroduction guard test (consider during W2) |
 | WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **in-progress** — executor dispatched 2026-06-11 (`wi573-executor`, parallel with WI-574) |
 
 ### W2 — identity / consent / proxy / age (critical path)
