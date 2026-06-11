@@ -158,7 +158,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi577-executor`) |
 | WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready (dispatch held)** — deps met; held until WI-577 merges (shared Inngest-function surface, conflict risk) |
 | WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi579-executor`) |
-| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi580-executor`) |
+| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **in-progress (PR open)** — PR #900 (head 24d28dcdf, CI running): adult-owner-only name gating, two-layer fail-closed, red-green break tests, zero eval-snapshot drift. Eval-hook gate-gap it exposed captured as WI-619 |
 | WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **in-progress** — executor dispatched 2026-06-11 (`wi581-executor`) immediately on WI-576's merge |
 | WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi582-executor`) |
 
@@ -166,7 +166,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress (rework 2)** — follow-up PR #897 open (head 7a0d387ad, CI running): Stripe-path `handleTierChange` re-reads tier inside the transaction, 2 mirrored coherence tests, sibling sweep evidenced clean (no further stale-read sites). A DIFFERENT defect class found during the sweep (F-124-sibling re-attribution gaps in dormant Stripe-deleted/trial-downgrade paths) captured as WI-618 (Bug, P3, Captured) — deliberately out of WI-583 scope. CODEOWNERS approval will be needed again at merge |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress (rework 2, round 2)** — PR #897 went green (Claude review APPROVED) but a Codex P1 thread escalated the concurrency fix: in-tx read without row lock doesn't serialize concurrent webhooks under READ COMMITTED. Executor triaging: FOR UPDATE (or atomic conditional UPDATE) on BOTH paths incl. the RevenueCat sibling from #876. WI-618 (F-124-sibling re-attribution gaps in dormant paths, Bug P3) captured from the sweep. CODEOWNERS approval still needed at merge |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer (PR #874). First WI through the full loop with zero human touches |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
