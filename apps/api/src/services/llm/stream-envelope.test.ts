@@ -232,6 +232,50 @@ describe('streamEnvelopeReply', () => {
       const stream = streamEnvelopeReply(chunked(raw, 6));
       expect(await collect(stream)).toBe('fenced');
     });
+
+    // Deterministic property check: for adversarial envelope shapes, the
+    // streamed reply must equal the parsed top-level reply under many
+    // different chunk fragmentations (seeded LCG — fully reproducible).
+    const adversarialEnvelopes: string[] = [
+      '{"x":{"reply":"AAA","arr":[{"reply":"B"}]},"reply":"top level","signals":{"partial_progress":true}}',
+      '{"a":"val with \\"reply\\": fake","b":{"c":"{\\"reply\\":\\"nope\\"}"},"reply":"real one","confidence":"high"}',
+      '```json\n{"meta":[1,2,{"reply":"no"}],"reply":"fenced real","ui_hints":{}}\n```',
+      '{"deep":{"deeper":{"deepest":{"reply":"x"}}},"reply":"surface","private_sources":{"relied_on":["a"]}}',
+      '{"weird key with spaces":"v","reply":"after weird","signals":{}}',
+      '{"a":123,"b":true,"c":null,"reply":"after scalars"}',
+      '{"a":[[],[[{"reply":"nested arr"}]]],"reply":"after arrays"}',
+    ];
+
+    async function* chunkSeeded(
+      text: string,
+      seed: number,
+    ): AsyncGenerator<string> {
+      let s = seed;
+      let i = 0;
+      while (i < text.length) {
+        s = (s * 1103515245 + 12345) % 2147483648;
+        const n = 1 + (s % 7);
+        yield text.slice(i, i + n);
+        i += n;
+      }
+    }
+
+    it.each(adversarialEnvelopes.map((raw) => [raw]))(
+      'streamed reply equals parsed top-level reply under 25 chunkings — case %#',
+      async (raw) => {
+        const parsed = parseEnvelope(raw, 'exchange.session', {
+          silent: true,
+        });
+        expect(parsed.ok).toBe(true);
+        if (!parsed.ok) return;
+        for (let seed = 1; seed <= 25; seed += 1) {
+          const streamed = await collect(
+            streamEnvelopeReply(chunkSeeded(raw, seed)),
+          );
+          expect(streamed).toBe(parsed.envelope.reply);
+        }
+      },
+    );
   });
 
   // ---- [LITERAL-ESCAPE] Defensive normalizer for double-escaping LLMs ----
