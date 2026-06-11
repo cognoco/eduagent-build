@@ -22,6 +22,7 @@ type TestEnv = {
   Variables: {
     db: unknown;
     profileId: string | undefined;
+    profileMeta: undefined;
     user: unknown;
   };
 };
@@ -31,6 +32,7 @@ function makeApp(profileId = 'profile-1') {
   app.use('*', async (c, next) => {
     c.set('db', { kind: 'db' });
     c.set('profileId', profileId);
+    c.set('profileMeta', undefined);
     await next();
   });
   app.route('/v1', nowRoutes);
