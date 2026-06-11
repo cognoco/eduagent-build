@@ -892,7 +892,6 @@
       "reviewFailedTitle": "Falló la revisión",
       "tryAgain": "Intentar de nuevo",
       "skip": "Omitir",
-      "couldNotSaveDictation": "No pudimos guardar el resultado de tu dictado.",
       "couldNotSaveTitle": "No se pudo guardar tu resultado",
       "continueWithoutSaving": "Continuar sin guardar",
       "tookTooLong": "Eso tardó demasiado — inténtalo de nuevo",
@@ -1488,7 +1487,6 @@
     "startLearning": "Empezar a aprender",
     "keepLearning": "Seguir aprendiendo",
     "refreshFailedTitle": "Falló la actualización",
-    "refreshFailed": "No pudimos actualizar tu progreso en este momento.",
     "hero": {
       "sessionsCompleted": "{{count}} sesión completada",
       "sessionsCompleted_other": "{{count}} sesiones completadas",
@@ -1592,7 +1590,6 @@
       "deleteConfirm": "Quitar",
       "deleteErrorTitle": "No se pudo quitar el marcador",
       "errorLoad": "No se pudieron cargar tus respuestas guardadas.",
-      "errorNetwork": "Revisa tu conexión e inténtalo de nuevo.",
       "retryLabel": "Reintentar carga de marcadores guardados",
       "emptyTitle": "Nada guardado todavía",
       "emptySubtitle": "Marca páginas durante las sesiones para encontrarlas aquí.",

@@ -917,7 +917,6 @@
       "reviewFailedTitle": "Sprawdzanie nieudane",
       "tryAgain": "Spróbuj ponownie",
       "skip": "Pomiń",
-      "couldNotSaveDictation": "Nie mogliśmy zapisać wyniku Twojego dyktanda.",
       "couldNotSaveTitle": "Nie można zapisać wyniku",
       "continueWithoutSaving": "Kontynuuj bez zapisywania",
       "tookTooLong": "To trwało zbyt długo — spróbuj ponownie",
@@ -1513,7 +1512,6 @@
     "startLearning": "Rozpocznij naukę",
     "keepLearning": "Kontynuuj naukę",
     "refreshFailedTitle": "Odświeżanie nie powiodło się",
-    "refreshFailed": "Nie mogliśmy teraz odświeżyć Twoich postępów.",
     "hero": {
       "sessionsCompleted": "Ukończono {{count}} sesję",
       "sessionsCompleted_other": "Ukończono {{count}} sesji",
@@ -1617,7 +1615,6 @@
       "deleteConfirm": "Usuń",
       "deleteErrorTitle": "Nie można usunąć zakładki",
       "errorLoad": "Nie można załadować zapisanych odpowiedzi.",
-      "errorNetwork": "Sprawdź połączenie i spróbuj ponownie.",
       "retryLabel": "Spróbuj ponownie załadować zapisane zakładki",
       "emptyTitle": "Jeszcze nic nie zapisano",
       "emptySubtitle": "Dodawaj zakładki do stron podczas sesji, aby je tutaj znaleźć.",

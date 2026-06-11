@@ -16,7 +16,10 @@ import { LatestReportCard } from './_components/LatestReportCard';
 import { RecentFocusCard } from './_components/RecentFocusCard';
 import { ProgressStatsChips } from './_components/ProgressStatsChips';
 import { platformAlert } from '../../../lib/platform-alert';
-import { classifyApiError } from '../../../lib/format-api-error';
+import {
+  classifyApiError,
+  formatApiError,
+} from '../../../lib/format-api-error';
 import {
   useFocusEffect,
   useLocalSearchParams,
@@ -230,9 +233,10 @@ export default function ProgressScreen(): React.ReactElement {
           }
         } catch (err) {
           if (options?.alertOnError !== false) {
-            const message =
-              err instanceof Error ? err.message : t('progress.refreshFailed');
-            platformAlert(t('progress.refreshFailedTitle'), message);
+            platformAlert(
+              t('progress.refreshFailedTitle'),
+              formatApiError(err),
+            );
           }
         }
       }

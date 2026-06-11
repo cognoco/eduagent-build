@@ -123,6 +123,15 @@ jest.mock(
   () => ({
     formatApiError: (error: unknown) =>
       error instanceof Error ? error.message : 'Something went wrong',
+    extractApiErrorCode: (error: unknown) => {
+      if (!error || typeof error !== 'object') return undefined;
+      const e = error as {
+        apiCode?: string;
+        errorCode?: string;
+        code?: string;
+      };
+      return e.apiCode ?? e.errorCode ?? e.code;
+    },
   }),
 );
 
@@ -381,6 +390,47 @@ describe('CreateSubjectScreen', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('[F-110] surfaces a non-curriculum CONFLICT as an error instead of retrying it as preparing', async () => {
+    // Guard-narrowness regression: extractApiErrorCode alone matches ANY
+    // 409 CONFLICT. Only the curriculum-preparing conflict (message
+    // "Curriculum is still being prepared") may be swallowed and retried;
+    // any other CONFLICT must propagate to the error UI.
+    setResolveResponse({
+      status: 'direct_match',
+      resolvedName: 'Ancient History',
+      suggestions: [],
+      displayMessage: 'Ancient History works.',
+    });
+    createSubjectResponse = {
+      subject: { id: 'subject-history', name: 'Ancient History' },
+    };
+
+    let firstCurriculumCalls = 0;
+    mockFetch.setRoute('/sessions/first-curriculum', () => {
+      firstCurriculumCalls++;
+      return new Response(
+        JSON.stringify({
+          code: 'CONFLICT',
+          message: 'Session is not eligible for Library filing.',
+        }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    await enterSubjectName('Ancient History');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('create-subject-error');
+    });
+
+    // Not retried: a single call, no preparing-and-wait loop.
+    expect(firstCurriculumCalls).toBe(1);
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('falls back to the learning session surface when first lesson preparation keeps returning conflicts', async () => {

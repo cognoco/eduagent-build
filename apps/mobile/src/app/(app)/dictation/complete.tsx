@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { platformAlert } from '../../../lib/platform-alert';
+import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useDictationData } from './_layout';
@@ -254,21 +255,23 @@ export default function DictationCompleteScreen(): React.ReactElement {
           latestReviewAttemptRef.current !== attemptId
         )
           return;
-        const message =
-          err instanceof Error ? err.message : t('errors.generic');
-        platformAlert(t('dictation.complete.reviewFailedTitle'), message, [
-          {
-            text: t('dictation.complete.tryAgain'),
-            onPress: () => void handleCheckWriting(),
-          },
-          {
-            text: t('dictation.complete.skip'),
-            style: 'cancel',
-            onPress: () => {
-              reviewCancelledRef.current = true;
+        platformAlert(
+          t('dictation.complete.reviewFailedTitle'),
+          formatApiError(err),
+          [
+            {
+              text: t('dictation.complete.tryAgain'),
+              onPress: () => void handleCheckWriting(),
             },
-          },
-        ]);
+            {
+              text: t('dictation.complete.skip'),
+              style: 'cancel',
+              onPress: () => {
+                reviewCancelledRef.current = true;
+              },
+            },
+          ],
+        );
       }
     } finally {
       if (latestReviewAttemptRef.current === attemptId) {
@@ -301,21 +304,21 @@ export default function DictationCompleteScreen(): React.ReactElement {
       // tell the user honestly and offer Retry / Continue.
       doneInFlightRef.current = false;
       console.warn('[dictation] result recording failed:', err);
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : t('dictation.complete.couldNotSaveDictation');
-      platformAlert(t('dictation.complete.couldNotSaveTitle'), message, [
-        {
-          text: t('common.retry'),
-          onPress: () => void handleDone(),
-        },
-        {
-          text: t('dictation.complete.continueWithoutSaving'),
-          style: 'cancel',
-          onPress: () => router.replace('/(app)/practice' as Href),
-        },
-      ]);
+      platformAlert(
+        t('dictation.complete.couldNotSaveTitle'),
+        formatApiError(err),
+        [
+          {
+            text: t('common.retry'),
+            onPress: () => void handleDone(),
+          },
+          {
+            text: t('dictation.complete.continueWithoutSaving'),
+            style: 'cancel',
+            onPress: () => router.replace('/(app)/practice' as Href),
+          },
+        ],
+      );
       return;
     }
 

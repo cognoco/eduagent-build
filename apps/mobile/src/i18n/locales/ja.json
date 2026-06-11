@@ -892,7 +892,6 @@
       "reviewFailedTitle": "レビューに失敗しました",
       "tryAgain": "再試行",
       "skip": "スキップ",
-      "couldNotSaveDictation": "ディクテーションの結果を保存できませんでした。",
       "couldNotSaveTitle": "結果を保存できませんでした",
       "continueWithoutSaving": "保存せずに続ける",
       "tookTooLong": "時間がかかりすぎました — もう一度お試しください",
@@ -1488,7 +1487,6 @@
     "startLearning": "学習を開始",
     "keepLearning": "学習を続ける",
     "refreshFailedTitle": "更新に失敗しました",
-    "refreshFailed": "現在、進捗を更新できませんでした。",
     "hero": {
       "sessionsCompleted": "{{count}}セッション完了",
       "sessionsCompleted_other": "{{count}}セッション完了",
@@ -1592,7 +1590,6 @@
       "deleteConfirm": "削除",
       "deleteErrorTitle": "ブックマークを削除できませんでした",
       "errorLoad": "保存した回答を読み込めませんでした。",
-      "errorNetwork": "接続を確認して、もう一度お試しください。",
       "retryLabel": "保存したブックマークの読み込みを再試行",
       "emptyTitle": "まだ何も保存されていません",
       "emptySubtitle": "セッション中にページをブックマークすると、ここに表示されます。",

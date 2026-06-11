@@ -64,6 +64,16 @@ jest.mock('expo-router', () => ({
 
 // ── External native/UI module boundaries (gc1-allow) ────────────────────────
 
+const mockFormatApiError = jest.fn((err: unknown) =>
+  err instanceof Error ? `classified:${err.message}` : 'classified:unknown',
+);
+jest.mock(
+  '../../../lib/format-api-error' /* gc1-allow: format-api-error calls i18next which requires expo-localization/async-storage init unavailable in jest */,
+  () => ({
+    formatApiError: (err: unknown) => mockFormatApiError(err),
+  }),
+);
+
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: unit test boundary; real impl requires expo-router Router */,
   () => ({
@@ -275,10 +285,16 @@ describe('SavedBookmarksScreen', () => {
       screen.getByText("We couldn't load your saved items");
     });
 
-    it('shows the network error message from the thrown error', () => {
+    it('[F-110] routes load error through formatApiError boundary, not raw instanceof check', () => {
       mockHooks({ isError: true });
       render(<SavedBookmarksScreen />);
-      screen.getByText('Network failure');
+      // The error message is the classified output of formatApiError, not the
+      // raw Error.message — this verifies the boundary rule (screens must never
+      // bypass the shared error classifier).
+      expect(mockFormatApiError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Network failure' }),
+      );
+      screen.getByText('classified:Network failure');
     });
 
     it('shows retry button with correct testID', () => {
@@ -441,10 +457,9 @@ describe('SavedBookmarksScreen', () => {
       });
     });
 
-    it('shows an error alert when deletion fails', async () => {
-      mockDeleteBookmarkMutateAsync.mockRejectedValueOnce(
-        new Error('Server failure'),
-      );
+    it('[F-110] routes delete error through formatApiError boundary, not raw instanceof check', async () => {
+      const deleteErr = new Error('Server failure');
+      mockDeleteBookmarkMutateAsync.mockRejectedValueOnce(deleteErr);
       mockHooks({ bookmarks: [BOOKMARK_1] });
       render(<SavedBookmarksScreen />);
       fireEvent.press(screen.getByTestId('bookmark-delete-bk-1'));
@@ -456,9 +471,10 @@ describe('SavedBookmarksScreen', () => {
       buttons.find((b) => b.text === 'Delete')?.onPress?.();
 
       await waitFor(() => {
+        expect(mockFormatApiError).toHaveBeenCalledWith(deleteErr);
         expect(mockPlatformAlert).toHaveBeenLastCalledWith(
           'Could not delete bookmark',
-          'Server failure',
+          'classified:Server failure',
         );
       });
     });

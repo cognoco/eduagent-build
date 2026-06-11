@@ -892,7 +892,6 @@
       "reviewFailedTitle": "Gjennomgang mislyktes",
       "tryAgain": "Prøv igjen",
       "skip": "Hopp over",
-      "couldNotSaveDictation": "Vi kunne ikke lagre diktatresultatet ditt.",
       "couldNotSaveTitle": "Kunne ikke lagre resultatet ditt",
       "continueWithoutSaving": "Fortsett uten å lagre",
       "tookTooLong": "Det tok for lang tid – prøv igjen",
@@ -1488,7 +1487,6 @@
     "startLearning": "Start læring",
     "keepLearning": "Fortsett å lære",
     "refreshFailedTitle": "Oppdatering mislyktes",
-    "refreshFailed": "Vi kunne ikke oppdatere fremgangen din akkurat nå.",
     "hero": {
       "sessionsCompleted": "{{count}} økt fullført",
       "sessionsCompleted_other": "{{count}} økter fullført",
@@ -1592,7 +1590,6 @@
       "deleteConfirm": "Fjern",
       "deleteErrorTitle": "Kunne ikke fjerne bokmerke",
       "errorLoad": "Kunne ikke laste dine lagrede svar.",
-      "errorNetwork": "Sjekk tilkoblingen din og prøv igjen.",
       "retryLabel": "Prøv å laste lagrede bokmerker på nytt",
       "emptyTitle": "Ingenting lagret ennå",
       "emptySubtitle": "Bokmerk sider under økter for å finne dem her.",

@@ -892,7 +892,6 @@
       "reviewFailedTitle": "Überprüfung fehlgeschlagen",
       "tryAgain": "Erneut versuchen",
       "skip": "Überspringen",
-      "couldNotSaveDictation": "Wir konnten dein Diktatergebnis nicht speichern.",
       "couldNotSaveTitle": "Dein Ergebnis konnte nicht gespeichert werden",
       "continueWithoutSaving": "Ohne Speichern fortfahren",
       "tookTooLong": "Das hat zu lange gedauert – versuche es erneut",
@@ -1488,7 +1487,6 @@
     "startLearning": "Lernen starten",
     "keepLearning": "Weiterlernen",
     "refreshFailedTitle": "Update fehlgeschlagen",
-    "refreshFailed": "Wir konnten deinen Fortschritt gerade nicht aktualisieren.",
     "hero": {
       "sessionsCompleted": "{{count}} Sitzung abgeschlossen",
       "sessionsCompleted_other": "{{count}} Sitzungen abgeschlossen",
@@ -1592,7 +1590,6 @@
       "deleteConfirm": "Entfernen",
       "deleteErrorTitle": "Lesezeichen konnte nicht entfernt werden",
       "errorLoad": "Deine gespeicherten Antworten konnten nicht geladen werden.",
-      "errorNetwork": "Bitte überprüfe deine Verbindung und versuche es erneut.",
       "retryLabel": "Gespeicherte Lesezeichen erneut laden",
       "emptyTitle": "Noch nichts gespeichert",
       "emptySubtitle": "Setze während der Sitzungen Lesezeichen, um sie hier zu finden.",

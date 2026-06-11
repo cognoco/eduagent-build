@@ -978,7 +978,6 @@
       "reviewFailedTitle": "Review failed",
       "tryAgain": "Try again",
       "skip": "Skip",
-      "couldNotSaveDictation": "We couldn't save your dictation result.",
       "couldNotSaveTitle": "Couldn't save your result",
       "continueWithoutSaving": "Continue without saving",
       "tookTooLong": "That took too long — try again",
@@ -1581,7 +1580,6 @@
     "startLearning": "Start learning",
     "keepLearning": "Keep learning",
     "refreshFailedTitle": "Refresh failed",
-    "refreshFailed": "We couldn't refresh your progress right now.",
     "hero": {
       "sessionsCompleted": "{{count}} session completed",
       "sessionsCompleted_other": "{{count}} sessions completed",
@@ -1725,7 +1723,6 @@
       "deleteConfirm": "Remove",
       "deleteErrorTitle": "Could not remove bookmark",
       "errorLoad": "Couldn't load your saved responses.",
-      "errorNetwork": "Please check your connection and try again.",
       "retryLabel": "Retry loading saved bookmarks",
       "emptyTitle": "Nothing saved yet",
       "emptySubtitle": "Bookmark pages during sessions to find them here.",

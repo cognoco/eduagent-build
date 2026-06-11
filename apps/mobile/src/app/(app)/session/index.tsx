@@ -61,9 +61,9 @@ import { useMilestoneTracker } from '../../../hooks/use-milestone-tracker';
 import { useChallengeRound } from '../../../hooks/use-challenge-round';
 import {
   useApiClient,
-  NotFoundError,
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
+import { classifyApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { useCreateNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
@@ -640,7 +640,8 @@ function SessionScreenInner() {
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
   const activeHomeworkProblem = homeworkProblemsState[currentProblemIndex];
   const sessionExpired =
-    !!routeSessionId && transcript.error instanceof NotFoundError;
+    !!routeSessionId &&
+    classifyApiError(transcript.error).category === 'not-found';
 
   useEffect(() => {
     const round = activeSession.data?.metadata?.challengeRound;
