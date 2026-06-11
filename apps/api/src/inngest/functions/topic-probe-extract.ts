@@ -144,6 +144,10 @@ export async function handleTopicProbeExtract({
     return { skipped: 'invalid_payload' };
   }
 
+  // PII egress: step returns are memoized into Inngest's third-party state
+  // store. `metadata` (which can carry prior runs' extractedSignals) and
+  // `sessionType` are deliberately not selected — the handler only needs the
+  // identifiers to validate the event reference.
   const session = await step.run('load-session', async () => {
     const db = getStepDatabase();
     const [row] = await db
@@ -152,8 +156,6 @@ export async function handleTopicProbeExtract({
         profileId: learningSessions.profileId,
         subjectId: learningSessions.subjectId,
         topicId: learningSessions.topicId,
-        metadata: learningSessions.metadata,
-        sessionType: learningSessions.sessionType,
       })
       .from(learningSessions)
       .where(
@@ -173,35 +175,12 @@ export async function handleTopicProbeExtract({
     return { skipped: 'subject_changed' };
   }
 
-  const history = await step.run('load-transcript', async () => {
-    const db = getStepDatabase();
-    return loadTopicProbeHistory(db, payload.profileId, payload.sessionId);
-  });
-  if (history.length === 0) {
-    return { skipped: 'empty_transcript', sessionId: payload.sessionId };
-  }
-
-  const extractedSignals = await step.run('extract-signals', () =>
-    extractSignalsFromExchangeHistory(history),
-  );
-  const parsedSignalsResult =
-    extractedInterviewSignalsSchema.safeParse(extractedSignals);
-  const parsedSignals = parsedSignalsResult.success
-    ? parsedSignalsResult.data
-    : defaultExtractedSignals(history);
-  if (!parsedSignalsResult.success) {
-    logger.warn('[topic-probe-extract] extracted signals failed validation', {
-      event: 'topic_probe.extract_invalid_signals',
-      profileId: payload.profileId,
-      sessionId: payload.sessionId,
-      topicId: payload.topicId,
-      issues: parsedSignalsResult.error.issues.map((issue) => ({
-        path: issue.path.join('.'),
-        message: issue.message,
-      })),
-    });
-  }
-
+  // Runs before the extraction step so its memoized return (a bare quality
+  // number, non-PII) is available to the metadata write inside the merged
+  // extract-signals closure. On an empty/purged transcript the
+  // learner-message lookup below comes up empty and this step no-ops (no
+  // card row created, no LLM call) — matching the pre-reorder behavior where
+  // seeding never ran for empty transcripts.
   const priorKnowledgeQuality = await step.run(
     'seed-retention-card',
     async () => {
@@ -251,8 +230,43 @@ export async function handleTopicProbeExtract({
     },
   );
 
-  await step.run('persist-session-metadata', async () => {
+  // PII egress: the transcript (F-028) and the inferred learner signals
+  // (F-091) must never ride a memoized step return, so loading, extraction,
+  // and persistence share ONE step closure — both stay local variables and
+  // only an opaque signal count crosses the step boundary. Every operation
+  // in here is idempotent under step-level retry: the transcript load is a
+  // read, the LLM extraction is repeatable, and the metadata write is a
+  // jsonb_set overwrite keyed on the same session row.
+  const extraction = await step.run('extract-signals', async () => {
     const db = getStepDatabase();
+    const history = await loadTopicProbeHistory(
+      db,
+      payload.profileId,
+      payload.sessionId,
+    );
+    if (history.length === 0) {
+      return { skipped: true as const };
+    }
+
+    const extractedSignals = await extractSignalsFromExchangeHistory(history);
+    const parsedSignalsResult =
+      extractedInterviewSignalsSchema.safeParse(extractedSignals);
+    const parsedSignals = parsedSignalsResult.success
+      ? parsedSignalsResult.data
+      : defaultExtractedSignals(history);
+    if (!parsedSignalsResult.success) {
+      logger.warn('[topic-probe-extract] extracted signals failed validation', {
+        event: 'topic_probe.extract_invalid_signals',
+        profileId: payload.profileId,
+        sessionId: payload.sessionId,
+        topicId: payload.topicId,
+        issues: parsedSignalsResult.error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+        })),
+      });
+    }
+
     const extractedAt = new Date().toISOString();
     const basePatch = sql`jsonb_set(
       jsonb_set(
@@ -288,15 +302,24 @@ export async function handleTopicProbeExtract({
           eq(learningSessions.profileId, payload.profileId),
         ),
       );
+
+    return {
+      skipped: false as const,
+      signalCount:
+        parsedSignals.goals.length +
+        (parsedSignals.interests?.length ?? 0) +
+        (parsedSignals.currentKnowledge ? 1 : 0),
+    };
   });
+
+  if (extraction.skipped) {
+    return { skipped: 'empty_transcript', sessionId: payload.sessionId };
+  }
 
   return {
     sessionId: payload.sessionId,
     topicId: payload.topicId,
-    signalCount:
-      parsedSignals.goals.length +
-      (parsedSignals.interests?.length ?? 0) +
-      (parsedSignals.currentKnowledge ? 1 : 0),
+    signalCount: extraction.signalCount,
     priorKnowledgeQuality,
   };
 }

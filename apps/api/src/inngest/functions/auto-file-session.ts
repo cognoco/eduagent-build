@@ -68,14 +68,20 @@ async function runAutoFileSession({
     return { status: 'failed', reason: 'retry_cap' };
   }
 
-  const sessionTranscript = await step.run('fetch-transcript', async () => {
+  // PII egress: step returns are memoized into Inngest's third-party state
+  // store, so this step carries an existence marker only — the formatted
+  // transcript is rehydrated from the DB inside the file-session step closure
+  // and never serialized into Inngest state (same closure pattern as
+  // freeform-filing's retry-filing step).
+  const transcriptAvailable = await step.run('fetch-transcript', async () => {
     const db = getStepDatabase();
-    return formatTranscript(
+    const formatted = formatTranscript(
       await getSessionTranscript(db, profileId, sessionId),
     );
+    return formatted ? { available: true as const } : null;
   });
 
-  if (!sessionTranscript) {
+  if (!transcriptAvailable) {
     await step.run('mark-failed-transcript-unavailable', async () => {
       const db = getStepDatabase();
       return markSessionAutoFilingFailed(db, profileId, sessionId);
@@ -86,6 +92,15 @@ async function runAutoFileSession({
 
   const result = await step.run('file-session', async () => {
     const db = getStepDatabase();
+    // Rehydrated here instead of riding the fetch-transcript step return.
+    // A transcript that vanished between steps (e.g. purged) yields null and
+    // the function marks the filing failed below.
+    const sessionTranscript = formatTranscript(
+      await getSessionTranscript(db, profileId, sessionId),
+    );
+    if (!sessionTranscript) {
+      return null;
+    }
     const libraryIndex = await buildLibraryIndex(db, profileId);
     const filingResponse = await fileToLibrary(
       { sessionTranscript, sessionMode: 'freeform' },
@@ -100,6 +115,17 @@ async function runAutoFileSession({
       filingResponse,
     });
   });
+
+  if (!result) {
+    // Mutually exclusive with the availability branch above (that branch
+    // returns), so the step name cannot collide within a single run.
+    await step.run('mark-failed-transcript-unavailable', async () => {
+      const db = getStepDatabase();
+      return markSessionAutoFilingFailed(db, profileId, sessionId);
+    });
+
+    return { status: 'failed', reason: 'transcript_unavailable' };
+  }
 
   const finalized = await step.run('finalize-session', async () => {
     const db = getStepDatabase();

@@ -254,6 +254,79 @@ describe('autoFileSession', () => {
     expect(result).toMatchObject({ status: 'failed', reason: 'retry_cap' });
   });
 
+  // -------------------------------------------------------------------------
+  // Memoized step returns are persisted in Inngest's third-party state store;
+  // auto-filing operates on a (possibly minor's) session transcript, so step
+  // returns must never carry transcript content. The transcript is rehydrated
+  // from the DB inside the file-session step closure instead (same pattern as
+  // freeform-filing's retry-filing step).
+  // -------------------------------------------------------------------------
+  describe('memoized step-state PII break test [F-028]', () => {
+    it('never memoizes transcript content in any step return', async () => {
+      const memoized: unknown[] = [];
+      const runner = createInngestStepRunner();
+      const recordingStep = {
+        ...runner.step,
+        run: async (name: string, cb: () => Promise<unknown>) => {
+          const value = await runner.step.run(name, cb);
+          memoized.push(value);
+          return value;
+        },
+      };
+      const handler = (autoFileSession as any).fn;
+      const result = await handler({
+        event: {
+          name: 'app/session.auto_file_requested',
+          data: eventData(),
+        },
+        step: recordingStep,
+      });
+
+      const serialized = JSON.stringify(memoized);
+      expect(serialized).not.toContain('What is gravity?');
+      expect(serialized).not.toContain('Gravity attracts masses.');
+      expect(serialized).not.toContain('Learner:');
+      expect(serialized).not.toContain('Tutor:');
+
+      // The filing still ran with the real transcript — rehydrated inside the
+      // file-session step closure, never from memoized step state.
+      expect(mockFileToLibrary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionTranscript:
+            'Learner: What is gravity?\nTutor: Gravity attracts masses.',
+        }),
+        expect.anything(),
+        expect.any(Function),
+      );
+      expect(result).toMatchObject({ status: 'completed' });
+    });
+
+    it('marks filing_failed when the transcript vanishes between the availability check and file-session', async () => {
+      // First read (fetch-transcript availability) sees the transcript; the
+      // second read (file-session rehydration) finds it purged.
+      mockGetSessionTranscript
+        .mockResolvedValueOnce({
+          archived: false,
+          exchanges: [{ role: 'user', content: 'What is gravity?' }],
+        })
+        .mockResolvedValueOnce(null);
+
+      const { result, sendEventCalls } = await execute();
+
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+      expect(mockMarkSessionAutoFilingFailed).toHaveBeenCalledWith(
+        db,
+        profileId,
+        sessionId,
+      );
+      expect(sendEventCalls).toHaveLength(0);
+      expect(result).toMatchObject({
+        status: 'failed',
+        reason: 'transcript_unavailable',
+      });
+    });
+  });
+
   it('marks filing_failed from onFailure after Inngest exhausts handler retries', async () => {
     const onFailure = (autoFileSession as any).opts.onFailure as (args: {
       event: { data: { event: { data: ReturnType<typeof eventData> } } };
