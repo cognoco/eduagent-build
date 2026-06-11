@@ -69,13 +69,13 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **W0 done (2026-06-10):** all 11 patch-now defects shipped — `WI-549`/`WI-550`
   Closed/Done (PRs #817/#818) and `WI-551` Closed/Done (`c5c9b39bb`). Baseline
   reset `WI-569` executed + PR #845 merged (Reviewing).
-- **Execution underway (2026-06-11, shepherded):** **W1 fully merged** —
-  `WI-570` (schema, PR #855) · `WI-571` (spine, PR #860 after shepherd-mandated
-  cleanup) · `WI-572` (authority-graph, PR #859); all at Reviewing alongside
-  baseline `WI-569`. `WI-573` (inngest-wiring) Ready and unblocked; W2
-  pre-bridged Ready. **The 4-item review stack awaits operator `/cosmo:review`
-  — first clean closes fire program gate G2** (→ PRG-12 activation). Live
-  state: Cosmo + `execution-tracker.md` §5; this is a pointer.
+- **Execution state (Cosmo-verified 2026-06-11 midday):** **W0 + W1 fully
+  CLOSED** (549/550/551/569/570/571/572/573 all Closed/Done) — **gates G2
+  (pipeline proven) and G3 ("W1 landed") have both FIRED.** W2: `WI-574`
+  (scope-rls) Closed; `WI-575` (proxy-authority) + `WI-576` (consent-deletion)
+  Executing. W3: all six Ready (pre-bridged). W4: `WI-583` Executing, `WI-584`
+  Closed. Tail: Backlog (gated on W2∧W3∧W4). Live state: Cosmo +
+  `execution-tracker.md` §5; this is a pointer.
 - **Activate-when:** — (active)
 
 ### PRG-02 · Harness Hygiene — `tail`
@@ -189,9 +189,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 | ID | Initiative (clear-out) | Findings (bucket 3) | Blast-radius vs PRG-01 (N.1 signal; O is authority) | Activate-when (ratified 2026-06-10) |
 |---|---|---|---|---|
-| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **split** — out-of-radius subset (CI/GHA + input-validation) at pipeline-proven; auth/PII remainder after IF "W2/W3 landed" |
-| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | after IF "W1 landed" + moot-by-refactor scan vs the W1 file-touch set |
-| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | pipeline-proven — **first parallel activation** (queue entry 1) |
+| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **split** — safe subset (CI/GHA + input-validation) gate **FIRED 06-11** (G2); auth/PII remainder after IF "W2/W3 landed" |
+| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | gate **FIRED 06-11** (G3 "W1 landed") — moot-by-refactor scan unlocked, runs before activation |
+| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | gate **FIRED 06-11** (G2 pipeline-proven) — **first-activation decision LIVE** (queue entry 1) |
 | PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | after IF W1-inngest-wiring + W3 land |
 | PRG-14 | agent-instructions | 10 (+3 merged: F-116 + the F-151/F-157 CI/Platform fold) | partial **inside** (overlaps PRG-03) | light thread (skill-description/sync fixes) **now**; skill-building after PRG-03 B4 (AGENTS/CLAUDE converge) |
 | PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | after IF "W3 envelope-router landed"; F-110 mobile prep parallel-safe sooner |
@@ -331,6 +331,16 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-11 (midday) — G2 + G3 FIRED; standing Cosmo watch armed.** Operator
+  closed the entire W0+W1 set (8 items Closed/Done) and more: W2 `WI-574`
+  Closed, `WI-575`/`576` Executing; W4 `WI-583` Executing, `WI-584` Closed.
+  Consequences: **PRG-12 first-activation decision LIVE** · **PRG-10 safe
+  subset gate met** · **PRG-11 moot-by-refactor scan unlocked**. PRG-13 still
+  waits on W3. Ops: stale NOTION_TOKEN root-caused (legacy infisical call;
+  fixed via `estate-secrets refresh` + host.env) — the old G2 watch had gone
+  blind and was replaced by a standing IF-workstream stage-diff watch with a
+  degraded-watch alarm. HH closing ladder in progress on nexus side
+  (operator-reported; deliberately not monitored).
 - **2026-06-11 — G1 FIRED (HH PR #832 merged 09:27Z).** PRG-02 → formal
   close-out only; **residue quick-land batch unlocked** (queue entry 3 live).
   IF spine PR #860 also merged → **W1 fully merged**, 4-item review stack

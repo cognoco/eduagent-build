@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>G1 fired</b> — HH PR #832 merged 06-11, PRG-02 residue batch unlocked · <b>IF W1 fully merged</b> (schema, spine, authority-graph) · <b>G2 fires on the operator closes</b> (/cosmo:review the 569/570/571/572 stack) · <b>1 ruling on Zuzka's desk</b> (WI-587 sheet).</span>
+  <span class="txt"><b>Right now:</b> <b>G1 + G2 + G3 all fired 06-11</b> — W0+W1 closed, W2 executing (574 done, 575/576 in flight), W4 underway · <b>PRG-12 first-activation decision is LIVE</b>; PRG-10 safe subset + PRG-11 moot scan unlocked · HH close-out ladder in progress (nexus) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
 </div>
 
 <nav>
@@ -578,8 +578,8 @@ footer .warn{color:var(--amber)}
 /* =============== DATA — derived from roster + charters, 2026-06-10 =============== */
 const GATES = [
   {id:"G1", name:"HH merge", state:"fired", what:"Harness-Hygiene PR #832 MERGED 2026-06-11 09:27Z. Formal WI-530/533 closes are mechanical follow-up.", unlocks:["PRG-02 residue batch — LIVE","formal WI-530 close"], status:"fired 06-11"},
-  {id:"G2", name:"Pipeline proven", state:"hot", what:"A few IF work items through claim → build → review → close, cleanly. All four (569/570/571/572) are built+merged — only the operator closes remain.", unlocks:["PRG-12 (first parallel lane)","PRG-10 safe subset"], status:"firing — closes pending"},
-  {id:"G3", name:"IF W1 landed", state:"cold", what:"Schema bedrock + session-exchange rewiring merged.", unlocks:["PRG-11 (after moot scan)","PRG-13 (part)"], status:"waiting"},
+  {id:"G2", name:"Pipeline proven", state:"fired", what:"FIRED 06-11: the whole W0+W1 set went claim → build → review → close cleanly (8 items Closed/Done).", unlocks:["PRG-12 — first-activation decision LIVE","PRG-10 safe subset — gate met"], status:"fired 06-11"},
+  {id:"G3", name:"IF W1 landed", state:"fired", what:"FIRED 06-11: all four W1 units Closed/Done (schema, spine, authority-graph, inngest-wiring).", unlocks:["PRG-11 moot-by-refactor scan — unlocked","PRG-13 (part; W3 still pending)"], status:"fired 06-11"},
   {id:"G4", name:"IF W2/W3 landed", state:"cold", what:"Authority model, PII + envelope/router hardening merged.", unlocks:["PRG-10 remainder","PRG-15"], status:"waiting"},
   {id:"G5", name:"IF tail done", state:"cold", what:"Legacy identity deleted, data re-seeded. Clean cut complete.", unlocks:["PRG-20 bulk"], status:"waiting"}
 ];
@@ -603,15 +603,15 @@ const QUEUE = [
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"Executing, shepherded — WI-530 gate operator-waived; W1 half-landed.",
+  owner:"Jorn + runway agents", gate:"Executing, shepherded — W0+W1 CLOSED; W2 + W4 in flight; W3 staged Ready.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
     {n:"W0 · Security patch-now + baseline reset", s:"4 units", m:"mixed", st:"done", note:"All shipped: patches closed (PRs #817/#818 + trial-expiry), migration baseline reset merged (PR #845, in review)."},
-    {n:"W1 · Schema bedrock + session-exchange rewiring", s:"4 units", m:"human", st:"go", note:"FULLY MERGED: schema #855, spine #860, authority-graph #859. Review stack awaits operator closes (= G2); inngest-wiring ready."},
-    {n:"W2 · Authority model + policy engine", s:"3 WPs", m:"human", st:"hold", note:"Pre-bridged Ready — dispatches the moment W1 lands."},
-    {n:"W3 · PII + envelope/router hardening", s:"≈4 units", m:"mixed", st:"hold", note:"After W2. Landing it fires G4."},
-    {n:"W4 · Billing, credits & consent surfaces", s:"≈3 units", m:"mixed", st:"hold", note:"Off critical path."},
+    {n:"W1 · Schema bedrock + session-exchange rewiring", s:"4 units", m:"human", st:"done", note:"All four CLOSED 06-11 (schema #855, spine #860, authority-graph #859, inngest-wiring). Fired G2 + G3."},
+    {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"go", note:"Scope-RLS (574) CLOSED; proxy-authority (575) + consent-deletion (576) executing."},
+    {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"hold", note:"All six Ready (pre-bridged). Landing it fires G4."},
+    {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"go", note:"Billing-credits (583) executing; accommodation fallback (584) CLOSED. Off critical path."},
     {n:"Clean-cut tail · delete legacy, re-seed", s:"≈2 units", m:"human", st:"hold", note:"The point of no return — fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
@@ -651,7 +651,7 @@ const INIT = [
 
 { id:"PRG-12", name:"UI language & accessibility", accent:"var(--amber)", lane:"armed", status:"armed", q:"#1",
   tagline:"358 hardcoded English strings, silent screen-readers, 13 modals without focus management. The first parallel lane.",
-  owner:"Agent-heavy, low supervision", gate:"G2 — pipeline proven. The named archetype for first activation.",
+  owner:"Agent-heavy, low supervision", gate:"G2 FIRED 06-11 — gate met; first-activation decision is LIVE (operator go = run the 4-step recipe).",
   outcome:"Every user-visible string through translation, screen-reader parity on core flows, pluralization & dates locale-correct. 34 findings.",
   bundles:[
     {n:"Hardcoded-strings sweep", s:"7 findings · 358 strings", m:"agent", st:"hold"},
@@ -667,7 +667,7 @@ const INIT = [
 
 { id:"PRG-10", name:"API security & PII", accent:"var(--amber)", lane:"armed", status:"armed · split", q:"#7",
   tagline:"27 verified non-rewrite security findings. Splits cleanly: half can start early, the auth half waits for the new auth model.",
-  owner:"Mixed; human review on auth & CI permissions", gate:"Safe subset at G2 · auth/PII remainder after G4. Per-finding split confirmed by file-touch scan at activation.",
+  owner:"Mixed; human review on auth & CI permissions", gate:"Safe-subset gate (G2) FIRED 06-11 · auth/PII remainder after G4. Per-finding split confirmed by file-touch scan at activation.",
   outcome:"Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized.",
   bundles:[
     {n:"CI/GHA permissions", s:"3 findings", m:"mixed", st:"hold", note:"Safe early."},
@@ -682,7 +682,7 @@ const INIT = [
 
 { id:"PRG-11", name:"Architecture clean-up", accent:"var(--amber)", lane:"armed", status:"armed", q:"#8",
   tagline:"Circular deps, god-modules, smeared domains. Waits for W1 — much of it may be rebuilt for free.",
-  owner:"Human-led decomposition; agents execute", gate:"G3 (W1 lands) + a moot-by-refactor scan first — don't fix what the rewrite just rebuilt.",
+  owner:"Human-led decomposition; agents execute", gate:"G3 FIRED 06-11 — the moot-by-refactor scan is unlocked and runs before activation.",
   outcome:"27 structural findings resolved or proven moot; decomposition decisions made once, against the post-W1 codebase.",
   bundles:[
     {n:"Moot-by-refactor scan", s:"gate task", m:"human", st:"hold", note:"First move: check the 27 against W1's real file-touch set."},
