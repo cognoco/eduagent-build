@@ -22,7 +22,6 @@ import { z } from 'zod';
 import {
   accounts,
   familyLinks,
-  learningProfiles,
   notificationPreferences,
   profiles,
   weeklyReports,
@@ -45,6 +44,7 @@ import {
   getLatestSnapshotOnOrBefore,
 } from '../../services/snapshot-aggregation';
 import { generateWeeklyReportData } from '../../services/weekly-report';
+import { listStruggleTopicNames } from '../../services/learner-profile';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
@@ -83,17 +83,20 @@ const weeklyProgressPushEventSchema = z.object({
 // chain cannot deliver duplicate pushes.
 const MAX_GENERATE_RETRY_ATTEMPTS = 3;
 
+// Minor-PII discipline: this shape is a memoized Inngest step return
+// (persisted in the third-party state store), so it carries opaque child
+// profile ids and booleans only. The digest content — child names, summary
+// lines, struggle topics, the parent email address — is rebuilt inside the
+// send steps via buildChildWeeklyDigestLine.
 type PreparedWeeklyProgressDigest =
   | {
       status: 'prepared';
       parentId: string;
       reportWeek: string;
       childProfileIds: string[];
-      childSummaries: string[];
-      struggleLines: ChildStruggleLine[];
       shouldSendPush: boolean;
       shouldSendEmail: boolean;
-      parentEmail: string | null;
+      hasParentEmail: boolean;
     }
   | {
       status: 'skipped' | 'throttled' | 'self_report_only';
@@ -238,6 +241,174 @@ async function persistWeeklySelfReportForProfile(
     .onConflictDoNothing();
 
   return { status: 'completed', reportWeek: reportWeekStart };
+}
+
+interface ChildWeeklyDigestLine {
+  /** 0..1 push/email summary line for this child (null = no line). */
+  summaryLine: string | null;
+  struggleLine: ChildStruggleLine;
+  hasStruggleTopics: boolean;
+}
+
+/**
+ * Computes one child's weekly digest content (summary line + struggle
+ * watch-line) from the DB, optionally persisting the weekly report row.
+ *
+ * Called once from the prepare step (persistReport: true — decides
+ * eligibility and writes weeklyReports) and again from each send step
+ * (persistReport: false — rehydrates the content). The recompute keeps the
+ * child's name, summary text, and struggle topics out of memoized Inngest
+ * step state; snapshots change at most daily, so back-to-back steps see the
+ * same data.
+ *
+ * Returns null when the child is consent-blocked, archived/missing, or has
+ * no snapshot.
+ */
+async function buildChildWeeklyDigestLine(
+  db: ReturnType<typeof getStepDatabase>,
+  parentId: string,
+  childProfileId: string,
+  reportWeekStart: string,
+  opts: { persistReport: boolean },
+): Promise<ChildWeeklyDigestLine | null> {
+  if (!(await isGdprProcessingAllowed(db, childProfileId))) {
+    return null;
+  }
+
+  const child = await db.query.profiles.findFirst({
+    where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
+    columns: { displayName: true },
+  });
+  if (!child) return null;
+
+  const latest = await getLatestSnapshot(db, childProfileId);
+  if (!latest) return null;
+  const latestMetrics = await filterProgressMetricsToActiveSubjects(
+    db,
+    childProfileId,
+    latest.metrics,
+  );
+
+  const previous = await getLatestSnapshotOnOrBefore(
+    db,
+    childProfileId,
+    isoDate(subtractDays(new Date(`${latest.snapshotDate}T00:00:00Z`), 7)),
+  );
+
+  // [CR-2] Clamp: treat previous snapshot as null when the gap exceeds 14 days.
+  // A wider gap means the "delta" spans multiple weeks rather than the current
+  // 7-day window, producing inflated session and minute counts for inactive learners.
+  const MAX_SNAPSHOT_GAP_MS = 14 * 24 * 60 * 60 * 1000;
+  const snapshotGapMs =
+    previous != null
+      ? new Date(`${latest.snapshotDate}T00:00:00Z`).getTime() -
+        new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
+      : 0;
+  const cappedPrevious = snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+  const cappedPreviousMetrics = cappedPrevious
+    ? await filterProgressMetricsToActiveSubjects(
+        db,
+        childProfileId,
+        cappedPrevious.metrics,
+      )
+    : null;
+
+  const name = child.displayName ?? 'Your learner';
+  const topicDelta = cappedPrevious
+    ? Math.max(
+        0,
+        latestMetrics.topicsMastered -
+          (cappedPreviousMetrics?.topicsMastered ?? 0),
+      )
+    : null;
+  const vocabDelta = cappedPrevious
+    ? Math.max(
+        0,
+        latestMetrics.vocabularyTotal -
+          (cappedPreviousMetrics?.vocabularyTotal ?? 0),
+      )
+    : null;
+  const exploredDelta = cappedPrevious
+    ? Math.max(
+        0,
+        sumTopicsExplored(latestMetrics) -
+          sumTopicsExplored(cappedPreviousMetrics ?? latestMetrics),
+      )
+    : null;
+
+  if (opts.persistReport) {
+    // [BUG-524] Persist the weekly report before building the push summary.
+    // Uses onConflictDoNothing so re-runs for the same week are idempotent.
+    const weekStartDate = new Date(`${reportWeekStart}T00:00:00.000Z`);
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
+    const previousWeekStart = subtractDays(weekStartDate, 7);
+    const practiceSummary = await getPracticeActivitySummary(db, {
+      profileId: childProfileId,
+      period: {
+        start: weekStartDate,
+        endExclusive: weekEndDate,
+      },
+      previousPeriod: {
+        start: previousWeekStart,
+        endExclusive: weekStartDate,
+      },
+    });
+    const reportData = generateWeeklyReportData(
+      name,
+      reportWeekStart,
+      latestMetrics,
+      cappedPreviousMetrics,
+      practiceSummary,
+    );
+    await db
+      .insert(weeklyReports)
+      .values({
+        profileId: parentId,
+        childProfileId,
+        reportWeek: reportWeekStart,
+        reportData,
+      })
+      .onConflictDoNothing();
+  }
+
+  let summaryLine: string | null = null;
+  if (
+    latestMetrics.totalSessions === 0 ||
+    (topicDelta === 0 && vocabDelta === 0 && exploredDelta === 0)
+  ) {
+    summaryLine = `${name} took a quieter week and still kept ${latestMetrics.topicsMastered} topics.`;
+  } else {
+    const parts = [
+      topicDelta && topicDelta > 0 ? `+${topicDelta} topics` : null,
+      vocabDelta && vocabDelta > 0 ? `+${vocabDelta} words` : null,
+      exploredDelta && exploredDelta > 0 ? `+${exploredDelta} explored` : null,
+    ].filter((value): value is string => !!value);
+    if (parts.length > 0) {
+      summaryLine = `${name}: ${parts.join(', ')}`;
+    }
+  }
+
+  // Read current struggles for the watch-line (path A: topic names only).
+  // A failing read is captured and degrades to an empty line; the digest
+  // still sends.
+  let topics: string[] = [];
+  try {
+    topics = await listStruggleTopicNames(db, childProfileId, 2);
+  } catch (err) {
+    captureException(err, {
+      extra: {
+        childProfileId,
+        context: 'weekly-progress-push-struggles',
+      },
+    });
+  }
+
+  return {
+    summaryLine,
+    struggleLine: { childName: name, topics },
+    hasStruggleTopics: topics.length > 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -599,181 +770,32 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             };
           }
 
-          // [BUG-524] Compute the Monday start date for this week's report
-          const weekStartDate = new Date(`${reportWeekStart}T00:00:00.000Z`);
           const reportWeek = reportWeekStart;
 
-          const childSummaries: string[] = [];
+          // [BUG-524] Per-child digest math + weeklyReports persistence live
+          // in buildChildWeeklyDigestLine; this step only decides eligibility
+          // and memoizes the child ids (opaque references — the content is
+          // rebuilt inside the send steps).
+          let summaryLineCount = 0;
           const childProfileIds: string[] = [];
-          const struggleLines: ChildStruggleLine[] = [];
           for (const link of links) {
-            if (!(await isGdprProcessingAllowed(db, link.childProfileId))) {
-              continue;
-            }
-
-            const child = await db.query.profiles.findFirst({
-              where: and(
-                eq(profiles.id, link.childProfileId),
-                isNull(profiles.archivedAt),
-              ),
-              columns: { displayName: true },
-            });
-            if (!child) continue;
-
-            const latest = await getLatestSnapshot(db, link.childProfileId);
-            if (!latest) continue;
-            const latestMetrics = await filterProgressMetricsToActiveSubjects(
+            const line = await buildChildWeeklyDigestLine(
               db,
+              parentId,
               link.childProfileId,
-              latest.metrics,
+              reportWeekStart,
+              { persistReport: true },
             );
-
-            const previous = await getLatestSnapshotOnOrBefore(
-              db,
-              link.childProfileId,
-              isoDate(
-                subtractDays(new Date(`${latest.snapshotDate}T00:00:00Z`), 7),
-              ),
-            );
-
-            // [CR-2] Clamp: treat previous snapshot as null when the gap exceeds 14 days.
-            // A wider gap means the "delta" spans multiple weeks rather than the current
-            // 7-day window, producing inflated session and minute counts for inactive learners.
-            const MAX_SNAPSHOT_GAP_MS = 14 * 24 * 60 * 60 * 1000;
-            const snapshotGapMs =
-              previous != null
-                ? new Date(`${latest.snapshotDate}T00:00:00Z`).getTime() -
-                  new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
-                : 0;
-            const cappedPrevious =
-              snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
-            const cappedPreviousMetrics = cappedPrevious
-              ? await filterProgressMetricsToActiveSubjects(
-                  db,
-                  link.childProfileId,
-                  cappedPrevious.metrics,
-                )
-              : null;
-
-            const name = child?.displayName ?? 'Your learner';
-            const topicDelta = cappedPrevious
-              ? Math.max(
-                  0,
-                  latestMetrics.topicsMastered -
-                    (cappedPreviousMetrics?.topicsMastered ?? 0),
-                )
-              : null;
-            const vocabDelta = cappedPrevious
-              ? Math.max(
-                  0,
-                  latestMetrics.vocabularyTotal -
-                    (cappedPreviousMetrics?.vocabularyTotal ?? 0),
-                )
-              : null;
-            const exploredDelta = cappedPrevious
-              ? Math.max(
-                  0,
-                  sumTopicsExplored(latestMetrics) -
-                    sumTopicsExplored(cappedPreviousMetrics ?? latestMetrics),
-                )
-              : null;
-
-            // [BUG-524] Persist the weekly report before building the push summary.
-            // Uses onConflictDoNothing so re-runs for the same week are idempotent.
-            const weekEndDate = new Date(weekStartDate);
-            weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
-            const previousWeekStart = subtractDays(weekStartDate, 7);
-            const practiceSummary = await getPracticeActivitySummary(db, {
-              profileId: link.childProfileId,
-              period: {
-                start: weekStartDate,
-                endExclusive: weekEndDate,
-              },
-              previousPeriod: {
-                start: previousWeekStart,
-                endExclusive: weekStartDate,
-              },
-            });
-            const reportData = generateWeeklyReportData(
-              name,
-              reportWeek,
-              latestMetrics,
-              cappedPreviousMetrics,
-              practiceSummary,
-            );
-            await db
-              .insert(weeklyReports)
-              .values({
-                profileId: parentId,
-                childProfileId: link.childProfileId,
-                reportWeek,
-                reportData,
-              })
-              .onConflictDoNothing();
-
-            const summaryCountBeforeChild = childSummaries.length;
-            if (
-              latestMetrics.totalSessions === 0 ||
-              (topicDelta === 0 && vocabDelta === 0 && exploredDelta === 0)
-            ) {
-              childSummaries.push(
-                `${name} took a quieter week and still kept ${latestMetrics.topicsMastered} topics.`,
-              );
-            } else {
-              const parts = [
-                topicDelta && topicDelta > 0 ? `+${topicDelta} topics` : null,
-                vocabDelta && vocabDelta > 0 ? `+${vocabDelta} words` : null,
-                exploredDelta && exploredDelta > 0
-                  ? `+${exploredDelta} explored`
-                  : null,
-              ].filter((value): value is string => !!value);
-
-              if (parts.length > 0) {
-                childSummaries.push(`${name}: ${parts.join(', ')}`);
-              }
-            }
-
-            // Read current struggles for the watch-line (path A: topic names only).
-            // Malformed JSONB is skipped gracefully; digest still sends.
-            let hasStruggleTopics = false;
-            try {
-              const learningProfile = await db.query.learningProfiles.findFirst(
-                {
-                  where: eq(learningProfiles.profileId, link.childProfileId),
-                  columns: { struggles: true },
-                },
-              );
-              const rawStruggles = learningProfile?.struggles;
-              const topics = Array.isArray(rawStruggles)
-                ? (rawStruggles as Array<{ topic?: string }>)
-                    .map((s) => s.topic)
-                    .filter(
-                      (t): t is string => typeof t === 'string' && t.length > 0,
-                    )
-                    .slice(0, 2)
-                : [];
-              hasStruggleTopics = topics.length > 0;
-              struggleLines.push({ childName: name, topics });
-            } catch (err) {
-              captureException(err, {
-                extra: {
-                  childProfileId: link.childProfileId,
-                  context: 'weekly-progress-push-struggles',
-                },
-              });
-              struggleLines.push({ childName: name, topics: [] });
-            }
-            if (
-              childSummaries.length > summaryCountBeforeChild ||
-              hasStruggleTopics
-            ) {
+            if (!line) continue;
+            if (line.summaryLine) summaryLineCount += 1;
+            if (line.summaryLine || line.hasStruggleTopics) {
               childProfileIds.push(link.childProfileId);
             }
           }
 
           // Consent gate: if ALL linked children were redacted, skip entirely —
           // do not send an empty digest (push or email).
-          if (childSummaries.length === 0) {
+          if (summaryLineCount === 0) {
             if (selfReportResult?.status === 'completed') {
               return {
                 status: 'self_report_only' as const,
@@ -820,7 +842,10 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             prefs != null && prefs.pushEnabled && prefs.weeklyProgressPush;
           const shouldSendEmail = prefs?.weeklyProgressEmail ?? true;
 
-          let parentEmail: string | null = null;
+          // The address itself stays out of the memoized return; the email
+          // step re-reads it. This boolean only gates whether the email step
+          // runs at all.
+          let hasParentEmail = false;
           if (shouldSendEmail) {
             const parentProfile = await db.query.profiles.findFirst({
               where: and(
@@ -835,7 +860,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                   columns: { email: true },
                 })
               : null;
-            parentEmail = parentAccount?.email ?? null;
+            hasParentEmail = Boolean(parentAccount?.email);
           }
 
           return {
@@ -843,11 +868,9 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             parentId,
             reportWeek,
             childProfileIds,
-            childSummaries,
-            struggleLines,
             shouldSendPush,
             shouldSendEmail,
-            parentEmail,
+            hasParentEmail,
           };
         },
       );
@@ -881,10 +904,26 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                 return { sent: false, reason: 'profile_archived' as const };
               }
             }
+            // Rebuild the digest lines in-step (rehydrate-by-reference): the
+            // prepare step memoized only the child ids.
+            const childSummaries: string[] = [];
+            for (const childProfileId of prepared.childProfileIds) {
+              const line = await buildChildWeeklyDigestLine(
+                db,
+                parentId,
+                childProfileId,
+                prepared.reportWeek,
+                { persistReport: false },
+              );
+              if (line?.summaryLine) childSummaries.push(line.summaryLine);
+            }
+            if (childSummaries.length === 0) {
+              return { sent: false, reason: 'no_activity' as const };
+            }
             return sendPushNotification(db, {
               profileId: parentId,
               title: 'Weekly learning progress',
-              body: prepared.childSummaries.join(' '),
+              body: childSummaries.join(' '),
               type: 'weekly_progress',
             });
           })
@@ -895,8 +934,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
       // if the later notification-log write fails, retries reuse this step's
       // completed result instead of calling Resend a second time.
       let emailSent = false;
-      const parentEmail = prepared.parentEmail;
-      if (prepared.shouldSendEmail && parentEmail) {
+      if (prepared.shouldSendEmail && prepared.hasParentEmail) {
         const emailResult = await step.run(
           'send-weekly-progress-email',
           async () => {
@@ -906,7 +944,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                 eq(profiles.id, parentId),
                 isNull(profiles.archivedAt),
               ),
-              columns: { id: true },
+              columns: { id: true, accountId: true },
             });
             if (!activeParent) {
               return { sent: false, reason: 'profile_archived' as const };
@@ -923,10 +961,40 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                 return { sent: false, reason: 'profile_archived' as const };
               }
             }
+            // Re-read the address in-step — it never rides memoized step
+            // state (prepare memoized only the hasParentEmail boolean).
+            const parentAccount = activeParent.accountId
+              ? await db.query.accounts.findFirst({
+                  where: eq(accounts.id, activeParent.accountId),
+                  columns: { email: true },
+                })
+              : null;
+            const parentEmail = parentAccount?.email ?? null;
+            if (!parentEmail) {
+              return { sent: false, reason: 'no_email' as const };
+            }
+            // Rebuild the digest lines in-step (rehydrate-by-reference).
+            const childSummaries: string[] = [];
+            const struggleLines: ChildStruggleLine[] = [];
+            for (const childProfileId of prepared.childProfileIds) {
+              const line = await buildChildWeeklyDigestLine(
+                db,
+                parentId,
+                childProfileId,
+                prepared.reportWeek,
+                { persistReport: false },
+              );
+              if (!line) continue;
+              if (line.summaryLine) childSummaries.push(line.summaryLine);
+              struggleLines.push(line.struggleLine);
+            }
+            if (childSummaries.length === 0) {
+              return { sent: false, reason: 'no_activity' as const };
+            }
             const emailPayload = formatWeeklyProgressEmail(
               parentEmail,
-              prepared.childSummaries,
-              prepared.struggleLines,
+              childSummaries,
+              struggleLines,
             );
             return sendEmail(emailPayload, {
               resendApiKey: getStepResendApiKey(),

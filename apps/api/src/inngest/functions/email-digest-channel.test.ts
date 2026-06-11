@@ -173,6 +173,21 @@ let dbState: {
   childDisplayName: string;
 };
 
+// Walks a drizzle WHERE expression (cycle-safe) and reports whether the
+// given literal value is bound anywhere inside it. Lets mocks dispatch on
+// the queried profileId instead of brittle call-count ordering.
+function whereExpressionContainsValue(node: unknown, value: string): boolean {
+  const visited = new WeakSet<object>();
+  const visit = (current: unknown): boolean => {
+    if (current === value) return true;
+    if (!current || typeof current !== 'object') return false;
+    if (visited.has(current as object)) return false;
+    visited.add(current as object);
+    return Object.values(current as Record<string, unknown>).some(visit);
+  };
+  return visit(node);
+}
+
 function resetDbState() {
   dbState = {
     consentStatus: 'CONSENTED',
@@ -638,24 +653,25 @@ describe('Email digest channel — weekly', () => {
     db.query.profiles.findFirst = jest
       .fn()
       .mockResolvedValue({ displayName: 'Alice', accountId: 'account-001' });
-    db.query.consentStates.findFirst = jest.fn().mockImplementation(() => {
-      // Alternate based on call count: first call = CHILD_ID_A → CONSENTED,
-      // second call = CHILD_ID_B → WITHDRAWN
-      const callCount = (db.query.consentStates.findFirst as jest.Mock).mock
-        .calls.length;
-      if (callCount === 1) {
+    // Dispatch on the profileId bound into the WHERE expression (not call
+    // count): the send steps now re-check consent per child when they
+    // rebuild the digest in-step, so the same child is queried repeatedly.
+    db.query.consentStates.findFirst = jest
+      .fn()
+      .mockImplementation((queryArgs: unknown) => {
+        if (whereExpressionContainsValue(queryArgs, CHILD_ID_B)) {
+          return Promise.resolve({
+            status: 'WITHDRAWN',
+            profileId: CHILD_ID_B,
+            consentType: 'GDPR',
+          });
+        }
         return Promise.resolve({
           status: 'CONSENTED',
           profileId: CHILD_ID_A,
           consentType: 'GDPR',
         });
-      }
-      return Promise.resolve({
-        status: 'WITHDRAWN',
-        profileId: CHILD_ID_B,
-        consentType: 'GDPR',
       });
-    });
 
     const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
       status: string;

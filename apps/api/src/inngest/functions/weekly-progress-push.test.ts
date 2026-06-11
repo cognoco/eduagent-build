@@ -377,9 +377,7 @@ describe('[WI-368] weekly progress push GDPR consent helper consolidation', () =
     );
 
     expect(source).toContain("from '../../services/consent'");
-    expect(source).toContain(
-      'isGdprProcessingAllowed(db, link.childProfileId)',
-    );
+    expect(source).toContain('isGdprProcessingAllowed(db, childProfileId)');
     expect(source).not.toContain('db.query.consentStates.findFirst');
     expect(source).not.toContain("eq(consentStates.consentType, 'GDPR')");
     expect(source).not.toContain("status !== 'CONSENTED'");
@@ -969,9 +967,13 @@ describe('weekly progress generate practice summary', () => {
       expect.objectContaining({
         status: 'prepared',
         childProfileIds: [CHILD_ID_2],
-        childSummaries: [expect.stringContaining('Alex:')],
       }),
     );
+    // Minor-PII: the memoized prepare return carries opaque ids only — the
+    // summary lines and struggle topics are rebuilt inside the send steps.
+    expect(prepared).not.toHaveProperty('childSummaries');
+    expect(prepared).not.toHaveProperty('struggleLines');
+    expect(prepared).not.toHaveProperty('parentEmail');
   });
 
   it('[WI-86] skips weekly push and email when parent is archived after preparation', async () => {
@@ -986,11 +988,9 @@ describe('weekly progress generate practice summary', () => {
             parentId: PARENT_ID,
             reportWeek: '2026-05-11',
             childProfileIds: [CHILD_ID],
-            childSummaries: ['Alex: +1 topics'],
-            struggleLines: [],
             shouldSendPush: true,
             shouldSendEmail: true,
-            parentEmail: 'parent@example.com',
+            hasParentEmail: true,
           },
         },
       },
@@ -1017,11 +1017,9 @@ describe('weekly progress generate practice summary', () => {
             parentId: PARENT_ID,
             reportWeek: '2026-05-11',
             childProfileIds: [CHILD_ID],
-            childSummaries: ['Alex: +1 topics'],
-            struggleLines: [],
             shouldSendPush: true,
             shouldSendEmail: true,
-            parentEmail: 'parent@example.com',
+            hasParentEmail: true,
           },
         },
       },
@@ -1044,6 +1042,8 @@ describe('weekly progress generate practice summary', () => {
       .mockResolvedValueOnce({ displayName: 'Noah' })
       .mockResolvedValueOnce({ id: PARENT_ID })
       .mockResolvedValueOnce({ id: CHILD_ID })
+      // Push-step rebuild rehydrates the contributing child's name in-step.
+      .mockResolvedValueOnce({ displayName: 'Alex' })
       .mockResolvedValueOnce(null);
     mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
       pushEnabled: true,
@@ -1058,13 +1058,22 @@ describe('weekly progress generate practice summary', () => {
       .mockResolvedValueOnce({
         snapshotDate: '2026-05-13',
         metrics: CURRENT_METRICS,
+      })
+      // Push-step rebuild for the contributing child.
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-13',
+        metrics: CURRENT_METRICS,
       });
     mockGetLatestSnapshotOnOrBefore
       .mockResolvedValueOnce({
         snapshotDate: '2026-05-06',
         metrics: PREVIOUS_METRICS,
       })
-      .mockResolvedValueOnce(null);
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-06',
+        metrics: PREVIOUS_METRICS,
+      });
 
     const result = await executeGenerateSteps({ parentId: PARENT_ID });
 
@@ -1119,5 +1128,91 @@ describe('weekly progress generate practice summary', () => {
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+});
+
+// Memoized step returns are persisted in Inngest's third-party state store;
+// the prepare step must memoize opaque child ids only — never child names,
+// summary lines, struggle topics, or the parent email address.
+describe('memoized step-state PII break test [F-085]', () => {
+  it('never memoizes child names, struggle topics, or the parent email; sends still carry the content', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+    mockDb.query.familyLinks.findMany.mockResolvedValue([
+      { childProfileId: CHILD_ID },
+    ]);
+    // Blanket profile row serves every call site (parent lookup, child
+    // lookup, send-step rechecks, in-step rebuilds).
+    mockDb.query.profiles.findFirst.mockResolvedValue({
+      id: PARENT_ID,
+      accountId: 'account-1',
+      displayName: 'Alex',
+    });
+    mockDb.query.accounts.findFirst.mockResolvedValue({
+      email: 'parent@example.com',
+    });
+    mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
+      pushEnabled: true,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: true,
+    });
+    mockDb.query.learningProfiles.findFirst.mockResolvedValue({
+      struggles: [{ topic: 'Fractions' }],
+    });
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-13',
+      metrics: CURRENT_METRICS,
+    });
+    mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+      snapshotDate: '2026-05-06',
+      metrics: PREVIOUS_METRICS,
+    });
+
+    const memoized: unknown[] = [];
+    const { step } = createInngestStepRunner();
+    const recordingStep = {
+      ...step,
+      run: async (name: string, cb: () => Promise<unknown>) => {
+        const value = await step.run(name, cb);
+        memoized.push(value);
+        return value;
+      },
+    };
+    const handler = (
+      weeklyProgressPushGenerate as unknown as {
+        fn: (ctx: unknown) => Promise<unknown>;
+      }
+    ).fn;
+    const result = await handler({
+      event: {
+        data: { parentId: PARENT_ID },
+        name: 'app/weekly-progress-push.generate',
+      },
+      step: recordingStep,
+    });
+    jest.useRealTimers();
+
+    // Content still reaches both channels (rebuilt in-step)…
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        type: 'weekly_progress',
+        body: expect.stringContaining('Alex'),
+      }),
+    );
+    expect(mockFormatWeeklyProgressEmail).toHaveBeenCalledWith(
+      'parent@example.com',
+      expect.arrayContaining([expect.stringContaining('Alex')]),
+      expect.arrayContaining([
+        expect.objectContaining({ topics: ['Fractions'] }),
+      ]),
+    );
+
+    // …but never through memoized step state or the run output.
+    const serialized = JSON.stringify(memoized);
+    expect(serialized).not.toContain('Alex');
+    expect(serialized).not.toContain('Fractions');
+    expect(serialized).not.toContain('parent@example.com');
+    expect(JSON.stringify(result)).not.toContain('Alex');
+    expect(JSON.stringify(result)).not.toContain('parent@example.com');
   });
 });
