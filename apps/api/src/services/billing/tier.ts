@@ -10,6 +10,7 @@ import {
   topUpCredits,
   type Database,
   findSubscriptionById__unscoped,
+  lockSubscriptionById__unscoped,
   findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier } from '@eduagent/schemas';
@@ -243,9 +244,26 @@ export async function handleTierChange(
   // change and credit re-attribution are atomic.
   // See `reattributeTopUpCreditsOnModelChange` for the full rationale.
   let reattributedCount = 0;
-  const previousTierForMetric = sub.tier;
+  let previousTier: SubscriptionTier = sub.tier;
 
   await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    // [F-124 rework] Lock-and-read the tier INSIDE the transaction
+    // (SELECT … FOR UPDATE) so the tier-change detection and the credit
+    // re-attribution below are serialized against concurrent tier changes on
+    // the same subscription. A plain in-transaction read under READ COMMITTED
+    // is not enough: two concurrent transactions can both read the same
+    // previousTier before either commits (Codex P1 on PR #897). The row lock
+    // is held until commit; the second transaction blocks here and then sees
+    // the first one's committed tier. Mirrors the same fix in
+    // updateSubscriptionAndQuotaFromRevenuecatWebhook (revenuecat.ts).
+    // safe-caller: Stripe webhook tier-change handler — subscriptionId from verified Stripe event
+    const current = await lockSubscriptionById__unscoped(txDb, subscriptionId);
+    if (current) {
+      previousTier = current.tier;
+    }
+
     await tx
       .update(subscriptions)
       .set({
@@ -254,18 +272,15 @@ export async function handleTierChange(
       })
       .where(eq(subscriptions.id, subscriptionId));
 
-    await reconcileQuotaStateForSubscription(
-      tx as unknown as Database,
-      subscriptionId,
-      now,
-      { resetExpiredSharedPoolUsage: false },
-    );
+    await reconcileQuotaStateForSubscription(txDb, subscriptionId, now, {
+      resetExpiredSharedPoolUsage: false,
+    });
 
     reattributedCount = await reattributeTopUpCreditsOnModelChange(
-      tx as unknown as Database,
+      txDb,
       subscriptionId,
       sub.accountId,
-      previousTierForMetric,
+      previousTier,
       newTier,
     );
   });
@@ -276,7 +291,7 @@ export async function handleTierChange(
     await emitTopUpCreditsReattributedMetric({
       subscriptionId,
       accountId: sub.accountId,
-      previousTier: previousTierForMetric,
+      previousTier,
       newTier,
       reattributedCount,
       occurredAt: now,
@@ -284,7 +299,7 @@ export async function handleTierChange(
   }
 
   return {
-    previousTier: sub.tier,
+    previousTier,
     newTier,
     usedThisCycle,
     newMonthlyLimit,
