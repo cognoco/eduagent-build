@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>three lanes live, all shepherded</b> — IF (W3 at 5/6, <b>G4 hangs on WI-578 alone</b>) · PRG-12 (<b>first WP closed: WI-622</b> sr-announcements) · PRG-15 (WI-639 + WI-641 executing) · PRG-11 scan done (scope ≈ intact) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>G4 FIRED — the IF rewrite is BUILT</b> (all waves W0–W4 closed; only the point-of-no-return tail remains, operator-gated) · PRG-12 (first WP closed: WI-622) · PRG-15 (2 units executing) · <b>PRG-10 + PRG-13 gates now open</b> (attention-budget calls) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
 </div>
 
 <nav>
@@ -580,7 +580,7 @@ const GATES = [
   {id:"G1", name:"HH merge", state:"fired", what:"Harness-Hygiene PR #832 MERGED 2026-06-11 09:27Z. Formal WI-530/533 closes are mechanical follow-up.", unlocks:["PRG-02 residue batch — LIVE","formal WI-530 close"], status:"fired 06-11"},
   {id:"G2", name:"Pipeline proven", state:"fired", what:"FIRED 06-11: the whole W0+W1 set went claim → build → review → close cleanly (8 items Closed/Done).", unlocks:["PRG-12 — ✓ ACTIVATED 06-11","PRG-10 safe subset — gate met"], status:"fired 06-11"},
   {id:"G3", name:"IF W1 landed", state:"fired", what:"FIRED 06-11: all four W1 units Closed/Done (schema, spine, authority-graph, inngest-wiring).", unlocks:["PRG-11 moot-by-refactor scan — unlocked","PRG-13 (part; W3 still pending)"], status:"fired 06-11"},
-  {id:"G4", name:"IF W2/W3 landed", state:"cold", what:"Authority model, PII + envelope/router hardening merged.", unlocks:["PRG-10 remainder","PRG-15"], status:"waiting"},
+  {id:"G4", name:"IF W2/W3 landed", state:"fired", what:"FIRED 06-11 late: every W2 + W3 unit Closed — authority model, PII + envelope/router hardening all landed. The rewrite proper is built.", unlocks:["PRG-10 auth/PII remainder — gate met","PRG-13 — gate met","clean-cut tail ungated"], status:"fired 06-11"},
   {id:"G5", name:"IF tail done", state:"cold", what:"Legacy identity deleted, data re-seeded. Clean cut complete.", unlocks:["PRG-20 bulk"], status:"waiting"}
 ];
 const TRIGGERS = [
@@ -593,8 +593,8 @@ const QUEUE = [
   ["3","PRG-02","Harness Hygiene — residue batch","HH PR merged (G1)"],
   ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
   ["5","PRG-15","Error handling","✅ ACTIVATED 06-11 — third parallel lane (WI-639/640/641)"],
-  ["6","PRG-13","Background-job security","IF W1 job-wiring + W3 land (G3/G4)"],
-  ["7","PRG-10","API security","Safe subset at G2 · auth/PII remainder after G4"],
+  ["6","PRG-13","Background-job security","✅ gate FIRED 06-11 (G4) — activation is an attention-budget call"],
+  ["7","PRG-10","API security","✅ both gates FIRED (G2 + G4) — activation is an attention-budget call"],
   ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
   ["10","PRG-20","Estate-canon drain","IF clean-cut tail done (G5), or a named pull-forward earlier"],
@@ -603,16 +603,16 @@ const QUEUE = [
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"Executing, shepherded — W0+W1+W2+W4 CLOSED; W3 at 3/6 closed (G4 hangs on the other 3).",
+  owner:"Jorn + runway agents", gate:"ALL WAVES CLOSED (W0–W4, 36 units) — G2+G3+G4 fired. Only the clean-cut tail remains: the point of no return, operator-gated.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
     {n:"W0 · Security patch-now + baseline reset", s:"4 units", m:"mixed", st:"done", note:"All shipped: patches closed (PRs #817/#818 + trial-expiry), migration baseline reset merged (PR #845, in review)."},
     {n:"W1 · Schema bedrock + session-exchange rewiring", s:"4 units", m:"human", st:"done", note:"All four CLOSED 06-11 (schema #855, spine #860, authority-graph #859, inngest-wiring). Fired G2 + G3."},
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
-    {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"go", note:"5/6 CLOSED (577, 579, 580, 581 envelope-router, 582); pii-step-state (578) executing — G4 hangs on it alone."},
+    {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"done", note:"All six CLOSED 06-11 — fired G4 (and the envelope-router boundary event for PRG-15)."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
-    {n:"Clean-cut tail · delete legacy, re-seed", s:"≈2 units", m:"human", st:"hold", note:"The point of no return — fires G5."}
+    {n:"Clean-cut tail · re-seed, delete legacy", s:"2 units", m:"human", st:"go", note:"WI-585 → WI-586, Ready, fully ungated. The point of no return — operator-gated dispatch; fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
 
@@ -667,7 +667,7 @@ const INIT = [
 
 { id:"PRG-10", name:"API security & PII", accent:"var(--amber)", lane:"armed", status:"armed · split", q:"#7",
   tagline:"27 verified non-rewrite security findings. Splits cleanly: half can start early, the auth half waits for the new auth model.",
-  owner:"Mixed; human review on auth & CI permissions", gate:"Safe-subset gate (G2) FIRED 06-11 · auth/PII remainder after G4. Per-finding split confirmed by file-touch scan at activation.",
+  owner:"Mixed; human review on auth & CI permissions", gate:"BOTH gates FIRED 06-11 (safe subset at G2; auth/PII remainder at G4) — full activation is an attention-budget call. Per-finding split confirmed by file-touch scan at activation.",
   outcome:"Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized.",
   bundles:[
     {n:"CI/GHA permissions", s:"3 findings", m:"mixed", st:"hold", note:"Safe early."},
@@ -698,7 +698,7 @@ const INIT = [
 
 { id:"PRG-13", name:"Background-job security", accent:"var(--amber)", lane:"armed", status:"armed", q:"#6",
   tagline:"Six tight findings: minors' data sitting in job state, plus two correctness bugs. Small and surgical.",
-  owner:"Agent-sweep; PII changes reviewed", gate:"G3 + G4 — coordinates with the rewrite's own PII work to avoid double-touching the same jobs.",
+  owner:"Agent-sweep; PII changes reviewed", gate:"Gate FIRED 06-11 (G4) — activation = attention-budget call. First move at activation: check whether F-028/F-091 were subsumed by the rewrite's own PII work (WI-578).",
   outcome:"No PII in step state or event payloads on non-rewrite jobs; the two correctness bugs fixed.",
   bundles:[
     {n:"PII in step state & event payloads", s:"3 findings", m:"mixed", st:"hold", note:"Checked for overlap with W3's sibling work at activation."},
