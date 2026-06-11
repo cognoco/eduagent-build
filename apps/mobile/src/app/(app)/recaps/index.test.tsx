@@ -7,7 +7,7 @@
  *  - The route tree has `index` + `[recapId]` + a `_layout` exporting
  *    `unstable_settings = { initialRouteName: 'index' }`.
  *  - The row press is a SAME-STACK `router.push` (the recaps tab root IS the
- *    list), so the CLAUDE.md cross-tab ancestor-chain rule does not apply —
+ *    list), so the AGENTS.md cross-tab ancestor-chain rule does not apply —
  *    the list is already mounted underneath, seeding the back-stack.
  *  - `recapId` is a valid UUID from the schema; the push target is the
  *    registered `/(app)/recaps/[recapId]` route.

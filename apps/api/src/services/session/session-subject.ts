@@ -14,7 +14,7 @@ const SUBJECT_SESSIONS_LIMIT = 50;
  * properly completed and auto-closed sessions. Excludes accidental opens
  * (requires at least 1 exchange). Profile ownership is enforced through
  * `subjects.profileId` — the sanctioned parent-chain join pattern
- * (see CLAUDE.md).
+ * (see AGENTS.md).
  */
 export async function getSubjectSessions(
   db: Database,

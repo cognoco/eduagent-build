@@ -2,7 +2,7 @@
 # Verifies that today's production V0 guardian tab shape renders intact when
 # MODE_NAV_V1_ENABLED=false. Companion to recaps-tab-list.yaml (V1 shape).
 #
-# Shape invariant (CLAUDE.md → "Profile Shapes", navigation-contract.ts):
+# Shape invariant (AGENTS.md → "Profile Shapes", navigation-contract.ts):
 #   V0 guardian (5 tabs): home, MY-LEARNING, LIBRARY, progress, more   ← production today
 #   V1 guardian (4 tabs): home, RECAPS, progress, more                  ← future default
 # This flow asserts the V0 surface: tab-my-learning + tab-library visible,

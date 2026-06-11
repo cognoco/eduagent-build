@@ -3,9 +3,9 @@ import { join } from 'node:path';
 
 // Forward-only guard: confirms that no route file imports from drizzle-orm.
 //
-// Context: sessions.ts had a sanctioned drizzle-orm import (CLAUDE.md
+// Context: sessions.ts had a sanctioned drizzle-orm import (AGENTS.md
 // "Known Exceptions") that was silently removed in PR #130 (8672bdcd).
-// The CLAUDE.md exception entry was removed in e622dd15. This test ensures
+// The AGENTS.md exception entry was removed in e622dd15. This test ensures
 // the invariant "zero route files import drizzle-orm" is forward-only:
 // if any route file re-introduces the pattern, jest fails fast.
 //

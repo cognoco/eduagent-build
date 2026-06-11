@@ -12,7 +12,7 @@
 // This follows the same observer pattern as payment-failed-observe.ts and
 // ask-classification-observe.ts: structured log + return-shape contract,
 // no transformation or retry logic. Schema drift escalates to Sentry so the
-// "silent recovery without escalation" rule (CLAUDE.md) is honoured.
+// "silent recovery without escalation" rule (AGENTS.md) is honoured.
 //
 // Event payload shapes (shared with sender via `@eduagent/schemas`):
 //   app/ask.gate_decision  → askGateDecisionEventSchema

@@ -13,7 +13,7 @@
 #   launch.tsx checks: errorCode.startsWith('CONSENT_') → isUnretryable = true
 #   → primaryAction is undefined (Retry suppressed)
 #   → secondaryAction renders quiz-launch-back
-#   Per CLAUDE.md: YAML asserts rendered fallback UI by testID, NOT formatted error string.
+#   Per AGENTS.md: YAML asserts rendered fallback UI by testID, NOT formatted error string.
 #
 # NOTE: The consent-pending scenario renders ConsentPendingGate BEFORE the tab
 # navigator loads (the gate intercepts the learner layout). The user cannot

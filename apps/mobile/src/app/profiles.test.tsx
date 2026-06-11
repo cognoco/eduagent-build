@@ -562,7 +562,7 @@ describe('ProfilesScreen', () => {
 
   // -------------------------------------------------------------------------
   // [BUG-127 / BREAK] Non-owners (children on a parent's account) must NOT
-  // see the "+ Add profile" button. Per CLAUDE.md Profile Shapes the
+  // see the "+ Add profile" button. Per AGENTS.md Profile Shapes the
   // add-child affordance requires isOwner; a child acting on the parent's
   // account should have no way to trigger create-profile.
   // -------------------------------------------------------------------------

@@ -106,7 +106,7 @@ export async function emitTopUpCreditsReattributedMetric(params: {
   await safeSend(
     () =>
       inngest.send({
-        // orphan-allow: structured telemetry required by CLAUDE.md
+        // orphan-allow: structured telemetry required by AGENTS.md
         // ("silent recovery in billing must emit a structured metric").
         // The re-attribution is handled in-line. This event is a
         // dashboard-queryable signal so ops can audit credit migration.

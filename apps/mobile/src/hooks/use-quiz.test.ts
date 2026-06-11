@@ -220,7 +220,7 @@ describe('usePrefetchRound', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    // Error recovery must escalate to Sentry — silent recovery is banned per CLAUDE.md
+    // Error recovery must escalate to Sentry — silent recovery is banned per AGENTS.md
     expect(captureSpy).toHaveBeenCalledWith(
       expect.stringContaining('[quiz] prefetch failed'),
       'warning',

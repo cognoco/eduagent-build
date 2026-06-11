@@ -986,7 +986,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               // of empty-reply / unparseable-envelope fallbacks is queryable via
               // the exchange-empty-reply-fallback Inngest handler. Without this
               // the handler is wired-but-untriggered (worse than dead code per
-              // CLAUDE.md). Non-core observability: safeSend captures dispatch
+              // AGENTS.md). Non-core observability: safeSend captures dispatch
               // failure to Sentry without breaking the SSE stream the client has
               // already received. Frames are flushed above, so this only delays
               // stream close by the dispatch round-trip (bounded by safeSend's
@@ -1573,7 +1573,7 @@ async function dispatchSessionAutoFileRequested(
  * entire post-session pipeline (retention scoring, XP, streaks, embeddings,
  * memory extraction, dashboard rollups). A silent drop here was producing
  * stranded sessions — the user finished the session, but their streak,
- * memories, and dashboard never updated. Per CLAUDE.md
+ * memories, and dashboard never updated. Per AGENTS.md
  * "Silent recovery without escalation is banned" AND the explicit
  * core-send vs safe-non-core rule: this is a CORE dispatch and dispatch
  * failure MUST short-circuit the user action so the client retries.

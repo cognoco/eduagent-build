@@ -82,7 +82,7 @@ export async function detectLanguageSubject(
 
     return entryToDetection(hint);
   } catch (err) {
-    // [BUG-462] Silent recovery banned (CLAUDE.md). Fallback is kept for
+    // [BUG-462] Silent recovery banned (AGENTS.md). Fallback is kept for
     // resilience but the error must be visible — log + capture before returning.
     captureException(err, {
       extra: { context: 'language-detect.fallback', rawInput },

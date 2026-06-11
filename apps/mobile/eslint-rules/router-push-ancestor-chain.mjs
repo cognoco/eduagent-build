@@ -8,7 +8,7 @@
  * `router.back()` from that leaf then falls through to the Tabs first
  * route (Home), not the parent screen the user expects.
  *
- * The rule of thumb (see CLAUDE.md → Repo-Specific Guardrails):
+ * The rule of thumb (see AGENTS.md → Repo-Specific Guardrails):
  *   - Push the full ancestor chain (parent first, then child), OR
  *   - Ensure the call originates from a file already inside the
  *     parent stack (no synthesis needed), OR
@@ -164,7 +164,7 @@ const rule = {
     schema: [],
     messages: {
       missingParentPush:
-        "router.push('{{ target }}') goes 2+ params deep without an intermediate parent push. Either push '{{ parent }}' first in the same function, rely on the file already being inside that parent stack, or annotate with `// gc4-allow: <reason>`. See CLAUDE.md > Repo-Specific Guardrails.",
+        "router.push('{{ target }}') goes 2+ params deep without an intermediate parent push. Either push '{{ parent }}' first in the same function, rely on the file already being inside that parent stack, or annotate with `// gc4-allow: <reason>`. See AGENTS.md > Repo-Specific Guardrails.",
     },
   },
 

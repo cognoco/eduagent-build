@@ -20,7 +20,7 @@
 // loaded.
 //
 // On SecureStore write failure: Sentry capture + `intro_securestore_write_failed`
-// metric (per CLAUDE.md "silent recovery without escalation is banned" —
+// metric (per AGENTS.md "silent recovery without escalation is banned" —
 // Sentry alone isn't queryable as a rate). The in-memory bit still answers
 // the gate for the remainder of the process so the user is never trapped in
 // a re-show loop.

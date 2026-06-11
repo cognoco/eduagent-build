@@ -16,7 +16,7 @@
 #   18c captures the actual tab bar for visual audit.
 #   See: apps/mobile/src/app/(app)/_layout.tsx:663-728 for tabBarButtonTestID values.
 #        apps/mobile/src/lib/navigation-contract.ts FAMILY_TABS / LEGACY_GUARDIAN_TABS.
-#        CLAUDE.md "Hard Constraint" section.
+#        AGENTS.md "Hard Constraint" section.
 #
 # PROXY-MODE / CHILD-STATE NOTE [ACCOUNT-04]:
 #   After the BUG-774 fix (apps/mobile/src/app/profiles.tsx:185-202), tapping a

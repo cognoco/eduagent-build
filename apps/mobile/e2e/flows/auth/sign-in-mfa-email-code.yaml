@@ -1,6 +1,6 @@
 # Flow A-MFA-1: Sign-in MFA — Email code branch
 #
-# BLOCKED: CLERK_TESTING_TOKEN is currently a placeholder (see CLAUDE.md).
+# BLOCKED: CLERK_TESTING_TOKEN is currently a placeholder (see AGENTS.md).
 # MFA branches require a Clerk test user with email-code 2FA enrolled.
 # Seeding a user with MFA via Clerk Admin API would work, but the seeder
 # (apps/api/src/services/test-seed.ts) does not yet enroll TOTP/phone/email-2FA

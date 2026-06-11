@@ -2,7 +2,7 @@
  * Integration: getSubjectSessions joins through subjects.profileId.
  *
  * This service is one of the architectural exceptions documented in
- * CLAUDE.md — it uses a direct db.select() with a multi-table join
+ * AGENTS.md — it uses a direct db.select() with a multi-table join
  * (learning_sessions → subjects) so profile scoping is enforced via
  * subjects.profileId rather than createScopedRepository. A unit test
  * with a mocked db would only assert that the joins are called, not that

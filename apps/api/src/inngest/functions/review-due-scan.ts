@@ -2,7 +2,7 @@
 //
 // This function is intentionally cross-profile. It scans all profiles with
 // overdue retention cards every 2 hours to fan out review-due notifications.
-// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// Profile-scoping rules in AGENTS.md ("Reads must use createScopedRepository")
 // do NOT apply here — this is system-wide work running outside any single
 // profile's request context.
 //

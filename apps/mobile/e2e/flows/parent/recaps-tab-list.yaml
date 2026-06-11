@@ -1,7 +1,7 @@
 # Flow: V1 Guardian Recaps Tab — Shape & List
 # Validates the V1 guardian (family) tab shape and the populated recaps list.
 #
-# Shape invariant (CLAUDE.md, navigation-contract.ts):
+# Shape invariant (AGENTS.md, navigation-contract.ts):
 #   V0 guardian (5 tabs): home, my-learning, library, progress, more
 #   V1 guardian (4 tabs): home, RECAPS, progress, more  ← my-learning + library replaced by recaps
 # This flow asserts the V1 surface: tab-recaps visible; tab-my-learning and

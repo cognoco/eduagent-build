@@ -3,7 +3,7 @@
 // app/billing.trial_subscription_failed event emitted by account
 // provisioning when createSubscription throws. [BUG-837 / F-SVC-003]
 //
-// CLAUDE.md rule: "Silent recovery without escalation is banned" in
+// AGENTS.md rule: "Silent recovery without escalation is banned" in
 // billing/auth/webhook code. The lazy-provision path can't fail account
 // creation when the trial subscription insert fails (the user must still
 // land in the app), so the recovery is a delegated retry/alert via this

@@ -227,7 +227,7 @@ export async function getUnpickedBookSuggestionsWithTopup(
       // generateCategorizedBookSuggestions catches its known failure paths
       // and returns a reason; reaching here means an unexpected throw (DB
       // outage, schema drift). Emit a structured metric so the recovery is
-      // not invisible — CLAUDE.md "Silent recovery without escalation is
+      // not invisible — AGENTS.md "Silent recovery without escalation is
       // banned" — and surface 'unknown' to the caller.
       logger.warn('book_suggestion_topup_unhandled', {
         metric: 'book_suggestion_topup_unhandled',

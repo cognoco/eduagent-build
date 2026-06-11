@@ -957,7 +957,7 @@ export function useChildWeeklyReports(
           // [CR-2026-05-19-H27] Escalate family-link ACL failures to Sentry
           // with the queryable tag so a broken or revoked family link is not
           // invisible in production. Previously this was a console.warn-only
-          // swallow that returned [], which violated CLAUDE.md "Silent
+          // swallow that returned [], which violated AGENTS.md "Silent
           // recovery without escalation is banned" — and also masked a real
           // IDOR/ACL regression behind an empty-state UI. The typed error
           // (ForbiddenError / NotFoundError already classified by the API

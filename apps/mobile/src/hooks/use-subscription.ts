@@ -139,7 +139,7 @@ export function useFamilySubscription(
       } catch (error) {
         // [BUG-160] Production api-client throws before returning the Response,
         // so the res.status === 404 check above is unreachable in production.
-        // Classify on the raw typed error (per CLAUDE.md "Classify errors
+        // Classify on the raw typed error (per AGENTS.md "Classify errors
         // before formatting") instead of string-matching the formatted message,
         // which is fragile when the formatter changes.
         if (error instanceof NotFoundError) {

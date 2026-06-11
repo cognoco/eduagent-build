@@ -122,7 +122,7 @@ export function mockInngestEvents(): MockHandle {
  * Do **not** loosen the assertion to `toContainEqual(...)` or
  * `expect.arrayContaining([...])` just to make a failing test pass — that
  * removes the regression-detection value the strict pattern exists for.
- * See CLAUDE.md → "Tests Must Reflect Reality" for the project rule.
+ * See AGENTS.md → "Tests Must Reflect Reality" for the project rule.
  *
  * Tracked by Notion bug BUG-1021 (LOW finding ADV-2 from cleanup PR).
  */

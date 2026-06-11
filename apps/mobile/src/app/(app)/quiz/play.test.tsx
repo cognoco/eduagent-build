@@ -1393,7 +1393,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
   // [BUG-268 / CCR PR #230] handleSaveAndQuit must NOT silently no-op when the
   // round was already auto-submitted in the background (final-question path).
-  // Per CLAUDE.md "Silent recovery without escalation is banned" — when the
+  // Per AGENTS.md "Silent recovery without escalation is banned" — when the
   // submission is complete we navigate the user to results; when it's still
   // in-flight we queue navigation for the in-flight onSuccess.
   it('[BUG-268] save-and-quit navigates to results when round already auto-saved', async () => {

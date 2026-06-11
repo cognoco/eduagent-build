@@ -29,7 +29,7 @@
  * — that doc records the 17-file count and the promotion-to-`error`
  * gating condition. Promotion happens after the sweep PR lands.
  *
- * See CLAUDE.md > Non-Negotiable Engineering Rules.
+ * See AGENTS.md > Non-Negotiable Engineering Rules.
  */
 
 const RAW_DB_METHODS = new Set([
@@ -119,7 +119,7 @@ const rule = {
     schema: [],
     messages: {
       missingAdminTag:
-        "Inngest function file uses raw `db.{{ method }}` but neither imports createScopedRepository nor declares `// @inngest-admin: <reason>` at the top of the file. Add the annotation (`cross-profile`, `parent-chain`, etc.) explaining why this function bypasses scoped-repo isolation, or refactor to use createScopedRepository(profileId). See CLAUDE.md.",
+        "Inngest function file uses raw `db.{{ method }}` but neither imports createScopedRepository nor declares `// @inngest-admin: <reason>` at the top of the file. Add the annotation (`cross-profile`, `parent-chain`, etc.) explaining why this function bypasses scoped-repo isolation, or refactor to use createScopedRepository(profileId). See AGENTS.md.",
     },
   },
 

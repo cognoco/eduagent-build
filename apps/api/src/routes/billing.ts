@@ -675,7 +675,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // tier, effectiveAccessTier, billingAccess, status, monthlyLimit,
     // usedThisMonth, dailyLimit, usedToday from the parent's account — the
     // exact account-level billing-state leak BUG-644 added owner-gating for
-    // on /subscription. CLAUDE.md billing rules forbid this class of leak.
+    // on /subscription. AGENTS.md billing rules forbid this class of leak.
     assertOwnerProfile(
       c,
       'Only the account owner can view subscription status.',
@@ -686,7 +686,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     // Try KV first (fast path).
     // [BUG-97 / A1-MED] Wrap KV read in try/catch -- KV outages must not 500.
-    // Per CLAUDE.md "Silent recovery without escalation is banned": fall
+    // Per AGENTS.md "Silent recovery without escalation is banned": fall
     // through to the DB path but emit Sentry + structured log on KV failure
     // so we can detect cache outages, not just observe slow latency.
     if (kv) {

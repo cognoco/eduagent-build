@@ -65,7 +65,7 @@ const ALLOWED_UNREGISTERED_PREFIXES: string[] = [
  * Triage history: the original baseline held 15 entries. 14 were resolved by
  * adding a `// orphan-allow: <reason>` comment at the dispatch site once each
  * was confirmed to be a genuine observability-only marker (structured-telemetry
- * signals paired with logger.warn + captureException to satisfy CLAUDE.md's
+ * signals paired with logger.warn + captureException to satisfy AGENTS.md's
  * "silent recovery must emit a structured signal" rule, or — for
  * app/filing.retry_completed — an event with a real `step.waitForEvent`
  * consumer the scanner cannot see because it only harvests

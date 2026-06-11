@@ -6,7 +6,7 @@
  * and that the dedup pass skips (does not delete) such facts when they reach
  * the pass via the candidateIds path.
  *
- * Per CLAUDE.md: "No internal mocks in integration tests."
+ * Per AGENTS.md: "No internal mocks in integration tests."
  * No LLM calls needed for these tests.
  */
 
@@ -130,9 +130,13 @@ describe('suppressed-prewrite guard (real DB)', () => {
     expect(candidateRow).not.toBeNull();
 
     // Event must carry the warning flag
-    const suppressEvent = events.find((e) => e.name === 'memory.fact.suppressed_skip');
+    const suppressEvent = events.find(
+      (e) => e.name === 'memory.fact.suppressed_skip',
+    );
     expect(suppressEvent).toBeDefined();
-    expect(suppressEvent?.data['warning']).toBe('suppressed_fact_reached_dedup_pass');
+    expect(suppressEvent?.data['warning']).toBe(
+      'suppressed_fact_reached_dedup_pass',
+    );
 
     await db.delete(accounts).where(eq(accounts.id, accountId));
   });
@@ -170,7 +174,8 @@ describe('suppressed-prewrite guard (real DB)', () => {
     ]);
 
     const scoped = createScopedRepository(db, profileId);
-    const candidates = await scoped.memoryFacts.findActiveCandidatesWithEmbedding();
+    const candidates =
+      await scoped.memoryFacts.findActiveCandidatesWithEmbedding();
 
     const ids = candidates.map((c) => c.id);
     expect(ids).toContain(activeId);

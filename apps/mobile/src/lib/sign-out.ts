@@ -127,7 +127,7 @@ export async function signOutWithCleanup(
   //
   // [BUG-771] Race clerkSignOut against a hard timeout. Symptom in production:
   // sign-out button hangs > 45s and the user is never returned to the
-  // sign-in screen. Per CLAUDE.md UX Resilience Rules ("stuck states must
+  // sign-in screen. Per AGENTS.md UX Resilience Rules ("stuck states must
   // have a timeout + recovery action") and Fix Development Rules ("silent
   // recovery without escalation is banned") we:
   //   1. Cap the Clerk call at CLERK_SIGNOUT_TIMEOUT_MS so the caller can

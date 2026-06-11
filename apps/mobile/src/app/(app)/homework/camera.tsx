@@ -304,7 +304,7 @@ export default function CameraScreen(): React.ReactNode {
             // network / rate-limit errors surface their specific actionable
             // message, while a 5xx UpstreamError collapses to generic
             // "Something went wrong on our end…" by design (formatApiError never
-            // leaks a raw server-internal 5xx body to the user — see CLAUDE.md
+            // leaks a raw server-internal 5xx body to the user — see AGENTS.md
             // "never surface raw runtime/internal error strings"). In every case
             // we append the manual-picker recovery instruction so the learner is
             // never stranded without an actionable next step.

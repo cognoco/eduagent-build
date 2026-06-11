@@ -317,7 +317,7 @@ describe('SignUpScreen', () => {
   });
 
   // [BUG-510] Break test: when ssoSignIn.status is set, the flow must emit a
-  // structured Sentry event before redirecting. Per CLAUDE.md: "Silent recovery
+  // structured Sentry event before redirecting. Per AGENTS.md: "Silent recovery
   // without escalation is banned." console.warn alone is insufficient; the event
   // must be observable in Sentry so we can query how many times this path fired.
   it('[BUG-510] emits Sentry captureMessage when SSO redirects due to incomplete signIn status', async () => {

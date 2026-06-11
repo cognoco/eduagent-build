@@ -235,7 +235,7 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
   });
 
   // [BREAK / BUG-312] Schema drift must escalate to Sentry — silent
-  // logger.error alone fails the CLAUDE.md "Silent recovery without
+  // logger.error alone fails the AGENTS.md "Silent recovery without
   // escalation" rule. Pinned to "called exactly once" so a future refactor
   // can't downgrade the signal.
   it('[BREAK / BUG-312] captures schema drift to Sentry exactly once with payload context', async () => {

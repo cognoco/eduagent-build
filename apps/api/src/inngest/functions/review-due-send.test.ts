@@ -375,7 +375,7 @@ describe('[BUG-976 / BUG-839] review-due-send checkAndLogRateLimitInternal DB fa
       reason: 'dedup_check_failed',
       profileId: 'p-err',
     });
-    // CLAUDE.md "Silent recovery without escalation is banned": the
+    // AGENTS.md "Silent recovery without escalation is banned": the
     // dedup_check_failed path must dispatch a structured event so the
     // suppression is queryable in 24h dashboards. Sentry alone is not enough.
     expect(sendEventCalls).toContainEqual({

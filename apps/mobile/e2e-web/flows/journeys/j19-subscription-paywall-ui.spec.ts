@@ -17,7 +17,7 @@ import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 //   - back-navigation returns to the more tab
 //
 // RevenueCat is a true external boundary (mobile SDK, no web support) —
-// mocking it here is correct per CLAUDE.md "Mock only true external boundaries".
+// mocking it here is correct per AGENTS.md "Mock only true external boundaries".
 test('J-19 free-tier learner sees subscription paywall with static tier comparison on web', async ({
   page,
 }) => {

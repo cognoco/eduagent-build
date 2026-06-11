@@ -65,7 +65,7 @@ export async function lookupAssistantTurnState(params: {
     // Auth-adjacent silent recovery: bypass the idempotency replay rather than
     // failing the request, but emit a queryable counter so a sustained DB
     // outage shows up in metrics instead of as elevated duplicate-message
-    // rates. (CLAUDE.md: "Silent recovery without escalation is banned.")
+    // rates. (AGENTS.md: "Silent recovery without escalation is banned.")
     addBreadcrumb('assistant turn lookup failed', 'idempotency', 'warning');
     logger.warn('[idempotency] assistant turn lookup failed', {
       event: 'idempotency.assistant_turn_lookup_failed',
@@ -78,14 +78,14 @@ export async function lookupAssistantTurnState(params: {
       extra: { context: 'idempotency.lookupAssistantTurnState', flow, key },
     });
     // [BUG-420] Non-core telemetry dispatch must go through safeSend per
-    // CLAUDE.md "Silent recovery without escalation is banned" — bare
+    // AGENTS.md "Silent recovery without escalation is banned" — bare
     // inngest.send(...).catch(() => {}) erases all observability of dispatch
     // failures. safeSend captures dispatch failures + timeouts in Sentry and
     // logs them with `surface` while still never throwing into the caller.
     await safeSend(
       () =>
         inngest.send({
-          // orphan-allow: structured telemetry signal required by CLAUDE.md
+          // orphan-allow: structured telemetry signal required by AGENTS.md
           // (silent recovery must emit a structured metric/Inngest event). The
           // lookup failure recovers in-line (returns SAFE_ASSISTANT_TURN_STATE)
           // and escalates via logger.warn + captureException(Sentry). The event

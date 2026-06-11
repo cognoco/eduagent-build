@@ -6,7 +6,7 @@
 // Pre-fix: per-trial errors inside the for-loop were swallowed with a bare
 // console.error so the cron silently reported a smaller count and stuck
 // trials accumulated invisibly — the exact "silent recovery without
-// escalation" pattern banned by CLAUDE.md.
+// escalation" pattern banned by AGENTS.md.
 //
 // This handler is the queryable terminus. A real retry strategy (re-queue
 // the failed trialId after backoff, page on rate spikes) is intentionally
@@ -47,5 +47,5 @@ export const trialExpiryFailureObserve = inngest.createFunction(
       trialId: data.trialId ?? null,
       retryDeferred: 'pending_trial_expiry_retry_strategy',
     };
-  }
+  },
 );

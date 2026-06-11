@@ -425,7 +425,7 @@ describe('findOrCreateAccount', () => {
 
   // [BUG-837 / F-SVC-003] When createSubscription throws, account creation
   // must still succeed (lazy-provision contract) — but the failure MUST
-  // escalate per CLAUDE.md ("Silent recovery without escalation is banned in
+  // escalate per AGENTS.md ("Silent recovery without escalation is banned in
   // billing/auth/webhook code"). Three escalation surfaces required:
   // structured log, Sentry capture, Inngest event.
   describe('[BUG-837] trial subscription failure escalation', () => {

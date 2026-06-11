@@ -105,7 +105,7 @@ export async function emitCrisisRedirectEvent(context: {
 
 /**
  * F1.1 — Server-side hard cap on interview / onboarding exchanges. Per the
- * envelope contract in CLAUDE.md ("Every envelope signal must have a
+ * envelope contract in AGENTS.md ("Every envelope signal must have a
  * server-side hard cap so the flow terminates even if the LLM never emits the
  * signal"), interview-style flows MUST terminate at this exchange count even
  * when `signals.ready_to_finish` is never received. Callers that drive
@@ -116,7 +116,7 @@ export async function emitCrisisRedirectEvent(context: {
  * Non-interview flows (regular learning, homework, language, recitation) are
  * still bounded by `MAX_EXCHANGES_PER_SESSION` (50) and ignore this constant.
  *
- * Value justification: 4 exchanges is the example cap cited in CLAUDE.md and
+ * Value justification: 4 exchanges is the example cap cited in AGENTS.md and
  * the docs/architecture.md envelope contract — short enough that the
  * interview never runs unbounded, long enough to capture goals, current
  * knowledge, and interests in a fast-path onboarding chat.

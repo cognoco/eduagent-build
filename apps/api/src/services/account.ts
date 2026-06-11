@@ -314,7 +314,7 @@ export async function findOrCreateAccount(
     });
   } catch (error) {
     // [BUG-837 / F-SVC-003] Don't fail account creation — but billing-adjacent
-    // catches MUST escalate per CLAUDE.md ("Silent recovery without
+    // catches MUST escalate per AGENTS.md ("Silent recovery without
     // escalation is banned in billing/auth/webhook code"). Emit:
     //   1. Structured error log so it's queryable via observability.
     //   2. Sentry capture so on-call gets paged on aggregate spikes.

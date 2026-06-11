@@ -362,7 +362,7 @@ export const resendWebhookRoute = new Hono<{
       await safeSend(
         () =>
           inngest.send({
-            // orphan-allow: structured telemetry required by CLAUDE.md (silent
+            // orphan-allow: structured telemetry required by AGENTS.md (silent
             // recovery must emit a structured signal). The DB-dedup outage
             // recovers in-line (falls back to KV) + escalates via logger.warn.
             // The event is a dashboard-queryable signal for how often the weaker
@@ -386,7 +386,7 @@ export const resendWebhookRoute = new Hono<{
     await safeSend(
       () =>
         inngest.send({
-          // orphan-allow: structured telemetry required by CLAUDE.md (silent
+          // orphan-allow: structured telemetry required by AGENTS.md (silent
           // recovery must emit a structured signal). Missing DB binding in a
           // deployed env means the atomic dedup gate is off — escalated via
           // logger.warn. The event is a dashboard-queryable misconfiguration
@@ -407,7 +407,7 @@ export const resendWebhookRoute = new Hono<{
       alreadySeen = (await dedupKv.get(dedupKey)) !== null;
     } catch (err) {
       // KV read failure must not silently weaken replay protection.
-      // (CLAUDE.md: "Silent recovery without escalation is banned.")
+      // (AGENTS.md: "Silent recovery without escalation is banned.")
       logger.warn('[resend] svix-id dedup read failed; allowing request', {
         event: 'resend.dedup_lookup_failed',
         webhookId,
@@ -419,7 +419,7 @@ export const resendWebhookRoute = new Hono<{
       await safeSend(
         () =>
           inngest.send({
-            // orphan-allow: structured telemetry required by CLAUDE.md (silent
+            // orphan-allow: structured telemetry required by AGENTS.md (silent
             // recovery must emit a structured signal). KV read failure recovers
             // in-line (allows the request) + escalates via logger.warn +
             // captureException(Sentry). The event is a dashboard-queryable
@@ -475,7 +475,7 @@ export const resendWebhookRoute = new Hono<{
       await safeSend(
         () =>
           inngest.send({
-            // orphan-allow: structured telemetry required by CLAUDE.md (silent
+            // orphan-allow: structured telemetry required by AGENTS.md (silent
             // recovery must emit a structured signal). Dedup pre-write failure
             // recovers in-line (continues with weakened protection) + escalates
             // via logger.warn + captureException(Sentry). The event is a
@@ -505,7 +505,7 @@ export const resendWebhookRoute = new Hono<{
     await safeSend(
       () =>
         inngest.send({
-          // orphan-allow: structured telemetry required by CLAUDE.md (silent
+          // orphan-allow: structured telemetry required by AGENTS.md (silent
           // recovery must emit a structured signal). Missing IDEMPOTENCY_KV
           // binding in a deployed env disables svix-id replay protection —
           // escalated via logger.warn. The event is a dashboard-queryable

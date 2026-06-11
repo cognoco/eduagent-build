@@ -2,7 +2,7 @@
 // Stripe Webhook Handler — service module
 // ---------------------------------------------------------------------------
 // [FCR-2026-05-23-L5.M3] Extracted from routes/stripe-webhook.ts to enforce
-// the route/service boundary (eslint G1/G5, CLAUDE.md §"Non-Negotiable
+// the route/service boundary (eslint G1/G5, AGENTS.md §"Non-Negotiable
 // Engineering Rules"). The route file now owns ONLY signature verification,
 // idempotency claim, livemode / stale-event guards, and the event-type switch.
 // All subscription-state, quota-pool, KV-cache, and Inngest dispatches live
@@ -128,7 +128,7 @@ export function mapStripeStatus(
 // `updateSubscriptionFromWebhook` returns null when no row matches the Stripe
 // subscription ID. Previously the handlers returned silently — the event's
 // state (period dates, cancelled_at, past_due transitions) was lost forever
-// because Stripe will not re-deliver after a 200. CLAUDE.md "Silent recovery
+// because Stripe will not re-deliver after a 200. AGENTS.md "Silent recovery
 // without escalation is banned in billing" — escalate so the rate is
 // queryable in Sentry.
 function escalateSubscriptionNotFound(
@@ -178,7 +178,7 @@ export async function handleSubscriptionEvent(
   const status = mapStripeStatus(stripeSubscription.status);
   if (!status) {
     // [#441] Unmapped Stripe status — silent early-return is banned in billing
-    // (CLAUDE.md: "Silent recovery without escalation is banned"). Surface to
+    // (AGENTS.md: "Silent recovery without escalation is banned"). Surface to
     // Sentry so stuck-in-incomplete scenarios are visible in the dashboard.
     logger.warn(
       '[stripe-webhook] handleSubscriptionEvent: unmapped Stripe status — event dropped',

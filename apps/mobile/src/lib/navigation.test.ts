@@ -121,7 +121,7 @@ describe('goBackOrReplace', () => {
   // dropped at Home with no path back to their context). This test uses a
   // representative parent href ('/(app)/more') to make the contract explicit.
   //
-  // See CLAUDE.md — "cross-tab / cross-stack router.push" rule.
+  // See AGENTS.md — "cross-tab / cross-stack router.push" rule.
   // ---------------------------------------------------------------------------
   it('[BUG-552] deep-link / first-route: calls replace(fallbackHref) with the exact parent href, never back()', () => {
     const parentHref = '/(app)/more' as const;

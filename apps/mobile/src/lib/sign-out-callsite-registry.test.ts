@@ -134,7 +134,7 @@ describe('sign-out call-site registry', () => {
         `Direct Clerk signOut() invocations found outside ` +
         `apps/mobile/src/lib/sign-out.ts. Replace with ` +
         `signOutWithCleanup({...}) so SecureStore + queryClient ` +
-        `state is cleared. See CLAUDE.md > Code Quality Guards.\n\n` +
+        `state is cleared. See AGENTS.md > Code Quality Guards.\n\n` +
         violations
           .map((v) => `  ${v.relPath}:${v.line}\n    ${v.text}`)
           .join('\n');

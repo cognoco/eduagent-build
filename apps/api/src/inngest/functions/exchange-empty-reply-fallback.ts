@@ -7,7 +7,7 @@
 // 'app/exchange.empty_reply_fallback', ... }) but no handler was registered,
 // so the very escalation channel meant to surface broken LLM responses was
 // silently dropped — exactly the "wired-but-untriggered" anti-pattern called
-// out in CLAUDE.md ("worse than dead code because it creates false
+// out in AGENTS.md ("worse than dead code because it creates false
 // confidence").
 //
 // This handler is the observable terminus: every empty-reply event lands

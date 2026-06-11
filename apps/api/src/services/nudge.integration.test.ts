@@ -12,7 +12,7 @@
  * Expo Push API is intercepted at the fetch boundary. All service modules and
  * DB operations run through the real integration path.
  *
- * CLAUDE.md rule: no internal jest.mock() in integration tests.
+ * AGENTS.md rule: no internal jest.mock() in integration tests.
  */
 
 import { resolve } from 'path';

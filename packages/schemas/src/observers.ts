@@ -5,7 +5,7 @@
 //
 // Each schema mirrors the runtime shape that the observer function validates
 // with `safeParse` before logging / acting on the payload. Extracting these
-// to `@eduagent/schemas` keeps the contract centralized (CLAUDE.md rule:
+// to `@eduagent/schemas` keeps the contract centralized (AGENTS.md rule:
 // "@eduagent/schemas is the shared contract; do not redefine API-facing
 // types locally") and lets future senders import the same schema for
 // build-time validation.

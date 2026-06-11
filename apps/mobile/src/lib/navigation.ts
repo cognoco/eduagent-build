@@ -75,7 +75,7 @@ export function homeHrefForReturnTo(
  * screen — e.g. a list screen, a tab root, or the `more` tab — so that
  * `replace` keeps the user in the correct context.
  *
- * @see CLAUDE.md — "cross-tab / cross-stack router.push" rule: pushes must
+ * @see AGENTS.md — "cross-tab / cross-stack router.push" rule: pushes must
  *   include the full ancestor chain so that `router.back()` resolves
  *   correctly and the fallback only fires as a last-resort guard.
  *
@@ -110,7 +110,7 @@ export function pushLearningResumeTarget(
   // route rename will fail at compile time) while accepting the dynamic
   // params shape; `as never` allowed any pathname through.
   //
-  // [BUG-551] CLAUDE.md: cross-tab/cross-stack router.push must push the full
+  // [BUG-551] AGENTS.md: cross-tab/cross-stack router.push must push the full
   // ancestor chain. A single push to /(app)/session synthesises a 1-deep stack,
   // so back() from session falls through to the active tab's first-route
   // (Home) instead of the caller's previous screen.
@@ -138,7 +138,7 @@ export function pushLearningResumeTarget(
 /**
  * Cross-tab push from the Progress tab to a linked child's monthly report.
  *
- * [BUG-524] CLAUDE.md: cross-tab/cross-stack `router.push` must push the full
+ * [BUG-524] AGENTS.md: cross-tab/cross-stack `router.push` must push the full
  * ancestor chain. A direct push to `child/[profileId]/report/[reportId]` from
  * the Progress tab synthesises a 1-deep stack containing only the leaf, so
  * `router.back()` from the leaf falls through to the Tabs first-route (Home)

@@ -1317,7 +1317,7 @@ describe('CameraScreen', () => {
   // than the raw server body — this is the intentional contract pinned by
   // format-api-error.test.ts ("[BUG-545] returns server message for UpstreamError
   // 500/502", which assert generic copy even when the body carries a specific
-  // message). The reason is CLAUDE.md's "never surface raw runtime/internal
+  // message). The reason is AGENTS.md's "never surface raw runtime/internal
   // error strings to users" guard: a 5xx body is server-internal and may leak
   // LLM/provider/stack detail. The actionable recovery for the learner is the
   // manual subject picker, which the alert directs them to. So this test asserts

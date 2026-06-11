@@ -2,7 +2,7 @@
 // RevenueCat Webhook Handler — service module
 // ---------------------------------------------------------------------------
 // [FCR-2026-05-23-L5.M2] Extracted from routes/revenuecat-webhook.ts to
-// enforce the route/service boundary (eslint G1/G5, CLAUDE.md §"Non-Negotiable
+// enforce the route/service boundary (eslint G1/G5, AGENTS.md §"Non-Negotiable
 // Engineering Rules"). The route file now owns ONLY:
 //   1. Bearer-token validation (timing-safe HMAC compare)
 //   2. Zod payload parsing

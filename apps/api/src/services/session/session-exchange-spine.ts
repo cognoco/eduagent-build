@@ -19,7 +19,7 @@ import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
  *     (`metadata.onboardingFastPath` object present) AND the persisted
  *     `exchangeCount` has reached {@link MAX_INTERVIEW_EXCHANGES}. This is
  *     the server-side hard cap mandated by the envelope contract in
- *     CLAUDE.md — without it, an LLM that never emits the signal lets the
+ *     AGENTS.md — without it, an LLM that never emits the signal lets the
  *     interview run all the way to MAX_EXCHANGES_PER_SESSION (50).
  *   - Returns `false` otherwise. Non-interview sessions are not capped here
  *     and rely on the global MAX_EXCHANGES_PER_SESSION ceiling.

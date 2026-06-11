@@ -664,7 +664,7 @@ export async function activateSubscriptionFromCheckout(
         await safeSend(
           () =>
             inngest.send({
-              // orphan-allow: structured telemetry required by CLAUDE.md
+              // orphan-allow: structured telemetry required by AGENTS.md
               // (silent recovery in billing must emit a structured signal). The
               // divergent-sub conflict is resolved in-line here and escalated
               // via logger.warn + captureException(Sentry). The Inngest event is
@@ -778,7 +778,7 @@ export async function activateSubscriptionFromCheckout(
         await safeSend(
           () =>
             inngest.send({
-              // orphan-allow: structured telemetry required by CLAUDE.md (silent
+              // orphan-allow: structured telemetry required by AGENTS.md (silent
               // recovery in billing must emit a structured signal). Divergence is
               // resolved in-line (row updated to incoming) + escalated via
               // logger.warn + captureException; the event is a dashboard-
@@ -805,7 +805,7 @@ export async function activateSubscriptionFromCheckout(
       await safeSend(
         () =>
           inngest.send({
-            // orphan-allow: structured telemetry required by CLAUDE.md (silent
+            // orphan-allow: structured telemetry required by AGENTS.md (silent
             // recovery in billing must emit a structured signal). Divergence is
             // resolved in-line + escalated via logger.warn + captureException;
             // the event is a dashboard-queryable signal, no handler intended.

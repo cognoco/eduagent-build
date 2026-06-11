@@ -34,7 +34,7 @@ jest.mock(
 );
 
 // Deterministic error text so the export-failure assertion is stable
-// (per CLAUDE.md "Classify errors before formatting" — the screen passes the
+// (per AGENTS.md "Classify errors before formatting" — the screen passes the
 // raw error to formatApiError; the test pins the rendered string).
 jest.mock(
   '../../../lib/format-api-error' /* gc1-allow: screen test needs deterministic error text */,

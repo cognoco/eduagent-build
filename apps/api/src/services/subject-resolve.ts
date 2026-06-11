@@ -127,7 +127,7 @@ export async function resolveSubjectName(
       };
     }
   } catch (err) {
-    // [BUG-462] Silent recovery banned (CLAUDE.md). JSON parse fallback is
+    // [BUG-462] Silent recovery banned (AGENTS.md). JSON parse fallback is
     // kept for resilience but the error must be visible — log + capture before
     // falling through to no_match.
     captureException(err, {

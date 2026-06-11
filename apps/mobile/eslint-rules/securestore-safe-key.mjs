@@ -23,7 +23,7 @@
  *   - `setItemAsync(`safe-${id}`, '1')`                — static parts are safe;
  *     the `${id}` may still be unsafe at runtime (caller responsibility)
  *
- * See CLAUDE.md > Repo-Specific Guardrails > "SecureStore keys must use
+ * See AGENTS.md > Repo-Specific Guardrails > "SecureStore keys must use
  * Expo-safe characters only" and the governance audit
  * docs/_archive/plans/done/2026-05-03-governance-audit.md (item GC2).
  */

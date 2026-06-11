@@ -61,10 +61,10 @@ export function usePrefetchRound(): UseMutationResult<
     // Prefetch failures fall back to the normal launch path, so the UX is
     // unaffected — but we still want visibility when the backend starts
     // reliably rejecting prefetch (quota, backend outage, etc.). Silent
-    // recovery without any signal is banned per ~/.claude/CLAUDE.md.
+    // recovery without any signal is banned per ~/.claude/AGENTS.md.
     onError: (err) => {
       // [IMP-5] Escalate to Sentry so prefetch failures are queryable,
-      // not just in local console. Per ~/.claude/CLAUDE.md: silent recovery
+      // not just in local console. Per ~/.claude/AGENTS.md: silent recovery
       // without escalation is banned on quota paths.
       Sentry.captureMessage(
         `[quiz] prefetch failed: ${err.message}`,

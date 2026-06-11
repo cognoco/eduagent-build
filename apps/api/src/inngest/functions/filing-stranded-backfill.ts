@@ -4,7 +4,7 @@
 // that scans all learning sessions created in the last 14 days whose filing
 // status is stranded (completed/auto-closed but never filed), then dispatches
 // synthetic filing-timed-out events to recover them. Profile-scoping rules in
-// CLAUDE.md ("Reads must use createScopedRepository") do NOT apply here —
+// AGENTS.md ("Reads must use createScopedRepository") do NOT apply here —
 // this is system-wide maintenance work running outside any single profile's
 // request context.
 //

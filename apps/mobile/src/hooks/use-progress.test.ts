@@ -497,7 +497,7 @@ describe('useProfileWeeklyReports', () => {
 // family-link ACL was therefore invisible in production. After the fix the
 // hook surfaces the typed ForbiddenError via React Query AND captures it to
 // Sentry with hook + childProfileId tags so the rate of fallback firings is
-// queryable per the CLAUDE.md "Silent recovery without escalation is banned"
+// queryable per the AGENTS.md "Silent recovery without escalation is banned"
 // rule. The screen renders its existing error fallback (retry + back).
 describe('useChildWeeklyReports — silent-403 escalation [CR-2026-05-19-H27]', () => {
   it('surfaces ForbiddenError AND captures to Sentry on 403 (does not return [])', async () => {
@@ -536,7 +536,7 @@ describe('useChildWeeklyReports — silent-403 escalation [CR-2026-05-19-H27]', 
     // Hook must not silently swallow to []
     expect(result.current.data).toBeUndefined();
     // Sentry capture with queryable tags — this is the "escalation" the
-    // CLAUDE.md silent-recovery rule requires (console.warn alone is banned).
+    // AGENTS.md silent-recovery rule requires (console.warn alone is banned).
     expect(sentry.captureException).toHaveBeenCalledWith(
       expect.any(ForbiddenError),
       expect.objectContaining({

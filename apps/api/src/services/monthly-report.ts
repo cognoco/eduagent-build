@@ -247,7 +247,7 @@ export async function generateReportHighlights(
         typeof parsed.equivalent === 'string' ? parsed.equivalent : null,
     };
   } catch (error) {
-    // CLAUDE.md "Silent recovery without escalation is banned" — escalate
+    // AGENTS.md "Silent recovery without escalation is banned" — escalate
     // to Sentry AND structured logs so this fallback is observable.
     logger.error('generateReportHighlights: LLM call or parse failed', {
       error: error instanceof Error ? error.message : String(error),

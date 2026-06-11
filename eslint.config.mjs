@@ -47,7 +47,7 @@ export default [
   // (Stripe, Clerk JWKS, third-party SDKs, push providers, time). At `warn`
   // severity for now: ~260 legacy violations exist and are tracked toward
   // a separate cleanup epic; this rule's job is to stop NEW violations.
-  // See CLAUDE.md > Code Quality Guards.
+  // See AGENTS.md > Code Quality Guards.
   // -------------------------------------------------------------------------
   {
     files: [
@@ -136,7 +136,7 @@ export default [
   // no mobile test imports @eduagent/api at runtime today and the ban is
   // harmless to them.
   //
-  // See CLAUDE.md > Known Exceptions to Engineering Rules
+  // See AGENTS.md > Known Exceptions to Engineering Rules
   // ("Type-only imports from @eduagent/api are accepted; runtime imports
   // remain forbidden").
   // -------------------------------------------------------------------------
@@ -164,7 +164,7 @@ export default [
             {
               name: '@eduagent/api',
               message:
-                'Mobile may only type-import from @eduagent/api (`import type { AppType } from "@eduagent/api"`). A runtime/value import bundles the entire API server (Hono, drizzle, services) into the mobile app. See CLAUDE.md > Known Exceptions to Engineering Rules.',
+                'Mobile may only type-import from @eduagent/api (`import type { AppType } from "@eduagent/api"`). A runtime/value import bundles the entire API server (Hono, drizzle, services) into the mobile app. See AGENTS.md > Known Exceptions to Engineering Rules.',
               allowTypeImports: true,
             },
           ],
@@ -239,7 +239,7 @@ export default [
   //      adapters under services/llm/providers/**. All other code must call
   //      services/llm/router.ts (or its barrel) so the router's
   //      retry/fallback/cost-metering logic stays the single chokepoint.
-  // See CLAUDE.md > Non-Negotiable Engineering Rules.
+  // See AGENTS.md > Non-Negotiable Engineering Rules.
   // -------------------------------------------------------------------------
   // First, the broad G3 rule for everything under apps/api/src (except
   // provider adapters). Routes get their own override below.
@@ -318,7 +318,7 @@ export default [
             {
               name: 'drizzle-orm',
               message:
-                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See CLAUDE.md.',
+                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See AGENTS.md.',
             },
             {
               name: '@anthropic-ai/sdk',
@@ -355,7 +355,7 @@ export default [
             {
               group: ['drizzle-orm/*'],
               message:
-                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See CLAUDE.md.',
+                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See AGENTS.md.',
             },
           ],
         },
@@ -373,7 +373,7 @@ export default [
             {
               name: '@eduagent/database',
               message:
-                'Route files must not import @eduagent/database values. Move schema table access to services/*. Type-only imports (`import type { Database }`) remain allowed. See CLAUDE.md.',
+                'Route files must not import @eduagent/database values. Move schema table access to services/*. Type-only imports (`import type { Database }`) remain allowed. See AGENTS.md.',
               allowTypeImports: true,
             },
           ],
@@ -396,7 +396,7 @@ export default [
   //   and prevent accidental rename drift — same rationale as the mobile G4
   //   rule in apps/mobile/eslint.config.mjs.
   //
-  // See CLAUDE.md > Repo-Specific Guardrails.
+  // See AGENTS.md > Repo-Specific Guardrails.
   // -------------------------------------------------------------------------
   {
     files: ['apps/api/src/**/*.ts'],
@@ -416,12 +416,12 @@ export default [
           selector:
             "MemberExpression[object.name='process'][property.name='env']",
           message:
-            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See CLAUDE.md.',
+            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See AGENTS.md.',
         },
         {
           selector: 'ExportDefaultDeclaration',
           message:
-            'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See CLAUDE.md.',
+            'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See AGENTS.md.',
         },
       ],
     },
@@ -438,7 +438,7 @@ export default [
           selector:
             "MemberExpression[object.name='process'][property.name='env']",
           message:
-            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See CLAUDE.md.',
+            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See AGENTS.md.',
         },
       ],
     },
@@ -450,7 +450,7 @@ export default [
   // rule, a route could still write `c.get('db').select().from(table)` and
   // satisfy the import-only check. Move the query into services/* and use
   // createScopedRepository(profileId).
-  // See CLAUDE.md > Non-Negotiable Engineering Rules ("Reads must use
+  // See AGENTS.md > Non-Negotiable Engineering Rules ("Reads must use
   // createScopedRepository(profileId)"; "Route files must not import ORM
   // primitives, schema tables, or createScopedRepository").
   //
@@ -486,18 +486,18 @@ export default [
           selector:
             "MemberExpression[object.name='process'][property.name='env']",
           message:
-            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See CLAUDE.md.',
+            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See AGENTS.md.',
         },
         {
           selector:
             "CallExpression[callee.property.name=/^(select|insert|update|delete)$/][callee.object.type='CallExpression'][callee.object.callee.object.name='c'][callee.object.callee.property.name='get'][callee.object.arguments.0.value='db']",
           message:
-            "Route files must not call .select/.insert/.update/.delete directly on c.get('db'). Move the query into services/* and use createScopedRepository(profileId). See CLAUDE.md. Note: this rule catches the c.get('db').op() chain; const-destructured db patterns (const db = c.get('db'); db.select()) are caught by G1 (no drizzle-orm imports in routes).",
+            "Route files must not call .select/.insert/.update/.delete directly on c.get('db'). Move the query into services/* and use createScopedRepository(profileId). See AGENTS.md. Note: this rule catches the c.get('db').op() chain; const-destructured db patterns (const db = c.get('db'); db.select()) are caught by G1 (no drizzle-orm imports in routes).",
         },
         {
           selector: 'ExportDefaultDeclaration',
           message:
-            'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See CLAUDE.md.',
+            'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See AGENTS.md.',
         },
       ],
     },

@@ -32,7 +32,7 @@ import { ErrorFallback } from '../../../../components/common/ErrorFallback';
 import { RewardBurst } from '../../../../components/common/RewardBurst';
 import { hapticSuccess } from '../../../../lib/haptics';
 // [BUG-138 / BUG-227] Underscore-prefixed helpers so Expo Router does NOT
-// treat them as route files in /(app)/practice/assessment/. Per CLAUDE.md
+// treat them as route files in /(app)/practice/assessment/. Per AGENTS.md
 // Repo-Specific Guardrails rule 16: any non-route helper file inside the
 // app/ tree must be `_` prefixed (or live in a `_components` / `_hooks`
 // folder), otherwise Expo Router registers it as a phantom route.

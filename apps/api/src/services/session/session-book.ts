@@ -26,7 +26,7 @@ export interface BookSession {
  * and auto-closed sessions (which had real exchanges but were killed by the
  * stale-cleanup cron). Excludes accidental opens (requires at least 1
  * exchange). Profile ownership is verified through `subjects.profileId` —
- * the sanctioned parent-chain join pattern (see CLAUDE.md).
+ * the sanctioned parent-chain join pattern (see AGENTS.md).
  */
 export async function getBookSessions(
   db: Database,

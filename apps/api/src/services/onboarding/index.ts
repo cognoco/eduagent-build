@@ -4,7 +4,7 @@
 // surfaced during onboarding. No Hono imports — handlers live under
 // routes/onboarding.ts.
 //
-// Scoping discipline per CLAUDE.md:
+// Scoping discipline per AGENTS.md:
 //  - profile-level writes (conversation_language, pronouns) filter on
 //    profiles.id = profileId AND profiles.accountId = accountId. The accountId
 //    guard protects against a rooted mobile client sending another account's

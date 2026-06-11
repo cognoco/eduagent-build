@@ -24,7 +24,7 @@ import { registerProvider } from '../../apps/api/src/services/llm';
 import { app } from '../../apps/api/src/index';
 
 // Controllable mock provider — overrides the default mock registered in setup.ts.
-// Avoids jest.mock on an internal service (CLAUDE.md rule: no internal mocks in
+// Avoids jest.mock on an internal service (AGENTS.md rule: no internal mocks in
 // integration tests). Uses registerProvider so the full routeAndCall path runs.
 const mockChat = jest.fn<
   Promise<string>,
@@ -86,7 +86,7 @@ function installCurriculumLlmMocks(): void {
       }
 
       return 'Unexpected curriculum LLM call';
-    }
+    },
   );
 }
 
@@ -135,17 +135,17 @@ describe('Integration: curriculum routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.curriculum.subjectId).toBe(subject.id);
     expect(
-      body.curriculum.topics.map((topic: { title: string }) => topic.title)
+      body.curriculum.topics.map((topic: { title: string }) => topic.title),
     ).toEqual(['Linear Equations', 'Systems of Equations']);
   });
 
@@ -155,7 +155,7 @@ describe('Integration: curriculum routes', () => {
     const res = await app.request(
       `/v1/subjects/${subject.id}/curriculum`,
       { method: 'GET' },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -179,11 +179,11 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ topicId }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -200,7 +200,7 @@ describe('Integration: curriculum routes', () => {
     const adaptation = await db.query.curriculumAdaptations.findFirst({
       where: and(
         eq(curriculumAdaptations.profileId, profile.id),
-        eq(curriculumAdaptations.topicId, topicId)
+        eq(curriculumAdaptations.topicId, topicId),
       ),
       orderBy: desc(curriculumAdaptations.createdAt),
     });
@@ -219,11 +219,11 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ topicId: 'not-a-uuid' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -247,11 +247,11 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ topicId }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -268,7 +268,7 @@ describe('Integration: curriculum routes', () => {
     const adaptation = await db.query.curriculumAdaptations.findFirst({
       where: and(
         eq(curriculumAdaptations.profileId, profile.id),
-        eq(curriculumAdaptations.topicId, topicId)
+        eq(curriculumAdaptations.topicId, topicId),
       ),
       orderBy: desc(curriculumAdaptations.createdAt),
     });
@@ -292,11 +292,11 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ topicId }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(422);
@@ -318,14 +318,14 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           mode: 'preview',
           title: 'trig',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -357,7 +357,7 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           mode: 'create',
@@ -366,7 +366,7 @@ describe('Integration: curriculum routes', () => {
           estimatedMinutes: 35,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -400,7 +400,7 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           mode: 'create',
@@ -409,7 +409,7 @@ describe('Integration: curriculum routes', () => {
           estimatedMinutes: 30,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -434,19 +434,19 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           feedback: 'I already know the basics, skip intro topics',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(
-      body.curriculum.topics.map((topic: { title: string }) => topic.title)
+      body.curriculum.topics.map((topic: { title: string }) => topic.title),
     ).toEqual(['Quadratic Functions', 'Trigonometric Ratios']);
 
     const db = getIntegrationDb();
@@ -477,11 +477,11 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ feedback: '' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -507,14 +507,14 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           topicId,
           signal: 'struggling',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -536,7 +536,7 @@ describe('Integration: curriculum routes', () => {
     const adaptation = await db.query.curriculumAdaptations.findFirst({
       where: and(
         eq(curriculumAdaptations.profileId, profile.id),
-        eq(curriculumAdaptations.topicId, topicId)
+        eq(curriculumAdaptations.topicId, topicId),
       ),
       orderBy: desc(curriculumAdaptations.createdAt),
     });
@@ -548,7 +548,7 @@ describe('Integration: curriculum routes', () => {
       curriculum.topicIds[1],
     ]);
     expect(adaptation?.skipReason).toContain(
-      'Performance adaptation: struggling'
+      'Performance adaptation: struggling',
     );
   });
 
@@ -566,14 +566,14 @@ describe('Integration: curriculum routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           topicId: curriculum.topicIds[0],
           signal: 'invalid_signal',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -596,10 +596,10 @@ describe('Integration: curriculum routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: CURRICULUM_USER.userId, email: CURRICULUM_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);

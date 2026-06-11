@@ -4,7 +4,7 @@ import { Sentry } from '../lib/sentry';
 import type { DictationPace } from '@eduagent/schemas';
 
 // [escalation] SecureStore writes here are best-effort, but per project
-// CLAUDE.md "console.warn alone is never sufficient" for fallback paths.
+// AGENTS.md "console.warn alone is never sufficient" for fallback paths.
 // We log to Sentry with a tag so we can quantify how often these silently
 // fail in production without flooding the breadcrumb stream with noise.
 function reportSecureStoreFailure(

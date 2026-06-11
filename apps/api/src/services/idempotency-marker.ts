@@ -80,14 +80,14 @@ export async function markPersisted(params: {
       },
     });
     // [BUG-107] Non-core telemetry dispatch must go through safeSend per
-    // CLAUDE.md "Silent recovery without escalation is banned" — bare
+    // AGENTS.md "Silent recovery without escalation is banned" — bare
     // inngest.send(...).catch(() => {}) erases all observability of dispatch
     // failures. safeSend captures dispatch failures + timeouts in Sentry and
     // logs them with `surface` while still never throwing into the caller.
     await safeSend(
       () =>
         inngest.send({
-          // orphan-allow: structured telemetry signal required by CLAUDE.md
+          // orphan-allow: structured telemetry signal required by AGENTS.md
           // (silent recovery must emit a structured metric/Inngest event). The
           // mark failure recovers in-line and escalates via logger.warn +
           // captureException(Sentry). The event is a dashboard-queryable

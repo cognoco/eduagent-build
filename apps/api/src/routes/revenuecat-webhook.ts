@@ -353,7 +353,7 @@ export const revenuecatWebhookRoute = new Hono<{
       // [audit-2026-05-30] New RevenueCat event types (e.g. a future
       // FAMILY_SHARE_REVOKED, GRACE_PERIOD_ENDED) must surface — silent 200
       // acknowledgement would let real entitlement changes go unhandled.
-      // Silent recovery is banned (CLAUDE.md); escalate via logger + Sentry.
+      // Silent recovery is banned (AGENTS.md); escalate via logger + Sentry.
       // Ack with 200 because hard-failing would loop RevenueCat forever on a
       // known-additive event.
       logger.warn(

@@ -8,7 +8,7 @@
 //     `app/progress.snapshot.refresh`; profileId comes from the event payload
 //     and all DB reads/writes are scoped to that single profile only.
 //
-// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// Profile-scoping rules in AGENTS.md ("Reads must use createScopedRepository")
 // do NOT apply to `dailySnapshotCron` — this is system-wide work running
 // outside any single profile's request context.
 //

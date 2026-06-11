@@ -4,7 +4,7 @@
 // onboarding. Each has a self-service variant (writes to the active profile)
 // and a parent-on-behalf-of-child variant (requires family_links proof).
 //
-// Per CLAUDE.md "Hono route files keep handlers inline for RPC inference, but
+// Per AGENTS.md "Hono route files keep handlers inline for RPC inference, but
 // business logic belongs in services/" — this file is pure glue between the
 // Zod validators, the auth/scope middleware, and services/onboarding.
 // ---------------------------------------------------------------------------

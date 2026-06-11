@@ -7,7 +7,7 @@ import { useThemeColors } from '../../../lib/theme';
 // this, `router.back()` from a kind list falls through to the Tabs
 // first-route (Home) — a dead-end. Same pattern as
 // shelf/[subjectId]/_layout.tsx and the new progress/[subjectId]/_layout.tsx.
-// See CLAUDE.md > Repo-Specific Guardrails ("Cross-tab / cross-stack
+// See AGENTS.md > Repo-Specific Guardrails ("Cross-tab / cross-stack
 // router.push" and "unstable_settings").
 export const unstable_settings = {
   initialRouteName: 'index',

@@ -254,7 +254,7 @@ export default function MoreScreen() {
                 // screen — staying here would let them keep tapping buttons
                 // against a half-signed-out app. The breadcrumb +
                 // captureMessage emitted by sign-out.ts already make this
-                // observable; no console.warn-only fallback per CLAUDE.md
+                // observable; no console.warn-only fallback per AGENTS.md
                 // "Silent recovery without escalation is banned".
                 if (err instanceof ClerkSignOutTimeoutError) {
                   router.replace('/sign-in');
