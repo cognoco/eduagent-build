@@ -3,9 +3,11 @@
 // handleTierChange, getUpgradePrompt, getTopUpPriceCents — pure logic
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
+  profiles,
   subscriptions,
+  topUpCredits,
   type Database,
   findSubscriptionById__unscoped,
   findQuotaPool__unscoped,
@@ -13,6 +15,11 @@ import {
 import type { SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
 import { reconcileQuotaStateForSubscription } from './quota-reconcile';
+import { safeSend } from '../safe-non-core';
+import { inngest } from '../../inngest/client';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +43,153 @@ export interface UpgradePrompt {
   reason: UpgradePromptReason;
   suggestedTier: 'plus' | 'family' | 'pro';
   message: string;
+}
+
+// ---------------------------------------------------------------------------
+// Top-up credit re-attribution metric — single event name, single schema
+// ---------------------------------------------------------------------------
+
+export interface TopUpCreditsReattributedEventData {
+  subscriptionId: string;
+  accountId: string;
+  previousTier: SubscriptionTier;
+  newTier: SubscriptionTier;
+  previousModel: 'per-profile' | 'shared-pool';
+  newModel: 'per-profile' | 'shared-pool';
+  reattributedCount: number;
+  occurredAt: string;
+}
+
+/**
+ * Pure builder — single source of truth for the
+ * `app/billing.topup_credits.reattributed` payload so the Stripe path
+ * (`handleTierChange`) and the RevenueCat webhook path
+ * (`updateSubscriptionAndQuotaFromRevenuecatWebhook`) emit an identical
+ * schema under the single event name. Exported for the schema-coherence
+ * assertion in tier.integration.test.ts.
+ */
+export function buildTopUpCreditsReattributedEventData(params: {
+  subscriptionId: string;
+  accountId: string;
+  previousTier: SubscriptionTier;
+  newTier: SubscriptionTier;
+  reattributedCount: number;
+  occurredAt: Date;
+}): TopUpCreditsReattributedEventData {
+  return {
+    subscriptionId: params.subscriptionId,
+    accountId: params.accountId,
+    previousTier: params.previousTier,
+    newTier: params.newTier,
+    previousModel: getTierConfig(params.previousTier).quotaModel,
+    newModel: getTierConfig(params.newTier).quotaModel,
+    reattributedCount: params.reattributedCount,
+    occurredAt: params.occurredAt.toISOString(),
+  };
+}
+
+/**
+ * Emits the queryable re-attribution metric (silent-recovery-banned rule).
+ * Both tier-change paths call this — a dispatch failure must never break
+ * the tier change, so it routes through safeSend.
+ */
+export async function emitTopUpCreditsReattributedMetric(params: {
+  subscriptionId: string;
+  accountId: string;
+  previousTier: SubscriptionTier;
+  newTier: SubscriptionTier;
+  reattributedCount: number;
+  occurredAt: Date;
+}): Promise<void> {
+  const data = buildTopUpCreditsReattributedEventData(params);
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: structured telemetry required by CLAUDE.md
+        // ("silent recovery in billing must emit a structured metric").
+        // The re-attribution is handled in-line. This event is a
+        // dashboard-queryable signal so ops can audit credit migration.
+        name: 'app/billing.topup_credits.reattributed',
+        data,
+      }),
+    'billing.topup_credits.reattributed',
+    {
+      subscriptionId: data.subscriptionId,
+      reattributedCount: data.reattributedCount,
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// reattributeTopUpCreditsOnModelChange
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-attributes active top-up credits when the quota model changes tier.
+ *
+ * Must be called INSIDE an open transaction (`tx`).
+ * Returns the number of credit rows re-attributed (0 if no model change).
+ *
+ * This function is also called from the RevenueCat webhook tier-change path
+ * (`updateSubscriptionAndQuotaFromRevenuecatWebhook`) so that credits are
+ * re-attributed regardless of which path triggered the tier change.
+ *
+ * See [F-124] comment block in `handleTierChange` for the full rationale.
+ */
+export async function reattributeTopUpCreditsOnModelChange(
+  tx: Database,
+  subscriptionId: string,
+  accountId: string,
+  previousTier: SubscriptionTier,
+  newTier: SubscriptionTier,
+): Promise<number> {
+  const oldModel = getTierConfig(previousTier).quotaModel;
+  const newModel = getTierConfig(newTier).quotaModel;
+
+  if (oldModel === newModel) return 0;
+
+  if (newModel === 'per-profile') {
+    // shared-pool → per-profile: re-attribute null credits to the owner profile.
+    const owner = await tx.query.profiles.findFirst({
+      where: and(eq(profiles.accountId, accountId), eq(profiles.isOwner, true)),
+      columns: { id: true },
+    });
+
+    if (!owner) {
+      logger.warn(
+        '[billing.tier] shared-pool→per-profile: no owner profile found; top-up credits left with profileId=null',
+        { subscriptionId, newTier, metric: 'billing_tier_topup_no_owner' },
+      );
+      return 0;
+    }
+
+    const updated = await tx
+      .update(topUpCredits)
+      .set({ profileId: owner.id })
+      .where(
+        and(
+          eq(topUpCredits.subscriptionId, subscriptionId),
+          isNull(topUpCredits.profileId),
+          sql`${topUpCredits.remaining} > 0`,
+        ),
+      )
+      .returning({ id: topUpCredits.id });
+    return updated.length;
+  }
+
+  // per-profile → shared-pool: re-attribute owner-profile credits to null.
+  const updated = await tx
+    .update(topUpCredits)
+    .set({ profileId: null })
+    .where(
+      and(
+        eq(topUpCredits.subscriptionId, subscriptionId),
+        isNotNull(topUpCredits.profileId),
+        sql`${topUpCredits.remaining} > 0`,
+      ),
+    )
+    .returning({ id: topUpCredits.id });
+  return updated.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +238,13 @@ export async function handleTierChange(
   // so the pair is atomic: either both land or neither does, never a state
   // where the quota pool reflects the new tier while subscriptions.tier lags.
   const now = new Date();
+
+  // [F-124] Re-attribute top-up credits inside the transaction so the model
+  // change and credit re-attribution are atomic.
+  // See `reattributeTopUpCreditsOnModelChange` for the full rationale.
+  let reattributedCount = 0;
+  const previousTierForMetric = sub.tier;
+
   await db.transaction(async (tx) => {
     await tx
       .update(subscriptions)
@@ -99,7 +260,28 @@ export async function handleTierChange(
       now,
       { resetExpiredSharedPoolUsage: false },
     );
+
+    reattributedCount = await reattributeTopUpCreditsOnModelChange(
+      tx as unknown as Database,
+      subscriptionId,
+      sub.accountId,
+      previousTierForMetric,
+      newTier,
+    );
   });
+
+  // Emit a queryable metric whenever credits are re-attributed so ops can
+  // measure how often this path fires (silent-recovery-banned rule).
+  if (reattributedCount > 0) {
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId,
+      accountId: sub.accountId,
+      previousTier: previousTierForMetric,
+      newTier,
+      reattributedCount,
+      occurredAt: now,
+    });
+  }
 
   return {
     previousTier: sub.tier,

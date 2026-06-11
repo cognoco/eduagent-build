@@ -21,6 +21,10 @@ import {
   type SubscriptionRow,
 } from './types';
 import { reconcileQuotaStateForSubscription } from './quota-reconcile';
+import {
+  reattributeTopUpCreditsOnModelChange,
+  emitTopUpCreditsReattributedMetric,
+} from './tier';
 
 const logger = createLogger();
 import { getSubscriptionByAccountId } from './subscription-core';
@@ -126,8 +130,23 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
   },
   _quota: RevenuecatQuotaUpdate,
 ): Promise<AppliedSubscriptionRow | null> {
-  return db.transaction(async (tx) => {
+  let reattributedCount = 0;
+  let previousTier: SubscriptionTier | undefined;
+  const now = new Date();
+
+  const result = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+
+    // [F-124] Read the previous tier INSIDE the transaction so the
+    // tier-change detection and the credit re-attribution below are coherent
+    // with the row this transaction updates — a concurrent webhook for the
+    // same account cannot make the compare-and-reattribute act on a stale
+    // tier. Scoped repo read (by accountId, owner-restricted); the caller
+    // (RevenueCat webhook handler) already validated accountId.
+    const repo = createAccountRepository(txDb, accountId);
+    const existing = await repo.subscriptions.findFirst();
+    previousTier = existing?.tier;
+
     const updated = await applySubscriptionUpdateFromRevenuecat(
       txDb,
       accountId,
@@ -136,10 +155,38 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
 
     if (updated && updated.webhookApplied !== false) {
       await reconcileQuotaStateForSubscription(txDb, updated.id);
+
+      // [F-124] Re-attribute top-up credits when the quota model changes.
+      // Only fires when the webhook actually changed the tier.
+      if (previousTier && updates.tier && previousTier !== updates.tier) {
+        reattributedCount = await reattributeTopUpCreditsOnModelChange(
+          txDb,
+          updated.id,
+          accountId,
+          previousTier,
+          updates.tier,
+        );
+      }
     }
 
     return updated;
   });
+
+  // Emit queryable metric if credits were re-attributed (silent-recovery-banned
+  // rule). Same event name + payload schema as the Stripe path — single source
+  // of truth in emitTopUpCreditsReattributedMetric (tier.ts).
+  if (reattributedCount > 0 && previousTier && updates.tier && result) {
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId: result.id,
+      accountId,
+      previousTier,
+      newTier: updates.tier,
+      reattributedCount,
+      occurredAt: now,
+    });
+  }
+
+  return result;
 }
 
 async function applySubscriptionUpdateFromRevenuecat(
