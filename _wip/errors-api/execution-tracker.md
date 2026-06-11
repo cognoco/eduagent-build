@@ -128,17 +128,26 @@ parallel with either.
 
 ## 5. Current position
 
-**2026-06-11 — ACTIVATED (program session).** Tracker created; Cosmo Workstream
-**API Error Handling** (`37c8bce9-1f7c-817c-98ec-d1d4ba0a15e3`) created; 3 units
-sliced as **WI-639/640/641** (Backlog, order 1–3). Nothing claimed; no shepherd
-session yet. Next: operator spawns the PRG-15 shepherd with the kickoff brief;
-shepherd verifies the reviewer watcher covers this workstream, refines WI-639 to
-Ready (DoR bridge), and proposes first pickup.
+**2026-06-11 — SHEPHERD LIVE (autonomous mandate).** Review loop joined (see
+change log). Operator directive at session start: execute the whole workstream
+autonomously — no per-pickup go-gate; stop only when genuinely blocked or for the
+standing WI-640 medium-supervision surface (JWKS/auth design change → operator
+before merge). Plan of record: refine WI-639 (DoR bridge) → dispatch; refine
+WI-641 (normal refine) → dispatch in parallel (mobile surface); WI-640 serial
+after WI-639 merges.
 
 ---
 
 ## 6. Change log
 
+- **2026-06-11 (shepherd session start)** — **Review loop joined.** The watcher
+  config entry for **API Error Handling** (`37c8bce9-1f7c-817c-98ec-d1d4ba0a15e3`,
+  no overrides) was already present in `review-watcher-v3.ts` when this shepherd
+  read it (pre-added alongside the PRG-12 multi-workstream extension); the shepherd's
+  act was **verification, not the edit**: confirmed exactly one watcher process
+  (bun pid 79192, restarted 12:30:32Z), baseline + poll 2 (12:31:35Z) list all three
+  workstreams, `Reviewing=none` everywhere → seeded cleanly, nothing re-fired. One
+  watcher process for all workstreams holds.
 - **2026-06-11** — Created at PRG-15 activation (program session), immediately after
   its gate fired (`WI-581` envelope-router Closed). Charter transcribed from ratified
   activation-planning §2; both charter open questions resolved/mooted by the gate
