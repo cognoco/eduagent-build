@@ -61,3 +61,10 @@ itself: `_wip/identity-foundation/executor-protocol.md` (phases 0–7).
     `git -C <repo-root> status`) that the commit landed on YOUR branch and the main
     checkout is untouched. If a misfire reaches shared main: do NOT revert on your
     own — report to the shepherd and continue.
+15. **No split-sentence fragment keys (learned 2026-06-11, WI-621 PR A / Codex P2):**
+    never split one sentence into multiple translation keys flanking an inline
+    element — that hard-codes English word order and renders broken prose in
+    free-word-order locales (JA verified). One key per sentence with `{{var}}`
+    interpolation; if the inline element needs styling, react-i18next `<Trans>`.
+    Leading/trailing punctuation living in a key value is the smell that flags
+    this pattern.
