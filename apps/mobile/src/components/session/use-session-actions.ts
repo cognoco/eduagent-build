@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import i18next from 'i18next';
 // Alert import removed — all calls migrated to platformAlert [F-029]
 import { platformAlert } from '../../lib/platform-alert';
 import type {
@@ -333,16 +334,16 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     // Alert.alert is a no-op that never invokes callbacks, leaving isClosing=true
     // permanently and trapping the user in "Wrapping up..." state.
     platformAlert(
-      'End session?',
+      i18next.t('session.endPrompt.title'),
       '',
       [
         {
-          text: 'Continue',
+          text: i18next.t('common.continue'),
           style: 'cancel',
           onPress: () => setIsClosing(false),
         },
         {
-          text: 'End Session',
+          text: i18next.t('session.endPrompt.confirm'),
           onPress: async () => {
             let timeoutId: ReturnType<typeof setTimeout> | undefined;
             try {
@@ -417,7 +418,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 });
               }
               platformAlert(
-                'Could not end this session cleanly',
+                i18next.t('session.endPrompt.errorTitle'),
                 classified.message,
                 buttons,
               );
@@ -467,8 +468,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       if (chip === 'park') {
         if (!activeSessionId) {
           platformAlert(
-            'Start the conversation first',
-            'Send one message so this session has somewhere to save your parking lot.',
+            i18next.t('session.parkingLot.startFirstTitle'),
+            i18next.t('session.parkingLot.startFirstMessage'),
           );
           return;
         }
@@ -582,7 +583,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           await handleSend(followUpPrompt);
         }
       } catch (err: unknown) {
-        platformAlert('Could not save feedback', classifyApiError(err).message);
+        platformAlert(
+          i18next.t('session.feedbackErrorTitle'),
+          classifyApiError(err).message,
+        );
       }
     },
     [
@@ -600,8 +604,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
   const handleSaveParkingLot = useCallback(async () => {
     if (!activeSessionId) {
       platformAlert(
-        'Start the conversation first',
-        'Send one message so this session has somewhere to save your parking lot.',
+        i18next.t('session.parkingLot.startFirstTitle'),
+        i18next.t('session.parkingLot.startFirstMessage'),
       );
       return;
     }
@@ -611,10 +615,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     try {
       await addParkingLotItem.mutateAsync({ question: parkingLotDraft.trim() });
       setParkingLotDraft('');
-      showConfirmation('Saved to your parking lot.');
+      showConfirmation(i18next.t('session.parkingLot.savedConfirmation'));
     } catch (err: unknown) {
       platformAlert(
-        'Could not save parking lot item',
+        i18next.t('session.parkingLot.saveErrorTitle'),
         classifyApiError(err).message,
       );
     }
@@ -657,7 +661,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         } as Href);
       } catch (err: unknown) {
         setIsClosing(false);
-        platformAlert('Could not switch topic', classifyApiError(err).message);
+        platformAlert(
+          i18next.t('session.topicSwitchErrorTitle'),
+          classifyApiError(err).message,
+        );
       } finally {
         topicSwitchInFlightRef.current = false;
       }

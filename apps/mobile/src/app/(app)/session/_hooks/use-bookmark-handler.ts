@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import i18next from 'i18next';
 import { platformAlert } from '../../../../lib/platform-alert';
 import {
   useCreateBookmark,
@@ -66,8 +67,10 @@ export function useBookmarkHandler({
         } catch (error) {
           updateBookmarkEntry(eventId, existingBookmarkId);
           platformAlert(
-            'Could not remove bookmark',
-            error instanceof Error ? error.message : 'Please try again.',
+            i18next.t('session.bookmarks.removeErrorTitle'),
+            error instanceof Error
+              ? error.message
+              : i18next.t('common.pleaseTryAgain'),
           );
         }
         return;
@@ -80,8 +83,10 @@ export function useBookmarkHandler({
       } catch (error) {
         updateBookmarkEntry(eventId, null);
         platformAlert(
-          'Could not save bookmark',
-          error instanceof Error ? error.message : 'Please try again.',
+          i18next.t('session.bookmarks.saveErrorTitle'),
+          error instanceof Error
+            ? error.message
+            : i18next.t('common.pleaseTryAgain'),
         );
       }
     },

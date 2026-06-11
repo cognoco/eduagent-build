@@ -36,7 +36,8 @@
     "active": "Aktywny",
     "goBackAction": "Wróć",
     "tryAgainAction": "Spróbuj ponownie",
-    "dismiss": "Odrzuć"
+    "dismiss": "Odrzuć",
+    "pleaseTryAgain": "Spróbuj ponownie."
   },
   "quota": {
     "parent": {
@@ -489,7 +490,11 @@
         "save": "Zapisz notatkę",
         "edit": "Najpierw edytuj",
         "skip": "Pomiń"
-      }
+      },
+      "startErrorTitle": "Nie udało się rozpocząć rundy wyzwania",
+      "updateErrorTitle": "Nie udało się zaktualizować rundy wyzwania",
+      "noteSaved": "Notatka zapisana.",
+      "noteSaveErrorTitle": "Nie udało się zapisać notatki"
     },
     "mentorMemory": {
       "title": "Co wie mój mentor",
@@ -657,7 +662,12 @@
       "voicePermissionErrorMessage": "Dostęp do mikrofonu jest potrzebny do wprowadzania głosowego. Włącz go w Ustawieniach.",
       "voicePermissionOpenSettings": "Otwórz Ustawienia",
       "replyReady": "Odpowiedź gotowa",
-      "voiceErrorTapRetry": "{{error}} — dotknij, by spróbować ponownie"
+      "voiceErrorTapRetry": "{{error}} — dotknij, by spróbować ponownie",
+      "a11yHomeworkImage": "Zdjęcie pracy domowej",
+      "a11yMessageInput": "Wpisz wiadomość",
+      "a11yEnableVoice": "Włącz wiadomość głosową",
+      "a11ySendMessage": "Wyślij wiadomość",
+      "a11yVoiceErrorHint": "Stuknij, aby ponowić wprowadzanie głosowe"
     },
     "filingFailed": {
       "retryInProgress": "Ponowna próba jest już w toku.",
@@ -712,7 +722,11 @@
       "inputHint": "Wpisz pytanie lub pomysł, do którego chcesz wrócić później",
       "saveButton": "Zapisz",
       "savedForLater": "Zapisano na później",
-      "emptyState": "Jeszcze nic nie zaparkowano"
+      "emptyState": "Jeszcze nic nie zaparkowano",
+      "startFirstTitle": "Najpierw rozpocznij rozmowę",
+      "startFirstMessage": "Wyślij jedną wiadomość, aby ta sesja miała gdzie zapisać Twoje notatki.",
+      "savedConfirmation": "Zapisano w Twoich notatkach.",
+      "saveErrorTitle": "Nie udało się zapisać notatki"
     },
     "topicSwitcher": {
       "title": "Zmień temat",
@@ -773,10 +787,38 @@
       "voice": "Głos"
     },
     "messageActions": {
-      "reconnect": "Połącz ponownie"
+      "reconnect": "Połącz ponownie",
+      "a11yReconnect": "Połącz ponownie z rozmową",
+      "a11yHelpful": "Pomocne — oznacz tę odpowiedź jako pomocną",
+      "a11yNotHelpful": "Niepomocne — oznacz tę odpowiedź jako niepomocną",
+      "a11yIncorrect": "Oznacz tę odpowiedź jako niedokładną",
+      "wrongSubject": "Nie na temat"
     },
     "questionCounter": {
       "question": "Pytanie {{count}}"
+    },
+    "skipWarmupErrorTitle": "Nie udało się pominąć rozgrzewki",
+    "feedbackErrorTitle": "Nie udało się zapisać opinii",
+    "topicSwitchErrorTitle": "Nie udało się zmienić tematu",
+    "endPrompt": {
+      "title": "Zakończyć sesję?",
+      "confirm": "Zakończ sesję",
+      "errorTitle": "Nie udało się poprawnie zakończyć tej sesji"
+    },
+    "bookmarks": {
+      "removeErrorTitle": "Nie udało się usunąć zakładki",
+      "saveErrorTitle": "Nie udało się zapisać zakładki"
+    },
+    "voice": {
+      "a11yReplay": "Odtwórz ostatnią wiadomość AI",
+      "a11yStop": "Zatrzymaj mowę",
+      "a11yResume": "Wznów mówienie",
+      "a11yPause": "Wstrzymaj mówienie",
+      "a11ySpeed": "Prędkość mowy {{rate}}x. Dotknij, by zmienić."
+    },
+    "inputMode": {
+      "text": "Tryb tekstowy",
+      "voice": "Tryb głosowy"
     }
   },
   "quiz": {
@@ -2538,8 +2580,33 @@
       "failedTitle": "Nie mogliśmy dodać tego do Twojej biblioteki",
       "failedHint": "Twój czat jest zapisany. Spróbuj ponownie, gdy będziesz gotów.",
       "keptOutTitle": "Nie w bibliotece",
-      "keptOutHint": "Ten czat jest zapisany, ale nie jest tematem z biblioteki."
-    }
+      "keptOutHint": "Ten czat jest zapisany, ale nie jest tematem z biblioteki.",
+      "a11yRefresh": "Odśwież status biblioteki",
+      "a11yOpenInLibrary": "Otwórz w bibliotece",
+      "updateError": "Nie udało się teraz zaktualizować biblioteki. Spróbuj ponownie za chwilę.",
+      "dontAdd": "Nie dodawaj do biblioteki",
+      "remove": "Usuń z biblioteki",
+      "add": "Dodaj do biblioteki"
+    },
+    "notFoundHeadHomeMessage": "Nie znaleźliśmy tej sesji. Wróć na stronę główną, aby rozpocząć nową.",
+    "loadTimeoutTitle": "Trwa to dłużej niż zwykle",
+    "loadTimeoutMessage": "Nie udało się wczytać podsumowania sesji. Sprawdź połączenie i spróbuj ponownie.",
+    "saveErrorTitle": "Nie udało się zapisać",
+    "skipErrorTitle": "Nie udało się pominąć",
+    "draftPrompt": {
+      "title": "Zapisać Twoją refleksję?",
+      "messageCanSubmit": "Wpisano refleksję, ale jej nie przesłano. Przesłać ją teraz, odrzucić czy kontynuować pisanie?",
+      "messageTooShort": "Twoja refleksja jest za krótka, by ją przesłać (musi mieć co najmniej 10 znaków). Odrzucić ją czy kontynuować pisanie?",
+      "keepWriting": "Kontynuuj pisanie",
+      "submitNow": "Prześlij teraz",
+      "discard": "Odrzuć"
+    },
+    "a11yCloseGoHome": "Zamknij i wróć",
+    "a11yRetryRecap": "Ponów ładowanie podsumowania",
+    "a11yStarters": "Propozycje rozpoczęcia zdania",
+    "a11yWriteSummary": "Napisz podsumowanie swojej nauki",
+    "a11ySkipSummary": "Pomiń podsumowanie",
+    "a11yStarterHint": "Stuknij, aby użyć tego początku zdania"
   },
   "sessionTranscript": {
     "archived": {
@@ -2557,7 +2624,11 @@
     "messageCount_other": "{{count}} wiadomości",
     "you": "Ty",
     "emptyTitle": "Brak wiadomości",
-    "emptyMessage": "Ta sesja nie ma żadnych zapisanych wymian do pokazania."
+    "emptyMessage": "Ta sesja nie ma żadnych zapisanych wymian do pokazania.",
+    "loadingTranscript": "Wczytywanie transkrypcji...",
+    "stillLoadingTitle": "Nadal się wczytuje",
+    "stillLoadingMessage": "Wczytywanie transkrypcji trwa dłużej niż zwykle. Spróbuj ponownie lub wróć do swojej biblioteki.",
+    "loadErrorTitle": "Nie udało się wczytać rozmowy"
   },
   "practiceHub": {
     "title": "Sprawdź się",

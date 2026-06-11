@@ -36,7 +36,8 @@
     "active": "アクティブ",
     "goBackAction": "戻る",
     "tryAgainAction": "再試行",
-    "dismiss": "閉じる"
+    "dismiss": "閉じる",
+    "pleaseTryAgain": "もう一度お試しください。"
   },
   "quota": {
     "parent": {
@@ -462,7 +463,11 @@
         "save": "ノートを保存",
         "edit": "まず編集する",
         "skip": "スキップ"
-      }
+      },
+      "startErrorTitle": "チャレンジラウンドを開始できませんでした",
+      "updateErrorTitle": "チャレンジラウンドを更新できませんでした",
+      "noteSaved": "メモを保存しました。",
+      "noteSaveErrorTitle": "メモを保存できませんでした"
     },
     "mentorMemory": {
       "title": "私のメンターが知っていること",
@@ -630,7 +635,12 @@
       "voicePermissionErrorMessage": "音声入力にはマイクへのアクセスが必要です。設定で有効にしてください。",
       "voicePermissionOpenSettings": "設定を開く",
       "replyReady": "返信の準備ができました",
-      "voiceErrorTapRetry": "{{error}} — タップして再試行"
+      "voiceErrorTapRetry": "{{error}} — タップして再試行",
+      "a11yHomeworkImage": "宿題の画像",
+      "a11yMessageInput": "メッセージ入力",
+      "a11yEnableVoice": "音声メッセージを有効にする",
+      "a11ySendMessage": "メッセージを送信",
+      "a11yVoiceErrorHint": "タップして音声入力を再試行"
     },
     "filingFailed": {
       "retryInProgress": "再試行はすでに進行中です。",
@@ -685,7 +695,11 @@
       "inputHint": "後で戻ってきたい質問やアイデアを入力してください",
       "saveButton": "保存",
       "savedForLater": "後で見るために保存しました",
-      "emptyState": "まだ何も保留されていません"
+      "emptyState": "まだ何も保留されていません",
+      "startFirstTitle": "最初に会話を始めてください",
+      "startFirstMessage": "このセッションでパーキングロットを保存できるように、まずメッセージを1件送信してください。",
+      "savedConfirmation": "パーキングロットに保存しました。",
+      "saveErrorTitle": "パーキングロットの項目を保存できませんでした"
     },
     "topicSwitcher": {
       "title": "トピックを切り替える",
@@ -746,10 +760,38 @@
       "voice": "音声"
     },
     "messageActions": {
-      "reconnect": "再接続"
+      "reconnect": "再接続",
+      "a11yReconnect": "会話に再接続",
+      "a11yHelpful": "役に立った — この返信を「役に立った」とマーク",
+      "a11yNotHelpful": "役に立たなかった — この返信を「役に立たなかった」とマーク",
+      "a11yIncorrect": "この返信を不正確としてフラグを立てる",
+      "wrongSubject": "話題がずれている"
     },
     "questionCounter": {
       "question": "質問 {{count}}"
+    },
+    "skipWarmupErrorTitle": "ウォームアップをスキップできませんでした",
+    "feedbackErrorTitle": "フィードバックを保存できませんでした",
+    "topicSwitchErrorTitle": "トピックを切り替えられませんでした",
+    "endPrompt": {
+      "title": "セッションを終了しますか？",
+      "confirm": "セッションを終了",
+      "errorTitle": "このセッションを正常に終了できませんでした"
+    },
+    "bookmarks": {
+      "removeErrorTitle": "ブックマークを削除できませんでした",
+      "saveErrorTitle": "ブックマークを保存できませんでした"
+    },
+    "voice": {
+      "a11yReplay": "最後のAIメッセージを再生",
+      "a11yStop": "読み上げを停止",
+      "a11yResume": "読み上げを再開",
+      "a11yPause": "読み上げを一時停止",
+      "a11ySpeed": "読み上げ速度{{rate}}倍。タップして変更。"
+    },
+    "inputMode": {
+      "text": "テキストモード",
+      "voice": "音声モード"
     }
   },
   "quiz": {
@@ -2507,8 +2549,33 @@
       "failedTitle": "これをライブラリに追加できませんでした",
       "failedHint": "チャットは保存されています。準備ができたら再試行してください。",
       "keptOutTitle": "ライブラリにありません",
-      "keptOutHint": "このチャットは保存されていますが、ライブラリのトピックではありません。"
-    }
+      "keptOutHint": "このチャットは保存されていますが、ライブラリのトピックではありません。",
+      "a11yRefresh": "ライブラリのステータスを更新",
+      "a11yOpenInLibrary": "ライブラリで開く",
+      "updateError": "現在ライブラリを更新できませんでした。しばらくしてからもう一度お試しください。",
+      "dontAdd": "ライブラリに追加しない",
+      "remove": "ライブラリから削除",
+      "add": "ライブラリに追加"
+    },
+    "notFoundHeadHomeMessage": "このセッションが見つかりませんでした。ホームに戻って新しいセッションを開始してください。",
+    "loadTimeoutTitle": "予想以上に時間がかかっています",
+    "loadTimeoutMessage": "セッションの概要を読み込めませんでした。接続を確認して、もう一度お試しください。",
+    "saveErrorTitle": "保存できませんでした",
+    "skipErrorTitle": "スキップできませんでした",
+    "draftPrompt": {
+      "title": "振り返りを保存しますか？",
+      "messageCanSubmit": "振り返りを入力しましたが、まだ送信していません。今すぐ送信しますか、破棄しますか、それとも書き続けますか？",
+      "messageTooShort": "振り返りが短すぎて送信できません（10文字以上必要です）。破棄しますか、それとも書き続けますか？",
+      "keepWriting": "書き続ける",
+      "submitNow": "今すぐ送信",
+      "discard": "破棄"
+    },
+    "a11yCloseGoHome": "閉じてホームに戻る",
+    "a11yRetryRecap": "まとめの読み込みを再試行",
+    "a11yStarters": "書き出しの提案",
+    "a11yWriteSummary": "学習のまとめを書く",
+    "a11ySkipSummary": "サマリーをスキップ",
+    "a11yStarterHint": "タップしてこの書き出しを使用"
   },
   "sessionTranscript": {
     "archived": {
@@ -2524,7 +2591,11 @@
     "messageCount_other": "{{count}}件のメッセージ",
     "you": "あなた",
     "emptyTitle": "まだメッセージはありません",
-    "emptyMessage": "このセッションには表示する保存済みのやり取りがありません。"
+    "emptyMessage": "このセッションには表示する保存済みのやり取りがありません。",
+    "loadingTranscript": "トランスクリプトを読み込み中...",
+    "stillLoadingTitle": "まだ読み込み中です",
+    "stillLoadingMessage": "トランスクリプトの読み込みに通常より時間がかかっています。再試行するか、ライブラリに戻ってください。",
+    "loadErrorTitle": "会話を読み込めませんでした"
   },
   "nudge": {
     "sheet": {

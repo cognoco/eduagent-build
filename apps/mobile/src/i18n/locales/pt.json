@@ -36,7 +36,8 @@
     "active": "Ativo",
     "goBackAction": "Voltar",
     "tryAgainAction": "Tentar novamente",
-    "dismiss": "Dispensar"
+    "dismiss": "Dispensar",
+    "pleaseTryAgain": "Tente novamente."
   },
   "quota": {
     "parent": {
@@ -489,7 +490,11 @@
         "save": "Salvar nota",
         "edit": "Editar primeiro",
         "skip": "Pular"
-      }
+      },
+      "startErrorTitle": "Não foi possível iniciar a rodada de desafio",
+      "updateErrorTitle": "Não foi possível atualizar a rodada de desafio",
+      "noteSaved": "Nota salva.",
+      "noteSaveErrorTitle": "Não foi possível salvar a nota"
     },
     "mentorMemory": {
       "title": "O que Meu Mentor Sabe",
@@ -657,7 +662,12 @@
       "voicePermissionErrorMessage": "É necessário acesso ao microfone para a entrada de voz. Ative-o nas Configurações.",
       "voicePermissionOpenSettings": "Abrir Configurações",
       "replyReady": "Resposta pronta",
-      "voiceErrorTapRetry": "{{error}} — toque para tentar novamente"
+      "voiceErrorTapRetry": "{{error}} — toque para tentar novamente",
+      "a11yHomeworkImage": "Imagem do dever de casa",
+      "a11yMessageInput": "Entrada de mensagem",
+      "a11yEnableVoice": "Ativar mensagem de voz",
+      "a11ySendMessage": "Enviar mensagem",
+      "a11yVoiceErrorHint": "Toque para repetir a entrada de voz"
     },
     "filingFailed": {
       "retryInProgress": "Uma nova tentativa já está em andamento.",
@@ -712,7 +722,11 @@
       "inputHint": "Digite uma pergunta ou ideia à qual você queira voltar mais tarde",
       "saveButton": "Salvar",
       "savedForLater": "Salvo para depois",
-      "emptyState": "Nada estacionado ainda"
+      "emptyState": "Nada estacionado ainda",
+      "startFirstTitle": "Comece a conversa primeiro",
+      "startFirstMessage": "Envie uma mensagem para que esta sessão tenha um lugar para salvar seus itens.",
+      "savedConfirmation": "Salvo nos seus itens.",
+      "saveErrorTitle": "Não foi possível salvar o item"
     },
     "topicSwitcher": {
       "title": "Mudar de tópico",
@@ -773,10 +787,38 @@
       "voice": "Voz"
     },
     "messageActions": {
-      "reconnect": "Reconectar"
+      "reconnect": "Reconectar",
+      "a11yReconnect": "Reconectar à conversa",
+      "a11yHelpful": "Útil — marcar esta resposta como útil",
+      "a11yNotHelpful": "Não útil — marcar esta resposta como não útil",
+      "a11yIncorrect": "Sinalizar esta resposta como imprecisa",
+      "wrongSubject": "Fora do assunto"
     },
     "questionCounter": {
       "question": "Pergunta {{count}}"
+    },
+    "skipWarmupErrorTitle": "Não foi possível pular o aquecimento",
+    "feedbackErrorTitle": "Não foi possível salvar o feedback",
+    "topicSwitchErrorTitle": "Não foi possível trocar de tópico",
+    "endPrompt": {
+      "title": "Encerrar sessão?",
+      "confirm": "Encerrar Sessão",
+      "errorTitle": "Não foi possível encerrar esta sessão corretamente"
+    },
+    "bookmarks": {
+      "removeErrorTitle": "Não foi possível remover o marcador",
+      "saveErrorTitle": "Não foi possível salvar o marcador"
+    },
+    "voice": {
+      "a11yReplay": "Repetir última mensagem da IA",
+      "a11yStop": "Parar de falar",
+      "a11yResume": "Retomar fala",
+      "a11yPause": "Pausar fala",
+      "a11ySpeed": "Velocidade da fala {{rate}}x. Toque para alterar."
+    },
+    "inputMode": {
+      "text": "Modo texto",
+      "voice": "Modo voz"
     }
   },
   "quiz": {
@@ -2534,8 +2576,33 @@
       "failedTitle": "Não foi possível adicionar isto à tua Biblioteca",
       "failedHint": "A tua conversa está guardada. Tenta novamente quando estiveres pronto.",
       "keptOutTitle": "Não está na Biblioteca",
-      "keptOutHint": "Esta conversa está guardada, mas não é um tópico da Biblioteca."
-    }
+      "keptOutHint": "Esta conversa está guardada, mas não é um tópico da Biblioteca.",
+      "a11yRefresh": "Atualizar status da Biblioteca",
+      "a11yOpenInLibrary": "Abrir na Biblioteca",
+      "updateError": "Não foi possível atualizar a Biblioteca agora. Tente novamente em um instante.",
+      "dontAdd": "Não salvar na Biblioteca",
+      "remove": "Remover da Biblioteca",
+      "add": "Salvar na Biblioteca"
+    },
+    "notFoundHeadHomeMessage": "Não encontramos esta sessão. Volte para o início para começar uma nova.",
+    "loadTimeoutTitle": "Demorando mais que o esperado",
+    "loadTimeoutMessage": "Não foi possível carregar o resumo da sua sessão. Verifique sua conexão e tente novamente.",
+    "saveErrorTitle": "Não foi possível salvar",
+    "skipErrorTitle": "Não foi possível pular",
+    "draftPrompt": {
+      "title": "Salvar sua reflexão?",
+      "messageCanSubmit": "Você escreveu uma reflexão, mas não a enviou. Quer enviá-la agora, descartá-la ou continuar escrevendo?",
+      "messageTooShort": "Sua reflexão é muito curta para ser enviada (precisa de pelo menos 10 caracteres). Deseja descartá-la ou continuar escrevendo?",
+      "keepWriting": "Continuar escrevendo",
+      "submitNow": "Enviar agora",
+      "discard": "Descartar"
+    },
+    "a11yCloseGoHome": "Fechar e ir para o início",
+    "a11yRetryRecap": "Tentar carregar o resumo novamente",
+    "a11yStarters": "Sugestões de início de frase",
+    "a11yWriteSummary": "Escreva seu resumo do aprendizado",
+    "a11ySkipSummary": "Pular o resumo",
+    "a11yStarterHint": "Toque para usar este início de frase"
   },
   "sessionTranscript": {
     "archived": {
@@ -2551,7 +2618,11 @@
     "messageCount_other": "{{count}} mensagens",
     "you": "Tu",
     "emptyTitle": "Ainda sem mensagens",
-    "emptyMessage": "Esta sessão não tem trocas de mensagens guardadas para mostrar."
+    "emptyMessage": "Esta sessão não tem trocas de mensagens guardadas para mostrar.",
+    "loadingTranscript": "Carregando transcrição...",
+    "stillLoadingTitle": "Ainda carregando",
+    "stillLoadingMessage": "A transcrição está demorando mais que o normal. Tente novamente ou volte para sua biblioteca.",
+    "loadErrorTitle": "Não foi possível carregar a conversa"
   },
   "practiceHub": {
     "title": "Teste-se",

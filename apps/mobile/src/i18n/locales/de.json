@@ -36,7 +36,8 @@
     "active": "Aktiv",
     "goBackAction": "Zurück",
     "tryAgainAction": "Erneut versuchen",
-    "dismiss": "Schließen"
+    "dismiss": "Schließen",
+    "pleaseTryAgain": "Bitte versuche es erneut."
   },
   "quota": {
     "parent": {
@@ -462,7 +463,11 @@
         "save": "Notiz speichern",
         "edit": "Zuerst bearbeiten",
         "skip": "Überspringen"
-      }
+      },
+      "startErrorTitle": "Start der Herausforderung fehlgeschlagen",
+      "updateErrorTitle": "Update der Herausforderung fehlgeschlagen",
+      "noteSaved": "Notiz gespeichert.",
+      "noteSaveErrorTitle": "Speichern der Notiz fehlgeschlagen"
     },
     "mentorMemory": {
       "title": "Was mein Mentor weiß",
@@ -630,7 +635,12 @@
       "voicePermissionErrorMessage": "Für die Spracheingabe ist Mikrofonzugriff erforderlich. Bitte in den Einstellungen aktivieren.",
       "voicePermissionOpenSettings": "Einstellungen öffnen",
       "replyReady": "Antwort bereit",
-      "voiceErrorTapRetry": "{{error}} – zum Wiederholen tippen"
+      "voiceErrorTapRetry": "{{error}} – zum Wiederholen tippen",
+      "a11yHomeworkImage": "Bild der Hausaufgabe",
+      "a11yMessageInput": "Nachrichteneingabe",
+      "a11yEnableVoice": "Sprachnachricht aktivieren",
+      "a11ySendMessage": "Nachricht senden",
+      "a11yVoiceErrorHint": "Tippen, um Spracheingabe zu wiederholen"
     },
     "filingFailed": {
       "retryInProgress": "Ein Wiederholungsversuch läuft bereits.",
@@ -685,7 +695,11 @@
       "inputHint": "Gib eine Frage oder Idee ein, auf die du später zurückkommen möchtest",
       "saveButton": "Speichern",
       "savedForLater": "Für später gespeichert",
-      "emptyState": "Noch nichts geparkt"
+      "emptyState": "Noch nichts geparkt",
+      "startFirstTitle": "Beginne zuerst das Gespräch",
+      "startFirstMessage": "Sende eine Nachricht, damit diese Sitzung einen Ort hat, um deinen Parkplatz zu speichern.",
+      "savedConfirmation": "In deinem Parkplatz gespeichert.",
+      "saveErrorTitle": "Parkplatz-Element konnte nicht gespeichert werden"
     },
     "topicSwitcher": {
       "title": "Thema wechseln",
@@ -746,10 +760,38 @@
       "voice": "Stimme"
     },
     "messageActions": {
-      "reconnect": "Neu verbinden"
+      "reconnect": "Neu verbinden",
+      "a11yReconnect": "Erneut mit dem Gespräch verbinden",
+      "a11yHelpful": "Hilfreich – diese Antwort als hilfreich markieren",
+      "a11yNotHelpful": "Nicht hilfreich – diese Antwort als nicht hilfreich markieren",
+      "a11yIncorrect": "Diese Antwort als ungenau markieren",
+      "wrongSubject": "Falsches Thema"
     },
     "questionCounter": {
       "question": "Frage {{count}}"
+    },
+    "skipWarmupErrorTitle": "Aufwärmen überspringen fehlgeschlagen",
+    "feedbackErrorTitle": "Feedback konnte nicht gespeichert werden",
+    "topicSwitchErrorTitle": "Thema konnte nicht gewechselt werden",
+    "endPrompt": {
+      "title": "Sitzung beenden?",
+      "confirm": "Sitzung beenden",
+      "errorTitle": "Diese Sitzung konnte nicht sauber beendet werden"
+    },
+    "bookmarks": {
+      "removeErrorTitle": "Lesezeichen konnte nicht entfernt werden",
+      "saveErrorTitle": "Lesezeichen konnte nicht gespeichert werden"
+    },
+    "voice": {
+      "a11yReplay": "Letzte KI-Nachricht wiederholen",
+      "a11yStop": "Sprechen beenden",
+      "a11yResume": "Sprechen fortsetzen",
+      "a11yPause": "Sprechen pausieren",
+      "a11ySpeed": "Sprechgeschwindigkeit {{rate}}x. Zum Ändern tippen."
+    },
+    "inputMode": {
+      "text": "Textmodus",
+      "voice": "Sprachmodus"
     }
   },
   "quiz": {
@@ -2507,8 +2549,33 @@
       "failedTitle": "Wir konnten dies nicht zu deiner Bibliothek hinzufügen",
       "failedHint": "Dein Chat ist gespeichert. Versuche es erneut, wenn du bereit bist.",
       "keptOutTitle": "Nicht in der Bibliothek",
-      "keptOutHint": "Dieser Chat ist gespeichert, aber es ist kein Bibliotheksthema."
-    }
+      "keptOutHint": "Dieser Chat ist gespeichert, aber es ist kein Bibliotheksthema.",
+      "a11yRefresh": "Bibliotheksstatus aktualisieren",
+      "a11yOpenInLibrary": "In Bibliothek öffnen",
+      "updateError": "Die Bibliothek konnte gerade nicht aktualisiert werden. Versuche es gleich noch einmal.",
+      "dontAdd": "Nicht zur Bibliothek hinzufügen",
+      "remove": "Aus der Bibliothek entfernen",
+      "add": "Zur Bibliothek hinzufügen"
+    },
+    "notFoundHeadHomeMessage": "Wir konnten diese Sitzung nicht finden. Geh zur Startseite, um eine neue zu beginnen.",
+    "loadTimeoutTitle": "Dauert länger als erwartet",
+    "loadTimeoutMessage": "Wir konnten deine Sitzungszusammenfassung nicht laden. Überprüfe deine Verbindung und versuche es erneut.",
+    "saveErrorTitle": "Speichern fehlgeschlagen",
+    "skipErrorTitle": "Konnte nicht überspringen",
+    "draftPrompt": {
+      "title": "Deine Reflexion speichern?",
+      "messageCanSubmit": "Du hast eine Reflexion geschrieben, aber noch nicht eingereicht. Jetzt einreichen, verwerfen oder weiterschreiben?",
+      "messageTooShort": "Deine Reflexion ist zu kurz zum Einreichen (sie braucht mindestens 10 Zeichen). Verwerfen oder weiterschreiben?",
+      "keepWriting": "Weiterschreiben",
+      "submitNow": "Jetzt einreichen",
+      "discard": "Verwerfen"
+    },
+    "a11yCloseGoHome": "Schließen und zur Startseite",
+    "a11yRetryRecap": "Zusammenfassung erneut laden",
+    "a11yStarters": "Vorschläge für Satzanfänge",
+    "a11yWriteSummary": "Deine Lernzusammenfassung schreiben",
+    "a11ySkipSummary": "Zusammenfassung überspringen",
+    "a11yStarterHint": "Tippen, um diesen Satzanfang zu verwenden"
   },
   "sessionTranscript": {
     "archived": {
@@ -2524,7 +2591,11 @@
     "messageCount_other": "{{count}} Nachrichten",
     "you": "Du",
     "emptyTitle": "Noch keine Nachrichten",
-    "emptyMessage": "Diese Sitzung hat keine gespeicherten Austausche zum Anzeigen."
+    "emptyMessage": "Diese Sitzung hat keine gespeicherten Austausche zum Anzeigen.",
+    "loadingTranscript": "Transkript wird geladen ...",
+    "stillLoadingTitle": "Wird noch geladen",
+    "stillLoadingMessage": "Das Laden des Transkripts dauert länger als gewöhnlich. Versuche es erneut oder kehre zu deiner Bibliothek zurück.",
+    "loadErrorTitle": "Unterhaltung konnte nicht geladen werden"
   },
   "nudge": {
     "sheet": {

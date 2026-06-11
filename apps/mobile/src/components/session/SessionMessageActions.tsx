@@ -68,7 +68,7 @@ export function SessionMessageActions({
         className="rounded-full bg-primary/15 px-3 py-1.5 self-start"
         testID={`session-reconnect-${message.id}`}
         accessibilityRole="button"
-        accessibilityLabel="Reconnect to the conversation"
+        accessibilityLabel={t('session.messageActions.a11yReconnect')}
       >
         <Text className="text-caption font-semibold text-primary">
           {t('session.messageActions.reconnect')}
@@ -117,7 +117,12 @@ export function SessionMessageActions({
       label: QUICK_CHIP_CONFIG[chipId].label,
     })),
     ...(showWrongSubjectChip && message.id === latestAiMessageId
-      ? [{ id: 'wrong_subject' as QuickChipId, label: 'Wrong subject' }]
+      ? [
+          {
+            id: 'wrong_subject' as QuickChipId,
+            label: t('session.messageActions.wrongSubject'),
+          },
+        ]
       : []),
   ];
   const showFeedbackButtons = !!message.eventId;
@@ -167,7 +172,7 @@ export function SessionMessageActions({
             }
             testID={`message-feedback-helpful-${feedbackTestIdSuffix}`}
             accessibilityRole="button"
-            accessibilityLabel="Helpful — mark this reply helpful"
+            accessibilityLabel={t('session.messageActions.a11yHelpful')}
             accessibilityState={{
               selected: feedbackState === 'helpful',
               disabled: feedbackState === 'incorrect' || isStreaming,
@@ -202,7 +207,7 @@ export function SessionMessageActions({
             }
             testID={`message-feedback-not-helpful-${feedbackTestIdSuffix}`}
             accessibilityRole="button"
-            accessibilityLabel="Not helpful — mark this reply not helpful"
+            accessibilityLabel={t('session.messageActions.a11yNotHelpful')}
             accessibilityState={{
               selected: feedbackState === 'not_helpful',
               disabled: feedbackState === 'incorrect' || isStreaming,
@@ -237,7 +242,7 @@ export function SessionMessageActions({
             }
             testID={`message-feedback-incorrect-${feedbackTestIdSuffix}`}
             accessibilityRole="button"
-            accessibilityLabel="Mark this reply as incorrect"
+            accessibilityLabel={t('session.messageActions.a11yIncorrect')}
             accessibilityState={{
               selected: feedbackState === 'incorrect',
               disabled: isStreaming,
