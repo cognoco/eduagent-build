@@ -102,6 +102,16 @@ productionization implication.
   Solo Item, so the children-sweep variable wasn't exercised; the first
   autonomous WP close will test that.
 
+- **2026-06-11 — green→merge seam: executor CI-waiters don't survive turn end
+  (3rd seam instance).** WI-575's executor armed a background CI waiter and
+  ended its turn; PR #882 went fully green but no green-report ever arrived —
+  the shepherd discovered it by polling after compaction, ran the merge gate,
+  merged, and had to resume the executor by message to fire `complete`. Same
+  family as the commit→PR stalls: any executor hand-off that relies on "I'll
+  wake when X" dies silently if the waiter is bound to a finished turn.
+  *Production:* the shepherd (or harness) should own all cross-turn waits —
+  executors report state and end; wake-ups are the coordinator's job.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no

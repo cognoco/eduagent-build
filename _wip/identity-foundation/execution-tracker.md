@@ -148,8 +148,8 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #875); children WI-598/599 swept with parent |
-| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi575-executor`) |
-| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi576-executor`) |
+| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **merged** — PR #882 merge-gated + merged 2026-06-11 (6/6 green, Claude review 0 findings); executor firing `complete` |
+| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **in-progress** — PR #888 open (rebased post-#832), CI running; executor CI-waiter armed |
 
 ### W3 — PII-handling + envelope/router (critical path)
 
@@ -197,8 +197,9 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   merged and Closed via review: WI-570 (#855), WI-571 (#860), WI-572 (#859),
   WI-573 (#867). G2 tripped earlier same day (WI-569 Closed). No review
   backlog remains.
-- **In flight (3 executors): WI-575 (PR phase) ∥ WI-576 (worktree recovery) ∥
-  WI-583 (payload-schema rework).** WI-584 merged (#874), at Reviewing.
+- **In flight (3 executors): WI-575 (PR #882 MERGED, firing `complete`) ∥
+  WI-576 (PR #888 open, CI running) ∥ WI-583 (payload-schema rework on held
+  PR #876).** WI-584 CLOSED autonomously (#874).
 - **Reviewing-loop monitor ACTIVE (this session):** a persistent poll (90s) on
   the workstream emits every Stage transition — a reviewer agent picks up
   Reviewing items autonomously; the shepherd reacts to Closed (sweep-check
