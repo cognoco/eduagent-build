@@ -166,7 +166,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress** — executor dispatched 2026-06-11 (`wi583-executor`, parallel W4 track) |
-| WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **in-progress** — executor dispatched 2026-06-11 (`wi584-executor`, parallel W4 track) |
+| WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **review** — Stage=Reviewing 2026-06-11, PR #874 MERGED 09:12Z (shepherd-verified: green, P2 thread dispositioned, surgical 2-file diff); awaiting `/cosmo:review` |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
 
@@ -196,7 +196,8 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   merged and Closed via review: WI-570 (#855), WI-571 (#860), WI-572 (#859),
   WI-573 (#867). G2 tripped earlier same day (WI-569 Closed). No review
   backlog remains.
-- **In flight (4 executors): WI-575 ∥ WI-576 (W2 tail) ∥ WI-583 ∥ WI-584 (W4).**
+- **In flight (3 executors): WI-575 ∥ WI-576 (W2 tail) ∥ WI-583 (W4).** WI-584
+  merged (#874).
   WI-574 merged (#875) and at Reviewing. After 575/576 land → W3 dispatches
   (577/578/579/580/582 on 574; 581 also needs 576).
 - **W3 + W4 fully pre-bridged 2026-06-11** — WI-577…584 all Ready+Assisted
