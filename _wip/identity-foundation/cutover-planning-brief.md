@@ -1,6 +1,6 @@
 # Cutover Planning Brief — the IF application cutover (the missing wave)
 
-**Date:** 2026-06-12 · **Commissioned by:** umbrella program session · **Operator:** Jorn
+**Date:** 2026-06-11 · **Commissioned by:** umbrella program session · **Operator:** Jorn
 **Your role:** dedicated architecture + planning session. You design; you do not execute,
 instantiate, or coordinate. One deliverable: a ratified-plan-grade document.
 
@@ -16,6 +16,12 @@ gap.
 
 **PLAN ONLY.** Output is one committed markdown document. No code, no migrations, no
 Cosmo writes, no messages to other agents.
+
+**This session is NOT executing WI-586** (or any work item). The repo's Cosmo
+work-item operating rules (claim before execute, complete → Reviewing, etc.) do not
+apply to you — do not claim, refine, complete, review, close, update properties on, or
+create any Cosmo item. WI-586 is parked in Executing under another agent's claim;
+leave it exactly as found. Notion is **read-only** for this session.
 
 ## What happened (one paragraph of context)
 
@@ -36,10 +42,17 @@ flip → drop → grep-clean).
    plan; especially the WP-TAIL-reseed / WP-TAIL-drop-legacy sections (~lines 408–430).
 2. `_wip/identity-foundation/CANONICAL-SET.md` + `docs/canon/identity/` — the ratified
    target model. Your plan extends it; it never reopens it.
-3. **WI-586 Notion page** — `37b8bce9-1f7c-8166-b539-eb1a69ebf0fe`
-   ("WP-TAIL-drop-legacy"). The executor's scope report there, with its per-orphan
-   mapping, is the **authoritative inventory** of legacy readers. Build on it; do not
-   re-derive it from scratch (do verify spot-checks against the repo).
+3. **Scope evidence for the gap.** The verified summary counts are the ones in the
+   context paragraph above (~80 runtime files, both payment webhooks, 22 Inngest
+   functions, consent gap, store-correlation IDs, 57 FKs, ~190 test files). A full
+   per-orphan inventory does **not** currently exist as a durable artifact — if
+   `_wip/identity-foundation/wi586-scope-report.md` exists when you start, use it as
+   your seed; otherwise **deriving the inventory from the repo is part of deliverable
+   2** (`rg` for the legacy tables/symbols named in the master plan's WP-TAIL section),
+   cross-checked against the summary counts. If your derived counts diverge materially
+   from them, flag it in Open Questions rather than silently trusting either side. The
+   WI-586 Notion page (`37b8bce9-1f7c-8166-b539-eb1a69ebf0fe`) holds only the original
+   WP description — useful for the drop scope's own wording, nothing more.
 4. `_wip/identity-foundation/execution-tracker.md` — read-only context (shepherd-owned;
    **never edit it**).
 5. `.claude/memory/feedback_plan_cutover_ownership.md` — the lesson that produced this
@@ -73,9 +86,12 @@ flip → drop → grep-clean).
 - The V0 5-tab nav hard constraint and all AGENTS.md engineering rules apply to whatever
   your plan prescribes.
 
-## Deliverables — one plan document, four sections
+## Deliverables — one plan document
 
-Write to `_wip/identity-foundation/2026-06-12-cutover-plan.md`.
+Write to `_wip/identity-foundation/2026-06-11-cutover-plan.md`. The document must
+contain: an **Open Questions** section at the top, the **four mandated sections**
+below, and **appendices as needed** (e.g. the ADR text from deliverable 1, the full
+reader inventory table).
 
 1. **CUT-A schema-extension design** (the only architecture-grade section).
    `consent_request` table design at full depth: states, token lifecycle, parent-email
@@ -117,7 +133,9 @@ guess silently.
 ## Repo hygiene
 
 - Shared `main` checkout, multiple concurrent sessions: stage ONLY your own file(s),
-  never `git add -A`. Commit via the repo commit skill (`/commit`). On push rejection:
+  never `git add -A`. Before committing, inspect `git status` and stage exactly your
+  plan doc — never `.cosmo/` artifacts or any other session's modified/untracked
+  files. Commit via the repo commit skill (`/commit`). On push rejection:
   `git pull --no-rebase`, then push. Never rebase or force-push.
 - Notion read access: `NOTION_TOKEN` is in your environment (if missing:
   `source /Users/vetinari/.config/nexus/host.env`). Never print it or write it to a file.
