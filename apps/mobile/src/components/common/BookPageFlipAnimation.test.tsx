@@ -6,21 +6,23 @@ import { BookPageFlipAnimation } from './BookPageFlipAnimation';
 describe('BookPageFlipAnimation', () => {
   it('renders without crashing', () => {
     const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
-    getByTestId('book');
+    getByTestId('book', { includeHiddenElements: true });
   });
 
-  it('applies accessibility attributes', () => {
+  it('is hidden from screen readers (decorative animation)', () => {
     const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
-    const el = getByTestId('book');
-    expect(el.props.accessibilityLabel).toBe('Loading content');
-    expect(el.props.accessibilityRole).toBe('image');
+    const el = getByTestId('book', { includeHiddenElements: true });
+    // Decorative animation — hidden from SR so users don't hear "image, Loading content"
+    expect(el.props.accessible).toBe(false);
+    expect(el.props.accessibilityElementsHidden).toBe(true);
+    expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('accepts custom size and color props', () => {
     const { getByTestId } = render(
       <BookPageFlipAnimation testID="book" size={80} color="#3b82f6" />,
     );
-    getByTestId('book');
+    getByTestId('book', { includeHiddenElements: true });
   });
 
   it('renders in reduced motion mode without crashing', () => {
@@ -29,7 +31,7 @@ describe('BookPageFlipAnimation', () => {
     reanimated.useReducedMotion = () => true;
 
     const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
-    getByTestId('book');
+    getByTestId('book', { includeHiddenElements: true });
 
     reanimated.useReducedMotion = original;
   });
@@ -72,7 +74,7 @@ describe('BookPageFlipAnimation', () => {
 
     // Should not throw; covers and pages are rendered but animated pages are hidden
     const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
-    getByTestId('book');
+    getByTestId('book', { includeHiddenElements: true });
 
     reanimated.useReducedMotion = original;
   });

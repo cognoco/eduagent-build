@@ -60,7 +60,14 @@ export function NudgeBanner(): React.ReactElement | null {
         }
         testID="nudge-banner"
       >
-        <Ionicons name="heart-outline" size={22} color={colors.primary} />
+        <Ionicons
+          name="heart-outline"
+          size={22}
+          color={colors.primary}
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
         <View className="flex-1 ml-3">
           <Text className="text-body font-semibold text-text-primary">
             {t('nudge.banner.title', {

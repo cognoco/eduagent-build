@@ -181,7 +181,6 @@ export function LivingBook({
       {/* Page counter — subtle text below icon */}
       <Text
         className="text-caption text-text-secondary mt-0.5"
-        style={{ fontSize: 10 }}
         testID="living-book-counter"
       >
         {exchangeCount === 0

@@ -188,8 +188,8 @@ export function TopicStatusRow({
                       ? `topic-relevance-label-${testID}`
                       : 'topic-relevance-label'
                   }
+                  className="text-caption"
                   style={{
-                    fontSize: 10,
                     fontWeight: '500',
                     color: relevanceLabelColor,
                   }}

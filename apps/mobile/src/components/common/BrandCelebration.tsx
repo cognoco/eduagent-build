@@ -395,7 +395,13 @@ export function BrandCelebration({
   }));
 
   return (
-    <Animated.View style={[styles.container, containerStyle]} testID={testID}>
+    <Animated.View
+      style={[styles.container, containerStyle]}
+      testID={testID}
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <Svg width={size} height={size} viewBox="-5 -15 130 130">
         <Defs>
           <LinearGradient id="cel-arc" x1="0" y1="1" x2="1" y2="0">

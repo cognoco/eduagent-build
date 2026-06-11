@@ -310,7 +310,9 @@ describe('CreateSubjectScreen', () => {
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      screen.getByTestId('subject-book-loading');
+      screen.getByTestId('subject-book-loading', {
+        includeHiddenElements: true,
+      });
       screen.getByText('Checking subject name...');
       expect(screen.queryByTestId('create-subject-submit')).toBeNull();
     });
@@ -364,7 +366,9 @@ describe('CreateSubjectScreen', () => {
       fireEvent.press(screen.getByTestId('create-subject-submit'));
 
       await waitFor(() => {
-        screen.getByTestId('subject-book-loading');
+        screen.getByTestId('subject-book-loading', {
+          includeHiddenElements: true,
+        });
         screen.getByText('Preparing your first lesson...');
         expect(screen.queryByTestId('create-subject-error')).toBeNull();
       });
@@ -1624,7 +1628,9 @@ describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
       await waitFor(() => {
         // Either creating spinner or first-lesson preparing copy must show
         // — confirms resolveState.phase !== 'resolving'.
-        screen.getByTestId('subject-book-loading');
+        screen.getByTestId('subject-book-loading', {
+          includeHiddenElements: true,
+        });
       });
 
       // Sanity: no error yet.
@@ -1664,7 +1670,9 @@ describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
       fireEvent.press(screen.getByTestId('create-subject-submit'));
 
       await waitFor(() => {
-        screen.getByTestId('subject-book-loading');
+        screen.getByTestId('subject-book-loading', {
+          includeHiddenElements: true,
+        });
         screen.getByText('Checking subject name...');
       });
 
@@ -1743,7 +1751,9 @@ describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
       fireEvent.press(screen.getByTestId('create-subject-submit'));
 
       await waitFor(() => {
-        screen.getByTestId('subject-book-loading');
+        screen.getByTestId('subject-book-loading', {
+          includeHiddenElements: true,
+        });
         screen.getByText('Checking subject name...');
       });
 
@@ -1787,7 +1797,11 @@ describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
 
       expect(navigatedWithStaleSubject).toBe(false);
       expect(createdSubjectNames).not.toContain('Stale Geometry');
-      expect(screen.getByTestId('subject-book-loading')).toBeTruthy();
+      expect(
+        screen.getByTestId('subject-book-loading', {
+          includeHiddenElements: true,
+        }),
+      ).toBeTruthy();
 
       await act(async () => {
         resolveSecond({
