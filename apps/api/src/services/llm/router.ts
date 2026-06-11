@@ -466,9 +466,11 @@ const V2_SERVING_REGION_PLACEHOLDER = 'global';
  * is the identity mapping; maxTokens/reasoningEffort live outside the 3-param
  * routing key and are carried over from the matrix config.
  *
- * Exported for testing only (via `_pickThroughExchangeRouterForTest`).
+ * Exported so tests exercise the real function (no test-only wrapper);
+ * production callers are `getModelConfigV2` and any future eligibility-set
+ * builder — every new call site carries the same error-mapping obligation.
  */
-function pickThroughExchangeRouter(config: ModelConfig): ModelConfig {
+export function pickThroughExchangeRouter(config: ModelConfig): ModelConfig {
   const candidate: ExchangeRouterRow = {
     model: config.model,
     serviceProvider: config.provider,
@@ -493,13 +495,6 @@ function pickThroughExchangeRouter(config: ModelConfig): ModelConfig {
     }
     throw err;
   }
-}
-
-/** Exported for testing only — exercises the eligibility/ban/error mapping. */
-export function _pickThroughExchangeRouterForTest(
-  config: ModelConfig,
-): ModelConfig {
-  return pickThroughExchangeRouter(config);
 }
 
 /**

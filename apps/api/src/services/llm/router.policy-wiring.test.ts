@@ -10,7 +10,7 @@
 // No internal jest.mock() — all implementations are real.
 // ---------------------------------------------------------------------------
 
-import { _pickThroughExchangeRouterForTest, CircuitOpenError } from './router';
+import { pickThroughExchangeRouter, CircuitOpenError } from './router';
 import { NoEligibleModelError } from '../policy-engine';
 import type { ModelConfig } from './types';
 
@@ -22,7 +22,7 @@ describe('[WI-581] policy-engine exchange-router wiring', () => {
       maxTokens: 1024,
       reasoningEffort: 'high',
     };
-    expect(_pickThroughExchangeRouterForTest(config)).toEqual(config);
+    expect(pickThroughExchangeRouter(config)).toEqual(config);
   });
 
   it('carries non-routing fields (maxTokens, reasoningEffort) through the pick', () => {
@@ -33,7 +33,7 @@ describe('[WI-581] policy-engine exchange-router wiring', () => {
       reasoningEffort: 'low',
       responseFormat: 'json',
     };
-    const picked = _pickThroughExchangeRouterForTest(config);
+    const picked = pickThroughExchangeRouter(config);
     expect(picked.maxTokens).toBe(2048);
     expect(picked.reasoningEffort).toBe('low');
     expect(picked.responseFormat).toBe('json');
@@ -47,9 +47,7 @@ describe('[WI-581] policy-engine exchange-router wiring', () => {
         model: 'gemini-2.5-pro',
         maxTokens: 1024,
       };
-      expect(() => _pickThroughExchangeRouterForTest(config)).toThrow(
-        CircuitOpenError,
-      );
+      expect(() => pickThroughExchangeRouter(config)).toThrow(CircuitOpenError);
     },
   );
 
@@ -60,7 +58,7 @@ describe('[WI-581] policy-engine exchange-router wiring', () => {
       maxTokens: 1024,
     };
     try {
-      _pickThroughExchangeRouterForTest(banned);
+      pickThroughExchangeRouter(banned);
       throw new Error('expected a throw');
     } catch (err) {
       expect(err).toBeInstanceOf(CircuitOpenError);

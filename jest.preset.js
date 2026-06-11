@@ -15,9 +15,16 @@ const ciDefaults = process.env.CI
     }
   : {};
 
-// True when this preset file itself lives inside a .worktrees/ checkout —
-// i.e. jest was launched from an isolated worktree, not the main checkout.
-const IS_WORKTREE_RUN = /[/\\]\.worktrees[/\\]/.test(__dirname);
+// True when this preset file itself sits at the root of a worktree checkout —
+// i.e. __dirname is exactly `<repo>/.worktrees/<branch>` (the layout
+// scripts/setup-worktree.sh produces), so jest was launched from an isolated
+// worktree, not the main checkout. Anchoring on the grandparent directory
+// name (instead of a substring match anywhere in the path) avoids false
+// positives for repos cloned under unrelated `.worktrees` paths; the one
+// residual edge — a full clone placed DIRECTLY at `<x>/.worktrees/<y>` — is
+// accepted: the only effect is that such a clone's own nested scratch
+// copies would be scanned.
+const IS_WORKTREE_RUN = path.basename(path.dirname(__dirname)) === '.worktrees';
 
 module.exports = {
   ...nxPreset,
