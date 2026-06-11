@@ -84,7 +84,14 @@ export const stripeWebhookRoute = new Hono<{
       webhookSecret,
       c.env.STRIPE_SECRET_KEY ?? 'sk_webhook_verification_only',
     );
-  } catch {
+  } catch (err) {
+    // Log the failure reason so a misconfiguration (e.g. webhook-secret rotation
+    // gone wrong) is distinguishable from internet probes — without captureException
+    // per-event (that would cause alert-storm from background noise).
+    logger.warn('[stripe-webhook] signature verification failed', {
+      event: 'stripe.webhook.signature_verification_failed',
+      reason: err instanceof Error ? err.message : String(err),
+    });
     return apiError(
       c,
       400,

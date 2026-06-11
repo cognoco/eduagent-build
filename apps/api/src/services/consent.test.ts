@@ -1488,3 +1488,92 @@ describe('consent audit metadata [Bug #872]', () => {
     expect(call).not.toHaveProperty('userAgent');
   });
 });
+
+// ---------------------------------------------------------------------------
+// F-048 regression: rollback failure logging in resendConsent (errors-api F-048)
+// ---------------------------------------------------------------------------
+
+describe('resendConsent — rollback failure logging (errors-api F-048)', () => {
+  const CHILD_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('logs a warn when the rollback update throws (missing storedEmail path)', async () => {
+    // Arrange: simulate a row that passes the DB filter but has null parentEmail
+    // (data inconsistency edge case that reaches the rollback branch).
+    //
+    // resendConsent calls db.update() twice in this path:
+    //   Call 1 — counter increment: .set().where().returning() → must return [nullEmailRow]
+    //   Call 2 — rollback: .set().where() awaited directly (no .returning())
+    //
+    // The test validates that a throw inside the rollback is caught and logged,
+    // and that ConsentRequestNotFoundError is still thrown (best-effort rollback).
+    //
+    // NOTE: mockConsentRow uses `?? 'parent@example.com'` so passing `null`
+    // would be coalesced to the default. Spread and override explicitly instead.
+    const rowWithNullEmail = { ...mockConsentRow(), parentEmail: null as null };
+    const rollbackError = new Error('DB rollback failed');
+
+    // Build the returning-stub for call 1 as a standalone function so it can
+    // be confirmed independent of the chain depth.
+    const returningStub = jest.fn().mockResolvedValue([rowWithNullEmail]);
+    const whereStubCall1 = jest
+      .fn()
+      .mockReturnValue({ returning: returningStub });
+    const setStubCall1 = jest.fn().mockReturnValue({ where: whereStubCall1 });
+
+    // Build the rollback-stub for call 2: .where() itself rejects —
+    // the code awaits .set().where() without a further .returning() call.
+    const whereStubCall2 = jest.fn().mockRejectedValue(rollbackError);
+    const setStubCall2 = jest.fn().mockReturnValue({ where: whereStubCall2 });
+
+    let updateCallCount = 0;
+    const db = {
+      query: {
+        consentStates: {
+          findFirst: jest.fn().mockResolvedValue(rowWithNullEmail),
+        },
+        profiles: {
+          findFirst: jest.fn().mockResolvedValue({ displayName: 'Test Child' }),
+        },
+      },
+      insert: jest.fn(),
+      transaction: jest.fn(),
+      delete: jest.fn(),
+      update: jest.fn().mockImplementation(() => {
+        updateCallCount++;
+        return updateCallCount === 1
+          ? { set: setStubCall1 }
+          : { set: setStubCall2 };
+      }),
+    } as unknown as Database;
+
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      await expect(
+        resendConsent(
+          db,
+          { childProfileId: CHILD_ID, consentType: 'GDPR' },
+          'https://api.mentomate.com',
+          EMAIL_OPTIONS,
+        ),
+      ).rejects.toThrow(ConsentRequestNotFoundError);
+
+      // The catch block must log the rollback failure — previously it was silent
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[consent] Failed to rollback resend counter'),
+      );
+      const loggedEntry = JSON.parse(
+        warnSpy.mock.calls.find((call) =>
+          (call[0] as string).includes(
+            '[consent] Failed to rollback resend counter',
+          ),
+        )?.[0] as string,
+      ) as { context: { error: string } };
+      expect(loggedEntry.context.error).toContain('DB rollback failed');
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});

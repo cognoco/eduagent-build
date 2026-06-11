@@ -422,6 +422,42 @@ describe('POST /webhooks/resend — authentication', () => {
 
     expect(res.status).toBe(401);
   });
+
+  it('logs structured context with webhookId + webhookTimestamp on signature failure (errors-api F-049)', async () => {
+    // Verify that signature verification failures now emit structured context —
+    // previously the logger.warn had no arguments, making misconfiguration
+    // (e.g. wrong webhook secret) invisible from logs alone.
+    const rawBody = JSON.stringify({ type: 'email.delivered', data: {} });
+    const id = 'msg_f049_regression';
+    const ts = nowTimestamp();
+
+    mockLoggerWarn.mockClear();
+
+    await app.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': 'v1,invalidsignature==',
+        },
+        body: rawBody,
+      },
+      TEST_ENV,
+    );
+
+    // Logger must have been called with structured context (not just a bare message)
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid webhook signature'),
+      expect.objectContaining({
+        event: 'resend.webhook.signature_verification_failed',
+        webhookId: id,
+        webhookTimestamp: ts,
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

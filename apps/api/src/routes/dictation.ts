@@ -31,6 +31,10 @@ import {
 } from '../services/dictation';
 import { getLearningProfile } from '../services/learner-profile';
 import { checkAndLogRateLimit } from '../services/settings';
+import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Dictation Routes
@@ -283,8 +287,18 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
             .slice(0, 10)
             .map((entry) => entry.topic);
         }
-      } catch {
+      } catch (err) {
         // Graceful degradation — review proceeds without struggle-aware feedback.
+        // Log so a systematic DB failure (e.g. connection-pool exhaustion, schema
+        // drift) is queryable; the degradation rate must not be invisible to ops.
+        logger.warn('[dictation] struggle fetch failed; degrading review', {
+          event: 'dictation.struggle_fetch_failed',
+          profileId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        captureException(err, {
+          extra: { context: 'dictation.review.struggles', profileId },
+        });
       }
 
       const result = await reviewDictation({
