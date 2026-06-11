@@ -835,4 +835,50 @@ describe('[F-124 rework] Stripe path chained tier changes stay transaction-coher
     expect(credits.length).toBe(1);
     expect(credits[0]!.profileId).toBe(owner.id); // attributed once, stable
   });
+
+  /**
+   * Concurrency invariant (Codex P1 on PR #897): the in-transaction tier read
+   * is SELECT … FOR UPDATE, so two concurrent tier changes on the same
+   * subscription serialize — the second blocks on the row lock and then sees
+   * the first one's committed tier. Whichever order they commit in, the
+   * credits' profileId must match the FINAL tier's quota model (a stale
+   * unserialized read could leave credits attributed for the losing tier).
+   */
+  it('concurrent tier changes serialize on the row lock — credits match the final tier model', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('stripe-tx-concurrent');
+    const owner = await seedProfile({
+      accountId: acct.id,
+      displayName: 'Owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscriptionWithQuota({
+      accountId: acct.id,
+      tier: 'family',
+    });
+    await seedTopUpCredit({
+      subscriptionId: sub.id,
+      profileId: null,
+      amount: 500,
+      remaining: 350,
+    });
+
+    // Race a per-profile target against a shared-pool target.
+    await Promise.all([
+      handleTierChange(db, sub.id, 'plus'),
+      handleTierChange(db, sub.id, 'pro'),
+    ]);
+
+    const finalSub = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.id, sub.id),
+    });
+    const finalModel = getTierConfig(finalSub!.tier).quotaModel;
+    const credits = await loadTopUpCredits(sub.id);
+    expect(credits.length).toBe(1);
+    if (finalModel === 'per-profile') {
+      expect(credits[0]!.profileId).toBe(owner.id);
+    } else {
+      expect(credits[0]!.profileId).toBeNull();
+    }
+  });
 });

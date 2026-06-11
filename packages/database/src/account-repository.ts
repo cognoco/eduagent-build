@@ -76,6 +76,46 @@ export async function findSubscriptionById__unscoped(
 }
 
 /**
+ * Lock-and-read a subscription row by primary key (SELECT … FOR UPDATE).
+ *
+ * MUST be called inside a `db.transaction()` callback — the row lock is held
+ * until the transaction commits, serializing concurrent tier-change
+ * transactions on the same subscription. A plain in-transaction read under
+ * READ COMMITTED does NOT serialize: two transactions can both read the same
+ * pre-change tier before either commits.
+ *
+ * SECURITY: same caller contract as findSubscriptionById__unscoped.
+ */
+export async function lockSubscriptionById__unscoped(
+  db: Database,
+  subscriptionId: string,
+) {
+  const [row] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.id, subscriptionId))
+    .for('update');
+  return row;
+}
+
+/**
+ * Lock-and-read a subscription row by account ID (SELECT … FOR UPDATE).
+ * Same contract and rationale as lockSubscriptionById__unscoped.
+ */
+export async function lockSubscriptionByAccountId__unscoped(
+  db: Database,
+  accountId: string,
+) {
+  const [row] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.accountId, accountId))
+    .limit(1)
+    .for('update');
+  return row;
+}
+
+/**
  * Find a subscription by its Stripe subscription ID.
  *
  * SECURITY: caller MUST verify ownership before returning data to a client;

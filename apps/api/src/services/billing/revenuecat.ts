@@ -10,6 +10,7 @@ import {
   quotaPools,
   type Database,
   createAccountRepository,
+  lockSubscriptionByAccountId__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
@@ -137,14 +138,21 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
   const result = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
 
-    // [F-124] Read the previous tier INSIDE the transaction so the
-    // tier-change detection and the credit re-attribution below are coherent
-    // with the row this transaction updates — a concurrent webhook for the
-    // same account cannot make the compare-and-reattribute act on a stale
-    // tier. Scoped repo read (by accountId, owner-restricted); the caller
-    // (RevenueCat webhook handler) already validated accountId.
-    const repo = createAccountRepository(txDb, accountId);
-    const existing = await repo.subscriptions.findFirst();
+    // [F-124] Lock-and-read the previous tier INSIDE the transaction
+    // (SELECT … FOR UPDATE) so the tier-change detection and the credit
+    // re-attribution below are serialized against concurrent webhooks for
+    // the same account. A plain in-transaction read under READ COMMITTED is
+    // not enough: two concurrent transactions can both read the same
+    // previousTier before either commits (Codex P1 on PR #897). The row lock
+    // is held until commit; the second transaction blocks here and then sees
+    // the first one's committed tier. The eventId dedup inside
+    // applySubscriptionUpdateFromRevenuecat only gates duplicate deliveries
+    // of the SAME event — it does not serialize two different events.
+    // safe-caller: RevenueCat webhook handler — accountId already validated by the caller
+    const existing = await lockSubscriptionByAccountId__unscoped(
+      txDb,
+      accountId,
+    );
     previousTier = existing?.tier;
 
     const updated = await applySubscriptionUpdateFromRevenuecat(

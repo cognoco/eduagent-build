@@ -10,6 +10,7 @@ import {
   topUpCredits,
   type Database,
   findSubscriptionById__unscoped,
+  lockSubscriptionById__unscoped,
   findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier } from '@eduagent/schemas';
@@ -248,14 +249,17 @@ export async function handleTierChange(
   await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
 
-    // [F-124 rework] Re-read the tier INSIDE the transaction so the
-    // tier-change detection and the credit re-attribution below are coherent
-    // with the row this transaction updates — a concurrent tier change for
-    // the same subscription cannot make the compare-and-reattribute act on a
-    // stale tier read before the transaction opened. Mirrors the same fix in
+    // [F-124 rework] Lock-and-read the tier INSIDE the transaction
+    // (SELECT … FOR UPDATE) so the tier-change detection and the credit
+    // re-attribution below are serialized against concurrent tier changes on
+    // the same subscription. A plain in-transaction read under READ COMMITTED
+    // is not enough: two concurrent transactions can both read the same
+    // previousTier before either commits (Codex P1 on PR #897). The row lock
+    // is held until commit; the second transaction blocks here and then sees
+    // the first one's committed tier. Mirrors the same fix in
     // updateSubscriptionAndQuotaFromRevenuecatWebhook (revenuecat.ts).
     // safe-caller: Stripe webhook tier-change handler — subscriptionId from verified Stripe event
-    const current = await findSubscriptionById__unscoped(txDb, subscriptionId);
+    const current = await lockSubscriptionById__unscoped(txDb, subscriptionId);
     if (current) {
       previousTier = current.tier;
     }
