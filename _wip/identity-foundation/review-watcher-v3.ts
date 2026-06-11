@@ -42,6 +42,12 @@ const workstreams: Workstream[] = [
     id: "37c8bce9-1f7c-817c-98ec-d1d4ba0a15e3",
     overrides: new Map(),
   },
+  {
+    name: "Inngest Security & Correctness",
+    slug: "inngest-security-correctness",
+    id: "37c8bce9-1f7c-81d7-9377-e79356055ff3",
+    overrides: new Map(),
+  },
 ];
 
 mkdirSync(reviewDir, { recursive: true });
