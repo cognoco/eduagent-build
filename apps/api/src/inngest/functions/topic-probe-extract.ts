@@ -207,7 +207,7 @@ export async function handleTopicProbeExtract({
     async () => {
       const db = getStepDatabase();
       const [topic] = await db
-        .select({ id: curriculumTopics.id })
+        .select({ id: curriculumTopics.id, title: curriculumTopics.title })
         .from(curriculumTopics)
         .innerJoin(
           curriculumBooks,
@@ -222,12 +222,30 @@ export async function handleTopicProbeExtract({
         )
         .limit(1);
       if (!topic) return null;
+      // PII egress: Rehydrate the learner's probe answer from the DB by
+      // the event's opaque reference — the raw text never rides in the event
+      // payload, and as a local variable here it is never serialized into
+      // Inngest state. A missing row (e.g. transcript purged since dispatch)
+      // skips seeding rather than guessing at a different message.
+      const [learnerMessageRow] = await db
+        .select({ content: sessionEvents.content })
+        .from(sessionEvents)
+        .where(
+          and(
+            eq(sessionEvents.id, payload.learnerMessageEventId),
+            eq(sessionEvents.profileId, payload.profileId),
+            eq(sessionEvents.sessionId, payload.sessionId),
+            eq(sessionEvents.eventType, 'user_message'),
+          ),
+        )
+        .limit(1);
+      if (!learnerMessageRow?.content) return null;
       return seedRetentionCard({
         db,
         profileId: payload.profileId,
         topicId: payload.topicId,
-        learnerMessage: payload.learnerMessage,
-        topicTitle: payload.topicTitle,
+        learnerMessage: learnerMessageRow.content,
+        topicTitle: topic.title,
         timestamp: payload.timestamp,
       });
     },
