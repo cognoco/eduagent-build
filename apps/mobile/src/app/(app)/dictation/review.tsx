@@ -16,6 +16,7 @@ import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useDictationData } from './_layout';
 import { useRecordDictationResult } from '../../../hooks/use-dictation-api';
+import { toLocalDateString } from '../../../lib/local-date';
 
 export default function DictationReviewScreen(): React.ReactElement {
   const { t } = useTranslation();
@@ -53,7 +54,7 @@ export default function DictationReviewScreen(): React.ReactElement {
     if (savingRef.current || recordResult.isPending) return;
     savingRef.current = true;
 
-    const localDate = new Date().toISOString().slice(0, 10);
+    const localDate = toLocalDateString();
     const mistakeCount = mistakes.length;
 
     try {

@@ -5,6 +5,7 @@ import {
 } from '../../../test-utils/screen-render';
 import { fetchCallsMatching } from '../../../test-utils/mock-api-routes';
 import QuizHistoryScreen from './history';
+import * as localDateModule from '../../../lib/local-date';
 
 // ─── Boundary mocks (external / native runtime only) ────────────────────────
 //
@@ -201,6 +202,72 @@ describe('QuizHistoryScreen', () => {
       pathname: '/(app)/quiz',
       params: {},
     });
+  });
+
+  it('[F-178] groups rounds by local date, not UTC date (midnight boundary)', async () => {
+    // RED-GREEN evidence for F-178.
+    //
+    // Scenario: user is in UTC-1. Round completed at 2026-04-30T00:30:00Z.
+    //   - UTC date: '2026-04-30' (what the old `.slice(0,10)` would give)
+    //   - Local date: '2026-04-29' (what toLocalDateString() correctly returns)
+    //
+    // We spy on toLocalDateString to simulate a UTC-1 user: the timestamp at
+    // UTC midnight + 30m maps to the previous local day. Any other call falls
+    // through to the REAL implementation so unexpected calls stay visible.
+    //
+    // BUGGY code: `round.completedAt.slice(0, 10)` → groups under '2026-04-30'
+    // FIXED code: `toLocalDateString(new Date(round.completedAt))` → '2026-04-29'
+
+    const realToLocalDateString = localDateModule.toLocalDateString;
+    const spy = jest
+      .spyOn(localDateModule, 'toLocalDateString')
+      .mockImplementation((d?: Date) => {
+        // Simulate UTC-1: 2026-04-30T00:30:00Z is locally 2026-04-29 23:30
+        if (d && d.toISOString() === '2026-04-30T00:30:00.000Z') {
+          return '2026-04-29';
+        }
+        return realToLocalDateString(d);
+      });
+
+    const roundAtUTCMidnight = [
+      {
+        id: 'round-boundary',
+        activityType: 'vocabulary',
+        theme: 'Animals',
+        score: 3,
+        total: 5,
+        xpEarned: 60,
+        completedAt: '2026-04-30T00:30:00.000Z', // April 30 UTC, April 29 locally
+      },
+    ];
+
+    mount({ [RECENT_ROUNDS_ROUTE]: roundAtUTCMidnight });
+    await waitFor(() => {
+      screen.getByTestId('quiz-history-row-round-boundary');
+    });
+
+    // 1. The grouping path must hand the helper the exact Date built from
+    //    completedAt (jest Date equality compares timestamps). With the buggy
+    //    `.slice(0, 10)` key the helper is never called for this round.
+    expect(spy).toHaveBeenCalledWith(new Date('2026-04-30T00:30:00.000Z'));
+
+    // 2. The rendered section header must show the LOCAL day (Apr 29), not the
+    //    UTC day (Apr 30). The header renders relativeDate('<key>T00:00:00');
+    //    for a >30-day-old date the real useRelativeDate hook formats it via
+    //    toLocaleDateString — replicate that exact formatting here.
+    const headerFor = (localMidnightIso: string): string => {
+      const d = new Date(localMidnightIso);
+      const includeYear = d.getFullYear() !== new Date().getFullYear();
+      return d.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        ...(includeYear ? { year: 'numeric' } : {}),
+      });
+    };
+    expect(screen.getByText(headerFor('2026-04-29T00:00:00'))).toBeTruthy();
+    expect(screen.queryByText(headerFor('2026-04-30T00:00:00'))).toBeNull();
+
+    spy.mockRestore();
   });
 
   it('shows error state with retry and go-back actions', async () => {
