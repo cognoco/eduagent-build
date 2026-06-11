@@ -139,8 +139,8 @@ overlapping component files — keep adjacent/serial).
 | 3 | WI-623 WP-L12-modal-focus-roles | ready — bridged (children WI-653/654); run adjacent/serial with WI-624 (overlapping surface) |
 | 4 | WI-624 WP-L12-label-prop-strings | ready — bridged (children WI-655/656); after WI-621 lands (same screens, attribute pass) |
 | 5 | WI-625 WP-L12-pluralization | ready — bridged (children WI-657/658); PR #961 left plural-site breadcrumbs |
-| 6 | WI-626 WP-L12-mobile-logic-bugs | in-progress — PR #959 open, gate-held once (valid Codex CJK-matcher P2, fixed in `210569ee6`; CI re-running). NOTE: executor ran premature `complete` on the unmerged PR — shepherd restored Stage=Executing with [shepherd:hold] comment; one review run wasted. F-123 delivered as dormant-instance gating (shared live component — full removal would break focused/mobile chat); completion summary must carry the AC deviation note |
-| 7 | WI-627 WP-L12-dates-locale | ready — bridged (children WI-659/660); most disjoint, next dispatch candidate |
+| 6 | WI-626 WP-L12-mobile-logic-bugs | review — PR #959 **MERGED** `0a7b07dbe` after 5 CI rounds (matcher finding chain: Codex CJK → CodeRabbit per-token + mount-assert → ?-boundary, all red-verified; gc1-allow wording flip-flop ruled shepherd-side). Children WI-644/645 swept; re-`complete` firing with the F-123 AC deviation note |
+| 7 | WI-627 WP-L12-dates-locale | in-progress — dispatched wi627-executor (rolled into WI-626's freed lane) |
 | 8 | WI-628 WP-L12-decorative-lowvision | ready — bridged (children WI-661/662) |
 
 **Sub-slice watch:** WP-1 absorbs the ~358-string aggregate (F-069) — it is the one
