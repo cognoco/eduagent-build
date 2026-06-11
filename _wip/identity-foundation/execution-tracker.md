@@ -166,7 +166,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **review (PR held)** — Stage=Reviewing 2026-06-11, PR #876 HELD at shepherd merge gate: CodeRabbit Major valid+unaddressed (same event name `app/billing.topup_credits.reattributed`, two incompatible payload schemas across Stripe/RevenueCat paths — executor conflated safeSend label with event name); sent back to unify payload + thread replies. Incidental find captured: pre-existing failing revenuecat rollback integration test on main |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress (rework)** — bounced to Executing 2026-06-11 by BOTH gates: shepherd merge-gate hold (event-name/payload-schema divergence) AND the autonomous reviewer's first live rejection (stale Fixed In + a new finding: previousTier read pre-transaction, concurrency staleness). Executor reworking all of it in one round; PR #876 open |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **review** — Stage=Reviewing 2026-06-11, PR #874 MERGED 09:12Z (shepherd-verified: green, P2 thread dispositioned, surgical 2-file diff); awaiting `/cosmo:review` |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)

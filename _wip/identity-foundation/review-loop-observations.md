@@ -70,12 +70,29 @@ productionization implication.
   *Production:* the protocol's phase chain needs an explicit "the turn does NOT
   end at push" instruction, or the dispatch harness should auto-resume an
   executor whose WI is still claimed but whose turn ended pre-`complete`.
-- **2026-06-11 — bounce protocol is undefined.** If the reviewer rejects, what
-  Stage does it set (Ready? Executing?), who holds the claim, and where do the
-  findings land (page comment? new child items?)? The shepherd currently plans
-  to "read the review and re-engage the executor" — works only if findings are
-  on the WI page. *Production:* define the bounce contract explicitly in the
-  lifecycle standard.
+- **2026-06-11 — FIRST BOUNCE observed (WI-583); the bounce contract revealed
+  itself.** The reviewer rejected with: page comment `[zdx:review] Rejected —
+  Stage → Executing (tag: rework)` listing concrete DoD failures with live
+  GitHub evidence, Stage set back to `Executing`, claim left EMPTY. The
+  shepherd's monitor caught the transition in <90s; findings relayed to the
+  original executor within minutes. The contract works: findings on the page,
+  Stage as the signal, unclaimed = anyone may pick up. *Production:* codify
+  exactly this (comment tag + Stage + claim-release), and have the bounce
+  notify the claimant-of-record rather than relying on shepherd relay.
+- **2026-06-11 — reviewer audited a moving target (race between shepherd hold
+  and reviewer pickup).** WI-583 sat at Stage=Reviewing while the shepherd had
+  already HELD its PR at the merge gate and sent the executor back to rework —
+  the hold was PR-level state, invisible in Cosmo. The reviewer then audited
+  mid-rework (stale Fixed In, CI pending on a moving head) and bounced. Outcome
+  was correct and convergent (both gates rejected), but the review was spent on
+  a known-dirty artifact. *Production:* a shepherd merge-gate hold must reflect
+  in Cosmo immediately (set Stage back to Executing, or a `hold` tag the
+  reviewer skips) so review effort is only spent on shepherd-passed items.
+- **2026-06-11 — reviewer added genuine value beyond the shepherd gate.** Its
+  rejection included a finding the merge gate missed: `previousTier` read
+  before the transaction in revenuecat.ts (concurrency staleness). Two
+  independent judgment layers caught disjoint defect sets — evidence the
+  post-merge-audit layer earns its cost even with a strong merge gate.
 
 ## Open design questions for productionization
 
