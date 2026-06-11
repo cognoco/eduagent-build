@@ -45,11 +45,12 @@ productionization implication.
   the division should be explicit: merge-gate = "is the PR really green and
   in-scope" (pre-merge, fast); review = "is the WI's AC actually satisfied"
   (post-merge, deep). Avoid double-auditing the same finding threads.
-- **2026-06-11 — post-merge review means a bounce costs a follow-up PR.** No
-  bounce has occurred yet; when one does, the rework lands as a new PR on main
-  rather than a fix-up on the open PR. Acceptable pre-launch; for production
-  decide per-risk-class whether review gates the merge (e.g. `risky` WPs) or
-  trails it (`standard`).
+- **2026-06-11 — post-merge review means a bounce costs a follow-up PR.**
+  (Updated: the first bounce, WI-583, happened to hit a PR the shepherd had
+  HELD unmerged, so the follow-up-PR cost wasn't exercised — rework lands on
+  the still-open PR. A bounce of an already-merged PR would cost a new PR.)
+  Acceptable pre-launch; for production decide per-risk-class whether review
+  gates the merge (e.g. `risky` WPs) or trails it (`standard`).
 - **2026-06-11 — executor failure modes the gates caught (4 distinct):**
   (1) stale-green reporting — "all checks green" from the previous CI run while
   the final commit was still pending (WI-571, WI-583 partially);
@@ -93,6 +94,13 @@ productionization implication.
   before the transaction in revenuecat.ts (concurrency staleness). Two
   independent judgment layers caught disjoint defect sets — evidence the
   post-merge-audit layer earns its cost even with a strong merge gate.
+
+- **2026-06-11 — first fully-autonomous happy path (WI-584).** Executor built
+  and completed → shepherd merge-gated and merged → reviewer audited and
+  Closed/Done — no human action at any step (operator reviews up to WI-574 were
+  manual; this one wasn't). Monitor caught the close within its 90s window.
+  Solo Item, so the children-sweep variable wasn't exercised; the first
+  autonomous WP close will test that.
 
 ## Open design questions for productionization
 
