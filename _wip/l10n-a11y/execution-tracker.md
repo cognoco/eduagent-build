@@ -31,16 +31,16 @@ review, not per-string decisions.
 is soft (Workstream Order), chosen so the two P1 bundles (largest user impact) land
 first and overlapping surfaces (roles ↔ label-strings) land adjacently.
 
-| # | Unit | Findings absorbed | Priority |
-|---|---|---|---|
-| 1 | WP-L12-jsx-strings — route hardcoded JSX/auth strings through i18n | F-026, F-061, F-062, F-069, INV-1 | P1 |
-| 2 | WP-L12-sr-announcements — announce streamed replies, quiz results, loading, toasts | F-050, F-051, F-053, F-054, F-068 | P1 |
-| 3 | WP-L12-modal-focus-roles — modal focus trap, roles, input labels, badge semantics | F-052, F-070, F-055, F-057, F-058 | P2 |
-| 4 | WP-L12-label-prop-strings — hardcoded accessibilityLabel / native-dialog / prop strings → `t()` | F-063, F-064, F-066 | P2 |
-| 5 | WP-L12-pluralization — migrate 29 manual-plural sites to i18n plural model | F-065, F-071 | P2 |
-| 6 | WP-L12-mobile-logic-bugs — small mobile logic/UX bug batch | F-123, F-160, F-161, F-165, F-168, F-172, F-175 | P2 |
-| 7 | WP-L12-dates-locale — locale-aware date formatting + UTC/local-day fixes | F-067, F-072, F-177, F-178 | P3 |
-| 8 | WP-L12-decorative-lowvision — hide decorative content from SR + fix 10px text | F-056, F-059, F-060 | P3 |
+| # | WI | Unit | Findings absorbed | Priority |
+|---|---|---|---|---|
+| 1 | WI-621 | WP-L12-jsx-strings — route hardcoded JSX/auth strings through i18n | F-026, F-061, F-062, F-069, INV-1 | P1 |
+| 2 | WI-622 | WP-L12-sr-announcements — announce streamed replies, quiz results, loading, toasts | F-050, F-051, F-053, F-054, F-068 | P1 |
+| 3 | WI-623 | WP-L12-modal-focus-roles — modal focus trap, roles, input labels, badge semantics | F-052, F-070, F-055, F-057, F-058 | P2 |
+| 4 | WI-624 | WP-L12-label-prop-strings — hardcoded accessibilityLabel / native-dialog / prop strings → `t()` | F-063, F-064, F-066 | P2 |
+| 5 | WI-625 | WP-L12-pluralization — migrate 29 manual-plural sites to i18n plural model | F-065, F-071 | P2 |
+| 6 | WI-626 | WP-L12-mobile-logic-bugs — small mobile logic/UX bug batch | F-123, F-160, F-161, F-165, F-168, F-172, F-175 | P2 |
+| 7 | WI-627 | WP-L12-dates-locale — locale-aware date formatting + UTC/local-day fixes | F-067, F-072, F-177, F-178 | P3 |
+| 8 | WI-628 | WP-L12-decorative-lowvision — hide decorative content from SR + fix 10px text | F-056, F-059, F-060 | P3 |
 
 Coverage check: 33 F-IDs + INV-1 = 34, each absorbed exactly once. Full finding text
 lives in the register (§3) — WP bodies carry the one-line gists + register pointer,
@@ -134,14 +134,14 @@ overlapping component files — keep adjacent/serial).
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WP-L12-jsx-strings | backlog |
-| 2 | WP-L12-sr-announcements | backlog |
-| 3 | WP-L12-modal-focus-roles | backlog |
-| 4 | WP-L12-label-prop-strings | backlog |
-| 5 | WP-L12-pluralization | backlog |
-| 6 | WP-L12-mobile-logic-bugs | backlog |
-| 7 | WP-L12-dates-locale | backlog |
-| 8 | WP-L12-decorative-lowvision | backlog |
+| 1 | WI-621 WP-L12-jsx-strings | backlog |
+| 2 | WI-622 WP-L12-sr-announcements | backlog |
+| 3 | WI-623 WP-L12-modal-focus-roles | backlog |
+| 4 | WI-624 WP-L12-label-prop-strings | backlog |
+| 5 | WI-625 WP-L12-pluralization | backlog |
+| 6 | WI-626 WP-L12-mobile-logic-bugs | backlog |
+| 7 | WI-627 WP-L12-dates-locale | backlog |
+| 8 | WI-628 WP-L12-decorative-lowvision | backlog |
 
 **Sub-slice watch:** WP-1 absorbs the ~358-string aggregate (F-069) — it is the one
 bundle likely to exceed PR size. Sub-slice on demand at execution (planning-reference
@@ -152,10 +152,12 @@ PRs or sibling WPs at the shepherd's call. Do not pre-slice.
 
 ## 5. Current position
 
-**2026-06-11 — ACTIVATED (program session).** Tracker created, Cosmo Workstream +
-8 WPs sliced per §1. Nothing claimed; no shepherd session yet. Next: operator spawns
-the PRG-12 shepherd with the kickoff brief; shepherd refines WP-1 + WP-2 to Ready
-(DoR bridge) and proposes first pickup.
+**2026-06-11 — ACTIVATED (program session).** Tracker created (commit `9570f5b63`);
+Cosmo Workstream **L10n & A11y Mobile** created; 8 WPs sliced as **WI-621…WI-628**
+(all `Stage=Backlog`, `Altitude=WP`, Workstream Order 1–8). Nothing claimed; no
+shepherd session yet. Next: operator spawns the PRG-12 shepherd with the kickoff
+brief; shepherd refines WI-621 + WI-622 to Ready (DoR bridge) and proposes first
+pickup.
 
 ---
 

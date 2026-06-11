@@ -244,6 +244,10 @@ the same change-set as the event they record.
   top-down slice; the IF pattern (tracker + Workstream + direct-to-WP slice) is
   the activation template (§2.1). The **IF W1 shepherd** (kicked off
   2026-06-10) is the first per-Initiative shepherd session (§2.5–2.7).
+  **Second instance:** PRG-12 / l10n-a11y (activated 2026-06-11 via the §2.1
+  recipe) — tracker `_wip/l10n-a11y/execution-tracker.md`, Workstream "L10n &
+  A11y Mobile", WI-621…628; first *parallel* activation alongside a running
+  Initiative.
 - **Generated views:** `dashboard.html` ("Flight Deck") — board / gate-rail /
   field-guide over initiatives × bundles × gates, for Jorn + Zuzka. A **view,
   never a home** (it states so itself); regenerated at umbrella touches; on
