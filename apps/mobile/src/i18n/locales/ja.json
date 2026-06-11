@@ -209,7 +209,12 @@
         "title": "Set up Family",
         "subtitle": "Add a child profile so they can learn with their own mentor",
         "cta": "Set up Family"
-      }
+      },
+      "greeting": "やあ、{{name}}さん！",
+      "greetingNoName": "こんにちは！",
+      "myNotes": "マイノート",
+      "subjectsLoadError": "現在、教科を読み込めませんでした",
+      "subjectsLoadErrorHint": "セッションを開始したり、他のアクションを試すことはできます。"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -306,7 +311,16 @@
       }
     },
     "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress"
+    "goToProgressLabel": "Go to Progress",
+    "coachBand": {
+      "estimatedMinutes": "{{minutes}}分"
+    },
+    "earlyAdopter": {
+      "badge": "早期ユーザー — あなたのフィードバックがMentoMateを形作ります"
+    },
+    "subjectTile": {
+      "topicsProgress": "{{completed}}/{{total}} トピック"
+    }
   },
   "family": {
     "orientationCueBody": "お子さまの進捗とあなた自身の学習を、ひとつの場所で。",
@@ -612,7 +626,8 @@
       "voicePermissionErrorTitle": "音声入力エラー",
       "voicePermissionErrorMessage": "音声入力にはマイクへのアクセスが必要です。設定で有効にしてください。",
       "voicePermissionOpenSettings": "設定を開く",
-      "replyReady": "返信の準備ができました"
+      "replyReady": "返信の準備ができました",
+      "voiceErrorTapRetry": "{{error}} — タップして再試行"
     },
     "filingFailed": {
       "retryInProgress": "再試行はすでに進行中です。",
@@ -712,7 +727,27 @@
       "startRecording": "録音開始",
       "stopRecording": "録音停止"
     },
-    "expiredSystemMessage": "セッションが期限切れです。新しいセッションを開始して続けてください。"
+    "expiredSystemMessage": "セッションが期限切れです。新しいセッションを開始して続けてください。",
+    "errorBoundary": {
+      "crashTitle": "セッション画面がクラッシュしました",
+      "unknownError": "不明なエラー"
+    },
+    "screenChrome": {
+      "wrapping": "まとめ中...",
+      "exit": "終了",
+      "retryClassification": "分類を再試行",
+      "skipWarmup": "ウォームアップをスキップして開始"
+    },
+    "inputModeToggle": {
+      "text": "テキスト",
+      "voice": "音声"
+    },
+    "messageActions": {
+      "reconnect": "再接続"
+    },
+    "questionCounter": {
+      "question": "質問 {{count}}"
+    }
   },
   "quiz": {
     "index": {
@@ -2218,7 +2253,12 @@
       "endsAt": "トライアル終了：{{date}}"
     },
     "statusBadge": {
-      "trial": "トライアル"
+      "trial": "トライアル",
+      "active": "有効",
+      "cancelling": "キャンセル中",
+      "pastDue": "支払い遅延",
+      "expired": "期限切れ",
+      "unknown": "不明"
     },
     "alerts": {
       "restoredTitle": "Restored",
@@ -2297,6 +2337,40 @@
     "loadError": {
       "message": "サブスクリプションの詳細を読み込めませんでした。もう一度お試しください。",
       "retryAccessibility": "サブスクリプションの読み込みを再試行"
+    },
+    "headerTitle": "サブスクリプション",
+    "currentPlan": "現在のプラン",
+    "endingTitle": "サブスクリプション終了",
+    "endingBody": "サブスクリプションはキャンセルされました。{{date}}まで全ての機能を引き続きご利用いただけます。その後、アカウントは無料プランに戻ります。",
+    "familyPool": "ファミリープール",
+    "profilesConnected": "{{max}}件のプロフィールのうち{{count}}件が接続済み",
+    "sharedQuestionsLeft": "このサイクルで残っている共有質問は{{count}}件です。",
+    "removeMember": "削除",
+    "removingMember": "削除中...",
+    "confirmingPurchase": "購入を確認中...",
+    "plans": "プラン",
+    "upgrade": "アップグレード",
+    "checkLater": "後で確認",
+    "needMoreQuestions": "もっと質問が必要ですか？",
+    "openingStore": "ストアを開いています...",
+    "buyCredits": "500クレジットを購入",
+    "topUpHint": "一回限りの購入です。クレジットは12ヶ月で失効します。",
+    "manage": "管理",
+    "manageBilling": "請求情報の管理",
+    "manageBillingWebHint": "サブスクリプションはモバイルデバイスで管理されます",
+    "opensAppStore": "App Storeのサブスクリプションを開きます",
+    "opensGooglePlay": "Google Playのサブスクリプションを開きます",
+    "usageCard": {
+      "usageThisMonth": "今月の使用状況",
+      "todayUsage": "今日: {{used}} / {{limit}} 毎日の質問",
+      "topUpRemaining": "残り{{count}}追加クレジット",
+      "yourShare": "あなたの割り当て",
+      "yourUsage": "あなたの使用状況",
+      "questionsUsed": "{{count}}件の質問",
+      "familyAggregate": "家族の合計",
+      "quotaResets": "割り当ては{{date}}にリセットされます",
+      "renews": "サブスクリプションは{{date}}に更新されます",
+      "dailyLimitHint": "1日の上限 — 深夜0時にリセット"
     }
   },
   "sessionSummary": {
@@ -2319,6 +2393,58 @@
     "transcriptPurged": {
       "badge": "トランスクリプトがアーカイブされました",
       "notice": "このセッションは要約されました。元のトランスクリプトはアーカイブされました。"
+    },
+    "title": "セッション完了",
+    "expiredTitle": "このセッションは期限切れです",
+    "expiredMessage": "このセッションは利用できなくなりました。ホームに戻って新しいセッションを開始してください。",
+    "notFoundTitle": "セッションが見つかりません",
+    "notFoundMessage": "このセッションを読み込めませんでした。存在しない可能性があります。",
+    "couldNotLoadMessage": "このセッションは読み込めませんでした。ホームに戻って新しいセッションを開始してください。",
+    "loadingSummary": "セッションの概要を読み込み中...",
+    "whatHappened": "何が起こったか",
+    "checkInSoon": "またすぐに連絡します",
+    "resumeSession": "このセッションを再開",
+    "viewTranscript": "全トランスクリプトを表示",
+    "recapStillLoading": "学習者の要約はまだ読み込み中です。",
+    "tapToRetry": "タップして再試行",
+    "milestones": "マイルストーン",
+    "upNext": "次へ",
+    "youMightAlsoLike": "こちらもおすすめです",
+    "continueLearning": "学習を続ける",
+    "bookmarkNudge": "このセッションには素晴らしい説明がいくつかありました。次回はブックマークできます。",
+    "freshWins": "新たな達成",
+    "newAchievement": "セッションの直後に新しいアチーブメントを獲得しました。",
+    "reflectionIncentive": "振り返りを書いて1.5倍のXPを獲得しよう",
+    "xpBreakdown": "基本: {{base}} XP → 振り返りあり: {{total}} XP",
+    "bonusXpEarned": "+{{xp}}ボーナスXP獲得！",
+    "reflectionNextTime": "次回は振り返りを書いて+{{xp}} XPを獲得しよう。",
+    "recallCheckTitle": "簡単な復習チェック",
+    "recallCheckIntro": "宿題、お疲れ様でした！使った方法について、これらの質問に答えられますか？",
+    "doneHeadHome": "完了 — ホームへ",
+    "yourWords": "あなたの言葉",
+    "mateFeedback": "メイトからのフィードバック",
+    "skippedNotice": "このセッションの要約の作成をスキップしました。",
+    "resumeReflectionBanner": "前回、振り返りを開始しましたが送信しませんでした。以下で完成させて送信し、あなたの言葉を保存してください。",
+    "writePrompt": "学んだことの短い要約を書いてください。これは記憶の定着に役立ち、私が次に何を計画するかを助けます。",
+    "saveError": "要約を保存できませんでした。接続を確認して再試行してください。あなたの作業は失われません。",
+    "skipError": "現在、要約をスキップできませんでした。接続を確認して再試行してください。",
+    "submitSummary": "要約を送信",
+    "skipForNow": "今はスキップ",
+    "skipping": "スキップ中...",
+    "seeYourLibrary": "ライブラリを見る",
+    "libraryFiling": {
+      "stillAddingTitle": "まだライブラリに追加中です...",
+      "stillAddingHint": "これには少し時間がかかることがあります。チャットはいずれにせよ保存されます。",
+      "addingTitle": "ライブラリに追加中...",
+      "addingHint": "チャットは保存されました。ライブラリの適切な場所を探しています。",
+      "addedTitle": "ライブラリに追加済み",
+      "linkedHint": "このチャットはライブラリにリンクされています。",
+      "openInLibrary": "ライブラリで開く",
+      "refresh": "更新",
+      "failedTitle": "これをライブラリに追加できませんでした",
+      "failedHint": "チャットは保存されています。準備ができたら再試行してください。",
+      "keptOutTitle": "ライブラリにありません",
+      "keptOutHint": "このチャットは保存されていますが、ライブラリのトピックではありません。"
     }
   },
   "sessionTranscript": {
@@ -2326,7 +2452,16 @@
       "title": "この会話は{{date}}にアーカイブされました。",
       "intro": "学習した内容:",
       "continueCta": "このトピックを続ける"
-    }
+    },
+    "missingSessionTitle": "セッションが見つかりません",
+    "missingSessionMessage": "どの会話を読み込むべきかわかりませんでした。",
+    "backToLibrary": "ライブラリに戻る",
+    "conversation": "会話",
+    "messageCount_one": "{{count}}件のメッセージ",
+    "messageCount_other": "{{count}}件のメッセージ",
+    "you": "あなた",
+    "emptyTitle": "まだメッセージはありません",
+    "emptyMessage": "このセッションには表示する保存済みのやり取りがありません。"
   },
   "nudge": {
     "sheet": {
@@ -2831,5 +2966,15 @@
     "defaultTitleNoName": "チューターがお子様について学習するのを手伝う",
     "defaultDescription": "これにより、チューターはどのような説明が効果的か、何がまだ難しいか、どの例が関連性があるかを記憶できます。",
     "grant": "はい、有効にする"
+  },
+  "saveWizard": {
+    "title": "素晴らしい！これを保存して始めましょう。",
+    "whereSave": "どこに保存しますか？",
+    "aboutYouSelf": "あなたについて教えてください",
+    "aboutYouParent": "あなたについて（保護者の方）",
+    "aboutChild": "お子様について",
+    "ageGate": "お子様の学習を設定するには、アカウント所有者が18歳以上である必要があります。代わりに自分の学習を設定することもできます。前のステップで「自分の学習」を選択してください。",
+    "childSaveError": "アカウントは保存しましたが、まだお子様を追加できませんでした: {{error}}",
+    "confirmChildReady": "お子様のプロフィールが設定されました。保護者用のホームを開きましょう。"
   }
 }

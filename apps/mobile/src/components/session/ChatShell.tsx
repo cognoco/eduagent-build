@@ -906,7 +906,7 @@ export function ChatShell({
           accessibilityHint="Tap to retry voice input"
         >
           <Text className="text-caption text-error">
-            {sttError} — tap to retry
+            {t('session.chatShell.voiceErrorTapRetry', { error: sttError })}
           </Text>
         </Pressable>
       )}

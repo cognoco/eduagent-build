@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Pressable, Text, View } from 'react-native';
+import i18next from 'i18next';
 
 import { MilestoneDots } from '../../../../components/session/MilestoneDots';
 import { getResumeBannerCopy } from '../../../../components/session/resume-banner-copy';
@@ -56,10 +57,10 @@ export function SessionScreenChrome(props: SessionScreenChromeProps): {
         numberOfLines={1}
       >
         {props.isClosing
-          ? 'Wrapping...'
+          ? i18next.t('session.screenChrome.wrapping')
           : props.activeSessionId
-            ? 'Done'
-            : 'Exit'}
+            ? i18next.t('common.done')
+            : i18next.t('session.screenChrome.exit')}
       </Text>
     </Pressable>
   );
@@ -94,7 +95,7 @@ export function SessionScreenChrome(props: SessionScreenChromeProps): {
         testID="classify-error-retry"
       >
         <Text className="text-body-sm font-semibold text-text-secondary">
-          Retry classification
+          {i18next.t('session.screenChrome.retryClassification')}
         </Text>
       </Pressable>
     </View>
@@ -118,7 +119,7 @@ export function SessionScreenChrome(props: SessionScreenChromeProps): {
         testID="session-skip-warmup"
       >
         <Text className="text-body-sm font-semibold text-text-secondary">
-          Skip the warm-up, jump in
+          {i18next.t('session.screenChrome.skipWarmup')}
         </Text>
       </Pressable>
     </View>

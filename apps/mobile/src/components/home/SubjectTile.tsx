@@ -1,4 +1,5 @@
 import { Pressable, View, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { SubjectBookshelfMotif } from '../common/SubjectBookshelfMotif';
 
 export interface SubjectTileProps {
@@ -27,6 +28,7 @@ export function SubjectTile({
   onPress,
   testID,
 }: SubjectTileProps) {
+  const { t } = useTranslation();
   return (
     <Pressable
       testID={testID}
@@ -69,7 +71,10 @@ export function SubjectTile({
             testID={`${testID}-topics`}
             className="text-[10px] font-semibold text-text-secondary"
           >
-            {topicsCompleted}/{topicsTotal} topics
+            {t('home.subjectTile.topicsProgress', {
+              completed: topicsCompleted,
+              total: topicsTotal,
+            })}
           </Text>
         )}
         <View className="h-1 rounded-full bg-surface-elevated overflow-hidden flex-row">

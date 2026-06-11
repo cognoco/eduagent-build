@@ -209,7 +209,12 @@
         "title": "Set up Family",
         "subtitle": "Add a child profile so they can learn with their own mentor",
         "cta": "Set up Family"
-      }
+      },
+      "greeting": "Hei {{name}}!",
+      "greetingNoName": "Hei på deg!",
+      "myNotes": "Mine notater",
+      "subjectsLoadError": "Vi kunne ikke laste inn fagene dine akkurat nå",
+      "subjectsLoadErrorHint": "Du kan fortsatt starte en økt eller prøve en annen handling."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
@@ -306,7 +311,16 @@
       }
     },
     "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress"
+    "goToProgressLabel": "Go to Progress",
+    "coachBand": {
+      "estimatedMinutes": "{{minutes}} min"
+    },
+    "earlyAdopter": {
+      "badge": "Tidlig bruker – din tilbakemelding former MentoMate"
+    },
+    "subjectTile": {
+      "topicsProgress": "{{completed}}/{{total}} emner"
+    }
   },
   "family": {
     "orientationCueBody": "Barnas fremgang og din egen læring, alt på ett sted.",
@@ -612,7 +626,8 @@
       "voicePermissionErrorTitle": "Feil med taleinndata",
       "voicePermissionErrorMessage": "Tilgang til mikrofonen er nødvendig for taleinndata. Aktiver den i Innstillinger.",
       "voicePermissionOpenSettings": "Åpne Innstillinger",
-      "replyReady": "Svar klart"
+      "replyReady": "Svar klart",
+      "voiceErrorTapRetry": "{{error}} – trykk for å prøve igjen"
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",
@@ -712,7 +727,27 @@
       "startRecording": "Start opptak",
       "stopRecording": "Stopp opptak"
     },
-    "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette."
+    "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette.",
+    "errorBoundary": {
+      "crashTitle": "Øktskjermen krasjet",
+      "unknownError": "Ukjent feil"
+    },
+    "screenChrome": {
+      "wrapping": "Avslutter ...",
+      "exit": "Avslutt",
+      "retryClassification": "Prøv klassifisering på nytt",
+      "skipWarmup": "Hopp over oppvarmingen, sett i gang"
+    },
+    "inputModeToggle": {
+      "text": "Tekst",
+      "voice": "Stemme"
+    },
+    "messageActions": {
+      "reconnect": "Koble til på nytt"
+    },
+    "questionCounter": {
+      "question": "Spørsmål {{count}}"
+    }
   },
   "quiz": {
     "index": {
@@ -2218,7 +2253,12 @@
       "endsAt": "Prøveperioden slutter {{date}}"
     },
     "statusBadge": {
-      "trial": "Prøve"
+      "trial": "Prøve",
+      "active": "Aktiv",
+      "cancelling": "Kanselleres",
+      "pastDue": "Forfalt",
+      "expired": "Utløpt",
+      "unknown": "Ukjent"
     },
     "alerts": {
       "restoredTitle": "Restored",
@@ -2297,6 +2337,40 @@
     "loadError": {
       "message": "Kunne ikke laste abonnementsdetaljer. Prøv igjen.",
       "retryAccessibility": "Prøv å laste abonnementet på nytt"
+    },
+    "headerTitle": "Abonnement",
+    "currentPlan": "Gjeldende abonnement",
+    "endingTitle": "Abonnementet avsluttes",
+    "endingBody": "Abonnementet ditt er kansellert. Du kan fortsette å bruke alle funksjoner frem til {{date}}. Etter det vil kontoen din gå tilbake til gratisversjonen.",
+    "familyPool": "Familiepott",
+    "profilesConnected": "{{count}} av {{max}} profiler tilkoblet",
+    "sharedQuestionsLeft": "{{count}} delte spørsmål igjen denne perioden.",
+    "removeMember": "Fjern",
+    "removingMember": "Fjerner ...",
+    "confirmingPurchase": "Bekrefter kjøp …",
+    "plans": "Abonnementer",
+    "upgrade": "Oppgrader",
+    "checkLater": "Sjekk senere",
+    "needMoreQuestions": "Trenger du flere spørsmål?",
+    "openingStore": "Åpner butikk ...",
+    "buyCredits": "Kjøp 500 kreditter",
+    "topUpHint": "Engangskjøp. Kreditter utløper om 12 måneder.",
+    "manage": "Administrer",
+    "manageBilling": "Administrer fakturering",
+    "manageBillingWebHint": "Abonnementet administreres på mobilenheten din",
+    "opensAppStore": "Åpner App Store-abonnementer",
+    "opensGooglePlay": "Åpner Google Play-abonnementer",
+    "usageCard": {
+      "usageThisMonth": "Bruk denne måneden",
+      "todayUsage": "I dag: {{used}} / {{limit}} daglige spørsmål",
+      "topUpRemaining": "+ {{count}} påfyllingskreditter gjenstår",
+      "yourShare": "Din andel",
+      "yourUsage": "Ditt forbruk",
+      "questionsUsed": "{{count}} spørsmål",
+      "familyAggregate": "Familiesum",
+      "quotaResets": "Kvoten nullstilles {{date}}",
+      "renews": "Abonnementet fornyes {{date}}",
+      "dailyLimitHint": "Daglig grense – nullstilles ved midnatt"
     }
   },
   "sessionSummary": {
@@ -2319,6 +2393,58 @@
     "transcriptPurged": {
       "badge": "Transkripsjon arkivert",
       "notice": "Denne økten ble oppsummert; den opprinnelige transkripsjonen ble arkivert."
+    },
+    "title": "Økt fullført",
+    "expiredTitle": "Denne økten har utløpt",
+    "expiredMessage": "Denne økten er ikke lenger tilgjengelig. Gå til hjem for å starte en ny.",
+    "notFoundTitle": "Økt ikke funnet",
+    "notFoundMessage": "Vi kunne ikke laste inn denne økten. Den eksisterer kanskje ikke lenger.",
+    "couldNotLoadMessage": "Denne økten kunne ikke lastes inn. Gå til hjem for å starte en ny.",
+    "loadingSummary": "Laster inn øktsammendraget ditt ...",
+    "whatHappened": "Hva skjedde",
+    "checkInSoon": "Jeg sjekker inn med deg snart",
+    "resumeSession": "Gjenoppta denne økten",
+    "viewTranscript": "Se hele transkripsjonen",
+    "recapStillLoading": "Sammendraget ditt lastes fortsatt inn.",
+    "tapToRetry": "Trykk for å prøve igjen",
+    "milestones": "Milepæler",
+    "upNext": "Neste",
+    "youMightAlsoLike": "Du vil kanskje også like",
+    "continueLearning": "Fortsett å lære",
+    "bookmarkNudge": "Noen gode forklaringer i denne økten – du kan bokmerke dem neste gang.",
+    "freshWins": "Nye seire",
+    "newAchievement": "En ny prestasjon landet rett etter økten din.",
+    "reflectionIncentive": "Skriv en refleksjon for å tjene 1,5x XP",
+    "xpBreakdown": "Base: {{base}} XP → Med refleksjon: {{total}} XP",
+    "bonusXpEarned": "+{{xp}} bonus-XP tjent!",
+    "reflectionNextTime": "Skriv en refleksjon neste gang for å tjene +{{xp}} XP.",
+    "recallCheckTitle": "Rask repetisjonssjekk",
+    "recallCheckIntro": "Godt jobbet med leksene! Kan du svare på disse spørsmålene om metoden du brukte?",
+    "doneHeadHome": "Ferdig – gå til hjem",
+    "yourWords": "Dine ord",
+    "mateFeedback": "Tilbakemelding fra Mate",
+    "skippedNotice": "Du hoppet over å skrive et sammendrag for denne økten.",
+    "resumeReflectionBanner": "Du startet en refleksjon, men sendte den ikke inn sist. Fullfør den nedenfor og send inn for å lagre ordene dine.",
+    "writePrompt": "Skriv et kort sammendrag av hva du lærte. Dette hjelper deg med å huske og hjelper meg med å planlegge hva som kommer neste gang.",
+    "saveError": "Kunne ikke lagre sammendraget ditt. Sjekk tilkoblingen din og prøv igjen – arbeidet ditt vil ikke gå tapt.",
+    "skipError": "Kunne ikke hoppe over sammendraget ditt akkurat nå. Sjekk tilkoblingen din og prøv igjen.",
+    "submitSummary": "Send inn sammendrag",
+    "skipForNow": "Hopp over for nå",
+    "skipping": "Hopper over ...",
+    "seeYourLibrary": "Se biblioteket ditt",
+    "libraryFiling": {
+      "stillAddingTitle": "Legger fortsatt til dette i biblioteket ditt ...",
+      "stillAddingHint": "Dette kan ta litt lengre tid. Samtalen din lagres uansett.",
+      "addingTitle": "Legger til dette i biblioteket ditt ...",
+      "addingHint": "Samtalen din er lagret. Vi finner riktig plass til den i biblioteket.",
+      "addedTitle": "Lagt til i biblioteket",
+      "linkedHint": "Denne samtalen er koblet til biblioteket ditt.",
+      "openInLibrary": "Åpne i biblioteket",
+      "refresh": "Oppdater",
+      "failedTitle": "Vi kunne ikke legge dette til i biblioteket ditt",
+      "failedHint": "Samtalen din er lagret. Prøv igjen når du er klar.",
+      "keptOutTitle": "Ikke i biblioteket",
+      "keptOutHint": "Denne samtalen er lagret, men den er ikke et bibliotekemne."
     }
   },
   "sessionTranscript": {
@@ -2326,7 +2452,16 @@
       "title": "Denne samtalen ble arkivert {{date}}.",
       "intro": "Dette gikk dere gjennom:",
       "continueCta": "Fortsett med dette temaet"
-    }
+    },
+    "missingSessionTitle": "Mangler økt",
+    "missingSessionMessage": "Vi kunne ikke finne ut hvilken samtale som skulle lastes inn.",
+    "backToLibrary": "Tilbake til biblioteket",
+    "conversation": "Samtale",
+    "messageCount_one": "{{count}} melding",
+    "messageCount_other": "{{count}} meldinger",
+    "you": "Du",
+    "emptyTitle": "Ingen meldinger ennå",
+    "emptyMessage": "Denne økten har ingen lagrede utvekslinger å vise."
   },
   "nudge": {
     "sheet": {
@@ -2831,5 +2966,15 @@
     "defaultTitleNoName": "Hjelp veilederen med å lære om barnet ditt",
     "defaultDescription": "Dette lar veilederen huske hva slags forklaringer som fungerer, hva som fortsatt er vanskelig, og hvilke eksempler som føles relevante.",
     "grant": "Ja, aktiver"
+  },
+  "saveWizard": {
+    "title": "Flott, la oss lagre dette og komme i gang.",
+    "whereSave": "Hvor skal vi lagre dette?",
+    "aboutYouSelf": "Fortell oss om deg",
+    "aboutYouParent": "Om deg (forelderen)",
+    "aboutChild": "Om barnet ditt",
+    "ageGate": "For å sette opp læring for et barn, må kontoinnehaveren være 18 år eller eldre. Du kan fortsatt sette opp din egen læring i stedet – velg «Min læring» i forrige trinn.",
+    "childSaveError": "Vi lagret kontoen din, men kunne ikke legge til barnet ditt ennå: {{error}}",
+    "confirmChildReady": "Barnets profil er satt opp. La oss åpne foreldrenes hjem."
   }
 }

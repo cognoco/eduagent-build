@@ -106,7 +106,7 @@ export function ConfirmStep({
       <Text className="text-h3 font-semibold text-text-primary mb-2">
         {isSelfBranch
           ? `Your first lesson is ready${previewState.topicText ? `: ${previewState.topicText}` : ''}.`
-          : "Your child's profile is set up. Let's open parent home."}
+          : t('saveWizard.confirmChildReady')}
       </Text>
       {landingError && (
         <View className="bg-danger/10 rounded-card px-4 py-3 mb-3">

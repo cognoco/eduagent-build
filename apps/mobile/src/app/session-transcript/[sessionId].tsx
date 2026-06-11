@@ -93,10 +93,10 @@ export default function SessionTranscriptScreen() {
         testID="session-transcript-no-id"
       >
         <Text className="text-h3 font-semibold text-text-primary mb-2 text-center">
-          Missing session
+          {t('sessionTranscript.missingSessionTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          We couldn&apos;t tell which conversation to load.
+          {t('sessionTranscript.missingSessionMessage')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/library')}
@@ -105,7 +105,7 @@ export default function SessionTranscriptScreen() {
           accessibilityLabel="Back to library"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Back to library
+            {t('sessionTranscript.backToLibrary')}
           </Text>
         </Pressable>
       </View>
@@ -202,10 +202,10 @@ export default function SessionTranscriptScreen() {
         testID="session-transcript-empty"
       >
         <Text className="text-h3 font-semibold text-text-primary mb-2 text-center">
-          No messages yet
+          {t('sessionTranscript.emptyTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          This session doesn&apos;t have any saved exchanges to show.
+          {t('sessionTranscript.emptyMessage')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/library')}
@@ -214,7 +214,7 @@ export default function SessionTranscriptScreen() {
           accessibilityLabel="Back to library"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Back to library
+            {t('sessionTranscript.backToLibrary')}
           </Text>
         </Pressable>
       </View>
@@ -240,11 +240,12 @@ export default function SessionTranscriptScreen() {
         </Pressable>
         <View className="flex-1">
           <Text className="text-body font-semibold text-text-primary">
-            Conversation
+            {t('sessionTranscript.conversation')}
           </Text>
           <Text className="text-caption text-text-secondary">
-            {visibleExchanges.length}{' '}
-            {visibleExchanges.length === 1 ? 'message' : 'messages'}
+            {t('sessionTranscript.messageCount', {
+              count: visibleExchanges.length,
+            })}
           </Text>
         </View>
       </View>
@@ -274,7 +275,7 @@ export default function SessionTranscriptScreen() {
                       : 'text-text-secondary'
                   }`}
                 >
-                  {isUser ? 'You' : 'MentoMate'}
+                  {isUser ? t('sessionTranscript.you') : 'MentoMate'}
                   {' · '}
                   {formatTimestamp(exchange.timestamp)}
                 </Text>

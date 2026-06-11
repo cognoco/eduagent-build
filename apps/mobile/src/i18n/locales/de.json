@@ -209,7 +209,12 @@
         "title": "Set up Family",
         "subtitle": "Add a child profile so they can learn with their own mentor",
         "cta": "Set up Family"
-      }
+      },
+      "greeting": "Hey {{name}}!",
+      "greetingNoName": "Hallo!",
+      "myNotes": "Meine Notizen",
+      "subjectsLoadError": "Wir konnten deine Fächer gerade nicht laden",
+      "subjectsLoadErrorHint": "Du kannst trotzdem eine Sitzung starten oder etwas anderes versuchen."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -306,7 +311,16 @@
       }
     },
     "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress"
+    "goToProgressLabel": "Go to Progress",
+    "coachBand": {
+      "estimatedMinutes": "{{minutes}} Min."
+    },
+    "earlyAdopter": {
+      "badge": "Früher Nutzer – dein Feedback formt MentoMate"
+    },
+    "subjectTile": {
+      "topicsProgress": "{{completed}}/{{total}} Themen"
+    }
   },
   "family": {
     "orientationCueBody": "Fortschritt der Kinder und dein eigenes Lernen an einem Ort.",
@@ -612,7 +626,8 @@
       "voicePermissionErrorTitle": "Fehler bei der Spracheingabe",
       "voicePermissionErrorMessage": "Für die Spracheingabe ist Mikrofonzugriff erforderlich. Bitte in den Einstellungen aktivieren.",
       "voicePermissionOpenSettings": "Einstellungen öffnen",
-      "replyReady": "Antwort bereit"
+      "replyReady": "Antwort bereit",
+      "voiceErrorTapRetry": "{{error}} – zum Wiederholen tippen"
     },
     "filingFailed": {
       "retryInProgress": "Ein Wiederholungsversuch läuft bereits.",
@@ -712,7 +727,27 @@
       "startRecording": "Aufnahme starten",
       "stopRecording": "Aufnahme stoppen"
     },
-    "expiredSystemMessage": "Sitzung abgelaufen. Starte eine neue, um weiterzumachen."
+    "expiredSystemMessage": "Sitzung abgelaufen. Starte eine neue, um weiterzumachen.",
+    "errorBoundary": {
+      "crashTitle": "Sitzungsbildschirm abgestürzt",
+      "unknownError": "Unbekannter Fehler"
+    },
+    "screenChrome": {
+      "wrapping": "Wird abgeschlossen...",
+      "exit": "Beenden",
+      "retryClassification": "Klassifizierung wiederholen",
+      "skipWarmup": "Aufwärmen überspringen, direkt loslegen"
+    },
+    "inputModeToggle": {
+      "text": "Text",
+      "voice": "Stimme"
+    },
+    "messageActions": {
+      "reconnect": "Neu verbinden"
+    },
+    "questionCounter": {
+      "question": "Frage {{count}}"
+    }
   },
   "quiz": {
     "index": {
@@ -2218,7 +2253,12 @@
       "endsAt": "Testphase endet am {{date}}"
     },
     "statusBadge": {
-      "trial": "Test"
+      "trial": "Test",
+      "active": "Aktiv",
+      "cancelling": "Wird gekündigt",
+      "pastDue": "Überfällig",
+      "expired": "Abgelaufen",
+      "unknown": "Unbekannt"
     },
     "alerts": {
       "restoredTitle": "Restored",
@@ -2297,6 +2337,40 @@
     "loadError": {
       "message": "Abonnementdetails konnten nicht geladen werden. Bitte versuche es erneut.",
       "retryAccessibility": "Laden des Abonnements wiederholen"
+    },
+    "headerTitle": "Abonnement",
+    "currentPlan": "Aktueller Plan",
+    "endingTitle": "Abonnement endet",
+    "endingBody": "Dein Abonnement wurde gekündigt. Du kannst alle Funktionen bis zum {{date}} weiter nutzen. Danach wird dein Konto auf die kostenlose Version zurückgestuft.",
+    "familyPool": "Familien-Pool",
+    "profilesConnected": "{{count}} von {{max}} Profilen verbunden",
+    "sharedQuestionsLeft": "{{count}} geteilte Fragen in diesem Zyklus übrig.",
+    "removeMember": "Entfernen",
+    "removingMember": "Wird entfernt...",
+    "confirmingPurchase": "Kauf wird bestätigt...",
+    "plans": "Pläne",
+    "upgrade": "Upgrade",
+    "checkLater": "Später prüfen",
+    "needMoreQuestions": "Mehr Fragen benötigt?",
+    "openingStore": "Store wird geöffnet...",
+    "buyCredits": "500 Credits kaufen",
+    "topUpHint": "Einmaliger Kauf. Credits verfallen in 12 Monaten.",
+    "manage": "Verwalten",
+    "manageBilling": "Abrechnung verwalten",
+    "manageBillingWebHint": "Abonnement wird auf deinem Mobilgerät verwaltet",
+    "opensAppStore": "Öffnet App Store-Abonnements",
+    "opensGooglePlay": "Öffnet Google Play-Abonnements",
+    "usageCard": {
+      "usageThisMonth": "Nutzung diesen Monat",
+      "todayUsage": "Heute: {{used}} / {{limit}} tägliche Fragen",
+      "topUpRemaining": "+ {{count}} Auflade-Credits übrig",
+      "yourShare": "Dein Anteil",
+      "yourUsage": "Deine Nutzung",
+      "questionsUsed": "{{count}} Fragen",
+      "familyAggregate": "Familie gesamt",
+      "quotaResets": "Kontingent wird am {{date}} zurückgesetzt",
+      "renews": "Abo erneuert sich am {{date}}",
+      "dailyLimitHint": "Tageslimit – wird um Mitternacht zurückgesetzt"
     }
   },
   "sessionSummary": {
@@ -2319,6 +2393,58 @@
     "transcriptPurged": {
       "badge": "Transkript archiviert",
       "notice": "Diese Sitzung wurde zusammengefasst; das ursprüngliche Transkript wurde archiviert."
+    },
+    "title": "Sitzung abgeschlossen",
+    "expiredTitle": "Diese Sitzung ist abgelaufen",
+    "expiredMessage": "Diese Sitzung ist nicht mehr verfügbar. Geh zur Startseite, um eine neue zu beginnen.",
+    "notFoundTitle": "Sitzung nicht gefunden",
+    "notFoundMessage": "Wir konnten diese Sitzung nicht laden. Möglicherweise existiert sie nicht mehr.",
+    "couldNotLoadMessage": "Diese Sitzung konnte nicht geladen werden. Geh zur Startseite, um eine neue zu beginnen.",
+    "loadingSummary": "Lade deine Sitzungszusammenfassung...",
+    "whatHappened": "Was ist passiert",
+    "checkInSoon": "Ich melde mich bald bei dir",
+    "resumeSession": "Diese Sitzung fortsetzen",
+    "viewTranscript": "Ganzes Transkript ansehen",
+    "recapStillLoading": "Deine Lernzusammenfassung wird noch geladen.",
+    "tapToRetry": "Zum Wiederholen tippen",
+    "milestones": "Meilensteine",
+    "upNext": "Als Nächstes",
+    "youMightAlsoLike": "Das könnte dir auch gefallen",
+    "continueLearning": "Weiterlernen",
+    "bookmarkNudge": "In dieser Sitzung gab es einige tolle Erklärungen – du kannst sie nächstes Mal mit einem Lesezeichen versehen.",
+    "freshWins": "Neue Erfolge",
+    "newAchievement": "Ein neuer Erfolg ist direkt nach deiner Sitzung eingetroffen.",
+    "reflectionIncentive": "Schreibe eine Reflexion, um 1,5x XP zu verdienen",
+    "xpBreakdown": "Basis: {{base}} XP → Mit Reflexion: {{total}} XP",
+    "bonusXpEarned": "+{{xp}} Bonus-XP verdient!",
+    "reflectionNextTime": "Schreibe nächstes Mal eine Reflexion, um +{{xp}} XP zu verdienen.",
+    "recallCheckTitle": "Kurzer Gedächtnis-Check",
+    "recallCheckIntro": "Gute Arbeit bei den Hausaufgaben! Kannst du diese Fragen zur verwendeten Methode beantworten?",
+    "doneHeadHome": "Fertig – zur Startseite",
+    "yourWords": "Deine Worte",
+    "mateFeedback": "Mate-Feedback",
+    "skippedNotice": "Du hast das Schreiben einer Zusammenfassung für diese Sitzung übersprungen.",
+    "resumeReflectionBanner": "Du hast letztes Mal eine Reflexion begonnen, aber nicht abgeschickt. Beende sie unten und sende sie ab, um deine Worte zu speichern.",
+    "writePrompt": "Schreibe eine kurze Zusammenfassung dessen, was du gelernt hast. Das hilft dir, dich zu erinnern, und mir, das Nächste zu planen.",
+    "saveError": "Deine Zusammenfassung konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut – deine Arbeit geht nicht verloren.",
+    "skipError": "Deine Zusammenfassung konnte gerade nicht übersprungen werden. Prüfe deine Verbindung und versuche es erneut.",
+    "submitSummary": "Zusammenfassung senden",
+    "skipForNow": "Jetzt überspringen",
+    "skipping": "Wird übersprungen...",
+    "seeYourLibrary": "Deine Bibliothek ansehen",
+    "libraryFiling": {
+      "stillAddingTitle": "Wird noch zu deiner Bibliothek hinzugefügt...",
+      "stillAddingHint": "Das kann etwas länger dauern. Dein Chat wird auf jeden Fall gespeichert.",
+      "addingTitle": "Wird zu deiner Bibliothek hinzugefügt...",
+      "addingHint": "Dein Chat ist gespeichert. Wir finden den richtigen Platz in der Bibliothek dafür.",
+      "addedTitle": "Zur Bibliothek hinzugefügt",
+      "linkedHint": "Dieser Chat ist mit deiner Bibliothek verknüpft.",
+      "openInLibrary": "In Bibliothek öffnen",
+      "refresh": "Aktualisieren",
+      "failedTitle": "Wir konnten dies nicht zu deiner Bibliothek hinzufügen",
+      "failedHint": "Dein Chat ist gespeichert. Versuche es erneut, wenn du bereit bist.",
+      "keptOutTitle": "Nicht in der Bibliothek",
+      "keptOutHint": "Dieser Chat ist gespeichert, aber es ist kein Bibliotheksthema."
     }
   },
   "sessionTranscript": {
@@ -2326,7 +2452,16 @@
       "title": "Diese Unterhaltung wurde am {{date}} archiviert.",
       "intro": "Das habt ihr behandelt:",
       "continueCta": "Mit diesem Thema fortfahren"
-    }
+    },
+    "missingSessionTitle": "Fehlende Sitzung",
+    "missingSessionMessage": "Wir konnten nicht feststellen, welche Unterhaltung geladen werden soll.",
+    "backToLibrary": "Zurück zur Bibliothek",
+    "conversation": "Unterhaltung",
+    "messageCount_one": "{{count}} Nachricht",
+    "messageCount_other": "{{count}} Nachrichten",
+    "you": "Du",
+    "emptyTitle": "Noch keine Nachrichten",
+    "emptyMessage": "Diese Sitzung hat keine gespeicherten Austausche zum Anzeigen."
   },
   "nudge": {
     "sheet": {
@@ -2831,5 +2966,15 @@
     "defaultTitleNoName": "Hilf dem Tutor, mehr über dein Kind zu lernen",
     "defaultDescription": "Dies ermöglicht dem Tutor, sich zu merken, welche Erklärungen funktionieren, was noch schwierig ist und welche Beispiele relevant erscheinen.",
     "grant": "Ja, aktivieren"
+  },
+  "saveWizard": {
+    "title": "Super, lass uns das speichern und loslegen.",
+    "whereSave": "Wo sollen wir das speichern?",
+    "aboutYouSelf": "Erzähl uns von dir",
+    "aboutYouParent": "Über dich (der Elternteil)",
+    "aboutChild": "Über dein Kind",
+    "ageGate": "Um das Lernen eines Kindes einzurichten, muss der Kontoinhaber 18 Jahre oder älter sein. Du kannst stattdessen dein eigenes Lernen einrichten – wähle im vorherigen Schritt „Mein Lernen“.",
+    "childSaveError": "Wir haben dein Konto gespeichert, konnten aber dein Kind noch nicht hinzufügen: {{error}}",
+    "confirmChildReady": "Das Profil deines Kindes ist eingerichtet. Lass uns die Eltern-Startseite öffnen."
   }
 }
