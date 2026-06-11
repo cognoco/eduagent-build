@@ -14,7 +14,13 @@ export function NudgeUnreadModal({
   const { t } = useTranslation();
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onDismiss}
+      accessibilityViewIsModal
+    >
       <View className="flex-1 justify-end bg-black/40">
         <View className="bg-surface rounded-t-3xl px-5 pt-5 pb-8">
           <Text className="text-h3 font-bold text-text-primary mb-3">
@@ -39,6 +45,7 @@ export function NudgeUnreadModal({
             onPress={onDismiss}
             className="bg-primary rounded-button min-h-[48px] items-center justify-center mt-3"
             accessibilityRole="button"
+            accessibilityLabel={t('common.done')}
             testID="nudge-unread-dismiss"
           >
             <Text className="text-body font-semibold text-text-inverse">

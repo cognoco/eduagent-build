@@ -40,10 +40,13 @@ export function MetricInfoDot({ metricKey }: MetricInfoDotProps) {
         transparent
         animationType="fade"
         onRequestClose={() => setVisible(false)}
+        accessibilityViewIsModal
       >
         <Pressable
           className="flex-1 justify-end bg-black/30"
           onPress={() => setVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
         >
           <View
             className="bg-surface rounded-t-2xl p-6 pb-10"

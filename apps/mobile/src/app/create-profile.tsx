@@ -594,6 +594,11 @@ export default function CreateProfileScreen() {
             editable={!loading}
             testID="create-profile-name"
             onFocus={onFieldFocus('name')}
+            accessibilityLabel={
+              isAddingChild
+                ? t('createProfile.childDisplayNameLabel')
+                : t('createProfile.displayNameLabel')
+            }
           />
         </View>
 
@@ -655,13 +660,19 @@ export default function CreateProfileScreen() {
         )}
 
         {Platform.OS === 'ios' && showDatePicker && (
-          <Modal transparent animationType="slide" testID="date-picker-modal">
+          <Modal
+            transparent
+            animationType="slide"
+            testID="date-picker-modal"
+            accessibilityViewIsModal
+          >
             <View className="flex-1 justify-end bg-black/30">
               <View className="bg-surface rounded-t-2xl pb-8">
                 <View className="flex-row justify-end px-4 pt-3 pb-1">
                   <Pressable
                     onPress={() => setShowDatePicker(false)}
                     className="min-h-[44px] min-w-[44px] items-center justify-center"
+                    accessibilityRole="button"
                     accessibilityLabel="Close date picker"
                     testID="date-picker-done"
                   >

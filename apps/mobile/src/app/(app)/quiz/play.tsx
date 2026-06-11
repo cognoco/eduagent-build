@@ -1164,6 +1164,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         transparent
         animationType="fade"
         onRequestClose={() => setQuitConfirmVisible(false)}
+        accessibilityViewIsModal
       >
         <Pressable
           className="flex-1 bg-black/40 justify-center items-center px-6"

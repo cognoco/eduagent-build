@@ -46,6 +46,7 @@ export function ParkingLotModal({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      accessibilityViewIsModal
     >
       <KeyboardAvoidingView
         className="flex-1 bg-black/40 justify-end"
@@ -85,6 +86,7 @@ export function ParkingLotModal({
                 : 'bg-surface-elevated rounded-button py-3 mt-4 items-center'
             }
             testID="parking-lot-save"
+            accessibilityRole="button"
           >
             {addParkingLotItem.isPending ? (
               <ActivityIndicator
@@ -185,6 +187,7 @@ export function TopicSwitcherModal({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      accessibilityViewIsModal
     >
       <View className="flex-1 bg-black/40 justify-end">
         <View
@@ -267,6 +270,7 @@ export function TopicSwitcherModal({
                       style={{ opacity: isSwitching ? 0.5 : 1 }}
                       className="bg-surface rounded-card px-4 py-3 mb-2"
                       testID={`switch-topic-${topic.id}`}
+                      accessibilityRole="button"
                     >
                       <Text className="text-body font-semibold text-text-primary">
                         {topic.title}

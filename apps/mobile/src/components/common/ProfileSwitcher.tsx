@@ -124,6 +124,7 @@ export function ProfileSwitcher({
         transparent
         animationType="fade"
         onRequestClose={() => setIsOpen(false)}
+        accessibilityViewIsModal
       >
         {/* Guard the body on isOpen as well: at runtime Modal already gates on
             `visible`, but this also ensures nothing renders when closed under
@@ -133,6 +134,7 @@ export function ProfileSwitcher({
           <Pressable
             onPress={() => setIsOpen(false)}
             style={{ flex: 1 }}
+            accessibilityRole="button"
             accessibilityLabel="Close profile switcher"
             testID="profile-switcher-backdrop"
           >

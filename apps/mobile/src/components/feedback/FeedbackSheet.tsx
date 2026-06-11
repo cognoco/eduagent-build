@@ -78,6 +78,7 @@ export function FeedbackSheet({
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
       testID="feedback-modal"
+      accessibilityViewIsModal
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -190,6 +191,7 @@ export function FeedbackSheet({
                 autoFocus
                 editable={!submit.isPending}
                 testID="feedback-message-input"
+                accessibilityLabel={t('feedbackSheet.messageLabel')}
               />
               <Text className="text-caption text-text-muted mt-1 text-right">
                 {message.length}/2000

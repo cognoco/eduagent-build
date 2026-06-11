@@ -33,6 +33,7 @@ export function TopicPickerSheet({
       animationType="slide"
       onRequestClose={onClose}
       testID="topic-picker-modal"
+      accessibilityViewIsModal
     >
       {/* Semi-transparent backdrop — tapping it dismisses the sheet */}
       <Pressable

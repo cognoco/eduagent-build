@@ -362,6 +362,7 @@ export default function ProfilesScreen() {
         animationType="fade"
         onRequestClose={handleCancelRename}
         testID="rename-modal"
+        accessibilityViewIsModal
       >
         <Pressable
           className="flex-1 bg-black/50 justify-center px-8"

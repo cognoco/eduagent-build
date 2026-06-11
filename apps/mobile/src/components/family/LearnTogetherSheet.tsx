@@ -69,7 +69,13 @@ export function LearnTogetherSheet({
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      accessibilityViewIsModal
+    >
       <View className="flex-1 justify-end bg-black/40">
         <View
           className="bg-surface rounded-t-3xl px-5 pt-5 pb-8"

@@ -1231,6 +1231,7 @@ function LibraryScreenContent({
         transparent
         animationType="slide"
         onRequestClose={() => setShowManageSubjects(false)}
+        accessibilityViewIsModal
       >
         <Pressable
           className="flex-1 bg-black/40 justify-end"
@@ -1287,6 +1288,7 @@ function LibraryScreenContent({
                             disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`pause-subject-${subject.id}`}
+                            accessibilityRole="button"
                           >
                             <Text className="text-body-sm font-semibold text-text-primary">
                               {isPending
@@ -1301,6 +1303,7 @@ function LibraryScreenContent({
                             disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`archive-subject-${subject.id}`}
+                            accessibilityRole="button"
                           >
                             <Text className="text-body-sm font-semibold text-text-primary">
                               {t('library.manage.archive')}
@@ -1316,6 +1319,7 @@ function LibraryScreenContent({
                             disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-primary py-2.5 items-center"
                             testID={`resume-subject-${subject.id}`}
+                            accessibilityRole="button"
                           >
                             <Text className="text-body-sm font-semibold text-text-inverse">
                               {isPending
@@ -1330,6 +1334,7 @@ function LibraryScreenContent({
                             disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`archive-subject-${subject.id}`}
+                            accessibilityRole="button"
                           >
                             <Text className="text-body-sm font-semibold text-text-primary">
                               {t('library.manage.archive')}
@@ -1344,6 +1349,7 @@ function LibraryScreenContent({
                           disabled={isSavingAnySubject || !canWrite}
                           className="flex-1 rounded-button bg-primary py-2.5 items-center"
                           testID={`restore-subject-${subject.id}`}
+                          accessibilityRole="button"
                         >
                           <Text className="text-body-sm font-semibold text-text-inverse">
                             {isPending
@@ -1368,6 +1374,7 @@ function LibraryScreenContent({
                             : 'mt-2 rounded-button border border-danger/30 bg-danger/10 py-2.5 items-center'
                         }
                         testID={`delete-subject-${subject.id}`}
+                        accessibilityRole="button"
                       >
                         <Text className="text-body-sm font-semibold text-danger">
                           {isDeleting
