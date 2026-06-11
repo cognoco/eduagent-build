@@ -667,8 +667,6 @@
     },
     "notePrompt": {
       "writeNote": "メモを書く",
-      "cannotSaveTitle": "メモを保存できません",
-      "cannotSaveMessage": "現在メモを保存できません。もう一度お試しください。",
       "saveFailedTitle": "メモを保存できませんでした",
       "summaryPlaceholder": "このセッションで覚えておくことは何ですか？"
     },
@@ -2658,7 +2656,6 @@
       "topicsReady_other": "{{count}}トピックがテスト可能",
       "afterFinishTopic": "トピック完了後に利用可能",
       "hintOpenPicker": "アセスメントピッカーを開く",
-      "hintOpenLibrary": "ライブラリを開く",
       "couldNotLoad": "アセスメントトピックを読み込めませんでした",
       "studySubjectFirst": "これをアンロックするには、まず{{subject}}を学習しましょう"
     },

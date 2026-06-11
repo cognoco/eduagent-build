@@ -720,8 +720,6 @@
     },
     "notePrompt": {
       "writeNote": "Write a note",
-      "cannotSaveTitle": "Cannot save note",
-      "cannotSaveMessage": "Notes cannot be saved right now. Please try again.",
       "saveFailedTitle": "Could not save note",
       "summaryPlaceholder": "What should we remember from this session?"
     },
@@ -1009,7 +1007,6 @@
       "studySubjectFirst": "Study {{subject}} first to unlock this",
       "afterFinishTopic": "Available after you finish a topic",
       "hintOpenPicker": "Opens the assessment picker",
-      "hintOpenLibrary": "Opens the library",
       "couldNotLoad": "Could not load assessment topics"
     },
     "quiz": {

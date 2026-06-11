@@ -667,8 +667,6 @@
     },
     "notePrompt": {
       "writeNote": "Skriv et notat",
-      "cannotSaveTitle": "Kan ikke lagre notat",
-      "cannotSaveMessage": "Notater kan ikke lagres akkurat nå. Prøv igjen.",
       "saveFailedTitle": "Kunne ikke lagre notat",
       "summaryPlaceholder": "Hva skal vi huske fra denne økten?"
     },
@@ -2658,7 +2656,6 @@
       "topicsReady_other": "{{count}} temaer klare for test",
       "afterFinishTopic": "Tilgjengelig etter at du fullfører et tema",
       "hintOpenPicker": "Åpner vurderingsvelgeren",
-      "hintOpenLibrary": "Åpner biblioteket",
       "couldNotLoad": "Kunne ikke laste vurderingsemner",
       "studySubjectFirst": "Studer {{subject}} først for å låse opp dette"
     },

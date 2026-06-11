@@ -6,6 +6,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
+  CelebrationName,
+  CelebrationReason,
   CompleteRoundResponse,
   QuestionResult,
   QuizQuestion,
@@ -15,6 +17,7 @@ import { cefrLevelSchema, isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
+import { queueCelebration } from '../celebrations';
 import { recordPracticeActivityEvent } from '../practice-activity-events';
 import { safeWrite, type DeferredActivityEvent } from '../safe-non-core';
 import { createVocabulary, reviewVocabulary } from '../vocabulary';
@@ -441,6 +444,20 @@ export function getCelebrationTier(
   return 'nice';
 }
 
+export function getQuizCompletionCelebration(
+  celebrationTier: CompleteRoundResponse['celebrationTier'],
+): { celebration: CelebrationName; reason: CelebrationReason } {
+  if (celebrationTier === 'perfect') {
+    return { celebration: 'comet', reason: 'comet' };
+  }
+
+  if (celebrationTier === 'great') {
+    return { celebration: 'twin_stars', reason: 'twin_stars' };
+  }
+
+  return { celebration: 'polar_star', reason: 'polar_star' };
+}
+
 /**
  * Complete an active quiz round atomically.
  *
@@ -841,6 +858,22 @@ export async function completeQuizRound(
       questionResults,
     };
   });
+
+  const quizCelebration = getQuizCompletionCelebration(
+    response.celebrationTier,
+  );
+  await safeWrite(
+    () =>
+      queueCelebration(
+        db,
+        profileId,
+        quizCelebration.celebration,
+        quizCelebration.reason,
+        roundId,
+      ),
+    'quiz.round-celebration',
+    { profileId, roundId, celebrationTier: response.celebrationTier },
+  );
 
   for (const evt of deferredEvents) {
     await safeWrite(

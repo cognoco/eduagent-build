@@ -9,6 +9,8 @@
 > directly by an analyst; doc claims were verified against source, not taken on trust.
 > Sizes: **S** = one file / a few hours · **M** = a screen or service + tests · **L** =
 > multi-file feature, possible schema/endpoint · **XL** = cross-system, migration + backfill.
+>
+> **Update 2026-06-11.** First small implementation slice is now in source: subject-carousel opens shelf, topicless note CTA/editor is suppressed, `gap_fill` has Gap Check chrome, locked Assessment is non-pressable, recitation skips the filing wait, and quiz completion queues persistent celebrations. Rows below mark those as done where relevant; remaining sizing refers to the still-open broader proposal.
 
 ---
 
@@ -41,11 +43,12 @@ strength: most of the apparatus it needs already exists.
 | **XL** | Quiz↔Assessment merge + retention-universe unification |
 | **L** | Talk-first Path 0 (topic-attach is net-new); Review→Relearn consolidation; Mode collapse 7→3; Verification-overlay collapse; Supporter "This Week" digest; Practice Hub rework; Practice-tab promotion; Challenge-Round learner-initiated rework; Freeform "Loose notes" bucket; Notes+Bookmarks "Saved" shelf; Dictation de-islanding |
 | **M** | Most "fix the exit / fix the entry" items; More-fold; Recaps-tab fold; subtitle/CTA copy on resume |
-| **S** | Retire Interleaved path; retire recall-test screen; kill cannot-save alert; spoken countdown; renames; all "KEEP" no-ops |
+| **S** | Retire Interleaved path; retire recall-test screen; spoken countdown; renames; all "KEEP" no-ops. The freeform cannot-save alert and `gap_fill` chrome items have shipped. |
 
-**Cheapest high-value wins (ship independently):** kill the freeform cannot-save alert
-(S+S); auto-file homework + un-starve the Recall Bridge (M, coupled); retire the two dead
-screens (S+S); the "make it count" quiz trio (XP-ledger / celebration / surfaced retention, M).
+**Cheapest high-value wins (ship independently):** freeform cannot-save alert is now fixed
+for topicless prompts; auto-file homework + un-starve the Recall Bridge (M, coupled); retire
+the two dead screens (S+S); remaining quiz "make it count" work is XP-ledger + surfaced
+retention because celebration queueing has shipped.
 
 ---
 
@@ -55,7 +58,7 @@ screens (S+S); the "make it count" quiz trio (XP-ledger / celebration / surfaced
 |---|---|---|---|---|
 | **Add 4th learner tab "Practice"** (promote the buried hub) | NOT a tab today: absent from `TabKey`/`STUDY_TABS` (`navigation-contract.ts:13-19,146-169`); registered in `FULL_SCREEN_ROUTES` so its tab bar collapses to 0 (`_layout.tsx:55-60`); reached via `home-action-practice` button (`LearnerScreen.tsx:87-91`). Add to `TabKey`+`STUDY_TABS`, remove from full-screen routes, add `<Tabs.Screen>`, per-shape `visibleTabs`. | Persistent Practice tab vs buried button | **L** | High |
 | **Fold "More" into header/avatar menu** (keep learner tabs = 4) | `more` is a first-class tab + RouteKeys (`navigation-contract.ts:146-169`, `_layout.tsx:724-735`). Drop from learner set, build header menu linking `more/account`+`more/privacy` (routes stay; `isOwner` gating unchanged). | More moves to header affordance, no feature loss | **M** | Med |
-| **Unify subject-carousel destination with Library** | Carousel → `/(app)/progress/[subjectId]` report (`LearnerScreen.tsx:643-649`); Library → its own shelf tree. Repoint one onPress. | Same intent → one destination | **S** | High |
+| **Unify subject-carousel destination with Library** | **DONE 2026-06-11.** Carousel now opens `/(app)/shelf/[subjectId]` [was: progress report]. | Same intent → one destination | **S** | High |
 | **One canonical entry per verb; deep-links land inside it** (Relearn has 4 entries, Quiz 3) | Per-call-site re-pointing across `LearnerScreen.tsx`, `practice/index.tsx`, `book/[bookId].tsx`, `topic/relearn.tsx`; must honor cross-stack ancestor-chain push rule. | Back-nav always resolves; fewer dead ends | **M** | Med |
 | **Home "Continue where you left off" card** | PARTIALLY BUILT: `useLearningResumeTarget` + carousel "Continue {topic}" already route to active/paused session (`LearnerScreen.tsx:122,282-285,350-356`); `IntentCard.test.tsx:75` references it. Remaining = a dedicated resume card. | 1-tap resume vs 5-tap dig | **S–M** | High |
 | **KEEP V0/V1 contract + audience split untouched** | Verified intact (`navigation-contract.ts:362`, `:273-283`, `home.tsx:161`). | None | — | High |
@@ -79,7 +82,7 @@ The inventory delta is **collapse, not addition**:
 - **Assessment ladder → Quiz** (XL) — two architecturally distinct backends into one; retention-universe unification risk.
 - **Retire Interleaved path** (S) — zero mobile callers (only prose-comment matches in `mentor-memory.tsx:350`, `my-notes/[kind].tsx`); keep engine.
 - **Retire recall-test screen** (S) — orphaned; keep engine (load-bearing for relearn).
-- **Fix `gap_fill`** (S–M) — no `SESSION_MODE_CONFIGS` entry → falls to freeform chrome (`sessionModeConfig.ts:68,77`); pushed from `practice/assessment/index.tsx:466`.
+- **Fix `gap_fill` chrome** (DONE/S) — `SESSION_MODE_CONFIGS.gap_fill` now provides Gap Check chrome; broader mode-collapse/analytics questions remain.
 - **Notes+Bookmarks → "Saved"** (M); **Promote Practice button→tab** (M); **Supporter simplify** (L).
 
 **Verified structural facts:** 6-entry `SESSION_MODE_CONFIGS` with `practice→review`
@@ -112,8 +115,8 @@ ambiguous.
 
 | Change | Codebase impact | UX impact | Size | Confidence |
 |---|---|---|---|---|
-| **Gate "Write a note" CTA on `topicId != null`** | Renders on `notePromptOffered` with no topic check (`SessionFooter.tsx:103-118`); homework gate pattern at `use-session-actions.ts:375-376`. | Dead button stops appearing | **S** | High |
-| **Delete the cannot-save alert path** | Alert at `SessionFooter.tsx:128-134`; copy `en.json:635`. Remove + delete 2 i18n keys across 7 locales. | "Try again" lie gone | **S** | High |
+| **Gate "Write a note" CTA on `topicId != null`** | **DONE 2026-06-11.** `SessionFooter` now gates the prompt/editor on `topicId`. | Dead button stops appearing | **S** | High |
+| **Delete the cannot-save alert path** | **DONE 2026-06-11 for topicless prompt/editor path.** Existing unused copy cleanup can be a follow-up i18n hygiene task. | "Try again" lie gone | **S** | High |
 | **NEW "Loose notes" bucket** (topicless save) | No implementation exists (grep clean). `createNote` requires `topicId`; needs schema/migration if `topic_id` NOT NULL + new Library surface + topicless ownership story. | Freeform thoughts saveable | **L** | Med |
 | **Silent, non-blocking first-turn classification** | Classification BLOCKS composer today (`session/index.tsx:1095-1096,1218-1219`); teach turn fires only after classify (`use-subject-classification.ts:759`). Reorder to answer-first. | First turn in ~2s, no "classifying…" banner | **M–L** | Med |
 | **Remove "Looks like X" auto-pick + disambiguation chips** | Injected at `use-subject-classification.ts:546`; chips in `SessionAccessories.tsx`. These fixed prior bugs (BUG-31/234/236) — removal re-opens "wrong subject silently chosen." | No chips interrupting "ask anything" | **M** | Med |
@@ -165,7 +168,7 @@ own payoff). Cite drift: doc says `exchange-prompts.ts:130` — file is `apps/ap
 | Change | Codebase impact | UX impact | Size | Confidence |
 |---|---|---|---|---|
 | **Merge "Review" into Relearn — one "Go over again"** | Two modes + two entries: review CTA `mode:'review'` (`topic/[topicId].tsx:459-462`) vs relearn `POST /retention/relearn`. Merge must reconcile divergent prompts: review overrides at `exchange-prompts.ts:483-484,549-551,799,1111-1112` vs relearn standard. Touches enum across mobile+API+tests. | One button vs two near-synonym CTAs | **L** | Med |
-| **"Make it count" — always non-null `effectiveQuality`** | **PARTIALLY BUILT — both docs are outdated here.** Review ALREADY grades + writes SM-2 via `maybeDispatchReviewCalibration` (`session-exchange.ts:1038-1142`) → `review-calibration-grade.ts:96-130`. Remaining = make it guaranteed (it skips on non-substantive answer + 24h cooldown `:92-94`). | Review reliably moves the card | **S–M** | Med-Low |
+| **"Make it count" — always non-null `effectiveQuality`** | **PARTIALLY BUILT.** Review ALREADY grades + writes SM-2 via `maybeDispatchReviewCalibration` (`session-exchange.ts:1038-1142`) → `review-calibration-grade.ts:96-130`. Remaining = make it guaranteed (it skips on non-substantive answer + 24h cooldown `:92-94`). | Review reliably moves the card | **S–M** | Med-Low |
 | **Keep review timer + retention-aware rung on merged surface** | Timer client-side; rung injected in review path. If relearn's mode wins the merge, these must be *ported*, not just kept. | No perceived regression | **S** | Med |
 | **Remove "Practice again"→`mode=learning` divergence** | Strong-topic branch routes `mode:'learning'` (`topic/[topicId].tsx:239-242`); proposal doesn't explicitly address it. | Ambiguous | **S** | Low |
 
@@ -183,17 +186,17 @@ consolidation (L) and reconciling two prompt regimes (regression risk to tuned r
 | Change | Codebase impact | UX impact | Size | Confidence |
 |---|---|---|---|---|
 | **Kill the cosmetic method picker** | Verified cosmetic: `relearn.tsx` only *reads* `teachingPreference` (`:188-189`), never writes it; only writer is the standalone `PUT /subjects/:id/teaching-preference` (`retention.ts:151-200`), never called from relearn. Remove method phase (`relearn.tsx:35-79,274-363,618-668`); `RelearnTopicInput` schema loses fields. | No 4-way style choice that did nothing | **M** | High |
-| **Fix Challenge-Round block (resolve `needs_deepening` on relearn completion)** | `startRelearn` inserts `needs_deepening_topics{status:active}` (`retention-data.ts:1104-1109`); Challenge gate rejects `struggleStatus!=='normal'` (`trigger.ts:80`); **nothing in `session-completed.ts` resolves it on relearn completion** (grep clean). Add a resolve step gated on `effectiveQuality!=null`. | Relearning no longer locks you out of Challenge forever | **S–M** | High |
+| **Fix remaining Challenge-Round block edges** | `startRelearn` inserts `needs_deepening_topics{status:active}` (`retention-data.ts:1104-1109`); Challenge gate rejects `struggleStatus!=='normal'` (`trigger.ts:80`). Quality-bearing completions now self-heal through `updateNeedsDeepeningProgress()` after 3 good completions; remaining risk is no-quality/abandoned sessions. | Relearning no longer leaves stale Challenge blocks | **S–M** | High |
 | **Path 5 becomes THE study-again surface (Review merges in)** | Load-bearing work is on the Review side (always non-null quality). Path-5 wiring is small. | One "Go over again" | **S** (P5-only) / L (with P4) | Med |
 | **Retire recall-test screen, keep engine** | `recall-test.tsx` fully orphaned (no inbound nav; `recall_nudge`→`/(app)/home` per `notification-tap-navigation.ts:34-37`); `processRecallTest` load-bearing. | None (already unreachable) | **S** | High |
 
-**Both "known gaps" in the current doc are real & verified.** 4 live relearn entries confirmed
+**The relearn method-picker gap is real; the Challenge block is narrower than first written.** 4 live relearn entries confirmed
 (`LearnerScreen.tsx:370`, `practice/index.tsx:515`, `book/[bookId].tsx:1184`,
 `use-clone-from-child.ts:204`). The recap anchor + SM-2 baseline reset
 (`session-completed.ts:636-650`, guard `effectiveQuality!=null && exchangeCount>0`) are
-genuinely load-bearing — the resolve fix should reuse that same predicate. The picker-kill is
-a taste/dark-pattern call; the Challenge-block is a correctness bug that should ship
-regardless (latent until Challenge Round ships — currently flag-off).
+genuinely load-bearing. The picker-kill is a taste/dark-pattern call; stale no-quality
+needs-deepening rows remain a correctness risk that should ship regardless (latent until
+Challenge Round ships — currently flag-off).
 
 ---
 
@@ -203,14 +206,14 @@ regardless (latent until Challenge Round ships — currently flag-off).
 |---|---|---|---|---|
 | **Voice-first default** | Input defaults to `text` + SecureStore restore (`session/index.tsx:333,341-353`); voice toggle exists (`:1258-1259`). Seed `voice` for `mode==='recitation'` without clobbering the global pref (BUG-357 guard at `:527`). Feedback prompt already branches on input mode (`exchange-prompts.ts:769-787`). | Lands in voice → discovers pace/expression feedback (the gem) | **S** | High |
 | **Drop the subject** (synthetic/no bucket, never `subjects[0]`) | Auto-picks `availableSubjects[0]` today (`use-subject-classification.ts:509-521`); write binds it (`session-exchange.ts:2683-2695`, `practice_activity_events`). Remove auto-pick; allow null subject. | Recited poem stops polluting "Biology" progress | **M** (→L if migration) | High |
-| **Kill the 60s topicless filing-wait** | `session-completed.ts:415-439` `waitForEvent` times out at 60s for topicless sessions. Skip for recitation. | ~60s post-finish latency gone | **S–M** | Med |
+| **Kill the 60s topicless filing-wait** | **DONE 2026-06-11.** `waitForEvent` now skips recitation mode. | ~60s post-finish latency gone | **S–M** | Med |
 | **Replace "Beta" with "Practice reciting"** | i18n only (`practice/index.tsx:942-950`); gated on voice-default working first. | "Beta" stops reading as "might not work" | **S** | High |
 
 **Biggest unknown = nullability/migration.** Whether `subjectId` can be null or needs a
 synthetic "Recitation" subject row determines M vs L. Downstream readers of
 `practice_activity_events` (reports/aggregations) must tolerate it. Dropping the subject is
-the load-bearing change — it *causes* the filing-wait removal. Recitation prompt/evidence
-source (`recitation_text`, `exchange-prompts.ts:439`) survive unchanged.
+the load-bearing change. The filing-wait removal has shipped independently. Recitation
+prompt/evidence source (`recitation_text`, `exchange-prompts.ts:439`) survive unchanged.
 
 ---
 
@@ -220,14 +223,15 @@ source (`recitation_text`, `exchange-prompts.ts:439`) survive unchanged.
 |---|---|---|---|---|
 | **Generate quizzes from learner's active topics** | NO topic-bound type exists: `quizActivityTypeSchema` = `['capitals','vocabulary','guess_who']` (`packages/schemas/src/quiz.ts:4-8`). Capitals deterministic (`generate-round.ts:495-529`); vocab only four_strands; guess_who generic LLM. Needs new type + topic-content LLM prompt (eval-harness work) + mastery-key scheme. | Biology learner gets biology, not Capitals trivia | **L** | High |
 | **Write quiz XP into main `xp_ledger`** | Quiz XP lives only in `quizRounds.xpEarned` + `practice_activity_events` (`complete-round.ts:509,554-574`); no `xpLedger.insert`. `xp.ts:84` is session/topic-scoped — quiz has no topic. | Quiz moves the real progress bar/streak | **M** | High |
-| **Fire the celebration queue** | `celebrationTier` computed + returned only (`complete-round.ts:510,837`); `queueCelebration` (`celebrations.ts:76`) never called. Add via deferred `safeWrite`. | Good round → celebration on next Home | **S** | High |
+| **Fire the celebration queue** | **DONE 2026-06-11.** `complete-round.ts` maps `celebrationTier` to a queued celebration through deferred `safeWrite`. | Good round → celebration on next Home | **S** | High |
 | **Surface the retention loop ("3 things to review")** | Wrong answers→`quiz_missed_items` re-injected silently (`generate-round.ts:484-490`); SM-2 invisible. Net-new read endpoint/UI. | Learner sees what to review | **M** | Med |
 | **Absorb Assessment ladder as "serious depth tier"; rename to "Check what you know"** | Assessment is a separate route/service co-committing SM-2+XP (`routes/assessments.ts:199-231`). Merge spans two paths; reconcile to avoid double-XP. | One self-test surface, two tiers | **L** | Med |
 | **Keep engine; unify retention onto topic-level `retention_cards`** | Quiz SM-2 on `vocabulary_retention_cards`/`quiz_mastery_items` (parallel universe). Migrate onto `retention_cards`; Guess-Who scoring (`getGuessWhoSm2Quality:419-429`) → optional. | One retention universe | **L** | Med |
 
 **Every current-doc claim verified.** Server-checked answers (`complete-round.ts:128-215`)
 are sound and untouched. The "make it count" trio (XP-ledger / celebration / surfaced
-retention) is **M and shippable independently** of the content rework. Hardest piece is
+retention) is now partly shipped: celebration queueing is done; XP-ledger + surfaced
+retention remain **M and shippable independently** of the content rework. Hardest piece is
 topic-bound generation + retention unification (XL together with the Assessment merge).
 
 ---
@@ -238,7 +242,7 @@ topic-bound generation + retention unification (XL together with the Assessment 
 |---|---|---|---|---|
 | **Collapse two-choice entry → single "Start dictation"** | Two `IntentCard`s today (`dictation/index.tsx:213-224`); primary CTA = `handleSurpriseMe()` (`:52-107`), demote "own text". | One tap → personalized dictation | **S** | High |
 | **Interest/curriculum-aware generation (the real personalization)** | PLUMBING EXISTS BUT UNFED: `generate.ts:41-49,72-108` supports interests+libraryTopics; `fetchGenerateContext` returns only `{nativeLanguage,ageYears}` (`result.ts:166-179`). Fix = populate that function. No prompt/schema change. | "Surprise me" stops being irrelevant-by-construction | **M** | High |
-| **"Use my own text" → camera-first (wire `ocrText`)** | `text-preview.tsx:25-29` already reads `ocrText` but is unreachable. Reuse homework camera+OCR (`homework/camera.tsx`); push `?ocrText=…`. | Snap a worksheet vs hand-type | **M** | Med-High |
+| **"Use my own text" → camera-first** | `text-preview.tsx` no longer reads any dictation `ocrText` route param. Reuse homework camera/OCR output or add an explicit dictation OCR param before pushing text-preview. | Snap a worksheet vs hand-type | **M** | Med-High |
 | **Route `/review` mistakes into shared retention/struggles store** | NO write-back today: `review.ts:38` only *reads* struggles; `recordDictationResult` (`result.ts:41-108`) writes reporting-only. Needs Inngest/scoped write + a topic anchor for spelling/grammar mistakes. | Dictation effort compounds elsewhere | **L** | Med |
 | **Spoken 3.5s countdown** | `COUNTDOWN_MS=3500` (`use-dictation-playback.ts:43`); TTS only after countdown (`:211`). Add `Speech.speak` at countdown start. | "Ready… start writing" spoken | **S** | High |
 
@@ -260,7 +264,7 @@ function," not "build personalization." "Check my writing" has no flag gate (`co
 | Change | Codebase impact | Size | Confidence |
 |---|---|---|---|
 | **C1. Merge Quiz into Assessment self-test; unify quiz onto `retention_cards`** | Quiz writes parallel universe (`vocabulary_retention_cards`, `quiz_mastery_items`) vs Assessment canonical (`routes/assessments.ts:199-231`). Migration + backfill. | **XL** | High |
-| **C2. Merge Review→Relearn, always record SM-2** | Review suppresses overlays → null quality → `update-retention` skips (`session-completed.ts`). | **L** | High |
+| **C2. Merge Review→Relearn, always record SM-2** | Review calibration grading exists, but no-quality/cooldown edges can still skip ordinary `update-retention`. | **L** | High |
 | **C3. Merge `evaluate`+`teach_back` → one ambient check, one gate** | Gates `evaluate.ts:32` (ease≥2.5) vs `teach-back.ts:33` (ease≥2.3); collapse to one. | **L** | High |
 | **C4. Merge Challenge Round into ambient check (or retire)** | Flag-OFF (`config.ts:145`); full engine in `services/challenge-round/`. Delete 5/8 gates + cooldown table; keep finalize pipeline. | **L–XL** | High |
 | **C5. Retire Interleaved path; keep engine** | Zero mobile callers verified. | **S** | High |
@@ -304,7 +308,7 @@ first). **Genuine DECISION (Q3):** Devil's-Advocate under-15 — recommend hard-
 | Change | Codebase impact | Size | Confidence |
 |---|---|---|---|
 | **Unify Notes+Bookmarks into one "Saved" shelf** | Two separate systems: `topic_notes`/`notes.ts` (cap 50) vs `bookmarks`/`bookmarks.ts` (eventId provenance, topic-nullable). Needs authorship/type discriminator column + migration; data migration of bookmarks; reconcile cap vs uncapped + IDOR guard (`notes.ts:270`) for null-topic items. | **L** | Med-High |
-| **Consolidate the THREE saved surfaces** | Doc under-describes: `progress/saved.tsx` (bookmarks), `my-notes/index.tsx` (hub), `my-notes/[kind].tsx:14-15` (ALREADY merges both). Partial UI consolidation exists. | **M** | Med |
+| **Consolidate the FOUR saved surfaces** | Doc under-described: `progress/saved.tsx` (bookmarks), `my-notes/index.tsx` (hub), `my-notes/[kind].tsx:14-15` (ALREADY merges both), and topic-detail inline notes (`topic/[topicId].tsx`). Partial UI consolidation exists. | **M** | Med |
 | **Fix freeform phantom-save → "Loose notes"** | topicId null guard alerts today; route to a loose bucket (couples to nullable-topic). | **M** | Med |
 | **First-Turn Opener — KEEP** | No-op (fun-fact opener already removed). | **S** (none) | High |
 | **Next-Topic Recap content — KEEP** | No-op to the card; its only change (placement/spinner) belongs to the session-close scope. | **S** (none) | High |
@@ -324,7 +328,7 @@ the merged shelf or it's a regression.
 |---|---|---|---|
 | **1. Reward-first close: dispatch pipeline immediately (ungate from reflection)** | Pending close does NOT dispatch today; recap waits for Submit/Skip (`routes/sessions.ts:1268-1287,1579`). Fire a recap-only dispatch on pending close; preserve BUG-398 auto_closed exclusion + idempotency key (`:1610`). | **M** | High |
 | **2. Reflection optional card; kill the poll-spinner** | Mobile polls `learnerRecap` every 2s with 15s timeout (`session-summary/[sessionId].tsx:190-251`). Render win+recap first; reflection optional; no user-facing dead-wait. | **M** | High |
-| **3. Rider 2 — fix review→SM-2 skip-on-null** | `update-retention` skips on null quality (`session-completed.ts:687-697`). Reverses Issue #19's deliberate anti-inflation skip — needs a quality *source*, not just guard removal. | **M** | Med-High |
+| **3. Rider 2 — harden review→SM-2 no-quality edges** | Calibration grading exists, but `update-retention` still skips on null quality (`session-completed.ts:687-697`). Reverses Issue #19's deliberate anti-inflation skip only if there is a defensible quality *source*, not just guard removal. | **M** | Med-High |
 | **4. Rider 1 — KEEP the rest of the pipeline** | Concurrency/idempotency, `relearn-retention-reset`, `stripEnvelopeJson`, crons all intact. | **S** (no-op) | High |
 | **5. Mode taxonomy 7→3 (`tutor`/`review`/`homework`) + runtime modifiers** | **No DB column for `mode`** — JSONB `effectiveMode` (`schema/sessions.ts:140,156`); `session_type` enum already 3-value. `relearn` special-cased in pipeline (`session-completed.ts:637`) + created bypassing `startSession` — must re-key the reset off a runtime signal. Test-fixture sweep required. | **L** | High (no migration) / Med (blast radius) |
 | **6. Add decoupled `entryPoint` telemetry** | Greenfield enum; modes currently double as analytics. Must ship same PR as the collapse or reporting breaks silently. | **S** | Med |
@@ -345,11 +349,11 @@ section are imprecise (real poll lives in mobile `[sessionId].tsx:190-251`, not 
 | **Fold Recaps tab into the digest** | `recaps` is a V1 guardian tab (`navigation-contract.ts:152-154`); removing touches the nav contract (V0 hard constraint). Content overlap verified (`child/[profileId]/session/[sessionId].tsx:241-368`). Notification deep-links to `/(app)/recaps` need re-pointing. | **M** | High |
 | **Reframe clone CTA "Learn together"→ secondary "Try this topic yourself"** | Copy/placement only; flow intact (`use-clone-from-child.ts:203-217`, `BridgeTriggerSurface` union). | **S** | High |
 | **Practice Hub: 4 sections → 1 hero + collapsed "More ways"** | 1005-line `practice/index.tsx`; 4 `SectionLabel` sections (`:500,675,797,958`); review hero (`:503-582`). Layout rework. | **L** | High |
-| **Hide locked Assessment row** | `practice/index.tsx:649-651` renders `lock-closed` at `assessmentCount===0`. | **S** | High |
+| **Hide/disable locked Assessment row** | **PARTLY DONE 2026-06-11.** Locked Assessment is now non-pressable with a hint, so no false navigation; fully hiding it remains a product/layout choice. | **S** | High |
 | **Move Capitals/Guess-Who tiles inside Quiz** | Tiles `practice/index.tsx:720-766`; relocate to quiz screen. | **M** | Med |
 | **Kid-legible renames** | i18n only (7 locales + orphan-key checker). | **S** | High |
 | **Cross-cutting dimensions — KEEP** | No-op (serious/casual already removed). | **S** (no-op) | High |
-| **Retire Interleaved path / recall-test screen / quiz prefetch / fix gap_fill / kill relearn picker** | Dispositions cross-referenced from other scopes (mostly S; gap_fill M). | S–M | Mixed |
+| **Retire Interleaved path / recall-test screen / quiz prefetch / kill relearn picker** | Dispositions cross-referenced from other scopes (mostly S). `gap_fill` chrome is fixed; broader mode taxonomy remains. | S–M | Mixed |
 
 **The two biggest §11 items (digest, Practice Hub) are both L re-skins of a verified-rich
 data layer — backend stays.** Recaps-tab fold inherits the V0/V1 hard constraint + its test

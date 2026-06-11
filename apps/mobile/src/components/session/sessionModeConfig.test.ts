@@ -34,6 +34,14 @@ describe('getOpeningMessage', () => {
     );
   });
 
+  it('uses gap-fill opening copy instead of generic freeform chat', () => {
+    const msg = getOpeningMessage('gap_fill', 2, undefined, 'Fractions');
+
+    expect(msg).toContain('close the gaps');
+    expect(msg).toContain('Fractions');
+    expect(msg).not.toBe(SESSION_MODE_CONFIGS.freeform.openingMessage);
+  });
+
   it('returns problem-text override regardless of experience', () => {
     const msg = getOpeningMessage('homework', 0, 'Solve 2+2');
     expect(msg).toBe(
@@ -119,6 +127,16 @@ describe('getOpeningMessage', () => {
       expect(getOpeningMessage('practice', 5)).toBe(
         getOpeningMessage('review', 5),
       );
+    });
+  });
+
+  describe('gap_fill mode chrome', () => {
+    it('uses a dedicated config instead of freeform fallback', () => {
+      const config = getModeConfig('gap_fill');
+
+      expect(config).not.toBe(getModeConfig('freeform'));
+      expect(config.title).toBe('Gap Check');
+      expect(config.subtitle).toBe('Close the gaps from your assessment');
     });
   });
 

@@ -694,8 +694,6 @@
     },
     "notePrompt": {
       "writeNote": "Napisz notatkę",
-      "cannotSaveTitle": "Nie można zapisać notatki",
-      "cannotSaveMessage": "Notatek nie można teraz zapisać. Spróbuj ponownie.",
       "saveFailedTitle": "Nie można zapisać notatki",
       "summaryPlaceholder": "Co powinniśmy zapamiętać z tej sesji?"
     },
@@ -2664,7 +2662,6 @@
       "topicsReady_other": "{{count}} tematów gotowych do testu",
       "afterFinishTopic": "Dostępne po ukończeniu tematu",
       "hintOpenPicker": "Otwiera wybór testów",
-      "hintOpenLibrary": "Otwiera bibliotekę",
       "couldNotLoad": "Nie udało się wczytać tematów testów",
       "studySubjectFirst": "Najpierw ucz się {{subject}}, aby to odblokować"
     },

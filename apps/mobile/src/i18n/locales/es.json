@@ -667,8 +667,6 @@
     },
     "notePrompt": {
       "writeNote": "Escribir una nota",
-      "cannotSaveTitle": "No se puede guardar la nota",
-      "cannotSaveMessage": "No se pueden guardar notas ahora. Inténtalo de nuevo.",
       "saveFailedTitle": "No se pudo guardar la nota",
       "summaryPlaceholder": "¿Qué deberíamos recordar de esta sesión?"
     },
@@ -2658,7 +2656,6 @@
       "topicsReady_other": "{{count}} temas listos para evaluar",
       "afterFinishTopic": "Disponible después de completar un tema",
       "hintOpenPicker": "Abre el selector de evaluación",
-      "hintOpenLibrary": "Abre la biblioteca",
       "couldNotLoad": "Error al cargar temas de evaluación",
       "studySubjectFirst": "Estudia {{subject}} primero para desbloquear esto"
     },

@@ -5,6 +5,8 @@ A redesign companion to [`learning-path-flows.md`](learning-path-flows.md). Same
 > **How to read this.** Each section gives **Today** (the current code-true behavior, with `file:line` from the source doc / source) → **Friction** (what an end user actually feels) → **Proposed** (the simpler flow) → **What we'd lose** (honest cost). Where the current flow is already good, it says **KEEP** and explains why — no manufactured change.
 >
 > **Method note (2026-06-09).** Built from a 20-agent end-user critique pass over the code-true [`learning-path-flows.md`](learning-path-flows.md), each agent walking one path/mechanism as a real learner (or parent) and asked: *what would frustrate me, what's overcomplicated, what major simplification gives 80–90% of the value more elegantly, and what would I miss?* The current-state citations are inherited from that doc and are current as of this date; re-verify after any nav-contract / session-exchange / post-session-pipeline change before acting on a proposal.
+>
+> **Implementation note (2026-06-11).** The first small slice from this proposal has shipped in source: topicless note CTAs are suppressed, `gap_fill` has Gap Check chrome, home subject cards open the shelf, locked Assessment is non-pressable, recitation skips the filing wait, and quiz completion queues a persistent celebration. Remaining proposal text keeps the broader direction, but "Today" statements below are patched where those shipped changes changed the current state.
 
 ---
 
@@ -13,10 +15,10 @@ A redesign companion to [`learning-path-flows.md`](learning-path-flows.md). Same
 Every per-path proposal below is an instance of one of these. If you only change five things, change these.
 
 1. **Answer first, resolve in the background.** The product makes a brand-new, thin-patience learner absorb **30–90s of cold-start latency and 3–6 forced decisions before a single word of teaching** (subject-resolve 30s timeout → curriculum poll 25s + 409 retries → `/ready` → maybe a book-picker). The infra to do it the other way already exists (freeform Path 1, classify-after-first-message). Reorder, don't rebuild.
-2. **Never offer an action you'll then refuse.** Two confirmed "the app showed me a button then yanked it" traps: the freeform **"Write note" → "cannot save, try again"** alert (a permanent condition wearing transient-error copy), and **`gap_fill` silently rendering freeform chrome** so a learner who was "doing an assessment" lands in a generic chat with no signpost.
+2. **Never offer an action you'll then refuse.** First slice fixed the two confirmed traps: topicless freeform no longer renders the "Write note" CTA/alert path, and `gap_fill` no longer renders generic freeform chrome. Keep applying the same rule to future entry points: never show a button the app must refuse.
 3. **Collapse the ten "test me" mechanisms to three.** Quiz, Assessment, Challenge Round, Devil's-Advocate, Feynman, Review, Relearn, Interleaved, recall-test, plus invisible SM-2 — **only 4 are reachable today**, they overlap into indistinguishability, and the most game-like one (Quiz) doesn't even feed topic mastery. Target: **one self-test surface + one study-again surface + one ambient in-session check.**
 4. **Collapse seven session modes to three.** `tutor` / `review` / `homework`. The other four (`freeform`, `learning`, `relearn`, `gap_fill`) are runtime branches — opener flavor, `topicId == null`, `gaps[]`, pedagogy flag — dressed up as top-level modes. Preserve funnel analytics with a decoupled `entryPoint` field.
-5. **No fake choices, no silent no-ops.** The relearn **method-picker is never written back** (cosmetic), and a **review session frequently records no SM-2 update** (`effectiveQuality` null → step skips). Both are trust defects: the user does the work and the app pretends they didn't. Either wire it or cut it — never present a lever that does nothing.
+5. **No fake choices, no silent no-ops.** The relearn **method-picker is never written back** (cosmetic), and review is **live-but-not-guaranteed** for SM-2: calibration grading exists, but no-quality/cooldown edges can still leave the card unchanged. Both are trust defects when presented as user-visible levers. Either wire the lever fully or cut it.
 
 ---
 
@@ -32,7 +34,7 @@ Every per-path proposal below is an instance of one of these. If you only change
 
 ### Proposed tab shape — four learner verbs
 
-**Today:** learner shell is `home, library, progress, more` (`STUDY_TABS` / `LEARNER_TABS`). The busiest verb-cluster — *practice / test myself* (Quiz, Dictation, Recite, Assessment, Relearn — 5 activities) — has **no tab**; it hides behind a `home-action-practice` button on `LearnerScreen`. The home subject-carousel routes to `/(app)/progress/[subjectId]` (a report screen), while Library routes to its own tree — **same intent, two destinations.**
+**Today:** learner shell is `home, library, progress, more` (`STUDY_TABS`; the legacy learner shape is equivalent). The busiest verb-cluster — *practice / test myself* (Quiz, Dictation, Recite, Assessment, Relearn — 5 activities) — has **no tab**; it hides behind a `home-action-practice` button on `LearnerScreen`. The home subject-carousel now routes to the same `/(app)/shelf/[subjectId]` tree as Library [was: progress report], so that specific duplicate-destination trap is fixed.
 
 **Proposed:** tabs become the four things a learner actually does — **Learn (home) · Practice · Library · Progress** (More folds into a header/avatar menu). The Practice hub already exists fully built at `practice/index.tsx` — this is a *promotion*, not a build. Every contextual entry (overdue banner, CoachBand, book "Start Review") becomes a **deep-link into the Practice tab**, not a parallel destination — so back-navigation and re-discovery always resolve to one canonical place.
 
@@ -55,7 +57,7 @@ Every per-path proposal below is an instance of one of these. If you only change
 | 8 — Dictation | **SIMPLIFY** → one personalized entry + camera-first own-text; feed retention |
 | Assessment ladder | **CONSOLIDATE → Quiz** as its serious depth tier; rename away from "Assessment" |
 | Interleaved Retrieval | **RETIRE** the path (zero callers); keep engine, revive only as a Quiz option |
-| `gap_fill` | **FIX** → give it real chrome + results-carrying copy, or fold into `tutor` with `gaps[]` |
+| `gap_fill` | **PARTLY FIXED** → now has real Gap Check chrome; broader mode-collapse can still fold it into `tutor` with `gaps[]` |
 | Challenge Round | **REWORK → learner-initiated "Challenge me"**; fold into the ambient check |
 | Verification Overlays | **SIMPLIFY → one announced/opt-in teach-back**; demote deliberate-lie mode |
 | Notes (4 routes) + Bookmarks | **CONSOLIDATE → one "Saved" shelf** |
@@ -93,7 +95,7 @@ Add a **Home "Continue where you left off" card** (top of `LearnerScreen`) that 
 **Friction:** the *lightest* entry in the app makes a curriculum-filing decision on the user's very first sentence (the opposite of "just ask"), and then offers a save button whose copy *lies* — it says "try again" for a permanent structural condition, so the kid taps again, fails again, and concludes the app is broken.
 
 **Proposed — SIMPLIFY (spine is right):**
-- **Gate the "Write note" CTA on `topicId != null`** (mirror the existing homework-only gating of `setShowFilingPrompt`). Delete the cannot-save alert path entirely. If a freeform save has no topic, drop it into a **"Loose notes"** bucket instead of refusing — never offer a save you'll reject.
+- **Already done in the first slice:** gate the "Write note" CTA/editor on `topicId != null` and remove the topicless cannot-save alert path. Future optional improvement: if product wants deliberate topicless saves, add a **"Loose notes"** bucket instead of keeping the affordance hidden.
 - Make first-turn classification **silent and non-blocking**: answer the question first; resolve subject in the background only to satisfy bookmark/auto-file machinery. No "Looks like X" chips, no create-subject screen on an "ask anything" session.
 - Keep the ≥5-exchange auto-file (it rescues a deep accidental session into the library) but surface it with a gentle **"Saved this to your library"** toast at summary instead of total silence.
 
@@ -117,7 +119,7 @@ Add a **Home "Continue where you left off" card** (top of `LearnerScreen`) that 
 
 ## Path 3: Homework Help — KEEP, fix the exit
 
-**Today (`homework/camera.tsx:509`, `use-homework-ocr.ts`, `exchange-prompts.ts:130`):** camera → OCR cascade (ML Kit → server `POST /v1/ocr` → retry → manual, single `processing` spinner) → subject auto-classify → `{mode:'homework'}` with optional "Help Me Solve It / Check My Answer" chips → **End → Filing Prompt ("Yes, add it / No thanks")** → Summary → Recall Bridge (max 2 Qs, **requires `topicId`** so empty unless filed).
+**Today (`homework/camera.tsx:509`, `use-homework-ocr.ts`, `exchange-prompts.ts:130`):** camera → OCR cascade (ML Kit → server `POST /v1/ocr` → retry → manual, single `processing` spinner) → subject auto-classify → `{mode:'homework'}` with optional "Help Me Solve It / Check My Answer" chips → **End → Filing Prompt ("Yes, add it / No thanks")** → Summary. Recall Bridge is currently a **Skip-only** summary branch (max 2 Qs, **requires `topicId`**, so empty unless filed); submitting "Your Words" only dispatches completion.
 
 **Friction:** at 9pm a stuck kid who just got unstuck wants to be *done* — and homework is the **only** path that interrupts the exit with a save decision. Worse, the Recall Bridge (the one feature that turns a one-off rescue into learning) is gated behind that prompt most kids reflexively dismiss with "No thanks." **The interruption suppresses its own payoff.** Secondary: the mode chips default to `undefined` with a generic server fallback (`:130`), so they're optional — but the UI over-signals them as a required gate, making a stuck kid pause to "pick right."
 
@@ -132,9 +134,9 @@ Add a **Home "Continue where you left off" card** (top of `LearnerScreen`) that 
 
 ## Path 4: Practice / Review — CONSOLIDATE into "Go over again", and make it count
 
-**Today (`relearn.tsx:280-285`, `session-completed.ts` update-retention):** `mode=review` on completed+overdue topics. Verification-overlay prompt blocks are **suppressed** (`!isReviewMode`), so `effectiveQuality` is often `null`, so the post-session SM-2 `update-retention` step **skips** — **a review session frequently leaves the retention card unchanged.** The non-overdue "Practice again" routes `mode=learning`.
+**Today (`relearn.tsx:280-285`, `review-calibration-grade.ts`, `session-completed.ts` update-retention):** `mode=review` on completed+overdue topics. Verification-overlay prompt blocks are **suppressed** (`!isReviewMode`), but review has a live calibration-grading path that can write SM-2. It is still **not guaranteed**: non-substantive answers, cooldowns, or no-quality edges can leave the retention card unchanged. The non-overdue "Practice again" routes `mode=learning`.
 
-**Friction:** the user does the review the app *asked* for, and the app's model of "do they still remember it" doesn't update — the same topic shows up overdue again tomorrow. A review that can't move the retention needle is theater, and the user feels it as "this button is busywork" even if they can't name SM-2. The mode whose entire purpose is to *re-measure* retention is the one mode gated out of measuring it.
+**Friction:** the user does the review the app *asked* for, and the app still has paths where its model of "do they still remember it" doesn't update. Even a rare no-op is trust-eroding when the button's whole promise is review. The mode whose purpose is to re-measure retention should not rely on a best-effort quality source.
 
 **Proposed — MERGE Review into Relearn as one "Go over this again" session that always records SM-2:**
 - Collapse "Review this topic" (overdue) and "Revisit … fading" (Path 5) into a single study-again session. One concept, one button.
@@ -147,13 +149,13 @@ Add a **Home "Continue where you left off" card** (top of `LearnerScreen`) that 
 
 ## Path 5: Retention Relearn — the one study-again surface; kill the fake choice
 
-**Today (`startRelearn`, `retention/relearn`):** method picker (visual_diagrams / step_by_step / real_world_examples / practice_problems) with "Usual method" highlighted → recap-anchored session. **The picker is never written back** — no code calls `setTeachingPreference` / `PUT /subjects/:id/teaching-preference` from this flow (source doc "known gaps" #1). The `needs_deepening_topics` insert sets `struggleStatus='needs_deepening'`, which **permanently blocks Challenge Round** if never resolved (gap #2). `relearn-retention-reset` resets the SM-2 card to baseline before the advance step.
+**Today (`startRelearn`, `retention/relearn`):** method picker (visual_diagrams / step_by_step / real_world_examples / practice_problems) with "Usual method" highlighted → recap-anchored session. **The picker is never written back** — no code calls `setTeachingPreference` / `PUT /subjects/:id/teaching-preference` from this flow (source doc "known gaps" #1). The `needs_deepening_topics` insert sets `struggleStatus='needs_deepening'`, which temporarily blocks Challenge Round; quality-bearing completions can self-heal through `updateNeedsDeepeningProgress()` after 3 good completions. `relearn-retention-reset` resets the SM-2 card to baseline before the advance step when quality exists.
 
 **Friction:** the user picks "real-world examples," starts, and gets taught exactly as always — they *feel* "I picked diagrams but got the same thing." A choice that does nothing is worse than no choice: it teaches a learner that their preferences don't matter, in a product whose pitch is "it adapts to me." That's a deceptive pattern.
 
 **Proposed:**
 - **Kill the cosmetic picker.** Open straight into the recap-anchored session ("Last time we covered X — want a quick quiz first, or shall I re-explain?"). The mentor already adapts mid-conversation; let the *conversation* surface method. One fewer screen, zero deception, faster to value. (If product truly wants the choice, it must call `PUT /subjects/:id/teaching-preference` on submit so the next session reflects it — but that's more code for a rarely-changed setting. **Recommend: kill it.**)
-- **Fix the Challenge-Round block** — resolve `needs_deepening` on relearn completion so the ambient check un-blocks. This is a correctness bug, not a taste call.
+- **Fix the remaining Challenge-Round block edges** — the quality-bearing path self-heals, but no-quality or abandoned relearn sessions can leave the block active. This is a correctness bug, not a taste call.
 
 **What we'd lose:** only the *feeling* of control, which is currently fake. The recap opening and the SM-2 baseline reset are the load-bearing value — they stay.
 
@@ -161,13 +163,13 @@ Add a **Home "Continue where you left off" card** (top of `LearnerScreen`) that 
 
 ## Path 6: Recitation — voice-first, subject-less
 
-**Today (`use-subject-classification.ts:507-518`):** Practice hub "Recite (Beta)" → `{mode:'recitation'}`. Subject **silently auto-assigned to `availableSubjects[0]`**; input mode **text by default** (voice opt-in); **60s server-side filing-wait** for topicless sessions (Sentry + `app/session.filing_timed_out` then proceeds).
+**Today (`use-subject-classification.ts:507-518`):** Practice hub "Recite (Beta)" → `{mode:'recitation'}`. Subject **silently auto-assigned to `availableSubjects[0]`**; input mode **text by default** (voice opt-in). The former 60s topicless filing wait is fixed: recitation now skips the generic filing wait.
 
 **Friction:** a *recitation* feature that defaults to a keyboard quietly downgrades to a spelling test — a first-timer never discovers voice exists. The silent `subjects[0]` pick files an English poem under (alphabetically/recently first) "Biology", polluting that subject's progress with off-topic `practice_activity_events`. "Beta" reads as "might not work" to a nervous kid practicing for a graded recital. The 60s post-finish wait *feels* broken even if "transparent."
 
 **Proposed — REWORK toward radical simplicity:**
 - **Voice-first** (text as an explicit accessibility fallback). The name promises this; voice feedback covers pace/expression — the one real gem here.
-- **Drop the subject entirely** — file under a synthetic "Recitation/Practice" bucket or no subject, never `subjects[0]`. Killing the topic pretense also kills the 60s topicless filing-wait.
+- **Drop the subject entirely** — file under a synthetic "Recitation/Practice" bucket or no subject, never `subjects[0]`. The filing-wait part is already fixed; the remaining issue is subject pollution.
 - Replace "Beta" with a plain "Practice reciting" once voice-default works.
 
 **What we'd lose:** very little — the voice pace/expression feedback is what no flashcard app gives; keep it, throw away the scaffolding around it.
@@ -176,7 +178,7 @@ Add a **Home "Continue where you left off" card** (top of `LearnerScreen`) that 
 
 ## Path 7: Quiz — quiz my actual subjects, and make it count
 
-**Today (`computeRoundStats`, `quiz_rounds.xpEarned`):** Quiz Index = Capitals (always) · Vocabulary:<Language> (locked if no four_strands subject) · Guess Who (always). 30s hard timeout → error panel (no Retry on quota/forbidden/consent). Wrong answers feed `quiz_missed_items` + SM-2 on `vocabulary_retention_cards` / `quiz_mastery_items` — a **parallel retention universe** from the topic-level `retention_cards`. **Quiz XP is NOT in `xp_ledger`**; **no celebration is queued**; mid-round prefetch is dead code.
+**Today (`computeRoundStats`, `quiz_rounds.xpEarned`):** Quiz Index = Capitals (always) · Vocabulary:<Language> (locked if no four_strands subject) · Guess Who (always). 30s hard timeout → error panel (no Retry on quota/forbidden/consent). Wrong answers feed `quiz_missed_items` + SM-2 on `vocabulary_retention_cards` / `quiz_mastery_items` — a **parallel retention universe** from the topic-level `retention_cards`. **Quiz XP is NOT in `xp_ledger`**; persistent completion celebrations are now queued; mid-round prefetch is dead code.
 
 **Friction:** a kid studying biology opens Quiz and is offered Capitals and Guess Who — generic trivia with nothing to do with their subjects — while the one subject-linked card (Vocabulary) is the one most often shown *locked*. The personalization is inverted. And their effort vanishes into invisible systems: XP that doesn't move the "real" progress bar, a retention loop they never see, no celebration. It feels like a disconnected trivia arcade, not their learning.
 
@@ -192,13 +194,13 @@ Add a **Home "Continue where you left off" card** (top of `LearnerScreen`) that 
 
 ## Path 8: Dictation — one personalized entry, end the island
 
-**Today (`POST /dictation/generate`, `/prepare-homework`, `/review`):** "I have a text" → **blank editable TextInput** (no camera/OCR; `ocrText` param exists but no in-flow nav sets it) → `prepare-homework`. "Surprise me" → LLM 6–10 sentences **age-appropriate by AGE ONLY** (ignores learning history/interests). 3.5s silent countdown. "Check my writing" → camera → `/review` (reads `learningProfiles.struggles` best-effort, **does not write back**). Feeds **no** retention/memory/curriculum — reporting only.
+**Today (`POST /dictation/generate`, `/prepare-homework`, `/review`):** "I have a text" → **blank editable TextInput** (no camera/OCR; no dictation text-preview `ocrText` route param/producer) → `prepare-homework`. "Surprise me" → LLM 6–10 sentences **age-appropriate by AGE ONLY** (ignores learning history/interests). 3.5s silent countdown. "Check my writing" → camera → `/review` (reads `learningProfiles.struggles` best-effort, **does not write back**). Feeds **no** retention/memory/curriculum — reporting only.
 
 **Friction:** "I have a text" is a trap — the user expects to *give* the app a text (snap a worksheet) and instead must hand-type a whole passage into a phone keyboard before they can start, while the OCR fix is wired-but-unreachable. "Surprise me" content is irrelevant by construction. And the whole activity is an island — even when it works, none of the effort compounds.
 
 **Proposed — SIMPLIFY (leaning rework on entry + feedback):**
 - Collapse the two-choice entry into **one "Start dictation"** defaulting to **interest/curriculum-aware** generation (pass recent topics + interests into `/generate`, not just age).
-- Add **"Use my own text"** as a secondary, **camera-first** path (wire the existing `ocrText`), with manual typing as the fallback — not the default.
+- Add **"Use my own text"** as a secondary, **camera-first** path (reuse homework OCR output or add an explicit dictation OCR param), with manual typing as the fallback — not the default.
 - **Route `/review` mistakes into the shared retention/struggles store** so dictation stops being an island.
 - Make the 3.5s countdown spoken ("Ready… start writing") instead of a silent label.
 
@@ -241,7 +243,7 @@ This is the single highest-leverage simplification in the whole doc.
 - Keep one server check ("enough evidence for a meaningful transfer check?"); if not, grey the button with "a bit more practice first."
 - **Fold this entry point into the ambient "Mate checks you" beat** — one "challenge me" routing into the strongest available check beats three parallel surprise mechanisms.
 
-**What we'd lose:** automatic nudging of kids who'd never tap the button — recoverable with a once-per-session gentle inline prompt, not a modal + cooldown. The entire finalize pipeline (strict quote-validation, mastery INSERT, needs-deepening routing, hallucination-guarded note draft — the genuinely good part) runs unchanged.
+**What we'd lose:** automatic nudging of kids who'd never tap the button — recoverable with a once-per-session gentle inline prompt, not a modal + cooldown. The finalize pipeline's quote validation, mastery INSERT, and needs-deepening routing are the genuinely good parts and should run unchanged. The drafted-note guard is intended but currently not wired into the save route, so that needs fixing before calling the note path guarded.
 
 ---
 
@@ -261,13 +263,13 @@ This is the single highest-leverage simplification in the whole doc.
 
 ## Notes + Bookmarks — one "Saved" shelf
 
-**Today:** four note-creation routes (manual chip, LLM `note_prompt`, reflection auto-note, Challenge draft) all converge on `topic_notes` (cap 50). **Bookmarks** are a *separate* system — save AI messages to `progress/saved`. Notes are topic-bound; bookmarks aren't.
+**Today:** four note-creation routes (manual chip, LLM `note_prompt`, reflection auto-note, Challenge draft) all converge on `topic_notes` (cap 50). **Bookmarks** are a *separate* system — save AI messages to `progress/saved`. Notes are topic-bound; bookmarks have nullable `topicId` but require non-null `subjectId`, so fully subjectless freeform messages cannot be bookmarked.
 
 **Friction:** a kid has one instinct — *"save this"* — and the app makes them pick a lane they don't know exists, split by **authorship** (did the mate say it = bookmark, did I write it = note). Nobody files memories by who said them. Later, finding "that thing about mitosis" means remembering which system it went to. (The four note *routes* are fine invisible plumbing — they all become "a note on this topic"; the problem is the *second system*.)
 
 **Proposed — SIMPLIFY (plumbing is sound):**
 - Collapse to **one "Saved" shelf with two item *types*, not two systems.** Make "bookmark this message" simply create a note **seeded with the AI's text** (quote pre-filled, editable, still one-tap, no forced editing). Same store, same shelf, tiny ✍️ (I wrote it) / 💬 (mate said it) icon.
-- Fix the Freeform phantom-save: no-topic saves go to a "Loose notes" bucket, never an alert.
+- Extend the first-slice Freeform fix: topicless CTAs are now suppressed, but a future "Loose notes" bucket could allow deliberate no-topic saves instead of hiding the affordance.
 
 **What we'd lose:** keep one-tap quote capture (don't force typing to keep something the mate said) and per-topic organization (the auto-notes building a topic record are valuable — don't flatten into one pile).
 
@@ -298,7 +300,7 @@ The fun-fact opener is already removed; the **FIRST TURN RULE** (teach one idea 
 
 The pipeline (`session-completed.ts`, concurrency 25/profile, idempotent) is sophisticated and mostly invisible in the right way — **KEEP.** Two riders fall out of the proposals above:
 1. **Ungate dispatch from reflection** for the reward-first close (above).
-2. **The review→SM-2 skip** (`update-retention` skips on null quality) must be fixed so "Go over again" always records — the merged study-again surface depends on it.
+2. **The review→SM-2 edge skips** must be fixed so "Go over again" always records. Calibration grading exists, but no-quality/cooldown cases still need a guaranteed quality source or explicit UX.
 
 `stripEnvelopeJson` on every bubble (BUG-941) is load-bearing — **KEEP.** Server-validated answers (quiz/assessment strip the correct answer client-side) — **KEEP.** Crons (`session-stale-cleanup` 10-min cadence / 30-min threshold; daily reconciliation) — **KEEP.**
 
@@ -306,7 +308,7 @@ The pipeline (`session-completed.ts`, concurrency 25/profile, idempotent) is sop
 
 ## Mode taxonomy — collapse seven to three
 
-**Today:** seven `mode` strings ship (`freeform, learning, review, homework, relearn, recitation, gap_fill`). The user never picks one — it's inferred from the button. `learning`/`relearn`/`review` are **all `sessionType=learning`**, differing only in opener copy + one timer + one Challenge policy. `gap_fill` has **no `SESSION_MODE_CONFIGS` entry** and renders freeform chrome.
+**Today:** seven `mode` strings ship (`freeform, learning, review, homework, relearn, recitation, gap_fill`). The user never picks one — it's inferred from the button. `learning`/`relearn`/`review` are **all `sessionType=learning`**, differing only in opener copy + one timer + one Challenge policy. `gap_fill` now has a dedicated Gap Check config/chrome, but it is still a runtime branch rather than a learner-selected top-level mode.
 
 **Proposed minimal set — 3 modes + runtime modifiers:**
 
@@ -315,7 +317,7 @@ The pipeline (`session-completed.ts`, concurrency 25/profile, idempotent) is sop
 | **learning** | **KEEP** → rename `tutor` (the canonical teaching session) |
 | freeform | **MERGE → tutor**; "subject unknown at start" = `topicId == null` runtime branch (drives classification + auto-file) |
 | relearn | **MERGE → tutor**; recap opener derived from "topic has prior summary" |
-| gap_fill | **MERGE → tutor**; carry `gaps[]` as session params (+ give it real results-carrying chrome so a tested learner isn't dumped into a generic chat) |
+| gap_fill | **MERGE → tutor** eventually; carry `gaps[]` as session params. Chrome is already fixed with Gap Check copy. |
 | **review** | **KEEP** → the one mode with a distinct affordance (the visible timer) + overlay-suppression |
 | **homework** | **KEEP** → camera entry, direct (non-Socratic) answers, filing flow, no overlays |
 | recitation | **DERIVE-AT-RUNTIME** under `tutor` as `pedagogy=verbatim` |
@@ -344,7 +346,7 @@ The pipeline (`session-completed.ts`, concurrency 25/profile, idempotent) is sop
 
 **Today (`practice/index.tsx:498-1000`):** four co-equal sections — `bestNextStep` (a "Review" card → relearn + a usually-**locked** Assessment row), `quiz` (card + Capitals "?"/Guess-Who "W" tiles), `otherPractice` (Vocab/Dictation "D"/Recite "R" slider), `recentProgress` (History "H").
 
-**Friction:** ~8–9 tappable things across four sections; cryptic single-letter icons; "Assessment" vs "Quiz" undifferentiated (both = "a test" to a kid); the recommendation doesn't dominate because three equal-weight sections follow it; and a usually-**locked Assessment row** is many kids' first impression ("this app is full of stuff I can't use").
+**Friction:** ~8–9 tappable things across four sections; cryptic single-letter icons; "Assessment" vs "Quiz" undifferentiated (both = "a test" to a kid); the recommendation doesn't dominate because three equal-weight sections follow it. First slice made the locked Assessment state non-pressable, but the locked hint can still be many kids' first impression ("this app is full of stuff I can't use").
 
 **Proposed — SIMPLIFY (leaning rework of layout):**
 - **One dominant recommended action as hero** (the Best-next-step card, verb-first: "Review 3 topics"), one button.
@@ -369,9 +371,9 @@ Pedagogy mode, input mode, celebration level, conversation language, pronouns, i
 | Interleaved session | server-built / mobile-dormant | **RETIRE the path**; keep engine; revive only as a self-test "mixed review" option |
 | recall-test screen | orphaned (push-deep-link only) | **RETIRE the screen**; keep the engine (load-bearing for relearn) |
 | Quiz mid-round prefetch | dead code | **DELETE** (or wire it — Play Again currently re-generates) |
-| `gap_fill` chrome | freeform chrome, no config | **FIX** — real results-carrying chrome, or fold into `tutor` with `gaps[]` |
+| `gap_fill` chrome | fixed: Gap Check chrome exists | **DONE for chrome** — broader mode collapse may still fold it into `tutor` with `gaps[]` |
 | relearn method-picker | cosmetic (never persisted) | **DELETE** (or wire `setTeachingPreference`) |
-| freeform "Write note" alert | offered-then-denied | **DELETE** the alert; gate CTA on `topicId`; "Loose notes" fallback |
+| freeform "Write note" alert | fixed: topicless CTA/editor suppressed | **DONE for alert**; "Loose notes" remains optional future work |
 
 ---
 
@@ -382,7 +384,7 @@ Pedagogy mode, input mode, celebration level, conversation language, pronouns, i
 3. **Devil's-Advocate for under-15s** — opt-in banner, or cut entirely for the younger cohort? (The silent-lie-to-a-13-year-old path is the highest-risk surface in the doc.)
 4. **Mode collapse to 3** — confirm `tutor`/`review`/`homework` + `entryPoint` telemetry, vs a softer 5-mode trim.
 5. **Talk-first Path 0** — confirm the product is willing to attach a session to a subject *after* the first turn (eventually-consistent), which is the crux of removing the cold-start gauntlet.
-6. **Review→SM-2 fix** — derive quality from the calibration opener, or let one teach-back probe through? Either way, a review must always write the card.
+6. **Review→SM-2 hardening** — calibration grading exists, but derive/force a quality source for no-quality/cooldown edges, or make those edges visible. Either way, a review must not appear to count while silently doing nothing.
 7. **Supporter digest** — willing to fold the Recaps tab into a per-child digest and demote the 7 deeper child screens behind progressive disclosure?
 
 ---

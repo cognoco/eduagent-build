@@ -5,6 +5,8 @@ Complete, code-true trace of every learning path in MentoMate — from the first
 > **Verification note (2026-06-09).** This document was reconstructed directly from source (`apps/mobile/src/app/(app)/**`, `apps/api/src/**`, `packages/schemas/src/**`) by an 18-agent end-to-end audit, not from the previous edition of this file. Where the prior doc diverged from code, the code wins and the drift is flagged inline as **[was: …]**. File:line citations are current as of this date; re-verify after any nav-contract, session-exchange, or post-session-pipeline change.
 >
 > **Correction pass (2026-06-09).** A follow-up 14-agent re-verification corrected the topic-probe failure semantics (Path 0), the `needs_deepening_topics` writer set (Notes / Path 5), the recall-test inbound path (Path 5), the Assessment create endpoint, the freeform overlay-eligibility row, the completion dispatch-site count, and added several previously-missing entry surfaces and branches. Each correction is flagged inline with a **[was: …]** note.
+>
+> **Correction pass (2026-06-11).** Applied the learning-flow simplification deepdive patch list and first small implementation slice: review SM-2 calibration is live-but-not-guaranteed, Challenge drafted-note save is not guarded today, Recall Bridge is skip-path-only, `gap_fill` has dedicated chrome, topicless note prompts are suppressed, quiz completion queues a persistent celebration, locked Assessment is non-pressable, recitation skips the filing wait, and the home subject carousel opens the shelf. Each correction is flagged inline where it replaces a stale claim.
 
 ---
 
@@ -42,6 +44,8 @@ Two parallel shells coexist, selected by `MODE_NAV_V1_ENABLED` (V1 guardian rede
 | Parent-proxy | `PROXY_TABS` = home, library, progress (no `more`) | `PARENT_PROXY_TABS` (3) | `PARENT_PROXY_TABS` (3) |
 
 > **Hard constraint (preserved).** The V1-off + V0-off branch returns `LEGACY_GUARDIAN_TABS` (5 tabs) for the production guardian (`navigation-contract.ts:273-283`). This is the shipped production shape and must not regress when V1 lands. See `docs/specs/2026-05-21-navigation-contract.md`.
+>
+> **Labeling nuance.** V1-off explicit Study mode uses the contract's study fall-through shape, not the V0 helper as an implementation source. The resulting learner tab set matches the legacy learner shape, but docs should avoid implying the V0 helper owns that branch.
 
 ### Home branching (learner vs supporter)
 
@@ -82,7 +86,7 @@ navigationContract.home.screen === 'FamilyHome'
 | **5 — Retention Relearn** | Learner: Library pills / Practice hub / book "review" | `relearn` | `learning` | prod-active (recall-test pre-check is **orphaned**) |
 | **6 — Recitation** | Learner: Practice hub "Recite" (Beta) | `recitation` | `learning` | prod-active (Beta) |
 | **NEW — Interleaved Retrieval** | *(none — no mobile caller)* | n/a | **`interleaved`** | **server-built / mobile-dormant** |
-| **NEW — `gap_fill`** | Spawned by Assessment "borderline" | `gap_fill` (no mode config → renders freeform chrome) | `learning` | prod-active (spawned only) |
+| **NEW — `gap_fill`** | Spawned by Assessment "borderline" | `gap_fill` (dedicated "Gap Check" chrome) | `learning` | prod-active (spawned only) |
 
 ### Practice activities (non-session — own tables)
 
@@ -112,14 +116,14 @@ Every in-app surface that starts a path. `mode:` is the route param pushed to `/
 | 0 Learn-New | `home-action-study-new`, `home-add-subject-tile`, `home-add-first-subject` | `/create-subject` → `/(app)/session` `{mode:'learning'}` | ✅ | study ctx | `LearnerScreen.tsx:93-99,656-661,709-731` |
 | 2 Guided | topic detail "Start studying" / continue | `/(app)/session` `{mode:'learning', subjectId, topicId}` | ✅ | owner | `topic/[topicId].tsx:443-481` |
 | 2 Guided | book "up next" / topic row | `/(app)/session` `{mode:'learning', ...}` | ✅ | owner | `shelf/[subjectId]/book/[bookId].tsx:1086-1130` |
-| 2 Guided | subject carousel `home-subject-card-*` | `/(app)/progress/[subjectId]` (→ topic detail) | ✅ | view-only | `LearnerScreen.tsx:629-651` |
+| 2 Guided | subject carousel `home-subject-card-*` | `/(app)/shelf/[subjectId]` | ✅ | view-only | `LearnerScreen.tsx:629-651` [was: progress detail] |
 | 3 Homework | `home-action-homework` | `/(app)/homework/camera` → `{mode:'homework'}` | ✅ | study ctx | `LearnerScreen.tsx:72-78`; `homework/camera.tsx:509` |
 | 4 Practice/Review | topic detail "Review this topic" (overdue) | `/(app)/session` `{mode:'review'}` | ✅ | owner | `topic/[topicId].tsx:458-462` |
 | 5 Relearn | Practice hub "Best next step"; book "review"; CoachBand "Revisit … fading" | `/(app)/topic/relearn` → `{mode:'relearn'}` | ✅ | owner | `practice/index.tsx:513-518`; `book/[bookId].tsx:1184`; `LearnerScreen.tsx:367-372`; `topic/relearn.tsx:316-318` |
 | 6 Recitation | Practice hub `practice-recitation` (Beta) | `/(app)/session` `{mode:'recitation'}` | ✅ | owner | `practice/index.tsx:920-924` |
 | 7 Quiz | Practice hub "Quiz" / vocab cards; CoachBand quiz-discovery (capitals/guess_who → `/(app)/quiz/launch`, vocabulary → `/(app)/quiz` picker, fixed 2026-06-10); quiz/history "Play again" | `/(app)/quiz` | ✅ | owner | `practice/index.tsx:397-423,832-839`; `LearnerScreen.tsx:391-401` |
 | 8 Dictation | Practice hub `practice-dictation` | `/(app)/dictation` | ✅ | owner | `practice/index.tsx:879-883` |
-| Assessment | Practice hub "Assessment" | `/(app)/practice/assessment-picker` → `/(app)/practice/assessment` | ✅ | owner | `practice/index.tsx:425-440` |
+| Assessment | Practice hub "Assessment" (pressable only when eligible topics exist; otherwise non-pressable locked hint) | `/(app)/practice/assessment-picker` → `/(app)/practice/assessment` | ✅ | owner | `practice/index.tsx:425-440` |
 | Supporter-only | "Learn together → Add to my learning" (clone child topic) | `POST /curriculum/clone-from-child` → `/(app)/topic/relearn` (study mode) | — | ✅ (as self) | `LearnTogetherSheet.tsx`; `use-clone-from-child.ts:200-218` |
 | Supporter-only | "Continue learning this topic" from the read-only transcript (archived only) | `session-transcript/[sessionId]` → `/(app)/session` `{mode:'learning'}` | — | ✅ (as self) | `session-transcript/[sessionId].tsx:179-186` |
 
@@ -200,7 +204,7 @@ Home → home-ask-anything → /(app)/session {mode:'freeform'}
 
 ### Key behavior & corrections
 - **Filing affordance is homework-only.** `setShowFilingPrompt(true)` fires **only** for `effectiveMode==='homework'` (`use-session-actions.ts:375-376`). Freeform **never** shows the manual "Add to Library" prompt — it goes straight to summary. The ≥5-exchange threshold (MMT-ADR-0019, `FILING_CONFIG.minFreeformExchanges=5`) gates the **server-side auto-file dispatch only**, not a prompt.
-- **Note prompt UI is NOT freeform-excluded.** The KNOWLEDGE CAPTURE block is included for all non-recitation sessions, so the LLM *can* emit `note_prompt.show` and the "Write note" affordance *can* render in freeform. The save is blocked at the `topicId` null guard with a "cannot save" alert — exclusion is **emergent (save-time), not CTA-suppression** [was: "Freeform does not offer a learner-note flow"].
+- **Topic notes are CTA-suppressed when topicless.** The KNOWLEDGE CAPTURE block is still included for all non-recitation sessions, so the LLM *can* emit `note_prompt.show`; however, `SessionFooter` renders the "Write note" affordance and `NoteInput` only when `topicId` is present. A topicless freeform session no longer shows a note-save CTA or the old "cannot save" alert [was: "prompt can appear, save blocked at topicId guard"].
 - Challenge Round excluded (no `topicId`).
 - After background filing completes, `postSessionSuggestions` writes ≤2 `topic_suggestions` for the book.
 - Durable review artifact for a filed freeform session = the LLM learner recap / structured summary (no learner-authored note).
@@ -263,7 +267,8 @@ Home → home-action-homework → Camera Screen (blocked in parent-proxy: read-o
       │   homework_problem_started / _completed / ocr_correction events
       └─ End Session → Filing Prompt ("Yes, add it" / "No thanks") [homework is the ONLY path
           that shows the manual filing prompt] → Session Summary
-          └─ Recall Bridge: POST /sessions/:id/recall-bridge — generates MAX 2 questions
+          ├─ Submit "Your Words" → completion dispatch only
+          └─ Skip → Recall Bridge POST /sessions/:id/recall-bridge — generates MAX 2 questions
              [was: "3"], homework-only, requires topicId (so empty unless the session was filed)
 ```
 
@@ -291,7 +296,7 @@ Topic Detail (completed/verified/stable AND overdue) → "Review this topic"
       └─ End Session → Session Summary (no filing prompt; topic exists)
 ```
 
-> **Recording caveat.** Because `evaluate`/`teach_back` prompt blocks are suppressed in review, `effectiveQuality` is often `null`, and the post-session `update-retention` SM-2 step **skips** when quality is null — a plain review session may leave the retention card unchanged. [was: "no special recording differences vs guided" — inaccurate; review has substantial prompt divergence and conditional SM-2.]
+> **Recording caveat.** Review has a live calibration grading path (`maybeDispatchReviewCalibration` → `review-calibration-grade.ts`) that can write SM-2 outside the ordinary overlay-quality path. The post-session `update-retention` step still skips when `effectiveQuality` is null, so review is **live-but-not-guaranteed**: non-substantive answers, cooldowns, or other no-quality edges may leave the card unchanged. [was: "review frequently records no SM-2 because overlays are suppressed" — over-pessimistic.]
 
 The non-overdue **"Practice again"** CTA on a strong topic routes `mode=learning` (a normal learning session), **not** review.
 
@@ -327,10 +332,10 @@ Library pill / overdue banner / Practice hub → /(app)/topic/relearn
 
 ### Two known gaps (verify before relying on this path)
 1. **Teaching preference is never written back.** `startRelearn` reads the preference and echoes the choice, but no code calls `setTeachingPreference` / the `PUT /subjects/:id/teaching-preference` endpoint from the relearn flow. The method choice is currently cosmetic.
-2. **Challenge Round is blocked after relearn.** The `needs_deepening_topics` insert at relearn start sets `struggleStatus='needs_deepening'`, which fails the Challenge eligibility gate. If the row is never resolved on completion, the block persists (resolution path UNVERIFIED).
+2. **Challenge Round is temporarily blocked after relearn.** The `needs_deepening_topics` insert at relearn start sets `struggleStatus='needs_deepening'`, which fails the Challenge eligibility gate. This is not permanent in the normal quality-bearing path: `updateNeedsDeepeningProgress()` resolves the row after `EXIT_CONSECUTIVE_SUCCESSES = 3` good completions. The remaining risk is no-quality or abandoned relearn sessions, which do not advance the counter.
 
 ### Relearn-specific side-effect
-`relearn-retention-reset` (CRITICAL pipeline step) resets the SM-2 card to baseline (`easeFactor 2.5, intervalDays 1, repetitions 0, failureCount 0`) **before** the SM-2 advance step runs.
+`relearn-retention-reset` (CRITICAL pipeline step) resets the SM-2 card to baseline (`easeFactor 2.5, intervalDays 1, repetitions 0, failureCount 0`) **before** the SM-2 advance step runs. It is gated on `mode==='relearn'`, `topicId`, `exchangeCount > 0`, and `effectiveQuality != null` [was: documented as mode-only].
 
 ---
 
@@ -353,7 +358,7 @@ Home → home-action-practice → Practice Hub → "Recite (Beta)" → /(app)/se
 
 ### Side-effects not in the old doc
 - **`practice_activity_events` write per AI turn** (`activityType='recitation'`).
-- **Guaranteed 60s filing-wait timeout** in the pipeline for topicless recitation sessions (filing never arrives → Sentry + `app/session.filing_timed_out`, then proceeds). Adds 60s server-side latency; transparent to the learner.
+- **No filing-wait timeout for recitation.** Topicless recitation used to enter the generic topicless-session wait and emit `app/session.filing_timed_out` after 60s; the pipeline now skips that wait when `event.data.mode === 'recitation'` [was: guaranteed 60s wait].
 - The full post-completion pipeline (coaching card, LLM summary, memory, XP, streak, embeddings) runs regardless of topic context. Verification overlays and Challenge Round do not run.
 
 ---
@@ -388,7 +393,7 @@ After dismissal: /(app)/quiz/history → /(app)/quiz/[roundId]
 
 ### Corrections (verify against the old doc)
 - **No `quiz_stats` table.** Stats are computed on-demand from `quiz_rounds` via SQL GROUP BY (`computeRoundStats`). [was: "writes to `quiz_stats`"]
-- **No celebration is queued on completion.** `celebrationTier` is computed and returned to the client; nothing writes the persistent celebration queue. [was: "celebration queued for next Home visit"]
+- **Persistent celebration is queued on completion.** `celebrationTier` is computed, returned to the client, and mapped to the existing home-surface celebration queue via `queueCelebration()` in a non-fatal `safeWrite` [was: "no celebration queued"].
 - **Mid-round prefetch is dead code.** `usePrefetchRound` + `/quiz/rounds/prefetch` exist but no production screen calls them; `prefetchedRoundId` is always null, and Play Again falls back to a fresh `launch`. [was: "mid-round prefetch at 50% so Play Again is instant"]
 - **Quiz XP is not written to `xp_ledger`.** It lives in `quiz_rounds.xpEarned` + `practice_activity_events.pointsEarned`. The `xp_ledger` is session/topic-scoped only.
 
@@ -406,7 +411,7 @@ After dismissal: /(app)/quiz/history → /(app)/quiz/[roundId]
 ```
 Practice Hub → "Dictation" → /(app)/dictation (Choice)
   ├─ "I have a text" → /(app)/dictation/text-preview  (BLANK editable TextInput — NO camera/OCR
-  │   in this flow [was: "Camera → OCR"]; ocrText param exists but no in-flow nav sets it)
+  │   in this flow [was: "Camera → OCR"]; no dictation text-preview `ocrText` route param/producer)
   │   → POST /dictation/prepare-homework (LLM sentence-split + punctuation) → Playback
   └─ "Surprise me" → POST /dictation/generate (LLM, 6-10 sentences [was: "6-12"], age-appropriate
       by AGE ONLY — does NOT read learning history/interests [was: "age-appropriate to recent
@@ -447,8 +452,8 @@ Practice Hub → "Assessment" → /(app)/practice/assessment-picker
       └─ Terminal status:
           ├─ passed
           ├─ borderline       → opens /(app)/session {mode:'gap_fill', gaps: JSON.stringify(weakAreas)}
-          │                      (NEW mode, no config → renders freeform chrome; server keys off
-          │                      gaps + topicId). Secondary action "decline-refresh" →
+          │                      (dedicated "Gap Check" chrome; server keys off gaps + topicId).
+          │                      Secondary action "decline-refresh" →
           │                      PATCH /assessments/:id/decline-refresh → back to /(app)/practice
           └─ failed_exhausted → opens /(app)/session {mode:'learning'}
 ```
@@ -500,7 +505,8 @@ Finalize (decideMasteryAndReview):
   │   [recorded via INSERT, not UPDATE]
   ├─ partial/misconception → needs_deepening_topics (source 'challenge_round', 7-day expiry)
   ├─ all missing → reteach (no mastery)
-  └─ solid evidence → DraftedNoteReview (lexical-overlap guard ≥0.4; fallback prompt if it fails)
+  └─ solid evidence → DraftedNoteReview (intended lexical-overlap guard exists, but the
+     current save route does not call `validateNoteDraft`; do not treat Save as guarded)
 ```
 
 - **LLM rung floor IS in source** (`resolveChallengeRoundLlmRoutingRung`, `session-exchange.ts:260-275`) — floors accepted/active/drafting turns to the advanced rung. [CLAUDE.md says "mechanism planned, not yet in source" — that note is stale.]
@@ -540,13 +546,13 @@ The old doc's "Guided + Practice only" was wrong in both directions: practice/re
 Notes are topic-bound. All four creation routes converge on `topic_notes` via `insertNoteWithCap()` (cap `MAX_NOTES_PER_TOPIC = 50`, advisory-locked).
 
 1. **Manual note** — "Add note" tool chip (shows in `teaching` stage, not topic-gated) → `NoteInput` → `POST /subjects/:s/topics/:t/notes`.
-2. **LLM `note_prompt`** — `ui_hints.note_prompt.show` renders a "Write note" affordance; `.post_session` opens `NoteInput` near session end. Emitted for all non-recitation sessions.
+2. **LLM `note_prompt`** — `ui_hints.note_prompt.show` renders a "Write note" affordance only when `topicId` is present; `.post_session` opens `NoteInput` near session end under the same topic gate. Emitted for all non-recitation sessions, but topicless sessions suppress the CTA.
 3. **Reflection auto-note** — "Your Words" reflection is copied verbatim into a topic note when `session.topicId` is set (cap conflict non-fatal).
-4. **Challenge drafted note** — LLM-authored from solid answers only, validated by a lexical-overlap guard before `DraftedNoteReview` Save/Skip.
+4. **Challenge drafted note** — LLM-authored from solid answers only. `validateNoteDraft()` exists and is used in the Challenge signal path, but the current note-save route does not call it before `DraftedNoteReview` Save/Skip [was: save was described as guarded].
 
 ### Corrections
-- **There is NO LLM review of a learner-authored note.** The only LLM evaluation nearby is `evaluateSummary()` on the *reflection* (route 3's source text), which gates reflection-bonus XP and "Mate feedback". The Challenge draft (route 4) is LLM *authoring* guarded by a deterministic overlap check, not LLM *review*.
-- **Freeform exclusion is save-time, not CTA-suppression** — the CTA/prompt can appear; the save is blocked by the `topicId` null guard with an alert.
+- **There is NO LLM review of a learner-authored note.** The only LLM evaluation nearby is `evaluateSummary()` on the *reflection* (route 3's source text), which gates reflection-bonus XP and "Mate feedback". The Challenge draft (route 4) is LLM *authoring*; its deterministic guard exists but is not wired into the current save route.
+- **Freeform topicless notes are CTA-suppressed** — the prompt signal can arrive, but `SessionFooter` suppresses both the CTA and editor when `topicId` is missing [was: save-time alert].
 - **`signals.needs_deepening` does NOT write a `needs_deepening_topics` row** — it is stored only in `session_events.metadata.needsDeepening` (telemetry). There are **two** production writers of `needs_deepening_topics`: the Challenge Round (`source='challenge_round'`, `challenge-round/persistence.ts:254` / `session-exchange.ts:777`) and the **relearn flow** (`retention-data.ts:1104-1109`, no explicit source → schema default `source='system_signal'`) [was: "the only writer is the Challenge Round; the `system_signal` default is unused" — refuted; the relearn path relies on the `system_signal` default].
 
 ### Per-path note applicability
@@ -554,7 +560,7 @@ Notes are topic-bound. All four creation routes converge on `topic_notes` via `i
 | Path | Manual | note_prompt | Reflection auto-note | Challenge draft |
 |---|---|---|---|---|
 | 0 / 2 Learning | ✅ | ✅ | ✅ (topic set) | ✅ (flag on) |
-| 1 Freeform | CTA shows, save blocked | prompt may fire, save blocked | ✗ (no topic) | ✗ |
+| 1 Freeform | ✗ unless a topic has been attached | prompt may fire, CTA suppressed without topic | ✗ (no topic) | ✗ |
 | 3 Homework | ✅ if topic-bound | ✅ | ✅ if topic | ✅ if topic-bound |
 | 4 Practice/Review | ✅ | ✅ | ✅ | ✅ |
 | 5 Relearn | ✅ | ✅ | ✅ | (blocked by needs_deepening status) |
@@ -565,7 +571,7 @@ Notes are topic-bound. All four creation routes converge on `topic_notes` via `i
 
 ## Bookmarks (within any tutoring session)
 
-Save AI messages mid-session once an AI response is persisted with a `subjectId` (topicId nullable). A one-time `BookmarkNudgeTooltip` appears after a few responses (per-profile SecureStore key). Saved at `/(app)/progress/saved`; parent-proxy hides delete. Bookmarks don't change pedagogy or recording.
+Save AI messages mid-session once an AI response is persisted with a `subjectId`. `topicId` is nullable, but `bookmarks.subjectId` is NOT NULL; a fully subjectless freeform turn cannot be bookmarked until classification/attachment supplies a subject. A one-time `BookmarkNudgeTooltip` appears after a few responses (per-profile SecureStore key). Saved at `/(app)/progress/saved`; parent-proxy hides delete. Bookmarks don't change pedagogy or recording.
 
 ---
 
@@ -611,10 +617,10 @@ un-keyed event array, so it relies on Inngest's native delivery dedup, NOT the $
 
 | Step | What | Gate |
 |---|---|---|
-| wait-for-filing (≤60s) | wait `app/filing.completed` | `(sessionType==='homework' \|\| !topicId) && !auto_closed` [was: "freeform/homework only"] |
+| wait-for-filing (≤60s) | wait `app/filing.completed` | `(sessionType==='homework' \|\| !topicId) && !auto_closed && mode!=='recitation'` [was: "freeform/homework only"; then recitation also waited] |
 | re-read-session | backfill topicId/exchangeCount | if missing |
 | process-verification-completion | evaluate/teach_back → SM-2 quality | vType ∈ {evaluate, teach_back} + topicId |
-| **relearn-retention-reset** | reset card to baseline | mode==='relearn' [**omitted from old doc**] |
+| **relearn-retention-reset** | reset card to baseline | mode==='relearn' + topicId + exchangeCount>0 + effectiveQuality!=null [**omitted from old doc**] |
 | update-retention | SM-2 advance | skip if no topics OR quality null |
 | update-vocabulary-retention | extract + upsert vocab | four_strands + languageCode |
 | update-needs-deepening | needs-deepening progress | quality + topics |
@@ -703,7 +709,7 @@ Top-level `session-transcript/[sessionId]` (NOT under `(app)/`; manual `useAuth`
 | Pedagogy | per subject | per subject | direct (no Socratic) | review override | standard learning | verbatim recall | cycle topics |
 | First-turn opener | FIRST TURN RULE | FIRST TURN RULE | none | review calibration | recap-based | none | n/a |
 | Verification overlays | **Yes** | **Yes** | None | **No** (suppressed) | **Yes** | None | None |
-| Challenge Round | No | flag-gated | No | No (review) | blocked (needs_deepening) | No | No |
+| Challenge Round | No | flag-gated | No | No (review) | temporarily blocked while `needs_deepening` is active | No | No |
 | Timer visible | No | No | No | **Yes** | No | No | No |
 | Reachable in mobile | Yes | Yes | Yes | Yes | Yes | Yes (Beta) | **No (dormant)** |
 
@@ -714,8 +720,8 @@ Top-level `session-transcript/[sessionId]` (NOT under `(app)/`; manual `useAuth`
 | Subject at start | optional (vocab) | No | topic-scoped |
 | Server-validated answers | Yes (per-question) | Yes (multimodal review, optional) | Yes (per-answer) |
 | Feeds retention | Yes (own tables: vocabulary / quiz_mastery_items) | No | Yes (`assessments`) |
-| XP | `quiz_rounds.xpEarned` + practice_activity_events (NOT xp_ledger) | None (v1) | UNVERIFIED |
-| Spawns a session? | No | text-preview → homework session | borderline→gap_fill, failed→learning |
+| XP | `quiz_rounds.xpEarned` + practice_activity_events (NOT xp_ledger) | None (v1) | `xp_ledger` entry atomically co-committed with SM-2 on terminal pass |
+| Spawns a session? | No | text-preview → homework session | borderline→gap_fill (Gap Check chrome), failed→learning |
 | Tables | `quiz_rounds` (+ missed_items, mastery_items); stats computed live | `dictation_results` (streak computed live) | `assessments` |
 
 ---
@@ -760,8 +766,8 @@ Top-level `session-transcript/[sessionId]` (NOT under `(app)/`; manual `useAuth`
 1. **Interleaved Retrieval** — intended-future (wire a mobile entry) or dead (remove)? It is fully server-built.
 2. **recall-test pre-check** — re-wire an in-app entry, or formally retire the screen? It has **no inbound path at all** (not even a notification deep-link — `recall_nudge` routes to `/home`), but the engine (`processRecallTest`) is load-bearing.
 3. **Relearn teaching-preference write** — the method choice is currently never persisted (`PUT /subjects/:id/teaching-preference` is unwired from the relearn flow). Intended or a gap?
-4. **Relearn → Challenge Round block** — confirm whether `needs_deepening_topics` is resolved on relearn completion; if not, challenge rounds are permanently blocked per relearned topic.
-5. **`gap_fill` mode** — no `SESSION_MODE_CONFIGS` entry (renders freeform chrome); confirm the server handles `mode=gap_fill` distinctly or via the `gaps`+`topicId` params.
+4. **Relearn → Challenge Round block** — no longer a permanent-block assumption; quality-bearing completions resolve `needs_deepening` after 3 good completions. Decide whether no-quality/abandoned relearn sessions need a separate unblock policy.
+5. **`gap_fill` server semantics** — mobile now has dedicated `gap_fill` chrome. Confirm whether the server should continue treating it as standard learning with `gaps`+`topicId`, or needs distinct analytics/prompt handling beyond the existing gap prompt block.
 6. **Embedding consent asymmetry** — document step 5 as intentional, or gate it with `isGdprProcessingAllowed`.
 7. **Consent-skip observability** — memory write is skipped silently; add a metric if visibility is wanted.
 8. **Production flag state** — confirm live Doppler values of `EXPO_PUBLIC_ENABLE_MODE_NAV` / `..._V1` before publishing the tab matrix as authoritative.

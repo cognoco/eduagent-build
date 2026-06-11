@@ -136,6 +136,19 @@ describe('SessionFooter', () => {
     );
   });
 
+  it('does not offer the note prompt when the session has no topicId', () => {
+    const props = createProps({
+      showFilingPrompt: false,
+      notePromptOffered: true,
+      topicId: undefined,
+    });
+
+    render(<SessionFooter {...(props as any)} />);
+
+    expect(screen.queryByTestId('session-note-prompt')).toBeNull();
+    expect(screen.queryByTestId('note-text-input')).toBeNull();
+  });
+
   it('keeps the note editor open when note saving fails', () => {
     const setShowNoteInput = jest.fn();
     const createNote = {
@@ -180,6 +193,7 @@ describe('SessionFooter', () => {
       showFilingPrompt: false,
       notePromptOffered: true,
       showNoteInput: true,
+      topicId: 'topic-1',
     });
     render(<SessionFooter {...(props as any)} />);
 

@@ -293,27 +293,26 @@ describe('PracticeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/practice/assessment-picker');
   });
 
-  it('routes the assessment row to library when no topics are ready', async () => {
+  it('hides the assessment action and keeps unlock guidance when no topics are ready', async () => {
     mount({ subjects: [], assessmentTopics: [] });
 
     await waitFor(() => {
       screen.getByText('Available after you finish a topic');
     });
-    fireEvent.press(screen.getByTestId('practice-assessment'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    screen.getByTestId('practice-assessment-locked-hint');
+    expect(screen.queryByTestId('practice-assessment')).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('routes the assessment row to the active subject when a topic must be studied first', async () => {
+  it('hides the assessment action with active-subject unlock guidance', async () => {
     mount({ assessmentTopics: [] });
 
     await waitFor(() => {
       screen.getByText('Study Italian first to unlock this');
     });
-    fireEvent.press(screen.getByTestId('practice-assessment'));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'subject-it' },
-    });
+    screen.getByTestId('practice-assessment-locked-hint');
+    expect(screen.queryByTestId('practice-assessment')).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('routes the quiz parent to index and nested options to direct launch', async () => {

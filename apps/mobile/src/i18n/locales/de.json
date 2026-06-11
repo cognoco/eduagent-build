@@ -667,8 +667,6 @@
     },
     "notePrompt": {
       "writeNote": "Notiz schreiben",
-      "cannotSaveTitle": "Notiz nicht gespeichert",
-      "cannotSaveMessage": "Notizen können im Moment nicht gespeichert werden. Bitte versuche es erneut.",
       "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
       "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?"
     },
@@ -2658,7 +2656,6 @@
       "topicsReady_other": "{{count}} Themen testbereit",
       "afterFinishTopic": "Verfügbar, nachdem du ein Thema abgeschlossen hast",
       "hintOpenPicker": "Öffnet die Testauswahl",
-      "hintOpenLibrary": "Öffnet die Bibliothek",
       "couldNotLoad": "Testthemen konnten nicht geladen werden",
       "studySubjectFirst": "Lerne zuerst {{subject}}, um dies freizuschalten"
     },

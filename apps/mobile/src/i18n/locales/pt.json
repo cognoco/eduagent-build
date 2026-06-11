@@ -694,8 +694,6 @@
     },
     "notePrompt": {
       "writeNote": "Escrever uma nota",
-      "cannotSaveTitle": "Não é possível salvar a nota",
-      "cannotSaveMessage": "Não é possível salvar notas no momento. Tente novamente.",
       "saveFailedTitle": "Não foi possível salvar a nota",
       "summaryPlaceholder": "O que devemos lembrar desta sessão?"
     },
@@ -2658,7 +2656,6 @@
       "topicsReady_other": "{{count}} tópicos prontos para testar",
       "afterFinishTopic": "Disponível após concluir um tópico",
       "hintOpenPicker": "Abre o seletor de avaliações",
-      "hintOpenLibrary": "Abre a biblioteca",
       "couldNotLoad": "Não foi possível carregar os tópicos da avaliação",
       "studySubjectFirst": "Estude {{subject}} primeiro para desbloquear isto"
     },

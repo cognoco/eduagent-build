@@ -657,7 +657,7 @@ export function LearnerScreen({
                         ? undefined
                         : () => {
                             router.push({
-                              pathname: '/(app)/progress/[subjectId]',
+                              pathname: '/(app)/shelf/[subjectId]',
                               params: {
                                 subjectId: card.subjectId,
                                 returnTo: returnToTab,
