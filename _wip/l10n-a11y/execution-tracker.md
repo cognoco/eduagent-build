@@ -134,12 +134,12 @@ overlapping component files — keep adjacent/serial).
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-621 WP-L12-jsx-strings | in-progress — sub-sliced into 3 serial PRs (A: auth+onboarding+shared #942 in fix round; B: session+home+subscription; C: library+progress+rest). Baseline 361→272 after PR A |
-| 2 | WI-622 WP-L12-sr-announcements | review — PR #940 MERGED `ce8b10ab9` (2 CI rounds, Claude APPROVED, Codex P2 fixed); children WI-635/636 swept Closed/Done; `complete` firing → Reviewing |
+| 1 | WI-621 WP-L12-jsx-strings | in-progress — sub-sliced into 3 serial PRs. PR A #942 gate-passed (Claude APPROVED, Codex P2 split-sentence keys fixed + 4-sibling sweep), rebased over #940, CI re-running on `b6443ba0b`. Baseline 361→272 after PR A |
+| 2 | WI-622 WP-L12-sr-announcements | **done** — PR #940 merged `ce8b10ab9`; children WI-635/636 swept; CLOSED Done by autonomous review 2026-06-11 (first WP through the PRG-12 loop, zero human touches) |
 | 3 | WI-623 WP-L12-modal-focus-roles | backlog |
 | 4 | WI-624 WP-L12-label-prop-strings | backlog |
 | 5 | WI-625 WP-L12-pluralization | backlog |
-| 6 | WI-626 WP-L12-mobile-logic-bugs | backlog |
+| 6 | WI-626 WP-L12-mobile-logic-bugs | in-progress — pulled forward as safe parallel lane (tracker §4 rule); bridged (children WI-644/645) + Ready + dispatched wi626-executor 2026-06-11 |
 | 7 | WI-627 WP-L12-dates-locale | backlog |
 | 8 | WI-628 WP-L12-decorative-lowvision | backlog |
 
