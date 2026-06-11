@@ -128,7 +128,7 @@ Non-negotiable when working any Cosmo Work Item (WI). Each rule is a **trigger �
 
 ## Git Commits
 
-Always use the repo commit skill for every commit and push — `/commit` in Claude Code, or load `.agents/skills/commit/SKILL.md` in Codex. It is the single source of truth for staging, message format, hook handling, and push behavior (a thin overlay over the global `/zdx-core:commit`). Never hand-roll a commit flow, use the runtime's built-in commit protocol, or stage broadly without first checking scope. The skill lets hooks run and never bypasses them autonomously; the `--no-verify` doctrine lives in Required Validation below.
+Always use the repo commit skill for every commit and push — `/commit` in Claude Code, or load `.agents/skills/commit/SKILL.md` in Codex. It is the single source of truth for staging, message format, hook handling, and push behavior (a thin overlay over the global `/zdx-core:commit`). The global primitive ships in the `zdx-core` plugin from the `cognoco/zdx-marketplace` plugin registry — if `/zdx-core:commit` is unavailable, install/enable that plugin; never fall back to ad-hoc git. Never hand-roll a commit flow, use the runtime's built-in commit protocol, or stage broadly without first checking scope. The skill lets hooks run and never bypasses them autonomously; the `--no-verify` doctrine lives in Required Validation below.
 
 Agents perform code changes in isolated worktrees they own (see Worktree Placement below) and commit from there. In the residual shared-tree case, commit only your own session's work — own-work scope, which the commit skill enforces — and never stage files another session modified.
 
