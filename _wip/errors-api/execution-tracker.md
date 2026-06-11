@@ -120,9 +120,9 @@ parallel with either.
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-639 WP-E15-catch-hygiene | in-progress — Ready (bridged) + executor dispatched 2026-06-11 |
-| 2 | WI-640 WP-E15-typed-errors | backlog — serial after WI-639 merge |
-| 3 | WI-641 IT-E15-mobile-classification | in-progress — Ready + executor dispatched 2026-06-11 (parallel) |
+| 1 | WI-639 WP-E15-catch-hygiene | review — PR #948 MERGED `f54dd3c0f`; Stage=Reviewing via `complete`; children WI-642/643 swept Closed |
+| 2 | WI-640 WP-E15-typed-errors | in-progress — Ready (bridged, children WI-647/648) + executor dispatched 2026-06-11 |
+| 3 | WI-641 IT-E15-mobile-classification | review — PR #943 MERGED `fc52f96f3`; Stage=Reviewing via `complete` |
 
 ---
 
@@ -140,6 +140,21 @@ after WI-639 merges.
 
 ## 6. Change log
 
+- **2026-06-11 (shepherd, first merges)** — **WI-641 and WI-639 both MERGED and in
+  Reviewing.** WI-641: PR #943 → merge `fc52f96f3` (4 CI rounds: i18n source-baseline
+  staleness fix; review round added 2 boundary tests; final verdict APPROVED 0
+  findings). WI-639: PR #948 → merge `f54dd3c0f` (3 rounds: billing Sentry
+  escalation + 2 regression tests; consent `event` field; final verdict APPROVED,
+  2 non-blocking considers). Both finalized via `complete` (Fixed In = landed merge
+  commits); children WI-642/643 swept Closed/Done at merge. Incidental **WI-646**
+  (stripe-webhook rate-limited Sentry escalation, P3) captured from the un-folded
+  consider. **WI-640** bridged (brief + children WI-647/648) → Ready → executor
+  dispatched (JWKS hard constraint in brief: shape-validation only, design-divergence
+  → STOP → operator before merge). *Ops lesson for the mechanics doc:* the one-shot
+  CI watcher can fire in the push→check-suite-registration gap, and claude[bot]
+  RE-REVIEWS every push — the merge gate must re-read verdict + checks against the
+  exact head SHA and verify the verdict comment postdates the head push (caught a
+  stale-green twice tonight).
 - **2026-06-11 (shepherd, post-join)** — **WI-639 + WI-641 Ready and dispatched.**
   WI-639 bridged per the standing WP DoR ruling: bundle brief written to the page
   body; provenance children **WI-642** (silence half: F-022/F-047/F-048) and
