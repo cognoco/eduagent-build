@@ -243,6 +243,19 @@ productionization implication.
   default. *Production:* per-risk-class DoD depth (this WI deserved the full
   gauntlet; a docs WP does not) is the single highest-leverage tuning knob.
 
+- **2026-06-11 — the reviewer's DoD bar keeps revealing itself one bounce at a
+  time (WI-581).** After five clean WP closes, a NEW evidence-form
+  requirement surfaced: the PR body must list child WI ids explicitly (finding
+  ids aren't enough), and children must carry Completed dates. Both were
+  shepherd-side fixes (minutes), but the pattern is structural: the manual-DoD
+  checklist lives in the reviewer's judgment and is only discoverable by
+  failing it. *Production:* the close-evidence contract (what `complete` +
+  the PR must contain, field by field) must be a published artifact both
+  executor and shepherd can satisfy proactively — not an oral tradition
+  reconstructed from bounce messages. Tally of distinct DoD facets learned by
+  bounce so far: children closed, same Fixed In, merged-on-base, revert-proof,
+  child-ids-in-PR-body, Completed dates.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no

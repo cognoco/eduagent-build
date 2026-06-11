@@ -161,7 +161,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready (dispatch held)** — deps met; held until WI-577 merges (shared Inngest-function surface, conflict risk) |
 | WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #902). Zero bounces — children pre-swept at merge |
 | WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #900, 3 gate rounds). Eval-hook gate-gap = WI-619 (hit 3×) |
-| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **reviewing** — PR #915 merged (7bf3bdb7b); `complete` fired, Fixed In fa8246c30, children pre-swept — awaiting reviewer |
+| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **reviewing (resubmitted)** — first pass bounced on evidence form only (PR body lacked explicit child WI ids; children's Completed dates null). Shepherd fixed both (PR #915 body section + dates) and restored Stage=Reviewing |
 | WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #903). Zero bounces — third consecutive clean close |
 
 ### W4 — billing + remaining (parallel track)
@@ -216,7 +216,10 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   the parent's Fixed In BEFORE parent review; `complete` doesn't do it, so an
   unswept WP bounces by construction (proven on WI-575 and WI-583).
   Immediately after merging a WP's PR: PATCH its provenance children to
-  Stage=Closed, Resolution=Done, Fixed In = landed head commit URL. Applies
+  Stage=Closed, Resolution=Done, Fixed In = landed head commit URL, AND
+  Completed + Resolved dates = now (WI-581 bounce: null dates flagged), AND
+  ensure the PR body explicitly lists the child WI ids as resolved (the
+  reviewer wants child ids, not just finding ids, in the PR evidence). Applies
   to WI-576 (children WI-602/603), WI-577 (604/605), WI-578 (606/607),
   WI-579 (608/609), WI-581 (610/611), WI-582 (612/613), and the tail WPs.
   The reviewer keeps its own meta-log: `review-loop-reviewer-observations.md`.
