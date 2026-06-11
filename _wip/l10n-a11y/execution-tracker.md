@@ -136,12 +136,12 @@ overlapping component files — keep adjacent/serial).
 |---|---|---|
 | 1 | WI-621 WP-L12-jsx-strings | in-progress — PR A #942 MERGED `684495a2c` (89 strings, 361→272); PR B #961 **MERGED** `e382a95e6` (138 strings, 272→134, clean gate). Child WI-634 swept. Group C (final, ~127 strings + 8 `--accept`) building on `WI-621-c` |
 | 2 | WI-622 WP-L12-sr-announcements | **done** — PR #940 merged `ce8b10ab9`; children WI-635/636 swept; CLOSED Done by autonomous review 2026-06-11 (first WP through the PRG-12 loop, zero human touches) |
-| 3 | WI-623 WP-L12-modal-focus-roles | backlog |
-| 4 | WI-624 WP-L12-label-prop-strings | backlog |
-| 5 | WI-625 WP-L12-pluralization | backlog |
+| 3 | WI-623 WP-L12-modal-focus-roles | ready — bridged (children WI-653/654); run adjacent/serial with WI-624 (overlapping surface) |
+| 4 | WI-624 WP-L12-label-prop-strings | ready — bridged (children WI-655/656); after WI-621 lands (same screens, attribute pass) |
+| 5 | WI-625 WP-L12-pluralization | ready — bridged (children WI-657/658); PR #961 left plural-site breadcrumbs |
 | 6 | WI-626 WP-L12-mobile-logic-bugs | in-progress — PR #959 open, gate-held once (valid Codex CJK-matcher P2, fixed in `210569ee6`; CI re-running). NOTE: executor ran premature `complete` on the unmerged PR — shepherd restored Stage=Executing with [shepherd:hold] comment; one review run wasted. F-123 delivered as dormant-instance gating (shared live component — full removal would break focused/mobile chat); completion summary must carry the AC deviation note |
-| 7 | WI-627 WP-L12-dates-locale | backlog |
-| 8 | WI-628 WP-L12-decorative-lowvision | backlog |
+| 7 | WI-627 WP-L12-dates-locale | ready — bridged (children WI-659/660); most disjoint, next dispatch candidate |
+| 8 | WI-628 WP-L12-decorative-lowvision | ready — bridged (children WI-661/662) |
 
 **Sub-slice watch:** WP-1 absorbs the ~358-string aggregate (F-069) — it is the one
 bundle likely to exceed PR size. Sub-slice on demand at execution (planning-reference
@@ -161,13 +161,15 @@ watching **Identity Foundation + L10n & A11y Mobile**, trigger `Stage=Reviewing`
 review outputs named `<WI>.<ws-slug>.<ts>.*` under `/tmp/cosmo-watch/reviews/`.
 WI-621 and WI-622 bridged (briefs in page bodies; provenance children WI-633/634
 and WI-635/636; Sub-item set) and refined to `Stage=Ready`, `Execution Path=Assisted`.
-**PAUSE 2026-06-11 16:50 CEST — executor token-limit window (account pool shared
-across parallel shepherd fleets).** Both executors died mid-stride (WI-621-c
-mid-sweep uncommitted; WI-626 annotation fix staged uncommitted, PR #959 at
-`210569ee6` awaiting final round). 17:42 resume attempt failed — window re-exhausted
-instantly, new reset **21:50**; shepherd cron 7c5eda72 fires 21:52 (self-rescheduling
-if it re-exhausts again). If THIS session is dead instead: re-brief fresh executors
-from the amendments file; worktree states above are the pickup points.
+**Token-pool incident 2026-06-11 (~16:50–18:00 CEST), resolved by probe:** the shared
+account pool exhausted twice mid-execution; probes at ~18:00 found it cleared and both
+executors resumed (cron 7c5eda72 @ 21:52 stands as a harmless safety net; it no-ops if
+all is moving). During the stall the shepherd pre-bridged the ENTIRE remaining backlog
+(WI-623/624/625/627/628 → Ready, children WI-653…662, codex dedup judge to stay off
+the Claude pool). **Concurrency policy adopted: max 2 active executors** — the pool
+died at 2 builders + fleet overhead; roll the next bundle in as each lands. Next
+dispatch order: WI-627 (most disjoint) → WI-625 → WI-623 → WI-624 (adjacent pair,
+serial).
 
 **Operator go received 2026-06-11 (full autonomous mandate for the whole workstream;
 hold only for genuine judgment-unresolvable issues, conservatively).** WI-621 +
