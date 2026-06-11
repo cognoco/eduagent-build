@@ -546,7 +546,9 @@ export default function CreateProfileScreen() {
       >
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-h1 font-bold text-text-primary">
-            {isAddingChild ? 'Tell us about your child' : "Who's the learner?"}
+            {isAddingChild
+              ? t('createProfile.titleChild')
+              : t('createProfile.titleSelf')}
           </Text>
           <Button
             variant="tertiary"
@@ -573,7 +575,9 @@ export default function CreateProfileScreen() {
 
         <View onLayout={onFieldLayout('name')}>
           <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            {isAddingChild ? "Child's display name" : 'Display name'}
+            {isAddingChild
+              ? t('createProfile.childDisplayNameLabel')
+              : t('createProfile.displayNameLabel')}
           </Text>
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
@@ -594,12 +598,14 @@ export default function CreateProfileScreen() {
         </View>
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          {isAddingChild ? "Child's birth date" : 'Birth date'}
+          {isAddingChild
+            ? t('createProfile.childBirthDateLabel')
+            : t('createProfile.birthDateLabel')}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
           {isAddingChild
-            ? "So your child's mentor talks to them the right way. Minimum age is 11."
-            : 'So your mentor talks to you the right way. Minimum age is 11.'}
+            ? t('createProfile.childBirthDateHint')
+            : t('createProfile.birthDateHint')}
         </Text>
         {Platform.OS === 'web' ? (
           <View className="mb-2" onLayout={onFieldLayout('birthdate')}>
@@ -619,8 +625,8 @@ export default function CreateProfileScreen() {
             />
             <Text className="text-caption text-text-secondary mt-2">
               {isAddingChild
-                ? "Enter your child's birth date as YYYY-MM-DD."
-                : 'Enter your birth date as YYYY-MM-DD.'}
+                ? t('createProfile.childWebDateFormatHint')
+                : t('createProfile.webDateFormatHint')}
             </Text>
           </View>
         ) : (
@@ -642,8 +648,8 @@ export default function CreateProfileScreen() {
               {birthDate
                 ? formatDateForDisplay(birthDate)
                 : isAddingChild
-                  ? "Select your child's date of birth"
-                  : 'Select date of birth'}
+                  ? t('createProfile.selectChildDob')
+                  : t('createProfile.selectDob')}
             </Text>
           </Pressable>
         )}
@@ -660,7 +666,7 @@ export default function CreateProfileScreen() {
                     testID="date-picker-done"
                   >
                     <Text className="text-primary text-body font-semibold">
-                      Done
+                      {t('common.done')}
                     </Text>
                   </Pressable>
                 </View>

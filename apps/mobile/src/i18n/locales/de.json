@@ -26,7 +26,14 @@
       "title": "Dauert zu lange",
       "message": "Das dauert länger als erwartet. Bitte überprüfe deine Verbindung und versuche es erneut.",
       "loading": "Wird geladen, bitte warten"
-    }
+    },
+    "save": "Speichern",
+    "saving": "Wird gespeichert...",
+    "or": "oder",
+    "show": "Anzeigen",
+    "hide": "Ausblenden",
+    "notNow": "Nicht jetzt",
+    "active": "Aktiv"
   },
   "quota": {
     "parent": {
@@ -99,6 +106,56 @@
       "loadingLabel": "Anmeldung wird abgeschlossen",
       "finishing": "Anmeldung wird abgeschlossen...",
       "backToSignIn": "Zurück zur Anmeldung"
+    },
+    "signIn": {
+      "welcome": "Willkommen",
+      "welcomeReturning": "Willkommen zurück",
+      "welcomeFirstTime": "Willkommen bei MentoMate",
+      "subtitleLoading": "Melde dich an, um loszulegen",
+      "subtitleReturning": "Melde dich an, um weiterzulernen",
+      "subtitleFirstTime": "Melde dich an, um mit dem Lernen zu beginnen",
+      "signingYouIn": "Du wirst angemeldet...",
+      "enterAuthenticatorCode": "Authentifizierungscode eingeben",
+      "enterBackupCode": "Backup-Code eingeben",
+      "enterVerificationCode": "Bestätigungscode eingeben",
+      "totpHint": "Öffne deine Authenticator-App und gib den 6-stelligen Code ein.",
+      "backupCodeHint": "Gib einen der Backup-Codes ein, die du bei der Einrichtung der Zwei-Faktor-Authentifizierung gespeichert hast.",
+      "verificationCodeLabel": "Bestätigungscode",
+      "emailLabel": "E-Mail",
+      "passwordLabel": "Passwort",
+      "enterEmailHint": "Gib deine E-Mail-Adresse ein, um fortzufahren",
+      "enterPasswordHint": "Gib dein Passwort ein, um fortzufahren",
+      "additionalVerificationTitle": "Zusätzliche Verifizierung ist verfügbar",
+      "yourDevice": "dein Gerät",
+      "noAccountPrompt": "Du hast noch kein Konto?",
+      "newHere": "Neu hier?",
+      "tryMentomate": "MentoMate ausprobieren",
+      "unsupportedSsoHint": "Wenn dieses Konto auch Google- oder Apple-Anmeldung verwendet, versuche das oben. Wenn das nicht funktioniert, kontaktiere den Support.",
+      "unsupportedContactHint": "Kontaktiere den Support und wir helfen dir bei der Anmeldung. Erwähne: {{methods}}.",
+      "sentCodeTo": "Wir haben einen Bestätigungscode an <email>{{email}}</email> gesendet",
+      "offerBody": "Dieses Konto kann mit einem Bestätigungscode fortfahren, der an <id>{{identifier}}</id> gesendet wird. Wir senden den Code nur, wenn du fortfährst."
+    },
+    "signUp": {
+      "title": "Konto erstellen",
+      "subtitle": "Beginne deine Lernreise",
+      "accountNotFound": "Wir konnten kein Konto mit dieser E-Mail finden. Erstelle unten eines, um loszulegen.",
+      "orContinueWithEmail": "oder mit E-Mail fortfahren",
+      "emailLabel": "E-Mail",
+      "passwordLabel": "Passwort",
+      "alreadyHaveAccount": "Du hast bereits ein Konto?",
+      "verifyEmailTitle": "Deine E-Mail bestätigen",
+      "verificationCodeLabel": "Bestätigungscode",
+      "agreeToTerms": "Mit deiner Anmeldung stimmst du unseren <terms>Nutzungsbedingungen</terms> und unserer <privacy>Datenschutzerklärung</privacy> zu.",
+      "sentCodeTo": "Wir haben einen Bestätigungscode an <email>{{email}}</email> gesendet"
+    },
+    "forgotPassword": {
+      "title": "Passwort vergessen?",
+      "subtitle": "Wir senden einen Code zum Zurücksetzen an deine E-Mail",
+      "emailLabel": "E-Mail",
+      "resetPasswordTitle": "Passwort zurücksetzen",
+      "resetCodeLabel": "Code zum Zurücksetzen",
+      "newPasswordLabel": "Neues Passwort",
+      "enterCodeAndPassword": "Gib den an <email>{{email}}</email> gesendeten Code und dein neues Passwort ein"
     }
   },
   "guards": {
@@ -1759,6 +1816,9 @@
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
+    },
+    "stepIndicator": {
+      "stepOf": "Schritt {{current}} von {{total}}"
     }
   },
   "parentView": {
@@ -2692,7 +2752,12 @@
     }
   },
   "profiles": {
-    "title": "Profile"
+    "title": "Profile",
+    "noProfilesYet": "Noch keine Profile",
+    "createFirstHint": "Erstelle dein erstes Profil, um loszulegen",
+    "createProfile": "Profil erstellen",
+    "addProfile": "+ Profil hinzufügen",
+    "renameTitle": "Profil umbenennen"
   },
   "time": {
     "relative": {
@@ -2736,5 +2801,38 @@
       "stayHere": "Hier bleiben",
       "openUpdate": "Update öffnen"
     }
+  },
+  "createProfile": {
+    "titleChild": "Erzähl uns von deinem Kind",
+    "titleSelf": "Wer lernt hier?",
+    "displayNameLabel": "Anzeigename",
+    "childDisplayNameLabel": "Anzeigename des Kindes",
+    "birthDateLabel": "Geburtsdatum",
+    "childBirthDateLabel": "Geburtsdatum des Kindes",
+    "birthDateHint": "Damit dein Tutor richtig mit dir spricht. Mindestalter ist 11.",
+    "childBirthDateHint": "Damit der Tutor deines Kindes richtig mit ihm spricht. Mindestalter ist 11.",
+    "webDateFormatHint": "Gib dein Geburtsdatum als JJJJ-MM-TT ein.",
+    "childWebDateFormatHint": "Gib das Geburtsdatum deines Kindes als JJJJ-MM-TT ein.",
+    "selectDob": "Geburtsdatum auswählen",
+    "selectChildDob": "Geburtsdatum deines Kindes auswählen"
+  },
+  "clerkGate": {
+    "timeoutTitle": "Dauert länger als erwartet",
+    "timeoutMessage": "Bitte überprüfe deine Internetverbindung und versuche es erneut.",
+    "tryAgain": "Erneut versuchen",
+    "continueOffline": "Ohne Konto fortfahren",
+    "connecting": "Sichere Verbindung wird hergestellt..."
+  },
+  "modeSwitcher": {
+    "switchError": "Wechseln fehlgeschlagen. Zum Wiederholen tippen."
+  },
+  "profileSwitcher": {
+    "fallbackName": "Profil"
+  },
+  "memoryConsent": {
+    "defaultTitle": "Hilf dem Tutor, mehr über {{name}} zu lernen",
+    "defaultTitleNoName": "Hilf dem Tutor, mehr über dein Kind zu lernen",
+    "defaultDescription": "Dies ermöglicht dem Tutor, sich zu merken, welche Erklärungen funktionieren, was noch schwierig ist und welche Beispiele relevant erscheinen.",
+    "grant": "Ja, aktivieren"
   }
 }

@@ -26,7 +26,14 @@
       "title": "時間がかかりすぎています",
       "message": "想定より時間がかかっています。接続を確認して、もう一度お試しください。",
       "loading": "読み込み中、お待ちください"
-    }
+    },
+    "save": "保存",
+    "saving": "保存中...",
+    "or": "または",
+    "show": "表示",
+    "hide": "非表示",
+    "notNow": "後で",
+    "active": "アクティブ"
   },
   "quota": {
     "parent": {
@@ -99,6 +106,56 @@
       "loadingLabel": "サインインを完了中",
       "finishing": "サインインを完了中...",
       "backToSignIn": "サインインに戻る"
+    },
+    "signIn": {
+      "welcome": "ようこそ",
+      "welcomeReturning": "おかえりなさい",
+      "welcomeFirstTime": "MentoMateへようこそ",
+      "subtitleLoading": "サインインして始めましょう",
+      "subtitleReturning": "サインインして学習を続けましょう",
+      "subtitleFirstTime": "サインインして学習を始めましょう",
+      "signingYouIn": "サインインしています…",
+      "enterAuthenticatorCode": "認証アプリのコードを入力",
+      "enterBackupCode": "バックアップコードを入力",
+      "enterVerificationCode": "認証コードを入力",
+      "totpHint": "認証アプリを開き、6桁のコードを入力してください。",
+      "backupCodeHint": "2段階認証を設定した際に保存したバックアップコードのいずれかを入力してください。",
+      "verificationCodeLabel": "認証コード",
+      "emailLabel": "メールアドレス",
+      "passwordLabel": "パスワード",
+      "enterEmailHint": "続行するにはメールアドレスを入力",
+      "enterPasswordHint": "続行するにはパスワードを入力",
+      "additionalVerificationTitle": "追加の認証が利用可能です",
+      "yourDevice": "お使いのデバイス",
+      "noAccountPrompt": "アカウントをお持ちでないですか？",
+      "newHere": "初めての方",
+      "tryMentomate": "MentoMateを試す",
+      "unsupportedSsoHint": "このアカウントでGoogleまたはAppleサインインも使用している場合は、上記でお試しください。それでもうまくいかない場合は、サポートにお問い合わせください。",
+      "unsupportedContactHint": "サポートにお問い合わせください。サインインをお手伝いします。言及：{{methods}}",
+      "sentCodeTo": "<email>{{email}}</email>に認証コードを送信しました",
+      "offerBody": "このアカウントは<id>{{identifier}}</id>に送信される認証コードで続行できます。続行を選択した場合にのみ、コードを送信します。"
+    },
+    "signUp": {
+      "title": "アカウント作成",
+      "subtitle": "学習の旅を始めましょう",
+      "accountNotFound": "そのメールアドレスのアカウントが見つかりませんでした。以下から作成して始めましょう。",
+      "orContinueWithEmail": "またはメールアドレスで続ける",
+      "emailLabel": "メールアドレス",
+      "passwordLabel": "パスワード",
+      "alreadyHaveAccount": "すでにアカウントをお持ちですか？",
+      "verifyEmailTitle": "メールアドレスの認証",
+      "verificationCodeLabel": "認証コード",
+      "agreeToTerms": "登録すると、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したことになります。",
+      "sentCodeTo": "<email>{{email}}</email>に認証コードを送信しました"
+    },
+    "forgotPassword": {
+      "title": "パスワードをお忘れですか？",
+      "subtitle": "メールアドレスにリセットコードを送信します",
+      "emailLabel": "メールアドレス",
+      "resetPasswordTitle": "パスワードをリセット",
+      "resetCodeLabel": "リセットコード",
+      "newPasswordLabel": "新しいパスワード",
+      "enterCodeAndPassword": "<email>{{email}}</email>に送信されたコードと新しいパスワードを入力してください"
     }
   },
   "guards": {
@@ -1759,6 +1816,9 @@
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
+    },
+    "stepIndicator": {
+      "stepOf": "ステップ {{current}}/{{total}}"
     }
   },
   "parentView": {
@@ -2692,7 +2752,12 @@
     }
   },
   "profiles": {
-    "title": "プロフィール"
+    "title": "プロフィール",
+    "noProfilesYet": "プロフィールがまだありません",
+    "createFirstHint": "最初のプロフィールを作成して始めましょう",
+    "createProfile": "プロフィールを作成",
+    "addProfile": "+ プロフィールを追加",
+    "renameTitle": "プロフィールの名前を変更"
   },
   "time": {
     "relative": {
@@ -2736,5 +2801,38 @@
       "stayHere": "このままにする",
       "openUpdate": "アップデートを開く"
     }
+  },
+  "createProfile": {
+    "titleChild": "お子様について教えてください",
+    "titleSelf": "学習するのはどなたですか？",
+    "displayNameLabel": "表示名",
+    "childDisplayNameLabel": "お子様の表示名",
+    "birthDateLabel": "生年月日",
+    "childBirthDateLabel": "お子様の生年月日",
+    "birthDateHint": "チューターがあなたに合った話し方をするために必要です。対象年齢は11歳以上です。",
+    "childBirthDateHint": "チューターがお子様に合った話し方をするために必要です。対象年齢は11歳以上です。",
+    "webDateFormatHint": "生年月日を「YYYY-MM-DD」の形式で入力してください。",
+    "childWebDateFormatHint": "お子様の生年月日を「YYYY-MM-DD」の形式で入力してください。",
+    "selectDob": "生年月日を選択",
+    "selectChildDob": "お子様の生年月日を選択"
+  },
+  "clerkGate": {
+    "timeoutTitle": "予想以上に時間がかかっています",
+    "timeoutMessage": "インターネット接続を確認して、もう一度お試しください。",
+    "tryAgain": "再試行",
+    "continueOffline": "アカウントなしで続ける",
+    "connecting": "安全に接続中..."
+  },
+  "modeSwitcher": {
+    "switchError": "切り替えられませんでした。タップして再試行してください。"
+  },
+  "profileSwitcher": {
+    "fallbackName": "プロフィール"
+  },
+  "memoryConsent": {
+    "defaultTitle": "チューターが{{name}}さんについて学習するのを手伝う",
+    "defaultTitleNoName": "チューターがお子様について学習するのを手伝う",
+    "defaultDescription": "これにより、チューターはどのような説明が効果的か、何がまだ難しいか、どの例が関連性があるかを記憶できます。",
+    "grant": "はい、有効にする"
   }
 }

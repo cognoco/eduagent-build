@@ -26,7 +26,14 @@
       "title": "Tar for lang tid",
       "message": "Dette tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen.",
       "loading": "Laster, vennligst vent"
-    }
+    },
+    "save": "Lagre",
+    "saving": "Lagrer...",
+    "or": "eller",
+    "show": "Vis",
+    "hide": "Skjul",
+    "notNow": "Ikke nå",
+    "active": "Aktiv"
   },
   "quota": {
     "parent": {
@@ -99,6 +106,56 @@
       "loadingLabel": "Fullfører pålogging",
       "finishing": "Fullfører pålogging ...",
       "backToSignIn": "Tilbake til pålogging"
+    },
+    "signIn": {
+      "welcome": "Velkommen",
+      "welcomeReturning": "Velkommen tilbake",
+      "welcomeFirstTime": "Velkommen til MentoMate",
+      "subtitleLoading": "Logg inn for å komme i gang",
+      "subtitleReturning": "Logg inn for å fortsette å lære",
+      "subtitleFirstTime": "Logg inn for å begynne å lære",
+      "signingYouIn": "Logger deg inn...",
+      "enterAuthenticatorCode": "Skriv inn autentiseringskode",
+      "enterBackupCode": "Skriv inn en reservekode",
+      "enterVerificationCode": "Skriv inn bekreftelseskode",
+      "totpHint": "Åpne autentiseringsappen din og skriv inn den 6-sifrede koden.",
+      "backupCodeHint": "Skriv inn en av reservekodene du lagret da du satte opp tofaktorautentisering.",
+      "verificationCodeLabel": "Bekreftelseskode",
+      "emailLabel": "E-post",
+      "passwordLabel": "Passord",
+      "enterEmailHint": "Skriv inn e-posten din for å fortsette",
+      "enterPasswordHint": "Skriv inn passordet ditt for å fortsette",
+      "additionalVerificationTitle": "Ekstra bekreftelse er tilgjengelig",
+      "yourDevice": "enheten din",
+      "noAccountPrompt": "Har du ikke en konto?",
+      "newHere": "Ny her?",
+      "tryMentomate": "Prøv MentoMate",
+      "unsupportedSsoHint": "Hvis denne kontoen også bruker Google- eller Apple-innlogging, prøv det ovenfor. Hvis det ikke fungerer, kontakt kundestøtte.",
+      "unsupportedContactHint": "Kontakt kundestøtte, så hjelper vi deg med å logge inn. Nevn: {{methods}}.",
+      "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>",
+      "offerBody": "Denne kontoen kan fortsette med en bekreftelseskode sendt til <id>{{identifier}}</id>. Vi sender bare koden hvis du velger å fortsette."
+    },
+    "signUp": {
+      "title": "Opprett konto",
+      "subtitle": "Start læringsreisen din",
+      "accountNotFound": "Vi fant ingen konto med den e-postadressen. Opprett en nedenfor for å komme i gang.",
+      "orContinueWithEmail": "eller fortsett med e-post",
+      "emailLabel": "E-post",
+      "passwordLabel": "Passord",
+      "alreadyHaveAccount": "Har du allerede en konto?",
+      "verifyEmailTitle": "Bekreft e-posten din",
+      "verificationCodeLabel": "Bekreftelseskode",
+      "agreeToTerms": "Ved å registrere deg godtar du våre <terms>vilkår for bruk</terms> og <privacy>personvernerklæring</privacy>.",
+      "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>"
+    },
+    "forgotPassword": {
+      "title": "Glemt passord?",
+      "subtitle": "Vi sender en tilbakestillingskode til e-posten din",
+      "emailLabel": "E-post",
+      "resetPasswordTitle": "Tilbakestill passord",
+      "resetCodeLabel": "Tilbakestillingskode",
+      "newPasswordLabel": "Nytt passord",
+      "enterCodeAndPassword": "Skriv inn koden som ble sendt til <email>{{email}}</email> og ditt nye passord"
     }
   },
   "guards": {
@@ -1759,6 +1816,9 @@
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
+    },
+    "stepIndicator": {
+      "stepOf": "Steg {{current}} av {{total}}"
     }
   },
   "parentView": {
@@ -2692,7 +2752,12 @@
     }
   },
   "profiles": {
-    "title": "Profiler"
+    "title": "Profiler",
+    "noProfilesYet": "Ingen profiler ennå",
+    "createFirstHint": "Opprett din første profil for å komme i gang",
+    "createProfile": "Opprett profil",
+    "addProfile": "+ Legg til profil",
+    "renameTitle": "Gi profilen nytt navn"
   },
   "time": {
     "relative": {
@@ -2736,5 +2801,38 @@
       "stayHere": "Bli her",
       "openUpdate": "Åpne oppdatering"
     }
+  },
+  "createProfile": {
+    "titleChild": "Fortell oss om barnet ditt",
+    "titleSelf": "Hvem er det som skal lære?",
+    "displayNameLabel": "Visningsnavn",
+    "childDisplayNameLabel": "Barnets visningsnavn",
+    "birthDateLabel": "Fødselsdato",
+    "childBirthDateLabel": "Barnets fødselsdato",
+    "birthDateHint": "Slik at veilederen din snakker til deg på riktig måte. Aldersgrensen er 11 år.",
+    "childBirthDateHint": "Slik at barnets veileder snakker til dem på riktig måte. Aldersgrensen er 11 år.",
+    "webDateFormatHint": "Skriv inn fødselsdatoen din som ÅÅÅÅ-MM-DD.",
+    "childWebDateFormatHint": "Skriv inn barnets fødselsdato som ÅÅÅÅ-MM-DD.",
+    "selectDob": "Velg fødselsdato",
+    "selectChildDob": "Velg barnets fødselsdato"
+  },
+  "clerkGate": {
+    "timeoutTitle": "Tar lengre tid enn forventet",
+    "timeoutMessage": "Vennligst sjekk internettforbindelsen din og prøv igjen.",
+    "tryAgain": "Prøv igjen",
+    "continueOffline": "Fortsett uten konto",
+    "connecting": "Kobler til sikkert..."
+  },
+  "modeSwitcher": {
+    "switchError": "Kunne ikke bytte. Trykk for å prøve igjen."
+  },
+  "profileSwitcher": {
+    "fallbackName": "Profil"
+  },
+  "memoryConsent": {
+    "defaultTitle": "Hjelp veilederen med å lære om {{name}}",
+    "defaultTitleNoName": "Hjelp veilederen med å lære om barnet ditt",
+    "defaultDescription": "Dette lar veilederen huske hva slags forklaringer som fungerer, hva som fortsatt er vanskelig, og hvilke eksempler som føles relevante.",
+    "grant": "Ja, aktiver"
   }
 }

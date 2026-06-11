@@ -42,7 +42,14 @@
       "title": "Taking too long",
       "message": "This is taking longer than expected. Please check your connection and try again.",
       "loading": "Loading, please wait"
-    }
+    },
+    "save": "Save",
+    "saving": "Saving...",
+    "or": "or",
+    "show": "Show",
+    "hide": "Hide",
+    "notNow": "Not now",
+    "active": "Active"
   },
   "quota": {
     "parent": {
@@ -115,6 +122,56 @@
       "loadingLabel": "Finishing sign-in",
       "finishing": "Finishing sign-in...",
       "backToSignIn": "Back to sign in"
+    },
+    "signIn": {
+      "welcome": "Welcome",
+      "welcomeReturning": "Welcome back",
+      "welcomeFirstTime": "Welcome to MentoMate",
+      "subtitleLoading": "Sign in to get started",
+      "subtitleReturning": "Sign in to continue learning",
+      "subtitleFirstTime": "Sign in to start learning",
+      "signingYouIn": "Signing you in…",
+      "enterAuthenticatorCode": "Enter authenticator code",
+      "enterBackupCode": "Enter a backup code",
+      "enterVerificationCode": "Enter verification code",
+      "totpHint": "Open your authenticator app and enter the 6-digit code.",
+      "backupCodeHint": "Enter one of the backup codes you saved when you set up two-factor authentication.",
+      "sentCodeTo": "We sent a verification code to <email>{{email}}</email>",
+      "verificationCodeLabel": "Verification code",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "enterEmailHint": "Enter your email to continue",
+      "enterPasswordHint": "Enter your password to continue",
+      "additionalVerificationTitle": "Additional verification is available",
+      "offerBody": "This account can continue with a verification code sent to <id>{{identifier}}</id>. We will only send the code if you choose to continue.",
+      "yourDevice": "your device",
+      "noAccountPrompt": "Don't have an account?",
+      "newHere": "New here?",
+      "tryMentomate": "Try MentoMate",
+      "unsupportedSsoHint": "If this account also uses Google or Apple sign-in, try that above. If that doesn't work, contact support.",
+      "unsupportedContactHint": "Contact support and we'll help you sign in. Mention: {{methods}}."
+    },
+    "signUp": {
+      "title": "Create account",
+      "subtitle": "Start your learning journey",
+      "accountNotFound": "We couldn't find an account with that email. Create one below to get started.",
+      "orContinueWithEmail": "or continue with email",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "alreadyHaveAccount": "Already have an account?",
+      "agreeToTerms": "By signing up, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+      "verifyEmailTitle": "Verify your email",
+      "sentCodeTo": "We sent a verification code to <email>{{email}}</email>",
+      "verificationCodeLabel": "Verification code"
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "subtitle": "We'll send a reset code to your email",
+      "emailLabel": "Email",
+      "resetPasswordTitle": "Reset password",
+      "enterCodeAndPassword": "Enter the code sent to <email>{{email}}</email> and your new password",
+      "resetCodeLabel": "Reset code",
+      "newPasswordLabel": "New password"
     }
   },
   "guards": {
@@ -1852,6 +1909,9 @@
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
+    },
+    "stepIndicator": {
+      "stepOf": "Step {{current}} of {{total}}"
     }
   },
   "parentView": {
@@ -2716,7 +2776,12 @@
     }
   },
   "profiles": {
-    "title": "Profiles"
+    "title": "Profiles",
+    "noProfilesYet": "No profiles yet",
+    "createFirstHint": "Create your first profile to get started",
+    "createProfile": "Create profile",
+    "addProfile": "+ Add profile",
+    "renameTitle": "Rename profile"
   },
   "feedbackSheet": {
     "title": "Give us feedback",
@@ -2736,5 +2801,38 @@
       "suggestion": "Suggestion",
       "other": "Other"
     }
+  },
+  "createProfile": {
+    "titleChild": "Tell us about your child",
+    "titleSelf": "Who's the learner?",
+    "displayNameLabel": "Display name",
+    "childDisplayNameLabel": "Child's display name",
+    "birthDateLabel": "Birth date",
+    "childBirthDateLabel": "Child's birth date",
+    "birthDateHint": "So your mentor talks to you the right way. Minimum age is 11.",
+    "childBirthDateHint": "So your child's mentor talks to them the right way. Minimum age is 11.",
+    "webDateFormatHint": "Enter your birth date as YYYY-MM-DD.",
+    "childWebDateFormatHint": "Enter your child's birth date as YYYY-MM-DD.",
+    "selectDob": "Select date of birth",
+    "selectChildDob": "Select your child's date of birth"
+  },
+  "clerkGate": {
+    "timeoutTitle": "Taking longer than expected",
+    "timeoutMessage": "Please check your internet connection and try again.",
+    "tryAgain": "Try again",
+    "continueOffline": "Continue without account",
+    "connecting": "Connecting securely..."
+  },
+  "modeSwitcher": {
+    "switchError": "Couldn't switch. Tap to try again."
+  },
+  "profileSwitcher": {
+    "fallbackName": "Profile"
+  },
+  "memoryConsent": {
+    "defaultTitle": "Help the mentor learn about {{name}}",
+    "defaultTitleNoName": "Help the mentor learn about your child",
+    "defaultDescription": "This lets the mentor remember what kinds of explanations work, what is still tricky, and which examples feel relevant.",
+    "grant": "Yes, enable"
   }
 }

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSignIn } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
+import { Trans, useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
@@ -69,6 +70,7 @@ function withTimeout<T>(
 }
 
 export default function ForgotPasswordScreen() {
+  const { t } = useTranslation();
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -293,18 +295,22 @@ export default function ForgotPasswordScreen() {
             className="text-h2 font-bold text-text-primary mb-1"
             accessibilityRole="header"
           >
-            Reset password
+            {t('auth.forgotPassword.resetPasswordTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
-            Enter the code sent to{' '}
-            <Text
-              className="text-body-sm text-text-secondary font-semibold"
-              numberOfLines={1}
-              ellipsizeMode="middle"
-            >
-              {emailAddress}
-            </Text>{' '}
-            and your new password
+            <Trans
+              i18nKey="auth.forgotPassword.enterCodeAndPassword"
+              values={{ email: emailAddress }}
+              components={{
+                email: (
+                  <Text
+                    className="text-body-sm text-text-secondary font-semibold"
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  />
+                ),
+              }}
+            />
           </Text>
 
           {error !== '' && (
@@ -347,7 +353,7 @@ export default function ForgotPasswordScreen() {
             <>
               <View onLayout={onResetFieldLayout('code')}>
                 <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                  Reset code
+                  {t('auth.forgotPassword.resetCodeLabel')}
                 </Text>
                 <TextInput
                   className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
@@ -364,7 +370,7 @@ export default function ForgotPasswordScreen() {
 
               <View onLayout={onResetFieldLayout('password')}>
                 <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                  New password
+                  {t('auth.forgotPassword.newPasswordLabel')}
                 </Text>
                 <View className="mb-6">
                   <PasswordInput
@@ -454,10 +460,10 @@ export default function ForgotPasswordScreen() {
           className="text-h2 font-bold text-text-primary mb-1"
           accessibilityRole="header"
         >
-          Forgot password?
+          {t('auth.forgotPassword.title')}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-6">
-          We&apos;ll send a reset code to your email
+          {t('auth.forgotPassword.subtitle')}
         </Text>
 
         {error !== '' && (
@@ -471,7 +477,7 @@ export default function ForgotPasswordScreen() {
 
         <View onLayout={onFieldLayout('email')}>
           <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            Email
+            {t('auth.forgotPassword.emailLabel')}
           </Text>
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
