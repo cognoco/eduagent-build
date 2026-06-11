@@ -120,21 +120,20 @@
       "enterVerificationCode": "Wpisz kod weryfikacyjny",
       "totpHint": "Otwórz aplikację uwierzytelniającą i wpisz 6-cyfrowy kod.",
       "backupCodeHint": "Wpisz jeden z kodów zapasowych zapisanych podczas konfigurowania uwierzytelniania dwuskładnikowego.",
-      "sentCodePrefix": "Wysłaliśmy kod weryfikacyjny na adres",
       "verificationCodeLabel": "Kod weryfikacyjny",
       "emailLabel": "Email",
       "passwordLabel": "Hasło",
       "enterEmailHint": "Wpisz swój email, aby kontynuować",
       "enterPasswordHint": "Wpisz swoje hasło, aby kontynuować",
       "additionalVerificationTitle": "Dostępna jest dodatkowa weryfikacja",
-      "offerSentToPrefix": "To konto może kontynuować za pomocą kodu weryfikacyjnego wysłanego na",
-      "offerSendNote": ". Wyślemy kod tylko wtedy, gdy zdecydujesz się kontynuować.",
       "yourDevice": "Twoje urządzenie",
       "noAccountPrompt": "Nie masz konta?",
       "newHere": "Jesteś tu nowy?",
       "tryMentomate": "Wypróbuj MentoMate",
       "unsupportedSsoHint": "Jeśli to konto korzysta również z logowania przez Google lub Apple, spróbuj tej opcji powyżej. Jeśli to nie zadziała, skontaktuj się z pomocą techniczną.",
-      "unsupportedContactHint": "Skontaktuj się z pomocą techniczną, a pomożemy Ci się zalogować. Podaj: {{methods}}."
+      "unsupportedContactHint": "Skontaktuj się z pomocą techniczną, a pomożemy Ci się zalogować. Podaj: {{methods}}.",
+      "sentCodeTo": "Wysłaliśmy kod weryfikacyjny na adres <email>{{email}}</email>",
+      "offerBody": "Możesz kontynuować na tym koncie, używając kodu weryfikacyjnego wysłanego na <id>{{identifier}}</id>. Wyślemy kod tylko wtedy, gdy zdecydujesz się kontynuować."
     },
     "signUp": {
       "title": "Utwórz konto",
@@ -144,22 +143,19 @@
       "emailLabel": "Email",
       "passwordLabel": "Hasło",
       "alreadyHaveAccount": "Masz już konto?",
-      "agreePrefix": "Rejestrując się, zgadzasz się na nasze",
-      "termsOfService": "Warunki korzystania z usługi",
-      "privacyPolicy": "Polityka prywatności",
       "verifyEmailTitle": "Zweryfikuj swój email",
-      "sentCodePrefix": "Wysłaliśmy kod weryfikacyjny na adres",
-      "verificationCodeLabel": "Kod weryfikacyjny"
+      "verificationCodeLabel": "Kod weryfikacyjny",
+      "agreeToTerms": "Rejestrując się, akceptujesz nasz <terms>Regulamin</terms> i <privacy>Politykę Prywatności</privacy>.",
+      "sentCodeTo": "Wysłaliśmy kod weryfikacyjny na adres <email>{{email}}</email>"
     },
     "forgotPassword": {
       "title": "Nie pamiętasz hasła?",
       "subtitle": "Wyślemy kod resetujący na Twój email",
       "emailLabel": "Email",
       "resetPasswordTitle": "Zresetuj hasło",
-      "enterCodeSentTo": "Wpisz kod wysłany na adres",
-      "andYourNewPassword": "i swoje nowe hasło",
       "resetCodeLabel": "Kod resetujący",
-      "newPasswordLabel": "Nowe hasło"
+      "newPasswordLabel": "Nowe hasło",
+      "enterCodeAndPassword": "Wpisz kod wysłany na adres <email>{{email}}</email> i swoje nowe hasło"
     }
   },
   "guards": {

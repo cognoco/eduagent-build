@@ -120,21 +120,20 @@
       "enterVerificationCode": "Skriv inn bekreftelseskode",
       "totpHint": "Åpne autentiseringsappen din og skriv inn den 6-sifrede koden.",
       "backupCodeHint": "Skriv inn en av reservekodene du lagret da du satte opp tofaktorautentisering.",
-      "sentCodePrefix": "Vi sendte en bekreftelseskode til",
       "verificationCodeLabel": "Bekreftelseskode",
       "emailLabel": "E-post",
       "passwordLabel": "Passord",
       "enterEmailHint": "Skriv inn e-posten din for å fortsette",
       "enterPasswordHint": "Skriv inn passordet ditt for å fortsette",
       "additionalVerificationTitle": "Ekstra bekreftelse er tilgjengelig",
-      "offerSentToPrefix": "Denne kontoen kan fortsette med en bekreftelseskode sendt til",
-      "offerSendNote": ". Vi sender bare koden hvis du velger å fortsette.",
       "yourDevice": "enheten din",
       "noAccountPrompt": "Har du ikke en konto?",
       "newHere": "Ny her?",
       "tryMentomate": "Prøv MentoMate",
       "unsupportedSsoHint": "Hvis denne kontoen også bruker Google- eller Apple-innlogging, prøv det ovenfor. Hvis det ikke fungerer, kontakt kundestøtte.",
-      "unsupportedContactHint": "Kontakt kundestøtte, så hjelper vi deg med å logge inn. Nevn: {{methods}}."
+      "unsupportedContactHint": "Kontakt kundestøtte, så hjelper vi deg med å logge inn. Nevn: {{methods}}.",
+      "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>",
+      "offerBody": "Denne kontoen kan fortsette med en bekreftelseskode sendt til <id>{{identifier}}</id>. Vi sender bare koden hvis du velger å fortsette."
     },
     "signUp": {
       "title": "Opprett konto",
@@ -144,22 +143,19 @@
       "emailLabel": "E-post",
       "passwordLabel": "Passord",
       "alreadyHaveAccount": "Har du allerede en konto?",
-      "agreePrefix": "Ved å registrere deg godtar du våre",
-      "termsOfService": "vilkår for bruk",
-      "privacyPolicy": "personvernerklæring",
       "verifyEmailTitle": "Bekreft e-posten din",
-      "sentCodePrefix": "Vi sendte en bekreftelseskode til",
-      "verificationCodeLabel": "Bekreftelseskode"
+      "verificationCodeLabel": "Bekreftelseskode",
+      "agreeToTerms": "Ved å registrere deg godtar du våre <terms>vilkår for bruk</terms> og <privacy>personvernerklæring</privacy>.",
+      "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>"
     },
     "forgotPassword": {
       "title": "Glemt passord?",
       "subtitle": "Vi sender en tilbakestillingskode til e-posten din",
       "emailLabel": "E-post",
       "resetPasswordTitle": "Tilbakestill passord",
-      "enterCodeSentTo": "Skriv inn koden som ble sendt til",
-      "andYourNewPassword": "og ditt nye passord",
       "resetCodeLabel": "Tilbakestillingskode",
-      "newPasswordLabel": "Nytt passord"
+      "newPasswordLabel": "Nytt passord",
+      "enterCodeAndPassword": "Skriv inn koden som ble sendt til <email>{{email}}</email> og ditt nye passord"
     }
   },
   "guards": {

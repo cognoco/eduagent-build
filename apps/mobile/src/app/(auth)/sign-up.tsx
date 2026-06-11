@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Sentry } from '../../lib/sentry';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -361,14 +361,19 @@ export default function SignUpScreen() {
             {t('auth.signUp.verifyEmailTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
-            {t('auth.signUp.sentCodePrefix')}{' '}
-            <Text
-              className="text-body-sm text-text-secondary font-semibold"
-              numberOfLines={1}
-              ellipsizeMode="middle"
-            >
-              {emailAddress}
-            </Text>
+            <Trans
+              i18nKey="auth.signUp.sentCodeTo"
+              values={{ email: emailAddress }}
+              components={{
+                email: (
+                  <Text
+                    className="text-body-sm text-text-secondary font-semibold"
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  />
+                ),
+              }}
+            />
           </Text>
 
           {error !== '' && (
@@ -661,23 +666,25 @@ export default function SignUpScreen() {
             className="text-caption text-text-secondary text-center px-2 mb-8"
             testID="sign-up-terms-copy"
           >
-            {t('auth.signUp.agreePrefix')}{' '}
-            <Text
-              className="text-primary"
-              onPress={() => router.push('/terms')}
-              accessibilityRole="link"
-            >
-              {t('auth.signUp.termsOfService')}
-            </Text>{' '}
-            {t('common.and')}{' '}
-            <Text
-              className="text-primary"
-              onPress={() => router.push('/privacy')}
-              accessibilityRole="link"
-            >
-              {t('auth.signUp.privacyPolicy')}
-            </Text>
-            .
+            <Trans
+              i18nKey="auth.signUp.agreeToTerms"
+              components={{
+                terms: (
+                  <Text
+                    className="text-primary"
+                    onPress={() => router.push('/terms')}
+                    accessibilityRole="link"
+                  />
+                ),
+                privacy: (
+                  <Text
+                    className="text-primary"
+                    onPress={() => router.push('/privacy')}
+                    accessibilityRole="link"
+                  />
+                ),
+              }}
+            />
           </Text>
         </View>
       </ScrollView>

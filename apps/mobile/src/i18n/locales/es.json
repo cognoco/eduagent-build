@@ -120,21 +120,20 @@
       "enterVerificationCode": "Introduce el código de verificación",
       "totpHint": "Abre tu app de autenticación e introduce el código de 6 dígitos.",
       "backupCodeHint": "Introduce uno de los códigos de respaldo que guardaste al configurar la autenticación de dos factores.",
-      "sentCodePrefix": "Enviamos un código de verificación a",
       "verificationCodeLabel": "Código de verificación",
       "emailLabel": "Email",
       "passwordLabel": "Contraseña",
       "enterEmailHint": "Introduce tu email para continuar",
       "enterPasswordHint": "Introduce tu contraseña para continuar",
       "additionalVerificationTitle": "Verificación adicional disponible",
-      "offerSentToPrefix": "Esta cuenta puede continuar con un código de verificación enviado a",
-      "offerSendNote": ". Solo enviaremos el código si decides continuar.",
       "yourDevice": "tu dispositivo",
       "noAccountPrompt": "¿No tienes una cuenta?",
       "newHere": "¿Nuevo por aquí?",
       "tryMentomate": "Prueba MentoMate",
       "unsupportedSsoHint": "Si esta cuenta también usa el inicio de sesión de Google o Apple, prueba esa opción. Si no funciona, contacta con soporte.",
-      "unsupportedContactHint": "Contacta con soporte y te ayudaremos a iniciar sesión. Menciona: {{methods}}."
+      "unsupportedContactHint": "Contacta con soporte y te ayudaremos a iniciar sesión. Menciona: {{methods}}.",
+      "sentCodeTo": "Enviamos un código de verificación a <email>{{email}}</email>",
+      "offerBody": "Esta cuenta puede continuar con un código de verificación enviado a <id>{{identifier}}</id>. Solo enviaremos el código si decides continuar."
     },
     "signUp": {
       "title": "Crear cuenta",
@@ -144,22 +143,19 @@
       "emailLabel": "Email",
       "passwordLabel": "Contraseña",
       "alreadyHaveAccount": "¿Ya tienes una cuenta?",
-      "agreePrefix": "Al registrarte, aceptas nuestros",
-      "termsOfService": "Términos de servicio",
-      "privacyPolicy": "Política de privacidad",
       "verifyEmailTitle": "Verifica tu email",
-      "sentCodePrefix": "Enviamos un código de verificación a",
-      "verificationCodeLabel": "Código de verificación"
+      "verificationCodeLabel": "Código de verificación",
+      "agreeToTerms": "Al registrarte, aceptas nuestros <terms>Términos de servicio</terms> y nuestra <privacy>Política de privacidad</privacy>.",
+      "sentCodeTo": "Enviamos un código de verificación a <email>{{email}}</email>"
     },
     "forgotPassword": {
       "title": "¿Has olvidado la contraseña?",
       "subtitle": "Te enviaremos un código a tu correo",
       "emailLabel": "Email",
       "resetPasswordTitle": "Restablecer contraseña",
-      "enterCodeSentTo": "Introduce el código enviado a",
-      "andYourNewPassword": "y tu nueva contraseña",
       "resetCodeLabel": "Código de reinicio",
-      "newPasswordLabel": "Nueva contraseña"
+      "newPasswordLabel": "Nueva contraseña",
+      "enterCodeAndPassword": "Ingresa el código enviado a <email>{{email}}</email> y tu nueva contraseña"
     }
   },
   "guards": {

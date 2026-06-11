@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSignIn } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
@@ -298,15 +298,19 @@ export default function ForgotPasswordScreen() {
             {t('auth.forgotPassword.resetPasswordTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
-            {t('auth.forgotPassword.enterCodeSentTo')}{' '}
-            <Text
-              className="text-body-sm text-text-secondary font-semibold"
-              numberOfLines={1}
-              ellipsizeMode="middle"
-            >
-              {emailAddress}
-            </Text>{' '}
-            {t('auth.forgotPassword.andYourNewPassword')}
+            <Trans
+              i18nKey="auth.forgotPassword.enterCodeAndPassword"
+              values={{ email: emailAddress }}
+              components={{
+                email: (
+                  <Text
+                    className="text-body-sm text-text-secondary font-semibold"
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  />
+                ),
+              }}
+            />
           </Text>
 
           {error !== '' && (

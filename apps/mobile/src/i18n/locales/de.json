@@ -120,21 +120,20 @@
       "enterVerificationCode": "Bestätigungscode eingeben",
       "totpHint": "Öffne deine Authenticator-App und gib den 6-stelligen Code ein.",
       "backupCodeHint": "Gib einen der Backup-Codes ein, die du bei der Einrichtung der Zwei-Faktor-Authentifizierung gespeichert hast.",
-      "sentCodePrefix": "Wir haben einen Bestätigungscode gesendet an",
       "verificationCodeLabel": "Bestätigungscode",
       "emailLabel": "E-Mail",
       "passwordLabel": "Passwort",
       "enterEmailHint": "Gib deine E-Mail-Adresse ein, um fortzufahren",
       "enterPasswordHint": "Gib dein Passwort ein, um fortzufahren",
       "additionalVerificationTitle": "Zusätzliche Verifizierung ist verfügbar",
-      "offerSentToPrefix": "Dieses Konto kann mit einem Bestätigungscode fortfahren, der an",
-      "offerSendNote": " gesendet wird. Wir senden den Code nur, wenn du dich entscheidest, fortzufahren.",
       "yourDevice": "dein Gerät",
       "noAccountPrompt": "Du hast noch kein Konto?",
       "newHere": "Neu hier?",
       "tryMentomate": "MentoMate ausprobieren",
       "unsupportedSsoHint": "Wenn dieses Konto auch Google- oder Apple-Anmeldung verwendet, versuche das oben. Wenn das nicht funktioniert, kontaktiere den Support.",
-      "unsupportedContactHint": "Kontaktiere den Support und wir helfen dir bei der Anmeldung. Erwähne: {{methods}}."
+      "unsupportedContactHint": "Kontaktiere den Support und wir helfen dir bei der Anmeldung. Erwähne: {{methods}}.",
+      "sentCodeTo": "Wir haben einen Bestätigungscode an <email>{{email}}</email> gesendet",
+      "offerBody": "Dieses Konto kann mit einem Bestätigungscode fortfahren, der an <id>{{identifier}}</id> gesendet wird. Wir senden den Code nur, wenn du fortfährst."
     },
     "signUp": {
       "title": "Konto erstellen",
@@ -144,22 +143,19 @@
       "emailLabel": "E-Mail",
       "passwordLabel": "Passwort",
       "alreadyHaveAccount": "Du hast bereits ein Konto?",
-      "agreePrefix": "Mit der Anmeldung stimmst du unseren",
-      "termsOfService": "Nutzungsbedingungen",
-      "privacyPolicy": "Datenschutzrichtlinien",
       "verifyEmailTitle": "Deine E-Mail bestätigen",
-      "sentCodePrefix": "Wir haben einen Bestätigungscode gesendet an",
-      "verificationCodeLabel": "Bestätigungscode"
+      "verificationCodeLabel": "Bestätigungscode",
+      "agreeToTerms": "Mit deiner Anmeldung stimmst du unseren <terms>Nutzungsbedingungen</terms> und unserer <privacy>Datenschutzerklärung</privacy> zu.",
+      "sentCodeTo": "Wir haben einen Bestätigungscode an <email>{{email}}</email> gesendet"
     },
     "forgotPassword": {
       "title": "Passwort vergessen?",
       "subtitle": "Wir senden einen Code zum Zurücksetzen an deine E-Mail",
       "emailLabel": "E-Mail",
       "resetPasswordTitle": "Passwort zurücksetzen",
-      "enterCodeSentTo": "Gib den an",
-      "andYourNewPassword": "gesendeten Code und dein neues Passwort ein",
       "resetCodeLabel": "Code zum Zurücksetzen",
-      "newPasswordLabel": "Neues Passwort"
+      "newPasswordLabel": "Neues Passwort",
+      "enterCodeAndPassword": "Gib den an <email>{{email}}</email> gesendeten Code und dein neues Passwort ein"
     }
   },
   "guards": {

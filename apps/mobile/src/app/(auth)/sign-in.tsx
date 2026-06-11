@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import * as Linking from 'expo-linking';
 import * as SecureStore from '../../lib/secure-storage';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
@@ -1118,16 +1118,19 @@ export default function SignInScreen() {
             ) : pendingVerification.strategy === 'backup_code' ? (
               t('auth.signIn.backupCodeHint')
             ) : (
-              <>
-                {t('auth.signIn.sentCodePrefix')}{' '}
-                <Text
-                  className="text-body-sm text-text-secondary font-semibold"
-                  numberOfLines={1}
-                  ellipsizeMode="middle"
-                >
-                  {pendingVerification.identifier}
-                </Text>
-              </>
+              <Trans
+                i18nKey="auth.signIn.sentCodeTo"
+                values={{ email: pendingVerification.identifier }}
+                components={{
+                  email: (
+                    <Text
+                      className="text-body-sm text-text-secondary font-semibold"
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    />
+                  ),
+                }}
+              />
             )}
           </Text>
 
@@ -1483,13 +1486,18 @@ export default function SignInScreen() {
                   {t('auth.signIn.additionalVerificationTitle')}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-2">
-                  {t('auth.signIn.offerSentToPrefix')}{' '}
-                  <Text className="font-semibold text-text-primary">
-                    {'identifier' in verificationOffer
-                      ? verificationOffer.identifier
-                      : t('auth.signIn.yourDevice')}
-                  </Text>
-                  {t('auth.signIn.offerSendNote')}
+                  <Trans
+                    i18nKey="auth.signIn.offerBody"
+                    values={{
+                      identifier:
+                        'identifier' in verificationOffer
+                          ? verificationOffer.identifier
+                          : t('auth.signIn.yourDevice'),
+                    }}
+                    components={{
+                      id: <Text className="font-semibold text-text-primary" />,
+                    }}
+                  />
                 </Text>
                 <View className="mt-4">
                   <Button

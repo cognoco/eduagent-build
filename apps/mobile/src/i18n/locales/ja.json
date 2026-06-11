@@ -120,21 +120,20 @@
       "enterVerificationCode": "認証コードを入力",
       "totpHint": "認証アプリを開き、6桁のコードを入力してください。",
       "backupCodeHint": "2段階認証を設定した際に保存したバックアップコードのいずれかを入力してください。",
-      "sentCodePrefix": "認証コードを送信しました：",
       "verificationCodeLabel": "認証コード",
       "emailLabel": "メールアドレス",
       "passwordLabel": "パスワード",
       "enterEmailHint": "続行するにはメールアドレスを入力",
       "enterPasswordHint": "続行するにはパスワードを入力",
       "additionalVerificationTitle": "追加の認証が利用可能です",
-      "offerSentToPrefix": "このアカウントは、次の宛先に送信される認証コードで続行できます：",
-      "offerSendNote": "。続行を選択した場合にのみ、コードが送信されます。",
       "yourDevice": "お使いのデバイス",
       "noAccountPrompt": "アカウントをお持ちでないですか？",
       "newHere": "初めての方",
       "tryMentomate": "MentoMateを試す",
       "unsupportedSsoHint": "このアカウントでGoogleまたはAppleサインインも使用している場合は、上記でお試しください。それでもうまくいかない場合は、サポートにお問い合わせください。",
-      "unsupportedContactHint": "サポートにお問い合わせください。サインインをお手伝いします。言及：{{methods}}"
+      "unsupportedContactHint": "サポートにお問い合わせください。サインインをお手伝いします。言及：{{methods}}",
+      "sentCodeTo": "<email>{{email}}</email>に認証コードを送信しました",
+      "offerBody": "このアカウントは<id>{{identifier}}</id>に送信される認証コードで続行できます。続行を選択した場合にのみ、コードを送信します。"
     },
     "signUp": {
       "title": "アカウント作成",
@@ -144,22 +143,19 @@
       "emailLabel": "メールアドレス",
       "passwordLabel": "パスワード",
       "alreadyHaveAccount": "すでにアカウントをお持ちですか？",
-      "agreePrefix": "登録することにより、当社の",
-      "termsOfService": "利用規約",
-      "privacyPolicy": "プライバシーポリシー",
       "verifyEmailTitle": "メールアドレスの認証",
-      "sentCodePrefix": "認証コードを送信しました：",
-      "verificationCodeLabel": "認証コード"
+      "verificationCodeLabel": "認証コード",
+      "agreeToTerms": "登録すると、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したことになります。",
+      "sentCodeTo": "<email>{{email}}</email>に認証コードを送信しました"
     },
     "forgotPassword": {
       "title": "パスワードをお忘れですか？",
       "subtitle": "メールアドレスにリセットコードを送信します",
       "emailLabel": "メールアドレス",
       "resetPasswordTitle": "パスワードをリセット",
-      "enterCodeSentTo": "送信されたコードを入力",
-      "andYourNewPassword": "そして新しいパスワード",
       "resetCodeLabel": "リセットコード",
-      "newPasswordLabel": "新しいパスワード"
+      "newPasswordLabel": "新しいパスワード",
+      "enterCodeAndPassword": "<email>{{email}}</email>に送信されたコードと新しいパスワードを入力してください"
     }
   },
   "guards": {
