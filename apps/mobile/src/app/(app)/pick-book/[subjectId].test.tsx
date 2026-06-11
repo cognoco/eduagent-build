@@ -303,7 +303,7 @@ describe('PickBookScreen', () => {
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(
-        'Something went wrong',
+        "Something didn't load",
         expect.stringContaining("Couldn't set up that book"),
         expect.any(Array),
         undefined,
