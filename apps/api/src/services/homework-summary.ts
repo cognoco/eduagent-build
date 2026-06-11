@@ -134,7 +134,7 @@ export function parseHomeworkSummaryResponse(
     captureException(err, {
       extra: {
         site: 'parseHomeworkSummaryResponse',
-        // [F-074 / WI-579] Length only — even a truncated slice of LLM
+        // Length only — even a truncated slice of LLM
         // output can leak learner content to Sentry.
         responseLength: response.length,
       },

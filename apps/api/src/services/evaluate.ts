@@ -209,7 +209,7 @@ export function parseEvaluateAssessment(
       // but failed to parse — that's the meaningful failure case. A plain
       // prose reply that doesn't start with `{` is the expected post-cleanup
       // shape and shouldn't generate noise.
-      // [F-074 / WI-579] Shape-only diagnostics — LLM output derived from a
+      // Shape-only diagnostics — LLM output derived from a
       // learner's session must not ship to logs/Sentry, even truncated.
       logger.warn('Failed to parse evaluate assessment via envelope', {
         reason: parsed.reason,

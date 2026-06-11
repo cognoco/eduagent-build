@@ -3,7 +3,7 @@
 // (identity-foundation bundle: WP-W3-pii-error-logging / -event-payloads /
 // -step-state / IT-W3-pii-llm-provider).
 //
-// [F-018 / WI-579] Error/observability paths must never emit raw,
+// Error/observability paths must never emit raw,
 // unvalidated payloads (which can carry a minor's transcript, name, or
 // freeform input) via `logger.*` or `captureException` extras. On a
 // schema-drift path the payload is by definition unknown, so the only safe
@@ -22,7 +22,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * extras. Never includes keys or values from the input — only its type and,
  * for plain objects, the number of fields.
  */
-export function summarizeRawPayload(rawData: unknown) {
+export interface RawPayloadSummary {
+  payloadType: string;
+  fieldCount?: number;
+}
+
+export function summarizeRawPayload(rawData: unknown): RawPayloadSummary {
   if (!isRecord(rawData)) {
     return { payloadType: Array.isArray(rawData) ? 'array' : typeof rawData };
   }

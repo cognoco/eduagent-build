@@ -1779,7 +1779,7 @@ export async function analyzeSessionTranscript(
     captureException(err, {
       extra: {
         context: 'analyzeSession',
-        // [F-074 / WI-579] Length only — the LLM analysis of a learner's
+        // Length only — the LLM analysis of a learner's
         // session can echo learner quotes; no content slices to Sentry.
         responseLength: result.response?.length ?? 0,
       },

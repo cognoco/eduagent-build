@@ -26,7 +26,7 @@ import {
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
-// [WI-579] summarizeRawPayload moved to its canonical home in
+// summarizeRawPayload moved to its canonical home in
 // services/pii-scrub.ts (shared by every observe handler's drift path).
 import { summarizeRawPayload } from '../../services/pii-scrub';
 

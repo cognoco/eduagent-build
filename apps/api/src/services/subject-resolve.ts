@@ -131,7 +131,7 @@ export async function resolveSubjectName(
     // kept for resilience but the error must be visible — log + capture before
     // falling through to no_match.
     captureException(err, {
-      // [F-140 / WI-579] Length only — rawInput is freeform learner text and
+      // Length only — rawInput is freeform learner text and
       // must not be forwarded to Sentry.
       extra: {
         context: 'subject-resolve.fallback',

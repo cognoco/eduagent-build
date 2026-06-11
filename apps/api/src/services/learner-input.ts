@@ -131,7 +131,7 @@ async function parseLearnerInputToAnalysis(
       captureException(parseErr, {
         extra: {
           site: 'parseLearnerInputToAnalysis.jsonParse',
-          // [F-074 / WI-579] Length only — no learner-derived LLM output
+          // Length only — no learner-derived LLM output
           // content to Sentry.
           responseLength: result.response.length,
         },
@@ -144,7 +144,7 @@ async function parseLearnerInputToAnalysis(
         extra: {
           site: 'parseLearnerInputToAnalysis.safeParse',
           issues: validated.error.issues,
-          // [F-074 / WI-579] Length only — Zod issues already carry field
+          // Length only — Zod issues already carry field
           // paths (not values) for debugging.
           responseLength: result.response.length,
         },
