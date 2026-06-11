@@ -219,7 +219,7 @@ export default function ConsentScreen() {
         testID="consent-auth-loading"
         className="flex-1 items-center justify-center bg-background"
       >
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
       </View>
     );
   }

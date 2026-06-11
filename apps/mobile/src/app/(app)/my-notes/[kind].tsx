@@ -487,7 +487,7 @@ export default function MyNotesListScreen(): React.ReactElement {
         ListEmptyComponent={
           activeQuery.isLoading ? (
             <View className="items-center py-14" testID="my-notes-loading">
-              <ActivityIndicator />
+              <ActivityIndicator accessibilityLabel="Loading" />
             </View>
           ) : activeQuery.isError ? (
             <View className="items-center py-14" testID="my-notes-error">
@@ -520,7 +520,7 @@ export default function MyNotesListScreen(): React.ReactElement {
         ListFooterComponent={
           isFetchingNextPage ? (
             <View className="py-4 items-center">
-              <ActivityIndicator />
+              <ActivityIndicator accessibilityLabel="Loading" />
             </View>
           ) : hasNextPage ? (
             <Pressable

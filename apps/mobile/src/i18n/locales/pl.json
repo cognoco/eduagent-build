@@ -24,7 +24,8 @@
     },
     "timeoutLoader": {
       "title": "Trwa to zbyt długo",
-      "message": "Trwa to dłużej niż oczekiwano. Sprawdź połączenie i spróbuj ponownie."
+      "message": "Trwa to dłużej niż oczekiwano. Sprawdź połączenie i spróbuj ponownie.",
+      "loading": "Trwa ładowanie"
     }
   },
   "quota": {
@@ -578,7 +579,8 @@
       "stepProgress": "Krok {{current}} z {{total}}",
       "voicePermissionErrorTitle": "Błąd wprowadzania głosowego",
       "voicePermissionErrorMessage": "Dostęp do mikrofonu jest potrzebny do wprowadzania głosowego. Włącz go w Ustawieniach.",
-      "voicePermissionOpenSettings": "Otwórz Ustawienia"
+      "voicePermissionOpenSettings": "Otwórz Ustawienia",
+      "replyReady": "Odpowiedź gotowa"
     },
     "filingFailed": {
       "retryInProgress": "Ponowna próba jest już w toku.",
@@ -810,7 +812,11 @@
       "oneMoreLabel": "Rozpocznij kolejny quiz",
       "disputeLabel": "Zakwestionuj tę odpowiedź",
       "dismissLabel": "Zamknij",
-      "saveAndFinishLabel": "Zapisz postęp i zakończ rundę"
+      "saveAndFinishLabel": "Zapisz postęp i zakończ rundę",
+      "correctAnnounce": "Dobrze! Poprawna odpowiedź to {{answer}}",
+      "correctAnnounceNoAnswer": "Dobrze!",
+      "wrongAnnounce": "Niezupełnie. Poprawna odpowiedź to {{answer}}",
+      "wrongAnnounceNoAnswer": "Niezupełnie."
     },
     "results": {
       "viewHistory": "Zobacz historię"

@@ -217,7 +217,10 @@ export function FeedbackSheet({
                 testID="feedback-submit"
               >
                 {submit.isPending ? (
-                  <ActivityIndicator color={colors.textInverse} />
+                  <ActivityIndicator
+                    color={colors.textInverse}
+                    accessibilityLabel={t('common.loading')}
+                  />
                 ) : (
                   <Text className="text-body font-semibold text-text-inverse">
                     {t('feedbackSheet.sendButton')}

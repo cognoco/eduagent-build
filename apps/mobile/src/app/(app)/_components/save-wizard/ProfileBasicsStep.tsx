@@ -313,7 +313,7 @@ export function ProfileBasicsStep({
         accessibilityState={{ disabled: !canSubmit }}
       >
         {loading ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator color="white" accessibilityLabel="Loading" />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
             Continue

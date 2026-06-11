@@ -136,7 +136,11 @@ export function ClerkGate({
           backgroundColor: gateColors.background,
         }}
       >
-        <ActivityIndicator size="large" color={gateColors.primary} />
+        <ActivityIndicator
+          size="large"
+          color={gateColors.primary}
+          accessibilityLabel="Loading"
+        />
         <Text
           style={{
             marginTop: 16,

@@ -24,7 +24,8 @@
     },
     "timeoutLoader": {
       "title": "Tar for lang tid",
-      "message": "Dette tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen."
+      "message": "Dette tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen.",
+      "loading": "Laster, vennligst vent"
     }
   },
   "quota": {
@@ -553,7 +554,8 @@
       "stepProgress": "Steg {{current}} av {{total}}",
       "voicePermissionErrorTitle": "Feil med taleinndata",
       "voicePermissionErrorMessage": "Tilgang til mikrofonen er nødvendig for taleinndata. Aktiver den i Innstillinger.",
-      "voicePermissionOpenSettings": "Åpne Innstillinger"
+      "voicePermissionOpenSettings": "Åpne Innstillinger",
+      "replyReady": "Svar klart"
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",
@@ -785,7 +787,11 @@
       "oneMoreLabel": "Start en quiz til",
       "disputeLabel": "Bestrid dette svaret",
       "dismissLabel": "Lukk",
-      "saveAndFinishLabel": "Lagre fremdrift og avslutt runden"
+      "saveAndFinishLabel": "Lagre fremdrift og avslutt runden",
+      "correctAnnounce": "Riktig! Svaret var {{answer}}",
+      "correctAnnounceNoAnswer": "Riktig!",
+      "wrongAnnounce": "Ikke helt. Svaret var {{answer}}",
+      "wrongAnnounceNoAnswer": "Ikke helt."
     },
     "results": {
       "viewHistory": "Vis historikk"

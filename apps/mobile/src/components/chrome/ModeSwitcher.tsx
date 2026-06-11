@@ -66,6 +66,7 @@ export function ModeSwitcher(): React.ReactElement | null {
               testID="mode-switcher-study-spinner"
               size="small"
               className="me-1"
+              accessibilityLabel={t('common.loading')}
             />
           ) : null}
           <Text
@@ -101,6 +102,7 @@ export function ModeSwitcher(): React.ReactElement | null {
               testID="mode-switcher-family-spinner"
               size="small"
               className="me-1"
+              accessibilityLabel={t('common.loading')}
             />
           ) : null}
           <Text

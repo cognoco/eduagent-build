@@ -906,7 +906,10 @@ function LibraryScreenContent({
                 className="flex-row items-center px-1 mb-2"
                 testID="library-search-server-loading"
               >
-                <ActivityIndicator size="small" />
+                <ActivityIndicator
+                  size="small"
+                  accessibilityLabel={t('common.loading')}
+                />
                 <Text className="text-body-sm text-text-secondary ms-2">
                   {t('library.search.searching')}
                 </Text>

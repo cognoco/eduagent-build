@@ -442,7 +442,7 @@ export default function RelearnScreen() {
           className="flex-1 items-center justify-center px-6"
           testID="relearn-overdue-loading"
         >
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" accessibilityLabel="Loading" />
           <Text className="mt-3 text-body text-text-secondary">
             Loading review topics...
           </Text>
@@ -520,7 +520,7 @@ export default function RelearnScreen() {
           className="flex-1 items-center justify-center px-6"
           testID="relearn-loading"
         >
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" accessibilityLabel="Loading" />
           <Text className="mt-3 text-body text-text-secondary">
             Starting relearn session...
           </Text>

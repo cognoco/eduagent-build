@@ -128,7 +128,7 @@ export function SessionSummaryLibraryFilingControls({
       testID={testID}
     >
       {isBusy ? (
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel="Loading" />
       ) : (
         <Text className="text-body-sm font-semibold text-text-inverse">
           {label}

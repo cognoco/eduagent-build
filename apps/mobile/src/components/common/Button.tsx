@@ -75,6 +75,7 @@ export function Button({
       {loading ? (
         <ActivityIndicator
           color={variant === 'primary' ? colors.textInverse : colors.primary}
+          accessibilityLabel="Loading"
         />
       ) : (
         <Text

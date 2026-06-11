@@ -94,7 +94,11 @@ export function ConsentWithdrawnGate(): React.ReactElement {
           accessibilityLabel={t('tabs.consentWithdrawn.refreshStatus')}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color="white" />
+            <ActivityIndicator
+              size="small"
+              color="white"
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text className="text-body font-semibold text-text-inverse">
               {t('tabs.consentWithdrawn.refreshStatus')}

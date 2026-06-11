@@ -87,7 +87,10 @@ export function ParkingLotModal({
             testID="parking-lot-save"
           >
             {addParkingLotItem.isPending ? (
-              <ActivityIndicator color="white" />
+              <ActivityIndicator
+                color="white"
+                accessibilityLabel={t('common.loading')}
+              />
             ) : (
               <Text
                 className={
@@ -119,7 +122,7 @@ export function ParkingLotModal({
             ))}
             {parkingLot.isLoading ? (
               <View className="py-4 items-center">
-                <ActivityIndicator />
+                <ActivityIndicator accessibilityLabel={t('common.loading')} />
               </View>
             ) : parkingLot.data?.length ? null : (
               <Text className="text-body-sm text-text-secondary mt-3">
@@ -240,7 +243,7 @@ export function TopicSwitcherModal({
           <ScrollView style={{ maxHeight: 280 }}>
             {switcherCurriculum.isLoading ? (
               <View className="py-6 items-center">
-                <ActivityIndicator />
+                <ActivityIndicator accessibilityLabel={t('common.loading')} />
               </View>
             ) : (
               (switcherCurriculum.data?.topics ?? [])

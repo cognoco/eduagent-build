@@ -73,7 +73,7 @@ export default function SessionTranscriptScreen() {
         className="flex-1 bg-background items-center justify-center"
         testID="session-transcript-auth-loading"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" accessibilityLabel="Loading" />
       </View>
     );
   }

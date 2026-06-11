@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { View, Text } from 'react-native';
+import { useAnnounce } from '../../../../hooks/use-announce';
 
 export function ConfirmationToast({
   message,
@@ -7,6 +9,12 @@ export function ConfirmationToast({
   message: string | null;
   insetsBottom: number;
 }) {
+  const announce = useAnnounce();
+
+  useEffect(() => {
+    if (message) announce(message);
+  }, [message, announce]);
+
   if (!message) return null;
   return (
     <View
@@ -16,6 +24,8 @@ export function ConfirmationToast({
         bottom: Math.max(insetsBottom, 16) + 88,
       }}
       testID="session-confirmation-toast"
+      accessibilityLiveRegion="polite"
+      accessibilityRole="status"
     >
       <View className="rounded-full bg-text-primary px-4 py-3">
         <Text className="text-body-sm font-semibold text-text-inverse">

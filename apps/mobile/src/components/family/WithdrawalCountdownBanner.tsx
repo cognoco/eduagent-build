@@ -100,6 +100,7 @@ export function WithdrawalCountdownBanner({
                 <ActivityIndicator
                   size="small"
                   testID={`withdrawal-countdown-loading-${child.profileId}`}
+                  accessibilityLabel={t('common.loading')}
                 />
               ) : (
                 <Text className="text-caption font-semibold text-text-inverse">

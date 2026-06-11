@@ -83,7 +83,7 @@ export function AnalogyDomainPicker({
   if (isLoading) {
     return (
       <View className="py-4 items-center" testID="analogy-domain-loading">
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel="Loading" />
       </View>
     );
   }

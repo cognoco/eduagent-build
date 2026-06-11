@@ -1336,7 +1336,11 @@ export default function CameraScreen(): React.ReactNode {
                 className="flex-row items-center gap-2 py-3"
                 testID="subject-picker-loading"
               >
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator
+                  size="small"
+                  color={colors.primary}
+                  accessibilityLabel={t('common.loading')}
+                />
                 <Text className="text-body-sm text-text-secondary">
                   {t('homework.loadingSubjects')}
                 </Text>
@@ -1576,6 +1580,7 @@ export default function CameraScreen(): React.ReactNode {
                         <ActivityIndicator
                           size="small"
                           color={colors.primary}
+                          accessibilityLabel={t('common.loading')}
                         />
                         <Text className="text-body-sm text-text-secondary">
                           {t('homework.loadingSubjects')}

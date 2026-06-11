@@ -40,7 +40,8 @@
     },
     "timeoutLoader": {
       "title": "Taking too long",
-      "message": "This is taking longer than expected. Please check your connection and try again."
+      "message": "This is taking longer than expected. Please check your connection and try again.",
+      "loading": "Loading, please wait"
     }
   },
   "quota": {
@@ -570,7 +571,8 @@
       "stepProgress": "Step {{current}} of {{total}}",
       "voicePermissionErrorTitle": "Voice input error",
       "voicePermissionErrorMessage": "Microphone access is needed for voice input. Please enable it in Settings.",
-      "voicePermissionOpenSettings": "Open Settings"
+      "voicePermissionOpenSettings": "Open Settings",
+      "replyReady": "Reply ready"
     },
     "messageBubble": {
       "thinking": "Thinking",
@@ -777,7 +779,11 @@
       "oneMoreLabel": "Start one more quiz",
       "disputeLabel": "Dispute this answer",
       "dismissLabel": "Dismiss",
-      "saveAndFinishLabel": "Save progress and finish round"
+      "saveAndFinishLabel": "Save progress and finish round",
+      "correctAnnounce": "Correct! The answer was {{answer}}",
+      "correctAnnounceNoAnswer": "Correct!",
+      "wrongAnnounce": "Not quite. The answer was {{answer}}",
+      "wrongAnnounceNoAnswer": "Not quite."
     },
     "round": {
       "goBack": "Go back",

@@ -386,7 +386,10 @@ export default function LanguageSetup() {
           testID="language-setup-continue"
         >
           {isContinuing ? (
-            <ActivityIndicator color={colors.textInverse} />
+            <ActivityIndicator
+              color={colors.textInverse}
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text className="text-text-inverse text-body font-semibold">
               {t('common.continue')}

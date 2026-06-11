@@ -138,7 +138,10 @@ export function QuotaExceededCard({
             testID="quota-notify-parent-btn"
           >
             {notifyState === 'sending' ? (
-              <ActivityIndicator color="white" />
+              <ActivityIndicator
+                color="white"
+                accessibilityLabel={t('common.loading')}
+              />
             ) : (
               <Text
                 className={`text-body-sm font-semibold ${

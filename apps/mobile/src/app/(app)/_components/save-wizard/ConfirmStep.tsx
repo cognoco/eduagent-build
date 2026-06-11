@@ -119,7 +119,7 @@ export function ConfirmStep({
         accessibilityRole="button"
       >
         {landing ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator color="white" accessibilityLabel="Loading" />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
             {cta}

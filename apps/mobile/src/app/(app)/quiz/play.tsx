@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { hapticError, hapticLight, hapticSuccess } from '../../../lib/haptics';
 import { useTranslation } from 'react-i18next';
+import { useAnnounce } from '../../../hooks/use-announce';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -73,6 +74,7 @@ function appendFirstQuestionResult(
 
 export default function QuizPlayScreen(): React.ReactElement {
   const { t } = useTranslation();
+  const announce = useAnnounce();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -564,6 +566,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setAnswerState('checking');
 
     let correct = false;
+    let revealedCorrectAnswer: string | null = null;
     try {
       const result = await checkAnswer.mutateAsync({
         roundId: activeRound.id,
@@ -577,6 +580,7 @@ export default function QuizPlayScreen(): React.ReactElement {
       // [F-Q-02] Server reveals correctAnswer on wrong submissions so the
       // client can highlight the right option without a second round-trip.
       if (!correct && result.correctAnswer) {
+        revealedCorrectAnswer = result.correctAnswer;
         setCorrectAnswer(result.correctAnswer);
       }
     } catch (err) {
@@ -616,8 +620,18 @@ export default function QuizPlayScreen(): React.ReactElement {
     if (correct) {
       setCorrectCelebrationKey(Date.now());
       hapticSuccess();
+      announce(
+        answer
+          ? t('quiz.play.correctAnnounce', { answer })
+          : t('quiz.play.correctAnnounceNoAnswer'),
+      );
     } else {
       hapticError();
+      announce(
+        revealedCorrectAnswer
+          ? t('quiz.play.wrongAnnounce', { answer: revealedCorrectAnswer })
+          : t('quiz.play.wrongAnnounceNoAnswer'),
+      );
     }
 
     if (questionIndex + 1 >= totalQuestions) {
@@ -848,7 +862,11 @@ export default function QuizPlayScreen(): React.ReactElement {
 
         {answerState === 'checking' ? (
           <View className="mt-6 items-center gap-2 px-5">
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+              accessibilityLabel={t('common.loading')}
+            />
             <Text className="text-center text-body-sm text-text-secondary">
               {t('quiz.play.checking')}
             </Text>
@@ -1065,7 +1083,11 @@ export default function QuizPlayScreen(): React.ReactElement {
 
         {completeRound.isPending ? (
           <View className="mt-6 items-center gap-2 px-5">
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+              accessibilityLabel={t('common.loading')}
+            />
             <Text className="text-center text-body-sm text-text-secondary">
               {t('quiz.play.scoringRound')}
             </Text>
