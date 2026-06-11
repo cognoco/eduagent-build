@@ -150,6 +150,11 @@ export const progressSummaryGeneration = inngest.createFunction(
         );
       }
 
+      // [WI-82] Re-check before persisting derived data — defense-in-depth
+      // for a withdrawal that lands while the LLM call is in flight.
+      if (!(await isGdprProcessingAllowed(db, profileId))) {
+        return { status: 'skipped' as const, reason: 'consent_not_granted' };
+      }
       await upsertProgressSummary(db, {
         childProfileId: profileId,
         summary,

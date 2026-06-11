@@ -20,6 +20,7 @@ import {
   getPendingNoticeChildName,
   recordPendingNotice,
 } from '../../services/notices';
+import { captureException } from '../../services/sentry';
 
 /**
  * Scheduled consent revocation — 7-day grace period then cascade delete.
@@ -324,11 +325,27 @@ export const consentRevocation = inngest.createFunction(
       if (!deleted) {
         return { deleted: false as const, noticeId: null };
       }
-      const noticeId = await recordPendingNotice(db, {
-        ownerProfileId: archiveDecision.ownerProfileId,
-        type: 'consent_deleted',
-        childName,
-      });
+      // The delete has already happened; a notice-insert failure must NOT
+      // throw, or the step retry would re-run the (now no-op) delete, read
+      // `deleted: false`, and mislabel the run as `restored` — silently
+      // dropping the parent's completion push. Escalate and degrade to the
+      // name-less fallback copy instead.
+      let noticeId: string | null = null;
+      try {
+        noticeId = await recordPendingNotice(db, {
+          ownerProfileId: archiveDecision.ownerProfileId,
+          type: 'consent_deleted',
+          childName,
+        });
+      } catch (err) {
+        captureException(err, {
+          extra: {
+            childProfileId,
+            ownerProfileId: archiveDecision.ownerProfileId,
+            context: 'consent-revocation-delete-notice',
+          },
+        });
+      }
       return { deleted: true as const, noticeId };
     });
     // Tolerate the pre-restructure memoized shape (a bare boolean) for runs
