@@ -2188,6 +2188,11 @@ describe('metering middleware', () => {
         'WI-258: book-suggestions topup',
         `/v1/subjects/${SUBJECT_UUID}/book-suggestions/topup`,
       ],
+      // [F-023 / WI-575] — quick-check bypassed quota before this fix
+      [
+        'F-023 / WI-575: session quick-check',
+        `/v1/sessions/${SESSION_UUID}/quick-check`,
+      ],
     ];
 
     it.each(POST_METERED_ROUTES)(
