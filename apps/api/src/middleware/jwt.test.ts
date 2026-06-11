@@ -235,6 +235,47 @@ describe('fetchJWKS', () => {
 
     await expect(fetchJWKS(JWKS_URL)).rejects.toThrow('Failed to fetch JWKS');
   });
+
+  // [F-017] Malformed-200 JWKS — shape validation break test.
+  // A well-formed-but-malformed-content 200 response (missing keys array) must
+  // be classified as an infra failure, NOT a token error.
+  // The error message must contain 'JWKS' so auth.ts's isInfraFailure regex
+  // (/fetch|JWKS|network|abort/i) classifies it → 503 (not 401/sign-out).
+  // The malformed payload must NOT be cached.
+  it('[F-017] throws with a JWKS-prefixed message when upstream 200 is missing keys array', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: 'service unavailable' }), // no keys array
+    }) as unknown as typeof fetch;
+
+    const error = await fetchJWKS(JWKS_URL).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/JWKS/i);
+  });
+
+  it('[F-017] does NOT cache a malformed-200 JWKS response', async () => {
+    const malformedResponse = {
+      ok: true,
+      json: async () => ({ message: 'bad' }),
+    };
+    const goodResponse = { ok: true, json: async () => MOCK_JWKS };
+
+    let callCount = 0;
+    globalThis.fetch = jest.fn().mockImplementation(() => {
+      callCount++;
+      return Promise.resolve(
+        callCount === 1 ? malformedResponse : goodResponse,
+      );
+    }) as unknown as typeof fetch;
+
+    // First call returns malformed 200 — should throw
+    await expect(fetchJWKS(JWKS_URL)).rejects.toThrow(/JWKS/i);
+
+    // Second call (fresh fetch, cache must NOT have been poisoned) should succeed
+    const jwks = await fetchJWKS(JWKS_URL);
+    expect(jwks.keys).toHaveLength(1);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
 });
 
 // ---------------------------------------------------------------------------

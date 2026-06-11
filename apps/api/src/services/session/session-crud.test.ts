@@ -1,8 +1,11 @@
 import {
   __sessionCrudTestHooks,
   buildTopicIntentMatcherMessages,
+  flagContent,
   matchTopicByIntent,
   projectAiResponseContent,
+  recordSessionEvent,
+  recordSystemPrompt,
   runTopicIntentMatcher,
   startFirstCurriculumSession,
   stripMarkdownFence,
@@ -19,6 +22,7 @@ import * as sentryModule from '../sentry';
 import {
   childSessionSchema,
   MAX_EXCHANGES_PER_SESSION,
+  NotFoundError,
 } from '@eduagent/schemas';
 import type { LearningSession } from '@eduagent/schemas';
 
@@ -1050,5 +1054,65 @@ describe('runTopicIntentMatcher — malformed LLM response logging (errors-api F
       { extra: { context: string } },
     ];
     expect(context?.extra?.context).toBe('session.topic_intent_matcher.parse');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-015] recordSystemPrompt / recordSessionEvent / flagContent —
+// typed NotFoundError for missing session
+//
+// Red-green evidence: before the fix, these functions threw a raw Error whose
+// message matched no typed branch in the global onError handler → 500 + Sentry.
+// After the fix, they throw NotFoundError → onError maps it to 404.
+// ---------------------------------------------------------------------------
+
+/** Minimal db stub: scoped repo returns null (session not found). */
+function makeNullSessionDb() {
+  // createScopedRepository(db, profileId) calls db.select internally for the
+  // findFirst path. Return an empty array so the row lookup returns null.
+  const selectLimit = jest.fn().mockResolvedValue([]);
+  const selectWhere = { limit: selectLimit };
+  const selectFrom = {
+    where: jest.fn().mockReturnValue(selectWhere),
+  };
+  const selectStart = { from: jest.fn().mockReturnValue(selectFrom) };
+  return {
+    select: jest.fn().mockReturnValue(selectStart),
+    query: {
+      learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
+    },
+  } as never;
+}
+
+describe('[F-015] recordSystemPrompt — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      recordSystemPrompt(db, 'prof-1', 'sess-missing', {
+        kind: 'silence_nudge',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[F-015] recordSessionEvent — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      recordSessionEvent(db, 'prof-1', 'sess-missing', {
+        eventType: 'quick_action',
+        content: 'too_easy',
+        metadata: { chip: 'too_easy' },
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[F-015] flagContent — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      flagContent(db, 'prof-1', 'sess-missing', { eventId: 'evt-1' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

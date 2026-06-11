@@ -494,6 +494,7 @@ import {
   getSessionTranscript,
   recordSystemPrompt,
   recordSessionEvent,
+  flagContent,
   setSessionInputMode,
   startFirstCurriculumSession,
   SessionExchangeLimitError,
@@ -506,6 +507,7 @@ import { Hono } from 'hono';
 import { app } from '../index';
 import { sessionRoutes } from './sessions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { NotFoundError } from '@eduagent/schemas';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -1020,6 +1022,26 @@ describe('session routes', () => {
       expect(res.status).toBe(400);
       expect(recordSystemPrompt).not.toHaveBeenCalled();
     });
+
+    it('[F-015] returns 404 (not 500) when session is not found', async () => {
+      (recordSystemPrompt as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Session'),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/system-prompt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ kind: 'silence_nudge' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('NOT_FOUND');
+    });
   });
 
   describe('POST /v1/sessions/:sessionId/events', () => {
@@ -1049,6 +1071,30 @@ describe('session routes', () => {
           content: 'too_easy',
         }),
       );
+    });
+
+    it('[F-015] returns 404 (not 500) when session is not found', async () => {
+      (recordSessionEvent as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Session'),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            content: 'too_easy',
+            metadata: { chip: 'too_easy' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('NOT_FOUND');
     });
   });
 
@@ -1546,6 +1592,26 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    it('[F-015] returns 404 (not 500) when session is not found', async () => {
+      (flagContent as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Session'),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/flag`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ eventId: EVENT_ID }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('NOT_FOUND');
     });
   });
 

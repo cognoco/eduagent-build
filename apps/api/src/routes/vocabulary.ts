@@ -7,7 +7,6 @@ import {
   vocabularyCreateResponseSchema,
   vocabularyReviewResponseSchema,
   vocabularyDeleteResponseSchema,
-  ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -20,7 +19,6 @@ import {
   reviewVocabulary,
 } from '../services/vocabulary';
 import {
-  apiError,
   notFound,
   SubjectNotFoundError,
   VocabularyNotFoundError,
@@ -104,12 +102,10 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
         if (err instanceof VocabularyNotFoundError) {
           return notFound(c, err.message);
         }
-        return apiError(
-          c,
-          422,
-          ERROR_CODES.VALIDATION_ERROR,
-          err instanceof Error ? err.message : 'Vocabulary review failed',
-        );
+        // Re-throw all other errors (transient DB, unexpected) so the global
+        // onError handler classifies them correctly via isTransientDatabaseError()
+        // → 503 + Retry-After, rather than masking them as 422.
+        throw err;
       }
     },
   )

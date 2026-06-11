@@ -304,7 +304,7 @@ describe('vocabulary routes', () => {
       expect(body.code).toBe('NOT_FOUND');
     });
 
-    it('returns 422 when review input is semantically invalid', async () => {
+    it('[F-016] propagates unexpected errors (e.g. transient DB) as 500 rather than masking as 422', async () => {
       (reviewVocabulary as jest.Mock).mockRejectedValueOnce(
         new Error('Review failed'),
       );
@@ -319,7 +319,12 @@ describe('vocabulary routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(422);
+      // Unexpected/transient errors must propagate to the global handler (5xx),
+      // not be silently masked as a permanent validation failure (422).
+      expect(res.status).toBe(500);
+      const body = (await res.json()) as { code: string };
+      // Raw err.message must NOT be echoed to the client
+      expect(body.code).toBe('INTERNAL_ERROR');
     });
 
     it('returns 400 with invalid review payload', async () => {
