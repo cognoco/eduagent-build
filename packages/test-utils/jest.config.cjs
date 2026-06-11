@@ -43,11 +43,15 @@ module.exports = {
     '[/\\\\]\\.tmp',
     '\\.claude/worktrees',
   ]),
-  testPathIgnorePatterns: dropWorktreeGuards([
-    '<rootDir>/.worktrees/',
-    '<rootDir>/.tmp/',
-    '[/\\\\]\\.tmp',
-  ]),
+  testPathIgnorePatterns: [
+    ...dropWorktreeGuards([
+      '<rootDir>/.worktrees/',
+      '<rootDir>/.tmp/',
+      '[/\\\\]\\.tmp',
+    ]),
+    // WI-536 flaky-test quarantine (see tools/quarantine/).
+    ...require('../../tools/quarantine/registry.cjs').jestIgnorePatterns(),
+  ],
   moduleFileExtensions: ['ts', 'js'],
   testMatch: ['**/packages/test-utils/src/**/*.test.ts'],
   coverageDirectory: '<rootDir>/coverage/packages/test-utils',

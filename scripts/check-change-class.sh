@@ -21,6 +21,8 @@ source "$WORKSPACE_ROOT/scripts/lib/i18n-change-detection.sh"
 MODE="advisory"
 SOURCE="auto"
 SPEED_FILTER="all"
+GITHUB_OUTPUT_MODE=0
+BASE_UNRESOLVED=0
 
 # ── State ────────────────────────────────────────────────────────────────
 SEEN_CMDS=$'\n'
@@ -70,6 +72,55 @@ filter_files() {
   echo "$FILES" | grep -E "$1" 2>/dev/null || true
 }
 
+# ── GitHub router output (WI-452) ────────────────────────────────────────
+# With --github-output, emit machine-readable flags to $GITHUB_OUTPUT so CI
+# steps can gate slow suites on the change-class matrix (the router) instead
+# of maintaining parallel paths-filter blocks that drift from it.
+#   classes=<csv>        all matched classes (or "unresolved" on fail-open)
+#   integration=<bool>   matrix demands API/cross-package integration tests
+#   eval=<bool>          matrix demands the LLM eval harness (Tier 1)
+# Fail-open invariant: if no diff base resolves, the router cannot prove a
+# slow suite unaffected, so it demands them ALL — never silently skips.
+emit_github_output() {
+  if [[ "$GITHUB_OUTPUT_MODE" != "1" ]]; then return 0; fi
+  local out="${GITHUB_OUTPUT:-/dev/stdout}"
+  if [[ "$BASE_UNRESOLVED" == "1" ]]; then
+    echo "::warning::change-class router: no diff base resolved — failing OPEN (all slow suites run)"
+    {
+      echo "classes=unresolved"
+      echo "integration=true"
+      echo "eval=true"
+    } >> "$out"
+    return 0
+  fi
+  local classes integration=false eval_needed=false entry cmd
+  classes=$(join_unique_classes | tr ' ' ',')
+  if [[ ${#SLOW_CMDS[@]} -gt 0 ]]; then
+    for entry in "${SLOW_CMDS[@]}"; do
+      cmd="${entry%%|*}"
+      if [[ "$cmd" == *test:api:integration* || "$cmd" == *"pnpm test:integration"* ]]; then
+        integration=true
+      fi
+      if [[ "$cmd" == *eval:llm* ]]; then
+        eval_needed=true
+      fi
+    done
+  fi
+  if [[ ${#FAST_CMDS[@]} -gt 0 ]]; then
+    for entry in "${FAST_CMDS[@]}"; do
+      cmd="${entry%%|*}"
+      if [[ "$cmd" == *eval:llm* ]]; then
+        eval_needed=true
+      fi
+    done
+  fi
+  {
+    echo "classes=${classes}"
+    echo "integration=${integration}"
+    echo "eval=${eval_needed}"
+  } >> "$out"
+}
+
 # ── Args ─────────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -77,6 +128,7 @@ while [[ $# -gt 0 ]]; do
     --staged) SOURCE="staged"; shift ;;
     --branch) SOURCE="branch"; shift ;;
     --fast)   SPEED_FILTER="fast"; shift ;;
+    --github-output) GITHUB_OUTPUT_MODE=1; shift ;;
     -h|--help)
       echo "Usage: scripts/check-change-class.sh [--staged|--branch] [--run [--fast]]"
       echo ""
@@ -90,11 +142,13 @@ while [[ $# -gt 0 ]]; do
       echo "  3. Branch diff vs main (git merge-base)"
       echo ""
       echo "Options:"
-      echo "  --staged   Check only staged files"
-      echo "  --branch   Check all changes vs main"
-      echo "  --run      Execute identified validation commands"
-      echo "  --fast     With --run: skip slow commands"
-      echo "  -h, --help Show this help"
+      echo "  --staged          Check only staged files"
+      echo "  --branch          Check all changes vs main (or vs origin/\$BASE_REF if set)"
+      echo "  --run             Execute identified validation commands"
+      echo "  --fast            With --run: skip slow commands"
+      echo "  --github-output   Also emit router flags (classes, integration, eval)"
+      echo "                    to \$GITHUB_OUTPUT for CI step gating (WI-452)"
+      echo "  -h, --help        Show this help"
       exit 0
       ;;
     *) echo "Unknown: $1 (try --help)" >&2; exit 1 ;;
@@ -107,8 +161,18 @@ case "$SOURCE" in
     FILES=$(git diff --cached --name-only --diff-filter=d)
     ;;
   branch)
-    BASE=$(git merge-base HEAD main 2>/dev/null || echo "main")
-    FILES=$(git diff --name-only --diff-filter=d "$BASE")
+    # In CI, BASE_REF (the PR base branch) is explicit; locally fall back to
+    # main. If neither resolves, flag it so --github-output can fail OPEN
+    # (run the slow suites) instead of silently skipping them.
+    if [[ -n "${BASE_REF:-}" ]] && git rev-parse --verify --quiet "origin/${BASE_REF}" >/dev/null; then
+      BASE=$(git merge-base HEAD "origin/${BASE_REF}")
+    elif BASE=$(git merge-base HEAD main 2>/dev/null); then
+      :
+    else
+      BASE=""
+      BASE_UNRESOLVED=1
+    fi
+    FILES=$([[ -n "$BASE" ]] && git diff --name-only --diff-filter=d "$BASE" || true)
     ;;
   auto)
     FILES=$(git diff --cached --name-only --diff-filter=d)
@@ -124,6 +188,7 @@ esac
 
 if [[ -z "$FILES" ]]; then
   echo "No changed files detected."
+  emit_github_output
   exit 0
 fi
 
@@ -164,7 +229,10 @@ if hit '^packages/database/drizzle/'; then
 fi
 
 # ── LLM Prompts ──────────────────────────────────────────────────────────
-PROMPT_HITS=$(filter_files '(services/.*-prompts\.ts$|services/llm/[^/]+\.ts$)' | grep -vE '\.test\.ts$' || true)
+# services/llm/ is matched recursively (providers/ subdirectory included) so
+# the CI eval gate that routes on this class covers provider-level prompt
+# assembly, matching the paths-filter it replaced (WI-452).
+PROMPT_HITS=$(filter_files '(services/.*-prompts\.ts$|services/llm/.+\.ts$)' | grep -vE '\.test\.ts$' || true)
 if [[ -n "$PROMPT_HITS" ]]; then
   CLASSES+=("llm-prompts")
   add_cmd fast  "pnpm eval:llm"              "Snapshot prompts (Tier 1 — no LLM call)"
@@ -249,6 +317,15 @@ if hit '^packages/schemas/src/'; then
   note "shared-schemas: @eduagent/schemas is the shared contract — never redefine types locally"
 fi
 
+# ── Dependencies / Lockfile ──────────────────────────────────────────────
+# Parity with the old ci.yml dorny paths-filter, which included
+# pnpm-lock.yaml in the integration-test gate: a lockfile change can shift
+# transitive dependency behavior that only integration tests observe.
+if hit '^pnpm-lock\.yaml$'; then
+  CLASSES+=("dependencies")
+  add_cmd slow  "pnpm test:api:integration"  "API integration tests (dependency change)"
+fi
+
 # ── Shared Database (non-schema) ─────────────────────────────────────────
 DB_NON_SCHEMA=$(filter_files '^packages/database/src/' | grep -vE '^packages/database/src/schema/' || true)
 if [[ -n "$DB_NON_SCHEMA" ]]; then
@@ -282,8 +359,9 @@ fi
 # ── E2E Tests ────────────────────────────────────────────────────────────
 if hit '(^tests/e2e/|^apps/mobile/e2e/|playwright\.config|\.e2e\.)'; then
   CLASSES+=("e2e")
-  add_cmd slow  "C:/Tools/doppler/doppler.exe run -c stg -- pnpm test:e2e:web:smoke" "Playwright E2E smoke"
-  note "e2e: Full web suite: C:/Tools/doppler/doppler.exe run -c stg -- pnpm test:e2e:web"
+  add_cmd slow  "doppler run -c stg -- pnpm test:e2e:web:smoke" "Playwright E2E smoke"
+  note "e2e: Full web suite: doppler run -c stg -- pnpm test:e2e:web"
+  note "e2e: Windows dev machines without doppler on PATH: C:/Tools/doppler/doppler.exe"
 fi
 
 # ── Lint / Tooling Config ────────────────────────────────────────────────
@@ -307,9 +385,12 @@ if hit '^packages/retention/src/'; then
   add_cmd fast  "pnpm test:api:unit"          "API unit tests (retention consumer)"
 fi
 
-# ── Eval Harness Code (not snapshots) ────────────────────────────────────
-EVAL_CODE=$(filter_files '^apps/api/eval-llm/' | grep -vE '^apps/api/eval-llm/snapshots/' || true)
-if [[ -n "$EVAL_CODE" ]]; then
+# ── Eval Harness (code AND snapshots) ────────────────────────────────────
+# Snapshots are included deliberately (WI-452): a hand-edited snapshot with
+# no matching prompt change is exactly the drift `pnpm eval:llm` catches, and
+# the CI eval gate routes on this class — excluding snapshots would let that
+# edit skip the gate.
+if hit '^apps/api/eval-llm/'; then
   CLASSES+=("eval-harness")
   add_cmd fast  "pnpm eval:llm"              "Verify eval harness runs clean"
 fi
@@ -329,8 +410,11 @@ fi
 if [[ ${#CLASSES[@]} -eq 0 ]]; then
   echo "No change classes matched ($FILE_COUNT file(s) checked)."
   echo "Pre-commit hooks (lint, tsc, surgical tests) cover these files."
+  emit_github_output
   exit 0
 fi
+
+emit_github_output
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════"

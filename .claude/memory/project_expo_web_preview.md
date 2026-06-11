@@ -4,7 +4,7 @@ description: How to spin up the mobile app in a browser via .claude/launch.json 
 type: project
 ---
 
-**Config:** `.claude/launch.json` has a `mobile` target that runs `expo start --web --port 8081`. Also has `api` on 8787 (wrangler dev for the Hono worker).
+**Config:** `.claude/launch.json` has a `mobile` target that runs `expo start --web --port 8089`. Also has `api` on 8787 (wrangler dev for the Hono worker).
 
 **How to start (in-session):**
 ```
