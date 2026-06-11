@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import type { AllNote, Bookmark, ChildSession } from '@eduagent/schemas';
 import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { useAllNotes } from '../../../hooks/use-notes';
@@ -298,6 +299,7 @@ function ArchiveCard({
 }
 
 export default function MyNotesListScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -487,7 +489,7 @@ export default function MyNotesListScreen(): React.ReactElement {
         ListEmptyComponent={
           activeQuery.isLoading ? (
             <View className="items-center py-14" testID="my-notes-loading">
-              <ActivityIndicator accessibilityLabel="Loading" />
+              <ActivityIndicator accessibilityLabel={t('common.loading')} />
             </View>
           ) : activeQuery.isError ? (
             <View className="items-center py-14" testID="my-notes-error">
@@ -520,7 +522,7 @@ export default function MyNotesListScreen(): React.ReactElement {
         ListFooterComponent={
           isFetchingNextPage ? (
             <View className="py-4 items-center">
-              <ActivityIndicator accessibilityLabel="Loading" />
+              <ActivityIndicator accessibilityLabel={t('common.loading')} />
             </View>
           ) : hasNextPage ? (
             <Pressable

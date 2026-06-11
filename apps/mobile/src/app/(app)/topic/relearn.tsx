@@ -14,6 +14,7 @@ import {
   type Href,
 } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   useStartRelearn,
   useTeachingPreference,
@@ -120,6 +121,7 @@ function buildSelectedTopic(
 }
 
 export default function RelearnScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -442,7 +444,10 @@ export default function RelearnScreen() {
           className="flex-1 items-center justify-center px-6"
           testID="relearn-overdue-loading"
         >
-          <ActivityIndicator size="large" accessibilityLabel="Loading" />
+          <ActivityIndicator
+            size="large"
+            accessibilityLabel={t('common.loading')}
+          />
           <Text className="mt-3 text-body text-text-secondary">
             Loading review topics...
           </Text>
@@ -520,7 +525,10 @@ export default function RelearnScreen() {
           className="flex-1 items-center justify-center px-6"
           testID="relearn-loading"
         >
-          <ActivityIndicator size="large" accessibilityLabel="Loading" />
+          <ActivityIndicator
+            size="large"
+            accessibilityLabel={t('common.loading')}
+          />
           <Text className="mt-3 text-body text-text-secondary">
             Starting relearn session...
           </Text>

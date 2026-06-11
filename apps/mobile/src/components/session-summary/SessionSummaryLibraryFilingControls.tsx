@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
 import type { LearningSession } from '@eduagent/schemas';
 
@@ -33,6 +34,7 @@ function isAutoFileCandidate(session: EnrichedLibrarySession): boolean {
 export function SessionSummaryLibraryFilingControls({
   sessionId,
 }: SessionSummaryLibraryFilingControlsProps): React.ReactElement | null {
+  const { t } = useTranslation();
   const router = useRouter();
   const filing = useSessionLibraryFiling(sessionId);
   const keepOut = useKeepSessionOutOfLibrary();
@@ -128,7 +130,7 @@ export function SessionSummaryLibraryFilingControls({
       testID={testID}
     >
       {isBusy ? (
-        <ActivityIndicator accessibilityLabel="Loading" />
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
       ) : (
         <Text className="text-body-sm font-semibold text-text-inverse">
           {label}

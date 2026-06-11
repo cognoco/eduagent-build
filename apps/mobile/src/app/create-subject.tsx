@@ -1162,13 +1162,17 @@ function CreateSubjectScreenAuthenticated() {
 // component's API-query hooks cannot fire for unauthenticated users.
 export default function CreateSubjectScreen() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { t } = useTranslation();
   if (!isLoaded) {
     return (
       <View
         testID="create-subject-auth-loading"
         className="flex-1 bg-background items-center justify-center"
       >
-        <ActivityIndicator size="large" accessibilityLabel="Loading" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }

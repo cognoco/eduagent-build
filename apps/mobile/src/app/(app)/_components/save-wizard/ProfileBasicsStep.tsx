@@ -34,7 +34,7 @@ export function ProfileBasicsStep({
 }): React.ReactElement {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   // i18n Phase 1 — Signup-time fix. The owner POST is a self-create, so
   // forward the device UI language for the first LLM call. The child POST
   // OMITS the field (MED-2): the parent's UI locale does not reliably
@@ -313,7 +313,10 @@ export function ProfileBasicsStep({
         accessibilityState={{ disabled: !canSubmit }}
       >
         {loading ? (
-          <ActivityIndicator color="white" accessibilityLabel="Loading" />
+          <ActivityIndicator
+            color="white"
+            accessibilityLabel={t('common.loading')}
+          />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
             Continue

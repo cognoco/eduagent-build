@@ -11,6 +11,10 @@ export function ConfirmationToast({
 }) {
   const announce = useAnnounce();
 
+  // Event-driven announcement only — no accessibilityLiveRegion on the View.
+  // The toast is transient and mount-driven, so a single imperative announce
+  // is the documented pattern (use-announce.ts); a live region on top would
+  // risk double-announcing the same message on Android.
   useEffect(() => {
     if (message) announce(message);
   }, [message, announce]);
@@ -24,7 +28,6 @@ export function ConfirmationToast({
         bottom: Math.max(insetsBottom, 16) + 88,
       }}
       testID="session-confirmation-toast"
-      accessibilityLiveRegion="polite"
     >
       <View className="rounded-full bg-text-primary px-4 py-3">
         <Text className="text-body-sm font-semibold text-text-inverse">
