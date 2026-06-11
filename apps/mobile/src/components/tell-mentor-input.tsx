@@ -1,4 +1,5 @@
 import { Pressable, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { computeAgeBracket } from '@eduagent/schemas';
 
 type TellMentorAudience = 'learner' | 'parent';
@@ -67,6 +68,7 @@ export function TellMentorInput({
   onChangeText,
   onSubmit,
 }: TellMentorInputProps) {
+  const { t } = useTranslation();
   const copy = getCopy(audience, birthYear, childName);
   const disabled = isPending || value.trim().length === 0;
 
@@ -117,7 +119,7 @@ export function TellMentorInput({
         }`}
       >
         <Text className="text-body font-semibold text-text-inverse">
-          {isPending ? 'Saving...' : 'Save'}
+          {isPending ? t('common.saving') : t('common.save')}
         </Text>
       </Pressable>
     </View>

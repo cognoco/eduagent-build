@@ -258,10 +258,10 @@ export default function ProfilesScreen() {
       ) : profiles.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">
           <Text className="text-h2 font-bold text-text-primary mb-2">
-            No profiles yet
+            {t('profiles.noProfilesYet')}
           </Text>
           <Text className="text-body text-text-secondary text-center mb-6">
-            Create your first profile to get started
+            {t('profiles.createFirstHint')}
           </Text>
           <Pressable
             onPress={() => router.push('/create-profile')}
@@ -269,7 +269,7 @@ export default function ProfilesScreen() {
             testID="profiles-create-first"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Create profile
+              {t('profiles.createProfile')}
             </Text>
           </Pressable>
         </View>
@@ -327,7 +327,7 @@ export default function ProfilesScreen() {
                     testID={`profile-rename-${profile.id}`}
                   >
                     <Text className="text-body-sm text-text-secondary">
-                      Edit
+                      {t('common.edit')}
                     </Text>
                   </Pressable>
                 )}
@@ -350,7 +350,7 @@ export default function ProfilesScreen() {
               testID="profiles-add-button"
             >
               <Text className="text-body font-semibold text-primary">
-                + Add profile
+                {t('profiles.addProfile')}
               </Text>
             </Pressable>
           )}
@@ -378,7 +378,7 @@ export default function ProfilesScreen() {
               className="bg-surface rounded-card p-5"
             >
               <Text className="text-h2 font-bold text-text-primary mb-4">
-                Rename profile
+                {t('profiles.renameTitle')}
               </Text>
               <TextInput
                 ref={renameInputRef}
@@ -426,7 +426,9 @@ export default function ProfilesScreen() {
                   accessibilityLabel="Save"
                 >
                   <Text className="text-body font-semibold text-text-inverse">
-                    {updateName.isPending ? 'Saving...' : 'Save'}
+                    {updateName.isPending
+                      ? t('common.saving')
+                      : t('common.save')}
                   </Text>
                 </Pressable>
               </View>

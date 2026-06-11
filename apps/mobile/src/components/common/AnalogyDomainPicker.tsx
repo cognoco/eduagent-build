@@ -119,7 +119,7 @@ export function AnalogyDomainPicker({
               </Text>
               {isSelected && (
                 <Text className="text-primary text-body font-semibold">
-                  Active
+                  {t('common.active')}
                 </Text>
               )}
             </View>

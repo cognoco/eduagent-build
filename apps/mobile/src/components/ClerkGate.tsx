@@ -70,7 +70,7 @@ export function ClerkGate({
               color: gateColors.textPrimary,
             }}
           >
-            Taking longer than expected
+            {t('clerkGate.timeoutTitle')}
           </Text>
           <Text
             style={{
@@ -80,7 +80,7 @@ export function ClerkGate({
               marginBottom: 24,
             }}
           >
-            Please check your internet connection and try again.
+            {t('clerkGate.timeoutMessage')}
           </Text>
           {/* Primary action: force Clerk to re-initialise by remounting ClerkProvider */}
           <Pressable
@@ -103,7 +103,7 @@ export function ClerkGate({
                 fontSize: 16,
               }}
             >
-              Try again
+              {t('clerkGate.tryAgain')}
             </Text>
           </Pressable>
           {/* Secondary action: continue without auth for offline / degraded network */}
@@ -121,7 +121,7 @@ export function ClerkGate({
                 textDecorationLine: 'underline',
               }}
             >
-              Continue without account
+              {t('clerkGate.continueOffline')}
             </Text>
           </Pressable>
         </View>
@@ -152,7 +152,7 @@ export function ClerkGate({
             textAlign: 'center',
           }}
         >
-          Connecting securely...
+          {t('clerkGate.connecting')}
         </Text>
       </View>
     );

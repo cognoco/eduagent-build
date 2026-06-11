@@ -125,7 +125,7 @@ export function ModeSwitcher(): React.ReactElement | null {
           className="flex-row items-center justify-between px-4 py-2 bg-error-soft border-t border-error/30"
         >
           <Text className="flex-1 text-body-sm text-error me-3">
-            Couldn't switch. Tap to try again.
+            {t('modeSwitcher.switchError')}
           </Text>
           <Pressable
             testID="mode-switcher-error-retry"
@@ -135,7 +135,7 @@ export function ModeSwitcher(): React.ReactElement | null {
             className="px-3 py-1 rounded-full bg-error"
           >
             <Text className="text-body-sm font-semibold text-on-error">
-              Retry
+              {t('common.retry')}
             </Text>
           </Pressable>
           <Pressable

@@ -1,4 +1,5 @@
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 interface MemoryConsentPromptProps {
   childName?: string;
@@ -17,14 +18,17 @@ export function MemoryConsentPrompt({
   onGrant,
   onDecline,
 }: MemoryConsentPromptProps) {
+  const { t } = useTranslation();
   return (
     <View className="bg-surface rounded-card p-4 border border-border">
       <Text className="text-body font-semibold text-text-primary mb-1">
-        {title ?? `Help the mentor learn about ${childName ?? 'your child'}`}
+        {title ??
+          (childName
+            ? t('memoryConsent.defaultTitle', { name: childName })
+            : t('memoryConsent.defaultTitleNoName'))}
       </Text>
       <Text className="text-body-sm text-text-secondary mb-4">
-        {description ??
-          'This lets the mentor remember what kinds of explanations work, what is still tricky, and which examples feel relevant.'}
+        {description ?? t('memoryConsent.defaultDescription')}
       </Text>
       <View className="flex-row gap-2">
         <Pressable
@@ -36,7 +40,7 @@ export function MemoryConsentPrompt({
           testID="memory-consent-grant"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            {isPending ? 'Saving...' : 'Yes, enable'}
+            {isPending ? t('common.saving') : t('memoryConsent.grant')}
           </Text>
         </Pressable>
         <Pressable
@@ -48,7 +52,7 @@ export function MemoryConsentPrompt({
           testID="memory-consent-decline"
         >
           <Text className="text-body font-semibold text-text-primary">
-            Not now
+            {t('common.notNow')}
           </Text>
         </Pressable>
       </View>

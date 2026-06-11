@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 interface OnboardingStepIndicatorProps {
   step: number;
@@ -11,6 +12,7 @@ export function OnboardingStepIndicator({
   totalSteps,
   stepLabels,
 }: OnboardingStepIndicatorProps): React.ReactElement {
+  const { t } = useTranslation();
   const safeTotalSteps = Math.max(totalSteps, 1);
   const activeStep = Math.min(Math.max(step, 1), safeTotalSteps);
   const activeStepLabel = stepLabels?.[activeStep - 1];
@@ -41,7 +43,10 @@ export function OnboardingStepIndicator({
       </View>
       <View className="items-center">
         <Text className="text-caption text-muted">
-          Step {activeStep} of {safeTotalSteps}
+          {t('onboarding.stepIndicator.stepOf', {
+            current: activeStep,
+            total: safeTotalSteps,
+          })}
         </Text>
         {activeStepLabel ? (
           <Text className="text-body-sm font-semibold text-text-primary mt-1">

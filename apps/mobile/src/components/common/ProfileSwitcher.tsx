@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { View, Text, Pressable, Platform, Modal } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
 import { isGuardianProfile } from '../../lib/profile';
 import { platformAlert } from '../../lib/platform-alert';
@@ -41,6 +42,7 @@ export function ProfileSwitcher({
   activeProfileId,
   onSwitch,
 }: ProfileSwitcherProps): ReactNode {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const switchingRef = useRef(false);
@@ -105,7 +107,7 @@ export function ProfileSwitcher({
           </Text>
         </View>
         <Text className="text-body-sm font-medium text-text-primary me-1">
-          {activeProfile?.displayName ?? 'Profile'}
+          {activeProfile?.displayName ?? t('profileSwitcher.fallbackName')}
         </Text>
         <Text className="text-text-secondary text-caption">
           {isOpen ? '\u25B2' : '\u25BC'}

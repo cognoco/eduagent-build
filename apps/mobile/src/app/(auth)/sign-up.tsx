@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
+import { useTranslation } from 'react-i18next';
 import { Sentry } from '../../lib/sentry';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -34,6 +35,7 @@ const SCREEN_HEIGHT =
     : Dimensions.get('screen').height;
 
 export default function SignUpScreen() {
+  const { t } = useTranslation();
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
   const { email: emailParam, fromSignIn } = useLocalSearchParams<{
@@ -356,10 +358,10 @@ export default function SignUpScreen() {
         >
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
-            Verify your email
+            {t('auth.signUp.verifyEmailTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
-            We sent a verification code to{' '}
+            {t('auth.signUp.sentCodePrefix')}{' '}
             <Text
               className="text-body-sm text-text-secondary font-semibold"
               numberOfLines={1}
@@ -380,7 +382,7 @@ export default function SignUpScreen() {
 
           <View onLayout={onVerifyFieldLayout('code')}>
             <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Verification code
+              {t('auth.signUp.verificationCodeLabel')}
             </Text>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
@@ -488,10 +490,10 @@ export default function SignUpScreen() {
             className="text-h2 font-bold text-text-primary mb-1"
             testID="sign-up-heading"
           >
-            Create account
+            {t('auth.signUp.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-4">
-            Start your learning journey
+            {t('auth.signUp.subtitle')}
           </Text>
 
           {fromSignIn === '1' && (
@@ -500,8 +502,7 @@ export default function SignUpScreen() {
               accessibilityRole="alert"
             >
               <Text className="text-body-sm text-text-primary">
-                We couldn't find an account with that email. Create one below to
-                get started.
+                {t('auth.signUp.accountNotFound')}
               </Text>
             </View>
           )}
@@ -583,14 +584,14 @@ export default function SignUpScreen() {
           <View className="flex-row items-center mb-3">
             <View className="flex-1 h-px bg-border" />
             <Text className="text-body-sm text-text-secondary mx-4">
-              or continue with email
+              {t('auth.signUp.orContinueWithEmail')}
             </Text>
             <View className="flex-1 h-px bg-border" />
           </View>
 
           <View onLayout={onFieldLayout('email')}>
             <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Email
+              {t('auth.signUp.emailLabel')}
             </Text>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
@@ -609,7 +610,7 @@ export default function SignUpScreen() {
 
           <View onLayout={onFieldLayout('password')}>
             <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Password
+              {t('auth.signUp.passwordLabel')}
             </Text>
             <View className="mb-4">
               <PasswordInput
@@ -645,7 +646,7 @@ export default function SignUpScreen() {
             testID="sign-up-back-to-sign-in-row"
           >
             <Text className="text-body-sm text-text-secondary">
-              Already have an account?{' '}
+              {t('auth.signUp.alreadyHaveAccount')}{' '}
             </Text>
             <Button
               variant="tertiary"
@@ -660,21 +661,21 @@ export default function SignUpScreen() {
             className="text-caption text-text-secondary text-center px-2 mb-8"
             testID="sign-up-terms-copy"
           >
-            By signing up, you agree to our{' '}
+            {t('auth.signUp.agreePrefix')}{' '}
             <Text
               className="text-primary"
               onPress={() => router.push('/terms')}
               accessibilityRole="link"
             >
-              Terms of Service
+              {t('auth.signUp.termsOfService')}
             </Text>{' '}
-            and{' '}
+            {t('common.and')}{' '}
             <Text
               className="text-primary"
               onPress={() => router.push('/privacy')}
               accessibilityRole="link"
             >
-              Privacy Policy
+              {t('auth.signUp.privacyPolicy')}
             </Text>
             .
           </Text>
