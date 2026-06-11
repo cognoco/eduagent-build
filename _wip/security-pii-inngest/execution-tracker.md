@@ -72,3 +72,22 @@ shepherd chooses, but small enough to run serially.
 
 - 2026-06-11 — Activated. Workstream + WI-665/WI-666 created (`Stage=Backlog`).
   Subsumption scan done (§3). Shepherd kickoff prompt handed to operator.
+- 2026-06-11 — Shepherd arrived. Review watcher wired for this workstream
+  (`review-watcher-v3.ts` 4th config entry, commit `9a314f736`; watcher restarted,
+  baseline confirms coverage). Restart-gap repair: WI-625 (L10n & A11y Mobile)
+  entered Reviewing during the ~45s watcher restart window — its review agent was
+  launched manually with the identical prompt contract.
+- 2026-06-11 — WI-665 brought through DoR bridge to `Stage=Ready`. Bundle brief
+  authored on the WP page; 4 children linked as absorbed provenance (ZDX-ADR-0001):
+  WI-638 (F-028 leg 1, auto-file-session — pre-existing capture from the WI-578
+  wave, adopted; dedup judge flagged it at 0.95), WI-667 (F-028 leg 2,
+  topic-probe-extract load-transcript — narrowed from the initial capture to avoid
+  overlap with WI-638), WI-668 (F-091), WI-669 (F-090). Execution Path=Assisted.
+  Executor dispatched (wi665-executor, plan-phase stop enforced).
+- 2026-06-11 — WI-666 brought through DoR bridge to `Stage=Ready` (brief authored;
+  children WI-670 (F-094), WI-671 (F-162), WI-672 (F-174) linked as absorbed
+  provenance; Execution Path=Assisted). Dedup adjudication: capture judge linked
+  WI-672 to WI-234 (Closed, PR #415, retention-data.ts) as duplicate@0.85 —
+  shepherd verified F-174 LIVE in `review-calibration-grade.ts:96` (grade step
+  precedes cooldown claim); kept as related-provenance, NOT a duplicate. WI-666
+  build dispatch deferred until WI-665 lands (serial per unit map order).
