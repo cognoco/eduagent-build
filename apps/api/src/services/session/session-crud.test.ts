@@ -1066,18 +1066,18 @@ describe('runTopicIntentMatcher — malformed LLM response logging (errors-api F
 // After the fix, they throw NotFoundError → onError maps it to 404.
 // ---------------------------------------------------------------------------
 
-/** Minimal db stub: scoped repo returns null (session not found). */
+/**
+ * Minimal db stub: session lookup returns null (session not found).
+ *
+ * getSession → createScopedRepository(db, profileId).sessions.findFirst(...)
+ * → db.query.learningSessions.findFirst({ where }). That is the ONLY db
+ * surface these three functions touch before the !session guard, so the stub
+ * is wired narrowly to it. If getSession ever migrates to a different Drizzle
+ * query style (e.g. db.select()), this stub throws (method missing) and the
+ * test fails loudly instead of silently passing.
+ */
 function makeNullSessionDb() {
-  // createScopedRepository(db, profileId) calls db.select internally for the
-  // findFirst path. Return an empty array so the row lookup returns null.
-  const selectLimit = jest.fn().mockResolvedValue([]);
-  const selectWhere = { limit: selectLimit };
-  const selectFrom = {
-    where: jest.fn().mockReturnValue(selectWhere),
-  };
-  const selectStart = { from: jest.fn().mockReturnValue(selectFrom) };
   return {
-    select: jest.fn().mockReturnValue(selectStart),
     query: {
       learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
     },
