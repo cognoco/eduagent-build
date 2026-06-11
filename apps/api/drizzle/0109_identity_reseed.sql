@@ -125,7 +125,9 @@ BEGIN
   -- A subscription mirror also goes when its payer person lost their legacy
   --   profile (the row can no longer satisfy payer_person_id and re-joins the
   --   "ownerless account" exception class reported by the verify script).
-  --   subscription_payers rows cascade with it.
+  --   Its subscription_payers rows cascade with it:
+  --   subscription_payers.subscription_id -> subscription is ON DELETE CASCADE
+  --   in 0108 (subscription_payers_subscription_id_subscription_id_fk).
   DELETE FROM subscription sub
   WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.id = sub.id)
      OR NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = sub.payer_person_id);

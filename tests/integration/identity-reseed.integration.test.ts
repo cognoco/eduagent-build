@@ -64,6 +64,9 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
   const CS3 = randomUUID(); // P2 GDPR PENDING (must NOT be seeded)
   const S1 = randomUUID(); // A1 subscription (plus/active, stripe)
   const S2 = randomUUID(); // A2 subscription (ownerless — must NOT be seeded)
+  const A4 = randomUUID(); // account whose owner profile is deleted between runs
+  const P4 = randomUUID(); // A4 owner (deleted before the second run)
+  const S3 = randomUUID(); // A4 subscription (payer loses their profile between runs)
   const uniq = randomUUID().slice(0, 8);
 
   async function one<T extends Record<string, unknown>>(
@@ -90,28 +93,33 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
     // ── legacy fixtures ────────────────────────────────────────────────
     await client.query(
       `INSERT INTO accounts (id, clerk_user_id, email, timezone, created_at, updated_at) VALUES
-       ($1, $4, $5, 'Europe/Prague', '2025-01-01T00:00:00Z', '2025-06-01T00:00:00Z'),
-       ($2, $6, $7, NULL,            '2025-02-01T00:00:00Z', '2025-02-01T00:00:00Z'),
-       ($3, $8, $9, 'America/New_York', '2025-03-01T00:00:00Z', '2025-03-02T00:00:00Z')`,
+       ($1, $5, $6, 'Europe/Prague', '2025-01-01T00:00:00Z', '2025-06-01T00:00:00Z'),
+       ($2, $7, $8, NULL,            '2025-02-01T00:00:00Z', '2025-02-01T00:00:00Z'),
+       ($3, $9, $10, 'America/New_York', '2025-03-01T00:00:00Z', '2025-03-02T00:00:00Z'),
+       ($4, $11, $12, NULL,          '2025-04-01T00:00:00Z', '2025-04-01T00:00:00Z')`,
       [
         A1,
         A2,
         A3,
+        A4,
         `clerk_reseed_${uniq}_1`,
         `reseed_${uniq}_1@example.test`,
         `clerk_reseed_${uniq}_2`,
         `reseed_${uniq}_2@example.test`,
         `clerk_reseed_${uniq}_3`,
         `reseed_${uniq}_3@example.test`,
+        `clerk_reseed_${uniq}_4`,
+        `reseed_${uniq}_4@example.test`,
       ],
     );
 
     await client.query(
       `INSERT INTO profiles (id, account_id, display_name, birth_year, location, is_owner, created_at, updated_at, archived_at) VALUES
-       ($1, $4, 'Parent One', 1990, 'EU', true,  '2025-01-01T01:00:00Z', '2025-06-01T01:00:00Z', NULL),
-       ($2, $4, 'Child Two',  2014, 'EU', false, '2025-01-02T00:00:00Z', '2025-01-03T00:00:00Z', NULL),
-       ($3, $5, 'Archived Three', 1985, NULL, true, '2025-03-01T01:00:00Z', '2025-03-02T01:00:00Z', '2025-04-01T00:00:00Z')`,
-      [P1, P2, P3, A1, A3],
+       ($1, $5, 'Parent One', 1990, 'EU', true,  '2025-01-01T01:00:00Z', '2025-06-01T01:00:00Z', NULL),
+       ($2, $5, 'Child Two',  2014, 'EU', false, '2025-01-02T00:00:00Z', '2025-01-03T00:00:00Z', NULL),
+       ($3, $6, 'Archived Three', 1985, NULL, true, '2025-03-01T01:00:00Z', '2025-03-02T01:00:00Z', '2025-04-01T00:00:00Z'),
+       ($4, $7, 'Owner Four', 1992, 'US', true, '2025-04-01T01:00:00Z', '2025-04-01T01:00:00Z', NULL)`,
+      [P1, P2, P3, P4, A1, A3, A4],
     );
 
     await client.query(
@@ -130,9 +138,10 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
 
     await client.query(
       `INSERT INTO subscriptions (id, account_id, tier, status, stripe_subscription_id, current_period_start, current_period_end, created_at, updated_at) VALUES
-       ($1, $3, 'plus', 'active', $5, '2025-06-01T00:00:00Z', '2025-07-01T00:00:00Z', '2025-01-01T02:00:00Z', '2025-06-01T02:00:00Z'),
-       ($2, $4, 'free', 'trial', NULL, NULL, NULL, '2025-02-01T01:00:00Z', '2025-02-01T01:00:00Z')`,
-      [S1, S2, A1, A2, `sub_reseed_${uniq}`],
+       ($1, $4, 'plus', 'active', $7, '2025-06-01T00:00:00Z', '2025-07-01T00:00:00Z', '2025-01-01T02:00:00Z', '2025-06-01T02:00:00Z'),
+       ($2, $5, 'free', 'trial', NULL, NULL, NULL, '2025-02-01T01:00:00Z', '2025-02-01T01:00:00Z'),
+       ($3, $6, 'plus', 'active', NULL, NULL, NULL, '2025-04-01T02:00:00Z', '2025-04-01T02:00:00Z')`,
+      [S1, S2, S3, A1, A2, A4, `sub_reseed_${uniq}`],
     );
 
     // ── execute the committed migration block ──────────────────────────
@@ -333,11 +342,12 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
       store_platform: 'stripe',
     });
 
-    const sp = await one<{ person_id: string; role: string }>(
-      'SELECT person_id, role FROM subscription_payers WHERE subscription_id = $1',
+    // Strict: exactly one payer row for S1, and it is the primary = P1.
+    const spRows = await client.query(
+      'SELECT person_id, role FROM subscription_payers WHERE subscription_id = $1 ORDER BY role',
       [S1],
     );
-    expect(sp).toEqual({ person_id: P1, role: 'primary' });
+    expect(spRows.rows).toEqual([{ person_id: P1, role: 'primary' }]);
 
     expect(
       await count('SELECT count(*)::int AS n FROM subscription WHERE id = $1', [
@@ -353,9 +363,19 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
   it('re-run is idempotent and converges on legacy updates + deletions', async () => {
     const freedEmail = `reseed_${uniq}_3@example.test`; // A3's email, freed below
 
+    // First-run sanity for the A4 graph: subscription + primary payer seeded.
+    expect(
+      await count(
+        'SELECT count(*)::int AS n FROM subscription_payers WHERE subscription_id = $1',
+        [S3],
+      ),
+    ).toBe(1);
+
     // Mutate legacy: rename owner, retier subscription, unlink the child,
     // delete a whole account (cascades its profiles + consents in legacy),
-    // and have a surviving account claim the deleted account's email.
+    // have a surviving account claim the deleted account's email, and delete
+    // an owner PROFILE while its account + subscription survive (the
+    // "ownerless account" convergence path).
     await client.query(
       `UPDATE profiles SET display_name = 'Parent One Renamed', updated_at = '2025-06-02T00:00:00Z' WHERE id = $1`,
       [P1],
@@ -370,6 +390,7 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
       A1,
       freedEmail,
     ]);
+    await client.query('DELETE FROM profiles WHERE id = $1', [P4]);
 
     await client.query(reseedSql); // second run
 
@@ -430,6 +451,36 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
         'SELECT count(*)::int AS n FROM consent_grant WHERE id = $1',
         [CS2],
       ),
+    ).toBe(0);
+
+    // Ownerless-account convergence: P4's profile vanished while account A4 +
+    // subscription S3 survive in legacy. The subscription mirror is deleted
+    // (it can no longer satisfy payer_person_id NOT NULL) and its payer join
+    // row goes with it via the 0108 ON DELETE CASCADE FK
+    // (subscription_payers_subscription_id_subscription_id_fk) — pinned here
+    // so a future FK amendment cannot silently break the re-run path.
+    expect(
+      await count('SELECT count(*)::int AS n FROM subscription WHERE id = $1', [
+        S3,
+      ]),
+    ).toBe(0);
+    expect(
+      await count(
+        'SELECT count(*)::int AS n FROM subscription_payers WHERE subscription_id = $1',
+        [S3],
+      ),
+    ).toBe(0);
+    expect(
+      await count('SELECT count(*)::int AS n FROM person WHERE id = $1', [P4]),
+    ).toBe(0);
+    // The account itself survives as an (ownerless) organization, login gone.
+    expect(
+      await count('SELECT count(*)::int AS n FROM organization WHERE id = $1', [
+        A4,
+      ]),
+    ).toBe(1);
+    expect(
+      await count('SELECT count(*)::int AS n FROM login WHERE id = $1', [A4]),
     ).toBe(0);
 
     // Freed unique value: A1 claimed the deleted account's email; the re-run
