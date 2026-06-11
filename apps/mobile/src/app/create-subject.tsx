@@ -95,10 +95,13 @@ function isFirstCurriculumPreparingError(err: unknown): boolean {
   // (e.g. Library-filing conflicts) still throw instead of being retried.
   // TODO(typed-error): replace the message test with a dedicated code
   // (e.g. CURRICULUM_PREPARING) once the API adds one.
-  const message = err instanceof Error ? err.message : '';
+  // rawMessage is extracted for discrimination only (which CONFLICT is
+  // this?), never for display — user-facing formatting stays with
+  // formatApiError at the call sites.
+  const rawMessage = err instanceof Error ? err.message : '';
   return (
     extractApiErrorCode(err) === 'CONFLICT' &&
-    /curriculum is still being prepared/i.test(message)
+    /curriculum is still being prepared/i.test(rawMessage)
   );
 }
 
