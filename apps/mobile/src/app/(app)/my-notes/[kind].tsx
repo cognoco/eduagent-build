@@ -497,9 +497,11 @@ export default function MyNotesListScreen(): React.ReactElement {
           ) : activeQuery.isError ? (
             <View className="items-center py-14" testID="my-notes-error">
               <Text className="text-body font-semibold text-text-primary">
-                {t('myNotes.loadError', {
-                  kind: titleForKind(kind).toLowerCase(),
-                })}
+                {kind === 'notes'
+                  ? t('myNotes.loadErrorNotes')
+                  : kind === 'bookmarks'
+                    ? t('myNotes.loadErrorBookmarks')
+                    : t('myNotes.loadErrorSessions')}
               </Text>
               <Pressable
                 onPress={() => void activeQuery.refetch()}
@@ -516,9 +518,11 @@ export default function MyNotesListScreen(): React.ReactElement {
           ) : (
             <View className="items-center py-14" testID="my-notes-empty">
               <Text className="text-body font-semibold text-text-primary">
-                {t('myNotes.noneYet', {
-                  kind: titleForKind(kind).toLowerCase(),
-                })}
+                {kind === 'notes'
+                  ? t('myNotes.noneYetNotes')
+                  : kind === 'bookmarks'
+                    ? t('myNotes.noneYetBookmarks')
+                    : t('myNotes.noneYetSessions')}
               </Text>
               <Text className="text-body-sm text-text-secondary mt-1 text-center">
                 {t('myNotes.emptyHint')}

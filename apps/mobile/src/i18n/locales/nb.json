@@ -1190,7 +1190,6 @@
       "notReadyHint": "Sett opp temaene først. Deretter kan du begynne å lære trinn for trinn.",
       "setUpBook": "Sett opp denne boken",
       "finishedTitle": "Du fullførte denne boken",
-      "finishedBody": "Du har studert alle {{count}} temaene i denne boken. Repeter dem for å holde dem ferske, eller gå tilbake og velg hva du vil lære neste gang.",
       "startReview": "▶ Start repetisjon",
       "startFirstLesson": "▶ Start første leksjon",
       "finishError": "Kunne ikke fullføre denne boken akkurat nå.",
@@ -1204,7 +1203,9 @@
       "noNotesYet": "Ingen notater ennå. Legg til ett når noe klikker.",
       "addNote": "+ Legg til et notat",
       "addFirstNote": "+ Legg til ditt første notat for denne boken",
-      "backToSubject": "Tilbake til emne →"
+      "backToSubject": "Tilbake til emne →",
+      "finishedBody_one": "Du har studert det eneste emnet i denne boken. Repeter det for å holde det friskt i minne, eller gå tilbake og velg hva du vil lære neste gang.",
+      "finishedBody_other": "Du har studert alle de {{count}} emnene i denne boken. Repeter dem for å holde dem friske i minne, eller gå tilbake og velg hva du vil lære neste gang."
     },
     "notStartedCount": "{{notStarted}} / {{total}} ikke startet",
     "chooseTopic": "Velg et tema",
@@ -3043,10 +3044,14 @@
     "subtitle": "Økter, notater og lagrede svar",
     "sortDate": "Dato",
     "sortSubject": "Emne",
-    "noneYet": "Ingen {{kind}} ennå",
     "emptyHint": "De vil dukke opp her etter hvert som du lærer.",
-    "loadError": "Kunne ikke laste inn {{kind}}",
-    "loadMore": "Last mer"
+    "loadMore": "Last mer",
+    "noneYetNotes": "Ingen notater ennå",
+    "noneYetBookmarks": "Ingen bokmerker ennå",
+    "noneYetSessions": "Ingen økter ennå",
+    "loadErrorNotes": "Kunne ikke laste notater",
+    "loadErrorBookmarks": "Kunne ikke laste bokmerker",
+    "loadErrorSessions": "Kunne ikke laste økter"
   },
   "pickBook": {
     "subjectFallback": "Emne",

@@ -1215,7 +1215,6 @@
       "notReadyHint": "Configure os tópicos primeiro. Depois, pode começar a aprender passo a passo.",
       "setUpBook": "Configurar este livro",
       "finishedTitle": "Você terminou este livro",
-      "finishedBody": "Você estudou todos os {{count}} tópicos deste livro. Revise-os para mantê-los frescos, ou volte e escolha o que aprender a seguir.",
       "startReview": "▶ Iniciar revisão",
       "startFirstLesson": "▶ Iniciar primeira lição",
       "finishError": "Não foi possível terminar este livro agora.",
@@ -1229,7 +1228,9 @@
       "noNotesYet": "Ainda não há notas. Adicione uma quando algo fizer sentido.",
       "addNote": "+ Adicionar uma nota",
       "addFirstNote": "+ Adicione sua primeira nota para este livro",
-      "backToSubject": "Voltar ao assunto →"
+      "backToSubject": "Voltar ao assunto →",
+      "finishedBody_one": "Você estudou o único tópico deste livro. Revise-o para manter o conteúdo atualizado, ou volte e escolha o que aprender a seguir.",
+      "finishedBody_other": "Você estudou todos os {{count}} tópicos deste livro. Revise-os para manter o conteúdo atualizado, ou volte e escolha o que aprender a seguir."
     },
     "notStartedCount": "{{notStarted}} / {{total}} por começar",
     "chooseTopic": "Escolha um tópico",
@@ -3043,10 +3044,14 @@
     "subtitle": "Sessões, notas e respostas salvas",
     "sortDate": "Data",
     "sortSubject": "Assunto",
-    "noneYet": "Nenhum(a) {{kind}} ainda",
     "emptyHint": "Eles aparecerão aqui conforme você aprende.",
-    "loadError": "Não foi possível carregar {{kind}}",
-    "loadMore": "Carregar mais"
+    "loadMore": "Carregar mais",
+    "noneYetNotes": "Ainda sem notas",
+    "noneYetBookmarks": "Ainda sem favoritos",
+    "noneYetSessions": "Ainda sem sessões",
+    "loadErrorNotes": "Erro ao carregar notas",
+    "loadErrorBookmarks": "Erro ao carregar favoritos",
+    "loadErrorSessions": "Erro ao carregar sessões"
   },
   "pickBook": {
     "subjectFallback": "Assunto",

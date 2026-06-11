@@ -1190,7 +1190,6 @@
       "notReadyHint": "Richte zuerst die Themen ein. Dann kannst du Schritt für Schritt mit dem Lernen beginnen.",
       "setUpBook": "Dieses Buch einrichten",
       "finishedTitle": "Du hast dieses Buch beendet",
-      "finishedBody": "Du hast alle {{count}} Themen in diesem Buch gelernt. Wiederhole sie, um sie frisch zu halten, oder geh zurück und wähle, was du als Nächstes lernen möchtest.",
       "startReview": "▶ Wiederholung starten",
       "startFirstLesson": "▶ Erste Lektion starten",
       "finishError": "Dieses Buch konnte jetzt nicht beendet werden.",
@@ -1204,7 +1203,9 @@
       "noNotesYet": "Noch keine Notizen. Füge eine hinzu, wenn es Klick macht.",
       "addNote": "+ Notiz hinzufügen",
       "addFirstNote": "+ Füge deine erste Notiz für dieses Buch hinzu",
-      "backToSubject": "Zurück zum Thema →"
+      "backToSubject": "Zurück zum Thema →",
+      "finishedBody_one": "Du hast das einzige Thema in diesem Buch gelernt. Wiederhole es, damit es frisch im Gedächtnis bleibt, oder gehe zurück und wähle aus, was du als Nächstes lernen möchtest.",
+      "finishedBody_other": "Du hast alle {{count}} Themen in diesem Buch gelernt. Wiederhole sie, damit sie frisch im Gedächtnis bleiben, oder gehe zurück und wähle aus, was du als Nächstes lernen möchtest."
     },
     "notStartedCount": "{{notStarted}} / {{total}} nicht begonnen",
     "chooseTopic": "Wähle ein Thema",
@@ -3043,10 +3044,14 @@
     "subtitle": "Sitzungen, Notizen und gespeicherte Antworten",
     "sortDate": "Datum",
     "sortSubject": "Thema",
-    "noneYet": "Noch keine {{kind}}",
     "emptyHint": "Sie werden hier angezeigt, während du lernst.",
-    "loadError": "{{kind}} konnten nicht geladen werden",
-    "loadMore": "Mehr laden"
+    "loadMore": "Mehr laden",
+    "noneYetNotes": "Noch keine Notizen",
+    "noneYetBookmarks": "Noch keine Lesezeichen",
+    "noneYetSessions": "Noch keine Sitzungen",
+    "loadErrorNotes": "Notizen konnten nicht geladen werden",
+    "loadErrorBookmarks": "Lesezeichen konnten nicht geladen werden",
+    "loadErrorSessions": "Sitzungen konnten nicht geladen werden"
   },
   "pickBook": {
     "subjectFallback": "Thema",

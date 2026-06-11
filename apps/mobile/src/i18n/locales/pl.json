@@ -1215,7 +1215,6 @@
       "notReadyHint": "Najpierw skonfiguruj tematy. Potem możesz zacząć naukę krok po kroku.",
       "setUpBook": "Skonfiguruj tę książkę",
       "finishedTitle": "Ukończono tę książkę",
-      "finishedBody": "Udało Ci się przerobić wszystkie {{count}} tematów w tej książce. Powtórz je, aby utrwalić wiedzę, lub wróć i wybierz, czego chcesz się uczyć dalej.",
       "startReview": "▶ Rozpocznij powtórkę",
       "startFirstLesson": "▶ Rozpocznij pierwszą lekcję",
       "finishError": "Nie udało się teraz ukończyć tej książki.",
@@ -1229,15 +1228,17 @@
       "noNotesYet": "Brak notatek. Dodaj notatkę, gdy coś zrozumiesz.",
       "addNote": "+ Dodaj notatkę",
       "addFirstNote": "+ Dodaj swoją pierwszą notatkę do tej książki",
-      "backToSubject": "Wróć do tematu →"
+      "backToSubject": "Wróć do tematu →",
+      "finishedBody_one": "Ukończono jedyny temat w tej książce. Powtórz go, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
+      "finishedBody_few": "Ukończono wszystkie {{count}} tematy w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
+      "finishedBody_many": "Ukończono wszystkie {{count}} tematów w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej.",
+      "finishedBody_other": "Ukończono wszystkie {{count}} tematów w tej książce. Powtórz je, aby utrwalić materiał, lub wróć i wybierz, czego uczyć się dalej."
     },
     "notStartedCount": "{{notStarted}} / {{total}} nierozpoczętych",
     "chooseTopic": "Wybierz temat",
     "provenanceFrom": "Od {{name}}",
     "recentlyAdded": "Ostatnio dodane",
     "sessionCount_one": "{{count}} sesja",
-    "sessionCount_few": "{{count}} sesje",
-    "sessionCount_many": "{{count}} sesji",
     "sessionCount_other": "{{count}} sesji"
   },
   "topic": {
@@ -2546,8 +2547,6 @@
     "backToLibrary": "Powrót do biblioteki",
     "conversation": "Rozmowa",
     "messageCount_one": "{{count}} wiadomość",
-    "messageCount_few": "{{count}} wiadomości",
-    "messageCount_many": "{{count}} wiadomości",
     "messageCount_other": "{{count}} wiadomości",
     "you": "Ty",
     "emptyTitle": "Brak wiadomości",
@@ -3047,10 +3046,14 @@
     "subtitle": "Sesje, notatki i zapisane odpowiedzi",
     "sortDate": "Data",
     "sortSubject": "Temat",
-    "noneYet": "Jeszcze brak {{kind}}",
     "emptyHint": "Pojawią się tutaj w miarę Twojej nauki.",
-    "loadError": "Nie udało się wczytać {{kind}}",
-    "loadMore": "Wczytaj więcej"
+    "loadMore": "Wczytaj więcej",
+    "noneYetNotes": "Brak notatek",
+    "noneYetBookmarks": "Brak zakładek",
+    "noneYetSessions": "Brak sesji",
+    "loadErrorNotes": "Nie udało się wczytać notatek",
+    "loadErrorBookmarks": "Nie udało się wczytać zakładek",
+    "loadErrorSessions": "Nie udało się wczytać sesji"
   },
   "pickBook": {
     "subjectFallback": "Temat",
@@ -3071,12 +3074,8 @@
     "loadingReviewTopics": "Wczytywanie tematów do powtórki...",
     "startingSession": "Rozpoczynanie sesji powtórkowej...",
     "overdueTopicCount_one": "{{count}} zaległy temat",
-    "overdueTopicCount_few": "{{count}} zaległe tematy",
-    "overdueTopicCount_many": "{{count}} zaległych tematów",
     "overdueTopicCount_other": "{{count}} zaległych tematów",
     "daysOverdue_one": "{{count}} dzień zaległości",
-    "daysOverdue_few": "{{count}} dni zaległości",
-    "daysOverdue_many": "{{count}} dni zaległości",
     "daysOverdue_other": "{{count}} dni zaległości"
   },
   "preview": {
