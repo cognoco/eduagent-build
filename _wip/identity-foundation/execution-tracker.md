@@ -175,7 +175,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **in-progress (staging write in motion)** — dev verified green (20/20, 223/4/40). PR #963 MERGED 2026-06-11 (290b32dfa; 3 gate rounds: NULL-birth_year guard, FK-cascade pin + between-runs fixture) — deploy.yml is applying 0109 to staging; executor runs staging verify (expect 6/1/0), then `complete`. Children WI-629/630 pre-swept (Fixed In 08c5cf82d). Journal drift → WI-649 |
+| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **in-progress (staging via path B)** — dev verified green (20/20, 223/4/40); PR #963 merged (290b32dfa, 3 gate rounds). Deploy pipeline turned out broken on TWO pre-existing infra gaps: (1) BUG-721 CF_* secrets never propagated — shepherd recovered the 7 values from git history, set GitHub repo secrets (captured as a security Bug WI); (2) IDEMPOTENCY_KV namespace never provisioned (BUG-12) hard-blocks the KV-verify gate, no override — captured as P1 Bug WI; migrate step skipped both runs, staging DB untouched. Ruling: staging migrate runs LOCALLY via `doppler -c stg drizzle-kit migrate` (committed SQL + drizzle-kit + clean journal = rule-compliant; only CI provenance differs). Executor on it; then verify (6/1/0) → `complete`. Children pre-swept. Journal drift → WI-649 |
 | WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | backlog-gated |
 
 ---
