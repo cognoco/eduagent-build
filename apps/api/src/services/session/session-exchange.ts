@@ -37,8 +37,8 @@ import {
   classifyOrphanError,
   challengeRoundSessionStateSchema,
   extractedInterviewSignalsSchema,
+  isUnambiguouslyAdult,
 } from '@eduagent/schemas';
-import { isUnambiguouslyAdult } from '../exchange-prompts';
 import { persistUserMessageOnly } from './persist-user-message-only';
 import {
   processExchange,

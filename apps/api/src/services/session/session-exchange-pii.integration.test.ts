@@ -129,6 +129,10 @@ describeIfDb('prepareExchangeContext WI-580 minor-name egress (F-076)', () => {
   });
 
   afterAll(async () => {
+    // The whole seeded chain hangs off accounts via ON DELETE CASCADE:
+    // accounts → profiles (profiles.ts:71) → subjects (subjects.ts:54) →
+    // curricula/curriculumBooks/curriculumTopics (subjects.ts:100/128/179/188)
+    // and learningSessions (sessions.ts:95-98) — one delete cleans up all rows.
     await db
       .delete(accounts)
       .where(like(accounts.clerkUserId, `clerk_wi580_pii_${RUN_ID}%`));

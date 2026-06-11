@@ -1,5 +1,6 @@
 import {
   computeAgeBracket,
+  isUnambiguouslyAdult,
   type AgeBracket,
   type SessionType,
   type HomeworkMode,
@@ -35,20 +36,6 @@ import type { ExchangeContext } from './exchanges';
 // `?? null` defensive chain. Tightening the type makes that trap unrepresentable.
 export function resolveAgeBracket(birthYear: number): AgeBracket {
   return computeAgeBracket(birthYear);
-}
-
-/**
- * WI-580 (F-076, PR #900 Codex P1): conservative adult check for minor-PII
- * egress decisions. Year-difference age is ambiguous at the boundary — a
- * profile with `birthYear === currentYear - 18` may still be 17 if their
- * birthday has not passed this year. Minor PII is fail-closed, so the
- * boundary year is treated as minor: only `birthYear < currentYear - 18` is
- * unambiguously 18+. Deliberately NOT `computeAgeBracket`/`isAdultOwner` —
- * their calendar-year semantics serve tone/voice and other call sites with
- * different stakes and are not changed here.
- */
-export function isUnambiguouslyAdult(birthYear: number): boolean {
-  return birthYear < new Date().getFullYear() - 18;
 }
 
 /**
