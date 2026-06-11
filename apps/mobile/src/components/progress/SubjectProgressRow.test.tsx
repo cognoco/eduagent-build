@@ -8,16 +8,28 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock(
-  './AccordionTopicList' /* gc1-allow: pre-existing mock carried through PR 7 rename */,
-  () => {
-    const { Text } = require('react-native');
+// GC6 burn-down: the former full './AccordionTopicList' component stub is
+// gone — the real component renders below. Only its data hook is spied,
+// mirroring the canonical pattern-a conversion in AccordionTopicList.test.tsx.
+const mockUseChildSubjectTopics = jest.fn().mockReturnValue({
+  data: [],
+  isLoading: false,
+  isError: false,
+  refetch: jest.fn(),
+});
 
-    return {
-      AccordionTopicList: ({ expanded }: { expanded: boolean }) =>
-        expanded ? <Text testID="mock-topic-list">Topics visible</Text> : null,
-    };
-  },
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+  useSegments: () => ['(app)', 'child', '[profileId]'],
+}));
+
+jest.mock(
+  '../../hooks/use-dashboard' /* gc1-allow: pattern-a conversion; use-dashboard requires a live TanStack query context; pattern-a spy overrides only the child-topics hook the real AccordionTopicList child calls */,
+  () => ({
+    ...jest.requireActual('../../hooks/use-dashboard'),
+    useChildSubjectTopics: (...args: unknown[]) =>
+      mockUseChildSubjectTopics(...args),
+  }),
 );
 
 function makeSubject(
@@ -179,15 +191,17 @@ describe('SubjectProgressRow accordion mode', () => {
     );
 
     screen.getByText('▾ See topics');
-    expect(screen.queryByTestId('mock-topic-list')).toBeNull();
+    expect(screen.queryByTestId('accordion-topics-empty')).toBeNull();
 
     fireEvent.press(screen.getByTestId('card'));
     screen.getByText('▴ Hide topics');
-    screen.getByTestId('mock-topic-list');
+    // Real AccordionTopicList: hook spy returns no topics, so the expanded
+    // accordion renders its empty state.
+    screen.getByTestId('accordion-topics-empty');
 
     fireEvent.press(screen.getByTestId('card'));
     screen.getByText('▾ See topics');
-    expect(screen.queryByTestId('mock-topic-list')).toBeNull();
+    expect(screen.queryByTestId('accordion-topics-empty')).toBeNull();
   });
 
   it('sets accordion accessibility metadata', () => {
@@ -246,7 +260,7 @@ describe('SubjectProgressRow accordion mode', () => {
 
     expect(onPress).toHaveBeenCalled();
     expect(screen.queryByText('▾ See topics')).toBeNull();
-    expect(screen.queryByTestId('mock-topic-list')).toBeNull();
+    expect(screen.queryByTestId('accordion-topics-empty')).toBeNull();
   });
 });
 
