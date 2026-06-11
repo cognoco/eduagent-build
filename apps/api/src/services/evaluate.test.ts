@@ -1,3 +1,4 @@
+import * as sentry from './sentry';
 import {
   shouldTriggerEvaluate,
   getEvaluateRungDescription,
@@ -303,5 +304,44 @@ describe('evaluateAssessmentFromEnvelopeSignal', () => {
       challenge_passed: boolean;
     });
     expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-074 / WI-579] Envelope-failure path must not leak LLM output content
+// ---------------------------------------------------------------------------
+
+describe('[F-074 / WI-579] parseEvaluateAssessment envelope failure leaks no content', () => {
+  const SENTINEL = 'Tommy-said-something-private-9yo';
+
+  it('[BREAK] logs and captures shape-only diagnostics, never the response slice', () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    try {
+      // Starts with `{` so it LOOKS like an envelope, but is malformed —
+      // drives the envelope-failure logging branch.
+      const content = `{"broken envelope with learner quote: ${SENTINEL}`;
+      expect(parseEvaluateAssessment(content)).toBeNull();
+
+      // Neither the structured log nor the Sentry extras may carry content.
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(SENTINEL);
+      expect(captureSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'parseEvaluateAssessment',
+            responseLength: content.length,
+          }),
+        }),
+      );
+      expect(JSON.stringify(captureSpy.mock.calls)).not.toContain(SENTINEL);
+    } finally {
+      captureSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

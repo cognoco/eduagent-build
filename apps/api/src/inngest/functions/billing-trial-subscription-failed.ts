@@ -27,6 +27,7 @@
 import { z } from 'zod';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
@@ -69,7 +70,7 @@ export const billingTrialSubscriptionFailed = inngest.createFunction(
       captureException(err, {
         extra: {
           surface: 'billing-trial-subscription-failed.invalid_payload',
-          rawData: event.data as unknown,
+          rawData: summarizeRawPayload(event.data),
         },
       });
       logger.error('billing.trial_subscription_failed.invalid_payload', {

@@ -131,7 +131,12 @@ export async function resolveSubjectName(
     // kept for resilience but the error must be visible — log + capture before
     // falling through to no_match.
     captureException(err, {
-      extra: { context: 'subject-resolve.fallback', rawInput },
+      // [F-140 / WI-579] Length only — rawInput is freeform learner text and
+      // must not be forwarded to Sentry.
+      extra: {
+        context: 'subject-resolve.fallback',
+        rawInputLength: rawInput.length,
+      },
     });
     logger.warn(
       '[subject-resolve] LLM response parse failed — falling back to no_match',

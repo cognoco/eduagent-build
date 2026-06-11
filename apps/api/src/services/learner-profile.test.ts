@@ -23,6 +23,7 @@ import {
 } from './learner-profile';
 import type { Database } from '@eduagent/database';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
+import * as sentry from './sentry';
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
@@ -2159,5 +2160,61 @@ describe('applyAnalysis — in-transaction GDPR re-check (WI-82 TOCTOU)', () => 
     expect(txUpdate).not.toHaveBeenCalled();
     // The outer gate passed (CONSENTED) — transaction was entered
     expect(db.transaction as jest.Mock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-074 / WI-579] analyzeSessionTranscript parse failure leaks no content
+// ---------------------------------------------------------------------------
+
+describe('[F-074 / WI-579] analyzeSessionTranscript parse failure leaks no content', () => {
+  const SENTINEL = 'Tommy-session-quote-private';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('[BREAK] captures shape-only diagnostics, never a response slice', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    try {
+      // Balanced braces (the JSON extractor returns a slice) but invalid
+      // JSON (`undefined` is not a JSON token) — JSON.parse throws and the
+      // catch branch fires.
+      const response = `{"struggles": undefined, "quote": "${SENTINEL}"}`;
+      mockRouteAndCall.mockResolvedValue({ response });
+
+      const events = [
+        { eventType: 'user_message', content: 'Long division confuses me.' },
+        { eventType: 'ai_response', content: 'Let me show it step by step.' },
+        { eventType: 'user_message', content: 'Okay, that makes more sense.' },
+      ];
+      const result = await analyzeSessionTranscript(
+        events,
+        'Mathematics',
+        'Long division',
+        null,
+      );
+      expect(result).toBeNull();
+
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(SENTINEL);
+      expect(captureSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'analyzeSession',
+            responseLength: response.length,
+          }),
+        }),
+      );
+      expect(JSON.stringify(captureSpy.mock.calls)).not.toContain(SENTINEL);
+    } finally {
+      captureSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

@@ -20,6 +20,7 @@
 import { z } from 'zod';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '../../services/pii-scrub';
 
 const logger = createLogger();
 
@@ -48,7 +49,7 @@ export const exchangeEmptyReplyFallback = inngest.createFunction(
     if (!parsed.success) {
       logger.warn('exchange.empty_reply_fallback.invalid_payload', {
         parseError: parsed.error.message,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       return { status: 'invalid_payload' as const };
     }

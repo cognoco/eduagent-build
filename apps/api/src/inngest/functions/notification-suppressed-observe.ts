@@ -17,6 +17,7 @@
 import { appNotificationSuppressedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '../../services/pii-scrub';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
@@ -38,17 +39,17 @@ export const notificationSuppressedObserve = inngest.createFunction(
       // throw so Inngest retries → eventually dead-letters, where the volume
       // is queryable.
       const err = new Error(
-        '[notification-suppressed] invalid event payload — schema drift or bad event'
+        '[notification-suppressed] invalid event payload — schema drift or bad event',
       );
       logger.error('[notification-suppressed] invalid event payload', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(err, {
         extra: {
           context: 'notification-suppressed-observe:invalid_payload',
           issues: parsed.error.issues,
-          rawData: event.data,
+          rawData: summarizeRawPayload(event.data),
         },
       });
       throw err;
@@ -68,5 +69,5 @@ export const notificationSuppressedObserve = inngest.createFunction(
       notificationType: data.notificationType,
       reason: data.reason,
     };
-  }
+  },
 );
