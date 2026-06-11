@@ -155,7 +155,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **in-progress (PR open)** — PR #911 (head 3be2e68, CI running): reference-and-rehydrate for all 4 findings, shared scrubber in `packages/schemas/pii-scrub.ts` + Inngest middleware, break tests red-green. Incidental calibration-event leak captured as WI-620. Scrubber-home consolidation with WI-579's log summarizer deliberately deferred to WI-578 |
+| WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **reviewing** — PR #911 merged 2026-06-11 (a20a0ad50; 2 rounds incl. Codex P2 staleness bound); `complete` fired, Fixed In abb745632, children WI-604/605 pre-swept — awaiting reviewer. WI-620 captured (calibration leak) |
 | WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready (dispatch held)** — deps met; held until WI-577 merges (shared Inngest-function surface, conflict risk) |
 | WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #902). Zero bounces — children pre-swept at merge |
 | WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #900, 3 gate rounds). Eval-hook gate-gap = WI-619 (hit 3×) |
@@ -173,7 +173,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | backlog-gated |
+| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **ready** — bridged + refined 2026-06-11 (Assisted; brief in body, children WI-629/630). RISKY: live-data migration — executor must stop pre-destructive-step for shepherd go |
 | WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | backlog-gated |
 
 ---
