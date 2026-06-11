@@ -9,8 +9,10 @@
 # Two owners are listed so the non-author can always approve (no solo-author deadlock).
 #
 # NOTE: this file only *requests* code-owner review. Making that review *required*
-# on these paths is a branch-protection setting (GitHub repo admin), tracked
-# separately as WI-538. Until that lands, these lines are advisory only.
+# on these paths is a branch-protection setting (GitHub repo admin). WI-538 enabled
+# and proved it (2026-06-11), then it was deliberately SUSPENDED until MentoMate is
+# in production (operator ruling) — re-arming is WI-617, a pre-launch checklist item.
+# Until then, these lines are advisory only.
 
 # Payments / subscription — mischarge / revenue risk
 **/billing/**                    @jojorgen @crowka
