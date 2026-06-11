@@ -70,7 +70,7 @@ export function SessionSummaryLibraryFilingControls({
   const showUnfiled = filing.filingStatus == null && !meetsFilingThreshold;
 
   const handleMutationFailure = (): void => {
-    setMessage("Couldn't update Library right now. Try again in a moment.");
+    setMessage(t('sessionSummary.libraryFiling.updateError'));
   };
 
   const handleKeepOut = async (): Promise<void> => {
@@ -168,7 +168,7 @@ export function SessionSummaryLibraryFilingControls({
                 void filing.refetch();
               }}
               accessibilityRole="button"
-              accessibilityLabel="Refresh Library status"
+              accessibilityLabel={t('sessionSummary.libraryFiling.a11yRefresh')}
               className="rounded-button py-2.5 px-4 items-center bg-surface-elevated"
               testID="session-summary-library-refresh"
             >
@@ -177,7 +177,7 @@ export function SessionSummaryLibraryFilingControls({
               </Text>
             </Pressable>
             {renderPrimaryAction(
-              "Don't add to Library",
+              t('sessionSummary.libraryFiling.dontAdd'),
               handleKeepOut,
               'session-summary-library-keep-out',
             )}
@@ -193,7 +193,7 @@ export function SessionSummaryLibraryFilingControls({
           </Text>
           <View className="mt-3">
             {renderPrimaryAction(
-              "Don't add to Library",
+              t('sessionSummary.libraryFiling.dontAdd'),
               handleKeepOut,
               'session-summary-library-keep-out',
             )}
@@ -223,7 +223,9 @@ export function SessionSummaryLibraryFilingControls({
               <Pressable
                 onPress={handleOpenTopic}
                 accessibilityRole="button"
-                accessibilityLabel="Open in Library"
+                accessibilityLabel={t(
+                  'sessionSummary.libraryFiling.a11yOpenInLibrary',
+                )}
                 className="rounded-button py-2.5 px-4 items-center bg-surface-elevated"
                 testID="session-summary-library-open-topic"
               >
@@ -233,7 +235,7 @@ export function SessionSummaryLibraryFilingControls({
               </Pressable>
             ) : null}
             {renderPrimaryAction(
-              'Remove from Library',
+              t('sessionSummary.libraryFiling.remove'),
               handleKeepOut,
               'session-summary-library-remove',
             )}
@@ -249,7 +251,7 @@ export function SessionSummaryLibraryFilingControls({
           </Text>
           <View className="mt-3">
             {renderPrimaryAction(
-              'Retry',
+              t('common.retry'),
               handleRetry,
               'session-summary-library-retry',
             )}
@@ -265,7 +267,7 @@ export function SessionSummaryLibraryFilingControls({
           </Text>
           <View className="mt-3">
             {renderPrimaryAction(
-              'Add to Library',
+              t('sessionSummary.libraryFiling.add'),
               filing.isKeptOut ? handleRestore : handleAdd,
               'session-summary-library-add',
             )}

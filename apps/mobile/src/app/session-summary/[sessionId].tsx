@@ -485,10 +485,10 @@ export default function SessionSummaryScreen() {
     return (
       <ErrorFallback
         variant="centered"
-        title="Session not found"
-        message="We couldn't find this session. Head home to start a new one."
+        title={t('sessionSummary.notFoundTitle')}
+        message={t('sessionSummary.notFoundHeadHomeMessage')}
         primaryAction={{
-          label: 'Go Home',
+          label: t('common.goHome'),
           onPress: () => goBackOrReplace(router, summaryHomeHref),
           testID: 'session-summary-missing-param',
         }}
@@ -521,7 +521,7 @@ export default function SessionSummaryScreen() {
           onPress={() => goBackOrReplace(router, summaryHomeHref)}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="expired-session-go-home"
-          accessibilityLabel="Go home"
+          accessibilityLabel={t('common.goHome')}
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
@@ -547,7 +547,7 @@ export default function SessionSummaryScreen() {
           onPress={() => goBackOrReplace(router, summaryHomeHref)}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="session-not-found-go-home"
-          accessibilityLabel="Go home"
+          accessibilityLabel={t('common.goHome')}
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
@@ -569,17 +569,17 @@ export default function SessionSummaryScreen() {
       return (
         <ErrorFallback
           variant="centered"
-          title="Taking longer than expected"
-          message="We couldn't load your session summary. Check your connection and try again."
+          title={t('sessionSummary.loadTimeoutTitle')}
+          message={t('sessionSummary.loadTimeoutMessage')}
           primaryAction={{
-            label: 'Try Again',
+            label: t('common.tryAgain'),
             onPress: () => {
               setLoadingTimedOut(false);
               void transcript.refetch();
             },
           }}
           secondaryAction={{
-            label: 'Go Home',
+            label: t('common.goHome'),
             onPress: () => goBackOrReplace(router, summaryHomeHref),
           }}
         />
@@ -616,7 +616,7 @@ export default function SessionSummaryScreen() {
           onPress={() => router.replace(summaryHomeHref as Href)}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="session-not-found-go-home"
-          accessibilityLabel="Go home"
+          accessibilityLabel={t('common.goHome')}
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
@@ -673,7 +673,7 @@ export default function SessionSummaryScreen() {
       // [BUG-800] Use formatApiError so typed server errors (400 word-limit,
       // 422 too-short, etc.) reach the user verbatim. The previous generic
       // 'Please try again.' hid actionable reasons — user could not self-correct.
-      platformAlert('Could not save', formatApiError(err));
+      platformAlert(t('sessionSummary.saveErrorTitle'), formatApiError(err));
       return false;
     } finally {
       submitInFlight.current = false;
@@ -689,34 +689,37 @@ export default function SessionSummaryScreen() {
       const buttons = canSubmit
         ? [
             {
-              text: 'Keep writing',
+              text: t('sessionSummary.draftPrompt.keepWriting'),
               style: 'cancel' as const,
               onPress: () => resolve('keep'),
             },
-            { text: 'Submit now', onPress: () => resolve('submit') },
             {
-              text: 'Discard',
+              text: t('sessionSummary.draftPrompt.submitNow'),
+              onPress: () => resolve('submit'),
+            },
+            {
+              text: t('sessionSummary.draftPrompt.discard'),
               style: 'destructive' as const,
               onPress: () => resolve('discard'),
             },
           ]
         : [
             {
-              text: 'Keep writing',
+              text: t('sessionSummary.draftPrompt.keepWriting'),
               style: 'cancel' as const,
               onPress: () => resolve('keep'),
             },
             {
-              text: 'Discard',
+              text: t('sessionSummary.draftPrompt.discard'),
               style: 'destructive' as const,
               onPress: () => resolve('discard'),
             },
           ];
       platformAlert(
-        'Save your reflection?',
+        t('sessionSummary.draftPrompt.title'),
         canSubmit
-          ? "You typed a reflection but haven't submitted it. Submit it now, discard it, or keep writing?"
-          : 'Your reflection is too short to submit (it needs at least 10 characters). Discard it or keep writing?',
+          ? t('sessionSummary.draftPrompt.messageCanSubmit')
+          : t('sessionSummary.draftPrompt.messageTooShort'),
         buttons,
       );
     });
@@ -759,7 +762,10 @@ export default function SessionSummaryScreen() {
       } catch {
         skipInFlight.current = false;
         // S-3: Surface skip failures — bare catch { return } was silent.
-        platformAlert('Could not skip', 'Please try again.');
+        platformAlert(
+          t('sessionSummary.skipErrorTitle'),
+          t('common.pleaseTryAgain'),
+        );
         return;
       }
       skipInFlight.current = false;
@@ -874,7 +880,7 @@ export default function SessionSummaryScreen() {
               void handleContinue();
             }}
             className="me-2 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
-            accessibilityLabel="Close and go home"
+            accessibilityLabel={t('sessionSummary.a11yCloseGoHome')}
             accessibilityRole="button"
             testID="summary-close-button"
           >
@@ -983,7 +989,7 @@ export default function SessionSummaryScreen() {
             }}
             className="bg-primary rounded-button py-3 items-center mb-4"
             accessibilityRole="button"
-            accessibilityLabel="Resume this session"
+            accessibilityLabel={t('sessionSummary.resumeSession')}
             testID="resume-session-cta"
           >
             <Text className="text-text-inverse text-body font-semibold">
@@ -1034,7 +1040,7 @@ export default function SessionSummaryScreen() {
               }}
               className="bg-surface rounded-button py-3 items-center mb-4"
               accessibilityRole="button"
-              accessibilityLabel="View full transcript"
+              accessibilityLabel={t('sessionSummary.viewTranscript')}
               testID="view-transcript-cta"
             >
               <Text className="text-text-primary text-body font-semibold">
@@ -1084,7 +1090,7 @@ export default function SessionSummaryScreen() {
               }}
               className="mt-3 items-center"
               accessibilityRole="button"
-              accessibilityLabel="Retry loading session recap"
+              accessibilityLabel={t('sessionSummary.a11yRetryRecap')}
               testID="session-recap-retry"
             >
               <Text className="text-body-sm font-semibold text-primary">
@@ -1168,7 +1174,7 @@ export default function SessionSummaryScreen() {
                 }
                 className="bg-primary rounded-button py-3 items-center"
                 accessibilityRole="button"
-                accessibilityLabel="Continue learning"
+                accessibilityLabel={t('sessionSummary.continueLearning')}
                 testID="session-next-topic-cta"
               >
                 <Text className="text-text-inverse text-body font-semibold">
@@ -1331,7 +1337,7 @@ export default function SessionSummaryScreen() {
                 })();
               }}
               testID="recall-bridge-done-button"
-              accessibilityLabel="Done, head home"
+              accessibilityLabel={t('sessionSummary.doneHeadHome')}
               accessibilityRole="button"
             >
               <Text className="text-text-inverse text-body font-semibold">
@@ -1412,7 +1418,7 @@ export default function SessionSummaryScreen() {
             <View
               className="flex-row flex-wrap gap-2 mb-3"
               testID="summary-prompt-chips"
-              accessibilityLabel="Sentence starter suggestions"
+              accessibilityLabel={t('sessionSummary.a11yStarters')}
             >
               {summaryPrompts.map((prompt) => (
                 <Pressable
@@ -1422,7 +1428,7 @@ export default function SessionSummaryScreen() {
                   testID={`summary-prompt-chip-${prompt}`}
                   accessibilityLabel={prompt}
                   accessibilityRole="button"
-                  accessibilityHint="Tap to use this sentence starter"
+                  accessibilityHint={t('sessionSummary.a11yStarterHint')}
                 >
                   <Text className="text-caption text-text-secondary">
                     {prompt}
@@ -1442,7 +1448,7 @@ export default function SessionSummaryScreen() {
               textAlignVertical="top"
               editable={!submitSummary.isPending}
               testID="summary-input"
-              accessibilityLabel="Write your learning summary"
+              accessibilityLabel={t('sessionSummary.a11yWriteSummary')}
             />
             <Text className="text-caption text-text-secondary mt-1 text-right">
               {summaryText.length}/2000
@@ -1479,7 +1485,7 @@ export default function SessionSummaryScreen() {
                   : 'bg-surface-elevated'
               }`}
               testID="submit-summary-button"
-              accessibilityLabel="Submit summary"
+              accessibilityLabel={t('sessionSummary.submitSummary')}
               accessibilityRole="button"
             >
               {submitSummary.isPending ? (
@@ -1526,7 +1532,7 @@ export default function SessionSummaryScreen() {
             }}
             className="py-3 items-center"
             testID="skip-summary-button"
-            accessibilityLabel="Skip summary"
+            accessibilityLabel={t('sessionSummary.a11ySkipSummary')}
             accessibilityRole="button"
           >
             <Text className="text-body-sm text-text-secondary">
@@ -1542,7 +1548,7 @@ export default function SessionSummaryScreen() {
           onPress={handleGoToLibrary}
           className="py-3 items-center mt-1"
           testID="go-to-library"
-          accessibilityLabel="See your Library"
+          accessibilityLabel={t('sessionSummary.seeYourLibrary')}
           accessibilityRole="link"
         >
           <Text className="text-caption text-text-secondary">

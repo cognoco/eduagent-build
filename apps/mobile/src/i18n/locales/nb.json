@@ -36,7 +36,8 @@
     "active": "Aktiv",
     "goBackAction": "Gå tilbake",
     "tryAgainAction": "Prøv igjen",
-    "dismiss": "Avvis"
+    "dismiss": "Avvis",
+    "pleaseTryAgain": "Prøv igjen."
   },
   "quota": {
     "parent": {
@@ -461,7 +462,11 @@
         "save": "Lagre notat",
         "edit": "Rediger først",
         "skip": "Hopp over"
-      }
+      },
+      "startErrorTitle": "Kunne ikke starte utfordringsrunden",
+      "updateErrorTitle": "Kunne ikke oppdatere utfordringsrunden",
+      "noteSaved": "Notat lagret.",
+      "noteSaveErrorTitle": "Kunne ikke lagre notatet"
     },
     "mentorMemory": {
       "title": "Hva mentoren min vet",
@@ -629,7 +634,12 @@
       "voicePermissionErrorMessage": "Tilgang til mikrofonen er nødvendig for taleinndata. Aktiver den i Innstillinger.",
       "voicePermissionOpenSettings": "Åpne Innstillinger",
       "replyReady": "Svar klart",
-      "voiceErrorTapRetry": "{{error}} – trykk for å prøve igjen"
+      "voiceErrorTapRetry": "{{error}} – trykk for å prøve igjen",
+      "a11yHomeworkImage": "Leksebilde",
+      "a11yMessageInput": "Meldingsfelt",
+      "a11yEnableVoice": "Aktiver talemelding",
+      "a11ySendMessage": "Send melding",
+      "a11yVoiceErrorHint": "Trykk for å prøve stemmeinndata på nytt"
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",
@@ -684,7 +694,11 @@
       "inputHint": "Skriv et spørsmål eller en idé du vil komme tilbake til senere",
       "saveButton": "Lagre",
       "savedForLater": "Lagret for senere",
-      "emptyState": "Ingenting parkert ennå"
+      "emptyState": "Ingenting parkert ennå",
+      "startFirstTitle": "Start samtalen først",
+      "startFirstMessage": "Send én melding slik at denne økten har et sted å lagre parkeringsplassen din.",
+      "savedConfirmation": "Lagret på parkeringsplassen din.",
+      "saveErrorTitle": "Kunne ikke lagre element på parkeringsplassen"
     },
     "topicSwitcher": {
       "title": "Bytt emne",
@@ -738,13 +752,6 @@
       "unknownError": "Ukjent feil",
       "body": "Noe gikk galt under lasting av denne skjermen. Du kan prøve igjen eller gå tilbake til hjem."
     },
-    "challengeAlerts": {
-      "couldNotStart": "Kunne ikke starte øvingsrunden",
-      "couldNotUpdate": "Kunne ikke oppdatere øvingsrunden",
-      "couldNotSaveNote": "Kunne ikke lagre notatet",
-      "noteSaved": "Notat lagret.",
-      "couldNotSkipWarmup": "Kunne ikke hoppe over oppvarmingen"
-    },
     "screenChrome": {
       "wrapping": "Avslutter ...",
       "exit": "Avslutt",
@@ -756,10 +763,38 @@
       "voice": "Stemme"
     },
     "messageActions": {
-      "reconnect": "Koble til på nytt"
+      "reconnect": "Koble til på nytt",
+      "a11yReconnect": "Koble til samtalen på nytt",
+      "a11yHelpful": "Nyttig – merk dette svaret som nyttig",
+      "a11yNotHelpful": "Ikke nyttig – merk dette svaret som ikke nyttig",
+      "a11yIncorrect": "Merk dette svaret som unøyaktig",
+      "wrongSubject": "Utenfor emne"
     },
     "questionCounter": {
       "question": "Spørsmål {{count}}"
+    },
+    "skipWarmupErrorTitle": "Kunne ikke hoppe over oppvarmingen",
+    "feedbackErrorTitle": "Kunne ikke lagre tilbakemelding",
+    "topicSwitchErrorTitle": "Kunne ikke bytte emne",
+    "endPrompt": {
+      "title": "Avslutte økten?",
+      "confirm": "Avslutt økt",
+      "errorTitle": "Kunne ikke avslutte denne økten"
+    },
+    "bookmarks": {
+      "removeErrorTitle": "Kunne ikke fjerne bokmerke",
+      "saveErrorTitle": "Kunne ikke lagre bokmerke"
+    },
+    "voice": {
+      "a11yReplay": "Spill av siste AI-melding på nytt",
+      "a11yStop": "Stopp tale",
+      "a11yResume": "Gjenoppta tale",
+      "a11yPause": "Sett tale på pause",
+      "a11ySpeed": "Talehastighet {{rate}}x. Trykk for å endre."
+    },
+    "inputMode": {
+      "text": "Tekstmodus",
+      "voice": "Talemodus"
     }
   },
   "quiz": {
@@ -2513,8 +2548,33 @@
       "failedTitle": "Vi kunne ikke legge dette til i biblioteket ditt",
       "failedHint": "Samtalen din er lagret. Prøv igjen når du er klar.",
       "keptOutTitle": "Ikke i biblioteket",
-      "keptOutHint": "Denne samtalen er lagret, men den er ikke et bibliotekemne."
-    }
+      "keptOutHint": "Denne samtalen er lagret, men den er ikke et bibliotekemne.",
+      "a11yRefresh": "Oppdater bibliotekstatus",
+      "a11yOpenInLibrary": "Åpne i bibliotek",
+      "updateError": "Kunne ikke oppdatere biblioteket akkurat nå. Prøv igjen om et øyeblikk.",
+      "dontAdd": "Ikke legg til i biblioteket",
+      "remove": "Fjern fra biblioteket",
+      "add": "Legg til i biblioteket"
+    },
+    "notFoundHeadHomeMessage": "Vi fant ikke denne økten. Gå til startsiden for å starte en ny.",
+    "loadTimeoutTitle": "Tar lengre tid enn forventet",
+    "loadTimeoutMessage": "Vi kunne ikke laste øktssammendraget ditt. Sjekk tilkoblingen din og prøv igjen.",
+    "saveErrorTitle": "Kunne ikke lagre",
+    "skipErrorTitle": "Kunne ikke hoppe over",
+    "draftPrompt": {
+      "title": "Lagre refleksjonen din?",
+      "messageCanSubmit": "Du skrev en refleksjon, men har ikke sendt den inn. Vil du sende den inn nå, forkaste den eller fortsette å skrive?",
+      "messageTooShort": "Refleksjonen din er for kort til å sendes inn (den må ha minst 10 tegn). Vil du forkaste den eller fortsette å skrive?",
+      "keepWriting": "Fortsett å skrive",
+      "submitNow": "Send inn nå",
+      "discard": "Forkast"
+    },
+    "a11yCloseGoHome": "Lukk og gå til startsiden",
+    "a11yRetryRecap": "Prøv å laste oppsummeringen på nytt",
+    "a11yStarters": "Forslag til setningsstartere",
+    "a11yWriteSummary": "Skriv læringssammendraget ditt",
+    "a11ySkipSummary": "Hopp over sammendraget",
+    "a11yStarterHint": "Trykk for å bruke denne setningsstarteren"
   },
   "sessionTranscript": {
     "archived": {
@@ -2530,7 +2590,11 @@
     "messageCount_other": "{{count}} meldinger",
     "you": "Du",
     "emptyTitle": "Ingen meldinger ennå",
-    "emptyMessage": "Denne økten har ingen lagrede utvekslinger å vise."
+    "emptyMessage": "Denne økten har ingen lagrede utvekslinger å vise.",
+    "loadingTranscript": "Laster transkripsjon ...",
+    "stillLoadingTitle": "Laster fortsatt",
+    "stillLoadingMessage": "Transkripsjonen tar lengre tid enn vanlig. Prøv igjen eller gå tilbake til biblioteket ditt.",
+    "loadErrorTitle": "Kunne ikke laste samtalen"
   },
   "nudge": {
     "sheet": {

@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
 
@@ -39,6 +40,7 @@ export function VoicePlaybackBar({
   onRateChange,
   variant = 'bar',
 }: VoicePlaybackBarProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const isInline = variant === 'inline';
 
@@ -56,7 +58,7 @@ export function VoicePlaybackBar({
           disabled={isSpeaking && !isPaused}
           accessibilityState={{ disabled: isSpeaking && !isPaused }}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
-          accessibilityLabel="Replay last AI message"
+          accessibilityLabel={t('session.voice.a11yReplay')}
           accessibilityRole="button"
           testID="voice-replay-button"
         >
@@ -79,7 +81,11 @@ export function VoicePlaybackBar({
           <Pressable
             onPress={isPaused ? onResume : onPause}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
-            accessibilityLabel={isPaused ? 'Resume speaking' : 'Pause speaking'}
+            accessibilityLabel={
+              isPaused
+                ? t('session.voice.a11yResume')
+                : t('session.voice.a11yPause')
+            }
             accessibilityRole="button"
             testID="voice-pause-resume-button"
           >
@@ -103,7 +109,7 @@ export function VoicePlaybackBar({
           <Pressable
             onPress={onStop}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
-            accessibilityLabel="Stop speaking"
+            accessibilityLabel={t('session.voice.a11yStop')}
             accessibilityRole="button"
             testID="voice-stop-button"
           >
@@ -122,7 +128,7 @@ export function VoicePlaybackBar({
         <Pressable
           onPress={() => onRateChange(nextRate(rate))}
           className="min-h-[44px] px-3 items-center justify-center rounded-button bg-surface-elevated"
-          accessibilityLabel={`Speech speed ${rate}x. Tap to change.`}
+          accessibilityLabel={t('session.voice.a11ySpeed', { rate })}
           accessibilityRole="button"
           testID="voice-rate-button"
         >

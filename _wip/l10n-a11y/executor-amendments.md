@@ -68,7 +68,15 @@ itself: `_wip/identity-foundation/executor-protocol.md` (phases 0–7).
     generated pl output actually contains `_few`/`_many` after `pnpm translate`.
     Also: `--findRelatedTests` does NOT catch `src/i18n/index.test.ts` (locale
     parity) — run the full `src/i18n/` suite whenever locale JSONs change.
-16. **No split-sentence fragment keys (learned 2026-06-11, WI-621 PR A / Codex P2):**
+16. **Cross-cutting sweeps need a forward-only guard from the start (learned
+    2026-06-11, WI-623 bounce on `dod.cross_cutting_sweep`):** any fix touching 3+
+    sibling sites must EITHER ship a forward-only guard test in the same PR
+    (mirror `persona-fossil-guard.test.ts` / `safe-non-core.guard.test.ts`) OR
+    carry a documented deferred sweep (tracked WI + owner + target + remaining
+    sites) in the PR body and completion summary. Where a mechanical guard is
+    infeasible (judgment-dependent sites), say so explicitly with one sentence of
+    reasoning — silence on the guard question is a guaranteed review bounce.
+17. **No split-sentence fragment keys (learned 2026-06-11, WI-621 PR A / Codex P2):**
     never split one sentence into multiple translation keys flanking an inline
     element — that hard-codes English word order and renders broken prose in
     free-word-order locales (JA verified). One key per sentence with `{{var}}`

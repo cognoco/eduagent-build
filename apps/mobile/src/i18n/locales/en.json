@@ -52,7 +52,8 @@
     "active": "Active",
     "goBackAction": "Go back",
     "tryAgainAction": "Try again",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "pleaseTryAgain": "Please try again."
   },
   "quota": {
     "parent": {
@@ -468,13 +469,6 @@
     "timer": {
       "accessibilityLabel": "Session time: {{time}}"
     },
-    "challengeAlerts": {
-      "couldNotStart": "Couldn't start the challenge round",
-      "couldNotUpdate": "Couldn't update the challenge round",
-      "couldNotSaveNote": "Couldn't save the note",
-      "noteSaved": "Note saved.",
-      "couldNotSkipWarmup": "Could not skip warm-up"
-    },
     "challenge": {
       "offerTitle": "Up for a challenge round?",
       "tryIt": "Try it",
@@ -488,7 +482,11 @@
         "save": "Save note",
         "edit": "Edit first",
         "skip": "Skip"
-      }
+      },
+      "startErrorTitle": "Couldn't start the challenge round",
+      "updateErrorTitle": "Couldn't update the challenge round",
+      "noteSaved": "Note saved.",
+      "noteSaveErrorTitle": "Couldn't save the note"
     },
     "mentorMemory": {
       "title": "Help your mentor learn how to teach you",
@@ -656,7 +654,12 @@
       "voicePermissionErrorMessage": "Microphone access is needed for voice input. Please enable it in Settings.",
       "voicePermissionOpenSettings": "Open Settings",
       "replyReady": "Reply ready",
-      "voiceErrorTapRetry": "{{error}} — tap to retry"
+      "voiceErrorTapRetry": "{{error}} — tap to retry",
+      "a11yHomeworkImage": "Homework image",
+      "a11yMessageInput": "Message input",
+      "a11yEnableVoice": "Enable voice message",
+      "a11ySendMessage": "Send message",
+      "a11yVoiceErrorHint": "Tap to retry voice input"
     },
     "messageBubble": {
       "thinking": "Thinking",
@@ -744,7 +747,11 @@
       "inputHint": "Type a question or idea you want to come back to later",
       "saveButton": "Save",
       "savedForLater": "Saved for later",
-      "emptyState": "Nothing parked yet"
+      "emptyState": "Nothing parked yet",
+      "startFirstTitle": "Start the conversation first",
+      "startFirstMessage": "Send one message so this session has somewhere to save your parking lot.",
+      "savedConfirmation": "Saved to your parking lot.",
+      "saveErrorTitle": "Could not save parking lot item"
     },
     "topicSwitcher": {
       "title": "Switch topic",
@@ -772,10 +779,38 @@
       "voice": "Voice"
     },
     "messageActions": {
-      "reconnect": "Reconnect"
+      "reconnect": "Reconnect",
+      "a11yReconnect": "Reconnect to the conversation",
+      "a11yHelpful": "Helpful — mark this reply helpful",
+      "a11yNotHelpful": "Not helpful — mark this reply not helpful",
+      "a11yIncorrect": "Flag this reply as inaccurate",
+      "wrongSubject": "Off subject"
     },
     "questionCounter": {
       "question": "Question {{count}}"
+    },
+    "skipWarmupErrorTitle": "Could not skip warm-up",
+    "feedbackErrorTitle": "Could not save feedback",
+    "topicSwitchErrorTitle": "Could not switch topic",
+    "endPrompt": {
+      "title": "End session?",
+      "confirm": "End Session",
+      "errorTitle": "Could not end this session cleanly"
+    },
+    "bookmarks": {
+      "removeErrorTitle": "Could not remove bookmark",
+      "saveErrorTitle": "Could not save bookmark"
+    },
+    "voice": {
+      "a11yReplay": "Replay last AI message",
+      "a11yStop": "Stop speaking",
+      "a11yResume": "Resume speaking",
+      "a11yPause": "Pause speaking",
+      "a11ySpeed": "Speech speed {{rate}}x. Tap to change."
+    },
+    "inputMode": {
+      "text": "Text mode",
+      "voice": "Voice mode"
     }
   },
   "quiz": {
@@ -2635,8 +2670,33 @@
       "failedTitle": "We couldn't add this to your Library",
       "failedHint": "Your chat is saved. Try again when you're ready.",
       "keptOutTitle": "Not in Library",
-      "keptOutHint": "This chat is saved, but it is not a Library topic."
-    }
+      "keptOutHint": "This chat is saved, but it is not a Library topic.",
+      "a11yRefresh": "Refresh Library status",
+      "a11yOpenInLibrary": "Open in Library",
+      "updateError": "Couldn't update Library right now. Try again in a moment.",
+      "dontAdd": "Don't add to Library",
+      "remove": "Remove from Library",
+      "add": "Add to Library"
+    },
+    "notFoundHeadHomeMessage": "We couldn't find this session. Head home to start a new one.",
+    "loadTimeoutTitle": "Taking longer than expected",
+    "loadTimeoutMessage": "We couldn't load your session summary. Check your connection and try again.",
+    "saveErrorTitle": "Could not save",
+    "skipErrorTitle": "Could not skip",
+    "draftPrompt": {
+      "title": "Save your reflection?",
+      "messageCanSubmit": "You typed a reflection but haven't submitted it. Submit it now, discard it, or keep writing?",
+      "messageTooShort": "Your reflection is too short to submit (it needs at least 10 characters). Discard it or keep writing?",
+      "keepWriting": "Keep writing",
+      "submitNow": "Submit now",
+      "discard": "Discard"
+    },
+    "a11yCloseGoHome": "Close and go home",
+    "a11yRetryRecap": "Retry loading the recap",
+    "a11yStarters": "Sentence starter suggestions",
+    "a11yWriteSummary": "Write your learning summary",
+    "a11ySkipSummary": "Skip the summary",
+    "a11yStarterHint": "Tap to use this sentence starter"
   },
   "sessionTranscript": {
     "archived": {
@@ -2652,7 +2712,11 @@
     "messageCount_other": "{{count}} messages",
     "you": "You",
     "emptyTitle": "No messages yet",
-    "emptyMessage": "This session doesn't have any saved exchanges to show."
+    "emptyMessage": "This session doesn't have any saved exchanges to show.",
+    "loadingTranscript": "Loading transcript...",
+    "stillLoadingTitle": "Still loading",
+    "stillLoadingMessage": "The transcript is taking longer than usual. Try again or head back to your library.",
+    "loadErrorTitle": "Couldn't load conversation"
   },
   "notifications": {
     "tap": {

@@ -1003,13 +1003,13 @@ function SessionScreenInner() {
         challengeActionInFlightRef.current = false;
       }
     },
-    [applyChallengeRouteResponse],
+    [applyChallengeRouteResponse, t],
   );
 
   const handleAcceptChallengeRound = useCallback(() => {
     void runChallengeAction(
       () => challengeRoundActions.accept(),
-      t('session.challengeAlerts.couldNotStart'),
+      t('session.challenge.startErrorTitle'),
     );
   }, [challengeRoundActions, runChallengeAction, t]);
 
@@ -1017,7 +1017,7 @@ function SessionScreenInner() {
     (dontAskAgain: boolean) => {
       void runChallengeAction(
         () => challengeRoundActions.decline(dontAskAgain),
-        t('session.challengeAlerts.couldNotUpdate'),
+        t('session.challenge.updateErrorTitle'),
       );
     },
     [challengeRoundActions, runChallengeAction, t],
@@ -1030,13 +1030,13 @@ function SessionScreenInner() {
       try {
         await challengeRoundActions.saveNote(content);
         setDraftedNote(null);
-        showConfirmation(t('session.challengeAlerts.noteSaved'));
+        showConfirmation(t('session.challenge.noteSaved'));
       } catch (err) {
         Sentry.captureException(err, {
           tags: { screen: 'session', action: 'saveDraftedNote' },
         });
         platformAlert(
-          t('session.challengeAlerts.couldNotSaveNote'),
+          t('session.challenge.noteSaveErrorTitle'),
           formatApiError(err),
         );
       } finally {
@@ -1081,10 +1081,7 @@ function SessionScreenInner() {
       Sentry.captureException(err, {
         tags: { screen: 'session', action: 'skipWarmup' },
       });
-      platformAlert(
-        t('session.challengeAlerts.couldNotSkipWarmup'),
-        formatApiError(err),
-      );
+      platformAlert(t('session.skipWarmupErrorTitle'), formatApiError(err));
     }
   }, [clearContinuationDepth, t]);
 
