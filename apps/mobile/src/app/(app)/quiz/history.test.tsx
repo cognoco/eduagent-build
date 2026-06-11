@@ -211,22 +211,22 @@ describe('QuizHistoryScreen', () => {
     //   - UTC date: '2026-04-30' (what the old `.slice(0,10)` would give)
     //   - Local date: '2026-04-29' (what toLocalDateString() correctly returns)
     //
-    // We spy on toLocalDateString to simulate a UTC-1 user: the function
-    // maps the UTC-midnight+30m timestamp to the local date '2026-04-29'.
-    // The test verifies the section date key comes from toLocalDateString,
-    // not from the raw ISO slice.
+    // We spy on toLocalDateString to simulate a UTC-1 user: the timestamp at
+    // UTC midnight + 30m maps to the previous local day. Any other call falls
+    // through to the REAL implementation so unexpected calls stay visible.
     //
     // BUGGY code: `round.completedAt.slice(0, 10)` → groups under '2026-04-30'
     // FIXED code: `toLocalDateString(new Date(round.completedAt))` → '2026-04-29'
 
+    const realToLocalDateString = localDateModule.toLocalDateString;
     const spy = jest
       .spyOn(localDateModule, 'toLocalDateString')
       .mockImplementation((d?: Date) => {
-        if (!d) return '2026-04-29'; // default case (not relevant here)
-        const iso = d.toISOString();
         // Simulate UTC-1: 2026-04-30T00:30:00Z is locally 2026-04-29 23:30
-        if (iso.startsWith('2026-04-30T00:30')) return '2026-04-29';
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (d && d.toISOString() === '2026-04-30T00:30:00.000Z') {
+          return '2026-04-29';
+        }
+        return realToLocalDateString(d);
       });
 
     const roundAtUTCMidnight = [
@@ -246,14 +246,27 @@ describe('QuizHistoryScreen', () => {
       screen.getByTestId('quiz-history-row-round-boundary');
     });
 
-    // The section header date key passed to relativeDate() should be '2026-04-29'
-    // (local date), not '2026-04-30' (UTC date). The spy was called with the
-    // Date object wrapping completedAt, confirming the fix path was taken.
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        // The Date constructed from the completedAt ISO string
-      }),
-    );
+    // 1. The grouping path must hand the helper the exact Date built from
+    //    completedAt (jest Date equality compares timestamps). With the buggy
+    //    `.slice(0, 10)` key the helper is never called for this round.
+    expect(spy).toHaveBeenCalledWith(new Date('2026-04-30T00:30:00.000Z'));
+
+    // 2. The rendered section header must show the LOCAL day (Apr 29), not the
+    //    UTC day (Apr 30). The header renders relativeDate('<key>T00:00:00');
+    //    for a >30-day-old date the real useRelativeDate hook formats it via
+    //    toLocaleDateString — replicate that exact formatting here.
+    const headerFor = (localMidnightIso: string): string => {
+      const d = new Date(localMidnightIso);
+      const includeYear = d.getFullYear() !== new Date().getFullYear();
+      return d.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        ...(includeYear ? { year: 'numeric' } : {}),
+      });
+    };
+    expect(screen.getByText(headerFor('2026-04-29T00:00:00'))).toBeTruthy();
+    expect(screen.queryByText(headerFor('2026-04-30T00:00:00'))).toBeNull();
+
     spy.mockRestore();
   });
 
