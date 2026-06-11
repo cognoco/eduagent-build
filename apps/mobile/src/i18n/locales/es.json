@@ -24,7 +24,8 @@
     },
     "timeoutLoader": {
       "title": "Tardando demasiado",
-      "message": "Esto está tardando más de lo esperado. Revisa tu conexión e inténtalo de nuevo."
+      "message": "Esto está tardando más de lo esperado. Revisa tu conexión e inténtalo de nuevo.",
+      "loading": "Cargando, por favor espera"
     }
   },
   "quota": {
@@ -553,7 +554,8 @@
       "stepProgress": "Paso {{current}} de {{total}}",
       "voicePermissionErrorTitle": "Error de entrada de voz",
       "voicePermissionErrorMessage": "Se necesita acceso al micrófono para la entrada de voz. Actívalo en Ajustes.",
-      "voicePermissionOpenSettings": "Abrir Ajustes"
+      "voicePermissionOpenSettings": "Abrir Ajustes",
+      "replyReady": "Respuesta lista"
     },
     "filingFailed": {
       "retryInProgress": "Ya hay un reintento en curso.",
@@ -785,7 +787,11 @@
       "oneMoreLabel": "Empezar otro quiz",
       "disputeLabel": "Disputar esta respuesta",
       "dismissLabel": "Cerrar",
-      "saveAndFinishLabel": "Guardar progreso y terminar la ronda"
+      "saveAndFinishLabel": "Guardar progreso y terminar la ronda",
+      "correctAnnounce": "¡Correcto! La respuesta era {{answer}}",
+      "correctAnnounceNoAnswer": "¡Correcto!",
+      "wrongAnnounce": "Casi. La respuesta era {{answer}}",
+      "wrongAnnounceNoAnswer": "Casi."
     },
     "results": {
       "viewHistory": "Ver historial"

@@ -213,7 +213,10 @@ export default function ProfilesScreen() {
         testID="profiles-auth-loading"
         className="flex-1 bg-background items-center justify-center"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -246,7 +249,11 @@ export default function ProfilesScreen() {
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" testID="profiles-loading" />
+          <ActivityIndicator
+            size="large"
+            testID="profiles-loading"
+            accessibilityLabel={t('common.loading')}
+          />
         </View>
       ) : profiles.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">

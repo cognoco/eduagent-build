@@ -128,7 +128,11 @@ export function NudgeActionSheet({
                     {t(`nudge.templates.${template}`)}
                   </Text>
                   {isPending ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.primary}
+                      accessibilityLabel={t('common.loading')}
+                    />
                   ) : (
                     <Ionicons
                       name="send-outline"

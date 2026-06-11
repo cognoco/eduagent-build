@@ -750,6 +750,7 @@ function SubscriptionContent(): React.ReactElement | null {
                 size="small"
                 color="white"
                 testID="subscription-retry-loading"
+                accessibilityLabel={t('common.loading')}
               />
             ) : (
               <Text className="text-text-inverse text-body font-semibold">
@@ -1015,6 +1016,7 @@ function SubscriptionContent(): React.ReactElement | null {
                     size="small"
                     color={colors.primary}
                     testID="purchase-polling-spinner"
+                    accessibilityLabel={t('common.loading')}
                   />
                   <Text className="text-body font-semibold text-primary ml-2">
                     Confirming purchase…
@@ -1137,6 +1139,7 @@ function SubscriptionContent(): React.ReactElement | null {
                         size="small"
                         color={colors.primary}
                         testID="restore-loading"
+                        accessibilityLabel={t('common.loading')}
                       />
                       <Text className="text-body font-semibold text-primary ml-2">
                         {restorePolling
@@ -1196,6 +1199,7 @@ function SubscriptionContent(): React.ReactElement | null {
                       size="small"
                       color={colors.primary}
                       testID="top-up-spinner"
+                      accessibilityLabel={t('common.loading')}
                     />
                     <Text className="text-body font-semibold text-primary ml-2">
                       {topUpPolling ? pollMessage : 'Opening store...'}
@@ -1311,6 +1315,7 @@ function SubscriptionContent(): React.ReactElement | null {
                     size="small"
                     color={colors.textInverse}
                     testID="join-byok-waitlist-loading"
+                    accessibilityLabel={t('common.loading')}
                   />
                 ) : byokJoined ? (
                   <Text className="text-text-secondary text-body font-semibold">

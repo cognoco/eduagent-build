@@ -17,6 +17,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import type { SessionTranscriptExchange } from '@eduagent/schemas';
 import { useSessionTranscript } from '../../hooks/use-sessions';
 import { goBackOrReplace } from '../../lib/navigation';
@@ -43,6 +44,7 @@ function isVisibleExchange(e: SessionTranscriptExchange): boolean {
 }
 
 export default function SessionTranscriptScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -73,7 +75,10 @@ export default function SessionTranscriptScreen() {
         className="flex-1 bg-background items-center justify-center"
         testID="session-transcript-auth-loading"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }

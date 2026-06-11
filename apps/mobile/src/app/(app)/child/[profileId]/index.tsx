@@ -672,7 +672,10 @@ function ConsentManagementSection({
         </View>
       ) : consent.isLoading ? (
         <View className="py-4 items-start">
-          <ActivityIndicator testID="consent-status-loading" />
+          <ActivityIndicator
+            testID="consent-status-loading"
+            accessibilityLabel={t('common.loading')}
+          />
         </View>
       ) : isWithdrawn ? (
         <View
@@ -706,7 +709,10 @@ function ConsentManagementSection({
             testID="cancel-deletion-button"
           >
             {restoreConsent.isPending ? (
-              <ActivityIndicator testID="cancel-deletion-loading" />
+              <ActivityIndicator
+                testID="cancel-deletion-loading"
+                accessibilityLabel={t('common.loading')}
+              />
             ) : (
               <Text className="text-body font-semibold text-text-inverse">
                 {t('parentView.index.cancelDeletion', {
@@ -728,7 +734,10 @@ function ConsentManagementSection({
           testID="withdraw-consent-button"
         >
           {revokeConsent.isPending ? (
-            <ActivityIndicator testID="withdraw-consent-loading" />
+            <ActivityIndicator
+              testID="withdraw-consent-loading"
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text className="text-body font-semibold text-danger">
               {t('parentView.index.withdrawConsent', {

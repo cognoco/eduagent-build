@@ -470,7 +470,10 @@ export default function SessionSummaryScreen() {
         className="flex-1 bg-background items-center justify-center"
         testID="session-summary-auth-loading"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -584,7 +587,7 @@ export default function SessionSummaryScreen() {
     }
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
         <Text className="text-text-secondary text-body text-center mt-3">
           Loading your session summary...
         </Text>
@@ -1481,7 +1484,10 @@ export default function SessionSummaryScreen() {
               accessibilityRole="button"
             >
               {submitSummary.isPending ? (
-                <ActivityIndicator color={colors.textInverse} />
+                <ActivityIndicator
+                  color={colors.textInverse}
+                  accessibilityLabel={t('common.loading')}
+                />
               ) : (
                 <Text
                   className={`text-body font-semibold ${

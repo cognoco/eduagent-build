@@ -323,7 +323,10 @@ export function ConsentPendingGate(): React.ReactElement {
           accessibilityLabel={t('tabs.consentPending.checkAgain')}
         >
           {checking ? (
-            <ActivityIndicator color={colors.textInverse} />
+            <ActivityIndicator
+              color={colors.textInverse}
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text className="text-body font-semibold text-text-inverse">
               {t('tabs.consentPending.checkAgain')}
@@ -347,7 +350,10 @@ export function ConsentPendingGate(): React.ReactElement {
             )}
           >
             {resendConsentMutation.isPending ? (
-              <ActivityIndicator color={colors.accent} />
+              <ActivityIndicator
+                color={colors.accent}
+                accessibilityLabel={t('common.loading')}
+              />
             ) : (
               <Text className="text-body font-semibold text-primary">
                 {t('tabs.consentPending.resendEmail')}
@@ -449,7 +455,10 @@ export function ConsentPendingGate(): React.ReactElement {
               accessibilityLabel={copy.changeEmailSubmit}
             >
               {resendMutation.isPending ? (
-                <ActivityIndicator color={colors.textInverse} />
+                <ActivityIndicator
+                  color={colors.textInverse}
+                  accessibilityLabel={t('common.loading')}
+                />
               ) : (
                 <Text className="text-body font-semibold text-text-inverse">
                   {copy.changeEmailSubmit}

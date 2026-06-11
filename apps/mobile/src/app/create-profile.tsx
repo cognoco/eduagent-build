@@ -467,7 +467,10 @@ export default function CreateProfileScreen() {
         testID="create-profile-auth-loading"
         className="flex-1 bg-background items-center justify-center"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -484,7 +487,10 @@ export default function CreateProfileScreen() {
         testID="create-profile-role-loading"
         className="flex-1 bg-background items-center justify-center"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }

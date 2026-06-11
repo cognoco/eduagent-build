@@ -252,7 +252,10 @@ function StandardFilingPrompt({
           }
         >
           {filing.isPending ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator
+              color="white"
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text className="text-text-inverse font-semibold">
               {t('session.filingPrompt.yesAdd')}

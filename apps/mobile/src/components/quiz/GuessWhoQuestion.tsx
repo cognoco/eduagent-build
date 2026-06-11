@@ -248,7 +248,11 @@ export function GuessWhoQuestion({
             testID="guess-who-submit"
           >
             {isChecking ? (
-              <ActivityIndicator size="small" color={colors.textInverse} />
+              <ActivityIndicator
+                size="small"
+                color={colors.textInverse}
+                accessibilityLabel={t('common.loading')}
+              />
             ) : (
               <Text
                 className={`text-body-sm font-semibold ${

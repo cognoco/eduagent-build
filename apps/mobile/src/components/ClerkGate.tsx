@@ -7,6 +7,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
+import { useTranslation } from 'react-i18next';
 
 import { tokens } from '../lib/design-tokens';
 
@@ -35,6 +36,7 @@ export function ClerkGate({
   onContinueOffline: () => void;
 }) {
   const { isLoaded } = useAuth();
+  const { t } = useTranslation();
   // ThemeContext is not yet mounted at this point (ClerkGate renders above
   // it in the tree). Read the system color scheme directly so dark-mode users
   // see a dark timeout screen instead of the default light palette.
@@ -136,7 +138,11 @@ export function ClerkGate({
           backgroundColor: gateColors.background,
         }}
       >
-        <ActivityIndicator size="large" color={gateColors.primary} />
+        <ActivityIndicator
+          size="large"
+          color={gateColors.primary}
+          accessibilityLabel={t('common.loading')}
+        />
         <Text
           style={{
             marginTop: 16,

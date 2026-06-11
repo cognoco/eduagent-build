@@ -358,7 +358,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
             </>
           ) : (
             <>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <ActivityIndicator
+                size="large"
+                color={colors.primary}
+                accessibilityLabel={t('common.loading')}
+              />
               <Text className="text-body text-text-secondary mt-4 text-center">
                 {t('dictation.complete.checkingWriting')}
               </Text>
@@ -443,7 +447,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
               accessibilityLabel={t('dictation.complete.imDone')}
             >
               {recordResult.isPending ? (
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator
+                  size="small"
+                  color={colors.primary}
+                  accessibilityLabel={t('common.loading')}
+                />
               ) : (
                 <Text className="font-semibold text-body text-text-primary">
                   {t('dictation.complete.imDone')}

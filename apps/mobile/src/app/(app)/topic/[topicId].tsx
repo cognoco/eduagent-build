@@ -566,7 +566,11 @@ export default function TopicDetailScreen() {
     }
     return (
       <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -676,7 +680,11 @@ export default function TopicDetailScreen() {
             className="flex-1 items-center justify-center"
             testID="topic-detail-loading"
           >
-            <ActivityIndicator size="large" color={colors.muted} />
+            <ActivityIndicator
+              size="large"
+              color={colors.muted}
+              accessibilityLabel={t('common.loading')}
+            />
             <Text className="text-text-secondary mt-2">Loading topic...</Text>
           </View>
           {/* CTA visible but disabled while data loads */}

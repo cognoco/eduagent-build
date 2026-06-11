@@ -161,7 +161,11 @@ export default function DictationReviewScreen(): React.ReactElement {
           accessibilityLabel={t('common.done')}
         >
           {recordResult.isPending ? (
-            <ActivityIndicator size="small" color={colors.textInverse} />
+            <ActivityIndicator
+              size="small"
+              color={colors.textInverse}
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text className="text-text-inverse font-semibold text-body">
               {t('common.done')}

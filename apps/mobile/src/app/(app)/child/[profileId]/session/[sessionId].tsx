@@ -98,7 +98,10 @@ export default function SessionDetailScreen() {
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator testID="loading" />
+        <ActivityIndicator
+          testID="loading"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
