@@ -247,7 +247,9 @@ the same change-set as the event they record.
   **Second instance:** PRG-12 / l10n-a11y (activated 2026-06-11 via the §2.1
   recipe) — tracker `_wip/l10n-a11y/execution-tracker.md`, Workstream "L10n &
   A11y Mobile", WI-621…628; first *parallel* activation alongside a running
-  Initiative.
+  Initiative. **Third:** PRG-15 / errors-api (2026-06-11, same evening its
+  gate fired) — `_wip/errors-api/execution-tracker.md`, Workstream "API Error
+  Handling", WI-639…641; the recipe is now routine.
 - **Generated views:** `dashboard.html` ("Flight Deck") — board / gate-rail /
   field-guide over initiatives × bundles × gates, for Jorn + Zuzka. A **view,
   never a home** (it states so itself); regenerated at umbrella touches; on

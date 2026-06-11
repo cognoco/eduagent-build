@@ -183,6 +183,23 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   (one watcher, both workstreams), then refine WI-621/622 to Ready.
 - **Activate-when:** — (active)
 
+### PRG-15 · API Error Handling — `active` (2026-06-11)
+- **Outcome:** all 8 `errors-api` audit findings resolved — silent-failure catch
+  blocks logged/escalated (billing/consent/webhook silent-recovery ban enforced),
+  typed-error classification fixed at API boundaries (incl. the JWKS auth path),
+  error classification enforced at the mobile client boundary (6 screens).
+- **Owner:** Jorn (+ PRG-15 shepherd session; agent-heavy sweep, medium
+  supervision on the typed-error/auth-path unit).
+- **Depends-on:** ✅ satisfied — boundary event "W3 envelope-router landed"
+  (`WI-581` Closed 2026-06-11); envelope contract final on `main`.
+- **Decomposition:** `_wip/errors-api/execution-tracker.md` (charter + unit map +
+  slice-time decisions). Cosmo **Workstream "API Error Handling"** with
+  **WI-639/640/641** (2 WPs + 1 Item, `Stage=Backlog`, order 1–3).
+- **Activated 2026-06-11** — third run of the §2.1 recipe, activated the same
+  evening its gate fired; both charter open questions resolved/mooted by the
+  gate event. Shepherd session not yet spawned.
+- **Activate-when:** — (active)
+
 ---
 
 ## Emerging — clear-out workstreams from the audit triage (firm @ Phase M)
@@ -222,7 +239,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 | PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-621…628 sliced) |
 | PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | after IF W1-inngest-wiring + W3 land |
 | PRG-14 | agent-instructions | 10 (+3 merged: F-116 + the F-151/F-157 CI/Platform fold) | partial **inside** (overlaps PRG-03) | light thread (skill-description/sync fixes) **now**; skill-building after PRG-03 B4 (AGENTS/CLAUDE converge) |
-| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | gate **FIRED 06-11** ("W3 envelope-router landed" — `WI-581` Closed) — **activation decision LIVE**, ordered behind attention budget (PRG-12 just spawned) |
+| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-639/640/641 sliced) |
 
 ### PRG-16 · Singleton tail — `DISSOLVED 2026-06-10`
 The ~15 one-finding labels are normalized per `activation-planning.md` §1
@@ -309,7 +326,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
 | 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
-| 5 | **PRG-15** errors-api | gate ✅ **FIRED 06-11** (envelope-router `WI-581` Closed) — activation = attention-budget call |
+| 5 | **PRG-15** errors-api | ✅ **ACTIVATED 06-11** (same evening its gate fired — envelope-router `WI-581` Closed) |
 | 6 | **PRG-13** security-pii-inngest | IF W1-inngest-wiring + W3 landed |
 | 7 | **PRG-10** security-pii-api | split: out-of-radius subset (CI/GHA + input-validation) at pipeline-proven; auth/PII remainder after IF "W2/W3 landed" |
 | 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
@@ -359,6 +376,13 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-11 (night, +1h) — PRG-15 ACTIVATED on operator go.** Third run of
+  the §2.1 recipe: tracker `_wip/errors-api/execution-tracker.md`, Cosmo
+  Workstream **API Error Handling**, units **WI-639** (catch-hygiene, P1),
+  **WI-640** (typed-errors, P2), **WI-641** (mobile-classification Item, P2).
+  Both charter open questions resolved/mooted by the gate event (envelope
+  contract final). Now three parallel lanes: PRG-01 (W3 tail), PRG-12, PRG-15.
+  Shepherd kickoff prompt handed to operator.
 - **2026-06-11 (night) — PRG-15 gate FIRED: envelope-router landed.** `WI-581`
   Closed by the autonomous reviewer → boundary event "W3 envelope-router
   landed" fired; PRG-15 (errors-api) activation decision is LIVE, held behind

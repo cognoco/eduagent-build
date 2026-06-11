@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-12 shepherd LIVE</b> (review loop wired, WI-621/622 Ready) · <b>PRG-15 gate FIRED</b> (envelope-router closed — activation decision live) · IF: W3 at 5/6 — <b>G4 hangs on WI-578 alone</b> · PRG-11 scan done (scope ≈ intact) · HH residue in operator triage · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>three lanes live</b> — IF (W3 at 5/6, <b>G4 hangs on WI-578 alone</b>) · PRG-12 (shepherd live, WI-621/622 Ready) · <b>PRG-15 ACTIVATED</b> (WI-639/640/641 sliced, shepherd next) · PRG-11 scan done (scope ≈ intact) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
 </div>
 
 <nav>
@@ -592,7 +592,7 @@ const QUEUE = [
   ["2","PRG-14","Agent instructions","Light fixes: now · skill-building: after doc convergence (PRG-03/B4)"],
   ["3","PRG-02","Harness Hygiene — residue batch","HH PR merged (G1)"],
   ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
-  ["5","PRG-15","Error handling","✅ gate FIRED 06-11 (envelope-router closed) — activation is an attention-budget call"],
+  ["5","PRG-15","Error handling","✅ ACTIVATED 06-11 — third parallel lane (WI-639/640/641)"],
   ["6","PRG-13","Background-job security","IF W1 job-wiring + W3 land (G3/G4)"],
   ["7","PRG-10","API security","Safe subset at G2 · auth/PII remainder after G4"],
   ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
@@ -706,17 +706,16 @@ const INIT = [
   ],
   homes:["activation-planning.md §2 PRG-13 (charter)","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-15", name:"Error handling", accent:"var(--amber)", lane:"armed", status:"armed", q:"#5",
+{ id:"PRG-15", name:"Error handling", accent:"var(--teal)", lane:"now", status:"active", q:"#5",
   tagline:"Silent catch blocks in billing & consent code, errors misclassified into wrong status codes. High value per finding.",
-  owner:"Agent-sweep; typed-error work reviewed", gate:"Gate FIRED 06-11 — envelope-router (WI-581) closed. Activation = attention-budget call (PRG-12 just spawned).",
+  owner:"Agent-sweep; typed-error work reviewed", gate:"ACTIVATED 06-11 (same evening its gate fired) — tracker + Workstream + WI-639/640/641 sliced; shepherd session next.",
   outcome:"No silent failures in money/auth/consent paths; errors classified once, at the boundary; 8 findings closed.",
   bundles:[
-    {n:"Silent-failure catch blocks", s:"3 findings", m:"agent", st:"hold", note:"Incl. a GDPR-adjacent consent rollback swallow."},
-    {n:"Typed errors & misclassification", s:"3 findings", m:"mixed", st:"hold"},
-    {n:"Webhook error context", s:"1 finding", m:"agent", st:"hold"},
-    {n:"Mobile error classification", s:"1 finding", m:"agent", st:"hold", note:"Parallel-safe before G4."}
+    {n:"WI-639 · Catch-block hygiene", s:"4 findings", m:"agent", st:"go", note:"P1 — silent recovery in billing/consent/webhook code is a banned pattern, incl. a GDPR-adjacent rollback swallow."},
+    {n:"WI-640 · Typed errors & misclassification", s:"3 findings", m:"mixed", st:"go", note:"Touches the JWKS auth path — reviewed."},
+    {n:"WI-641 · Mobile error classification", s:"1 finding · 6 screens", m:"agent", st:"go", note:"Envelope contract final (WI-581 closed)."}
   ],
-  homes:["activation-planning.md §2 PRG-15 (charter)","L-gap-delta.md (per-finding)"]},
+  homes:["_wip/errors-api/execution-tracker.md (THE entry point)","Cosmo Workstream: API Error Handling","L-gap-delta.md (per-finding)"]},
 
 { id:"PRG-04", name:"Cosmo top-down layer", accent:"var(--lav)", lane:"later", status:"embryo", q:"#9",
   tagline:"Teach the work system to do what this dashboard does by hand. This page is its prototype.",
