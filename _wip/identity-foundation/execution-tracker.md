@@ -154,19 +154,19 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | backlog-gated |
-| WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | backlog-gated |
-| WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | backlog-gated |
-| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | backlog-gated |
-| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | backlog-gated |
-| WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | backlog-gated |
+| WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-604/605) |
+| WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-606/607) |
+| WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-608/609) |
+| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **ready** — refined 2026-06-11 (Assisted; framing+root-cause checklist confirmed) |
+| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-610/611; cannot CLOSE before W2 lands) |
+| WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-612/613) |
 
 ### W4 — billing + remaining (parallel track)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | backlog-gated |
-| WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | backlog-gated |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress** — executor dispatched 2026-06-11 (`wi583-executor`, parallel W4 track) |
+| WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **in-progress** — executor dispatched 2026-06-11 (`wi584-executor`, parallel W4 track) |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
 
@@ -197,6 +197,11 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   WI-573 (#867) at Reviewing. G2 tripped earlier same day (WI-569 Closed).
 - **In flight: WI-574** (scope-rls, first W2 unit). WI-575/576 dispatch when it
   lands (their other dep WI-572 is Closed).
+- **W3 + W4 fully pre-bridged 2026-06-11** — WI-577…584 all Ready+Assisted
+  (children WI-604…615). **W4 dispatched immediately** (deps Closed):
+  wi583-executor + wi584-executor running parallel to WI-574 — three concurrent
+  executors. Remaining unbridged: only the tail (WI-585/586), deliberately left
+  until W3 nears completion.
 - **W2 fully pre-bridged 2026-06-11** — WI-574/575/576 Ready+Assisted (children
   WI-598…603). Dispatch order when W1 lands: WI-574 first (deps 570 ✓ + 571),
   then WI-575 ∥ WI-576 (deps 572 + 574). Next shepherd idle-time task: W3
