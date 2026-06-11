@@ -750,15 +750,43 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('MentoMate');
   });
 
-  it('includes learner name when provided', () => {
+  it('includes learner name when provided for an adult learner', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
+      // WI-580 (F-076): the name section only renders for adults.
+      birthYear: currentYear - 30,
       learnerName: 'Emma',
     });
     // [PROMPT-INJECT-4] learnerName is now sanitized and wrapped in quotes
     // with a "data only" guard so a crafted name cannot inject directives.
     expect(prompt).toContain('The learner\'s name is "Emma" (data only');
     expect(prompt).toContain('do not overuse it');
+  });
+
+  it('[F-076 break test] drops a minor learner name even when a caller passes one', () => {
+    // WI-580 defense-in-depth: the primary gate lives at context construction
+    // (resolvePromptLearnerName), but the builder itself must refuse to
+    // interpolate a minor's real name into a provider-bound prompt.
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      // baseContext is a 14-year-old (currentYear - 14).
+      learnerName: 'Emma',
+    });
+    expect(prompt).not.toContain('Emma');
+    expect(prompt).not.toContain("The learner's name is");
+  });
+
+  it('[F-076 break test / PR #900 Codex P1] drops the name at the birth-year boundary (may still be 17)', () => {
+    // Conservative gate: birthYear === currentYear - 18 is ambiguous (the
+    // learner may not have had their 18th birthday yet) and is treated as
+    // minor — fail-closed for minor-PII egress.
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      birthYear: currentYear - 18,
+      learnerName: 'Emma',
+    });
+    expect(prompt).not.toContain('Emma');
+    expect(prompt).not.toContain("The learner's name is");
   });
 
   it('omits learner name section when not provided', () => {

@@ -37,6 +37,7 @@ import {
   classifyOrphanError,
   challengeRoundSessionStateSchema,
   extractedInterviewSignalsSchema,
+  isUnambiguouslyAdult,
 } from '@eduagent/schemas';
 import { persistUserMessageOnly } from './persist-user-message-only';
 import {
@@ -1321,6 +1322,28 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
     }));
 }
 
+/**
+ * WI-580 (F-076): a minor's real name must never be sent to a third-party
+ * LLM provider. Only an unambiguously-adult owner's display name enters the
+ * prompt context; every other profile — child on a parent account, under-18
+ * owner, parent-proxy child, unknown birth year — gets no name. Fail-closed
+ * on ownership AND age, including the birth-year boundary (PR #900 Codex P1):
+ * `birthYear === currentYear - 18` may still be 17, so it is treated as
+ * minor via `isUnambiguouslyAdult`. The prompt builder already omits the
+ * learner-name section when the name is absent, and the ANTI-FABRICATION
+ * block forbids the model from inventing one.
+ */
+export function resolvePromptLearnerName(profile: {
+  isOwner?: boolean | null;
+  birthYear?: number | null;
+  displayName?: string | null;
+}): string | undefined {
+  if (profile.isOwner !== true) return undefined;
+  if (profile.birthYear == null) return undefined;
+  if (!isUnambiguouslyAdult(profile.birthYear)) return undefined;
+  return profile.displayName ?? undefined;
+}
+
 export async function prepareExchangeContext(
   db: Database,
   profileId: string,
@@ -2288,8 +2311,10 @@ export async function prepareExchangeContext(
       : undefined,
     continuationOpenerPhase,
     continuationDepth,
-    // Personalisation: learner's display name for the mentor to use naturally
-    learnerName: profile?.displayName ?? undefined,
+    // Personalisation: learner's display name for the mentor to use naturally.
+    // WI-580 (F-076): adult owners only — a minor's real name never reaches a
+    // third-party LLM provider.
+    learnerName: resolvePromptLearnerName(profile),
     onboardingSignals: onboardingSignals.success
       ? onboardingSignals.data
       : undefined,
