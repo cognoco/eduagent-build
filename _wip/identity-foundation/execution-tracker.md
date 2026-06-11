@@ -175,7 +175,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **in-progress (dev delivery, Option 1)** — first dev migrate attempt aborted atomically on PRE-EXISTING journal drift (dev push-managed; journal 22/109 rows — captured as WI-649, hygiene). Shepherd ruled direct execution of the committed 0109 block on dev (dev exempt from migrate discipline). Staging journal verified clean — merge stays the staging write. PR #963 majority-green, `main`+claude-review pending |
+| WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **in-progress (dev DONE, awaiting merge gate)** — dev reseed applied via Option-1 direct execution and VERIFIED GREEN: 20/20 integrity checks, full row parity (1351/1350/1128/22/52/6), exception profile exactly as predicted (223/4/40). Journal drift → WI-649. PR #963 awaits `main`+claude-review (CodeRabbit pass is HOLLOW — rate-limited, never ran); merge = staging write after my gate |
 | WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | backlog-gated |
 
 ---
