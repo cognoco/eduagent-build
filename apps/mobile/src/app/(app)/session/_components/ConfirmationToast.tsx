@@ -25,7 +25,6 @@ export function ConfirmationToast({
       }}
       testID="session-confirmation-toast"
       accessibilityLiveRegion="polite"
-      accessibilityRole="status"
     >
       <View className="rounded-full bg-text-primary px-4 py-3">
         <Text className="text-body-sm font-semibold text-text-inverse">

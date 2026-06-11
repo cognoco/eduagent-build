@@ -1168,10 +1168,7 @@ export default function CreateSubjectScreen() {
         testID="create-subject-auth-loading"
         className="flex-1 bg-background items-center justify-center"
       >
-        <ActivityIndicator
-          size="large"
-          accessibilityLabel={t('common.loading')}
-        />
+        <ActivityIndicator size="large" accessibilityLabel="Loading" />
       </View>
     );
   }
