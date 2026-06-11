@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-12 shepherd LIVE</b> (WI-621…628; reviewer-watcher extension first) · <b>PRG-11 scan done: scope ≈ intact</b> (3 moot / 23 live) · IF: W3 at 4/6, envelope-router in review — <b>G4 hangs on 2 units</b> (578, 581) · HH residue in operator triage (branch) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>PRG-12 shepherd LIVE</b> (review loop wired, WI-621/622 Ready) · <b>PRG-15 gate FIRED</b> (envelope-router closed — activation decision live) · IF: W3 at 5/6 — <b>G4 hangs on WI-578 alone</b> · PRG-11 scan done (scope ≈ intact) · HH residue in operator triage · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
 </div>
 
 <nav>
@@ -592,7 +592,7 @@ const QUEUE = [
   ["2","PRG-14","Agent instructions","Light fixes: now · skill-building: after doc convergence (PRG-03/B4)"],
   ["3","PRG-02","Harness Hygiene — residue batch","HH PR merged (G1)"],
   ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
-  ["5","PRG-15","Error handling","IF envelope-router lands (G4) · mobile half sooner"],
+  ["5","PRG-15","Error handling","✅ gate FIRED 06-11 (envelope-router closed) — activation is an attention-budget call"],
   ["6","PRG-13","Background-job security","IF W1 job-wiring + W3 land (G3/G4)"],
   ["7","PRG-10","API security","Safe subset at G2 · auth/PII remainder after G4"],
   ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
@@ -610,7 +610,7 @@ const INIT = [
     {n:"W0 · Security patch-now + baseline reset", s:"4 units", m:"mixed", st:"done", note:"All shipped: patches closed (PRs #817/#818 + trial-expiry), migration baseline reset merged (PR #845, in review)."},
     {n:"W1 · Schema bedrock + session-exchange rewiring", s:"4 units", m:"human", st:"done", note:"All four CLOSED 06-11 (schema #855, spine #860, authority-graph #859, inngest-wiring). Fired G2 + G3."},
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
-    {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"go", note:"3/6 CLOSED (579, 580, 582); event-payloads (577) + envelope-router (581) in flight; 578 Ready. Landing fires G4."},
+    {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"go", note:"5/6 CLOSED (577, 579, 580, 581 envelope-router, 582); pii-step-state (578) executing — G4 hangs on it alone."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
     {n:"Clean-cut tail · delete legacy, re-seed", s:"≈2 units", m:"human", st:"hold", note:"The point of no return — fires G5."}
   ],
@@ -708,7 +708,7 @@ const INIT = [
 
 { id:"PRG-15", name:"Error handling", accent:"var(--amber)", lane:"armed", status:"armed", q:"#5",
   tagline:"Silent catch blocks in billing & consent code, errors misclassified into wrong status codes. High value per finding.",
-  owner:"Agent-sweep; typed-error work reviewed", gate:"G4 (envelope-router lands) for the server side · the mobile half is parallel-safe sooner.",
+  owner:"Agent-sweep; typed-error work reviewed", gate:"Gate FIRED 06-11 — envelope-router (WI-581) closed. Activation = attention-budget call (PRG-12 just spawned).",
   outcome:"No silent failures in money/auth/consent paths; errors classified once, at the boundary; 8 findings closed.",
   bundles:[
     {n:"Silent-failure catch blocks", s:"3 findings", m:"agent", st:"hold", note:"Incl. a GDPR-adjacent consent rollback swallow."},
