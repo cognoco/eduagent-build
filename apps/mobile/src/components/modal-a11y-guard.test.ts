@@ -6,7 +6,10 @@ import { resolve } from 'node:path';
 // VoiceOver/TalkBack focus escapes behind the overlay and reads the obscured
 // screen, so SR users interact with content they cannot see. This forward-only
 // guard scans every production .tsx file for <Modal ...> JSX openings and fails
-// if any opening tag lacks the accessibilityViewIsModal prop.
+// if any opening tag lacks the accessibilityViewIsModal prop or sets a literal
+// accessibilityViewIsModal={false}.
+// Limitation: non-literal values (accessibilityViewIsModal={someCondition}) are
+// accepted — the guard does not statically judge conditional expressions.
 // Pattern mirrors persona-fossil-guard.test.ts (source-text scan over git ls-files).
 
 interface ModalOpening {
@@ -26,11 +29,7 @@ function listMobileTsxSources(): string[] {
     .filter((l) => !/\.test\.tsx$/.test(l));
 }
 
-/**
- * Find every `<Modal ...>` JSX opening tag in a source file. The end of the
- * opening tag is the first `>` at curly-brace depth 0, so `>` characters
- * inside prop expressions (arrow functions, comparisons) don't truncate it.
- */
+// Brace-depth-aware: tracks {/} so '>' inside prop expressions doesn't truncate the tag.
 function findModalOpenings(source: string): ModalOpening[] {
   const openings: ModalOpening[] = [];
   const re = /<Modal[\s/>]/g;
@@ -56,6 +55,12 @@ function findModalOpenings(source: string): ModalOpening[] {
   return openings;
 }
 
+// A tag violates if the prop is absent, or present but disabled with a literal {false}.
+function tagViolates(tag: string): boolean {
+  if (!tag.includes('accessibilityViewIsModal')) return true;
+  return /accessibilityViewIsModal\s*=\s*\{\s*false\s*\}/.test(tag);
+}
+
 describe('MODAL-A11Y-GUARD — every <Modal> traps screen-reader focus', () => {
   const repoRoot = resolve(__dirname, '../../../..');
   const files = listMobileTsxSources();
@@ -75,6 +80,18 @@ describe('MODAL-A11Y-GUARD — every <Modal> traps screen-reader focus', () => {
     expect(total).toBeGreaterThan(0);
   });
 
+  it('rejects an explicit accessibilityViewIsModal={false} opt-out', () => {
+    expect(tagViolates('<Modal accessibilityViewIsModal={false}>')).toBe(true);
+    expect(tagViolates('<Modal accessibilityViewIsModal = { false }>')).toBe(
+      true,
+    );
+    // Bare prop and non-literal conditional are accepted (see header limitation).
+    expect(tagViolates('<Modal accessibilityViewIsModal>')).toBe(false);
+    expect(tagViolates('<Modal accessibilityViewIsModal={isOpen}>')).toBe(
+      false,
+    );
+  });
+
   it('every <Modal> opening tag carries accessibilityViewIsModal', () => {
     const violations: string[] = [];
     for (const file of files) {
@@ -82,7 +99,7 @@ describe('MODAL-A11Y-GUARD — every <Modal> traps screen-reader focus', () => {
       if (!existsSync(abs)) continue;
       const source = readFileSync(abs, 'utf-8');
       for (const opening of findModalOpenings(source)) {
-        if (!opening.tag.includes('accessibilityViewIsModal')) {
+        if (tagViolates(opening.tag)) {
           violations.push(`  - ${file}:${opening.line}`);
         }
       }
