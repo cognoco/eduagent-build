@@ -15,6 +15,7 @@ import {
 } from '../../services/session';
 import { deleteTopicIfSafe } from '../../services/curriculum';
 import { FILING_CONFIG } from '../../config/filing';
+import { writeActivityMoment } from '../../services/activity-ledger';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
 
@@ -118,6 +119,37 @@ async function runAutoFileSession({
       topicId: result.topicId,
     };
   }
+
+  await step.run('write-ledger-moment', async () => {
+    const db = getStepDatabase();
+    try {
+      await writeActivityMoment({
+        db,
+        profileId,
+        actorJob: 'auto-file-session',
+        kind: 'session_filed',
+        templateKey: 'ledger.session_filed.default',
+        params: {
+          topicTitle: result.topicTitle,
+          subjectId: result.shelfId,
+          bookId: result.bookId,
+          topicId: result.topicId,
+        },
+        visibility: 'self',
+      });
+      return { written: true };
+    } catch (err) {
+      captureException(err, {
+        profileId,
+        extra: {
+          site: 'autoFileSession.writeLedgerMoment',
+          sessionId,
+          topicId: result.topicId,
+        },
+      });
+      return { written: false };
+    }
+  });
 
   const timestamp = new Date().toISOString();
   await step.sendEvent('notify-filing-completed', {

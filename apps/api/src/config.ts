@@ -152,6 +152,10 @@ const envSchema = z.object({
   // additionally gated by non-code legal prerequisites (G-P1/G-P2/G-P3) — see
   // the build spec; this flag only controls the code path.
   LLM_ROUTING_V2_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // S1 mobile-shell flag; reserved at S0 so the name is final. No API code
+  // reads this yet.
+  MODE_NAV_V2_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;
