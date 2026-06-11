@@ -27,11 +27,10 @@ import { Button } from '../components/common/Button';
 import { BookPageFlipAnimation } from '../components/common/BookPageFlipAnimation';
 import { MagicPenAnimation } from '../components/common/MagicPenAnimation';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
-import { formatApiError } from '../lib/format-api-error';
+import { formatApiError, extractApiErrorCode } from '../lib/format-api-error';
 import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
-import { ConflictError } from '../lib/api-errors';
 import type { LearningSession, SubjectResolveResult } from '@eduagent/schemas';
 
 /** Strip markdown bold markers so `**Science**` renders as plain "Science". */
@@ -90,10 +89,7 @@ function wait(ms: number): Promise<void> {
 }
 
 function isFirstCurriculumPreparingError(err: unknown): boolean {
-  return (
-    err instanceof ConflictError &&
-    /curriculum is still being prepared/i.test(err.message)
-  );
+  return extractApiErrorCode(err) === 'CONFLICT';
 }
 
 function CreateSubjectScreenAuthenticated() {

@@ -70,6 +70,16 @@ jest.mock(
   }),
 );
 
+const mockFormatApiError = jest.fn((err: unknown) =>
+  err instanceof Error ? `classified:${err.message}` : 'classified:unknown',
+);
+jest.mock(
+  '../../../lib/format-api-error' /* gc1-allow: format-api-error calls i18next which requires expo-localization/async-storage init unavailable in jest */,
+  () => ({
+    formatApiError: (err: unknown) => mockFormatApiError(err),
+  }),
+);
+
 jest.mock(
   '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
   () => ({
@@ -546,5 +556,55 @@ describe('DictationCompleteScreen', () => {
 
     // After timeout the error banner must be visible.
     expect(queryByTestId('review-timeout-error')).not.toBeNull();
+  });
+
+  // -----------------------------------------------------------------------
+  // [F-110] Error classification boundary — screens must not bypass classifyApiError
+  // -----------------------------------------------------------------------
+
+  it('[F-110] routes review error through formatApiError boundary, not raw instanceof check', async () => {
+    const reviewErr = new Error('Network timeout');
+    const picker = require('expo-image-picker');
+    (picker.launchCameraAsync as jest.Mock).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///photo.jpg', mimeType: 'image/jpeg' }],
+    });
+    mockReviewMutateAsync.mockRejectedValueOnce(reviewErr);
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockFormatApiError).toHaveBeenCalledWith(reviewErr);
+    expect(mockPlatformAlert).toHaveBeenCalledWith(
+      expect.any(String),
+      'classified:Network timeout',
+      expect.any(Array),
+    );
+  });
+
+  it('[F-110] routes record-result error through formatApiError boundary, not raw instanceof check', async () => {
+    const recordErr = new Error('Server unavailable');
+    mockRecordMutateAsync.mockRejectedValueOnce(recordErr);
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+    fireEvent.press(getByTestId('complete-done'));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockFormatApiError).toHaveBeenCalledWith(recordErr);
+    expect(mockPlatformAlert).toHaveBeenCalledWith(
+      expect.any(String),
+      'classified:Server unavailable',
+      expect.any(Array),
+    );
   });
 });

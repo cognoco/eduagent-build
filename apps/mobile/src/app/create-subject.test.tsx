@@ -123,6 +123,15 @@ jest.mock(
   () => ({
     formatApiError: (error: unknown) =>
       error instanceof Error ? error.message : 'Something went wrong',
+    extractApiErrorCode: (error: unknown) => {
+      if (!error || typeof error !== 'object') return undefined;
+      const e = error as {
+        apiCode?: string;
+        errorCode?: string;
+        code?: string;
+      };
+      return e.apiCode ?? e.errorCode ?? e.code;
+    },
   }),
 );
 
