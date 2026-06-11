@@ -30,16 +30,48 @@
 //      valid JSON but fails Zod, so we still want to project `.reply`.
 //      Apply normalizeReplyText here too so resumed messages match what the
 //      live stream would have rendered.
-//   5. If even raw extraction fails, return the original content. Never
-//      silently drop characters the user already saw render correctly.
+//   5. If no usable `reply` string can be extracted AND the content carries
+//      envelope side-channel vocabulary (`signals`, `ui_hints`,
+//      `private_sources`, `confidence`), FAIL CLOSED: return an empty
+//      string, never the raw content — that side-channel is "never rendered
+//      to the learner" and this output flows into GDPR exports, bookmarks,
+//      and downstream LLM prompts. An empty-/missing-reply envelope was
+//      never rendered, so returning its side-channel is strictly worse than
+//      returning empty. Content WITHOUT any side-channel marker is
+//      indistinguishable from a legitimate historical JSON-shaped assistant
+//      message (e.g. a lesson whose whole visible text is
+//      `{"reply": 42, "meaning": "status code"}`) — that passes through
+//      unchanged so old session content is never silently erased. Mirrors
+//      the structural-sibling gate in the mobile render-boundary guard
+//      (apps/mobile/src/lib/strip-envelope.ts).
 // ---------------------------------------------------------------------------
 
+import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 import {
   parseEnvelope,
   normalizeReplyText,
   stripEmbeddedEnvelopeTail,
 } from './envelope';
 import { extractFirstJsonObject } from './extract-json';
+
+/**
+ * Envelope side-channel vocabulary — every top-level schema key except
+ * `reply`. Derived from `llmResponseEnvelopeSchema` so it can never drift
+ * (same derivation as the mobile guard's sibling set).
+ */
+const ENVELOPE_SIDE_CHANNEL_KEYS: readonly string[] = llmResponseEnvelopeSchema
+  .keyof()
+  .options.filter((key) => key !== 'reply');
+
+/**
+ * Quoted-key marker check for content that cannot be JSON.parsed (truncated
+ * or malformed). A quoted side-channel key is a strong envelope signature;
+ * its absence means the content may be a legitimate historical JSON-shaped
+ * message that must not be blanked.
+ */
+function hasEnvelopeSideChannelMarker(text: string): boolean {
+  return ENVELOPE_SIDE_CHANNEL_KEYS.some((key) => text.includes(`"${key}"`));
+}
 
 /**
  * Strip a leading/trailing markdown code fence from `text` if present.
@@ -76,24 +108,29 @@ export function projectAiResponseContent(
   }
 
   // Step 4: schema-invalid but structurally valid JSON — extract reply directly.
+  // Every failure exit below applies the side-channel gate from step 5:
+  // envelope-signature content fails closed to ''; marker-free content
+  // passes through (legitimate historical JSON-shaped messages).
   const jsonStr = extractFirstJsonObject(trimmed);
-  if (!jsonStr) return rawContent;
+  if (!jsonStr) {
+    return hasEnvelopeSideChannelMarker(trimmed) ? '' : rawContent;
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonStr);
   } catch {
-    return rawContent;
+    return hasEnvelopeSideChannelMarker(trimmed) ? '' : rawContent;
   }
-  if (
-    typeof parsed === 'object' &&
-    parsed !== null &&
-    !Array.isArray(parsed) &&
-    typeof (parsed as { reply?: unknown }).reply === 'string' &&
-    (parsed as { reply: string }).reply.length > 0
-  ) {
-    return stripEmbeddedEnvelopeTail(
-      normalizeReplyText((parsed as { reply: string }).reply),
-    );
+  if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    const reply = (parsed as { reply?: unknown }).reply;
+    if (typeof reply === 'string' && reply.length > 0) {
+      return stripEmbeddedEnvelopeTail(normalizeReplyText(reply));
+    }
+    // Step 5: no usable reply — fail closed only when a true side-channel
+    // key is present on the object itself (precise check, no substring).
+    return ENVELOPE_SIDE_CHANNEL_KEYS.some((key) => key in (parsed as object))
+      ? ''
+      : rawContent;
   }
-  return rawContent;
+  return hasEnvelopeSideChannelMarker(trimmed) ? '' : rawContent;
 }

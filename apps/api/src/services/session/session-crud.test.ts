@@ -110,11 +110,15 @@ describe('projectAiResponseContent', () => {
     expect(projectAiResponseContent(teaching)).toBe(teaching);
   });
 
-  it('leaves JSON-shaped content with reply key but invalid envelope alone', () => {
-    // Has `"reply"` substring but won't pass schema (`reply` must be
-    // non-empty string). Treat as opaque content — never drop it.
+  it('[WI-581/F-136] preserves JSON-shaped content with a non-string reply and no envelope sibling', () => {
+    // Has `"reply"` substring but won't pass schema (`reply` must be a
+    // non-empty string). With no side-channel key (`signals`, `ui_hints`,
+    // `private_sources`, `confidence`) this is indistinguishable from a
+    // historical JSON-shaped assistant message — pass through as prose.
+    // Content WITH a side-channel key fails closed to '' instead.
     const malformed = '{"reply": 42, "junk": true}';
     expect(projectAiResponseContent(malformed)).toBe(malformed);
+    expect(projectAiResponseContent('{"reply": 42, "signals": {}}')).toBe('');
   });
 
   it('handles leading whitespace before the envelope', () => {

@@ -146,9 +146,19 @@ describe('projectAiResponseContent', () => {
     }
   });
 
-  it('falls through to JSON.parse path when reply is empty string (fails min(1)) and returns rawContent', () => {
-    // Empty reply fails Zod (min 1). Falls to JSON.parse path, but
-    // (parsed.reply.length > 0) guard blocks it → returns rawContent.
+  // Fail-closed, sibling-gated: when content with no usable reply carries
+  // envelope side-channel vocabulary (`signals`, `ui_hints`,
+  // `private_sources`, `confidence` — keys derived from the schema), no
+  // failure path may return the raw string — it flows into GDPR exports,
+  // bookmarks, and downstream LLM prompts. Content WITHOUT any side-channel
+  // marker is indistinguishable from a legitimate historical JSON-shaped
+  // assistant message (e.g. a lesson showing `{"reply": 42}`) and passes
+  // through as prose — mirrors the mobile render-boundary guard
+  // (strip-envelope.ts). See Codex PR-915 P2 thread.
+
+  it('[WI-581/F-136] passes a bare empty-reply object through (no side-channel, treated as prose)', () => {
+    // Empty reply fails Zod (min 1) and the fallback length guard, but a
+    // lone {"reply":""} carries nothing private — preserve historical rows.
     const input = JSON.stringify({ reply: '' });
     const { spy } = captureWarns();
     try {
@@ -159,14 +169,22 @@ describe('projectAiResponseContent', () => {
     }
   });
 
+  it('[WI-581/F-136] fails closed on an empty-reply object that carries signals', () => {
+    const input = JSON.stringify({ reply: '', signals: {} });
+    const { spy } = captureWarns();
+    try {
+      expect(projectAiResponseContent(input, { silent: true })).toBe('');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   // ---- Case 6: Malformed JSON in JSON.parse fallback ---------------------
 
-  it('returns rawContent unchanged when nested JSON is syntactically malformed', () => {
-    // Has { and "reply" → passes pre-check.
-    // parseEnvelope tries JSON.parse → fails (bad is not valid JSON).
-    // The repair helper (bare-quote repair) doesn't fix `{bad}` → invalid_json.
-    // projectAiResponseContent then calls extractFirstJsonObject → finds the
-    // outer balanced `{}` → JSON.parse throws → returns rawContent unchanged.
+  it('[WI-581/F-136] passes malformed JSON through when no side-channel marker is present', () => {
+    // Has { and "reply" → passes pre-check; JSON.parse fails everywhere.
+    // No "signals"/"ui_hints"/"private_sources"/"confidence" marker → could
+    // be a legitimate historical JSON-ish message; surface it for triage.
     const input = '{"reply": "oops", "nested": {bad}}';
     const { spy } = captureWarns();
     try {
@@ -176,11 +194,17 @@ describe('projectAiResponseContent', () => {
     }
   });
 
-  it('returns rawContent when truly unparseable JSON is in the candidate', () => {
-    // Construct input that passes the pre-check (starts with { and has "reply")
-    // but the inner JSON is totally malformed after extraction, so JSON.parse
-    // throws and we fall back to returning rawContent.
-    // The brace walker will extract the outer {}, but JSON.parse will fail.
+  it('[WI-581/F-136] fails closed on malformed JSON that carries a side-channel marker', () => {
+    const input = '{"reply": "oops", "signals": {bad}}';
+    const { spy } = captureWarns();
+    try {
+      expect(projectAiResponseContent(input, { silent: true })).toBe('');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('[WI-581/F-136] passes truly unparseable marker-free JSON through unchanged', () => {
     const input = '{"reply": "test",,,,}';
     const { spy } = captureWarns();
     try {
@@ -191,17 +215,38 @@ describe('projectAiResponseContent', () => {
     }
   });
 
-  // ---- Case 7: Empty reply in fallback path (length > 0 guard) ----------
-
-  it('returns rawContent when reply is empty string (length > 0 guard blocks fallback return)', () => {
-    // This specifically tests the `(parsed.reply.length > 0)` guard.
-    // parseEnvelope fails for empty reply (min 1 violation).
-    // JSON.parse fallback finds reply: "" → length === 0 → guard blocks it.
-    // Returns rawContent.
-    const input = '{"reply": ""}';
+  it('[WI-581/F-136] returns empty string for a truncated envelope (no balanced object, signals marker present)', () => {
+    // Unbalanced braces: pre-check passes, no balanced JSON object can be
+    // extracted, and the "signals" marker identifies it as a real partial
+    // envelope → previously leaked the raw partial envelope; now fail-closed.
+    const input = '{"reply": "cut off", "signals": {';
     const { spy } = captureWarns();
     try {
-      expect(projectAiResponseContent(input, { silent: true })).toBe(input);
+      expect(projectAiResponseContent(input, { silent: true })).toBe('');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // ---- Case 7: Empty reply in fallback path (length > 0 guard) ----------
+
+  it('[WI-581/F-136] break test: empty-reply envelope with private_sources leaks nothing', () => {
+    // The exact leak shape from the audit finding: a structurally-valid
+    // envelope whose reply is empty but whose side-channel is populated.
+    const input = JSON.stringify({
+      reply: '',
+      signals: { ready_to_finish: true },
+      private_sources: {
+        relied_on: ['source-1'],
+        reason: 'internal provenance',
+      },
+    });
+    const { spy } = captureWarns();
+    try {
+      const result = projectAiResponseContent(input, { silent: true });
+      expect(result).toBe('');
+      expect(result).not.toContain('private_sources');
+      expect(result).not.toContain('signals');
     } finally {
       spy.mockRestore();
     }
@@ -209,11 +254,10 @@ describe('projectAiResponseContent', () => {
 
   // ---- Case 8: Reply is not a string in fallback path -------------------
 
-  it('returns rawContent when reply is a number (typeof guard in fallback)', () => {
-    // parseEnvelope fails (reply is not a string → schema_violation).
-    // JSON.parse fallback: typeof parsed.reply === 'number' → guard blocks it.
-    // Returns rawContent.
-    const input = '{"reply": 42}';
+  it('[WI-581/F-136] preserves a historical JSON lesson with a non-string reply key (Codex PR-915 P2 regression)', () => {
+    // A legitimate assistant message that is itself a JSON teaching example.
+    // No envelope sibling → must NOT be blanked.
+    const input = '{"reply": 42, "meaning": "status code"}';
     const { spy } = captureWarns();
     try {
       expect(projectAiResponseContent(input, { silent: true })).toBe(input);
@@ -222,11 +266,23 @@ describe('projectAiResponseContent', () => {
     }
   });
 
-  it('returns rawContent when reply is an object (typeof guard in fallback)', () => {
-    const input = '{"reply": {"nested": "object"}}';
+  it('[WI-581/F-136] fails closed when a non-string reply is accompanied by a side-channel key', () => {
+    const input = '{"reply": 42, "signals": {}}';
     const { spy } = captureWarns();
     try {
-      expect(projectAiResponseContent(input, { silent: true })).toBe(input);
+      expect(projectAiResponseContent(input, { silent: true })).toBe('');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('[WI-581/F-136] passes a bare object-reply through; fails closed with a confidence sibling', () => {
+    const bare = '{"reply": {"nested": "object"}}';
+    const withSibling = '{"reply": {"nested": "object"}, "confidence": "high"}';
+    const { spy } = captureWarns();
+    try {
+      expect(projectAiResponseContent(bare, { silent: true })).toBe(bare);
+      expect(projectAiResponseContent(withSibling, { silent: true })).toBe('');
     } finally {
       spy.mockRestore();
     }

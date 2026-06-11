@@ -158,6 +158,61 @@ describe('llmResponseEnvelopeSchema', () => {
     expect(parsed.private_sources?.factual_confidence).toBeCloseTo(0.91);
   });
 
+  // Out-of-range factual_confidence must degrade gracefully —
+  // it is non-critical provenance ("never rendered to the learner") and must
+  // never reject the whole envelope, which would drop the valid reply and
+  // every state-machine signal.
+  describe('[WI-581/F-025] factual_confidence robustness', () => {
+    it('normalizes a bare numeric percentage (91) to 0.91 like the string path', () => {
+      const parsed = llmResponseEnvelopeSchema.parse({
+        reply: 'Test',
+        private_sources: { factual_confidence: 91 },
+      });
+      expect(parsed.private_sources?.factual_confidence).toBeCloseTo(0.91);
+    });
+
+    it('keeps an in-range numeric value unchanged', () => {
+      const parsed = llmResponseEnvelopeSchema.parse({
+        reply: 'Test',
+        private_sources: { factual_confidence: 0.5 },
+      });
+      expect(parsed.private_sources?.factual_confidence).toBeCloseTo(0.5);
+    });
+
+    it('drops only the field — not the envelope — for an irrecoverable numeric value (250)', () => {
+      const parsed = llmResponseEnvelopeSchema.parse({
+        reply: 'Valid reply',
+        signals: { ready_to_finish: true },
+        private_sources: {
+          relied_on: ['general_knowledge'],
+          factual_confidence: 250,
+        },
+      });
+      expect(parsed.reply).toBe('Valid reply');
+      expect(parsed.signals?.ready_to_finish).toBe(true);
+      expect(parsed.private_sources?.relied_on).toEqual(['general_knowledge']);
+      expect(parsed.private_sources?.factual_confidence).toBeUndefined();
+    });
+
+    it('drops only the field for a negative numeric value', () => {
+      const parsed = llmResponseEnvelopeSchema.parse({
+        reply: 'Valid reply',
+        private_sources: { factual_confidence: -0.3 },
+      });
+      expect(parsed.reply).toBe('Valid reply');
+      expect(parsed.private_sources?.factual_confidence).toBeUndefined();
+    });
+
+    it('drops only the field for an out-of-range string percentage', () => {
+      const parsed = llmResponseEnvelopeSchema.parse({
+        reply: 'Valid reply',
+        private_sources: { factual_confidence: '250%' },
+      });
+      expect(parsed.reply).toBe('Valid reply');
+      expect(parsed.private_sources?.factual_confidence).toBeUndefined();
+    });
+  });
+
   it('accepts envelope with ui_hints showing note_prompt', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
       reply: 'Great!',

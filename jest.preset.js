@@ -3,12 +3,18 @@ const nxPreset = require('@nx/jest/preset').default;
 
 // When jest is run from inside a git worktree (.worktrees/<branch>/), the
 // worktree-guard ignore patterns below would match the worktree's own test
-// paths and silently yield "No tests found". Detect that case (the preset's
-// own __dirname sits under .worktrees/) and drop the .worktrees guards —
-// mirrors the same guard in apps/api/jest.config.cjs. The main-checkout run
-// is unaffected: a worktree's rootDir never contains a sibling worktree, so
-// there is no haste-map collision risk to guard against.
-const RUNNING_INSIDE_WORKTREE = __dirname.includes('.worktrees');
+// paths and silently yield "No tests found". Detect that case and drop the
+// .worktrees guards — mirrors the same guard in apps/api/jest.config.cjs.
+// Detection is anchored on the grandparent directory name (__dirname is
+// exactly `<repo>/.worktrees/<branch>` in the layout scripts/setup-worktree.sh
+// produces) rather than a substring match anywhere in the path, so repos
+// cloned under unrelated `.worktrees` paths are not false positives; the one
+// residual edge — a full clone placed DIRECTLY at `<x>/.worktrees/<y>` — is
+// accepted (its own nested scratch copies would be scanned). The
+// main-checkout run is unaffected: a worktree's rootDir never contains a
+// sibling worktree, so there is no haste-map collision risk to guard against.
+const RUNNING_INSIDE_WORKTREE =
+  path.basename(path.dirname(__dirname)) === '.worktrees';
 const dropWorktreeGuards = (patterns) =>
   RUNNING_INSIDE_WORKTREE
     ? patterns.filter((p) => !/worktrees/i.test(p))
