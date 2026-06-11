@@ -88,6 +88,49 @@ BEGIN
     RAISE EXCEPTION 'identity reseed: account(s) with >1 is_owner profile';
   END IF;
 
+  -- 0. Mirror-deletes FIRST: rows whose legacy source row no longer exists
+  --    are removed, so a re-run converges on the legacy truth even if legacy
+  --    deletions (account/profile deletion flows) happened since the last
+  --    run. Running these BEFORE the upserts also frees unique values
+  --    (login.email / login.clerk_user_id) that a deleted account may have
+  --    released and a live account since claimed — upserting first would hit
+  --    the unique constraint and abort with no converging re-run possible.
+  --    PRECONDITION (grep-verified at this commit, and required until the
+  --    legacy-drop cutover): no runtime code writes the new tables, so every
+  --    row here is reseed-sourced and safe to mirror. Child-before-parent
+  --    order respects the RESTRICT FKs.
+  DELETE FROM subscription_payers sp
+  WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.id = sp.subscription_id);
+
+  DELETE FROM consent_grant cg
+  WHERE NOT EXISTS (
+    SELECT 1 FROM consent_states cs
+    WHERE cs.id = cg.id AND cs.status IN ('CONSENTED', 'WITHDRAWN')
+  );
+
+  DELETE FROM guardianship g
+  WHERE NOT EXISTS (SELECT 1 FROM family_links fl WHERE fl.id = g.id);
+
+  -- A subscription mirror also goes when its payer person lost their legacy
+  --   profile (the row can no longer satisfy payer_person_id and re-joins the
+  --   "ownerless account" exception class reported by the verify script).
+  --   subscription_payers rows cascade with it.
+  DELETE FROM subscription sub
+  WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.id = sub.id)
+     OR NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = sub.payer_person_id);
+
+  DELETE FROM membership m
+  WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = m.id);
+
+  DELETE FROM login l
+  WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.id = l.id);
+
+  DELETE FROM person per
+  WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = per.id);
+
+  DELETE FROM organization o
+  WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.id = o.id);
+
   -- 1. accounts -> organization (id reuse). Name from the owner profile's
   --    display name (archived included — an account mid-deletion can have an
   --    archived owner and organization.name is NOT NULL), falling back to the
@@ -113,14 +156,15 @@ BEGIN
     a.updated_at
   FROM accounts a
   ON CONFLICT (id) DO UPDATE SET
+    name = excluded.name,
     timezone = excluded.timezone,
     deletion_scheduled_at = excluded.deletion_scheduled_at,
     deletion_cancelled_at = excluded.deletion_cancelled_at,
     updated_at = excluded.updated_at
-  WHERE (organization.timezone, organization.deletion_scheduled_at,
-         organization.deletion_cancelled_at)
+  WHERE (organization.name, organization.timezone,
+         organization.deletion_scheduled_at, organization.deletion_cancelled_at)
     IS DISTINCT FROM
-        (excluded.timezone, excluded.deletion_scheduled_at,
+        (excluded.name, excluded.timezone, excluded.deletion_scheduled_at,
          excluded.deletion_cancelled_at);
 
   -- 2. profiles -> person (id reuse). login_id is wired in step 4 (the
@@ -162,6 +206,11 @@ BEGIN
     display_name = excluded.display_name,
     birth_date = excluded.birth_date,
     residence_jurisdiction = excluded.residence_jurisdiction,
+    -- The knowing caches refresh whenever a converging field changed (the
+    -- WHERE below deliberately excludes them — their last_updated stamp
+    -- differs every run and would otherwise force a rewrite of every row).
+    age_knowing = excluded.age_knowing,
+    residence_knowing = excluded.residence_knowing,
     last_activity_at = excluded.last_activity_at,
     updated_at = excluded.updated_at
   WHERE (person.display_name, person.birth_date,
@@ -186,7 +235,16 @@ BEGIN
     IS DISTINCT FROM
         (excluded.person_id, excluded.clerk_user_id, excluded.email);
 
-  -- 4. Wire person.login_id for owner persons (converges on re-run).
+  -- 4. Wire person.login_id for owner persons (converges on re-run). First
+  --    clear a stale binding (a person pointing at a login that now belongs
+  --    to someone else — e.g. the account's owner profile changed between
+  --    runs), then set the current bindings.
+  UPDATE person per
+  SET login_id = NULL, updated_at = now()
+  FROM login l
+  WHERE per.login_id = l.id
+    AND l.person_id <> per.id;
+
   UPDATE person per
   SET login_id = l.id, updated_at = now()
   FROM login l
@@ -275,10 +333,23 @@ BEGIN
   JOIN profiles p ON p.id = cs.profile_id
   WHERE cs.status IN ('CONSENTED', 'WITHDRAWN')
   ON CONFLICT (id) DO UPDATE SET
+    -- The legacy row mutates in place through status transitions
+    -- (e.g. WITHDRAWN -> re-requested -> CONSENTED rewrites responded_at),
+    -- so every derived field must converge, not just withdrawn_at.
+    granted_at = excluded.granted_at,
     withdrawn_at = excluded.withdrawn_at,
-    audit_fact = excluded.audit_fact
-  WHERE (consent_grant.withdrawn_at, consent_grant.audit_fact)
-    IS DISTINCT FROM (excluded.withdrawn_at, excluded.audit_fact);
+    lawful_basis = excluded.lawful_basis,
+    audit_fact = excluded.audit_fact,
+    snapshot_age_at_grant = excluded.snapshot_age_at_grant,
+    snapshot_jurisdiction_at_grant = excluded.snapshot_jurisdiction_at_grant
+  WHERE (consent_grant.granted_at, consent_grant.withdrawn_at,
+         consent_grant.lawful_basis, consent_grant.audit_fact,
+         consent_grant.snapshot_age_at_grant,
+         consent_grant.snapshot_jurisdiction_at_grant)
+    IS DISTINCT FROM
+        (excluded.granted_at, excluded.withdrawn_at, excluded.lawful_basis,
+         excluded.audit_fact, excluded.snapshot_age_at_grant,
+         excluded.snapshot_jurisdiction_at_grant);
 
   -- 9. subscriptions -> subscription (id reuse), re-anchored to the org. The
   --    primary payer is the owner person; ownerless accounts are skipped
@@ -339,42 +410,4 @@ BEGIN
   FROM subscription sub
   ON CONFLICT DO NOTHING;
 
-  -- 11. Mirror-deletes: rows whose legacy source row no longer exists are
-  --     removed, so a re-run converges on the legacy truth even if legacy
-  --     deletions (account/profile deletion flows) happened since the last
-  --     run. PRECONDITION (grep-verified at this commit, and required until
-  --     the legacy-drop cutover): no runtime code writes the new
-  --     tables, so every row here is reseed-sourced and safe to mirror.
-  --     Child-before-parent order respects the RESTRICT FKs.
-  DELETE FROM subscription_payers sp
-  WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.id = sp.subscription_id);
-
-  DELETE FROM consent_grant cg
-  WHERE NOT EXISTS (
-    SELECT 1 FROM consent_states cs
-    WHERE cs.id = cg.id AND cs.status IN ('CONSENTED', 'WITHDRAWN')
-  );
-
-  DELETE FROM guardianship g
-  WHERE NOT EXISTS (SELECT 1 FROM family_links fl WHERE fl.id = g.id);
-
-  -- A subscription mirror also goes when its payer person lost their legacy
-  --   profile (the row can no longer satisfy payer_person_id and re-joins the
-  --   "ownerless account" exception class reported by the verify script).
-  --   subscription_payers rows cascade with it.
-  DELETE FROM subscription sub
-  WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.id = sub.id)
-     OR NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = sub.payer_person_id);
-
-  DELETE FROM membership m
-  WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = m.id);
-
-  DELETE FROM login l
-  WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.id = l.id);
-
-  DELETE FROM person per
-  WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = per.id);
-
-  DELETE FROM organization o
-  WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.id = o.id);
 END $$;

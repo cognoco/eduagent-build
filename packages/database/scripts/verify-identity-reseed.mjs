@@ -47,8 +47,9 @@ async function makeClient(url) {
     const sql = neon(url);
     return {
       driver: 'neon-http',
+      // v0.10 has no sql.query(); the conventional call sql(text) returns rows.
       query: async (text) => {
-        const res = await sql.query(text);
+        const res = await sql(text);
         return Array.isArray(res) ? res : res.rows;
       },
       close: async () => undefined, // Neon HTTP is connectionless; nothing to close

@@ -346,7 +346,11 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
   });
 
   it('re-run is idempotent and converges on legacy updates + deletions', async () => {
-    // Mutate legacy: rename owner, retier subscription, unlink the child.
+    const freedEmail = `reseed_${uniq}_3@example.test`; // A3's email, freed below
+
+    // Mutate legacy: rename owner, retier subscription, unlink the child,
+    // delete a whole account (cascades its profiles + consents in legacy),
+    // and have a surviving account claim the deleted account's email.
     await client.query(
       `UPDATE profiles SET display_name = 'Parent One Renamed', updated_at = '2025-06-02T00:00:00Z' WHERE id = $1`,
       [P1],
@@ -356,22 +360,27 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
       [S1],
     );
     await client.query('DELETE FROM family_links WHERE id = $1', [L1]);
+    await client.query('DELETE FROM accounts WHERE id = $1', [A3]);
+    await client.query('UPDATE accounts SET email = $2 WHERE id = $1', [
+      A1,
+      freedEmail,
+    ]);
 
     await client.query(reseedSql); // second run
 
-    // No duplicates for the fixture graph.
+    // No duplicates for the surviving fixture graph.
     expect(
       await count(
-        'SELECT count(*)::int AS n FROM person WHERE id IN ($1, $2, $3)',
-        [P1, P2, P3],
+        'SELECT count(*)::int AS n FROM person WHERE id IN ($1, $2)',
+        [P1, P2],
       ),
-    ).toBe(3);
+    ).toBe(2);
     expect(
       await count(
-        'SELECT count(*)::int AS n FROM membership WHERE id IN ($1, $2, $3)',
-        [P1, P2, P3],
+        'SELECT count(*)::int AS n FROM membership WHERE id IN ($1, $2)',
+        [P1, P2],
       ),
-    ).toBe(3);
+    ).toBe(2);
     expect(
       await count(
         'SELECT count(*)::int AS n FROM subscription_payers WHERE subscription_id = $1',
@@ -397,5 +406,41 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
         L1,
       ]),
     ).toBe(0);
+
+    // Mirror-delete: the deleted account's whole graph is gone (org, person,
+    // login, consent mirror).
+    expect(
+      await count('SELECT count(*)::int AS n FROM organization WHERE id = $1', [
+        A3,
+      ]),
+    ).toBe(0);
+    expect(
+      await count('SELECT count(*)::int AS n FROM person WHERE id = $1', [P3]),
+    ).toBe(0);
+    expect(
+      await count('SELECT count(*)::int AS n FROM login WHERE id = $1', [A3]),
+    ).toBe(0);
+    expect(
+      await count(
+        'SELECT count(*)::int AS n FROM consent_grant WHERE id = $1',
+        [CS2],
+      ),
+    ).toBe(0);
+
+    // Freed unique value: A1 claimed the deleted account's email; the re-run
+    // must not abort (mirror-deletes run before the upserts) and the login
+    // converges to the new email.
+    const l1 = await one<{ email: string }>(
+      'SELECT email FROM login WHERE id = $1',
+      [A1],
+    );
+    expect(l1?.email).toBe(freedEmail);
+
+    // Org name converged with the owner rename.
+    const o1 = await one<{ name: string }>(
+      'SELECT name FROM organization WHERE id = $1',
+      [A1],
+    );
+    expect(o1?.name).toBe('Parent One Renamed');
   });
 });
