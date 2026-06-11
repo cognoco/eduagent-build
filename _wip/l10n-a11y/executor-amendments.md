@@ -61,7 +61,14 @@ itself: `_wip/identity-foundation/executor-protocol.md` (phases 0–7).
     `git -C <repo-root> status`) that the commit landed on YOUR branch and the main
     checkout is untouched. If a misfire reaches shared main: do NOT revert on your
     own — report to the shepherd and continue.
-15. **No split-sentence fragment keys (learned 2026-06-11, WI-621 PR A / Codex P2):**
+15. **Plural keys need FULL plural categories (learned 2026-06-11, WI-621 PR C):**
+    a new `_one`/`_other` key pair silently breaks Polish (i18next's pl resolver
+    demands `_few`/`_many`). Any new plural key must carry every category the UI
+    locales need (pl is the multi-category one in en/de/es/ja/nb/pl/pt) — verify the
+    generated pl output actually contains `_few`/`_many` after `pnpm translate`.
+    Also: `--findRelatedTests` does NOT catch `src/i18n/index.test.ts` (locale
+    parity) — run the full `src/i18n/` suite whenever locale JSONs change.
+16. **No split-sentence fragment keys (learned 2026-06-11, WI-621 PR A / Codex P2):**
     never split one sentence into multiple translation keys flanking an inline
     element — that hard-codes English word order and renders broken prose in
     free-word-order locales (JA verified). One key per sentence with `{{var}}`
