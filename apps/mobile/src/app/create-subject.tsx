@@ -89,7 +89,17 @@ function wait(ms: number): Promise<void> {
 }
 
 function isFirstCurriculumPreparingError(err: unknown): boolean {
-  return extractApiErrorCode(err) === 'CONFLICT';
+  // The API has no dedicated error code for the curriculum-preparing race —
+  // sessions.ts maps CurriculumSessionNotReadyError to a generic 409 CONFLICT.
+  // The message check keeps this guard narrow so other CONFLICT responses
+  // (e.g. Library-filing conflicts) still throw instead of being retried.
+  // TODO(typed-error): replace the message test with a dedicated code
+  // (e.g. CURRICULUM_PREPARING) once the API adds one.
+  const message = err instanceof Error ? err.message : '';
+  return (
+    extractApiErrorCode(err) === 'CONFLICT' &&
+    /curriculum is still being prepared/i.test(message)
+  );
 }
 
 function CreateSubjectScreenAuthenticated() {
