@@ -53,6 +53,10 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     // [CR-657] requireAccount() throws 401 if account is unset at runtime
     // (TS declares it non-nullable but that depends on middleware ordering).
     const account = requireAccount(c.get('account'));
+    // [F-125] Owner gate — matches sibling routes /email, /security-event, /export.
+    // A non-owner profile (child on a family account) must not be able to read
+    // the account owner's deletion schedule.
+    assertOwnerProfile(c, 'Only the account owner can view deletion status.');
     try {
       const status = await getDeletionStatus(db, account.id);
       return c.json(accountDeletionStatusResponseSchema.parse(status));
