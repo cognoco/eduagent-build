@@ -140,7 +140,7 @@ overlapping component files — keep adjacent/serial).
 | 4 | WI-624 WP-L12-label-prop-strings | ready — bridged (children WI-655/656); after WI-621 lands (same screens, attribute pass) |
 | 5 | WI-625 WP-L12-pluralization | in-progress — dispatched wi625-executor (unblocked by #985's translate-pipeline fix; scope includes the 36 pre-existing families lacking pl few/many) |
 | 6 | WI-626 WP-L12-mobile-logic-bugs | **done** — PR #959 merged `0a7b07dbe` (5 CI rounds, all red-verified); one mis-attributed bounce (red main = cross-stream PR #931) refuted with evidence; CLOSED Done on re-review 2026-06-11 |
-| 7 | WI-627 WP-L12-dates-locale | in-progress — dispatched wi627-executor (rolled into WI-626's freed lane) |
+| 7 | WI-627 WP-L12-dates-locale | review — PR #993 **MERGED** `1f5574e63` (3 rounds: vacuous-assertion fix with screen-level red proof, comment hygiene); children WI-659/660 swept; `complete` firing |
 | 8 | WI-628 WP-L12-decorative-lowvision | ready — bridged (children WI-661/662) |
 
 **Sub-slice watch:** WP-1 absorbs the ~358-string aggregate (F-069) — it is the one
