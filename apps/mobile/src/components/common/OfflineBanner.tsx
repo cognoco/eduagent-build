@@ -26,6 +26,7 @@ export function OfflineBanner(): React.ReactElement {
         size={16}
         color={colors.background}
         accessible={false}
+        accessibilityElementsHidden
         importantForAccessibility="no"
       />
       <Text

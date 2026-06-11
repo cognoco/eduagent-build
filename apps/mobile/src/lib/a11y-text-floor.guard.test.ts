@@ -45,7 +45,7 @@ function* walkFiles(dir: string): Generator<string> {
 }
 
 describe('a11y text-floor guard (F-060)', () => {
-  it('has no raw fontSize below 12 in mobile app source', () => {
+  it('has no raw fontSize at or below 10 in mobile app source', () => {
     const violations: string[] = [];
 
     for (const filePath of walkFiles(MOBILE_SRC)) {

@@ -399,6 +399,7 @@ export function BrandCelebration({
       style={[styles.container, containerStyle]}
       testID={testID}
       accessible={false}
+      accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
       <Svg width={size} height={size} viewBox="-5 -15 130 130">

@@ -57,8 +57,11 @@ describe('CelebrationAnimation', () => {
       includeHiddenElements: true,
     });
     expect(element).toBeTruthy();
-    // Decorative animation — hidden from SR so users don't hear "image, Celebration"
+    // Decorative animation — hidden from SR so users don't hear "image, Celebration".
+    // Both platform props required: importantForAccessibility is Android-only;
+    // accessibilityElementsHidden is the iOS (VoiceOver) equivalent.
     expect(element.props.accessible).toBe(false);
+    expect(element.props.accessibilityElementsHidden).toBe(true);
     expect(element.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 

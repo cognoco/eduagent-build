@@ -468,6 +468,7 @@ export function BookPageFlipAnimation({
     <View
       testID={testID}
       accessible={false}
+      accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{ width: size, height: size }}
     >

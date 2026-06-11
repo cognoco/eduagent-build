@@ -582,6 +582,7 @@ export function MagicPenAnimation({
       <View
         testID={testID}
         accessible={false}
+        accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         style={{ width: size, height: size, position: 'relative' }}
       >
@@ -723,6 +724,7 @@ export function MagicPenAnimation({
     <View
       testID={testID}
       accessible={false}
+      accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{ width: size, height: size, position: 'relative' }}
     >

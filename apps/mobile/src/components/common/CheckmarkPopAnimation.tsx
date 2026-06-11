@@ -117,6 +117,7 @@ export function CheckmarkPopAnimation({
       style={containerStyle}
       testID={testID}
       accessible={false}
+      accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
       <Svg width={size} height={size} viewBox="0 0 80 80">

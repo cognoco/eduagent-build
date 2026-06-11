@@ -63,6 +63,7 @@ export function EngagementChip({ signal }: EngagementChipProps) {
         color={color}
         style={{ marginRight: 6 }}
         accessible={false}
+        accessibilityElementsHidden
         importantForAccessibility="no"
       />
       <Text className="text-body-sm font-semibold" style={{ color }}>

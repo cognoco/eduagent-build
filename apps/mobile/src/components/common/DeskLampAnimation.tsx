@@ -202,6 +202,7 @@ export function DeskLampAnimation({
     <View
       testID={testID}
       accessible={false}
+      accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{ width: svgW, height: size }}
     >

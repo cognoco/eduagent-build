@@ -135,6 +135,7 @@ export function CelebrationAnimation({
       style={[styles.container, containerStyle, { width: size, height: size }]}
       testID={testID}
       accessible={false}
+      accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>

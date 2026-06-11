@@ -40,6 +40,7 @@ export function ProxyBanner({
           color={colors.warning}
           style={{ marginRight: 10 }}
           accessible={false}
+          accessibilityElementsHidden
           importantForAccessibility="no"
         />
         <View className="flex-1 pr-3">

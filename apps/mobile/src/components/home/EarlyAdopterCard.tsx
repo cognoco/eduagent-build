@@ -92,6 +92,7 @@ export function EarlyAdopterCard({
           size={16}
           color={colors.primary}
           accessible={false}
+          accessibilityElementsHidden
           importantForAccessibility="no"
         />
       </Pressable>

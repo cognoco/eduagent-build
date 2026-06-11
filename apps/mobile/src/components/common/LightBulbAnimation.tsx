@@ -302,6 +302,7 @@ export function LightBulbAnimation({
     <View
       testID={testID}
       accessible={false}
+      accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{ width: size, height: svgH, alignItems: 'center' }}
     >

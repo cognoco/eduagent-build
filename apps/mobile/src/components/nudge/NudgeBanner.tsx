@@ -65,6 +65,7 @@ export function NudgeBanner(): React.ReactElement | null {
           size={22}
           color={colors.primary}
           accessible={false}
+          accessibilityElementsHidden
           importantForAccessibility="no"
         />
         <View className="flex-1 ml-3">
