@@ -146,14 +146,21 @@ describe('projectAiResponseContent', () => {
     }
   });
 
-  it('falls through to JSON.parse path when reply is empty string (fails min(1)) and returns rawContent', () => {
+  // [WI-581/F-136] Fail-closed: once the pre-check has identified
+  // envelope-shaped content, no failure path may return the raw envelope —
+  // it carries `signals` and `private_sources` ("never rendered to the
+  // learner") into GDPR exports, bookmarks, and downstream LLM prompts.
+  // An empty-reply envelope was never rendered, so returning empty is
+  // strictly safer than returning its side-channel.
+
+  it('[WI-581/F-136] returns empty string when reply is empty (never the raw envelope)', () => {
     // Empty reply fails Zod (min 1). Falls to JSON.parse path, but
-    // (parsed.reply.length > 0) guard blocks it → returns rawContent.
+    // (parsed.reply.length > 0) guard blocks it → fail-closed empty string.
     const input = JSON.stringify({ reply: '' });
     const { spy } = captureWarns();
     try {
       const result = projectAiResponseContent(input, { silent: true });
-      expect(result).toBe(input);
+      expect(result).toBe('');
     } finally {
       spy.mockRestore();
     }
@@ -161,31 +168,42 @@ describe('projectAiResponseContent', () => {
 
   // ---- Case 6: Malformed JSON in JSON.parse fallback ---------------------
 
-  it('returns rawContent unchanged when nested JSON is syntactically malformed', () => {
+  it('[WI-581/F-136] returns empty string when nested JSON is syntactically malformed', () => {
     // Has { and "reply" → passes pre-check.
     // parseEnvelope tries JSON.parse → fails (bad is not valid JSON).
     // The repair helper (bare-quote repair) doesn't fix `{bad}` → invalid_json.
     // projectAiResponseContent then calls extractFirstJsonObject → finds the
-    // outer balanced `{}` → JSON.parse throws → returns rawContent unchanged.
+    // outer balanced `{}` → JSON.parse throws → fail-closed empty string
+    // (the malformed blob is still envelope-shaped side-channel content).
     const input = '{"reply": "oops", "nested": {bad}}';
     const { spy } = captureWarns();
     try {
-      expect(projectAiResponseContent(input, { silent: true })).toBe(input);
+      expect(projectAiResponseContent(input, { silent: true })).toBe('');
     } finally {
       spy.mockRestore();
     }
   });
 
-  it('returns rawContent when truly unparseable JSON is in the candidate', () => {
-    // Construct input that passes the pre-check (starts with { and has "reply")
-    // but the inner JSON is totally malformed after extraction, so JSON.parse
-    // throws and we fall back to returning rawContent.
-    // The brace walker will extract the outer {}, but JSON.parse will fail.
+  it('[WI-581/F-136] returns empty string when truly unparseable JSON is in the candidate', () => {
+    // Passes the pre-check (starts with { and has "reply") but the JSON is
+    // malformed after extraction, so JSON.parse throws → fail-closed empty.
     const input = '{"reply": "test",,,,}';
     const { spy } = captureWarns();
     try {
       const result = projectAiResponseContent(input, { silent: true });
-      expect(result).toBe(input);
+      expect(result).toBe('');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('[WI-581/F-136] returns empty string for a truncated envelope (extractFirstJsonObject finds no balanced object)', () => {
+    // Unbalanced braces: pre-check passes, but no balanced JSON object can be
+    // extracted → previously leaked the raw partial envelope; now fail-closed.
+    const input = '{"reply": "cut off", "signals": {';
+    const { spy } = captureWarns();
+    try {
+      expect(projectAiResponseContent(input, { silent: true })).toBe('');
     } finally {
       spy.mockRestore();
     }
@@ -193,15 +211,23 @@ describe('projectAiResponseContent', () => {
 
   // ---- Case 7: Empty reply in fallback path (length > 0 guard) ----------
 
-  it('returns rawContent when reply is empty string (length > 0 guard blocks fallback return)', () => {
-    // This specifically tests the `(parsed.reply.length > 0)` guard.
-    // parseEnvelope fails for empty reply (min 1 violation).
-    // JSON.parse fallback finds reply: "" → length === 0 → guard blocks it.
-    // Returns rawContent.
-    const input = '{"reply": ""}';
+  it('[WI-581/F-136] break test: empty-reply envelope with private_sources leaks nothing', () => {
+    // The exact leak shape from the audit finding: a structurally-valid
+    // envelope whose reply is empty but whose side-channel is populated.
+    const input = JSON.stringify({
+      reply: '',
+      signals: { ready_to_finish: true },
+      private_sources: {
+        relied_on: ['source-1'],
+        reason: 'internal provenance',
+      },
+    });
     const { spy } = captureWarns();
     try {
-      expect(projectAiResponseContent(input, { silent: true })).toBe(input);
+      const result = projectAiResponseContent(input, { silent: true });
+      expect(result).toBe('');
+      expect(result).not.toContain('private_sources');
+      expect(result).not.toContain('signals');
     } finally {
       spy.mockRestore();
     }
@@ -209,24 +235,23 @@ describe('projectAiResponseContent', () => {
 
   // ---- Case 8: Reply is not a string in fallback path -------------------
 
-  it('returns rawContent when reply is a number (typeof guard in fallback)', () => {
+  it('[WI-581/F-136] returns empty string when reply is a number (typeof guard in fallback)', () => {
     // parseEnvelope fails (reply is not a string → schema_violation).
     // JSON.parse fallback: typeof parsed.reply === 'number' → guard blocks it.
-    // Returns rawContent.
     const input = '{"reply": 42}';
     const { spy } = captureWarns();
     try {
-      expect(projectAiResponseContent(input, { silent: true })).toBe(input);
+      expect(projectAiResponseContent(input, { silent: true })).toBe('');
     } finally {
       spy.mockRestore();
     }
   });
 
-  it('returns rawContent when reply is an object (typeof guard in fallback)', () => {
+  it('[WI-581/F-136] returns empty string when reply is an object (typeof guard in fallback)', () => {
     const input = '{"reply": {"nested": "object"}}';
     const { spy } = captureWarns();
     try {
-      expect(projectAiResponseContent(input, { silent: true })).toBe(input);
+      expect(projectAiResponseContent(input, { silent: true })).toBe('');
     } finally {
       spy.mockRestore();
     }

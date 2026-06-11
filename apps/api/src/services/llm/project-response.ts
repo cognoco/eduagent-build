@@ -30,8 +30,15 @@
 //      valid JSON but fails Zod, so we still want to project `.reply`.
 //      Apply normalizeReplyText here too so resumed messages match what the
 //      live stream would have rendered.
-//   5. If even raw extraction fails, return the original content. Never
-//      silently drop characters the user already saw render correctly.
+//   5. [WI-581/F-136] If no usable `reply` string can be extracted, FAIL
+//      CLOSED: return an empty string, never the raw content. Once the
+//      pre-check has identified envelope-shaped content, the raw string is
+//      side-channel material (`signals`, `private_sources` — "never rendered
+//      to the learner") and it flows into GDPR exports, bookmarks, and
+//      downstream LLM prompts. The old "never silently drop characters the
+//      user already saw render correctly" rationale does not apply here: an
+//      empty-/missing-reply envelope was never rendered, so returning its
+//      side-channel is strictly worse than returning empty.
 // ---------------------------------------------------------------------------
 
 import {
@@ -76,13 +83,15 @@ export function projectAiResponseContent(
   }
 
   // Step 4: schema-invalid but structurally valid JSON — extract reply directly.
+  // [WI-581/F-136] Every failure exit below returns '' (fail-closed), never
+  // rawContent — see header comment, step 5.
   const jsonStr = extractFirstJsonObject(trimmed);
-  if (!jsonStr) return rawContent;
+  if (!jsonStr) return '';
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonStr);
   } catch {
-    return rawContent;
+    return '';
   }
   if (
     typeof parsed === 'object' &&
@@ -95,5 +104,6 @@ export function projectAiResponseContent(
       normalizeReplyText((parsed as { reply: string }).reply),
     );
   }
-  return rawContent;
+  // Step 5: envelope-shaped content with no usable reply — fail closed.
+  return '';
 }
