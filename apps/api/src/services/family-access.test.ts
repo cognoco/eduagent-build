@@ -139,7 +139,7 @@ describe('assertParentAccess', () => {
 // assertCanManageOwnConsent — age-gate UTC consistency
 //
 // [CR LOW] This consent age-gate must compute age with getUTCFullYear() so it
-// agrees with the canonical calculateAge() (consent.ts) and getProfileAge()
+// agrees with the canonical calculateAge() (age-utils.ts) and getProfileAge()
 // (profile.ts) at the 18 boundary. A local getFullYear() could disagree by a
 // year depending on host timezone. We pin the boundary using birthYear math
 // derived from the same UTC year the SUT uses, so the test is timezone-stable.

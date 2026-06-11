@@ -33,7 +33,8 @@ import {
   sendEmail,
   formatConsentRequestEmail,
   type EmailOptions,
-} from './notifications';
+} from './notifications/email';
+import { calculateAge, calculateAgeFromParts, MINIMUM_AGE } from './age-utils';
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -181,47 +182,11 @@ function mapConsentRow(row: typeof consentStates.$inferSelect): ConsentState {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Approximate age from birth year using the current UTC calendar year.
- *
- * Uses getUTCFullYear() (not getFullYear()) so the computed age is
- * independent of the host process timezone — important for tests running
- * on developer machines outside UTC and for environments that don't run in
- * UTC (Cloudflare Workers do, but this contract should not depend on that).
- */
-export function calculateAge(birthYear: number): number {
-  return new Date().getUTCFullYear() - birthYear;
-}
-
-/** Minimum age to use the platform (PRD line 386: "Ages 6-10 Out of Scope") */
-export const MINIMUM_AGE = 11;
-
-/**
- * Calculates exact age from a full birth date (year, month 1-based, day) and
- * the current UTC date.
- *
- * Subtracts 1 if today is before this year's birthday — i.e., the child has
- * not yet had their birthday this calendar year.
- *
- * Month is 1-based (January = 1). When month or day are not supplied, falls
- * back to the same year-only approximation as calculateAge().
- */
-export function calculateAgeFromParts(
-  birthYear: number,
-  birthMonth?: number,
-  birthDay?: number,
-): number {
-  const now = new Date();
-  const yearDiff = now.getUTCFullYear() - birthYear;
-  if (birthMonth == null || birthDay == null) {
-    return yearDiff;
-  }
-  // 1-based month → 0-based for Date constructor
-  const birthdayThisYear = new Date(
-    Date.UTC(now.getUTCFullYear(), birthMonth - 1, birthDay),
-  );
-  return now < birthdayThisYear ? yearDiff - 1 : yearDiff;
-}
+// calculateAge, calculateAgeFromParts, and MINIMUM_AGE live in ./age-utils
+// (WI-572: moved to break the family-access→consent→notifications SCC).
+// Re-exported here for backwards compatibility with existing callers that
+// import these from consent.ts directly.
+export { calculateAge, calculateAgeFromParts, MINIMUM_AGE } from './age-utils';
 
 /**
  * Determines whether parental consent is required using an exact birth date

@@ -108,16 +108,17 @@ describe('Integration: POST /v1/profiles', () => {
   });
 
   it('returns 201 with birthYear-only profile data', async () => {
+    // WI-570: v1 13+ floor — use 2013 (age 13, boundary valid).
     const created = await createProfileViaRoute({
       app,
       env: TEST_ENV,
       user: PROFILE_USER,
       displayName: 'Birth Year User',
-      birthYear: 2014,
+      birthYear: 2013,
     });
 
     expect(created.displayName).toBe('Birth Year User');
-    expect(created.birthYear).toBe(2014);
+    expect(created.birthYear).toBe(2013);
   });
 
   it('returns 400 when displayName is missing', async () => {
@@ -129,7 +130,7 @@ describe('Integration: POST /v1/profiles', () => {
           sub: PROFILE_USER.userId,
           email: PROFILE_USER.email,
         }),
-        body: JSON.stringify({ birthYear: 2014 }),
+        body: JSON.stringify({ birthYear: 2013 }),
       },
       TEST_ENV,
     );

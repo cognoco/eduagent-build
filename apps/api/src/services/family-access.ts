@@ -8,7 +8,7 @@
 import { and, eq } from 'drizzle-orm';
 import { familyLinks, type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
-import { calculateAge } from './consent';
+import { calculateAge } from './age-utils';
 import type { Context, Env, Input } from 'hono';
 import type { ProfileMeta } from '../middleware/profile-scope';
 
@@ -93,7 +93,7 @@ export function assertCanManageOwnConsent<
     );
   }
   // Use the canonical calculateAge() (getUTCFullYear-based) so this consent
-  // age-gate shares one definition with calculateAge (consent.ts) and
+  // age-gate shares one definition with calculateAge (age-utils.ts) and
   // getProfileAge (profile.ts). A local getFullYear() could disagree by a
   // year at the 18 boundary depending on host timezone.
   const age = calculateAge(birthYear);

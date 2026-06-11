@@ -286,20 +286,20 @@ describe('POST /v1/profiles', () => {
       new ProfileValidationError(
         'CHILD_AGE_VIOLATION',
         'birthYear',
-        'User must be at least 11',
+        'User must be at least 13',
       ),
     );
 
-    // [BUG-577] birthYearSchema now rejects ages < 11 at the request boundary,
-    // so we send a schema-valid birthYear (12) and let the mocked service
-    // throw ProfileValidationError — this still exercises the 400-on-service-
-    // throw branch the test is asserting.
+    // [WI-570] birthYearSchema rejects ages < 13 at the request boundary
+    // (v1 13+ floor). Use a schema-valid birthYear (age 14) and let the
+    // mocked service throw ProfileValidationError — this exercises the
+    // 400-on-service-throw branch without triggering Zod rejection.
     const res = await makeApp().request('/v1/profiles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         displayName: 'Young',
-        birthYear: new Date().getFullYear() - 12,
+        birthYear: new Date().getFullYear() - 14,
         location: 'EU',
       }),
     });

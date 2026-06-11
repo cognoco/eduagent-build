@@ -54,8 +54,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   router, three-axis age model). Pre-launch: build direct, re-seed, delete legacy
   — no dual-model, no backfill.
 - **Owner:** Jorn (+ runway session agents)
-- **Depends-on:** **Phase P (Cosmo slicing / execution start) is blocked-by
-  Harness-Hygiene exit-gate `WI-530`** (mirrored by boundary node `WI-533`).
+- **Depends-on:** Harness-Hygiene exit-gate `WI-530` → `WI-533` — **operator-waived
+  2026-06-10** for execution start (W1 proceeds shepherded); formal close rides
+  the HH PR (#832, open).
 - **Decomposition:** `_wip/identity-foundation/execution-tracker.md` (the durable
   execution entry point — charter / WI map / wave sequence / coarse status; created
   by Phase-P slicing 2026-06-10). `_wip/identity-foundation/ROADMAP.md` is now the
@@ -65,12 +66,15 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   trio below) under the new Cosmo **Workstream "Identity Foundation"**
   (`37b8bce9-1f7c-81c2-bb42-cf7f47f839cc`), with native dependency edges per O §4.
   **Execution start of W1+ remains gated on `WI-530`.** Live state is Cosmo's.
-- **W0 decoupled (2026-06-09):** the 11 patch-now security defects ship immediately
-  on the current harness, ungated by `WI-530`/Phase P (O §7 decision 4). Instantiated
-  in Cosmo: **`WI-549`** (api bundle, 7 findings, WP) · **`WI-550`** (inngest bundle,
-  3 findings, WP) · **`WI-551`** (billing F-121, Item) — project MentoMate;
-  WI-549/550 Closed/Done (PRs #817/#818, merged 2026-06-10), WI-551 still Ready.
-  Live state is Cosmo's; this is a pointer. (Baseline reset stays gated with W1.)
+- **W0 done (2026-06-10):** all 11 patch-now defects shipped — `WI-549`/`WI-550`
+  Closed/Done (PRs #817/#818) and `WI-551` Closed/Done (`c5c9b39bb`). Baseline
+  reset `WI-569` executed + PR #845 merged (Reviewing).
+- **Execution underway (2026-06-11, shepherded):** W1 half-landed —
+  `WI-570` (schema) + `WI-572` (authority-graph) merged (PRs #855/#859,
+  Reviewing); `WI-571` (spine) PR #860 held for cleanup; `WI-573` Ready. W2
+  pre-bridged Ready. **Review stack (569/570/572) awaits operator
+  `/cosmo:review` — the first clean closes fire program gate G2** (→ PRG-12
+  activation). Live state: Cosmo + `execution-tracker.md` §5; this is a pointer.
 - **Activate-when:** — (active)
 
 ### PRG-02 · Harness Hygiene — `tail`
@@ -300,7 +304,14 @@ the reference's Appendix.
 
 Post-P operating posture (per reference §6.4): **two concurrent activities** —
 IF execution (PRG-01) + activation planning over all other Initiatives; planned
-Initiatives start executing in parallel as their §6.3 gates clear.
+Initiatives start executing in parallel as their §6.3 gates clear. Session
+model per reference §2.5–2.7: program session · per-Initiative shepherd ·
+executors.
+
+**Generated view:** [`dashboard.html`](dashboard.html) — the "Flight Deck"
+(board / gate-rail / field-guide over initiatives × bundles × gates, for
+Jorn + Zuzka). A view, **never a home**: regenerated at umbrella touches; on
+any disagreement this roster and Cosmo win.
 
 ## Cross-program gates (the edges that matter)
 
@@ -317,6 +328,17 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-11 — Umbrella touch: IF execution underway.** W0 fully done
+  (549/550/551 closed; baseline 569 merged@Reviewing). W1 half-landed (570 + 572
+  merged@Reviewing, 571 PR held, 573 Ready); W2 pre-bridged. WI-530 gate
+  operator-waived for execution start (HH PR #832 still open). PRG-01 rows
+  updated; dashboard regenerated. **G2 now waits only on operator
+  `/cosmo:review` closes of the 569/570/572 stack.**
+- **2026-06-10 — Session model + Flight Deck registered.** Planning-reference
+  bumped to v1.1 (§2.5–2.7: program session / per-Initiative shepherd /
+  executor altitudes; disposable-shepherd invariant; model tiering). IF W1
+  shepherd is the first instance. `dashboard.html` (Flight Deck) added as a
+  generated view — view-never-home, regenerated at umbrella touches.
 - **2026-06-10 — Full-forward-view amendment pass (ratified).** (1) **Activation
   queue** added as a roster section (its home per the planning-reference document
   map) — 11 gate-ordered entries covering *every* Initiative incl. the late ones.

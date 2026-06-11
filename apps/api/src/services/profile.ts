@@ -349,12 +349,12 @@ export async function createProfile(
     input.birthDay,
   );
 
-  // Enforce minimum age (PRD line 386: ages 6-10 out of scope)
+  // Enforce minimum age (WI-570 / data-model.md §2A.5: v1 launch floor is 13+)
   if (consentCheck?.belowMinimumAge) {
     throw new ProfileValidationError(
       'CHILD_AGE_VIOLATION',
       'birthYear',
-      'Users must be at least 11 years old to create a profile',
+      'Users must be at least 13 years old to create a profile',
     );
   }
 

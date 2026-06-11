@@ -47,7 +47,6 @@ import {
   auditExchangeSources,
   applySourceAuditSafetyFallback,
   inferObviousReliableSourceForAudit,
-  MAX_INTERVIEW_EXCHANGES,
   type ExchangeContext,
   type ExchangeFallback,
   type ExchangeSourceAudit,
@@ -132,40 +131,9 @@ import { validateNoteDraft } from '../challenge-round/note-draft';
 import { transitionChallengeState } from '../challenge-round/state';
 import { evaluateChallengeReadiness } from '../challenge-round/trigger';
 
-/**
- * [BUG-92 / CR-2026-05-19-C4] Decide whether the interview / onboarding loop
- * should terminate on this turn.
- *
- * Contract:
- *   - Returns `true` if the LLM emitted `signals.ready_to_finish`
- *     (passed in as `llmReadyToFinish`).
- *   - Returns `true` if the session is on the interview/onboarding fast path
- *     (`metadata.onboardingFastPath` object present) AND the persisted
- *     `exchangeCount` has reached {@link MAX_INTERVIEW_EXCHANGES}. This is
- *     the server-side hard cap mandated by the envelope contract in
- *     CLAUDE.md — without it, an LLM that never emits the signal lets the
- *     interview run all the way to MAX_EXCHANGES_PER_SESSION (50).
- *   - Returns `false` otherwise. Non-interview sessions are not capped here
- *     and rely on the global MAX_EXCHANGES_PER_SESSION ceiling.
- *
- * Extracted as a pure function so the cap logic is unit-testable without
- * spinning up the full processMessage DB pipeline.
- */
-export function resolveReadyToFinish(input: {
-  llmReadyToFinish: boolean;
-  exchangeCount: number;
-  sessionMetadata: Record<string, unknown> | null;
-}): boolean {
-  if (input.llmReadyToFinish) return true;
-  const meta = input.sessionMetadata;
-  const isInterviewFlow =
-    meta != null &&
-    meta['onboardingFastPath'] != null &&
-    typeof meta['onboardingFastPath'] === 'object' &&
-    !Array.isArray(meta['onboardingFastPath']);
-  if (!isInterviewFlow) return false;
-  return input.exchangeCount >= MAX_INTERVIEW_EXCHANGES;
-}
+// [WI-571 WP-W1-spine] Spine slice carved to session-exchange-spine.ts
+import { resolveReadyToFinish } from './session-exchange-spine';
+export { resolveReadyToFinish } from './session-exchange-spine';
 
 const BANNED_FILLER_OPENERS = [
   "i'm so proud",
@@ -188,94 +156,16 @@ const BANNED_FILLER_OPENERS = [
 const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
-// [BUG-732] Gates Plus / addon-Premium profiles into the `premium` LLM tier
-// (Gemini Pro / Claude Sonnet — the "advanced" rung for the default Gemini
-// pool). Distinct from `OPENAI_ADVANCED_MODEL_MIN_RUNG = 5` in
-// services/llm/router.ts, which suppresses the OpenAI advanced candidate
-// even on premium tier until rung ≥ 5. Naming both constants by provider
-// makes the routing matrix self-documenting at the call site.
-const GEMINI_ADVANCED_MODEL_MIN_RUNG = 4;
-const PLUS_ADVANCED_RUNG_ROUTING_REASON = 'plus_included_advanced_rung';
-const PLUS_STANDARD_RUNG_ROUTING_REASON = 'plus_standard_below_advanced_rung';
-const PREMIUM_ADDON_ADVANCED_RUNG_ROUTING_REASON =
-  'premium_profile_or_addon_advanced_rung';
-const PREMIUM_ADDON_STANDARD_RUNG_ROUTING_REASON =
-  'premium_profile_or_addon_standard_below_advanced_rung';
-
-export interface ExchangeLlmRouting {
-  llmTier?: LLMTier;
-  preferredProvider?: PreferredLlmProvider;
-  providerPolicy?: LlmProviderPolicy;
-  routingReason?: string;
-}
-
-// [B71] `advancedLlmProvider` was a per-request provider preference (e.g. force
-// Claude over GPT on advanced rungs) introduced in PR #309 but never wired into
-// any route handler, middleware, env var, or UI surface. It only flowed through
-// service-internal call chains and the manual `scripts/premium-routing-pass.ts`
-// probe. The parameter and its branches were removed in the pre-launch cleanup
-// pass — if per-profile provider preference becomes a real product feature, add
-// a config column + UI control + middleware injection in the same change.
-export function resolveExchangeLlmRouting(input: {
-  subscriptionTier?: SubscriptionTier;
-  requestedLlmTier?: LLMTier;
-  effectiveRung: EscalationRung;
-}): ExchangeLlmRouting {
-  const isAdvancedRung = input.effectiveRung >= GEMINI_ADVANCED_MODEL_MIN_RUNG;
-
-  if (input.subscriptionTier === 'plus') {
-    return isAdvancedRung
-      ? {
-          llmTier: 'premium',
-          routingReason: PLUS_ADVANCED_RUNG_ROUTING_REASON,
-        }
-      : {
-          llmTier: 'standard',
-          providerPolicy: 'gemini_only',
-          routingReason: PLUS_STANDARD_RUNG_ROUTING_REASON,
-        };
-  }
-
-  if (input.requestedLlmTier === 'premium') {
-    return isAdvancedRung
-      ? {
-          llmTier: 'premium',
-          routingReason: PREMIUM_ADDON_ADVANCED_RUNG_ROUTING_REASON,
-        }
-      : {
-          llmTier: 'standard',
-          providerPolicy: 'gemini_only',
-          routingReason: PREMIUM_ADDON_STANDARD_RUNG_ROUTING_REASON,
-        };
-  }
-
-  if (input.subscriptionTier === 'family') {
-    return {
-      llmTier: input.requestedLlmTier,
-      providerPolicy: 'gemini_only',
-      routingReason: 'family_standard_gemini_only',
-    };
-  }
-
-  return { llmTier: input.requestedLlmTier };
-}
-
-export function resolveChallengeRoundLlmRoutingRung(
-  escalationRung: EscalationRung,
-  challengeRound: Pick<ChallengeRoundSessionState, 'state'> | undefined,
-): EscalationRung {
-  if (
-    challengeRound?.state === 'accepted' ||
-    challengeRound?.state === 'active' ||
-    challengeRound?.state === 'drafting'
-  ) {
-    return Math.max(
-      escalationRung,
-      GEMINI_ADVANCED_MODEL_MIN_RUNG,
-    ) as EscalationRung;
-  }
-  return escalationRung;
-}
+// [WI-571 WP-W1-spine] Routing slice carved to session-exchange-router.ts
+import {
+  resolveExchangeLlmRouting,
+  resolveChallengeRoundLlmRoutingRung,
+} from './session-exchange-router';
+export type { ExchangeLlmRouting } from './session-exchange-router';
+export {
+  resolveExchangeLlmRouting,
+  resolveChallengeRoundLlmRoutingRung,
+} from './session-exchange-router';
 
 async function recordSessionPracticeActivityEvent(
   db: Database,

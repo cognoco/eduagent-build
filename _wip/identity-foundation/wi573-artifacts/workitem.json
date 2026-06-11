@@ -1,0 +1,17 @@
+{
+  "pageId": "37b8bce9-1f7c-81da-8434-feb760346654",
+  "id": "WI-573",
+  "name": "IT-W1-inngest-wiring: make every registered Inngest function wired-and-triggered",
+  "description": "W1 (structural foundation, solo Item) — convert silent registration-sync to wired-and-triggered: every Inngest function registered is provably dispatched in production code (F-005, end-to-end feature-tracing rule; MMT-ADR-0009). Authority enforcement inside the functions is out of scope (W3). Depends on WP-W1-spine (triggers route through the spine).",
+  "acceptanceCriteria": "No registered-but-untriggered Inngest function; a production dispatch site exists for each; durable async work routes through Inngest (no fire-and-forget). Findings: F-005. Source of truth: _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 IT-W1-inngest-wiring (commit 23d0c01ad)",
+  "riskImpact": "S / standard — event-registration plumbing.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

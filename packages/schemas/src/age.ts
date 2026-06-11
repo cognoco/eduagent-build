@@ -1,4 +1,11 @@
-export type AgeBracket = 'adolescent' | 'adult';
+/**
+ * WI-570 (data-model.md §2A.5): 'child' added for the 13+ v1 launch floor and
+ * the future v1.1 sub-13 ungating path.
+ *   - 'child'      — under 13 (sub-COPPA threshold; currently blocked by birthYearSchema)
+ *   - 'adolescent' — 13–17 inclusive
+ *   - 'adult'      — 18 and above
+ */
+export type AgeBracket = 'child' | 'adolescent' | 'adult';
 
 /**
  * The active-profile role discriminator. Mirrors
@@ -27,12 +34,12 @@ export interface AgeGateProfile {
 /**
  * Computes an age bracket from birthYear for consent gating and voice selection.
  *
- * Two-way model (D-C4-2), aligned to the strictly-11+ product constraint
- * ([CR-2026-05-19-H11]). The product never allows users under 11; birth years
- * that would produce age < 11 are rejected by `birthYearSchema` at the API
- * boundary, so `computeAgeBracket` treats them as the minimum valid bracket
- * ('adolescent') rather than a now-removed 'child' value.
- *   - 'adolescent' — under 18 (includes 11–17 and any clamped sub-11 input)
+ * WI-570 (data-model.md §2A.5): three-way model with the v1 13+ launch floor.
+ * The API boundary (birthYearSchema) enforces the 13-floor, so 'child' cannot
+ * be produced by any current API call — it exists for the v1.1 sub-13 ungating
+ * path and for the policy engine's age-band evaluation.
+ *   - 'child'      — under 13
+ *   - 'adolescent' — 13–17 inclusive
  *   - 'adult'      — 18 and above
  *
  * Uses `currentYear - birthYear`, which can overestimate by up to 11 months.
@@ -46,6 +53,7 @@ export function computeAgeBracket(
   const year = currentYear ?? new Date().getFullYear();
   const age = year - birthYear;
 
+  if (age < 13) return 'child';
   if (age < 18) return 'adolescent';
   return 'adult';
 }

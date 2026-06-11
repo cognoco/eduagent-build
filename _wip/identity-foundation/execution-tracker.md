@@ -76,6 +76,30 @@ tables/readers dropped, full project grep clean, tests green post-drop.
   for Ready+Assisted items (filed as WI-552). Ignore it; trust the **Validity**
   formula.
 
+### Operator rulings (standing for this initiative)
+
+- **2026-06-10 — Merge authority granted to the shepherd (Jorn), conditional.**
+  The shepherd may merge an IF work-item PR once the WI has reached
+  `Stage=Reviewing` via `/cosmo:execute complete`, **provided the shepherd
+  independently re-verifies the PR is really green at merge time** — not from
+  the executor's report: run `gh pr checks` (all checks pass, none pending),
+  confirm no unresolved blocker/must-fix/should-fix review findings, and sanity-
+  check `gh pr diff` shape against the WI scope. Merge ≠ close: `/cosmo:review`
+  remains the operator's gate.
+
+- **2026-06-10 — WP DoR bridging is pre-approved, blanket (Jorn).** Top-down-sliced
+  WPs fail the bottom-up WP DoR mechanically (see WI-593). For every remaining IF
+  WP (WI-571…586), the shepherd applies the bridge **without asking per WP**:
+  (1) transcribe the frozen master-plan WP block into the page body as the bundle
+  brief; (2) capture **2 thin provenance children** (stubs marked "absorbed
+  provenance — lifecycle rides the parent, never claim/execute standalone", findings
+  mapped across them; full finding detail stays in the brief's findings table);
+  (3) set the `Sub-item` relation; (4) `refine --to-ready`. A zero-children full
+  bypass was considered and rejected: `review.ts` `dod.wp.bulk_ready` mechanically
+  requires ≥1 child at the operator's close gate, so bypassing refine would just
+  move the friction to every `/cosmo:review`. Standing until WI-593 lands a
+  substrate fix (DoR amendment or slicer tooling).
+
 ---
 
 ## 3. Pointers / index
@@ -107,42 +131,42 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-549 | WP-W0-patch-api | close 7 live api security defects (F-117/118/122/130/133/144/145) | WP | P0 | — | **done** — Closed/Done, PR #817 (merged 2026-06-10) |
 | WI-550 | WP-W0-patch-inngest | close 3 live inngest security defects (F-019/020/092) | WP | P1 | — | **done** — Closed/Done, PR #818 (merged 2026-06-10) |
 | WI-551 | IT-W0-patch-billing | trial-expiry standalone patch (F-121) | Item | P0 | — | **done** — Closed/Done, fixed in `c5c9b39bb` (2026-06-10) |
-| WI-569 | WP-W0-baseline | migration-chain baseline reset (`MMT-ADR-0012`) | WP | P1 | — (W0-labeled but travels with the gated rewrite) | **ready** — DoR met (Ready + Assisted); WI-530 wait **waived by operator 2026-06-10**, proceed shepherded |
+| WI-569 | WP-W0-baseline | migration-chain baseline reset (`MMT-ADR-0012`) | WP | P1 | — (W0-labeled but travels with the gated rewrite) | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #845, `a16642538`). **G2 tripped** — first WP through the full lifecycle |
 
 ### W1 — structural foundation (critical-path ROOT)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **ready** — refined 2026-06-10 (Ready + Assisted; brief in body, children WI-591/592); starts when WI-569 lands |
-| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | backlog-gated |
-| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | backlog-gated |
-| WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | backlog-gated |
+| WI-570 | WP-W1-schema | 8-table identity/tenancy/consent schema + scoped-repo (F-032) | WP | P1 | WI-569 + WI-549 + WI-550 + WI-551 (**the W0 hard gate**) | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #855); children WI-591/592 bulk-closed with parent |
+| WI-571 | WP-W1-spine | session-exchange carve + engine/router/judge scaffold (F-003) | WP | P1 | WI-570 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #860); children WI-594/595 bulk-closed by shepherd 2026-06-11 (the review missed them — mirrored the WI-570 pattern) |
+| WI-572 | WP-W1-authority-graph | break the 4-node SCC + consent cycle, structural (F-004, F-029-struct) | WP | P1 | WI-570 | **done** — Closed/Done 2026-06-11 via `/cosmo:review` (PR #859); children WI-596/597 closed with parent. No SCC-reintroduction guard test (consider during W2) |
+| WI-573 | IT-W1-inngest-wiring | registration wired-and-triggered (F-005) | Item | P1 | WI-571 | **review** — Stage=Reviewing 2026-06-11, PR #867 MERGED 08:32Z (shepherd-verified: 6/6 green; guard triangle complete — registration-sync + pre-existing orphan-dispatcher/orphan-handler cover F-005's AC; recursion fix verified in code); awaiting `/cosmo:review` |
 
 ### W2 — identity / consent / proxy / age (critical path)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | backlog-gated |
-| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | backlog-gated |
-| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | backlog-gated |
+| WI-574 | WP-W2-scope-rls | ownership, two-layer RLS, JWT age/consent transport (6 findings) | WP | P1 | WI-570, WI-571 | **in-progress** — executor dispatched 2026-06-11 (`wi574-executor`, parallel with WI-573; W2 entry under way) |
+| WI-575 | WP-W2-proxy-authority | central proxy authority guards (F-126, F-023; regression-ACs F-117/144) | WP | P2 | WI-572, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-600/601) |
+| WI-576 | WP-W2-consent-deletion | consent authority + account-isolated deletion + fail-closed age-gate (F-093, F-029-semantic; regression-ACs F-118/122/130/145) | WP | P1 | WI-572, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-602/603) |
 
 ### W3 — PII-handling + envelope/router (critical path)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | backlog-gated |
-| WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | backlog-gated |
-| WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | backlog-gated |
-| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | backlog-gated |
-| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | backlog-gated |
-| WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | backlog-gated |
+| WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-604/605) |
+| WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-606/607) |
+| WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-608/609) |
+| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **ready** — refined 2026-06-11 (Assisted; framing+root-cause checklist confirmed) |
+| WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-610/611; cannot CLOSE before W2 lands) |
+| WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **ready** — refined 2026-06-11 (Assisted; brief in body, children WI-612/613) |
 
 ### W4 — billing + remaining (parallel track)
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | backlog-gated |
-| WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | backlog-gated |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress** — executor dispatched 2026-06-11 (`wi583-executor`, parallel W4 track) |
+| WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **in-progress** — executor dispatched 2026-06-11 (`wi584-executor`, parallel W4 track) |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
 
@@ -155,25 +179,73 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 ## 5. Current position — pick up here
 
+- **WI-569 DONE (executor side), 2026-06-10 ~21:35 UTC:** Stage=Reviewing, Fixed In
+  `a16642538`, PR #845 merged after independent shepherd green-verification (9/9
+  checks; all review threads fixed-or-deferred-with-rationale; the unreplied Codex
+  P1 on the `now()` partial index verified fixed in the landed SQL — predicate is
+  `WHERE revoked_at IS NULL`). Dev + staging hold the 17 baseline tables, verified;
+  full evidence in the WI-569 completion summary. **Awaiting `/cosmo:review WI-569`
+  (operator) — that close is program gate G2.**
+- **WI-570 DONE (executor side), merged 2026-06-10 23:01 UTC** — PR #855: 17-table
+  TS schema (parity-verified: `db:push:dev` dry-check zero changes), scoped-repo
+  break tests, canon-mandated AgeBracket 3-way + 13-floor (data-model §2A.5).
+  Known limitation dispositioned: `person.loginId` FK undeclared in TS (Drizzle
+  circular-type issue), constraint live from 0108 SQL, JSDoc'd. Awaiting
+  `/cosmo:review`.
+- **G3 TRIPPED 2026-06-11 08:32 UTC — W1 LANDED.** All four W1 units merged to
+  main: WI-570 (#855), WI-571 (#860), WI-572 (#859) all Closed via review;
+  WI-573 (#867) at Reviewing. G2 tripped earlier same day (WI-569 Closed).
+- **In flight: WI-574** (scope-rls, first W2 unit). WI-575/576 dispatch when it
+  lands (their other dep WI-572 is Closed).
+- **W3 + W4 fully pre-bridged 2026-06-11** — WI-577…584 all Ready+Assisted
+  (children WI-604…615). **W4 dispatched immediately** (deps Closed):
+  wi583-executor + wi584-executor running parallel to WI-574 — three concurrent
+  executors. Remaining unbridged: only the tail (WI-585/586), deliberately left
+  until W3 nears completion.
+- **W2 fully pre-bridged 2026-06-11** — WI-574/575/576 Ready+Assisted (children
+  WI-598…603). Dispatch order when W1 lands: WI-574 first (deps 570 ✓ + 571),
+  then WI-575 ∥ WI-576 (deps 572 + 574). Next shepherd idle-time task: W3
+  pre-bridging (WI-577…582).
+
 - **W0 is fully done on the patch side:** WI-549/550 Closed/Done (PRs #817/#818,
   merged 2026-06-10) and WI-551 Closed/Done (`c5c9b39bb`, resolved 2026-06-10).
 - **WI-530 gate: operator-waived 2026-06-10.** WI-530 itself is still open in
   Cosmo (Backlog, 15 open blockers), but the operator has waived waiting for the
   rewrite's execution start — W1 proceeds **shepherded** (a shepherd session runs
   pick/refine/brief/track; executors in isolated worktrees).
-- **In execution: WI-569 (baseline reset)** — executor sub-agent dispatched
-  2026-06-10 (`wi569-executor`, Sonnet, `.worktrees/WI-569`), running the
-  executor protocol with a hard pre-reset stop: it must report the exact dev/
-  staging reset commands to the shepherd and wait for go before executing them.
-- **Refined and queued: WI-570 (schema)** — Ready + Assisted as of 2026-06-10.
-  Claimable the moment WI-569 lands (last open entry of its W0 hard gate).
+- **In execution: WI-569 (baseline reset)** — PR #845 GREEN (9/9 checks, commit
+  `3fd5b85c8`); chain shape shepherd-verified against MMT-ADR-0012 + master plan
+  (0106 AND 0107 out of the journal, 0108 single baseline; legacy tables retained
+  for the tail by design). Pre-reset HARD STOP passed 2026-06-10: shepherd issued
+  **conditional go** — read-only journal/T1-table verification on dev + staging
+  first, decision matrix (clean → proceed; stale empty plural T1 tables → drop
+  only `"organizations"`/`"memberships"`; anything else → stop), post-reset
+  evidence (staging migrate clean re-run), then `/cosmo:execute complete`.
+  PR #845 stays UNMERGED — merge is an operator/shepherd seam at review.
+  **Step-0 verification fired matrix (c) and stopped (correctly):** T1 tables
+  populated on BOTH DBs (dev 1339/1332 rows = 0106-backfill mirror of accounts;
+  staging 49/28 = spillover-test artifacts), 0106 WAS applied to staging
+  (journal id=107 — the "never applied" premise was wrong), plus an orphaned
+  early-0107 `sturdy_monster_badoon` journal row + `nudge_direction` enum from
+  a since-deleted migration. Shepherd ruled GO 2026-06-10 late: dev
+  `db:push:dev --force`; staging `DROP TABLE IF EXISTS organizations,
+  memberships CASCADE` → migrate; hygiene drops of the four orphan artifacts
+  (`profiles.clerk_user_id`, `subscriptions.organization_id`,
+  `nudges.direction`, `nudge_direction` type) approved with IF EXISTS guards;
+  erratum recorded in migrations README + completion summary (NOT in the ADR).
+- **Refined and queued: ALL of W1** — WI-570, WI-571, WI-572, WI-573 are
+  Ready + Assisted as of 2026-06-10 (570/571/572 bridged per the §2 ruling;
+  children WI-591/592, WI-594/595, WI-596/597). Execution order on dependency
+  edges: WI-570 claims when WI-569 lands → then WI-571 ∥ WI-572 in parallel →
+  WI-573 after WI-571.
 - **Known refine friction (affects every remaining WP, WI-571…586):** top-down-
   sliced WPs mechanically fail the WP DoR (`wp.children` + `wp.brief` — blank
   bodies, no Sub-items; `/cosmo:bundle` absent from cosmo plugin 0.6.0). Filed as
   **WI-593** (Hygiene, project Nexus). Interim bridge used on WI-570: transcribe
   the frozen master-plan WP block into the body, capture the provenance children
   (WI-591 schema-build, WI-592 F-032 scoped-repo), hand-set `Sub-item`, then
-  refine `--to-ready`. Repeat per WP until WI-593 is ruled.
+  refine `--to-ready`. **Blanket-approved by operator 2026-06-10** — see §2
+  Operator rulings; apply per WP without asking.
 - **Shepherd protocol:** executor agents work in `.worktrees/WI-NN` (worktree-setup
   skill), one PR per WP, claim via `execute.ts fetch --supervised` + `claim
   --claimant`, complete → Stage=Reviewing + release claim; close only via
@@ -187,6 +259,10 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 ## 6. Change log
 
+- **2026-06-10 (late) — whole of W1 refined to Ready.** WI-571/572 bridged
+  under the §2 standing ruling (briefs in body; children WI-594/595, WI-596/597);
+  WI-573 (Item, no bridge) refined with framing checklist confirmed. All four W1
+  units now Ready+Assisted, claimable in dependency order behind WI-569/570.
 - **2026-06-10 (evening) — WI-569 dispatched; WI-570 refined to Ready.**
   Executor protocol landed (`executor-protocol.md`, from the operator's
   wi-execute template: work-type-parameterized planning, review loop capped at

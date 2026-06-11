@@ -450,13 +450,13 @@ footer .warn{color:var(--amber)}
   </div>
   <div class="hdr-right">
     <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐ theme</button>
-    <div class="stamp">snapshot <b>2026-06-10</b><br>11 initiatives · ~50 bundles · 5 gates<br>view · not a source of truth</div>
+    <div class="stamp">snapshot <b>2026-06-11</b><br>11 initiatives · ~50 bundles · 5 gates<br>view · not a source of truth</div>
   </div>
 </header>
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> Harness-Hygiene PR approved — merge imminent · Identity Foundation execution starting (shepherded) · <b>1 ruling on Zuzka's desk</b> (WI-587 sheet) · next activation armed: <b>PRG-12</b> behind “pipeline proven”.</span>
+  <span class="txt"><b>Right now:</b> IF W1 half-landed — schema + authority-graph merged, spine PR in cleanup · <b>G2 fires on the first operator closes</b> (/cosmo:review the 569/570/572 stack) · HH PR #832 still open (execution waived ahead) · <b>1 ruling on Zuzka's desk</b> (WI-587 sheet).</span>
 </div>
 
 <nav>
@@ -565,7 +565,7 @@ footer .warn{color:var(--amber)}
 </section>
 
 <footer>
-  <div>Generated <b>2026-06-10</b> from <code>program-roster.md</code> + <code>activation-planning.md</code> + initiative trackers.<br>
+  <div>Generated <b>2026-06-11</b> from <code>program-roster.md</code> + <code>activation-planning.md</code> + initiative trackers.<br>
   <span class="warn">⚠ View, not a home.</span> Live work-item state: Cosmo · rules: <code>planning-reference.md</code> · regenerate at umbrella touches.</div>
   <div style="text-align:right">Keys: <code>1 2 3</code> views · <code>t</code> theme · <code>esc</code> close<br>Prototype input to <code>PRG-04 / WI-590</code> (Cosmo top-down layer)</div>
 </footer>
@@ -577,8 +577,8 @@ footer .warn{color:var(--amber)}
 <script>
 /* =============== DATA — derived from roster + charters, 2026-06-10 =============== */
 const GATES = [
-  {id:"G1", name:"HH merge", state:"hot", what:"Harness-Hygiene PR merges; exit-gate WI-530 closes.", unlocks:["PRG-01 full execution","PRG-02 residue batch"], status:"imminent"},
-  {id:"G2", name:"Pipeline proven", state:"cold", what:"A few IF work items through claim → build → review → close, cleanly.", unlocks:["PRG-12 (first parallel lane)","PRG-10 safe subset"], status:"armed next"},
+  {id:"G1", name:"HH merge", state:"hot", what:"Harness-Hygiene PR #832 merges; exit-gate WI-530 closes. Execution started ahead under operator waiver.", unlocks:["PRG-02 residue batch","formal WI-530 close"], status:"PR open"},
+  {id:"G2", name:"Pipeline proven", state:"hot", what:"A few IF work items through claim → build → review → close, cleanly. Three are built+merged — only the operator closes remain.", unlocks:["PRG-12 (first parallel lane)","PRG-10 safe subset"], status:"firing — closes pending"},
   {id:"G3", name:"IF W1 landed", state:"cold", what:"Schema bedrock + session-exchange rewiring merged.", unlocks:["PRG-11 (after moot scan)","PRG-13 (part)"], status:"waiting"},
   {id:"G4", name:"IF W2/W3 landed", state:"cold", what:"Authority model, PII + envelope/router hardening merged.", unlocks:["PRG-10 remainder","PRG-15"], status:"waiting"},
   {id:"G5", name:"IF tail done", state:"cold", what:"Legacy identity deleted, data re-seeded. Clean cut complete.", unlocks:["PRG-20 bulk"], status:"waiting"}
@@ -603,13 +603,13 @@ const QUEUE = [
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"Executing — W1+ opens fully at G1 (HH merge). Already shepherded.",
+  owner:"Jorn + runway agents", gate:"Executing, shepherded — WI-530 gate operator-waived; W1 half-landed.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
-    {n:"W0 · Security patch-now", s:"3 units", m:"mixed", st:"done", note:"Shipped ungated: 2 of 3 closed (PRs #817/#818); trial-expiry item ready."},
-    {n:"W1 · Schema bedrock + session-exchange rewiring", s:"≈6 units", m:"human", st:"go", note:"The critical path starts here. Starting now, shepherded."},
-    {n:"W2 · Authority model + policy engine", s:"≈4 units", m:"human", st:"hold", note:"After W1."},
+    {n:"W0 · Security patch-now + baseline reset", s:"4 units", m:"mixed", st:"done", note:"All shipped: patches closed (PRs #817/#818 + trial-expiry), migration baseline reset merged (PR #845, in review)."},
+    {n:"W1 · Schema bedrock + session-exchange rewiring", s:"4 units", m:"human", st:"go", note:"Half-landed: schema (PR #855) + authority-graph (PR #859) merged; spine PR #860 in cleanup; inngest-wiring ready."},
+    {n:"W2 · Authority model + policy engine", s:"3 WPs", m:"human", st:"hold", note:"Pre-bridged Ready — dispatches the moment W1 lands."},
     {n:"W3 · PII + envelope/router hardening", s:"≈4 units", m:"mixed", st:"hold", note:"After W2. Landing it fires G4."},
     {n:"W4 · Billing, credits & consent surfaces", s:"≈3 units", m:"mixed", st:"hold", note:"Off critical path."},
     {n:"Clean-cut tail · delete legacy, re-seed", s:"≈2 units", m:"human", st:"hold", note:"The point of no return — fires G5."}
@@ -621,7 +621,7 @@ const INIT = [
   owner:"Hex + Vetinari", gate:"Merge is G1 itself — imminent. Residue batch unlocks right behind it.",
   outcome:"Commit → CI → review → merge tail rewired and ZDX/Cosmo-backed to replacement parity, so the big refactor runs on a trustworthy harness.",
   bundles:[
-    {n:"Gate close-out · review stack → WI-530 → WI-533", s:"4 WIs", m:"mixed", st:"go", note:"PR approved; merge waits only on reading-in the team."},
+    {n:"Gate close-out · review stack → WI-530 → WI-533", s:"4 WIs", m:"mixed", st:"go", note:"PR #832 open — merge waits only on reading-in the team. IF execution already waived ahead."},
     {n:"Residue quick-land batch", s:"≈10 items", m:"mixed", st:"hold", note:"Deliberately off critical path: branch protection, pointer sweeps, validation-scope tooling. Batch lands right after merge."}
   ],
   homes:["nexus: _WIP/zdx-productionization/harness-hygiene-tracker.md","Cosmo · WI-530 exit-gate WP"]},

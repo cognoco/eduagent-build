@@ -18,9 +18,8 @@ describe('buildGuessWhoPrompt', () => {
     });
 
     expect(prompt).toContain('4');
-    // [CR-2026-05-19-H11] AgeBracket 'adolescent' spans 11-17 in the strictly-11+
-    // product (11-12 were reclassified out of the 'child' bracket).
-    expect(prompt).toContain('11-17');
+    // [WI-570] AgeBracket 'adolescent' spans 13-17 (v1 13+ floor).
+    expect(prompt).toContain('13-17');
     expect(prompt).toContain('Isaac Newton');
     expect(prompt).toContain('Classical mechanics');
     expect(prompt).toContain('History and science');
