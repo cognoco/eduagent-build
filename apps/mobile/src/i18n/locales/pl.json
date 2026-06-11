@@ -1239,6 +1239,8 @@
     "provenanceFrom": "Od {{name}}",
     "recentlyAdded": "Ostatnio dodane",
     "sessionCount_one": "{{count}} sesja",
+    "sessionCount_few": "{{count}} sesje",
+    "sessionCount_many": "{{count}} sesji",
     "sessionCount_other": "{{count}} sesji"
   },
   "topic": {
@@ -2547,6 +2549,8 @@
     "backToLibrary": "Powrót do biblioteki",
     "conversation": "Rozmowa",
     "messageCount_one": "{{count}} wiadomość",
+    "messageCount_few": "{{count}} wiadomości",
+    "messageCount_many": "{{count}} wiadomości",
     "messageCount_other": "{{count}} wiadomości",
     "you": "Ty",
     "emptyTitle": "Brak wiadomości",
@@ -3074,8 +3078,12 @@
     "loadingReviewTopics": "Wczytywanie tematów do powtórki...",
     "startingSession": "Rozpoczynanie sesji powtórkowej...",
     "overdueTopicCount_one": "{{count}} zaległy temat",
+    "overdueTopicCount_few": "{{count}} zaległe tematy",
+    "overdueTopicCount_many": "{{count}} zaległych tematów",
     "overdueTopicCount_other": "{{count}} zaległych tematów",
     "daysOverdue_one": "{{count}} dzień zaległości",
+    "daysOverdue_few": "{{count}} dni zaległości",
+    "daysOverdue_many": "{{count}} dni zaległości",
     "daysOverdue_other": "{{count}} dni zaległości"
   },
   "preview": {

@@ -4,6 +4,8 @@ import * as path from 'node:path';
 
 import {
   buildBaselineForKeys,
+  isLocalePluralVariant,
+  mergeTranslatedIntoPrevious,
   commitPrunedLocaleAndBaseline,
   commitTranslatedLocaleAndBaseline,
   expandSourceBaselineFile,
@@ -173,6 +175,75 @@ describe('selectGeminiDiffKeys', () => {
     ).toEqual({
       translateKeys: ['common.cancel'],
       removedKeys: [],
+    });
+  });
+});
+
+describe('locale-specific CLDR plural variants (WI-621 regression)', () => {
+  // English only carries _one/_other; Polish legitimately adds _few/_many.
+  const sourceFlat = {
+    'relearn.daysOverdue_one': '{{count}} day overdue',
+    'relearn.daysOverdue_other': '{{count}} days overdue',
+    'common.save': 'Save',
+  };
+
+  describe('isLocalePluralVariant', () => {
+    it('accepts a locale plural suffix when en carries ANY family member', () => {
+      expect(isLocalePluralVariant('relearn.daysOverdue_few', sourceFlat)).toBe(
+        true,
+      );
+      expect(
+        isLocalePluralVariant('relearn.daysOverdue_many', sourceFlat),
+      ).toBe(true);
+    });
+
+    it('rejects plural-suffixed keys whose family is gone from en', () => {
+      expect(isLocalePluralVariant('old.removed_few', sourceFlat)).toBe(false);
+    });
+
+    it('rejects non-plural keys', () => {
+      expect(isLocalePluralVariant('common.save', sourceFlat)).toBe(false);
+    });
+  });
+
+  describe('mergeTranslatedIntoPrevious', () => {
+    it('preserves hand-authored locale plural variants through a real write', () => {
+      // The exact failure mode that deleted pl _few/_many twice on PR #985:
+      // a translate run for unrelated keys must not drop locale-only plural
+      // forms of a still-live family.
+      const previousFlat = {
+        'relearn.daysOverdue_one': '{{count}} dzień zaległości',
+        'relearn.daysOverdue_few': '{{count}} dni zaległości',
+        'relearn.daysOverdue_many': '{{count}} dni zaległości',
+        'relearn.daysOverdue_other': '{{count}} dni zaległości',
+        'common.save': 'Zapisz',
+      };
+      const translatedFlat = { 'common.save': 'Zapisz teraz' };
+
+      const merged = mergeTranslatedIntoPrevious(
+        previousFlat,
+        translatedFlat,
+        sourceFlat,
+      );
+
+      expect(merged['relearn.daysOverdue_few']).toBe(
+        '{{count}} dni zaległości',
+      );
+      expect(merged['relearn.daysOverdue_many']).toBe(
+        '{{count}} dni zaległości',
+      );
+      expect(merged['common.save']).toBe('Zapisz teraz');
+    });
+
+    it('still drops keys whose entire family was removed from en', () => {
+      const previousFlat = {
+        'old.removed_one': 'x',
+        'old.removed_few': 'y',
+        'old.plain': 'z',
+        'common.save': 'Zapisz',
+      };
+      const merged = mergeTranslatedIntoPrevious(previousFlat, {}, sourceFlat);
+      expect(merged).toEqual({ 'common.save': 'Zapisz' });
     });
   });
 });
