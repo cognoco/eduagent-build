@@ -3253,7 +3253,7 @@
     "skipStart": "Überspringen – trotzdem mit dem Lernen beginnen",
     "missingSubject": "Fehlendes Thema. Bitte geh zurück und versuch es erneut.",
     "takingLonger": "Das dauert etwas länger als gewöhnlich ...",
-    "errorTitle": "Etwas konnte nicht geladen werden",
+    "errorTitle": "Etwas wurde nicht geladen",
     "setupErrorMessage": "Buch konnte nicht eingerichtet werden. Nochmal versuchen?",
     "customPlaceholder": "Buch oder Thema zum Hinzufügen",
     "organizingLibrary": "Deine Bibliothek wird organisiert ..."

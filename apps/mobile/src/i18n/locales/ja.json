@@ -1272,7 +1272,7 @@
       "deleteBookTitle": "ブックを削除しますか？",
       "deleteBookMessage": "後で再度追加できます。開始済みのトピックがある場合、それらのトピックと学習履歴も削除する前に確認メッセージが表示されます。",
       "buildErrorTitle": "このブックを作成できませんでした",
-      "generationFailedTitle": "コンテンツを利用できません",
+      "generationFailedTitle": "コンテンツが利用できません",
       "topicListErrorTitle": "トピックリストを設定できませんでした",
       "movedTitle": "移動しました",
       "movedMessage": "「{{topic}}」を{{book}}に移動しました。",
@@ -3253,7 +3253,7 @@
     "skipStart": "スキップ — そのまま学習を開始",
     "missingSubject": "科目がありません。戻ってやり直してください。",
     "takingLonger": "通常より少し時間がかかっています...",
-    "errorTitle": "読み込めませんでした",
+    "errorTitle": "読み込みに失敗しました",
     "setupErrorMessage": "そのブックを設定できませんでした。もう一度試しますか？",
     "customPlaceholder": "追加するブックまたはトピック",
     "organizingLibrary": "ライブラリを整理中..."

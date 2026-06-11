@@ -1272,7 +1272,7 @@
       "deleteBookTitle": "Slette boken?",
       "deleteBookMessage": "Du kan legge den til igjen senere. Hvis noen emner er påbegynt, vil du bli spurt før disse emnene og læringshistorikken deres også slettes.",
       "buildErrorTitle": "Kunne ikke bygge denne boken",
-      "generationFailedTitle": "Innhold ikke tilgjengelig",
+      "generationFailedTitle": "Innhold utilgjengelig",
       "topicListErrorTitle": "Kunne ikke sette opp emnelisten",
       "movedTitle": "Flyttet",
       "movedMessage": "\"{{topic}}\" ble flyttet til {{book}}.",
@@ -3253,7 +3253,7 @@
     "skipStart": "Hopp over – start å lære uansett",
     "missingSubject": "Mangler emne. Gå tilbake og prøv igjen.",
     "takingLonger": "Dette tar litt lengre tid enn vanlig ...",
-    "errorTitle": "Noe lastet ikke",
+    "errorTitle": "Noe ble ikke lastet inn",
     "setupErrorMessage": "Kunne ikke sette opp den boken. Prøve igjen?",
     "customPlaceholder": "Bok eller emne å legge til",
     "organizingLibrary": "Organiserer biblioteket ditt ..."
