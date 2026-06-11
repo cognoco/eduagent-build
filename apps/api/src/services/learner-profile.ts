@@ -1169,6 +1169,7 @@ export async function listStruggleTopicNames(
         ? (entry as { topic?: unknown }).topic
         : undefined,
     )
+    .map((topic) => (typeof topic === 'string' ? topic.trim() : undefined))
     .filter((t): t is string => typeof t === 'string' && t.length > 0)
     .slice(0, max);
 }

@@ -1888,5 +1888,6 @@ describe('memoized step-state PII break test [F-086]', () => {
     expect(serialized).not.toContain('Emma');
     expect(serialized).not.toContain('Fractions');
     expect(JSON.stringify(result)).not.toContain('Emma');
+    expect(JSON.stringify(result)).not.toContain('Fractions');
   });
 });

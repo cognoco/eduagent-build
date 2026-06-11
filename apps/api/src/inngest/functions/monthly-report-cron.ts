@@ -549,7 +549,11 @@ export const monthlyReportGenerate = inngest.createFunction(
       if (!activeChild) {
         return { sent: false, reason: 'profile_archived' as const };
       }
-      const childDisplayName = activeChild.displayName ?? 'Your child';
+      // Blank/whitespace names fall back too — copy must never render
+      // "'s monthly report is ready".
+      const childDisplayName = activeChild.displayName?.trim()
+        ? activeChild.displayName.trim()
+        : 'Your child';
       await sendPushNotification(
         db,
         {
@@ -617,7 +621,9 @@ export const monthlyReportGenerate = inngest.createFunction(
           return { sent: false, reason: 'no_email' };
         }
 
-        const childDisplayName = childProfile.displayName ?? 'Your child';
+        const childDisplayName = childProfile.displayName?.trim()
+          ? childProfile.displayName.trim()
+          : 'Your child';
         // Struggle watch-line (path A: topic names only). Malformed JSONB
         // degrades to an empty list inside the helper.
         const struggleLines: ChildStruggleLine[] = [

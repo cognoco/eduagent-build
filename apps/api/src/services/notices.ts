@@ -53,14 +53,20 @@ export async function recordPendingNotice(
 /**
  * Rehydrates the child name captured in a pending notice. Used by deletion
  * flows where the profile row is already gone and the notice payload is the
- * only first-party copy of the name.
+ * only first-party copy of the name. Scoped by ownerProfileId (same shape as
+ * markPendingNoticeSeen) so a leaked/forged notice id cannot read another
+ * family's notice payload.
  */
 export async function getPendingNoticeChildName(
   db: Database,
+  ownerProfileId: string,
   noticeId: string,
 ): Promise<string | null> {
   const row = await db.query.pendingNotices.findFirst({
-    where: eq(pendingNotices.id, noticeId),
+    where: and(
+      eq(pendingNotices.id, noticeId),
+      eq(pendingNotices.ownerProfileId, ownerProfileId),
+    ),
     columns: { payloadJson: true },
   });
   return row ? parsePayload(row.payloadJson).childName : null;

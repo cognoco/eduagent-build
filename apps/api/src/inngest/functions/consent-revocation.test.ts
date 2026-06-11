@@ -787,6 +787,7 @@ describe('memoized step-state PII break test [F-088]', () => {
     );
     expect(mockGetPendingNoticeChildName).toHaveBeenCalledWith(
       expect.anything(),
+      'parent-001', // owner-scoped read (same shape as markPendingNoticeSeen)
       'notice-001',
     );
     expect(mockSendPushNotification).toHaveBeenCalledWith(

@@ -1492,7 +1492,13 @@ export const sessionCompleted = inngest.createFunction(
             );
 
             // FR247.6 — struggle pushes to the parent, sent at the source so
-            // the topic strings never enter memoized step state.
+            // the topic strings never enter memoized step state. Delivery is
+            // effectively at-most-once per confidence transition: if the
+            // process dies mid-step, the step re-runs applyAnalysis, whose
+            // merge is idempotent — the before/after diff then detects no new
+            // transition, so already-sent pushes are not re-sent (and
+            // sendStruggleNotification's 24h per-type dedup backstops any
+            // duplicate window).
             struggleNotificationsDetected = analysisResult.notifications.length;
             for (const notification of analysisResult.notifications) {
               try {

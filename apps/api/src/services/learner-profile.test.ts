@@ -2278,8 +2278,9 @@ describe('listStruggleTopicNames', () => {
         'not-an-object',
         { topic: null },
         { topic: '' },
+        { topic: '   ' },
         { notTopic: 'x' },
-        { topic: 'fractions' },
+        { topic: '  fractions  ' },
       ],
     });
     await expect(listStruggleTopicNames(db, PROFILE_ID, 5)).resolves.toEqual([

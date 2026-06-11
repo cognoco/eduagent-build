@@ -491,7 +491,7 @@ const mockSendStruggleNotification = jest
   .fn()
   .mockResolvedValue({ sent: true });
 jest.mock(
-  '../../services/notifications' /* gc1-allow: push delivery external boundary */,
+  '../../services/notifications' /* gc1-allow: internal module mocked to stub sendStruggleNotification — its Expo push transport cannot run in the unit env; requireActual keeps every other export real */,
   () => {
     const actual = jest.requireActual(
       '../../services/notifications',

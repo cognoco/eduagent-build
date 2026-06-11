@@ -377,10 +377,14 @@ export const consentRevocation = inngest.createFunction(
         return { sent: false, reason: 'dedup_24h' };
       }
       // The profile row is gone; rehydrate the name from the pending-notice
-      // row recorded in the delete step (opaque-id reference).
+      // row recorded in the delete step (opaque-id reference, scoped to the
+      // owner resolved before deletion).
       const childName = deleteNoticeId
-        ? ((await getPendingNoticeChildName(db, deleteNoticeId)) ??
-          'Your child')
+        ? ((await getPendingNoticeChildName(
+            db,
+            archiveDecision.ownerProfileId,
+            deleteNoticeId,
+          )) ?? 'Your child')
         : 'Your child';
       await sendPushNotification(db, {
         profileId: parentProfileId,
