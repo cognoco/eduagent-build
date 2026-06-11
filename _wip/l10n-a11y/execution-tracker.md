@@ -134,12 +134,12 @@ overlapping component files — keep adjacent/serial).
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-621 WP-L12-jsx-strings | in-progress — PR A #942 **MERGED** `684495a2c` (auth+onboarding+shared, 89 strings, baseline 361→272; one advisory claude-review crash, rerun APPROVED). Child WI-634 (F-062/F-026) swept Closed/Done. Group B (session+home+subscription, ~140 strings) building on `WI-621-b` |
+| 1 | WI-621 WP-L12-jsx-strings | in-progress — PR A #942 MERGED `684495a2c` (89 strings, 361→272); PR B #961 **MERGED** `e382a95e6` (138 strings, 272→134, clean gate). Child WI-634 swept. Group C (final, ~127 strings + 8 `--accept`) building on `WI-621-c` |
 | 2 | WI-622 WP-L12-sr-announcements | **done** — PR #940 merged `ce8b10ab9`; children WI-635/636 swept; CLOSED Done by autonomous review 2026-06-11 (first WP through the PRG-12 loop, zero human touches) |
 | 3 | WI-623 WP-L12-modal-focus-roles | backlog |
 | 4 | WI-624 WP-L12-label-prop-strings | backlog |
 | 5 | WI-625 WP-L12-pluralization | backlog |
-| 6 | WI-626 WP-L12-mobile-logic-bugs | in-progress — pulled forward as safe parallel lane (tracker §4 rule); bridged (children WI-644/645) + Ready + dispatched wi626-executor 2026-06-11 |
+| 6 | WI-626 WP-L12-mobile-logic-bugs | in-progress — PR #959 open, gate-held once (valid Codex CJK-matcher P2, fixed in `210569ee6`; CI re-running). NOTE: executor ran premature `complete` on the unmerged PR — shepherd restored Stage=Executing with [shepherd:hold] comment; one review run wasted. F-123 delivered as dormant-instance gating (shared live component — full removal would break focused/mobile chat); completion summary must carry the AC deviation note |
 | 7 | WI-627 WP-L12-dates-locale | backlog |
 | 8 | WI-628 WP-L12-decorative-lowvision | backlog |
 
