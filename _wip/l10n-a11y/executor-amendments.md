@@ -53,3 +53,11 @@ itself: `_wip/identity-foundation/executor-protocol.md` (phases 0–7).
 13. Shared mobile components stay persona-unaware (semantic tokens, no hardcoded
     hex); accessibility props are part of the component contract — don't fork
     components per persona to add them.
+14. **Commit-skill CWD anchoring (learned 2026-06-11, WI-621 PR A):** the commit
+    skill runs as a forked execution and can default to the MAIN checkout, staging
+    other sessions' files and pushing them to origin/main. When invoking it from a
+    worktree, state the worktree path explicitly in the invocation ("commit in
+    .worktrees/WI-NN") and verify afterwards (`git -C .worktrees/WI-NN log -1` +
+    `git -C <repo-root> status`) that the commit landed on YOUR branch and the main
+    checkout is untouched. If a misfire reaches shared main: do NOT revert on your
+    own — report to the shepherd and continue.
