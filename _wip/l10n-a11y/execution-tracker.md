@@ -1,0 +1,168 @@
+# L10n & A11y Mobile — Execution Tracker
+
+**Stream:** l10n-a11y (umbrella roster **PRG-12**) · **Activity:** mobile localization + accessibility clean-out (agent-heavy sweep)
+**Last updated:** 2026-06-11 (activation — program session) · **Owner:** Jorn (+ shepherd session agents)
+
+> **This is the durable entry point for this activity.** Point a fresh session here:
+> it should be enough to know *what this is*, *where the detail lives*, and *where to
+> pick up*. It is **not** a second source of truth — see §2.
+
+---
+
+## 1. Charter
+
+**What this activity is.** Resolve all 34 `l10n-a11y-mobile` findings from the
+2026-05-29 full audit (ratified charter: `_wip/umbrella-program/activation-planning.md`
+§2 → PRG-12): route 358+ hardcoded English strings through `t()`, wire screen-reader
+announcements and modal focus management, complete role annotations, migrate
+pluralization to the i18n-native model, fix date/locale handling, and clear the small
+mobile logic-bug batch that travels with this surface.
+
+**Blast-radius class (ratified):** `out-of-radius` — UI/i18n/a11y layer; the identity
+rewrite does not touch this surface. **Parallel-safe, anytime.** No cross-Initiative
+gates; no boundary events imported.
+
+**Supervision profile:** agent-heavy / low-supervision — this Initiative is the
+program's archetype for mechanical agent-sweep work. Human attention goes to bundle
+review, not per-string decisions.
+
+**The bundle model (8 WPs, flat, no hard edges).** All units live in Cosmo under the
+**L10n & A11y Mobile** Workstream. Bundles are independent file-surfaces; order below
+is soft (Workstream Order), chosen so the two P1 bundles (largest user impact) land
+first and overlapping surfaces (roles ↔ label-strings) land adjacently.
+
+| # | Unit | Findings absorbed | Priority |
+|---|---|---|---|
+| 1 | WP-L12-jsx-strings — route hardcoded JSX/auth strings through i18n | F-026, F-061, F-062, F-069, INV-1 | P1 |
+| 2 | WP-L12-sr-announcements — announce streamed replies, quiz results, loading, toasts | F-050, F-051, F-053, F-054, F-068 | P1 |
+| 3 | WP-L12-modal-focus-roles — modal focus trap, roles, input labels, badge semantics | F-052, F-070, F-055, F-057, F-058 | P2 |
+| 4 | WP-L12-label-prop-strings — hardcoded accessibilityLabel / native-dialog / prop strings → `t()` | F-063, F-064, F-066 | P2 |
+| 5 | WP-L12-pluralization — migrate 29 manual-plural sites to i18n plural model | F-065, F-071 | P2 |
+| 6 | WP-L12-mobile-logic-bugs — small mobile logic/UX bug batch | F-123, F-160, F-161, F-165, F-168, F-172, F-175 | P2 |
+| 7 | WP-L12-dates-locale — locale-aware date formatting + UTC/local-day fixes | F-067, F-072, F-177, F-178 | P3 |
+| 8 | WP-L12-decorative-lowvision — hide decorative content from SR + fix 10px text | F-056, F-059, F-060 | P3 |
+
+Coverage check: 33 F-IDs + INV-1 = 34, each absorbed exactly once. Full finding text
+lives in the register (§3) — WP bodies carry the one-line gists + register pointer,
+per the direct-to-WP slice rule (planning-reference §2.2).
+
+**Slice-time decisions (recorded at activation, 2026-06-11):**
+
+- **INV-1 is PARTIALLY RESOLVED already** — `scripts/check-i18n-jsx-literals.ts`
+  (forward-only ratchet, **361-entry baseline**) exists and gates CI for JSX
+  text-children. WP-1's INV-1 scope is therefore: **burn down the 361-entry baseline**
+  as strings are routed through `t()` (re-run `--accept` only for genuinely
+  non-translatable copy, justified per commit), NOT building a guard. Extending the
+  guard to JSX *attribute* literals stays open scope (see AGENTS.md — needs a per-prop
+  allow/deny model) and is **not** in WP-1; it rides F-063/F-066 review in WP-4 as a
+  candidate follow-up capture.
+- **F-123 stays in PRG-12** (charter open question 2): it is a stale-instance removal
+  (dormant web ChatShell voice controls) — scope in WP-6 is **remove the dead
+  instance**, not fix it.
+- **F-172 stays in PRG-12** (charter open question 3): yes it is a logic bug, not
+  l10n/a11y, but it is a small single-screen mobile fix and PRG-11 activates much
+  later (post-G4 + moot scan). Moving it would trade a trivial fix for a long delay.
+- **F-163 EXCLUDED**: in-IF-scope, already delivered and Closed via WI-584 (PR #874).
+- **F-026 INCLUDED** in WP-1: it carries the `l10n-a11y-mobile` label in the register
+  though it sits outside the charter's representative list.
+- **Priority derivation rule** (charter encodes severity, not priority): WP priority =
+  highest constituent audit severity — C→P1, H→P2, M/L→P3. Logic-bug batch held at P2
+  (contains a HIGH_BUG, F-123).
+
+**The bar ("done").** All 34 findings resolved or explicitly re-dispositioned at
+review; i18n checkers green (`check-i18n-orphan-keys`, `check-i18n-jsx-literals` with a
+materially smaller baseline); no new hardcoded user-visible copy introduced; every WP
+Closed via `/cosmo:review`.
+
+---
+
+## 2. How to use this doc
+
+- **Cosmo is authoritative for live per-WI state** (Stage / State / claims /
+  dependencies). This file carries the **charter, pointers, bundle map, and coarse
+  status** only — refresh at checkpoints; never treat its status column as the system
+  of record.
+- **Claim before you execute.** The lock is the live Cosmo Claim props, not this file.
+  Repo AGENTS.md Cosmo operating rules apply in full: claim → execute → complete →
+  Reviewing; never self-close; close only via `/cosmo:review` (+ `/cosmo:qa` evidence).
+- **Worktrees:** every executor works in `.worktrees/<WI-NN>/` via the repo
+  worktree-setup skill (`.agents/skills/worktree-setup/SKILL.md`) — never Claude Code's
+  built-in EnterWorktree.
+- **i18n mechanics:** before touching strings, read AGENTS.md §Languages + §UI strings
+  hygiene. New keys go in `en.json` in the same PR; run `pnpm translate`; dynamic-key
+  patterns go through `scripts/i18n-keep.ts` with a real `file:line` cite.
+- **Status vocabulary (coarse):** `backlog` · `ready` · `in-progress` · `review` · `done`.
+
+### Operating patterns inherited from the IF dogfood (apply here)
+
+- **WP DoR bridge (top-down-sliced WPs).** Top-down WPs fail the bottom-up WP DoR
+  mechanically, and the review gate (`dod.wp.bulk_ready`) requires ≥1 child at close.
+  Per the IF operator ruling 2026-06-10 (see IF tracker §2), the shepherd applies the
+  bridge per WP without asking: transcribe the bundle brief into the page body, capture
+  2 thin provenance children (stubs — "absorbed provenance, lifecycle rides the
+  parent"), set `Sub-item`, then `refine --to-ready`. *Extension of that IF-scoped
+  ruling to PRG-12 assumed at activation — operator may veto.* Standing until WI-593
+  (substrate DoR fix) lands.
+- **Children pre-sweep at merge.** Sweep provenance children with the parent at merge
+  time (validated by WI-576 — avoids the children-gate bounce at review).
+- **Conditional merge authority.** Mirrors the IF ruling: a PR may be merged once its
+  WI reaches `Stage=Reviewing` via `complete`, provided the merger independently
+  re-verifies green (`gh pr checks` all passing, no unresolved blocker findings, diff
+  shape sanity-checked). Merge ≠ close.
+
+---
+
+## 3. Pointers / index
+
+| What | Where |
+| --- | --- |
+| **Ratified charter** (THE slice source — themes, counts, open-question dispositions) | `_wip/umbrella-program/activation-planning.md` §2 → PRG-12 |
+| **Findings register** (full finding text, one row per F-ID, label `l10n-a11y-mobile`) | `docs/audit/2026-05-29-full-audit/L-gap-delta.md` |
+| **Umbrella roster** (program altitude — PRG-12 row, gates, queue) | `_wip/umbrella-program/program-roster.md` |
+| **Substrate operating rules** (claim/complete/review, output conventions) | repo `AGENTS.md` → "Cosmo work-item operating rules" + "Working a Cosmo Work Item" |
+| **i18n ratchet** (INV-1 artifact — baseline = WP-1 burn-down list) | `scripts/check-i18n-jsx-literals.ts` + `scripts/i18n-jsx-literals-baseline.json` |
+| **Cosmo Workstream** | "L10n & A11y Mobile" (Workstreams DB), all 8 WPs related |
+
+---
+
+## 4. Execution sequence + coarse status
+
+Soft order = Workstream Order. No hard `Blocked-by` edges — all bundles are
+independent surfaces; run serially by default, parallelize only non-overlapping
+surfaces (e.g. WP-6 logic bugs alongside WP-1 strings is safe; WP-3 and WP-4 touch
+overlapping component files — keep adjacent/serial).
+
+| Order | Unit | Coarse status |
+|---|---|---|
+| 1 | WP-L12-jsx-strings | backlog |
+| 2 | WP-L12-sr-announcements | backlog |
+| 3 | WP-L12-modal-focus-roles | backlog |
+| 4 | WP-L12-label-prop-strings | backlog |
+| 5 | WP-L12-pluralization | backlog |
+| 6 | WP-L12-mobile-logic-bugs | backlog |
+| 7 | WP-L12-dates-locale | backlog |
+| 8 | WP-L12-decorative-lowvision | backlog |
+
+**Sub-slice watch:** WP-1 absorbs the ~358-string aggregate (F-069) — it is the one
+bundle likely to exceed PR size. Sub-slice on demand at execution (planning-reference
+§2.2): split by screen-group (e.g. auth+onboarding / session+home / rest) into stacked
+PRs or sibling WPs at the shepherd's call. Do not pre-slice.
+
+---
+
+## 5. Current position
+
+**2026-06-11 — ACTIVATED (program session).** Tracker created, Cosmo Workstream +
+8 WPs sliced per §1. Nothing claimed; no shepherd session yet. Next: operator spawns
+the PRG-12 shepherd with the kickoff brief; shepherd refines WP-1 + WP-2 to Ready
+(DoR bridge) and proposes first pickup.
+
+---
+
+## 6. Change log
+
+- **2026-06-11** — Created at PRG-12 activation (program session). Charter
+  transcribed from ratified activation-planning §2; INV-1 pre-check run (ratchet
+  exists, 361-entry baseline → scope reframed to burn-down); placement decisions
+  F-123/F-172 (stay), F-163 (excluded, delivered), F-026 (included) recorded; 8-WP
+  slice defined.
