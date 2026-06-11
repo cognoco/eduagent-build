@@ -121,25 +121,38 @@ parallel with either.
 | Order | Unit | Coarse status |
 |---|---|---|
 | 1 | WI-639 WP-E15-catch-hygiene | **done** — Closed/Done by autonomous review 2026-06-11 (PR #948, `f54dd3c0f`; one rework round: PR body child-list, shepherd-fixed) |
-| 2 | WI-640 WP-E15-typed-errors | in-progress — Ready (bridged, children WI-647/648) + executor dispatched 2026-06-11 |
+| 2 | WI-640 WP-E15-typed-errors | **done** — Closed/Done by autonomous review 2026-06-11 (PR #966, `c64327985`, first-pass close; JWKS medium-supervision check passed shepherd-side) |
 | 3 | WI-641 IT-E15-mobile-classification | **done** — Closed/Done by autonomous review 2026-06-11 (PR #943, `fc52f96f3`, first-pass close) |
 
 ---
 
 ## 5. Current position
 
-**2026-06-11 — SHEPHERD LIVE (autonomous mandate).** Review loop joined (see
-change log). Operator directive at session start: execute the whole workstream
-autonomously — no per-pickup go-gate; stop only when genuinely blocked or for the
-standing WI-640 medium-supervision surface (JWKS/auth design change → operator
-before merge). Plan of record: refine WI-639 (DoR bridge) → dispatch; refine
-WI-641 (normal refine) → dispatch in parallel (mobile surface); WI-640 serial
-after WI-639 merges.
+**2026-06-11 — ALL 3 UNITS CLOSED — GRADUATION CANDIDATE.** WI-639, WI-640,
+WI-641 all Closed/Done via the autonomous review loop, same day as activation.
+All 8 charter findings resolved on `main`: F-022/047/048/049 (PR #948,
+`f54dd3c0f`), F-015/016/017 (PR #966, `c64327985`), F-110 (PR #943, `fc52f96f3`).
+Provenance children WI-642/643/647/648 swept Closed at their merges. Incidental
+captures during the run: **WI-646** (stripe-webhook rate-limited Sentry
+escalation, P3) and **WI-650** (raw 'Session not found' sibling-site sweep, P3)
+— both outside the charter, left Captured for normal triage. The bar in §1 is
+met; awaiting operator graduation ruling. Worktrees `.worktrees/WI-639/640/641`
+left in place (merged branches) for a later sweep.
 
 ---
 
 ## 6. Change log
 
+- **2026-06-11 (shepherd, graduation candidate)** — **WI-640 Closed/Done
+  first-pass** (PR #966 → merge `c64327985`; 2 CI rounds; final verdict APPROVED
+  0/0/0; shepherd's JWKS medium-supervision diff check passed — shape-validation
+  only, no auth-flow shape change, Clerk token-template fallback untouched, so no
+  operator escalation was triggered; children WI-647/648 swept at merge; deferred
+  raw-'Session not found' sweep captured as WI-650). **All 3 units Closed; all 8
+  findings resolved. PRG-15 is a graduation candidate.** Reviewer-side note for
+  productionization: CodeRabbit was rate-limited (org credits) for the entire
+  WI-639/640 PR lifecycle — claude[bot] + the shepherd gate were the effective
+  review layer tonight.
 - **2026-06-11 (shepherd, first closes)** — **WI-641 and WI-639 both CLOSED (Done)
   by the autonomous reviewer.** WI-641 closed first-pass. WI-639 took one rework
   round — the reviewer caught a WP DoD conformance gap (PR #948 body listed finding
