@@ -160,7 +160,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **in-progress (PR open)** — PR #902 (head 533afc2cd, CI running): canonical scrubber `pii-scrub.ts`, all 30 rawData sites cleared, forward-only guard test red-green verified |
 | WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **in-progress (PR open)** — PR #900 (head 24d28dcdf, CI running): adult-owner-only name gating, two-layer fail-closed, red-green break tests, zero eval-snapshot drift. Eval-hook gate-gap it exposed captured as WI-619 |
 | WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **in-progress** — executor dispatched 2026-06-11 (`wi581-executor`) immediately on WI-576's merge |
-| WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi582-executor`) |
+| WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **in-progress (PR open)** — PR #903 (head 7ccba2f3b, CI running): F-135 masked at both metering call sites, F-134 logIn-gated RC hook + Sentry escalation; red-green verified; no CODEOWNERS trigger |
 
 ### W4 — billing + remaining (parallel track)
 
