@@ -178,9 +178,12 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **Activated 2026-06-11** — first parallel activation (queue entry 1); second
   dogfood of the §2.1 recipe (tracker → Workstream → direct-to-WP slice → shepherd).
   INV-1 pre-checked at slice (i18n ratchet exists, 361-entry baseline → burn-down
-  scope). **Shepherd session SPAWNED 2026-06-11 (late)** — first task: extend the
-  autonomous reviewer watcher (`review-watcher-v3.ts`) to cover this workstream
-  (one watcher, both workstreams), then refine WI-621/622 to Ready.
+  scope). **Shepherd session SPAWNED 2026-06-11 (late)** — wired the reviewer
+  watcher to multi-workstream on arrival.
+- **Execution state:** **first WP CLOSED 2026-06-11 night — `WI-622`
+  (sr-announcements)**, full claim→build→review→close loop autonomous; validates
+  the multi-workstream reviewer watcher on a second lane. Live state: Cosmo +
+  `_wip/l10n-a11y/execution-tracker.md`.
 - **Activate-when:** — (active)
 
 ### PRG-15 · API Error Handling — `active` (2026-06-11)
