@@ -154,7 +154,12 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   per-item inside WI-590's design work.
 - **Activate-when:** orchestrator pull, once ≥1 full Initiative cycle has run on
   the IF pattern (dogfood evidence in hand). Earlier parallel build allowed if
-  ZDX-side capacity appears.
+  ZDX-side capacity appears. **Gate effectively MET 2026-06-11** — IF ran the
+  full loop (W0–W2+W4 closed through the autonomous reviewer); PRG-12 is the
+  second instance. Design input captured on `WI-590` (comment, 2026-06-11): the
+  shepherd-kickoff skill + executor-protocol skill + reviewer-dispatcher
+  pattern, with pointers to the five `_wip/identity-foundation/review-loop-*` /
+  `executor-protocol*` artifacts. Pull remains deliberate (attention budget).
 
 ### PRG-12 · L10n & A11y Mobile — `active` (2026-06-11)
 - **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
@@ -171,7 +176,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **Activated 2026-06-11** — first parallel activation (queue entry 1); second
   dogfood of the §2.1 recipe (tracker → Workstream → direct-to-WP slice → shepherd).
   INV-1 pre-checked at slice (i18n ratchet exists, 361-entry baseline → burn-down
-  scope). Shepherd session not yet spawned.
+  scope). **Shepherd session SPAWNED 2026-06-11 (late)** — first task: extend the
+  autonomous reviewer watcher (`review-watcher-v3.ts`) to cover this workstream
+  (one watcher, both workstreams), then refine WI-621/622 to Ready.
 - **Activate-when:** — (active)
 
 ---
