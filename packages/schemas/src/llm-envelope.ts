@@ -29,7 +29,7 @@ const privateReasonSchema = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : undefined;
 }, z.string().min(1).max(1000).optional());
 
-// [WI-581/F-025] Non-critical provenance must degrade gracefully:
+// Non-critical provenance must degrade gracefully:
 // - the `>1 → /100` percentage-drift normalization applies to the NUMBER path
 //   too (a bare `91` is coerced like the string `'91'`/'91%'), and
 // - the schema terminates in `.catch(undefined)` so an irrecoverable value

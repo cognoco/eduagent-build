@@ -24,7 +24,7 @@
 // JSON-shaped text with a `reply` field as part of prose: a confirmed
 // envelope must carry `reply` PLUS at least one structural envelope sibling.
 //
-// [WI-581/F-137] The original heuristic ALSO required every top-level key to
+// Fail-open hardening (2026-06-11): the original heuristic ALSO required every top-level key to
 // belong to a hardcoded allowlist mirroring `llmResponseEnvelopeSchema` —
 // which failed OPEN: the moment the schema gained a new top-level field not
 // mirrored here, every leaked envelope rendered its raw internals (including
@@ -45,8 +45,7 @@ import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
  * A confirmed envelope must contain `reply` PLUS at least one structural
  * sibling key from the envelope schema's own top-level vocabulary. A lone
  * `{"reply":"x"}` object is ambiguous — it could be arbitrary JSON — so it
- * is treated as prose. Derived from the schema so it can never drift
- * ([WI-581/F-137]).
+ * is treated as prose. Derived from the schema so it can never drift.
  */
 const REQUIRED_ENVELOPE_SIBLINGS: ReadonlySet<string> = new Set(
   llmResponseEnvelopeSchema.keyof().options.filter((key) => key !== 'reply'),
@@ -119,7 +118,7 @@ export function stripEnvelopeJson(rawContent: string): string {
     !Array.isArray(parsed) &&
     typeof (parsed as { reply?: unknown }).reply === 'string' &&
     (parsed as { reply: string }).reply.length > 0 &&
-    // CR-PR129-M7 + [WI-581/F-137]: at least one schema-derived structural
+    // CR-PR129-M7 + fail-open hardening: at least one schema-derived structural
     // sibling must be present alongside `reply`. A bare {"reply":"x"} object
     // is ambiguous and is returned verbatim rather than silently rewritten.
     // Unknown extra keys do NOT disqualify the envelope — requiring every

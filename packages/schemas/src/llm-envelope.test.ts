@@ -158,7 +158,7 @@ describe('llmResponseEnvelopeSchema', () => {
     expect(parsed.private_sources?.factual_confidence).toBeCloseTo(0.91);
   });
 
-  // [WI-581/F-025] Out-of-range factual_confidence must degrade gracefully —
+  // Out-of-range factual_confidence must degrade gracefully —
   // it is non-critical provenance ("never rendered to the learner") and must
   // never reject the whole envelope, which would drop the valid reply and
   // every state-machine signal.

@@ -146,7 +146,7 @@ describe('projectAiResponseContent', () => {
     }
   });
 
-  // [WI-581/F-136] Fail-closed: once the pre-check has identified
+  // Fail-closed: once the pre-check has identified
   // envelope-shaped content, no failure path may return the raw envelope —
   // it carries `signals` and `private_sources` ("never rendered to the
   // learner") into GDPR exports, bookmarks, and downstream LLM prompts.

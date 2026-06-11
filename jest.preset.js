@@ -24,7 +24,7 @@ module.exports = {
   ...ciDefaults,
   // Prevent haste-map from scanning local scratch copies.
   // The regex entries are cross-platform fallbacks for Windows backslashes.
-  // [WI-581] When jest runs INSIDE a .worktrees/<branch>/ checkout (the
+  // When jest runs INSIDE a .worktrees/<branch>/ checkout (the
   // sanctioned isolated-agent workflow), the unanchored '.worktrees' regex
   // matched EVERY path in the checkout, so every suite reported "No tests
   // found" with exit 0 — a silently-green local gate. Skip the .worktrees

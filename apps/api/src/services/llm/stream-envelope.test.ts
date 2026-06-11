@@ -182,6 +182,58 @@ describe('streamEnvelopeReply', () => {
     expect(await collect(stream)).toBe('');
   });
 
+  // ---- Top-level reply only — streamed text must match what persists ----
+  // The extractor must emit the envelope's TOP-LEVEL reply, never a `reply`
+  // key nested inside an earlier object: completion-time parseEnvelope reads
+  // the top-level field, so emitting a nested one shows the learner text
+  // that never persists to the transcript/export/parent view.
+
+  describe('[WI-581/F-131] top-level reply extraction', () => {
+    it('emits the top-level reply, not a nested pre-reply object reply (single chunk)', async () => {
+      const raw = '{"x":{"reply":"AAA"},"reply":"BBB","signals":{}}';
+      const stream = streamEnvelopeReply(fromChunks([raw]));
+      expect(await collect(stream)).toBe('BBB');
+    });
+
+    it('emits the top-level reply with a nested object, split into tiny chunks', async () => {
+      const raw =
+        '{"meta":{"reply":"nested decoy","deep":{"reply":"deeper"}},"reply":"Real reply","signals":{"partial_progress":false}}';
+      const stream = streamEnvelopeReply(chunked(raw, 3));
+      expect(await collect(stream)).toBe('Real reply');
+    });
+
+    it('streamed text matches the parsed+persisted reply for a nested-decoy envelope', async () => {
+      const raw =
+        '{"x":{"reply":"DECOY"},"reply":"Persisted text","signals":{}}';
+      await expectStreamedReplyToMatchParsedEnvelope(raw, 5, 'Persisted text');
+    });
+
+    it('ignores "reply" appearing inside a top-level string VALUE before the real key', async () => {
+      const raw =
+        '{"a":"see \\"reply\\": value inside a string","reply":"REAL"}';
+      const stream = streamEnvelopeReply(chunked(raw, 4));
+      expect(await collect(stream)).toBe('REAL');
+    });
+
+    it('ignores a reply key nested inside a top-level array element', async () => {
+      const raw = '{"list":[{"reply":"in array"}],"reply":"top"}';
+      const stream = streamEnvelopeReply(fromChunks([raw]));
+      expect(await collect(stream)).toBe('top');
+    });
+
+    it('still finds the top-level reply key when split across chunk boundaries', async () => {
+      const raw = '{"signals":{"ready_to_finish":false},"reply":"split key"}';
+      const stream = streamEnvelopeReply(chunked(raw, 2));
+      expect(await collect(stream)).toBe('split key');
+    });
+
+    it('still extracts a fence-prefixed envelope top-level reply', async () => {
+      const raw = '```json\n{"reply":"fenced","signals":{}}\n```';
+      const stream = streamEnvelopeReply(chunked(raw, 6));
+      expect(await collect(stream)).toBe('fenced');
+    });
+  });
+
   // ---- [LITERAL-ESCAPE] Defensive normalizer for double-escaping LLMs ----
 
   it('[LITERAL-ESCAPE] converts literal `\\n` (raw `\\\\n`) to a real newline mid-stream', async () => {

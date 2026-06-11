@@ -30,7 +30,7 @@
 //      valid JSON but fails Zod, so we still want to project `.reply`.
 //      Apply normalizeReplyText here too so resumed messages match what the
 //      live stream would have rendered.
-//   5. [WI-581/F-136] If no usable `reply` string can be extracted, FAIL
+//   5. If no usable `reply` string can be extracted, FAIL
 //      CLOSED: return an empty string, never the raw content. Once the
 //      pre-check has identified envelope-shaped content, the raw string is
 //      side-channel material (`signals`, `private_sources` — "never rendered
@@ -83,8 +83,8 @@ export function projectAiResponseContent(
   }
 
   // Step 4: schema-invalid but structurally valid JSON — extract reply directly.
-  // [WI-581/F-136] Every failure exit below returns '' (fail-closed), never
-  // rawContent — see header comment, step 5.
+  // Every failure exit below returns '' (fail-closed), never rawContent —
+  // see header comment, step 5.
   const jsonStr = extractFirstJsonObject(trimmed);
   if (!jsonStr) return '';
   let parsed: unknown;
