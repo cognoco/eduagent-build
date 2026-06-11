@@ -91,3 +91,22 @@ shepherd chooses, but small enough to run serially.
   shepherd verified F-174 LIVE in `review-calibration-grade.ts:96` (grade step
   precedes cooldown claim); kept as related-provenance, NOT a duplicate. WI-666
   build dispatch deferred until WI-665 lands (serial per unit map order).
+- 2026-06-11 — WI-665 plan-phase stop reviewed and APPROVED with rulings:
+  (D1) F-090 via new `feedback_retry_queue` table, migration 0110 (enum alternative
+  rejected — PG enums irreversible); insert in failure path only, insert-failure
+  degrades gracefully (Sentry, no PII fallback into payload); support_to re-derived
+  from config if possible; unconsumed-row purge or tracked follow-up. (D2) 4→1 step
+  collapse in topic-probe-extract conditionally approved — executor must verify
+  seedRetentionCard idempotency under retry, else fall back to 2-step
+  reference-and-rehydrate shape. Corrections: event payload TYPE must drop
+  message/supportTo; GC1 hazard on DB mocks (requireActual pattern); migration
+  -before-deploy ordering in PR description. Executor implementing; next boundary
+  PR-open.
+- 2026-06-11 ~23:25 — wi665-executor killed mid-implementation by the account
+  usage-limit window (resets 00:40 Oslo). Worktree `.worktrees/WI-665` holds
+  uncommitted partial progress (F-028 legs + F-091 source/test edits;
+  F-090 schema + route-test started; no migration, no commits; `_plan-WI-665.md`
+  present). Recovery: shepherd scheduled a 00:47 one-shot wake-up to resume the
+  SAME executor from its transcript (context preserved). If this session dies
+  before the resume, a fresh executor must re-orient from `_plan-WI-665.md` +
+  `git status` in the worktree and the approved-plan rulings logged above.
