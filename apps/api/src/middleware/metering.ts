@@ -226,6 +226,11 @@ export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   // distinguish from the DB-only GET counterpart. Splitting into an
   // explicit POST topup route makes metering coverage trivial.
   /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/book-suggestions\/topup\/?$/,
+  // [F-023 / WI-575] POST /sessions/:sessionId/quick-check invokes
+  // evaluateQuickCheckAnswer which calls routeAndCall (LLM). Without metering,
+  // any authenticated user can call this in a tight loop and burn unbounded LLM
+  // capacity. Path uses a UUID session ID to avoid matching non-LLM session routes.
+  /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/quick-check\/?$/,
 ];
 
 const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [
