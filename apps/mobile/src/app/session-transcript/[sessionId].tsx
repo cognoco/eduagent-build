@@ -102,7 +102,7 @@ export default function SessionTranscriptScreen() {
           onPress={() => goBackOrReplace(router, '/(app)/library')}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Back to library"
+          accessibilityLabel={t('sessionTranscript.backToLibrary')}
         >
           <Text className="text-body font-semibold text-text-inverse">
             {t('sessionTranscript.backToLibrary')}
@@ -123,16 +123,16 @@ export default function SessionTranscriptScreen() {
         isLoading={transcript.isLoading}
         timeoutMs={15_000}
         testID="session-transcript-loading"
-        loadingLabel="Loading transcript..."
-        title="Still loading"
-        message="The transcript is taking longer than usual. Try again or head back to your library."
+        loadingLabel={t('sessionTranscript.loadingTranscript')}
+        title={t('sessionTranscript.stillLoadingTitle')}
+        message={t('sessionTranscript.stillLoadingMessage')}
         primaryAction={{
-          label: 'Retry',
+          label: t('common.retry'),
           onPress: () => void transcript.refetch(),
           testID: 'session-transcript-timeout-retry',
         }}
         secondaryAction={{
-          label: 'Back to library',
+          label: t('sessionTranscript.backToLibrary'),
           onPress: () => goBackOrReplace(router, '/(app)/library'),
           testID: 'session-transcript-timeout-back',
         }}
@@ -144,16 +144,16 @@ export default function SessionTranscriptScreen() {
     return (
       <View className="flex-1 bg-background" testID="session-transcript-error">
         <ErrorFallback
-          title="Couldn't load conversation"
+          title={t('sessionTranscript.loadErrorTitle')}
           message={formatApiError(transcript.error)}
           variant="centered"
           primaryAction={{
-            label: 'Retry',
+            label: t('common.retry'),
             onPress: () => void transcript.refetch(),
             testID: 'session-transcript-retry',
           }}
           secondaryAction={{
-            label: 'Back to library',
+            label: t('sessionTranscript.backToLibrary'),
             onPress: () => goBackOrReplace(router, '/(app)/library'),
             testID: 'session-transcript-error-back',
           }}
@@ -211,7 +211,7 @@ export default function SessionTranscriptScreen() {
           onPress={() => goBackOrReplace(router, '/(app)/library')}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Back to library"
+          accessibilityLabel={t('sessionTranscript.backToLibrary')}
         >
           <Text className="text-body font-semibold text-text-inverse">
             {t('sessionTranscript.backToLibrary')}
@@ -232,7 +232,7 @@ export default function SessionTranscriptScreen() {
           onPress={() => goBackOrReplace(router, '/(app)/library')}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('common.back')}
           testID="session-transcript-back"
           hitSlop={8}
         >

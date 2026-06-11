@@ -36,7 +36,8 @@
     "active": "Activo",
     "goBackAction": "Volver",
     "tryAgainAction": "Intentar de nuevo",
-    "dismiss": "Descartar"
+    "dismiss": "Descartar",
+    "pleaseTryAgain": "Inténtalo de nuevo."
   },
   "quota": {
     "parent": {
@@ -462,7 +463,11 @@
         "save": "Guardar nota",
         "edit": "Editar primero",
         "skip": "Omitir"
-      }
+      },
+      "startErrorTitle": "No se pudo iniciar la ronda de desafío",
+      "updateErrorTitle": "No se pudo actualizar la ronda de desafío",
+      "noteSaved": "Nota guardada.",
+      "noteSaveErrorTitle": "No se pudo guardar la nota"
     },
     "mentorMemory": {
       "title": "Lo que mi mentor sabe",
@@ -630,7 +635,12 @@
       "voicePermissionErrorMessage": "Se necesita acceso al micrófono para la entrada de voz. Actívalo en Ajustes.",
       "voicePermissionOpenSettings": "Abrir Ajustes",
       "replyReady": "Respuesta lista",
-      "voiceErrorTapRetry": "{{error}}: toca para reintentar"
+      "voiceErrorTapRetry": "{{error}}: toca para reintentar",
+      "a11yHomeworkImage": "Imagen de la tarea",
+      "a11yMessageInput": "Entrada de mensaje",
+      "a11yEnableVoice": "Activar mensaje de voz",
+      "a11ySendMessage": "Enviar mensaje",
+      "a11yVoiceErrorHint": "Toca para reintentar la entrada de voz"
     },
     "filingFailed": {
       "retryInProgress": "Ya hay un reintento en curso.",
@@ -685,7 +695,11 @@
       "inputHint": "Escribe una pregunta o idea a la que quieras volver más tarde",
       "saveButton": "Guardar",
       "savedForLater": "Guardado para más tarde",
-      "emptyState": "Nada aparcado todavía"
+      "emptyState": "Nada aparcado todavía",
+      "startFirstTitle": "Inicia la conversación primero",
+      "startFirstMessage": "Envía un mensaje para que esta sesión tenga dónde guardar tus notas.",
+      "savedConfirmation": "Guardado en tus notas.",
+      "saveErrorTitle": "No se pudo guardar el elemento"
     },
     "topicSwitcher": {
       "title": "Cambiar tema",
@@ -746,10 +760,38 @@
       "voice": "Voz"
     },
     "messageActions": {
-      "reconnect": "Reconectar"
+      "reconnect": "Reconectar",
+      "a11yReconnect": "Reconectar con la conversación",
+      "a11yHelpful": "Útil: marcar esta respuesta como útil",
+      "a11yNotHelpful": "No útil: marcar esta respuesta como no útil",
+      "a11yIncorrect": "Marcar esta respuesta como inexacta",
+      "wrongSubject": "Fuera de tema"
     },
     "questionCounter": {
       "question": "Pregunta {{count}}"
+    },
+    "skipWarmupErrorTitle": "No se pudo omitir el calentamiento",
+    "feedbackErrorTitle": "No se pudo guardar el comentario",
+    "topicSwitchErrorTitle": "No se pudo cambiar de tema",
+    "endPrompt": {
+      "title": "¿Terminar sesión?",
+      "confirm": "Terminar sesión",
+      "errorTitle": "No se pudo terminar esta sesión correctamente"
+    },
+    "bookmarks": {
+      "removeErrorTitle": "No se pudo eliminar el marcador",
+      "saveErrorTitle": "No se pudo guardar el marcador"
+    },
+    "voice": {
+      "a11yReplay": "Repetir el último mensaje de la IA",
+      "a11yStop": "Dejar de hablar",
+      "a11yResume": "Reanudar narración",
+      "a11yPause": "Pausar narración",
+      "a11ySpeed": "Velocidad de narración: {{rate}}x. Toca para cambiar."
+    },
+    "inputMode": {
+      "text": "Modo texto",
+      "voice": "Modo voz"
     }
   },
   "quiz": {
@@ -2507,8 +2549,33 @@
       "failedTitle": "No pudimos añadir esto a tu biblioteca",
       "failedHint": "Tu chat está guardado. Inténtalo de nuevo cuando quieras.",
       "keptOutTitle": "No está en la biblioteca",
-      "keptOutHint": "Este chat está guardado, pero no es un tema de la biblioteca."
-    }
+      "keptOutHint": "Este chat está guardado, pero no es un tema de la biblioteca.",
+      "a11yRefresh": "Actualizar estado de la biblioteca",
+      "a11yOpenInLibrary": "Abrir en la biblioteca",
+      "updateError": "No se pudo actualizar la biblioteca ahora. Inténtalo de nuevo en un momento.",
+      "dontAdd": "No añadir a la biblioteca",
+      "remove": "Quitar de la biblioteca",
+      "add": "Añadir a la biblioteca"
+    },
+    "notFoundHeadHomeMessage": "No pudimos encontrar esta sesión. Vuelve al inicio para empezar una nueva.",
+    "loadTimeoutTitle": "Tarda más de lo esperado",
+    "loadTimeoutMessage": "No pudimos cargar el resumen de tu sesión. Revisa tu conexión e inténtalo de nuevo.",
+    "saveErrorTitle": "No se pudo guardar",
+    "skipErrorTitle": "No se pudo omitir",
+    "draftPrompt": {
+      "title": "¿Guardar tu reflexión?",
+      "messageCanSubmit": "Escribiste una reflexión, pero no la has enviado. ¿Enviarla ahora, descartarla o seguir escribiendo?",
+      "messageTooShort": "Tu reflexión es muy corta para enviarla (necesita al menos 10 caracteres). ¿Descartarla o seguir escribiendo?",
+      "keepWriting": "Seguir escribiendo",
+      "submitNow": "Enviar ahora",
+      "discard": "Descartar"
+    },
+    "a11yCloseGoHome": "Cerrar y volver al inicio",
+    "a11yRetryRecap": "Reintentar cargar el resumen",
+    "a11yStarters": "Sugerencias para empezar la frase",
+    "a11yWriteSummary": "Escribe tu resumen de aprendizaje",
+    "a11ySkipSummary": "Saltar el resumen",
+    "a11yStarterHint": "Toca para usar este iniciador de frase"
   },
   "sessionTranscript": {
     "archived": {
@@ -2524,7 +2591,11 @@
     "messageCount_other": "{{count}} mensajes",
     "you": "Tú",
     "emptyTitle": "Aún no hay mensajes",
-    "emptyMessage": "Esta sesión no tiene intercambios guardados para mostrar."
+    "emptyMessage": "Esta sesión no tiene intercambios guardados para mostrar.",
+    "loadingTranscript": "Cargando transcripción...",
+    "stillLoadingTitle": "Sigue cargando",
+    "stillLoadingMessage": "La transcripción tarda más de lo normal. Inténtalo de nuevo o vuelve a tu biblioteca.",
+    "loadErrorTitle": "No se pudo cargar la conversación"
   },
   "nudge": {
     "sheet": {

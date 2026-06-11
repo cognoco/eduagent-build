@@ -91,7 +91,9 @@ export function SessionScreenChrome(props: SessionScreenChromeProps): {
         onPress={props.onRetryClassification}
         className="bg-surface-elevated rounded-full px-3 py-1.5 items-center justify-center"
         accessibilityRole="button"
-        accessibilityLabel="Retry classification"
+        accessibilityLabel={i18next.t(
+          'session.screenChrome.retryClassification',
+        )}
         testID="classify-error-retry"
       >
         <Text className="text-body-sm font-semibold text-text-secondary">
@@ -115,7 +117,7 @@ export function SessionScreenChrome(props: SessionScreenChromeProps): {
         disabled={props.isSkippingWarmup}
         className="bg-surface-elevated rounded-full px-3 py-1.5 items-center justify-center"
         accessibilityRole="button"
-        accessibilityLabel="Skip the warm-up, jump in"
+        accessibilityLabel={i18next.t('session.screenChrome.skipWarmup')}
         testID="session-skip-warmup"
       >
         <Text className="text-body-sm font-semibold text-text-secondary">

@@ -31,7 +31,7 @@ export function SessionInputModeToggle({
         className={`flex-1 flex-row items-center justify-center gap-2 py-2 rounded-lg min-h-[44px] ${
           mode === 'text' ? 'bg-primary' : ''
         }`}
-        accessibilityLabel="Text mode"
+        accessibilityLabel={t('session.inputMode.text')}
         accessibilityRole="button"
         accessibilityState={{ selected: mode === 'text' }}
         testID="input-mode-text"
@@ -62,7 +62,7 @@ export function SessionInputModeToggle({
         className={`flex-1 flex-row items-center justify-center gap-2 py-2 rounded-lg min-h-[44px] ${
           mode === 'voice' ? 'bg-primary' : ''
         }`}
-        accessibilityLabel="Voice mode"
+        accessibilityLabel={t('session.inputMode.voice')}
         accessibilityRole="button"
         accessibilityState={{ selected: mode === 'voice' }}
         testID="input-mode-voice"

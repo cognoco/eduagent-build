@@ -991,29 +991,29 @@ function SessionScreenInner() {
         const response = await action();
         applyChallengeRouteResponse(response);
       } catch {
-        platformAlert(title, 'Please try again.');
+        platformAlert(title, t('common.pleaseTryAgain'));
       } finally {
         challengeActionInFlightRef.current = false;
       }
     },
-    [applyChallengeRouteResponse],
+    [applyChallengeRouteResponse, t],
   );
 
   const handleAcceptChallengeRound = useCallback(() => {
     void runChallengeAction(
       () => challengeRoundActions.accept(),
-      "Couldn't start the challenge round",
+      t('session.challenge.startErrorTitle'),
     );
-  }, [challengeRoundActions, runChallengeAction]);
+  }, [challengeRoundActions, runChallengeAction, t]);
 
   const handleDeclineChallengeRound = useCallback(
     (dontAskAgain: boolean) => {
       void runChallengeAction(
         () => challengeRoundActions.decline(dontAskAgain),
-        "Couldn't update the challenge round",
+        t('session.challenge.updateErrorTitle'),
       );
     },
-    [challengeRoundActions, runChallengeAction],
+    [challengeRoundActions, runChallengeAction, t],
   );
 
   const handleSaveDraftedNote = useCallback(
@@ -1023,14 +1023,17 @@ function SessionScreenInner() {
       try {
         await challengeRoundActions.saveNote(content);
         setDraftedNote(null);
-        showConfirmation('Note saved.');
+        showConfirmation(t('session.challenge.noteSaved'));
       } catch {
-        platformAlert("Couldn't save the note", 'Please try again.');
+        platformAlert(
+          t('session.challenge.noteSaveErrorTitle'),
+          t('common.pleaseTryAgain'),
+        );
       } finally {
         challengeActionInFlightRef.current = false;
       }
     },
-    [challengeRoundActions, showConfirmation],
+    [challengeRoundActions, showConfirmation, t],
   );
 
   const handleSkipDraftedNote = useCallback(() => {
@@ -1065,9 +1068,12 @@ function SessionScreenInner() {
     try {
       await clearContinuationDepth.mutateAsync();
     } catch {
-      platformAlert('Could not skip warm-up', 'Please try again.');
+      platformAlert(
+        t('session.skipWarmupErrorTitle'),
+        t('common.pleaseTryAgain'),
+      );
     }
-  }, [clearContinuationDepth]);
+  }, [clearContinuationDepth, t]);
 
   const { headerRight, headerBelow, subtitle } = SessionScreenChrome({
     activeSessionId,

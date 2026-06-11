@@ -249,7 +249,7 @@ export function ChatShell({
               source={{ uri: msg.imageUri, cache: 'force-cache' }}
               className="w-full aspect-[4/3] rounded-lg"
               resizeMode="contain"
-              accessibilityLabel="Homework image"
+              accessibilityLabel={t('session.chatShell.a11yHomeworkImage')}
               onError={() => {
                 setFailedImages((prev) => new Set(prev).add(msg.id));
               }}
@@ -730,7 +730,7 @@ export function ChatShell({
               goBackOrReplace(router, fallback);
             }}
             className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBackAction')}
             accessibilityRole="button"
             testID="chat-shell-back"
           >
@@ -904,8 +904,10 @@ export function ChatShell({
           onPress={() => void startListening()}
           testID="voice-error-indicator"
           accessibilityRole="button"
-          accessibilityLabel={`Voice error: ${sttError}. Tap to retry.`}
-          accessibilityHint="Tap to retry voice input"
+          accessibilityLabel={t('session.chatShell.voiceErrorTapRetry', {
+            error: sttError,
+          })}
+          accessibilityHint={t('session.chatShell.a11yVoiceErrorHint')}
         >
           <Text className="text-caption text-error">
             {t('session.chatShell.voiceErrorTapRetry', { error: sttError })}
@@ -1072,7 +1074,7 @@ export function ChatShell({
               // !isFocused effectively never fires there.
               editable={!isStreaming && !isWebDormant}
               testID="chat-input"
-              accessibilityLabel="Message input"
+              accessibilityLabel={t('session.chatShell.a11yMessageInput')}
             />
             {isVoiceEnabled ? (
               <View className="me-2">
@@ -1097,7 +1099,7 @@ export function ChatShell({
                   isStreaming || speechStatus === 'requesting_permission'
                 }
                 className="h-[52px] w-[52px] rounded-input bg-surface-elevated items-center justify-center me-2"
-                accessibilityLabel="Enable voice message"
+                accessibilityLabel={t('session.chatShell.a11yEnableVoice')}
                 accessibilityRole="button"
               >
                 <Ionicons
@@ -1119,7 +1121,7 @@ export function ChatShell({
                   : 'bg-surface-elevated'
               }`}
               testID="send-button"
-              accessibilityLabel="Send message"
+              accessibilityLabel={t('session.chatShell.a11ySendMessage')}
               accessibilityRole="button"
             >
               <Ionicons

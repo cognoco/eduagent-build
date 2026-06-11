@@ -158,7 +158,7 @@ export class SessionErrorBoundary extends Component<
             }}
             testID="session-error-boundary-go-home"
             accessibilityRole="button"
-            accessibilityLabel="Go Home"
+            accessibilityLabel={i18next.t('common.goHome')}
           >
             <Text
               style={{
