@@ -200,9 +200,13 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   **WI-639/640/641** (2 WPs + 1 Item, `Stage=Backlog`, order 1–3).
 - **Activated 2026-06-11** — third run of the §2.1 recipe, activated the same
   evening its gate fired; both charter open questions resolved/mooted by the
-  gate event. **Shepherd session SPAWNED 2026-06-11 (night)** — first task:
-  join the shared reviewer watcher (add workstream to the config array), then
-  refine WI-639 to Ready.
+  gate event. **Shepherd SPAWNED 2026-06-11 (night)**, autonomous mandate;
+  reviewer-watcher coverage verified on arrival.
+- **Execution state:** **first unit CLOSED 2026-06-11 late night — `WI-641`
+  (mobile-classification)**, full loop autonomous → the shared review watcher
+  is now validated on all three workstreams. `WI-639` (catch-hygiene) in
+  Reviewing; `WI-640` (typed-errors) Executing. Live state: Cosmo +
+  `_wip/errors-api/execution-tracker.md`.
 - **Activate-when:** — (active)
 
 ---

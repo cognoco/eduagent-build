@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>G4 FIRED — the IF rewrite is BUILT</b> (all waves W0–W4 closed; only the point-of-no-return tail remains, operator-gated) · PRG-12 (first WP closed: WI-622) · PRG-15 (2 units executing) · <b>PRG-10 + PRG-13 gates now open</b> (attention-budget calls) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>G4 FIRED — the IF rewrite is BUILT</b>; tail reseed (WI-585) executing, <b>G5 next</b> · PRG-12 (first WP closed: WI-622) · PRG-15 (<b>first unit closed: WI-641</b>; 639 in review, 640 building) · <b>PRG-10 + PRG-13 gates open</b> (attention-budget calls) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
 </div>
 
 <nav>
@@ -711,9 +711,9 @@ const INIT = [
   owner:"Agent-sweep; typed-error work reviewed", gate:"ACTIVATED 06-11 — shepherd LIVE (joining the shared reviewer watcher, then WI-639 to Ready).",
   outcome:"No silent failures in money/auth/consent paths; errors classified once, at the boundary; 8 findings closed.",
   bundles:[
-    {n:"WI-639 · Catch-block hygiene", s:"4 findings", m:"agent", st:"go", note:"P1 — silent recovery in billing/consent/webhook code is a banned pattern, incl. a GDPR-adjacent rollback swallow."},
-    {n:"WI-640 · Typed errors & misclassification", s:"3 findings", m:"mixed", st:"go", note:"Touches the JWKS auth path — reviewed."},
-    {n:"WI-641 · Mobile error classification", s:"1 finding · 6 screens", m:"agent", st:"go", note:"Envelope contract final (WI-581 closed)."}
+    {n:"WI-639 · Catch-block hygiene", s:"4 findings", m:"agent", st:"go", note:"P1 — in review. Silent recovery in billing/consent/webhook code is a banned pattern."},
+    {n:"WI-640 · Typed errors & misclassification", s:"3 findings", m:"mixed", st:"go", note:"Executing. Touches the JWKS auth path — reviewed before merge."},
+    {n:"WI-641 · Mobile error classification", s:"1 finding · 6 screens", m:"agent", st:"done", note:"CLOSED 06-11 — first PRG-15 unit through the full autonomous loop."}
   ],
   homes:["_wip/errors-api/execution-tracker.md (THE entry point)","Cosmo Workstream: API Error Handling","L-gap-delta.md (per-finding)"]},
 
