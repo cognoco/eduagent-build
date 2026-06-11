@@ -161,6 +161,13 @@ watching **Identity Foundation + L10n & A11y Mobile**, trigger `Stage=Reviewing`
 review outputs named `<WI>.<ws-slug>.<ts>.*` under `/tmp/cosmo-watch/reviews/`.
 WI-621 and WI-622 bridged (briefs in page bodies; provenance children WI-633/634
 and WI-635/636; Sub-item set) and refined to `Stage=Ready`, `Execution Path=Assisted`.
+**PAUSE 2026-06-11 16:50 CEST — executor token-limit window; resets 17:40.** Both
+executors died mid-stride (WI-621-c mid-sweep uncommitted; WI-626 annotation fix
+staged uncommitted, PR #959 at `210569ee6` awaiting final round). Shepherd cron
+8463ff8d fires 17:42 to resume both via SendMessage (fallback: fresh executors with
+resume context). If THIS session is dead instead: re-brief fresh executors from the
+amendments file; worktree states above are the pickup points.
+
 **Operator go received 2026-06-11 (full autonomous mandate for the whole workstream;
 hold only for genuine judgment-unresolvable issues, conservatively).** WI-621 +
 WI-622 dispatched in parallel and claimed (`wi621-executor` / `wi622-executor`,
