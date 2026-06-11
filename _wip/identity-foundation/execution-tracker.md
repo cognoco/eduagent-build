@@ -157,8 +157,8 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-577 | WP-W3-pii-event-payloads | minor-PII out of event payloads (F-073/083/084/095) | WP | P1 | WI-571, WI-574 | **in-progress** — executor dispatched 2026-06-11 (`wi577-executor`) |
 | WI-578 | WP-W3-pii-step-state | minor-PII out of memoized step returns (F-075/085/086/087/088/089) | WP | P2 | WI-571, WI-574 | **ready (dispatch held)** — deps met; held until WI-577 merges (shared Inngest-function surface, conflict risk) |
-| WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **in-progress (round pushed)** — PR #902 head 4619ade06, CI re-running: GC6 deferral block in commit message, both considers folded, mobile flake evidenced foreign (API-only diff, test passes locally on branch) |
-| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **in-progress (PR open)** — PR #900 (head 24d28dcdf, CI running): adult-owner-only name gating, two-layer fail-closed, red-green break tests, zero eval-snapshot drift. Eval-hook gate-gap it exposed captured as WI-619 |
+| WI-579 | WP-W3-pii-error-logging | minor-PII out of logs + Sentry (F-018/074/140) | WP | P2 | WI-571, WI-574 | **merged** — PR #902 merged 2026-06-11 (e6cb6170; round 2 green, APPROVED, flake did not recur). Children WI-608/609 pre-swept with Fixed In 4619ade06; executor firing `complete` |
+| WI-580 | IT-W3-pii-llm-provider | child name out of LLM-provider prompts (F-076) | Item | P3 | WI-571, WI-574 | **in-progress (round 3)** — PR #900: round 2 made the gate boundary-year-conservative (Codex P1); round 3 moves `isUnambiguouslyAdult` into `@eduagent/schemas` (shared-contract rule) + fixes PR description. Eval-hook gate-gap captured as WI-619 (hit twice) |
 | WI-581 | WP-W3-envelope-router | envelope/router integrity fail-closed (F-025/131/136/137/141; regression-ACs F-133, F-019/020/092) | WP | P1 | WI-571, WI-574, **WI-576** | **in-progress** — executor dispatched 2026-06-11 (`wi581-executor`) immediately on WI-576's merge |
 | WI-582 | WP-W3-entitlement-isolation | entitlement/credit isolation (F-134, F-135) | WP | P2 | WI-574 | **in-progress (fix round)** — PR #903 CI green but review wants the fail-closed assertion pinned (test must assert getCustomerInfo NOT called after terminal sync failure) + 1 consider; executor on one round |
 
@@ -166,7 +166,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
-| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **in-progress (rework 2, round 2 pushed)** — Codex P1 validated (no per-subscription serialization existed) and fixed: `SELECT … FOR UPDATE` lock helpers wired into BOTH tier-change paths (incl. the #876 RevenueCat sibling), driver effectiveness confirmed (neon-serverless WebSocket), concurrency race test added. Head 7bde68edd, CI running. WI-618 captured from the sweep. CODEOWNERS approval still needed at merge |
+| WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **merged** — PR #897 merged 2026-06-11 (e6e2af75e; plain merge — the code-owner review requirement was lifted from branch protection, no admin bypass). FOR UPDATE serialization both paths + race test landed; children WI-614/615 Fixed In aligned to 7bde68edd; executor firing `complete`. WI-618 captured from the sweep |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer (PR #874). First WI through the full loop with zero human touches |
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)

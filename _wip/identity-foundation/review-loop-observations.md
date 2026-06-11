@@ -203,6 +203,19 @@ productionization implication.
   not a rework bounce. *Production:* the merge gate needs a flake/unrelated-
   failure lane distinct from "fix your PR".
 
+- **2026-06-11 — the blocked-on-human loop was resolved by POLICY change, not
+  by a workflow lane.** Sometime after the WI-583 admin-merge ruling, the
+  `require_code_owner_reviews` requirement disappeared from branch protection
+  (`required_pull_request_reviews` now empty) — PR #897, touching the same
+  billing paths as #876, merged plain with zero approvals. The agent-loop
+  friction got fixed by lowering the human gate rather than by giving the loop
+  a human-merge lane. Defensible pre-launch (the operator IS the code owner
+  and rules per-PR anyway), but it means CODEOWNERS now only *requests*
+  review again. *Production:* decide deliberately which gates are
+  human-mandatory and give the orchestration a first-class lane for them —
+  otherwise the pressure of an autonomous loop will erode the gates one
+  inconvenience at a time.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no
