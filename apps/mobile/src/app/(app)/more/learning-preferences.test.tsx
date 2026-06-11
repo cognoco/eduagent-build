@@ -149,7 +149,9 @@ describe('LearningPreferencesScreen', () => {
 
     // F-163 regression: child mode must show the CHILD's accommodation, not the
     // parent's. Parent has 'short-burst', child has 'none' — the row label must
-    // NOT show 'Short-Burst'.
+    // show 'None' (child) and NOT 'Short-Burst' (parent).
+    // Wait for 'None' to appear so the assertion runs after the child query
+    // settles, not while responses are still pending.
     it("shows the child's accommodation mode, not the parent's (F-163)", async () => {
       active = renderScreen(<LearningPreferencesScreen />, {
         profile: activeProfile,
@@ -157,9 +159,8 @@ describe('LearningPreferencesScreen', () => {
         routes: childModeRoutes('none', 'short-burst'),
       });
 
-      // Wait for async query to resolve, then assert the parent's mode is absent.
-      // The row falls back to the 'view and manage' label when mode is 'none'.
-      await active.result.findByTestId('accommodation-link');
+      // findByText waits for the child query to resolve and render 'None'.
+      await active.result.findByText('None');
       expect(active.result.queryByText('Short-Burst')).toBeNull();
     });
   });
