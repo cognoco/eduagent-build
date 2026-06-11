@@ -1206,7 +1206,7 @@
       "addFirstNote": "+ このブックの最初のノートを追加",
       "backToSubject": "科目に戻る →"
     },
-    "notStartedCount": "{{count}} / {{total}} 未開始",
+    "notStartedCount": "{{notStarted}} / {{total}} 未開始",
     "chooseTopic": "トピックを選択",
     "provenanceFrom": "{{name}}より",
     "recentlyAdded": "最近追加された項目",

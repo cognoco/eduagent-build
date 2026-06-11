@@ -1206,7 +1206,7 @@
       "addFirstNote": "+ Legg til ditt første notat for denne boken",
       "backToSubject": "Tilbake til emne →"
     },
-    "notStartedCount": "{{count}} / {{total}} ikke startet",
+    "notStartedCount": "{{notStarted}} / {{total}} ikke startet",
     "chooseTopic": "Velg et tema",
     "provenanceFrom": "Fra {{name}}",
     "recentlyAdded": "Nylig lagt til",

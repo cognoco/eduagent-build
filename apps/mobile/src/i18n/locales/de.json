@@ -1206,7 +1206,7 @@
       "addFirstNote": "+ Füge deine erste Notiz für dieses Buch hinzu",
       "backToSubject": "Zurück zum Thema →"
     },
-    "notStartedCount": "{{count}} / {{total}} nicht begonnen",
+    "notStartedCount": "{{notStarted}} / {{total}} nicht begonnen",
     "chooseTopic": "Wähle ein Thema",
     "provenanceFrom": "Von {{name}}",
     "recentlyAdded": "Kürzlich hinzugefügt",

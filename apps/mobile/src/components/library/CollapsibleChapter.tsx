@@ -58,7 +58,7 @@ export function CollapsibleChapter({
             </Text>
             <Text className="text-caption text-text-secondary">
               {t('library.notStartedCount', {
-                count: topics.length,
+                notStarted: topics.length,
                 total: totalTopicCount,
               })}
             </Text>

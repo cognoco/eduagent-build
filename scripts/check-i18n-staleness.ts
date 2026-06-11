@@ -37,7 +37,7 @@ function discoverTargetLanguages(): string[] {
 // check is supposed to do.
 export function assertExpectedLocalesPresent(
   discovered: string[],
-  expected: readonly string[] = EXPECTED_TARGET_LANGUAGES
+  expected: readonly string[] = EXPECTED_TARGET_LANGUAGES,
 ): { ok: true } | { ok: false; missing: string[] } {
   const discoveredSet = new Set(discovered);
   const missing = expected.filter((lang) => !discoveredSet.has(lang));
@@ -45,6 +45,10 @@ export function assertExpectedLocalesPresent(
 }
 
 type NestedStrings = { [k: string]: string | NestedStrings };
+
+// CLDR plural categories — used to recognize locale-specific plural
+// variants (e.g. Polish `_few`/`_many`) that have no English counterpart.
+const PLURAL_SUFFIXES = ['zero', 'one', 'two', 'few', 'many', 'other'] as const;
 
 interface StalenessError {
   lang: string;
@@ -77,7 +81,7 @@ function extractVariables(str: string): string[] {
 
 export function checkStaleness(
   source: NestedStrings,
-  targets: Record<string, NestedStrings>
+  targets: Record<string, NestedStrings>,
 ): StalenessResult {
   const sourceFlat = flattenKeys(source);
   const errors: StalenessError[] = [];
@@ -114,6 +118,19 @@ export function checkStaleness(
 
     for (const key of Object.keys(targetFlat)) {
       if (!(key in sourceFlat)) {
+        // Locale-specific CLDR plural-category variants are NOT orphans.
+        // English only has `one`/`other`, but languages like Polish require
+        // `few`/`many` — those forms exist only in the target locale, keyed
+        // off the same plural family. A target key with a plural-category
+        // suffix is legitimate when the English source carries the same
+        // base key with any plural suffix.
+        const pluralMatch = /^(.*)_(zero|one|two|few|many|other)$/.exec(key);
+        if (
+          pluralMatch &&
+          PLURAL_SUFFIXES.some((s) => `${pluralMatch[1]}_${s}` in sourceFlat)
+        ) {
+          continue;
+        }
         errors.push({ lang, type: 'orphaned_key', key });
       }
     }
@@ -145,14 +162,14 @@ function main(): void {
         presence.missing.map((l) => `  - ${l}.json`).join('\n') +
         '\n\nExpected target languages are pinned in scripts/check-i18n-staleness.ts ' +
         '(must mirror scripts/translate.ts → TARGET_LANGUAGES).\n' +
-        'Run `pnpm translate` and commit the result.'
+        'Run `pnpm translate` and commit the result.',
     );
     process.exit(1);
   }
 
   if (targetLanguages.length === 0) {
     console.log(
-      'No target locales present (en-only); staleness check is a no-op.'
+      'No target locales present (en-only); staleness check is a no-op.',
     );
     return;
   }
@@ -180,12 +197,12 @@ function main(): void {
         break;
       case 'missing_variable':
         console.error(
-          `  [${err.lang}] Missing variable ${err.variable} in: ${err.key}`
+          `  [${err.lang}] Missing variable ${err.variable} in: ${err.key}`,
         );
         break;
       case 'extra_variable':
         console.error(
-          `  [${err.lang}] Extra variable ${err.variable} not in source: ${err.key}`
+          `  [${err.lang}] Extra variable ${err.variable} not in source: ${err.key}`,
         );
         break;
     }

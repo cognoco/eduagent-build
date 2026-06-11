@@ -230,8 +230,18 @@ export function selectGeminiDiffKeys(args: {
   const sourceFlat = flattenKeys(args.source);
   const targetFlat = flattenKeys(args.target);
   const baseline = normalizeSourceBaseline(args.baseline);
+  // CLDR plural categories: target locales may legitimately carry plural
+  // variants the English source does not (e.g. Polish `_few`/`_many` next to
+  // en's `_one`/`_other`). Those are hand-maintained — never prune them when
+  // the English source still has the same plural family.
+  const PLURAL_SUFFIXES = ['zero', 'one', 'two', 'few', 'many', 'other'];
+  const isLocalePluralVariant = (key: string): boolean => {
+    const m = /^(.*)_(zero|one|two|few|many|other)$/.exec(key);
+    if (!m) return false;
+    return PLURAL_SUFFIXES.some((sfx) => `${m[1]}_${sfx}` in sourceFlat);
+  };
   const removedKeys = Object.keys(targetFlat).filter(
-    (key) => !(key in sourceFlat),
+    (key) => !(key in sourceFlat) && !isLocalePluralVariant(key),
   );
 
   if (args.full) {

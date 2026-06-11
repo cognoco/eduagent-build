@@ -1206,7 +1206,7 @@
       "addFirstNote": "+ Añade tu primera nota para este libro",
       "backToSubject": "Volver al tema →"
     },
-    "notStartedCount": "{{count}} / {{total}} sin empezar",
+    "notStartedCount": "{{notStarted}} / {{total}} sin empezar",
     "chooseTopic": "Elige un tema",
     "provenanceFrom": "De {{name}}",
     "recentlyAdded": "Añadido recientemente",

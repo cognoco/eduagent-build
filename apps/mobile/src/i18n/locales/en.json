@@ -1292,7 +1292,7 @@
       "addFirstNote": "+ Add your first note for this book",
       "backToSubject": "Back to subject →"
     },
-    "notStartedCount": "{{count}} / {{total}} not started",
+    "notStartedCount": "{{notStarted}} / {{total}} not started",
     "chooseTopic": "Choose a topic",
     "provenanceFrom": "From {{name}}",
     "recentlyAdded": "Recently added",
