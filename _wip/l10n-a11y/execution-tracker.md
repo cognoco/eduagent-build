@@ -134,8 +134,8 @@ overlapping component files — keep adjacent/serial).
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-621 WP-L12-jsx-strings | ready |
-| 2 | WI-622 WP-L12-sr-announcements | ready |
+| 1 | WI-621 WP-L12-jsx-strings | in-progress (claimed wi621-executor 2026-06-11; Phase-2 sizing checkpoint pending) |
+| 2 | WI-622 WP-L12-sr-announcements | in-progress (claimed wi622-executor 2026-06-11) |
 | 3 | WI-623 WP-L12-modal-focus-roles | backlog |
 | 4 | WI-624 WP-L12-label-prop-strings | backlog |
 | 5 | WI-625 WP-L12-pluralization | backlog |
@@ -161,8 +161,14 @@ watching **Identity Foundation + L10n & A11y Mobile**, trigger `Stage=Reviewing`
 review outputs named `<WI>.<ws-slug>.<ts>.*` under `/tmp/cosmo-watch/reviews/`.
 WI-621 and WI-622 bridged (briefs in page bodies; provenance children WI-633/634
 and WI-635/636; Sub-item set) and refined to `Stage=Ready`, `Execution Path=Assisted`.
-Nothing claimed. Next: operator go on first pickup (proposed: WI-621 first, WI-622
-in parallel — disjoint surfaces), then dispatch first executor.
+**Operator go received 2026-06-11 (full autonomous mandate for the whole workstream;
+hold only for genuine judgment-unresolvable issues, conservatively).** WI-621 +
+WI-622 dispatched in parallel and claimed (`wi621-executor` / `wi622-executor`,
+Stage=Executing). Executor briefs generate from
+`_wip/l10n-a11y/executor-amendments.md` (living checklist — IF amendments inherited
++ PRG-12 i18n/a11y domain rules). Stage monitor armed on this workstream (90s,
+shepherd-owned); review watcher already multi-workstream. WI-621 has a mandatory
+Phase-2 sizing checkpoint before mass edits (sub-slice ruling is the shepherd's).
 
 **Restart context (if this session dies):** the watcher survives (detached); check it
 with `ps -eo pid,command | rg review-watcher` + the heartbeat log above — never start
