@@ -38,6 +38,20 @@ export function resolveAgeBracket(birthYear: number): AgeBracket {
 }
 
 /**
+ * WI-580 (F-076, PR #900 Codex P1): conservative adult check for minor-PII
+ * egress decisions. Year-difference age is ambiguous at the boundary — a
+ * profile with `birthYear === currentYear - 18` may still be 17 if their
+ * birthday has not passed this year. Minor PII is fail-closed, so the
+ * boundary year is treated as minor: only `birthYear < currentYear - 18` is
+ * unambiguously 18+. Deliberately NOT `computeAgeBracket`/`isAdultOwner` —
+ * their calendar-year semantics serve tone/voice and other call sites with
+ * different stakes and are not changed here.
+ */
+export function isUnambiguouslyAdult(birthYear: number): boolean {
+  return birthYear < new Date().getFullYear() - 18;
+}
+
+/**
  * Four-tier age-voice mapping driven directly by `birthYear`. Tiers:
  *   age < 14 → EARLY_TEEN_VOICE
  *   age < 18 → TEEN_VOICE
@@ -514,11 +528,13 @@ export function buildSystemPrompt(
   // WI-580 (F-076): defense-in-depth at the egress surface — a minor's real
   // name must never be interpolated into a provider-bound prompt, regardless
   // of what a caller placed in `context.learnerName`. The construction site
-  // (resolvePromptLearnerName in session-exchange.ts) is the primary gate;
-  // this layer holds even if a future caller bypasses it. Ownership is not
-  // visible here, so this guard gates on age alone.
+  // (resolvePromptLearnerName in session-exchange.ts) is the primary gate —
+  // it also checks ownership; this layer holds even if a future caller
+  // bypasses it. `isOwner` is deliberately not part of ExchangeContext (the
+  // builder is profile-role-unaware), so this guard gates on age alone,
+  // conservatively: the ambiguous birth-year boundary is treated as minor.
   const safeLearnerName =
-    context.learnerName && resolveAgeBracket(context.birthYear) === 'adult'
+    context.learnerName && isUnambiguouslyAdult(context.birthYear)
       ? sanitizeXmlValue(context.learnerName, 64)
       : '';
   const safeTopicTitle = context.topicTitle

@@ -1077,6 +1077,16 @@ describe('resolvePromptLearnerName', () => {
     ).toBeUndefined();
   });
 
+  it('[F-076 / PR #900 Codex P1] treats the birth-year boundary as minor (owner born currentYear - 18 may still be 17)', () => {
+    expect(
+      resolvePromptLearnerName({
+        isOwner: true,
+        birthYear: currentYear - 18,
+        displayName: 'Zuzana',
+      }),
+    ).toBeUndefined();
+  });
+
   it('[F-076] returns undefined for an adult-aged non-owner (fail-closed on ownership)', () => {
     expect(
       resolvePromptLearnerName({

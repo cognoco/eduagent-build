@@ -37,8 +37,8 @@ import {
   classifyOrphanError,
   challengeRoundSessionStateSchema,
   extractedInterviewSignalsSchema,
-  isAdultOwner,
 } from '@eduagent/schemas';
+import { isUnambiguouslyAdult } from '../exchange-prompts';
 import { persistUserMessageOnly } from './persist-user-message-only';
 import {
   processExchange,
@@ -1324,19 +1324,24 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
 
 /**
  * WI-580 (F-076): a minor's real name must never be sent to a third-party
- * LLM provider. Only a verified adult owner's display name enters the prompt
- * context; every other profile — child on a parent account, under-18 owner,
- * parent-proxy child, unknown birth year — gets no name. Fail-closed via the
- * canonical `isAdultOwner` gate (`@eduagent/schemas`). The prompt builder
- * already omits the learner-name section when the name is absent, and the
- * ANTI-FABRICATION block forbids the model from inventing one.
+ * LLM provider. Only an unambiguously-adult owner's display name enters the
+ * prompt context; every other profile — child on a parent account, under-18
+ * owner, parent-proxy child, unknown birth year — gets no name. Fail-closed
+ * on ownership AND age, including the birth-year boundary (PR #900 Codex P1):
+ * `birthYear === currentYear - 18` may still be 17, so it is treated as
+ * minor via `isUnambiguouslyAdult`. The prompt builder already omits the
+ * learner-name section when the name is absent, and the ANTI-FABRICATION
+ * block forbids the model from inventing one.
  */
 export function resolvePromptLearnerName(profile: {
   isOwner?: boolean | null;
   birthYear?: number | null;
   displayName?: string | null;
 }): string | undefined {
-  return isAdultOwner(profile) ? (profile.displayName ?? undefined) : undefined;
+  if (profile.isOwner !== true) return undefined;
+  if (profile.birthYear == null) return undefined;
+  if (!isUnambiguouslyAdult(profile.birthYear)) return undefined;
+  return profile.displayName ?? undefined;
 }
 
 export async function prepareExchangeContext(

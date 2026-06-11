@@ -776,6 +776,19 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain("The learner's name is");
   });
 
+  it('[F-076 break test / PR #900 Codex P1] drops the name at the birth-year boundary (may still be 17)', () => {
+    // Conservative gate: birthYear === currentYear - 18 is ambiguous (the
+    // learner may not have had their 18th birthday yet) and is treated as
+    // minor — fail-closed for minor-PII egress.
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      birthYear: currentYear - 18,
+      learnerName: 'Emma',
+    });
+    expect(prompt).not.toContain('Emma');
+    expect(prompt).not.toContain("The learner's name is");
+  });
+
   it('omits learner name section when not provided', () => {
     const prompt = buildSystemPrompt(baseContext);
     expect(prompt).not.toContain("The learner's name is");

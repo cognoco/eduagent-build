@@ -171,6 +171,23 @@ describeIfDb('prepareExchangeContext WI-580 minor-name egress (F-076)', () => {
     expect(prompt).not.toContain(sentinel);
   });
 
+  it('[F-076 break test / PR #900 Codex P1] an owner at the birth-year boundary (currentYear - 18, may still be 17) sends no real name', async () => {
+    const sentinel = `Matylda-${RUN_ID}`;
+    const seeded = await seedLearner(db, {
+      displayName: sentinel,
+      // Ambiguous boundary: 17 or 18 depending on whether the birthday has
+      // passed — must be treated as minor (fail-closed).
+      birthYear: currentYear - 18,
+      isOwner: true,
+    });
+
+    const prep = await prepare(db, seeded.profileId, seeded.sessionId);
+
+    expect(prep.context.learnerName).toBeUndefined();
+    const prompt = buildSystemPrompt(prep.context);
+    expect(prompt).not.toContain(sentinel);
+  });
+
   it('an adult owner keeps name personalization (consented, audit-accepted)', async () => {
     const sentinel = `Astrid-${RUN_ID}`;
     const seeded = await seedLearner(db, {
