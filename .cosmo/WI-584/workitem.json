@@ -1,0 +1,17 @@
+{
+  "pageId": "37b8bce9-1f7c-8185-8b65-dabab50833a1",
+  "id": "WI-584",
+  "name": "IT-W4-l10n-accommodation: view-self fallback so a child never sees a parent's accommodation",
+  "description": "W4 (solo Item) — add a view-self fallback so a child does not see a parent's accommodation copy (F-163, MMT-ADR-0008). Rides the guardian-authority model established in WP-W1-authority-graph. The single in-scope finding from the l10n-a11y-mobile workstream (the other 34 rows are out-of-scope, O §2).",
+  "acceptanceCriteria": "A child profile never renders a parent's accommodation copy. Findings: F-163. Source of truth: _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 IT-W4-l10n-accommodation (commit 23d0c01ad)",
+  "riskImpact": "XS / tiny.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
