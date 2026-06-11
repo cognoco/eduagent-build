@@ -155,6 +155,26 @@ productionization implication.
   executor's recall; (b) a reviewer finding that names a code location should
   flow into the next executor brief verbatim — the relay worked, keep it.
 
+- **2026-06-11 — the reviewer side keeps its own mirror log** —
+  `review-loop-reviewer-observations.md` (same directory, written by the
+  reviewer session; discovered untracked in the shared tree). Read both
+  together: the two sides independently converged on the same #1 defect (WP
+  child closure has no single owner — reviewer bounces conservatively when
+  children are open) and the same hold-visibility gap. Reviewer-side detail
+  worth noting: their watcher v2 polls at 60s, de-dupes by transition key
+  (not item id — which is why rework cycles re-trigger correctly), and
+  launches `codex exec` review agents directly; their open questions #7/#9
+  pair with this file's #5 and the hold observation.
+- **2026-06-11 — LOOP IMPROVEMENT ADOPTED (shepherd side): children swept at
+  merge time.** Since the reviewer's DoD demands WP children Closed with the
+  parent's Fixed In *before* parent review, and `/cosmo:execute complete`
+  doesn't do it, every remaining WP would bounce once by construction. New
+  standing shepherd step: immediately after merging a WP's PR (and before or
+  while the executor fires `complete`), the shepherd closes the WP's
+  provenance children (Stage=Closed, Resolution=Done, Fixed In = landed
+  commit). Applies to WI-576/577/578/579/581/582/585/586. The real fix
+  remains: fold the sweep into `complete` itself.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no

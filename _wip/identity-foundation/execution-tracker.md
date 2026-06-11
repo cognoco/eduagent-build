@@ -209,8 +209,15 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
   Reviewing items autonomously; the shepherd reacts to Closed (sweep-check
   children, update tracker, dispatch unblocked work) and to rework bounces
   (re-engage the executor). If this session dies, restart the monitor.
-  WI-574 merged (#875) and at Reviewing. After 575/576 land → W3 dispatches
-  (577/578/579/580/582 on 574; 581 also needs 576).
+- **STANDING SHEPHERD STEP (adopted 2026-06-11): sweep WP children at merge
+  time.** The reviewer's DoD requires WP provenance children Closed/Done with
+  the parent's Fixed In BEFORE parent review; `complete` doesn't do it, so an
+  unswept WP bounces by construction (proven on WI-575 and WI-583).
+  Immediately after merging a WP's PR: PATCH its provenance children to
+  Stage=Closed, Resolution=Done, Fixed In = landed head commit URL. Applies
+  to WI-576 (children WI-602/603), WI-577 (604/605), WI-578 (606/607),
+  WI-579 (608/609), WI-581 (610/611), WI-582 (612/613), and the tail WPs.
+  The reviewer keeps its own meta-log: `review-loop-reviewer-observations.md`.
 - **W3 + W4 fully pre-bridged 2026-06-11** — WI-577…584 all Ready+Assisted
   (children WI-604…615). **W4 dispatched immediately** (deps Closed):
   wi583-executor + wi584-executor running parallel to WI-574 — three concurrent
