@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-15 SLICE COMPLETE</b> (all 3 units closed, same night as activation — graduation candidate) · IF tail reseed (WI-585) executing, <b>G5 next</b> · PRG-12 rolling (WI-622 closed) · <b>PRG-10 + PRG-13 gates open</b> · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>IF tail scope finding</b> — the app cutover was hidden in WI-586; executor plan-stop caught it pre-code; <b>split ruling with operator</b> · PRG-15 slice complete (graduation candidate) · PRG-12 rolling · PRG-10 + PRG-13 gates open · 1 ruling on Zuzka's desk (WI-587).</span>
 </div>
 
 <nav>
@@ -603,7 +603,7 @@ const QUEUE = [
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"ALL WAVES CLOSED (W0–W4, 36 units) — G2+G3+G4 fired. Only the clean-cut tail remains: the point of no return, operator-gated.",
+  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired) — BUT the app still runs on legacy tables: the cutover was hidden inside WI-586's scope. Executor plan-stop caught it; split ruling with operator.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
@@ -612,7 +612,7 @@ const INIT = [
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
     {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"done", note:"All six CLOSED 06-11 — fired G4 (and the envelope-router boundary event for PRG-15)."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
-    {n:"Clean-cut tail · re-seed, delete legacy", s:"2 units", m:"human", st:"go", note:"WI-585 → WI-586, Ready, fully ungated. The point of no return — operator-gated dispatch; fires G5."}
+    {n:"Clean-cut tail · cutover + drop", s:"2 units → likely 4", m:"human", st:"go", note:"WI-585 first reseed CLOSED; WI-586 plan-stop found the full app cutover hiding in 'drop' scope (~80 files). Split ruling with operator: CUT-A (additive) → CUT-B (reader cutover, legacy live) → shrunk drop. Fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
 

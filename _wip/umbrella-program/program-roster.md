@@ -69,16 +69,21 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **W0 done (2026-06-10):** all 11 patch-now defects shipped — `WI-549`/`WI-550`
   Closed/Done (PRs #817/#818) and `WI-551` Closed/Done (`c5c9b39bb`). Baseline
   reset `WI-569` executed + PR #845 merged (Reviewing).
-- **Execution state (Cosmo-verified 2026-06-11 late night):** **ALL WAVES
-  CLOSED — W0 + W1 + W2 + W3 + W4** (every unit WI-549…584 Closed/Done;
-  `WI-578` pii-step-state closed last). **Gates G2, G3, and G4 ("W2/W3
-  landed") have ALL FIRED.** Boundary event "W3 envelope-router landed" fired
-  earlier same day (`WI-581`). Only the **clean-cut tail** remains:
-  `WI-585` (reseed) → `WI-586` (drop-legacy), both Ready, strictly serial,
-  now fully ungated (W2∧W3∧W4 ✅) — landing them fires **G5** and closes the
-  Initiative. The tail is the point of no return (live-data migration +
-  legacy deletion) — operator/shepherd seam, not auto-dispatched. Live
-  state: Cosmo + `execution-tracker.md` §5; this is a pointer.
+- **Execution state (2026-06-12, post WI-586 plan-phase stop):** **ALL WAVES
+  CLOSED — W0–W4** (every unit WI-549…584 Closed/Done); gates **G2 + G3 + G4
+  FIRED**. Caveat discovered at the tail: the waves built the new model +
+  spine + guards, but **the app still runs on the legacy tables** (the W1
+  policy-engine spine is a fail-closed scaffold, zero DB reads) — the
+  application **cutover** was hidden inside WI-586's "S-sized" drop scope
+  (~80 runtime files, 22 Inngest functions, both payment webhooks, 57 FKs).
+  `WI-585` (first reseed) Closed; `WI-586` executor performed the **mandatory
+  plan-phase STOP** (claim held, zero code) and escalated — **scope ruling
+  with the operator** (recommended: split into WP-CUT-A additive model
+  completion → WP-CUT-B domain-wise reader cutover, legacy frozen-but-live →
+  WI-586 shrunk back to final convergent reseed + verified irreversible drop,
+  Neon PITR marker as recovery). **G5 ("tail done") = unchanged as the
+  exported boundary node, later in time.** Live state: Cosmo +
+  `execution-tracker.md` §5; this is a pointer.
 - **Activate-when:** — (active)
 
 ### PRG-02 · Harness Hygiene — `graduated` (2026-06-11)
