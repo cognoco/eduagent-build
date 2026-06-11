@@ -21,6 +21,9 @@ import {
   type SubscriptionRow,
 } from './types';
 import { reconcileQuotaStateForSubscription } from './quota-reconcile';
+import { reattributeTopUpCreditsOnModelChange } from './tier';
+import { safeSend } from '../safe-non-core';
+import { inngest } from '../../inngest/client';
 
 const logger = createLogger();
 import { getSubscriptionByAccountId } from './subscription-core';
@@ -126,7 +129,18 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
   },
   _quota: RevenuecatQuotaUpdate,
 ): Promise<AppliedSubscriptionRow | null> {
-  return db.transaction(async (tx) => {
+  // [F-124] Read the previous tier before the transaction so we can detect a
+  // quota-model change and re-attribute top-up credits inside the transaction.
+  // Uses the scoped repo (reads by accountId, owner-restricted) — safe because
+  // the caller (RevenueCat webhook handler) already validated accountId.
+  const repo = createAccountRepository(db, accountId);
+  const existing = await repo.subscriptions.findFirst();
+  const previousTier = existing?.tier;
+
+  let reattributedCount = 0;
+  const now = new Date();
+
+  const result = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
     const updated = await applySubscriptionUpdateFromRevenuecat(
       txDb,
@@ -136,10 +150,45 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
 
     if (updated && updated.webhookApplied !== false) {
       await reconcileQuotaStateForSubscription(txDb, updated.id);
+
+      // [F-124] Re-attribute top-up credits when the quota model changes.
+      // Only fires when the webhook actually changed the tier.
+      if (previousTier && updates.tier && previousTier !== updates.tier) {
+        reattributedCount = await reattributeTopUpCreditsOnModelChange(
+          txDb,
+          updated.id,
+          accountId,
+          previousTier,
+          updates.tier,
+        );
+      }
     }
 
     return updated;
   });
+
+  // Emit queryable metric if credits were re-attributed (silent-recovery-banned rule).
+  if (reattributedCount > 0 && previousTier && updates.tier) {
+    await safeSend(
+      () =>
+        inngest.send({
+          // orphan-allow: structured telemetry required by CLAUDE.md
+          // ("silent recovery in billing must emit a structured metric").
+          name: 'app/billing.topup_credits.reattributed',
+          data: {
+            accountId,
+            previousTier,
+            newTier: updates.tier,
+            reattributedCount,
+            occurredAt: now.toISOString(),
+          },
+        }),
+      'billing.topup_credits.reattributed.revenuecat',
+      { accountId, reattributedCount },
+    );
+  }
+
+  return result;
 }
 
 async function applySubscriptionUpdateFromRevenuecat(

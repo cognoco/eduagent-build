@@ -80,7 +80,12 @@ export type {
   UpgradePromptReason,
   UpgradePrompt,
 } from './tier';
-export { handleTierChange, getUpgradePrompt, getTopUpPriceCents } from './tier';
+export {
+  handleTierChange,
+  getUpgradePrompt,
+  getTopUpPriceCents,
+  reattributeTopUpCreditsOnModelChange,
+} from './tier';
 
 // Time-zone helpers (per-account day-window resolution)
 export { getTimeZoneOffsetMs, getStartOfTodayInTimeZone } from './timezone';

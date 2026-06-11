@@ -46,6 +46,78 @@ export interface UpgradePrompt {
 }
 
 // ---------------------------------------------------------------------------
+// reattributeTopUpCreditsOnModelChange
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-attributes active top-up credits when the quota model changes tier.
+ *
+ * Must be called INSIDE an open transaction (`tx`).
+ * Returns the number of credit rows re-attributed (0 if no model change).
+ *
+ * This function is also called from the RevenueCat webhook tier-change path
+ * (`updateSubscriptionAndQuotaFromRevenuecatWebhook`) so that credits are
+ * re-attributed regardless of which path triggered the tier change.
+ *
+ * See [F-124] comment block in `handleTierChange` for the full rationale.
+ */
+export async function reattributeTopUpCreditsOnModelChange(
+  tx: Database,
+  subscriptionId: string,
+  accountId: string,
+  previousTier: SubscriptionTier,
+  newTier: SubscriptionTier,
+): Promise<number> {
+  const oldModel = getTierConfig(previousTier).quotaModel;
+  const newModel = getTierConfig(newTier).quotaModel;
+
+  if (oldModel === newModel) return 0;
+
+  if (newModel === 'per-profile') {
+    // shared-pool → per-profile: re-attribute null credits to the owner profile.
+    const owner = await tx.query.profiles.findFirst({
+      where: and(eq(profiles.accountId, accountId), eq(profiles.isOwner, true)),
+      columns: { id: true },
+    });
+
+    if (!owner) {
+      logger.warn(
+        '[billing.tier] shared-pool→per-profile: no owner profile found; top-up credits left with profileId=null',
+        { subscriptionId, newTier, metric: 'billing_tier_topup_no_owner' },
+      );
+      return 0;
+    }
+
+    const updated = await tx
+      .update(topUpCredits)
+      .set({ profileId: owner.id })
+      .where(
+        and(
+          eq(topUpCredits.subscriptionId, subscriptionId),
+          isNull(topUpCredits.profileId),
+          sql`${topUpCredits.remaining} > 0`,
+        ),
+      )
+      .returning({ id: topUpCredits.id });
+    return updated.length;
+  }
+
+  // per-profile → shared-pool: re-attribute owner-profile credits to null.
+  const updated = await tx
+    .update(topUpCredits)
+    .set({ profileId: null })
+    .where(
+      and(
+        eq(topUpCredits.subscriptionId, subscriptionId),
+        isNotNull(topUpCredits.profileId),
+        sql`${topUpCredits.remaining} > 0`,
+      ),
+    )
+    .returning({ id: topUpCredits.id });
+  return updated.length;
+}
+
+// ---------------------------------------------------------------------------
 // handleTierChange
 // ---------------------------------------------------------------------------
 
@@ -92,45 +164,11 @@ export async function handleTierChange(
   // where the quota pool reflects the new tier while subscriptions.tier lags.
   const now = new Date();
 
-  // [F-124] Detect quota-model change so top-up credits are re-attributed
-  // before the new model's metering path tries to consume them.
-  //
-  // Why: purchaseTopUpCredits sets profileId=owner.id on per-profile tiers
-  // (plus) and profileId=null on shared-pool tiers (family/pro).
-  // consumeOwnerTopUpCredit (per-profile path) filters by eq(profileId, owner.id)
-  // — so shared-pool credits (profileId=null) become invisible after an upgrade
-  // to per-profile. decrementPoolQuota (shared-pool path) has no profileId
-  // filter, but the existing per-profile credits (profileId=owner.id) that were
-  // previously invisible are now findable — HOWEVER those credits were purchased
-  // under per-profile semantics and the profileId IS set to the owner, so they
-  // ARE visible to the shared-pool path. Wait — this means:
-  //   - per-profile → shared-pool: credits with profileId=owner.id are VISIBLE
-  //     to decrementPoolQuota (no profileId filter) but their profileId is set.
-  //     The shared-pool path (decrementPoolQuota) queries by subscriptionId only,
-  //     so it WILL find them. They would work. BUT for the reverse case:
-  //   - shared-pool → per-profile: credits with profileId=null are NOT found by
-  //     consumeOwnerTopUpCredit which adds eq(topUpCredits.profileId, profileId).
-  //     profileId=null rows fail the eq() test. STRANDED.
-  //
-  // Fix: re-attribute active (remaining>0) credits to match the new model:
-  //   - shared-pool → per-profile: SET profileId = owner.id (makes them
-  //     findable by consumeOwnerTopUpCredit)
-  //   - per-profile → shared-pool: SET profileId = NULL (canonical shared-pool
-  //     form; decrementPoolQuota already finds them, but normalizing to null
-  //     is the correct canonical form so future per-profile readers don't see
-  //     orphaned per-profile credits after the model change)
-  //
-  // Only active credits (remaining > 0) are re-attributed; spent rows stay
-  // as-is (they are historical records, not functional state).
-  //
-  // The re-attribution happens INSIDE the same transaction so the model change
-  // and credit re-attribution are atomic. safeSend emits a queryable metric
-  // if any rows are moved (silent-recovery-banned rule).
-  const oldQuotaModel = getTierConfig(sub.tier).quotaModel;
-  const newQuotaModel = newConfig.quotaModel;
-  const modelChanged = oldQuotaModel !== newQuotaModel;
-
+  // [F-124] Re-attribute top-up credits inside the transaction so the model
+  // change and credit re-attribution are atomic.
+  // See `reattributeTopUpCreditsOnModelChange` for the full rationale.
   let reattributedCount = 0;
+  const previousTierForMetric = sub.tier;
 
   await db.transaction(async (tx) => {
     await tx
@@ -148,64 +186,21 @@ export async function handleTierChange(
       { resetExpiredSharedPoolUsage: false },
     );
 
-    if (modelChanged) {
-      if (newQuotaModel === 'per-profile') {
-        // shared-pool → per-profile: re-attribute null credits to the owner profile.
-        // Find the owner for this subscription's account.
-        // `sub` is guaranteed non-null at this point (early return above).
-        const owner = await tx.query.profiles.findFirst({
-          where: and(
-            eq(profiles.accountId, sub.accountId),
-            eq(profiles.isOwner, true),
-          ),
-          columns: { id: true },
-        });
-
-        if (owner) {
-          const updated = await tx
-            .update(topUpCredits)
-            .set({ profileId: owner.id })
-            .where(
-              and(
-                eq(topUpCredits.subscriptionId, subscriptionId),
-                isNull(topUpCredits.profileId),
-                sql`${topUpCredits.remaining} > 0`,
-              ),
-            )
-            .returning({ id: topUpCredits.id });
-          reattributedCount = updated.length;
-        } else {
-          // No owner profile yet — credits stay null; log so ops can see this.
-          // This is an edge-case (account in transition); it is not a silent
-          // failure because the metric below fires on reattributedCount == 0
-          // only when modelChanged is true.
-          logger.warn(
-            '[billing.tier] shared-pool→per-profile: no owner profile found; top-up credits left with profileId=null',
-            { subscriptionId, newTier, metric: 'billing_tier_topup_no_owner' },
-          );
-        }
-      } else {
-        // per-profile → shared-pool: re-attribute owner-profile credits to null.
-        const updated = await tx
-          .update(topUpCredits)
-          .set({ profileId: null })
-          .where(
-            and(
-              eq(topUpCredits.subscriptionId, subscriptionId),
-              isNotNull(topUpCredits.profileId),
-              sql`${topUpCredits.remaining} > 0`,
-            ),
-          )
-          .returning({ id: topUpCredits.id });
-        reattributedCount = updated.length;
-      }
-    }
+    reattributedCount = await reattributeTopUpCreditsOnModelChange(
+      tx as unknown as Database,
+      subscriptionId,
+      sub.accountId,
+      previousTierForMetric,
+      newTier,
+    );
   });
 
   // Emit a queryable metric whenever credits are re-attributed so ops can
   // measure how often this path fires (silent-recovery-banned rule).
   // Uses safeSend — a dispatch failure must never break the tier change.
-  if (modelChanged && reattributedCount > 0) {
+  if (reattributedCount > 0) {
+    const oldModel = getTierConfig(previousTierForMetric).quotaModel;
+    const newModel = newConfig.quotaModel;
     await safeSend(
       () =>
         inngest.send({
@@ -216,10 +211,10 @@ export async function handleTierChange(
           name: 'app/billing.topup_credits.reattributed',
           data: {
             subscriptionId,
-            previousTier: sub.tier,
+            previousTier: previousTierForMetric,
             newTier,
-            previousModel: oldQuotaModel,
-            newModel: newQuotaModel,
+            previousModel: oldModel,
+            newModel,
             reattributedCount,
             occurredAt: now.toISOString(),
           },
