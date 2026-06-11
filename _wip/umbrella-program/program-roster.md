@@ -202,11 +202,12 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   evening its gate fired; both charter open questions resolved/mooted by the
   gate event. **Shepherd SPAWNED 2026-06-11 (night)**, autonomous mandate;
   reviewer-watcher coverage verified on arrival.
-- **Execution state:** **first unit CLOSED 2026-06-11 late night — `WI-641`
-  (mobile-classification)**, full loop autonomous → the shared review watcher
-  is now validated on all three workstreams. `WI-639` (catch-hygiene) in
-  Reviewing; `WI-640` (typed-errors) Executing. Live state: Cosmo +
-  `_wip/errors-api/execution-tracker.md`.
+- **Execution state:** **SLICE COMPLETE 2026-06-11 (same night as activation)
+  — all 3 units Closed/Done** (`WI-639` catch-hygiene, `WI-640` typed-errors,
+  `WI-641` mobile-classification), every close via the autonomous review loop.
+  The 8 findings' outcome bar is met pending the shepherd's final tracker
+  checkpoint. **GRADUATION CANDIDATE — awaiting operator ruling.** Live state:
+  Cosmo + `_wip/errors-api/execution-tracker.md`.
 - **Activate-when:** — (active)
 
 ---

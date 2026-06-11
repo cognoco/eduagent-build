@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>G4 FIRED — the IF rewrite is BUILT</b>; tail reseed (WI-585) executing, <b>G5 next</b> · PRG-12 (first WP closed: WI-622) · PRG-15 (<b>first unit closed: WI-641</b>; 639 in review, 640 building) · <b>PRG-10 + PRG-13 gates open</b> (attention-budget calls) · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>PRG-15 SLICE COMPLETE</b> (all 3 units closed, same night as activation — graduation candidate) · IF tail reseed (WI-585) executing, <b>G5 next</b> · PRG-12 rolling (WI-622 closed) · <b>PRG-10 + PRG-13 gates open</b> · <b>1 ruling on Zuzka's desk</b> (WI-587).</span>
 </div>
 
 <nav>
@@ -706,13 +706,13 @@ const INIT = [
   ],
   homes:["activation-planning.md §2 PRG-13 (charter)","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-15", name:"Error handling", accent:"var(--teal)", lane:"now", status:"active", q:"#5",
-  tagline:"Silent catch blocks in billing & consent code, errors misclassified into wrong status codes. High value per finding.",
-  owner:"Agent-sweep; typed-error work reviewed", gate:"ACTIVATED 06-11 — shepherd LIVE (joining the shared reviewer watcher, then WI-639 to Ready).",
+{ id:"PRG-15", name:"Error handling", accent:"var(--green)", lane:"now", status:"slice complete", q:"#5",
+  tagline:"Silent catch blocks in billing & consent code, errors misclassified into wrong status codes. Activated and DELIVERED in one night.",
+  owner:"Agent-sweep; typed-error work reviewed", gate:"ALL 3 UNITS CLOSED 06-11 (same night as activation) — graduation candidate, awaiting operator ruling.",
   outcome:"No silent failures in money/auth/consent paths; errors classified once, at the boundary; 8 findings closed.",
   bundles:[
-    {n:"WI-639 · Catch-block hygiene", s:"4 findings", m:"agent", st:"go", note:"P1 — in review. Silent recovery in billing/consent/webhook code is a banned pattern."},
-    {n:"WI-640 · Typed errors & misclassification", s:"3 findings", m:"mixed", st:"go", note:"Executing. Touches the JWKS auth path — reviewed before merge."},
+    {n:"WI-639 · Catch-block hygiene", s:"4 findings", m:"agent", st:"done", note:"CLOSED 06-11 — banned silent-recovery patterns in billing/consent/webhook fixed."},
+    {n:"WI-640 · Typed errors & misclassification", s:"3 findings", m:"mixed", st:"done", note:"CLOSED 06-11 — incl. the JWKS malformed-response fix."},
     {n:"WI-641 · Mobile error classification", s:"1 finding · 6 screens", m:"agent", st:"done", note:"CLOSED 06-11 — first PRG-15 unit through the full autonomous loop."}
   ],
   homes:["_wip/errors-api/execution-tracker.md (THE entry point)","Cosmo Workstream: API Error Handling","L-gap-delta.md (per-finding)"]},
