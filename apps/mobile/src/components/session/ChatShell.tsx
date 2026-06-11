@@ -685,17 +685,19 @@ export function ChatShell({
       style={{ flexShrink: 1, maxWidth: '70%' }}
       testID="chat-shell-header-actions"
     >
-      <VoiceToggle
-        isVoiceEnabled={isVoiceEnabled}
-        onToggle={() =>
-          void handleSelectInputMode(isVoiceEnabled ? 'text' : 'voice')
-        }
-      />
+      {!isWebDormant && (
+        <VoiceToggle
+          isVoiceEnabled={isVoiceEnabled}
+          onToggle={() =>
+            void handleSelectInputMode(isVoiceEnabled ? 'text' : 'voice')
+          }
+        />
+      )}
       {rightAction}
     </View>
   );
   const showVoicePlaybackControls =
-    isVoiceEnabled && !inputDisabled && !screenReaderEnabled;
+    isVoiceEnabled && !inputDisabled && !screenReaderEnabled && !isWebDormant;
   const showComposerToolbar = showVoicePlaybackControls || !!composerAccessory;
 
   return (
