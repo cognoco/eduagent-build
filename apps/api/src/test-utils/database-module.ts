@@ -29,6 +29,20 @@ export function createDatabaseModuleMock<TDb extends MockDatabaseRecord>(
   const createDatabase = jest.fn().mockReturnValue(db);
   const closeDatabase = jest.fn().mockResolvedValue(undefined);
 
+  // [F-078] When the mock DB is used, withProfileScope must be overridden to
+  // skip the UUID validation (test profiles use non-UUID ids like 'test-profile-id')
+  // and to call fn(db) directly — the mock db.transaction handles the pass-through.
+  // The actual RLS GUC behavior is tested in the integration suite (rls.integration.test.ts).
+  const withProfileScope = jest
+    .fn()
+    .mockImplementation(
+      async <T>(
+        _db: unknown,
+        _profileId: string,
+        fn: (tx: unknown) => Promise<T>,
+      ) => fn(db),
+    );
+
   return {
     db,
     createDatabase,
@@ -39,6 +53,7 @@ export function createDatabaseModuleMock<TDb extends MockDatabaseRecord>(
         : {}),
       createDatabase,
       closeDatabase,
+      withProfileScope,
       ...(options.exports ?? {}),
     },
   };

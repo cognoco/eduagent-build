@@ -215,7 +215,7 @@ export async function previewCurriculumTopic(
     // [BUG-109] Silent `catch {}` swallowed every parse/transport error.
     // Replace with structured warn so support can query how often the
     // preview LLM call fails per "Silent recovery without escalation is
-    // banned" (CLAUDE.md).
+    // banned" (AGENTS.md).
     logger.warn('curriculum.preview_topic.failed', {
       subjectName: sanitizeXmlValue(subjectName, 120),
       rawTitle: sanitizeXmlValue(trimmedTitle, 120),

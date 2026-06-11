@@ -87,7 +87,13 @@ export function NudgeActionSheet({
               : null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      accessibilityViewIsModal
+    >
       <View className="flex-1 justify-end bg-black/40">
         <View className="bg-surface rounded-t-3xl px-5 pt-5 pb-8">
           <View className="flex-row items-center justify-between mb-3">
@@ -128,7 +134,11 @@ export function NudgeActionSheet({
                     {t(`nudge.templates.${template}`)}
                   </Text>
                   {isPending ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.primary}
+                      accessibilityLabel={t('common.loading')}
+                    />
                   ) : (
                     <Ionicons
                       name="send-outline"

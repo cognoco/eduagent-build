@@ -339,7 +339,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
     // older schema (renamed roles, missing fields). A strict .parse() here
     // would 500 on any drift; safeParse + per-entry filtering keeps the
     // endpoint serving the rest of the assessment and surfaces drift via
-    // logs instead. Same pattern recommended in CLAUDE.md > Code Quality
+    // logs instead. Same pattern recommended in AGENTS.md > Code Quality
     // Guards (classify before formatting / fail-loud-but-don't-crash).
     const parsed = getAssessmentResponseSchema.safeParse({ assessment });
     if (parsed.success) {

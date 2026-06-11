@@ -484,6 +484,26 @@ jest.mock(
   },
 );
 
+// Push delivery is the external boundary; struggle pushes are sent inside
+// the analyze-learner-profile step (minor-PII discipline), so the spy lets
+// tests assert delivery without topics riding memoized step state.
+const mockSendStruggleNotification = jest
+  .fn()
+  .mockResolvedValue({ sent: true });
+jest.mock(
+  '../../services/notifications' /* gc1-allow: internal module mocked to stub sendStruggleNotification — its Expo push transport cannot run in the unit env; requireActual keeps every other export real */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendStruggleNotification: (...args: unknown[]) =>
+        mockSendStruggleNotification(...args),
+    };
+  },
+);
+
 import { sessionCompleted, embedNewFactsForProfile } from './session-completed';
 import { createDatabase } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
@@ -563,7 +583,10 @@ describe('sessionCompleted', () => {
       memoryCollectionEnabled: false,
     });
     mockAnalyzeSessionTranscript.mockResolvedValue(null);
-    mockApplyAnalysis.mockResolvedValue(undefined);
+    mockApplyAnalysis.mockResolvedValue({
+      fieldsUpdated: [],
+      notifications: [],
+    });
   });
 
   afterEach(() => {
@@ -589,7 +612,7 @@ describe('sessionCompleted', () => {
     );
   });
 
-  // [BUG-146] Per CLAUDE.md "Inngest" rule, every receiver-style function
+  // [BUG-146] Per AGENTS.md "Inngest" rule, every receiver-style function
   // must declare a concurrency cap so a flurry of events cannot stampede
   // the LLM provider and Neon connection pool. session-completed runs
   // heavy LLM work (analyze, insights, recap, summary) plus Voyage
@@ -2209,7 +2232,7 @@ describe('sessionCompleted', () => {
   // [FIX-INNGEST-1] Critical vs soft step break tests
   // Proves that runCritical steps throw (Inngest retries) while runIsolated
   // steps absorb errors (pipeline continues). These tests are the "break tests"
-  // required by CLAUDE.md for every security/correctness fix.
+  // required by AGENTS.md for every security/correctness fix.
   // ---------------------------------------------------------------------------
 
   describe('[FIX-INNGEST-1] critical step break tests', () => {
@@ -2531,5 +2554,97 @@ describe('embedNewFactsForProfile embed failure observability [CR-2026-05-19-M1]
     );
     // safeSend must NOT fire for unexpected failure classes
     expect(mockSafeSend).not.toHaveBeenCalled();
+  });
+});
+
+// Memoized step returns are persisted in Inngest's third-party state store;
+// struggle notifications (each carrying a minor's struggle topic) must be
+// sent at the source and never round-trip through step state.
+describe('memoized step-state PII break test [F-089]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (createDatabase as jest.Mock).mockReturnValue(mockSessionCompletedDb);
+    process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+    mockGetLearningProfile.mockResolvedValue({
+      memoryConsentStatus: 'granted',
+      memoryCollectionEnabled: true,
+    });
+    mockAnalyzeSessionTranscript.mockResolvedValue({
+      explanationEffectiveness: null,
+      interests: null,
+      strengths: null,
+      struggles: [{ topic: 'long division', subject: 'maths' }],
+      resolvedTopics: null,
+      communicationNotes: null,
+      engagementLevel: null,
+      confidence: 'high',
+    });
+    mockApplyAnalysis.mockResolvedValue({
+      fieldsUpdated: ['struggles'],
+      notifications: [
+        { type: 'struggle_noticed', topic: 'long division', subject: 'maths' },
+      ],
+    });
+  });
+
+  afterEach(() => {
+    delete process.env['DATABASE_URL'];
+  });
+
+  it('sends struggle notifications inside the analyze step and never memoizes topics', async () => {
+    const { result, mockStep } = (await executeSteps(
+      createEventData({ qualityRating: 4 }),
+    )) as {
+      result: { outcomes: Array<{ step: string; status: string }> };
+      mockStep: { run: jest.Mock };
+    };
+
+    // Delivery still happens (rehydration-free: sent at the source).
+    expect(mockSendStruggleNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      expect.objectContaining({
+        type: 'struggle_noticed',
+        topic: 'long division',
+      }),
+    );
+
+    // No memoized step return carries the struggle topic.
+    const memoized = await Promise.all(
+      mockStep.run.mock.results.map((r) => r.value as Promise<unknown>),
+    );
+    expect(JSON.stringify(memoized)).not.toContain('long division');
+
+    // The notify outcome survives for soft-failure observability.
+    expect(result.outcomes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ step: 'notify-struggle', status: 'ok' }),
+      ]),
+    );
+    // Function-level run output is persisted too.
+    expect(JSON.stringify(result)).not.toContain('long division');
+  });
+
+  it('a push failure marks the notify-struggle outcome failed without failing the analysis', async () => {
+    mockSendStruggleNotification.mockRejectedValueOnce(
+      new Error('push provider down'),
+    );
+
+    const { result } = (await executeSteps(
+      createEventData({ qualityRating: 4 }),
+    )) as {
+      result: { outcomes: Array<{ step: string; status: string }> };
+    };
+
+    expect(result.outcomes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          step: 'analyze-learner-profile',
+          status: 'ok',
+        }),
+        expect.objectContaining({ step: 'notify-struggle', status: 'failed' }),
+      ]),
+    );
+    expect(JSON.stringify(result)).not.toContain('long division');
   });
 });

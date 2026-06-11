@@ -17,6 +17,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import type { SessionTranscriptExchange } from '@eduagent/schemas';
 import { useSessionTranscript } from '../../hooks/use-sessions';
 import { goBackOrReplace } from '../../lib/navigation';
@@ -43,6 +44,7 @@ function isVisibleExchange(e: SessionTranscriptExchange): boolean {
 }
 
 export default function SessionTranscriptScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -73,7 +75,10 @@ export default function SessionTranscriptScreen() {
         className="flex-1 bg-background items-center justify-center"
         testID="session-transcript-auth-loading"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -88,10 +93,10 @@ export default function SessionTranscriptScreen() {
         testID="session-transcript-no-id"
       >
         <Text className="text-h3 font-semibold text-text-primary mb-2 text-center">
-          Missing session
+          {t('sessionTranscript.missingSessionTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          We couldn&apos;t tell which conversation to load.
+          {t('sessionTranscript.missingSessionMessage')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/library')}
@@ -100,7 +105,7 @@ export default function SessionTranscriptScreen() {
           accessibilityLabel="Back to library"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Back to library
+            {t('sessionTranscript.backToLibrary')}
           </Text>
         </Pressable>
       </View>
@@ -111,7 +116,7 @@ export default function SessionTranscriptScreen() {
   // user can sit forever on a spinner when the network is slow or the server
   // is down. TimeoutLoader spins for 15s then flips to ErrorFallback with
   // Retry + Back to library — matching the session-summary pattern and the
-  // standard error fallback rule in CLAUDE.md > UX Resilience Rules.
+  // standard error fallback rule in AGENTS.md > UX Resilience Rules.
   if (transcript.isLoading) {
     return (
       <TimeoutLoader
@@ -197,10 +202,10 @@ export default function SessionTranscriptScreen() {
         testID="session-transcript-empty"
       >
         <Text className="text-h3 font-semibold text-text-primary mb-2 text-center">
-          No messages yet
+          {t('sessionTranscript.emptyTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          This session doesn&apos;t have any saved exchanges to show.
+          {t('sessionTranscript.emptyMessage')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/library')}
@@ -209,7 +214,7 @@ export default function SessionTranscriptScreen() {
           accessibilityLabel="Back to library"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Back to library
+            {t('sessionTranscript.backToLibrary')}
           </Text>
         </Pressable>
       </View>
@@ -235,11 +240,12 @@ export default function SessionTranscriptScreen() {
         </Pressable>
         <View className="flex-1">
           <Text className="text-body font-semibold text-text-primary">
-            Conversation
+            {t('sessionTranscript.conversation')}
           </Text>
           <Text className="text-caption text-text-secondary">
-            {visibleExchanges.length}{' '}
-            {visibleExchanges.length === 1 ? 'message' : 'messages'}
+            {t('sessionTranscript.messageCount', {
+              count: visibleExchanges.length,
+            })}
           </Text>
         </View>
       </View>
@@ -269,7 +275,7 @@ export default function SessionTranscriptScreen() {
                       : 'text-text-secondary'
                   }`}
                 >
-                  {isUser ? 'You' : 'MentoMate'}
+                  {isUser ? t('sessionTranscript.you') : 'MentoMate'}
                   {' · '}
                   {formatTimestamp(exchange.timestamp)}
                 </Text>

@@ -112,6 +112,7 @@ export function CollapsibleMemorySection({
   children: ReactNode;
   defaultExpanded?: boolean;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
@@ -127,7 +128,7 @@ export function CollapsibleMemorySection({
           {title}
         </Text>
         <Text className="text-caption font-semibold text-primary">
-          {expanded ? 'Hide' : 'Show'}
+          {expanded ? t('common.hide') : t('common.show')}
         </Text>
       </Pressable>
       {expanded ? children : null}

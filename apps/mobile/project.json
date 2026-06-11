@@ -1,0 +1,17 @@
+{
+  "name": "@eduagent/mobile",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "typecheck": {
+      "//": "WI-451 (D5): mirror of nx.json targetDefaults.typecheck.outputs. mobile is fully-inferred (no project.json) so the targetDefaults override does not apply to it — this explicit project-level override drops .tsbuildinfo from cached outputs (TS6305 root cause). Other targets stay plugin-inferred.",
+      "outputs": [
+        "{projectRoot}/**/*.d.ts",
+        "{projectRoot}/**/*.d.cts",
+        "{projectRoot}/**/*.d.mts",
+        "{projectRoot}/**/*.d.ts.map",
+        "{projectRoot}/**/*.d.cts.map",
+        "{projectRoot}/**/*.d.mts.map"
+      ]
+    }
+  }
+}

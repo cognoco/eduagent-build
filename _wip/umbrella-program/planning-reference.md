@@ -230,10 +230,11 @@ the same change-set as the event they record.
   PRG-20 (estate-canon drain) only.
 - **Routing rule (current):** audit-finding-class → its `Defer-to-workstream`
   label in `docs/audit/2026-05-29-full-audit/L-gap-delta.md` → that PRG row ·
-  harness/pipeline-class → PRG-02 (tail) · memory/doctrine/instruction-surface
-  → PRG-03 · product/learning canon → PRG-20 / PRG-21 per glossary bucket ·
-  top-down/delivery-layer tooling → PRG-04 · fits nothing → unrouted-intake
-  line on the roster.
+  harness/pipeline-class → the HH residue triage (operator branch session,
+  2026-06-11; re-bind here when its dispositions land — PRG-02 graduated) ·
+  memory/doctrine/instruction-surface → PRG-03 · product/learning canon →
+  PRG-20 / PRG-21 per glossary bucket · top-down/delivery-layer tooling →
+  PRG-04 · fits nothing → unrouted-intake line on the roster.
 - **Satellite register:** `L-gap-delta.md` (per-finding home; WPs absorb, point,
   never copy).
 - **Boundary nodes (current exports):** HH → `WI-530`/`WI-533` (gates IF W1+
@@ -243,6 +244,12 @@ the same change-set as the event they record.
   top-down slice; the IF pattern (tracker + Workstream + direct-to-WP slice) is
   the activation template (§2.1). The **IF W1 shepherd** (kicked off
   2026-06-10) is the first per-Initiative shepherd session (§2.5–2.7).
+  **Second instance:** PRG-12 / l10n-a11y (activated 2026-06-11 via the §2.1
+  recipe) — tracker `_wip/l10n-a11y/execution-tracker.md`, Workstream "L10n &
+  A11y Mobile", WI-621…628; first *parallel* activation alongside a running
+  Initiative. **Third:** PRG-15 / errors-api (2026-06-11, same evening its
+  gate fired) — `_wip/errors-api/execution-tracker.md`, Workstream "API Error
+  Handling", WI-639…641; the recipe is now routine.
 - **Generated views:** `dashboard.html` ("Flight Deck") — board / gate-rail /
   field-guide over initiatives × bundles × gates, for Jorn + Zuzka. A **view,
   never a home** (it states so itself); regenerated at umbrella touches; on

@@ -222,7 +222,7 @@ export default function SessionSummaryScreen() {
 
   // [BUG-890] When the 15s recap-loading window elapses without a recap,
   // do NOT silently fall through to a manual "Tap to retry" affordance —
-  // per CLAUDE.md UX Resilience Rules and "Silent recovery without
+  // per AGENTS.md UX Resilience Rules and "Silent recovery without
   // escalation is banned", we must (a) escalate the failure to Sentry so
   // ops can see how often this fires, and (b) trigger one automatic
   // refetch attempt before the user has to discover the manual retry.
@@ -428,7 +428,7 @@ export default function SessionSummaryScreen() {
       router.replace('/(app)/library' as Href);
       InteractionManager.runAfterInteractions(() => {
         // Push full ancestor chain so back-button restores shelf context.
-        // See CLAUDE.md "Cross-tab / cross-stack router.push" rule and
+        // See AGENTS.md "Cross-tab / cross-stack router.push" rule and
         // library.tsx handleBookPress for the canonical two-push pattern.
         router.push({
           pathname: '/(app)/shelf/[subjectId]',
@@ -470,7 +470,10 @@ export default function SessionSummaryScreen() {
         className="flex-1 bg-background items-center justify-center"
         testID="session-summary-auth-loading"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -494,7 +497,7 @@ export default function SessionSummaryScreen() {
   }
 
   // [BUG-139] Classify the transcript-load error through the shared
-  // classifier, not via raw HTTP status duck-typing. Per CLAUDE.md UX
+  // classifier, not via raw HTTP status duck-typing. Per AGENTS.md UX
   // Resilience Rules, "classification happens at the API client boundary"
   // and screens must NEVER parse HTTP status codes. `classifyApiError`
   // handles both typed error classes (NotFoundError, ResourceGoneError)
@@ -509,10 +512,10 @@ export default function SessionSummaryScreen() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-3">
-          This session has expired
+          {t('sessionSummary.expiredTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          This session is no longer available. Head home to start a new one.
+          {t('sessionSummary.expiredMessage')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, summaryHomeHref)}
@@ -522,7 +525,7 @@ export default function SessionSummaryScreen() {
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Go Home
+            {t('common.goHome')}
           </Text>
         </Pressable>
       </View>
@@ -535,10 +538,10 @@ export default function SessionSummaryScreen() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-3">
-          Session not found
+          {t('sessionSummary.notFoundTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          We couldn&apos;t load this session. It may no longer exist.
+          {t('sessionSummary.notFoundMessage')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, summaryHomeHref)}
@@ -548,7 +551,7 @@ export default function SessionSummaryScreen() {
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Go Home
+            {t('common.goHome')}
           </Text>
         </Pressable>
       </View>
@@ -584,9 +587,9 @@ export default function SessionSummaryScreen() {
     }
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
         <Text className="text-text-secondary text-body text-center mt-3">
-          Loading your session summary...
+          {t('sessionSummary.loadingSummary')}
         </Text>
       </View>
     );
@@ -604,10 +607,10 @@ export default function SessionSummaryScreen() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-3">
-          Session not found
+          {t('sessionSummary.notFoundTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          This session could not be loaded. Head home to start a new one.
+          {t('sessionSummary.couldNotLoadMessage')}
         </Text>
         <Pressable
           onPress={() => router.replace(summaryHomeHref as Href)}
@@ -617,7 +620,7 @@ export default function SessionSummaryScreen() {
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Go Home
+            {t('common.goHome')}
           </Text>
         </Pressable>
       </View>
@@ -882,7 +885,7 @@ export default function SessionSummaryScreen() {
             className="text-h3 font-semibold text-text-primary ms-2"
             testID="summary-title"
           >
-            Session Complete
+            {t('sessionSummary.title')}
           </Text>
         </View>
         {subjectName ? (
@@ -917,7 +920,7 @@ export default function SessionSummaryScreen() {
           testID="session-takeaways"
         >
           <Text className="text-body font-semibold text-text-primary mb-2">
-            What happened
+            {t('sessionSummary.whatHappened')}
           </Text>
           {takeaways.map((t, i) => (
             <View key={i} className="flex-row items-start mt-1">
@@ -928,7 +931,7 @@ export default function SessionSummaryScreen() {
             </View>
           ))}
           <Text className="text-caption text-text-secondary mt-3">
-            I'll check in with you soon
+            {t('sessionSummary.checkInSoon')}
           </Text>
         </View>
 
@@ -984,7 +987,7 @@ export default function SessionSummaryScreen() {
             testID="resume-session-cta"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Resume this session
+              {t('sessionSummary.resumeSession')}
             </Text>
           </Pressable>
         ) : null}
@@ -1035,7 +1038,7 @@ export default function SessionSummaryScreen() {
               testID="view-transcript-cta"
             >
               <Text className="text-text-primary text-body font-semibold">
-                View full transcript
+                {t('sessionSummary.viewTranscript')}
               </Text>
             </Pressable>
           )
@@ -1072,7 +1075,7 @@ export default function SessionSummaryScreen() {
             testID="session-recap-timeout"
           >
             <Text className="text-body-sm text-text-secondary text-center">
-              Your learner recap is still loading.
+              {t('sessionSummary.recapStillLoading')}
             </Text>
             <Pressable
               onPress={() => {
@@ -1085,7 +1088,7 @@ export default function SessionSummaryScreen() {
               testID="session-recap-retry"
             >
               <Text className="text-body-sm font-semibold text-primary">
-                Tap to retry
+                {t('sessionSummary.tapToRetry')}
               </Text>
             </Pressable>
           </View>
@@ -1109,7 +1112,7 @@ export default function SessionSummaryScreen() {
             testID="milestone-recap"
           >
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Milestones
+              {t('sessionSummary.milestones')}
             </Text>
             {milestoneLabels.map((label) => (
               <View key={label} className="flex-row items-start mt-1">
@@ -1138,7 +1141,9 @@ export default function SessionSummaryScreen() {
             testID="session-next-topic-card"
           >
             <Text className="text-body font-semibold text-text-primary mb-1">
-              {persisted.nextTopicReason ? 'Up next' : 'You might also like'}
+              {persisted.nextTopicReason
+                ? t('sessionSummary.upNext')
+                : t('sessionSummary.youMightAlsoLike')}
             </Text>
             {persisted.nextTopicReason ? (
               <Text className="text-body-sm text-text-secondary mb-2">
@@ -1167,7 +1172,7 @@ export default function SessionSummaryScreen() {
                 testID="session-next-topic-cta"
               >
                 <Text className="text-text-inverse text-body font-semibold">
-                  Continue learning
+                  {t('sessionSummary.continueLearning')}
                 </Text>
               </Pressable>
             ) : null}
@@ -1225,8 +1230,7 @@ export default function SessionSummaryScreen() {
             testID="session-bookmark-nudge"
           >
             <Text className="text-body-sm text-text-secondary text-center">
-              Some great explanations in this session — you can bookmark them
-              next time.
+              {t('sessionSummary.bookmarkNudge')}
             </Text>
           </View>
         ) : null}
@@ -1237,15 +1241,14 @@ export default function SessionSummaryScreen() {
             testID="fast-celebrations"
           >
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Fresh wins
+              {t('sessionSummary.freshWins')}
             </Text>
             {parsedFastCelebrations.map((celebration, index) => (
               <Text
                 key={`${celebration.reason ?? 'celebration'}-${index}`}
                 className="text-body text-text-primary mt-1"
               >
-                {celebration.detail ??
-                  'A new achievement landed right after your session.'}
+                {celebration.detail ?? t('sessionSummary.newAchievement')}
               </Text>
             ))}
           </View>
@@ -1259,11 +1262,13 @@ export default function SessionSummaryScreen() {
             <Text className="text-body-sm mr-2">+</Text>
             <View className="flex-1">
               <Text className="text-body-sm font-semibold text-text-primary">
-                Write a reflection to earn 1.5x XP
+                {t('sessionSummary.reflectionIncentive')}
               </Text>
               <Text className="text-caption text-text-secondary">
-                Base: {baseXp} XP → With reflection:{' '}
-                {baseXp + (reflectionBonusXp ?? 0)} XP
+                {t('sessionSummary.xpBreakdown', {
+                  base: baseXp,
+                  total: baseXp + (reflectionBonusXp ?? 0),
+                })}
               </Text>
             </View>
           </View>
@@ -1276,7 +1281,7 @@ export default function SessionSummaryScreen() {
           >
             <Text className="text-body-sm mr-2">+</Text>
             <Text className="text-body-sm font-semibold text-reward">
-              +{reflectionBonusXp} bonus XP earned!
+              {t('sessionSummary.bonusXpEarned', { xp: reflectionBonusXp })}
             </Text>
           </View>
         ) : null}
@@ -1291,7 +1296,9 @@ export default function SessionSummaryScreen() {
                 normal choice, not a failure to flag — the prior copy
                 violated the "positive framing / no struggle" rule. */}
             <Text className="text-body-sm text-text-secondary">
-              Write a reflection next time to earn +{reflectionBonusXp} XP.
+              {t('sessionSummary.reflectionNextTime', {
+                xp: reflectionBonusXp,
+              })}
             </Text>
           </View>
         ) : null}
@@ -1303,11 +1310,10 @@ export default function SessionSummaryScreen() {
             testID="recall-bridge-questions"
           >
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Quick recall check
+              {t('sessionSummary.recallCheckTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary mb-4">
-              Nice work on that homework! Can you answer these about the method
-              you used?
+              {t('sessionSummary.recallCheckIntro')}
             </Text>
             {recallQuestions.map((question, index) => (
               <View key={index} className="mb-3">
@@ -1329,7 +1335,7 @@ export default function SessionSummaryScreen() {
               accessibilityRole="button"
             >
               <Text className="text-text-inverse text-body font-semibold">
-                Done — head home
+                {t('sessionSummary.doneHeadHome')}
               </Text>
             </Pressable>
           </View>
@@ -1344,7 +1350,7 @@ export default function SessionSummaryScreen() {
         {showSubmittedView ? (
           <View className="mb-4">
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Your Words
+              {t('sessionSummary.yourWords')}
             </Text>
             <View
               className="bg-surface rounded-card p-4"
@@ -1360,7 +1366,7 @@ export default function SessionSummaryScreen() {
                 <>
                   <View className="h-px bg-surface-elevated my-3" />
                   <Text className="text-body-sm font-semibold text-text-primary mb-1">
-                    Mate feedback
+                    {t('sessionSummary.mateFeedback')}
                   </Text>
                   <Text
                     className="text-body-sm text-text-secondary"
@@ -1375,18 +1381,18 @@ export default function SessionSummaryScreen() {
         ) : isPersistedSkipped && summaryText.length === 0 ? (
           <View className="mb-4" testID="summary-skipped-state">
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Your Words
+              {t('sessionSummary.yourWords')}
             </Text>
             <View className="bg-surface rounded-card p-4">
               <Text className="text-body text-text-secondary">
-                You skipped writing a summary for this session.
+                {t('sessionSummary.skippedNotice')}
               </Text>
             </View>
           </View>
         ) : (
           <View className="mb-4">
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Your Words
+              {t('sessionSummary.yourWords')}
             </Text>
             {isPersistedSkipped ? (
               <View
@@ -1394,14 +1400,12 @@ export default function SessionSummaryScreen() {
                 testID="summary-resubmit-banner"
               >
                 <Text className="text-body-sm text-text-secondary">
-                  You started a reflection but didn&apos;t submit it last time.
-                  Finish it below and submit to save your words.
+                  {t('sessionSummary.resumeReflectionBanner')}
                 </Text>
               </View>
             ) : null}
             <Text className="text-body-sm text-text-secondary mb-3">
-              Write a short summary of what you learned. This helps you remember
-              and helps me plan what comes next.
+              {t('sessionSummary.writePrompt')}
             </Text>
 
             {/* BUG-33 Phase 1: Sentence starter chips */}
@@ -1449,8 +1453,7 @@ export default function SessionSummaryScreen() {
                 className="text-body-sm text-danger mt-2"
                 testID="summary-error"
               >
-                Couldn't save your summary. Check your connection and try again
-                — your work won't be lost.
+                {t('sessionSummary.saveError')}
               </Text>
             )}
 
@@ -1459,8 +1462,7 @@ export default function SessionSummaryScreen() {
                 className="text-body-sm text-danger mt-2"
                 testID="skip-summary-error"
               >
-                Couldn't skip your summary right now. Check your connection and
-                try again.
+                {t('sessionSummary.skipError')}
               </Text>
             )}
 
@@ -1481,7 +1483,10 @@ export default function SessionSummaryScreen() {
               accessibilityRole="button"
             >
               {submitSummary.isPending ? (
-                <ActivityIndicator color={colors.textInverse} />
+                <ActivityIndicator
+                  color={colors.textInverse}
+                  accessibilityLabel={t('common.loading')}
+                />
               ) : (
                 <Text
                   className={`text-body font-semibold ${
@@ -1490,7 +1495,7 @@ export default function SessionSummaryScreen() {
                       : 'text-text-secondary'
                   }`}
                 >
-                  Submit Summary
+                  {t('sessionSummary.submitSummary')}
                 </Text>
               )}
             </Pressable>
@@ -1511,7 +1516,7 @@ export default function SessionSummaryScreen() {
             accessibilityRole="button"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Continue
+              {t('common.continue')}
             </Text>
           </Pressable>
         ) : (
@@ -1525,7 +1530,9 @@ export default function SessionSummaryScreen() {
             accessibilityRole="button"
           >
             <Text className="text-body-sm text-text-secondary">
-              {skipSummary.isPending ? 'Skipping...' : 'Skip for now'}
+              {skipSummary.isPending
+                ? t('sessionSummary.skipping')
+                : t('sessionSummary.skipForNow')}
             </Text>
           </Pressable>
         )}
@@ -1539,7 +1546,7 @@ export default function SessionSummaryScreen() {
           accessibilityRole="link"
         >
           <Text className="text-caption text-text-secondary">
-            See your Library
+            {t('sessionSummary.seeYourLibrary')}
           </Text>
         </Pressable>
       </ScrollView>

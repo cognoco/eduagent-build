@@ -276,3 +276,56 @@ describe('sessionCompletedWithErrorsObserve [BUG-369]', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// [F-018 / WI-579] Schema-drift paths must not leak the raw event payload —
+// logs and Sentry extras carry a shape-only summary, never event.data.
+// ---------------------------------------------------------------------------
+
+describe('[F-018 / WI-579] schema-drift paths leak no raw payload', () => {
+  const SENTINEL = 'Tommy-private-transcript-text';
+
+  it.each([
+    ['sessionSummaryGeneratedObserve', sessionSummaryGeneratedObserve],
+    ['sessionSummaryFailedObserve', sessionSummaryFailedObserve],
+    ['sessionCompletedWithErrorsObserve', sessionCompletedWithErrorsObserve],
+  ] as const)(
+    '[BREAK] %s: drift log + Sentry extras carry shape only',
+    async (_name, handler) => {
+      const result = await invoke(handler, {
+        profileId: 123, // type drift — fails every handler schema
+        transcript: SENTINEL,
+        childName: SENTINEL,
+      } as unknown as Record<string, unknown>);
+      expect(result).toEqual({ status: 'schema_error' });
+
+      // No console channel may carry the payload content.
+      const allConsole = JSON.stringify([
+        consoleLogSpy.mock.calls,
+        consoleWarnSpy.mock.calls,
+        consoleErrorSpy.mock.calls,
+      ]);
+      expect(allConsole).not.toContain(SENTINEL);
+
+      // The drift log carries the shape-only summary.
+      const entry = lastJsonLine(consoleErrorSpy);
+      expect(entry?.context).toMatchObject({
+        rawData: { payloadType: 'object', fieldCount: 3 },
+      });
+
+      // Sentry extras: summarized shape, no payload content.
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            rawData: { payloadType: 'object', fieldCount: 3 },
+          }),
+        }),
+      );
+      expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain(
+        SENTINEL,
+      );
+    },
+  );
+});

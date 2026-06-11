@@ -13,8 +13,9 @@ import {
   useResendConsent,
   useChildConsentStatus,
   useRevokeConsent,
-  useRestoreConsent,
 } from './use-consent';
+// [F-153] useRestoreConsent moved to use-restore-consent (variables-as-arg pattern)
+import { useRestoreConsent } from './use-restore-consent';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -356,8 +357,11 @@ describe('useRevokeConsent', () => {
   });
 });
 
-describe('useRestoreConsent', () => {
-  it('calls PUT /consent/:childProfileId/restore', async () => {
+// [F-153] useRestoreConsent now lives in use-restore-consent.ts and uses the
+// variables-as-arg pattern: mutate({ childProfileId }) instead of baking
+// the id at hook construction time.
+describe('useRestoreConsent (use-restore-consent.ts)', () => {
+  it('[BREAK F-153] calls PUT /consent/:childProfileId/restore with childProfileId as mutation variable', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -369,13 +373,15 @@ describe('useRestoreConsent', () => {
     );
 
     const childId = '550e8400-e29b-41d4-a716-446655440000';
-    const { result } = renderHook(() => useRestoreConsent(childId), {
+    // New signature: no argument at construction time; childProfileId is a mutation variable.
+    const { result } = renderHook(() => useRestoreConsent(), {
       wrapper: createWrapper(),
     });
 
     let data: Awaited<ReturnType<typeof result.current.mutateAsync>>;
     await act(async () => {
-      data = await result.current.mutateAsync();
+      // Variables-as-arg pattern: pass childProfileId here, not at hook call.
+      data = await result.current.mutateAsync({ childProfileId: childId });
     });
 
     expect(mockFetch).toHaveBeenCalled();

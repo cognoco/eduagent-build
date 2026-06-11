@@ -360,7 +360,10 @@ export default function AppLayout() {
   if (!isLoaded)
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   if (!isSignedIn) {
@@ -397,7 +400,10 @@ export default function AppLayout() {
         className="flex-1 bg-background items-center justify-center"
         testID="auth-redirect-replay"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -441,7 +447,10 @@ export default function AppLayout() {
         className="flex-1 bg-background items-center justify-center"
         testID="profile-loading"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -519,7 +528,10 @@ export default function AppLayout() {
         className="flex-1 bg-background items-center justify-center"
         testID="preview-state-loading"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }

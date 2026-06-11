@@ -67,6 +67,7 @@ export function ModeSwitcher(): React.ReactElement | null {
               testID="mode-switcher-study-spinner"
               size="small"
               className="me-1"
+              accessibilityLabel={t('common.loading')}
             />
           ) : null}
           <Text
@@ -103,6 +104,7 @@ export function ModeSwitcher(): React.ReactElement | null {
               testID="mode-switcher-family-spinner"
               size="small"
               className="me-1"
+              accessibilityLabel={t('common.loading')}
             />
           ) : null}
           <Text
@@ -125,24 +127,24 @@ export function ModeSwitcher(): React.ReactElement | null {
           className="flex-row items-center justify-between px-4 py-2 bg-error-soft border-t border-error/30"
         >
           <Text className="flex-1 text-body-sm text-error me-3">
-            {t('chrome.modeSwitcher.switchError')}
+            {t('modeSwitcher.switchError')}
           </Text>
           <Pressable
             testID="mode-switcher-error-retry"
             onPress={() => switchMode(switchError)}
             accessibilityRole="button"
-            accessibilityLabel={t('chrome.modeSwitcher.retry')}
+            accessibilityLabel={t('common.retry')}
             className="px-3 py-1 rounded-full bg-error"
           >
             <Text className="text-body-sm font-semibold text-on-error">
-              {t('chrome.modeSwitcher.retry')}
+              {t('common.retry')}
             </Text>
           </Pressable>
           <Pressable
             testID="mode-switcher-error-dismiss"
             onPress={dismissError}
             accessibilityRole="button"
-            accessibilityLabel={t('chrome.modeSwitcher.dismiss')}
+            accessibilityLabel={t('common.dismiss')}
             className="ms-2 px-2 py-1"
           >
             <Text className="text-body-sm text-text-secondary">✕</Text>

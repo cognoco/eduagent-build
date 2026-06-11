@@ -9,8 +9,8 @@ Playwright E2E tests live in `apps/mobile/e2e-web/` and run against the Expo web
 
 ```bash
 # macOS / Linux
-doppler run -c stg -- pnpm run test:e2e:web:smoke   # smoke (~1-2 min)
-doppler run -c stg -- pnpm run test:e2e:web          # full suite (~23 min)
+doppler run --project mentomate -c stg -- pnpm run test:e2e:web:smoke   # smoke (~1-2 min)
+doppler run --project mentomate -c stg -- pnpm run test:e2e:web          # full suite (~23 min)
 
 # Windows (MSYS)
 C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke
@@ -23,7 +23,7 @@ C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web
 
 ## Key details
 
-- Config: `apps/mobile/playwright.config.ts` — 5 projects (setup, smoke-auth, smoke-learner, smoke-parent, role-transitions, later-phases)
+- Config: `apps/mobile/playwright.config.ts` — 8 projects (see that file for the authoritative list)
 - Playwright auto-starts wrangler dev (port 8787) and Expo web export (port 19006)
 - `CLERK_TESTING_TOKEN` is vestigial — Clerk's Backend API fetches a fresh short-lived token at runtime. The Doppler stg slot can be removed (Phase 0 / P4 decision).
 - Auth setup seeds users via `POST /v1/__test/seed` (requires `TEST_SEED_SECRET` header match), then signs in via Clerk and saves `storageState` JSON for downstream tests.

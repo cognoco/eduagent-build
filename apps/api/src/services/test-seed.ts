@@ -5379,7 +5379,7 @@ export async function attachClerkTotpFactor(
     return { secret: payload.secret ?? '', disabledReason: '' };
   }
 
-  // Read body once — Response body streams are single-use (CLAUDE.md rule).
+  // Read body once — Response body streams are single-use (AGENTS.md rule).
   const body = await res.text();
 
   // 405 = Clerk environment has authenticator-app MFA disabled. The attach
@@ -5660,7 +5660,7 @@ export async function resetDatabase(
 }
 
 // ---------------------------------------------------------------------------
-// Debug query functions (extracted from route handlers per CLAUDE.md rules)
+// Debug query functions (extracted from route handlers per AGENTS.md rules)
 // ---------------------------------------------------------------------------
 
 export interface DebugAccountChain {

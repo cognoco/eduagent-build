@@ -1,8 +1,8 @@
 # AGENTS.md ↔ CLAUDE.md merge plan
 
-> **Status (2026-05-25):** ~25% complete. Only the **Profile Shapes** section has been backported from `CLAUDE.md` into `AGENTS.md`. ~14 of 15 RECOVER sections are still missing from `AGENTS.md` (safeSend, Challenge Round mastery, GC1/GC6 details, expanded PR Review protocol, etc.). `diff AGENTS.md CLAUDE.md` is **318 lines**. No `scripts/sync-agent-docs.mjs` exists (the failed prototype was rolled back as planned). **Resume here:** pick the next RECOVER section by priority order in the plan body (suggest safeSend or GC1/GC6 next — both are referenced by active workflows), backport into `AGENTS.md`, re-run `diff` to confirm convergence on that section, then loop. Choose a sync strategy (hand-maintained vs. resurrected script) only after the content merge is complete.
+> **Status (2026-06-09 — DONE via WI-386):** Completed using the **reference model** (chosen over all four sync options in the "Sync mechanism decision" section below). In one pass: all RECOVER-table content was merged into `AGENTS.md` (now the single source of truth), `CLAUDE.md` was reduced to a thin `@AGENTS.md` pointer, and every harness consumer that read `CLAUDE.md` literally (the doc-count scripts; the CI claude-review action + workflow) was repointed to `AGENTS.md`. Divergence is now structurally impossible, so no sync script exists or is needed — `scripts/sync-agent-docs.mjs` is **not** revived. The section-by-section backport-then-pick-a-sync-strategy approach this plan originally describes was superseded.
 
-**Status:** Open — follow-up from PR #412 (`worktree-rules`).
+**Status:** DONE (2026-06-09, WI-386) — reference model; superseded the original section-by-section sync approach. Originally a follow-up from PR #412 (`worktree-rules`).
 **Trigger memory:** `.claude/memory/project_agent_doc_and_memory_architecture_revisit.md`.
 
 ## Why this exists
@@ -70,6 +70,8 @@ Re-running PR #412's `scripts/sync-agent-docs.mjs` is **not** the right move —
 4. **Shape A (template blocks)** — use `<!-- claude-only -->` / `<!-- codex-only -->` markers in a single master if real per-platform divergence emerges.
 
 Recommendation: do the **content merge first** (RECOVER table above), THEN pick a sync strategy when both files are in sync and the divergence rate is known. Don't re-prototype sync without understanding what's diverging.
+
+> **Resolution (2026-06-09, WI-386).** None of options 1–4 were taken. We adopted a **fifth, simpler option — the reference model**: make `AGENTS.md` the single source and reduce `CLAUDE.md` to `@AGENTS.md` (Claude Code resolves the `@`-import; Codex reads `AGENTS.md` natively). This eliminates the sync problem entirely rather than managing it — there is no generated file, no master/replica direction, no drift to guard. The only cost was repointing the handful of harness scripts/CI steps that read `CLAUDE.md` literally over to `AGENTS.md`. This mirrors the nexus-repo decision (Ruler decommission, WI-541).
 
 ## Cross-agent memory architecture (broader question)
 

@@ -3,7 +3,7 @@ import { relative, resolve } from 'node:path';
 
 // Integration-test internal-mock guard.
 //
-// Per CLAUDE.md "No Internal Mocks in Integration Tests": integration tests
+// Per AGENTS.md "No Internal Mocks in Integration Tests": integration tests
 // must not jest.mock internal modules (database, services, middleware) — only
 // true external boundaries. The set of internal module specifiers that are
 // nonetheless treated as boundary stubs is `ALLOWED_INTERNAL_BOUNDARY_MOCKS`

@@ -117,7 +117,7 @@ export function TopicStatusRow({
   const subtitleParts = [
     chapterName,
     shouldShowSessionCount
-      ? `${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}`
+      ? t('library.sessionCount', { count: sessionCount })
       : null,
   ].filter(Boolean) as string[];
 
@@ -219,7 +219,7 @@ export function TopicStatusRow({
 
           {shouldShowSessionCount ? (
             <Text className="mt-0.5 text-caption text-text-secondary">
-              {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}
+              {t('library.sessionCount', { count: sessionCount })}
             </Text>
           ) : null}
           <TopicProvenance

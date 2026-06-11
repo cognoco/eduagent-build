@@ -1,4 +1,5 @@
 import { View, Text, Pressable, Modal, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 interface TopicOption {
@@ -22,6 +23,7 @@ export function TopicPickerSheet({
   onSelect,
   onClose,
 }: TopicPickerSheetProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   return (
@@ -31,6 +33,7 @@ export function TopicPickerSheet({
       animationType="slide"
       onRequestClose={onClose}
       testID="topic-picker-modal"
+      accessibilityViewIsModal
     >
       {/* Semi-transparent backdrop — tapping it dismisses the sheet */}
       <Pressable
@@ -51,7 +54,7 @@ export function TopicPickerSheet({
           </View>
 
           <Text className="text-h3 font-semibold text-text-primary mb-4">
-            Choose a topic
+            {t('library.chooseTopic')}
           </Text>
 
           <ScrollView

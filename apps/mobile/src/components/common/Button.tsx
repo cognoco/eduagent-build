@@ -1,4 +1,5 @@
 import { Pressable, Text, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'tertiary';
@@ -52,6 +53,7 @@ export function Button({
   loading = false,
   testID,
 }: ButtonProps): React.JSX.Element {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const isDisabled = disabled || loading;
 
@@ -68,13 +70,17 @@ export function Button({
         opacity: pressed && !isDisabled ? 0.8 : 1,
       })}
       accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: isDisabled }}
+      // SR loading state lives on the Pressable — it is the accessible element,
+      // so focusing the button while loading must surface the busy state, not
+      // the (visually hidden to SR) inner ActivityIndicator label.
+      accessibilityLabel={loading ? t('common.loading') : label}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       testID={testID}
     >
       {loading ? (
         <ActivityIndicator
           color={variant === 'primary' ? colors.textInverse : colors.primary}
+          accessibilityLabel={t('common.loading')}
         />
       ) : (
         <Text

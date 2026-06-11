@@ -21,36 +21,35 @@
 //
 // CR-PR129-M7: The detection heuristic was tightened (2026-05-01) to avoid
 // silently rewriting legitimate assistant messages that happen to contain
-// JSON-shaped text with a `reply` field as part of prose. The parsed object
-// must contain ONLY keys from the known envelope vocabulary
-// (`reply`, `signals`, `ui_hints`, `private_sources`, `confidence`). Any unrecognised key signals that the
-// JSON is arbitrary data (e.g. a teaching example), not a leaked envelope.
+// JSON-shaped text with a `reply` field as part of prose: a confirmed
+// envelope must carry `reply` PLUS at least one structural envelope sibling.
+//
+// Fail-open hardening (2026-06-11): the original heuristic ALSO required every top-level key to
+// belong to a hardcoded allowlist mirroring `llmResponseEnvelopeSchema` —
+// which failed OPEN: the moment the schema gained a new top-level field not
+// mirrored here, every leaked envelope rendered its raw internals (including
+// `private_sources`, documented as "never rendered to the learner") into the
+// chat bubble. Two changes close that:
+//   1. The sibling set is DERIVED from `llmResponseEnvelopeSchema.keyof()`
+//      so it can never drift from the schema.
+//   2. An unknown extra key no longer flips the guard open — when `reply` is
+//      a non-empty string and a structural sibling is present, we project to
+//      `.reply` (an unknown key is far more likely a future envelope field
+//      than user prose). Arbitrary JSON without an envelope sibling still
+//      passes through untouched.
 // ---------------------------------------------------------------------------
 
-/**
- * The exhaustive set of top-level keys produced by the LLM envelope schema
- * (`llmResponseEnvelopeSchema` in `@eduagent/schemas`). Any parsed object
- * whose key-set is not a strict subset of these is not an envelope.
- */
-const KNOWN_ENVELOPE_KEYS = new Set([
-  'reply',
-  'signals',
-  'ui_hints',
-  'private_sources',
-  'confidence',
-]);
+import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 
 /**
  * A confirmed envelope must contain `reply` PLUS at least one structural
- * sibling key (`signals`, `ui_hints`, `private_sources`, or `confidence`). A lone `{"reply":"x"}` object is
- * ambiguous — it could be arbitrary JSON — so it is treated as prose.
+ * sibling key from the envelope schema's own top-level vocabulary. A lone
+ * `{"reply":"x"}` object is ambiguous — it could be arbitrary JSON — so it
+ * is treated as prose. Derived from the schema so it can never drift.
  */
-const REQUIRED_ENVELOPE_SIBLINGS = new Set([
-  'signals',
-  'ui_hints',
-  'private_sources',
-  'confidence',
-]);
+const REQUIRED_ENVELOPE_SIBLINGS: ReadonlySet<string> = new Set(
+  llmResponseEnvelopeSchema.keyof().options.filter((key) => key !== 'reply'),
+);
 
 const EMBEDDED_ENVELOPE_TAIL_RE =
   /["\u201c\u201d]\s*,\s*["\u201c\u201d](?:signals|ui_hints|private_sources|confidence)["\u201c\u201d]\s*:/;
@@ -119,13 +118,11 @@ export function stripEnvelopeJson(rawContent: string): string {
     !Array.isArray(parsed) &&
     typeof (parsed as { reply?: unknown }).reply === 'string' &&
     (parsed as { reply: string }).reply.length > 0 &&
-    // CR-PR129-M7: Two-part strictness check:
-    // 1. Every key must belong to the known envelope vocabulary — any
-    //    unrecognised key means this is arbitrary JSON, not a leaked envelope.
-    // 2. At least one structural sibling (`signals` or `ui_hints`) must be
-    //    present alongside `reply`. A bare {"reply":"x"} object is ambiguous
-    //    and is returned verbatim rather than silently rewritten.
-    Object.keys(parsed as object).every((k) => KNOWN_ENVELOPE_KEYS.has(k)) &&
+    // CR-PR129-M7 + fail-open hardening: at least one schema-derived structural
+    // sibling must be present alongside `reply`. A bare {"reply":"x"} object
+    // is ambiguous and is returned verbatim rather than silently rewritten.
+    // Unknown extra keys do NOT disqualify the envelope — requiring every
+    // key to be recognised made the guard fail open on schema drift.
     Object.keys(parsed as object).some((k) => REQUIRED_ENVELOPE_SIBLINGS.has(k))
   ) {
     return stripEmbeddedEnvelopeTail((parsed as { reply: string }).reply);

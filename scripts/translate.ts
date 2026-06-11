@@ -138,7 +138,7 @@ function glossaryMatches(targetNormalised: string, expected: string): boolean {
 
 export function computeChangedKeys(
   current: NestedStrings,
-  previous: NestedStrings | null
+  previous: NestedStrings | null,
 ): string[] {
   const currentFlat = flattenKeys(current);
   if (!previous) return Object.keys(currentFlat);
@@ -164,7 +164,7 @@ export function validateTranslation(
   source: NestedStrings,
   translated: NestedStrings,
   lang: string,
-  glossary?: Record<string, Record<string, string>>
+  glossary?: Record<string, Record<string, string>>,
 ): ValidationResult {
   const sourceFlat = flattenKeys(source);
   const translatedFlat = flattenKeys(translated);
@@ -176,7 +176,7 @@ export function validateTranslation(
   // locked translation for that language.
   const glossaryEntries = glossary
     ? Object.entries(glossary).filter(
-        ([term, translations]) => term !== '_meta' && lang in translations
+        ([term, translations]) => term !== '_meta' && lang in translations,
       )
     : [];
 
@@ -191,7 +191,7 @@ export function validateTranslation(
       // (≤3 chars, e.g. brand acronym 'XP') use word-boundary regex to
       // avoid matching unrelated words. See glossaryMatches() for details.
       const targetNormalised = stripDiacritics(
-        translatedFlat[key]
+        translatedFlat[key],
       ).toLowerCase();
       if (!glossaryMatches(targetNormalised, expected)) {
         errors.push({
@@ -240,7 +240,7 @@ export function validateTranslation(
           type: 'length_exceeded',
           key,
           detail: `${translatedLen} chars is ${Math.round(
-            ratio * 100
+            ratio * 100,
           )}% of source (${sourceLen}). Max: ${LENGTH_FAIL_RATIO * 100}%`,
         });
       } else if (overWarn) {
@@ -248,7 +248,7 @@ export function validateTranslation(
           type: 'length_warning',
           key,
           detail: `${translatedLen} chars is ${Math.round(
-            ratio * 100
+            ratio * 100,
           )}% of source (${sourceLen})`,
         });
       }
@@ -257,6 +257,17 @@ export function validateTranslation(
 
   for (const key of Object.keys(translatedFlat)) {
     if (!(key in sourceFlat)) {
+      // Locale-specific CLDR plural variants (e.g. Polish _few/_many beside
+      // en's _one/_other) are legitimate, hand-maintained keys — not extras —
+      // as long as the English source carries any member of the same plural
+      // family. Mirrors isLocalePluralVariant in translate-gemini.ts.
+      const m = /^(.*)_(zero|one|two|few|many|other)$/.exec(key);
+      const isPluralFamilyVariant =
+        m !== null &&
+        ['zero', 'one', 'two', 'few', 'many', 'other'].some(
+          (sfx) => `${m[1]}_${sfx}` in sourceFlat,
+        );
+      if (isPluralFamilyVariant) continue;
       errors.push({ type: 'extra_key', key });
     }
   }
@@ -270,7 +281,7 @@ export function validateTranslation(
 
 function buildSystemPrompt(
   lang: string,
-  glossary: Record<string, Record<string, string>>
+  glossary: Record<string, Record<string, string>>,
 ): string {
   const glossaryEntries = Object.entries(glossary)
     .filter(([_, translations]) => lang in translations)
@@ -304,7 +315,7 @@ async function translateWithRetry(
   client: Anthropic,
   systemPrompt: string,
   sourceJson: string,
-  lang: string
+  lang: string,
 ): Promise<string> {
   let lastError: Error | null = null;
 
@@ -343,7 +354,7 @@ async function translateWithRetry(
         console.warn(
           `[${lang}] Attempt ${attempt + 1} failed: ${
             lastError.message
-          }. Retrying in ${delay}ms...`
+          }. Retrying in ${delay}ms...`,
         );
         await new Promise((r) => setTimeout(r, delay));
       }
@@ -351,7 +362,7 @@ async function translateWithRetry(
   }
 
   throw new Error(
-    `[${lang}] All ${MAX_RETRIES} attempts failed. Last error: ${lastError?.message}`
+    `[${lang}] All ${MAX_RETRIES} attempts failed. Last error: ${lastError?.message}`,
   );
 }
 
@@ -386,15 +397,15 @@ async function main(): Promise<void> {
   const opts = parseArgs(process.argv.slice(2));
   const languages = opts.lang
     ? [opts.lang].filter((l) =>
-        (TARGET_LANGUAGES as readonly string[]).includes(l)
+        (TARGET_LANGUAGES as readonly string[]).includes(l),
       )
     : [...TARGET_LANGUAGES];
 
   if (languages.length === 0) {
     console.error(
       `Unknown language: ${opts.lang}. Supported: ${TARGET_LANGUAGES.join(
-        ', '
-      )}`
+        ', ',
+      )}`,
     );
     process.exit(1);
   }
@@ -448,7 +459,7 @@ async function main(): Promise<void> {
         console.log(
           `[${lang}] Full translation (${
             Object.keys(flattenKeys(source)).length
-          } keys)`
+          } keys)`,
         );
       } else {
         const changedKeys = computeChangedKeys(source, previous);
@@ -476,7 +487,7 @@ async function main(): Promise<void> {
         console.log(
           `[${lang}] Dry run — would translate ${
             Object.keys(flattenKeys(toTranslate)).length
-          } keys`
+          } keys`,
         );
         succeeded.push(lang);
         return;
@@ -486,7 +497,7 @@ async function main(): Promise<void> {
         client,
         systemPrompt,
         sourceJson,
-        lang
+        lang,
       );
       let translated: NestedStrings = JSON.parse(translatedJson);
 
@@ -509,7 +520,7 @@ async function main(): Promise<void> {
         source,
         translated,
         lang,
-        glossary
+        glossary,
       );
 
       if (validation.warnings.length > 0) {
@@ -524,7 +535,7 @@ async function main(): Promise<void> {
           console.error(
             `  ${e.type}: ${e.key}${e.variable ? ` (${e.variable})` : ''}${
               e.detail ? ` — ${e.detail}` : ''
-            }`
+            }`,
           );
         }
         console.error(`[${lang}] Skipping — previous file preserved`);
@@ -553,7 +564,7 @@ async function main(): Promise<void> {
       fs.writeFileSync(
         tmpPath,
         JSON.stringify(translated, null, 2) + '\n',
-        'utf-8'
+        'utf-8',
       );
       fs.renameSync(tmpPath, targetPath);
       console.log(`[${lang}] Written to ${targetPath}`);
@@ -570,7 +581,7 @@ async function main(): Promise<void> {
   await Promise.all(tasks);
 
   console.log(
-    `\nResults: ${succeeded.length} succeeded, ${failed.length} failed`
+    `\nResults: ${succeeded.length} succeeded, ${failed.length} failed`,
   );
   if (failed.length > 0) {
     console.error(`Failed languages: ${failed.join(', ')}`);

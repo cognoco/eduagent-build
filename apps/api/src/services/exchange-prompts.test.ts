@@ -62,6 +62,9 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
         learnerName: 'Zuzana',
         pedagogyMode: 'four_strands',
         languageCode: 'it',
+        // WI-580 (F-076): the learner-name section only renders for adults —
+        // the default 14yo fixture would (correctly) drop the name.
+        birthYear: new Date().getFullYear() - 30,
       }),
     );
 

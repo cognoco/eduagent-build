@@ -978,7 +978,7 @@ describe('resolveNavigationContract snapshot surface', () => {
   });
 });
 
-describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint)', () => {
+describe('V0 fallback - hard constraint (AGENTS.md, spec section Hard Constraint)', () => {
   it('returns LEGACY_GUARDIAN_TABS (5 tabs) when both flags are off and profile is family-capable', () => {
     const contract = resolveNavigationContract(
       makeContext({

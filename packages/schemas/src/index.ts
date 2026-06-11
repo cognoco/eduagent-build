@@ -35,6 +35,7 @@ export * from './billing';
 // Filing (Conversation-First Flow)
 export * from './filing';
 export * from './inngest-events';
+export * from './pii-scrub';
 export * from './depth-evaluation';
 
 // Topic Notes

@@ -171,7 +171,7 @@ export function evaluateAssessmentFromEnvelopeSignal(
  *      still contains the full LLM envelope JSON, parse it via parseEnvelope).
  *   3. Returns null. The legacy "look for a {challengePassed: ...} JSON blob
  *      in free-text prose" path is gone — those events were already
- *      backfilled and the contract (CLAUDE.md → LLM Response Envelope) bans
+ *      backfilled and the contract (AGENTS.md → LLM Response Envelope) bans
  *      that shape.
  */
 export function parseEvaluateAssessment(
@@ -209,15 +209,17 @@ export function parseEvaluateAssessment(
       // but failed to parse — that's the meaningful failure case. A plain
       // prose reply that doesn't start with `{` is the expected post-cleanup
       // shape and shouldn't generate noise.
+      // Shape-only diagnostics — LLM output derived from a
+      // learner's session must not ship to logs/Sentry, even truncated.
       logger.warn('Failed to parse evaluate assessment via envelope', {
         reason: parsed.reason,
-        contentSnippet: normalised.content.slice(0, 200),
+        contentLength: normalised.content.length,
       });
       captureException(new Error('parseEvaluateAssessment envelope failure'), {
         extra: {
           context: 'parseEvaluateAssessment',
           reason: parsed.reason,
-          rawSlice: normalised.content.slice(0, 500),
+          responseLength: normalised.content.length,
         },
       });
     }

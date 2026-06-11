@@ -15,6 +15,11 @@ import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
 import { SafetyFilterError } from '../../errors';
 import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
+import {
+  resolveExchangeRouter,
+  NoEligibleModelError,
+  type ExchangeRouterRow,
+} from '../policy-engine';
 
 const logger = createLogger();
 
@@ -422,6 +427,77 @@ const V2_ADVANCED_MODEL_MIN_RUNG = 4;
 const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
 
 /**
+ * V2 model selection: the §1.5 matrix proposes a candidate, and the
+ * policy-engine exchange router (`resolveExchangeRouter`) makes the pick —
+ * see `pickThroughExchangeRouter` for the enforcement properties.
+ */
+function getModelConfigV2(
+  rung: EscalationRung,
+  llmTier: LLMTier,
+  capability: LlmCapability,
+): ModelConfig {
+  return pickThroughExchangeRouter(
+    getModelConfigV2Matrix(rung, llmTier, capability),
+  );
+}
+
+// The serving-region routing parameter (MMT-ADR-0014 3-param runtime key:
+// model × serviceProvider × servingRegion) has no live infrastructure input
+// yet — regions become real when the vetted `allowed_models` table lands
+// (vetting-research workstream). Until then every candidate row carries this
+// placeholder.
+const V2_SERVING_REGION_PLACEHOLDER = 'global';
+
+/**
+ * Route the V2 matrix pick through the policy-engine exchange router
+ * (`resolveExchangeRouter`, MMT-ADR-0014) — the W3 wiring obligation from the
+ * WP-W1 scaffold. Two enforcement properties:
+ *
+ * 1. Fail-closed vendor ban: a candidate whose provider is in
+ *    FALLBACK_FORBIDDEN (Gemini/Vertex — banned under-18, MMT-ADR-0016 §10.1)
+ *    is excluded from the eligibility set BEFORE the pick, so matrix drift
+ *    can never silently serve a banned vendor.
+ * 2. Error mapping: an empty eligibility set surfaces as `CircuitOpenError`,
+ *    so the existing `503 LLM_UNAVAILABLE` handlers (index.ts error handler,
+ *    routes/sessions.ts) handle the no-eligible-model case unchanged —
+ *    `NoEligibleModelError` never escapes the router layer.
+ *
+ * Today the matrix supplies exactly one candidate row, so a successful pick
+ * is the identity mapping; maxTokens/reasoningEffort live outside the 3-param
+ * routing key and are carried over from the matrix config.
+ *
+ * Exported so tests exercise the real function (no test-only wrapper);
+ * production callers are `getModelConfigV2` and any future eligibility-set
+ * builder — every new call site carries the same error-mapping obligation.
+ */
+export function pickThroughExchangeRouter(config: ModelConfig): ModelConfig {
+  const candidate: ExchangeRouterRow = {
+    model: config.model,
+    serviceProvider: config.provider,
+    servingRegion: V2_SERVING_REGION_PLACEHOLDER,
+  };
+  const eligibleRows = FALLBACK_FORBIDDEN.has(candidate.serviceProvider)
+    ? []
+    : [candidate];
+
+  try {
+    const picked = resolveExchangeRouter({ eligibleRows });
+    // The eligibility set is built from `config`, so the picked identity is
+    // sound to narrow back onto the ModelConfig provider union.
+    return {
+      ...config,
+      model: picked.model,
+      provider: picked.serviceProvider as ModelConfig['provider'],
+    };
+  } catch (err) {
+    if (err instanceof NoEligibleModelError) {
+      throw new CircuitOpenError('policy-engine', 'policy:no-eligible-model');
+    }
+    throw err;
+  }
+}
+
+/**
  * V2 primary-model matrix (MMT-ADR-0016 §1.5). Pure function of
  * (rung, tier, capability) — providerPolicy is intentionally NOT consulted:
  * the legacy `gemini_only` policy (how Family / Plus-standard / addon-standard
@@ -431,7 +507,7 @@ const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
  * `premium` llmTier upstream (`resolveExchangeLlmRouting`), so it can never
  * satisfy the `llmTier === 'premium'` gate below and always lands on gpt-oss.
  */
-function getModelConfigV2(
+function getModelConfigV2Matrix(
   rung: EscalationRung,
   llmTier: LLMTier,
   capability: LlmCapability,

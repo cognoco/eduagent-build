@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   OWN_LEARNING_RETURN_TO,
@@ -58,6 +59,7 @@ function CountPill({ value }: { value: number | undefined }) {
 }
 
 export default function MyNotesHubScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -93,10 +95,10 @@ export default function MyNotesHubScreen(): React.ReactElement {
           </Pressable>
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">
-              My Notes
+              {t('myNotes.title')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              Sessions, notes, and saved replies
+              {t('myNotes.subtitle')}
             </Text>
           </View>
         </View>

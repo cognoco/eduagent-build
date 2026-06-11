@@ -1931,7 +1931,7 @@ describe('unknown event types', () => {
   });
 
   // [BREAK BUG-834] Silent recovery without escalation is banned for billing
-  // code (CLAUDE.md). An unhandled RC event type must surface to Sentry with
+  // code (AGENTS.md). An unhandled RC event type must surface to Sentry with
   // a structured tag and the eventType/eventId so ops can detect when RC
   // ships a new event we haven't implemented. Without the default-arm
   // escalation in revenuecat-webhook.ts, this test fails — the silent 200

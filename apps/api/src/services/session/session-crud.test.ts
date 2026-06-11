@@ -1,8 +1,12 @@
 import {
   __sessionCrudTestHooks,
   buildTopicIntentMatcherMessages,
+  flagContent,
   matchTopicByIntent,
   projectAiResponseContent,
+  recordSessionEvent,
+  recordSystemPrompt,
+  runTopicIntentMatcher,
   startFirstCurriculumSession,
   stripMarkdownFence,
   SubjectInactiveError,
@@ -13,9 +17,12 @@ import {
   getSessionMetadata,
   normalizeHomeworkSummary,
 } from './session-crud';
+import * as llmModule from '../llm';
+import * as sentryModule from '../sentry';
 import {
   childSessionSchema,
   MAX_EXCHANGES_PER_SESSION,
+  NotFoundError,
 } from '@eduagent/schemas';
 import type { LearningSession } from '@eduagent/schemas';
 
@@ -110,11 +117,15 @@ describe('projectAiResponseContent', () => {
     expect(projectAiResponseContent(teaching)).toBe(teaching);
   });
 
-  it('leaves JSON-shaped content with reply key but invalid envelope alone', () => {
-    // Has `"reply"` substring but won't pass schema (`reply` must be
-    // non-empty string). Treat as opaque content — never drop it.
+  it('[WI-581/F-136] preserves JSON-shaped content with a non-string reply and no envelope sibling', () => {
+    // Has `"reply"` substring but won't pass schema (`reply` must be a
+    // non-empty string). With no side-channel key (`signals`, `ui_hints`,
+    // `private_sources`, `confidence`) this is indistinguishable from a
+    // historical JSON-shaped assistant message — pass through as prose.
+    // Content WITH a side-channel key fails closed to '' instead.
     const malformed = '{"reply": 42, "junk": true}';
     expect(projectAiResponseContent(malformed)).toBe(malformed);
+    expect(projectAiResponseContent('{"reply": 42, "signals": {}}')).toBe('');
   });
 
   it('handles leading whitespace before the envelope', () => {
@@ -987,5 +998,121 @@ describe('getSessionMetadata', () => {
   it('returns empty object for an empty object', () => {
     const meta = {};
     expect(getSessionMetadata(meta)).toBe(meta);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-022 regression: parseTopicIntentMatcherResponse exception logging
+// ---------------------------------------------------------------------------
+
+describe('runTopicIntentMatcher — malformed LLM response logging (errors-api F-022)', () => {
+  let routeAndCallSpy: jest.SpiedFunction<typeof llmModule.routeAndCall>;
+  let captureExceptionSpy: jest.SpiedFunction<
+    typeof sentryModule.captureException
+  >;
+
+  // LLM response with balanced braces but invalid JSON keys (unquoted) so
+  // extractFirstJsonObject returns the raw balanced-brace substring and
+  // JSON.parse throws inside parseTopicIntentMatcherResponse, triggering
+  // the catch block that was previously bare (errors-api F-022).
+  const MALFORMED_RESPONSE = '{ unquoted_key: "value" }';
+
+  beforeEach(() => {
+    // LLM external boundary: routeAndCall makes real network calls; the spy
+    // prevents the call without replacing the module.
+    routeAndCallSpy = jest.spyOn(llmModule, 'routeAndCall').mockResolvedValue({
+      response: MALFORMED_RESPONSE,
+      provider: 'test',
+      model: 'fixture',
+      latencyMs: 0,
+      stopReason: 'stop',
+    });
+    captureExceptionSpy = jest
+      .spyOn(sentryModule, 'captureException')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    routeAndCallSpy.mockRestore();
+    captureExceptionSpy.mockRestore();
+  });
+
+  it('returns null when LLM response is unparseable JSON', async () => {
+    const result = await runTopicIntentMatcher('learn something', [
+      { id: FALLBACK_TOPIC_ID, title: 'Chemistry' },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('calls captureException when JSON parse throws on malformed LLM response', async () => {
+    await runTopicIntentMatcher('learn something', [
+      { id: FALLBACK_TOPIC_ID, title: 'Chemistry' },
+    ]);
+    expect(captureExceptionSpy).toHaveBeenCalled();
+    const [, context] = captureExceptionSpy.mock.calls[0] as [
+      unknown,
+      { extra: { context: string } },
+    ];
+    expect(context?.extra?.context).toBe('session.topic_intent_matcher.parse');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-015] recordSystemPrompt / recordSessionEvent / flagContent —
+// typed NotFoundError for missing session
+//
+// Red-green evidence: before the fix, these functions threw a raw Error whose
+// message matched no typed branch in the global onError handler → 500 + Sentry.
+// After the fix, they throw NotFoundError → onError maps it to 404.
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal db stub: session lookup returns null (session not found).
+ *
+ * getSession → createScopedRepository(db, profileId).sessions.findFirst(...)
+ * → db.query.learningSessions.findFirst({ where }). That is the ONLY db
+ * surface these three functions touch before the !session guard, so the stub
+ * is wired narrowly to it. If getSession ever migrates to a different Drizzle
+ * query style (e.g. db.select()), this stub throws (method missing) and the
+ * test fails loudly instead of silently passing.
+ */
+function makeNullSessionDb() {
+  return {
+    query: {
+      learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
+    },
+  } as never;
+}
+
+describe('[F-015] recordSystemPrompt — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      recordSystemPrompt(db, 'prof-1', 'sess-missing', {
+        kind: 'silence_nudge',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[F-015] recordSessionEvent — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      recordSessionEvent(db, 'prof-1', 'sess-missing', {
+        eventType: 'quick_action',
+        content: 'too_easy',
+        metadata: { chip: 'too_easy' },
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[F-015] flagContent — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      flagContent(db, 'prof-1', 'sess-missing', { eventId: 'evt-1' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

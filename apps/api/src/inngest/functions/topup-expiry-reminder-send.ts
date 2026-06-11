@@ -4,7 +4,7 @@
 // Per-credit handler for `app/topup.expiry-reminder` events fanned out by
 // `topupExpiryReminder` (cron). The cron used to send events into a queue
 // with no listener, so reminders were silently dropped — a wired-but-
-// untriggered path that creates false confidence (CLAUDE.md: "Wired-but-
+// untriggered path that creates false confidence (AGENTS.md: "Wired-but-
 // untriggered code is worse than dead code").
 //
 // This handler is the observable terminus: every cron fan-out lands here
@@ -53,5 +53,5 @@ export const topupExpiryReminderSend = inngest.createFunction(
       // Story 5.6 implementation can grep for this exact reason string.
       deliveryDeferred: 'pending_notification_handler_story_5_6',
     };
-  }
+  },
 );

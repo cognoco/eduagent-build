@@ -18,7 +18,7 @@
  * shapes / verify-then-write / verify-then-throw semantics that would balloon a
  * focused PR. They are tracked as sweep **SWEEP-topic-ownership-join** and
  * enumerated in EXPECTED_COUNTS below, NOT treated as acceptable permanent
- * state (CLAUDE.md "Sweep when you fix" → option (b): documented deferred sweep).
+ * state (AGENTS.md "Sweep when you fix" → option (b): documented deferred sweep).
  *
  * Ratchet semantics (strict, count-based):
  *   - Any matched site in a file NOT in EXPECTED_COUNTS fails CI (a brand-new

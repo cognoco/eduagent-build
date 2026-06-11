@@ -258,7 +258,10 @@ export function ChildPaywall({
           }
         >
           {notifyPending ? (
-            <ActivityIndicator color={colors.textInverse} />
+            <ActivityIndicator
+              color={colors.textInverse}
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text
               className={`text-body font-semibold ${

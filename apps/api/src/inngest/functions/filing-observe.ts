@@ -24,6 +24,7 @@
 import {
   filingResolvedEventSchema,
   filingAutoRetryAttemptedEventSchema,
+  summarizeRawPayload,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
@@ -46,13 +47,18 @@ export const sessionFilingResolvedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('session.filing_resolved.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[session-filing-resolved] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }
@@ -96,13 +102,18 @@ export const filingAutoRetryAttemptedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('filing.auto_retry_attempted.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[filing-auto-retry-attempted] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }

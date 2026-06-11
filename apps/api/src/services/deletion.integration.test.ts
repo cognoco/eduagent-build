@@ -34,6 +34,7 @@ import { eq } from 'drizzle-orm';
 import {
   cancelDeletion,
   deleteArchivedProfileIfStillEligible,
+  deleteProfileIfConsentWithdrawn,
   executeDeletion,
   scheduleDeletion,
 } from './deletion';
@@ -385,6 +386,166 @@ describeIfDbF122(
 
       expect(deleted).toBe(false);
       expect(await profileExists(profileId)).toBe(true);
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// [F-093] deleteProfileIfConsentWithdrawn — account isolation guard.
+//
+// Finding: "Consent-revocation delete branch lacks parent-chain account guard
+// that archive branch has (BUG-662 asymmetry)."
+//
+// The archive branch (UPDATE profiles) has:
+//   AND account_id = (SELECT account_id FROM profiles WHERE id = ${parentProfileId})
+// The delete branch previously called deleteProfileIfConsentWithdrawn() with
+// no account guard, meaning a corrupt/replayed Inngest event with a mismatched
+// (childProfileId, parentProfileId) pair could delete a profile from a
+// different account.
+//
+// Red→green: adding an optional parentProfileId param that, when supplied, adds
+// the same parent-chain account guard to the DELETE's WHERE clause. A cross-
+// account attempt must return false (profile retained).
+// ---------------------------------------------------------------------------
+const F093_RUN_ID = generateUUIDv7();
+const describeIfDbF093 = hasDatabaseUrl ? describe : describe.skip;
+
+describeIfDbF093(
+  '[F-093] deleteProfileIfConsentWithdrawn — account isolation',
+  () => {
+    let db: Database;
+    let seq = 0;
+
+    beforeAll(() => {
+      db = createDatabase(process.env.DATABASE_URL!);
+    });
+
+    afterAll(async () => {
+      await db.execute(
+        sql`DELETE FROM accounts WHERE clerk_user_id LIKE ${`clerk_f093_${F093_RUN_ID}%`}`,
+      );
+    });
+
+    async function seedAccountWithWithdrawnProfile(): Promise<{
+      accountId: string;
+      profileId: string;
+      revokedAt: Date;
+    }> {
+      const idx = ++seq;
+      const [account] = await db
+        .insert(accounts)
+        .values({
+          clerkUserId: `clerk_f093_${F093_RUN_ID}_${idx}`,
+          email: `f093_${F093_RUN_ID}_${idx}@test.invalid`,
+        })
+        .returning({ id: accounts.id });
+
+      const [profile] = await db
+        .insert(profiles)
+        .values({
+          accountId: account!.id,
+          displayName: `F093 Test ${idx}`,
+          birthYear: 2013,
+          isOwner: false,
+        })
+        .returning({ id: profiles.id });
+
+      const revokedAt = new Date();
+      await db.insert(consentStates).values({
+        profileId: profile!.id,
+        consentType: 'GDPR',
+        status: 'WITHDRAWN',
+        respondedAt: revokedAt,
+      });
+
+      return { accountId: account!.id, profileId: profile!.id, revokedAt };
+    }
+
+    async function profileExists(profileId: string): Promise<boolean> {
+      const row = await db.query.profiles.findFirst({
+        where: (p, { eq: eqFn }) => eqFn(p.id, profileId),
+        columns: { id: true },
+      });
+      return row != null;
+    }
+
+    // [F-093][BREAK] Cross-account delete attempt must be blocked.
+    // A parentProfileId from a DIFFERENT account is passed — the guard must
+    // reject the delete and return false, leaving the profile intact.
+    it('[F-093][BREAK] cross-account deletion attempt is rejected (profile retained)', async () => {
+      const { profileId, revokedAt } = await seedAccountWithWithdrawnProfile();
+
+      // Seed a second account with its own profile (the "attacker" account).
+      const [attackerAccount] = await db
+        .insert(accounts)
+        .values({
+          clerkUserId: `clerk_f093_${F093_RUN_ID}_attacker_${++seq}`,
+          email: `f093_attacker_${F093_RUN_ID}_${seq}@test.invalid`,
+        })
+        .returning({ id: accounts.id });
+      const [attackerProfile] = await db
+        .insert(profiles)
+        .values({
+          accountId: attackerAccount!.id,
+          displayName: `F093 Attacker ${seq}`,
+          birthYear: 1990,
+          isOwner: true,
+        })
+        .returning({ id: profiles.id });
+
+      // Attempt to delete using an attacker parentProfileId from a different account.
+      const deleted = await deleteProfileIfConsentWithdrawn(
+        db,
+        profileId,
+        revokedAt,
+        attackerProfile!.id, // cross-account parent — must be rejected
+      );
+
+      // Profile must survive — the account guard blocked the delete.
+      expect(deleted).toBe(false);
+      expect(await profileExists(profileId)).toBe(true);
+    });
+
+    // Same-account deletion with a valid parentProfileId must still succeed (happy path).
+    it('same-account deletion with parentProfileId succeeds (happy path)', async () => {
+      const { accountId, profileId, revokedAt } =
+        await seedAccountWithWithdrawnProfile();
+
+      // A valid parent profile on the same account.
+      const [parentProfile] = await db
+        .insert(profiles)
+        .values({
+          accountId,
+          displayName: 'F093 Parent',
+          birthYear: 1985,
+          isOwner: true,
+        })
+        .returning({ id: profiles.id });
+
+      const deleted = await deleteProfileIfConsentWithdrawn(
+        db,
+        profileId,
+        revokedAt,
+        parentProfile!.id, // same account — must be allowed
+      );
+
+      expect(deleted).toBe(true);
+      expect(await profileExists(profileId)).toBe(false);
+    });
+
+    // Backward-compat: omitting parentProfileId still deletes (existing callers
+    // that don't have parentProfileId available don't break).
+    it('omitting parentProfileId still deletes (backward compat)', async () => {
+      const { profileId, revokedAt } = await seedAccountWithWithdrawnProfile();
+
+      const deleted = await deleteProfileIfConsentWithdrawn(
+        db,
+        profileId,
+        revokedAt,
+      );
+
+      expect(deleted).toBe(true);
+      expect(await profileExists(profileId)).toBe(false);
     });
   },
 );

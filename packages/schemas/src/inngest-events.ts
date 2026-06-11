@@ -11,11 +11,14 @@ export const filingTimedOutEventSchema = z.object({
 });
 export type FilingTimedOutEvent = z.infer<typeof filingTimedOutEventSchema>;
 
+// PII egress: No `sessionTranscript` field: Inngest persists
+// event payloads in its third-party event store, so a minor's transcript
+// must never ride in the event. The consumer (freeform-filing) rehydrates
+// the transcript from the DB by sessionId, scoped by profileId.
 export const filingRetryEventSchema = z.object({
   profileId: z.string().uuid(),
   sessionId: z.string().uuid(),
   sessionMode: z.enum(['freeform', 'homework']),
-  sessionTranscript: z.string().optional(),
 });
 export type FilingRetryEvent = z.infer<typeof filingRetryEventSchema>;
 
@@ -127,14 +130,20 @@ export type ReviewCalibrationRequestedEvent = z.infer<
   typeof reviewCalibrationRequestedEventSchema
 >;
 
+// PII egress: No raw `learnerMessage` / `topicTitle` fields: Inngest
+// persists event payloads in its third-party event store. The payload
+// carries an opaque reference (`learnerMessageEventId`, the session_events
+// row id of the learner's probe answer); the consumer (topic-probe-extract)
+// rehydrates the message content and the topic title from the DB, scoped by
+// profileId. Legacy in-flight events with the raw-text shape fail safeParse
+// and are skipped by the consumer.
 export const topicProbeRequestedEventSchema = z.object({
   version: z.literal(1),
   profileId: z.string().uuid(),
   sessionId: z.string().uuid(),
   subjectId: z.string().uuid(),
   topicId: z.string().uuid(),
-  learnerMessage: z.string().min(1),
-  topicTitle: z.string().min(1),
+  learnerMessageEventId: z.string().uuid(),
   timestamp: isoDateField,
 });
 export type TopicProbeRequestedEvent = z.infer<

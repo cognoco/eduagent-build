@@ -796,5 +796,24 @@ describe('account routes', () => {
       // The non-owner must not be able to trigger a notification dispatch.
       expect(inngestMock.inngest.send).not.toHaveBeenCalled();
     });
+
+    it('[BREAK F-125] GET /v1/account/deletion-status returns 403 for non-owner profile', async () => {
+      // F-125: GET /account/deletion-status was missing the assertOwnerProfile
+      // gate that its three sibling routes (/email, /security-event, /export) all
+      // enforce. A child profile on a family account could query the parent's
+      // deletion schedule.
+      const res = await app.request(
+        '/v1/account/deletion-status',
+        { headers: nonOwnerHeaders },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can view deletion status.',
+      });
+    });
   });
 });

@@ -8,6 +8,7 @@ import {
   resolveChallengeRoundRuntimeStartState,
   checkExchangeLimit,
   resolveReadyToFinish,
+  resolvePromptLearnerName,
   type ExchangeHistoryEvent,
 } from './session-exchange';
 import type { processMessage, streamMessage } from './session-exchange';
@@ -900,7 +901,7 @@ describe('checkExchangeLimit', () => {
 // resolveReadyToFinish — interview / onboarding hard cap
 // ---------------------------------------------------------------------------
 //
-// [BUG-92 / CR-2026-05-19-C4] The envelope contract in CLAUDE.md mandates a
+// [BUG-92 / CR-2026-05-19-C4] The envelope contract in AGENTS.md mandates a
 // server-side hard cap per envelope signal so the flow terminates even if
 // the LLM never emits the signal. resolveReadyToFinish is the single source
 // of truth for the interview-close decision. These tests pin the contract:
@@ -1046,3 +1047,83 @@ type _assertProcessNotePrompt = 'notePrompt' extends keyof ProcessMessageResult
   : never;
 const _processNotePromptCheck: _assertProcessNotePrompt = true;
 void _processNotePromptCheck;
+
+// ---------------------------------------------------------------------------
+// WI-580 (F-076) — resolvePromptLearnerName: a minor's real name must never
+// enter the LLM prompt context. Fail-closed: only a verified adult owner's
+// display name passes the gate.
+// ---------------------------------------------------------------------------
+
+describe('resolvePromptLearnerName', () => {
+  const currentYear = new Date().getFullYear();
+
+  it('[F-076] returns undefined for a child profile on a parent account (non-owner)', () => {
+    expect(
+      resolvePromptLearnerName({
+        isOwner: false,
+        birthYear: currentYear - 12,
+        displayName: 'Zuzana',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('[F-076] returns undefined for an under-18 owner (solo minor)', () => {
+    expect(
+      resolvePromptLearnerName({
+        isOwner: true,
+        birthYear: currentYear - 15,
+        displayName: 'Zuzana',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('[F-076 / PR #900 Codex P1] treats the birth-year boundary as minor (owner born currentYear - 18 may still be 17)', () => {
+    expect(
+      resolvePromptLearnerName({
+        isOwner: true,
+        birthYear: currentYear - 18,
+        displayName: 'Zuzana',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('[F-076] returns undefined for an adult-aged non-owner (fail-closed on ownership)', () => {
+    expect(
+      resolvePromptLearnerName({
+        isOwner: false,
+        birthYear: currentYear - 30,
+        displayName: 'Nikolaj',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('[F-076] returns undefined when birthYear is unknown (fail-closed on age)', () => {
+    expect(
+      resolvePromptLearnerName({
+        isOwner: true,
+        birthYear: null,
+        displayName: 'Zuzana',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('returns the display name for an adult owner (consented personalization preserved)', () => {
+    expect(
+      resolvePromptLearnerName({
+        isOwner: true,
+        birthYear: currentYear - 30,
+        displayName: 'Astrid',
+      }),
+    ).toBe('Astrid');
+  });
+
+  it('returns undefined for an adult owner without a display name', () => {
+    expect(
+      resolvePromptLearnerName({
+        isOwner: true,
+        birthYear: currentYear - 30,
+        displayName: null,
+      }),
+    ).toBeUndefined();
+  });
+});

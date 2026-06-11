@@ -48,7 +48,7 @@ export default [
   // `sanitizeSecureStoreKey()` for dynamic keys; this rule catches static
   // literals (and the static parts of template strings) before they ship.
   // Test files excluded — tests may exercise unsafe-key handling paths.
-  // See CLAUDE.md > Repo-Specific Guardrails and the governance audit.
+  // See AGENTS.md > Repo-Specific Guardrails and the governance audit.
   // -------------------------------------------------------------------------
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
@@ -68,7 +68,7 @@ export default [
   //   (b) the file's own route is already under the parent prefix, OR
   //   (c) `// gc4-allow: <reason>` annotation is present.
   // Test files excluded — they exercise navigation patterns but don't ship.
-  // See CLAUDE.md > Repo-Specific Guardrails and the governance audit.
+  // See AGENTS.md > Repo-Specific Guardrails and the governance audit.
   // -------------------------------------------------------------------------
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
@@ -89,7 +89,7 @@ export default [
   // SVG attributes and worklet shared values require literal hex strings.
   // BookPageFlipAnimation, BrandCelebration, AnimatedSplash, MentomateLogo
   // all fit this exception.
-  // See CLAUDE.md > Non-Negotiable Engineering Rules.
+  // See AGENTS.md > Non-Negotiable Engineering Rules.
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
     ignores: [
@@ -117,7 +117,7 @@ export default [
   // key sanitization; bypassing it crashes iOS Keychain on invalid chars.
   // Test files are excluded so jest.mock('expo-secure-store') still works
   // for the wrapper's own unit tests.
-  // See CLAUDE.md > Repo-Specific Guardrails.
+  // See AGENTS.md > Repo-Specific Guardrails.
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
     ignores: [
@@ -146,7 +146,7 @@ export default [
   // make imports searchable and prevent accidental rename drift. `.d.ts` files
   // are excluded because Metro's `*.svg` ambient module declaration requires
   // `export default content` to model `import Logo from './logo.svg'`.
-  // See CLAUDE.md > Repo-Specific Guardrails.
+  // See AGENTS.md > Repo-Specific Guardrails.
   // -------------------------------------------------------------------------
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
@@ -163,7 +163,7 @@ export default [
         {
           selector: 'ExportDefaultDeclaration',
           message:
-            'Default exports are only for Expo Router page components under src/app/. Use a named export instead. See CLAUDE.md.',
+            'Default exports are only for Expo Router page components under src/app/. Use a named export instead. See AGENTS.md.',
         },
       ],
     },

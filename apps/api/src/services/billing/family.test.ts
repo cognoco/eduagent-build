@@ -15,8 +15,14 @@ jest.mock(
 
 import type { Database } from '@eduagent/database';
 
+import * as sentryModule from '../sentry';
 import * as settingsService from '../settings';
-import { getUsageBreakdownForProfile, type UsageBreakdown } from './family';
+import {
+  downgradeAllFamilyProfiles,
+  getUsageBreakdownForProfile,
+  listFamilyMembers,
+  type UsageBreakdown,
+} from './family';
 
 function createUsageBreakdownDb(input: {
   viewer: {
@@ -280,5 +286,108 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
       ),
     ).toEqual(['adult-1']);
     expect(result.familyAggregate).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Subscription-not-found escalation (errors-api F-022 review follow-up):
+// billing recovery paths must pair logger.warn with captureException —
+// console.warn alone is banned in billing code.
+// ---------------------------------------------------------------------------
+
+describe('subscription-not-found escalation', () => {
+  let captureExceptionSpy: jest.SpiedFunction<
+    typeof sentryModule.captureException
+  >;
+  let warnSpy: jest.SpiedFunction<typeof console.warn>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindSubscriptionById.mockResolvedValue(null);
+    captureExceptionSpy = jest
+      .spyOn(sentryModule, 'captureException')
+      .mockImplementation(() => undefined);
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    captureExceptionSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  function findWarnEntry(
+    needle: string,
+  ): { context?: { event?: string } } | undefined {
+    return warnSpy.mock.calls
+      .map((call) => {
+        try {
+          return JSON.parse(call[0] as string) as {
+            message?: string;
+            context?: { event?: string };
+          };
+        } catch {
+          return undefined;
+        }
+      })
+      .find((entry) => entry?.message?.includes(needle));
+  }
+
+  it('listFamilyMembers logs warn + captureException when subscription not found', async () => {
+    const result = await listFamilyMembers(
+      {} as unknown as Database,
+      'missing-sub-id',
+    );
+
+    expect(result).toEqual([]);
+
+    const warnEntry = findWarnEntry(
+      'listFamilyMembers: subscription not found',
+    );
+    expect(warnEntry).toBeDefined();
+    expect(warnEntry?.context?.event).toBe(
+      'billing.family.list_members.subscription_not_found',
+    );
+
+    expect(captureExceptionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'listFamilyMembers: subscription not found',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'billing.family.list_members.subscription_not_found',
+          subscriptionId: 'missing-sub-id',
+        }),
+      }),
+    );
+  });
+
+  it('downgradeAllFamilyProfiles logs warn + captureException when subscription not found', async () => {
+    const result = await downgradeAllFamilyProfiles(
+      {} as unknown as Database,
+      'missing-sub-id',
+      new Map(),
+    );
+
+    expect(result).toEqual([]);
+
+    const warnEntry = findWarnEntry(
+      'downgradeAllFamilyProfiles: subscription not found',
+    );
+    expect(warnEntry).toBeDefined();
+    expect(warnEntry?.context?.event).toBe(
+      'billing.family.downgrade_all.subscription_not_found',
+    );
+
+    expect(captureExceptionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'downgradeAllFamilyProfiles: subscription not found',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'billing.family.downgrade_all.subscription_not_found',
+          subscriptionId: 'missing-sub-id',
+        }),
+      }),
+    );
   });
 });

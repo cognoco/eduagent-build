@@ -40,7 +40,7 @@ import {
 } from '../../apps/api/src/test-utils/llm-provider-fixtures';
 
 // Controllable mock provider — overrides the default mock registered in setup.ts.
-// Avoids jest.mock on an internal service (CLAUDE.md rule: no internal mocks in
+// Avoids jest.mock on an internal service (AGENTS.md rule: no internal mocks in
 // integration tests). Uses the shared fixture so the full routeAndCall path runs.
 beforeAll(() => {
   mockInngestEvents();

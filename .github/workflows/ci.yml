@@ -119,6 +119,14 @@ jobs:
       # to verify source-output consistency. Nx remote cache can restore stale dist/ and
       # .tsbuildinfo from a previous build, causing TS6305 false positives when source files
       # change. Removing these forces tsc --build to regenerate declarations from scratch.
+      #
+      # WI-451 (D5): the typecheck cache now excludes .tsbuildinfo from cached outputs
+      # (nx.json targetDefaults.typecheck.outputs + apps/mobile/project.json), so the remote
+      # cache can no longer restore incremental TS state — the TS6305 root cause is fixed at
+      # the cache level. This step is now redundant belt-and-suspenders. RETIRE it (and the
+      # local `nx reset` dance) only after several real CI builds confirm zero TS6305 with the
+      # nets removed — never delete a net before the fix is proven (D5 sequencing). Tracked by
+      # the harness-hygiene activity; first proof rides WI-388's real-PR adoption.
       - name: Clean stale TypeScript build artifacts
         run: |
           find . -name '*.tsbuildinfo' -not -path '*/node_modules/*' -delete
@@ -186,16 +194,32 @@ jobs:
 
       # Forbid [MARKER] tokens in LLM prompt builders. State-machine signals
       # must use the structured `signals` envelope (services/llm/envelope.ts),
-      # not free-text marker tokens. See CLAUDE.md → "LLM Response Envelope".
+      # not free-text marker tokens. See AGENTS.md → "LLM Response Envelope".
       - name: Prompt marker-token check
         run: bash scripts/check-prompt-markers.sh
+
+      # [G11 / WI-452] No-clinical-copy ratchet previously ran ONLY in the
+      # pre-commit hook — bypassable via --no-verify and invisible to any
+      # committer that skips Husky. CI is the backstop. Baseline ratchet:
+      # existing offenses are grandfathered, only NEW ones fail.
+      - name: No-clinical-copy ratchet (G11)
+        run: pnpm run check:no-clinical-copy
+
+      # [G11 / WI-452] Test-only-exports ratchet (D-TTL-6: *ForTesting/__test*
+      # symbols must not be imported from production code). It already ran
+      # inside the bundled "scripts/* tests" step below, but invisibly — a
+      # violation surfaced as an anonymous bundle failure. Discrete step makes
+      # the red check name the violation class. (The bundle still includes it;
+      # the ~seconds of overlap buys a legible failure surface.)
+      - name: Test-only-exports ratchet (G11)
+        run: pnpm exec jest --config scripts/jest.config.cjs scripts/check-test-only-exports.test.ts --no-coverage
 
       # GC1 ratchet (Tier 1): block PRs that add NEW relative-path jest.mock()
       # calls in test files unless the factory uses Pattern A (spreads
       # jest.requireActual of the same specifier) or the line carries a
       # `// gc1-allow: <reason>` sticker. Same TypeScript detector the
       # pre-commit hook in `.husky/pre-commit` uses, so rules can't drift.
-      # See CLAUDE.md → "Code Quality Guards" → "No new internal jest.mock()".
+      # See AGENTS.md → "Code Quality Guards" → "No new internal jest.mock()".
       - name: GC1 — no new internal jest.mock
         if: github.event_name == 'pull_request'
         env:
@@ -211,23 +235,32 @@ jobs:
       - name: scripts/* tests
         run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
 
-      # [BUG-246] Change-class advisory: walks the PR diff and prints the
-      # "you touched X, run Y" matrix from docs/change-classes.md so authors
-      # have a visible reminder of which integration tests, migrations, or
-      # eval runs the change implies. Advisory only (continue-on-error +
-      # --no-fail) — the underlying validation commands run as their own
-      # CI steps; this step is the human-readable surface so reviewers can
-      # confirm the right validation was performed. Promote to a blocking
-      # gate by removing continue-on-error once the advisory output has
-      # stabilized.
-      - name: Change-class advisory (BUG-246)
+      # WI-536: validate the flaky-test quarantine registry. Deterministic, so
+      # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
+      # if a quarantined path no longer exists (a stale entry that would rot
+      # silently). The quarantined tests themselves run in the non-gating
+      # quarantine-report.yml lane, never here.
+      - name: Quarantine registry valid (WI-536)
+        run: node tools/quarantine/validate.cjs
+
+      # [BUG-246 → WI-452] Change-class ROUTER: walks the PR diff, prints the
+      # "you touched X, run Y" matrix from docs/change-classes.md (the
+      # human-readable surface for reviewers), AND emits machine-readable
+      # routing flags (--github-output) that gate the slow suites below —
+      # the matrix is the single source of truth for slow-suite routing, not
+      # a parallel paths-filter that can drift from it. No continue-on-error:
+      # the router is deterministic, and a router failure must be loud (a
+      # broken router silently skipping integration tests is the worst
+      # failure mode). Fail-open: if the script cannot resolve a diff base it
+      # emits integration=true/eval=true rather than skipping suites.
+      - name: Change-class router (WI-452)
+        id: change-class
         if: github.event_name == 'pull_request'
-        continue-on-error: true
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          echo "Inspecting push delta vs origin/${BASE_REF}..."
-          bash scripts/check-change-class.sh --branch || true
+          echo "Routing slow suites by change class vs origin/${BASE_REF}..."
+          bash scripts/check-change-class.sh --branch --github-output
 
       # PR builds: only lint/test/typecheck/build projects affected by the diff.
       # Push to main: full validation across all projects.
@@ -246,13 +279,20 @@ jobs:
           pnpm exec nx run-many -t lint test typecheck
           pnpm exec nx run-many -t build --exclude=@eduagent/mobile
 
-      # Run API integration tests against real PostgreSQL (only when API-relevant files changed)
+      # Run API integration tests against real PostgreSQL.
+      # PRs: routed by the change-class router (WI-452) — runs whenever the
+      # matrix maps any touched class to integration tests (db-schema,
+      # db-migrations, inngest, api-routes, api-middleware, shared-schemas,
+      # shared-database, security-sensitive, test-infra, dependencies).
+      # Push to main: keeps the original dorny paths-filter gate unchanged.
       - name: API integration tests
-        if: steps.changes.outputs.api == 'true'
+        if: >-
+          (github.event_name == 'push' && steps.changes.outputs.api == 'true') ||
+          (github.event_name == 'pull_request' && steps.change-class.outputs.integration == 'true')
         run: pnpm exec nx run api:test:integration
 
-      # Advisory check: flag stale counts in CLAUDE.md (does not block PRs)
-      - name: Validate CLAUDE.md counts
+      # Advisory check: flag stale counts in AGENTS.md (does not block PRs)
+      - name: Validate AGENTS.md counts
         if: always()
         continue-on-error: true
         run: bash scripts/validate-doc-versions.sh

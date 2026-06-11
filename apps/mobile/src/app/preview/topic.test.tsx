@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -8,7 +9,13 @@ import { useRouter } from 'expo-router';
 import TopicScreen from './topic';
 import * as state from '../../lib/preview-onboarding-state';
 
-jest.mock('expo-router', () => ({ useRouter: jest.fn() }));
+let capturedFocusCallback: (() => void) | null = null;
+jest.mock('expo-router', () => ({
+  useRouter: jest.fn(),
+  useFocusEffect: (cb: () => void) => {
+    capturedFocusCallback = cb;
+  },
+}));
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -18,6 +25,7 @@ describe('Preview TopicScreen', () => {
   const push = jest.fn();
   const replace = jest.fn();
   beforeEach(() => {
+    capturedFocusCallback = null;
     (useRouter as jest.Mock).mockReturnValue({ push, replace });
     push.mockReset();
     replace.mockReset();
@@ -58,5 +66,36 @@ describe('Preview TopicScreen', () => {
     render(<TopicScreen />);
     fireEvent.press(screen.getByTestId('preview-topic-back'));
     expect(replace).toHaveBeenCalledWith('/(auth)/sign-in');
+  });
+
+  it('[F-160] resets submitting state when screen regains focus', async () => {
+    // Arrange: setPreviewState never resolves — leaves submitting=true permanently.
+    jest
+      .spyOn(state, 'setPreviewState')
+      .mockReturnValue(new Promise(() => undefined));
+
+    render(<TopicScreen />);
+
+    // Act: press a button — this sets submitting=true
+    fireEvent.press(screen.getByTestId('preview-topic-sample-geography'));
+
+    // Assert: button is disabled while submitting
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('preview-topic-sample-geography').props
+          .accessibilityState,
+      ).toMatchObject({ disabled: true });
+    });
+
+    // Act: simulate screen regaining focus (useFocusEffect callback fires)
+    act(() => {
+      capturedFocusCallback?.();
+    });
+
+    // Assert: button is enabled again after focus reset
+    expect(
+      screen.getByTestId('preview-topic-sample-geography').props
+        .accessibilityState,
+    ).toMatchObject({ disabled: false });
   });
 });

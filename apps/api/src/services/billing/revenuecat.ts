@@ -10,6 +10,7 @@ import {
   quotaPools,
   type Database,
   createAccountRepository,
+  lockSubscriptionByAccountId__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
@@ -21,6 +22,10 @@ import {
   type SubscriptionRow,
 } from './types';
 import { reconcileQuotaStateForSubscription } from './quota-reconcile';
+import {
+  reattributeTopUpCreditsOnModelChange,
+  emitTopUpCreditsReattributedMetric,
+} from './tier';
 
 const logger = createLogger();
 import { getSubscriptionByAccountId } from './subscription-core';
@@ -126,8 +131,30 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
   },
   _quota: RevenuecatQuotaUpdate,
 ): Promise<AppliedSubscriptionRow | null> {
-  return db.transaction(async (tx) => {
+  let reattributedCount = 0;
+  let previousTier: SubscriptionTier | undefined;
+  const now = new Date();
+
+  const result = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+
+    // [F-124] Lock-and-read the previous tier INSIDE the transaction
+    // (SELECT … FOR UPDATE) so the tier-change detection and the credit
+    // re-attribution below are serialized against concurrent webhooks for
+    // the same account. A plain in-transaction read under READ COMMITTED is
+    // not enough: two concurrent transactions can both read the same
+    // previousTier before either commits (Codex P1 on PR #897). The row lock
+    // is held until commit; the second transaction blocks here and then sees
+    // the first one's committed tier. The eventId dedup inside
+    // applySubscriptionUpdateFromRevenuecat only gates duplicate deliveries
+    // of the SAME event — it does not serialize two different events.
+    // safe-caller: RevenueCat webhook handler — accountId already validated by the caller
+    const existing = await lockSubscriptionByAccountId__unscoped(
+      txDb,
+      accountId,
+    );
+    previousTier = existing?.tier;
+
     const updated = await applySubscriptionUpdateFromRevenuecat(
       txDb,
       accountId,
@@ -136,10 +163,38 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
 
     if (updated && updated.webhookApplied !== false) {
       await reconcileQuotaStateForSubscription(txDb, updated.id);
+
+      // [F-124] Re-attribute top-up credits when the quota model changes.
+      // Only fires when the webhook actually changed the tier.
+      if (previousTier && updates.tier && previousTier !== updates.tier) {
+        reattributedCount = await reattributeTopUpCreditsOnModelChange(
+          txDb,
+          updated.id,
+          accountId,
+          previousTier,
+          updates.tier,
+        );
+      }
     }
 
     return updated;
   });
+
+  // Emit queryable metric if credits were re-attributed (silent-recovery-banned
+  // rule). Same event name + payload schema as the Stripe path — single source
+  // of truth in emitTopUpCreditsReattributedMetric (tier.ts).
+  if (reattributedCount > 0 && previousTier && updates.tier && result) {
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId: result.id,
+      accountId,
+      previousTier,
+      newTier: updates.tier,
+      reattributedCount,
+      occurredAt: now,
+    });
+  }
+
+  return result;
 }
 
 async function applySubscriptionUpdateFromRevenuecat(

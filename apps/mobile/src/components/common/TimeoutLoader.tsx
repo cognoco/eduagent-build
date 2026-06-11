@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from './ErrorFallback';
+import { useAnnounce } from '../../hooks/use-announce';
 
 interface TimeoutLoaderAction {
   label: string;
@@ -47,6 +48,7 @@ export function TimeoutLoader({
   testID,
 }: TimeoutLoaderProps) {
   const { t } = useTranslation();
+  const announce = useAnnounce();
   const resolvedTitle = title ?? t('common.timeoutLoader.title');
   const resolvedMessage = message ?? t('common.timeoutLoader.message');
   const [timedOut, setTimedOut] = useState(false);
@@ -56,9 +58,16 @@ export function TimeoutLoader({
       setTimedOut(false);
       return;
     }
-    const t = setTimeout(() => setTimedOut(true), timeoutMs);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setTimedOut(true), timeoutMs);
+    return () => clearTimeout(timer);
   }, [isLoading, timeoutMs]);
+
+  // Announce loading state to screen-reader users when spinner mounts (F-053).
+  useEffect(() => {
+    if (isLoading && !timedOut) {
+      announce(loadingLabel ?? t('common.timeoutLoader.loading'));
+    }
+  }, [isLoading, timedOut, loadingLabel, announce, t]);
 
   if (!isLoading) return null;
 
@@ -78,6 +87,8 @@ export function TimeoutLoader({
     <View
       className="flex-1 bg-background items-center justify-center px-6"
       testID={testID}
+      accessibilityRole="progressbar"
+      accessibilityLabel={loadingLabel ?? t('common.timeoutLoader.loading')}
     >
       <ActivityIndicator size="large" />
       {loadingLabel ? (

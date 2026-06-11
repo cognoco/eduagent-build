@@ -6,17 +6,13 @@
  * profile 1's root; asserts profile 1's chain is deleted and profile 2's
  * chain is intact.
  *
- * Per CLAUDE.md: "No internal mocks in integration tests."
+ * Per AGENTS.md: "No internal mocks in integration tests."
  * The existing cascade-delete.test.ts mocks db.execute — this test uses the
  * real DB to exercise the actual recursive CTE query.
  */
 
 import { eq } from 'drizzle-orm';
-import {
-  accounts,
-  generateUUIDv7,
-  memoryFacts,
-} from '@eduagent/database';
+import { accounts, generateUUIDv7, memoryFacts } from '@eduagent/database';
 
 import { cascadeDeleteFactWithAncestry } from '../../apps/api/src/services/memory/cascade-delete';
 import { seedLearningProfile, setupTestDb } from './helpers/memory-facts';
@@ -54,7 +50,9 @@ describe('cascadeDeleteFactWithAncestry (real DB)', () => {
 
     const emitted: string[] = [];
     await cascadeDeleteFactWithAncestry(db, profileId, rootId, {
-      emit: (name) => { emitted.push(name); },
+      emit: (name) => {
+        emitted.push(name);
+      },
     });
 
     const remaining = await db.query.memoryFacts.findMany({
@@ -101,7 +99,9 @@ describe('cascadeDeleteFactWithAncestry (real DB)', () => {
     const p2Facts = await db.query.memoryFacts.findMany({
       where: eq(memoryFacts.profileId, p2),
     });
-    expect(p2Facts.map((r) => r.id).sort()).toEqual([p2RootId, p2ChildId].sort());
+    expect(p2Facts.map((r) => r.id).sort()).toEqual(
+      [p2RootId, p2ChildId].sort(),
+    );
 
     await db.delete(accounts).where(eq(accounts.id, a1));
     await db.delete(accounts).where(eq(accounts.id, a2));

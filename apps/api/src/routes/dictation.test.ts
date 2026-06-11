@@ -966,3 +966,92 @@ describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
     expect(res.status).toBe(200);
   });
 });
+
+// ---------------------------------------------------------------------------
+// F-047 regression: struggle fetch failure logging in dictation review
+// ---------------------------------------------------------------------------
+
+import * as sentryModule from '../services/sentry';
+
+describe('POST /v1/dictation/review — struggle fetch failure logging (errors-api F-047)', () => {
+  it('logs warn + captureException when getLearningProfile DB call throws', async () => {
+    // Make the dictation review succeed (so we reach the struggle fetch)
+    (reviewDictation as jest.Mock).mockResolvedValueOnce({
+      totalSentences: 1,
+      correctCount: 1,
+      mistakes: [],
+    });
+
+    // Override db.query to throw for learningProfiles only.
+    // The existing db.query is already a metering-fixture Proxy that handles
+    // subscriptions / quotaPools / etc. — we wrap it so that only
+    // learningProfiles throws while all other table accessors delegate through
+    // to the fixture (so ensureFreeSubscription and metering continue working).
+    const dbFetchError = new Error('Neon: connection pool exhausted');
+    const originalQuery = (mockDatabaseModule.db as Record<string, unknown>)
+      .query;
+    (mockDatabaseModule.db as Record<string, unknown>).query = new Proxy(
+      originalQuery as object,
+      {
+        get(target, prop, receiver) {
+          if (prop === 'learningProfiles') {
+            return {
+              findFirst: jest.fn().mockRejectedValue(dbFetchError),
+              findMany: jest.fn().mockResolvedValue([]),
+            };
+          }
+          // All other tables delegate to the metering fixture's query proxy
+          return Reflect.get(target, prop, receiver);
+        },
+      },
+    );
+
+    const captureExceptionSpy = jest
+      .spyOn(sentryModule, 'captureException')
+      .mockImplementation(() => undefined);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(REVIEW_BODY),
+        },
+        TEST_ENV,
+      );
+
+      // Review still succeeds — degradation is graceful
+      expect(res.status).toBe(200);
+
+      // captureException must have been called with the DB error
+      expect(captureExceptionSpy).toHaveBeenCalled();
+      const [caughtErr, context] = captureExceptionSpy.mock.calls[0] as [
+        Error,
+        { extra: { context: string } },
+      ];
+      expect(caughtErr).toBe(dbFetchError);
+      expect(context?.extra?.context).toBe('dictation.review.struggles');
+
+      // logger.warn must also have been emitted
+      expect(warnSpy).toHaveBeenCalled();
+      const matchingEntry = warnSpy.mock.calls
+        .map((call) => {
+          try {
+            return JSON.parse(call[0] as string) as { message?: string };
+          } catch {
+            return null;
+          }
+        })
+        .find((entry) => entry?.message?.includes('struggle fetch failed'));
+      expect(matchingEntry).not.toBeNull();
+    } finally {
+      (mockDatabaseModule.db as Record<string, unknown>).query = originalQuery;
+      captureExceptionSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+});

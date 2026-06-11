@@ -27,11 +27,10 @@ import { Button } from '../components/common/Button';
 import { BookPageFlipAnimation } from '../components/common/BookPageFlipAnimation';
 import { MagicPenAnimation } from '../components/common/MagicPenAnimation';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
-import { formatApiError } from '../lib/format-api-error';
+import { formatApiError, extractApiErrorCode } from '../lib/format-api-error';
 import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
-import { ConflictError } from '../lib/api-errors';
 import type { LearningSession, SubjectResolveResult } from '@eduagent/schemas';
 
 /** Strip markdown bold markers so `**Science**` renders as plain "Science". */
@@ -90,9 +89,19 @@ function wait(ms: number): Promise<void> {
 }
 
 function isFirstCurriculumPreparingError(err: unknown): boolean {
+  // The API has no dedicated error code for the curriculum-preparing race —
+  // sessions.ts maps CurriculumSessionNotReadyError to a generic 409 CONFLICT.
+  // The message check keeps this guard narrow so other CONFLICT responses
+  // (e.g. Library-filing conflicts) still throw instead of being retried.
+  // TODO(typed-error): replace the message test with a dedicated code
+  // (e.g. CURRICULUM_PREPARING) once the API adds one.
+  // rawMessage is extracted for discrimination only (which CONFLICT is
+  // this?), never for display — user-facing formatting stays with
+  // formatApiError at the call sites.
+  const rawMessage = err instanceof Error ? err.message : '';
   return (
-    err instanceof ConflictError &&
-    /curriculum is still being prepared/i.test(err.message)
+    extractApiErrorCode(err) === 'CONFLICT' &&
+    /curriculum is still being prepared/i.test(rawMessage)
   );
 }
 
@@ -1162,13 +1171,17 @@ function CreateSubjectScreenAuthenticated() {
 // component's API-query hooks cannot fire for unauthenticated users.
 export default function CreateSubjectScreen() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { t } = useTranslation();
   if (!isLoaded) {
     return (
       <View
         testID="create-subject-auth-loading"
         className="flex-1 bg-background items-center justify-center"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }

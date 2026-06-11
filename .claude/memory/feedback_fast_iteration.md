@@ -14,4 +14,4 @@ User explicitly called the 60-min CI+build feedback loop "an awful waste of time
 
 **How to apply:** When proposing CI or build changes, always optimize for the fastest path to a testable artifact on device. Never add gates that increase iteration time without clear safety justification. Prefer OTA updates over full builds for JS-only changes.
 
-Sweep + guard tests required by CLAUDE.md `Sweep when you fix` are *correctness* gates, not ceremony. They count as "clear safety justification" and override iteration-speed preference.
+Sweep + guard tests required by AGENTS.md ## Fix Development Rules ("When fixing a drift that has 3+ sibling locations…") are *correctness* gates, not ceremony. They count as "clear safety justification" and override iteration-speed preference.

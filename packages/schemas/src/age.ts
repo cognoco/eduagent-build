@@ -70,3 +70,26 @@ export function isAdultOwner(
   const year = currentYear ?? new Date().getFullYear();
   return year - profile.birthYear >= 18;
 }
+
+/**
+ * WI-580 (F-076): conservative adult check for minor-PII gating decisions —
+ * the fail-closed variant of the calendar-year age functions above.
+ *
+ * Year-difference age is ambiguous at the boundary: a profile with
+ * `birthYear === currentYear - 18` may still be 17 if their birthday has not
+ * passed this year (the overestimate `computeAgeBracket` documents). Minor
+ * PII must be fail-closed, so the boundary year is treated as minor — only
+ * `birthYear < currentYear - 18` is unambiguously 18+.
+ *
+ * Use this for PII egress / privacy gates (e.g. whether a learner's real
+ * name may enter an LLM-provider prompt). Keep `computeAgeBracket` /
+ * `isAdultOwner` for tone/voice and other gates where the calendar-year
+ * semantics are the intended trade-off.
+ */
+export function isUnambiguouslyAdult(
+  birthYear: number,
+  currentYear?: number,
+): boolean {
+  const year = currentYear ?? new Date().getFullYear();
+  return birthYear < year - 18;
+}

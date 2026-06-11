@@ -40,45 +40,19 @@
     },
     "timeoutLoader": {
       "title": "Taking too long",
-      "message": "This is taking longer than expected. Please check your connection and try again."
-    }
-  },
-  "chrome": {
-    "modeSwitcher": {
-      "switchError": "Couldn't switch. Tap to try again.",
-      "retry": "Retry",
-      "dismiss": "Dismiss"
-    }
-  },
-  "myNotes": {
-    "titleNotes": "Notes",
-    "titleBookmarks": "Bookmarks",
-    "titleSessions": "Sessions",
-    "subtitleNotes_one": "{{count}} note",
-    "subtitleNotes_other": "{{count}} notes",
-    "subtitleBookmarks_one": "{{count}} saved reply",
-    "subtitleBookmarks_other": "{{count}} saved replies",
-    "subtitleSessions_one": "{{count}} session",
-    "subtitleSessions_other": "{{count}} sessions",
-    "searchNotes": "Search notes",
-    "searchBookmarks": "Search bookmarks",
-    "searchSessions": "Search sessions",
-    "back": "Back",
-    "loadMore": "Load more",
-    "tryAgain": "Try again",
-    "errorNotes": "Couldn't load notes",
-    "errorBookmarks": "Couldn't load bookmarks",
-    "errorSessions": "Couldn't load sessions",
-    "emptyNotes": "No notes yet",
-    "emptyBookmarks": "No bookmarks yet",
-    "emptySessions": "No sessions yet",
-    "emptyHint": "They'll show up here as you learn.",
-    "typeNote": "Note",
-    "typeBookmark": "Bookmark",
-    "typeHomework": "Homework",
-    "typeReview": "Review",
-    "typeLearning": "Learning",
-    "unknownSubject": "Unknown subject"
+      "message": "This is taking longer than expected. Please check your connection and try again.",
+      "loading": "Loading, please wait"
+    },
+    "save": "Save",
+    "saving": "Saving...",
+    "or": "or",
+    "show": "Show",
+    "hide": "Hide",
+    "notNow": "Not now",
+    "active": "Active",
+    "goBackAction": "Go back",
+    "tryAgainAction": "Try again",
+    "dismiss": "Dismiss"
   },
   "quota": {
     "parent": {
@@ -151,6 +125,56 @@
       "loadingLabel": "Finishing sign-in",
       "finishing": "Finishing sign-in...",
       "backToSignIn": "Back to sign in"
+    },
+    "signIn": {
+      "welcome": "Welcome",
+      "welcomeReturning": "Welcome back",
+      "welcomeFirstTime": "Welcome to MentoMate",
+      "subtitleLoading": "Sign in to get started",
+      "subtitleReturning": "Sign in to continue learning",
+      "subtitleFirstTime": "Sign in to start learning",
+      "signingYouIn": "Signing you in…",
+      "enterAuthenticatorCode": "Enter authenticator code",
+      "enterBackupCode": "Enter a backup code",
+      "enterVerificationCode": "Enter verification code",
+      "totpHint": "Open your authenticator app and enter the 6-digit code.",
+      "backupCodeHint": "Enter one of the backup codes you saved when you set up two-factor authentication.",
+      "sentCodeTo": "We sent a verification code to <email>{{email}}</email>",
+      "verificationCodeLabel": "Verification code",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "enterEmailHint": "Enter your email to continue",
+      "enterPasswordHint": "Enter your password to continue",
+      "additionalVerificationTitle": "Additional verification is available",
+      "offerBody": "This account can continue with a verification code sent to <id>{{identifier}}</id>. We will only send the code if you choose to continue.",
+      "yourDevice": "your device",
+      "noAccountPrompt": "Don't have an account?",
+      "newHere": "New here?",
+      "tryMentomate": "Try MentoMate",
+      "unsupportedSsoHint": "If this account also uses Google or Apple sign-in, try that above. If that doesn't work, contact support.",
+      "unsupportedContactHint": "Contact support and we'll help you sign in. Mention: {{methods}}."
+    },
+    "signUp": {
+      "title": "Create account",
+      "subtitle": "Start your learning journey",
+      "accountNotFound": "We couldn't find an account with that email. Create one below to get started.",
+      "orContinueWithEmail": "or continue with email",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "alreadyHaveAccount": "Already have an account?",
+      "agreeToTerms": "By signing up, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+      "verifyEmailTitle": "Verify your email",
+      "sentCodeTo": "We sent a verification code to <email>{{email}}</email>",
+      "verificationCodeLabel": "Verification code"
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "subtitle": "We'll send a reset code to your email",
+      "emailLabel": "Email",
+      "resetPasswordTitle": "Reset password",
+      "enterCodeAndPassword": "Enter the code sent to <email>{{email}}</email> and your new password",
+      "resetCodeLabel": "Reset code",
+      "newPasswordLabel": "New password"
     }
   },
   "guards": {
@@ -204,7 +228,12 @@
         "title": "Set up Family",
         "subtitle": "Add a child profile so they can learn with their own mentor",
         "cta": "Set up Family"
-      }
+      },
+      "greeting": "Hey {{name}}!",
+      "greetingNoName": "Hey there!",
+      "myNotes": "My Notes",
+      "subjectsLoadError": "We couldn't load your subjects right now",
+      "subjectsLoadErrorHint": "You can still start a session or try another action."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -301,7 +330,16 @@
       }
     },
     "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress"
+    "goToProgressLabel": "Go to Progress",
+    "coachBand": {
+      "estimatedMinutes": "{{minutes}} min"
+    },
+    "earlyAdopter": {
+      "badge": "Early user — your feedback shapes MentoMate"
+    },
+    "subjectTile": {
+      "topicsProgress": "{{completed}}/{{total}} topics"
+    }
   },
   "family": {
     "orientationCueBody": "Kids' progress and your own learning, all in one place.",
@@ -429,10 +467,6 @@
     "expiredSystemMessage": "Session expired. Start a new one to keep going.",
     "timer": {
       "accessibilityLabel": "Session time: {{time}}"
-    },
-    "errorBoundary": {
-      "title": "This screen ran into a problem",
-      "body": "This screen couldn't load. You can try again or go back home."
     },
     "challengeAlerts": {
       "couldNotStart": "Couldn't start the challenge round",
@@ -620,7 +654,9 @@
       "stepProgress": "Step {{current}} of {{total}}",
       "voicePermissionErrorTitle": "Voice input error",
       "voicePermissionErrorMessage": "Microphone access is needed for voice input. Please enable it in Settings.",
-      "voicePermissionOpenSettings": "Open Settings"
+      "voicePermissionOpenSettings": "Open Settings",
+      "replyReady": "Reply ready",
+      "voiceErrorTapRetry": "{{error}} — tap to retry"
     },
     "messageBubble": {
       "thinking": "Thinking",
@@ -719,6 +755,27 @@
       "currentTopic": "Topic:",
       "changeTopicLabel": "Change topic from {{topic}}",
       "changeTopic": "Change"
+    },
+    "errorBoundary": {
+      "crashTitle": "Session screen crashed",
+      "unknownError": "Unknown error",
+      "body": "This screen couldn't load. You can try again or go back home."
+    },
+    "screenChrome": {
+      "wrapping": "Wrapping...",
+      "exit": "Exit",
+      "retryClassification": "Retry classification",
+      "skipWarmup": "Skip the warm-up, jump in"
+    },
+    "inputModeToggle": {
+      "text": "Text",
+      "voice": "Voice"
+    },
+    "messageActions": {
+      "reconnect": "Reconnect"
+    },
+    "questionCounter": {
+      "question": "Question {{count}}"
     }
   },
   "quiz": {
@@ -751,7 +808,9 @@
       "revealNextClue": "Reveal next clue",
       "revealNextClueLabel": "Reveal next clue",
       "iDontKnow": "I don't know",
-      "iDontKnowLabel": "I don't know the answer"
+      "iDontKnowLabel": "I don't know the answer",
+      "clue": "Clue {{number}}",
+      "fallbackPrompt": "Need a fallback? Pick one:"
     },
     "launch": {
       "loadingShuffling": "Shuffling questions...",
@@ -827,7 +886,12 @@
       "oneMoreLabel": "Start one more quiz",
       "disputeLabel": "Dispute this answer",
       "dismissLabel": "Dismiss",
-      "saveAndFinishLabel": "Save progress and finish round"
+      "saveAndFinishLabel": "Save progress and finish round",
+      "correctAnnounce": "Correct! The answer was {{answer}}",
+      "correctAnnounceNoAnswer": "Correct!",
+      "wrongAnnounce": "Not quite. The answer was {{answer}}",
+      "wrongAnnounceNoAnswer": "Not quite.",
+      "questionProgress": "{{current}} of {{total}}"
     },
     "round": {
       "goBack": "Go back",
@@ -864,7 +928,14 @@
       }
     },
     "results": {
-      "viewHistory": "View History"
+      "viewHistory": "View History",
+      "peopleIdentified": "{{score}} of {{total}} people identified",
+      "xpEarned": "+{{xp}} XP",
+      "whatYouMissed": "What you missed",
+      "youSaid": "You said: {{answer}}",
+      "youSkipped": "You skipped this question",
+      "noAnswer": "You didn't answer",
+      "playAgain": "Play Again"
     }
   },
   "practiceHub": {
@@ -1208,8 +1279,38 @@
       },
       "mastered": "Mastered",
       "reviewDue": "Review ready",
-      "topicProgressThreeState": "{{mastered}} mastered · {{learning}} learning · {{total}} total"
-    }
+      "topicProgressThreeState": "{{mastered}} mastered · {{learning}} learning · {{total}} total",
+      "badge": "Book",
+      "missingDetails": "Missing book details. Please go back and try again.",
+      "writingYourBook": "Writing your book...",
+      "takingLonger": "Taking a little longer than usual...",
+      "notReadyTitle": "This book is not ready yet",
+      "notReadyHint": "Set up the topics first. Then you can start learning step by step.",
+      "setUpBook": "Set up this book",
+      "finishedTitle": "You finished this book",
+      "finishedBody_one": "You've studied the only topic in this book. Review it to keep it fresh, or go back and choose what to learn next.",
+      "finishedBody_other": "You've studied all {{count}} topics in this book. Review them to keep them fresh, or go back and choose what to learn next.",
+      "startReview": "▶ Start review",
+      "startFirstLesson": "▶ Start first lesson",
+      "finishError": "Couldn't finish this book right now.",
+      "topics": "Topics",
+      "progressError": "Couldn't load progress.",
+      "progressEmpty": "Start your first lesson to see your progress here.",
+      "nothingToShow": "Nothing to show yet.",
+      "pastConversations": "Past conversations",
+      "historyError": "Couldn't load your history.",
+      "noConversations": "No conversations yet",
+      "noNotesYet": "No notes yet. Add one when something clicks.",
+      "addNote": "+ Add a note",
+      "addFirstNote": "+ Add your first note for this book",
+      "backToSubject": "Back to subject →"
+    },
+    "notStartedCount": "{{notStarted}} / {{total}} not started",
+    "chooseTopic": "Choose a topic",
+    "provenanceFrom": "From {{name}}",
+    "recentlyAdded": "Recently added",
+    "sessionCount_one": "{{count}} session",
+    "sessionCount_other": "{{count}} sessions"
   },
   "topic": {
     "lastStudied": "Last studied {{when}}",
@@ -1235,7 +1336,17 @@
       "errorTitle": "Something went wrong",
       "timeoutTitle": "Still waiting…",
       "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again."
-    }
+    },
+    "notFoundTitle": "Topic not found",
+    "notFoundMessage": "This topic could not be opened. Please go back and try again.",
+    "loadErrorTitle": "We couldn't load this topic",
+    "loadErrorMessage": "Please try again, or go back to your library.",
+    "removedHint": "This topic may have been removed from your curriculum.",
+    "loadingTopic": "Loading topic...",
+    "noNotesYet": "No notes yet. Add one when something clicks.",
+    "noSessionsYet": "No sessions yet. Start one below!",
+    "addNote": "+ Add a note",
+    "addFirstNote": "+ Add your first note for this topic"
   },
   "subject": {
     "settings": {
@@ -1830,6 +1941,15 @@
       "secondaryCtaA11y": "Try this topic again later",
       "libraryLink": "While you wait, check out your Library",
       "libraryLinkA11y": "Check out your Library"
+    },
+    "accordion": {
+      "loadErrorRetry": "Could not load topics. Tap to retry, or close the subject card to dismiss.",
+      "noTopicsYet": "No topics yet",
+      "browseTopics": "Browse topics"
+    },
+    "subjectRow": {
+      "hideTopics": "▴ Hide topics",
+      "seeTopics": "▾ See topics"
     }
   },
   "onboarding": {
@@ -1894,6 +2014,9 @@
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
+    },
+    "stepIndicator": {
+      "stepOf": "Step {{current}} of {{total}}"
     }
   },
   "parentView": {
@@ -2144,7 +2267,8 @@
       "reportGoneTitle": "This report is no longer available",
       "reportGoneBody": "It may have been archived or removed. All your other reports are still safe.",
       "testsCompleted": "Tests completed",
-      "testPoints": "Test points"
+      "testPoints": "Test points",
+      "activeMinutes": "{{count}} min"
     },
     "practiceSummary": {
       "title": "Test detail",
@@ -2324,7 +2448,12 @@
       "endsAt": "Trial ends {{date}}"
     },
     "statusBadge": {
-      "trial": "Trial"
+      "trial": "Trial",
+      "active": "Active",
+      "cancelling": "Cancelling",
+      "pastDue": "Past due",
+      "expired": "Expired",
+      "unknown": "Unknown"
     },
     "alerts": {
       "restoredTitle": "Restored",
@@ -2399,6 +2528,40 @@
         "errorTitle": "Error",
         "errorBody": "Could not join waitlist. Try again."
       }
+    },
+    "headerTitle": "Subscription",
+    "currentPlan": "Current plan",
+    "endingTitle": "Subscription ending",
+    "endingBody": "Your subscription has been cancelled. You can continue using all features until {{date}}. After that, your account will revert to the Free tier.",
+    "familyPool": "Family pool",
+    "profilesConnected": "{{count}} of {{max}} profiles connected",
+    "sharedQuestionsLeft": "{{count}} shared questions left this cycle.",
+    "removeMember": "Remove",
+    "removingMember": "Removing...",
+    "confirmingPurchase": "Confirming purchase…",
+    "plans": "Plans",
+    "upgrade": "Upgrade",
+    "checkLater": "Check later",
+    "needMoreQuestions": "Need more questions?",
+    "openingStore": "Opening store...",
+    "buyCredits": "Buy 500 credits",
+    "topUpHint": "One-time purchase. Credits expire in 12 months.",
+    "manage": "Manage",
+    "manageBilling": "Manage billing",
+    "manageBillingWebHint": "Subscription is managed on your mobile device",
+    "opensAppStore": "Opens App Store subscriptions",
+    "opensGooglePlay": "Opens Google Play subscriptions",
+    "usageCard": {
+      "usageThisMonth": "Usage this month",
+      "todayUsage": "Today: {{used}} / {{limit}} daily questions",
+      "topUpRemaining": "+ {{count}} top-up credits remaining",
+      "yourShare": "Your share",
+      "yourUsage": "Your usage",
+      "questionsUsed": "{{count}} questions",
+      "familyAggregate": "Family aggregate",
+      "quotaResets": "Quota resets {{date}}",
+      "renews": "Subscription renews {{date}}",
+      "dailyLimitHint": "Daily limit — resets at midnight"
     }
   },
   "sessionSummary": {
@@ -2421,6 +2584,58 @@
     "transcriptPurged": {
       "badge": "Transcript archived",
       "notice": "This session was summarised; the original transcript was archived."
+    },
+    "title": "Session Complete",
+    "expiredTitle": "This session has expired",
+    "expiredMessage": "This session is no longer available. Head home to start a new one.",
+    "notFoundTitle": "Session not found",
+    "notFoundMessage": "We couldn't load this session. It may no longer exist.",
+    "couldNotLoadMessage": "This session could not be loaded. Head home to start a new one.",
+    "loadingSummary": "Loading your session summary...",
+    "whatHappened": "What happened",
+    "checkInSoon": "I'll check in with you soon",
+    "resumeSession": "Resume this session",
+    "viewTranscript": "View full transcript",
+    "recapStillLoading": "Your learner recap is still loading.",
+    "tapToRetry": "Tap to retry",
+    "milestones": "Milestones",
+    "upNext": "Up next",
+    "youMightAlsoLike": "You might also like",
+    "continueLearning": "Continue learning",
+    "bookmarkNudge": "Some great explanations in this session — you can bookmark them next time.",
+    "freshWins": "Fresh wins",
+    "newAchievement": "A new achievement landed right after your session.",
+    "reflectionIncentive": "Write a reflection to earn 1.5x XP",
+    "xpBreakdown": "Base: {{base}} XP → With reflection: {{total}} XP",
+    "bonusXpEarned": "+{{xp}} bonus XP earned!",
+    "reflectionNextTime": "Write a reflection next time to earn +{{xp}} XP.",
+    "recallCheckTitle": "Quick recall check",
+    "recallCheckIntro": "Nice work on that homework! Can you answer these about the method you used?",
+    "doneHeadHome": "Done — head home",
+    "yourWords": "Your Words",
+    "mateFeedback": "Mate feedback",
+    "skippedNotice": "You skipped writing a summary for this session.",
+    "resumeReflectionBanner": "You started a reflection but didn't submit it last time. Finish it below and submit to save your words.",
+    "writePrompt": "Write a short summary of what you learned. This helps you remember and helps me plan what comes next.",
+    "saveError": "Couldn't save your summary. Check your connection and try again — your work won't be lost.",
+    "skipError": "Couldn't skip your summary right now. Check your connection and try again.",
+    "submitSummary": "Submit Summary",
+    "skipForNow": "Skip for now",
+    "skipping": "Skipping...",
+    "seeYourLibrary": "See your Library",
+    "libraryFiling": {
+      "stillAddingTitle": "Still adding this to your Library...",
+      "stillAddingHint": "This can take a little longer. Your chat is saved either way.",
+      "addingTitle": "Adding this to your Library...",
+      "addingHint": "Your chat is saved. We are finding the right Library spot for it.",
+      "addedTitle": "Added to Library",
+      "linkedHint": "This chat is linked to your Library.",
+      "openInLibrary": "Open in Library",
+      "refresh": "Refresh",
+      "failedTitle": "We couldn't add this to your Library",
+      "failedHint": "Your chat is saved. Try again when you're ready.",
+      "keptOutTitle": "Not in Library",
+      "keptOutHint": "This chat is saved, but it is not a Library topic."
     }
   },
   "sessionTranscript": {
@@ -2428,7 +2643,16 @@
       "title": "This conversation was archived on {{date}}.",
       "intro": "Here's what you covered:",
       "continueCta": "Continue this topic"
-    }
+    },
+    "missingSessionTitle": "Missing session",
+    "missingSessionMessage": "We couldn't tell which conversation to load.",
+    "backToLibrary": "Back to library",
+    "conversation": "Conversation",
+    "messageCount_one": "{{count}} message",
+    "messageCount_other": "{{count}} messages",
+    "you": "You",
+    "emptyTitle": "No messages yet",
+    "emptyMessage": "This session doesn't have any saved exchanges to show."
   },
   "notifications": {
     "tap": {
@@ -2460,7 +2684,9 @@
     "banner": {
       "title": "{{fromDisplayName}} sent you a nudge",
       "unreadCount": "{{count}} new",
-      "modalTitle": "New nudges"
+      "modalTitle": "New nudges",
+      "bannerLabel": "{{fromDisplayName}} sent you a nudge: {{message}}, {{count}} new",
+      "bannerLabelSingle": "{{fromDisplayName}} sent you a nudge: {{message}}"
     }
   },
   "learnerHomeTimeout": {
@@ -2753,7 +2979,12 @@
     }
   },
   "profiles": {
-    "title": "Profiles"
+    "title": "Profiles",
+    "noProfilesYet": "No profiles yet",
+    "createFirstHint": "Create your first profile to get started",
+    "createProfile": "Create profile",
+    "addProfile": "+ Add profile",
+    "renameTitle": "Rename profile"
   },
   "feedbackSheet": {
     "title": "Give us feedback",
@@ -2773,5 +3004,109 @@
       "suggestion": "Suggestion",
       "other": "Other"
     }
+  },
+  "createProfile": {
+    "titleChild": "Tell us about your child",
+    "titleSelf": "Who's the learner?",
+    "displayNameLabel": "Display name",
+    "childDisplayNameLabel": "Child's display name",
+    "birthDateLabel": "Birth date",
+    "childBirthDateLabel": "Child's birth date",
+    "birthDateHint": "So your mentor talks to you the right way. Minimum age is 11.",
+    "childBirthDateHint": "So your child's mentor talks to them the right way. Minimum age is 11.",
+    "webDateFormatHint": "Enter your birth date as YYYY-MM-DD.",
+    "childWebDateFormatHint": "Enter your child's birth date as YYYY-MM-DD.",
+    "selectDob": "Select date of birth",
+    "selectChildDob": "Select your child's date of birth"
+  },
+  "clerkGate": {
+    "timeoutTitle": "Taking longer than expected",
+    "timeoutMessage": "Please check your internet connection and try again.",
+    "tryAgain": "Try again",
+    "continueOffline": "Continue without account",
+    "connecting": "Connecting securely..."
+  },
+  "modeSwitcher": {
+    "switchError": "Couldn't switch. Tap to try again."
+  },
+  "memoryConsent": {
+    "defaultTitle": "Help the mentor learn about {{name}}",
+    "defaultTitleNoName": "Help the mentor learn about your child",
+    "defaultDescription": "This lets the mentor remember what kinds of explanations work, what is still tricky, and which examples feel relevant.",
+    "grant": "Yes, enable"
+  },
+  "saveWizard": {
+    "title": "Great, let's save this and get you started.",
+    "whereSave": "Where should we save this?",
+    "aboutYouSelf": "Tell us about you",
+    "aboutYouParent": "About you (the parent)",
+    "aboutChild": "About your child",
+    "ageGate": "To set up a child's learning, the account holder must be 18 or older. You can still set up your own learning instead — pick \"My learning\" on the previous step.",
+    "childSaveError": "We saved your account, but couldn't add your child yet: {{error}}",
+    "confirmChildReady": "Your child's profile is set up. Let's open parent home.",
+    "yourNameLabel": "Your name",
+    "yourBirthYearLabel": "Your birth year",
+    "childNameLabel": "Child's name",
+    "childBirthYearLabel": "Child's birth year"
+  },
+  "myNotes": {
+    "title": "My Notes",
+    "subtitle": "Sessions, notes, and saved replies",
+    "sortDate": "Date",
+    "sortSubject": "Subject",
+    "noneYetNotes": "No notes yet",
+    "noneYetBookmarks": "No bookmarks yet",
+    "noneYetSessions": "No sessions yet",
+    "emptyHint": "They'll show up here as you learn.",
+    "loadErrorNotes": "Couldn't load notes",
+    "loadErrorBookmarks": "Couldn't load bookmarks",
+    "loadErrorSessions": "Couldn't load sessions",
+    "loadMore": "Load more"
+  },
+  "pickBook": {
+    "subjectFallback": "Subject",
+    "pickWhatInterests": "Pick what interests you",
+    "suggestionsFailedTitle": "Suggestions did not load",
+    "suggestionsFailedHint": "You can still type the book or topic you want to add.",
+    "basedOnStudied": "Based on what you've studied",
+    "trySomethingNew": "Try something new",
+    "somethingElse": "Something else...",
+    "settingUp": "Setting up...",
+    "go": "Go",
+    "skipStart": "Skip — start learning anyway",
+    "missingSubject": "Missing subject. Please go back and try again.",
+    "takingLonger": "This is taking a bit longer than usual..."
+  },
+  "relearn": {
+    "title": "Relearn Topic",
+    "loadingReviewTopics": "Loading review topics...",
+    "startingSession": "Starting relearn session...",
+    "overdueTopicCount_one": "{{count}} overdue topic",
+    "overdueTopicCount_other": "{{count}} overdue topics",
+    "daysOverdue_one": "{{count}} day overdue",
+    "daysOverdue_other": "{{count}} days overdue"
+  },
+  "preview": {
+    "backToSignIn": "Back to sign in",
+    "tryMentomate": "Try MentoMate",
+    "seeHowItWorks": "See how it works — no sign-up needed yet.",
+    "bothQuestion": "What do you want to set up first?",
+    "bothHint": "You can do both — pick where to start.",
+    "intentQuestion": "Who are you setting this up for?",
+    "intentHint": "We'll tailor what you see next.",
+    "pickSampleLesson": "Pick a sample lesson",
+    "safePreviews": "These are safe previews. Your own topic comes after signup.",
+    "signUpChild": "Sign up to set up your child",
+    "signUpLesson": "Sign up to start your first lesson",
+    "signUpLessonTopic": "Sign up to start your first lesson on {{topic}}",
+    "trySampleFirst": "Try a sample lesson first",
+    "howTeaches": "Here's how MentoMate teaches",
+    "howHelpsFamilies": "Here's how MentoMate helps families",
+    "conversationPitch": "A back-and-forth conversation that follows what you actually need — not a fixed lesson plan.",
+    "weeklyReadPitch": "You set up your child, they learn, and you get a short weekly read on what they're working on. No surveillance, just signal.",
+    "weeklyHighlight": "Weekly highlight",
+    "sampleBadge": "Sample",
+    "sampleDataNote": "Sample data — your child's real insights appear after their first session.",
+    "sampleWeeklyBody": "Practiced quadratic equations for 45 minutes across three sessions. Getting comfortable with factoring; working on completing the square."
   }
 }

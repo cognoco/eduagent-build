@@ -5,7 +5,7 @@
 // TanStack Query for caching and Clerk for identity management.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import Purchases from 'react-native-purchases';
@@ -39,6 +39,44 @@ function isRevenueCatAvailable(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Identity-sync store — which Clerk userId the RC SDK is confirmed synced to
+// ---------------------------------------------------------------------------
+
+// [F-134] `useCustomerInfo` caches `Purchases.getCustomerInfo()` under the
+// CLERK userId, but the SDK answers for whatever identity it is currently
+// logged into. On a shared-device account switch the query refetches under
+// the new user's key before `Purchases.logIn(newUserId)` resolves, so the
+// previous account's entitlement snapshot can be cached (and persisted) under
+// the new user's key. This module-level store records the userId for which
+// identity sync has COMPLETED; `useCustomerInfo` gates on it so the query can
+// never run while the SDK identity and the query key disagree.
+// `null` = signed-out / anonymous (the initial state).
+let rcSyncedUserId: string | null = null;
+const rcSyncListeners = new Set<() => void>();
+
+function setRcSyncedUserId(userId: string | null): void {
+  rcSyncedUserId = userId;
+  for (const listener of rcSyncListeners) listener();
+}
+
+function subscribeToRcSyncedUserId(listener: () => void): () => void {
+  rcSyncListeners.add(listener);
+  return () => {
+    rcSyncListeners.delete(listener);
+  };
+}
+
+function getRcSyncedUserId(): string | null {
+  return rcSyncedUserId;
+}
+
+/** Test-only: clear module-level identity-sync state between tests. */
+export function resetRevenueCatIdentitySyncForTests(): void {
+  rcSyncedUserId = null;
+  rcSyncListeners.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Identity — sync Clerk auth state with RevenueCat user identity
 // ---------------------------------------------------------------------------
 
@@ -53,6 +91,7 @@ function isRevenueCatAvailable(): boolean {
  */
 export function useRevenueCatIdentity(): void {
   const { isSignedIn, userId } = useAuth();
+  const queryClient = useQueryClient();
   const previousUserIdRef = useRef<string | null>(null);
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,12 +112,25 @@ export function useRevenueCatIdentity(): void {
             if (cancelled) return;
             previousUserIdRef.current = userId;
             retryCountRef.current = 0;
+            // [F-134] Mark identity sync complete BEFORE invalidating, so the
+            // refetch triggered by the invalidation below is not suppressed
+            // by the useCustomerInfo `enabled` gate.
+            setRcSyncedUserId(userId);
+            // [F-134] A snapshot cached under this key before the gate was in
+            // effect (e.g. restored by the query persister) may belong to a
+            // different SDK identity — force a refetch now that the SDK
+            // identity is confirmed to match the key.
+            void queryClient.invalidateQueries({
+              queryKey: ['revenuecat', 'customerInfo', userId],
+            });
           }
         } else if (previousUserIdRef.current !== null) {
           await Purchases.logOut();
           if (cancelled) return;
           previousUserIdRef.current = null;
           retryCountRef.current = 0;
+          // [F-134] RC identity is now anonymous — gate signed-in keys again.
+          setRcSyncedUserId(null);
         }
       } catch (error) {
         if (cancelled) return;
@@ -101,9 +153,9 @@ export function useRevenueCatIdentity(): void {
           // [error-observability H-2] Retries exhausted — RevenueCat stays in
           // anonymous mode and billing receipts from this session would be
           // mis-attributed. A breadcrumb alone is invisible unless a later
-          // exception fires in the same session, so escalate to a real Sentry
-          // event (CLAUDE.md: silent recovery without escalation is banned in
-          // billing code).
+          // exception fires in the same session, so escalate the underlying
+          // error to a real Sentry event with queryable tags (silent recovery
+          // without escalation is banned in billing code).
           Sentry.captureException(
             error instanceof Error ? error : new Error(String(error)),
             {
@@ -113,6 +165,17 @@ export function useRevenueCatIdentity(): void {
               },
               extra: { userId },
             },
+          );
+          // [F-134] With the identity-sync gate in place, a terminal sync
+          // failure leaves useCustomerInfo disabled for the session
+          // (fail-closed: no RC snapshot beats another account's snapshot;
+          // the subscription screen falls back to the server tier, which is
+          // the access authority). Escalate beyond a breadcrumb so the
+          // failure rate is queryable — silent recovery without escalation
+          // is banned on billing paths.
+          Sentry.captureMessage(
+            '[revenuecat] identity sync failed after retries — customerInfo gated off',
+            'warning',
           );
         }
       }
@@ -127,7 +190,7 @@ export function useRevenueCatIdentity(): void {
         retryTimerRef.current = null;
       }
     };
-  }, [isSignedIn, userId]);
+  }, [isSignedIn, userId, queryClient]);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,8 +240,22 @@ export function useOfferings(): UseQueryResult<PurchasesOfferings | null> {
 export function useCustomerInfo(): UseQueryResult<CustomerInfo | null> {
   // BC-01: scope query cache by userId to prevent entitlement leakage
   const { userId } = useAuth();
+  // [F-134] Gate fetching on identity-sync completion: getCustomerInfo()
+  // answers for the SDK's CURRENT identity, so fetching before
+  // Purchases.logIn(userId) resolves would cache another account's
+  // entitlement snapshot under this user's key. Web / unconfigured platforms
+  // have no RC identity at all — the queryFn returns null there, so they
+  // stay ungated.
+  const syncedUserId = useSyncExternalStore(
+    subscribeToRcSyncedUserId,
+    getRcSyncedUserId,
+    getRcSyncedUserId,
+  );
+  const identityReady =
+    !isRevenueCatAvailable() || syncedUserId === (userId ?? null);
   return useQuery({
     queryKey: ['revenuecat', 'customerInfo', userId],
+    enabled: identityReady,
     queryFn: async ({ signal: querySignal }): Promise<CustomerInfo | null> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

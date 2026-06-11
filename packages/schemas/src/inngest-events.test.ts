@@ -10,9 +10,73 @@ import {
   sessionTranscriptPurgedEventSchema,
   sessionPurgeDelayedEventSchema,
   summaryReconciliationRequeuedEventSchema,
+  topicProbeRequestedEventSchema,
 } from './inngest-events.js';
 
 const validUuid = '00000000-0000-4000-8000-000000000001';
+
+// ---------------------------------------------------------------------------
+// [WI-577] PII-free event payload shapes (F-073/F-083/F-084/F-095)
+// ---------------------------------------------------------------------------
+
+describe('[WI-577] PII-free Inngest event payload schemas', () => {
+  const minorText = 'Learner: my name is Milo Janssen, I struggle with maths';
+
+  it('filingRetryEventSchema strips a legacy sessionTranscript field', () => {
+    const parsed = filingRetryEventSchema.parse({
+      profileId: validUuid,
+      sessionId: validUuid,
+      sessionMode: 'freeform',
+      sessionTranscript: minorText,
+    });
+    expect(parsed).not.toHaveProperty('sessionTranscript');
+    expect(JSON.stringify(parsed)).not.toContain('Milo Janssen');
+  });
+
+  it('topicProbeRequestedEventSchema accepts the reference-only payload', () => {
+    const result = topicProbeRequestedEventSchema.safeParse({
+      version: 1,
+      profileId: validUuid,
+      sessionId: validUuid,
+      subjectId: validUuid,
+      topicId: validUuid,
+      learnerMessageEventId: validUuid,
+      timestamp: '2026-06-11T10:00:00.000Z',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('topicProbeRequestedEventSchema rejects the legacy raw-text payload', () => {
+    const result = topicProbeRequestedEventSchema.safeParse({
+      version: 1,
+      profileId: validUuid,
+      sessionId: validUuid,
+      subjectId: validUuid,
+      topicId: validUuid,
+      learnerMessage: minorText,
+      topicTitle: 'Atomic structure',
+      timestamp: '2026-06-11T10:00:00.000Z',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('topicProbeRequestedEventSchema strips raw-text keys riding alongside the reference', () => {
+    const parsed = topicProbeRequestedEventSchema.parse({
+      version: 1,
+      profileId: validUuid,
+      sessionId: validUuid,
+      subjectId: validUuid,
+      topicId: validUuid,
+      learnerMessageEventId: validUuid,
+      learnerMessage: minorText,
+      topicTitle: 'Atomic structure',
+      timestamp: '2026-06-11T10:00:00.000Z',
+    });
+    expect(parsed).not.toHaveProperty('learnerMessage');
+    expect(parsed).not.toHaveProperty('topicTitle');
+    expect(JSON.stringify(parsed)).not.toContain('Milo Janssen');
+  });
+});
 
 describe('filing lifecycle Inngest event schemas', () => {
   it('accepts a filing timeout payload', () => {

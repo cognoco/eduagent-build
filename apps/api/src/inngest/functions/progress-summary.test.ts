@@ -283,6 +283,52 @@ describe('progressSummaryGeneration', () => {
     );
   });
 
+  // Memoized step returns are persisted in Inngest's third-party state store;
+  // they must carry opaque references only, never the child's name, the
+  // knowledge inventory, or the generated summary text.
+  describe('memoized step-state PII break tests [F-075 / F-087]', () => {
+    it('never returns the child name, knowledge inventory, or summary text from any step', async () => {
+      const { result, step } = await invokeProgressSummary({
+        profileId: 'child-1',
+        sessionId: 'session-1',
+      });
+
+      const memoized = await Promise.all(
+        step.run.mock.results.map((r) => r.value as Promise<unknown>),
+      );
+      const serialized = JSON.stringify(memoized);
+      // F-075: child display name out of gather-context's memoized return.
+      expect(serialized).not.toContain('Emma');
+      // F-087: knowledge inventory out of memoized step state.
+      expect(serialized).not.toContain('topicsAttempted');
+      expect(serialized).not.toContain('currentlyWorkingOn');
+      // The LLM summary (parent-facing minor PII) stays inside the
+      // generate-and-persist step.
+      expect(serialized).not.toContain('Generated summary.');
+      // Function-level run output is persisted too.
+      expect(JSON.stringify(result)).not.toContain('Emma');
+    });
+
+    it('still generates and persists using the rehydrated child name', async () => {
+      const { result } = await invokeProgressSummary({
+        profileId: 'child-1',
+        sessionId: 'session-1',
+      });
+
+      expect(result).toMatchObject({ status: 'generated' });
+      expect(mockGenerateProgressSummary).toHaveBeenCalledWith(
+        expect.objectContaining({ childName: 'Emma' }),
+      );
+      expect(mockUpsertProgressSummary).toHaveBeenCalledWith(
+        sharedDb,
+        expect.objectContaining({
+          childProfileId: 'child-1',
+          summary: 'Generated summary.',
+        }),
+      );
+    });
+  });
+
   // [WI-82] GDPR consent gate — background job must re-check consent at execution time
   describe('GDPR consent gate', () => {
     it.each([

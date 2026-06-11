@@ -167,12 +167,35 @@ describe('stripEnvelopeJson', () => {
   });
 
   describe('schema-invalid but extractable envelope', () => {
-    it('returns original when envelope has unrecognised top-level keys [CR-PR129-M7]', () => {
-      // CR-PR129-M7: Unknown keys mean we cannot safely distinguish a leaked
-      // envelope from arbitrary JSON (e.g. a teaching example). Return raw.
+    it('[WI-581/F-137] projects reply when an unknown key accompanies a structural sibling (fail-safe)', () => {
+      // Previously the allowlist failed OPEN here: one unrecognised top-level
+      // key made the whole envelope render raw — including `signals` and
+      // `private_sources`. An unknown key alongside `reply` + a structural
+      // envelope sibling is far more likely a future schema field than user
+      // prose, so we project to `.reply`.
       const envelope =
         '{"reply":"Still good","signals":{"partial_progress":false},"future_field":42}';
-      expect(stripEnvelopeJson(envelope)).toBe(envelope);
+      expect(stripEnvelopeJson(envelope)).toBe('Still good');
+    });
+
+    it('[WI-581/F-137] break test: unknown key never causes private_sources to render', () => {
+      const envelope = JSON.stringify({
+        reply: 'Visible text only',
+        signals: { ready_to_finish: false },
+        private_sources: { relied_on: ['source-1'], reason: 'hidden' },
+        new_top_level_field: { anything: true },
+      });
+      const result = stripEnvelopeJson(envelope);
+      expect(result).toBe('Visible text only');
+      expect(result).not.toContain('private_sources');
+      expect(result).not.toContain('hidden');
+    });
+
+    it('[WI-581/F-137] still passes through JSON whose extra keys have no envelope sibling', () => {
+      // reply + only unknown keys = arbitrary JSON (e.g. a teaching example),
+      // not a leaked envelope — leave untouched.
+      const arbitrary = '{"reply":"x","name":"example","age":11}';
+      expect(stripEnvelopeJson(arbitrary)).toBe(arbitrary);
     });
 
     it('extracts reply when fluency_drill has invalid duration_s (zod min(15) violation)', () => {

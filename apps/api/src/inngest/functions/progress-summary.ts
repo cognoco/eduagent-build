@@ -79,13 +79,14 @@ export const progressSummaryGeneration = inngest.createFunction(
       }
       if (!latestSession) return null;
 
-      const inventory = await buildKnowledgeInventory(db, profileId);
+      // Minor-PII discipline: this return value is memoized into Inngest's
+      // third-party state store, so it carries opaque references only — the
+      // child's name and knowledge inventory are rehydrated from the DB
+      // inside the step that consumes them.
       return {
         status: 'ok' as const,
-        childName: profile.displayName,
         latestSessionId: latestSession.id,
         latestSessionAt: latestSession.startedAt,
-        inventory,
         // DB returns string | null; parse to union before passing to LLM call.
         conversationLanguage: parseConversationLanguage(
           profile.conversationLanguage,
@@ -102,17 +103,35 @@ export const progressSummaryGeneration = inngest.createFunction(
     // `context.status === 'ok'` — narrowed cleanly, no cast needed.
     const ctx = context;
 
-    const summary = await step.run('generate-summary', async () => {
+    // Generation and persistence share one step: the generated summary is
+    // parent-facing personal data about the minor (name + learning topics),
+    // so it must never cross a step boundary into Inngest's memoized state.
+    // The child name and knowledge inventory are rehydrated from the DB here
+    // instead of riding the gather-context step return.
+    const summaryResult = await step.run('generate-summary', async () => {
       // [WI-82] Re-check consent here too: gather-context's gate is memoized by
       // Inngest, so on a retry of this step a withdrawal after the first run
-      // must still block the LLM call (cross-step memoization gap).
+      // must still block the LLM call (cross-step memoization gap). Persisting
+      // in the same step also closes the old generate→persist gap.
       const db = getStepDatabase();
-      if (!(await isGdprProcessingAllowed(db, profileId))) return null;
+      if (!(await isGdprProcessingAllowed(db, profileId))) {
+        return { status: 'skipped' as const, reason: 'consent_not_granted' };
+      }
+      const profile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, profileId),
+        columns: { displayName: true },
+      });
+      if (!profile) {
+        return { status: 'skipped' as const, reason: 'profile_missing' };
+      }
+      const inventory = await buildKnowledgeInventory(db, profileId);
+
+      let summary: string;
       try {
-        return await generateProgressSummary({
-          childName: ctx.childName,
+        summary = await generateProgressSummary({
+          childName: profile.displayName,
           latestSessionId: ctx.latestSessionId,
-          inventory: ctx.inventory,
+          inventory,
           latestSessionAt: new Date(ctx.latestSessionAt),
           conversationLanguage: ctx.conversationLanguage,
         });
@@ -125,29 +144,29 @@ export const progressSummaryGeneration = inngest.createFunction(
             sessionId,
           },
         });
-        return deterministicProgressSummaryFallback(
-          ctx.childName,
+        summary = deterministicProgressSummaryFallback(
+          profile.displayName,
           new Date(ctx.latestSessionAt),
         );
       }
-    });
 
-    if (summary === null) {
-      return { status: 'skipped', reason: 'consent_not_granted' };
-    }
-
-    await step.run('persist-summary', async () => {
-      const db = getStepDatabase();
-      // [WI-82] Re-check before persisting derived data — defense-in-depth for
-      // a withdrawal between generate and this (separately retried) step.
-      if (!(await isGdprProcessingAllowed(db, profileId))) return;
+      // [WI-82] Re-check before persisting derived data — defense-in-depth
+      // for a withdrawal that lands while the LLM call is in flight.
+      if (!(await isGdprProcessingAllowed(db, profileId))) {
+        return { status: 'skipped' as const, reason: 'consent_not_granted' };
+      }
       await upsertProgressSummary(db, {
         childProfileId: profileId,
         summary,
         basedOnLastSessionAt: new Date(ctx.latestSessionAt),
         latestSessionId: ctx.latestSessionId,
       });
+      return { status: 'generated' as const };
     });
+
+    if (summaryResult.status === 'skipped') {
+      return { status: 'skipped', reason: summaryResult.reason };
+    }
 
     return {
       status: 'generated',

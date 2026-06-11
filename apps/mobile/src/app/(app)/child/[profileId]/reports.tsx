@@ -118,7 +118,9 @@ function ReportsHeaderSummary({
               {t('parentView.weeklyReport.timeOnApp')}
             </Text>
             <Text className="text-body font-semibold text-text-primary mt-1">
-              {thisWeek.totalActiveMinutes} min
+              {t('parentView.weeklyReport.activeMinutes', {
+                count: thisWeek.totalActiveMinutes,
+              })}
             </Text>
           </View>
           <View>

@@ -649,6 +649,31 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('[F-110] engages the session-expired UI for any error the boundary classifies as not-found, not only typed NotFoundError instances', () => {
+    // sessionExpired is computed from
+    // classifyApiError(transcript.error).category === 'not-found' rather
+    // than a per-screen instanceof NotFoundError check. Seed a plain
+    // status-404 error (no typed class): the boundary classifies it as
+    // 'not-found', so the expired UI must engage. The old instanceof check
+    // would have missed this shape entirely.
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: 'topic-1',
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+    });
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: Object.assign(new Error('Session not found'), { status: 404 }),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+
+    expect(testScreen.getByTestId('session-expired-new-session')).toBeTruthy();
+  });
+
   it('keeps homework progress in one session when moving to the next problem', async () => {
     const testScreen = renderSessionScreen();
 

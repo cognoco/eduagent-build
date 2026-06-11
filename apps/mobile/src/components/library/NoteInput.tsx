@@ -86,7 +86,11 @@ export function NoteInput({
 
       {isListening && (
         <View className="flex-row items-center mb-2">
-          <ActivityIndicator size="small" color={themeColors.primary} />
+          <ActivityIndicator
+            size="small"
+            color={themeColors.primary}
+            accessibilityLabel={t('common.loading')}
+          />
           <Text className="text-caption text-text-secondary ms-2">
             {t('session.noteInput.listening')}
           </Text>
@@ -136,7 +140,11 @@ export function NoteInput({
             accessibilityLabel={t('session.noteInput.save')}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={themeColors.textInverse} />
+              <ActivityIndicator
+                size="small"
+                color={themeColors.textInverse}
+                accessibilityLabel={t('common.loading')}
+              />
             ) : (
               <Text className="text-body text-text-primary">
                 {t('session.noteInput.save')}

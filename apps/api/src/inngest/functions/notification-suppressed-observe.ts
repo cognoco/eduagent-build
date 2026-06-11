@@ -10,11 +10,14 @@
 // volume is visible in Cloudflare Workers Logpush / `wrangler tail` and can
 // be aggregated by the `[notification-suppressed]` prefix.
 //
-// Reference: CLAUDE.md > Fix Verification Rules — "Silent recovery without
+// Reference: AGENTS.md > Fix Verification Rules — "Silent recovery without
 // escalation is banned".
 // ---------------------------------------------------------------------------
 
-import { appNotificationSuppressedEventSchema } from '@eduagent/schemas';
+import {
+  appNotificationSuppressedEventSchema,
+  summarizeRawPayload,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
@@ -31,24 +34,24 @@ export const notificationSuppressedObserve = inngest.createFunction(
     const parsed = appNotificationSuppressedEventSchema.safeParse(event.data);
 
     if (!parsed.success) {
-      // CLAUDE.md "Silent recovery without escalation is banned": a malformed
+      // AGENTS.md "Silent recovery without escalation is banned": a malformed
       // payload here means an upstream producer drifted from the schema, or a
       // bad actor / replay injected garbage. Returning success would mark the
       // run completed and disappear the signal. Instead: capture to Sentry and
       // throw so Inngest retries → eventually dead-letters, where the volume
       // is queryable.
       const err = new Error(
-        '[notification-suppressed] invalid event payload — schema drift or bad event'
+        '[notification-suppressed] invalid event payload — schema drift or bad event',
       );
       logger.error('[notification-suppressed] invalid event payload', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(err, {
         extra: {
           context: 'notification-suppressed-observe:invalid_payload',
           issues: parsed.error.issues,
-          rawData: event.data,
+          rawData: summarizeRawPayload(event.data),
         },
       });
       throw err;
@@ -68,5 +71,5 @@ export const notificationSuppressedObserve = inngest.createFunction(
       notificationType: data.notificationType,
       reason: data.reason,
     };
-  }
+  },
 );

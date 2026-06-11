@@ -10,7 +10,7 @@ RevenueCat project created on 2026-03-27:
 - **Store connections:** Account access is available as of 2026-05-15; connect App Store and Google Play when products/service credentials are ready.
 
 **Product ID mapping (must match code exactly):**
-Code reference: `apps/api/src/routes/revenuecat-webhook.ts:81-104`
+Code reference: `apps/api/src/services/billing/revenuecat-webhook-handler.ts:79` (PRODUCT_TIER_MAP) and `:99` (CONSUMABLE_PRODUCT_CREDITS)
 
 Subscriptions (6):
 - `com.eduagent.plus.monthly[.android]` → Plus

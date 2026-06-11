@@ -340,7 +340,17 @@ function parseTopicIntentMatcherResponse(
     const parsed = JSON.parse(jsonStr);
     const result = topicIntentMatcherResponseSchema.safeParse(parsed);
     return result.success ? result.data : null;
-  } catch {
+  } catch (err) {
+    // A parse exception here means the LLM returned structurally invalid JSON
+    // that even the brace-depth walker could not isolate. Log so a systematic
+    // regression (e.g. prompt drift causing malformed output) is queryable.
+    logger.warn('topic_intent_matcher_parse_error', {
+      event: 'session.topic_intent_matcher.parse_error',
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      extra: { context: 'session.topic_intent_matcher.parse' },
+    });
     return null;
   }
 }
@@ -1488,7 +1498,7 @@ export async function recordSystemPrompt(
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {
@@ -1508,7 +1518,7 @@ export async function recordSessionEvent(
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {
@@ -1529,7 +1539,7 @@ export async function flagContent(
   // Look up the session to get its subjectId
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   await insertSessionEvent(db, session, profileId, {
@@ -2132,7 +2142,7 @@ export async function listProfileSessions(
  * summaries, subject names, topic titles and ai_response drill rows would
  * leak across accounts.
  *
- * Per CLAUDE.md: the scoped repository can't express multi-table joins, so we
+ * Per AGENTS.md: the scoped repository can't express multi-table joins, so we
  * use direct `db.select()` / `db.query.*` with explicit
  * `eq(*.profileId, profileId)` predicates. `curriculumTopics` has no
  * `profileId` column — for that table we enforce isolation through the

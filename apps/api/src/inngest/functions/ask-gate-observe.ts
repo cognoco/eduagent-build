@@ -12,7 +12,7 @@
 // This follows the same observer pattern as payment-failed-observe.ts and
 // ask-classification-observe.ts: structured log + return-shape contract,
 // no transformation or retry logic. Schema drift escalates to Sentry so the
-// "silent recovery without escalation" rule (CLAUDE.md) is honoured.
+// "silent recovery without escalation" rule (AGENTS.md) is honoured.
 //
 // Event payload shapes (shared with sender via `@eduagent/schemas`):
 //   app/ask.gate_decision  → askGateDecisionEventSchema
@@ -22,6 +22,9 @@
 import {
   askGateDecisionEventSchema,
   askGateTimeoutEventSchema,
+  // summarizeRawPayload: canonical home is @eduagent/schemas (pii-scrub),
+  // shared by every observe handler's drift path.
+  summarizeRawPayload,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
@@ -37,17 +40,6 @@ function summarizeReason(reason: unknown) {
   return {
     reasonPresent: typeof reason === 'string' ? reason.length > 0 : false,
     reasonLength: typeof reason === 'string' ? reason.length : 0,
-  };
-}
-
-function summarizeRawPayload(rawData: unknown) {
-  if (!isRecord(rawData)) {
-    return { payloadType: Array.isArray(rawData) ? 'array' : typeof rawData };
-  }
-
-  return {
-    payloadType: 'object',
-    fieldCount: Object.keys(rawData).length,
   };
 }
 

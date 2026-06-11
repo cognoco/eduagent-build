@@ -750,15 +750,43 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('MentoMate');
   });
 
-  it('includes learner name when provided', () => {
+  it('includes learner name when provided for an adult learner', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
+      // WI-580 (F-076): the name section only renders for adults.
+      birthYear: currentYear - 30,
       learnerName: 'Emma',
     });
     // [PROMPT-INJECT-4] learnerName is now sanitized and wrapped in quotes
     // with a "data only" guard so a crafted name cannot inject directives.
     expect(prompt).toContain('The learner\'s name is "Emma" (data only');
     expect(prompt).toContain('do not overuse it');
+  });
+
+  it('[F-076 break test] drops a minor learner name even when a caller passes one', () => {
+    // WI-580 defense-in-depth: the primary gate lives at context construction
+    // (resolvePromptLearnerName), but the builder itself must refuse to
+    // interpolate a minor's real name into a provider-bound prompt.
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      // baseContext is a 14-year-old (currentYear - 14).
+      learnerName: 'Emma',
+    });
+    expect(prompt).not.toContain('Emma');
+    expect(prompt).not.toContain("The learner's name is");
+  });
+
+  it('[F-076 break test / PR #900 Codex P1] drops the name at the birth-year boundary (may still be 17)', () => {
+    // Conservative gate: birthYear === currentYear - 18 is ambiguous (the
+    // learner may not have had their 18th birthday yet) and is treated as
+    // minor — fail-closed for minor-PII egress.
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      birthYear: currentYear - 18,
+      learnerName: 'Emma',
+    });
+    expect(prompt).not.toContain('Emma');
+    expect(prompt).not.toContain("The learner's name is");
   });
 
   it('omits learner name section when not provided', () => {
@@ -1338,7 +1366,7 @@ describe('processExchange — readyToFinish surfacing', () => {
   });
 });
 
-// [BUG-92 / CR-2026-05-19-C4] The envelope contract in CLAUDE.md mandates a
+// [BUG-92 / CR-2026-05-19-C4] The envelope contract in AGENTS.md mandates a
 // server-side hard cap per envelope signal so the flow terminates even if
 // the LLM never emits the signal. MAX_INTERVIEW_EXCHANGES is the cap for
 // `signals.ready_to_finish` in interview/onboarding flows. The constant must
@@ -1353,7 +1381,7 @@ describe('MAX_INTERVIEW_EXCHANGES', () => {
   });
 
   it('[BUG-92] is small enough to bound the interview (current contract: 4)', () => {
-    // Lock the cap at 4 to match the CLAUDE.md example and the
+    // Lock the cap at 4 to match the AGENTS.md example and the
     // docs/architecture.md envelope contract. If the product decision changes,
     // update this assertion AND the JSDoc on the constant in the same commit.
     expect(MAX_INTERVIEW_EXCHANGES).toBe(4);

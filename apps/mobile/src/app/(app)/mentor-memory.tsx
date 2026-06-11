@@ -279,7 +279,7 @@ export default function MentorMemoryScreen() {
         className="flex-1 bg-background items-center justify-center"
         style={{ paddingTop: insets.top }}
       >
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
       </View>
     );
   }

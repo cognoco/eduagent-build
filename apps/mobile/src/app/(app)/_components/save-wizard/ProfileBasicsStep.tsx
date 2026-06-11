@@ -34,7 +34,7 @@ export function ProfileBasicsStep({
 }): React.ReactElement {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   // i18n Phase 1 — Signup-time fix. The owner POST is a self-create, so
   // forward the device UI language for the first LLM call. The child POST
   // OMITS the field (MED-2): the parent's UI locale does not reliably
@@ -206,7 +206,9 @@ export function ProfileBasicsStep({
       {needsOwner && (
         <View className="mb-6">
           <Text className="text-h3 font-semibold text-text-primary mb-3">
-            {target === 'self' ? 'Tell us about you' : 'About you (the parent)'}
+            {target === 'self'
+              ? t('saveWizard.aboutYouSelf')
+              : t('saveWizard.aboutYouParent')}
           </Text>
           <TextInput
             placeholder="Your name"
@@ -218,6 +220,7 @@ export function ProfileBasicsStep({
                 ? 'save-basics-display-name'
                 : 'save-basics-parent-name'
             }
+            accessibilityLabel={t('saveWizard.yourNameLabel')}
           />
           <TextInput
             placeholder="Birth year (e.g. 1985)"
@@ -231,6 +234,7 @@ export function ProfileBasicsStep({
                 ? 'save-basics-birth-year'
                 : 'save-basics-parent-birth-year'
             }
+            accessibilityLabel={t('saveWizard.yourBirthYearLabel')}
           />
         </View>
       )}
@@ -238,7 +242,7 @@ export function ProfileBasicsStep({
       {needsChild && (
         <View className="mb-6">
           <Text className="text-h3 font-semibold text-text-primary mb-3">
-            About your child
+            {t('saveWizard.aboutChild')}
           </Text>
           <TextInput
             placeholder="Their name or nickname"
@@ -246,6 +250,7 @@ export function ProfileBasicsStep({
             onChangeText={setChildName}
             className="bg-surface text-text-primary rounded-input px-4 py-3 mb-3"
             testID="save-basics-child-name"
+            accessibilityLabel={t('saveWizard.childNameLabel')}
           />
           <TextInput
             placeholder="Birth year"
@@ -255,6 +260,7 @@ export function ProfileBasicsStep({
             maxLength={4}
             className="bg-surface text-text-primary rounded-input px-4 py-3"
             testID="save-basics-child-birth-year"
+            accessibilityLabel={t('saveWizard.childBirthYearLabel')}
           />
         </View>
       )}
@@ -271,9 +277,7 @@ export function ProfileBasicsStep({
           accessibilityLiveRegion="polite"
         >
           <Text className="text-warning text-body-sm">
-            To set up a child&apos;s learning, the account holder must be 18 or
-            older. You can still set up your own learning instead — pick
-            &quot;My learning&quot; on the previous step.
+            {t('saveWizard.ageGate')}
           </Text>
         </View>
       )}
@@ -291,15 +295,16 @@ export function ProfileBasicsStep({
           testID="save-basics-child-error"
         >
           <Text className="text-danger text-body-sm mb-2">
-            We saved your account, but couldn&apos;t add your child yet:{' '}
-            {childError}
+            {t('saveWizard.childSaveError', { error: childError })}
           </Text>
           <Pressable
             onPress={() => void submit()}
             testID="save-basics-retry-child"
             accessibilityRole="button"
           >
-            <Text className="text-primary font-semibold">Retry</Text>
+            <Text className="text-primary font-semibold">
+              {t('common.retry')}
+            </Text>
           </Pressable>
         </View>
       )}
@@ -313,10 +318,13 @@ export function ProfileBasicsStep({
         accessibilityState={{ disabled: !canSubmit }}
       >
         {loading ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator
+            color="white"
+            accessibilityLabel={t('common.loading')}
+          />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
-            Continue
+            {t('common.continue')}
           </Text>
         )}
       </Pressable>

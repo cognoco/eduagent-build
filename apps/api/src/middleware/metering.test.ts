@@ -244,7 +244,7 @@ jest.mock(
 // the spy fns on a stable object keyed off __spies so they can be retrieved
 // later via jest.requireMock().
 // [CR-2026-05-21-047] safeSend spy — assertion mechanism for idempotency replay
-// KV failure observability (CLAUDE.md "Fix Development Rules": silent recovery
+// KV failure observability (AGENTS.md "Fix Development Rules": silent recovery
 // in billing without a structured metric is banned).
 const mockSafeSendFn = jest.fn().mockResolvedValue(undefined);
 jest.mock(
@@ -2036,6 +2036,145 @@ describe('metering middleware', () => {
   });
 
   // -----------------------------------------------------------------------
+  // [F-135] Per-profile top-up credit isolation — a child profile must never
+  // see the owner's purchased credit balance. Pre-fix, the middleware called
+  // getTopUpCreditsRemaining without a profileId for non-owner profiles,
+  // which returns the SUBSCRIPTION-WIDE sum (= the owner's credits on a
+  // per-profile tier) and echoed it in the 402 body.
+  // -----------------------------------------------------------------------
+
+  describe('[F-135] per-profile top-up credit isolation', () => {
+    it('never discloses the owner top-up balance to a child profile on the fast-path 402', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'plus' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'plus' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          role: 'child',
+          monthlyLimit: 100,
+          usedThisMonth: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        }),
+      );
+      // The owner has purchased credits. If the middleware runs the unscoped
+      // subscription-wide sum for the child, this leaks into the 402 body.
+      mockGetTopUpCreditsRemaining.mockResolvedValue(500);
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body.code).toBe('QUOTA_EXCEEDED');
+      expect(body.details.quotaModel).toBe('per-profile');
+      expect(body.details.profileRole).toBe('child');
+      expect(body.details.topUpCreditsRemaining).toBe(0);
+      // The unscoped aggregate must never even be queried for a child.
+      expect(mockGetTopUpCreditsRemaining).not.toHaveBeenCalled();
+      // Owner credits no longer mask the child's exhausted monthly quota at
+      // the fast-path check, so the request never reaches decrement.
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
+    it('never discloses the owner top-up balance to a child profile on the decrement-rejection 402', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'plus' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'plus' }),
+      );
+      // Fast-path sees one question left; the atomic decrement loses the race
+      // and rejects — the 402 body built on this path must also mask credits.
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          role: 'child',
+          monthlyLimit: 100,
+          usedThisMonth: 99,
+          dailyLimit: 10,
+          usedToday: 5,
+        }),
+      );
+      mockGetTopUpCreditsRemaining.mockResolvedValue(500);
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        source: 'none',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: 5,
+        profileRole: 'child',
+        quotaModel: 'per-profile',
+      });
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body.code).toBe('QUOTA_EXCEEDED');
+      expect(body.details.profileRole).toBe('child');
+      expect(body.details.topUpCreditsRemaining).toBe(0);
+      expect(mockGetTopUpCreditsRemaining).not.toHaveBeenCalled();
+    });
+
+    it('scopes the top-up read to the owner profileId on per-profile tiers', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'plus' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'plus' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          role: 'owner',
+          monthlyLimit: 700,
+          usedThisMonth: 700,
+          dailyLimit: null,
+          usedToday: 5,
+        }),
+      );
+      mockGetTopUpCreditsRemaining.mockResolvedValue(0);
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body.details.profileRole).toBe('owner');
+      expect(mockGetTopUpCreditsRemaining).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.any(Date),
+        'test-profile-id',
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Stream endpoint also metered
   // -----------------------------------------------------------------------
 
@@ -2187,6 +2326,11 @@ describe('metering middleware', () => {
       [
         'WI-258: book-suggestions topup',
         `/v1/subjects/${SUBJECT_UUID}/book-suggestions/topup`,
+      ],
+      // [F-023 / WI-575] — quick-check bypassed quota before this fix
+      [
+        'F-023 / WI-575: session quick-check',
+        `/v1/sessions/${SESSION_UUID}/quick-check`,
       ],
     ];
 

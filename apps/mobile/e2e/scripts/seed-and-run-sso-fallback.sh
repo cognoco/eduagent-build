@@ -11,7 +11,7 @@
 #   network. `svc wifi/data` has no permission requirement and actually
 #   disables the radios — Chrome Custom Tab sees a real "no network" state.
 #   Clerk testing-token rejection is not available (CLERK_TESTING_TOKEN is a
-#   placeholder per CLAUDE.md), so a real network kill is the deterministic
+#   placeholder per AGENTS.md), so a real network kill is the deterministic
 #   option.
 #
 # Strategy:

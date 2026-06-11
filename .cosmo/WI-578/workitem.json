@@ -1,0 +1,17 @@
+{
+  "pageId": "37b8bce9-1f7c-81ac-8297-cc3c4434b5a2",
+  "id": "WI-578",
+  "name": "WP-W3-pii-step-state: remove minor-PII from memoized Inngest step returns",
+  "description": "W3 (PII-handling, minor-PII egress) — memoize an ID/handle, not the minor's name/topics/birth-year (a memoized step return is persisted by Inngest): change each offending step's return to carry a reference; rehydrate downstream. Same fix across 6 sibling Inngest functions; shares the four-unit scrubber discipline.",
+  "acceptanceCriteria": "No minor-PII in any memoized step return; break-test per function; shared scrubber exported from a canonical home (bundle-level AC across the four W3 PII units). Findings: F-075, F-085, F-086, F-087, F-088, F-089 (6). P-batching hint: may slice the 6 into 2 batches if a single PR is too large — the pattern is identical, the split mechanical. Source of truth: _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 WP-W3-pii-step-state (commit 23d0c01ad)",
+  "riskImpact": "M / risky — memoized step-state persistence across 6 functions.",
+  "type": "Bug",
+  "altitude": "WP",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief (WP-W3-pii-step-state)\nTranscribed from the ratified Phase-O master plan §1 → \"WP-W3-pii-step-state\" @ 23d0c01ad — frozen source of truth. Children are absorbed provenance (ZDX-ADR-0001): WI-606/607.\nBundle rationale\nSame fix at the step-return site across sibling Inngest functions — memoize an ID/handle, not the minor's name/topics/birth-year (a memoized step return is persisted by Inngest).\nStrategy\nChange each offending step's return to carry a reference; rehydrate downstream. Shared scrubber discipline (see WI-577 brief).\nScope\nIn: F-075, F-085, F-086, F-087, F-088, F-089 (6 functions). Out: event payloads (WI-577).\nFindings table\nAcceptance Criteria (bundle)\nNo minor-PII in any memoized step return.\nBreak-test per function.\nRisk & blast radius\nM / risky — memoized step-state persistence across 6 functions. Depends on WP-W1-spine (WI-571) + WP-W2-scope-rls (WI-574). P-batching hint: the 6 may split into 2 PRs if one is too large — the pattern is identical, split is mechanical."
+}

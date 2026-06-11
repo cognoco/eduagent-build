@@ -275,11 +275,13 @@ describe('SavedBookmarksScreen', () => {
       screen.getByText("We couldn't load your saved items");
     });
 
-    it('shows the classified (formatApiError) message, not the raw error', () => {
-      // The screen now routes the thrown error through formatApiError instead
-      // of rendering err.message verbatim. A plain Error whose message contains
-      // "network" classifies as a network error, so the friendly networkError
-      // copy is shown and the raw "Network failure" string never reaches the UI.
+    it('[F-110] routes load error through formatApiError boundary, not raw instanceof check', () => {
+      // The screen routes the thrown error through the REAL formatApiError
+      // instead of rendering err.message verbatim. A plain Error whose message
+      // contains "network" classifies as a network error, so the friendly
+      // networkError copy is shown and the raw "Network failure" string never
+      // reaches the UI — this verifies the boundary rule (screens must never
+      // bypass the shared error classifier) against the real classifier.
       mockHooks({ isError: true });
       render(<SavedBookmarksScreen />);
       expect(screen.queryByText('Network failure')).toBeNull();
@@ -448,10 +450,12 @@ describe('SavedBookmarksScreen', () => {
       });
     });
 
-    it('shows an error alert when deletion fails', async () => {
-      mockDeleteBookmarkMutateAsync.mockRejectedValueOnce(
-        new Error('Server failure'),
-      );
+    it('[F-110] routes delete error through formatApiError boundary, not raw instanceof check', async () => {
+      // A message containing "network" makes the REAL classifier return the
+      // friendly networkError copy — distinguishable from the raw err.message,
+      // so this fails if the screen ever renders err.message directly again.
+      const deleteErr = new Error('network failure during delete');
+      mockDeleteBookmarkMutateAsync.mockRejectedValueOnce(deleteErr);
       mockHooks({ bookmarks: [BOOKMARK_1] });
       render(<SavedBookmarksScreen />);
       fireEvent.press(screen.getByTestId('bookmark-delete-bk-1'));
@@ -465,7 +469,7 @@ describe('SavedBookmarksScreen', () => {
       await waitFor(() => {
         expect(mockPlatformAlert).toHaveBeenLastCalledWith(
           'Could not delete bookmark',
-          'Server failure',
+          "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
         );
       });
     });

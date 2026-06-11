@@ -13,8 +13,7 @@
 
 - [project_nx_expo_plugin_bug.md](project_nx_expo_plugin_bug.md) — @nx/expo/plugin stack overflow on Windows. Run Jest/eslint directly.
 - [project_known_bug_patterns.md](project_known_bug_patterns.md) — Systemic patterns: silent fallbacks + React state timing gaps.
-- [project_schema_drift_pattern.md](project_schema_drift_pattern.md) — push→migrate transition silently skips columns. Fix dev: `db:push:dev`.
-- [project_dev_schema_drift_trap.md](project_dev_schema_drift_trap.md) — `mentomate-api-dev` "column does not exist" → `db:push:dev` + `db:generate`. Neon "staging" ≠ dev Worker's DB.
+- [project_schema_drift_pattern.md](project_schema_drift_pattern.md) — push→migrate transition silently skips columns; `mentomate-api-dev` "column does not exist" → `db:push:dev` + `db:generate:dev`. Neon "staging" ≠ dev Worker's DB.
 - [project_expo_router_pollution.md](_archive/project_expo_router_pollution.md) — Helpers under `app/(app)/` treated as routes. Fix: `_components/`, `_hooks/` dirs.
 
 ## Auth
@@ -31,28 +30,20 @@
 - [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. All 10 LLM flows wired. Fixture-driven snapshot harness for prompt builders.
 - [project_eval_llm_signal_metrics.md](project_eval_llm_signal_metrics.md) — Layer 1 signal-distribution regression guard. `emitsEnvelope` flag + `--check-baseline`/`--update-baseline`.
 - [project_llm_source_provenance.md](project_llm_source_provenance.md) — Private source provenance, sourceAudit metadata, and 0.88-gated general knowledge for ordinary rung 1-4 tutoring exchanges.
-- [billing-payments.md](billing-payments.md) — Mobile IAP (RevenueCat), Stripe dormant for future web. Epic 9 COMPLETE.
 - [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit; model routing details live in `MMT-ADR-0014` + `docs/registers/llm-models/master.md`.
 - [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). Consent/age-floor → `docs/compliance/identity-compliance-register.md` (canon).
 - [project_themekey_removed.md](project_themekey_removed.md) — NEVER use key={themeKey} OR Animated.View opacity on root layout.
-- [feedback_drizzle_transaction_cast.md](feedback_drizzle_transaction_cast.md) — PgTransaction → Database cast pattern for transactions.
 
 ## Workflow Preferences
 
 - Commit early + push after every commit. Never batch large changes.
-- [project_archon_spike_merge_rule.md](project_archon_spike_merge_rule.md) — During the Archon spike, `.archon/`-only changes can be direct-merged to main. Verify delta is `.archon/`-only first.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
 - [feedback_agent_checkpoint_cadence.md](feedback_agent_checkpoint_cadence.md) — Long-running agents save durable checkpoints every 4 minutes; no git from subagents.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
-- [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.
-- [feedback_no_pr_unless_asked.md](feedback_no_pr_unless_asked.md) — NEVER create a PR unless explicitly asked.
-- [feedback_use_gh_cli_for_prs.md](feedback_use_gh_cli_for_prs.md) — Use `gh` CLI for PR status, checks, logs, reviews, and conflict triage by default; keep small PR fixes lightweight.
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
-- [feedback_partial_staging_stash.md](feedback_partial_staging_stash.md) — Pre-commit tests full working tree; stash in-progress files before partial commits.
-- [feedback_commit_skip_failing.md](feedback_commit_skip_failing.md) — If pre-commit fails on some files, unstage them, commit+push what passes, fix failures after.
 - [feedback_test_receipts.md](feedback_test_receipts.md) — Stale `.test-receipts/*` push-hook failures: record, verify, then commit receipt-only follow-up.
 - [feedback_testing_tracking_only.md](feedback_testing_tracking_only.md) — When testing flows, track silently — surface flows tested + bugs at the end, not play-by-play.
 
@@ -62,7 +53,6 @@
 - Windows paths: Emulator/ADB at `C:\Android\Sdk`, Doppler at `C:\Tools\doppler\doppler.exe`. macOS/Linux: standard PATH.
 - [project_eas_build.md](project_eas_build.md) — EAS Build config, OTA operational, NX Cloud disconnected (2026-06-01, IID-792), Sentry upload disabled.
 - [project_eas_update_ota.md](project_eas_update_ota.md) — OTA IMPLEMENTED. JS-only changes deploy in ~5 min via expo-updates.
-- [project_ci_infrastructure.md](project_ci_infrastructure.md) — path filters, E2E APK caching, .nx/cache (NX Cloud disconnected, IID-792), Husky pre-commit.
 
 ## Testing Infrastructure
 
@@ -75,12 +65,9 @@
 - [feedback_doppler_secrets.md](feedback_doppler_secrets.md) — All secrets via Doppler. EXPO_PUBLIC vars synced via `pnpm env:sync`.
 - [doppler-secrets.md](doppler-secrets.md) — Test secret resolution: project `mentomate`, configs `dev/stg/prd`. `DATABASE_URL` and friends needed by `*.test.ts` files that include integration paths. Archon's validate/push wrap via `doppler run`.
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`). Staging synced 2026-04-17.
-- [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.
 
 ## Store Publishing
 
-- [project_apple_enrollment.md](project_apple_enrollment.md) — Apple Developer account available as of 2026-05-15; old enrollment blocker resolved.
-- [google_play_publishing.md](google_play_publishing.md) — Google Play account available as of 2026-05-15; old flagged-account blocker resolved.
 - [project_revenuecat_setup.md](project_revenuecat_setup.md) — RevenueCat project exists; remaining work is store product/connection/webhook setup.
 
 ## Brand & UX Decisions
@@ -91,7 +78,6 @@
 
 ## Persona Architecture (Epic 12 — COMPLETE, ThemeContext cleaned 2026-04-15)
 
-- [feedback_persona_vs_role.md](feedback_persona_vs_role.md) — Server-side: use `resolveProfileRole` (relationship-derived), not birthYear age. (`personaFromBirthYear` is a removed fossil.)
 
 ## Core Learning Philosophy
 
@@ -102,24 +88,16 @@
 - [feedback_never_force_add_child.md](feedback_never_force_add_child.md) — Never force add-child. Solo/skip path always available for parent accounts.
 - [feedback_human_override_everywhere.md](feedback_human_override_everywhere.md) — Every AI-driven screen must allow human override.
 - [feedback_quiet_defaults_over_friction.md](feedback_quiet_defaults_over_friction.md) — Default to quiet, infer from sustained behavior, surface controls only when sought. Surveillance and friction are both UX bugs.
-- [feedback_homework_not_socratic.md](feedback_homework_not_socratic.md) — Homework: explain + verify, NOT Socratic.
 - [feedback_no_jargon_kid_language.md](feedback_no_jargon_kid_language.md) — No app jargon. Plain language for all ages.
 - [feedback_voice_is_critical.md](feedback_voice_is_critical.md) — Voice input AND output critical — kids don't type.
 
 ## Development Process & Feedback
 
-- [project_commit_skill_drift.md](project_commit_skill_drift.md) — `.claude/skills/commit/` and `.agents/skills/commit/` diverged before sync existed; sync skips it. Follow-up to unify.
-- [project_sync_script_extension.md](project_sync_script_extension.md) — Two narrow sync scripts today. Generalize when a third sync need arises (N=3 trigger). Don't preemptively refactor.
+- [feedback_plan_cutover_ownership.md](feedback_plan_cutover_ownership.md) — Replace/rewrite plans need an owner for the cutover wave (switch-flip check); single-live-store invariant for piecemeal merges. From the WI-586 scope finding.
+
 - [project_agent_doc_and_memory_architecture_revisit.md](project_agent_doc_and_memory_architecture_revisit.md) — Open: AGENTS.md/CLAUDE.md content profile + cross-agent memory architecture. Memories currently Claude-only; Cortex (Nexus repo) is prior art for shared memory.
 - [feedback_audit_check_deleted_concepts.md](feedback_audit_check_deleted_concepts.md) — Before governance posture on rule violations, check if the concept was deleted by an epic. Literal grep misses aliases.
-- [feedback_comment_not_delete.md](feedback_comment_not_delete.md) — Comment out, don't delete unreleased UI features.
-- [feedback_testing_no_mocks.md](feedback_testing_no_mocks.md) — No new internal `jest.mock()` (GC1 ratchet). External-boundary mocks (Stripe, Clerk JWKS, Inngest, LLM providers) OK per CLAUDE.md.
-- [feedback_e2e_never_skip.md](feedback_e2e_never_skip.md) — Never skip E2E tests.
-- [feedback_e2e_release_gate.md](feedback_e2e_release_gate.md) — Release-blocking E2E means full suite, failure ledger, investigate each failure, fix real bugs or stale tests, repeat until green.
-- [feedback_batch_pr_fixes.md](feedback_batch_pr_fixes.md) — Batch PR fixes, validate locally, push once.
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
-- [feedback_verify_full_ci.md](feedback_verify_full_ci.md) — On CI failure, run full validation.
-- [feedback_pr_required_checks.md](feedback_pr_required_checks.md) — Missing required PR checks can be branch-protection/workflow-trigger drift; diagnose before changing product tests.
 - [feedback_e2e_cascade_root_cause.md](feedback_e2e_cascade_root_cause.md) — 20+ same-day Notion bugs with "Cascading X" in Found In = ONE infra bug. Fix upstream, don't close N individually.
 - [feedback_nx_reset_before_commit.md](feedback_nx_reset_before_commit.md) — NX cache causes phantom `@nx/enforce-module-boundaries` errors. Run `pnpm exec nx reset` to clear.
 
@@ -132,7 +110,6 @@
 - [reference_notion_workspace.md](reference_notion_workspace.md) — Issue Tracker split 2026-05-18: NEW bugs → Open `3598bce9...`; Resolved archive `b8ce802f...`. REST via Doppler.
 - [project_expo_web_preview.md](project_expo_web_preview.md) — `.claude/launch.json` `mobile` target. Cold bundle ~18s. Auth-walled past sign-in.
 - Template repo extraction plan — tracked in Notion (archived from memory 2026-05-04).
-- [feedback_notion_resolution_recording.md](feedback_notion_resolution_recording.md) — Record resolution on Done items. Never reopen.
 
 ## Custom Skills
 

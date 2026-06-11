@@ -45,11 +45,15 @@ module.exports = {
     '<rootDir>/.tmp/',
     '[/\\\\]\\.tmp',
   ]),
-  testPathIgnorePatterns: dropWorktreeGuards([
-    '<rootDir>/.worktrees/',
-    '<rootDir>/.tmp/',
-    '[/\\\\]\\.tmp',
-  ]),
+  testPathIgnorePatterns: [
+    ...dropWorktreeGuards([
+      '<rootDir>/.worktrees/',
+      '<rootDir>/.tmp/',
+      '[/\\\\]\\.tmp',
+    ]),
+    // WI-536 flaky-test quarantine (see tools/quarantine/).
+    ...require('../../tools/quarantine/registry.cjs').jestIgnorePatterns(),
+  ],
   moduleNameMapper: {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',

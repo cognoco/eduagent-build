@@ -78,7 +78,7 @@ describe('ask-silent-classify Inngest function', () => {
     // returns { skipped: true, reason: 'invalid_payload' } cleanly.
 
     it('does NOT throw when event.data is missing required fields', async () => {
-      // No sessionId / profileId / classifyInput / exchangeCount — the legacy
+      // No sessionId / profileId / exchangeCount — the legacy
       // .parse() path threw ZodError here. Now we expect a clean resolve.
       await expect(executeHandler({})).resolves.toBeTruthy();
     });
@@ -104,7 +104,7 @@ describe('ask-silent-classify Inngest function', () => {
     });
 
     it('emits app/ask.classification_failed for observability', async () => {
-      // Per global CLAUDE.md "Silent Recovery Without Escalation is Banned":
+      // Per global AGENTS.md "Silent Recovery Without Escalation is Banned":
       // the safeParse-fail path must emit a structured event so the case is
       // queryable via dashboards / metrics, not buried in logger.warn.
       // ask-classification-observe.ts:38-66 is the consumer that turns this
@@ -167,24 +167,133 @@ describe('ask-silent-classify Inngest function', () => {
   describe('valid payload — happy path proxies', () => {
     // Smoke checks that the safeParse fix did not regress the happy path —
     // a fully-valid payload must still pass through to classifySubject.
-    it('invokes classifySubject when payload validates', async () => {
-      mockClassifySubject.mockResolvedValue({ candidates: [] });
+    // [WI-577 / F-083] The db mock answers both step queries: the
+    // check-existing metadata read (…where().limit()) and the classify
+    // step's user_message rehydration (…where().orderBy().limit(n) —
+    // honors the limit so the staleness-bounding test below is real).
+    function stubDb(userMessageRows: Array<{ content: string }>) {
       mockGetStepDatabase.mockReturnValue({
         select: () => ({
           from: () => ({
-            where: () => ({ limit: async () => [{ metadata: {} }] }),
+            where: () => ({
+              limit: async () => [{ metadata: {} }],
+              orderBy: () => ({
+                limit: async (n: number) => userMessageRows.slice(0, n),
+              }),
+            }),
           }),
         }),
       });
+    }
+
+    it('invokes classifySubject when payload validates', async () => {
+      mockClassifySubject.mockResolvedValue({ candidates: [] });
+      stubDb([{ content: 'photosynthesis basics' }]);
 
       await executeHandler({
         sessionId: TEST_SESSION_ID,
         profileId: TEST_PROFILE_ID,
-        classifyInput: 'photosynthesis basics',
         exchangeCount: 1,
       });
 
       expect(mockClassifySubject).toHaveBeenCalled();
+    });
+
+    // [WI-577 / F-083] Break tests: the event payload must never be the
+    // classification-input source. Inngest persists event payloads in its
+    // third-party event store, so the minor's raw "ask" text rides only in
+    // the DB; the classify step rehydrates it from session_events.
+    it('[WI-577] rehydrates classify input from session_events and joins user messages', async () => {
+      mockClassifySubject.mockResolvedValue({ candidates: [] });
+      stubDb([
+        { content: 'what is photosynthesis?' },
+        { content: 'and why are leaves green?' },
+      ]);
+
+      await executeHandler({
+        sessionId: TEST_SESSION_ID,
+        profileId: TEST_PROFILE_ID,
+        exchangeCount: 2,
+      });
+
+      expect(mockClassifySubject).toHaveBeenCalledWith(
+        expect.anything(),
+        TEST_PROFILE_ID,
+        'what is photosynthesis?\nand why are leaves green?',
+      );
+    });
+
+    // Codex P2 (PR #911): a delayed/retried run must not classify from
+    // messages the learner sent AFTER the triggering exchange — rehydration
+    // is bounded to the first `exchangeCount` user messages.
+    it('[WI-577] bounds rehydration to the triggering exchange on delayed runs', async () => {
+      mockClassifySubject.mockResolvedValue({ candidates: [] });
+      stubDb([
+        { content: 'what is photosynthesis?' },
+        { content: 'and why are leaves green?' },
+        { content: 'now help me with my history homework instead' },
+      ]);
+
+      await executeHandler({
+        sessionId: TEST_SESSION_ID,
+        profileId: TEST_PROFILE_ID,
+        exchangeCount: 2,
+      });
+
+      expect(mockClassifySubject).toHaveBeenCalledWith(
+        expect.anything(),
+        TEST_PROFILE_ID,
+        'what is photosynthesis?\nand why are leaves green?',
+      );
+      expect(JSON.stringify(mockClassifySubject.mock.calls)).not.toContain(
+        'history homework',
+      );
+    });
+
+    it('[WI-577] ignores a legacy classifyInput field on the event payload', async () => {
+      mockClassifySubject.mockResolvedValue({ candidates: [] });
+      stubDb([{ content: 'what is photosynthesis?' }]);
+
+      await executeHandler({
+        sessionId: TEST_SESSION_ID,
+        profileId: TEST_PROFILE_ID,
+        // Legacy in-flight event shape — a known minor identifier that must
+        // never reach the classifier from the payload.
+        classifyInput: 'my name is Milo Janssen and I struggle with fractions',
+        exchangeCount: 1,
+      });
+
+      expect(mockClassifySubject).toHaveBeenCalledWith(
+        expect.anything(),
+        TEST_PROFILE_ID,
+        'what is photosynthesis?',
+      );
+      expect(JSON.stringify(mockClassifySubject.mock.calls)).not.toContain(
+        'Milo Janssen',
+      );
+    });
+
+    it('[WI-577] skips with no_user_messages when nothing is persisted yet', async () => {
+      stubDb([]);
+
+      const { result, sendEventCalls } = await executeHandler({
+        sessionId: TEST_SESSION_ID,
+        profileId: TEST_PROFILE_ID,
+        exchangeCount: 2,
+      });
+
+      expect(result).toMatchObject({
+        skipped: true,
+        reason: 'no_user_messages',
+      });
+      expect(mockClassifySubject).not.toHaveBeenCalled();
+      expect(sendEventCalls).toContainEqual({
+        name: 'classification-no-user-messages',
+        payload: expect.objectContaining({
+          name: 'app/ask.classification_skipped',
+          data: expect.objectContaining({ reason: 'no_user_messages' }),
+        }),
+      });
     });
   });
 });

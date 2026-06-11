@@ -79,6 +79,17 @@
         "cwd": "{workspaceRoot}",
         "command": "prettier --check \"{projectRoot}/**/*.{ts,tsx,js,jsx,json,css,scss,html}\""
       }
+    },
+    "typecheck": {
+      "//": "WI-451 (D5): cache only deterministic declaration outputs; never cache TS incremental state (.tsbuildinfo). Restoring stale .tsbuildinfo across input contexts causes TS6305 false positives. Positive .d.ts globs exclude .tsbuildinfo by construction. apps/mobile is fully-inferred (no project.json) and ignores this default, so it carries the same override in apps/mobile/project.json.",
+      "outputs": [
+        "{projectRoot}/**/*.d.ts",
+        "{projectRoot}/**/*.d.cts",
+        "{projectRoot}/**/*.d.mts",
+        "{projectRoot}/**/*.d.ts.map",
+        "{projectRoot}/**/*.d.cts.map",
+        "{projectRoot}/**/*.d.mts.map"
+      ]
     }
   },
   "generators": {}

@@ -1,0 +1,29 @@
+# CODEOWNERS — required human review on high-risk paths
+#
+# Source decision: docs/specs/2026-05-26-commit-pr-pipeline-gates.md (D4).
+# Rationale: automated LLM review is advisory (nondeterministic => never a required
+# gate); blanket human review would bottleneck autonomous flows and can deadlock a
+# solo author. So required human review is routed to high-consequence paths ONLY;
+# everything else is gated by deterministic CI.
+#
+# Two owners are listed so the non-author can always approve (no solo-author deadlock).
+#
+# NOTE: this file only *requests* code-owner review. Making that review *required*
+# on these paths is a branch-protection setting (GitHub repo admin). WI-538 enabled
+# and proved it (2026-06-11), then it was deliberately SUSPENDED until MentoMate is
+# in production (operator ruling) — re-arming is WI-617, a pre-launch checklist item.
+# Until then, these lines are advisory only.
+
+# Payments / subscription — mischarge / revenue risk
+**/billing/**                    @jojorgen @crowka
+
+# Authentication — security / privilege-escalation risk
+**/auth/**                       @jojorgen @crowka
+**/clerk*                        @jojorgen @crowka
+
+# Database migrations + schema — irreversible data-loss risk
+packages/database/drizzle/**     @jojorgen @crowka
+packages/database/src/schema/**  @jojorgen @crowka
+
+# CI/CD pipeline — self-protecting; secret-exfiltration risk
+.github/workflows/**             @jojorgen @crowka

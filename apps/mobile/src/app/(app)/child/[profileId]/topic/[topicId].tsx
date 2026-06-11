@@ -321,7 +321,7 @@ export default function TopicDetailScreen() {
         </Text>
         {sessionsLoading ? (
           <View className="py-4 items-center" testID="sessions-loading">
-            <ActivityIndicator />
+            <ActivityIndicator accessibilityLabel={t('common.loading')} />
           </View>
         ) : sessionsError && !sessions ? (
           // [UX-DE] Distinguish a session-fetch failure from a genuinely empty

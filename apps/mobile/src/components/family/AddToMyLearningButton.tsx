@@ -206,7 +206,10 @@ export function AddToMyLearningButton({
         testID="add-to-my-learning-button"
       >
         {isCloning ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator
+            color="white"
+            accessibilityLabel={t('common.loading')}
+          />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
             {t('addToMyLearning.buttonLabel')}

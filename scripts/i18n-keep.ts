@@ -67,6 +67,30 @@ const raw: readonly KeepPattern[] = [
       'selected via COMPLETION_STATUS_KEYS[completionStatus] at ' +
       'apps/mobile/src/app/(app)/child/[profileId]/topic/[topicId].tsx:182',
   },
+  // Keys referenced via react-i18next <Trans i18nKey="..."> (JSX attribute,
+  // not a t() call) — the AST walker only follows t()-style call sites, so
+  // Trans-only keys would otherwise be flagged as unused.
+  {
+    pattern: 'auth.signIn.sentCodeTo',
+    reason: '<Trans i18nKey> at apps/mobile/src/app/(auth)/sign-in.tsx:1122',
+  },
+  {
+    pattern: 'auth.signIn.offerBody',
+    reason: '<Trans i18nKey> at apps/mobile/src/app/(auth)/sign-in.tsx:1490',
+  },
+  {
+    pattern: 'auth.signUp.sentCodeTo',
+    reason: '<Trans i18nKey> at apps/mobile/src/app/(auth)/sign-up.tsx:365',
+  },
+  {
+    pattern: 'auth.signUp.agreeToTerms',
+    reason: '<Trans i18nKey> at apps/mobile/src/app/(auth)/sign-up.tsx:670',
+  },
+  {
+    pattern: 'auth.forgotPassword.enterCodeAndPassword',
+    reason:
+      '<Trans i18nKey> at apps/mobile/src/app/(auth)/forgot-password.tsx:302',
+  },
   // Home tab title + accessibility-label keys are chosen at runtime from the
   // navigation contract (V0 legacy + V1) via homeTabPresentation. Glob `*` is
   // non-empty, so bare `tabs.home` and `tabs.homeLabel` need separate entries.

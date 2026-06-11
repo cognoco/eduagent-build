@@ -494,6 +494,7 @@ import {
   getSessionTranscript,
   recordSystemPrompt,
   recordSessionEvent,
+  flagContent,
   setSessionInputMode,
   startFirstCurriculumSession,
   SessionExchangeLimitError,
@@ -506,6 +507,7 @@ import { Hono } from 'hono';
 import { app } from '../index';
 import { sessionRoutes } from './sessions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { NotFoundError } from '@eduagent/schemas';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -1020,6 +1022,26 @@ describe('session routes', () => {
       expect(res.status).toBe(400);
       expect(recordSystemPrompt).not.toHaveBeenCalled();
     });
+
+    it('[F-015] returns 404 (not 500) when session is not found', async () => {
+      (recordSystemPrompt as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Session'),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/system-prompt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ kind: 'silence_nudge' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('NOT_FOUND');
+    });
   });
 
   describe('POST /v1/sessions/:sessionId/events', () => {
@@ -1049,6 +1071,30 @@ describe('session routes', () => {
           content: 'too_easy',
         }),
       );
+    });
+
+    it('[F-015] returns 404 (not 500) when session is not found', async () => {
+      (recordSessionEvent as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Session'),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            content: 'too_easy',
+            metadata: { chip: 'too_easy' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('NOT_FOUND');
     });
   });
 
@@ -1546,6 +1592,26 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    it('[F-015] returns 404 (not 500) when session is not found', async () => {
+      (flagContent as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Session'),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/flag`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ eventId: EVENT_ID }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('NOT_FOUND');
     });
   });
 
@@ -3509,4 +3575,83 @@ describe('[WI-371 / DS-194] sessions proxy-mode guard — remaining write routes
       expect((await res.json()).code).toBe('PROXY_MODE');
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// [F-126 / WI-575] Library-filing proxy guard — central authority check.
+//
+// Finding: library-filing write endpoints were missing the proxy-mode guard
+// (F-126 — deepsec-MEDIUM-acl-check-4669badcf7). The guard on these routes
+// must use the SERVER-DERIVED authority check (profileMeta.isOwner, set by
+// profileScopeMiddleware from the server-side profile lookup), not just the
+// client-supplied X-Proxy-Mode header, so a proxy caller cannot regain write
+// access by simply omitting the header.
+//
+// This satisfies MMT-ADR-0008 "central guardian-act-for authority check" (inv
+// 7/8): the assertNotProxyMode function is the single resolver of "may this
+// caller mutate state on this profile?", keyed on server-derived isOwner.
+//
+// Break test: non-owner proxy caller WITHOUT X-Proxy-Mode header — must still
+// get 403 PROXY_MODE before any DB call (the regression guard for the specific
+// header-bypass attack vector F-126 identifies).
+// ---------------------------------------------------------------------------
+describe('[F-126 / WI-575] library-filing central authority check (server-derived, no header)', () => {
+  // Records any property access on the stub db — the guard must reject BEFORE
+  // the handler touches the DB (mirrors the proxy-guard.test.ts pattern).
+  const dbCalled = jest.fn();
+
+  function makeProxyAppNoHeader() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('user' as never, { id: 'test-user' });
+      // isOwner=false is set server-side by profileScopeMiddleware when the
+      // authenticated account does not own the target profile. The X-Proxy-Mode
+      // header is intentionally ABSENT — this is the exact attack vector F-126
+      // identifies: a proxy caller bypassing the guard by dropping the header.
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', sessionRoutes);
+    return proxyApp;
+  }
+
+  const SID = '550e8400-e29b-41d4-a716-446655440111';
+
+  beforeEach(() => dbCalled.mockReset());
+
+  it('[BREAK] keep-out: 403 PROXY_MODE even when X-Proxy-Mode header is absent', async () => {
+    // No X-Proxy-Mode header — pre-fix, this would bypass the guard.
+    const res = await makeProxyAppNoHeader().request(
+      `/sessions/${SID}/library-filing/keep-out`,
+      { method: 'POST' },
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('PROXY_MODE');
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] add: 403 PROXY_MODE even when X-Proxy-Mode header is absent', async () => {
+    const res = await makeProxyAppNoHeader().request(
+      `/sessions/${SID}/library-filing/add`,
+      { method: 'POST' },
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('PROXY_MODE');
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] restore: 403 PROXY_MODE even when X-Proxy-Mode header is absent', async () => {
+    const res = await makeProxyAppNoHeader().request(
+      `/sessions/${SID}/library-filing/restore`,
+      { method: 'POST' },
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('PROXY_MODE');
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
 });

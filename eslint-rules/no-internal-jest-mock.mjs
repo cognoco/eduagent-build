@@ -13,7 +13,7 @@
  * Severity is `warn` for now: ~260 legacy violations exist and are
  * tracked separately. The point is to stop NEW violations landing.
  *
- * See CLAUDE.md > Code Quality Guards > "No internal mocks in
+ * See AGENTS.md > Code Quality Guards > "No internal mocks in
  * integration tests" and the governance audit
  * docs/_archive/plans/done/2026-05-03-governance-audit.md (item GC1).
  *
@@ -31,7 +31,7 @@ const rule = {
     schema: [],
     messages: {
       internalMock:
-        "Avoid jest.mock('{{ specifier }}') of internal code — mocking your own modules hides real bugs. Mock only external boundaries (third-party SDKs, network, time). See CLAUDE.md > Code Quality Guards.",
+        "Avoid jest.mock('{{ specifier }}') of internal code — mocking your own modules hides real bugs. Mock only external boundaries (third-party SDKs, network, time). See AGENTS.md > Code Quality Guards.",
     },
   },
 

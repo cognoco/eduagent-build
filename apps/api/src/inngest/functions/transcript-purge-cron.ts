@@ -289,7 +289,7 @@ export const transcriptPurgeHandler = inngest.createFunction(
         },
       });
     } else {
-      // Per CLAUDE.md "silent recovery without escalation is banned": each
+      // Per AGENTS.md "silent recovery without escalation is banned": each
       // skip path must be observable in metrics, not just structured logs.
       // The reason field is bounded by purgeSessionTranscript and lets ops
       // group skip rate per cause without scraping log lines.

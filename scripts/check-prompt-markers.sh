@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CI guard: forbid [MARKER] tokens in LLM prompt builders.
 #
-# Background (CLAUDE.md → "Non-Negotiable Engineering Rules"):
+# Background (AGENTS.md → "Non-Negotiable Engineering Rules"):
 # LLM responses that drive state-machine decisions must use the structured
 # `signals` envelope (services/llm/envelope.ts). Embedding bracket tokens like
 # [CLOSE_INTERVIEW] or [ESCALATE] in free-text replies is the legacy antipattern
@@ -79,7 +79,7 @@ if [[ $found -gt 0 ]]; then
   echo ""
   echo "✗ $found unauthorized [MARKER] token(s) in prompt files."
   echo "  Use the structured signals envelope (services/llm/envelope.ts) — not free-text markers."
-  echo "  See CLAUDE.md → 'Non-Negotiable Engineering Rules' → LLM Response Envelope."
+  echo "  See AGENTS.md → 'Non-Negotiable Engineering Rules' → LLM Response Envelope."
   exit 1
 fi
 

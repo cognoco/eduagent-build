@@ -19,6 +19,7 @@ import {
   sessionSummaryFailedEventSchema,
   sessionSummaryGeneratedEventSchema,
   sessionCompletedWithErrorsEventSchema,
+  summarizeRawPayload,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
@@ -41,13 +42,18 @@ export const sessionSummaryGeneratedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('session.summary.generated.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[session-summary-generated] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }
@@ -82,13 +88,18 @@ export const sessionSummaryFailedObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('session.summary.failed.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[session-summary-failed] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }
@@ -120,13 +131,18 @@ export const sessionCompletedWithErrorsObserve = inngest.createFunction(
     if (!parsed.success) {
       logger.error('session.completed_with_errors.schema_drift', {
         issues: parsed.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[session-completed-with-errors] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parsed.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }

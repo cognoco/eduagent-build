@@ -16,6 +16,7 @@ jest.mock('./learner-profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import * as sentry from './sentry';
 import { routeAndCall } from './llm';
 import { applyAnalysis } from './learner-profile';
 import { parseLearnerInput } from './learner-input';
@@ -389,6 +390,72 @@ describe('parseLearnerInput structured logging', () => {
       expect(parsed.context?.profileId).toBe(profileId);
     } finally {
       errorSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-074 / WI-579] LLM-output parse failures must not leak content to Sentry
+// ---------------------------------------------------------------------------
+
+describe('[F-074 / WI-579] parseLearnerInput LLM parse failures leak no content', () => {
+  const SENTINEL = 'Tommy-note-quote-private';
+
+  it('[BREAK] jsonParse failure captures responseLength, never a response slice', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+    try {
+      // Balanced braces (the JSON extractor returns a slice) but invalid
+      // JSON — JSON.parse throws and the jsonParse capture fires.
+      const response = `{"interests": undefined, "quote": "${SENTINEL}"}`;
+      mockRouteAndCall.mockResolvedValueOnce({ response } as never);
+
+      const result = await parseLearnerInput(db, profileId, 'note', 'learner');
+      expect(result.success).toBe(true); // fallback analysis still applied
+
+      expect(captureSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            site: 'parseLearnerInputToAnalysis.jsonParse',
+            responseLength: response.length,
+          }),
+        }),
+      );
+      expect(JSON.stringify(captureSpy.mock.calls)).not.toContain(SENTINEL);
+    } finally {
+      captureSpy.mockRestore();
+    }
+  });
+
+  it('[BREAK] safeParse failure captures responseLength, never a response slice', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+    try {
+      // Valid JSON, wrong shape — schema validation fails and the safeParse
+      // capture fires.
+      const response = JSON.stringify({
+        struggles: `not-an-array ${SENTINEL}`,
+      });
+      mockRouteAndCall.mockResolvedValueOnce({ response } as never);
+
+      const result = await parseLearnerInput(db, profileId, 'note', 'learner');
+      expect(result.success).toBe(true); // fallback analysis still applied
+
+      expect(captureSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            site: 'parseLearnerInputToAnalysis.safeParse',
+            responseLength: response.length,
+          }),
+        }),
+      );
+      expect(JSON.stringify(captureSpy.mock.calls)).not.toContain(SENTINEL);
+    } finally {
+      captureSpy.mockRestore();
     }
   });
 });

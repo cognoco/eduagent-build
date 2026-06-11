@@ -109,7 +109,11 @@ function VocabularyRow({
         testID={`vocab-delete-${item.id}`}
       >
         {isDeleting ? (
-          <ActivityIndicator size="small" color={colors.muted} />
+          <ActivityIndicator
+            size="small"
+            color={colors.muted}
+            accessibilityLabel={t('common.loading')}
+          />
         ) : (
           <Ionicons name="trash-outline" size={20} color={colors.muted} />
         )}
@@ -123,7 +127,14 @@ export default function VocabularyListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
+  const { subjectId: rawSubjectId } = useLocalSearchParams<{
+    subjectId: string | string[];
+  }>();
+  // [F-168] Empty-array case: rawSubjectId[0] yields undefined — same value
+  // as a missing param, handled by the no-subject fallback below.
+  const subjectId = Array.isArray(rawSubjectId)
+    ? rawSubjectId[0]
+    : rawSubjectId;
   const vocabularyQuery = useVocabulary(subjectId ?? '');
   const deleteVocabulary = useDeleteVocabulary(subjectId ?? '');
   const subjectsQuery = useSubjects();
@@ -219,7 +230,11 @@ export default function VocabularyListScreen() {
 
       {vocabularyQuery.isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator
+            size="large"
+            color={colors.primary}
+            accessibilityLabel={t('common.loading')}
+          />
         </View>
       ) : vocabularyQuery.isError && !vocabularyQuery.data ? (
         <View className="flex-1 items-center justify-center px-6">

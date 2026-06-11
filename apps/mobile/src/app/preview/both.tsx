@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -34,6 +35,7 @@ const OPTIONS: ReadonlyArray<Option> = [
 ];
 
 export default function PreviewBothScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [submitting, setSubmitting] = useState(false);
@@ -101,14 +103,14 @@ export default function PreviewBothScreen() {
         accessibilityLabel="Go back"
       >
         <Text className="text-body-sm font-semibold text-primary">
-          Back to sign in
+          {t('preview.backToSignIn')}
         </Text>
       </Pressable>
       <Text className="text-h1 font-bold text-text-primary mb-2 text-center">
-        What do you want to set up first?
+        {t('preview.bothQuestion')}
       </Text>
       <Text className="text-body text-text-secondary mb-8 text-center">
-        You can do both — pick where to start.
+        {t('preview.bothHint')}
       </Text>
       {OPTIONS.map((opt) => (
         <Pressable

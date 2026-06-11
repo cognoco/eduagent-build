@@ -370,10 +370,25 @@ export async function deleteArchivedProfileIfStillEligible(
   return (result.rowCount ?? 0) > 0;
 }
 
+/**
+ * [F-093] Atomically deletes a profile if consent was withdrawn, with an
+ * optional parent-chain account guard.
+ *
+ * When `parentProfileId` is supplied, the DELETE additionally requires that
+ * the target profile's `account_id` matches the parent profile's `account_id`
+ * — mirroring the BUG-662 / FCR-2026-05-23-L3.L3.3 account guard that was
+ * added to the archive branch. Without this, a corrupt or replayed Inngest
+ * event with a mismatched (childProfileId, parentProfileId) pair could delete
+ * a profile from a different account (the asymmetry that F-093 identifies).
+ *
+ * Omitting `parentProfileId` retains the old behaviour (backward compat for
+ * callers that do not have the parent profile in scope).
+ */
 export async function deleteProfileIfConsentWithdrawn(
   db: Database,
   profileId: string,
   revokedAt?: Date | string,
+  parentProfileId?: string,
 ): Promise<boolean> {
   const revokedAtDate =
     revokedAt instanceof Date
@@ -382,6 +397,14 @@ export async function deleteProfileIfConsentWithdrawn(
         ? new Date(revokedAt)
         : undefined;
   if (revokedAtDate && Number.isNaN(revokedAtDate.getTime())) return false;
+
+  // [F-093] Account guard: when a parentProfileId is provided, require that
+  // the target profile's account_id matches the parent's account_id.
+  // If parentProfileId no longer exists the subquery returns NULL → guard
+  // blocks delete (fail-safe; caller returns 'restored').
+  const accountGuard = parentProfileId
+    ? sql`AND profiles.account_id = (SELECT account_id FROM profiles WHERE id = ${parentProfileId})`
+    : sql``;
 
   const result = await db.execute(sql`
     WITH locked_consent AS (
@@ -394,6 +417,7 @@ export async function deleteProfileIfConsentWithdrawn(
     )
     DELETE FROM profiles
     WHERE id = ${profileId}
+    ${accountGuard}
     AND EXISTS (SELECT 1 FROM locked_consent)
   `);
   return (result.rowCount ?? 0) > 0;

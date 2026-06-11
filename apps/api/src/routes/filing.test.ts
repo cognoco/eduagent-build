@@ -730,6 +730,58 @@ describe('filing routes', () => {
       );
     });
 
+    // [WI-577 / F-073 / F-095] Break test: Inngest persists event payloads in
+    // its third-party event store, so the minor's transcript must never ride
+    // in the app/filing.retry event. This drives the exact pre-fix leak path
+    // (fileToLibrary failure → async retry dispatch with the request's
+    // transcript) and asserts the known minor identifier never reaches any
+    // inngest.send call.
+    it('[WI-577] never places the session transcript in the app/filing.retry payload', async () => {
+      const { fileToLibrary } = await import('../services/filing');
+      const { inngest } = await import('../inngest/client');
+      const sendMock = inngest.send as jest.Mock;
+      sendMock.mockClear();
+      (fileToLibrary as jest.Mock).mockRejectedValueOnce(
+        new Error('LLM unavailable'),
+      );
+
+      const sessionId = '00000000-0000-4000-8000-000000000456';
+      const minorTranscript =
+        'Learner: my name is Milo Janssen and I live in Drammen\nTutor: hi Milo';
+
+      const res = await app.request(
+        '/v1/filing',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionId,
+            sessionTranscript: minorTranscript,
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      // No rawInput/subjectId fallback → the route reports the failure.
+      expect(res.status).toBe(500);
+
+      // The async retry WAS dispatched — but reference-only.
+      expect(sendMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/filing.retry',
+          data: {
+            profileId: 'test-profile-id',
+            sessionId,
+            sessionMode: 'freeform',
+          },
+        }),
+      );
+
+      // The known minor identifier must not appear in ANY dispatched payload.
+      expect(JSON.stringify(sendMock.mock.calls)).not.toContain('Milo Janssen');
+    });
+
     it('[CRITICAL-2] explicitly marks the session filed after resolving Library placement', async () => {
       const { resolveFilingResult } = await import('../services/filing');
       (resolveFilingResult as jest.Mock).mockClear();

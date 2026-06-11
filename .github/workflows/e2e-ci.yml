@@ -165,7 +165,7 @@ jobs:
 
       # [BUG-243] Use drizzle-kit migrate (not db:push) so committed migration
       # SQL is the source of truth for the E2E DB schema — same posture as
-      # ci.yml and the deploy.yml staging/production deploys. CLAUDE.md
+      # ci.yml and the deploy.yml staging/production deploys. AGENTS.md
       # "Staging and production must use committed migration SQL plus
       # drizzle-kit migrate" — the divergence here used to let push silently
       # accept schema that the migration SQL would have rejected, hiding

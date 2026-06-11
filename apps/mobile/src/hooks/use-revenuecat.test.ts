@@ -1,5 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import Purchases from 'react-native-purchases';
@@ -9,6 +10,7 @@ import {
   useCustomerInfo,
   usePurchase,
   useRestorePurchases,
+  resetRevenueCatIdentitySyncForTests,
 } from './use-revenuecat';
 
 // ---------------------------------------------------------------------------
@@ -107,6 +109,12 @@ function createWrapper() {
   return w.wrapper;
 }
 
+// [F-134] The identity-sync gate is module-level state — clear it between
+// tests so no test depends on the sync state a previous test left behind.
+beforeEach(() => {
+  resetRevenueCatIdentitySyncForTests();
+});
+
 // ---------------------------------------------------------------------------
 // useRevenueCatIdentity
 // ---------------------------------------------------------------------------
@@ -137,7 +145,7 @@ describe('useRevenueCatIdentity', () => {
       userId: 'clerk_user_123',
     });
 
-    renderHook(() => useRevenueCatIdentity());
+    renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
 
     await waitFor(() => {
       expect(Purchases.logIn).toHaveBeenCalledWith('clerk_user_123');
@@ -150,7 +158,9 @@ describe('useRevenueCatIdentity', () => {
       userId: 'clerk_user_123',
     });
 
-    const { rerender } = renderHook(() => useRevenueCatIdentity());
+    const { rerender } = renderHook(() => useRevenueCatIdentity(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(Purchases.logIn).toHaveBeenCalledWith('clerk_user_123');
@@ -176,7 +186,7 @@ describe('useRevenueCatIdentity', () => {
       userId: 'clerk_user_123',
     });
 
-    renderHook(() => useRevenueCatIdentity());
+    renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
 
     // Give time for any async effect to complete
     await new Promise((r) => setTimeout(r, 50));
@@ -190,7 +200,9 @@ describe('useRevenueCatIdentity', () => {
       userId: 'clerk_user_123',
     });
 
-    const { rerender } = renderHook(() => useRevenueCatIdentity());
+    const { rerender } = renderHook(() => useRevenueCatIdentity(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(Purchases.logIn).toHaveBeenCalledTimes(1);
@@ -215,7 +227,7 @@ describe('useRevenueCatIdentity', () => {
     });
 
     // Should not throw
-    renderHook(() => useRevenueCatIdentity());
+    renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
 
     await new Promise((r) => setTimeout(r, 50));
 
@@ -228,39 +240,95 @@ describe('useRevenueCatIdentity', () => {
   // fires the same session). The fix escalates to captureException.
   it('captures to Sentry when identity sync retries are exhausted', async () => {
     jest.useFakeTimers();
-    const Sentry = require('@sentry/react-native');
-    (Sentry.captureException as jest.Mock).mockClear();
-    // Every attempt fails — initial + MAX_RETRIES(2) retries = 3 logIn calls.
-    (Purchases.logIn as jest.Mock).mockRejectedValue(
-      new Error('Network error'),
-    );
-    mockUseAuth.mockReturnValue({
-      isSignedIn: true,
-      userId: 'clerk_user_123',
-    });
+    try {
+      (Sentry.captureException as jest.Mock).mockClear();
+      // Every attempt fails — initial + MAX_RETRIES(2) retries = 3 logIn calls.
+      (Purchases.logIn as jest.Mock).mockRejectedValue(
+        new Error('Network error'),
+      );
+      mockUseAuth.mockReturnValue({
+        isSignedIn: true,
+        userId: 'clerk_user_123',
+      });
 
-    renderHook(() => useRevenueCatIdentity());
+      renderHook(() => useRevenueCatIdentity(), { wrapper: createWrapper() });
 
-    // Drain the initial attempt + both 3s-delayed retries.
-    await act(async () => {
-      await jest.advanceTimersByTimeAsync(0);
-      await jest.advanceTimersByTimeAsync(3000);
-      await jest.advanceTimersByTimeAsync(3000);
-    });
+      // Drain the initial attempt + both 3s-delayed retries.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(0);
+        await jest.advanceTimersByTimeAsync(3000);
+        await jest.advanceTimersByTimeAsync(3000);
+      });
 
-    expect(Purchases.logIn).toHaveBeenCalledTimes(3);
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        tags: expect.objectContaining({
-          surface: 'revenuecat_identity',
-          reason: 'max_retries_exhausted',
+      expect(Purchases.logIn).toHaveBeenCalledTimes(3);
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            surface: 'revenuecat_identity',
+            reason: 'max_retries_exhausted',
+          }),
         }),
-      }),
-    );
+      );
+    } finally {
+      jest.useRealTimers();
+      // The persistent rejection above survives jest.clearAllMocks()
+      // (implementations are kept) — restore the default so later tests
+      // that rely on a succeeding logIn are not polluted.
+      (Purchases.logIn as jest.Mock).mockResolvedValue({
+        customerInfo: { entitlements: { active: {} } },
+        created: false,
+      });
+    }
+  });
 
-    jest.useRealTimers();
+  it('escalates to Sentry and keeps customerInfo gated off when identity sync fails after all retries', async () => {
+    // [F-134] Terminal sync failure now gates useCustomerInfo off for the
+    // session — that must be queryable, not just a breadcrumb. The gate
+    // HOLDING is the core security property: fail closed, never fetch under
+    // an identity the SDK has not confirmed.
+    jest.useFakeTimers();
+    try {
+      (Purchases.logIn as jest.Mock).mockRejectedValue(
+        new Error('Network error'),
+      );
+      mockUseAuth.mockReturnValue({
+        isSignedIn: true,
+        userId: 'clerk_user_123',
+      });
+
+      renderHook(
+        () => {
+          useRevenueCatIdentity();
+          return useCustomerInfo();
+        },
+        { wrapper: createWrapper() },
+      );
+
+      // Initial attempt + 2 retries, 3s apart.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(Purchases.logIn).toHaveBeenCalledTimes(3);
+      expect(Sentry.captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('identity sync failed after retries'),
+        'warning',
+      );
+      // Fail-closed: identity never synced, so the customerInfo query must
+      // never have run — the SDK could still answer for another account.
+      expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+      // The persistent rejection above survives jest.clearAllMocks()
+      // (implementations are kept) — restore the default so later
+      // describes that rely on a succeeding logIn are not polluted.
+      (Purchases.logIn as jest.Mock).mockResolvedValue({
+        customerInfo: { entitlements: { active: {} } },
+        created: false,
+      });
+    }
   });
 });
 
@@ -367,10 +435,22 @@ describe('useCustomerInfo', () => {
     Object.defineProperty(Platform, 'OS', { value: originalPlatformOS });
   });
 
-  it('fetches customer info from RevenueCat', async () => {
-    const { result } = renderHook(() => useCustomerInfo(), {
-      wrapper: createWrapper(),
+  it('fetches customer info from RevenueCat once identity sync completes', async () => {
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
     });
+    // [F-134] customerInfo is gated on identity sync — mount the identity
+    // hook alongside it, as the authenticated layout does in production.
+    const { result } = renderHook(
+      () => {
+        useRevenueCatIdentity();
+        return useCustomerInfo();
+      },
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -391,6 +471,167 @@ describe('useCustomerInfo', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
+    expect(result.current.data).toBeNull();
+    expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-134] Identity-sync gating — getCustomerInfo() answers for the SDK's
+// CURRENT identity. If the customerInfo query runs while Purchases.logIn for
+// the active Clerk user is still in flight, another account's entitlement
+// snapshot gets cached under the active user's key (cross-account leak on
+// shared devices). The query must stay disabled until sync completes.
+// ---------------------------------------------------------------------------
+
+describe('[F-134] identity-sync gating for customer info', () => {
+  const originalPlatformOS = Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (Purchases.logIn as jest.Mock).mockResolvedValue({
+      customerInfo: { entitlements: { active: {} } },
+      created: false,
+    });
+    (Purchases.getCustomerInfo as jest.Mock).mockResolvedValue({
+      entitlements: { active: {}, all: {} },
+      activeSubscriptions: [],
+      allPurchasedProductIdentifiers: [],
+    });
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+    Object.defineProperty(Platform, 'OS', { value: originalPlatformOS });
+  });
+
+  it('does not fetch customer info while identity sync is still in flight', async () => {
+    let resolveLogin!: (value: unknown) => void;
+    (Purchases.logIn as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveLogin = resolve;
+        }),
+    );
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
+    });
+
+    const { result } = renderHook(
+      () => {
+        useRevenueCatIdentity();
+        return useCustomerInfo();
+      },
+      { wrapper: createWrapper() },
+    );
+
+    // logIn is pending — the SDK may still be logged in as a previous
+    // identity, so the query must not run yet.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveLogin({
+        customerInfo: { entitlements: { active: {} } },
+        created: false,
+      });
+    });
+
+    await waitFor(() => {
+      expect(Purchases.getCustomerInfo).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+  });
+
+  it('does not cache a snapshot under the new user key during an account switch', async () => {
+    // Phase 1: account A fully synced and fetched.
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_A',
+    });
+    const wrapper = createWrapper();
+    const { result, rerender } = renderHook(
+      () => {
+        useRevenueCatIdentity();
+        return useCustomerInfo();
+      },
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Phase 2: switch to account B; logIn(B) hangs — the SDK still answers
+    // as A, so nothing may be fetched/cached under B's key yet.
+    let resolveLogin!: (value: unknown) => void;
+    (Purchases.logIn as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveLogin = resolve;
+        }),
+    );
+    (Purchases.getCustomerInfo as jest.Mock).mockClear();
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_B',
+    });
+    rerender({});
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
+    expect(
+      queryClient.getQueryData(['revenuecat', 'customerInfo', 'clerk_user_B']),
+    ).toBeUndefined();
+
+    // Phase 3: logIn(B) completes — fetching under B's key may now proceed.
+    await act(async () => {
+      resolveLogin({
+        customerInfo: { entitlements: { active: {} } },
+        created: false,
+      });
+    });
+    await waitFor(() => {
+      expect(Purchases.getCustomerInfo).toHaveBeenCalled();
+    });
+  });
+
+  it('invalidates the user-scoped customerInfo query after logIn completes', async () => {
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
+    });
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useRevenueCatIdentity(), { wrapper });
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryKey: ['revenuecat', 'customerInfo', 'clerk_user_123'],
+        }),
+      );
+    });
+  });
+
+  it('keeps customer info ungated on web where RevenueCat is unavailable', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'web' });
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_123',
+    });
+
+    const { result } = renderHook(() => useCustomerInfo(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
     expect(result.current.data).toBeNull();
     expect(Purchases.getCustomerInfo).not.toHaveBeenCalled();
   });

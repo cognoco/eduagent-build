@@ -224,6 +224,45 @@ describe('AuthRoutesLayout', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/bar');
   });
 
+  it('[F-175] rememberPendingAuthRedirect is NOT called on every re-render (render-phase side-effect bug)', () => {
+    // The bug: the if (redirectTarget) block in _layout.tsx calls
+    // rememberPendingAuthRedirect (storage write) during the render phase.
+    // The fix moves it to a useEffect. A useEffect only fires when its deps
+    // change; a render-phase call fires on every render.
+    //
+    // Test logic: render once (call count = N), rerender with same params
+    // (deps unchanged), assert call count is still N — i.e., the storage
+    // write did NOT re-fire on the second render.
+    const rememberMock = jest.spyOn(
+      require('../../lib/pending-auth-redirect'),
+      'rememberPendingAuthRedirect',
+    );
+    rememberMock.mockReturnValue('/(app)/foo');
+
+    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/foo' });
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+    });
+
+    const { rerender } = render(<AuthLayout />);
+
+    // Mount-time persistence MUST happen — the deep-link target is written
+    // exactly once by the mount effect. Without this assertion the test
+    // would also pass if rememberPendingAuthRedirect never ran at all.
+    expect(rememberMock).toHaveBeenCalledTimes(1);
+    expect(rememberMock).toHaveBeenCalledWith('/(app)/foo');
+
+    // Rerender with identical params — deps unchanged.
+    rerender(<AuthLayout />);
+
+    // With the fix: useEffect deps haven't changed → NOT re-called.
+    // With the bug: render-phase block fires on every render → count increases.
+    expect(rememberMock).toHaveBeenCalledTimes(1);
+
+    rememberMock.mockRestore();
+  });
+
   it('renders nothing when isLoaded is false (Clerk still initializing)', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: false,

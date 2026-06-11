@@ -65,7 +65,6 @@ import {
   analyzeSessionTranscript,
   applyAnalysis,
   getLearningProfile,
-  type StruggleNotification,
 } from '../../services/learner-profile';
 import { sendStruggleNotification } from '../../services/notifications';
 import {
@@ -1310,7 +1309,7 @@ export const sessionCompleted = inngest.createFunction(
             error: err instanceof Error ? err.message : String(err),
           });
           // Promote to `errored` so the failure event fires below — silent
-          // recovery without escalation is banned by CLAUDE.md.
+          // recovery without escalation is banned by AGENTS.md.
           return {
             outcome: {
               step: 'generate-llm-summary',
@@ -1356,13 +1355,21 @@ export const sessionCompleted = inngest.createFunction(
     // [EP15-M3]: runs AFTER write-coaching-card — profile analysis is background
     // enrichment and must not delay user-facing coaching card. EP15-C3 confirmed
     // this ordering is safe: snapshot pipeline never reads learning_profiles.
-    // step.run memoizes its return value — on Inngest replay the callback is
-    // NOT re-executed, so mutable closure variables would stay []. Returning
-    // notifications as part of the step result ensures they survive replay.
+    //
+    // Struggle notifications are SENT inside this step rather than returned:
+    // a memoized step return is persisted in Inngest's third-party state
+    // store, and the notifications carry the minor's struggle topics. The
+    // step result holds shape-only counters (detected/sent/failed) so the
+    // notify outcome still survives Inngest replay without round-tripping
+    // topic strings through step state. Send failures are isolated per
+    // notification (Sentry + counter) so a push hiccup never fails the
+    // analysis itself.
     const analyzeOutcome = await step.run(
       'analyze-learner-profile',
       async () => {
-        let stepNotifications: StruggleNotification[] = [];
+        let struggleNotificationsDetected = 0;
+        let struggleNotificationsSent = 0;
+        let struggleNotificationsFailed = 0;
         const outcome = await runIsolated(
           'analyze-learner-profile',
           profileId,
@@ -1484,10 +1491,45 @@ export const sessionCompleted = inngest.createFunction(
               subjectId,
             );
 
-            stepNotifications = analysisResult.notifications;
+            // FR247.6 — struggle pushes to the parent, sent at the source so
+            // the topic strings never enter memoized step state. Delivery is
+            // effectively at-most-once per confidence transition: if the
+            // process dies mid-step, the step re-runs applyAnalysis, whose
+            // merge is idempotent — the before/after diff then detects no new
+            // transition, so already-sent pushes are not re-sent (and
+            // sendStruggleNotification's 24h per-type dedup backstops any
+            // duplicate window).
+            struggleNotificationsDetected = analysisResult.notifications.length;
+            for (const notification of analysisResult.notifications) {
+              try {
+                await sendStruggleNotification(db, profileId, notification);
+                struggleNotificationsSent += 1;
+              } catch (err) {
+                struggleNotificationsFailed += 1;
+                sentry.captureException(err, {
+                  profileId,
+                  extra: {
+                    step: 'notify-struggle',
+                    surface: 'session-completed',
+                  },
+                });
+                logger.error('[session-completed] soft step failed', {
+                  step: 'notify-struggle',
+                  profileId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }
+            }
           },
         );
-        return { ...outcome, notifications: stepNotifications };
+        return {
+          ...outcome,
+          struggleNotifications: {
+            detected: struggleNotificationsDetected,
+            sent: struggleNotificationsSent,
+            failed: struggleNotificationsFailed,
+          },
+        };
       },
     );
     outcomes.push(analyzeOutcome);
@@ -1603,20 +1645,21 @@ export const sessionCompleted = inngest.createFunction(
       }
     }
 
-    // Step 3b: FR247.6 — Send struggle push notifications to parent
-    const pendingStruggleNotifications = analyzeOutcome.notifications ?? [];
-    if (pendingStruggleNotifications.length > 0) {
-      const notifications = [...pendingStruggleNotifications];
-      outcomes.push(
-        await step.run('notify-struggle', async () =>
-          runIsolated('notify-struggle', profileId, async () => {
-            const db = getStepDatabase();
-            for (const notification of notifications) {
-              await sendStruggleNotification(db, profileId, notification);
+    // Step 3b: FR247.6 — struggle pushes were sent inside
+    // analyze-learner-profile (see the minor-PII note there). Keep the
+    // notify-struggle outcome entry so soft-failure dashboards retain the
+    // per-step failure signal.
+    const struggleNotifyCounts = analyzeOutcome.struggleNotifications;
+    if (struggleNotifyCounts && struggleNotifyCounts.detected > 0) {
+      outcomes.push({
+        step: 'notify-struggle',
+        status: struggleNotifyCounts.failed > 0 ? 'failed' : 'ok',
+        ...(struggleNotifyCounts.failed > 0
+          ? {
+              error: `${struggleNotifyCounts.failed}/${struggleNotifyCounts.detected} struggle notifications failed to send`,
             }
-          }),
-        ),
-      );
+          : {}),
+      });
     }
 
     // Step 4: Update dashboard — streaks + XP

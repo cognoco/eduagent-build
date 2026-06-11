@@ -191,6 +191,20 @@ and the **physical layout** (§I.4: `docs/canon|adr|specs|plans|runbooks` +
 - **Agent-doctrine / memory pointer cleanup** — the canon-class memories (see the
   instruction-surface disposition matrix and roster **PRG-03**; PRG-03 handles the
   operational class now, this is its canon-class remainder).
+  - **`Docs`-tagged memories from the WI-387 triage feed in here.** The WI-387
+    memory-tidy (PRG-03 / Harness Hygiene) triages `.claude/memory/` and tags each file
+    in `_WIP/zdx-productionization/_state/2026-06-10-wi-387-memory-triage-prep.md`
+    (nexus). Files tagged **`Docs`** are the **documentation-shaped remainder** —
+    test-runner docs and LLM-policy that are accurate and load-bearing but live
+    **Claude-only** in memory (Codex agents can't read `.claude/memory/`). WI-387
+    **keeps them in place** (does not delete); **Stream 2 owns migrating their content to
+    `docs/`** (cross-runtime/Codex visibility + single-source), after which the memory
+    becomes a thin pointer or retires. Process **every** `Docs`-tagged row, not just the
+    current seed. Seed (2026-06-10, list grows as the comb continues):
+    `project_book_generation_pass` + `project_enduser_session_pass` → `docs/testing/`
+    (live `pnpm test:llm:*` runner docs); `project_llm_source_provenance` → architecture/
+    canon (source-audit policy; already partially echoed in `docs/project_context.md` —
+    converge, don't fork).
 - **The reduced `docs/` reorg** (canon→`docs/canon/` + the drains — what remains of
   F-PLACEMENT once the ADR home is settled) gates the bulk relocation.
 - **Estate-level generalisation to the ZDX standard** is parked as **WI-519**.
@@ -257,6 +271,17 @@ archives it or reduces it to a pointer.
 - **2026-06-10 — WI-387 memory-drain capture added.** Nine memory files dispositioned
   DRAIN by the WI-387 triage workflow (operator-confirmed) recorded as inbound items —
   see § Inbound — WI-387 memory-drain capture. Extract-before-cleanup binds their removal.
+  *(Supersedes the same-day `Docs`-tag seed below: of its three, `llm_source_provenance`
+  is row 3 of the capture table, `book_generation_pass` was triaged KEEP, and
+  `enduser_session_pass` awaits its decision.)*
+- **2026-06-10 — WI-387 `Docs`-tagged memory feed-in recorded.** The Harness-Hygiene
+  memory-tidy (WI-387 / PRG-03) now feeds its documentation-shaped memory remainder here:
+  memories tagged **`Docs`** in the WI-387 triage prep (nexus
+  `_WIP/zdx-productionization/_state/2026-06-10-wi-387-memory-triage-prep.md`) are kept in
+  place by WI-387 and handed to Stream 2 for migration to `docs/` (Codex visibility +
+  single-source). Recorded under the *Agent-doctrine / memory pointer cleanup* inventory
+  bullet. Seed: `project_book_generation_pass`, `project_enduser_session_pass`,
+  `project_llm_source_provenance`.
 - **2026-06-09 — created by extraction.** Moved the inventory + commencement threads out
   of `_wip/identity-foundation/ROADMAP.md` (consolidate-then-repoint); the runway was left
   a pointer and its N.0 gate repointed here. One semantic reconciliation: coordination

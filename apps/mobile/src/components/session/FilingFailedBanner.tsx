@@ -84,7 +84,7 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
     >
       {session.filingStatus === 'filing_pending' ? (
         <View className="flex-row items-center">
-          <ActivityIndicator />
+          <ActivityIndicator accessibilityLabel={t('common.loading')} />
           <Text className="text-body text-text-primary ms-3">
             {t('session.filingFailed.retrying')}
           </Text>

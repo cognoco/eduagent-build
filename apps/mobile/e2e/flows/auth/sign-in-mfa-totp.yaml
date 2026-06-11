@@ -4,7 +4,7 @@
 # TOTP enrollment requires calling Clerk's Admin API to set up TOTP on a test
 # user — the seeder does not yet support this. Additionally, TOTP codes rotate
 # every 30 seconds (RFC 6238); a Maestro flow cannot generate them without
-# `runScript` (unreliable on Maestro 2.2.0 per CLAUDE.md). This branch needs
+# `runScript` (unreliable on Maestro 2.2.0 per AGENTS.md). This branch needs
 # either (a) a pre-generated static test code from Clerk's testing-token
 # mechanism, or (b) a seed-and-run wrapper that generates and exports the TOTP
 # code before launching Maestro.

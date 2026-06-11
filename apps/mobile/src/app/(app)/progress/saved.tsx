@@ -191,7 +191,7 @@ export default function SavedBookmarksScreen() {
               className="items-center justify-center py-14 px-6"
               testID="saved-loading"
             >
-              <ActivityIndicator />
+              <ActivityIndicator accessibilityLabel={t('common.loading')} />
             </View>
           ) : bookmarksQuery.isError ? (
             <View
@@ -267,7 +267,7 @@ export default function SavedBookmarksScreen() {
         ListFooterComponent={
           bookmarksQuery.isFetchingNextPage ? (
             <View className="py-4 items-center">
-              <ActivityIndicator />
+              <ActivityIndicator accessibilityLabel={t('common.loading')} />
             </View>
           ) : null
         }

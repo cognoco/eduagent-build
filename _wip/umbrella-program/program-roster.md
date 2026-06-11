@@ -54,9 +54,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   router, three-axis age model). Pre-launch: build direct, re-seed, delete legacy
   — no dual-model, no backfill.
 - **Owner:** Jorn (+ runway session agents)
-- **Depends-on:** Harness-Hygiene exit-gate `WI-530` → `WI-533` — **operator-waived
-  2026-06-10** for execution start (W1 proceeds shepherded); formal close rides
-  the HH PR (#832, open).
+- **Depends-on:** Harness-Hygiene exit-gate `WI-530` → `WI-533` — execution was
+  operator-waived ahead (2026-06-10); **HH PR #832 merged 2026-06-11 (G1 fired)**,
+  so only the formal Cosmo closes of WI-530/533 remain.
 - **Decomposition:** `_wip/identity-foundation/execution-tracker.md` (the durable
   execution entry point — charter / WI map / wave sequence / coarse status; created
   by Phase-P slicing 2026-06-10). `_wip/identity-foundation/ROADMAP.md` is now the
@@ -69,15 +69,24 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **W0 done (2026-06-10):** all 11 patch-now defects shipped — `WI-549`/`WI-550`
   Closed/Done (PRs #817/#818) and `WI-551` Closed/Done (`c5c9b39bb`). Baseline
   reset `WI-569` executed + PR #845 merged (Reviewing).
-- **Execution underway (2026-06-11, shepherded):** W1 half-landed —
-  `WI-570` (schema) + `WI-572` (authority-graph) merged (PRs #855/#859,
-  Reviewing); `WI-571` (spine) PR #860 held for cleanup; `WI-573` Ready. W2
-  pre-bridged Ready. **Review stack (569/570/572) awaits operator
-  `/cosmo:review` — the first clean closes fire program gate G2** (→ PRG-12
-  activation). Live state: Cosmo + `execution-tracker.md` §5; this is a pointer.
+- **Execution state (2026-06-12, post WI-586 plan-phase stop):** **ALL WAVES
+  CLOSED — W0–W4** (every unit WI-549…584 Closed/Done); gates **G2 + G3 + G4
+  FIRED**. Caveat discovered at the tail: the waves built the new model +
+  spine + guards, but **the app still runs on the legacy tables** (the W1
+  policy-engine spine is a fail-closed scaffold, zero DB reads) — the
+  application **cutover** was hidden inside WI-586's "S-sized" drop scope
+  (~80 runtime files, 22 Inngest functions, both payment webhooks, 57 FKs).
+  `WI-585` (first reseed) Closed; `WI-586` executor performed the **mandatory
+  plan-phase STOP** (claim held, zero code) and escalated — **scope ruling
+  with the operator** (recommended: split into WP-CUT-A additive model
+  completion → WP-CUT-B domain-wise reader cutover, legacy frozen-but-live →
+  WI-586 shrunk back to final convergent reseed + verified irreversible drop,
+  Neon PITR marker as recovery). **G5 ("tail done") = unchanged as the
+  exported boundary node, later in time.** Live state: Cosmo +
+  `execution-tracker.md` §5; this is a pointer.
 - **Activate-when:** — (active)
 
-### PRG-02 · Harness Hygiene — `tail`
+### PRG-02 · Harness Hygiene — `graduated` (2026-06-11)
 - **Outcome:** eduagent-build's dev-execution harness (commit → pre-commit →
   pre-push → CI → review → merge tail) rewired and ZDX/cosmo-skill-backed to
   replacement-parity (80/20), so PRG-01 Phase P can begin on a trustworthy
@@ -87,16 +96,16 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   via `WI-530` → `WI-533`.
 - **Decomposition:** `nexus:_WIP/zdx-productionization/harness-hygiene-tracker.md`
   (the durable entry point; Cosmo `WI-530` exit-gate WP holds live per-item state).
-- **Tail posture (2026-06-10):** build is done; what remains is **(a) gate
-  close-out** — the Reviewing stack (`WI-378`/`WI-388`/`WI-398`/`WI-387`) clears
-  via review + the real-PR merge, then `WI-530` closes and `WI-533` unparks — and
-  **(b) the parked residue**: ~10 non-gating items deliberately left off the
-  critical path (branch protection `WI-538` Manual/HITL, pointer-sweep `WI-543`,
-  nx-reset memory `WI-561`, upstream-watch `WI-542`, ADR-facet `WI-548`, the
-  validation-scope impl cluster `WI-457`–`460`, Codex coverage `WI-534`), most of
-  which should land as a **quick-land batch soon after the HH PR merges** — see
-  the activation queue. Per-item state: tracker §4/§5 + Cosmo.
-- **Activate-when:** — (tail; queue entry 3)
+- **GRADUATED 2026-06-11 — outcome met.** HH PR #832 merged 09:27Z; the
+  `WI-530`-related items **closed through review** (critical path complete);
+  the new harness is proven in live use (IF W0–W2 executed on it). The
+  Initiative's program-level interest is closed.
+- **Residue (~12–15 non-critical-path WIs):** being **triaged in a separate
+  operator session** (branched 2026-06-11) into quick-land batch / return-to-
+  ZDX-stream / park / kill — not all of it stays under the umbrella.
+  Dispositions land there; the tracker remains the durable record.
+- **Activate-when:** — (graduated; queue entry 3 = residue batch, scope set by
+  the triage)
 
 ### PRG-03 · Instruction-surface / memory-doctrine cleanup — `in-progress`
 - **Outcome:** the `.claude/memory` + `AGENTS.md`/`CLAUDE.md` + doctrine surface
@@ -125,7 +134,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   (Captured, MentoMate). Evidence base:
   `supporting-artefacts/memory-cleanup.md` (full 55-memory triage results;
   adopted from nexus 2026-06-10 — now a registered PRG-03 artifact, no longer
-  rogue). Needs a **~20-min operator ruling session** (queue entry 4).
+  rogue). Needs a **~20-min operator ruling session** (queue entry 4). The
+  post-HH-merge sequencing hold on executing its edits **lifted 2026-06-11**
+  (PR #832 merged) — only the rulings themselves remain.
 - **Singleton merge (2026-06-10):** F-036 (`autoMemoryDirectory` mis-point)
   merged in from the dissolved PRG-16 tail.
 - **Activate-when:** active — the matrix already *is* the agreed owner-map; no
@@ -150,7 +161,59 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   per-item inside WI-590's design work.
 - **Activate-when:** orchestrator pull, once ≥1 full Initiative cycle has run on
   the IF pattern (dogfood evidence in hand). Earlier parallel build allowed if
-  ZDX-side capacity appears.
+  ZDX-side capacity appears. **Gate effectively MET 2026-06-11** — IF ran the
+  full loop (W0–W2+W4 closed through the autonomous reviewer); PRG-12 is the
+  second instance. Design input captured on `WI-590` (comment, 2026-06-11): the
+  shepherd-kickoff skill + executor-protocol skill + reviewer-dispatcher
+  pattern, with pointers to the five `_wip/identity-foundation/review-loop-*` /
+  `executor-protocol*` artifacts. Pull remains deliberate (attention budget).
+
+### PRG-12 · L10n & A11y Mobile — `active` (2026-06-11)
+- **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
+  English strings routed through `t()`, screen-reader announcements + modal focus
+  + role annotations wired, pluralization on the i18n-native model, date/locale
+  fixed, the small mobile logic-bug batch cleared.
+- **Owner:** Jorn (+ PRG-12 shepherd session; agent-heavy / low-supervision —
+  the program's mechanical-sweep archetype).
+- **Depends-on:** — (out-of-radius of PRG-01, parallel-safe; no boundary events
+  imported).
+- **Decomposition:** `_wip/l10n-a11y/execution-tracker.md` (charter + 8-WP bundle
+  map + slice-time decisions). Cosmo **Workstream "L10n & A11y Mobile"** with
+  **WI-621…WI-628** (8 WPs, `Stage=Backlog`, Workstream Order 1–8).
+- **Activated 2026-06-11** — first parallel activation (queue entry 1); second
+  dogfood of the §2.1 recipe (tracker → Workstream → direct-to-WP slice → shepherd).
+  INV-1 pre-checked at slice (i18n ratchet exists, 361-entry baseline → burn-down
+  scope). **Shepherd session SPAWNED 2026-06-11 (late)** — wired the reviewer
+  watcher to multi-workstream on arrival.
+- **Execution state:** **first WP CLOSED 2026-06-11 night — `WI-622`
+  (sr-announcements)**, full claim→build→review→close loop autonomous; validates
+  the multi-workstream reviewer watcher on a second lane. Live state: Cosmo +
+  `_wip/l10n-a11y/execution-tracker.md`.
+- **Activate-when:** — (active)
+
+### PRG-15 · API Error Handling — `✓ graduated` (2026-06-11)
+- **Outcome:** all 8 `errors-api` audit findings resolved — silent-failure catch
+  blocks logged/escalated (billing/consent/webhook silent-recovery ban enforced),
+  typed-error classification fixed at API boundaries (incl. the JWKS auth path),
+  error classification enforced at the mobile client boundary (6 screens).
+- **Owner:** Jorn (+ PRG-15 shepherd session; agent-heavy sweep, medium
+  supervision on the typed-error/auth-path unit).
+- **Depends-on:** ✅ satisfied — boundary event "W3 envelope-router landed"
+  (`WI-581` Closed 2026-06-11); envelope contract final on `main`.
+- **Decomposition:** `_wip/errors-api/execution-tracker.md` (charter + unit map +
+  slice-time decisions). Cosmo **Workstream "API Error Handling"** with
+  **WI-639/640/641** (2 WPs + 1 Item, `Stage=Backlog`, order 1–3).
+- **Activated 2026-06-11** — third run of the §2.1 recipe, activated the same
+  evening its gate fired; both charter open questions resolved/mooted by the
+  gate event. **Shepherd SPAWNED 2026-06-11 (night)**, autonomous mandate;
+  reviewer-watcher coverage verified on arrival.
+- **Execution state:** **GRADUATED 2026-06-11 (operator ruling)** — all 3 units
+  Closed/Done (`WI-639` catch-hygiene, `WI-640` typed-errors, `WI-641`
+  mobile-classification), every close via the autonomous review loop; whole
+  slice closed within a day of activation. The program's **second graduation**
+  and fastest full cycle. Shepherd standing down after its final tracker
+  checkpoint + residue statement (expected: none — slice was the full charter).
+- **Activate-when:** — (graduated)
 
 ---
 
@@ -186,12 +249,12 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 | ID | Initiative (clear-out) | Findings (bucket 3) | Blast-radius vs PRG-01 (N.1 signal; O is authority) | Activate-when (ratified 2026-06-10) |
 |---|---|---|---|---|
-| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **split** — out-of-radius subset (CI/GHA + input-validation) at pipeline-proven; auth/PII remainder after IF "W2/W3 landed" |
-| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | after IF "W1 landed" + moot-by-refactor scan vs the W1 file-touch set |
-| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | pipeline-proven — **first parallel activation** (queue entry 1) |
-| PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | after IF W1-inngest-wiring + W3 land |
+| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **BOTH gates FIRED** — safe subset at G2 (06-11); auth/PII remainder at **G4 (06-11 late)** — full activation decision LIVE, ordered behind attention budget |
+| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | **moot scan DONE 2026-06-11**: 3 moot (F-029/F-010/F-153) · 23 live · 1 partial (F-103) · INV-2 live (~153 sites) — **scope ≈ intact**, all 7 flagged candidates LIVE (`supporting-artefacts/prg-11-moot-scan.md`). Activation = human-led decomposition, ordered behind attention budget |
+| PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-621…628 sliced) |
+| PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | gate **FIRED 06-11 late (G4** — W1-inngest-wiring ✅ + W3 ✅**)** — activation decision LIVE; at activation, scan whether F-028/F-091 were subsumed by WP-W3-pii-step-state (`WI-578`, just closed) per charter OQ1 |
 | PRG-14 | agent-instructions | 10 (+3 merged: F-116 + the F-151/F-157 CI/Platform fold) | partial **inside** (overlaps PRG-03) | light thread (skill-description/sync fixes) **now**; skill-building after PRG-03 B4 (AGENTS/CLAUDE converge) |
-| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | after IF "W3 envelope-router landed"; F-110 mobile prep parallel-safe sooner |
+| PRG-15 | errors-api | 8 | likely **outside** → parallel-safe | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-639/640/641 sliced) |
 
 ### PRG-16 · Singleton tail — `DISSOLVED 2026-06-10`
 The ~15 one-finding labels are normalized per `activation-planning.md` §1
@@ -274,14 +337,14 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 
 | # | Initiative | Gate (activate / proceed when) |
 |---|---|---|
-| 1 | **PRG-12** l10n-a11y-mobile | pipeline-proven (a few IF WIs through claim→execute→review→close cleanly) — **first parallel activation** |
+| 1 | **PRG-12** l10n-a11y-mobile | ✅ **ACTIVATED 2026-06-11** (was: pipeline-proven — first parallel activation) |
 | 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
 | 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
-| 5 | **PRG-15** errors-api | IF boundary "W3 envelope-router landed"; F-110 mobile prep parallel-safe sooner |
-| 6 | **PRG-13** security-pii-inngest | IF W1-inngest-wiring + W3 landed |
-| 7 | **PRG-10** security-pii-api | split: out-of-radius subset (CI/GHA + input-validation) at pipeline-proven; auth/PII remainder after IF "W2/W3 landed" |
-| 8 | **PRG-11** architecture | IF "W1 landed" + moot-by-refactor scan of the W1 file-touch set |
+| 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
+| 6 | **PRG-13** security-pii-inngest | ✅ gate **FIRED 06-11 late** (G4) — activation = attention-budget call; F-028/F-091 subsumption scan at activation |
+| 7 | **PRG-10** security-pii-api | ✅ **both gates FIRED** (safe subset G2; auth/PII remainder G4 06-11 late) — activation = attention-budget call |
+| 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
 | 9 | **PRG-04** Cosmo top-down delivery layer | orchestrator pull on dogfood evidence (≥1 full Initiative cycle on the IF pattern) |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
@@ -316,7 +379,7 @@ any disagreement this roster and Cosmo win.
 ## Cross-program gates (the edges that matter)
 
 ```
-PRG-02 Harness Hygiene (tail)  ──(WI-530 exit-gate → WI-533 boundary)──▶  PRG-01 W1+ execution start
+PRG-02 Harness Hygiene  ──(WI-530 → WI-533)──▶  SATISFIED + CLOSED 2026-06-11 (PRG-02 graduated)
 PRG-03 operational-memory cleanup  ──(sequenced inside)──▶  PRG-02 (WI-531 → WI-387, both delivered; WI-587 residue ungated)
 PRG-01 IF exported boundary nodes (planning-reference Appendix):
   "W1 landed"                ──▶  PRG-11 · PRG-13(part)
@@ -328,6 +391,101 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-11 (late) — PRG-15 GRADUATED (second graduation, fastest cycle).**
+  Operator ruling on program-session recommendation: all 3 units closed via the
+  autonomous review loop within a day of activation; slice = full charter, no
+  planned residue. Shepherd standing down after final checkpoint + residue
+  statement. Same window: **cross-stream CI incident resolved** — PRG-12
+  shepherd's "mis-scoped PR #931 broke main" theory disproven at CI step level
+  (the PR is a clean comment sweep; the mobile-test red was a one-off flake,
+  rerun green; the integration red a transient LLM upstream, rerun green;
+  WI-626's closure stands). The one real item — chronic staging-deploy red,
+  missing `IDEMPOTENCY_KV` binding in `[env.staging]` — captured as **WI-664**
+  (Bug, P1; needs Cloudflare-credentialed actor; until fixed, staging E2E
+  validates stale builds). PRG-12 meanwhile at **4/8 closed**
+  (`WI-621`/`622`/`626`/`627`), `WI-623` + `WI-625` executing.
+- **2026-06-11 (late) — IF cutover gap: split RULED, planning session
+  commissioned.** The WI-586 executor plan-stop finding (app cutover hidden in
+  the "drop" scope; ~80 runtime files, both payment webhooks, 22 Inngest
+  functions, consent-request gap, 57 FKs, ~190 test files) ruled by operator:
+  **SPLIT** into CUT-A (additive model completion) → CUT-B (domain-wise reader
+  cutover under the single-live-store invariant) → shrunk WI-586 (atomic
+  convergence: freeze → reseed → verify → flip → drop → full legacy
+  retirement). Design routed to a **dedicated planning session** (brief:
+  `_wip/identity-foundation/cutover-planning-brief.md`, hardened by
+  adversarial review; seed: `wi586-scope-report.md`, the executor report
+  landed durably by the IF shepherd). WI-586 PAUSED; shepherd holding;
+  ratification + Cosmo re-slice happen at program level when the plan doc
+  lands. Lesson memorialized: `feedback_plan_cutover_ownership.md`
+  (switch-flip check at every plan ratification).
+- **2026-06-11 (late night) — G4 FIRED: the IF rewrite proper is BUILT.**
+  `WI-578` (pii-step-state) Closed → W3 6/6 → **every wave W0–W4 fully
+  Closed** (36 units start-to-finish in ~2 days). Consequences: **PRG-10
+  auth/PII remainder gate fired** (both PRG-10 gates now open) · **PRG-13
+  gate fired** (W1-wiring + W3 both landed; F-028/F-091 subsumption scan due
+  at its activation) · clean-cut tail (`WI-585`→`586`, Ready) fully ungated —
+  the remaining IF work is the point-of-no-return data migration, an
+  operator/shepherd seam. Next umbrella gate: **G5** (tail done) → PRG-20
+  bulk. Activation of PRG-10/PRG-13 held behind attention budget (three
+  lanes already live). Also this hour: PRG-12 first WP closed (`WI-622`).
+- **2026-06-11 (night, +1h) — PRG-15 ACTIVATED on operator go.** Third run of
+  the §2.1 recipe: tracker `_wip/errors-api/execution-tracker.md`, Cosmo
+  Workstream **API Error Handling**, units **WI-639** (catch-hygiene, P1),
+  **WI-640** (typed-errors, P2), **WI-641** (mobile-classification Item, P2).
+  Both charter open questions resolved/mooted by the gate event (envelope
+  contract final). Now three parallel lanes: PRG-01 (W3 tail), PRG-12, PRG-15.
+  Shepherd kickoff prompt handed to operator.
+- **2026-06-11 (night) — PRG-15 gate FIRED: envelope-router landed.** `WI-581`
+  Closed by the autonomous reviewer → boundary event "W3 envelope-router
+  landed" fired; PRG-15 (errors-api) activation decision is LIVE, held behind
+  attention budget (PRG-12 shepherd just spawned and wired the review loop;
+  WI-621/622 Ready). W3 now 5/6 — **G4 hangs on `WI-578` alone** (Executing);
+  tail `WI-585`/`586` pre-staged Ready.
+- **2026-06-11 (late evening) — PRG-11 moot scan DONE: hypothesis disproven.**
+  Verdict over 28 scanned (+2 excluded-deferred F-008/F-100): **3 MOOT**
+  (F-029 consent-cycle — delivered by WI-572/576; F-010 billing facade;
+  F-153) · **23 LIVE** · **1 PARTIAL** (F-103 Challenge-Round mastery — new
+  `persistence.ts` exists but `session-exchange.ts` still holds a private
+  copy) · INV-2 LIVE (~153 jest.mock sites). All 7 charter-flagged moot
+  candidates (F-011/031/106/107/108/109/112) are LIVE — the rewrite did not
+  subsume them. PRG-11 scope stands ≈ intact; its gate chain is now fully
+  cleared, activation is an attention-budget + human-led-decomposition call.
+  Report: `supporting-artefacts/prg-11-moot-scan.md`.
+- **2026-06-11 (evening) — PRG-12 ACTIVATED + PRG-11 moot scan launched.**
+  First parallel activation, on operator go. PRG-12: tracker
+  `_wip/l10n-a11y/execution-tracker.md` (commit `9570f5b63`), Cosmo Workstream
+  **L10n & A11y Mobile**, 8 WPs sliced as **WI-621…WI-628** (Backlog, order
+  1–8; 34 findings absorbed exactly once — F-163 excluded as delivered by
+  WI-584, F-026 included, F-123/F-172 ruled to stay). INV-1 pre-check: the
+  jsx-literals ratchet exists (361-entry baseline) → scope reframed to
+  burn-down. Shepherd kickoff prompt handed to operator. PRG-11: read-only
+  moot-by-refactor scan agent launched against the full landed IF file-touch
+  set (15 merged PRs, W0–W2 + early W3/W4); report →
+  `supporting-artefacts/prg-11-moot-scan.md`. Also: IF W2 + W4 fully closed,
+  W3 at 3/6 (`WI-579`/`580`/`582`) — G4 now hangs on W3's 3 remaining units.
+- **2026-06-11 (afternoon) — PRG-02 GRADUATED.** WI-530-related items closed
+  through review; HH critical path complete; outcome met (harness proven by
+  IF W0–W2 live execution). Residue (~12–15 WIs) triaged in a separate operator
+  session (branched) — quick-land / return-to-ZDX / park / kill; queue entry 3
+  scope set by that triage. Routing-rule binding re-pointed in the
+  planning-reference Appendix. First graduation of the program.
+- **2026-06-11 (midday) — G2 + G3 FIRED; standing Cosmo watch armed.** Operator
+  closed the entire W0+W1 set (8 items Closed/Done) and more: W2 `WI-574`
+  Closed, `WI-575`/`576` Executing; W4 `WI-583` Executing, `WI-584` Closed.
+  Consequences: **PRG-12 first-activation decision LIVE** · **PRG-10 safe
+  subset gate met** · **PRG-11 moot-by-refactor scan unlocked**. PRG-13 still
+  waits on W3. Ops: stale NOTION_TOKEN root-caused (legacy infisical call;
+  fixed via `estate-secrets refresh` + host.env) — the old G2 watch had gone
+  blind and was replaced by a standing IF-workstream stage-diff watch with a
+  degraded-watch alarm. HH closing ladder in progress on nexus side
+  (operator-reported; deliberately not monitored).
+- **2026-06-11 — G1 FIRED (HH PR #832 merged 09:27Z).** PRG-02 → formal
+  close-out only; **residue quick-land batch unlocked** (queue entry 3 live).
+  IF spine PR #860 also merged → **W1 fully merged**, 4-item review stack
+  (569/570/571/572) all at Reviewing — G2 hangs solely on operator
+  `/cosmo:review` closes. WI-587 edit-sequencing hold lifted. Dashboard
+  regenerated. Gate-event watches armed this morning caught both merges
+  (PR watch retired; Cosmo-closes watch for G2 still live).
 - **2026-06-11 — Umbrella touch: IF execution underway.** W0 fully done
   (549/550/551 closed; baseline 569 merged@Reviewing). W1 half-landed (570 + 572
   merged@Reviewing, 571 PR held, 573 Ready); W2 pre-bridged. WI-530 gate

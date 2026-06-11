@@ -15,6 +15,7 @@ import {
   useReviewDictation,
   useRecordDictationResult,
 } from '../../../hooks/use-dictation-api';
+import { toLocalDateString } from '../../../lib/local-date';
 
 // RF-09: Dictation result is NOT auto-recorded on mount.
 // "I'm done" is an explicit user action that records the result.
@@ -286,7 +287,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
     const sentences = data?.sentences ?? [];
     const mode = data?.mode ?? 'homework';
-    const localDate = new Date().toISOString().slice(0, 10);
+    const localDate = toLocalDateString();
 
     try {
       await recordResult.mutateAsync({
@@ -361,7 +362,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
             </>
           ) : (
             <>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <ActivityIndicator
+                size="large"
+                color={colors.primary}
+                accessibilityLabel={t('common.loading')}
+              />
               <Text className="text-body text-text-secondary mt-4 text-center">
                 {t('dictation.complete.checkingWriting')}
               </Text>
@@ -446,7 +451,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
               accessibilityLabel={t('dictation.complete.imDone')}
             >
               {recordResult.isPending ? (
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator
+                  size="small"
+                  color={colors.primary}
+                  accessibilityLabel={t('common.loading')}
+                />
               ) : (
                 <Text className="font-semibold text-body text-text-primary">
                   {t('dictation.complete.imDone')}

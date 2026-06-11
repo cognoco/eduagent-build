@@ -17,6 +17,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useDictationData } from './_layout';
 import { useRecordDictationResult } from '../../../hooks/use-dictation-api';
+import { toLocalDateString } from '../../../lib/local-date';
 
 export default function DictationReviewScreen(): React.ReactElement {
   const { t } = useTranslation();
@@ -54,7 +55,7 @@ export default function DictationReviewScreen(): React.ReactElement {
     if (savingRef.current || recordResult.isPending) return;
     savingRef.current = true;
 
-    const localDate = new Date().toISOString().slice(0, 10);
+    const localDate = toLocalDateString();
     const mistakeCount = mistakes.length;
 
     try {
@@ -66,7 +67,7 @@ export default function DictationReviewScreen(): React.ReactElement {
         mode,
         reviewed: true,
       });
-      // [CRIT-2] Navigate only after successful save — guarded per CLAUDE.md
+      // [CRIT-2] Navigate only after successful save — guarded per AGENTS.md
       router.replace('/(app)/practice' as Href);
     } catch (err) {
       savingRef.current = false;
@@ -162,7 +163,11 @@ export default function DictationReviewScreen(): React.ReactElement {
           accessibilityLabel={t('common.done')}
         >
           {recordResult.isPending ? (
-            <ActivityIndicator size="small" color={colors.textInverse} />
+            <ActivityIndicator
+              size="small"
+              color={colors.textInverse}
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text className="text-text-inverse font-semibold text-body">
               {t('common.done')}

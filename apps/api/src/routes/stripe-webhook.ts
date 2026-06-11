@@ -84,7 +84,14 @@ export const stripeWebhookRoute = new Hono<{
       webhookSecret,
       c.env.STRIPE_SECRET_KEY ?? 'sk_webhook_verification_only',
     );
-  } catch {
+  } catch (err) {
+    // Log the failure reason so a misconfiguration (e.g. webhook-secret rotation
+    // gone wrong) is distinguishable from internet probes — without captureException
+    // per-event (that would cause alert-storm from background noise).
+    logger.warn('[stripe-webhook] signature verification failed', {
+      event: 'stripe.webhook.signature_verification_failed',
+      reason: err instanceof Error ? err.message : String(err),
+    });
     return apiError(
       c,
       400,
@@ -101,7 +108,7 @@ export const stripeWebhookRoute = new Hono<{
     // [#830] A test-mode event reaching production with a valid production
     // webhook secret is a high-signal security event — likely production
     // webhook-secret leak, secret reuse, or webhook-endpoint misconfiguration.
-    // CLAUDE.md "Silent recovery without escalation is banned in billing" —
+    // AGENTS.md "Silent recovery without escalation is banned in billing" —
     // logger.warn alone is explicitly insufficient. Mirror the stale-event
     // branch and escalate to Sentry so the rate is queryable.
     logger.warn('[stripe] Rejected test-mode webhook event in production', {
@@ -183,7 +190,7 @@ export const stripeWebhookRoute = new Hono<{
       }
       if (checkoutClaim === 'unavailable') {
         // DB gate unavailable — escalate but continue. Silent recovery is banned
-        // (CLAUDE.md). activateSubscriptionFromCheckout has its own ON CONFLICT
+        // (AGENTS.md). activateSubscriptionFromCheckout has its own ON CONFLICT
         // guard so a duplicate will be caught at the DB level, but surface the
         // missing gate so it is queryable.
         logger.warn(
@@ -258,7 +265,7 @@ export const stripeWebhookRoute = new Hono<{
       // invoice.created) that get enabled on the webhook endpoint configuration
       // must surface — falling through silently would acknowledge with 200 and
       // Stripe would never retry, hiding the gap. Silent recovery is banned
-      // (CLAUDE.md); escalate via logger + Sentry so the unhandled type is
+      // (AGENTS.md); escalate via logger + Sentry so the unhandled type is
       // queryable. Still ack with 200 because hard-failing would loop Stripe
       // forever on a known-additive event.
       logger.warn(

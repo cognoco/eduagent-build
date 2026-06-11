@@ -7,6 +7,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
+import { useTranslation } from 'react-i18next';
 
 import { tokens } from '../lib/design-tokens';
 
@@ -35,6 +36,7 @@ export function ClerkGate({
   onContinueOffline: () => void;
 }) {
   const { isLoaded } = useAuth();
+  const { t } = useTranslation();
   // ThemeContext is not yet mounted at this point (ClerkGate renders above
   // it in the tree). Read the system color scheme directly so dark-mode users
   // see a dark timeout screen instead of the default light palette.
@@ -68,7 +70,7 @@ export function ClerkGate({
               color: gateColors.textPrimary,
             }}
           >
-            Taking longer than expected
+            {t('clerkGate.timeoutTitle')}
           </Text>
           <Text
             style={{
@@ -78,7 +80,7 @@ export function ClerkGate({
               marginBottom: 24,
             }}
           >
-            Please check your internet connection and try again.
+            {t('clerkGate.timeoutMessage')}
           </Text>
           {/* Primary action: force Clerk to re-initialise by remounting ClerkProvider */}
           <Pressable
@@ -101,7 +103,7 @@ export function ClerkGate({
                 fontSize: 16,
               }}
             >
-              Try again
+              {t('clerkGate.tryAgain')}
             </Text>
           </Pressable>
           {/* Secondary action: continue without auth for offline / degraded network */}
@@ -119,7 +121,7 @@ export function ClerkGate({
                 textDecorationLine: 'underline',
               }}
             >
-              Continue without account
+              {t('clerkGate.continueOffline')}
             </Text>
           </Pressable>
         </View>
@@ -136,7 +138,11 @@ export function ClerkGate({
           backgroundColor: gateColors.background,
         }}
       >
-        <ActivityIndicator size="large" color={gateColors.primary} />
+        <ActivityIndicator
+          size="large"
+          color={gateColors.primary}
+          accessibilityLabel={t('common.loading')}
+        />
         <Text
           style={{
             marginTop: 16,
@@ -146,7 +152,7 @@ export function ClerkGate({
             textAlign: 'center',
           }}
         >
-          Connecting securely...
+          {t('clerkGate.connecting')}
         </Text>
       </View>
     );

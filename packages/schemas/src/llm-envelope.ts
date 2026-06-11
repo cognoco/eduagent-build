@@ -29,14 +29,23 @@ const privateReasonSchema = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : undefined;
 }, z.string().min(1).max(1000).optional());
 
+// Non-critical provenance must degrade gracefully:
+// - the `>1 → /100` percentage-drift normalization applies to the NUMBER path
+//   too (a bare `91` is coerced like the string `'91'`/'91%'), and
+// - the schema terminates in `.catch(undefined)` so an irrecoverable value
+//   (e.g. 250 → 2.5, or a negative) drops ONLY this field — never the whole
+//   envelope, which would discard the valid reply and every state signal.
+//   Mirrors sibling `privateReliedOnSchema`'s `.catch([])`.
 const privateFactualConfidenceSchema = z.preprocess((value) => {
-  if (typeof value === 'number') return value;
+  if (typeof value === 'number') {
+    return value > 1 ? value / 100 : value;
+  }
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim().replace(/%$/, '');
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed)) return undefined;
   return value.trim().endsWith('%') || parsed > 1 ? parsed / 100 : parsed;
-}, z.number().min(0).max(1).optional());
+}, z.number().min(0).max(1).optional().catch(undefined));
 
 const nullToUndefined = (value: unknown): unknown =>
   value === null ? undefined : value;

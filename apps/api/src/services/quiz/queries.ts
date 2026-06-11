@@ -8,6 +8,7 @@ import {
   subjects,
   vocabulary,
   vocabularyRetentionCards,
+  withProfileScope,
   type Database,
 } from '@eduagent/database';
 import { languageCodeSchema, type QuizActivityType } from '@eduagent/schemas';
@@ -159,6 +160,19 @@ export async function computeRoundStats(db: Database, profileId: string) {
 }
 
 export async function getVocabularyRoundContext(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<VocabularyRoundContext> {
+  // [F-078] Two-layer RLS: withProfileScope sets app.current_profile_id via
+  // SET LOCAL so Postgres RLS policies activate as a defense-in-depth layer
+  // alongside the application-level createScopedRepository WHERE clause.
+  return withProfileScope(db, profileId, (tx) =>
+    _getVocabularyRoundContextInScope(tx, profileId, subjectId),
+  );
+}
+
+async function _getVocabularyRoundContextInScope(
   db: Database,
   profileId: string,
   subjectId: string,

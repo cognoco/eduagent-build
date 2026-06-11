@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import type { Profile } from '@eduagent/schemas';
 import { useProfile } from '../../../../lib/profile';
@@ -36,6 +37,7 @@ export function ConfirmStep({
   router: ReturnType<typeof useRouter>;
   onComplete: () => void; // [HIGH-A2] layout-level wizard-done signal
 }): React.ReactElement {
+  const { t } = useTranslation();
   const { switchProfile } = useProfile();
   const [landing, setLanding] = React.useState(false);
   const [landingError, setLandingError] = React.useState<string | null>(null);
@@ -104,7 +106,7 @@ export function ConfirmStep({
       <Text className="text-h3 font-semibold text-text-primary mb-2">
         {isSelfBranch
           ? `Your first lesson is ready${previewState.topicText ? `: ${previewState.topicText}` : ''}.`
-          : "Your child's profile is set up. Let's open parent home."}
+          : t('saveWizard.confirmChildReady')}
       </Text>
       {landingError && (
         <View className="bg-danger/10 rounded-card px-4 py-3 mb-3">
@@ -119,7 +121,10 @@ export function ConfirmStep({
         accessibilityRole="button"
       >
         {landing ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator
+            color="white"
+            accessibilityLabel={t('common.loading')}
+          />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
             {cta}

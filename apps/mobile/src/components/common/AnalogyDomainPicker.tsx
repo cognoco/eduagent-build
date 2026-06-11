@@ -1,5 +1,6 @@
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AnalogyDomain } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,7 @@ export function AnalogyDomainPicker({
   isLoading,
   disabled,
 }: AnalogyDomainPickerProps): React.JSX.Element {
+  const { t } = useTranslation();
   const handleSelect = useCallback(
     (domain: AnalogyDomain | null) => {
       if (!disabled) {
@@ -83,7 +85,7 @@ export function AnalogyDomainPicker({
   if (isLoading) {
     return (
       <View className="py-4 items-center" testID="analogy-domain-loading">
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
       </View>
     );
   }
@@ -117,7 +119,7 @@ export function AnalogyDomainPicker({
               </Text>
               {isSelected && (
                 <Text className="text-primary text-body font-semibold">
-                  Active
+                  {t('common.active')}
                 </Text>
               )}
             </View>

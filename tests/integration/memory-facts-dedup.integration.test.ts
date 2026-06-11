@@ -6,7 +6,7 @@
  * scoped repo. Mocks only the LLM boundary (routeAndCall) via registerProvider.
  * Asserts DB state after each action.
  *
- * Per CLAUDE.md: "No internal mocks in integration tests."
+ * Per AGENTS.md: "No internal mocks in integration tests."
  * LLM boundary: registerProvider (real routeAndCall dispatch, mock chat fn).
  */
 
@@ -38,8 +38,10 @@ const EMBEDDING_B = axis(0); // identical → cosine distance 0 (best case)
 const EMBEDDING_FAR = axis(1);
 
 function llmDecision(
-  decision: DedupLlmResult & { ok: true }
-): jest.MockedFunction<NonNullable<Parameters<typeof runDedupForProfile>[0]['llm']>> {
+  decision: DedupLlmResult & { ok: true },
+): jest.MockedFunction<
+  NonNullable<Parameters<typeof runDedupForProfile>[0]['llm']>
+> {
   return jest.fn().mockResolvedValue(decision);
 }
 
@@ -101,15 +103,23 @@ describe('memory_facts dedup — action branches (real DB)', () => {
     expect(report.merges).toBe(1);
 
     // Both originals should be superseded
-    const candidate = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, cId) });
-    const neighbour = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, nId) });
+    const candidate = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, cId),
+    });
+    const neighbour = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, nId),
+    });
     expect(candidate?.supersededBy).not.toBeNull();
     expect(neighbour?.supersededBy).not.toBeNull();
     expect(candidate?.supersededBy).toBe(neighbour?.supersededBy); // both point to merged fact
 
     // The merged fact should be active
     const merged = await db.query.memoryFacts.findFirst({
-      where: and(eq(memoryFacts.profileId, profileId), isNull(memoryFacts.supersededBy), eq(memoryFacts.category, 'interest')),
+      where: and(
+        eq(memoryFacts.profileId, profileId),
+        isNull(memoryFacts.supersededBy),
+        eq(memoryFacts.category, 'interest'),
+      ),
     });
     expect(merged).not.toBeNull();
     expect(merged?.text).toBe('likes fractions and fraction work');
@@ -167,10 +177,14 @@ describe('memory_facts dedup — action branches (real DB)', () => {
 
     expect(report.supersedes).toBe(1);
 
-    const neighbour = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, nId) });
+    const neighbour = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, nId),
+    });
     expect(neighbour?.supersededBy).toBe(cId);
 
-    const candidate = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, cId) });
+    const candidate = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, cId),
+    });
     expect(candidate?.supersededBy).toBeNull();
 
     await db.delete(accounts).where(eq(accounts.id, accountId));
@@ -225,8 +239,12 @@ describe('memory_facts dedup — action branches (real DB)', () => {
 
     expect(report.keptBoth).toBe(1);
 
-    const cRow = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, cId) });
-    const nRow = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, nId) });
+    const cRow = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, cId),
+    });
+    const nRow = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, nId),
+    });
     expect(cRow?.supersededBy).toBeNull();
     expect(nRow?.supersededBy).toBeNull();
 
@@ -282,10 +300,14 @@ describe('memory_facts dedup — action branches (real DB)', () => {
 
     expect(report.discarded).toBe(1);
 
-    const cRow = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, cId) });
+    const cRow = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, cId),
+    });
     expect(cRow).toBeUndefined();
 
-    const nRow = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, nId) });
+    const nRow = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, nId),
+    });
     expect(nRow).not.toBeNull();
 
     await db.delete(accounts).where(eq(accounts.id, accountId));
@@ -293,8 +315,10 @@ describe('memory_facts dedup — action branches (real DB)', () => {
 
   it('profile isolation: dedup on profile A does not affect profile B facts', async () => {
     const { db } = await setupTestDb();
-    const { profileId: profileA, accountId: accountA } = await seedLearningProfile(db, {});
-    const { profileId: profileB, accountId: accountB } = await seedLearningProfile(db, {});
+    const { profileId: profileA, accountId: accountA } =
+      await seedLearningProfile(db, {});
+    const { profileId: profileB, accountId: accountB } =
+      await seedLearningProfile(db, {});
 
     const now = new Date();
     const cId = generateUUIDv7();
@@ -353,7 +377,9 @@ describe('memory_facts dedup — action branches (real DB)', () => {
     });
 
     // Profile B fact must be untouched
-    const bRow = await db.query.memoryFacts.findFirst({ where: eq(memoryFacts.id, bId) });
+    const bRow = await db.query.memoryFacts.findFirst({
+      where: eq(memoryFacts.id, bId),
+    });
     expect(bRow).not.toBeNull();
     expect(bRow?.supersededBy).toBeNull();
 

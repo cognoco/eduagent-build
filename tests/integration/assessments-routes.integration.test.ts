@@ -28,7 +28,7 @@ import { registerProvider } from '../../apps/api/src/services/llm';
 import { app } from '../../apps/api/src/index';
 
 // Controllable mock provider — overrides the default mock registered in setup.ts.
-// Avoids jest.mock on an internal service (CLAUDE.md rule: no internal mocks in
+// Avoids jest.mock on an internal service (AGENTS.md rule: no internal mocks in
 // integration tests). Uses registerProvider so the full routeAndCall path runs.
 const mockChat = jest.fn<Promise<string>, [unknown, unknown]>();
 

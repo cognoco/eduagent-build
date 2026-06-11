@@ -1,99 +1,79 @@
 ---
 name: commit
-description: Use when the user asks to commit, save changes, commit staged files, commit specific files, or commit and push in the EduAgent repo.
+description: Use when committing in the EduAgent repo (commit, save changes, commit staged/specific files, commit and push). Thin overlay over the global /zdx-core:commit primitive — it adds only EduAgent's message conventions.
 ---
 
-# Commit
+# Commit (EduAgent overlay)
 
-You are handling git for this repo. Commit intentionally, preserve unrelated user work, and push after a successful commit unless the user explicitly asks you not to push.
+> **Requires the global `zdx-core` plugin.** This skill defers every commit
+> mechanic to **`/zdx-core:commit`** and only layers EduAgent's message
+> conventions on top. If `/zdx-core:commit` is not available, stop and report
+> that the global `zdx-core` plugin must be installed — do not hand-roll a
+> commit.
 
-## Critical Rules
+## What the CORE owns (follow `/zdx-core:commit` exactly)
 
-1. Push after successful commits unless the user explicitly says not to push. Never force-push unless explicitly requested.
-2. Never use `--no-verify`.
-3. Never stage files beyond the user's requested scope.
-4. Never edit source files as part of this skill. If hooks fail because code needs fixes, report the failure and leave changes staged/unstaged as appropriate.
-5. Exclude secrets and accidental large binaries from commits.
+All commit mechanics live in the portable core, not here:
 
-## Scope Modes
+- explicit `git -C <path>` working-tree resolution (never ambient cwd);
+- **own-work scope by default** — stage only files you edited this session;
+  list any other modified/untracked files and never touch them. `git add -A`
+  happens **only** on an explicit sweep/all instruction;
+- the secret / large-file safety scan (`.env*`, `*.pem`, `*.key`,
+  `credentials.json`, stray large binaries);
+- the conventional-commit message base (`type(scope): summary` + body bullets);
+- **hooks always run — never `--no-verify`** on your own initiative; the
+  one-retry failure ladder (related failure → stop and report; unrelated noise
+  → unstage and retry once);
+- push-by-default with the open-PR exception;
+- the never-rewrite-history boundaries (no rebase / force-push / amend-pushed /
+  reset-hard-to-non-HEAD; non-fast-forward push → stop and report).
 
-Classify the user's request:
+**Do not restate or hardcode the allowed commit types.** `/zdx-core:commit`
+reads this repo's `commitlint.config.js` at commit time and uses whatever it
+enforces, so the type set can never drift out of sync with the linter.
 
-- Staged mode: "staged", "staged only", or "commit staged" means commit only the current index. Do not run `git add`.
-- Files mode: explicit file paths mean stage only those paths.
-- Own-work mode: if the user asks for your changes only, stage only files you changed in this session.
-- All mode: if no scope is specified, stage all safe changes with `git add -A`.
+## What this overlay adds (apply on top of the CORE message)
 
-Use literal pathspecs for Expo Router bracket paths, for example:
+1. **Finding-ID in the subject.** When the diff fixes a tracked item, tag it:
+   `fix(api): atomic quota decrement [CR-1C.1]`.
 
-```bash
-git add ':(literal)apps/mobile/src/app/session/[sessionId].tsx'
-```
+2. **Verified-By table** — required when **3+ distinct finding IDs** appear in
+   one commit. One row per ID; every "Verified By" cell must be non-empty
+   (`test:`, `manual:`, or `N/A:` with a reason):
 
-## Workflow
+   ```text
+   | ID      | Files                         | Verified By                          |
+   |---------|-------------------------------|--------------------------------------|
+   | BUG-XXX | apps/api/foo.ts, foo.test.ts  | test: foo.test.ts:"break test name"  |
+   | CR-YYY  | packages/database/baz.ts      | N/A: schema-only, migrate verified   |
+   ```
 
-1. Snapshot:
+   6+ IDs → split into smaller commits instead (bundles hide weak fixes among
+   solid ones).
 
-```bash
-git status --short --branch
-git diff --cached --stat
-git log --oneline -5
-```
+3. **Sweep-audit block** — required when the message claims a sweep (the
+   `commit-msg` hook enforces this). Paste the query and the result:
 
-2. In staged mode, stop if `git diff --cached --stat` is empty. In all mode, stop if there are no changes.
+   ```text
+   Sweep audit:
+     rg 'pattern' path/
+     -> N hits; all N now have the fix.
+   ```
 
-3. Safety scan the staged/pending set. Exclude `.env`, `.dev.vars`, `credentials.json`, `*.pem`, `*.key`, tokens, and unintended large binaries. If a dangerous file is already staged, unstage it.
+   Use `(no-sweep)` if a sweep keyword is incidental.
 
-4. Stage according to the selected scope.
+4. **Prompt ↔ eval-snapshot pairing.** If the staged diff touches
+   `apps/api/src/services/**/*-prompts.ts` or non-test
+   `apps/api/src/services/llm/*.ts`, the matching
+   `apps/api/eval-llm/snapshots/**` updates must be staged too — run
+   `pnpm eval:llm` and re-stage before committing. Bypass only for pure
+   rename / comment / type-only refactors that cannot change generation output.
 
-5. Draft a conventional commit from `git diff --cached --stat`. Read the full diff only when the stat is ambiguous.
+## EduAgent staging note
 
-Allowed types:
-
-```text
-feat, fix, docs, chore, refactor, cfg, plan, zdx
-```
-
-Subject format:
-
-```text
-<type>(<scope>): <summary>
-```
-
-Keep the subject under 72 characters. Include finding IDs in the subject when the diff fixes tracked findings, for example `[CR-1C.1]`.
-
-For 3+ distinct finding IDs, include a non-empty Verified By table in the body with `test:`, `manual:`, or `N/A:` entries.
-
-When claiming a sweep, include:
-
-```text
-Sweep audit:
-  rg 'pattern' path/
-  -> N hits; all N now have the fix.
-```
-
-Use `(no-sweep)` if a sweep keyword is incidental.
-
-If staged files touch `apps/api/src/services/**/*-prompts.ts` or non-test `apps/api/src/services/llm/*.ts`, ensure the matching `apps/api/eval-llm/snapshots/**` updates are staged unless this is a pure rename/comment/type-only refactor.
-
-6. Commit:
-
-```bash
-git commit -m "$(cat <<'EOF'
-<message>
-EOF
-)"
-```
-
-7. If hooks fail:
-
-- Lint/format auto-fix: re-stage auto-fixed files and retry once.
-- Stale NX graph: run `pnpm exec nx reset`, re-stage intended files, retry once.
-- Type/test failure in related files: stop and report; do not unstage-and-ship a related broken change.
-- Type/test failure in unrelated unstaged files: first anchor a safety-net snapshot — `ts=$(date +%s); snap=$(git stash create -u); [ -n "$snap" ] && git update-ref "refs/preserved/commit-skill-$ts" "$snap"` — then `git stash push --keep-index -u -m "temp: unstaged WIP $ts"`, commit, then `git stash pop`. On clean completion delete the preserved ref (`git update-ref -d refs/preserved/commit-skill-$ts`); on any failure leave it and report the ref name so the caller can recover via `git stash apply <sha>`. If the stash pop reports "stash entry is kept", inspect before proceeding.
-
-Maximum two commit attempts.
-
-8. Push after a successful commit unless explicitly asked not to. Do not force-push or rebase unless explicitly requested.
-
-9. Report commit hash, message, committed files, excluded files, and whether push was performed.
+Don't commit half a feature: if a staged file references code that is modified
+but **unstaged** in the same logical scope, pull that file in (or split the
+commit) so each commit is self-contained. For Expo Router files with `[`/`]`
+in the path, use a literal pathspec, e.g.
+`git add ':(literal)apps/mobile/src/app/session/[sessionId].tsx'`.

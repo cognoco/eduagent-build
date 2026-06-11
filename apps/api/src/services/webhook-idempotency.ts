@@ -23,7 +23,7 @@ const logger = createLogger();
  * evaluates the unique constraint atomically: two concurrent inserts with the
  * same (source, webhook_id) cannot both return a row.
  *
- * Per CLAUDE.md "Silent recovery without escalation is banned": DB failures
+ * Per AGENTS.md "Silent recovery without escalation is banned": DB failures
  * are escalated to Sentry + structured log so on-call can query frequency and
  * distinguish transient connection errors from schema/auth regressions.
  * The caller still decides the fallback behaviour on 'unavailable'.

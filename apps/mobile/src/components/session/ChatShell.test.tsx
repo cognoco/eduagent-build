@@ -1649,6 +1649,72 @@ describe('ChatShell', () => {
     });
   });
 
+  describe('[F-123] dormant web instance voice controls', () => {
+    afterEach(() => {
+      mockIsFocused = true;
+    });
+
+    it('[F-123] hides VoiceToggle when the instance is dormant (web + unfocused)', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = false;
+        renderChatShell({ onSend: jest.fn() });
+
+        // VoiceToggle must not be present on a dormant web instance.
+        expect(
+          screen.queryByTestId('voice-toggle', { includeHiddenElements: true }),
+        ).toBeNull();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    it('[F-123] hides voice playback toolbar when the instance is dormant (web + unfocused)', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = false;
+        // Render with voice mode so showVoicePlaybackControls would be true
+        // if not for isWebDormant.
+        renderChatShell({ onSend: jest.fn(), inputMode: 'voice' });
+
+        expect(
+          screen.queryByTestId('chat-composer-toolbar', {
+            includeHiddenElements: true,
+          }),
+        ).toBeNull();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    it('[F-123] VoiceToggle IS rendered on focused web instances', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = true;
+        renderChatShell({ onSend: jest.fn() });
+
+        expect(screen.getByTestId('voice-toggle')).toBeTruthy();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+  });
+
   describe('escalation rung strip', () => {
     it('renders the rung strip when pedagogicalState is provided', () => {
       const { getByTestId, getByText } = renderChatShell({

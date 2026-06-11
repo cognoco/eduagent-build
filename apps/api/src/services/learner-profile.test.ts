@@ -23,6 +23,7 @@ import {
 } from './learner-profile';
 import type { Database } from '@eduagent/database';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
+import * as sentry from './sentry';
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
@@ -2159,5 +2160,144 @@ describe('applyAnalysis — in-transaction GDPR re-check (WI-82 TOCTOU)', () => 
     expect(txUpdate).not.toHaveBeenCalled();
     // The outer gate passed (CONSENTED) — transaction was entered
     expect(db.transaction as jest.Mock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-074 / WI-579] analyzeSessionTranscript parse failure leaks no content
+// ---------------------------------------------------------------------------
+
+describe('[F-074 / WI-579] analyzeSessionTranscript parse failure leaks no content', () => {
+  const SENTINEL = 'Tommy-session-quote-private';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('[BREAK] captures shape-only diagnostics, never a response slice', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    try {
+      // Balanced braces (the JSON extractor returns a slice) but invalid
+      // JSON (`undefined` is not a JSON token) — JSON.parse throws and the
+      // catch branch fires.
+      const response = `{"struggles": undefined, "quote": "${SENTINEL}"}`;
+      mockRouteAndCall.mockResolvedValue({ response });
+
+      const events = [
+        { eventType: 'user_message', content: 'Long division confuses me.' },
+        { eventType: 'ai_response', content: 'Let me show it step by step.' },
+        { eventType: 'user_message', content: 'Okay, that makes more sense.' },
+      ];
+      const result = await analyzeSessionTranscript(
+        events,
+        'Mathematics',
+        'Long division',
+        null,
+      );
+      expect(result).toBeNull();
+
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(SENTINEL);
+      expect(captureSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'analyzeSession',
+            responseLength: response.length,
+          }),
+        }),
+      );
+      expect(JSON.stringify(captureSpy.mock.calls)).not.toContain(SENTINEL);
+    } finally {
+      captureSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listStruggleTopicNames — scoped-repo read + malformed-JSONB fail-safe.
+// Digest send steps call this without a try/catch around entry parsing, so
+// legacy rows with null/scalar entries must degrade instead of throwing.
+// ---------------------------------------------------------------------------
+describe('listStruggleTopicNames', () => {
+  const PROFILE_ID = '00000000-0000-4000-8000-00000000aaaa';
+
+  function makeDb(strugglesRow: unknown): Database {
+    return {
+      query: {
+        learningProfiles: {
+          findFirst: jest.fn().mockResolvedValue(strugglesRow),
+        },
+      },
+    } as unknown as Database;
+  }
+
+  // Imported lazily to avoid touching the big import block above.
+  const { listStruggleTopicNames } =
+    jest.requireActual<typeof import('./learner-profile')>('./learner-profile');
+
+  it('returns up to max topic names in JSONB order', async () => {
+    const db = makeDb({
+      struggles: [
+        { topic: 'fractions' },
+        { topic: 'long division' },
+        { topic: 'decimals' },
+      ],
+    });
+    await expect(listStruggleTopicNames(db, PROFILE_ID, 2)).resolves.toEqual([
+      'fractions',
+      'long division',
+    ]);
+  });
+
+  it('reads through the scoped repository (profile-scoped where clause)', async () => {
+    const db = makeDb({ struggles: [{ topic: 'fractions' }] });
+    await listStruggleTopicNames(db, PROFILE_ID, 2);
+    const findFirst = (
+      db as unknown as {
+        query: { learningProfiles: { findFirst: jest.Mock } };
+      }
+    ).query.learningProfiles.findFirst;
+    expect(findFirst).toHaveBeenCalledTimes(1);
+    // The scoped repo always passes a where clause binding the profileId
+    // (the expression is a circular drizzle SQL node, so assert presence).
+    const arg = findFirst.mock.calls[0]?.[0] as { where?: unknown };
+    expect(arg?.where).toBeDefined();
+  });
+
+  it('fails safe on malformed entries (null, scalars, missing/empty topic)', async () => {
+    const db = makeDb({
+      struggles: [
+        null,
+        42,
+        'not-an-object',
+        { topic: null },
+        { topic: '' },
+        { topic: '   ' },
+        { notTopic: 'x' },
+        { topic: '  fractions  ' },
+      ],
+    });
+    await expect(listStruggleTopicNames(db, PROFILE_ID, 5)).resolves.toEqual([
+      'fractions',
+    ]);
+  });
+
+  it('returns empty for a non-array struggles column or missing row', async () => {
+    await expect(
+      listStruggleTopicNames(
+        makeDb({ struggles: { topic: 'x' } }),
+        PROFILE_ID,
+        2,
+      ),
+    ).resolves.toEqual([]);
+    await expect(
+      listStruggleTopicNames(makeDb(undefined), PROFILE_ID, 2),
+    ).resolves.toEqual([]);
   });
 });

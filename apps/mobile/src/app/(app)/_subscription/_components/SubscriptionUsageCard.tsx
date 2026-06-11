@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { UsageMeter } from '../../../../components/common';
 import { TrackedView } from '../../../../components/common/TrackedView';
 import type { UsageData } from '../../../../hooks/use-subscription';
@@ -19,6 +20,7 @@ export function SubscriptionUsageCard({
   canUseOwnerBillingGates,
   breakdownAnalytics,
 }: SubscriptionUsageCardProps): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <View className="mt-4">
       <TrackedView
@@ -28,7 +30,7 @@ export function SubscriptionUsageCard({
         testID="subscription-usage-tracker"
       >
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-          Usage this month
+          {t('subscription.usageCard.usageThisMonth')}
         </Text>
         <View className="bg-surface rounded-card px-4 py-3.5">
           <UsageMeter
@@ -40,13 +42,18 @@ export function SubscriptionUsageCard({
           {usage.dailyLimit != null && (
             <View className="mt-2" testID="daily-usage">
               <Text className="text-caption text-text-secondary">
-                Today: {usage.usedToday} / {usage.dailyLimit} daily questions
+                {t('subscription.usageCard.todayUsage', {
+                  used: usage.usedToday,
+                  limit: usage.dailyLimit,
+                })}
               </Text>
             </View>
           )}
           {usage.topUpCreditsRemaining > 0 && (
             <Text className="text-caption text-text-secondary mt-2">
-              + {usage.topUpCreditsRemaining} top-up credits remaining
+              {t('subscription.usageCard.topUpRemaining', {
+                count: usage.topUpCreditsRemaining,
+              })}
             </Text>
           )}
           {usage.byProfile && usage.byProfile.length > 0 ? (
@@ -59,13 +66,15 @@ export function SubscriptionUsageCard({
                 >
                   <Text className="text-caption text-text-secondary">
                     {row.is_self && canUseOwnerBillingGates
-                      ? 'Your share'
+                      ? t('subscription.usageCard.yourShare')
                       : row.is_self
-                        ? 'Your usage'
+                        ? t('subscription.usageCard.yourUsage')
                         : row.name}
                   </Text>
                   <Text className="text-caption font-semibold text-text-primary">
-                    {row.used} questions
+                    {t('subscription.usageCard.questionsUsed', {
+                      count: row.used,
+                    })}
                   </Text>
                 </View>
               ))}
@@ -75,7 +84,7 @@ export function SubscriptionUsageCard({
                   testID="usage-family-aggregate"
                 >
                   <Text className="text-caption text-text-secondary">
-                    Family aggregate
+                    {t('subscription.usageCard.familyAggregate')}
                   </Text>
                   <Text className="text-caption font-semibold text-text-primary">
                     {usage.familyAggregate.used} / {usage.familyAggregate.limit}
@@ -85,17 +94,21 @@ export function SubscriptionUsageCard({
             </View>
           ) : null}
           <Text className="text-caption text-text-secondary mt-1">
-            Quota resets{' '}
-            {usage.resetsAtLabel ??
-              new Date(usage.cycleResetAt).toLocaleDateString(undefined, {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
+            {t('subscription.usageCard.quotaResets', {
+              date:
+                usage.resetsAtLabel ??
+                new Date(usage.cycleResetAt).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                }),
+            })}
           </Text>
           {usage.renewsAtLabel ? (
             <Text className="text-caption text-text-secondary mt-1">
-              Subscription renews {usage.renewsAtLabel}
+              {t('subscription.usageCard.renews', {
+                date: usage.renewsAtLabel,
+              })}
             </Text>
           ) : null}
         </View>
@@ -113,7 +126,7 @@ export function SubscriptionUsageCard({
               }
             />
             <Text className="text-caption text-text-secondary mt-1">
-              Daily limit — resets at midnight
+              {t('subscription.usageCard.dailyLimitHint')}
             </Text>
           </View>
         )}

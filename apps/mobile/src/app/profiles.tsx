@@ -168,7 +168,7 @@ export default function ProfilesScreen() {
     } catch (err) {
       // [BUG-822] switchProfile may throw (network failure, Clerk error, etc.)
       // instead of returning {success:false}. Surface the typed server reason
-      // when available rather than a generic "Please try again." per CLAUDE.md
+      // when available rather than a generic "Please try again." per AGENTS.md
       // rule: never replace specific server errors with generic messages.
       clearTimeout(timeoutId);
       // [CR-2026-05-21-107] Same guard as the success path — if the 20s
@@ -213,7 +213,10 @@ export default function ProfilesScreen() {
         testID="profiles-auth-loading"
         className="flex-1 bg-background items-center justify-center"
       >
-        <ActivityIndicator size="large" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -246,15 +249,19 @@ export default function ProfilesScreen() {
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" testID="profiles-loading" />
+          <ActivityIndicator
+            size="large"
+            testID="profiles-loading"
+            accessibilityLabel={t('common.loading')}
+          />
         </View>
       ) : profiles.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">
           <Text className="text-h2 font-bold text-text-primary mb-2">
-            No profiles yet
+            {t('profiles.noProfilesYet')}
           </Text>
           <Text className="text-body text-text-secondary text-center mb-6">
-            Create your first profile to get started
+            {t('profiles.createFirstHint')}
           </Text>
           <Pressable
             onPress={() => router.push('/create-profile')}
@@ -262,7 +269,7 @@ export default function ProfilesScreen() {
             testID="profiles-create-first"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Create profile
+              {t('profiles.createProfile')}
             </Text>
           </Pressable>
         </View>
@@ -320,7 +327,7 @@ export default function ProfilesScreen() {
                     testID={`profile-rename-${profile.id}`}
                   >
                     <Text className="text-body-sm text-text-secondary">
-                      Edit
+                      {t('common.edit')}
                     </Text>
                   </Pressable>
                 )}
@@ -329,7 +336,7 @@ export default function ProfilesScreen() {
           })}
 
           {/*
-            [BUG-127] isOwner client-side gate. Per CLAUDE.md Profile Shapes,
+            [BUG-127] isOwner client-side gate. Per AGENTS.md Profile Shapes,
             "Add child" must only be visible to account owners (guardian or
             solo) — children acting on a parent's account must never see the
             add-profile affordance. Server-side enforcement remains the
@@ -343,7 +350,7 @@ export default function ProfilesScreen() {
               testID="profiles-add-button"
             >
               <Text className="text-body font-semibold text-primary">
-                + Add profile
+                {t('profiles.addProfile')}
               </Text>
             </Pressable>
           )}
@@ -355,6 +362,7 @@ export default function ProfilesScreen() {
         animationType="fade"
         onRequestClose={handleCancelRename}
         testID="rename-modal"
+        accessibilityViewIsModal
       >
         <Pressable
           className="flex-1 bg-black/50 justify-center px-8"
@@ -371,7 +379,7 @@ export default function ProfilesScreen() {
               className="bg-surface rounded-card p-5"
             >
               <Text className="text-h2 font-bold text-text-primary mb-4">
-                Rename profile
+                {t('profiles.renameTitle')}
               </Text>
               <TextInput
                 ref={renameInputRef}
@@ -419,7 +427,9 @@ export default function ProfilesScreen() {
                   accessibilityLabel="Save"
                 >
                   <Text className="text-body font-semibold text-text-inverse">
-                    {updateName.isPending ? 'Saving...' : 'Save'}
+                    {updateName.isPending
+                      ? t('common.saving')
+                      : t('common.save')}
                   </Text>
                 </Pressable>
               </View>

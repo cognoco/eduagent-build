@@ -159,7 +159,10 @@ export default function DeleteAccountScreen() {
         className="flex-1 bg-background items-center justify-center"
         testID="delete-account-profile-loading"
       >
-        <ActivityIndicator color={colors.primary} />
+        <ActivityIndicator
+          color={colors.primary}
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -212,6 +215,7 @@ export default function DeleteAccountScreen() {
             <ActivityIndicator
               color={colors.primary}
               testID="delete-account-status-loading"
+              accessibilityLabel={t('common.loading')}
             />
           </View>
         ) : statusLoadFailed ? (
@@ -264,7 +268,10 @@ export default function DeleteAccountScreen() {
               accessibilityLabel={t('account.keepAccountLabel')}
             >
               {cancelDeletion.isPending ? (
-                <ActivityIndicator color={colors.textInverse} />
+                <ActivityIndicator
+                  color={colors.textInverse}
+                  accessibilityLabel={t('common.loading')}
+                />
               ) : (
                 <Text className="text-body font-semibold text-text-inverse">
                   {t('account.keepAccount')}
@@ -380,6 +387,7 @@ export default function DeleteAccountScreen() {
                 <ActivityIndicator
                   color={colors.textInverse}
                   testID="delete-account-loading"
+                  accessibilityLabel={t('common.loading')}
                 />
               ) : (
                 <Text className="text-body font-semibold text-text-inverse">

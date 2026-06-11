@@ -16,10 +16,19 @@ jobs:
     name: API Quality Gate
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 (was filter: tree:0): the change-class router below
+      # diffs against the PR base branch, which needs real history + trees.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
-          filter: tree:0
+          fetch-depth: 0
           persist-credentials: false
+
+      # Ensure base branch is available for the change-class router diff
+      - name: Fetch base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
         with:
@@ -38,22 +47,25 @@ jobs:
       - name: Typecheck API
         run: pnpm exec nx run api:typecheck
 
-      # [M13] Detect whether LLM prompt or eval-harness files changed.
+      # [M13 → WI-452] Route the eval steps by the change-class matrix — the
+      # same router ci.yml uses, so slow-suite routing has ONE source of
+      # truth (docs/change-classes.md ↔ check-change-class.sh) instead of a
+      # parallel paths-filter that drifts from it. eval=true fires for the
+      # llm-prompts class (prompt builders + services/llm/** incl. providers)
+      # and the eval-harness class (apps/api/eval-llm/** incl. snapshots).
+      # Fail-open: an unresolvable diff base emits eval=true, never a skip.
+      - name: Change-class router (WI-452)
+        id: change-class
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash scripts/check-change-class.sh --branch --github-output
+
       # Tier-1 eval (pnpm eval:llm) is free — it builds prompt strings and
       # compares snapshots without making any real LLM calls. Run it whenever
       # prompt builders or the harness itself are touched so prompt drift is
       # caught on PRs rather than only when a developer manually remembers.
-      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590  # v3
-        id: prompt-changes
-        with:
-          filters: |
-            prompts:
-              - 'apps/api/eval-llm/**'
-              - 'apps/api/src/services/**/*-prompts.ts'
-              - 'apps/api/src/services/llm/**'
-
       - name: LLM eval harness — Tier 1 (prompt snapshots)
-        if: steps.prompt-changes.outputs.prompts == 'true'
+        if: steps.change-class.outputs.eval == 'true'
         run: pnpm eval:llm
 
       # [FCR-2026-05-23-L15.MED6] Deterministic, key-free guard that the
@@ -68,5 +80,5 @@ jobs:
       # envelope-emitting flows) and committed in the same PR that removed
       # continue-on-error here. See apps/api/eval-llm/README.md § Seeding.
       - name: LLM eval harness — validate signal baseline (deterministic)
-        if: steps.prompt-changes.outputs.prompts == 'true'
+        if: steps.change-class.outputs.eval == 'true'
         run: pnpm eval:llm -- --validate-baseline

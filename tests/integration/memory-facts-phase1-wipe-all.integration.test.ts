@@ -6,19 +6,13 @@
  * Asserts that BOTH active and superseded rows are deleted and replaced by
  * the new set.
  *
- * Per CLAUDE.md: "No internal mocks in integration tests."
+ * Per AGENTS.md: "No internal mocks in integration tests."
  */
 
 import { eq } from 'drizzle-orm';
-import {
-  accounts,
-  generateUUIDv7,
-  memoryFacts,
-} from '@eduagent/database';
+import { accounts, generateUUIDv7, memoryFacts } from '@eduagent/database';
 
-import {
-  replaceActiveMemoryFactsForProfile,
-} from '../../apps/api/src/services/memory/memory-facts';
+import { replaceActiveMemoryFactsForProfile } from '../../apps/api/src/services/memory/memory-facts';
 import { seedLearningProfile, setupTestDb } from './helpers/memory-facts';
 import type { MemoryProjection } from '../../apps/api/src/services/memory/backfill-mapping';
 

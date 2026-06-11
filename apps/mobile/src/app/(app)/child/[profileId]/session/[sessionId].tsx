@@ -32,9 +32,9 @@ try {
   // Native module unavailable (dev-client missing expo-clipboard)
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string | undefined): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(locale, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -42,7 +42,7 @@ function formatDate(iso: string): string {
 }
 
 export default function SessionDetailScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const durationLabel = useDurationLabel();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -98,7 +98,10 @@ export default function SessionDetailScreen() {
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator testID="loading" />
+        <ActivityIndicator
+          testID="loading"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -204,7 +207,7 @@ export default function SessionDetailScreen() {
           {session.displayTitle}
         </Text>
         <Text className="text-text-secondary mt-1 text-sm">
-          {formatDate(session.startedAt)}
+          {formatDate(session.startedAt, i18n?.language)}
         </Text>
       </View>
 

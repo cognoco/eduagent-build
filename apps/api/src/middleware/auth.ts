@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { decodeJWTHeader, lookupJWKByKid, verifyJWT } from './jwt';
 import type { JWK } from './jwt';
@@ -6,6 +7,19 @@ import { captureException, addBreadcrumb } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
+
+// ---------------------------------------------------------------------------
+// JWT claims schema
+// ---------------------------------------------------------------------------
+
+// [F-021] Validate JWT payload claims at the trust boundary.
+// `verifyJWT` returns a JSON.parse cast — sub/email are not guaranteed to be
+// present or the right type. Parse with Zod before trusting any value.
+const clerkJWTClaimsSchema = z.object({
+  sub: z.string().min(1),
+  email: z.string().optional(),
+  email_verified: z.boolean().optional(),
+});
 
 // ---------------------------------------------------------------------------
 // Types
@@ -117,12 +131,21 @@ async function verifyClerkJWT(
 
   // Verify signature and validate claims (issuer + audience)
   const issuer = deriveIssuerFromJwksUrl(jwksUrl);
-  const payload = await verifyJWT(token, jwk, { issuer, audience });
+  const rawPayload = await verifyJWT(token, jwk, { issuer, audience });
+
+  // [F-021] Runtime validation at the JWT trust boundary. verifyJWT returns a
+  // JSON.parse cast; sub/email may be absent or wrong type in a malformed token.
+  const claims = clerkJWTClaimsSchema.safeParse(rawPayload);
+  if (!claims.success) {
+    throw new Error(
+      'Invalid JWT: missing or invalid required claims (sub must be a non-empty string)',
+    );
+  }
 
   return {
-    sub: payload.sub,
-    email: payload.email as string | undefined,
-    emailVerified: payload.email_verified === true,
+    sub: claims.data.sub,
+    email: claims.data.email,
+    emailVerified: claims.data.email_verified === true,
   };
 }
 

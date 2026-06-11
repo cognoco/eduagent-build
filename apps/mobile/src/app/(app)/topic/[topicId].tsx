@@ -80,9 +80,12 @@ function getMostRecentSessionCreatedAt(
   }, null);
 }
 
-function formatSessionDate(createdAt: string): string {
+function formatSessionDate(
+  createdAt: string,
+  locale: string | undefined,
+): string {
   const date = new Date(createdAt);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 function formatSessionsSummary(
@@ -102,8 +105,11 @@ function formatSessionsSummary(
   return `${sessions.length} ${sessionLabel} · ${totalMinutes} min total`;
 }
 
-function formatBookmarkSourceLine(bookmark: Bookmark): string {
-  return `From chat · ${formatSessionDate(bookmark.createdAt)}`;
+function formatBookmarkSourceLine(
+  bookmark: Bookmark,
+  locale: string | undefined,
+): string {
+  return `From chat · ${formatSessionDate(bookmark.createdAt, locale)}`;
 }
 
 interface TopicSectionStripProps {
@@ -252,7 +258,7 @@ export default function TopicDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const relativeDate = useRelativeDate();
   const { activeProfile } = useProfile();
   const activeProfileRole = useActiveProfileRole();
@@ -566,7 +572,11 @@ export default function TopicDetailScreen() {
     }
     return (
       <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }
@@ -575,10 +585,10 @@ export default function TopicDetailScreen() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-8">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          Topic not found
+          {t('topic.notFoundTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          This topic could not be opened. Please go back and try again.
+          {t('topic.notFoundMessage')}
         </Text>
         <Pressable
           onPress={handleTopicBack}
@@ -588,7 +598,7 @@ export default function TopicDetailScreen() {
           testID="topic-detail-missing-params-back"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Go back
+            {t('common.goBackAction')}
           </Text>
         </Pressable>
       </View>
@@ -602,10 +612,10 @@ export default function TopicDetailScreen() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-8">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          We couldn't load this topic
+          {t('topic.loadErrorTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          Please try again, or go back to your library.
+          {t('topic.loadErrorMessage')}
         </Text>
         <Pressable
           onPress={() => {
@@ -618,7 +628,7 @@ export default function TopicDetailScreen() {
           testID="topic-detail-retry"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Retry
+            {t('common.retry')}
           </Text>
         </Pressable>
         <Pressable
@@ -629,7 +639,7 @@ export default function TopicDetailScreen() {
           testID="topic-detail-go-back"
         >
           <Text className="text-body font-semibold text-text-primary">
-            Go back
+            {t('common.goBackAction')}
           </Text>
         </Pressable>
         <Pressable
@@ -639,7 +649,9 @@ export default function TopicDetailScreen() {
           accessibilityLabel="Go home"
           testID="topic-detail-go-home"
         >
-          <Text className="text-body-sm text-primary">Go Home</Text>
+          <Text className="text-body-sm text-primary">
+            {t('common.goHome')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -676,8 +688,14 @@ export default function TopicDetailScreen() {
             className="flex-1 items-center justify-center"
             testID="topic-detail-loading"
           >
-            <ActivityIndicator size="large" color={colors.muted} />
-            <Text className="text-text-secondary mt-2">Loading topic...</Text>
+            <ActivityIndicator
+              size="large"
+              color={colors.muted}
+              accessibilityLabel={t('common.loading')}
+            />
+            <Text className="text-text-secondary mt-2">
+              {t('topic.loadingTopic')}
+            </Text>
           </View>
           {/* CTA visible but disabled while data loads */}
           <StudyCTA
@@ -694,10 +712,10 @@ export default function TopicDetailScreen() {
           testID="topic-detail-empty"
         >
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            Topic not found
+            {t('topic.notFoundTitle')}
           </Text>
           <Text className="text-body text-text-secondary text-center">
-            This topic may have been removed from your curriculum.
+            {t('topic.removedHint')}
           </Text>
           <Pressable
             onPress={handleTopicBack}
@@ -707,7 +725,7 @@ export default function TopicDetailScreen() {
             accessibilityLabel="Back to previous screen"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Go back
+              {t('common.goBackAction')}
             </Text>
           </Pressable>
         </View>
@@ -841,7 +859,7 @@ export default function TopicDetailScreen() {
                         noteId={note.id}
                         topicTitle={topicProgress.title}
                         content={note.content}
-                        sourceLine={formatSourceLine(note)}
+                        sourceLine={formatSourceLine(note, i18n?.language)}
                         updatedAt={note.updatedAt}
                         conceptSignal={
                           conceptSignalsQuery.data?.signals?.[note.topicId]
@@ -860,7 +878,7 @@ export default function TopicDetailScreen() {
                     className="text-body-sm text-text-secondary px-5 py-2"
                     testID="topic-notes-empty"
                   >
-                    No notes yet. Add one when something clicks.
+                    {t('topic.noNotesYet')}
                   </Text>
                 )}
 
@@ -893,8 +911,8 @@ export default function TopicDetailScreen() {
                   >
                     <Text className="text-primary text-body-sm font-medium">
                       {noteCount > 0
-                        ? '+ Add a note'
-                        : '+ Add your first note for this topic'}
+                        ? t('topic.addNote')
+                        : t('topic.addFirstNote')}
                     </Text>
                   </Pressable>
                 )}
@@ -936,7 +954,10 @@ export default function TopicDetailScreen() {
                       key={bookmark.id}
                       bookmarkId={bookmark.id}
                       content={bookmark.content}
-                      sourceLine={formatBookmarkSourceLine(bookmark)}
+                      sourceLine={formatBookmarkSourceLine(
+                        bookmark,
+                        i18n?.language,
+                      )}
                       onPress={() => handleSessionPress(bookmark.sessionId)}
                     />
                   ))
@@ -986,7 +1007,10 @@ export default function TopicDetailScreen() {
                       <TopicSessionRow
                         key={session.id}
                         sessionId={session.id}
-                        date={formatSessionDate(session.createdAt)}
+                        date={formatSessionDate(
+                          session.createdAt,
+                          i18n?.language,
+                        )}
                         durationSeconds={session.durationSeconds}
                         sessionType={session.sessionType}
                         onPress={handleSessionPress}
@@ -998,7 +1022,7 @@ export default function TopicDetailScreen() {
                     className="text-body-sm text-text-secondary px-5 py-2"
                     testID="topic-sessions-empty"
                   >
-                    No sessions yet. Start one below!
+                    {t('topic.noSessionsYet')}
                   </Text>
                 )}
               </View>

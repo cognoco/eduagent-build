@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# update-claude-md.sh — Update quantitative counts in CLAUDE.md from actual codebase state
+# update-claude-md.sh — Update quantitative counts in AGENTS.md from actual codebase state
 #
 # Updates the Snapshot block (lines 5-7) plus the "Counts verified YYYY-MM-DD" line.
 # Patterns are line-anchored so the same number that appears twice in the file
@@ -12,14 +12,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/_doc-counts.sh"
 
-TARGET="$REPO_ROOT/CLAUDE.md"
+TARGET="$REPO_ROOT/AGENTS.md"
 
 # Format number with comma for thousands: 1302 → "1,302"
 format_number() {
   printf "%'d" "$1" 2>/dev/null || echo "$1"
 }
 
-echo "Updating CLAUDE.md counts..."
+echo "Updating AGENTS.md counts..."
 echo ""
 
 # Collect actual counts
@@ -113,7 +113,7 @@ update_line "Verified date" \
 echo ""
 echo "==========================="
 if [ "$changes" -gt 0 ]; then
-  echo "$changes count(s) updated in CLAUDE.md"
+  echo "$changes count(s) updated in AGENTS.md"
 else
-  echo "CLAUDE.md already up to date — no changes made."
+  echo "AGENTS.md already up to date — no changes made."
 fi

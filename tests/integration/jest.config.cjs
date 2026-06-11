@@ -43,6 +43,8 @@ module.exports = {
     '<rootDir>/.worktrees/',
     '<rootDir>/.tmp/',
     '[/\\\\]\\.tmp',
+    // WI-536 flaky-test quarantine (see tools/quarantine/).
+    ...require('../../tools/quarantine/registry.cjs').jestIgnorePatterns(),
   ],
   // Integration tests share a Neon database. Global-scope operations like
   // quota-reset and concurrent session writes race across parallel workers,

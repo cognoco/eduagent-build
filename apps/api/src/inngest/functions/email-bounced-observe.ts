@@ -7,7 +7,7 @@
 // the comment "Telemetry-only event — no Inngest handler registered; consumed
 // by observability tooling." This meant the event fired into the void — the
 // Inngest dashboard could not query it and there was no structured-log terminus,
-// violating the CLAUDE.md "Silent recovery without escalation" rule.
+// violating the AGENTS.md "Silent recovery without escalation" rule.
 //
 // [SEC-6 / BUG-722] The email payload already masks recipient PII before
 // emitting the event. This handler logs the masked payload only.
@@ -21,7 +21,10 @@
 // reflects the original event type so dashboard queries can filter on it.
 // ---------------------------------------------------------------------------
 
-import { emailBouncedEventSchema } from '@eduagent/schemas';
+import {
+  emailBouncedEventSchema,
+  summarizeRawPayload,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
@@ -39,13 +42,18 @@ export const emailBouncedObserve = inngest.createFunction(
     if (!parseResult.success) {
       logger.error('email.bounced.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data, // `to` is pre-masked by sender (resend-webhook.ts:maskEmail)
+        rawData: summarizeRawPayload(event.data),
       });
       captureException(
         new Error(
           '[email-bounced] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parseResult.error.issues, rawData: event.data } },
+        {
+          extra: {
+            issues: parseResult.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
       );
       return { status: 'schema_error' as const };
     }

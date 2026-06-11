@@ -233,7 +233,7 @@ export default function ChildCurriculumScreen(): React.ReactElement {
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         testID="child-curriculum-loading"
       >
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
       </View>
     );
   }

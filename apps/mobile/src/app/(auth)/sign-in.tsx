@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Trans, useTranslation } from 'react-i18next';
 import * as Linking from 'expo-linking';
 import * as SecureStore from '../../lib/secure-storage';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
@@ -213,6 +214,7 @@ function formatUnsupportedVerificationMessage(strategies: string[]): string {
 }
 
 export default function SignInScreen() {
+  const { t } = useTranslation();
   const { signIn, setActive, isLoaded } = useSignIn();
   const { signOut: clerkSignOut, isSignedIn: isClerkSignedIn } = useClerk();
   const router = useRouter();
@@ -1072,7 +1074,7 @@ export default function SignInScreen() {
       >
         <ActivityIndicator size="large" accessibilityLabel="Signing you in" />
         <Text className="text-body text-text-secondary mt-4">
-          Signing you in…
+          {t('auth.signIn.signingYouIn')}
         </Text>
       </View>
     );
@@ -1105,27 +1107,30 @@ export default function SignInScreen() {
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
             {pendingVerification.strategy === 'totp'
-              ? 'Enter authenticator code'
+              ? t('auth.signIn.enterAuthenticatorCode')
               : pendingVerification.strategy === 'backup_code'
-                ? 'Enter a backup code'
-                : 'Enter verification code'}
+                ? t('auth.signIn.enterBackupCode')
+                : t('auth.signIn.enterVerificationCode')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
             {pendingVerification.strategy === 'totp' ? (
-              'Open your authenticator app and enter the 6-digit code.'
+              t('auth.signIn.totpHint')
             ) : pendingVerification.strategy === 'backup_code' ? (
-              'Enter one of the backup codes you saved when you set up two-factor authentication.'
+              t('auth.signIn.backupCodeHint')
             ) : (
-              <>
-                We sent a verification code to{' '}
-                <Text
-                  className="text-body-sm text-text-secondary font-semibold"
-                  numberOfLines={1}
-                  ellipsizeMode="middle"
-                >
-                  {pendingVerification.identifier}
-                </Text>
-              </>
+              <Trans
+                i18nKey="auth.signIn.sentCodeTo"
+                values={{ email: pendingVerification.identifier }}
+                components={{
+                  email: (
+                    <Text
+                      className="text-body-sm text-text-secondary font-semibold"
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    />
+                  ),
+                }}
+              />
             )}
           </Text>
 
@@ -1140,7 +1145,7 @@ export default function SignInScreen() {
 
           <View onLayout={onVerifyFieldLayout('code')}>
             <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Verification code
+              {t('auth.signIn.verificationCodeLabel')}
             </Text>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
@@ -1252,10 +1257,10 @@ export default function SignInScreen() {
               }
             >
               {isReturningUser === null
-                ? 'Welcome'
+                ? t('auth.signIn.welcome')
                 : isReturningUser
-                  ? 'Welcome back'
-                  : 'Welcome to MentoMate'}
+                  ? t('auth.signIn.welcomeReturning')
+                  : t('auth.signIn.welcomeFirstTime')}
             </Text>
             <Text
               className="text-body-sm text-text-secondary mb-2 text-center"
@@ -1268,10 +1273,10 @@ export default function SignInScreen() {
               }
             >
               {isReturningUser === null
-                ? 'Sign in to get started'
+                ? t('auth.signIn.subtitleLoading')
                 : isReturningUser
-                  ? 'Sign in to continue learning'
-                  : 'Sign in to start learning'}
+                  ? t('auth.signIn.subtitleReturning')
+                  : t('auth.signIn.subtitleFirstTime')}
             </Text>
 
             {error !== '' && (
@@ -1303,10 +1308,12 @@ export default function SignInScreen() {
               >
                 <Text className="text-body-sm text-text-secondary">
                   {unsupportedHasSSOProviders
-                    ? "If this account also uses Google or Apple sign-in, try that above. If that doesn't work, contact support."
-                    : `Contact support and we'll help you sign in. Mention: ${unsupportedVerificationStrategies
-                        .map(describeVerificationStrategy)
-                        .join(', ')}.`}
+                    ? t('auth.signIn.unsupportedSsoHint')
+                    : t('auth.signIn.unsupportedContactHint', {
+                        methods: unsupportedVerificationStrategies
+                          .map(describeVerificationStrategy)
+                          .join(', '),
+                      })}
                 </Text>
                 <View className="mt-4">
                   <Button
@@ -1390,13 +1397,15 @@ export default function SignInScreen() {
 
             <View className="flex-row items-center mb-2">
               <View className="flex-1 h-px bg-border" />
-              <Text className="text-body-sm text-text-secondary mx-4">or</Text>
+              <Text className="text-body-sm text-text-secondary mx-4">
+                {t('common.or')}
+              </Text>
               <View className="flex-1 h-px bg-border" />
             </View>
 
             <View onLayout={onFieldLayout('email')}>
               <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                Email
+                {t('auth.signIn.emailLabel')}
               </Text>
               <TextInput
                 className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
@@ -1418,7 +1427,7 @@ export default function SignInScreen() {
 
             <View onLayout={onFieldLayout('password')}>
               <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                Password
+                {t('auth.signIn.passwordLabel')}
               </Text>
               <View className="mb-2">
                 <PasswordInput
@@ -1461,9 +1470,9 @@ export default function SignInScreen() {
                 testID="sign-in-validation-hint"
               >
                 {emailAddress.trim() === ''
-                  ? 'Enter your email to continue'
+                  ? t('auth.signIn.enterEmailHint')
                   : password === ''
-                    ? 'Enter your password to continue'
+                    ? t('auth.signIn.enterPasswordHint')
                     : ''}
               </Text>
             )}
@@ -1474,16 +1483,21 @@ export default function SignInScreen() {
                 testID="sign-in-verification-offer"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  Additional verification is available
+                  {t('auth.signIn.additionalVerificationTitle')}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-2">
-                  This account can continue with a verification code sent to{' '}
-                  <Text className="font-semibold text-text-primary">
-                    {'identifier' in verificationOffer
-                      ? verificationOffer.identifier
-                      : 'your device'}
-                  </Text>
-                  . We will only send the code if you choose to continue.
+                  <Trans
+                    i18nKey="auth.signIn.offerBody"
+                    values={{
+                      identifier:
+                        'identifier' in verificationOffer
+                          ? verificationOffer.identifier
+                          : t('auth.signIn.yourDevice'),
+                    }}
+                    components={{
+                      id: <Text className="font-semibold text-text-primary" />,
+                    }}
+                  />
                 </Text>
                 <View className="mt-4">
                   <Button
@@ -1500,7 +1514,7 @@ export default function SignInScreen() {
 
             <View className="flex-row justify-center items-center mt-4">
               <Text className="text-body-sm text-text-secondary">
-                Don&apos;t have an account?{' '}
+                {t('auth.signIn.noAccountPrompt')}{' '}
               </Text>
               <Button
                 variant="tertiary"
@@ -1522,7 +1536,7 @@ export default function SignInScreen() {
               FEATURE_FLAGS.PREVIEW_ENTRY_CTA_ENABLED && (
                 <View className="w-full mt-6 pt-6 border-t border-border">
                   <Text className="text-body-sm text-text-secondary text-center mb-3">
-                    New here?
+                    {t('auth.signIn.newHere')}
                   </Text>
                   <Pressable
                     onPress={() => router.push('/preview')}
@@ -1532,7 +1546,7 @@ export default function SignInScreen() {
                     accessibilityLabel="Try MentoMate"
                   >
                     <Text className="text-body font-semibold text-primary">
-                      Try MentoMate
+                      {t('auth.signIn.tryMentomate')}
                     </Text>
                   </Pressable>
                 </View>

@@ -87,6 +87,10 @@ testsprite_tests/
 .dev.vars
 .wrangler/
 
+# Generic credential files (primary control; the pre-commit secret scan backstops these)
+*.pem
+credentials.json
+
 nul
 temp/*
 

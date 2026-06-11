@@ -7,6 +7,7 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 import type { Database } from '@eduagent/database';
+import * as sentry from './sentry';
 import { routeAndCall } from './llm';
 import {
   buildHomeworkSummaryUserPrompt,
@@ -651,5 +652,54 @@ describe('buildHomeworkSummaryUserPrompt [WI-215 / DS-126]', () => {
     });
     expect(prompt).toContain('<problem_count>3</problem_count>');
     expect(prompt).toMatch(/<problem index="0" mode="help_me">safe<\/problem>/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-074 / WI-579] Parse-failure path must not leak LLM output content
+// ---------------------------------------------------------------------------
+
+describe('[F-074 / WI-579] parseHomeworkSummaryResponse failure leaks no content', () => {
+  const SENTINEL = 'Tommy-homework-quote-private';
+
+  it('[BREAK] captures shape-only diagnostics, never a response slice', () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const fallback = {
+        problemCount: 0,
+        practicedSkills: [] as string[],
+        independentProblemCount: 0,
+        guidedProblemCount: 0,
+        summary: 'fallback',
+        displayTitle: 'Homework',
+      };
+      // Balanced braces (so the JSON extractor returns a slice) but invalid
+      // JSON (`undefined` is not a JSON token) — JSON.parse throws and the
+      // catch branch fires.
+      const response = `{"summary": undefined, "quote": "${SENTINEL}"}`;
+      expect(parseHomeworkSummaryResponse(response, fallback)).toEqual(
+        fallback,
+      );
+
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(SENTINEL);
+      expect(captureSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            site: 'parseHomeworkSummaryResponse',
+            responseLength: response.length,
+          }),
+        }),
+      );
+      expect(JSON.stringify(captureSpy.mock.calls)).not.toContain(SENTINEL);
+    } finally {
+      captureSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
   });
 });

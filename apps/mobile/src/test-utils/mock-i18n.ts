@@ -45,7 +45,10 @@ export function translate(key: string, opts?: Record<string, unknown>): string {
 }
 
 export const i18nMock = {
-  useTranslation: () => ({ t: translate }),
+  useTranslation: () => ({
+    t: translate,
+    i18n: { language: 'en' },
+  }),
   initReactI18next: { type: '3rdParty', init: () => undefined },
   Trans: ({ children }: { children?: unknown }) => children ?? null,
 };

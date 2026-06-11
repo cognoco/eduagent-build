@@ -371,18 +371,27 @@ describe('[WI-368] weekly progress push GDPR consent helper consolidation', () =
   });
 
   it('uses isGdprProcessingAllowed instead of an inline GDPR consent query', () => {
-    const source = readFileSync(
+    // The per-child consent gate lives in the digest-line builder, which the
+    // should-fix on PR #933 moved to services/weekly-digest.ts; scan both the
+    // Inngest function file and the builder module.
+    const functionSource = readFileSync(
       join(__dirname, 'weekly-progress-push.ts'),
       'utf8',
     );
-
-    expect(source).toContain("from '../../services/consent'");
-    expect(source).toContain(
-      'isGdprProcessingAllowed(db, link.childProfileId)',
+    const digestSource = readFileSync(
+      join(__dirname, '..', '..', 'services', 'weekly-digest.ts'),
+      'utf8',
     );
-    expect(source).not.toContain('db.query.consentStates.findFirst');
-    expect(source).not.toContain("eq(consentStates.consentType, 'GDPR')");
-    expect(source).not.toContain("status !== 'CONSENTED'");
+
+    expect(digestSource).toContain("from './consent'");
+    expect(digestSource).toContain(
+      'isGdprProcessingAllowed(db, childProfileId)',
+    );
+    for (const source of [functionSource, digestSource]) {
+      expect(source).not.toContain('db.query.consentStates.findFirst');
+      expect(source).not.toContain("eq(consentStates.consentType, 'GDPR')");
+      expect(source).not.toContain("status !== 'CONSENTED'");
+    }
   });
 
   it.each([
@@ -968,10 +977,14 @@ describe('weekly progress generate practice summary', () => {
     expect(prepared).toEqual(
       expect.objectContaining({
         status: 'prepared',
-        childProfileIds: [CHILD_ID_2],
-        childSummaries: [expect.stringContaining('Alex:')],
+        childDigests: [expect.objectContaining({ childProfileId: CHILD_ID_2 })],
       }),
     );
+    // Minor-PII: the memoized prepare return carries opaque ids only — the
+    // summary lines and struggle topics are rebuilt inside the send steps.
+    expect(prepared).not.toHaveProperty('childSummaries');
+    expect(prepared).not.toHaveProperty('struggleLines');
+    expect(prepared).not.toHaveProperty('parentEmail');
   });
 
   it('[WI-86] skips weekly push and email when parent is archived after preparation', async () => {
@@ -985,12 +998,12 @@ describe('weekly progress generate practice summary', () => {
             status: 'prepared',
             parentId: PARENT_ID,
             reportWeek: '2026-05-11',
-            childProfileIds: [CHILD_ID],
-            childSummaries: ['Alex: +1 topics'],
-            struggleLines: [],
+            childDigests: [
+              { childProfileId: CHILD_ID, snapshotDate: '2026-05-13' },
+            ],
             shouldSendPush: true,
             shouldSendEmail: true,
-            parentEmail: 'parent@example.com',
+            hasParentEmail: true,
           },
         },
       },
@@ -1016,12 +1029,12 @@ describe('weekly progress generate practice summary', () => {
             status: 'prepared',
             parentId: PARENT_ID,
             reportWeek: '2026-05-11',
-            childProfileIds: [CHILD_ID],
-            childSummaries: ['Alex: +1 topics'],
-            struggleLines: [],
+            childDigests: [
+              { childProfileId: CHILD_ID, snapshotDate: '2026-05-13' },
+            ],
             shouldSendPush: true,
             shouldSendEmail: true,
-            parentEmail: 'parent@example.com',
+            hasParentEmail: true,
           },
         },
       },
@@ -1044,6 +1057,8 @@ describe('weekly progress generate practice summary', () => {
       .mockResolvedValueOnce({ displayName: 'Noah' })
       .mockResolvedValueOnce({ id: PARENT_ID })
       .mockResolvedValueOnce({ id: CHILD_ID })
+      // Push-step rebuild rehydrates the contributing child's name in-step.
+      .mockResolvedValueOnce({ displayName: 'Alex' })
       .mockResolvedValueOnce(null);
     mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
       pushEnabled: true,
@@ -1058,13 +1073,22 @@ describe('weekly progress generate practice summary', () => {
       .mockResolvedValueOnce({
         snapshotDate: '2026-05-13',
         metrics: CURRENT_METRICS,
+      })
+      // Push-step rebuild for the contributing child.
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-13',
+        metrics: CURRENT_METRICS,
       });
     mockGetLatestSnapshotOnOrBefore
       .mockResolvedValueOnce({
         snapshotDate: '2026-05-06',
         metrics: PREVIOUS_METRICS,
       })
-      .mockResolvedValueOnce(null);
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-06',
+        metrics: PREVIOUS_METRICS,
+      });
 
     const result = await executeGenerateSteps({ parentId: PARENT_ID });
 
@@ -1119,5 +1143,153 @@ describe('weekly progress generate practice summary', () => {
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+});
+
+// Memoized step returns are persisted in Inngest's third-party state store;
+// the prepare step must memoize opaque child ids only — never child names,
+// summary lines, struggle topics, or the parent email address.
+describe('memoized step-state PII break test [F-085]', () => {
+  it('never memoizes child names, struggle topics, or the parent email; sends still carry the content', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+    mockDb.query.familyLinks.findMany.mockResolvedValue([
+      { childProfileId: CHILD_ID },
+    ]);
+    // Blanket profile row serves every call site (parent lookup, child
+    // lookup, send-step rechecks, in-step rebuilds).
+    mockDb.query.profiles.findFirst.mockResolvedValue({
+      id: PARENT_ID,
+      accountId: 'account-1',
+      displayName: 'Alex',
+    });
+    mockDb.query.accounts.findFirst.mockResolvedValue({
+      email: 'parent@example.com',
+    });
+    mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
+      pushEnabled: true,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: true,
+    });
+    mockDb.query.learningProfiles.findFirst.mockResolvedValue({
+      struggles: [{ topic: 'Fractions' }],
+    });
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-13',
+      metrics: CURRENT_METRICS,
+    });
+    mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+      snapshotDate: '2026-05-06',
+      metrics: PREVIOUS_METRICS,
+    });
+
+    const memoized: unknown[] = [];
+    const { step } = createInngestStepRunner();
+    const recordingStep = {
+      ...step,
+      run: async (name: string, cb: () => Promise<unknown>) => {
+        const value = await step.run(name, cb);
+        memoized.push(value);
+        return value;
+      },
+    };
+    const handler = (
+      weeklyProgressPushGenerate as unknown as {
+        fn: (ctx: unknown) => Promise<unknown>;
+      }
+    ).fn;
+    const result = await handler({
+      event: {
+        data: { parentId: PARENT_ID },
+        name: 'app/weekly-progress-push.generate',
+      },
+      step: recordingStep,
+    });
+    jest.useRealTimers();
+
+    // Content still reaches both channels (rebuilt in-step)…
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        type: 'weekly_progress',
+        body: expect.stringContaining('Alex'),
+      }),
+    );
+    expect(mockFormatWeeklyProgressEmail).toHaveBeenCalledWith(
+      'parent@example.com',
+      expect.arrayContaining([expect.stringContaining('Alex')]),
+      expect.arrayContaining([
+        expect.objectContaining({ topics: ['Fractions'] }),
+      ]),
+    );
+
+    // …but never through memoized step state or the run output.
+    const serialized = JSON.stringify(memoized);
+    expect(serialized).not.toContain('Alex');
+    expect(serialized).not.toContain('Fractions');
+    expect(serialized).not.toContain('parent@example.com');
+    expect(JSON.stringify(result)).not.toContain('Alex');
+    expect(JSON.stringify(result)).not.toContain('parent@example.com');
+  });
+});
+
+// Send-step rebuilds must stay tied to the snapshot the prepare step used:
+// a delayed retry after a newer snapshot exists must not send future
+// activity under the original week's idempotency key (PR #933 review).
+describe('send-step rehydration is pinned to the prepare-time snapshot', () => {
+  it('re-pins a delayed retry to the memoized snapshotDate when a newer snapshot exists', async () => {
+    mockDb.query.profiles.findFirst.mockResolvedValue({
+      id: PARENT_ID,
+      displayName: 'Alex',
+    });
+    // "Now": a newer snapshot has landed since prepare ran.
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-20',
+      metrics: { ...CURRENT_METRICS, topicsMastered: 99 },
+    });
+    // Anchored lookups: the prepare-time snapshot and its previous week.
+    mockGetLatestSnapshotOnOrBefore.mockImplementation(
+      async (_db: unknown, _profileId: unknown, date: unknown) =>
+        date === '2026-05-13'
+          ? { snapshotDate: '2026-05-13', metrics: CURRENT_METRICS }
+          : { snapshotDate: '2026-05-06', metrics: PREVIOUS_METRICS },
+    );
+
+    const result = await executeGenerateSteps(
+      { parentId: PARENT_ID },
+      {
+        runResults: {
+          'prepare-weekly-progress-digest': {
+            status: 'prepared',
+            parentId: PARENT_ID,
+            reportWeek: '2026-05-11',
+            childDigests: [
+              { childProfileId: CHILD_ID, snapshotDate: '2026-05-13' },
+            ],
+            shouldSendPush: true,
+            shouldSendEmail: false,
+            hasParentEmail: false,
+          },
+        },
+      },
+    );
+
+    // The rebuild detected the mismatch and re-fetched at the anchor.
+    expect(mockGetLatestSnapshotOnOrBefore).toHaveBeenCalledWith(
+      expect.anything(),
+      CHILD_ID,
+      '2026-05-13',
+    );
+    // Content reflects the prepare-time snapshot, not the newer one.
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        type: 'weekly_progress',
+        body: expect.stringContaining('+1 topics'),
+      }),
+    );
+    expect(
+      (mockSendPushNotification.mock.calls[0]?.[1] as { body: string }).body,
+    ).not.toContain('+95');
+    expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
   });
 });

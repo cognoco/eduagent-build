@@ -10,7 +10,7 @@
  * exactly ONE `db.insert(...)` call for the full batch.
  *
  * The fake `Database` below is a *real* object passed as an argument; it is
- * NOT a jest.mock of an internal module (per CLAUDE.md GC1 — only
+ * NOT a jest.mock of an internal module (per AGENTS.md GC1 — only
  * external-boundary mocks are permitted via jest.mock).  The fake records
  * the call sequence and returns canned data so the assertion can prove the
  * intended call-count contract without standing up Postgres.

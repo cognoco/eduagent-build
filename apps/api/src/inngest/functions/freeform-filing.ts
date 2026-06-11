@@ -29,10 +29,14 @@ async function runFreeformFiling({
   event: { data: Record<string, unknown> };
   step: FilingStep;
 }): Promise<unknown> {
+  // PII egress: The event payload carries NO transcript —
+  // Inngest persists payloads in its third-party event store, so the
+  // transcript is always rehydrated from the DB inside the retry-filing
+  // step below (scoped by profileId). Legacy in-flight events may still
+  // carry a `sessionTranscript` key; it is deliberately ignored.
   const { profileId, sessionId, sessionMode } = event.data as {
     profileId: string;
     sessionId: string;
-    sessionTranscript?: string;
     sessionMode?: 'freeform' | 'homework';
   };
   const effectiveSessionMode = sessionMode ?? 'freeform';
@@ -41,7 +45,7 @@ async function runFreeformFiling({
     const db = getStepDatabase();
     // [M8b] Use createScopedRepository so the profileId filter is enforced by
     // the shared scoping layer, not an ad-hoc inline eq(). This satisfies
-    // CLAUDE.md: "Reads must use createScopedRepository(profileId)."
+    // AGENTS.md: "Reads must use createScopedRepository(profileId)."
     const repo = createScopedRepository(db, profileId);
     const row = await repo.sessions.findFirst(
       eq(learningSessions.id, sessionId),
@@ -154,9 +158,6 @@ async function runFreeformFiling({
     };
   }
 
-  const eventSessionTranscript = (event.data as { sessionTranscript?: string })
-    .sessionTranscript;
-
   const result = await step.run('retry-filing', async () => {
     const db = getStepDatabase();
     // Re-check inside the consuming step. The earlier consent step is memoized
@@ -166,8 +167,11 @@ async function runFreeformFiling({
       return { status: 'skipped' as const, reason: 'consent_not_granted' };
     }
 
-    let sessionTranscript = eventSessionTranscript;
-    if (!sessionTranscript && sessionId) {
+    // PII egress: Rehydrate the transcript from the DB — never
+    // from the event payload. The transcript stays a local variable inside
+    // this step closure, so it is never serialized into Inngest state.
+    let sessionTranscript: string | undefined;
+    if (sessionId) {
       const transcript = await getSessionTranscript(db, profileId, sessionId);
       if (transcript && !transcript.archived) {
         sessionTranscript = transcript.exchanges

@@ -28,7 +28,7 @@ export default function OwnLearningScreen(): React.ReactElement {
   // for learners would double up on their default home and confuse the
   // navigation model — redirect them to /home, which is the canonical entry
   // for that shape. resolveTabShape() is the single source of truth for the
-  // shape decision (see CLAUDE.md > Profile Shapes).
+  // shape decision (see AGENTS.md > Profile Shapes).
   const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
   if (!familyCapable && tabShape !== 'guardian') {
     return <Redirect href="/(app)/home" />;

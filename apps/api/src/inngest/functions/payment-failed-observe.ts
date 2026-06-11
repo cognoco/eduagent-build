@@ -8,7 +8,7 @@
 // In practice this meant the events fired into the void — the Inngest
 // dashboard could not query them and there was no structured-log terminus,
 // so a real retry/notify/dunning strategy could not be built without first
-// rediscovering every send site. This violates the CLAUDE.md "Silent
+// rediscovering every send site. This violates the AGENTS.md "Silent
 // recovery without escalation" rule.
 //
 // This handler is the queryable terminus, following the same pattern as
@@ -26,6 +26,7 @@
 import { z } from 'zod';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { summarizeRawPayload } from '@eduagent/schemas';
 
 const logger = createLogger();
 
@@ -53,7 +54,7 @@ export const paymentFailedObserve = inngest.createFunction(
     if (!parseResult.success) {
       logger.error('billing.payment_failed.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data,
+        rawData: summarizeRawPayload(event.data),
       });
       return { status: 'schema_error' as const };
     }

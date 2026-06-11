@@ -498,7 +498,7 @@ export function LearnerScreen({
     );
   }
 
-  const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
+  const firstName = activeProfile?.displayName?.split(' ')[0];
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
   const showLearningActions = navigationContract.gates.showLearningActions;
@@ -513,7 +513,9 @@ export function LearnerScreen({
         <View className="flex-row items-center">
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary leading-tight">
-              Hey {firstName}!
+              {firstName
+                ? t('home.learner.greeting', { name: firstName })
+                : t('home.learner.greetingNoName')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
@@ -544,7 +546,7 @@ export function LearnerScreen({
                 className="text-caption font-semibold text-highlight-fg mt-0.5"
                 numberOfLines={1}
               >
-                My Notes
+                {t('home.learner.myNotes')}
               </Text>
             </Pressable>
           ) : null}
@@ -701,10 +703,10 @@ export function LearnerScreen({
                   style={{ opacity: 0.65 }}
                 />
                 <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
-                  We couldn't load your subjects right now
+                  {t('home.learner.subjectsLoadError')}
                 </Text>
                 <Text className="text-body-sm text-text-secondary text-center px-6">
-                  You can still start a session or try another action.
+                  {t('home.learner.subjectsLoadErrorHint')}
                 </Text>
                 <Pressable
                   testID="home-subjects-load-retry"
@@ -714,7 +716,7 @@ export function LearnerScreen({
                   accessibilityLabel="Retry loading subjects"
                 >
                   <Text className="text-body-sm font-bold text-text-primary">
-                    Retry
+                    {t('common.retry')}
                   </Text>
                 </Pressable>
               </View>

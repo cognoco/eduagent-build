@@ -167,6 +167,7 @@ export default function Index() {
           size="large"
           color={colors.muted}
           testID="index-loading"
+          accessibilityLabel={t('common.loading')}
         />
       </View>
     );
@@ -183,6 +184,7 @@ export default function Index() {
           size="large"
           color={colors.muted}
           testID="index-loading"
+          accessibilityLabel={t('common.loading')}
         />
       </View>
     );

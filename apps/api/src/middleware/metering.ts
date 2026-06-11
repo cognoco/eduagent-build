@@ -226,6 +226,11 @@ export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   // distinguish from the DB-only GET counterpart. Splitting into an
   // explicit POST topup route makes metering coverage trivial.
   /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/book-suggestions\/topup\/?$/,
+  // [F-023 / WI-575] POST /sessions/:sessionId/quick-check invokes
+  // evaluateQuickCheckAnswer which calls routeAndCall (LLM). Without metering,
+  // any authenticated user can call this in a tight loop and burn unbounded LLM
+  // capacity. Path uses a UUID session ID to avoid matching non-LLM session routes.
+  /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/quick-check\/?$/,
 ];
 
 const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [
@@ -334,7 +339,7 @@ async function maybeReplayIdempotentSessionRequest(
       error: errorMessage,
     });
     // [CR-2026-05-21-047] Silent recovery in billing without a structured metric
-    // is banned (CLAUDE.md "Fix Development Rules"). On KV outage every idempotent
+    // is banned (AGENTS.md "Fix Development Rules"). On KV outage every idempotent
     // session request is processed twice if the client retries — including
     // double-decrementing the quota pool. Emit via safeSend so dispatch failure
     // is captured in Sentry but never throws and never breaks the user action.
@@ -342,7 +347,7 @@ async function maybeReplayIdempotentSessionRequest(
     await safeSend(
       () =>
         inngest.send({
-          // orphan-allow: structured telemetry signal required by CLAUDE.md
+          // orphan-allow: structured telemetry signal required by AGENTS.md
           // ("silent recovery in billing must emit a structured metric"). The
           // KV-outage recovery is in-line (returns null → request processed
           // without replay protection); escalation is via logger.warn. The
@@ -487,7 +492,7 @@ async function safeWriteKV(
 // the cache entry — the next request falls through to DB and backfills KV
 // with the post-refund counters via the existing miss path. Silent recovery
 // is banned: on delete failure we emit a structured warn so the failure
-// rate is queryable (CLAUDE.md → "Silent recovery without escalation is
+// rate is queryable (AGENTS.md → "Silent recovery without escalation is
 // banned").
 async function safeDeleteKV(kv: KVNamespace, accountId: string): Promise<void> {
   try {
@@ -690,15 +695,22 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       }
     }
 
-    // 2. Query actual top-up credits for accurate quota check
-    const topUpCreditsRemaining = await getTopUpCreditsRemaining(
-      db,
-      subscriptionId,
-      new Date(),
-      quotaModel === 'per-profile' && profileRole === 'owner'
-        ? profileId
-        : undefined,
-    );
+    // 2. Query actual top-up credits for accurate quota check.
+    // [F-135] On per-profile tiers, top-up credits belong to the owner
+    // profile. Never run the unscoped subscription-wide sum for a non-owner —
+    // it returns the owner's purchased balance, which would leak into the
+    // child's 402 payload and quota fraction. Non-owners get 0 (they cannot
+    // draw on top-ups in decrementQuota either). Mirrors the /usage route
+    // masking in routes/billing.ts.
+    const topUpCreditsRemaining =
+      quotaModel === 'per-profile' && profileRole !== 'owner'
+        ? 0
+        : await getTopUpCreditsRemaining(
+            db,
+            subscriptionId,
+            new Date(),
+            quotaModel === 'per-profile' ? profileId : undefined,
+          );
 
     // 3. Check quota using pure business logic (checks both daily + monthly)
     const result = checkQuota({
@@ -798,16 +810,19 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       c.set('quotaDecrementTopUpCreditId', decrement.topUpCreditId);
     }
 
+    // [F-135] Same owner-only gate as the pre-check read above. A 'top_up'
+    // decrement is only reachable for an owner (consumeOwnerTopUpCredit) or a
+    // shared pool, but keep the invariant explicit rather than rely on that.
     const topUpRemainingAfterDecrement =
       decrement.source === 'top_up'
-        ? await getTopUpCreditsRemaining(
-            db,
-            subscriptionId,
-            new Date(),
-            quotaModel === 'per-profile' && profileRole === 'owner'
-              ? profileId
-              : undefined,
-          )
+        ? quotaModel === 'per-profile' && profileRole !== 'owner'
+          ? 0
+          : await getTopUpCreditsRemaining(
+              db,
+              subscriptionId,
+              new Date(),
+              quotaModel === 'per-profile' ? profileId : undefined,
+            )
         : decrement.remainingTopUp;
     const quotaRemainingTurns =
       decrement.remainingDaily === null

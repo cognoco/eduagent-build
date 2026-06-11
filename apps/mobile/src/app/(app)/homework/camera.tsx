@@ -312,7 +312,7 @@ export default function CameraScreen(): React.ReactNode {
             // network / rate-limit errors surface their specific actionable
             // message, while a 5xx UpstreamError collapses to generic
             // "Something went wrong on our end…" by design (formatApiError never
-            // leaks a raw server-internal 5xx body to the user — see CLAUDE.md
+            // leaks a raw server-internal 5xx body to the user — see AGENTS.md
             // "never surface raw runtime/internal error strings"). In every case
             // we append the manual-picker recovery instruction so the learner is
             // never stranded without an actionable next step.
@@ -1344,7 +1344,11 @@ export default function CameraScreen(): React.ReactNode {
                 className="flex-row items-center gap-2 py-3"
                 testID="subject-picker-loading"
               >
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator
+                  size="small"
+                  color={colors.primary}
+                  accessibilityLabel={t('common.loading')}
+                />
                 <Text className="text-body-sm text-text-secondary">
                   {t('homework.loadingSubjects')}
                 </Text>
@@ -1584,6 +1588,7 @@ export default function CameraScreen(): React.ReactNode {
                         <ActivityIndicator
                           size="small"
                           color={colors.primary}
+                          accessibilityLabel={t('common.loading')}
                         />
                         <Text className="text-body-sm text-text-secondary">
                           {t('homework.loadingSubjects')}

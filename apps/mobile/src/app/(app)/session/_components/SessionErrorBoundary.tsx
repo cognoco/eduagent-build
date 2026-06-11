@@ -62,7 +62,7 @@ export class SessionErrorBoundary extends Component<
               marginBottom: 12,
             }}
           >
-            {i18next.t('session.errorBoundary.title')}
+            {i18next.t('session.errorBoundary.crashTitle')}
           </Text>
           <Text
             style={{
@@ -85,7 +85,8 @@ export class SessionErrorBoundary extends Component<
                 }}
                 selectable
               >
-                {this.state.error?.message ?? 'Unknown error'}
+                {this.state.error?.message ??
+                  i18next.t('session.errorBoundary.unknownError')}
               </Text>
               <Text
                 style={{
@@ -144,7 +145,7 @@ export class SessionErrorBoundary extends Component<
                 fontWeight: '600',
               }}
             >
-              {i18next.t('recovery.tryAgain')}
+              {i18next.t('common.tryAgain')}
             </Text>
           </Pressable>
           {/* [UX-DE-M3] Secondary escape so a crash-loop doesn't trap the user.
@@ -168,7 +169,7 @@ export class SessionErrorBoundary extends Component<
             }}
             testID="session-error-boundary-go-home"
             accessibilityRole="button"
-            accessibilityLabel={i18next.t('recovery.goHome')}
+            accessibilityLabel={i18next.t('common.goHome')}
           >
             <Text
               style={{
@@ -177,7 +178,7 @@ export class SessionErrorBoundary extends Component<
                 fontWeight: '600',
               }}
             >
-              {i18next.t('recovery.goHome')}
+              {i18next.t('common.goHome')}
             </Text>
           </Pressable>
         </ScrollView>

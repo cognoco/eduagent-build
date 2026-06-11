@@ -114,7 +114,7 @@ export function teachBackAssessmentFromEnvelopeSignal(
  *      still contains the full LLM envelope JSON, parse it via parseEnvelope).
  *   3. Returns null. The legacy "look for a {completeness, accuracy} JSON
  *      blob in free-text prose" path is gone — those events were already
- *      backfilled and the contract (CLAUDE.md → LLM Response Envelope) bans
+ *      backfilled and the contract (AGENTS.md → LLM Response Envelope) bans
  *      that shape.
  */
 export function parseTeachBackAssessment(

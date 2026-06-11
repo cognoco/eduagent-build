@@ -19,7 +19,115 @@ import {
 //   and ui_hints are parsed at close via parseEnvelope against the full text.
 // ---------------------------------------------------------------------------
 
-const REPLY_KEY_RE = /"reply"\s*:/;
+// ---------------------------------------------------------------------------
+// Top-level reply-key scanner.
+//
+// The original implementation matched the FIRST /"reply"\s*:/ occurrence
+// anywhere in the raw stream — including one nested inside an earlier object
+// (`{"x":{"reply":"AAA"},"reply":"BBB"}` streamed "AAA"), while the
+// completion-time parseEnvelope persisted the TOP-LEVEL "BBB". The learner
+// could see live text that never matched the transcript/export/parent view.
+//
+// This scanner is JSON-aware: it tracks object/array depth plus string and
+// escape state, and only arms on a string key `reply` at depth 1 followed by
+// `:`. Text before the first `{` (markdown fences, stray prose) is skipped
+// without string semantics. Malformed output keeps the documented graceful
+// degradation — the scanner simply never matches and the caller parses the
+// full accumulated text at close.
+// ---------------------------------------------------------------------------
+
+// Keys are short; cap capture so a huge depth-1 string VALUE cannot grow the
+// buffer. A truncated capture can never equal 'reply', which is all we need.
+const MAX_KEY_CAPTURE_CHARS = 64;
+
+interface TopLevelReplyKeyScanner {
+  /**
+   * Feed the next raw chunk. Returns the index in `input` immediately AFTER
+   * the colon of the top-level `"reply":` key when it completes during this
+   * push, or -1 when not (yet) found. State persists across pushes, so keys
+   * and their colons may arrive split across chunks.
+   */
+  push(input: string): number;
+}
+
+function createTopLevelReplyKeyScanner(): TopLevelReplyKeyScanner {
+  // 0 = before the envelope's opening `{`; 1 = inside the top-level object.
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  // Non-null while capturing a depth-1 string that could be a key.
+  let capturedKey: string | null = null;
+  // Set when a depth-1 string just closed; the next non-whitespace char
+  // decides whether it was a key (`:`) or a value (`,`/`}`/…).
+  let closedString: string | null = null;
+
+  return {
+    push(input: string): number {
+      for (let i = 0; i < input.length; i += 1) {
+        const ch = input[i] as string;
+
+        // Skip everything before the first `{` without string semantics —
+        // pre-envelope prose/fences have no JSON quoting rules.
+        if (depth === 0) {
+          if (ch === '{') depth = 1;
+          continue;
+        }
+
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+          if (ch === '\\') {
+            escaped = true;
+            continue;
+          }
+          if (ch === '"') {
+            inString = false;
+            if (capturedKey !== null) {
+              closedString = capturedKey;
+              capturedKey = null;
+            }
+            continue;
+          }
+          if (
+            capturedKey !== null &&
+            capturedKey.length < MAX_KEY_CAPTURE_CHARS
+          ) {
+            capturedKey += ch;
+          }
+          continue;
+        }
+
+        if (closedString !== null) {
+          if (/\s/.test(ch)) continue;
+          const isReplyKey = ch === ':' && closedString === 'reply';
+          closedString = null;
+          if (isReplyKey) return i + 1;
+          if (ch === ':') continue; // a different key — keep scanning
+          // Not a colon: the string was a value; fall through and treat the
+          // current char structurally.
+        }
+
+        if (ch === '"') {
+          inString = true;
+          // Only depth-1 strings can be top-level keys.
+          capturedKey = depth === 1 ? '' : null;
+          continue;
+        }
+        if (ch === '{' || ch === '[') {
+          depth += 1;
+          continue;
+        }
+        if (ch === '}' || ch === ']') {
+          if (depth > 0) depth -= 1;
+          continue;
+        }
+      }
+      return -1;
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Literal-escape normalizer — defensive guard for the streaming path.
@@ -327,6 +435,7 @@ export async function* streamEnvelopeReply(
   // double-escaping LLMs before the chunk reaches the SSE consumer.
   const normalizer = createLiteralEscapeNormalizer();
   const embeddedTailFilter = createEmbeddedEnvelopeTailFilter();
+  const replyKeyScanner = createTopLevelReplyKeyScanner();
 
   function emit(text: string): string {
     return embeddedTailFilter.push(normalizer.push(text));
@@ -340,9 +449,14 @@ export async function* streamEnvelopeReply(
     // for more chunks.
     while (buffer.length > 0) {
       if (state === 'find_reply_key') {
-        const match = REPLY_KEY_RE.exec(buffer);
-        if (!match) break;
-        buffer = buffer.slice(match.index + match[0].length);
+        // The scanner is incremental (state persists across pushes), so the
+        // consumed buffer can be discarded whether or not the key was found.
+        const afterColonIndex = replyKeyScanner.push(buffer);
+        if (afterColonIndex < 0) {
+          buffer = '';
+          break;
+        }
+        buffer = buffer.slice(afterColonIndex);
         state = 'find_reply_value_start';
         continue;
       }

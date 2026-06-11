@@ -16,12 +16,12 @@ export interface TopicSession {
  * Returns completed or auto-closed sessions for a specific topic, filtered
  * to those with at least 1 exchange (excludes accidental opens). Profile
  * ownership is verified through `subjects.profileId` — the sanctioned
- * parent-chain join pattern (see CLAUDE.md).
+ * parent-chain join pattern (see AGENTS.md).
  */
 export async function getTopicSessions(
   db: Database,
   profileId: string,
-  topicId: string
+  topicId: string,
 ): Promise<TopicSession[]> {
   const rows = await db
     .select({
@@ -37,8 +37,8 @@ export async function getTopicSessions(
         eq(learningSessions.topicId, topicId),
         eq(subjects.profileId, profileId),
         inArray(learningSessions.status, ['completed', 'auto_closed']),
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     )
     .orderBy(desc(learningSessions.createdAt));
 

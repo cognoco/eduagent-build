@@ -238,60 +238,10 @@ export function useRevokeConsent(
   });
 }
 
-interface RestoreConsentResult {
-  message: string;
-  consentStatus: ConsentStatus;
-}
-
-/**
- * Restores consent for a child profile (cancels revocation).
- * Invalidates child consent status and dashboard queries on success.
- */
-export function useRestoreConsent(
-  childProfileId: string | undefined,
-): UseMutationResult<RestoreConsentResult, Error, void> {
-  const client = useApiClient();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (): Promise<RestoreConsentResult> => {
-      if (!childProfileId) {
-        throw new Error('childProfileId is required to restore consent');
-      }
-      const res = await client.consent[':childProfileId'].restore.$put({
-        param: { childProfileId },
-      });
-      await assertOk(res);
-      return (await res.json()) as RestoreConsentResult;
-    },
-    onSuccess: async () => {
-      // Consent changes affect all child-related data
-      await queryClient.invalidateQueries({
-        predicate: (query) => {
-          const key = String(query.queryKey[0]);
-          return [
-            'consent',
-            'consent-status',
-            'dashboard',
-            'progress',
-            'retention',
-            'sessions',
-            'session-summary',
-            'curriculum',
-            'assessment',
-            'streaks',
-            'xp',
-            'subjects',
-            'settings',
-            'subscription',
-            'usage',
-            'subscription-status',
-          ].includes(key);
-        },
-      });
-    },
-  });
-}
+// [F-153] useRestoreConsent was duplicated here with an incompatible signature
+// (profileId baked in as hook parameter, void mutation variable). The canonical
+// version lives in hooks/use-restore-consent.ts and uses the variables-as-arg
+// pattern ({ childProfileId } mutation variable). Callers updated to that import.
 
 // ---------------------------------------------------------------------------
 // Helpers

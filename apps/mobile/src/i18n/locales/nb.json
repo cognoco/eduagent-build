@@ -24,45 +24,19 @@
     },
     "timeoutLoader": {
       "title": "Tar for lang tid",
-      "message": "Dette tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen."
-    }
-  },
-  "chrome": {
-    "modeSwitcher": {
-      "switchError": "Kunne ikke bytte. Trykk for å prøve igjen.",
-      "retry": "Prøv igjen",
-      "dismiss": "Avvis"
-    }
-  },
-  "myNotes": {
-    "titleNotes": "Notater",
-    "titleBookmarks": "Bokmerker",
-    "titleSessions": "Økter",
-    "subtitleNotes_one": "{{count}} notat",
-    "subtitleNotes_other": "{{count}} notater",
-    "subtitleBookmarks_one": "{{count}} lagret svar",
-    "subtitleBookmarks_other": "{{count}} lagrede svar",
-    "subtitleSessions_one": "{{count}} økt",
-    "subtitleSessions_other": "{{count}} økter",
-    "searchNotes": "Søk i notater",
-    "searchBookmarks": "Søk i bokmerker",
-    "searchSessions": "Søk i økter",
-    "back": "Tilbake",
-    "loadMore": "Last inn mer",
-    "tryAgain": "Prøv igjen",
-    "errorNotes": "Kunne ikke laste notater",
-    "errorBookmarks": "Kunne ikke laste bokmerker",
-    "errorSessions": "Kunne ikke laste økter",
-    "emptyNotes": "Ingen notater ennå",
-    "emptyBookmarks": "Ingen bokmerker ennå",
-    "emptySessions": "Ingen økter ennå",
-    "emptyHint": "De vises her etter hvert som du lærer.",
-    "typeNote": "Notat",
-    "typeBookmark": "Bokmerke",
-    "typeHomework": "Lekser",
-    "typeReview": "Repetisjon",
-    "typeLearning": "Læring",
-    "unknownSubject": "Ukjent fag"
+      "message": "Dette tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen.",
+      "loading": "Laster, vennligst vent"
+    },
+    "save": "Lagre",
+    "saving": "Lagrer...",
+    "or": "eller",
+    "show": "Vis",
+    "hide": "Skjul",
+    "notNow": "Ikke nå",
+    "active": "Aktiv",
+    "goBackAction": "Gå tilbake",
+    "tryAgainAction": "Prøv igjen",
+    "dismiss": "Avvis"
   },
   "quota": {
     "parent": {
@@ -135,6 +109,56 @@
       "loadingLabel": "Fullfører pålogging",
       "finishing": "Fullfører pålogging ...",
       "backToSignIn": "Tilbake til pålogging"
+    },
+    "signIn": {
+      "welcome": "Velkommen",
+      "welcomeReturning": "Velkommen tilbake",
+      "welcomeFirstTime": "Velkommen til MentoMate",
+      "subtitleLoading": "Logg inn for å komme i gang",
+      "subtitleReturning": "Logg inn for å fortsette å lære",
+      "subtitleFirstTime": "Logg inn for å begynne å lære",
+      "signingYouIn": "Logger deg inn...",
+      "enterAuthenticatorCode": "Skriv inn autentiseringskode",
+      "enterBackupCode": "Skriv inn en reservekode",
+      "enterVerificationCode": "Skriv inn bekreftelseskode",
+      "totpHint": "Åpne autentiseringsappen din og skriv inn den 6-sifrede koden.",
+      "backupCodeHint": "Skriv inn en av reservekodene du lagret da du satte opp tofaktorautentisering.",
+      "verificationCodeLabel": "Bekreftelseskode",
+      "emailLabel": "E-post",
+      "passwordLabel": "Passord",
+      "enterEmailHint": "Skriv inn e-posten din for å fortsette",
+      "enterPasswordHint": "Skriv inn passordet ditt for å fortsette",
+      "additionalVerificationTitle": "Ekstra bekreftelse er tilgjengelig",
+      "yourDevice": "enheten din",
+      "noAccountPrompt": "Har du ikke en konto?",
+      "newHere": "Ny her?",
+      "tryMentomate": "Prøv MentoMate",
+      "unsupportedSsoHint": "Hvis denne kontoen også bruker Google- eller Apple-innlogging, prøv det ovenfor. Hvis det ikke fungerer, kontakt kundestøtte.",
+      "unsupportedContactHint": "Kontakt kundestøtte, så hjelper vi deg med å logge inn. Nevn: {{methods}}.",
+      "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>",
+      "offerBody": "Denne kontoen kan fortsette med en bekreftelseskode sendt til <id>{{identifier}}</id>. Vi sender bare koden hvis du velger å fortsette."
+    },
+    "signUp": {
+      "title": "Opprett konto",
+      "subtitle": "Start læringsreisen din",
+      "accountNotFound": "Vi fant ingen konto med den e-postadressen. Opprett en nedenfor for å komme i gang.",
+      "orContinueWithEmail": "eller fortsett med e-post",
+      "emailLabel": "E-post",
+      "passwordLabel": "Passord",
+      "alreadyHaveAccount": "Har du allerede en konto?",
+      "verifyEmailTitle": "Bekreft e-posten din",
+      "verificationCodeLabel": "Bekreftelseskode",
+      "agreeToTerms": "Ved å registrere deg godtar du våre <terms>vilkår for bruk</terms> og <privacy>personvernerklæring</privacy>.",
+      "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>"
+    },
+    "forgotPassword": {
+      "title": "Glemt passord?",
+      "subtitle": "Vi sender en tilbakestillingskode til e-posten din",
+      "emailLabel": "E-post",
+      "resetPasswordTitle": "Tilbakestill passord",
+      "resetCodeLabel": "Tilbakestillingskode",
+      "newPasswordLabel": "Nytt passord",
+      "enterCodeAndPassword": "Skriv inn koden som ble sendt til <email>{{email}}</email> og ditt nye passord"
     }
   },
   "guards": {
@@ -188,7 +212,12 @@
         "title": "Set up Family",
         "subtitle": "Add a child profile so they can learn with their own mentor",
         "cta": "Set up Family"
-      }
+      },
+      "greeting": "Hei {{name}}!",
+      "greetingNoName": "Hei på deg!",
+      "myNotes": "Mine notater",
+      "subjectsLoadError": "Vi kunne ikke laste inn fagene dine akkurat nå",
+      "subjectsLoadErrorHint": "Du kan fortsatt starte en økt eller prøve en annen handling."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
@@ -285,7 +314,16 @@
       }
     },
     "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress"
+    "goToProgressLabel": "Go to Progress",
+    "coachBand": {
+      "estimatedMinutes": "{{minutes}} min"
+    },
+    "earlyAdopter": {
+      "badge": "Tidlig bruker – din tilbakemelding former MentoMate"
+    },
+    "subjectTile": {
+      "topicsProgress": "{{completed}}/{{total}} emner"
+    }
   },
   "family": {
     "orientationCueBody": "Barnas fremgang og din egen læring, alt på ett sted.",
@@ -307,10 +345,10 @@
     "screenTitle": "Mer",
     "active": "Aktiv",
     "accommodation": {
+      "sectionHeader": "Din læringstilpasning",
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "guideActive": "Aktiv",
-      "childScreenTitle": "{{name}}s læringsinnstillinger",
-      "sectionHeader": "Din læringstilpasning"
+      "childScreenTitle": "{{name}}s læringsinnstillinger"
     },
     "learningPreferences": {
       "sectionHeader": "Din læring",
@@ -410,20 +448,6 @@
     }
   },
   "session": {
-    "timer": {
-      "accessibilityLabel": "Økttid: {{time}}"
-    },
-    "errorBoundary": {
-      "title": "Det oppstod et problem med denne skjermen",
-      "body": "Noe gikk galt under lasting av denne skjermen. Du kan prøve igjen eller gå tilbake til hjem."
-    },
-    "challengeAlerts": {
-      "couldNotStart": "Kunne ikke starte øvingsrunden",
-      "couldNotUpdate": "Kunne ikke oppdatere øvingsrunden",
-      "couldNotSaveNote": "Kunne ikke lagre notatet",
-      "noteSaved": "Notat lagret.",
-      "couldNotSkipWarmup": "Kunne ikke hoppe over oppvarmingen"
-    },
     "challenge": {
       "offerTitle": "Klar for en utfordringsrunde?",
       "tryIt": "Prøv det",
@@ -603,7 +627,9 @@
       "stepProgress": "Steg {{current}} av {{total}}",
       "voicePermissionErrorTitle": "Feil med taleinndata",
       "voicePermissionErrorMessage": "Tilgang til mikrofonen er nødvendig for taleinndata. Aktiver den i Innstillinger.",
-      "voicePermissionOpenSettings": "Åpne Innstillinger"
+      "voicePermissionOpenSettings": "Åpne Innstillinger",
+      "replyReady": "Svar klart",
+      "voiceErrorTapRetry": "{{error}} – trykk for å prøve igjen"
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",
@@ -703,7 +729,38 @@
       "startRecording": "Start opptak",
       "stopRecording": "Stopp opptak"
     },
-    "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette."
+    "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette.",
+    "timer": {
+      "accessibilityLabel": "Økttid: {{time}}"
+    },
+    "errorBoundary": {
+      "crashTitle": "Øktskjermen krasjet",
+      "unknownError": "Ukjent feil",
+      "body": "Noe gikk galt under lasting av denne skjermen. Du kan prøve igjen eller gå tilbake til hjem."
+    },
+    "challengeAlerts": {
+      "couldNotStart": "Kunne ikke starte øvingsrunden",
+      "couldNotUpdate": "Kunne ikke oppdatere øvingsrunden",
+      "couldNotSaveNote": "Kunne ikke lagre notatet",
+      "noteSaved": "Notat lagret.",
+      "couldNotSkipWarmup": "Kunne ikke hoppe over oppvarmingen"
+    },
+    "screenChrome": {
+      "wrapping": "Avslutter ...",
+      "exit": "Avslutt",
+      "retryClassification": "Prøv klassifisering på nytt",
+      "skipWarmup": "Hopp over oppvarmingen, sett i gang"
+    },
+    "inputModeToggle": {
+      "text": "Tekst",
+      "voice": "Stemme"
+    },
+    "messageActions": {
+      "reconnect": "Koble til på nytt"
+    },
+    "questionCounter": {
+      "question": "Spørsmål {{count}}"
+    }
   },
   "quiz": {
     "index": {
@@ -835,10 +892,22 @@
       "oneMoreLabel": "Start en quiz til",
       "disputeLabel": "Bestrid dette svaret",
       "dismissLabel": "Lukk",
-      "saveAndFinishLabel": "Lagre fremdrift og avslutt runden"
+      "saveAndFinishLabel": "Lagre fremdrift og avslutt runden",
+      "correctAnnounce": "Riktig! Svaret var {{answer}}",
+      "correctAnnounceNoAnswer": "Riktig!",
+      "wrongAnnounce": "Ikke helt. Svaret var {{answer}}",
+      "wrongAnnounceNoAnswer": "Ikke helt.",
+      "questionProgress": "{{current}} av {{total}}"
     },
     "results": {
-      "viewHistory": "Vis historikk"
+      "viewHistory": "Vis historikk",
+      "peopleIdentified": "{{score}} av {{total}} personer identifisert",
+      "xpEarned": "+{{xp}} XP",
+      "whatYouMissed": "Hva du gikk glipp av",
+      "youSaid": "Du sa: {{answer}}",
+      "youSkipped": "Du hoppet over dette spørsmålet",
+      "noAnswer": "Du svarte ikke",
+      "playAgain": "Spill igjen"
     },
     "guessWhoQuestion": {
       "typeAName": "Skriv et navn",
@@ -848,7 +917,9 @@
       "revealNextClue": "Vis neste hint",
       "revealNextClueLabel": "Vis neste hint",
       "iDontKnow": "Jeg vet ikke",
-      "iDontKnowLabel": "Jeg vet ikke svaret"
+      "iDontKnowLabel": "Jeg vet ikke svaret",
+      "clue": "Hint {{number}}",
+      "fallbackPrompt": "Trenger du et alternativ? Velg ett:"
     }
   },
   "dictation": {
@@ -1119,11 +1190,41 @@
       },
       "mastered": "Mestret",
       "reviewDue": "Klar for repetisjon",
-      "topicProgressThreeState": "{{mastered}} mestret · {{learning}} lærer · {{total}} totalt"
+      "topicProgressThreeState": "{{mastered}} mestret · {{learning}} lærer · {{total}} totalt",
+      "badge": "Bok",
+      "missingDetails": "Manglende bokdetaljer. Gå tilbake og prøv igjen.",
+      "writingYourBook": "Skriver boken din ...",
+      "takingLonger": "Tar litt lengre tid enn vanlig ...",
+      "notReadyTitle": "Denne boken er ikke klar ennå",
+      "notReadyHint": "Sett opp temaene først. Deretter kan du begynne å lære trinn for trinn.",
+      "setUpBook": "Sett opp denne boken",
+      "finishedTitle": "Du fullførte denne boken",
+      "startReview": "▶ Start repetisjon",
+      "startFirstLesson": "▶ Start første leksjon",
+      "finishError": "Kunne ikke fullføre denne boken akkurat nå.",
+      "topics": "Temaer",
+      "progressError": "Kunne ikke laste inn fremgang.",
+      "progressEmpty": "Start din første leksjon for å se fremgangen din her.",
+      "nothingToShow": "Ingenting å vise ennå.",
+      "pastConversations": "Tidligere samtaler",
+      "historyError": "Kunne ikke laste inn historikken din.",
+      "noConversations": "Ingen samtaler ennå",
+      "noNotesYet": "Ingen notater ennå. Legg til ett når noe klikker.",
+      "addNote": "+ Legg til et notat",
+      "addFirstNote": "+ Legg til ditt første notat for denne boken",
+      "backToSubject": "Tilbake til emne →",
+      "finishedBody_one": "Du har studert det eneste emnet i denne boken. Repeter det for å holde det friskt i minne, eller gå tilbake og velg hva du vil lære neste gang.",
+      "finishedBody_other": "Du har studert alle de {{count}} emnene i denne boken. Repeter dem for å holde dem friske i minne, eller gå tilbake og velg hva du vil lære neste gang."
     },
     "inactiveFallbackBanner": {
       "message": "Kunne ikke laste inn de pausede og arkiverte emnene dine. Trykk for å prøve igjen – de er ikke borte."
-    }
+    },
+    "notStartedCount": "{{notStarted}} / {{total}} ikke startet",
+    "chooseTopic": "Velg et tema",
+    "provenanceFrom": "Fra {{name}}",
+    "recentlyAdded": "Nylig lagt til",
+    "sessionCount_one": "{{count}} økt",
+    "sessionCount_other": "{{count}} økter"
   },
   "topic": {
     "relevance": {
@@ -1149,7 +1250,17 @@
       "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen."
     },
     "lastStudied": "Sist studert {{when}}",
-    "neverStudied": "Aldri studert"
+    "neverStudied": "Aldri studert",
+    "notFoundTitle": "Tema ikke funnet",
+    "notFoundMessage": "Dette temaet kunne ikke åpnes. Gå tilbake og prøv igjen.",
+    "loadErrorTitle": "Vi kunne ikke laste inn dette temaet",
+    "loadErrorMessage": "Prøv igjen, eller gå tilbake til biblioteket ditt.",
+    "removedHint": "Dette temaet kan ha blitt fjernet fra læreplanen din.",
+    "loadingTopic": "Laster inn tema ...",
+    "noNotesYet": "Ingen notater ennå. Legg til ett når noe klikker.",
+    "noSessionsYet": "Ingen økter ennå. Start en nedenfor!",
+    "addNote": "+ Legg til et notat",
+    "addFirstNote": "+ Legg til ditt første notat for dette temaet"
   },
   "subject": {
     "settings": {
@@ -1737,6 +1848,15 @@
       "secondaryCtaA11y": "Prøv dette emnet igjen senere",
       "libraryLink": "Mens du venter, sjekk ut Biblioteket ditt",
       "libraryLinkA11y": "Sjekk ut Biblioteket ditt"
+    },
+    "accordion": {
+      "loadErrorRetry": "Kunne ikke laste inn temaer. Trykk for å prøve igjen, eller lukk emnekortet for å avvise.",
+      "noTopicsYet": "Ingen temaer ennå",
+      "browseTopics": "Bla gjennom temaer"
+    },
+    "subjectRow": {
+      "hideTopics": "▴ Skjul temaer",
+      "seeTopics": "▾ Se temaer"
     }
   },
   "onboarding": {
@@ -1801,6 +1921,9 @@
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
+    },
+    "stepIndicator": {
+      "stepOf": "Steg {{current}} av {{total}}"
     }
   },
   "parentView": {
@@ -2051,7 +2174,8 @@
       "reportGoneTitle": "Denne rapporten er ikke lenger tilgjengelig",
       "reportGoneBody": "Den kan ha blitt arkivert eller fjernet. Alle de andre rapportene dine er fortsatt trygge.",
       "testsCompleted": "Tester fullført",
-      "testPoints": "Testpoeng"
+      "testPoints": "Testpoeng",
+      "activeMinutes": "{{count}} min"
     },
     "practiceSummary": {
       "title": "Testdetaljer",
@@ -2198,7 +2322,12 @@
       "endsAt": "Prøveperioden slutter {{date}}"
     },
     "statusBadge": {
-      "trial": "Prøve"
+      "trial": "Prøve",
+      "active": "Aktiv",
+      "cancelling": "Kanselleres",
+      "pastDue": "Forfalt",
+      "expired": "Utløpt",
+      "unknown": "Ukjent"
     },
     "alerts": {
       "restoredTitle": "Restored",
@@ -2277,6 +2406,40 @@
     "loadError": {
       "message": "Kunne ikke laste abonnementsdetaljer. Prøv igjen.",
       "retryAccessibility": "Prøv å laste abonnementet på nytt"
+    },
+    "headerTitle": "Abonnement",
+    "currentPlan": "Gjeldende abonnement",
+    "endingTitle": "Abonnementet avsluttes",
+    "endingBody": "Abonnementet ditt er kansellert. Du kan fortsette å bruke alle funksjoner frem til {{date}}. Etter det vil kontoen din gå tilbake til gratisversjonen.",
+    "familyPool": "Familiepott",
+    "profilesConnected": "{{count}} av {{max}} profiler tilkoblet",
+    "sharedQuestionsLeft": "{{count}} delte spørsmål igjen denne perioden.",
+    "removeMember": "Fjern",
+    "removingMember": "Fjerner ...",
+    "confirmingPurchase": "Bekrefter kjøp …",
+    "plans": "Abonnementer",
+    "upgrade": "Oppgrader",
+    "checkLater": "Sjekk senere",
+    "needMoreQuestions": "Trenger du flere spørsmål?",
+    "openingStore": "Åpner butikk ...",
+    "buyCredits": "Kjøp 500 kreditter",
+    "topUpHint": "Engangskjøp. Kreditter utløper om 12 måneder.",
+    "manage": "Administrer",
+    "manageBilling": "Administrer fakturering",
+    "manageBillingWebHint": "Abonnementet administreres på mobilenheten din",
+    "opensAppStore": "Åpner App Store-abonnementer",
+    "opensGooglePlay": "Åpner Google Play-abonnementer",
+    "usageCard": {
+      "usageThisMonth": "Bruk denne måneden",
+      "todayUsage": "I dag: {{used}} / {{limit}} daglige spørsmål",
+      "topUpRemaining": "+ {{count}} påfyllingskreditter gjenstår",
+      "yourShare": "Din andel",
+      "yourUsage": "Ditt forbruk",
+      "questionsUsed": "{{count}} spørsmål",
+      "familyAggregate": "Familiesum",
+      "quotaResets": "Kvoten nullstilles {{date}}",
+      "renews": "Abonnementet fornyes {{date}}",
+      "dailyLimitHint": "Daglig grense – nullstilles ved midnatt"
     }
   },
   "sessionSummary": {
@@ -2299,6 +2462,58 @@
     "transcriptPurged": {
       "badge": "Transkripsjon arkivert",
       "notice": "Denne økten ble oppsummert; den opprinnelige transkripsjonen ble arkivert."
+    },
+    "title": "Økt fullført",
+    "expiredTitle": "Denne økten har utløpt",
+    "expiredMessage": "Denne økten er ikke lenger tilgjengelig. Gå til hjem for å starte en ny.",
+    "notFoundTitle": "Økt ikke funnet",
+    "notFoundMessage": "Vi kunne ikke laste inn denne økten. Den eksisterer kanskje ikke lenger.",
+    "couldNotLoadMessage": "Denne økten kunne ikke lastes inn. Gå til hjem for å starte en ny.",
+    "loadingSummary": "Laster inn øktsammendraget ditt ...",
+    "whatHappened": "Hva skjedde",
+    "checkInSoon": "Jeg sjekker inn med deg snart",
+    "resumeSession": "Gjenoppta denne økten",
+    "viewTranscript": "Se hele transkripsjonen",
+    "recapStillLoading": "Sammendraget ditt lastes fortsatt inn.",
+    "tapToRetry": "Trykk for å prøve igjen",
+    "milestones": "Milepæler",
+    "upNext": "Neste",
+    "youMightAlsoLike": "Du vil kanskje også like",
+    "continueLearning": "Fortsett å lære",
+    "bookmarkNudge": "Noen gode forklaringer i denne økten – du kan bokmerke dem neste gang.",
+    "freshWins": "Nye seire",
+    "newAchievement": "En ny prestasjon landet rett etter økten din.",
+    "reflectionIncentive": "Skriv en refleksjon for å tjene 1,5x XP",
+    "xpBreakdown": "Base: {{base}} XP → Med refleksjon: {{total}} XP",
+    "bonusXpEarned": "+{{xp}} bonus-XP tjent!",
+    "reflectionNextTime": "Skriv en refleksjon neste gang for å tjene +{{xp}} XP.",
+    "recallCheckTitle": "Rask repetisjonssjekk",
+    "recallCheckIntro": "Godt jobbet med leksene! Kan du svare på disse spørsmålene om metoden du brukte?",
+    "doneHeadHome": "Ferdig – gå til hjem",
+    "yourWords": "Dine ord",
+    "mateFeedback": "Tilbakemelding fra Mate",
+    "skippedNotice": "Du hoppet over å skrive et sammendrag for denne økten.",
+    "resumeReflectionBanner": "Du startet en refleksjon, men sendte den ikke inn sist. Fullfør den nedenfor og send inn for å lagre ordene dine.",
+    "writePrompt": "Skriv et kort sammendrag av hva du lærte. Dette hjelper deg med å huske og hjelper meg med å planlegge hva som kommer neste gang.",
+    "saveError": "Kunne ikke lagre sammendraget ditt. Sjekk tilkoblingen din og prøv igjen – arbeidet ditt vil ikke gå tapt.",
+    "skipError": "Kunne ikke hoppe over sammendraget ditt akkurat nå. Sjekk tilkoblingen din og prøv igjen.",
+    "submitSummary": "Send inn sammendrag",
+    "skipForNow": "Hopp over for nå",
+    "skipping": "Hopper over ...",
+    "seeYourLibrary": "Se biblioteket ditt",
+    "libraryFiling": {
+      "stillAddingTitle": "Legger fortsatt til dette i biblioteket ditt ...",
+      "stillAddingHint": "Dette kan ta litt lengre tid. Samtalen din lagres uansett.",
+      "addingTitle": "Legger til dette i biblioteket ditt ...",
+      "addingHint": "Samtalen din er lagret. Vi finner riktig plass til den i biblioteket.",
+      "addedTitle": "Lagt til i biblioteket",
+      "linkedHint": "Denne samtalen er koblet til biblioteket ditt.",
+      "openInLibrary": "Åpne i biblioteket",
+      "refresh": "Oppdater",
+      "failedTitle": "Vi kunne ikke legge dette til i biblioteket ditt",
+      "failedHint": "Samtalen din er lagret. Prøv igjen når du er klar.",
+      "keptOutTitle": "Ikke i biblioteket",
+      "keptOutHint": "Denne samtalen er lagret, men den er ikke et bibliotekemne."
     }
   },
   "sessionTranscript": {
@@ -2306,7 +2521,16 @@
       "title": "Denne samtalen ble arkivert {{date}}.",
       "intro": "Dette gikk dere gjennom:",
       "continueCta": "Fortsett med dette temaet"
-    }
+    },
+    "missingSessionTitle": "Mangler økt",
+    "missingSessionMessage": "Vi kunne ikke finne ut hvilken samtale som skulle lastes inn.",
+    "backToLibrary": "Tilbake til biblioteket",
+    "conversation": "Samtale",
+    "messageCount_one": "{{count}} melding",
+    "messageCount_other": "{{count}} meldinger",
+    "you": "Du",
+    "emptyTitle": "Ingen meldinger ennå",
+    "emptyMessage": "Denne økten har ingen lagrede utvekslinger å vise."
   },
   "nudge": {
     "sheet": {
@@ -2330,7 +2554,9 @@
     "banner": {
       "title": "{{fromDisplayName}} sendte deg en nudge",
       "unreadCount": "{{count}} nye",
-      "modalTitle": "Nye nudger"
+      "modalTitle": "Nye nudger",
+      "bannerLabel": "{{fromDisplayName}} sendte deg et dytt: {{message}}, {{count}} nye",
+      "bannerLabelSingle": "{{fromDisplayName}} sendte deg et dytt: {{message}}"
     }
   },
   "practiceHub": {
@@ -2729,7 +2955,12 @@
     }
   },
   "profiles": {
-    "title": "Profiler"
+    "title": "Profiler",
+    "noProfilesYet": "Ingen profiler ennå",
+    "createFirstHint": "Opprett din første profil for å komme i gang",
+    "createProfile": "Opprett profil",
+    "addProfile": "+ Legg til profil",
+    "renameTitle": "Gi profilen nytt navn"
   },
   "time": {
     "relative": {
@@ -2773,5 +3004,109 @@
       "stayHere": "Bli her",
       "openUpdate": "Åpne oppdatering"
     }
+  },
+  "myNotes": {
+    "loadMore": "Last mer",
+    "emptyHint": "De vil dukke opp her etter hvert som du lærer.",
+    "title": "Mine notater",
+    "subtitle": "Økter, notater og lagrede svar",
+    "sortDate": "Dato",
+    "sortSubject": "Emne",
+    "noneYetNotes": "Ingen notater ennå",
+    "noneYetBookmarks": "Ingen bokmerker ennå",
+    "noneYetSessions": "Ingen økter ennå",
+    "loadErrorNotes": "Kunne ikke laste notater",
+    "loadErrorBookmarks": "Kunne ikke laste bokmerker",
+    "loadErrorSessions": "Kunne ikke laste økter"
+  },
+  "createProfile": {
+    "titleChild": "Fortell oss om barnet ditt",
+    "titleSelf": "Hvem er det som skal lære?",
+    "displayNameLabel": "Visningsnavn",
+    "childDisplayNameLabel": "Barnets visningsnavn",
+    "birthDateLabel": "Fødselsdato",
+    "childBirthDateLabel": "Barnets fødselsdato",
+    "birthDateHint": "Slik at veilederen din snakker til deg på riktig måte. Aldersgrensen er 11 år.",
+    "childBirthDateHint": "Slik at barnets veileder snakker til dem på riktig måte. Aldersgrensen er 11 år.",
+    "webDateFormatHint": "Skriv inn fødselsdatoen din som ÅÅÅÅ-MM-DD.",
+    "childWebDateFormatHint": "Skriv inn barnets fødselsdato som ÅÅÅÅ-MM-DD.",
+    "selectDob": "Velg fødselsdato",
+    "selectChildDob": "Velg barnets fødselsdato"
+  },
+  "clerkGate": {
+    "timeoutTitle": "Tar lengre tid enn forventet",
+    "timeoutMessage": "Vennligst sjekk internettforbindelsen din og prøv igjen.",
+    "tryAgain": "Prøv igjen",
+    "continueOffline": "Fortsett uten konto",
+    "connecting": "Kobler til sikkert..."
+  },
+  "modeSwitcher": {
+    "switchError": "Kunne ikke bytte. Trykk for å prøve igjen."
+  },
+  "memoryConsent": {
+    "defaultTitle": "Hjelp veilederen med å lære om {{name}}",
+    "defaultTitleNoName": "Hjelp veilederen med å lære om barnet ditt",
+    "defaultDescription": "Dette lar veilederen huske hva slags forklaringer som fungerer, hva som fortsatt er vanskelig, og hvilke eksempler som føles relevante.",
+    "grant": "Ja, aktiver"
+  },
+  "saveWizard": {
+    "title": "Flott, la oss lagre dette og komme i gang.",
+    "whereSave": "Hvor skal vi lagre dette?",
+    "aboutYouSelf": "Fortell oss om deg",
+    "aboutYouParent": "Om deg (forelderen)",
+    "aboutChild": "Om barnet ditt",
+    "ageGate": "For å sette opp læring for et barn, må kontoinnehaveren være 18 år eller eldre. Du kan fortsatt sette opp din egen læring i stedet – velg «Min læring» i forrige trinn.",
+    "childSaveError": "Vi lagret kontoen din, men kunne ikke legge til barnet ditt ennå: {{error}}",
+    "confirmChildReady": "Barnets profil er satt opp. La oss åpne foreldrenes hjem.",
+    "yourNameLabel": "Ditt navn",
+    "yourBirthYearLabel": "Ditt fødselsår",
+    "childNameLabel": "Barnets navn",
+    "childBirthYearLabel": "Barnets fødselsår"
+  },
+  "pickBook": {
+    "subjectFallback": "Emne",
+    "pickWhatInterests": "Velg det som interesserer deg",
+    "suggestionsFailedTitle": "Forslag ble ikke lastet inn",
+    "suggestionsFailedHint": "Du kan fortsatt skrive inn boken eller temaet du vil legge til.",
+    "basedOnStudied": "Basert på hva du har studert",
+    "trySomethingNew": "Prøv noe nytt",
+    "somethingElse": "Noe annet ...",
+    "settingUp": "Setter opp ...",
+    "go": "Gå",
+    "skipStart": "Hopp over – start å lære uansett",
+    "missingSubject": "Mangler emne. Gå tilbake og prøv igjen.",
+    "takingLonger": "Dette tar litt lengre tid enn vanlig ..."
+  },
+  "relearn": {
+    "title": "Lær tema på nytt",
+    "loadingReviewTopics": "Laster inn repetisjonstemaer ...",
+    "startingSession": "Starter repetisjonsøkt ...",
+    "overdueTopicCount_one": "{{count}} forfalt tema",
+    "overdueTopicCount_other": "{{count}} forfalte temaer",
+    "daysOverdue_one": "{{count}} dag på overtid",
+    "daysOverdue_other": "{{count}} dager på overtid"
+  },
+  "preview": {
+    "backToSignIn": "Tilbake til pålogging",
+    "tryMentomate": "Prøv MentoMate",
+    "seeHowItWorks": "Se hvordan det fungerer – ingen registrering nødvendig ennå.",
+    "bothQuestion": "Hva vil du sette opp først?",
+    "bothHint": "Du kan gjøre begge deler – velg hvor du vil starte.",
+    "intentQuestion": "Hvem setter du dette opp for?",
+    "intentHint": "Vi skreddersyr det du ser neste gang.",
+    "pickSampleLesson": "Velg en prøveleksjon",
+    "safePreviews": "Dette er trygge forhåndsvisninger. Ditt eget tema kommer etter registrering.",
+    "signUpChild": "Registrer deg for å sette opp barnet ditt",
+    "signUpLesson": "Registrer deg for å starte din første leksjon",
+    "signUpLessonTopic": "Registrer deg for å starte din første leksjon om {{topic}}",
+    "trySampleFirst": "Prøv en prøveleksjon først",
+    "howTeaches": "Slik underviser MentoMate",
+    "howHelpsFamilies": "Slik hjelper MentoMate familier",
+    "conversationPitch": "En samtale frem og tilbake som følger det du faktisk trenger – ikke en fast leksjonsplan.",
+    "weeklyReadPitch": "Du setter opp barnet ditt, de lærer, og du får en kort ukentlig oppsummering av hva de jobber med. Ingen overvåking, bare signaler.",
+    "weeklyHighlight": "Ukens høydepunkt",
+    "sampleBadge": "Eksempel",
+    "sampleDataNote": "Eksempeldata – barnets virkelige innsikt vises etter den første økten.",
+    "sampleWeeklyBody": "Øvde på andregradsligninger i 45 minutter over tre økter. Blir komfortabel med faktorisering; jobber med å fullføre kvadratet."
   }
 }

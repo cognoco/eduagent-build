@@ -12,7 +12,7 @@ type: reference
 - Notion MCP tools (`mcp__claude_ai_Notion__*`) are often NOT available in Claude Code sessions (ToolSearch returns nothing).
 - When MCP unavailable: use Notion REST API directly with key from Doppler.
   The `NOTION_API_KEY` lives in project `mentomate`, config `dev`:
-  `"C:\Tools\doppler\doppler.exe" secrets get NOTION_API_KEY --plain -p mentomate -c dev` (confirmed working 2026-04-16)
+  `doppler secrets get NOTION_API_KEY --plain -p mentomate -c dev` (confirmed working 2026-04-16)
 - `cd`-ing into the eduagent repo resolves Doppler scope automatically (it has a `.doppler.yaml` with project=mentomate, config=dev). Outside that scope, pass `-p mentomate -c dev` explicitly.
 - Notion REST endpoint: `https://api.notion.com/v1/...`, header `Notion-Version: 2022-06-28`.
 - Full decision guide: `/notion` skill.

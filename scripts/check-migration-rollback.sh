@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CI guard: destructive migration plans must include a Rollback section.
 #
-# Background (CLAUDE.md → "Schema And Deploy Safety"):
+# Background (AGENTS.md → "Schema And Deploy Safety"):
 # "Any migration that drops columns, tables, or types must include a `## Rollback`
 # section in the plan specifying: (a) whether rollback is possible, (b) what
 # data is lost, (c) what the recovery procedure is. If rollback is impossible,
@@ -66,7 +66,7 @@ if [[ ${#missing[@]} -gt 0 ]]; then
     echo "    - $f"
   done
   echo ""
-  echo "Per CLAUDE.md → 'Schema And Deploy Safety', the section must spell out:"
+  echo "Per AGENTS.md → 'Schema And Deploy Safety', the section must spell out:"
   echo "  (a) whether rollback is possible"
   echo "  (b) what data is lost"
   echo "  (c) the recovery procedure"

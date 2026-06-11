@@ -27,6 +27,7 @@ import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useStickyLoading } from '../../hooks/use-sticky-loading';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
+import { useAnnounce } from '../../hooks/use-announce';
 import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
@@ -370,6 +371,11 @@ export function ChatShell({
   // Track last spoken message id to avoid re-speaking
   const lastSpokenIdRef = useRef<string | null>(null);
 
+  // Track last announced message id to avoid re-announcing to screen reader
+  const lastAnnouncedIdRef = useRef<string | null>(null);
+
+  const announce = useAnnounce();
+
   // Snap to bottom on every message change. animated:false is intentional —
   // animated scroll from the top to the bottom of a long transcript (resumed
   // sessions) can stall short of the end when interrupted by onContentSizeChange
@@ -435,6 +441,25 @@ export function ChatShell({
       stopSpeaking();
     }
   }, [screenReaderEnabled, ttsPlaying, stopSpeaking]);
+
+  // SR announce: announce completed assistant replies to screen-reader users (F-050).
+  // Mirrors the Auto-TTS effect but fires only when screen reader is on (inverse guard).
+  // Announces the full reply content so the user hears the message without navigating.
+  useEffect(() => {
+    if (!screenReaderEnabled) return;
+
+    const lastAiMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === 'assistant' && !m.streaming);
+
+    if (!lastAiMessage) return;
+    if (lastAiMessage.id === lastAnnouncedIdRef.current) return;
+    if (!lastAiMessage.content.trim()) return;
+
+    const spokenText = stripEnvelopeJson(lastAiMessage.content).trim();
+    lastAnnouncedIdRef.current = lastAiMessage.id;
+    announce(spokenText || t('session.chatShell.replyReady'));
+  }, [messages, screenReaderEnabled, announce, t]);
 
   const setVoiceEnabled = useCallback(
     (enabled: boolean) => {
@@ -660,17 +685,19 @@ export function ChatShell({
       style={{ flexShrink: 1, maxWidth: '70%' }}
       testID="chat-shell-header-actions"
     >
-      <VoiceToggle
-        isVoiceEnabled={isVoiceEnabled}
-        onToggle={() =>
-          void handleSelectInputMode(isVoiceEnabled ? 'text' : 'voice')
-        }
-      />
+      {!isWebDormant && (
+        <VoiceToggle
+          isVoiceEnabled={isVoiceEnabled}
+          onToggle={() =>
+            void handleSelectInputMode(isVoiceEnabled ? 'text' : 'voice')
+          }
+        />
+      )}
       {rightAction}
     </View>
   );
   const showVoicePlaybackControls =
-    isVoiceEnabled && !inputDisabled && !screenReaderEnabled;
+    isVoiceEnabled && !inputDisabled && !screenReaderEnabled && !isWebDormant;
   const showComposerToolbar = showVoicePlaybackControls || !!composerAccessory;
 
   return (
@@ -881,7 +908,7 @@ export function ChatShell({
           accessibilityHint="Tap to retry voice input"
         >
           <Text className="text-caption text-error">
-            {sttError} — tap to retry
+            {t('session.chatShell.voiceErrorTapRetry', { error: sttError })}
           </Text>
         </Pressable>
       )}

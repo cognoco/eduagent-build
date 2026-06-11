@@ -46,6 +46,7 @@ export function ParkingLotModal({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      accessibilityViewIsModal
     >
       <KeyboardAvoidingView
         className="flex-1 bg-black/40 justify-end"
@@ -85,9 +86,13 @@ export function ParkingLotModal({
                 : 'bg-surface-elevated rounded-button py-3 mt-4 items-center'
             }
             testID="parking-lot-save"
+            accessibilityRole="button"
           >
             {addParkingLotItem.isPending ? (
-              <ActivityIndicator color="white" />
+              <ActivityIndicator
+                color="white"
+                accessibilityLabel={t('common.loading')}
+              />
             ) : (
               <Text
                 className={
@@ -119,7 +124,7 @@ export function ParkingLotModal({
             ))}
             {parkingLot.isLoading ? (
               <View className="py-4 items-center">
-                <ActivityIndicator />
+                <ActivityIndicator accessibilityLabel={t('common.loading')} />
               </View>
             ) : parkingLot.data?.length ? null : (
               <Text className="text-body-sm text-text-secondary mt-3">
@@ -182,6 +187,7 @@ export function TopicSwitcherModal({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      accessibilityViewIsModal
     >
       <View className="flex-1 bg-black/40 justify-end">
         <View
@@ -240,7 +246,7 @@ export function TopicSwitcherModal({
           <ScrollView style={{ maxHeight: 280 }}>
             {switcherCurriculum.isLoading ? (
               <View className="py-6 items-center">
-                <ActivityIndicator />
+                <ActivityIndicator accessibilityLabel={t('common.loading')} />
               </View>
             ) : (
               (switcherCurriculum.data?.topics ?? [])
@@ -264,6 +270,7 @@ export function TopicSwitcherModal({
                       style={{ opacity: isSwitching ? 0.5 : 1 }}
                       className="bg-surface rounded-card px-4 py-3 mb-2"
                       testID={`switch-topic-${topic.id}`}
+                      accessibilityRole="button"
                     >
                       <Text className="text-body font-semibold text-text-primary">
                         {topic.title}

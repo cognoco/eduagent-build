@@ -33,7 +33,7 @@ interface QueryStateViewProps {
  * fallback → success children. Composes the existing TimeoutLoader and
  * ErrorFallback so screens don't reimplement the pattern ad-hoc.
  *
- * Per CLAUDE.md → "UX Resilience Rules": every error/timeout state must be
+ * Per AGENTS.md → "UX Resilience Rules": every error/timeout state must be
  * actionable, so `retry` is required.
  */
 export function QueryStateView({

@@ -15,5 +15,9 @@ module.exports = {
   transform: { '^.+\\.tsx?$': ['ts-jest', { useESM: false }] },
   testMatch: ['<rootDir>/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
+  // WI-536 flaky-test quarantine (see tools/quarantine/).
+  testPathIgnorePatterns: [
+    ...require('../tools/quarantine/registry.cjs').jestIgnorePatterns(),
+  ],
   ...ciDefaults,
 };

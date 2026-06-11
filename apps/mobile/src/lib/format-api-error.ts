@@ -234,7 +234,7 @@ function isNetworkRelated(msg: string): boolean {
 // throw typed errors (UpstreamError with code + status fields) instead of plain
 // Error("API error {status}: …"). Classification uses typed shape checks, not
 // regex parsing of formatted message strings. This eliminates the
-// "classify errors before formatting" anti-pattern (see CLAUDE.md Code Quality
+// "classify errors before formatting" anti-pattern (see AGENTS.md Code Quality
 // Guards). The statuses this handled (401, 403, 404, 402, 429, 5xx) are now
 // covered by the UpstreamError instanceof / shape-guard branches above.
 
@@ -701,7 +701,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
  *
  * Screens MUST NOT inspect `error.name === 'ForbiddenError' | ...` directly.
  * Classification — including extracting a stable error code — belongs at the
- * API-client boundary (this module), per the UX Resilience rule in CLAUDE.md.
+ * API-client boundary (this module), per the UX Resilience rule in AGENTS.md.
  *
  * Returns the canonical code used elsewhere in the codebase:
  *   - `apiCode` / `code` / `errorCode` on the typed error object (preferred)

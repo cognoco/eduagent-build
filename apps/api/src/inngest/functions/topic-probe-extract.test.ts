@@ -44,7 +44,47 @@ jest.mock(
   },
 );
 
-import { topicProbeExtract } from './topic-probe-extract';
+// [WI-577 / F-084] LLM-backed services are not exercisable in the unit env —
+// targeted overrides so the seed-retention-card rehydration tests can assert
+// what reaches evaluateRecallQuality without a live LLM call.
+const mockExtractSignals = jest.fn();
+jest.mock(
+  '../../services/session/topic-probe-extraction', // gc1-allow: LLM boundary (routeAndCall) — real extraction needs a live LLM
+  () => {
+    const actual = jest.requireActual(
+      '../../services/session/topic-probe-extraction',
+    ) as typeof import('../../services/session/topic-probe-extraction');
+    return {
+      ...actual,
+      extractSignalsFromExchangeHistory: (...args: unknown[]) =>
+        mockExtractSignals(...args),
+    };
+  },
+);
+
+const mockEnsureRetentionCard = jest.fn();
+const mockEvaluateRecallQuality = jest.fn();
+jest.mock(
+  '../../services/retention-data', // gc1-allow: LLM boundary (evaluateRecallQuality → routeAndCall) + retention DB writes — not exercisable in unit env
+  () => {
+    const actual = jest.requireActual(
+      '../../services/retention-data',
+    ) as typeof import('../../services/retention-data');
+    return {
+      ...actual,
+      ensureRetentionCard: (...args: unknown[]) =>
+        mockEnsureRetentionCard(...args),
+      evaluateRecallQuality: (...args: unknown[]) =>
+        mockEvaluateRecallQuality(...args),
+    };
+  },
+);
+
+import {
+  handleTopicProbeExtract,
+  topicProbeExtract,
+} from './topic-probe-extract';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 function extractSqlTextAndValues(
   node: unknown,
@@ -88,6 +128,8 @@ function extractSqlTextAndValues(
   return values;
 }
 
+// [WI-577 / F-084] Payload carries an opaque reference to the learner's
+// message (`learnerMessageEventId`), never the raw text / topic title.
 function topicProbePayload() {
   return {
     version: 1,
@@ -95,11 +137,129 @@ function topicProbePayload() {
     sessionId: '00000000-0000-7000-8000-000000000002',
     subjectId: '00000000-0000-7000-8000-000000000003',
     topicId: '00000000-0000-7000-8000-000000000004',
-    learnerMessage: 'I know atoms have protons and electrons.',
-    topicTitle: 'Atomic structure',
+    learnerMessageEventId: '00000000-0000-7000-8000-000000000005',
     timestamp: '2026-05-24T10:00:00.000Z',
   };
 }
+
+// ---------------------------------------------------------------------------
+// [WI-577 / F-084] Break tests: the consumer must rehydrate the learner's
+// probe answer and the topic title from the DB by reference — never from the
+// event payload (Inngest persists payloads in its third-party event store).
+// ---------------------------------------------------------------------------
+
+describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]', () => {
+  const SESSION_ROW = {
+    id: '00000000-0000-7000-8000-000000000002',
+    profileId: '00000000-0000-7000-8000-000000000001',
+    subjectId: '00000000-0000-7000-8000-000000000003',
+    topicId: '00000000-0000-7000-8000-000000000004',
+    metadata: {},
+    sessionType: 'learning',
+  };
+  const TRANSCRIPT_ROWS = [
+    { eventType: 'user_message', content: 'I know atoms have protons.' },
+    { eventType: 'ai_response', content: 'Good — and electrons?' },
+  ];
+
+  // Queue-based db mock: each terminal select call (.limit() / .orderBy())
+  // pops the next result set; .update() chains resolve to undefined.
+  function stubDb(selectResults: unknown[][]) {
+    const queue = [...selectResults];
+    const chain = {
+      from: () => chain,
+      innerJoin: () => chain,
+      where: () => chain,
+      orderBy: async () => queue.shift() ?? [],
+      limit: async () => queue.shift() ?? [],
+    };
+    const update = jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      }),
+    });
+    mockGetStepDatabase.mockReturnValue({ select: () => chain, update });
+    return { update };
+  }
+
+  async function execute(eventData: unknown) {
+    const runner = createInngestStepRunner();
+    const result = await handleTopicProbeExtract({
+      event: { data: eventData },
+      step: runner.step,
+    });
+    return { result, runNames: runner.runNames() };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockInngestTransport.clear();
+    mockExtractSignals.mockResolvedValue({
+      goals: [],
+      experienceLevel: 'beginner',
+      currentKnowledge: '',
+      interests: [],
+      paceHint: 'standard',
+    });
+    mockEnsureRetentionCard.mockResolvedValue({
+      card: { id: 'card-1', repetitions: 0, lastReviewedAt: null },
+      isNew: true,
+    });
+    mockEvaluateRecallQuality.mockResolvedValue(4);
+  });
+
+  it('rehydrates the learner message and topic title from the DB by reference', async () => {
+    stubDb([
+      [SESSION_ROW], // load-session
+      TRANSCRIPT_ROWS, // load-transcript
+      [{ id: SESSION_ROW.topicId, title: 'Atomic structure' }], // topic + title
+      [{ content: 'I know atoms have protons and electrons.' }], // learner message by id
+    ]);
+
+    const { result } = await execute(topicProbePayload());
+
+    expect(mockEvaluateRecallQuality).toHaveBeenCalledWith(
+      'I know atoms have protons and electrons.',
+      'Atomic structure',
+    );
+    expect(result).toMatchObject({
+      sessionId: SESSION_ROW.id,
+      priorKnowledgeQuality: 4,
+    });
+  });
+
+  it('skips retention seeding when the referenced message row is gone (e.g. transcript purged)', async () => {
+    stubDb([
+      [SESSION_ROW], // load-session
+      TRANSCRIPT_ROWS, // load-transcript
+      [{ id: SESSION_ROW.topicId, title: 'Atomic structure' }], // topic + title
+      [], // learner message row missing
+    ]);
+
+    const { result } = await execute(topicProbePayload());
+
+    expect(mockEvaluateRecallQuality).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ priorKnowledgeQuality: null });
+  });
+
+  it('skips legacy raw-text payloads (learnerMessage/topicTitle, no reference) as invalid', async () => {
+    stubDb([[SESSION_ROW]]);
+
+    const { result } = await execute({
+      version: 1,
+      profileId: SESSION_ROW.profileId,
+      sessionId: SESSION_ROW.id,
+      subjectId: SESSION_ROW.subjectId,
+      topicId: SESSION_ROW.topicId,
+      learnerMessage: 'my name is Milo Janssen and I struggle with fractions',
+      topicTitle: 'Atomic structure',
+      timestamp: '2026-05-24T10:00:00.000Z',
+    });
+
+    expect(result).toEqual({ skipped: 'invalid_payload' });
+    expect(mockEvaluateRecallQuality).not.toHaveBeenCalled();
+  });
+});
 
 describe('topicProbeExtract onFailure', () => {
   beforeEach(() => {

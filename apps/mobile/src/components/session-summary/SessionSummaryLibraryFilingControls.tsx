@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
 import type { LearningSession } from '@eduagent/schemas';
 
@@ -35,6 +36,7 @@ function isAutoFileCandidate(session: EnrichedLibrarySession): boolean {
 export function SessionSummaryLibraryFilingControls({
   sessionId,
 }: SessionSummaryLibraryFilingControlsProps): React.ReactElement | null {
+  const { t } = useTranslation();
   const router = useRouter();
   const filing = useSessionLibraryFiling(sessionId);
   const keepOut = useKeepSessionOutOfLibrary();
@@ -138,7 +140,7 @@ export function SessionSummaryLibraryFilingControls({
       testID={testID}
     >
       {isBusy ? (
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
       ) : (
         <Text className="text-body-sm font-semibold text-text-inverse">
           {label}
@@ -155,10 +157,10 @@ export function SessionSummaryLibraryFilingControls({
       {filing.timedOutStillPending ? (
         <>
           <Text className="text-body font-semibold text-text-primary">
-            Still adding this to your Library...
+            {t('sessionSummary.libraryFiling.stillAddingTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            This can take a little longer. Your chat is saved either way.
+            {t('sessionSummary.libraryFiling.stillAddingHint')}
           </Text>
           <View className="flex-row flex-wrap gap-2 mt-3">
             <Pressable
@@ -171,7 +173,7 @@ export function SessionSummaryLibraryFilingControls({
               testID="session-summary-library-refresh"
             >
               <Text className="text-body-sm font-semibold text-text-primary">
-                Refresh
+                {t('sessionSummary.libraryFiling.refresh')}
               </Text>
             </Pressable>
             {renderPrimaryAction(
@@ -184,10 +186,10 @@ export function SessionSummaryLibraryFilingControls({
       ) : showPending ? (
         <>
           <Text className="text-body font-semibold text-text-primary">
-            Adding this to your Library...
+            {t('sessionSummary.libraryFiling.addingTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            Your chat is saved. We are finding the right Library spot for it.
+            {t('sessionSummary.libraryFiling.addingHint')}
           </Text>
           <View className="mt-3">
             {renderPrimaryAction(
@@ -200,7 +202,7 @@ export function SessionSummaryLibraryFilingControls({
       ) : filing.isFiledInLibrary ? (
         <>
           <Text className="text-body font-semibold text-text-primary">
-            Added to Library
+            {t('sessionSummary.libraryFiling.addedTitle')}
           </Text>
           {session.topicTitle ? (
             <Text className="text-body text-text-primary mt-2">
@@ -208,7 +210,7 @@ export function SessionSummaryLibraryFilingControls({
             </Text>
           ) : (
             <Text className="text-body-sm text-text-secondary mt-1">
-              This chat is linked to your Library.
+              {t('sessionSummary.libraryFiling.linkedHint')}
             </Text>
           )}
           {destinationLabel ? (
@@ -226,7 +228,7 @@ export function SessionSummaryLibraryFilingControls({
                 testID="session-summary-library-open-topic"
               >
                 <Text className="text-body-sm font-semibold text-text-primary">
-                  Open in Library
+                  {t('sessionSummary.libraryFiling.openInLibrary')}
                 </Text>
               </Pressable>
             ) : null}
@@ -240,10 +242,10 @@ export function SessionSummaryLibraryFilingControls({
       ) : filing.isTerminalFailure ? (
         <>
           <Text className="text-body font-semibold text-text-primary">
-            We couldn't add this to your Library
+            {t('sessionSummary.libraryFiling.failedTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            Your chat is saved. Try again when you're ready.
+            {t('sessionSummary.libraryFiling.failedHint')}
           </Text>
           <View className="mt-3">
             {renderPrimaryAction(
@@ -256,10 +258,10 @@ export function SessionSummaryLibraryFilingControls({
       ) : filing.isKeptOut || showUnfiled ? (
         <>
           <Text className="text-body font-semibold text-text-primary">
-            Not in Library
+            {t('sessionSummary.libraryFiling.keptOutTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            This chat is saved, but it is not a Library topic.
+            {t('sessionSummary.libraryFiling.keptOutHint')}
           </Text>
           <View className="mt-3">
             {renderPrimaryAction(

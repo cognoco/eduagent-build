@@ -220,8 +220,20 @@ function createMockDb({
   });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
   const createSelectChain = () => {
+    // Thenable + .for('update') so both `await ….where(…)` and the
+    // SELECT … FOR UPDATE chains (`.where(…).for('update')`,
+    // `.where(…).limit(1).for('update')` — lockSubscription*__unscoped)
+    // resolve to selectResult.
+    const makeLockableThenable = () => ({
+      for: jest.fn().mockResolvedValue(selectResult),
+      then: (
+        onfulfilled?: (value: unknown[]) => unknown,
+        onrejected?: (reason: unknown) => unknown,
+      ) => Promise.resolve(selectResult).then(onfulfilled, onrejected),
+    });
     const terminal = {
-      limit: jest.fn().mockResolvedValue(selectResult),
+      limit: jest.fn().mockReturnValue(makeLockableThenable()),
+      for: jest.fn().mockResolvedValue(selectResult),
       then: (
         onfulfilled?: (value: unknown[]) => unknown,
         onrejected?: (reason: unknown) => unknown,

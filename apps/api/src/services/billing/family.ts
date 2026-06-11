@@ -176,7 +176,7 @@ function formatDateLabel(
     // hid bad subscription/profile timezone columns from observability, so
     // cycle dates rendered to the wrong day for affected users with no audit
     // trail. Emit a structured log so on-call can query "how many billing
-    // renders fell back to UTC in 24h" — per CLAUDE.md "Silent recovery
+    // renders fell back to UTC in 24h" — per AGENTS.md "Silent recovery
     // without escalation is banned" in billing code.
     logger.warn('[billing] invalid timezone fell back to UTC', {
       event: 'billing.format_date.timezone_fallback',
@@ -239,6 +239,17 @@ export async function listFamilyMembers(
   const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
+    logger.warn('[billing] listFamilyMembers: subscription not found', {
+      event: 'billing.family.list_members.subscription_not_found',
+      subscriptionId,
+    });
+    // Sentry, not just console.warn, so the billing fallback rate is queryable.
+    captureException(new Error('listFamilyMembers: subscription not found'), {
+      extra: {
+        context: 'billing.family.list_members.subscription_not_found',
+        subscriptionId,
+      },
+    });
     return [];
   }
 
@@ -591,6 +602,25 @@ export async function downgradeAllFamilyProfiles(
   const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
+    // A missing subscription here means the downgrade caller passed a stale or
+    // invalid subscriptionId. Log so dangling-entitlement scenarios are queryable.
+    logger.warn(
+      '[billing] downgradeAllFamilyProfiles: subscription not found',
+      {
+        event: 'billing.family.downgrade_all.subscription_not_found',
+        subscriptionId,
+      },
+    );
+    // Sentry, not just console.warn, so the billing fallback rate is queryable.
+    captureException(
+      new Error('downgradeAllFamilyProfiles: subscription not found'),
+      {
+        extra: {
+          context: 'billing.family.downgrade_all.subscription_not_found',
+          subscriptionId,
+        },
+      },
+    );
     return [];
   }
 

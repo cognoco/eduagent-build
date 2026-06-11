@@ -196,9 +196,12 @@ export { calculateAge, calculateAgeFromParts, MINIMUM_AGE } from './age-utils';
  * - age < MINIMUM_AGE  → belowMinimumAge + GDPR required
  * - age <= 16          → GDPR required
  * - age > 16           → not required
+ *
+ * [F-029-sem] Fail-closed: null / undefined / 0 birthYear is treated as
+ * unknown age → required=true, belowMinimumAge=true.
  */
 export function checkConsentRequiredFromDate(
-  birthYear: number,
+  birthYear: number | null | undefined,
   birthMonth?: number,
   birthDay?: number,
 ): {
@@ -207,6 +210,15 @@ export function checkConsentRequiredFromDate(
   belowMinimumAge?: boolean;
   age: number;
 } {
+  // [F-029-sem] Fail closed: unknown age treated as sub-minimum.
+  if (!birthYear) {
+    return {
+      required: true,
+      consentType: 'GDPR',
+      belowMinimumAge: true,
+      age: 0,
+    };
+  }
   const age = calculateAgeFromParts(birthYear, birthMonth, birthDay);
   if (age < MINIMUM_AGE) {
     return { required: true, consentType: 'GDPR', belowMinimumAge: true, age };
@@ -229,13 +241,26 @@ export function checkConsentRequiredFromDate(
  * - Users ≤ 16 require GDPR consent (conservative: birth-year-only
  *   precision cannot confirm they have turned 17)
  * - Users 17+ do not require consent
+ *
+ * [F-029-sem] Fail-closed: null / undefined / 0 birthYear is treated as
+ * unknown age → required=true, belowMinimumAge=true. This closes the semantic
+ * gap where a caller passes a sentinel value and receives "not required" back.
  */
-export function checkConsentRequired(birthYear: number): {
+export function checkConsentRequired(birthYear: number | null | undefined): {
   required: boolean;
   consentType: ConsentType | null;
   belowMinimumAge?: boolean;
   age: number;
 } {
+  // [F-029-sem] Fail closed: unknown age treated as sub-minimum.
+  if (!birthYear) {
+    return {
+      required: true,
+      consentType: 'GDPR',
+      belowMinimumAge: true,
+      age: 0,
+    };
+  }
   const age = calculateAge(birthYear);
   if (age < MINIMUM_AGE) {
     return { required: true, consentType: 'GDPR', belowMinimumAge: true, age };
@@ -704,8 +729,15 @@ export async function resendConsent(
             eq(consentStates.profileId, row.profileId),
           ),
         );
-    } catch {
-      // best-effort rollback
+    } catch (rollbackError) {
+      // best-effort rollback — match the sibling catch blocks at :608 and :784
+      logger.warn('[consent] Failed to rollback resend counter', {
+        event: 'consent.resend.rollback_failed',
+        error:
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError),
+      });
     }
     throw new ConsentRequestNotFoundError();
   }

@@ -8,7 +8,7 @@
 //     `app/monthly-report.generate`; parentId and childId come from the event
 //     payload and all DB reads are scoped to those two profiles only.
 //
-// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// Profile-scoping rules in AGENTS.md ("Reads must use createScopedRepository")
 // do NOT apply to `monthlyReportCron` — this is system-wide work running
 // outside any single profile's request context.
 //
@@ -21,7 +21,6 @@ import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import {
   accounts,
   familyLinks,
-  learningProfiles,
   monthlyReports,
   notificationPreferences,
   profiles,
@@ -46,6 +45,7 @@ import {
   type ChildStruggleLine,
 } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
+import { listStruggleTopicNames } from '../../services/learner-profile';
 import { isGdprProcessingAllowed } from '../../services/consent';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
@@ -464,35 +464,12 @@ export const monthlyReportGenerate = inngest.createFunction(
           })
           .onConflictDoNothing();
 
-        // Read struggles for the watch-line (path A: topic names only).
-        // Malformed JSONB is caught and does not abort the report.
-        let struggleTopics: string[] = [];
-        try {
-          const learningProfile = await db.query.learningProfiles.findFirst({
-            where: eq(learningProfiles.profileId, childId),
-            columns: { struggles: true },
-          });
-          const rawStruggles = learningProfile?.struggles;
-          if (Array.isArray(rawStruggles)) {
-            struggleTopics = (rawStruggles as Array<{ topic?: string }>)
-              .map((s) => s.topic)
-              .filter((t): t is string => typeof t === 'string' && t.length > 0)
-              .slice(0, 2);
-          }
-        } catch (err) {
-          captureException(err, {
-            extra: {
-              childId,
-              context: 'monthly-report-generate-struggles',
-            },
-          });
-        }
-
+        // Minor-PII discipline: this return value is memoized into Inngest's
+        // third-party state store, so it carries no child name or struggle
+        // topics — the push/email steps rehydrate both from the DB.
         return {
           status: 'completed' as const,
-          childDisplayName,
           reportMonth: isoDate(lastMonthStart),
-          struggleTopics,
           isSelfReport,
         };
       } catch (error) {
@@ -563,18 +540,25 @@ export const monthlyReportGenerate = inngest.createFunction(
       if (!activeParent) {
         return { sent: false, reason: 'profile_archived' as const };
       }
+      // Rehydrated at send time — the child's name never rides the memoized
+      // generate-step return.
       const activeChild = await db.query.profiles.findFirst({
         where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
-        columns: { id: true },
+        columns: { id: true, displayName: true },
       });
       if (!activeChild) {
         return { sent: false, reason: 'profile_archived' as const };
       }
+      // Blank/whitespace names fall back too — copy must never render
+      // "'s monthly report is ready".
+      const childDisplayName = activeChild.displayName?.trim()
+        ? activeChild.displayName.trim()
+        : 'Your child';
       await sendPushNotification(
         db,
         {
           profileId: parentId,
-          title: `${reportResult.childDisplayName}'s monthly report is ready`,
+          title: `${childDisplayName}'s monthly report is ready`,
           body: 'Open the app to see what they learned this month.',
           type: 'monthly_report',
         },
@@ -622,9 +606,11 @@ export const monthlyReportGenerate = inngest.createFunction(
             })
           : null;
         const parentEmail = parentAccount?.email ?? null;
+        // Rehydrated at send time — name and struggle topics never ride the
+        // memoized generate-step return.
         const childProfile = await db.query.profiles.findFirst({
           where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
-          columns: { id: true },
+          columns: { id: true, displayName: true },
         });
 
         if (!childProfile) {
@@ -635,13 +621,18 @@ export const monthlyReportGenerate = inngest.createFunction(
           return { sent: false, reason: 'no_email' };
         }
 
+        const childDisplayName = childProfile.displayName?.trim()
+          ? childProfile.displayName.trim()
+          : 'Your child';
+        // Struggle watch-line (path A: topic names only). Malformed JSONB
+        // degrades to an empty list inside the helper.
         const struggleLines: ChildStruggleLine[] = [
           {
-            childName: reportResult.childDisplayName,
-            topics: reportResult.struggleTopics,
+            childName: childDisplayName,
+            topics: await listStruggleTopicNames(db, childId, 2),
           },
         ];
-        const summary = `${reportResult.childDisplayName}'s monthly report is ready. Open the app to see what they learned this month.`;
+        const summary = `${childDisplayName}'s monthly report is ready. Open the app to see what they learned this month.`;
         const emailPayload = formatMonthlyProgressEmail(
           parentEmail,
           summary,

@@ -1143,6 +1143,37 @@ export async function getLearningProfile(
   });
 }
 
+/**
+ * Reads the learner's current struggle topic names (JSONB order, via the
+ * scoped repository), capped at `max`. Malformed JSONB — a non-array
+ * column, or array entries that are null/scalars/missing `topic` — yields
+ * an empty or partial list rather than throwing, so callers on digest paths
+ * degrade gracefully instead of aborting the send.
+ *
+ * Shared by the weekly/monthly parent-digest steps, which rehydrate struggle
+ * topics from the DB at send time instead of round-tripping them through
+ * memoized Inngest step state.
+ */
+export async function listStruggleTopicNames(
+  db: Database,
+  profileId: string,
+  max: number,
+): Promise<string[]> {
+  const scoped = createScopedRepository(db, profileId);
+  const learningProfile = await scoped.learningProfiles.findFirst();
+  const rawStruggles: unknown = learningProfile?.struggles;
+  if (!Array.isArray(rawStruggles)) return [];
+  return rawStruggles
+    .map((entry) =>
+      typeof entry === 'object' && entry !== null
+        ? (entry as { topic?: unknown }).topic
+        : undefined,
+    )
+    .map((topic) => (typeof topic === 'string' ? topic.trim() : undefined))
+    .filter((t): t is string => typeof t === 'string' && t.length > 0)
+    .slice(0, max);
+}
+
 export function cleanCurrentlyWorkingOnLabel(topic: string): string {
   return topic
     .trim()
@@ -1755,7 +1786,9 @@ export async function analyzeSessionTranscript(
     captureException(err, {
       extra: {
         context: 'analyzeSession',
-        rawSlice: result.response?.slice(0, 500),
+        // Length only — the LLM analysis of a learner's
+        // session can echo learner quotes; no content slices to Sentry.
+        responseLength: result.response?.length ?? 0,
       },
     });
     return null;

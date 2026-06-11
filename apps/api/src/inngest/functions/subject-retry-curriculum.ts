@@ -32,7 +32,7 @@ async function loadBook(
   if (book.subjectId !== subjectId) {
     throw new NonRetriableError('book-subject-mismatch');
   }
-  // Verify the subject belongs to profileId (parent-chain ownership check per CLAUDE.md)
+  // Verify the subject belongs to profileId (parent-chain ownership check per AGENTS.md)
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
   });

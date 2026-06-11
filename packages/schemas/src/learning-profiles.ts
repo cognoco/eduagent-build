@@ -274,8 +274,11 @@ export type OnboardingInterestsContextPatch = z.infer<
 
 export const tellMentorInputSchema = z
   .object({
+    // [F-152] childProfileId was a dead field — the API routes extract the
+    // child profile from the URL param, never from the body. Retaining it in
+    // the .strict() schema was a latent IDOR footgun: a caller could include a
+    // foreign profileId in the body and confuse future readers into using it.
     text: z.string().min(1).max(500),
-    childProfileId: z.string().uuid().optional(),
   })
   .strict();
 export type TellMentorInput = z.infer<typeof tellMentorInputSchema>;

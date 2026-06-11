@@ -30,6 +30,7 @@ import type {
   SubscriptionTier,
   VerificationType,
   ChallengeRoundSessionState,
+  TopicProbeRequestedEvent,
 } from '@eduagent/schemas';
 import {
   ConflictError,
@@ -37,6 +38,7 @@ import {
   classifyOrphanError,
   challengeRoundSessionStateSchema,
   extractedInterviewSignalsSchema,
+  isUnambiguouslyAdult,
 } from '@eduagent/schemas';
 import { persistUserMessageOnly } from './persist-user-message-only';
 import {
@@ -921,16 +923,13 @@ interface ReviewCalibrationDispatchPayload {
   timestamp: string;
 }
 
-interface TopicProbeDispatchPayload {
-  version: 1;
-  profileId: string;
-  sessionId: string;
-  subjectId: string;
-  topicId: string;
-  learnerMessage: string;
-  topicTitle: string;
-  timestamp: string;
-}
+// PII egress: Carries an opaque reference (`learnerMessageEventId`)
+// instead of the learner's raw probe answer / topic title — Inngest persists
+// event payloads in its third-party event store. The consumer
+// (topic-probe-extract) rehydrates both from the DB, scoped by profileId.
+// Aliased to the schema-inferred type so the payload cannot drift from
+// `topicProbeRequestedEventSchema` (@eduagent/schemas).
+type TopicProbeDispatchPayload = TopicProbeRequestedEvent;
 
 async function maybeDispatchReviewCalibration(
   db: Database,
@@ -1049,14 +1048,20 @@ async function maybeDispatchTopicProbeExtraction(
   },
   effectiveMode: string | undefined,
   conversationLanguage: ConversationLanguage | undefined,
+  // learnerMessageText / topicTitle gate the dispatch locally and are NOT
+  // placed in the event payload (third-party event store).
   learnerMessageText: string,
   topicTitle: string | undefined,
   isFirstEncounter: boolean,
+  learnerMessageEventId: string | undefined,
 ): Promise<void> {
   if (effectiveMode !== 'learning') return;
   if (!isFirstEncounter) return;
   const topicId = session.topicId;
   if (!topicId || !topicTitle) return;
+  // PII egress: Without a persisted user_message row id there is no
+  // PII-safe way to reference the learner's answer — skip the probe.
+  if (!learnerMessageEventId) return;
   if (
     !isSubstantiveCalibrationAnswer(learnerMessageText, conversationLanguage)
   ) {
@@ -1105,8 +1110,7 @@ async function maybeDispatchTopicProbeExtraction(
         sessionId: session.id,
         subjectId: session.subjectId,
         topicId,
-        learnerMessage: learnerMessageText,
-        topicTitle,
+        learnerMessageEventId,
         timestamp,
       };
     },
@@ -1326,6 +1330,28 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
             })()
           : e.content,
     }));
+}
+
+/**
+ * WI-580 (F-076): a minor's real name must never be sent to a third-party
+ * LLM provider. Only an unambiguously-adult owner's display name enters the
+ * prompt context; every other profile — child on a parent account, under-18
+ * owner, parent-proxy child, unknown birth year — gets no name. Fail-closed
+ * on ownership AND age, including the birth-year boundary (PR #900 Codex P1):
+ * `birthYear === currentYear - 18` may still be 17, so it is treated as
+ * minor via `isUnambiguouslyAdult`. The prompt builder already omits the
+ * learner-name section when the name is absent, and the ANTI-FABRICATION
+ * block forbids the model from inventing one.
+ */
+export function resolvePromptLearnerName(profile: {
+  isOwner?: boolean | null;
+  birthYear?: number | null;
+  displayName?: string | null;
+}): string | undefined {
+  if (profile.isOwner !== true) return undefined;
+  if (profile.birthYear == null) return undefined;
+  if (!isUnambiguouslyAdult(profile.birthYear)) return undefined;
+  return profile.displayName ?? undefined;
 }
 
 export async function prepareExchangeContext(
@@ -1716,11 +1742,6 @@ export async function prepareExchangeContext(
   }
 
   if (isFreeform && session.exchangeCount === 1 && !silentClassification) {
-    const priorUserMessages = exchangeHistory
-      .filter((entry) => entry.role === 'user')
-      .map((entry) => entry.content)
-      .join('\n');
-
     // Fire-and-forget by design: this silent-classification observation must
     // not add Inngest round-trip latency to prepareExchangeContext (which is
     // on the synchronous /ask exchange hot path). safeSend internally routes
@@ -1730,6 +1751,10 @@ export async function prepareExchangeContext(
     // synchronous bug in argument validation before the inner try block) —
     // without this, such a regression would surface as an unhandledRejection
     // instead of as a Sentry event.
+    // PII egress: No raw learner text (`classifyInput`) in the event
+    // payload — Inngest persists payloads in its third-party event store.
+    // The consumer (ask-silent-classify) rehydrates the learner's persisted
+    // user messages from session_events, scoped by profileId.
     safeSend(
       () =>
         inngest.send({
@@ -1737,9 +1762,6 @@ export async function prepareExchangeContext(
           data: {
             sessionId,
             profileId,
-            classifyInput: [priorUserMessages, userMessage]
-              .filter(Boolean)
-              .join('\n'),
             exchangeCount: session.exchangeCount + 1,
           },
         }),
@@ -2295,8 +2317,10 @@ export async function prepareExchangeContext(
       : undefined,
     continuationOpenerPhase,
     continuationDepth,
-    // Personalisation: learner's display name for the mentor to use naturally
-    learnerName: profile?.displayName ?? undefined,
+    // Personalisation: learner's display name for the mentor to use naturally.
+    // WI-580 (F-076): adult owners only — a minor's real name never reaches a
+    // third-party LLM provider.
+    learnerName: resolvePromptLearnerName(profile),
     onboardingSignals: onboardingSignals.success
       ? onboardingSignals.data
       : undefined,
@@ -2329,6 +2353,13 @@ export async function persistExchangeResult(
   exchangeCount: number;
   aiEventId?: string;
   persistedUserMessage: boolean;
+  /**
+   * PII egress: session_events row id of the just-persisted
+   * user_message. Lets dispatchers reference the learner's message by id
+   * in Inngest event payloads instead of embedding the raw text (Inngest
+   * persists payloads in its third-party event store).
+   */
+  userMessageEventId?: string;
 }> {
   const previousRung = session.escalationRung;
 
@@ -2427,6 +2458,7 @@ export async function persistExchangeResult(
   const drillTotal = behavioral?.drillTotal ?? null;
   const persisted = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+    let clientPathUserMessageEventId: string | undefined;
 
     if (clientId) {
       const insertedUserRows = await txDb
@@ -2457,8 +2489,10 @@ export async function persistExchangeResult(
             eventType: string | null;
           }>,
           persistedUserMessage: false,
+          userMessageEventId: undefined as string | undefined,
         };
       }
+      clientPathUserMessageEventId = insertedUserRows[0].id;
     }
 
     const [updated] = await txDb
@@ -2542,6 +2576,12 @@ export async function persistExchangeResult(
       updated,
       insertedEvents,
       persistedUserMessage: true,
+      // PII egress: clientId path inserts the user_message separately
+      // above; the non-clientId path inserts it alongside the ai_response,
+      // so its id is recovered from insertedEvents below.
+      userMessageEventId:
+        clientPathUserMessageEventId ??
+        insertedEvents.find((event) => event.eventType === 'user_message')?.id,
     };
   });
   const { updated, insertedEvents } = persisted;
@@ -2665,6 +2705,7 @@ export async function persistExchangeResult(
     exchangeCount: updated.exchangeCount,
     aiEventId,
     persistedUserMessage: true,
+    userMessageEventId: persisted.userMessageEventId,
   };
 }
 
@@ -2875,6 +2916,7 @@ export async function processMessage(
       input.message,
       context.topicTitle,
       context.isFirstEncounter === true,
+      persisted.userMessageEventId,
     );
   }
 
@@ -3213,6 +3255,7 @@ export async function streamMessage(
           input.message,
           context.topicTitle,
           context.isFirstEncounter === true,
+          persisted.userMessageEventId,
         );
       }
 

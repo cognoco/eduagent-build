@@ -1,6 +1,7 @@
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticLight } from '../../lib/haptics';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import type { ChatMessage } from './ChatShell';
 import { QuotaExceededCard } from './QuotaExceededCard';
@@ -56,6 +57,7 @@ export function SessionMessageActions({
   onToggleBookmark,
   handleReconnect,
 }: SessionMessageActionsProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   if (message.kind === 'reconnect_prompt') {
@@ -69,7 +71,7 @@ export function SessionMessageActions({
         accessibilityLabel="Reconnect to the conversation"
       >
         <Text className="text-caption font-semibold text-primary">
-          Reconnect
+          {t('session.messageActions.reconnect')}
         </Text>
       </Pressable>
     );

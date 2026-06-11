@@ -1,10 +1,52 @@
 #!/usr/bin/env sh
 set -e
-# --concurrent false: On Windows, parallel chunk execution (the default) runs 8
-# simultaneous `node --stack-size=65536` processes which exhausts process
-# handles / memory and causes SIGKILL on large staged sets. Serial execution is
-# slower but reliable. Harmless on macOS/Linux (cost is a few extra seconds).
-pnpm exec lint-staged --concurrent false
+
+# Secret / large-file guard (WI-450 / gate-spec D3). Relocated out of the commit
+# skill into the hook so it runs for EVERY committer (human, agent, /commit, raw
+# git), not just when a skill chooses to scan. .gitignore is the primary control;
+# this is the backstop for files force-added (`git add -f`) or slipping a
+# gitignore gap. Path/extension-based and deterministic — no content scanning, so
+# no false positives. Genuine false positive: unstage, or `git commit --no-verify`.
+STAGED_ALL=$(git diff --cached --name-only --diff-filter=d)
+if [ -n "$STAGED_ALL" ]; then
+  SECRET_HITS=$(echo "$STAGED_ALL" \
+    | grep -E '(^|/)(\.env(\.|$)|\.dev\.vars$|\.env\.tokens$|credentials\.json$)|\.(pem|key|p8|p12|jks|mobileprovision)$' \
+    | grep -vE '(^|/)\.env\.example$' || true)
+  if [ -n "$SECRET_HITS" ]; then
+    echo ""
+    echo "pre-commit: refusing to commit likely secret/credential file(s):"
+    echo "$SECRET_HITS" | sed 's/^/  /'
+    echo ""
+    echo "These match secret patterns. Unstage them, or add to .gitignore."
+    echo "Genuine false positive: git commit --no-verify."
+    exit 1
+  fi
+  # Large-file guard — block staged blobs > 5 MB (accidental binaries / dumps).
+  echo "$STAGED_ALL" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    sz=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+    if [ "$sz" -gt 5242880 ]; then
+      echo ""
+      echo "pre-commit: staged file exceeds 5 MB ($((sz / 1048576)) MB): $f"
+      echo "Large binaries belong in Git LFS or .gitignore. Bypass: --no-verify."
+      exit 1
+    fi
+  done
+fi
+
+# lint-staged concurrency is OS-gated (WI-537). On Windows, parallel chunk
+# execution (the default) spawns simultaneous `node --stack-size=65536`
+# processes that exhaust process handles / memory → SIGKILL on large staged
+# sets, so Windows forces serial. macOS/Linux use the parallel default (a few
+# seconds faster). Windows (native + WSL) is an OS in active use — the serial
+# path must stay for it (see MMT-ADR-0019). husky runs under Git-Bash on
+# Windows, so uname -s is MINGW*/MSYS*/CYGWIN* there.
+case "$(uname -s)" in
+  MINGW* | MSYS* | CYGWIN*) LINT_STAGED_CONCURRENCY="--concurrent false" ;;
+  *) LINT_STAGED_CONCURRENCY="" ;;
+esac
+# shellcheck disable=SC2086 # intentional word-splitting of the flag
+pnpm exec lint-staged $LINT_STAGED_CONCURRENCY
 
 # [Low / deps-supply-chain] Guard: fail fast when a mobile-only dep is added to
 # the root package.json. The NativeWind double-copy bug means this check must
@@ -27,9 +69,9 @@ fi
 # SKIP_SKILLS in scripts/sync-skills.mjs) where direct edits are valid and
 # should not be auto-staged. Status messages go to stderr in this mode; stdout
 # is one repo-relative path per line.
-# (AGENTS.md <-> CLAUDE.md sync is intentionally not productionized in this
-# PR — see .claude/memory/project_agent_doc_and_memory_architecture_revisit.md
-# for the future work item.)
+# (AGENTS.md <-> CLAUDE.md no longer need syncing: as of WI-386 AGENTS.md is the
+# single source and CLAUDE.md is a thin `@AGENTS.md` pointer, so divergence is
+# structurally impossible — there is nothing to sync between them.)
 SYNC_CHANGES=$(node scripts/sync-skills.mjs --print-changed)
 if [ -n "$SYNC_CHANGES" ]; then
   echo "pre-commit: auto-staging sync-generated changes:"
@@ -39,7 +81,7 @@ fi
 
 # Eval-harness guard: prompt-touching files require an accompanying snapshot
 # diff. Without this, prompt drift ships silently (the eval harness only
-# catches it post-hoc on the next manual run). See CLAUDE.md "When changing
+# catches it post-hoc on the next manual run). See AGENTS.md "When changing
 # LLM prompts, run the eval harness".
 #
 # Triggers on staged changes to:
@@ -111,7 +153,7 @@ fi
 # new relative-path `jest.mock('./...')` / `jest.mock('../...')` unless the
 # factory follows Pattern A (spreads `jest.requireActual(<same path>)`), or
 # the line carries an on-line `gc1-allow: <reason>` escape hatch. See
-# CLAUDE.md → "No new internal jest.mock() (GC1 ratchet)" and
+# AGENTS.md → "No new internal jest.mock() (GC1 ratchet)" and
 # scripts/check-gc1-pattern-a.ts (the structural check that replaced the
 # previous textual-only grep — BUG-1051).
 STAGED_TESTS=$(git diff --cached --name-only --diff-filter=d -- '*.test.ts' '*.test.tsx')
@@ -119,14 +161,9 @@ if [ -n "$STAGED_TESTS" ]; then
   pnpm exec tsx scripts/check-gc1-pattern-a.ts || exit 1
 fi
 
-# Full project-reference type-check (incremental via composite tsconfig).
-# Emits .d.ts to dist/ (gitignored) + .tsbuildinfo (gitignored) for incremental caching.
-# Skip if no .ts/.tsx files are staged — docs/config-only commits need no tsc.
-STAGED_TS=$(git diff --cached --name-only --diff-filter=d -- '*.ts' '*.tsx')
-if [ -n "$STAGED_TS" ]; then
-  echo "pre-commit: running tsc --build (incremental)..."
-  pnpm exec tsc --build || exit 1
-fi
-
-# Surgical tests — only tests related to staged files (see scripts/pre-commit-tests.sh)
-bash scripts/pre-commit-tests.sh
+# Whole-tree `tsc --build` + surgical jest moved to pre-push (WI-450 / gate-spec
+# D1). At a partial commit the working tree != the index, so whole-tree type/test
+# checks are structurally wrong here (an unrelated in-progress file breaks an
+# otherwise-clean partial commit). They are valid at pre-push, where the working
+# tree ≈ HEAD — see .husky/pre-push -> scripts/pre-push-tests.sh. CI is the
+# authoritative backstop regardless.

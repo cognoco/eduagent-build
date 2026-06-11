@@ -9,7 +9,7 @@
 //
 // Internal-mock posture: the billing barrel is mocked because it owns the
 // hot-path DB writes and quota-pool updates whose real implementations require
-// a Postgres connection (per CLAUDE.md "Code Quality Guards" — internal
+// a Postgres connection (per AGENTS.md "Code Quality Guards" — internal
 // mocks are not preferred, but Stripe-webhook-handler logic is the boundary
 // being tested here, not the billing service itself, which is covered by
 // services/billing/*.integration.test.ts). External-boundary mocks (Sentry,
@@ -307,7 +307,7 @@ describe('out-of-order subscription event escalation [#828 break tests]', () => 
   // created the local row. updateSubscriptionFromWebhook returns null in
   // that case. Previously the handlers returned silently — event state
   // (period dates, cancelled_at, past_due) was lost forever because Stripe
-  // won't re-deliver after a 200. CLAUDE.md "Silent recovery without
+  // won't re-deliver after a 200. AGENTS.md "Silent recovery without
   // escalation is banned in billing".
 
   it('handleSubscriptionEvent escalates when local subscription row not found', async () => {

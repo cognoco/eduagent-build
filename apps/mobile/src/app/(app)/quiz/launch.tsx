@@ -326,7 +326,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   }
 
   if (generateRound.isError) {
-    // [CCR PR #282] [ASSUMP-F3] [IMP-2] Per the UX Resilience rule in CLAUDE.md,
+    // [CCR PR #282] [ASSUMP-F3] [IMP-2] Per the UX Resilience rule in AGENTS.md,
     // classification happens at the API-client boundary (lib/format-api-error)
     // — NEVER inline in a screen. `classifyApiError` returns a structured
     // recovery hint; we hide Retry whenever recovery is not 'retry' (quota /

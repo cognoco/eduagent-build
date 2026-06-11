@@ -168,7 +168,12 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         sessionId: body.sessionId,
         error: err instanceof Error ? err.message : String(err),
       });
-      // Fire async retry for freeform/homework sessions
+      // Fire async retry for freeform/homework sessions.
+      // PII egress: The transcript itself must NOT ride in the
+      // event payload — Inngest persists payloads in its third-party event
+      // store. The consumer (freeform-filing) re-fetches the transcript from
+      // the DB by sessionId, scoped by profileId. `sessionTranscript` here
+      // only gates WHETHER this is a session filing worth retrying.
       if (sessionTranscript && body.sessionId) {
         await safeSend(
           () =>
@@ -177,7 +182,6 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
               data: {
                 profileId,
                 sessionId: body.sessionId,
-                sessionTranscript,
                 sessionMode: body.sessionMode ?? 'freeform',
               },
             }),
@@ -238,6 +242,8 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       // the first catch block didn't already enqueue a retry (usedFallback).
       // Without this guard, two app/filing.retry events fire for the same
       // sessionId, causing duplicate topic rows + ghost filing.completed events.
+      // PII egress: As above: no transcript in the event payload;
+      // the consumer rehydrates from the DB.
       if (!usedFallback && sessionTranscript && body.sessionId) {
         await safeSend(
           () =>
@@ -246,7 +252,6 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
               data: {
                 profileId,
                 sessionId: body.sessionId,
-                sessionTranscript,
                 sessionMode: body.sessionMode ?? 'freeform',
               },
             }),

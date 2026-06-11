@@ -55,12 +55,16 @@ module.exports = {
   ],
   // Integration tests share a real Neon database and must run serially.
   // They live in jest.integration.config.cjs → `api:test-integration` target.
-  testPathIgnorePatterns: dropWorktreeGuards([
-    '/node_modules/',
-    '<rootDir>/.worktrees/',
-    '<rootDir>/.tmp/',
-    '[/\\\\]\\.tmp',
-    '\\.integration\\.test\\.ts$',
-  ]),
+  testPathIgnorePatterns: [
+    ...dropWorktreeGuards([
+      '/node_modules/',
+      '<rootDir>/.worktrees/',
+      '<rootDir>/.tmp/',
+      '[/\\\\]\\.tmp',
+      '\\.integration\\.test\\.ts$',
+    ]),
+    // WI-536 flaky-test quarantine (see tools/quarantine/).
+    ...require('../../tools/quarantine/registry.cjs').jestIgnorePatterns(),
+  ],
   coverageDirectory: '<rootDir>/coverage/apps/api',
 };

@@ -19,9 +19,10 @@ import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
 import { useProfileSessions } from '../../../../hooks/use-progress';
 import {
   useChildConsentStatus,
-  useRestoreConsent,
   useRevokeConsent,
 } from '../../../../hooks/use-consent';
+// [F-153] useRestoreConsent moved to use-restore-consent (variables-as-arg pattern)
+import { useRestoreConsent } from '../../../../hooks/use-restore-consent';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
@@ -565,7 +566,7 @@ function ConsentManagementSection({
   const { t } = useTranslation();
   const consent = useChildConsentStatus(childProfileId);
   const revokeConsent = useRevokeConsent(childProfileId);
-  const restoreConsent = useRestoreConsent(childProfileId);
+  const restoreConsent = useRestoreConsent();
   const [error, setError] = useState('');
 
   const consentStatus = consent.data?.consentStatus ?? null;
@@ -613,9 +614,10 @@ function ConsentManagementSection({
 
   const handleRestore = (): void => {
     setError('');
-    restoreConsent.mutate(undefined, {
-      onError: (err) => setError(consentMutationErrorMessage(err)),
-    });
+    restoreConsent.mutate(
+      { childProfileId },
+      { onError: (err) => setError(consentMutationErrorMessage(err)) },
+    );
   };
 
   return (
@@ -670,7 +672,10 @@ function ConsentManagementSection({
         </View>
       ) : consent.isLoading ? (
         <View className="py-4 items-start">
-          <ActivityIndicator testID="consent-status-loading" />
+          <ActivityIndicator
+            testID="consent-status-loading"
+            accessibilityLabel={t('common.loading')}
+          />
         </View>
       ) : isWithdrawn ? (
         <View
@@ -704,7 +709,10 @@ function ConsentManagementSection({
             testID="cancel-deletion-button"
           >
             {restoreConsent.isPending ? (
-              <ActivityIndicator testID="cancel-deletion-loading" />
+              <ActivityIndicator
+                testID="cancel-deletion-loading"
+                accessibilityLabel={t('common.loading')}
+              />
             ) : (
               <Text className="text-body font-semibold text-text-inverse">
                 {t('parentView.index.cancelDeletion', {
@@ -726,7 +734,10 @@ function ConsentManagementSection({
           testID="withdraw-consent-button"
         >
           {revokeConsent.isPending ? (
-            <ActivityIndicator testID="withdraw-consent-loading" />
+            <ActivityIndicator
+              testID="withdraw-consent-loading"
+              accessibilityLabel={t('common.loading')}
+            />
           ) : (
             <Text className="text-body font-semibold text-danger">
               {t('parentView.index.withdrawConsent', {
@@ -780,7 +791,7 @@ export default function ChildDetailScreen(): React.ReactElement {
   const { data: childConsentData } = useChildConsentStatus(profileId);
   const consentResolved = childConsentData !== undefined;
   const consentWithdrawn = childConsentData?.consentStatus === 'WITHDRAWN';
-  const restoreConsentForScreen = useRestoreConsent(profileId);
+  const restoreConsentForScreen = useRestoreConsent();
   // [WI-263] Hard-deny until consent is known: do not read the child's learner
   // profile until the consent query has resolved AND is not withdrawn. Gating
   // only on `consentWithdrawn` would still fire the fetch on the first render
@@ -950,7 +961,9 @@ export default function ChildDetailScreen(): React.ReactElement {
           {t('consent.withdrawn.hint', { name: childName })}
         </Text>
         <Pressable
-          onPress={() => restoreConsentForScreen.mutate(undefined)}
+          onPress={() =>
+            restoreConsentForScreen.mutate({ childProfileId: profileId })
+          }
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('consent.withdrawn.requestCta')}

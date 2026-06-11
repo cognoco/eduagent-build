@@ -10,7 +10,7 @@
  * that removing the `scopedWhere` filter from `findRelevant` causes the
  * assertion to fail with a clear cross-profile leakage message.
  *
- * Per CLAUDE.md: "No internal mocks in integration tests."
+ * Per AGENTS.md: "No internal mocks in integration tests."
  * Only external boundary mocked here: none - no LLM calls, no auth.
  */
 
@@ -40,7 +40,7 @@ const DIMS = 1024;
 
 /** Unit vector along axis 0. Used as the query AND Profile B's embedding. */
 const QUERY_VECTOR: number[] = Array.from({ length: DIMS }, (_, i) =>
-  i === 0 ? 1 : 0
+  i === 0 ? 1 : 0,
 );
 
 /** Profile B's embedding is IDENTICAL to the query - cosine distance 0. */
@@ -48,7 +48,7 @@ const PROFILE_B_EXACT: number[] = QUERY_VECTOR.slice();
 
 /** Profile A's embedding is along axis 1 - cosine distance 1 (orthogonal). */
 const PROFILE_A_WEAK: number[] = Array.from({ length: DIMS }, (_, i) =>
-  i === 1 ? 1 : 0
+  i === 1 ? 1 : 0,
 );
 
 const GRANTED_PROFILE = {
@@ -120,7 +120,7 @@ describe('memory_facts cross-profile isolation - getRelevantMemories (I5)', () =
       // -----------------------------------------------------------------------
       const rawCandidates = await scopedA.memoryFacts.findRelevant(
         QUERY_VECTOR,
-        10
+        10,
       );
 
       // Must return at least one row (Profile A's fact exists).
@@ -132,7 +132,7 @@ describe('memory_facts cross-profile isolation - getRelevantMemories (I5)', () =
 
       // Belt-and-suspenders: Profile B's perfect-match text must not appear.
       expect(
-        rawCandidates.map((c) => c.profileId).every((id) => id === profileA)
+        rawCandidates.map((c) => c.profileId).every((id) => id === profileA),
       ).toBe(true);
     } finally {
       // Cascade-delete via accounts (profiles and memoryFacts cascade).
@@ -189,7 +189,7 @@ describe('memory_facts cross-profile isolation - getRelevantMemories (I5)', () =
 
       const rawCandidates = await scopedA.memoryFacts.findRelevant(
         QUERY_VECTOR,
-        10
+        10,
       );
 
       // If scopedWhere is missing, Profile B's row (distance 0) would
@@ -200,7 +200,7 @@ describe('memory_facts cross-profile isolation - getRelevantMemories (I5)', () =
           `CROSS-PROFILE LEAK DETECTED: Profile B row found in Profile A results. ` +
             `Leaked row: id=${leakedRow.id}, profileId=${leakedRow.profileId}, ` +
             `text="${leakedRow.text}", distance=${leakedRow.distance}. ` +
-            `This means scopedWhere was not applied in findRelevant.`
+            `This means scopedWhere was not applied in findRelevant.`,
         );
       }
 
