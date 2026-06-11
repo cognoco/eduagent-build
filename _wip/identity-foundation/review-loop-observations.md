@@ -256,6 +256,20 @@ productionization implication.
   bounce so far: children closed, same Fixed In, merged-on-base, revert-proof,
   child-ids-in-PR-body, Completed dates.
 
+- **2026-06-11 — review-round convergence measured live (PR #933 / WI-578) and
+  the 3-round cap exercised.** Four gate rounds, each finding defects ONLY in
+  the previous round's new code (round 1: 3 findings on the base diff; round
+  2: 1 should-fix + 3 minors on round-1 code; round 3: 1 should-fix on
+  round-1 code). The series converges — each round's diff shrinks — but the
+  whack-a-mole tail is real. At the cap the shepherd made the severity call:
+  the final should-fix (business logic in an Inngest file, pure placement)
+  could not be waived because the operator's merge-gate ruling demands zero
+  unresolved should-fixes, so it became one surgical move-only round with a
+  hard scope fence ("no logic changes; ignore any further review output").
+  *Production:* the cap's exit must be exactly this — shepherd severity call
+  with a scope-fenced final round or an explicit operator waiver lane; and
+  large WPs (28 files) should expect 3-4 rounds as the norm, not a smell.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no
