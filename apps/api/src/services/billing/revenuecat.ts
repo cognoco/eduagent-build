@@ -130,19 +130,23 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
   },
   _quota: RevenuecatQuotaUpdate,
 ): Promise<AppliedSubscriptionRow | null> {
-  // [F-124] Read the previous tier before the transaction so we can detect a
-  // quota-model change and re-attribute top-up credits inside the transaction.
-  // Uses the scoped repo (reads by accountId, owner-restricted) — safe because
-  // the caller (RevenueCat webhook handler) already validated accountId.
-  const repo = createAccountRepository(db, accountId);
-  const existing = await repo.subscriptions.findFirst();
-  const previousTier = existing?.tier;
-
   let reattributedCount = 0;
+  let previousTier: SubscriptionTier | undefined;
   const now = new Date();
 
   const result = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+
+    // [F-124] Read the previous tier INSIDE the transaction so the
+    // tier-change detection and the credit re-attribution below are coherent
+    // with the row this transaction updates — a concurrent webhook for the
+    // same account cannot make the compare-and-reattribute act on a stale
+    // tier. Scoped repo read (by accountId, owner-restricted); the caller
+    // (RevenueCat webhook handler) already validated accountId.
+    const repo = createAccountRepository(txDb, accountId);
+    const existing = await repo.subscriptions.findFirst();
+    previousTier = existing?.tier;
+
     const updated = await applySubscriptionUpdateFromRevenuecat(
       txDb,
       accountId,

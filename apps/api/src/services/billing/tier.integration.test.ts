@@ -26,6 +26,7 @@ import {
   handleTierChange,
   buildTopUpCreditsReattributedEventData,
 } from './tier';
+import { updateSubscriptionAndQuotaFromRevenuecatWebhook } from './revenuecat';
 import { getTierConfig } from '../subscription';
 
 // ---------------------------------------------------------------------------
@@ -615,5 +616,136 @@ describe('topup_credits.reattributed event schema coherence', () => {
     expect(data.previousModel).toBe('shared-pool');
     expect(data.newModel).toBe('per-profile');
     expect(data.occurredAt).toBe('2026-06-11T00:00:00.000Z');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [F-124] RevenueCat webhook path — credit re-attribution end-to-end
+// ---------------------------------------------------------------------------
+//
+// The RevenueCat PRODUCT_CHANGE / tier-changing RENEWAL path goes through
+// updateSubscriptionAndQuotaFromRevenuecatWebhook, NOT handleTierChange
+// (Codex P1 on PR #876). These tests exercise that path end-to-end,
+// including the in-transaction previous-tier read (reviewer rework finding:
+// the read must be coherent with the row the transaction updates).
+
+describe('[F-124] RevenueCat webhook path re-attributes top-up credits', () => {
+  it('family (shared-pool) to plus (per-profile) via webhook: null credits re-attributed to owner', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('rc-family-to-plus');
+    const owner = await seedProfile({
+      accountId: acct.id,
+      displayName: 'Owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscriptionWithQuota({
+      accountId: acct.id,
+      tier: 'family',
+    });
+    await seedTopUpCredit({
+      subscriptionId: sub.id,
+      profileId: null,
+      amount: 500,
+      remaining: 300,
+    });
+
+    const result = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      db,
+      acct.id,
+      { eventId: 'evt-rc-f124-downgrade', tier: 'plus' },
+      { monthlyQuota: getTierConfig('plus').monthlyQuota, dailyLimit: null },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('plus');
+
+    const credits = await loadTopUpCredits(sub.id);
+    expect(credits.length).toBe(1);
+    expect(credits[0]!.profileId).toBe(owner.id);
+  });
+
+  it('plus (per-profile) to family (shared-pool) via webhook: owner credits nullified', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('rc-plus-to-family');
+    const owner = await seedProfile({
+      accountId: acct.id,
+      displayName: 'Owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscriptionWithQuota({
+      accountId: acct.id,
+      tier: 'plus',
+    });
+    await seedTopUpCredit({
+      subscriptionId: sub.id,
+      profileId: owner.id,
+      amount: 500,
+      remaining: 250,
+    });
+
+    const result = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      db,
+      acct.id,
+      { eventId: 'evt-rc-f124-upgrade', tier: 'family' },
+      { monthlyQuota: getTierConfig('family').monthlyQuota, dailyLimit: null },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('family');
+
+    const credits = await loadTopUpCredits(sub.id);
+    expect(credits.length).toBe(1);
+    expect(credits[0]!.profileId).toBeNull();
+  });
+
+  it('duplicate webhook delivery (same eventId) does not re-run re-attribution side effects', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('rc-duplicate-event');
+    const owner = await seedProfile({
+      accountId: acct.id,
+      displayName: 'Owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscriptionWithQuota({
+      accountId: acct.id,
+      tier: 'family',
+    });
+    await seedTopUpCredit({
+      subscriptionId: sub.id,
+      profileId: null,
+      amount: 500,
+      remaining: 100,
+    });
+
+    const updates = {
+      eventId: 'evt-rc-f124-dup',
+      tier: 'plus' as const,
+    };
+    const quota = {
+      monthlyQuota: getTierConfig('plus').monthlyQuota,
+      dailyLimit: null,
+    };
+
+    const first = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      db,
+      acct.id,
+      updates,
+      quota,
+    );
+    expect(first!.webhookApplied).toBe(true);
+
+    // Duplicate delivery — idempotency stamp short-circuits before the
+    // re-attribution block (webhookApplied=false branch).
+    const second = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      db,
+      acct.id,
+      updates,
+      quota,
+    );
+    expect(second!.webhookApplied).toBe(false);
+
+    const credits = await loadTopUpCredits(sub.id);
+    expect(credits.length).toBe(1);
+    expect(credits[0]!.profileId).toBe(owner.id); // attributed once, stable
   });
 });
