@@ -212,10 +212,12 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 
 - **W0 is fully done on the patch side:** WI-549/550 Closed/Done (PRs #817/#818,
   merged 2026-06-10) and WI-551 Closed/Done (`c5c9b39bb`, resolved 2026-06-10).
-- **WI-530 gate: operator-waived 2026-06-10.** WI-530 itself is still open in
-  Cosmo (Backlog, 15 open blockers), but the operator has waived waiting for the
-  rewrite's execution start — W1 proceeds **shepherded** (a shepherd session runs
-  pick/refine/brief/track; executors in isolated worktrees).
+- **WI-530 gate: substantively MOOT as of 2026-06-11.** PR #832 (the Harness-
+  Hygiene pipeline-tail rewire, WI-530's program) merged to main; shepherd
+  verified the branch-protection required checks (`main`, `Playwright web
+  smoke`, `API Quality Gate`) still match the rewired workflows. The original
+  operator waiver (2026-06-10) carried execution until then. WI-530's own close
+  belongs to its workstream, not this one.
 - **In execution: WI-569 (baseline reset)** — PR #845 GREEN (9/9 checks, commit
   `3fd5b85c8`); chain shape shepherd-verified against MMT-ADR-0012 + master plan
   (0106 AND 0107 out of the journal, 0108 single baseline; legacy tables retained
