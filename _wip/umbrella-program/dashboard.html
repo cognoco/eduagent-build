@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>IF tail scope finding</b> — the app cutover was hidden in WI-586; executor plan-stop caught it pre-code; <b>split ruling with operator</b> · PRG-15 slice complete (graduation candidate) · PRG-12 rolling · PRG-10 + PRG-13 gates open · 1 ruling on Zuzka's desk (WI-587).</span>
+  <span class="txt"><b>Right now:</b> <b>IF cutover plan in design</b> — split ruled; dedicated planning session running against <code>cutover-planning-brief.md</code> (seed: <code>wi586-scope-report.md</code>); IF shepherd holding; ratification next · <b>PRG-15 GRADUATED 06-11</b> (second graduation — whole slice closed within a day of activation) · PRG-12 rolling (4/8 closed, 2 executing) · CI incident resolved: nothing code-broken (flake + transient; reruns green) — chronic staging-KV deploy red captured as <b>WI-664</b> · WI-587 on Zuzka's desk.</span>
 </div>
 
 <nav>
@@ -592,7 +592,7 @@ const QUEUE = [
   ["2","PRG-14","Agent instructions","Light fixes: now · skill-building: after doc convergence (PRG-03/B4)"],
   ["3","PRG-02","Harness Hygiene — residue batch","HH PR merged (G1)"],
   ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
-  ["5","PRG-15","Error handling","✅ ACTIVATED 06-11 — third parallel lane (WI-639/640/641)"],
+  ["5","PRG-15","Error handling","✓ GRADUATED 06-11 — activation → graduation inside a day (WI-639/640/641)"],
   ["6","PRG-13","Background-job security","✅ gate FIRED 06-11 (G4) — activation is an attention-budget call"],
   ["7","PRG-10","API security","✅ both gates FIRED (G2 + G4) — activation is an attention-budget call"],
   ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
@@ -603,7 +603,7 @@ const QUEUE = [
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired) — BUT the app still runs on legacy tables: the cutover was hidden inside WI-586's scope. Executor plan-stop caught it; split ruling with operator.",
+  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired) — BUT the app still runs on legacy tables: the cutover was hidden inside WI-586's scope. Split RULED 06-11; dedicated planning session designing the cutover plan (CUT-A schema deltas · reader map · PR partition · convergence runbook). Shepherd holding; ratification + Cosmo re-slice at program level next.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
@@ -612,7 +612,7 @@ const INIT = [
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
     {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"done", note:"All six CLOSED 06-11 — fired G4 (and the envelope-router boundary event for PRG-15)."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
-    {n:"Clean-cut tail · cutover + drop", s:"2 units → likely 4", m:"human", st:"go", note:"WI-585 first reseed CLOSED; WI-586 plan-stop found the full app cutover hiding in 'drop' scope (~80 files). Split ruling with operator: CUT-A (additive) → CUT-B (reader cutover, legacy live) → shrunk drop. Fires G5."}
+    {n:"Clean-cut tail · cutover + drop", s:"2 units → likely 4–6", m:"human", st:"go", note:"WI-585 first reseed CLOSED; WI-586 PAUSED. Split RULED: CUT-A (additive) → CUT-B (reader cutover, legacy live) → shrunk drop. Planning session designing the full plan now (brief: cutover-planning-brief.md · seed: wi586-scope-report.md). Fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
 
@@ -651,16 +651,16 @@ const INIT = [
 
 { id:"PRG-12", name:"UI language & accessibility", accent:"var(--teal)", lane:"now", status:"active", q:"#1",
   tagline:"358 hardcoded English strings, silent screen-readers, 13 modals without focus management. The first parallel lane — now open.",
-  owner:"Agent-heavy, low supervision", gate:"ACTIVATED 06-11 — tracker + Workstream + 8 WPs (WI-621…628) sliced; shepherd session next.",
+  owner:"Agent-heavy, low supervision", gate:"Shepherd live — 4 of 8 WPs CLOSED through the autonomous loop (WI-621/622/626/627); WI-623 + WI-625 executing.",
   outcome:"Every user-visible string through translation, screen-reader parity on core flows, pluralization & dates locale-correct. 34 findings.",
   bundles:[
-    {n:"WI-621 · JSX/auth strings sweep", s:"5 findings · ~358 strings", m:"agent", st:"go", note:"P1. Ratchet baseline (361) is the burn-down list."},
+    {n:"WI-621 · JSX/auth strings sweep", s:"5 findings · ~358 strings", m:"agent", st:"done", note:"P1. CLOSED 06-11 (sub-sliced; PRs #942/#961) — ratchet burn-down landed."},
     {n:"WI-622 · Screen-reader announcements", s:"5 findings", m:"agent", st:"done", note:"P1. CLOSED 06-11 — first PRG-12 WP through the full autonomous loop."},
     {n:"WI-623 · Modal focus & roles", s:"5 findings", m:"agent", st:"go"},
     {n:"WI-624 · A11y-label / prop strings", s:"3 findings", m:"agent", st:"go"},
     {n:"WI-625 · Pluralization model", s:"2 findings", m:"agent", st:"go"},
-    {n:"WI-626 · Mobile logic bugs", s:"7 findings", m:"mixed", st:"go", note:"Incl. F-123 removal + F-172 (ruled to stay)."},
-    {n:"WI-627 · Dates & locale", s:"4 findings", m:"agent", st:"go"},
+    {n:"WI-626 · Mobile logic bugs", s:"7 findings", m:"mixed", st:"done", note:"CLOSED 06-11 — reviewer bounce on red main; CI rerun proved the red a flake, closure stands."},
+    {n:"WI-627 · Dates & locale", s:"4 findings", m:"agent", st:"done", note:"CLOSED 06-11."},
     {n:"WI-628 · Decorative / low-vision", s:"3 findings", m:"agent", st:"go"}
   ],
   homes:["_wip/l10n-a11y/execution-tracker.md (THE entry point)","Cosmo Workstream: L10n & A11y Mobile","L-gap-delta.md (per-finding)"]},
@@ -706,9 +706,9 @@ const INIT = [
   ],
   homes:["activation-planning.md §2 PRG-13 (charter)","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-15", name:"Error handling", accent:"var(--green)", lane:"now", status:"slice complete", q:"#5",
+{ id:"PRG-15", name:"Error handling", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#5",
   tagline:"Silent catch blocks in billing & consent code, errors misclassified into wrong status codes. Activated and DELIVERED in one night.",
-  owner:"Agent-sweep; typed-error work reviewed", gate:"ALL 3 UNITS CLOSED 06-11 (same night as activation) — graduation candidate, awaiting operator ruling.",
+  owner:"Agent-sweep; typed-error work reviewed", gate:"GRADUATED 06-11 — all 3 units closed within a day of activation; the program's second graduation and fastest full cycle. Shepherd standing down.",
   outcome:"No silent failures in money/auth/consent paths; errors classified once, at the boundary; 8 findings closed.",
   bundles:[
     {n:"WI-639 · Catch-block hygiene", s:"4 findings", m:"agent", st:"done", note:"CLOSED 06-11 — banned silent-recovery patterns in billing/consent/webhook fixed."},

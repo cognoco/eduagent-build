@@ -191,7 +191,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   `_wip/l10n-a11y/execution-tracker.md`.
 - **Activate-when:** — (active)
 
-### PRG-15 · API Error Handling — `active` (2026-06-11)
+### PRG-15 · API Error Handling — `✓ graduated` (2026-06-11)
 - **Outcome:** all 8 `errors-api` audit findings resolved — silent-failure catch
   blocks logged/escalated (billing/consent/webhook silent-recovery ban enforced),
   typed-error classification fixed at API boundaries (incl. the JWKS auth path),
@@ -207,13 +207,13 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   evening its gate fired; both charter open questions resolved/mooted by the
   gate event. **Shepherd SPAWNED 2026-06-11 (night)**, autonomous mandate;
   reviewer-watcher coverage verified on arrival.
-- **Execution state:** **SLICE COMPLETE 2026-06-11 (same night as activation)
-  — all 3 units Closed/Done** (`WI-639` catch-hygiene, `WI-640` typed-errors,
-  `WI-641` mobile-classification), every close via the autonomous review loop.
-  The 8 findings' outcome bar is met pending the shepherd's final tracker
-  checkpoint. **GRADUATION CANDIDATE — awaiting operator ruling.** Live state:
-  Cosmo + `_wip/errors-api/execution-tracker.md`.
-- **Activate-when:** — (active)
+- **Execution state:** **GRADUATED 2026-06-11 (operator ruling)** — all 3 units
+  Closed/Done (`WI-639` catch-hygiene, `WI-640` typed-errors, `WI-641`
+  mobile-classification), every close via the autonomous review loop; whole
+  slice closed within a day of activation. The program's **second graduation**
+  and fastest full cycle. Shepherd standing down after its final tracker
+  checkpoint + residue statement (expected: none — slice was the full charter).
+- **Activate-when:** — (graduated)
 
 ---
 
@@ -341,7 +341,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
 | 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
-| 5 | **PRG-15** errors-api | ✅ **ACTIVATED 06-11** (same evening its gate fired — envelope-router `WI-581` Closed) |
+| 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
 | 6 | **PRG-13** security-pii-inngest | ✅ gate **FIRED 06-11 late** (G4) — activation = attention-budget call; F-028/F-091 subsumption scan at activation |
 | 7 | **PRG-10** security-pii-api | ✅ **both gates FIRED** (safe subset G2; auth/PII remainder G4 06-11 late) — activation = attention-budget call |
 | 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
@@ -391,6 +391,33 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-11 (late) — PRG-15 GRADUATED (second graduation, fastest cycle).**
+  Operator ruling on program-session recommendation: all 3 units closed via the
+  autonomous review loop within a day of activation; slice = full charter, no
+  planned residue. Shepherd standing down after final checkpoint + residue
+  statement. Same window: **cross-stream CI incident resolved** — PRG-12
+  shepherd's "mis-scoped PR #931 broke main" theory disproven at CI step level
+  (the PR is a clean comment sweep; the mobile-test red was a one-off flake,
+  rerun green; the integration red a transient LLM upstream, rerun green;
+  WI-626's closure stands). The one real item — chronic staging-deploy red,
+  missing `IDEMPOTENCY_KV` binding in `[env.staging]` — captured as **WI-664**
+  (Bug, P1; needs Cloudflare-credentialed actor; until fixed, staging E2E
+  validates stale builds). PRG-12 meanwhile at **4/8 closed**
+  (`WI-621`/`622`/`626`/`627`), `WI-623` + `WI-625` executing.
+- **2026-06-11 (late) — IF cutover gap: split RULED, planning session
+  commissioned.** The WI-586 executor plan-stop finding (app cutover hidden in
+  the "drop" scope; ~80 runtime files, both payment webhooks, 22 Inngest
+  functions, consent-request gap, 57 FKs, ~190 test files) ruled by operator:
+  **SPLIT** into CUT-A (additive model completion) → CUT-B (domain-wise reader
+  cutover under the single-live-store invariant) → shrunk WI-586 (atomic
+  convergence: freeze → reseed → verify → flip → drop → full legacy
+  retirement). Design routed to a **dedicated planning session** (brief:
+  `_wip/identity-foundation/cutover-planning-brief.md`, hardened by
+  adversarial review; seed: `wi586-scope-report.md`, the executor report
+  landed durably by the IF shepherd). WI-586 PAUSED; shepherd holding;
+  ratification + Cosmo re-slice happen at program level when the plan doc
+  lands. Lesson memorialized: `feedback_plan_cutover_ownership.md`
+  (switch-flip check at every plan ratification).
 - **2026-06-11 (late night) — G4 FIRED: the IF rewrite proper is BUILT.**
   `WI-578` (pii-step-state) Closed → W3 6/6 → **every wave W0–W4 fully
   Closed** (36 units start-to-finish in ~2 days). Consequences: **PRG-10
