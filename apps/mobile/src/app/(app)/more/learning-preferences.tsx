@@ -6,7 +6,10 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useProfile } from '../../../lib/profile';
-import { useLearnerProfile } from '../../../hooks/use-learner-profile';
+import {
+  useChildLearnerProfile,
+  useLearnerProfile,
+} from '../../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../../lib/accommodation-options';
 import { goBackOrReplace } from '../../../lib/navigation';
 import {
@@ -30,7 +33,12 @@ export default function LearningPreferencesScreen(): React.ReactElement {
     : undefined;
   const childName = childProfile?.displayName;
 
-  const { data: learnerProfile } = useLearnerProfile();
+  // F-163: in child mode, fetch the child's profile — not the active (parent's).
+  const selfQuery = useLearnerProfile();
+  const childQuery = useChildLearnerProfile(
+    isChildMode ? childProfileId : undefined,
+  );
+  const { data: learnerProfile } = isChildMode ? childQuery : selfQuery;
 
   const activeOption = ACCOMMODATION_OPTIONS.find(
     (o) => o.mode === (learnerProfile?.accommodationMode ?? 'none'),
