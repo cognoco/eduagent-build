@@ -70,12 +70,11 @@ describe('toLocalDateString', () => {
   it('same-day case: UTC and local agree when user is UTC or ahead', () => {
     // User in UTC+2 at 10:00 local (08:00 UTC) → both are same date
     const d = new Date('2026-06-15T08:00:00Z');
-    const utcSlice = d.toISOString().slice(0, 10); // '2026-06-15'
     const local = toLocalDateString(d);
     // If test runner is UTC or ahead, both agree. Either way, local uses local components.
     const expectedLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     expect(local).toBe(expectedLocal);
-    // In UTC, same as utcSlice — acceptable
+    // In UTC, same as toISOString().slice(0,10) = '2026-06-15' — acceptable
     // In UTC+2, still same (10:00 local is well within the day)
     // In UTC-9, differs: 23:00 local June 14 → '2026-06-14'
   });
