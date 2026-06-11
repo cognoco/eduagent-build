@@ -134,7 +134,7 @@ overlapping component files — keep adjacent/serial).
 
 | Order | Unit | Coarse status |
 |---|---|---|
-| 1 | WI-621 WP-L12-jsx-strings | in-progress — sub-sliced into 3 serial PRs. PR A #942 gate-passed (Claude APPROVED, Codex P2 split-sentence keys fixed + 4-sibling sweep), rebased over #940, CI re-running on `b6443ba0b`. Baseline 361→272 after PR A |
+| 1 | WI-621 WP-L12-jsx-strings | in-progress — PR A #942 **MERGED** `684495a2c` (auth+onboarding+shared, 89 strings, baseline 361→272; one advisory claude-review crash, rerun APPROVED). Child WI-634 (F-062/F-026) swept Closed/Done. Group B (session+home+subscription, ~140 strings) building on `WI-621-b` |
 | 2 | WI-622 WP-L12-sr-announcements | **done** — PR #940 merged `ce8b10ab9`; children WI-635/636 swept; CLOSED Done by autonomous review 2026-06-11 (first WP through the PRG-12 loop, zero human touches) |
 | 3 | WI-623 WP-L12-modal-focus-roles | backlog |
 | 4 | WI-624 WP-L12-label-prop-strings | backlog |
