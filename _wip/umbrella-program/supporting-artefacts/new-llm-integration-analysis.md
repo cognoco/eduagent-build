@@ -1,11 +1,13 @@
 # new-llm Integration Analysis — gap vs main, gap vs the IF cutover, strategy
 
-**Date:** 2026-06-12 · **Status:** v1.2 — twice adversarially reviewed (pass 1: C5
-corrected, items 9–10 added, §7 enforcement; pass 2 by the cutover-context reviewer:
-item 10 made executable, repoint ownership split, S4/S5 re-key promoted to checklist
-item 11, item 5 intersection made dynamic). Verdict both passes: **O2 stands with
-amendments**. Branch FINAL at `6a81f7663` — nothing further in Zuzka's pipeline; §8
-rescan obligation is moot. Strategy recommendation pending operator ruling.
+**Date:** 2026-06-12 · **Status:** v1.3 — three adversarial passes (pass 1: C5
+corrected, items 9–10 added, §7 enforcement; pass 2, cutover-context reviewer: item 10
+executable, repoint ownership split, item 11 added, item 5 dynamic; pass 3, same
+reviewer: version bump REQUIRED not optional, item 5 bidirectional, §8 final rescan of
+the reconciled merge target restored as mandatory). Verdict all passes: **O2 stands
+with amendments** — every finding peripheral to the strategy core. Final feature SHA:
+`6a81f7663`; merge target = that SHA + reconciliation commits, rescanned per §8.
+Strategy recommendation pending operator ruling.
 **Method:** 9-surface sweep workflow (55 agents), every high/medium finding adversarially
 verified (confirmed / adjusted / refuted) by independent re-derivation. Branch state analyzed:
 `origin/new-llm` @ `6a81f7663` (60 ahead / ~11 behind main; merge-base = cutover-plan v1.3
@@ -137,13 +139,17 @@ is the existing one: PR review + CI + the reconciliation checklist below.
 5. **Content-level merge verification as an executable CI invariant (C9):**
    (a) path-level rule — every path in `diff(main, merge)` must appear in
    `diff(merge-base, branch)`; any extra = main content modified by the merge;
-   (b) the both-sides-changed set is **computed at merge time, never from a static
-   list** (pass-2: the v1.1 static list was already stale within hours — main moved;
-   the then-current intersection was `.claude/memory/MEMORY.md`, `AGENTS.md`,
-   `docs/PRD.md`) — every intersecting path gets a named resolution rule, and
-   branch-vs-main divergences in guard/baseline files are checked even when only one
-   side moved since merge-base (the C1 class); (c) runs as a check on the merge PR,
-   recorded in the PR, not a human promise.
+   (b) **bidirectional (pass-3):** every path in `diff(merge-base, branch)` must also
+   survive into the merge result — branch-only files blob-compared merge-vs-branch —
+   except explicit, documented "do not land / replaced by X" exclusions; otherwise a
+   reconciliation that silently drops `routes/now.ts` or `activity-ledger.ts` passes
+   the main-side rule; (c) the both-sides-changed set is **computed at merge time,
+   never from a static list** (pass-2: the v1.1 static list was stale within hours;
+   then-current intersection: `.claude/memory/MEMORY.md`, `AGENTS.md`, `docs/PRD.md`)
+   — every intersecting path gets a named resolution rule, and branch-vs-main
+   divergences in guard/baseline files are checked even when only one side moved since
+   merge-base (the C1 class); (d) runs as a check on the merge PR, recorded in the PR,
+   not a human promise.
 6. Doppler provisioning before the post-merge deploy: `CF_KV_IDEMPOTENCY_ID_DEV/STG/PRD`
    + `SEED_PASSWORD` (+ Cloudflare KV namespaces) — this is the WI-664 fix landing.
 7. **Operator sign-off against a generated, complete per-module behavior-change
@@ -161,11 +167,12 @@ is the existing one: PR review + CI + the reconciliation checklist below.
     job auto-publishes on **every push to main** when mobile changed and natives didn't.
     The merge commit itself skips (native diff in `package.json`), but the **next
     JS-only push** would OTA stale binaries built against the old native majors. Prose
-    "no OTA" is not a gate. Executable fix, in the merge itself: **bump
-    `apps/mobile/app.json` `version`** (runtimeVersion policy = appVersion → stale
-    binaries fall outside the OTA target permanently), or add a temporary
-    `OTA_FREEZE` repo-variable guard to the `ota-update` job, lifted only when new EAS
-    builds exist.
+    "no OTA" is not a gate. **Required fix (pass-3): bump `apps/mobile/app.json`
+    `version` in the merge itself** — runtimeVersion policy = appVersion, so the bump
+    permanently excludes stale binaries from the OTA target. An `OTA_FREEZE` repo
+    variable is NOT an equivalent alternative (lifting it "when new builds exist" does
+    not stop old 1.0.0 binaries receiving preview updates); a freeze is acceptable only
+    as a bridge, lifted strictly after the bump has landed.
 11. **Re-key the V2 plans' identity blockers in the merge (pass-2):** S4/S5/S6
     Blocked-by sections still cite the superseded "W1/W2 landed" chain — on post-merge
     main those tables exist but are NOT live until the flip. Rewrite to "post-IF-flip +
@@ -204,8 +211,14 @@ ratification folds the C3/C4/C5 deltas → S4/S5 re-key to post-flip (C-plans).
    legitimately burned); `AGENTS.md`/workflows resolve main-wins. The enforceable form is
    the post-merge checker run, not merge-commit prose.
 
-## §8 Rescan obligation — MOOT
+## §8 Final rescan — MANDATORY (pass-3 corrected; "moot" was wrong)
 
-The branch is final at `6a81f7663` (operator confirmation 2026-06-12: everything in
-transit had already landed before the audit ran). No rescan needed; any future commit to
-the branch re-opens this section.
+`6a81f7663` is the final **feature** SHA (operator confirmation 2026-06-12), but the
+reconciliation checklist (items 1–4, 9–11) adds commits to the branch — the merge target
+is therefore `6a81f7663` + reconciliation commits, which is NOT the SHA this analysis
+audited. Before operator approval of the actual merge: (1) a **diff-only rescan of
+`6a81f7663..<final reconciled SHA>`** against the nine lenses (expected small — the
+reconciliation commits are themselves checklist-prescribed); (2) a main-drift check —
+main was already 18 commits past the merge-base at v1.2; if main moves materially
+(schema, migrations, guard files, CUT-A landing), the collision matrix gets a delta
+review against the new main too.
