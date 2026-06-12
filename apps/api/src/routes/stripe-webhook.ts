@@ -31,6 +31,7 @@ import { claimWebhookId } from '../services/webhook-idempotency';
 
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
+import { recordSignatureFailure } from '../services/stripe/signature-failure-escalator';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
 
@@ -92,6 +93,10 @@ export const stripeWebhookRoute = new Hono<{
       event: 'stripe.webhook.signature_verification_failed',
       reason: err instanceof Error ? err.message : String(err),
     });
+    // Rate-limited escalation: a single failure stays log-only; sustained
+    // failures within the window fire exactly one deduplicated Sentry event.
+    // Per-isolate best-effort — see signature-failure-escalator.ts header.
+    recordSignatureFailure();
     return apiError(
       c,
       400,
