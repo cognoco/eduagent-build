@@ -105,10 +105,11 @@ above uses the calm/invitational register; the assertiveness dial is unruled
 *She saw "homework help — get your evenings back, know how school is going." She
 installs first.*
 
-⚠️ **Availability inversion (SURPRISE 1):** everything in this scene is **S4/S5 —
-the identity-blocked back half**. If V2 launches at S1–S3, Petra's experience is
-the **legacy V1 surfaces** (parent home, Recaps tab, proxy mode) — functional, but
-none of what follows. This scene is the *designed* state.
+**Build-order note (SURPRISE 1, re-scoped):** everything in this scene is **S4/S5 —
+the back half of the build order**, gated on the identity cutover. *Ruled 2026-06-12:
+launch waits for the full build*, so the once-flagged "S1–S3 launch on legacy V1
+surfaces" state is off the table — **this designed scene IS Petra's launch
+experience**; S4/S5 only land later in construction.
 
 Her Mentor tab shows the **variant-zero anchor**: `[ + Add my child ]`, with
 positive-only trust copy (spec §3.2):

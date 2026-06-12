@@ -29,10 +29,13 @@
 - **Nothing blocks S1/S2 construction.** §13.7 touches S1 copy only; one ruling
   ("calm default, yes") clears it. The real S1 holds are process, not decisions:
   the new-llm→main merge (PRG-17) and WI-678's plan-set re-key.
-- **§13.6 blocks S3+** — and via SURPRISE 1, the launch's parent-promise schedule
-  too: S4/S5 sit behind both the evidence gate and the identity cutover. Ruling
-  §13.6 as observed-cohort evidence (Bet Sheet) is the single highest-leverage
-  decision on this list.
+- **§13.6 blocks S3+** — S4/S5 sit behind both the evidence gate and the identity
+  cutover. Ruling §13.6 as observed-cohort evidence (Bet Sheet) is the single
+  highest-leverage decision on this list.
+- **Ruled 2026-06-12: launch waits for the full build.** No S1–S3 launch, no
+  "parent insight rides V1 surfaces" launch state — that fork (SURPRISE 1's
+  launch half) is closed. The evidence gate remains an *internal* checkpoint on
+  the back half, not a launch-sequencing decision.
 - **§13.1 blocks only deletions** at the very end. **§13.3/§13.5** block nothing now.
 
 ## Previously-asked questions, now closed by this dossier

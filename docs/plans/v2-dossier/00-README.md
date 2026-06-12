@@ -17,6 +17,7 @@
 | `01-day-in-the-life.md` | "What will it actually feel like?" — four honest scripted scenes (teen day one, teen day eight, parent day one, parent week one), with every gap marked |
 | `02-what-dies-in-user-terms.md` | "What will I notice missing, and where did its job go?" — code-verified |
 | `03-decision-ledger.md` | "What must I still decide, what does each block, and what's the recommendation?" |
+| `04-reels.html` | **Layer 2** — the clickable walkthrough of the V2 shell (open in any browser). All four scenes + free-roam shell screens; gaps 1–3 given concrete PROPOSAL frames; §13.4 name toggle and §13.7 tone toggle built in; the §2.1 noticing loop animated |
 
 ## The headline surprises (found 2026-06-12)
 
@@ -39,6 +40,13 @@ no-regress already guarantees those surfaces stay alive), but it must be a *chos
 state, not a discovered one. The Bet Sheet (Layer 3) and the launch sequencing
 decision should treat "parent insight at launch = V1 surfaces" as the explicit
 default until S4/S5 are scheduled.
+
+> **Ruled 2026-06-12 (product owner): launch waits for the full build.** There is
+> no S1–S3 launch and no "parent insight on V1 surfaces" launch state. SURPRISE 1
+> therefore reduces to a **build-order fact** — the parent half lands last, after
+> the identity cutover — not a launch decision. The §11 evidence gate stays as an
+> *internal* go/no-go checkpoint on the back half (measured on the observed
+> cohort, per the §13.6 recommendation), decoupled from launch.
 
 ### SURPRISE 2 — The S2→S3 evidence gate has no audience and no metric
 
