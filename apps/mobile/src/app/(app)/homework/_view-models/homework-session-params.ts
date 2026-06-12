@@ -1,4 +1,5 @@
 import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
+import type { TFunction } from 'i18next';
 
 import { serializeHomeworkProblems } from '../../../../components/homework/problem-cards';
 
