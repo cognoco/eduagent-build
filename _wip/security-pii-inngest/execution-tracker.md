@@ -153,3 +153,30 @@ shepherd chooses, but small enough to run serially.
   after WP closes. **WI-666 executor dispatched** (wi666-executor; same protocol
   + lessons: incremental commits, explicit worktree-directed first /commit, no
   bare drizzle-kit generate, plan-phase stop).
+- 2026-06-12 ~11:25 — Autonomous review of WI-665 BOUNCED it (rework,
+  Reviewing→Executing): all code-evidence DoD passed, sole blocker "children not
+  closed" (WI-638/667/668/669 at Captured). Shepherd adjudicated as reviewer
+  misfire: absorbed-provenance children are bulk-closed BY the close ceremony
+  (close.ts WP bulk-close; WI-578→WI-606/607 precedent). Adjudication comment
+  posted on the WP page; executor re-claiming + re-running `complete` to return
+  it to Reviewing for a second pass. **Productization observation for the review
+  loop (feed to review-loop-reviewer-observations.md owners): reviewer manual
+  checklist needs an explicit rule — open absorbed-provenance children are NOT a
+  WP DoD gap; disposition done + close handles them.**
+- 2026-06-12 ~11:30 — WI-666 plan-phase stop reviewed: APPROVED with F-162
+  design correction (max-successful cursor → longest-successful-PREFIX cursor;
+  mid-slice red test; zero-progress livelock guard with Sentry escalation;
+  sibling-backfill sweep check) + F-174 constraints (finalize keeps card-id WHERE
+  + profile protection, idempotent, partial-state semantics documented) + F-094
+  combined-ALS approved. Executor implementing.
+- 2026-06-12 ~11:40 — **WI-665 UNIT COMPLETE.** Second autonomous review pass
+  applied `done` (fresh local validation: 5 suites/51 tests + RLS 7 tests + tsc +
+  lint, all green) → WP `Closed/Done`. Children gap: review.ts's done path does
+  NOT run close.ts's WP bulk-close, leaving WI-638/667/668/669 at Captured —
+  shepherd replicated close.ts child semantics exactly via REST (Closed/Done,
+  parent Fixed In, date backfill, "Closed via WP WI-665." comment on each).
+  Worktree `.worktrees/WI-665` removed, branch deleted (merged). **Second
+  productization observation: review-close vs close-ceremony gap — a WP closed
+  via review.ts strands its children; either review's done path must invoke the
+  bulk-close or the watcher prompt must direct reviewers to run close.ts for
+  WPs.** F-028/F-091/F-090 remediated in production code (PR #1030).
