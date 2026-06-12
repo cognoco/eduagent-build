@@ -2,6 +2,7 @@
 name: No jargon — clear plain language for all ages
 description: All UI text must be instantly clear to any learner — 10-year-old or university student. No app jargon. Use moment-based language people actually think in ("I have homework", "Help me study for a test").
 type: feedback
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 
 The app uses developer/product jargon that's unclear to real users:

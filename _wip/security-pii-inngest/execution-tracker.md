@@ -153,3 +153,62 @@ shepherd chooses, but small enough to run serially.
   after WP closes. **WI-666 executor dispatched** (wi666-executor; same protocol
   + lessons: incremental commits, explicit worktree-directed first /commit, no
   bare drizzle-kit generate, plan-phase stop).
+- 2026-06-12 ~11:25 — Autonomous review of WI-665 BOUNCED it (rework,
+  Reviewing→Executing): all code-evidence DoD passed, sole blocker "children not
+  closed" (WI-638/667/668/669 at Captured). Shepherd adjudicated as reviewer
+  misfire: absorbed-provenance children are bulk-closed BY the close ceremony
+  (close.ts WP bulk-close; WI-578→WI-606/607 precedent). Adjudication comment
+  posted on the WP page; executor re-claiming + re-running `complete` to return
+  it to Reviewing for a second pass. **Productization observation for the review
+  loop (feed to review-loop-reviewer-observations.md owners): reviewer manual
+  checklist needs an explicit rule — open absorbed-provenance children are NOT a
+  WP DoD gap; disposition done + close handles them.**
+- 2026-06-12 ~11:30 — WI-666 plan-phase stop reviewed: APPROVED with F-162
+  design correction (max-successful cursor → longest-successful-PREFIX cursor;
+  mid-slice red test; zero-progress livelock guard with Sentry escalation;
+  sibling-backfill sweep check) + F-174 constraints (finalize keeps card-id WHERE
+  + profile protection, idempotent, partial-state semantics documented) + F-094
+  combined-ALS approved. Executor implementing.
+- 2026-06-12 ~11:40 — **WI-665 UNIT COMPLETE.** Second autonomous review pass
+  applied `done` (fresh local validation: 5 suites/51 tests + RLS 7 tests + tsc +
+  lint, all green) → WP `Closed/Done`. Children gap: review.ts's done path does
+  NOT run close.ts's WP bulk-close, leaving WI-638/667/668/669 at Captured —
+  shepherd replicated close.ts child semantics exactly via REST (Closed/Done,
+  parent Fixed In, date backfill, "Closed via WP WI-665." comment on each).
+  Worktree `.worktrees/WI-665` removed, branch deleted (merged). **Second
+  productization observation: review-close vs close-ceremony gap — a WP closed
+  via review.ts strands its children; either review's done path must invoke the
+  bulk-close or the watcher prompt must direct reviewers to run close.ts for
+  WPs.** F-028/F-091/F-090 remediated in production code (PR #1030).
+- 2026-06-12 ~12:1x — **WI-666 UNIT COMPLETE → CHARTER COMPLETE.** PR #1045
+  merged (`f0d122de5`): F-174 claim-before-grade split, F-162
+  longest-successful-prefix cursor + zero-progress livelock guard (mid-slice +
+  tail + livelock tests), F-094 combined-ALS env bindings (12 singletons
+  removed). Sibling sweep: embed-backfill already safe (BUG-366),
+  filing-stranded structurally unaffected. Review triage: 1 CONSIDER rejected
+  with rationale, CodeRabbit 0 actionable. Autonomous review applied `done` on
+  the FIRST pass (the pre-review children note on the WP page prevented a repeat
+  bounce). Children WI-670/671/672 bulk-closed via shepherd ceremony; worktree +
+  branch removed.
+
+## 6. Charter outcome (2026-06-12)
+
+All 6 `security-pii-inngest` findings remediated and closed: F-028 (2 legs) /
+F-091 / F-090 via WI-665 → PR #1030 (`b7de23fdf`); F-094 / F-162 / F-174 via
+WI-666 → PR #1045 (`f0d122de5`). Both WPs `Closed/Done` through the autonomous
+review loop; all 7 children closed via WP ceremony.
+
+**Standing operator items:**
+1. **Migration `0110` (`feedback_retry_queue`) is merged but NOT applied to
+   staging/production Neon** — apply before/with the next worker deploy
+   (feedback enqueue degrades gracefully until then; retry path inert).
+2. Unshipped schema drift (concepts/identity churn) sits on main —
+   `drizzle-kit generate` bundles it into any new migration; its owners should
+   capture it as a WI.
+3. Review-loop productization findings (for review-loop-reviewer-observations
+   owners): (a) reviewers need an explicit rule that open absorbed-provenance
+   children are not a WP DoD gap; (b) review.ts's `done` path strands WP
+   children — only close.ts runs the bulk-close.
+4. Stray commit `20b06b4c7` (executor /commit forked into main checkout,
+   ambient .cosmo state) — accepted, content benign; commit-skill CWD behavior
+   worth a look by its owners.

@@ -102,6 +102,13 @@ export const memoryFactsBackfill = inngest.createFunction(
     let totalMalformed = 0;
     let totalRowsInserted = 0;
     let totalFailed = 0;
+    // Run-level sort index of the FIRST profile whose transaction errored.
+    // Errored profiles still carry memoryFactsBackfilledAt IS NULL, but a
+    // cursor anchored on the last row of the run would advance past them and
+    // skip them forever — the cursor must stop at the end of the longest
+    // successful prefix instead. Aggregated from step returns (not closures)
+    // because step.run results are memoized across Inngest retries.
+    let firstErroredIndex: number | null = null;
 
     for (
       let index = 0;
@@ -117,8 +124,12 @@ export const memoryFactsBackfill = inngest.createFunction(
           let malformed = 0;
           let rowsInserted = 0;
           let failed = 0;
+          // Offset (within this batch) of the first errored profile, carried
+          // out through the step return so the run-level cursor logic can
+          // compute the longest successful prefix.
+          let firstErroredOffset: number | null = null;
 
-          for (const profileId of batch) {
+          for (const [offset, profileId] of batch.entries()) {
             // [BUG-183] Per-profile try/catch so one corrupt profile cannot
             // tank the whole batch. captureException makes the failure
             // queryable in Sentry — the previous `if (!result) continue`
@@ -176,6 +187,7 @@ export const memoryFactsBackfill = inngest.createFunction(
               }
             } catch (err) {
               failed += 1;
+              if (firstErroredOffset === null) firstErroredOffset = offset;
               // [BUG-183] Structured escalation — no silent recovery. Sentry
               // captures the per-profile failure with context so operators can
               // query how many backfill profiles failed and why.
@@ -195,13 +207,22 @@ export const memoryFactsBackfill = inngest.createFunction(
             }
           }
 
-          return { profiles, malformed, rowsInserted, failed };
+          return {
+            profiles,
+            malformed,
+            rowsInserted,
+            failed,
+            firstErroredOffset,
+          };
         },
       );
       totalProfiles += result.profiles;
       totalMalformed += result.malformed;
       totalRowsInserted += result.rowsInserted;
       totalFailed += result.failed;
+      if (firstErroredIndex === null && result.firstErroredOffset != null) {
+        firstErroredIndex = index + result.firstErroredOffset;
+      }
     }
 
     // [BUG-148] Self-reinvoke when the run was capped, mirroring
@@ -210,24 +231,58 @@ export const memoryFactsBackfill = inngest.createFunction(
     // `memoryFactsBackfilledAt IS NULL AND memoryFactsAnalysedAt IS NULL`
     // filter is the natural ceiling — once every profile has been processed by
     // either path the chain stops because the next query returns no rows.
+    //
+    // The cursor anchors on the end of the LONGEST SUCCESSFUL PREFIX, not the
+    // last row of the run: profiles that errored mid-run keep their NULL
+    // marker, so anchoring past them would silently drop them from the chain.
+    // Anchoring just before the first errored profile re-includes every
+    // errored profile in the next run's query window.
     let selfReinvoked = false;
     if (capped) {
-      const last = profilesThisRun[profilesThisRun.length - 1];
-      if (last) {
-        const nextCursor: BackfillCursor = {
-          lastCreatedAt: new Date(last.createdAt).toISOString(),
-          lastProfileId: last.profileId,
-        };
-        // Cooldown lets the prior run's transactions commit + replication
-        // catch up so the next batch sees the freshly-set
-        // memoryFactsBackfilledAt rows and excludes them via the IS NULL
-        // filter. 1m is generous slack on Neon read replicas.
-        await step.sleep('backfill-cooldown', '1m');
-        await step.sendEvent('continue-memory-facts-backfill', {
-          name: 'admin/memory-facts-backfill.requested',
-          data: nextCursor,
+      if (firstErroredIndex === 0) {
+        // Livelock guard: zero successful prefix — the cursor cannot advance.
+        // Re-invoking would retry the same stuck profile forever, so stop the
+        // chain and escalate. The next manual/cron trigger restarts from the
+        // same cursor once the underlying failure is addressed.
+        const stuck = profilesThisRun[0];
+        const stuckErr = new Error(
+          '[memory-facts-backfill] cursor cannot advance — first profile of the run failed; stopping self-reinvoke chain',
+        );
+        captureException(stuckErr, {
+          extra: {
+            surface: 'memory-facts-backfill',
+            reason: 'cursor_stuck_no_progress',
+            stuckProfileId: stuck?.profileId,
+            erroredCount: totalFailed,
+          },
         });
-        selfReinvoked = true;
+        logger.error('[memory_facts.backfill] cursor stuck — chain stopped', {
+          event: 'memory_facts.backfill.cursor_stuck',
+          stuckProfileId: stuck?.profileId,
+          erroredCount: totalFailed,
+        });
+      } else {
+        const cursorAnchorIndex =
+          firstErroredIndex !== null
+            ? firstErroredIndex - 1
+            : profilesThisRun.length - 1;
+        const last = profilesThisRun[cursorAnchorIndex];
+        if (last) {
+          const nextCursor: BackfillCursor = {
+            lastCreatedAt: new Date(last.createdAt).toISOString(),
+            lastProfileId: last.profileId,
+          };
+          // Cooldown lets the prior run's transactions commit + replication
+          // catch up so the next batch sees the freshly-set
+          // memoryFactsBackfilledAt rows and excludes them via the IS NULL
+          // filter. 1m is generous slack on Neon read replicas.
+          await step.sleep('backfill-cooldown', '1m');
+          await step.sendEvent('continue-memory-facts-backfill', {
+            name: 'admin/memory-facts-backfill.requested',
+            data: nextCursor,
+          });
+          selfReinvoked = true;
+        }
       }
     }
 

@@ -3,6 +3,7 @@ name: UX philosophy — quiet defaults beat both surveillance and friction
 description: User strongly prefers smart auto-defaults over either silent inference (surveillance) or constant explicit choices (friction). Specs should infer from sustained behavior, default sensibly in ambiguous cases, surface controls only when the user reaches for them.
 type: feedback
 originSessionId: 2047c338-9233-4907-8ea0-8142f47547cb
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 The user has now drawn this principle three times across spec reviews (parent-as-lens / profile-as-lens iterations, 2026-04-28 → 2026-04-29). It's a durable preference, not a one-off comment.
 

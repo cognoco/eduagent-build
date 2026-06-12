@@ -2,6 +2,7 @@
 name: When testing flows, track silently — don't narrate
 description: During exploratory / end-user-style testing of flows, do not report intermediate observations. Only keep internal track of flows exercised and bugs found; surface the consolidated list at the end.
 type: feedback
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 
 When the user asks to "test" a feature or flow (e.g. "test all the new quiz functionality"), do NOT narrate each step, screen, or observation. The user does not want a running commentary.

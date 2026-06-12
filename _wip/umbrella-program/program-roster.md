@@ -221,7 +221,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 ---
 
-### PRG-13 · Background-Job Security — `active` (2026-06-11)
+### PRG-13 · Background-Job Security — `✓ graduated` (2026-06-12)
 - **Outcome:** all 6 `security-pii-inngest` audit findings resolved — minors' PII
   out of memoized Inngest step returns and event payloads, env-binding isolation
   across concurrent runs, the cursor-skip and grade-before-claim correctness bugs.
@@ -235,8 +235,43 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   PRG-15's graduation. Both charter OQs resolved at activation: OQ1 subsumption
   scan vs `WI-578` = **partial** (F-028 shrunk 3 functions → 2, freeform-filing
   already fixed; F-091 fully live; scan detail in tracker §3); OQ2 = F-162 stays.
-- **Execution state:** units in Backlog; shepherd kickoff prompt handed to
-  operator. Live state: Cosmo + `_wip/security-pii-inngest/execution-tracker.md`.
+- **Execution state:** **GRADUATED 2026-06-12 (operator ruling)** — both WPs
+  (`WI-665` pii-step-state, `WI-666` config-correctness) Closed/Done via the
+  autonomous review loop; activation → slice-complete in under a day (fastest
+  lane yet). All 6 findings remediated; no exclusions or residue (the only
+  slice-time scope change was the F-028 shrink, a documented reduction). The
+  program's **fourth graduation**. Shepherd standing down after final
+  checkpoint + residue statement.
+- **Activate-when:** — (graduated)
+
+---
+
+### PRG-17 · new-llm Integration (LLM) — `active`
+- **Outcome:** the `origin/new-llm` branch (Zuzka's lane: V2-shell S0 "Now feed" +
+  ~25-module audit-fix batch, FINAL feature SHA `6a81f7663`, all live-on-merge)
+  reconciled and merged to `main` BEFORE IF cutover execution — strategy **O2**
+  ruled by operator 2026-06-12 (analysis v1.4 @ `450e4c522`, four adversarial
+  passes; strategy core survived 4-for-4).
+- **Owner:** Jorn (+ LLM shepherd session; program session orchestrates — Zuzka's
+  lane halted, reconciliation runs through this pipeline; Zuzka gets the exec
+  summary + a courtesy review slot on the merge PR).
+- **Depends-on:** — (parallel-safe vs everything active; it *gates* IF cutover
+  execution: CUT-A generates against the post-merge journal).
+- **Decomposition:** `_wip/new-llm-integration/execution-tracker.md` (charter +
+  unit map + merge gate). Cosmo **Workstream "new-llm Integration &
+  Reconciliation"** (`37d8bce9-1f7c-8145-80ef-cec4b55dcba4`) with
+  **WI-675…682** (6 WPs + 2 Tasks, `Stage=Backlog`, order 1–8): deploy-gate fix
+  (High) · ledger RLS (High) · baselines · ADR/V2-replan · export+OTA ·
+  merge-check · behavior inventory · provisioning (= WI-664 fix landing).
+- **Activated 2026-06-12** — fifth run of the §2.1 recipe, out-of-band of the
+  ratified queue (strategy ruling created the lane). Item 8 of the checklist
+  (account-detachment canon intake) routed to the IF ratification path via the
+  planner hand-off, not this workstream.
+- **Merge gate (program-session-owned):** all units closed → §8 final rescan of
+  the reconciled SHA + main-drift delta (incl. Inngest cross-file semantic
+  check) → operator approval vs the WI-681 inventory → merge with WI-680
+  verification on the merge PR → boundary event "new-llm merged" unlocks IF
+  cutover execution.
 - **Activate-when:** — (active)
 
 ---
@@ -366,12 +401,13 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
 | 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
 | 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
-| 6 | **PRG-13** security-pii-inngest | ✅ **ACTIVATED 06-11** — into the lane PRG-15's graduation freed (WI-665/666; subsumption scan: partial) |
+| 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
 | 7 | **PRG-10** security-pii-api | ✅ **both gates FIRED** (safe subset G2; auth/PII remainder G4 06-11 late) — activation = attention-budget call |
 | 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
 | 9 | **PRG-04** Cosmo top-down delivery layer | orchestrator pull on dogfood evidence (≥1 full Initiative cycle on the IF pattern) |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
+| 12 | **PRG-17** new-llm integration (LLM) | ✅ **ACTIVATED 06-12 out-of-band** (created by the O2 strategy ruling, not the ratified queue) — its merge gate in turn unlocks IF cutover execution |
 
 Attention budget is evaluated per activation window when a gate clears — it is
 never an edge (planning-reference §5.3/§6.3).
@@ -403,6 +439,7 @@ any disagreement this roster and Cosmo win.
 ## Cross-program gates (the edges that matter)
 
 ```
+PRG-17 new-llm Integration  ──("new-llm merged" boundary event)──▶  PRG-01 IF cutover EXECUTION start (CUT-A generates on post-merge journal; cutover *planning* runs in parallel, unblocked)
 PRG-02 Harness Hygiene  ──(WI-530 → WI-533)──▶  SATISFIED + CLOSED 2026-06-11 (PRG-02 graduated)
 PRG-03 operational-memory cleanup  ──(sequenced inside)──▶  PRG-02 (WI-531 → WI-387, both delivered; WI-587 residue ungated)
 PRG-01 IF exported boundary nodes (planning-reference Appendix):
@@ -415,6 +452,29 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-12 — new-llm strategy RULED (O2) + PRG-17 ACTIVATED (fifth lane).**
+  Operator approved the integration analysis's recommendation after four
+  adversarial passes: **merge new-llm first, then run the IF cutover on
+  post-merge main**, gated by the 12-item reconciliation checklist + a final
+  rescan of the reconciled SHA. Reconciliation executes through the program
+  pipeline (Zuzka's lane halted; stakeholder exec summary:
+  `supporting-artefacts/new-llm-integration-exec-summary.md`). Cosmo Workstream
+  "new-llm Integration & Reconciliation" sliced as `WI-675…682` (2 Highs:
+  deploy-gate false-positive that would brick all post-merge deploys; missing
+  RLS on `mentor_activity_ledger`). Two-track sequencing confirmed: cutover
+  *planning* (plan v1.5 → v1.6 delta + approval + WI slicing) runs in parallel;
+  cutover *execution* waits for the merge (CUT-A generates against the
+  post-merge journal). Planner hand-off:
+  `_wip/identity-foundation/cutover-plan-delta-newllm.md`.
+- **2026-06-12 — PRG-13 GRADUATED (fourth graduation, fastest lane).** Operator
+  ruling: `WI-665` + `WI-666` Closed/Done via the autonomous loop, activation →
+  slice-complete in under a day. All 6 `security-pii-inngest` findings
+  remediated (minors' PII out of step state/event payloads, env-binding
+  isolation, cursor-skip + grade-before-claim bugs); zero residue. Clear-out
+  scoreboard: 4 of the 6 audit clear-out initiatives now graduated
+  (PRG-12/13/15 + PRG-02); PRG-10 + PRG-11 remain armed. Live execution: IF
+  (cutover plan v1.1 in revision) + the new-llm integration analysis
+  (sweep workflow resumed after token-cap interruption).
 - **2026-06-12 — PRG-12 GRADUATED (third graduation, largest slice).** Operator
   ruling after program-session verification found nothing needing review:
   all 8 WPs (`WI-621…628`, ~34 findings) Closed/Done via the autonomous loop;

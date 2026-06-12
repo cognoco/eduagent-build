@@ -93,15 +93,60 @@ export async function handleReviewCalibrationGrade({
     return { skipped: 'cooldown_active', sessionId };
   }
 
+  const cooldownThreshold = new Date(eventAt.getTime() - RETEST_COOLDOWN_MS);
+
+  // Claim the cooldown slot BEFORE the paid LLM grade call. Previously the
+  // grade ran first, so losing the CAS claim still burned an LLM call. The
+  // claim is a slim CAS write (timestamps only); the SM-2 fields are written
+  // by finalize-retention-update once the grade is known.
+  //
+  // Partial-state trade: if the claim succeeds but the function permanently
+  // exhausts retries before finalize, the cooldown slot is consumed with the
+  // SM-2 fields unchanged. Accepted — Inngest retries cover the transient
+  // case, and the alternative wastes a paid LLM call on every lost claim.
+  const claimed = await step.run('claim-cooldown-slot', async () => {
+    const db = getStepDatabase();
+    return db
+      .update(retentionCards)
+      .set({
+        lastReviewedAt: eventAt,
+        updatedAt: eventAt,
+      })
+      .where(
+        and(
+          eq(retentionCards.id, card.id),
+          eq(retentionCards.profileId, profileId),
+          or(
+            isNull(retentionCards.lastReviewedAt),
+            lt(retentionCards.lastReviewedAt, cooldownThreshold),
+            // Re-entrancy: lastReviewedAt === eventAt means OUR claim from an
+            // earlier at-least-once execution of this step (eventAt derives
+            // deterministically from the event payload), not a competitor's —
+            // a retry after a lost step checkpoint must not lose its own slot.
+            eq(retentionCards.lastReviewedAt, eventAt),
+          ),
+        ),
+      )
+      .returning({ id: retentionCards.id });
+  });
+
+  if (claimed.length === 0) {
+    return { skipped: 'cooldown_claim_lost', sessionId };
+  }
+
   const quality = await step.run('grade-recall-quality', () =>
     evaluateRecallQuality(learnerMessage, topicTitle),
   );
   const result = processRecallResult(state, quality, eventAt.toISOString());
-  const cooldownThreshold = new Date(eventAt.getTime() - RETEST_COOLDOWN_MS);
 
-  const persisted = await step.run('persist-retention-update', async () => {
+  await step.run('finalize-retention-update', async () => {
     const db = getStepDatabase();
-    return db
+    // Only the cooldown CAS condition is intentionally absent here — the
+    // claim-cooldown-slot step above already holds the slot. The card-id +
+    // profileId conditions remain (explicit profileId write protection).
+    // Idempotent under retry: values derive deterministically from the
+    // state loaded above, the graded quality, and the event timestamp.
+    await db
       .update(retentionCards)
       .set({
         easeFactor: result.newState.easeFactor,
@@ -120,18 +165,9 @@ export async function handleReviewCalibrationGrade({
         and(
           eq(retentionCards.id, card.id),
           eq(retentionCards.profileId, profileId),
-          or(
-            isNull(retentionCards.lastReviewedAt),
-            lt(retentionCards.lastReviewedAt, cooldownThreshold),
-          ),
         ),
-      )
-      .returning({ id: retentionCards.id });
+      );
   });
-
-  if (persisted.length === 0) {
-    return { skipped: 'cooldown_claim_lost', sessionId };
-  }
 
   await step.run('stamp-mastery-on-verify', async () => {
     const db = getStepDatabase();

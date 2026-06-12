@@ -115,15 +115,41 @@ Key skills:
 | systematic-debugging | Any bug, test failure, or unexpected behavior | `.agents/skills/systematic-debugging/SKILL.md` |
 | verification-before-completion | About to claim work is done, fixed, or passing | `.agents/skills/verification-before-completion/SKILL.md` |
 
-<!-- ZDX-PROJECT-RULES:BEGIN v1 -->
-## Cosmo work-item operating rules
+<!-- ZDX-PROJECT-RULES:BEGIN cosmo v1 -->
+## Cosmo work items
 
-Non-negotiable when working any Cosmo Work Item (WI). Each rule is a **trigger → action** — it fires at the named moment **regardless of which skill or entry point** you came through (don't rely on a lifecycle skill's description to carry it).
+This repo's work is tracked in **Cosmo** (the estate work system) under the **ZDX**
+standard. These rules are **trigger → action**: each fires at its named moment,
+regardless of which skill or entry point you arrived through — don't rely on a
+lifecycle skill's description to carry them.
 
-- **Claim before you execute.** WHEN you begin work on a WI (any transition into build/execute mode) → claim it first via the sanctioned execute-side writer (`execute.ts fetch --supervised` + `claim --claimant`) and set `Stage=Executing`, **before any implementation**. Never start unclaimed; if a live claim (`Claimed By` set **and** `Claim Expires > now`) holds it, pick another item.
-- **Complete → Reviewing; never self-close.** WHEN your implementation is done → move the WI to `Stage=Reviewing` with a completion summary and **release your claim**. Do not close it yourself.
-- **Close only via review + QA.** WHEN a WI is to be closed → only through `/cosmo:review` incorporating `/cosmo:qa` verification evidence. No agent-asserted closes.
-- **Reference WIs as ID + name.** WHEN you reference a WI in user-facing output (table, list, prose) → include **both** the `WI-NN` ID **and** a brief name in the same reference (e.g. `WI-529 (Cosmo agent-op rules snippet)`). Format is your judgment — column, inline, list, whatever fits — but both pieces must be present so the reader can act without a lookup. Bare IDs are uncopyable; bare names unactionable. See the ZDX standard's *Agent output conventions* (conformance) for examples.
+- **Claim before you execute.** WHEN you begin work on a Work Item (`WI-NN`) — any
+  transition into build/execute mode → claim it first via `/cosmo:execute claim`
+  (sets `Stage=Executing`, `Started`, and the claim props) **before any
+  implementation**. Never start an unclaimed item; if a live claim holds it
+  (`Claimed By` set **and** `Claim Expires > now`), pick another.
+- **Finalize via `complete`; never self-close.** WHEN the work is committed and
+  pushed → run `/cosmo:execute complete`. It authors `Fixed In` (from the landed
+  commit), the completion summary (lifecycle template: *What was done / What changed
+  / Verification / Caveats / Follow-ups*), the `Stage=Reviewing` transition, and
+  `Resolved`, and settles your claim. It self-gates on the mechanical DoD and refuses
+  to finalize an item missing its close-artifacts — producing them is not optional.
+- **Never hand-edit lifecycle fields.** Do not hand-edit `Stage` or `Fixed In`, and
+  never move an item to `Reviewing` without running `complete`.
+- **Close only via review + QA.** WHEN an item is to be closed → only through
+  `/cosmo:review` incorporating `/cosmo:qa` evidence. Reviewing and closing are
+  separate, deliberate gates — not part of `execute`. No agent-asserted closes.
+- **Reference WIs as ID + name.** WHEN you reference a Work Item in user-facing output
+  → include both the `WI-NN` ID and a brief name (e.g.
+  `WI-449 (ZDX-standard project-rules snippet)`). Both pieces must be present; format
+  is your judgment. Bare IDs are uncopyable, bare names unactionable; see the ZDX
+  standard's *Agent output conventions* (`zdx/standard/conformance.md`) for examples.
+
+Lifecycle commands live in the `cosmo` and `zdx` skill namespaces (e.g.
+`/cosmo:execute`, `/cosmo:review`, `/cosmo:qa`); the estate-wide ZDX plugin is
+`zdx-core`. How a repo wraps commit or lifecycle commands is a repo-overlay (L3)
+concern and may override the commands named here. Standard:
+[`zdx/standard/`](https://github.com/cognoco/nexus/blob/main/zdx/standard/).
 <!-- ZDX-PROJECT-RULES:END -->
 
 ## Git Commits
@@ -471,15 +497,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-06-10
-
-<!-- BEGIN ZDX:project-rules (managed — source: zdx-marketplace cosmo plugin reference/project-rules-snippet.md; synced by the WI-448 PROP engine. Do not hand-edit inside these markers.) -->
-## Working a Cosmo Work Item
-
-When you pick up a Work Item (`WI-NN`):
-
-- **Claim it at the start** — `/cosmo:execute claim` (sets `Stage=Executing`, `Started`, claim props). Don't start substantive work on an unclaimed item.
-- **Finalize it when the work is committed and pushed** — `/cosmo:execute complete`. This self-gates on the mechanical DoD, then authors `Fixed In` (from the landed commit), the completion summary (lifecycle template: *What was done / What changed / Verification / Caveats / Follow-ups*), the `Stage=Reviewing` transition, and `Resolved`.
-- **Never hand-edit** a Work Item's `Stage` or `Fixed In`, and **never move an item to Reviewing without running `complete`** — it refuses to finalize an item missing its close-artifacts, so producing them is not optional.
-- Reviewing and closing are separate, deliberate gates (`/cosmo:review`), not part of execute.
-<!-- END ZDX:project-rules -->
+Last updated: 2026-06-12

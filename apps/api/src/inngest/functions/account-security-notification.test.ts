@@ -14,7 +14,6 @@
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
-import { setResendApiKey, setEmailFrom, resetResendConfig } from '../helpers';
 
 const mockInngestTransport = createInngestTransportCapture();
 jest.mock(
@@ -81,12 +80,20 @@ function lastResendBody(): {
 
 describe('account-security-notification Inngest function [CRITICAL-2a]', () => {
   let originalFetch: typeof globalThis.fetch;
+  let originalResendApiKey: string | undefined;
+  let originalEmailFrom: string | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockInngestTransport.clear();
-    setResendApiKey('test-resend-key');
-    setEmailFrom('noreply@test.com');
+    // The Resend config getters read AsyncLocalStorage bindings (set by the
+    // Inngest middleware in production) with a process.env fallback. Test
+    // hooks run in a sibling async context to the test body, so an ALS
+    // enterWith here would not reach the handler — use the env fallback.
+    originalResendApiKey = process.env['RESEND_API_KEY'];
+    originalEmailFrom = process.env['EMAIL_FROM'];
+    process.env['RESEND_API_KEY'] = 'test-resend-key';
+    process.env['EMAIL_FROM'] = 'noreply@test.com';
     originalFetch = globalThis.fetch;
     globalThis.fetch = jest
       .fn()
@@ -97,7 +104,16 @@ describe('account-security-notification Inngest function [CRITICAL-2a]', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    resetResendConfig();
+    if (originalResendApiKey !== undefined) {
+      process.env['RESEND_API_KEY'] = originalResendApiKey;
+    } else {
+      delete process.env['RESEND_API_KEY'];
+    }
+    if (originalEmailFrom !== undefined) {
+      process.env['EMAIL_FROM'] = originalEmailFrom;
+    } else {
+      delete process.env['EMAIL_FROM'];
+    }
   });
 
   describe('configuration', () => {
@@ -203,16 +219,11 @@ describe('account-security-notification Inngest function [CRITICAL-2a]', () => {
     });
 
     it('degrades without throwing when RESEND_API_KEY is absent', async () => {
-      resetResendConfig();
-      const originalEnvKey = process.env['RESEND_API_KEY'];
       delete process.env['RESEND_API_KEY'];
 
       const { result } = await executeHandler(securityEvent(), 'evt-2');
       expect(result).toMatchObject({ ok: false, reason: 'no_api_key' });
       expect(globalThis.fetch).not.toHaveBeenCalled();
-
-      if (originalEnvKey !== undefined)
-        process.env['RESEND_API_KEY'] = originalEnvKey;
     });
   });
 });

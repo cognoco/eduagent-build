@@ -2,6 +2,7 @@
 name: Audit deleted concepts before governance
 description: Before recommending governance posture for an apparent rule violation, check whether the underlying concept still exists — it may have been removed by an epic, in which case the question is dead-code cleanup, not governance.
 type: feedback
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 
 Literal-string grep is a proxy for architectural intent, not a test of it. Deleted concepts survive under boolean aliases, renamed functions, and stale comments.

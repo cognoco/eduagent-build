@@ -5,12 +5,6 @@ import {
   type Database,
 } from '@eduagent/database';
 
-// ---------------------------------------------------------------------------
-// Module-level DATABASE_URL — set by Inngest middleware on CF Workers,
-// falls back to process.env for Node.js test environments.
-// ---------------------------------------------------------------------------
-
-let _databaseUrl: string | undefined;
 const stepDatabaseScope = new AsyncLocalStorage<Set<Database>>();
 
 export async function runWithStepDatabaseScope<T>(
@@ -32,28 +26,83 @@ export async function closeStepDatabases(
   await Promise.all(databases.map((db) => closeDatabase(db)));
 }
 
-/** Called by Inngest middleware to inject the DATABASE_URL binding. */
-export function setDatabaseUrl(url: string): void {
-  _databaseUrl = url;
+// ---------------------------------------------------------------------------
+// Per-invocation env bindings — carried through AsyncLocalStorage, set by
+// Inngest middleware on CF Workers, falling back to process.env for Node.js
+// test environments.
+//
+// These were previously module-level `let` singletons assigned per invocation
+// by the middleware. On Cloudflare Workers one isolate can service overlapping
+// Inngest invocations, so a later assignment could overwrite the value a
+// concurrent run reads in a subsequent step. AsyncLocalStorage scopes the
+// bindings to the invocation's async context instead (same isolation model as
+// `stepDatabaseScope` above).
+// ---------------------------------------------------------------------------
+
+/** Env values injected per invocation by the Inngest middleware. */
+export interface EnvBindings {
+  databaseUrl?: string;
+  voyageApiKey?: string;
+  resendApiKey?: string;
+  emailFrom?: string;
+  appUrl?: string;
+  supportEmail?: string;
+  retentionPurgeEnabled?: string;
+  clerkSecretKey?: string;
+  memoryFactsDedupEnabled?: string;
+  memoryFactsDedupThreshold?: string;
+  maxDedupLlmCallsPerSession?: string;
+  memoryFactsDedupRolloutPct?: string;
 }
 
-/** Reset the injected URL — for test cleanup only. */
+const envBindings = new AsyncLocalStorage<EnvBindings>();
+
+/**
+ * Binds the given env values to the current async context (and its
+ * continuations). Called by the Inngest middleware per invocation — including
+ * step re-entries — alongside {@link beginStepDatabaseScope}.
+ */
+export function enterWithEnvBindings(bindings: EnvBindings): void {
+  envBindings.enterWith(bindings);
+}
+
+/** Merge a partial update into the current context's bindings (test helper). */
+function mergeEnvBindings(partial: EnvBindings): void {
+  envBindings.enterWith({ ...envBindings.getStore(), ...partial });
+}
+
+function getEnvBinding<K extends keyof EnvBindings>(
+  key: K,
+): EnvBindings[K] | undefined {
+  return envBindings.getStore()?.[key];
+}
+
+/**
+ * Injects the DATABASE_URL binding into the current async context.
+ * Test helper — production injection goes through
+ * {@link enterWithEnvBindings} in the Inngest middleware.
+ */
+export function setDatabaseUrl(url: string): void {
+  mergeEnvBindings({ databaseUrl: url });
+}
+
+/** Clear the injected URL in the current async context — for test cleanup only. */
 export function resetDatabaseUrl(): void {
-  _databaseUrl = undefined;
+  mergeEnvBindings({ databaseUrl: undefined });
 }
 
 /**
  * Returns a Database instance for use within Inngest step functions.
  *
- * Prefers the URL injected via {@link setDatabaseUrl} (set by middleware on
- * CF Workers). Falls back to `process.env['DATABASE_URL']` so tests running
+ * Prefers the URL injected via {@link enterWithEnvBindings} (set by middleware
+ * on CF Workers). Falls back to `process.env['DATABASE_URL']` so tests running
  * in Node.js keep working without middleware.
  *
  * Creates a fresh Drizzle instance with Neon pool caching disabled so Worker
  * request-bound WebSocket I/O is not reused across Inngest executions.
  */
 export function getStepDatabase(): Database {
-  const url = _databaseUrl ?? process.env['DATABASE_URL'];
+  const url = getEnvBinding('databaseUrl') ?? process.env['DATABASE_URL'];
   if (!url) {
     throw new Error(
       'DATABASE_URL not available — ensure Inngest middleware provides env bindings',
@@ -67,39 +116,6 @@ export function getStepDatabase(): Database {
   return db;
 }
 
-// ---------------------------------------------------------------------------
-// Module-level VOYAGE_API_KEY — set by Inngest middleware on CF Workers,
-// falls back to process.env for Node.js test environments.
-// ---------------------------------------------------------------------------
-
-let _voyageApiKey: string | undefined;
-let _memoryFactsDedupEnabled: string | undefined;
-let _memoryFactsDedupThreshold: string | undefined;
-let _maxDedupLlmCallsPerSession: string | undefined;
-let _memoryFactsDedupRolloutPct: string | undefined;
-
-/** Called by Inngest middleware to inject the VOYAGE_API_KEY binding. */
-export function setVoyageApiKey(key: string): void {
-  _voyageApiKey = key;
-}
-
-/** Reset the injected key — for test cleanup only. */
-export function resetVoyageApiKey(): void {
-  _voyageApiKey = undefined;
-}
-
-export function setMemoryFactsDedupConfig(config: {
-  enabled?: string;
-  threshold?: string;
-  maxLlmCalls?: string;
-  rolloutPct?: string;
-}): void {
-  _memoryFactsDedupEnabled = config.enabled;
-  _memoryFactsDedupThreshold = config.threshold;
-  _maxDedupLlmCallsPerSession = config.maxLlmCalls;
-  _memoryFactsDedupRolloutPct = config.rolloutPct;
-}
-
 export function getStepMemoryFactsDedupConfig(): {
   enabled: string;
   threshold: number;
@@ -108,21 +124,21 @@ export function getStepMemoryFactsDedupConfig(): {
 } {
   return {
     enabled:
-      _memoryFactsDedupEnabled ??
+      getEnvBinding('memoryFactsDedupEnabled') ??
       process.env['MEMORY_FACTS_DEDUP_ENABLED'] ??
       'false',
     threshold: Number(
-      _memoryFactsDedupThreshold ??
+      getEnvBinding('memoryFactsDedupThreshold') ??
         process.env['MEMORY_FACTS_DEDUP_THRESHOLD'] ??
         '0.15',
     ),
     maxLlmCalls: Number(
-      _maxDedupLlmCallsPerSession ??
+      getEnvBinding('maxDedupLlmCallsPerSession') ??
         process.env['MAX_DEDUP_LLM_CALLS_PER_SESSION'] ??
         '10',
     ),
     rolloutPct: Number(
-      _memoryFactsDedupRolloutPct ??
+      getEnvBinding('memoryFactsDedupRolloutPct') ??
         process.env['MEMORY_FACTS_DEDUP_ROLLOUT_PCT'] ??
         '0',
     ),
@@ -132,12 +148,12 @@ export function getStepMemoryFactsDedupConfig(): {
 /**
  * Returns the Voyage API key for use within Inngest step functions.
  *
- * Prefers the key injected via {@link setVoyageApiKey} (set by middleware on
- * CF Workers). Falls back to `process.env['VOYAGE_API_KEY']` so tests running
- * in Node.js keep working without middleware.
+ * Prefers the key injected via {@link enterWithEnvBindings} (set by middleware
+ * on CF Workers). Falls back to `process.env['VOYAGE_API_KEY']` so tests
+ * running in Node.js keep working without middleware.
  */
 export function getStepVoyageApiKey(): string {
-  const key = _voyageApiKey ?? process.env['VOYAGE_API_KEY'];
+  const key = getEnvBinding('voyageApiKey') ?? process.env['VOYAGE_API_KEY'];
   if (!key) {
     throw new Error(
       'VOYAGE_API_KEY not available — ensure Inngest middleware provides env bindings',
@@ -146,56 +162,19 @@ export function getStepVoyageApiKey(): string {
   return key;
 }
 
-// ---------------------------------------------------------------------------
-// Module-level APP_URL — set by Inngest middleware on CF Workers,
-// falls back to process.env for Node.js test environments.
-// ---------------------------------------------------------------------------
-
-let _appUrl: string | undefined;
-
-/** Called by Inngest middleware to inject the APP_URL binding. */
-export function setAppUrl(url: string): void {
-  _appUrl = url;
-}
-
-/** Reset the injected URL — for test cleanup only. */
-export function resetAppUrl(): void {
-  _appUrl = undefined;
-}
-
 /**
  * Returns the public app URL for use within Inngest step functions.
  *
- * Prefers the URL injected via {@link setAppUrl} (set by middleware on
- * CF Workers). Falls back to `process.env['APP_URL']` then the canonical
+ * Prefers the URL injected via {@link enterWithEnvBindings} (set by middleware
+ * on CF Workers). Falls back to `process.env['APP_URL']` then the canonical
  * production domain.
  */
 export function getStepAppUrl(): string {
-  return _appUrl ?? process.env['APP_URL'] ?? 'https://www.mentomate.com';
-}
-
-// ---------------------------------------------------------------------------
-// Module-level RESEND_API_KEY — set by Inngest middleware on CF Workers,
-// falls back to process.env for Node.js test environments.
-// ---------------------------------------------------------------------------
-
-let _resendApiKey: string | undefined;
-let _emailFrom: string | undefined;
-
-/** Called by Inngest middleware to inject the RESEND_API_KEY binding. */
-export function setResendApiKey(key: string): void {
-  _resendApiKey = key;
-}
-
-/** Called by Inngest middleware to inject the EMAIL_FROM binding. */
-export function setEmailFrom(from: string): void {
-  _emailFrom = from;
-}
-
-/** Reset the injected keys — for test cleanup only. */
-export function resetResendConfig(): void {
-  _resendApiKey = undefined;
-  _emailFrom = undefined;
+  return (
+    getEnvBinding('appUrl') ??
+    process.env['APP_URL'] ??
+    'https://www.mentomate.com'
+  );
 }
 
 /**
@@ -204,82 +183,44 @@ export function resetResendConfig(): void {
  * Returns undefined if not configured — callers should degrade gracefully.
  */
 export function getStepResendApiKey(): string | undefined {
-  return _resendApiKey ?? process.env['RESEND_API_KEY'];
+  return getEnvBinding('resendApiKey') ?? process.env['RESEND_API_KEY'];
 }
 
 /**
  * Returns the EMAIL_FROM address for use within Inngest step functions.
  */
 export function getStepEmailFrom(): string {
-  return _emailFrom ?? process.env['EMAIL_FROM'] ?? 'noreply@mentomate.com';
-}
-
-// ---------------------------------------------------------------------------
-// Module-level SUPPORT_EMAIL — set by Inngest middleware on CF Workers,
-// falls back to process.env for Node.js test environments.
-// ---------------------------------------------------------------------------
-
-let _supportEmail: string | undefined;
-let _retentionPurgeEnabled: string | undefined;
-
-/** Called by Inngest middleware to inject the SUPPORT_EMAIL binding. */
-export function setSupportEmail(email: string): void {
-  _supportEmail = email;
-}
-
-/** Reset the injected email — for test cleanup only. */
-export function resetSupportEmail(): void {
-  _supportEmail = undefined;
+  return (
+    getEnvBinding('emailFrom') ??
+    process.env['EMAIL_FROM'] ??
+    'noreply@mentomate.com'
+  );
 }
 
 /**
  * Returns the support email address for use within Inngest step functions.
  *
- * Prefers the value injected via {@link setSupportEmail} (set by middleware on
- * CF Workers). Falls back to process.env['SUPPORT_EMAIL'] then the canonical
- * default.
+ * Prefers the value injected via {@link enterWithEnvBindings} (set by
+ * middleware on CF Workers). Falls back to process.env['SUPPORT_EMAIL'] then
+ * the canonical default.
  */
 export function getStepSupportEmail(): string {
   return (
-    _supportEmail ?? process.env['SUPPORT_EMAIL'] ?? 'support@mentomate.com'
+    getEnvBinding('supportEmail') ??
+    process.env['SUPPORT_EMAIL'] ??
+    'support@mentomate.com'
   );
-}
-
-/** Called by Inngest middleware to inject RETENTION_PURGE_ENABLED. */
-export function setRetentionPurgeEnabled(value: string): void {
-  _retentionPurgeEnabled = value;
-}
-
-/** Reset the injected flag — for test cleanup only. */
-export function resetRetentionPurgeEnabled(): void {
-  _retentionPurgeEnabled = undefined;
 }
 
 export function getStepRetentionPurgeEnabled(): boolean {
   return (
-    (_retentionPurgeEnabled ?? process.env['RETENTION_PURGE_ENABLED']) ===
-    'true'
+    (getEnvBinding('retentionPurgeEnabled') ??
+      process.env['RETENTION_PURGE_ENABLED']) === 'true'
   );
 }
 
-// ---------------------------------------------------------------------------
-// [R1] Module-level CLERK_SECRET_KEY — set by Inngest middleware on CF Workers,
-// falls back to process.env for Node.js test environments. Used by the
-// scheduled-deletion job to erase the Clerk login identity (GDPR Art 17).
-// ---------------------------------------------------------------------------
-
-let _clerkSecretKey: string | undefined;
-
-/** Called by Inngest middleware to inject the CLERK_SECRET_KEY binding. */
-export function setClerkSecretKey(key: string): void {
-  _clerkSecretKey = key;
-}
-
-/** Reset the injected key — for test cleanup only. */
-export function resetClerkSecretKey(): void {
-  _clerkSecretKey = undefined;
-}
-
+// [R1] CLERK_SECRET_KEY is used by the scheduled-deletion job to erase the
+// Clerk login identity (GDPR Art 17).
 export function getStepClerkSecretKey(): string | undefined {
-  return _clerkSecretKey ?? process.env['CLERK_SECRET_KEY'];
+  return getEnvBinding('clerkSecretKey') ?? process.env['CLERK_SECRET_KEY'];
 }

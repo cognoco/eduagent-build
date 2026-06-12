@@ -2,6 +2,7 @@
 name: Use Sonnet for subagents
 description: User prefers Sonnet model for subagents where possible to save cost/speed
 type: feedback
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 
 Use Sonnet (model: "sonnet") for subagents where possible, reserving Opus for tasks that genuinely need deeper reasoning.
