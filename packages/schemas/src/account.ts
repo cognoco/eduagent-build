@@ -47,6 +47,7 @@ export const dataExportQuotaPoolRowSchema = dataExportRowSchema;
 export const dataExportTopUpCreditRowSchema = dataExportRowSchema;
 export const dataExportNeedsDeepeningTopicRowSchema = dataExportRowSchema;
 export const dataExportFamilyLinkRowSchema = dataExportRowSchema;
+export const dataExportMentorActivityLedgerRowSchema = dataExportRowSchema;
 
 export const accountDeletionResponseSchema = z.object({
   message: z.string(),
@@ -185,6 +186,11 @@ export const dataExportSchema = z.object({
     .optional(),
   familyLinks: z.array(dataExportFamilyLinkRowSchema).optional(),
   learningProfiles: z.array(learningProfileSchema).optional(),
+  // [WI-679] GDPR Art-15 gap: mentor_activity_ledger was missing from the
+  // export — erasure via FK cascade was covered but portability was not.
+  mentorActivityLedger: z
+    .array(dataExportMentorActivityLedgerRowSchema)
+    .optional(),
   exportedAt: isoDateField,
 });
 
