@@ -110,3 +110,27 @@ shepherd chooses, but small enough to run serially.
   SAME executor from its transcript (context preserved). If this session dies
   before the resume, a fresh executor must re-orient from `_plan-WI-665.md` +
   `git status` in the worktree and the approved-plan rulings logged above.
+- 2026-06-12 ~01:10 — Executor resumed at 00:47, banked two worktree commits
+  (`0094499fe` F-028 legs + F-091; `893711d15` F-090), then was limit-killed a
+  second time (resets 04:30 Oslo). Tree near-clean; untracked
+  `webhook-idempotency-purge.test.ts` = half-done D1 purge piece. Remaining:
+  purge (or tracked follow-up), GC6 scan, typecheck/lint, push, PR. Next resume
+  scheduled 04:37.
+- 2026-06-12 ~01:4x — Operator-ordered immediate resume succeeded. **PR #1030
+  open** (head `a0799401d`), CI pending; shepherd owns the wait (backstop cron
+  cancelled). D2 outcome: `seedRetentionCard` NOT return-stable → two-step shape
+  taken (seed as own step before idempotent merged `extract-signals`). D1
+  outcomes: `supportTo` config-derivable → not stored; unconsumed-row purge
+  landed in-PR (no follow-up WI); enqueue-failure degrades gracefully.
+  Adversarial review: 1 round, SHIP. GC6 clean. Migration `0110` re-verified
+  free at PR time; migration-before-deploy note in PR description.
+- 2026-06-12 — Incident adjudicated: executor's first `/commit` forked into the
+  MAIN checkout and pushed `20b06b4c7` (19 ambient `.cosmo/` artifact files from
+  several sessions + the review-loop handoff-doc edit). Content benign (no code,
+  no secrets; handoff edit substantively correct — documents this workstream's
+  watcher extension). Ruling: ACCEPT, no revert — reverting would delete other
+  sessions' artifacts. Flagged for operator. Executor self-corrected to
+  worktree-directed commits afterward.
+- Open observation (executor): unrelated schema drift (concepts/identity churn)
+  sits unshipped on main — `drizzle-kit generate` would bundle it; deliberately
+  NOT absorbed into migration 0110. May deserve a capture by its owners.
