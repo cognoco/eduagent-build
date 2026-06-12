@@ -1,6 +1,6 @@
 # IF Application Cutover Plan — WP-CUT-A → WP-CUT-B → WI-586 convergence
 
-**Date:** 2026-06-11 · **Status:** DRAFT v1.4 — awaiting ratification (program session + operator)
+**Date:** 2026-06-11 · **Status:** DRAFT v1.5 — awaiting ratification (program session + operator)
 **Author:** dedicated architecture/planning session (per `cutover-planning-brief.md`)
 **Profile:** design (plan only; no code, no migrations, no Cosmo writes)
 
@@ -67,6 +67,24 @@
 > restore/re-grant appends a new row; the contradictory "INSERT granted=false"
 > phrasing removed and the ADR text amended to state the one sanctioned in-row
 > transition.
+>
+> **Revision v1.5 (2026-06-12).** Three fifth-round findings + two migration-train
+> items folded, all verified: (1) the freeze gate is now **two-stage** — `/v1/inngest`
+> (the public, signed Inngest delivery endpoint, `auth.ts:51`) stays exempt while the
+> drain runs (a blanket gate would 503 step callbacks and deadlock the drain), and is
+> hard-blocked only after Running/Queued = 0; (2) the v1.4 scan-side EXISTS shortcut
+> was **wrong** — canon's age-transition appends a new grant while the previous row
+> is *superseded, not withdrawn* (`data-model.md` §6.2), so older granted+un-withdrawn
+> rows survive a withdrawal of the current one; the predicate now uses the same
+> current-row windowing as the reducer; (3) the `AnyBasis` ordering key is now
+> **legacy-faithful request-time**, not last-transition time (legacy `requestedAt`
+> never moves on revoke/restore — `consent.ts:1251/:1329` — so a restored older
+> basis must not outrank a newer-requested one); (4) literal migration numbers
+> replaced by **role names with next-free-at-landing** (`0110_feedback_retry_queue`
+> already took the slot the plan assumed); (5) a **CUT-A generate-preflight** added:
+> stray Drizzle-TS DDL never journaled (`concepts`/`concept_mastery` — CREATE only
+> in journal-removed 0107) must not be silently bundled into the consent_request
+> migration.
 
 **Inputs (read in full):**
 - `_wip/identity-foundation/cutover-planning-brief.md` — the mandate
@@ -93,7 +111,7 @@ real design alternatives; the rest are confirmations.**
 | **OQ-1** | **v2 signup bootstrap timing.** `login.person_id` is NOT NULL, but today's JIT bootstrap (`findOrCreateAccount` at first authed request) runs *before* birth-date capture — `person.birth_date NOT NULL` cannot be satisfied at signup. Option (c): defer the whole graph (organization + person + login + membership + subscription) to **onboarding completion**, when birth date is known — matches `inv 26` (age-gate precedes collection) and eliminates the ownerless-account class by construction, but moves the trial-clock start from signup to onboarding completion. Option (d): make `login.person_id` nullable (canon amendment) and keep signup-time creation. **v1.1:** (c)'s executable boundary is now specified in §2.2a (the existing `POST /v1/profiles` owner-create call becomes the graph transaction — **no mobile call-site change**; idempotent on `login.clerk_user_id`; pre-graph webhooks inherit today's ack-200 + Sentry-escalation path). The design did not weaken (c) — the mobile-unchanged finding strengthens it; recommendation stands. | **(c)** — boundary in §2.2a; trial-clock shift + pre-graph webhook window called out | Operator (product) |
 | **OQ-2** | **Re-homes beyond the accepted sub-rulings.** The brief's accepted set covers `conversation_language` → person, store IDs, `consent_request`, `has_premium_llm` derived, ownerless accounts. This plan additionally re-homes `pronouns`, `avatar_url`, `default_app_context`, `archived_at` to `person` and folds `birth_year_set_by` into `knowledge_assertions` (§1.3). | as designed §1.3 | Ratification |
 | **OQ-3** | **Staging ownerless accounts (6)** — case-by-case list produced (Appendix D): all six are test artifacts (`@test.local` ×3, `@test.test` ×1, `@integration.test` ×2; created 2026-05-31/06-10). | bulk-delete pre-drop, same as dev | Operator |
-| **OQ-4** | **Freeze mechanics + soak length** at convergence: proposal = gate **all** traffic first via a maintenance middleware mounted before auth/account resolution (`MAINTENANCE_READONLY` — v1.4: must kill the global JIT provisioning that runs even on authed `GET`s; 503 incl. webhooks), wait HTTP quiet, then pause + drain Inngest (§4 step 1); 24 h staging soak between flip and drop. | as proposed §4 | Operator |
+| **OQ-4** | **Freeze mechanics + soak length** at convergence: proposal = two-stage gate (v1.5) — stage 1 `MAINTENANCE_READONLY` mounted before auth/account resolution (kills the JIT provisioning that runs even on authed `GET`s; 503 incl. webhooks; **signed `/v1/inngest` exempt** so the drain can complete), HTTP quiet, Inngest pause + drain to zero, then stage 2 `MAINTENANCE_BLOCK_INNGEST` hard-blocks delivery too (§4 step 1); 24 h staging soak between flip and drop. | as proposed §4 | Operator |
 | **OQ-5** | **`consent_request` single-row recycling** (one row per charge × purpose × org × **basis**, counters monotonic — preserves WI-374 exactly, per-basis like legacy) vs append-per-cycle rows (counters reset per cycle — weakens WI-374 unless windowed sums added). v1.1: the unique key gained `requested_basis` so the guarded GDPR/COPPA dual-row coexistence survives (§1.2). | single-row, basis-keyed (§1.2 design rationale) | Ratification |
 | **OQ-6** | **Deviation from the executor's sketch:** the scope report suggested "new signups write the new model from the first cutover PR". This plan **rejects** that — it is a partial dual-write and violates the single-live-store invariant. The 0109 precondition window is closed by the convergent final reseed at freeze instead (§4 step 4). | reject early dual-writes | Ratification |
 | **OQ-7** | **`profileId` symbol / `profile_id` column rename** to `personId`/`person_id` across learning tables: out of grep-clean scope (FK constraints re-point; names stay — `person.id = profiles.id` by construction). Rename = a separate post-cutover hygiene item if ever wanted. | out of scope | Ratification |
@@ -172,12 +190,37 @@ layer exists anywhere in this plan. Per-PR arguments in §3.
 
 ## 1. WP-CUT-A — schema-extension design (additive, reversible)
 
-One migration (`0110_identity_cutover_homes.sql`) + matching Drizzle definitions in
-`packages/database/src/schema/identity.ts`, + an extension of the reseed block and the
-verify script. Everything here is **additive**: no legacy object is touched; the
-migration is reversible by dropping the added objects. CUT-A also performs the canon
-lockstep: `docs/canon/identity/data-model.md` gains §2B (cutover amendments) and the
-ADR (Appendix A) lands in `docs/adr/` in the same change-set.
+One migration (**`M-HOMES`** — see the naming convention below) + matching Drizzle
+definitions in `packages/database/src/schema/identity.ts`, + an extension of the
+reseed block and the verify script. Everything here is **additive**: no legacy object
+is touched; the migration is reversible by dropping the added objects. CUT-A also
+performs the canon lockstep: `docs/canon/identity/data-model.md` gains §2B (cutover
+amendments) and the ADR (Appendix A) lands in `docs/adr/` in the same change-set.
+
+> **Migration naming convention (v1.5 — binding for the whole plan).** This plan
+> names its four migrations by ROLE, not number: **`M-HOMES`** (the CUT-A schema
+> additions, `*_identity_cutover_homes.sql`), **`M-RESEED2`** (the CUT-A reseed
+> extension, `*_identity_cutover_reseed.sql`), **`M-REPOINT`** (the FK re-point,
+> §4 step 6), **`M-DROP`** (the legacy drop, §4 step 8). Each takes the **next free
+> number at landing** — earlier drafts hard-coded 0110–0113, and `main` has already
+> consumed 0110 (`0110_feedback_retry_queue`); other lanes keep consuming numbers,
+> so literal numbers in a plan rot by construction. The canonical sequence is the
+> role order above: `M-HOMES → M-RESEED2 → … → M-REPOINT → M-DROP`, interleaved
+> with whatever unrelated migrations land in between (safe: all four are
+> self-contained and ordered only relative to each other).
+>
+> **CUT-A generate-preflight (v1.5 — required before `drizzle-kit generate`).**
+> Unshipped DDL is sitting on `main`: `concepts` + `concept_mastery` are defined in
+> Drizzle TS (`packages/database/src/schema/concept-mastery.ts`) but their only
+> `CREATE TABLE` lives in **journal-removed** `0107_gorgeous_cardiac.sql`
+> (reference-only since the WI-569 baseline reset) — the TS schema and the journal
+> snapshot disagree TODAY. CUT-A is the next change that runs `drizzle-kit
+> generate`, which would silently bundle that stray DDL into the `consent_request`
+> migration. Preflight: diff the Drizzle schema against the journal snapshot first
+> (run `generate` in a scratch tree and inspect, or `drizzle-kit check`); any
+> stray DDL found is either shipped **deliberately in its own migration** (own
+> review, own rollback note) or **explicitly excluded** — never bundled. (Source:
+> PRG-13 shepherd wind-down + the new-llm sweep, 2026-06-12.)
 
 ### 1.1 Design ground rules
 
@@ -211,7 +254,7 @@ flows); approval writes a `consent_grant` row and back-links it via
 `consent_grant_id`. The request carries the *evidence trail* (token, IP/UA, policy
 version — the Bug #872 regulator fields); the grant carries the *decision*.
 
-**DDL (actual, lands in 0110):**
+**DDL (actual, lands in `M-HOMES`):**
 
 ```sql
 CREATE TABLE consent_request (
@@ -441,14 +484,14 @@ ALTER TABLE subscription ADD CONSTRAINT subscription_status_check
 
 **Quota satellites are kept, not replaced:** `quota_pools`, `profile_quota_usage`,
 `usage_events`, `top_up_credits`, `webhook_idempotency` remain the quota/idempotency
-substrate; their FKs re-point in the 0112 migration (§4 step 6) and their row keys never change
+substrate; their FKs re-point in `M-REPOINT` (§4 step 6) and their row keys never change
 (`subscription.id = subscriptions.id`, `person.id = profiles.id`).
 
 ### 1.5 Reseed-extension block + verify-script extension (land in CUT-A, run at convergence)
 
 The 0109 DO-block pattern extends to the new homes — same idempotent, convergent
 design (mirror-deletes first, then `ON CONFLICT (id) DO UPDATE … WHERE … IS DISTINCT
-FROM …`). Committed in CUT-A as `0111_identity_cutover_reseed.sql` (it runs once as a
+FROM …`). Committed in CUT-A as `M-RESEED2` (`*_identity_cutover_reseed.sql`; it runs once as a
 migration on dev/stg; the runbook re-executes its DO block at the freeze for final
 convergence, exactly as it re-runs 0109's):
 
@@ -516,7 +559,7 @@ SELECT p.id, p.id, 'age',
        THEN 'parent_reported' ELSE 'self_report' END,
   CASE WHEN p.birth_year_set_by IS NOT NULL AND p.birth_year_set_by <> p.id
        THEN 1.00 ELSE 0.80 END,          -- provisional (OQ-9)
-  'reseed_0111_backfill', p.created_at, p.birth_year_set_by
+  'reseed_cutover_backfill', p.created_at, p.birth_year_set_by
 FROM profiles p
 ON CONFLICT (id) DO NOTHING;
 -- + matching person.age_knowing cache update
@@ -799,50 +842,75 @@ variants**, and every surface is dispositioned to one of them:
   `getConsentStatus` / L7-F1 semantics. The name carries the warning; no caller may
   reach for it without meaning it.
 
-**The current-state reducer (v1.4 — both variants are defined in terms of it).**
-Legacy "latest" was trivial (`ORDER BY consent_states.requested_at DESC` over one
-mutable row per basis); the v2 state is split across `consent_request` (workflow)
-and `consent_grant` (event log), so the reduction must be stated, not implied:
+**The current-state reducer (v1.4, ordering + EXISTS corrected v1.5 — both variants
+are defined in terms of it).** Legacy "latest" was trivial
+(`ORDER BY consent_states.requested_at DESC` over one mutable row per basis); the v2
+state is split across `consent_request` (workflow) and `consent_grant` (event log),
+so the reduction must be stated, not implied:
 
 1. **Per-basis reduction** `reduceBasisState(charge, purpose, org, basis)`:
    - *Current grant* = the row with `max(granted_at)` (tiebreak `id DESC`, the
      BUG-394 pattern) among grants for `(charge, purpose, org)` whose
-     `lawful_basis` belongs to the basis. Withdrawal stamps `withdrawn_at` on this
-     row and restore appends a newer row (§2.3 / Appendix A, v1.4 model), so:
-     current grant exists ∧ `withdrawn_at IS NULL` → **CONSENTED**
-     (effective-ts = `granted_at`); current grant exists ∧ `withdrawn_at IS NOT
-     NULL` → **WITHDRAWN** (effective-ts = `withdrawn_at`). A **direct grant with
-     no request row** (the parent-created-child path) reduces here identically.
+     `lawful_basis` belongs to the basis. **The windowing is load-bearing**: canon's
+     age-transition appends a *new* grant while the previous row is *superseded,
+     not withdrawn* (`data-model.md` §6.2), so older granted+un-withdrawn rows are
+     normal — only the current row's state counts. Current grant exists ∧
+     `withdrawn_at IS NULL` → **CONSENTED**; ∧ `withdrawn_at IS NOT NULL` →
+     **WITHDRAWN**. A **direct grant with no request row** (the
+     parent-created-child path) reduces here identically.
    - *No grant* → the request row for the basis-keyed unique (≤1 by §1.2):
-     `'pending'` → **PENDING** (effective-ts = `COALESCE(requested_at, created_at)`
-     — reseeded legacy `PENDING` rows carry `requested_at = NULL`); `'requested'`
-     → **PARENTAL_CONSENT_REQUESTED** (effective-ts = `requested_at`); `'denied'`
-     → **WITHDRAWN** (legacy parity — deny wrote `WITHDRAWN`; deletion in flight);
-     `'expired'` → **PARENTAL_CONSENT_REQUESTED** (legacy parity — legacy has no
-     EXPIRED status; an expired cycle stayed `PARENTAL_CONSENT_REQUESTED` until the
-     day-30 delete). `'approved'` with no grant is unreachable (the approval
-     transaction writes both).
+     `'pending'` → **PENDING**; `'requested'` → **PARENTAL_CONSENT_REQUESTED**;
+     `'denied'` → **WITHDRAWN** (legacy parity — deny wrote `WITHDRAWN`; deletion
+     in flight); `'expired'` → **PARENTAL_CONSENT_REQUESTED** (legacy parity —
+     legacy has no EXPIRED status; an expired cycle stayed
+     `PARENTAL_CONSENT_REQUESTED` until the day-30 delete). `'approved'` with no
+     grant is unreachable (the approval transaction writes both).
    - No rows at all → **null**.
-2. **`AnyBasis` (single)** = run the reduction for each basis; return the state
-   with the **greatest effective-ts** (tie → `id DESC`). This mirrors the legacy
-   cross-row `requested_at DESC` pick; the residual nuance (legacy ordered by
-   request time even after consent, the reducer by last-transition time) only
-   reorders *dual-basis* profiles and is part of the named `AnyBasis` follow-up
-   below.
+2. **`AnyBasis` (single)** = run the reduction per basis; pick by the
+   **legacy-faithful request-time ordering key (v1.5)**:
+   `key(basis) = COALESCE(request.requested_at, request.created_at,
+   min(granted_at) over the basis's grants)`. Why request-time and not
+   last-transition time: legacy `getConsentStatus` orders by
+   `consent_states.requested_at` (`consent.ts:1018`), and revoke/restore mutate
+   `respondedAt` while `requestedAt` **never moves** (`consent.ts:1251`, `:1329`) —
+   so a restored older basis must NOT outrank a newer-requested one, which a
+   last-transition key (v1.4's `effective-ts`, **rejected**) would have done: a
+   silent behavior change wearing a compatibility label. The `min(granted_at)`
+   fallback covers post-cutover direct-grant bases only (every reseeded basis has
+   a request row carrying the legacy `requested_at` verbatim, incl. `NULL` for
+   legacy PENDING → `created_at` fallback) and equals the row-creation moment,
+   matching legacy's `requestedAt` default-now. Grant appends (restore,
+   age-transition) never move the key — same as legacy. Tie → fixed basis priority
+   (`gdpr_parental_consent` first), then `id DESC`.
 3. **Batched** = the same reduction window-functioned over `personIds`
    (`row_number() OVER (PARTITION BY charge_person_id, basis ORDER BY …)` on each
    table, reduced in one pass) — the L7-F1 replacement.
-4. **Scan-side EXISTS (withdrawal-safe)** — naive `EXISTS(granted = true)` over the
-   event log would keep allowing **after withdrawal** (the granted row still
-   exists). Under the v1.4 withdrawal model the correct predicate is cheap, no
-   subquery-max needed:
-   `EXISTS (SELECT 1 FROM consent_grant cg WHERE cg.charge_person_id = person.id
-   AND cg.purpose = 'platform_use' AND cg.granted AND cg.withdrawn_at IS NULL)`
-   — withdrawal stamps the live row so no un-withdrawn granted row survives it, and
-   restore appends a fresh un-withdrawn row. The legacy filter's **adult branch
-   must come along** (`review-due-scan.ts:99`: `…CONSENTED EXISTS … OR notExists(any
-   consent rows)`): v2 form is `… OR (NOT EXISTS(any consent_request for person) AND
-   NOT EXISTS(any consent_grant for person))`.
+4. **Scan-side EXISTS (v1.5 — must window to the current row).** Two traps, both
+   rejected: naive `EXISTS(granted = true)` keeps allowing after withdrawal (the
+   granted row still exists), and the v1.4 shortcut
+   `EXISTS(granted ∧ withdrawn_at IS NULL)` is **also wrong** — after
+   grant₁ → age-transition grant₂ → withdrawal of grant₂, grant₁ is still
+   granted+un-withdrawn (*superseded, not withdrawn*, canon §6.2) and the raw
+   EXISTS would re-allow the scan. The predicate needs the same current-row
+   reduction as everything else — correlated form (cheap on the
+   `(charge, purpose, org)` hot-path index):
+   ```sql
+   EXISTS (
+     SELECT 1 FROM consent_grant cg
+     WHERE cg.charge_person_id = person.id AND cg.purpose = 'platform_use'
+       AND cg.granted AND cg.withdrawn_at IS NULL
+       AND cg.granted_at = (SELECT max(cg2.granted_at) FROM consent_grant cg2
+                            WHERE cg2.charge_person_id = cg.charge_person_id
+                              AND cg2.purpose = cg.purpose
+                              AND cg2.organization_id = cg.organization_id
+                              AND cg2.lawful_basis = cg.lawful_basis))
+   ```
+   (i.e. *some basis whose current row is granted and un-withdrawn* — the batched
+   window form in item 3 is the set-based equivalent for scans over many persons).
+   The legacy filter's **adult branch must come along** (`review-due-scan.ts:99`:
+   `…CONSENTED EXISTS … OR notExists(any consent rows)`): v2 form is
+   `… OR (NOT EXISTS(any consent_request for person) AND NOT EXISTS(any
+   consent_grant for person))`.
 
 | Legacy surface | v2 call | Basis |
 |---|---|---|
@@ -946,8 +1014,8 @@ export completeness is a compliance surface.
 
 ### 2.7 The FK re-point list (≈56 at today's schema; catalog-authoritative)
 
-The FK re-point set lands in its own migration (`0112`, §4 step 6 — **inside the
-freeze window, before the flip**; the drop is the separate `0113` at step 8) —
+The FK re-point set lands in its own migration (`M-REPOINT`, §4 step 6 — **inside the
+freeze window, before the flip**; the drop is the separate `M-DROP` at step 8) —
 **constraint re-point only; columns, values, and names stay** (OQ-7). At today's
 static schema (v1.2 re-derivation): **56 re-points** — 52 × `profiles.id → person.id`
 (learning tables + the kept profile-adjacent feature tables + the quota satellites'
@@ -957,7 +1025,7 @@ static schema (v1.2 re-derivation): **56 re-points** — 52 × `profiles.id → 
 `subscriptions.account_id`) are intra-legacy and drop with their tables, as do the
 `family_links` pair, `consent_states.profile_id`, and the `birth_year_set_by`
 self-FK. **These static counts are advisory and MUST NOT be copied into the work
-order as fixed numbers** — the 0112 migration is generated from the live catalog
+order as fixed numbers** — `M-REPOINT` is generated from the live catalog
 immediately before ratification/execution; the authoritative enumeration is:
 
 ```sql
@@ -986,7 +1054,7 @@ the same way — they are live product features, **not** legacy identity.
 - **During CUT-B (per domain PR):** legacy tests stay untouched and green (legacy is
   the live store — they are the regression net). Each PR adds **v2 tests** for its
   twin (unit + integration), running with the flag set true in the test setup;
-  integration tests exercise the real new tables (0108/0109/0110 applied to the test
+  integration tests exercise the real new tables (0108/0109 + `M-HOMES` applied to the test
   DB). The GC1/GC6 internal-mock rules apply to all new tests.
 - **The ~194 files split two ways:** (a) ~dozens that *test identity behavior* —
   these get v2 twins in their domain's PR; (b) the long tail that merely *seeds*
@@ -1008,7 +1076,7 @@ all of them (the twins read/write §1 objects).
 
 | PR | Domain | Contents | Depends on |
 |---|---|---|---|
-| **CUT-B1 — identity spine** | auth/account/person | typed-config flag plumbing (§2.1) + the **flag-off break test** (literal `'false'` and unset both select legacy, zero new-model DB calls); the `MAINTENANCE_READONLY` gate middleware (mounted before auth/account resolution per §4 step 1a — must kill JIT provisioning); `resolveIdentityV2` + the onboarding-completion bootstrap `createIdentityGraph()` per §2.2a (transaction incl. the reverse `person.login_id` wire, idempotency on `login.clerk_user_id`, the BUG-411 email-reclaim guard + regression test, calendar-valid birth dates, pre-graph default responses); the consent-status **read** module per §2.3a (basis-explicit + `AnyBasis` variants — `profileMeta` depends on it); `profileMeta` v2; person-scope twins (profile, settings, onboarding, learner-profile, session-cache/exchanges context, snapshot-aggregation, coaching-cards); shared helpers (ii)–(v); `test-seed` v2 core; the P1/P2 Inngest functions (B1 rows, §2.5) | CUT-A |
+| **CUT-B1 — identity spine** | auth/account/person | typed-config flag plumbing (§2.1) + the **flag-off break test** (literal `'false'` and unset both select legacy, zero new-model DB calls); the two-stage maintenance gate middleware (`MAINTENANCE_READONLY` + `MAINTENANCE_BLOCK_INNGEST`, mounted before auth/account resolution per §4 step 1 — must kill JIT provisioning while keeping signed `/v1/inngest` deliverable during the drain); `resolveIdentityV2` + the onboarding-completion bootstrap `createIdentityGraph()` per §2.2a (transaction incl. the reverse `person.login_id` wire, idempotency on `login.clerk_user_id`, the BUG-411 email-reclaim guard + regression test, calendar-valid birth dates, pre-graph default responses); the consent-status **read** module per §2.3a (basis-explicit + `AnyBasis` variants — `profileMeta` depends on it); `profileMeta` v2; person-scope twins (profile, settings, onboarding, learner-profile, session-cache/exchanges context, snapshot-aggregation, coaching-cards); shared helpers (ii)–(v); `test-seed` v2 core; the P1/P2 Inngest functions (B1 rows, §2.5) | CUT-A |
 | **CUT-B2 — consent + family** | consent/guardianship/deletion | `consent-v2.ts` — the consent **write machine** (request lifecycle, grants, deletion; the read module ships in CUT-B1 per §2.3a); **required GDPR/COPPA coexistence break tests** — replicate the BUG-466/BUG-465 scenario against v2: a person holding both bases where the COPPA row is newer; the GDPR-pinned resolver and the dashboard paths must report the GDPR status, red-green per the regression-AC pattern; consent routes/web re-target; `deletion.ts`/`export.ts`/`notices` v2; `guardianship` reads (family-access, family-bridge, dashboard, nudge, notifications, solo-progress-reports, weekly-digest); the B2 Inngest functions | CUT-B1 (helpers, profileMeta) |
 | **CUT-B3 — billing + webhooks** | subscriptions/quota | `subscription-core` v2; both webhook handler twins (+ re-run BUG-116/CR-M11 break tests); metering/tier/trial/top-up/quota-provision/reconcile/family v2; routes/billing; `trial-expiry` Inngest; `session-exchange-router` tier source; drop the dead `hasPremiumLlm` override | CUT-B1 |
 
@@ -1052,32 +1120,44 @@ dev rehearsal of this entire runbook completed once before staging.
 Per environment — **dev first (full rehearsal), then staging**; production §4.1.
 
 1. **Freeze — write-ingress gate FIRST, then drain (v1.3 ordering).** Announce, then:
-   (a) **Gate ALL traffic, mounted before account resolution (v1.4 precision):**
-   deploy with `MAINTENANCE_READONLY=true` (typed-config flag added in CUT-B1). The
-   gate is a dedicated middleware **mounted at the top of the chain in `index.ts` —
-   before `authMiddleware` and `accountMiddleware`** — that 503s (+ `Retry-After`)
-   every request except the health check. A route/method-scoped "reject writes"
-   gate is NOT sufficient: `accountMiddleware` runs globally and
-   `findOrCreateAccount()` **lazily inserts `accounts` + a trial `subscriptions`
-   row on any authenticated request, including `GET`** (`index.ts:225`,
-   `middleware/account.ts:79`, `services/account.ts:137`) — so a fresh user hitting
-   `GET /v1/profiles` after the final reseed would create legacy rows the new model
-   never sees. Blocking all traffic kills JIT provisioning by construction; both
-   store webhooks are likewise 503'd (Stripe and RevenueCat retry on 5xx, so gated
-   deliveries are deferred, not lost). Gating first matters: a request accepted
-   before the gate can commit *after* a later step starts, so the gate must precede
-   everything that assumes quiet.
+   (a) **Gate user/API/webhook ingress — stage 1 (v1.5: `/v1/inngest` stays exempt
+   while draining):** deploy with `MAINTENANCE_READONLY=true` (typed-config flag
+   added in CUT-B1). The gate is a dedicated middleware **mounted at the top of the
+   chain in `index.ts` — before `authMiddleware` and `accountMiddleware`** — that
+   503s (+ `Retry-After`) every request **except the health check and the signed
+   Inngest delivery endpoint `/v1/inngest`**. Each half of that rule carries its
+   own leak/deadlock proof:
+   - *Why before account resolution:* a route/method-scoped "reject writes" gate is
+     NOT sufficient — `accountMiddleware` runs globally and `findOrCreateAccount()`
+     **lazily inserts `accounts` + a trial `subscriptions` row on any authenticated
+     request, including `GET`** (`index.ts:225`, `middleware/account.ts:79`,
+     `services/account.ts:137`); a fresh user hitting `GET /v1/profiles` after the
+     final reseed would create legacy rows the new model never sees. Blocking all
+     user traffic kills JIT provisioning by construction; both store webhooks are
+     likewise 503'd (Stripe and RevenueCat retry on 5xx — deferred, not lost).
+   - *Why `/v1/inngest` is exempt at this stage:* it is the **live delivery
+     endpoint for every Inngest function** (`routes/inngest.ts:17`,
+     public-with-signing per `auth.ts:51`). Gating it would 503 the step callbacks
+     of the very runs step (c) waits to drain — active runs would retry or sit
+     queued and the drain-gate could never reach zero. Leaving it open is safe:
+     deliveries are signature-verified, and stage 1 already stopped all new event
+     *production*, so the in-flight set can only shrink.
+   Gating first matters: a request accepted before the gate can commit *after* a
+   later step starts, so the gate must precede everything that assumes quiet.
    (b) **HTTP quiet:** wait out the in-flight request tail (Workers requests are
    seconds-scale; wait ≥60 s and observe zero write-path traffic in the worker
    logs/analytics before proceeding).
    (c) **Pause Inngest + drain-gate:** pause the app, then verify zero active or
    queued runs (Inngest dashboard / REST runs query, statuses `Running`/`Queued` = 0)
    — pausing stops new triggers, but in-flight functions (a `session-completed`
-   pipeline, a reminder fan-out) keep executing and writing. Let them complete or
-   cancel them, re-check. The API gate in (a) already stopped new event production,
-   so the queue can only shrink.
-   Only after (a)+(b)+(c) may steps 3–6 touch the data. Pre-launch, the whole window
-   is minutes and user-invisible.
+   pipeline, a reminder fan-out) keep executing and writing **through the exempted
+   `/v1/inngest` endpoint**. Let them complete or cancel them, re-check.
+   (d) **Hard-block `/v1/inngest` — stage 2:** only after the drain-gate reads
+   zero, set `MAINTENANCE_BLOCK_INNGEST=true` (second typed-config flag, CUT-B1) so
+   the gate 503s `/v1/inngest` too — belt-and-braces against a stray late delivery
+   or a manual replay landing mid-reseed.
+   Only after (a)+(b)+(c)+(d) may steps 3–6 touch the data. Pre-launch, the whole
+   window is minutes and user-invisible.
 2. **Recovery posture (binding constraint).** Record the Neon PITR marker and create
    the pre-drop branch — this **is** the rollback story for everything after step 5:
    ```bash
@@ -1093,7 +1173,7 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
    ```
    Staging: the same statement — the case-by-case review is done (Appendix D: all 6
    are test artifacts; OQ-3).
-4. **Final convergent reseed.** Re-execute the committed 0109 DO-block, then the 0111
+4. **Final convergent reseed.** Re-execute the committed 0109 DO-block, then the `M-RESEED2`
    extension block (§1.5), via SQL console/psql (both are idempotent + convergent;
    mirror-deletes reconcile rows deleted since the last run; upserts converge drift).
 5. **Parity verification.** `DATABASE_URL=… node
@@ -1113,7 +1193,7 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
           (SELECT count(*) FROM consent_states)  = (SELECT count(*) FROM consent_request) AS requests_ok,
           (SELECT count(*) FROM subscriptions)   = (SELECT count(*) FROM subscription)  AS subs_ok;
    ```
-6. **FK re-point migration** (`0112_repoint_identity_fks.sql`) *(STOP → shepherd
+6. **FK re-point migration** (`M-REPOINT` — `*_repoint_identity_fks.sql`) *(STOP → shepherd
    go; still inside the freeze, BEFORE the flip)*. One transaction re-pointing the
    full FK set (§2.7 pattern; ≈56 at today's schema, enumerated authoritatively by
    the §2.7 catalog query at generation time). This is safe at this
@@ -1125,7 +1205,8 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
    would violate every learning-data FK insert. Re-pointing inside the freeze means
    the system that unfreezes is already internally consistent on the new model.
 7. **Flip (atomic) + unfreeze, then soak.** Set `IDENTITY_V2_ENABLED=true` in
-   Doppler for the env; deploy the worker; unset `MAINTENANCE_READONLY`; resume
+   Doppler for the env; deploy the worker; unset both maintenance flags
+   (`MAINTENANCE_READONLY`, `MAINTENANCE_BLOCK_INNGEST`); resume
    Inngest. From this deploy, all reads AND writes go to the new model; **legacy is
    frozen** (no code path writes it — every write site branched on the same flag).
    Soak — staging: 24 h (OQ-4) with the e2e smoke + web suite green; smoke
@@ -1135,7 +1216,7 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
    (reminder scan) clean. Legacy tables remain queryable for ad-hoc diffing during the
    soak. **Abort path: PITR-only from here** — see Rollback below (the step-6
    re-point makes a flag flip-back unsafe except in the narrow zero-new-person case).
-8. **Drop migration** (`0113_drop_legacy_identity.sql`) *(STOP → shepherd go)*. One
+8. **Drop migration** (`M-DROP` — `*_drop_legacy_identity.sql`) *(STOP → shepherd go)*. One
    transaction (FKs already re-pointed in step 6):
    ```sql
    DROP TABLE consent_states, family_links, profiles, subscriptions, accounts;
@@ -1173,19 +1254,19 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
 
 Prod is empty, schema-stale (0108/0109 unapplied), and its deploy pipeline is blocked
 by **BUG-12 — IDEMPOTENCY_KV Cloudflare Worker binding missing, P1, captured during
-WI-585**. Per the accepted ruling: prod receives the whole chain — 0108 → 0109 → 0110
-→ 0111 → 0112 → flip → 0113 — via the existing `workflow_dispatch` + environment-approval
+WI-585**. Per the accepted ruling: prod receives the whole chain — 0108 → 0109 → `M-HOMES`
+→ `M-RESEED2` → `M-REPOINT` → flip → `M-DROP` — via the existing `workflow_dispatch` + environment-approval
 path once BUG-12 is fixed; reseed-on-empty is a no-op that must still verify exit 0;
 **prod apply does not gate WI-586's close** (recorded as an explicit caveat/follow-up
 in the WI-586 completion summary).
 
-### 4.2 `## Rollback` (verbatim section for the 0112 + 0113 migrations; per-step truth table)
+### 4.2 `## Rollback` (verbatim section for the `M-REPOINT` + `M-DROP` migrations; per-step truth table)
 
 Re-derived for the v1.1 ordering (re-point at step 6, before the flip):
 
 | Through step | Rollback possibility | Procedure | Data lost |
 |---|---|---|---|
-| 1–2 (freeze, marker) | trivial | unfreeze (unset flag, resume Inngest) | none |
+| 1–2 (freeze, marker) | trivial | unfreeze (unset both maintenance flags, resume Inngest) | none |
 | 3 (ownerless disposal) | PITR only | restore from the step-2 branch/marker | none of value (deleted rows are verified test junk) |
 | 4–5 (reseed + verify) | trivial | nothing to undo — legacy untouched; new tables can be re-converged or truncated and re-seeded at will | none |
 | 6 (FK re-point, still frozen) | clean reverse migration | inverse ALTERs re-point the full constraint set back to the legacy tables — data-free and safe **while the freeze holds**: verify (step 5) proved legacy and new agree row-for-row and nothing has written since. Abort here = re-point back, unfreeze flag-off. | none |
@@ -1194,8 +1275,8 @@ Re-derived for the v1.1 ordering (re-point at step 6, before the flip):
 | 9 (grep-clean) | normal git revert | code-only | none |
 
 **Stated explicitly per the repo schema-safety rule: rollback of the drop migration
-(0113) is impossible. Recovery is PITR-restore-to-marker with the data loss named
-above. The re-point migration (0112) is reversible only while the freeze holds; once
+(`M-DROP`) is impossible. Recovery is PITR-restore-to-marker with the data loss named
+above. The re-point migration (`M-REPOINT`) is reversible only while the freeze holds; once
 the flip unfreezes the system, the abort path is PITR-only.**
 
 ---
@@ -1355,7 +1436,7 @@ pending_notices `owner_profile_id` → person; intra-legacy drops: `family_links
 
 **No `accounts.id → organization.id` re-points exist** — both `accounts`-target FKs
 are intra-legacy drops (v1.2 correction; v1.0/v1.1 stated 4, which was wrong).
-These counts are **advisory**: the 0112 migration is generated from `pg_constraint`
+These counts are **advisory**: `M-REPOINT` is generated from `pg_constraint`
 (§2.7 query) at execution time, and any drift between this appendix and the catalog
 resolves in the catalog's favor.
 
