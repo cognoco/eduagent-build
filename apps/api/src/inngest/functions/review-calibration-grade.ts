@@ -119,6 +119,11 @@ export async function handleReviewCalibrationGrade({
           or(
             isNull(retentionCards.lastReviewedAt),
             lt(retentionCards.lastReviewedAt, cooldownThreshold),
+            // Re-entrancy: lastReviewedAt === eventAt means OUR claim from an
+            // earlier at-least-once execution of this step (eventAt derives
+            // deterministically from the event payload), not a competitor's —
+            // a retry after a lost step checkpoint must not lose its own slot.
+            eq(retentionCards.lastReviewedAt, eventAt),
           ),
         ),
       )
