@@ -233,6 +233,9 @@ jobs:
           CF_KV_COACHING_ID_DEV: ${{ secrets.CF_KV_COACHING_ID_DEV }}
           CF_KV_COACHING_ID_STG: ${{ secrets.CF_KV_COACHING_ID_STG }}
           CF_KV_COACHING_ID_PRD: ${{ secrets.CF_KV_COACHING_ID_PRD }}
+          CF_KV_IDEMPOTENCY_ID_DEV: ${{ secrets.CF_KV_IDEMPOTENCY_ID_DEV }}
+          CF_KV_IDEMPOTENCY_ID_STG: ${{ secrets.CF_KV_IDEMPOTENCY_ID_STG }}
+          CF_KV_IDEMPOTENCY_ID_PRD: ${{ secrets.CF_KV_IDEMPOTENCY_ID_PRD }}
         run: node scripts/render-wrangler-kv.mjs wrangler.toml
 
       - name: Verify Cloudflare KV bindings before migrations
