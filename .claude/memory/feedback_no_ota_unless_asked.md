@@ -2,6 +2,7 @@
 name: Never run OTA without explicit user request
 description: Do not run eas update (manual OTA) unless the user explicitly asks for it
 type: feedback
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 
 Never run `eas update` unless the user explicitly asks for it. Push and commit are fine when requested, but OTA publishing is a separate action that requires explicit instruction.

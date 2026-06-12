@@ -1368,13 +1368,13 @@ Realistic time expectations based on Foreign Service Institute research (for Eng
 - FR127: Manual prerequisite override — parent or advanced learner can mark a prerequisite as "already known" to unlock dependent topics without completing the prerequisite in-app.
 
 **Prerequisite Relationship Types:**
-- **REQUIRED** — topic is locked until prerequisite reaches "strong" retention. Enforced by unlock logic (FR119).
+- **REQUIRED** — strong advisory, never a hard lock. The topic always remains accessible (FR124); session ordering recommends the prerequisite first (FR119), explicit skips trigger the warning dialog (FR120), and the gap is injected as LLM teaching context (FR125). [Ruled 2026-06-11, WI-587: the earlier "locked until 'strong' retention" definition contradicted FR124 and the product's no-hard-gates posture; no unlock gate exists or will be built.]
 - **RECOMMENDED** — advisory only. Topic is unlocked regardless of prerequisite status. Coaching card and LLM context mention the gap but do not block progress.
 
 **Graph Constraints:**
 - Prerequisite graph must be a DAG (directed acyclic graph). Cycles are rejected on insert (FR118).
 - Each edge has a `relationshipType` enum: `REQUIRED | RECOMMENDED`.
-- Maximum depth: 5 levels. LLM prompt instructs shallow prerequisite chains to avoid deep lock cascades.
+- Maximum depth: 5 levels. LLM prompt instructs shallow prerequisite chains to avoid deep prerequisite cascades.
 
 **Visual Concept Map (FR121):**
 - Node colors: strong (green), fading (yellow), weak (red), grey (not started)

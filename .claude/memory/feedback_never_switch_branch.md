@@ -2,6 +2,7 @@
 name: Never switch branches without explicit permission
 description: NEVER run git checkout/switch to change branches unless the user explicitly asks — this has caused repeated frustration
 type: feedback
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 
 NEVER switch git branches (git checkout, git switch, or any equivalent) unless the user explicitly asks to change branches.
