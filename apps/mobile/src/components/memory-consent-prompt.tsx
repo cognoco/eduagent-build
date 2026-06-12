@@ -36,7 +36,7 @@ export function MemoryConsentPrompt({
           disabled={isPending}
           className="flex-1 bg-primary rounded-button px-4 py-3 items-center"
           accessibilityRole="button"
-          accessibilityLabel="Enable mentor memory"
+          accessibilityLabel={t('memoryConsent.a11yEnable')}
           testID="memory-consent-grant"
         >
           <Text className="text-body font-semibold text-text-inverse">
@@ -48,7 +48,7 @@ export function MemoryConsentPrompt({
           disabled={isPending}
           className="flex-1 bg-background rounded-button px-4 py-3 items-center border border-border"
           accessibilityRole="button"
-          accessibilityLabel="Decline mentor memory"
+          accessibilityLabel={t('memoryConsent.a11yDecline')}
           testID="memory-consent-decline"
         >
           <Text className="text-body font-semibold text-text-primary">

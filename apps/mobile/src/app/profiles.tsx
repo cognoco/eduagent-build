@@ -87,11 +87,11 @@ export default function ProfilesScreen() {
           setRenameValue('');
         },
         onError: (err) => {
-          platformAlert('Could not rename profile', formatApiError(err));
+          platformAlert(t('profiles.renameErrorTitle'), formatApiError(err));
         },
       },
     );
-  }, [renaming, renameValue, updateName, handleCancelRename]);
+  }, [renaming, renameValue, updateName, handleCancelRename, t]);
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/home');
@@ -132,7 +132,7 @@ export default function ProfilesScreen() {
       timedOut = true;
       switchInFlightRef.current = false;
       setIsSwitching(false);
-      platformAlert('Taking longer than expected', 'Please try again.');
+      platformAlert(t('profiles.timeoutTitle'), t('common.pleaseTryAgain'));
     }, 20_000);
     try {
       const result =
@@ -150,8 +150,8 @@ export default function ProfilesScreen() {
       }
       if (result?.success === false) {
         platformAlert(
-          'Could not switch profiles',
-          result.error ?? 'Please try again.',
+          t('profiles.switchErrorTitle'),
+          result.error ?? t('common.pleaseTryAgain'),
         );
         return;
       }
@@ -161,8 +161,8 @@ export default function ProfilesScreen() {
       handleClose();
       if (result?.persistenceFailed) {
         platformAlert(
-          'Profile switched',
-          'We could not save this profile choice on this device. You may need to pick it again after reopening the app.',
+          t('profiles.switchedTitle'),
+          t('profiles.switchPersistenceWarning'),
         );
       }
     } catch (err) {
@@ -174,7 +174,7 @@ export default function ProfilesScreen() {
       // [CR-2026-05-21-107] Same guard as the success path — if the 20s
       // alert already fired, do not stack a second error dialog over it.
       if (timedOut) return;
-      platformAlert('Could not switch profiles', formatApiError(err));
+      platformAlert(t('profiles.switchErrorTitle'), formatApiError(err));
     } finally {
       clearTimeout(timeoutId);
       switchInFlightRef.current = false;
@@ -322,7 +322,9 @@ export default function ProfilesScreen() {
                     }
                     hitSlop={8}
                     className="min-h-[44px] min-w-[44px] items-center justify-center"
-                    accessibilityLabel={`Rename ${profile.displayName}`}
+                    accessibilityLabel={t('profiles.a11yRename', {
+                      name: profile.displayName,
+                    })}
                     accessibilityRole="button"
                     testID={`profile-rename-${profile.id}`}
                   >
@@ -392,9 +394,9 @@ export default function ProfilesScreen() {
                 returnKeyType="done"
                 className="bg-background rounded-card px-4 py-3 text-body text-text-primary mb-4"
                 placeholderTextColor={colors.muted}
-                placeholder="Name"
+                placeholder={t('profiles.namePlaceholder')}
                 testID="rename-input"
-                accessibilityLabel="Profile name"
+                accessibilityLabel={t('profiles.a11yNameInput')}
               />
               <View className="flex-row justify-end gap-3">
                 <Pressable
@@ -424,7 +426,7 @@ export default function ProfilesScreen() {
                   }`}
                   testID="rename-save"
                   accessibilityRole="button"
-                  accessibilityLabel="Save"
+                  accessibilityLabel={t('common.save')}
                 >
                   <Text className="text-body font-semibold text-text-inverse">
                     {updateName.isPending

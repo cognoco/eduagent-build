@@ -218,7 +218,9 @@
       "greetingNoName": "Hei på deg!",
       "myNotes": "Mine notater",
       "subjectsLoadError": "Vi kunne ikke laste inn fagene dine akkurat nå",
-      "subjectsLoadErrorHint": "Du kan fortsatt starte en økt eller prøve en annen handling."
+      "subjectsLoadErrorHint": "Du kan fortsatt starte en økt eller prøve en annen handling.",
+      "a11yOpenMyNotes": "Åpne mine notater",
+      "a11yRetrySubjects": "Prøv å laste inn emner på nytt"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
@@ -317,10 +319,13 @@
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
     "coachBand": {
-      "estimatedMinutes": "{{minutes}} min"
+      "estimatedMinutes": "{{minutes}} min",
+      "a11yDismiss": "Avvis anbefaling",
+      "a11yLoadingCard": "Laster mentorkort"
     },
     "earlyAdopter": {
-      "badge": "Tidlig bruker – din tilbakemelding former MentoMate"
+      "badge": "Tidlig bruker – din tilbakemelding former MentoMate",
+      "a11ySendFeedback": "Send tilbakemelding – dine innspill former MentoMate"
     },
     "subjectTile": {
       "topicsProgress": "{{completed}}/{{total}} emner"
@@ -578,7 +583,11 @@
       "typeSubjectPlaceholder": "Skriv inn et emne",
       "typeSubjectLabel": "Skriv inn et emne",
       "useTypedSubject": "Bruk",
-      "useTypedSubjectLabel": "Bruk skrevet emne"
+      "useTypedSubjectLabel": "Bruk skrevet emne",
+      "a11yAddSubject": "Legg til {{name}} som et nytt emne",
+      "a11yChooseSubject": "Velg {{name}}",
+      "a11yHideProblem": "Skjul oppgavetekst",
+      "a11yShowProblem": "Vis oppgavetekst"
     },
     "quota": {
       "dailyLimitReached": "Daglig grense nådd",
@@ -613,7 +622,9 @@
       "dismissLabel": "Avvis ferdighetsøvelse",
       "title": "Ferdighetsøvelse",
       "skip": "Hopp over",
-      "skipLabel": "Hopp over dette øvelseselementet"
+      "skipLabel": "Hopp over dette øvelseselementet",
+      "a11yScore": "Øvelse fullført: {{correct}} av {{total}} riktige, {{pct}} prosent",
+      "a11yTimer": "Ferdighetsøvelse: {{time}} gjenstår"
     },
     "chatShell": {
       "defaultSubtitle": "Jeg er her for å hjelpe",
@@ -765,7 +776,9 @@
       "a11yHelpful": "Nyttig – merk dette svaret som nyttig",
       "a11yNotHelpful": "Ikke nyttig – merk dette svaret som ikke nyttig",
       "a11yIncorrect": "Merk dette svaret som unøyaktig",
-      "wrongSubject": "Utenfor emne"
+      "wrongSubject": "Utenfor emne",
+      "a11yRemoveBookmark": "Fjern bokmerke",
+      "a11yAddBookmark": "Bokmerk dette svaret"
     },
     "questionCounter": {
       "question": "Spørsmål {{count}}"
@@ -791,7 +804,8 @@
     },
     "inputMode": {
       "text": "Tekstmodus",
-      "voice": "Talemodus"
+      "voice": "Talemodus",
+      "saveError": "Kunne ikke lagre modusen akkurat nå."
     },
     "milestoneDots": {
       "reached_one": "1 milepæl nådd",
@@ -802,6 +816,39 @@
       "progressLabel_other": "Bokfremdrift: {{count}} sider",
       "pageCount_one": "{{count}} side",
       "pageCount_other": "{{count}} sider"
+    },
+    "quickChips": {
+      "hintLabel": "Hint",
+      "hintPrompt": "Gi meg et hint.",
+      "hintConfirm": "Legger til et hint.",
+      "exampleLabel": "Eksempel",
+      "examplePrompt": "Kan du vise et lignende eksempel?",
+      "exampleConfirm": "Henter et nytt eksempel.",
+      "knowThisLabel": "Jeg kan dette",
+      "knowThisPrompt": "Jeg kan denne delen allerede. Kan vi gå videre?",
+      "knowThisConfirm": "Går videre.",
+      "explainDifferentlyLabel": "Forklar annerledes",
+      "explainDifferentlyPrompt": "Kan du forklare det annerledes?",
+      "explainDifferentlyConfirm": "Prøver en annen vinkling.",
+      "tooEasyLabel": "For lett",
+      "tooEasyPrompt": "Det føles for lett. Kan du gjøre det mer utfordrende?",
+      "tooEasyConfirm": "Øker utfordringen.",
+      "tooHardLabel": "For vanskelig",
+      "tooHardPrompt": "Det føles for vanskelig. Kan du dele det opp mer?",
+      "tooHardConfirm": "Deler det opp mer."
+    },
+    "streamErrors": {
+      "reconnect": "Mistet tilkoblingen – sjekk nettverket ditt og trykk på Koble til på nytt for å prøve igjen.",
+      "timeout": "Økten din ble tidsavbrutt. Prøv igjen.",
+      "serverError": "Serverfeil – trykk på Koble til på nytt for å prøve igjen.",
+      "configError": "Serverkonfigurasjonsfeil – prøv igjen om et øyeblikk."
+    },
+    "a11yQuestionCount": "Spørsmål {{number}}",
+    "a11ySessionTime": "Økt-tid: {{time}}",
+    "feedbackConfirm": {
+      "helpful": "Holder dette tempoet.",
+      "notHelpful": "Justerer forklaringen.",
+      "incorrect": "Jeg retter det."
     }
   },
   "quiz": {
@@ -939,7 +986,9 @@
       "correctAnnounceNoAnswer": "Riktig!",
       "wrongAnnounce": "Ikke helt. Svaret var {{answer}}",
       "wrongAnnounceNoAnswer": "Ikke helt.",
-      "questionProgress": "{{current}} av {{total}}"
+      "questionProgress": "{{current}} av {{total}}",
+      "checkErrorTitle": "Kunne ikke sjekke svaret ditt",
+      "a11yElapsed": "Forløpt tid: {{seconds}} sekunder"
     },
     "results": {
       "viewHistory": "Vis historikk",
@@ -1301,7 +1350,11 @@
     "provenanceFrom": "Fra {{name}}",
     "recentlyAdded": "Nylig lagt til",
     "sessionCount_one": "{{count}} økt",
-    "sessionCount_other": "{{count}} økter"
+    "sessionCount_other": "{{count}} økter",
+    "a11yClearSearch": "Tøm søk",
+    "a11yEditNote": "Rediger notat",
+    "a11yDeleteNote": "Slett notat",
+    "a11yCloseTopicPicker": "Lukk emnevelger"
   },
   "topic": {
     "relevance": {
@@ -1470,7 +1523,8 @@
     "warningBody1": "Dette vil permanent slette kontoen din og alle tilknyttede data, inkludert profiler, læringsfremgang og samtykkeregistreringer.",
     "warningBody2": "Du vil ha en 7-dagers angrefrist til å ombestemme deg. Etter det kan ikke dataene dine gjenopprettes.",
     "understandDelete": "Jeg forstår, slett kontoen min",
-    "understandDeleteLabel": "Jeg forstår, slett kontoen min"
+    "understandDeleteLabel": "Jeg forstår, slett kontoen min",
+    "signOutErrorTitle": "Kunne ikke logge deg ut"
   },
   "legal": {
     "privacy": {
@@ -1667,7 +1721,28 @@
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
-    "microphoneUnavailableTitle": "Mikrofon utilgjengelig"
+    "microphoneUnavailableTitle": "Mikrofon utilgjengelig",
+    "detectSubjectErrorTitle": "Kunne ikke gjenkjenne emne",
+    "detectSubjectErrorBody": "{{error}} Velg emnet ditt manuelt.",
+    "identifySubjectErrorTitle": "Kunne ikke identifisere emnet",
+    "identifySubjectErrorBody": "{{error}} Velg emnet manuelt.",
+    "capturePhotoErrorTitle": "Kunne ikke ta bilde",
+    "capturePhotoErrorBody": "Prøv igjen. Hvis problemet vedvarer, prøv å importere fra galleriet ditt i stedet.",
+    "galleryOpenErrorTitle": "Kunne ikke åpne bildene dine",
+    "galleryOpenErrorBody": "Prøv igjen eller bruk kameraet i stedet.",
+    "photoAccessTitle": "Tilgang til bilder trengs",
+    "photoAccessBody": "Gi tilgang til bilder i Innstillinger for å importere lekser fra galleriet ditt.",
+    "truncationTitle": "Obs!",
+    "truncationSavedAndShortened": "Noen oppgaver var for lange til å passe. Bare de første {{saved}} ble lagret, og den siste ble forkortet.",
+    "truncationSingleShortened": "Denne oppgaven var for lang til å sendes i sin helhet og ble forkortet.",
+    "truncationSavedOnly": "Noen oppgaver var for lange; bare de første {{saved}} av {{input}} er lagret.",
+    "noProblemsTitle": "Ingen oppgaver funnet",
+    "noProblemsBody": "Behold minst ett oppgavekort.",
+    "noSubjectTitle": "Ikke noe emne valgt",
+    "noSubjectBody": "Gå tilbake og velg et emne først.",
+    "createSubjectErrorTitle": "Kunne ikke opprette emne",
+    "classifyErrorTitle": "Kunne ikke identifisere emnet",
+    "classifyErrorBody": "Velg hvilket emne denne leksen tilhører."
   },
   "progress": {
     "pageTitleMine": "Min fremgang",
@@ -1946,7 +2021,10 @@
     "accordion": {
       "loadErrorRetry": "Kunne ikke laste inn temaer. Trykk for å prøve igjen, eller lukk emnekortet for å avvise.",
       "noTopicsYet": "Ingen temaer ennå",
-      "browseTopics": "Bla gjennom temaer"
+      "browseTopics": "Bla gjennom temaer",
+      "a11yRetry": "Prøv å laste inn emner på nytt. Trykk her for å prøve igjen, eller lukk emnekortet for å avvise.",
+      "a11yViewTopic": "Se detaljer for {{title}}",
+      "a11yBrowseLibrary": "Bla gjennom emner i biblioteket ditt"
     },
     "subjectRow": {
       "hideTopics": "▴ Skjul temaer",
@@ -2902,7 +2980,30 @@
       "tryAgain": "Prøv igjen",
       "checkAgain": "Sjekk igjen",
       "topUpConnectionErrorTitle": "Nettverksfeil",
-      "topUpConnectionErrorBody": "Vennligst sjekk internettforbindelsen din og prøv igjen."
+      "topUpConnectionErrorBody": "Vennligst sjekk internettforbindelsen din og prøv igjen.",
+      "topUpUnavailableTitle": "Ikke tilgjengelig",
+      "topUpUnavailableBody": "Påfyllingskreditter er ikke tilgjengelige akkurat nå. Prøv igjen senere eller kontakt kundestøtte.",
+      "topUpConfirmedBody": "Dine 500 kreditter blir lagt til. De vises vanligvis innen et minutt – dra ned for å oppdatere bruken din.",
+      "contactSupportTitle": "Kontakt kundestøtte",
+      "contactSupportBody": "Send e-post til support@mentomate.app for hjelp med abonnementer.",
+      "removeFamilyTitle": "Fjerne fra familie?",
+      "removeFamilyBody": "{{name}}s profil vil bli fjernet fra denne familieplanen og skjult fra profilbytte.",
+      "removeAction": "Fjern",
+      "familyUpdatedTitle": "Familie oppdatert",
+      "familyUpdatedBody": "{{name}} ble fjernet fra familieplanen din.",
+      "removeFailedTitle": "Kunne ikke fjerne profil",
+      "removeFailedBody": "Sjekk tilkoblingen din og prøv igjen.",
+      "checkLaterTitle": "Sjekk senere",
+      "checkLaterBody": "Kreditter vil dukke opp snart – trykk på oppdater for å sjekke."
+    },
+    "a11yUpgradePlan": "Oppgrader plan",
+    "a11yRemoveMember": "Fjern {{name}} fra familien",
+    "a11yBuyCredits": "Kjøp 500 kreditter",
+    "a11yCancelTopUp": "Avbryt påfyllingsbekreftelse",
+    "a11yManageBilling": "Administrer fakturering",
+    "poll": {
+      "confirming": "Bekrefter kjøpet ditt...",
+      "slowPoll": "Bekrefter fortsatt – dette kan ta opptil 30 sekunder. Kjøpet ditt er trygt."
     }
   },
   "passwordInput": {
@@ -3111,7 +3212,15 @@
     "createFirstHint": "Opprett din første profil for å komme i gang",
     "createProfile": "Opprett profil",
     "addProfile": "+ Legg til profil",
-    "renameTitle": "Gi profilen nytt navn"
+    "renameTitle": "Gi profilen nytt navn",
+    "renameErrorTitle": "Kunne ikke endre navn på profil",
+    "timeoutTitle": "Tar lengre tid enn forventet",
+    "switchErrorTitle": "Kunne ikke bytte profiler",
+    "switchedTitle": "Profil byttet",
+    "switchPersistenceWarning": "Vi kunne ikke lagre dette profilvalget på denne enheten. Du må kanskje velge det igjen etter å ha åpnet appen på nytt.",
+    "a11yRename": "Gi nytt navn til {{name}}",
+    "namePlaceholder": "Navn",
+    "a11yNameInput": "Profilnavn"
   },
   "time": {
     "relative": {
@@ -3168,7 +3277,14 @@
     "webDateFormatHint": "Skriv inn fødselsdatoen din som ÅÅÅÅ-MM-DD.",
     "childWebDateFormatHint": "Skriv inn barnets fødselsdato som ÅÅÅÅ-MM-DD.",
     "selectDob": "Velg fødselsdato",
-    "selectChildDob": "Velg barnets fødselsdato"
+    "selectChildDob": "Velg barnets fødselsdato",
+    "createdTitle": "Profil opprettet",
+    "createdChildBody": "{{name}}s profil er klar. Du kan åpne den fra Familiemodus.",
+    "createdSwitchFailedBody": "Vi opprettet profilen, men kunne ikke bytte til den automatisk. Du kan bytte fra Profiler-skjermen.",
+    "upgradeRequiredTitle": "Oppgradering kreves",
+    "upgradeRequiredBody": "Abonnementet ditt støtter ikke flere profiler. Oppgrader til Familie eller Pro.",
+    "seePlans": "Se planer",
+    "a11yCloseDatePicker": "Lukk datovelger"
   },
   "clerkGate": {
     "timeoutTitle": "Tar lengre tid enn forventet",
@@ -3178,16 +3294,26 @@
     "connecting": "Kobler til sikkert..."
   },
   "modeSwitcher": {
-    "switchError": "Kunne ikke bytte. Trykk for å prøve igjen."
+    "switchError": "Kunne ikke bytte. Trykk for å prøve igjen.",
+    "a11yRetry": "Prøv modusbytte på nytt"
   },
   "profileSwitcher": {
-    "fallbackName": "Profil"
+    "fallbackName": "Profil",
+    "switchErrorTitle": "Kunne ikke bytte profil",
+    "a11yClose": "Lukk profilbytter",
+    "a11yChip": "Bytt profil. Nåværende: {{name}}",
+    "a11yOption": "{{name}}, {{role}}",
+    "a11yOptionActive": "{{name}}, {{role}}, aktiv",
+    "roleParent": "Foresatt",
+    "roleStudent": "Elev"
   },
   "memoryConsent": {
     "defaultTitle": "Hjelp veilederen med å lære om {{name}}",
     "defaultTitleNoName": "Hjelp veilederen med å lære om barnet ditt",
     "defaultDescription": "Dette lar veilederen huske hva slags forklaringer som fungerer, hva som fortsatt er vanskelig, og hvilke eksempler som føles relevante.",
-    "grant": "Ja, aktiver"
+    "grant": "Ja, aktiver",
+    "a11yEnable": "Aktiver veilederhukommelse",
+    "a11yDecline": "Hopp over veileder-minne"
   },
   "saveWizard": {
     "title": "Flott, la oss lagre dette og komme i gang.",
@@ -3201,7 +3327,13 @@
     "yourNameLabel": "Ditt navn",
     "yourBirthYearLabel": "Ditt fødselsår",
     "childNameLabel": "Barnets navn",
-    "childBirthYearLabel": "Barnets fødselsår"
+    "childBirthYearLabel": "Barnets fødselsår",
+    "yourNamePlaceholder": "Ditt navn",
+    "yourBirthYearPlaceholder": "Fødselsår (f.eks. 1985)",
+    "childNamePlaceholder": "Deres navn eller kallenavn",
+    "childBirthYearPlaceholder": "Fødselsår",
+    "a11yBack": "Tilbake til forrige trinn",
+    "a11yCancel": "Avbryt og avslutt"
   },
   "myNotes": {
     "title": "Mine notater",
@@ -3319,7 +3451,19 @@
     "weeklyHighlight": "Ukens høydepunkt",
     "sampleBadge": "Eksempel",
     "sampleDataNote": "Eksempeldata – barnets virkelige innsikt vises etter den første økten.",
-    "sampleWeeklyBody": "Øvde på andregradsligninger i 45 minutter over tre økter. Blir komfortabel med faktorisering; jobber med å fullføre kvadratet."
+    "sampleWeeklyBody": "Øvde på andregradsligninger i 45 minutter over tre økter. Blir komfortabel med faktorisering; jobber med å fullføre kvadratet.",
+    "intentSelfLabel": "Meg",
+    "intentSelfDescription": "Jeg setter opp dette for meg selv.",
+    "intentChildLabel": "Barnet mitt",
+    "intentChildDescription": "Jeg vil hjelpe barnet mitt.",
+    "intentBothLabel": "Begge",
+    "intentBothDescription": "For meg og barnet mitt.",
+    "intentNotSureLabel": "Ikke sikker",
+    "intentNotSureDescription": "Vis meg hvordan det fungerer først.",
+    "bothChildFirstLabel": "Sett opp for barnet mitt først",
+    "bothChildFirstDescription": "Vi hjelper barnet ditt i gang, og kommer så tilbake til deg.",
+    "bothSelfFirstLabel": "Prøv en leksjon selv først",
+    "bothSelfFirstDescription": "Se hvordan det fungerer, og sett deretter opp for barnet ditt etter registrering."
   },
   "milestoneCard": {
     "wordCount_one": "{{count}} ord lært",

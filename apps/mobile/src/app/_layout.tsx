@@ -1,3 +1,4 @@
+import i18next from 'i18next';
 import '../../global.css';
 import { ensureI18nReady } from '../i18n';
 import React, {
@@ -183,8 +184,8 @@ function ThemedApp() {
       })
         .catch(() => {
           platformAlert(
-            'Could not sign you out',
-            'Please close and reopen the app, then sign in again.',
+            i18next.t('account.signOutErrorTitle'),
+            i18next.t('account.signOutFailedMessage'),
           );
         })
         .finally(() => {

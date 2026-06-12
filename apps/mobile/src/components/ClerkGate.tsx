@@ -94,7 +94,7 @@ export function ClerkGate({
               marginBottom: 12,
             }}
             accessibilityRole="button"
-            accessibilityLabel="Try again"
+            accessibilityLabel={t('clerkGate.tryAgain')}
           >
             <Text
               style={{
@@ -112,7 +112,7 @@ export function ClerkGate({
             onPress={onContinueOffline}
             style={{ paddingVertical: 10, paddingHorizontal: 16 }}
             accessibilityRole="button"
-            accessibilityLabel="Continue without account"
+            accessibilityLabel={t('clerkGate.continueOffline')}
           >
             <Text
               style={{

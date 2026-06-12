@@ -234,7 +234,9 @@
       "greetingNoName": "Hey there!",
       "myNotes": "My Notes",
       "subjectsLoadError": "We couldn't load your subjects right now",
-      "subjectsLoadErrorHint": "You can still start a session or try another action."
+      "subjectsLoadErrorHint": "You can still start a session or try another action.",
+      "a11yOpenMyNotes": "Open My Notes",
+      "a11yRetrySubjects": "Retry loading subjects"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -333,10 +335,13 @@
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
     "coachBand": {
-      "estimatedMinutes": "{{minutes}} min"
+      "estimatedMinutes": "{{minutes}} min",
+      "a11yDismiss": "Dismiss recommendation",
+      "a11yLoadingCard": "Loading mentor card"
     },
     "earlyAdopter": {
-      "badge": "Early user — your feedback shapes MentoMate"
+      "badge": "Early user — your feedback shapes MentoMate",
+      "a11ySendFeedback": "Send feedback — your input shapes MentoMate"
     },
     "subjectTile": {
       "topicsProgress": "{{completed}}/{{total}} topics"
@@ -595,7 +600,11 @@
       "typeSubjectPlaceholder": "Type a subject",
       "typeSubjectLabel": "Type a subject",
       "useTypedSubject": "Use",
-      "useTypedSubjectLabel": "Use typed subject"
+      "useTypedSubjectLabel": "Use typed subject",
+      "a11yAddSubject": "Add {{name}} as a new subject",
+      "a11yChooseSubject": "Choose {{name}}",
+      "a11yHideProblem": "Hide problem text",
+      "a11yShowProblem": "Show problem text"
     },
     "quota": {
       "dailyLimitReached": "Daily limit reached",
@@ -630,7 +639,9 @@
       "dismissLabel": "Dismiss fluency drill",
       "title": "Fluency drill",
       "skip": "Skip",
-      "skipLabel": "Skip this drill item"
+      "skipLabel": "Skip this drill item",
+      "a11yScore": "Drill complete: {{correct}} out of {{total}} correct, {{pct}} percent",
+      "a11yTimer": "Fluency drill: {{time}} remaining"
     },
     "chatShell": {
       "defaultSubtitle": "I'm here to help",
@@ -781,7 +792,9 @@
       "a11yHelpful": "Helpful — mark this reply helpful",
       "a11yNotHelpful": "Not helpful — mark this reply not helpful",
       "a11yIncorrect": "Flag this reply as inaccurate",
-      "wrongSubject": "Off subject"
+      "wrongSubject": "Off subject",
+      "a11yRemoveBookmark": "Remove bookmark",
+      "a11yAddBookmark": "Bookmark this response"
     },
     "questionCounter": {
       "question": "Question {{count}}"
@@ -807,7 +820,8 @@
     },
     "inputMode": {
       "text": "Text mode",
-      "voice": "Voice mode"
+      "voice": "Voice mode",
+      "saveError": "Couldn't save that mode just now."
     },
     "milestoneDots": {
       "reached_one": "1 milestone reached",
@@ -818,6 +832,39 @@
       "progressLabel_other": "Book progress: {{count}} pages",
       "pageCount_one": "{{count}} page",
       "pageCount_other": "{{count}} pages"
+    },
+    "quickChips": {
+      "hintLabel": "Hint",
+      "hintPrompt": "Give me a hint.",
+      "hintConfirm": "Adding a hint.",
+      "exampleLabel": "Example",
+      "examplePrompt": "Can you show a similar example?",
+      "exampleConfirm": "Pulling a fresh example.",
+      "knowThisLabel": "I know this",
+      "knowThisPrompt": "I know this part already. Can we move ahead?",
+      "knowThisConfirm": "Moving ahead.",
+      "explainDifferentlyLabel": "Explain differently",
+      "explainDifferentlyPrompt": "Can you explain that differently?",
+      "explainDifferentlyConfirm": "Trying a different angle.",
+      "tooEasyLabel": "Too easy",
+      "tooEasyPrompt": "That feels too easy. Can you make it more challenging?",
+      "tooEasyConfirm": "Raising the challenge.",
+      "tooHardLabel": "Too hard",
+      "tooHardPrompt": "That feels too hard. Can you break it down more?",
+      "tooHardConfirm": "Breaking it down more."
+    },
+    "streamErrors": {
+      "reconnect": "Lost connection — check your network and tap Reconnect to try again.",
+      "timeout": "Your session timed out. Please try again.",
+      "serverError": "Server error — tap Reconnect to try again.",
+      "configError": "Server configuration error — try again in a moment."
+    },
+    "a11yQuestionCount": "Question {{number}}",
+    "a11ySessionTime": "Session time: {{time}}",
+    "feedbackConfirm": {
+      "helpful": "Keeping this pace.",
+      "notHelpful": "Adjusting the explanation.",
+      "incorrect": "I'll correct that."
     }
   },
   "quiz": {
@@ -933,7 +980,9 @@
       "correctAnnounceNoAnswer": "Correct!",
       "wrongAnnounce": "Not quite. The answer was {{answer}}",
       "wrongAnnounceNoAnswer": "Not quite.",
-      "questionProgress": "{{current}} of {{total}}"
+      "questionProgress": "{{current}} of {{total}}",
+      "checkErrorTitle": "Couldn't check your answer",
+      "a11yElapsed": "Elapsed time: {{seconds}} seconds"
     },
     "round": {
       "goBack": "Go back",
@@ -1387,7 +1436,11 @@
     "provenanceFrom": "From {{name}}",
     "recentlyAdded": "Recently added",
     "sessionCount_one": "{{count}} session",
-    "sessionCount_other": "{{count}} sessions"
+    "sessionCount_other": "{{count}} sessions",
+    "a11yClearSearch": "Clear search",
+    "a11yEditNote": "Edit note",
+    "a11yDeleteNote": "Delete note",
+    "a11yCloseTopicPicker": "Close topic picker"
   },
   "topic": {
     "lastStudied": "Last studied {{when}}",
@@ -1563,7 +1616,8 @@
     "warningBody1": "This will permanently delete your account and all associated data, including profiles, learning progress, and consent records.",
     "warningBody2": "You'll have a 7-day grace period to change your mind. After that, your data cannot be recovered.",
     "understandDelete": "I understand, delete my account",
-    "understandDeleteLabel": "I understand, delete my account"
+    "understandDeleteLabel": "I understand, delete my account",
+    "signOutErrorTitle": "Could not sign you out"
   },
   "legal": {
     "privacy": {
@@ -1760,7 +1814,28 @@
       "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
       "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
-    }
+    },
+    "detectSubjectErrorTitle": "Could not detect subject",
+    "detectSubjectErrorBody": "{{error}} Please select your subject manually.",
+    "identifySubjectErrorTitle": "Couldn't identify the subject",
+    "identifySubjectErrorBody": "{{error}} Please pick the subject manually.",
+    "capturePhotoErrorTitle": "Could not take photo",
+    "capturePhotoErrorBody": "Please try again. If the problem continues, try importing from your gallery instead.",
+    "galleryOpenErrorTitle": "Couldn't open your photos",
+    "galleryOpenErrorBody": "Please try again or use the camera instead.",
+    "photoAccessTitle": "Photo access needed",
+    "photoAccessBody": "Please allow photo access in Settings to import homework from your gallery.",
+    "truncationTitle": "Heads up",
+    "truncationSavedAndShortened": "Some problems were too long to fit. Only the first {{saved}} were saved, and the last one was shortened.",
+    "truncationSingleShortened": "This problem was too long to send in full and was shortened.",
+    "truncationSavedOnly": "Some problems were too long; only the first {{saved}} of {{input}} are saved.",
+    "noProblemsTitle": "No problems found",
+    "noProblemsBody": "Please keep at least one problem card.",
+    "noSubjectTitle": "No subject selected",
+    "noSubjectBody": "Please go back and select a subject first.",
+    "createSubjectErrorTitle": "Could not create subject",
+    "classifyErrorTitle": "Could not identify the subject",
+    "classifyErrorBody": "Please pick the subject this homework belongs to."
   },
   "progress": {
     "pageTitleMine": "My progress",
@@ -2039,7 +2114,10 @@
     "accordion": {
       "loadErrorRetry": "Could not load topics. Tap to retry, or close the subject card to dismiss.",
       "noTopicsYet": "No topics yet",
-      "browseTopics": "Browse topics"
+      "browseTopics": "Browse topics",
+      "a11yRetry": "Retry loading topics. Tap here to retry, or close the subject card to dismiss.",
+      "a11yViewTopic": "View {{title}} details",
+      "a11yBrowseLibrary": "Browse topics in your library"
     },
     "subjectRow": {
       "hideTopics": "▴ Hide topics",
@@ -2933,7 +3011,30 @@
       "tryAgain": "Try again",
       "checkAgain": "Check again",
       "topUpConnectionErrorTitle": "Network error",
-      "topUpConnectionErrorBody": "Please check your internet connection and try again."
+      "topUpConnectionErrorBody": "Please check your internet connection and try again.",
+      "topUpUnavailableTitle": "Not available",
+      "topUpUnavailableBody": "Top-up credits aren't available right now. Try again later or contact support.",
+      "topUpConfirmedBody": "Your 500 credits are being added. They usually appear within a minute — pull down to refresh your usage.",
+      "contactSupportTitle": "Contact support",
+      "contactSupportBody": "Email support@mentomate.app for help with subscriptions.",
+      "removeFamilyTitle": "Remove from family?",
+      "removeFamilyBody": "{{name}}'s profile will be removed from this family plan and hidden from profile switching.",
+      "removeAction": "Remove",
+      "familyUpdatedTitle": "Family updated",
+      "familyUpdatedBody": "{{name}} was removed from your family plan.",
+      "removeFailedTitle": "Could not remove profile",
+      "removeFailedBody": "Please check your connection and try again.",
+      "checkLaterTitle": "Check later",
+      "checkLaterBody": "Credits will appear shortly — tap refresh to check."
+    },
+    "a11yUpgradePlan": "Upgrade plan",
+    "a11yRemoveMember": "Remove {{name}} from family",
+    "a11yBuyCredits": "Buy 500 credits",
+    "a11yCancelTopUp": "Cancel top-up confirmation",
+    "a11yManageBilling": "Manage billing",
+    "poll": {
+      "confirming": "Confirming your purchase...",
+      "slowPoll": "Still confirming — this can take up to 30 seconds. Your purchase is safe."
     }
   },
   "passwordInput": {
@@ -3135,7 +3236,15 @@
     "createFirstHint": "Create your first profile to get started",
     "createProfile": "Create profile",
     "addProfile": "+ Add profile",
-    "renameTitle": "Rename profile"
+    "renameTitle": "Rename profile",
+    "renameErrorTitle": "Could not rename profile",
+    "timeoutTitle": "Taking longer than expected",
+    "switchErrorTitle": "Could not switch profiles",
+    "switchedTitle": "Profile switched",
+    "switchPersistenceWarning": "We could not save this profile choice on this device. You may need to pick it again after reopening the app.",
+    "a11yRename": "Rename {{name}}",
+    "namePlaceholder": "Name",
+    "a11yNameInput": "Profile name"
   },
   "feedbackSheet": {
     "title": "Give us feedback",
@@ -3168,7 +3277,14 @@
     "webDateFormatHint": "Enter your birth date as YYYY-MM-DD.",
     "childWebDateFormatHint": "Enter your child's birth date as YYYY-MM-DD.",
     "selectDob": "Select date of birth",
-    "selectChildDob": "Select your child's date of birth"
+    "selectChildDob": "Select your child's date of birth",
+    "createdTitle": "Profile created",
+    "createdChildBody": "{{name}}'s profile is ready. You can open it from Family mode.",
+    "createdSwitchFailedBody": "We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.",
+    "upgradeRequiredTitle": "Upgrade required",
+    "upgradeRequiredBody": "Your subscription does not support additional profiles. Please upgrade to Family or Pro.",
+    "seePlans": "See plans",
+    "a11yCloseDatePicker": "Close date picker"
   },
   "clerkGate": {
     "timeoutTitle": "Taking longer than expected",
@@ -3178,16 +3294,26 @@
     "connecting": "Connecting securely..."
   },
   "modeSwitcher": {
-    "switchError": "Couldn't switch. Tap to try again."
+    "switchError": "Couldn't switch. Tap to try again.",
+    "a11yRetry": "Retry mode switch"
   },
   "profileSwitcher": {
-    "fallbackName": "Profile"
+    "fallbackName": "Profile",
+    "switchErrorTitle": "Could not switch profile",
+    "a11yClose": "Close profile switcher",
+    "a11yChip": "Switch profile. Current: {{name}}",
+    "a11yOption": "{{name}}, {{role}}",
+    "a11yOptionActive": "{{name}}, {{role}}, active",
+    "roleParent": "Parent",
+    "roleStudent": "Student"
   },
   "memoryConsent": {
     "defaultTitle": "Help the mentor learn about {{name}}",
     "defaultTitleNoName": "Help the mentor learn about your child",
     "defaultDescription": "This lets the mentor remember what kinds of explanations work, what is still tricky, and which examples feel relevant.",
-    "grant": "Yes, enable"
+    "grant": "Yes, enable",
+    "a11yEnable": "Enable mentor memory",
+    "a11yDecline": "Skip mentor memory"
   },
   "saveWizard": {
     "title": "Great, let's save this and get you started.",
@@ -3201,7 +3327,13 @@
     "yourNameLabel": "Your name",
     "yourBirthYearLabel": "Your birth year",
     "childNameLabel": "Child's name",
-    "childBirthYearLabel": "Child's birth year"
+    "childBirthYearLabel": "Child's birth year",
+    "yourNamePlaceholder": "Your name",
+    "yourBirthYearPlaceholder": "Birth year (e.g. 1985)",
+    "childNamePlaceholder": "Their name or nickname",
+    "childBirthYearPlaceholder": "Birth year",
+    "a11yBack": "Back to previous step",
+    "a11yCancel": "Cancel and exit"
   },
   "myNotes": {
     "title": "My Notes",
@@ -3319,7 +3451,19 @@
     "weeklyHighlight": "Weekly highlight",
     "sampleBadge": "Sample",
     "sampleDataNote": "Sample data — your child's real insights appear after their first session.",
-    "sampleWeeklyBody": "Practiced quadratic equations for 45 minutes across three sessions. Getting comfortable with factoring; working on completing the square."
+    "sampleWeeklyBody": "Practiced quadratic equations for 45 minutes across three sessions. Getting comfortable with factoring; working on completing the square.",
+    "intentSelfLabel": "Me",
+    "intentSelfDescription": "I'm setting this up for myself.",
+    "intentChildLabel": "My child",
+    "intentChildDescription": "I want to help my child.",
+    "intentBothLabel": "Both",
+    "intentBothDescription": "For me and my child.",
+    "intentNotSureLabel": "Not sure",
+    "intentNotSureDescription": "Show me how it works first.",
+    "bothChildFirstLabel": "Set up my child first",
+    "bothChildFirstDescription": "We'll get your child going, then come back to you.",
+    "bothSelfFirstLabel": "Try a lesson myself first",
+    "bothSelfFirstDescription": "See how it works, then set up your child after sign-up."
   },
   "milestoneCard": {
     "wordCount_one": "{{count}} word learned",

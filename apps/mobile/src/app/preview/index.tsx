@@ -20,7 +20,7 @@ export default function PreviewLandingScreen() {
         className="self-start min-h-[44px] justify-center mb-4"
         testID="preview-landing-back"
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.goBackAction')}
       >
         <Text className="text-body-sm font-semibold text-primary">
           {t('preview.backToSignIn')}
@@ -38,7 +38,7 @@ export default function PreviewLandingScreen() {
         className="bg-primary rounded-button py-3.5 px-10 items-center w-full"
         testID="preview-landing-continue"
         accessibilityRole="button"
-        accessibilityLabel="Continue"
+        accessibilityLabel={t('common.continue')}
       >
         <Text className="text-body font-semibold text-text-inverse">
           {t('common.continue')}

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { View, Text, Pressable, Platform, Modal } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
+import type { TFunction } from 'i18next';
 import { isGuardianProfile } from '../../lib/profile';
 import { platformAlert } from '../../lib/platform-alert';
 
@@ -11,8 +12,11 @@ import { platformAlert } from '../../lib/platform-alert';
 function roleLabel(
   profile: { isOwner: boolean },
   allProfiles: ReadonlyArray<{ isOwner: boolean }>,
+  t: TFunction,
 ): string {
-  return isGuardianProfile(profile, allProfiles) ? 'Parent' : 'Student';
+  return isGuardianProfile(profile, allProfiles)
+    ? t('profileSwitcher.roleParent')
+    : t('profileSwitcher.roleStudent');
 }
 
 /** Derive up-to-2-char uppercase initials. Null-safe: a missing/blank
@@ -69,14 +73,17 @@ export function ProfileSwitcher({
         // Switch failed — keep dropdown open so user can retry.
       } catch (err: unknown) {
         console.error('Profile switch failed:', err);
-        platformAlert('Could not switch profile', 'Please try again.');
+        platformAlert(
+          t('profileSwitcher.switchErrorTitle'),
+          t('common.pleaseTryAgain'),
+        );
         // Dropdown stays open for retry
       } finally {
         switchingRef.current = false;
         setSwitching(false);
       }
     },
-    [activeProfileId, onSwitch],
+    [activeProfileId, onSwitch, t],
   );
 
   if (profiles.length <= 1) return null;
@@ -95,9 +102,9 @@ export function ProfileSwitcher({
         className="flex-row items-center bg-surface-elevated rounded-full px-3 py-1.5"
         style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
         accessibilityRole="button"
-        accessibilityLabel={`Switch profile. Current: ${
-          activeProfile?.displayName ?? 'Unknown'
-        }`}
+        accessibilityLabel={t('profileSwitcher.a11yChip', {
+          name: activeProfile?.displayName ?? t('profileSwitcher.fallbackName'),
+        })}
         accessibilityState={{ expanded: isOpen }}
         testID="profile-switcher-chip"
       >
@@ -135,7 +142,7 @@ export function ProfileSwitcher({
             onPress={() => setIsOpen(false)}
             style={{ flex: 1 }}
             accessibilityRole="button"
-            accessibilityLabel="Close profile switcher"
+            accessibilityLabel={t('profileSwitcher.a11yClose')}
             testID="profile-switcher-backdrop"
           >
             {/* Menu anchored to the top-right, near the chip. The inner View
@@ -172,10 +179,17 @@ export function ProfileSwitcher({
                         isActive ? 'bg-primary-soft' : ''
                       } ${switching ? 'opacity-50' : ''}`}
                       accessibilityRole="menuitem"
-                      accessibilityLabel={`${profile.displayName}, ${roleLabel(
-                        profile,
-                        profiles,
-                      )}${isActive ? ', active' : ''}`}
+                      accessibilityLabel={
+                        isActive
+                          ? t('profileSwitcher.a11yOptionActive', {
+                              name: profile.displayName,
+                              role: roleLabel(profile, profiles, t),
+                            })
+                          : t('profileSwitcher.a11yOption', {
+                              name: profile.displayName,
+                              role: roleLabel(profile, profiles, t),
+                            })
+                      }
                       accessibilityState={{ selected: isActive }}
                       testID={`profile-option-${profile.id}`}
                     >
@@ -203,7 +217,7 @@ export function ProfileSwitcher({
                           {profile.displayName}
                         </Text>
                         <Text className="text-caption text-text-secondary">
-                          {roleLabel(profile, profiles)}
+                          {roleLabel(profile, profiles, t)}
                         </Text>
                       </View>
                       {isActive && (

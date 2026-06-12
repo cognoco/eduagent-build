@@ -1,3 +1,4 @@
+import i18next from 'i18next';
 import type { PendingCelebration } from '@eduagent/schemas';
 import type { ChatMessage } from './ChatShell';
 import { sanitizeSecureStoreKey } from '../../lib/secure-storage';
@@ -75,79 +76,94 @@ export interface PendingSubjectResolution {
   }>;
 }
 
-export const CONFIRMATION_BY_CHIP: Partial<
-  Record<ContextualQuickChipId, string>
-> = {
-  hint: 'Adding a hint.',
-  example: 'Pulling a fresh example.',
-  know_this: 'Moving ahead.',
-  explain_differently: 'Trying a different angle.',
-  too_easy: 'Raising the challenge.',
-  too_hard: 'Breaking it down more.',
-};
+export function chipConfirmationMessage(id: ContextualQuickChipId): string {
+  switch (id) {
+    case 'hint':
+      return i18next.t('session.quickChips.hintConfirm');
+    case 'example':
+      return i18next.t('session.quickChips.exampleConfirm');
+    case 'know_this':
+      return i18next.t('session.quickChips.knowThisConfirm');
+    case 'explain_differently':
+      return i18next.t('session.quickChips.explainDifferentlyConfirm');
+    case 'too_easy':
+      return i18next.t('session.quickChips.tooEasyConfirm');
+    case 'too_hard':
+      return i18next.t('session.quickChips.tooHardConfirm');
+  }
+}
+
+export function quickChipLabel(id: ContextualQuickChipId): string {
+  switch (id) {
+    case 'hint':
+      return i18next.t('session.quickChips.hintLabel');
+    case 'example':
+      return i18next.t('session.quickChips.exampleLabel');
+    case 'know_this':
+      return i18next.t('session.quickChips.knowThisLabel');
+    case 'explain_differently':
+      return i18next.t('session.quickChips.explainDifferentlyLabel');
+    case 'too_easy':
+      return i18next.t('session.quickChips.tooEasyLabel');
+    case 'too_hard':
+      return i18next.t('session.quickChips.tooHardLabel');
+  }
+}
 
 // WI-373: the per-chip `systemPrompt` steering strings moved server-side
 // (apps/api/src/services/session/system-prompt-intents.ts). The client now
 // sends a `quick_chip` intent token and never authors system-role text.
-export const QUICK_CHIP_CONFIG: Record<
-  ContextualQuickChipId,
-  {
-    label: string;
-    prompt: string;
+// The prompt is the user-visible chat message sent on the learner's behalf,
+// so it renders in the learner's conversation language.
+export function quickChipPrompt(id: ContextualQuickChipId): string {
+  switch (id) {
+    case 'hint':
+      return i18next.t('session.quickChips.hintPrompt');
+    case 'example':
+      return i18next.t('session.quickChips.examplePrompt');
+    case 'know_this':
+      return i18next.t('session.quickChips.knowThisPrompt');
+    case 'explain_differently':
+      return i18next.t('session.quickChips.explainDifferentlyPrompt');
+    case 'too_easy':
+      return i18next.t('session.quickChips.tooEasyPrompt');
+    case 'too_hard':
+      return i18next.t('session.quickChips.tooHardPrompt');
   }
-> = {
-  hint: {
-    label: 'Hint',
-    prompt: 'Give me a hint.',
-  },
-  example: {
-    label: 'Example',
-    prompt: 'Can you show a similar example?',
-  },
-  know_this: {
-    label: 'I know this',
-    prompt: 'I know this part already. Can we move ahead?',
-  },
-  explain_differently: {
-    label: 'Explain differently',
-    prompt: 'Can you explain that differently?',
-  },
-  too_easy: {
-    label: 'Too easy',
-    prompt: 'That feels too easy. Can you make it more challenging?',
-  },
-  too_hard: {
-    label: 'Too hard',
-    prompt: 'That feels too hard. Can you break it down more?',
-  },
-};
+}
 
 // BUG-151: Copy must not promise a "Reconnect button below" verbatim — the
 // affordance is a Reconnect chip rendered next to the failing message only
 // when the error is reconnectable. Phrase the prompt so it works regardless
 // of which path surfaces it and so it doesn't reference UI that may not be
 // visible.
-export const RECONNECT_PROMPT =
-  'Lost connection — check your network and tap Reconnect to try again.';
+export function reconnectPrompt(): string {
+  return i18next.t('session.streamErrors.reconnect');
+}
 
-export const TIMEOUT_PROMPT = 'Your session timed out. Please try again.';
+export function timeoutPrompt(): string {
+  return i18next.t('session.streamErrors.timeout');
+}
 
-export const SERVER_ERROR_PROMPT = 'Server error — tap Reconnect to try again.';
+export function serverErrorPrompt(): string {
+  return i18next.t('session.streamErrors.serverError');
+}
 
-export const CONFIG_ERROR_PROMPT =
-  'Server configuration error — try again in a moment.';
+export function configErrorPrompt(): string {
+  return i18next.t('session.streamErrors.configError');
+}
 
 export function reconnectPromptForError(error: unknown): string {
-  if (isTimeoutError(error)) return TIMEOUT_PROMPT;
+  if (isTimeoutError(error)) return timeoutPrompt();
 
   if (error instanceof Error) {
-    if (error.name === 'UpstreamError') return SERVER_ERROR_PROMPT;
+    if (error.name === 'UpstreamError') return serverErrorPrompt();
     // CORS or server misconfiguration — surface config-error prompt so the
     // user knows a retry is unlikely to help (matches use-session-streaming
     // comment: "CORS/config → config error").
-    if (error.name === 'ConfigError') return CONFIG_ERROR_PROMPT;
+    if (error.name === 'ConfigError') return configErrorPrompt();
     if (error.name === 'NetworkError' || error.name === 'TypeError')
-      return RECONNECT_PROMPT;
+      return reconnectPrompt();
   }
 
   const status =
@@ -158,9 +174,9 @@ export function reconnectPromptForError(error: unknown): string {
       ? ((error as { status: number }).status as number)
       : undefined;
 
-  if (status !== undefined && status >= 500) return SERVER_ERROR_PROMPT;
+  if (status !== undefined && status >= 500) return serverErrorPrompt();
 
-  return RECONNECT_PROMPT;
+  return reconnectPrompt();
 }
 
 export function isTimeoutError(error: unknown): boolean {

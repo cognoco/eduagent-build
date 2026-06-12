@@ -13,7 +13,7 @@ export function QuestionCounter({ count }: QuestionCounterProps) {
     <View
       className="mt-2 items-center py-2"
       testID="question-counter"
-      accessibilityLabel={`Question ${count}`}
+      accessibilityLabel={t('session.a11yQuestionCount', { number: count })}
     >
       <Text className="text-caption text-text-secondary font-medium">
         {t('session.questionCounter.question', { count })}

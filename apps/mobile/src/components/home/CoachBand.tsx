@@ -74,7 +74,7 @@ export function CoachBand({
         onPress={onDismiss}
         className="absolute top-2 right-2.5 p-1"
         hitSlop={8}
-        accessibilityLabel="Dismiss recommendation"
+        accessibilityLabel={t('home.coachBand.a11yDismiss')}
         accessibilityRole="button"
       >
         <Text className="text-text-secondary text-base">×</Text>

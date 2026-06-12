@@ -173,7 +173,9 @@ export function SubjectResolutionAccessory({
               }
               className="rounded-full bg-primary/20 px-4 py-2"
               accessibilityRole="button"
-              accessibilityLabel={`Add ${pendingSubjectResolution.suggestedSubjectName} as a new subject`}
+              accessibilityLabel={t('session.accessories.a11yAddSubject', {
+                name: pendingSubjectResolution.suggestedSubjectName,
+              })}
               accessibilityState={{
                 disabled:
                   isStreaming ||
@@ -196,7 +198,9 @@ export function SubjectResolutionAccessory({
               disabled={isStreaming || pendingClassification}
               className="rounded-full bg-surface-elevated px-4 py-2"
               accessibilityRole="button"
-              accessibilityLabel={`Choose ${candidate.subjectName}`}
+              accessibilityLabel={t('session.accessories.a11yChooseSubject', {
+                name: candidate.subjectName,
+              })}
               accessibilityState={{
                 disabled: isStreaming || pendingClassification,
               }}
@@ -217,7 +221,9 @@ export function SubjectResolutionAccessory({
               }
               className="rounded-full bg-primary/20 px-4 py-2"
               accessibilityRole="button"
-              accessibilityLabel={`Add ${suggestion.name} as a new subject`}
+              accessibilityLabel={t('session.accessories.a11yAddSubject', {
+                name: suggestion.name,
+              })}
               accessibilityState={{
                 disabled:
                   isStreaming ||
@@ -362,7 +368,9 @@ export function HomeworkModeChips({
             className="flex-1 pr-2"
             accessibilityRole="button"
             accessibilityLabel={
-              problemExpanded ? 'Hide problem text' : 'Show problem text'
+              problemExpanded
+                ? t('session.accessories.a11yHideProblem')
+                : t('session.accessories.a11yShowProblem')
             }
             accessibilityState={{ expanded: problemExpanded }}
             testID="homework-problem-toggle"

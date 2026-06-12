@@ -1,4 +1,5 @@
 import type { HomeworkProblem } from '@eduagent/schemas';
+import i18next from 'i18next';
 
 import {
   buildHomeworkSessionParams,
@@ -110,25 +111,31 @@ describe('buildHomeworkSessionParams', () => {
 describe('getHomeworkProblemTruncationAlertMessage', () => {
   it('reports dropped-problem counts', () => {
     expect(
-      getHomeworkProblemTruncationAlertMessage({
-        inputProblemCount: 5,
-        savedProblemCount: 2,
-        droppedProblemCount: 3,
-        singleProblemTruncated: false,
-        maxParamLength: 8000,
-      }),
+      getHomeworkProblemTruncationAlertMessage(
+        {
+          inputProblemCount: 5,
+          savedProblemCount: 2,
+          droppedProblemCount: 3,
+          singleProblemTruncated: false,
+          maxParamLength: 8000,
+        },
+        i18next.t,
+      ),
     ).toBe('Some problems were too long; only the first 2 of 5 are saved.');
   });
 
   it('reports a shortened single problem', () => {
     expect(
-      getHomeworkProblemTruncationAlertMessage({
-        inputProblemCount: 1,
-        savedProblemCount: 1,
-        droppedProblemCount: 0,
-        singleProblemTruncated: true,
-        maxParamLength: 8000,
-      }),
+      getHomeworkProblemTruncationAlertMessage(
+        {
+          inputProblemCount: 1,
+          savedProblemCount: 1,
+          droppedProblemCount: 0,
+          singleProblemTruncated: true,
+          maxParamLength: 8000,
+        },
+        i18next.t,
+      ),
     ).toBe('This problem was too long to send in full and was shortened.');
   });
 });
