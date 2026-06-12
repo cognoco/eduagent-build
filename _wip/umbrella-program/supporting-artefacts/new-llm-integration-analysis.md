@@ -1,8 +1,11 @@
 # new-llm Integration Analysis — gap vs main, gap vs the IF cutover, strategy
 
-**Date:** 2026-06-12 · **Status:** v1.1 — analysis red-teamed (verdict: O2 stands with
-amendments; C5 corrected, checklist hardened, two new items, §7 enforcement added);
-strategy recommendation pending operator ruling
+**Date:** 2026-06-12 · **Status:** v1.2 — twice adversarially reviewed (pass 1: C5
+corrected, items 9–10 added, §7 enforcement; pass 2 by the cutover-context reviewer:
+item 10 made executable, repoint ownership split, S4/S5 re-key promoted to checklist
+item 11, item 5 intersection made dynamic). Verdict both passes: **O2 stands with
+amendments**. Branch FINAL at `6a81f7663` — nothing further in Zuzka's pipeline; §8
+rescan obligation is moot. Strategy recommendation pending operator ruling.
 **Method:** 9-surface sweep workflow (55 agents), every high/medium finding adversarially
 verified (confirmed / adjusted / refuted) by independent re-derivation. Branch state analyzed:
 `origin/new-llm` @ `6a81f7663` (60 ahead / ~11 behind main; merge-base = cutover-plan v1.3
@@ -57,7 +60,7 @@ convergence done), not "W2 landed" — the new tables exist today but are not li
 |---|---|---|---|
 | C1 | **i18n ratchet baseline re-inflated 12 → 349** — a branch-side merge resolution silently undid WI-621's burn-down (set-analysis: main's 12 + 337 resurrected entries; source-side `t()` routing survived on both sides) | **High, confirmed** | Pure file-level fix: take main's baseline wholesale at merge; branch's own new copy is properly t()-routed (7 locales) |
 | C2 | Migration slot 0111 consumed by `0111_zippy_gateway` while the cutover plan hard-codes 0111/0112/0113 | Medium (adjusted: first-merger-wins) | Plan switches to "next-free at landing" numbering (already in the v1.1 addendum); whoever merges second renumbers |
-| C3 | `mentor_activity_ledger.profile_id` FK → legacy `profiles(id)` ON DELETE CASCADE — a new drop-listed-table dependent unknown to the plan's static inventory | Medium (adjusted: **no stranding** — plan §2.7 generates M-REPOINT from live `pg_constraint`, absorbing it as the 57th re-point automatically) | Merge-order dependency only: 0111 must be applied before the re-point catalog snapshot; code-side: `activity-ledger.ts` joins the grep-clean/S4 re-point list |
+| C3 | `mentor_activity_ledger.profile_id` FK → legacy `profiles(id)` ON DELETE CASCADE — a new drop-listed-table dependent unknown to the plan's static inventory | Medium (adjusted: **no stranding** — plan §2.7 generates M-REPOINT from live `pg_constraint`, absorbing it automatically) | **Ownership split (pass-2 sharpened):** M-REPOINT owns the FK only; CUT-B/grep-clean owns the code side (`activity-ledger.ts` legacy `profiles` import, relations, tests, the scoped-repo accessor); and the V2 **S4 plan must be amended to DROP its independently-scheduled second repoint migration** (s4 plan lines ~168–175) — otherwise two lanes migrate the same column. 0111 must be applied before the re-point catalog snapshot |
 | C4 | `deletion.ts` gains a NEW legacy read (`accounts.email` RETURNING → byok_waitlist erase, GDPR Art-17) | Medium, confirmed | CUT-B2's deletion twin spec must carry it or the GDPR fix silently drops at cutover |
 | C5 | Deploy gate `check-reference-only-migrations.mjs` **false-positives on journaled 0108**: its marker regex (`/REFERENCE ONLY\|DO NOT APPLY/i`) scans every journaled migration's SQL, and 0108's own header *mentions* "0106/0107 are REFERENCE ONLY" — so post-merge the gate blocks **every** staging/prod deploy (it runs before the migrate + worker-deploy steps), including the whole convergence chain and the branch's own WI-664 payoff. 0108 is journaled forever (MMT-ADR-0012), so it never self-resolves. The script ships untested and unwired in CI, so the defect surfaces only at the first live deploy. *(Corrected by red-team — the original "0106/0107 journaled" framing and "runbook exemption note" remedy were both wrong.)* | **High** (red-team corrected) | **Pre-merge code fix, not a note:** structured own-file marker (e.g. first-line `-- @reference-only` token), a unit test pinning "current journal passes", and one CI invocation against the real journal |
 | C6 | ADR tangle: duplicate `MMT-ADR-0019` (branch freeform-threshold vs main os-agnostic), branch reserves 0020–0023 (0020 collides with the consent_request ADR pencil), branch `docs/INDEX.md` wrong, ledger ADR missing its lockstep canon edit | Medium, confirmed | Renumber branch ADRs to next-free at merge; fix INDEX; add the lockstep edit; cutover plan already yields on 0020 |
@@ -134,11 +137,13 @@ is the existing one: PR review + CI + the reconciliation checklist below.
 5. **Content-level merge verification as an executable CI invariant (C9):**
    (a) path-level rule — every path in `diff(main, merge)` must appear in
    `diff(merge-base, branch)`; any extra = main content modified by the merge;
-   (b) the both-sides-changed file set is enumerable today (ratchet baselines,
-   `_journal.json`, `AGENTS.md`, workflows, `i18n-keep.ts`) — each gets a named
-   resolution rule; (c) runs as a check on the merge PR, recorded in the PR, not a
-   human promise. Path-level alone cannot catch the C1 class — the per-file rules are
-   the actual guard.
+   (b) the both-sides-changed set is **computed at merge time, never from a static
+   list** (pass-2: the v1.1 static list was already stale within hours — main moved;
+   the then-current intersection was `.claude/memory/MEMORY.md`, `AGENTS.md`,
+   `docs/PRD.md`) — every intersecting path gets a named resolution rule, and
+   branch-vs-main divergences in guard/baseline files are checked even when only one
+   side moved since merge-base (the C1 class); (c) runs as a check on the merge PR,
+   recorded in the PR, not a human promise.
 6. Doppler provisioning before the post-merge deploy: `CF_KV_IDEMPOTENCY_ID_DEV/STG/PRD`
    + `SEED_PASSWORD` (+ Cloudflare KV namespaces) — this is the WI-664 fix landing.
 7. **Operator sign-off against a generated, complete per-module behavior-change
@@ -152,9 +157,20 @@ is the existing one: PR review + CI + the reconciliation checklist below.
    day but `services/export.ts` does not enumerate it — extend export before merge (or
    gate the ledger write), and add the table to CUT-B2's export-twin spec. Erasure is
    already covered (FK cascade); access/portability is not.
-10. **OTA hazard (red-team):** the expo package realignment changes native module majors
-    while `runtimeVersion` policy is `appVersion` — post-merge, **no OTA until new EAS
-    builds exist** (or bump `version` so stale binaries fall outside the OTA target).
+10. **OTA hazard — executable form (pass-2 upgraded to High):** `ci.yml`'s `ota-update`
+    job auto-publishes on **every push to main** when mobile changed and natives didn't.
+    The merge commit itself skips (native diff in `package.json`), but the **next
+    JS-only push** would OTA stale binaries built against the old native majors. Prose
+    "no OTA" is not a gate. Executable fix, in the merge itself: **bump
+    `apps/mobile/app.json` `version`** (runtimeVersion policy = appVersion → stale
+    binaries fall outside the OTA target permanently), or add a temporary
+    `OTA_FREEZE` repo-variable guard to the `ota-update` job, lifted only when new EAS
+    builds exist.
+11. **Re-key the V2 plans' identity blockers in the merge (pass-2):** S4/S5/S6
+    Blocked-by sections still cite the superseded "W1/W2 landed" chain — on post-merge
+    main those tables exist but are NOT live until the flip. Rewrite to "post-IF-flip +
+    convergence complete" (and apply the C3 S4 amendment) so no executor ever starts S4
+    against dead tables. Owner: Zuzka's lane; lands with the merge or immediately after.
 
 **Additional note (red-team F8):** the branch's 0111 SQL + snapshot are hand-curated, not
 clean `generate` output (the unshipped concepts DDL was hand-trimmed). CUT-A's
@@ -188,7 +204,8 @@ ratification folds the C3/C4/C5 deltas → S4/S5 re-key to post-flip (C-plans).
    legitimately burned); `AGENTS.md`/workflows resolve main-wins. The enforceable form is
    the post-merge checker run, not merge-commit prose.
 
-## §8 Rescan obligation
+## §8 Rescan obligation — MOOT
 
-Re-run a delta scan over commits landing after `6a81f7663` before merge ruling is executed
-(expected 1–2 small commits). Scope: same nine lenses, diff-only.
+The branch is final at `6a81f7663` (operator confirmation 2026-06-12: everything in
+transit had already landed before the audit ran). No rescan needed; any future commit to
+the branch re-opens this section.
