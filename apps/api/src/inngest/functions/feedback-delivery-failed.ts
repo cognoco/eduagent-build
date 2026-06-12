@@ -189,7 +189,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       // PII hygiene: the row's purpose is fulfilled — delete it. If this
       // delete fails the step retries; the re-send is deduped by Resend via
       // the idempotency key above, then the delete is retried.
-      await deleteFeedbackRetry(db, retryId);
+      await deleteFeedbackRetry(db, profileId, retryId);
 
       return { ok: true, profileId };
     });

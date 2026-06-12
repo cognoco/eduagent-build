@@ -98,12 +98,24 @@ export async function getFeedbackRetry(
   return row ?? null;
 }
 
-/** Deletes a consumed retry row — the strongest PII minimization. */
+/**
+ * Deletes a consumed retry row — the strongest PII minimization. Scoped by
+ * profileId (defence-in-depth write rule), matching getFeedbackRetry's read
+ * scope, so no future caller can delete another user's row by id alone.
+ */
 export async function deleteFeedbackRetry(
   db: Database,
+  profileId: string,
   retryId: string,
 ): Promise<void> {
-  await db.delete(feedbackRetryQueue).where(eq(feedbackRetryQueue.id, retryId));
+  await db
+    .delete(feedbackRetryQueue)
+    .where(
+      and(
+        eq(feedbackRetryQueue.id, retryId),
+        eq(feedbackRetryQueue.profileId, profileId),
+      ),
+    );
 }
 
 /**

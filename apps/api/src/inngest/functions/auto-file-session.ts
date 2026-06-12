@@ -117,9 +117,11 @@ async function runAutoFileSession({
   });
 
   if (!result) {
-    // Mutually exclusive with the availability branch above (that branch
-    // returns), so the step name cannot collide within a single run.
-    await step.run('mark-failed-transcript-unavailable', async () => {
+    // Distinct step name from the never-available branch above: this is the
+    // vanished-between-steps case (transcript purged after the availability
+    // check). Distinct names keep the two branches collision-proof even if a
+    // future edit removes the early return above.
+    await step.run('mark-failed-transcript-vanished', async () => {
       const db = getStepDatabase();
       return markSessionAutoFilingFailed(db, profileId, sessionId);
     });
