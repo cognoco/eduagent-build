@@ -24,13 +24,19 @@ import { lt } from 'drizzle-orm';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { webhookIdempotencyKeys } from '@eduagent/database';
+import {
+  FEEDBACK_RETRY_RETENTION_DAYS,
+  purgeExpiredFeedbackRetries,
+} from '../../services/feedback-retry';
 
 const RETENTION_DAYS = 30;
 
 export const webhookIdempotencyPurge = inngest.createFunction(
   {
     id: 'webhook-idempotency-purge',
-    name: 'Purge webhook_idempotency_keys older than retention window',
+    // id stays stable (Inngest identity); the name reflects that this cron
+    // also purges expired feedback_retry_queue rows (PII retention floor).
+    name: 'Purge expired idempotency keys and feedback retry rows',
     retries: 1,
     concurrency: { limit: 1 },
   },
@@ -54,6 +60,23 @@ export const webhookIdempotencyPurge = inngest.createFunction(
       },
     );
 
-    return { status: 'completed', deletedCount, cutoff };
+    // Bounded retention for feedback_retry_queue (PII: feedback free-text).
+    // The feedback-delivery-failed consumer deletes its row after a
+    // successful send; rows surviving past the retention floor are orphans
+    // (event dispatch failed, or every retry was exhausted) and are purged
+    // here so user free-text never sits in the table indefinitely.
+    const feedbackRetry = await step.run(
+      'purge-expired-feedback-retries',
+      async () => {
+        const cutoffDate = new Date(
+          Date.now() - FEEDBACK_RETRY_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+        );
+        const db = getStepDatabase();
+        const purgedCount = await purgeExpiredFeedbackRetries(db, cutoffDate);
+        return { deletedCount: purgedCount, cutoff: cutoffDate.toISOString() };
+      },
+    );
+
+    return { status: 'completed', deletedCount, cutoff, feedbackRetry };
   },
 );

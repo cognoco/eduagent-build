@@ -38,6 +38,24 @@ export type SessionAutoFileRequestedEvent = z.infer<
   typeof sessionAutoFileRequestedEventSchema
 >;
 
+// PII egress: No `message` / `supportTo` / `metaLines` fields: Inngest
+// persists event payloads in its third-party event store, so the user's
+// feedback free-text must never ride in the event. The feedback route parks
+// the full payload in the first-party `feedback_retry_queue` row and the
+// event carries only that row's opaque id; the consumer
+// (feedback-delivery-failed) rehydrates the payload by id (scoped by
+// profileId) and re-derives the support address from config.
+export const feedbackDeliveryFailedEventSchema = z.object({
+  retryId: z.string().uuid(),
+  // Not always a uuid: the feedback route's profile context can be the
+  // literal 'unknown'.
+  profileId: z.string().min(1),
+  userId: z.string().min(1),
+});
+export type FeedbackDeliveryFailedEvent = z.infer<
+  typeof feedbackDeliveryFailedEventSchema
+>;
+
 export const filingRetryCompletedEventSchema = z.object({
   sessionId: z.string().uuid(),
   profileId: z.string().uuid(),
