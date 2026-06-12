@@ -7,7 +7,7 @@ marked no-behavior-change. No area is silently omitted.
 **Diff range:** `origin/main...origin/new-llm` (three-dot — changes since merge-base `853b3c242`)
 **Branch HEAD at inventory time:** `e9f03dd1e` (final reconciled new-llm — all PRG-17 reconciliation PRs WI-675..685 merged)
 **Generated:** 2026-06-12 · **Regenerated against final state:** 2026-06-13
-**Diff stats:** 288 files changed, 22 409 insertions, 5 085 deletions (291 paths in `--name-only`, incl. binary/asset entries)
+**Diff stats:** 290 files changed, 22 454 insertions, 5 085 deletions (`--stat` summary); **293 paths** in `--name-only` (incl. binary/asset entries), measured against the final reconciled new-llm with this inventory committed
 
 > **This regeneration accounts for the PRG-17 reconciliation additions (WI-675..685)** — see §F. The count above is measured against `origin/main...origin/new-llm`. After this inventory file is itself committed to the branch, the authoritative count INCLUDING this file is stated in the *Artifact Coverage Confirmation* at the foot of the document, so `diff(main, new-llm)` after merge equals the number the artifact states.
 
@@ -421,9 +421,9 @@ A new `.github/workflows/merge-invariant.yml` runs on every PR targeting `main` 
 
 Coverage is stated against the diff that INCLUDES this committed inventory file, so that after merge `diff(origin/main, origin/new-llm)` equals the number stated here.
 
-- **Files changed, `origin/main...HEAD` (this branch, including this committed inventory file): 291 paths** (`--name-only`); 288 in the `--stat` file-summary (the difference is binary/asset accounting).
+- **Files changed, `origin/main...HEAD` (this branch, including this committed inventory file): 293 paths** (`--name-only`); 290 in the `--stat` file-summary (the difference is binary/asset accounting).
   - This is the count the operator should expect from `git diff origin/main...origin/new-llm --name-only | wc -l` once this inventory regeneration is merged.
-  - The inventory file already existed on `new-llm` (from the prior merged commit), so this regeneration MODIFIES that path rather than adding a new one — the count is identical (291) whether measured as `origin/main...HEAD` or `origin/main...origin/new-llm`. Verified equal at regeneration time.
+  - The count grew from 291 (the prior regeneration vs the final-but-pre-WI-687 new-llm) to 293 because the WI-687 reconciliation brought two previously-unchanged files into the diff: `apps/api/src/services/database-rls-coverage.ts` and its co-located test (both pre-exist in `main`; WI-687 added the manifest/`KNOWN_PROFILE_TABLES` entries). The inventory file itself modifies an existing path rather than adding one, so it does not inflate the count beyond its single self-entry.
 
 Inventory groups (every changed area mapped or explicitly marked no-behavior-change; none silently omitted):
 - §A API (`apps/api/`): config, routes, services, inngest, drizzle (incl. 0112 RLS), scripts, wrangler, deploy.yml — all accounted for
