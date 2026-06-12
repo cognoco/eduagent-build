@@ -27,7 +27,7 @@
 
 ## Critical Architecture Decisions
 
-- [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. All 10 LLM flows wired. Fixture-driven snapshot harness for prompt builders.
+- [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. 23 flows registered (FLOWS array in `apps/api/eval-llm/index.ts` is authoritative). Fixture-driven snapshot harness for prompt builders.
 - [project_eval_llm_signal_metrics.md](project_eval_llm_signal_metrics.md) — Layer 1 signal-distribution regression guard. `emitsEnvelope` flag + `--check-baseline`/`--update-baseline`.
 - [project_llm_source_provenance.md](project_llm_source_provenance.md) — Private source provenance, sourceAudit metadata, and 0.88-gated general knowledge for ordinary rung 1-4 tutoring exchanges.
 - [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit; model routing details live in `MMT-ADR-0014` + `docs/registers/llm-models/master.md`.
@@ -63,7 +63,7 @@
 ## Deployment & Secrets
 
 - [feedback_doppler_secrets.md](feedback_doppler_secrets.md) — All secrets via Doppler. EXPO_PUBLIC vars synced via `pnpm env:sync`.
-- [doppler-secrets.md](doppler-secrets.md) — Test secret resolution: project `mentomate`, configs `dev/stg/prd`. `DATABASE_URL` and friends needed by `*.test.ts` files that include integration paths. Archon's validate/push wrap via `doppler run`.
+- [doppler-secrets.md](doppler-secrets.md) — Test secret resolution: project `mentomate`, configs `dev/stg/prd`; `doppler run` wrap patterns + load-database-env probe paths. Archon's validate/push wrap via `doppler run`.
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`). Staging synced 2026-04-17.
 
 ## Store Publishing
@@ -84,7 +84,7 @@
 - [project_language_pedagogy.md](project_language_pedagogy.md) — four_strands pedagogy mode (alongside socratic). Vocabulary CRUD, CEFR levels, language-progress routes.
 - [project_freeform_library_filing_decision.md](project_freeform_library_filing_decision.md) — Ask Anything saves sessions by default; Library filing is separate, auto-file when confident, keep-out-of-Library remains available.
 - [project_language_assessments_production_first.md](project_language_assessments_production_first.md) — Language reviews must test production/translation/tiny exchanges, not abstract topic summaries or culture-ish "idea of a greeting" prompts.
-- [feedback_never_lock_topics.md](feedback_never_lock_topics.md) — NEVER lock/block topics. Prerequisites advisory.
+- [feedback_never_lock_topics.md](feedback_never_lock_topics.md) — NEVER lock/block topics. Prerequisites advisory. Ratified WI-587 (2026-06-11); PRD REQUIRED definition fixed to match.
 - [feedback_never_force_add_child.md](feedback_never_force_add_child.md) — Never force add-child. Solo/skip path always available for parent accounts.
 - [feedback_human_override_everywhere.md](feedback_human_override_everywhere.md) — Every AI-driven screen must allow human override.
 - [feedback_quiet_defaults_over_friction.md](feedback_quiet_defaults_over_friction.md) — Default to quiet, infer from sustained behavior, surface controls only when sought. Surveillance and friction are both UX bugs.

@@ -2,6 +2,7 @@
 name: LLM summaries of user content that surface to another user are a prompt-injection vector
 description: When an LLM reads content from user A and outputs text rendered to user B, specify injection mitigations in the spec's failure modes — not as an afterthought
 type: feedback
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 
 Any LLM pipeline where one user's content is fed to a model whose output is displayed to a different user is a prompt-injection surface. Spec the mitigations before implementation.

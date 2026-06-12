@@ -2,6 +2,7 @@
 name: User's primary test device is Samsung Galaxy S10e (small screen)
 description: User tests on Galaxy S10e (5.8" screen). Small screen layout bugs are a real concern — buttons getting cut off, scroll issues, keyboard overlap. Always consider this device when reviewing UI changes.
 type: user
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587 — still the test device)
 ---
 
 **Device:** Samsung Galaxy S10e

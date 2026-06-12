@@ -2,6 +2,7 @@
 name: Doppler — DATABASE_URL + test secrets
 description: Tests requiring real DB get DATABASE_URL via Doppler. Project=mentomate, configs dev/stg/prd. Archon's validate/push wrap with `doppler run`.
 type: project
+last_confirmed: 2026-06-11
 ---
 
 # Doppler-managed secrets for tests
@@ -15,10 +16,6 @@ All real-database test secrets (`DATABASE_URL`, `CLERK_SECRET_KEY`, `CLERK_PUBLI
 | `dev`  | Default for tests and Archon-driven validate/push runs |
 | `stg`  | Staging-equivalent (LLM eval gates, source-grounding) |
 | `prd`  | Production (do not target from local) |
-
-## Why some tests fail without it
-
-Tests living in `apps/api/src/services/*.test.ts` (e.g. `idempotency-assistant-state.test.ts`) include integration paths that require a real DB connection. They're not in `*.integration.test.ts` (which jest excludes via `testPathIgnorePatterns`), so they ARE picked up by `pnpm test:api:unit`. When `DATABASE_URL` is unset, `loadDatabaseEnv` warns and those tests fail with `DATABASE_URL is not set`. This is a known mis-categorization — tracked as a follow-up WI ([eduagent WI on validate gap]).
 
 ## How to run tests with secrets
 
@@ -36,7 +33,6 @@ When Archon runs `execute-workitem` against this repo, the validate and push bas
 
 - `zdx-config.yaml` for the selector
 - `~/.archon/scripts/zdx-validate.sh` and `zdx-push.sh` for the wrap logic
-- WI-89 session (PRs #373 + #374) was the first end-to-end run exercising this
 
 ## Operator note (macOS)
 

@@ -10,4 +10,4 @@ Voice mode must be fully functional, not hidden or deferred. Two directions:
 
 **Why:** The target audience is children. Typing is friction, especially for younger kids. A tutoring app that requires typing misses its audience. Voice-first is what makes MentoMate feel like having a real tutor.
 
-**How to apply:** When working on Epic 8 (Full Voice Mode), prioritize making voice work across ALL session types (learning, homework, practice). Don't defer voice or treat it as secondary. The Text/Voice toggle already exists in the UI — it just needs to work. TTS should be the default output mode, with text as fallback.
+**How to apply:** Voice must work across ALL session types (learning, homework, practice) — never defer it or treat it as secondary. As shipped (Epic 8, 2026-04-03): voice is a per-session Text/Voice toggle (FR144), not a universal default; TEACH_BACK mode defaults voice-on (FR142) as the narrower exception. The next phase of voice-first UX is the Epic 17 design (`docs/specs/2026-04-07-epic-17-voice-first-design.md`, NOT STARTED).

@@ -2,6 +2,7 @@
 name: Autonomous speccing
 description: When batch-speccing multiple items, make design decisions autonomously — only involve user for genuinely big trade-offs
 type: feedback
+last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
 ---
 
 When working through a batch of spec items, decide the best solution yourself. Only involve the user when there are genuinely large clarification or implementation differences between solutions.
