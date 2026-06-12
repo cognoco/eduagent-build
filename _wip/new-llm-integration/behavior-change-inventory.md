@@ -5,9 +5,11 @@ changed module in the branch diff is mapped to a behavioral effect or explicitly
 marked no-behavior-change. No area is silently omitted.
 
 **Diff range:** `origin/main...origin/new-llm` (three-dot — changes since merge-base `853b3c242`)
-**Branch HEAD at inventory time:** `9633c252f`
-**Generated:** 2026-06-12
-**Diff stats:** 274 files changed, 19 335 insertions, 5 084 deletions
+**Branch HEAD at inventory time:** `e9f03dd1e` (final reconciled new-llm — all PRG-17 reconciliation PRs WI-675..685 merged)
+**Generated:** 2026-06-12 · **Regenerated against final state:** 2026-06-13
+**Diff stats:** 290 files changed, 22 454 insertions, 5 085 deletions (`--stat` summary); **293 paths** in `--name-only` (incl. binary/asset entries), measured against the final reconciled new-llm with this inventory committed
+
+> **This regeneration accounts for the PRG-17 reconciliation additions (WI-675..685)** — see §F. The count above is measured against `origin/main...origin/new-llm`. After this inventory file is itself committed to the branch, the authoritative count INCLUDING this file is stated in the *Artifact Coverage Confirmation* at the foot of the document, so `diff(main, new-llm)` after merge equals the number the artifact states.
 
 ---
 
@@ -164,7 +166,7 @@ Each item verified present in the diff. Checked = present + correctly described 
 | `drizzle/0106_identity_t1_org_membership.sql` | Reference-only (1-line stub). Not applied in any deployed environment — no behavior change. |
 | `drizzle/0107_gorgeous_cardiac.sql` | Reference-only (1-line stub). `concepts`/`concept_mastery` tables. Not applied — see `CONCEPT_CAPTURE_ENABLED=false`. No behavior change. |
 | `drizzle/0111_zippy_gateway.sql` | **New `mentor_activity_ledger` table + `ledger_visibility` enum.** This migration IS applied (it's the table the Now-feed and activity-ledger service writes to). Must be run before deploying the worker code that references it. |
-| `drizzle/0112_rls_mentor_activity_ledger.sql` | **RLS enabled + profile-isolation policy on `mentor_activity_ledger`.** Idempotent (DO $$ IF NOT EXISTS guard). Must be run after 0111. |
+| `drizzle/0112_rls_mentor_activity_ledger.sql` | **BEHAVIORAL — RLS data-isolation on the ledger (WI-676).** Enables Row-Level Security + a `profile_id`-isolation policy on `mentor_activity_ledger` (the table 0111 shipped with no RLS — a live data-isolation gap). Idempotent (`DO $$ IF NOT EXISTS` guard). Must be run after 0111. Post-merge effect: ledger reads/writes are enforced to the current profile at the DB layer, matching the rest of the scoped tables. |
 | `drizzle/meta/_journal.json`, `meta/0111_snapshot.json`, `meta/0112_snapshot.json` | Drizzle meta — no behavior change. |
 
 #### A18. Wrangler / Deployment
@@ -172,9 +174,9 @@ Each item verified present in the diff. Checked = present + correctly described 
 | File | Effect |
 |------|--------|
 | `wrangler.toml` | **Staging `workers_dev` set to `false`.** Staging is no longer reachable at `*.workers.dev` — the URL that bypasses Cloudflare WAF/rate-limiting. **Production was already false.** `IDEMPOTENCY_KV` binding placeholder added for dev/stg/prd (actual namespace IDs managed via Doppler; `render-wrangler-kv.mjs` substitutes them at deploy). |
-| `apps/api/scripts/render-wrangler-kv.mjs` | KV substitution script update — no runtime behavior change. |
-| `apps/api/scripts/check-reference-only-migrations.mjs` | New script: validates that reference-only migrations (0106, 0107) have not been accidentally applied. No runtime behavior change. |
-| `apps/api/scripts/check-reference-only-migrations.test.mjs` | Test-only. |
+| `apps/api/scripts/render-wrangler-kv.mjs` | KV substitution script — now also maps `__IDEMPOTENCY_KV_DEV/STG/PRD__` → env `CF_KV_IDEMPOTENCY_ID_*` (read from `process.env`). No runtime behavior change (deploy-time tooling). See §F (WI-685) for the matching `deploy.yml` env wiring. |
+
+> Note: `check-reference-only-migrations.{mjs,test.mjs}` is the WI-675 deploy-gate tooling and lives under `packages/database/scripts/`, not `apps/api/scripts/` — see §F. (The prior inventory's `apps/api/scripts/` path here was a citation error, corrected in this regeneration.)
 
 #### A19. Middleware
 
@@ -342,6 +344,24 @@ All documentation files below are non-code and carry no behavioral effect at run
 
 ---
 
+### F. PRG-17 Reconciliation Commits (WI-675..685)
+
+These files were added/changed by the reconciliation PRs that landed on `new-llm` AFTER the first inventory was written (which captured 274 files). They are merge-invariant CI tooling, deploy wiring, two behavioral additions (RLS isolation, GDPR export), and docs. Listed here so the regenerated count is complete.
+
+| WI | File(s) | Effect |
+|----|---------|--------|
+| **WI-675** | `packages/database/scripts/check-reference-only-migrations.mjs` + `.test.mjs` | **No runtime behavior.** Deploy-gate tooling: validates that journaled reference-only migrations (0106, 0107) are not accidentally applied. CI/deploy guard only. |
+| **WI-676** | `apps/api/drizzle/0112_rls_mentor_activity_ledger.sql` + `drizzle/meta/0112_snapshot.json` | **BEHAVIORAL — RLS data-isolation on the ledger.** Enables Row-Level Security + `profile_id`-isolation policy on `mentor_activity_ledger`. Also cross-referenced in §A17. Post-merge: DB-layer profile isolation on ledger reads/writes. |
+| **WI-677** | `apps/mobile/src/i18n/source-baseline.json` | **No runtime behavior.** i18n source-baseline re-inflation after the new-llm merge reconciled the ratchet. (Note: `scripts/i18n-jsx-literals-baseline.json` is NOT in this diff — it was not changed by the reconciliation; reported as fact, not inferred.) |
+| **WI-678** | `docs/adr/*`, `docs/INDEX.md`, `docs/architecture.md`, `docs/plans/v2-plan/*`, `docs/plans/v2-dossier/00-README.md`, `01-day-in-the-life.md`, `02-what-dies-in-user-terms.md`, `03-decision-ledger.md`, `04-reels.html` | **No runtime behavior.** Planning/ADR/dossier docs (S4 ledger-repoint ownership alignment + v2 dossier). The `v2-dossier/04-reels.html` is a static doc asset. |
+| **WI-679** | `apps/api/src/services/export.ts`, `packages/schemas/src/account.ts` | **BEHAVIORAL — `mentor_activity_ledger` now included in GDPR data export.** `generateExport` reads ledger rows for the export's profileIds and adds a `mentorActivityLedger` array to the export payload (GDPR Art-15 portability gap; erasure via FK cascade was already covered). `account.ts` adds `dataExportMentorActivityLedgerRowSchema` + the optional `mentorActivityLedger` field on `dataExportSchema`. |
+| **WI-679** | `apps/mobile/app.json` | **BEHAVIORAL (release-metadata) — app `version` bumped 1.0.0 → 1.0.1.** This is the Expo marketing version (the `version` field, not a separate `runtimeVersion` policy field). Operator-visible: the next OTA/build ships as 1.0.1; relevant for store-version and OTA-channel tracking. |
+| **WI-680** | `scripts/check-merge-invariant.ts` + `.test.ts`, `scripts/merge-exclusions.json`, `.github/workflows/merge-invariant.yml` | **No runtime behavior.** New CI workflow (runs only on PRs to `main`) enforcing the three-way merge content invariant (main-side / branch-survival / both-sides-changed), with documented exclusions. Exists because new-llm's merge history twice silently dropped commit batches. Blocks the merge on violation but changes no app behavior. |
+| **WI-685** | `.github/workflows/deploy.yml` (env block) | **No runtime behavior (deploy wiring).** Adds `CF_KV_IDEMPOTENCY_ID_DEV/STG/PRD` to the `render-wrangler-kv` step's `env:` block — the missing third leg flagged in operator-attention #6. With this merged, the binding renders and the verify step passes (given the namespace + Doppler vars exist). See operator-attention #6 for the now-resolved status. |
+| **WI-687** | `apps/api/src/services/database-rls-coverage.ts` (manifest entry), `apps/api/src/services/database-rls-coverage.test.ts` (`KNOWN_PROFILE_TABLES`), `packages/database/src/schema/activity-ledger.ts` (`.enableRLS()`) | **No behavior change (RLS coverage registration).** Completes the TS-side of WI-676: registers `mentor_activity_ledger` in the `PROFILE_SCOPED_TABLES` RLS-coverage manifest, adds it to the test's `KNOWN_PROFILE_TABLES`, and chains `.enableRLS()` on the Drizzle table definition so the schema declaration matches the DB-side policy from migration 0112. This is manifest/test/schema-annotation hardening of an existing isolation policy — it asserts and declares the already-live RLS, introducing no NEW user-visible behavior. (The `.enableRLS()` on `schema/activity-ledger.ts` is the WI-687 delta on a file otherwise introduced by the ledger feature; the schema-package row in §C covers the table's introduction.) |
+
+---
+
 ## ⚠️ Operator Attention
 
 The following items require explicit operator awareness before approving the merge.
@@ -361,12 +381,12 @@ Migration 0111 (creates the `mentor_activity_ledger` table + enum) and 0112 (RLS
 ### 5. Staging `workers_dev = false` (new)
 Staging API is no longer reachable via `*.workers.dev`. Any internal tooling, test scripts, or manual QA flows that hardcode the workers.dev URL for staging will break. Custom-domain route (`api-stg.mentomate.com`) is the only path from merge onward.
 
-### 6. IDEMPOTENCY_KV binding now declared (not yet wired) — THREE-leg deploy blocker
-`wrangler.toml` now declares `IDEMPOTENCY_KV` for all three environments with placeholder IDs (`__IDEMPOTENCY_KV_DEV__`, etc.). The `render-wrangler-kv.mjs` script substitutes these at deploy time (`apps/api/scripts/render-wrangler-kv.mjs:42-44` maps `__IDEMPOTENCY_KV_DEV/STG/PRD__` → env `CF_KV_IDEMPOTENCY_ID_DEV/STG/PRD`, read from `process.env`), and `verify-wrangler-kv-binding.mjs` hard-fails the deploy if `IDEMPOTENCY_KV` stays unsubstituted (`.github/workflows/deploy.yml` verify step explicitly checks `IDEMPOTENCY_KV`). **Three legs are required before deploy succeeds — all three, or the deploy is blocked:**
+### 6. IDEMPOTENCY_KV binding — THREE legs; the CI-wiring leg is now done on-branch, the provisioning legs are still open
+`wrangler.toml` declares `IDEMPOTENCY_KV` for all three environments with placeholder IDs (`__IDEMPOTENCY_KV_DEV__`, etc.). `apps/api/scripts/render-wrangler-kv.mjs:42-44` maps `__IDEMPOTENCY_KV_DEV/STG/PRD__` → env `CF_KV_IDEMPOTENCY_ID_DEV/STG/PRD` (read from `process.env`), and `.github/workflows/deploy.yml`'s verify step hard-fails the deploy if `IDEMPOTENCY_KV` stays unsubstituted. **Three legs are required before a deploy with this binding succeeds:**
 
-1. **Cloudflare namespace** — create the `IDEMPOTENCY_KV` namespace in Cloudflare (Workers & Pages → KV → Create) for each of dev/stg/prd.
-2. **Doppler vars** — add `CF_KV_IDEMPOTENCY_ID_DEV/_STG/_PRD` (the created namespace IDs) to Doppler (project `mentomate`, configs dev/stg/prd) and into the GitHub Actions secrets used by the deploy workflow.
-3. **`deploy.yml` env wiring (MISSING on the branch)** — the `render-wrangler-kv` step in `.github/workflows/deploy.yml` (env block, ~lines 229-236) currently passes ONLY `CF_KV_SUBSCRIPTION_ID_*` and `CF_KV_COACHING_ID_*` to the job env — it does NOT pass the three `CF_KV_IDEMPOTENCY_ID_*`. So even after legs 1 and 2 exist, `render-wrangler-kv.mjs` reads `undefined` for the IDEMPOTENCY env vars, leaves `__IDEMPOTENCY_KV_*__` unsubstituted, and the very next step (`verify-wrangler-kv-binding.mjs ... IDEMPOTENCY_KV`) hard-fails → **deploy blocked**. The `deploy.yml` render step's `env:` block must add `CF_KV_IDEMPOTENCY_ID_DEV/STG/PRD` mirroring the existing SUBSCRIPTION/COACHING lines, otherwise the binding never renders. This is the missing third leg of the branch's WI-664 KV-wiring work. The code fix is tracked as **WI-685 (deploy.yml IDEMPOTENCY env wiring)** and pairs with **WI-682 (IDEMPOTENCY_KV namespace + Doppler provisioning)**.
+1. **Cloudflare namespace (OPEN — tracked WI-682)** — create the `IDEMPOTENCY_KV` namespace in Cloudflare (Workers & Pages → KV → Create) for each of dev/stg/prd.
+2. **Doppler + GH secrets (OPEN — tracked WI-682)** — add `CF_KV_IDEMPOTENCY_ID_DEV/_STG/_PRD` (the created namespace IDs) to Doppler (project `mentomate`, configs dev/stg/prd) and to the GitHub Actions secrets used by the deploy workflow.
+3. **`deploy.yml` env wiring (RESOLVED on-branch — WI-685, merged as part of this final reconciled new-llm)** — the `render-wrangler-kv` step's `env:` block now passes the three `CF_KV_IDEMPOTENCY_ID_*` (verified at `.github/workflows/deploy.yml:236-238`), mirroring the SUBSCRIPTION/COACHING lines. The first inventory flagged this leg as MISSING; it has since landed. With legs 1 + 2 still open, the placeholder is substituted with empty/undefined and the verify step will still hard-fail — **so a deploy that exercises the IDEMPOTENCY_KV verify is blocked until WI-682 provisioning lands.** Operator action: complete WI-682 (namespace + Doppler vars) before any deploy that runs the IDEMPOTENCY_KV verify step.
 
 ### 7. OTA CI now passes RevenueCat and Analytics keys
 The OTA publish step now injects `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`, `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`, and `EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1` as env vars. **If these secrets are not set in the GitHub Actions environment**, the OTA build will fail (or emit empty strings, silently disabling IAP and breaking HMAC analytics). Confirm all three are present in GitHub Actions secrets.
@@ -386,15 +406,35 @@ The Expo Router route `/(app)/more/learning-preferences` no longer exists. Any d
 ### 12. Concept-capture remains disabled (`CONCEPT_CAPTURE_ENABLED=false`)
 The mastery-star Challenge Round feature is still parked. The tables (0107) are reference-only. Re-enabling requires: applying 0107, flipping `CONCEPT_CAPTURE_ENABLED` to `true`, removing the comment. No user-visible regression — it was already non-functional.
 
+### 13. `mentor_activity_ledger` now in GDPR data export (WI-679)
+`generateExport` now includes a `mentorActivityLedger` array in the data-export payload. **Operator-visible:** a user's GDPR Art-15 export now contains their activity-ledger rows (templated activity moments). The export schema field is optional, so older export consumers do not break, but anyone reviewing export contents for PII/data-minimization should be aware the ledger is now surfaced. Pairs with the RLS isolation (WI-676) and the erasure cascade already in place.
+
+### 14. Mobile app version bumped 1.0.0 → 1.0.1 (WI-679)
+`apps/mobile/app.json` `version` is now `1.0.1`. **Operator action:** the next mobile build/OTA ships as 1.0.1 — confirm this aligns with the intended store-version / OTA-channel sequencing before cutting a release off the merged branch.
+
+### 15. Merge-invariant CI gate now active on PRs to `main` (WI-680)
+A new `.github/workflows/merge-invariant.yml` runs on every PR targeting `main` and **blocks the merge** if the three-way content invariant is violated (main-side untouched / branch content survives / documented exclusions). **Operator awareness:** the `new-llm → main` merge PR itself will be gated by this check; any intentional non-survival must be listed in `scripts/merge-exclusions.json` with a reason, or the gate fails. This is a guard, not an app behavior change.
+
 ---
 
-## Coverage Confirmation
+## Artifact Coverage Confirmation
 
-Re-run diff stat count: **274 files changed**. Inventory groups cover:
-- API (`apps/api/`): ~85 changed files (config, routes, services, inngest, drizzle, scripts, wrangler) — all accounted for
-- Mobile (`apps/mobile/`): ~110 changed files (screens, components, hooks, lib, i18n, tests, assets) — all accounted for
-- Shared packages (`packages/`): 10 changed files — all accounted for
-- CI/tooling (`.github/`, `.husky/`, `package.json`, `pnpm-lock.yaml`, `scripts/`) — all accounted for
-- Documentation (`docs/`, `_wip/`, `.claude/memory/`, `AGENTS.md`) — all accounted for (no behavior change)
+Coverage is stated against the diff that INCLUDES this committed inventory file, so that after merge `diff(origin/main, origin/new-llm)` equals the number stated here.
+
+- **Files changed, `origin/main...HEAD` (this branch, including this committed inventory file): 293 paths** (`--name-only`); 290 in the `--stat` file-summary (the difference is binary/asset accounting).
+  - This is the count the operator should expect from `git diff origin/main...origin/new-llm --name-only | wc -l` once this inventory regeneration is merged.
+  - The count grew from 291 (the prior regeneration vs the final-but-pre-WI-687 new-llm) to 293 because the WI-687 reconciliation brought two previously-unchanged files into the diff: `apps/api/src/services/database-rls-coverage.ts` and its co-located test (both pre-exist in `main`; WI-687 added the manifest/`KNOWN_PROFILE_TABLES` entries). The inventory file itself modifies an existing path rather than adding one, so it does not inflate the count beyond its single self-entry.
+
+Inventory groups (every changed area mapped or explicitly marked no-behavior-change; none silently omitted):
+- §A API (`apps/api/`): config, routes, services, inngest, drizzle (incl. 0112 RLS), scripts, wrangler, deploy.yml — all accounted for
+- §B Mobile (`apps/mobile/`): screens, components, hooks, lib, i18n, app.json, tests, assets — all accounted for
+- §C Shared packages (`packages/`): database (schema, repository, reference-only-migration scripts), schemas (activity-ledger, now-feed, stream-fallback, account, learning-profiles) — all accounted for
+- §D CI/tooling (`.github/`, `.husky/`, `package.json`, `pnpm-lock.yaml`, `scripts/` incl. merge-invariant + merge-exclusions) — all accounted for
+- §E Documentation (`docs/`, `_wip/`, `.claude/memory/`, `AGENTS.md`) — all accounted for (no behavior change)
+- §F PRG-17 reconciliation commits (WI-675..685) — all accounted for, two behavioral (WI-676 RLS, WI-679 GDPR export + version bump)
+
+**This inventory file itself** (`_wip/new-llm-integration/behavior-change-inventory.md`) — **no behavior change** (operator sign-off artifact; documents, does not modify runtime). Counted in the self-count above so the artifact does not under-report its own merge.
+
+All 9 known-live items remain present (see the Known-Live Changes Checklist at the top); the operator-attention section carries 15 items including the now-resolved-on-branch IDEMPOTENCY wiring leg (#6) and the two new behavioral reconciliation items (#13 GDPR export, #14 version bump).
 
 No changed area is silently omitted.
