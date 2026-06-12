@@ -140,6 +140,14 @@ reviewer-watcher's "API Error Handling" config entry is left in place (shared
 infra, harmless — flag for removal at the next watcher maintenance touch).
 This stream is dormant; nothing executes from here.
 
+*Residue addendum (2026-06-12):* on operator request, WI-646 and WI-650 were
+autonomously refined to **Ready** (Assisted) — WI-650's AC enumerates the 11
+live raw-throw sites (grep-verified) against the PR #966 pattern; WI-646's AC
+is outcome-level (deduplicated Sentry escalation on sustained webhook signature
+failure, mechanism implementer-chosen, webhook path never blocked). Both sit
+in the general Ready pool, unattached to this workstream; executable whenever
+capacity allows.
+
 ---
 
 **2026-06-11 — ALL 3 UNITS CLOSED — GRADUATION CANDIDATE.** WI-639, WI-640,
