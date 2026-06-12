@@ -8,7 +8,8 @@
 //   best-effort: it detects sustained failure within a single warm isolate's
 //   lifetime and fires one Sentry escalation. Under cold-start conditions or
 //   when the platform spawns multiple isolates, each isolate maintains its own
-//   independent counter. This is documented and accepted in the PR (WI-646).
+//   independent counter. This tradeoff is documented and accepted in the
+//   introducing PR's description.
 //
 //   A durable alternative (Inngest-based cross-isolate counter) is possible but
 //   would require a new Inngest function, a KV or D1 backend, and adds latency
@@ -95,11 +96,20 @@ export function createSignatureFailureEscalator(
 
         state.timestamps.push(nowMs);
 
+        // Cap retained timestamps at the threshold — beyond it the exact count
+        // is unused (the threshold check and the window-drain check only need
+        // the most recent THRESHOLD entries), and an unbounded array would grow
+        // per-request during a probe storm, burning isolate CPU/memory.
+        if (state.timestamps.length > SIGNATURE_FAILURE_THRESHOLD) {
+          state.timestamps = state.timestamps.slice(
+            -SIGNATURE_FAILURE_THRESHOLD,
+          );
+        }
+
         if (
           state.timestamps.length >= SIGNATURE_FAILURE_THRESHOLD &&
           !state.escalationFired
         ) {
-          state.escalationFired = true;
           captureException(new Error(errorMessage), {
             extra: {
               context: sentryContext,
@@ -108,12 +118,28 @@ export function createSignatureFailureEscalator(
               threshold: SIGNATURE_FAILURE_THRESHOLD,
             },
           });
+          // Set the flag only AFTER a successful capture. If captureException
+          // throws (Sentry SDK crash, misconfigured DSN), the flag stays false
+          // and the next failure in the episode retries the escalation —
+          // otherwise a throwing capture would permanently silence the episode.
+          state.escalationFired = true;
           // escalationFired stays true until all in-window timestamps evict
           // (on the next call after the window expires), preventing duplicate
           // escalations within the same sustained-failure window.
         }
-      } catch {
-        // Swallow — escalation-path failures must never affect the webhook handler.
+      } catch (err) {
+        // Swallow — escalation-path failures must never throw into the webhook
+        // handler. Leave a console trace so a Sentry-SDK failure is at least
+        // visible in Workers logs (the logger itself is a console wrapper; a
+        // bare console.error here cannot recurse into the failing SDK).
+        try {
+          console.error(
+            '[signature-failure-escalator] escalation path threw',
+            err instanceof Error ? err.message : String(err),
+          );
+        } catch {
+          // Truly silent only if console itself is unavailable.
+        }
       }
     },
 

@@ -15,7 +15,7 @@ import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
 import { safeSend } from '../services/safe-non-core';
 import { captureException } from '../services/sentry';
-import { resendSignatureFailureEscalator } from '../services/stripe/signature-failure-escalator';
+import { resendSignatureFailureEscalator } from '../services/webhooks/signature-failure-escalator';
 import {
   resendWebhookPayloadSchema,
   type ResendEmailEventData,

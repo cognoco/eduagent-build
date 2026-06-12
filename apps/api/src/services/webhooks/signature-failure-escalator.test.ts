@@ -147,13 +147,56 @@ describe('signature-failure escalator', () => {
     (captureException as jest.Mock).mockImplementationOnce(() => {
       throw new Error('Sentry SDK crashed');
     });
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
 
-    const now = Date.now();
-    expect(() => {
+    try {
+      const now = Date.now();
+      expect(() => {
+        for (let i = 0; i < SIGNATURE_FAILURE_THRESHOLD; i++) {
+          stripeSignatureFailureEscalator.record(now + i * 100);
+        }
+      }).not.toThrow();
+      // The swallowed failure must leave a console trace for post-incident triage.
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[signature-failure-escalator]'),
+        expect.stringContaining('Sentry SDK crashed'),
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('retries the escalation on the next failure when captureException throws at the threshold crossing', () => {
+    // If the threshold-crossing capture throws (Sentry SDK crash, bad DSN),
+    // the escalation flag must NOT be set — otherwise a continuous failure
+    // episode keeps the window non-empty and the alert is permanently lost.
+    (captureException as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('Sentry SDK crashed');
+    });
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    try {
+      const now = Date.now();
+      // Threshold-crossing call: capture throws, flag must stay false.
       for (let i = 0; i < SIGNATURE_FAILURE_THRESHOLD; i++) {
         stripeSignatureFailureEscalator.record(now + i * 100);
       }
-    }).not.toThrow();
+      expect(captureException).toHaveBeenCalledTimes(1); // the throwing attempt
+
+      // Next failure in the same episode: capture is retried and succeeds.
+      stripeSignatureFailureEscalator.record(now + 1000);
+      expect(captureException).toHaveBeenCalledTimes(2);
+
+      // After a successful capture the flag is set — no further escalations.
+      stripeSignatureFailureEscalator.record(now + 1100);
+      expect(captureException).toHaveBeenCalledTimes(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('fires exactly once for a continuous failure stream (one alert per episode, not per window)', () => {

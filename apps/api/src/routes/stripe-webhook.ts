@@ -31,7 +31,7 @@ import { claimWebhookId } from '../services/webhook-idempotency';
 
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
-import { recordSignatureFailure } from '../services/stripe/signature-failure-escalator';
+import { recordSignatureFailure } from '../services/webhooks/signature-failure-escalator';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
 

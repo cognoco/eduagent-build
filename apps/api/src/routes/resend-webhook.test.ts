@@ -44,6 +44,11 @@ import type { Database } from '@eduagent/database';
 import { resendWebhookRoute, verifyResendSignature } from './resend-webhook';
 import { claimWebhookId } from '../services/webhook-idempotency';
 import { inngest } from '../inngest/client';
+import { captureException } from '../services/sentry';
+import {
+  resendSignatureFailureEscalator,
+  SIGNATURE_FAILURE_THRESHOLD,
+} from '../services/webhooks/signature-failure-escalator';
 
 // ---------------------------------------------------------------------------
 // Test Svix signing helpers
@@ -457,6 +462,80 @@ describe('POST /webhooks/resend — authentication', () => {
         webhookTimestamp: ts,
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sustained signature-failure escalation [WI-646]
+//
+// Route-wiring regression: removing the resendSignatureFailureEscalator
+// .record() call from the !isValid branch must fail these tests. The
+// escalator's threshold/window logic itself is unit-tested in
+// services/webhooks/signature-failure-escalator.test.ts.
+// ---------------------------------------------------------------------------
+
+describe('sustained signature-failure escalation [WI-646]', () => {
+  beforeEach(() => {
+    // The escalator singleton accumulates state across other tests in this
+    // file (several earlier tests trigger signature failures). Reset for
+    // deterministic threshold counting.
+    resendSignatureFailureEscalator.__resetForTesting();
+    (captureException as jest.Mock).mockClear();
+  });
+
+  afterEach(() => {
+    // Leave clean state for any test that runs after this describe.
+    resendSignatureFailureEscalator.__resetForTesting();
+  });
+
+  async function sendBadSignatureRequest(suffix: number): Promise<Response> {
+    const rawBody = JSON.stringify({ type: 'email.delivered', data: {} });
+    return app.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': `msg_sustained_${suffix}`,
+          'svix-timestamp': nowTimestamp(),
+          'svix-signature': 'v1,invalidsignature123==',
+        },
+        body: rawBody,
+      },
+      TEST_ENV,
+    );
+  }
+
+  it('does not escalate to Sentry for a single signature failure (log-only)', async () => {
+    const res = await sendBadSignatureRequest(0);
+
+    expect(res.status).toBe(401);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('escalates to Sentry exactly once when threshold signature failures occur [WI-646 regression]', async () => {
+    for (let i = 0; i < SIGNATURE_FAILURE_THRESHOLD; i++) {
+      const res = await sendBadSignatureRequest(i);
+      expect(res.status).toBe(401);
+    }
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'resend.webhook.sustained_signature_failure',
+        }),
+      }),
+    );
+  });
+
+  it('still escalates only once when failures continue beyond the threshold', async () => {
+    for (let i = 0; i < SIGNATURE_FAILURE_THRESHOLD * 2; i++) {
+      await sendBadSignatureRequest(i);
+    }
+
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 });
 
