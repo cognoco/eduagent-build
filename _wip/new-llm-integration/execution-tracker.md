@@ -26,15 +26,22 @@ intake) is routed to the IF ratification path, not this workstream.
 4. Merge lands → boundary event "new-llm merged" → unlocks IF cutover execution
    (CUT-A generates against the post-merge journal).
 
-**Working mode for the shepherd:**
-- Isolated worktree at `.worktrees/new-llm` checked out on the **existing**
-  `new-llm` branch (`git worktree add .worktrees/new-llm new-llm` tracking
-  `origin/new-llm`, then `pnpm install` + `pnpm env:sync` per the worktree-setup
-  skill — note: the skill's default flow creates a NEW branch; here you attach to
-  the existing one). NEVER `git checkout`/`switch`/`stash` in the shared root
-  checkout.
-- Commits push to `origin/new-llm`. Zuzka's lane is halted; the branch is ours
-  until merge. Zuzka retains a courtesy review slot on the merge PR.
+**Working mode for the shepherd (amended 2026-06-12 — standard PR loop, base `new-llm`):**
+- Isolated worktree per unit at `.worktrees/<branch>` **branched off `new-llm`**
+  (e.g. `git worktree add .worktrees/WI-675 -b WI-675 origin/new-llm`, then
+  `pnpm install` + `pnpm env:sync` per the worktree-setup skill). NEVER
+  `git checkout`/`switch`/`stash` in the shared root checkout.
+- **One PR per unit, base = `new-llm`** (operator-sanctioned 2026-06-12) — the
+  standard Cosmo loop applies unchanged: PR is the WI's review evidence, CI runs
+  on it (`ci.yml` `pull_request` has no base filter; verified), the autonomous
+  review loop closes via `/cosmo:review`. Docs-only units (WI-678) skip CI via
+  `paths-ignore` — review is the gate there. WI-682 (provisioning) has no PR;
+  its evidence is the probe output recorded on the WI.
+- Pre-existing red on the base branch is a **finding to record, not noise to
+  fix-around** (the known one — the RLS guard — IS WI-676's subject).
+- Zuzka's lane is halted; the branch is ours until merge. She retains a courtesy
+  review slot on the final new-llm → main merge PR, which stays operator-gated
+  and program-owned — the per-unit PRs against `new-llm` are NOT that gate.
 - Migration numbers: next-free at landing, never pre-assigned (lockstep rule 2).
 
 ## §2 Unit map (Cosmo slice)
