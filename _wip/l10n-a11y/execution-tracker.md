@@ -171,6 +171,25 @@ watching **Identity Foundation + L10n & A11y Mobile**, trigger `Stage=Reviewing`
 review outputs named `<WI>.<ws-slug>.<ts>.*` under `/tmp/cosmo-watch/reviews/`.
 WI-621 and WI-622 bridged (briefs in page bodies; provenance children WI-633/634
 and WI-635/636; Sub-item set) and refined to `Stage=Ready`, `Execution Path=Assisted`.
+**ENDGAME CONTEXT (compaction-safe, 2026-06-12 ~00:55): 7 of 8 Closed; only WI-624
+PR-C remains.** Exact remaining procedure once PR-C opens (executor agent
+`a51bdff87ce4a3426`, resumable via SendMessage; cron 25b2232f re-fires it 04:32 if
+the token window stalled it again):
+1. Merge-gate PR-C (CI green on exact head · Claude COMMENT verdict · all
+   Codex/CodeRabbit threads dispositioned · diff-vs-scope) → merge.
+2. Sweep WI-624's provenance children with the PR-C merge commit, Completed/Resolved
+   dates set: **WI-655** page `37c8bce9-1f7c-819c-b9e6-e339ffff0feb`, **WI-656** page
+   `37c8bce9-1f7c-8159-8c29-ccd13214358c` (PATCH Stage=Closed, Resolution=Done,
+   Fixed In=commit URL — same shape as all prior sweeps).
+3. Executor runs `complete` citing all three PRs: A #1008 `2071b31e4` · B #1017
+   `b61c0d79c` · C (new) — Fixed In = PR-C merge commit; deferred forward-guard block
+   cites **WI-673** (attribute-literal ratchet extension, created 2026-06-12).
+   HEAD-race guard: run from worktree detached at the merge commit.
+4. Reviewer closes WI-624 → **ALL 8 CLOSED → graduation-candidate boundary report to
+   the operator** (include: 34/34 findings disposition, baseline 361→12, the 3 new CI
+   guards, WI-673 + the weeklyDelta translation-rot + pl-glossary incidental captures,
+   loop stats — bounces, rulings, lessons → amendments file).
+
 **HALF-SLICE REACHED 2026-06-11 (~21:30 CEST): 4 of 8 Closed** — WI-621 (3 PRs,
 baseline 361→12), WI-622, WI-626, WI-627 all Closed/Done. In flight: WI-623 (PR #997,
 rebase+NudgeBanner-label round; executor hit a "Not logged in" auth error ~21:20,
