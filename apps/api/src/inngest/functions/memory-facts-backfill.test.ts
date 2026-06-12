@@ -202,6 +202,111 @@ describe('memoryFactsBackfill [BUG-148] self-reinvoke pagination', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [F-162] The self-reinvoke cursor previously advanced to the LAST row of the
+// run regardless of per-profile failures, silently skipping every errored
+// profile that sorted before the cursor. The cursor must instead stop at the
+// end of the longest successful PREFIX so errored profiles (still marked
+// memoryFactsBackfilledAt IS NULL) are re-included by the next run.
+// ---------------------------------------------------------------------------
+describe('memoryFactsBackfill [F-162] cursor must not skip errored profiles', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDb.query.learningProfiles.findMany.mockReset().mockResolvedValue([]);
+    mockDb.transaction.mockReset();
+  });
+
+  function makeRows(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      profileId: `profile-${String(i).padStart(5, '0')}`,
+      createdAt: new Date(2026, 0, 1, 0, 0, 0, i),
+    }));
+  }
+
+  it('mid-slice error: cursor stops at the last profile BEFORE the first errored one', async () => {
+    // 5001 rows → capped. Profile index 100 errors; 101…4999 succeed.
+    // A last-success cursor would advance to 4999 and skip profile 100
+    // forever — the cursor must stop at index 99 (longest successful prefix).
+    mockDb.query.learningProfiles.findMany.mockResolvedValue(makeRows(5001));
+    let txCall = 0;
+    mockDb.transaction.mockImplementation(async () => {
+      const i = txCall++;
+      if (i === 100) throw new Error('boom: transient per-profile failure');
+      return null;
+    });
+
+    const { result, runner } = await execute();
+
+    expect(result.capped).toBe(true);
+    expect(result.selfReinvoked).toBe(true);
+    const continueCall = runner.sendEventCalls.find(
+      (c) => c.name === 'continue-memory-facts-backfill',
+    );
+    expect(continueCall).toBeDefined();
+    expect(
+      (continueCall!.payload as { data: { lastProfileId: string } }).data
+        .lastProfileId,
+    ).toBe('profile-00099');
+  });
+
+  it('tail error: cursor stops just before an error at the end of the slice', async () => {
+    mockDb.query.learningProfiles.findMany.mockResolvedValue(makeRows(5001));
+    let txCall = 0;
+    mockDb.transaction.mockImplementation(async () => {
+      const i = txCall++;
+      if (i === 4999) throw new Error('boom: transient per-profile failure');
+      return null;
+    });
+
+    const { result, runner } = await execute();
+
+    expect(result.capped).toBe(true);
+    expect(result.selfReinvoked).toBe(true);
+    const continueCall = runner.sendEventCalls.find(
+      (c) => c.name === 'continue-memory-facts-backfill',
+    );
+    expect(continueCall).toBeDefined();
+    expect(
+      (continueCall!.payload as { data: { lastProfileId: string } }).data
+        .lastProfileId,
+    ).toBe('profile-04998');
+  });
+
+  it('livelock guard: zero successful prefix → no self-reinvoke, escalates to Sentry', async () => {
+    // The very FIRST profile of the run errors: the cursor cannot advance at
+    // all. Re-invoking would loop on the same stuck profile forever, so the
+    // chain must stop and escalate instead (no silent recovery).
+    mockDb.query.learningProfiles.findMany.mockResolvedValue(makeRows(5001));
+    let txCall = 0;
+    mockDb.transaction.mockImplementation(async () => {
+      const i = txCall++;
+      if (i === 0) throw new Error('boom: persistent failure at prefix head');
+      return null;
+    });
+
+    const { result, runner } = await execute();
+
+    expect(result.capped).toBe(true);
+    expect(result.selfReinvoked).toBe(false);
+    expect(
+      runner.sendEventCalls.find(
+        (c) => c.name === 'continue-memory-facts-backfill',
+      ),
+    ).toBeUndefined();
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'memory-facts-backfill',
+          reason: 'cursor_stuck_no_progress',
+          stuckProfileId: 'profile-00000',
+          erroredCount: 1,
+        }),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [BUG-365] Marker split — the cron must stamp memoryFactsBackfilledAt and
 // MUST NOT stamp memoryFactsAnalysedAt (that column is owned by the runtime
 // applyAnalysis path).

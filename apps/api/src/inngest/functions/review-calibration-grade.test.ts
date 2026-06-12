@@ -105,8 +105,9 @@ describe('reviewCalibrationGrade', () => {
       makeValidPayload(),
       {
         'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
         'grade-recall-quality': 4,
-        'persist-retention-update': [{ id: CARD_ID }],
+        'finalize-retention-update': undefined,
         'stamp-mastery-on-verify': undefined,
         'sync-xp-ledger': undefined,
       },
@@ -118,11 +119,13 @@ describe('reviewCalibrationGrade', () => {
       quality: 4,
       passed: true,
     });
-    expect(runCalls).toHaveLength(5);
+    expect(runCalls).toHaveLength(6);
+    // F-174: the cooldown claim MUST precede the paid LLM grade step.
     expect(runCalls.map((c) => c.name)).toEqual([
       'load-retention-card',
+      'claim-cooldown-slot',
       'grade-recall-quality',
-      'persist-retention-update',
+      'finalize-retention-update',
       'stamp-mastery-on-verify',
       'sync-xp-ledger',
     ]);
@@ -133,6 +136,9 @@ describe('reviewCalibrationGrade', () => {
       makeValidPayload(),
       {
         'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [],
+        // Pre-fix step names kept as safety nets so a regression to the old
+        // ordering cannot leak a real LLM call out of this unit test.
         'grade-recall-quality': 4,
         'persist-retention-update': [],
       },
@@ -142,11 +148,31 @@ describe('reviewCalibrationGrade', () => {
       skipped: 'cooldown_claim_lost',
       sessionId: SESSION_ID,
     });
-    expect(runCalls).toHaveLength(3);
+    expect(runCalls).toHaveLength(2);
     expect(runCalls.map((c) => c.name)).toEqual([
       'load-retention-card',
-      'grade-recall-quality',
-      'persist-retention-update',
+      'claim-cooldown-slot',
     ]);
+  });
+
+  // F-174: the paid LLM grade ran BEFORE the cooldown claim, so a lost claim
+  // still burned an LLM call. The claim must precede the grade.
+  it('[F-174] does NOT run the paid LLM grade step when the cooldown claim fails', async () => {
+    const { result, runCalls } = await executeHandlerWithResults(
+      makeValidPayload(),
+      {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [], // 0 rows → claim lost
+        // Safety net against the pre-fix ordering — must NOT be reached.
+        'grade-recall-quality': 4,
+        'persist-retention-update': [],
+      },
+    );
+
+    expect(result).toEqual({
+      skipped: 'cooldown_claim_lost',
+      sessionId: SESSION_ID,
+    });
+    expect(runCalls.map((c) => c.name)).not.toContain('grade-recall-quality');
   });
 });
