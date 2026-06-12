@@ -72,16 +72,17 @@ Every downstream plan cites these verbatim — do not introduce parallel names.
 
 ## ADR obligations (spec §12 — owed in lockstep with the canon change BEFORE the phase merges)
 
-Latest ADR on disk is `MMT-ADR-0019`; this set reserves the next four (the `decision-adr-link` CI guard fails a spec decision block with no linked ADR):
+Latest ADRs on disk: `MMT-ADR-0021` (freeform filing threshold) and `MMT-ADR-0022` (activity ledger narration substrate). This set reserves the next three for the remaining plan obligations (the `decision-adr-link` CI guard fails a spec decision block with no linked ADR):
 
-| ADR | Subject | Spec obligation | Owned by |
-|---|---|---|---|
-| `MMT-ADR-0020` | Activity ledger as narration/moments substrate (template-first; load-bearing for GDPR timers) | #4 | S0 (T10) |
-| `MMT-ADR-0021` | One-shell / scope-chip model supersedes the mode/proxy/tab-shape matrix | #1 | S4 (T13) |
-| `MMT-ADR-0022` | Supporter visibility contract (non-reportable class, render-equivalence, appeal, artifact wall, safety exception) | #2 | S5 (T12) |
-| `MMT-ADR-0023` | Managed/credentialized as visibility-tier carrier + graduation (reconcile with identity canon, don't duplicate) | #3 | S5 (T12) |
+| ADR | Subject | Spec obligation | Owned by | Status |
+|---|---|---|---|---|
+| `MMT-ADR-0021` | Freeform filing threshold (5 exchanges; no freeform Challenge or notes) | — | S0 adjacent | **Exists** (`docs/adr/MMT-ADR-0021-freeform-library-filing-threshold.md`) |
+| `MMT-ADR-0022` | Activity ledger as narration/moments substrate (template-first; load-bearing for GDPR timers) | #4 | S0 (T10) | **Exists** (`docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md`) |
+| `MMT-ADR-0023` | One-shell / scope-chip model supersedes the mode/proxy/tab-shape matrix | #1 | S4 (T13) | Planned |
+| `MMT-ADR-0024` | Supporter visibility contract (non-reportable class, render-equivalence, appeal, artifact wall, safety exception) | #2 | S5 (T12) | Planned |
+| `MMT-ADR-0025` | Managed/credentialized as visibility-tier carrier + graduation (reconcile with identity canon, don't duplicate) | #3 | S5 (T12) | Planned |
 
-*(The original S4/S5 drafts both claimed `0021`; reconciled 2026-06-10 to the allocation above.)*
+*(Renumber history: 0020/0021 were the original branch allocations; renumbered to 0021/0022 on 2026-06-12 when merging new-llm → the collision with main's `MMT-ADR-0019` (OS-agnostic) resolved and 0020 yielded to the identity-foundation cutover-plan consent-request ADR. Downstream planned ADRs shift: scope-chip 0021→0023, supporter-visibility 0022→0024, managed-tier 0023→0025.)*
 
 ---
 

@@ -20,7 +20,7 @@ status: parked
 >
 > **Boundary with freeform Ask Anything:** this plan is topic-bound. It covers
 > `topic_notes` and Challenge-Round-derived notes for sessions that already have a
-> real `topicId`. It does not amend `MMT-ADR-0019`: freeform Ask Anything still
+> real `topicId`. It does not amend `MMT-ADR-0021`: freeform Ask Anything still
 > has no Challenge Round and no learner-note flow.
 
 **Goal:** Give a `learner-note` at most one provenance mark — a **green checkmark**

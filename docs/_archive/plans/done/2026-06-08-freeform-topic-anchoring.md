@@ -3,7 +3,7 @@ title: Freeform Library Filing Threshold - Implementation Plan
 date: 2026-06-08
 profile: code
 spec: docs/flows/learning-path-flows.md - Ask Anything filing flow
-adr: docs/adr/MMT-ADR-0019-freeform-library-filing-threshold.md
+adr: docs/adr/MMT-ADR-0021-freeform-library-filing-threshold.md
 status: implemented
 reviewed: 2026-06-08 (supersedes hidden provisional-topic anchoring and freeform note CTA plans)
 ---
@@ -12,7 +12,7 @@ reviewed: 2026-06-08 (supersedes hidden provisional-topic anchoring and freeform
 
 **Goal:** Keep Ask Anything low-friction for quick questions, and only make Library filing available once a freeform session has enough substance to deserve a durable curriculum topic.
 
-**Decision:** [`MMT-ADR-0019`](../../../adr/MMT-ADR-0019-freeform-library-filing-threshold.md) records the durable decision: Freeform Ask Anything sessions do not get Challenge Round and do not get a separate learner-note flow. Subject-backed bookmarks remain the instant-save path during chat and do not require a topic. Library filing becomes available only after **5 exchanges**. If the learner allows Library saving, the app relies on the LLM-generated learner recap / structured session summary as the saved session artifact, not a learner-authored note.
+**Decision:** [`MMT-ADR-0021`](../../../adr/MMT-ADR-0021-freeform-library-filing-threshold.md) records the durable decision: Freeform Ask Anything sessions do not get Challenge Round and do not get a separate learner-note flow. Subject-backed bookmarks remain the instant-save path during chat and do not require a topic. Library filing becomes available only after **5 exchanges**. If the learner allows Library saving, the app relies on the LLM-generated learner recap / structured session summary as the saved session artifact, not a learner-authored note.
 
 ## Product Boundary
 

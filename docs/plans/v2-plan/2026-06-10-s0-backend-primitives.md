@@ -28,7 +28,7 @@ In scope:
 - `apps/api/src/routes/now.ts` (new — `GET /now` Hono route group)
 - `apps/api/src/index.ts` (route registration — one added `.route('/', nowRoutes)` line)
 - `apps/api/src/config.ts` (add `MODE_NAV_V2_ENABLED` to the API env schema for completeness/parity; see T9)
-- `docs/adr/MMT-ADR-0020-activity-ledger-narration-substrate.md` (new ADR, lockstep)
+- `docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md` (new ADR, lockstep)
 - Co-located unit tests + one integration test (paths in `## Tests`)
 
 Out of scope (must not change):
@@ -51,7 +51,7 @@ Out of scope (must not change):
 | `services/now-feed.ts` | `buildNowFeed()` ranking algorithm + `RANKING` constants + `resolveDeepLink()` closed route catalog |
 | `routes/now.ts` | `nowRoutes` Hono group — `GET /now` (+ `GET /now/overflow`) |
 | `apps/api/drizzle/0108_*.sql` | additive migration (table + enum + indexes) |
-| `docs/adr/MMT-ADR-0020-*.md` | ADR for the ledger as load-bearing GDPR-timer substrate (spec §12 obligation #4) |
+| `docs/adr/MMT-ADR-0022-*.md` | ADR for the ledger as load-bearing GDPR-timer substrate (spec §12 obligation #4) |
 
 ---
 
@@ -383,9 +383,8 @@ Out of scope (must not change):
   Add `MODE_NAV_V2_ENABLED: z.enum(['true', 'false']).default('false')` to the env schema in `apps/api/src/config.ts` (alongside the other `MODE_NAV_*`-adjacent flags — there is no API-side MODE_NAV flag today, so add it next to `LLM_ROUTING_V2_ENABLED:154` with a comment). This is **name reservation only** — S0 ships no code that reads it; the mobile shell consumes `MODE_NAV_V2_ENABLED` (from `EXPO_PUBLIC_ENABLE_MODE_NAV_V2`) in S1. Reserving it here freezes the canonical name for every downstream plan (Deliverable 2(e)) and keeps the env-validation surface honest. Add a comment: "S1 mobile-shell flag; reserved at S0 so the name is final. No API code reads this yet."
   **done when:** `apps/api/src/config.test.ts` gains one assertion that `validateEnv({ ...minimal, MODE_NAV_V2_ENABLED: 'true' })` parses and yields `MODE_NAV_V2_ENABLED === 'true'`, and that the default is `'false'` when omitted. `pnpm exec nx run api:test` passes for `config.test.ts`.
 
-- [ ] **T10: Draft `MMT-ADR-0020` in lockstep (spec §12 obligation #4).**
-  Create `docs/adr/MMT-ADR-0020-activity-ledger-narration-substrate.md` following the format of `docs/adr/MMT-ADR-0019-*.md`. Decision: the `mentor_activity_ledger` is the append-only narration/moments substrate, template-first rendered (no LLM per row by default), and is **load-bearing for GDPR-timer countdowns** (spec §8.2) — which is why it crosses the significance gate. Record: context (P2/P4 ledger mechanism), the `profileId`-keyed / S4-repoint decision (§8.2 / §9), the template-first vs LLM-per-row tradeoff, and the additive-migration / no-rollback posture. Link the canon line it changes (the spec §8.2/§12) per MMT-ADR-0000 lockstep. **This task must land in the same change-set as T1–T9** (the `decision-adr-link` CI guard fails a decision block with no linked `MMT-ADR`).
-  **done when:** the ADR file exists with all required sections, references `mentor_activity_ledger` and the GDPR-timer rationale, and `scripts/check-decision-adr-link.ts` (the `docs-checks.yml` → `decision-adr-link` job) passes for the spec/plan decision block. (Plan author runs the check locally; no new decision block is introduced by this plan that lacks the link.)
+- [x] **T10: Draft `MMT-ADR-0022` in lockstep (spec §12 obligation #4). — DONE (renumbered from 0020 on 2026-06-12, WI-678)**
+  `docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md` exists. The lockstep canon edit is the `mentor_activity_ledger` rule in `docs/architecture.md` — added in the same change-set as the ADR file (WI-678). Decision: the `mentor_activity_ledger` is the append-only narration/moments substrate, template-first rendered (no LLM per row by default), and is **load-bearing for GDPR-timer countdowns** (spec §8.2). See the ADR for the full record (context, `profileId`-keyed / S4-repoint decision, template-first vs LLM-per-row tradeoff, additive-migration / no-rollback posture).
 
 ---
 

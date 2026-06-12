@@ -203,7 +203,7 @@ Home → home-ask-anything → /(app)/session {mode:'freeform'}
 ```
 
 ### Key behavior & corrections
-- **Filing affordance is homework-only.** `setShowFilingPrompt(true)` fires **only** for `effectiveMode==='homework'` (`use-session-actions.ts:375-376`). Freeform **never** shows the manual "Add to Library" prompt — it goes straight to summary. The ≥5-exchange threshold (MMT-ADR-0019, `FILING_CONFIG.minFreeformExchanges=5`) gates the **server-side auto-file dispatch only**, not a prompt.
+- **Filing affordance is homework-only.** `setShowFilingPrompt(true)` fires **only** for `effectiveMode==='homework'` (`use-session-actions.ts:375-376`). Freeform **never** shows the manual "Add to Library" prompt — it goes straight to summary. The ≥5-exchange threshold (MMT-ADR-0021, `FILING_CONFIG.minFreeformExchanges=5`) gates the **server-side auto-file dispatch only**, not a prompt.
 - **Topic notes are CTA-suppressed when topicless.** The KNOWLEDGE CAPTURE block is still included for all non-recitation sessions, so the LLM *can* emit `note_prompt.show`; however, `SessionFooter` renders the "Write note" affordance and `NoteInput` only when `topicId` is present. A topicless freeform session no longer shows a note-save CTA or the old "cannot save" alert [was: "prompt can appear, save blocked at topicId guard"].
 - Challenge Round excluded (no `topicId`).
 - After background filing completes, `postSessionSuggestions` writes ≤2 `topic_suggestions` for the book.
