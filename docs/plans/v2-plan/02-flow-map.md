@@ -19,6 +19,17 @@ The rule for implementation is simple: a V2 phase task that creates, moves,
 retires, or replaces a surface must cite the affected flow IDs from this map.
 If a flow is not cited, it is not covered.
 
+A flow may appear in more than one matrix row when different phases own
+different aspects of it (e.g. `ACCOUNT-37` rename sits in both the gate-stack
+row and the avatar-admin row); the Phase Backlinks table is the union of those
+assignments.
+
+> Revised 2026-06-12 (adversarial review): denominator corrected to 280; S6
+> backlink expanded to the S6 plan's full deletion scope; backlinks reconciled
+> with the matrix/gaps owner assignments; Library cross-subject browse heir
+> clarified per spec EU-6 (Journal, not the hub); push re-routing, route-key
+> mismatch, and stale-yaml gaps carried in from the inventory.
+
 ## Coverage Denominator
 
 Rows counted from `docs/flows/mobile-app-flow-inventory.md` on 2026-06-11:
@@ -39,7 +50,7 @@ Rows counted from `docs/flows/mobile-app-flow-inventory.md` on 2026-06-11:
 | QA / regression | 15 | `QA-01..QA-15` |
 | Cross-cutting | 21 | `CC-01..CC-21` |
 
-Total denominator: 260 inventory rows.
+Total denominator: 280 inventory rows.
 
 ## Trigger Vocabulary
 
@@ -66,7 +77,7 @@ Total denominator: 260 inventory rows.
 | `ACCOUNT-15..ACCOUNT-17`, `ACCOUNT-49..ACCOUNT-52` | Learner self, owner managing child memory | Mentor memory view, consent prompt, export, correction | Memory is part of the learner's paper trail and trust model | S3 Journal exposes self memory; avatar/child settings preserve management; S5 governs supporter visibility | S3 for self/admin; S5 for trust | S3 must cover self memory consent/toggles/delete/tell, not just read-only memory. Parent-managed child memory/export/correction must be classified as deliberate admin/rights or removed; it must not leak into Me-scope Journal or supporter scope before S5 |
 | `ACCOUNT-18` | Learner in a subject | Subject settings gear | Subject analogy preference belongs with the subject, not account chrome | S2 Subject hub settings affordance, preserving current server guard | S2 | Four-strands language subjects still need the current hidden/empty behavior |
 | `ACCOUNT-19..ACCOUNT-27`, `ACCOUNT-32`, `ACCOUNT-38..ACCOUNT-42` | Self-registering minor, parent outside app, owner restoring consent | Consent request, handoff, pending/withdrawn gates, server-web approval/denial, reminders, email failure, withdrawal countdown | These flows are legal/safety gates and must preempt the mentor shell | Preserve gate stack before V2; S5 later aligns with identity visibility ceremony | Preserve; S5 for identity-era ceremony | S5 must map current mobile consent gates, web deny, reminder cascade, while-you-wait previews, switch escape, and restore/withdrawal flows one by one. Age floor remains 11 in code while launch decision says 13+ |
-| `HOME-01`, `HOME-05..HOME-08`, `HOME-14..HOME-16` | Learner self or child learner | App home, empty state, resume, add child CTA, loading/error/overlay/nudge states | These are the existing learner-home jobs S1 replaces or absorbs | S1 Mentor home: now cards, calm on-track state, homework/camera, bar, cold-start | S1 | S1 must preserve recovery/timeout escapes, app-wide overlays, and `HOME-16` early-adopter/nudge behavior, not just happy cards |
+| `HOME-01`, `HOME-05..HOME-08`, `HOME-14..HOME-16` | Learner self or child learner; owner-only home overlays (`HOME-07` add-child CTA, `HOME-15` consent notices + withdrawal countdown) | App home, empty state, resume, add child CTA, loading/error/overlay/nudge states | These are the existing learner-home jobs S1 replaces or absorbs | S1 Mentor home: now cards, calm on-track state, homework/camera, bar, cold-start | S1 | S1 must preserve recovery/timeout escapes, app-wide overlays, and `HOME-16` early-adopter/nudge behavior, not just happy cards |
 | `HOME-02` | Guardian/supporter | Family home open | Current parent home is the seed for the Support hub | Preserve until S4; replace with Support hub and scoped feed | S4 | Current V1 Recaps-only assumptions are not enough for all parent rows |
 | `HOME-03`, `HOME-09`, `HOME-11..HOME-13` | Guardian in legacy modes, old deep links, proxy test paths | Tab rendering, ModeSwitcher, own-learning bridge, proxy shell, legacy dashboard | V2 intentionally retires the mode/proxy/tab-shape matrix, but not before parity | S4 scope chip supersedes; S6 deletes after V0 retirement ruling | S4 then S6 | `HOME-12` proxy is dormant; S6 must decide delete vs keep test seam |
 | `HOME-04`, `HOME-10` | All users | Splash, app-layout gates, timeout/error fallback | Shell-independent reliability | Preserve; S1/S4 must not bypass gate order | Preserve | Existing timeout/error paths lack strong E2E coverage |
@@ -74,7 +85,7 @@ Total denominator: 260 inventory rows.
 | `SUBJECT-06`, `SUBJECT-08`, `SUBJECT-12`, `SUBJECT-14` | Learner browsing or assessing knowledge | Pick book, language subject setup, browse curriculum, assessment | These are subject-map jobs, not global navigation jobs | S2 Subject hub and assessment entry; preserve guards until hub owns them | S2 | S2 must specify the top-level `subjects` tab list as well as the per-subject hub. Assessment screens lack their own guard today; S2 should not copy that gap |
 | `SUBJECT-17`, `SUBJECT-21` | No production user | Manual deep link only, server-only retry endpoint | Orphaned/dormant surfaces create false coverage | Keep dark until S6 decision | S6 | Pronouns picker and retry-curriculum need explicit wire/keep/delete decision |
 | `LEARN-01..LEARN-07`, `LEARN-41..LEARN-53`, `LEARN-55` | Learner in session; system stream; session recovery | Ask anything, guided session, voice, summary, crash/offline/reconnect, parking, topic switch, challenge overlays | Session is still the core learning engine; V2 changes how users arrive, not the engine | S1/S2 push into existing session paths; S3 adds park-and-return eval gate; S6 may dissolve exit funnel | Preserve plus S1/S2/S3 | `LEARN-44` parking lot must prove return via S3 evals before session-summary deletion |
-| `LEARN-08..LEARN-12`, `LEARN-16`, `LEARN-18`, `LEARN-25`, `LEARN-30..LEARN-37` | Learner browsing library/book/topic/progress artifacts | Subject/library open, book/topic rows, search, notes, delete/archive, generation lifecycle | Library/progress split is the biggest V2 consolidation target | S2 Subject hub absorbs subject-first browsing, topic detail, notes, next-up, retention affordances | S2 | Proxy write-gating, archive-first server enforcement, and lifecycle coverage are known gaps |
+| `LEARN-08..LEARN-12`, `LEARN-16`, `LEARN-18`, `LEARN-25`, `LEARN-30..LEARN-37` | Learner browsing library/book/topic/progress artifacts | Subject/library open, book/topic rows, search, notes, delete/archive, generation lifecycle | Library/progress split is the biggest V2 consolidation target | Split by job (spec §5.4/§7/EU-6): S2 Subjects tab + hub absorb STRUCTURE browsing (subject list, books, topics, next-up, retention affordances, per-subject notes) — Subjects is the Library tab's heir for the shelf job; the cross-subject saved-items archive plus the notes/sessions slice of search (`LEARN-25`) re-home to the S3 Journal browsable archive; the next-action card's job (`LEARN-30`) moves to the S1 now feed | S2; S3 cross-subject artifact archive + search slice; S1 next-action | Proxy write-gating, archive-first server enforcement, and lifecycle coverage are known gaps; `/library` pushes must be repointed by job (structure → Subjects, saved-items → Journal), never wholesale to one tab |
 | `LEARN-13`, `LEARN-14`, `LEARN-20`, `LEARN-38`, `LEARN-54` | No production user | Orphaned recall/milestones/book params/interleaved endpoint | Dormant surfaces should not be preserved by accident | S6 wire/keep/delete ledger | S6 | If any are revived, they need explicit V2 trigger rows and tests |
 | `LEARN-15`, `LEARN-26`, `LEARN-51` | Learner with due/recovery/new curriculum state | Relearn, first-curriculum polling, auto-resume | These are deterministic continuation jobs | S0/S1 now card and S2 hub next-up; preserve fallback session behavior | S0/S1/S2 | First-curriculum timeout YAML remains draft |
 | `LEARN-17`, `LEARN-19`, `LEARN-21..LEARN-24`, `LEARN-27..LEARN-29`, `LEARN-39`, `LEARN-40` | Learner self; proxy read-only in legacy | Progress, vocabulary, bookmarks, transcripts, My Notes, reports, archived transcript | V2 must keep the paper trail while killing tab clutter | S3 Journal/notes/recaps/memory; S2 hub for subject-local details; preserve progress until S6 | S2/S3/S6 | S3 must be browse-first, not search-only. Self reports, vocabulary browser/list, and archived transcripts need a named V2 home before Progress deletion |
@@ -99,13 +110,13 @@ Total denominator: 260 inventory rows.
 |---|---|
 | S0 backend primitives | `CC-21`, `LEARN-15`, `LEARN-26`, `LEARN-44`, `LEARN-49..LEARN-50`, `LEARN-55`; plus `/now` source rows that become cards |
 | S0-R retention gate | `LEARN-15..LEARN-16`, `SUBJECT-14`, `QUIZ-07`, `CC-10`, `CC-21` |
-| S1 Mentor home | `AUTH-01`, `AUTH-13`, `HOME-01`, `HOME-05..HOME-08`, `HOME-14..HOME-16`, `SUBJECT-01..SUBJECT-05`, `SUBJECT-07`, `SUBJECT-18..SUBJECT-20`, `SUBJECT-22`, `LEARN-01..LEARN-07`, `LEARN-41..LEARN-53`, `LEARN-55`, `PRACTICE-01..PRACTICE-05`, `QUIZ-01..QUIZ-18`, `DICT-01..DICT-13`, `HOMEWORK-01..HOMEWORK-12`, `BILLING-13`, `QA-01..QA-07`, `QA-10..QA-11`, `QA-13..QA-14`, `CC-01..CC-05`, `CC-09`, `CC-13..CC-16`, `CC-19`, `CC-21` |
-| S2 Subject hub | `ACCOUNT-18`, `SUBJECT-06`, `SUBJECT-08`, `SUBJECT-12`, `SUBJECT-14`, `LEARN-08..LEARN-12`, `LEARN-16`, `LEARN-18`, `LEARN-25`, `LEARN-30..LEARN-37` |
+| S1 Mentor home | `AUTH-01`, `AUTH-13`, `AUTH-15`, `ACCOUNT-01`, `ACCOUNT-33..ACCOUNT-36`, `HOME-01`, `HOME-04..HOME-08`, `HOME-10`, `HOME-14..HOME-16`, `SUBJECT-01..SUBJECT-05`, `SUBJECT-07`, `SUBJECT-18..SUBJECT-20`, `SUBJECT-22`, `LEARN-01..LEARN-07`, `LEARN-30`, `LEARN-41..LEARN-53`, `LEARN-55`, `PRACTICE-01..PRACTICE-05`, `QUIZ-01..QUIZ-18`, `DICT-01..DICT-13`, `HOMEWORK-01..HOMEWORK-12`, `BILLING-06`, `BILLING-13`, `QA-01..QA-07`, `QA-10..QA-11`, `QA-13..QA-14`, `CC-01..CC-05`, `CC-09`, `CC-13..CC-16`, `CC-19`, `CC-21`; plus re-routing the home-targeted pushes (`recall_nudge`, `dictation_review`) |
+| S2 Subject hub | `ACCOUNT-18`, `SUBJECT-06`, `SUBJECT-08`, `SUBJECT-12`, `SUBJECT-14`, `LEARN-08..LEARN-12`, `LEARN-16`, `LEARN-18`, `LEARN-22`, `LEARN-25`, `LEARN-28`, `LEARN-30..LEARN-37` |
 | S2 -> S3 evidence gate | Flow-level evidence for S1/S2 entry success: feed card open, bar intent match, hub reach, topic/session start, homework start, cold-start conversion |
-| S3 Journal and avatar | `AUTH-10`, `ACCOUNT-06..ACCOUNT-17`, `ACCOUNT-28..ACCOUNT-31`, `ACCOUNT-37`, `ACCOUNT-43..ACCOUNT-46`, `ACCOUNT-48..ACCOUNT-52`, `LEARN-17`, `LEARN-19`, `LEARN-21..LEARN-24`, `LEARN-27..LEARN-29`, `LEARN-39..LEARN-40`, `LEARN-44`, `BILLING-01..BILLING-05`, `BILLING-07..BILLING-12`, `BILLING-14..BILLING-16`, `CC-06..CC-08`, `CC-11..CC-12`, `CC-18` |
-| S4 Scope chip and Support hub | `HOME-02`, `HOME-03`, `HOME-09`, `HOME-11..HOME-13`, `PARENT-01..PARENT-06`, `PARENT-08..PARENT-10`, `PARENT-12`, `PARENT-17..PARENT-19`, `PARENT-21..PARENT-24`, `QA-08`, `CC-17`, `CC-19..CC-20` |
-| S5 Visibility contract | `ACCOUNT-15..ACCOUNT-17`, `ACCOUNT-19..ACCOUNT-27`, `ACCOUNT-32`, `ACCOUNT-38..ACCOUNT-42`, `ACCOUNT-49..ACCOUNT-52`, `PARENT-11`, `PARENT-13..PARENT-16`, `PARENT-20..PARENT-21`, `PARENT-25`, `QA-09`, `QA-12`, `QA-15` |
-| S6 Cutover and deletions | Dormant/orphaned rows `AUTH-17`, `SUBJECT-17`, `SUBJECT-21`, `LEARN-13`, `LEARN-14`, `LEARN-20`, `LEARN-38`, `LEARN-54`, old shell rows `HOME-03`, `HOME-09`, `HOME-11..HOME-13`, `PARENT-22`, `PARENT-23`, and every QA row whose entry path changes |
+| S3 Journal and avatar | `AUTH-10`, `ACCOUNT-04`, `ACCOUNT-06..ACCOUNT-17`, `ACCOUNT-28..ACCOUNT-31`, `ACCOUNT-37`, `ACCOUNT-43..ACCOUNT-46`, `ACCOUNT-48..ACCOUNT-52`, `LEARN-17`, `LEARN-19`, `LEARN-21..LEARN-25` (`LEARN-25` = notes/sessions search slice only; structure search stays S2), `LEARN-27..LEARN-29`, `LEARN-39..LEARN-40`, `LEARN-44`, `BILLING-01..BILLING-05`, `BILLING-07..BILLING-12`, `BILLING-14..BILLING-16`, `CC-06..CC-08`, `CC-11..CC-12`, `CC-18` |
+| S4 Scope chip and Support hub | `AUTH-15`, `ACCOUNT-01..ACCOUNT-05`, `ACCOUNT-33..ACCOUNT-36`, `HOME-02..HOME-04`, `HOME-09..HOME-13`, `PARENT-01..PARENT-06`, `PARENT-08..PARENT-10`, `PARENT-12`, `PARENT-17..PARENT-19`, `PARENT-21..PARENT-24`, `BILLING-06`, `BILLING-13`, `QA-08`, `CC-17`, `CC-19..CC-20` |
+| S5 Visibility contract | `AUTH-15`, `ACCOUNT-01..ACCOUNT-05`, `ACCOUNT-15..ACCOUNT-17`, `ACCOUNT-19..ACCOUNT-27`, `ACCOUNT-32..ACCOUNT-36`, `ACCOUNT-38..ACCOUNT-42`, `ACCOUNT-49..ACCOUNT-52`, `BILLING-06`, `BILLING-13`, `PARENT-11`, `PARENT-13..PARENT-16`, `PARENT-20..PARENT-21`, `PARENT-25`, `QA-09`, `QA-12`, `QA-15` |
+| S6 Cutover and deletions | By deletion subject, matching the S6 plan's task table: exit funnel `LEARN-07` (gated on `LEARN-44` park-return evidence); ModeSwitcher + mode shells `HOME-03`, `HOME-09`, `HOME-11`; proxy mode `HOME-12`, `LEARN-52`, `ACCOUNT-30`; `ParentHomeScreen` `HOME-02`, `PARENT-01..PARENT-02`, `PARENT-21`, `PARENT-24`; More tab + My Notes + Recaps + self mentor-memory `ACCOUNT-06..ACCOUNT-15`, `ACCOUNT-28..ACCOUNT-31`, `ACCOUNT-43..ACCOUNT-46`, `ACCOUNT-48`, `LEARN-27`, `PARENT-11`; Library tab `LEARN-08`, `LEARN-25`, `LEARN-30..LEARN-32`; `child/[profileId]/*` routes `PARENT-03..PARENT-06`, `PARENT-08..PARENT-10`, `PARENT-12..PARENT-13`, `PARENT-17..PARENT-19`, `ACCOUNT-16..ACCOUNT-17` (classification per S5); Progress tab `LEARN-17`, `LEARN-19`, `LEARN-21..LEARN-24`, `LEARN-28..LEARN-29`, `LEARN-39..LEARN-40`; practice-route disposition `PRACTICE-01..PRACTICE-05` (route kept as bar/feed target; XP-label removal touches `PRACTICE-01`); push re-routing for deleted targets (`PARENT-11`, `PARENT-13`); nav-contract retirement `CC-19` + XP readers `CC-03`/`CC-10`; dormant/orphaned rows `AUTH-17`, `SUBJECT-17`, `SUBJECT-21`, `LEARN-13`, `LEARN-14`, `LEARN-20`, `LEARN-38`, `LEARN-54`; old shell rows `HOME-13`, `PARENT-22`, `PARENT-23`; and, per completion rule 4, every flow file in any cited row's Coverage column whose entry path changes |
 
 ## Cross-Cutting Invariants
 
@@ -137,8 +148,8 @@ relevant phase before code execution:
 | Proxy write-gating on shelf/book and supporter structural mask parity | `LEARN-09..LEARN-12`, `LEARN-33..LEARN-37`, `PARENT-03..PARENT-10` | S2 now, S4 final |
 | Assessment screens lack their own guard | `SUBJECT-14`, `PRACTICE-05` | S2 |
 | Server-side archive-first enforcement | `LEARN-11` | S2 or S6, depending on deletion timing |
-| Age floor 11 vs 13+ launch decision | `ACCOUNT-01`, `ACCOUNT-19..ACCOUNT-27`, `ACCOUNT-26` | Pre-launch policy work; not shell-specific |
-| Child-cap notify proxy guard | `BILLING-06`, `BILLING-13`, `PARENT-21` | Billing/support phase before launch |
+| Age floor 11 vs 13+ launch decision | `ACCOUNT-01`, `ACCOUNT-19..ACCOUNT-27` | Pre-launch policy work; not shell-specific |
+| Child-cap notify proxy guard | `BILLING-06`, `BILLING-13`, `PARENT-21` | S4 (support-hub attention loop); server proxy guard tracked on the pre-launch checklist |
 | Subscription/account billing route-catalog destination | `BILLING-14`, `BILLING-15`, `AUTH-13` | S3/S6 |
 | Practice, quiz, and dictation V2 discovery | `PRACTICE-01..PRACTICE-05`, `QUIZ-01..QUIZ-18`, `DICT-01..DICT-13` | S1/S2 |
 | Save wizard and post-profile landing into V2 shell | `ACCOUNT-01`, `ACCOUNT-33..ACCOUNT-36`, `AUTH-15` | S1/S4/S5 |
@@ -147,6 +158,9 @@ relevant phase before code execution:
 | Dormant/orphaned surfaces need explicit disposition | `AUTH-17`, `SUBJECT-17`, `SUBJECT-21`, `LEARN-13`, `LEARN-14`, `LEARN-20`, `LEARN-38`, `LEARN-54` | S6 |
 | Parent/support story cannot be reduced to Recaps | `PARENT-01..PARENT-25` | S4/S5 |
 | S3 avatar must preserve obscure account rows, not just billing/sign-out | `ACCOUNT-28..ACCOUNT-31`, `ACCOUNT-43..ACCOUNT-46`, `ACCOUNT-48` | S3 |
+| Home-targeted pushes land on surfaces V2 replaces: `recall_nudge` + `dictation_review` route to `/home` (S1 replaces it); recaps/weekly-report pushes target screens S6 deletes | `LEARN-13` (push note), `DICT-01..DICT-13` (preamble), `PARENT-11`, `PARENT-13`, `BILLING-15` | S1 for home-targeted pushes; S4/S6 for recap/report pushes |
+| Contract route-key mismatch: `FAMILY_CHILD_ROUTES` key `child/[profileId]/reports/weekly` has no matching screen file (actual: `weekly-report/[weeklyReportId].tsx`) | `PARENT-13` | S4 (catalog must be truthful before scope-chip work); swept again in the S6 `child/*` deletion |
+| `retention/library.yaml` premise predates the retention-pill removal — assertions may be stale | `LEARN-08`, `LEARN-16` | S2 |
 
 ## Completion Rule
 
@@ -155,4 +169,6 @@ A V2 phase is not ready for implementation until its plan has:
 1. A "Flow coverage" section citing exact rows from this map.
 2. At least one negative-path or parity test for every re-homed gated surface.
 3. A S6 disposition for every flow it removes, hides, or makes unreachable.
-4. A QA update for every changed entry path from `QA-01..QA-15`.
+4. A test-manifest update for every cited flow whose inventory Coverage column
+   lists a flow file with a changed entry path — the per-row Maestro yamls
+   (~100 files across all families), not only the `QA-01..QA-15` rows.
