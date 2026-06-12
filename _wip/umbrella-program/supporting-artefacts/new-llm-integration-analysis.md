@@ -1,6 +1,8 @@
 # new-llm Integration Analysis — gap vs main, gap vs the IF cutover, strategy
 
-**Date:** 2026-06-12 · **Status:** analysis complete; strategy recommendation pending operator ruling
+**Date:** 2026-06-12 · **Status:** v1.1 — analysis red-teamed (verdict: O2 stands with
+amendments; C5 corrected, checklist hardened, two new items, §7 enforcement added);
+strategy recommendation pending operator ruling
 **Method:** 9-surface sweep workflow (55 agents), every high/medium finding adversarially
 verified (confirmed / adjusted / refuted) by independent re-derivation. Branch state analyzed:
 `origin/new-llm` @ `6a81f7663` (60 ahead / ~11 behind main; merge-base = cutover-plan v1.3
@@ -57,7 +59,7 @@ convergence done), not "W2 landed" — the new tables exist today but are not li
 | C2 | Migration slot 0111 consumed by `0111_zippy_gateway` while the cutover plan hard-codes 0111/0112/0113 | Medium (adjusted: first-merger-wins) | Plan switches to "next-free at landing" numbering (already in the v1.1 addendum); whoever merges second renumbers |
 | C3 | `mentor_activity_ledger.profile_id` FK → legacy `profiles(id)` ON DELETE CASCADE — a new drop-listed-table dependent unknown to the plan's static inventory | Medium (adjusted: **no stranding** — plan §2.7 generates M-REPOINT from live `pg_constraint`, absorbing it as the 57th re-point automatically) | Merge-order dependency only: 0111 must be applied before the re-point catalog snapshot; code-side: `activity-ledger.ts` joins the grep-clean/S4 re-point list |
 | C4 | `deletion.ts` gains a NEW legacy read (`accounts.email` RETURNING → byok_waitlist erase, GDPR Art-17) | Medium, confirmed | CUT-B2's deletion twin spec must carry it or the GDPR fix silently drops at cutover |
-| C5 | Deploy gate `check-reference-only-migrations.mjs` hard-fails staging/prod migrate while 0106/0107 stay journaled — the exact path the convergence runbook §4.1 uses | Medium (adjusted) | Reconcile before convergence: exempt the reference-only pair or resolve the journal; coordinate with the cutover planning session |
+| C5 | Deploy gate `check-reference-only-migrations.mjs` **false-positives on journaled 0108**: its marker regex (`/REFERENCE ONLY\|DO NOT APPLY/i`) scans every journaled migration's SQL, and 0108's own header *mentions* "0106/0107 are REFERENCE ONLY" — so post-merge the gate blocks **every** staging/prod deploy (it runs before the migrate + worker-deploy steps), including the whole convergence chain and the branch's own WI-664 payoff. 0108 is journaled forever (MMT-ADR-0012), so it never self-resolves. The script ships untested and unwired in CI, so the defect surfaces only at the first live deploy. *(Corrected by red-team — the original "0106/0107 journaled" framing and "runbook exemption note" remedy were both wrong.)* | **High** (red-team corrected) | **Pre-merge code fix, not a note:** structured own-file marker (e.g. first-line `-- @reference-only` token), a unit test pinning "current journal passes", and one CI invocation against the real journal |
 | C6 | ADR tangle: duplicate `MMT-ADR-0019` (branch freeform-threshold vs main os-agnostic), branch reserves 0020–0023 (0020 collides with the consent_request ADR pencil), branch `docs/INDEX.md` wrong, ledger ADR missing its lockstep canon edit | Medium, confirmed | Renumber branch ADRs to next-free at merge; fix INDEX; add the lockstep edit; cutover plan already yields on 0020 |
 | C7 | `source-baseline.json` drops its `locales` key (~16.5k lines of per-locale hash state) while `translate-gemini.ts` still reads it 11 times | Medium, confirmed | Restore at merge or re-run translate |
 | C8 | 9 legacy-reader-inventory files modified (all surgical fixes, none rewrite identity access) + 6 CUT-B twin-target files changed in place | Medium, confirmed | Twin-spec drift only: CUT-B authoring hasn't started, so author twins once against post-merge content |
@@ -117,21 +119,47 @@ is the existing one: PR review + CI + the reconciliation checklist below.
   plan needs only delta edits (C3 code-side, C4 twin spec, C5 deploy-gate reconciliation),
   which fold into the pending v1.1→ratification cycle.
 
-**Pre-merge reconciliation checklist (the price of O2, all mechanical):**
-1. Take main's `i18n-jsx-literals-baseline.json` wholesale (C1); verify ratchet CI green.
+**Pre-merge reconciliation checklist (the price of O2 — red-team-hardened v1.1; items
+4′/5′/7′ rewritten, 9–10 added):**
+1. i18n ratchet baseline (C1): resolve by **intersection of both sides' entries + re-run
+   the checker** (not main-wins — the branch legitimately burned entries main still
+   grandfathers); verify ratchet CI green on the merge PR.
 2. Restore the `locales` key in `source-baseline.json` or re-run translate (C7).
 3. ADR surgery: renumber the branch's two colliding ADRs to next-free, fix `docs/INDEX.md`,
    add the ledger ADR's lockstep canon edit (C6).
-4. Deploy-gate reconciliation plan agreed with the cutover planner (C5) — at minimum an
-   exemption note in the runbook preconditions.
-5. Content-level merge verification against both parents (C9): explicitly confirm every
-   main commit since merge-base survives — script-assisted, not eyeball.
+4. **Deploy-gate code fix on the branch before merge (C5):** structured own-file
+   reference-only marker + the missing unit test (pin "current journal passes") + one CI
+   invocation against the real journal. A runbook note is insufficient — the gate is code
+   and currently false-positives on journaled 0108.
+5. **Content-level merge verification as an executable CI invariant (C9):**
+   (a) path-level rule — every path in `diff(main, merge)` must appear in
+   `diff(merge-base, branch)`; any extra = main content modified by the merge;
+   (b) the both-sides-changed file set is enumerable today (ratchet baselines,
+   `_journal.json`, `AGENTS.md`, workflows, `i18n-keep.ts`) — each gets a named
+   resolution rule; (c) runs as a check on the merge PR, recorded in the PR, not a
+   human promise. Path-level alone cannot catch the C1 class — the per-file rules are
+   the actual guard.
 6. Doppler provisioning before the post-merge deploy: `CF_KV_IDEMPOTENCY_ID_DEV/STG/PRD`
    + `SEED_PASSWORD` (+ Cloudflare KV namespaces) — this is the WI-664 fix landing.
-7. Operator sign-off on the live-on-merge behavior changes (filing 3→5, escalation
-   heuristics, concept-capture disable) — deliberate audit fixes from Zuzka's lane, but
-   they change product behavior and deserve a conscious yes.
+7. **Operator sign-off against a generated, complete per-module behavior-change
+   inventory** (mechanically derived from the diff: module → one-line effect), not a
+   sample. Known-live changes include: filing 3→5, escalation heuristics,
+   concept-capture disable, metering refund refusal (`topup_credit_not_found` contract
+   change), fail-loud SSE done-frame parsing, recap ownership re-anchor, consent
+   rate-limit relocation, memory-enabled endpoint removal (404s for stale binaries).
 8. Canon intake of the account-detachment ruling (C10) rides the next IF ratification.
+9. **GDPR Art-15 export gap (red-team):** `mentor_activity_ledger` is written from merge
+   day but `services/export.ts` does not enumerate it — extend export before merge (or
+   gate the ledger write), and add the table to CUT-B2's export-twin spec. Erasure is
+   already covered (FK cascade); access/portability is not.
+10. **OTA hazard (red-team):** the expo package realignment changes native module majors
+    while `runtimeVersion` policy is `appVersion` — post-merge, **no OTA until new EAS
+    builds exist** (or bump `version` so stale binaries fall outside the OTA target).
+
+**Additional note (red-team F8):** the branch's 0111 SQL + snapshot are hand-curated, not
+clean `generate` output (the unshipped concepts DDL was hand-trimmed). CUT-A's
+generate-preflight (v1.1 addendum) is therefore **load-bearing**, diffing against a
+hand-doctored snapshot — not merely hygiene.
 
 **Sequencing:** Zuzka's 1–2 pipeline commits land → §8 rescan → checklist applied on the
 branch → merge (content-verified) → CUT-A proceeds on post-merge main → cutover plan
@@ -139,18 +167,26 @@ ratification folds the C3/C4/C5 deltas → S4/S5 re-key to post-flip (C-plans).
 
 ## §7 Lockstep protocol (the operating agreement, any strategy)
 
-1. **Boundary events both ways:** the umbrella program emits to Zuzka's lane: CUT-A merged,
-   each CUT-B merged, freeze window opening, flip done, drop done. Zuzka's lane emits:
-   branch mergeable, merge done, S-stage starts.
-2. **Migration numbers:** never pre-assign in either lane's docs — next-free at landing;
-   announce consumption as a boundary event.
+1. **Boundary events both ways, over a named channel with acks:** the umbrella program
+   emits to Zuzka's lane: CUT-A merged, each CUT-B merged, freeze opening, flip done,
+   drop done. Zuzka's lane emits: branch mergeable, merge done, S-stage starts. Channel:
+   operator relay (today) → Cosmo boundary events (when WI-590 lands); an event without
+   an ack is treated as undelivered.
+2. **Migration numbers:** never pre-assign in either lane's docs — next-free at landing.
+   (Self-enforcing at merge time: journal/meta files conflict loudly in git.)
 3. **Merge mechanics:** no more solo corrective merges — any sync that hits conflicts gets
-   content-level verification (C9 procedure) before push.
-4. **Freeze window:** from convergence step 1 to flip, no merges to main from any lane.
+   the checklist-5 content-level verification before push.
+4. **Freeze window — mechanical, detected, and extended through the drop:** from
+   convergence step 1 through **M-DROP completion** (not just the flip — the soak interval
+   is otherwise unprotected), no merges to main from any lane. Enforcement: a committed
+   freeze-marker file + a required CI check that fails while it exists; the convergence
+   shepherd is the named detector and lifts the marker.
 5. **Identity rulings:** canon changes ride the IF ratification path regardless of which
    lane originates them (C10 rule).
-6. **Shared-guard files** (ratchet baselines, AGENTS.md, workflows): conflicts resolve
-   main-wins by default; deviations need a named reason in the merge commit.
+6. **Shared-guard files:** forward-only ratchet baselines resolve by **intersection +
+   checker re-run** (main-wins silently resurrects grandfathered entries a branch
+   legitimately burned); `AGENTS.md`/workflows resolve main-wins. The enforceable form is
+   the post-merge checker run, not merge-commit prose.
 
 ## §8 Rescan obligation
 
