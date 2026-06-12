@@ -4,9 +4,11 @@
 corrected, items 9–10 added, §7 enforcement; pass 2, cutover-context reviewer: item 10
 executable, repoint ownership split, item 11 added, item 5 dynamic; pass 3, same
 reviewer: version bump REQUIRED not optional, item 5 bidirectional, §8 final rescan of
-the reconciled merge target restored as mandatory). Verdict all passes: **O2 stands
-with amendments** — every finding peripheral to the strategy core. Final feature SHA:
-`6a81f7663`; merge target = that SHA + reconciliation commits, rescanned per §8.
+the reconciled merge target restored as mandatory; pass 4: **item 12 RLS gap (High,
+verified)**, §6 sequencing order corrected, Inngest main-drift delta declared already
+triggered). Verdict all four passes: **O2 stands with amendments** — every finding
+peripheral to the strategy core. Final feature SHA: `6a81f7663`; merge target = that
+SHA + reconciliation commits (items 1–12), rescanned per §8 before approval.
 Strategy recommendation pending operator ruling.
 **Method:** 9-surface sweep workflow (55 agents), every high/medium finding adversarially
 verified (confirmed / adjusted / refuted) by independent re-derivation. Branch state analyzed:
@@ -178,15 +180,26 @@ is the existing one: PR review + CI + the reconciliation checklist below.
     main those tables exist but are NOT live until the flip. Rewrite to "post-IF-flip +
     convergence complete" (and apply the C3 S4 amendment) so no executor ever starts S4
     against dead tables. Owner: Zuzka's lane; lands with the merge or immediately after.
+12. **RLS for `mentor_activity_ledger` (pass-4, High):** the table is profile-scoped
+    (`profile_id`) but 0111 ships **without** `ENABLE ROW LEVEL SECURITY` or an
+    isolation policy — a live data-isolation gap AND a guaranteed CI failure on main
+    (`rls-coverage.test.ts` [ASSUMP-F14] requires RLS-in-a-migration for every
+    profile_id table; verified the branch did not modify the guard). Pre-merge, on the
+    branch: enable RLS + `mentor_activity_ledger_profile_isolation` policy in a
+    migration, update snapshot, run the coverage test green. The reconciliation should
+    also note WHY the branch's own CI never tripped this (likely change-class routing
+    skipping the database package tests) — that routing hole is its own small finding.
 
 **Additional note (red-team F8):** the branch's 0111 SQL + snapshot are hand-curated, not
 clean `generate` output (the unshipped concepts DDL was hand-trimmed). CUT-A's
 generate-preflight (v1.1 addendum) is therefore **load-bearing**, diffing against a
 hand-doctored snapshot — not merely hygiene.
 
-**Sequencing:** Zuzka's 1–2 pipeline commits land → §8 rescan → checklist applied on the
-branch → merge (content-verified) → CUT-A proceeds on post-merge main → cutover plan
-ratification folds the C3/C4/C5 deltas → S4/S5 re-key to post-flip (C-plans).
+**Sequencing (pass-4 corrected order):** reconciliation checklist (items 1–12) applied
+on the branch → **§8 final rescan of the exact reconciled SHA + main-drift delta
+(including the Inngest cross-file semantic check)** → operator approval → merge
+(checklist-5 verification on the merge PR) → CUT-A proceeds on post-merge main →
+cutover plan ratification folds the C3/C4 deltas → S4/S5 re-keyed plans live (item 11).
 
 ## §7 Lockstep protocol (the operating agreement, any strategy)
 
@@ -218,7 +231,10 @@ reconciliation checklist (items 1–4, 9–11) adds commits to the branch — th
 is therefore `6a81f7663` + reconciliation commits, which is NOT the SHA this analysis
 audited. Before operator approval of the actual merge: (1) a **diff-only rescan of
 `6a81f7663..<final reconciled SHA>`** against the nine lenses (expected small — the
-reconciliation commits are themselves checklist-prescribed); (2) a main-drift check —
-main was already 18 commits past the merge-base at v1.2; if main moves materially
-(schema, migrations, guard files, CUT-A landing), the collision matrix gets a delta
-review against the new main too.
+reconciliation commits are themselves checklist-prescribed); (2) the main-drift delta —
+**already triggered, not hypothetical** (pass-4): main is 19+ commits past the
+merge-base and has changed Inngest runtime files (`inngest/client.ts`, `helpers.ts`)
+while the branch rewrites six Inngest functions — the rescan must include an **Inngest
+cross-file semantic check** (do the branch's six rewritten functions still compose with
+main's moved runtime?), not just path-level merge survival. Any further material main
+movement (schema, migrations, guard files) extends the delta review.
