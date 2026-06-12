@@ -170,6 +170,16 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **done** — Closed/Done 2026-06-11 on the 5th review pass (PRs #876 + #897). 4 bounces, 4 distinct classes (children gate, unmerged PR, residual defect, evidence form); ended with FOR UPDATE serialization both paths + full red-green-revert proof. W4 complete. WI-618 captured from the sweep |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer (PR #874). First WI through the full loop with zero human touches |
+### CUT — cutover wave (split ruling, arrived in Cosmo 2026-06-13; NOT yet bridged/sequenced)
+
+| WI | unit | What | Pri | status |
+| --- | --- | --- | --- | --- |
+| WI-689 | CUT-A | additive identity schema extension (M-HOMES + M-RESEED2 + ADR + canon lockstep) | P1 | backlog — captured by planning session; Path unset, no deps/children |
+| WI-690 | CUT-canon-intake | account-detachment ruling sec-4 deltas into identity canon (OQ-11) | P2 | backlog — same |
+| WI-691 | CUT-B1 | identity spine cutover — flag plumbing, maintenance gates, bootstrap graph, person-scope twins | P1 | backlog — same |
+| WI-692 | CUT-B2 | consent + family cutover — write machine, coexistence break tests, deletion/export twins | P1 | backlog — same |
+| WI-693 | CUT-B3 | billing + webhooks cutover — subscription core, webhook twins, quota/trial chain | P1 | backlog — same |
+
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
 
