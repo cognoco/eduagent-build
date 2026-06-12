@@ -1,6 +1,6 @@
 # IF Application Cutover Plan — WP-CUT-A → WP-CUT-B → WI-586 convergence
 
-**Date:** 2026-06-11 · **Status:** DRAFT v1.1 — awaiting ratification (program session + operator)
+**Date:** 2026-06-11 · **Status:** DRAFT v1.2 — awaiting ratification (program session + operator)
 **Author:** dedicated architecture/planning session (per `cutover-planning-brief.md`)
 **Profile:** design (plan only; no code, no migrations, no Cosmo writes)
 
@@ -15,6 +15,24 @@
 > webhook behavior) as named CUT-B1 scope; (4) §2.1 flag read replaced with typed
 > config per G4 + a required flag-off break test. The switch-flip answer (§0.3) and
 > single-live-store structure are unchanged (review-confirmed).
+>
+> **Revision v1.2 (2026-06-11).** Six second-round review findings folded, all verified
+> against the repo: (1) the §2.3 consent resolver is now **basis-aware** (the BUG-466/
+> BUG-465 GDPR-only filters in `dashboard.ts` would otherwise revive the
+> newer-COPPA-masks-GDPR bug) + coexistence break tests named in CUT-B2; (2) §2.2a now
+> specifies the **graphless identity context and the route/middleware contract change**
+> the deferred bootstrap requires (`requireAccountMiddleware` allowlist; the
+> `POST /v1/profiles` v2 path no longer consumes `account.id`) — "no mobile call-site
+> change" stands, "no route/middleware contract change" was wrong and is withdrawn;
+> (3) `consent_request` gets an **actual RLS policy + exception model** (§1.2a) and a
+> coverage-manifest registration, not bare `ENABLE`; (4) the **FK inventory was
+> re-derived**: 56 re-points at today's schema (52 → person, 4 → subscription,
+> **0 → organization** — both `accounts`-target FKs are intra-legacy drops); stale
+> hard-coded counts removed, `pg_constraint` named authoritative; (5) the §2.2a
+> bootstrap transaction now pins `trial_ends_at = computeTrialEndDate(...)` (FR108)
+> and `person.birth_date` from the full WI-297 date inputs when present; (6) an
+> **Inngest drain gate** added to the freeze, and the §3 flag-polarity/step wording
+> corrected.
 
 **Inputs (read in full):**
 - `_wip/identity-foundation/cutover-planning-brief.md` — the mandate
@@ -78,7 +96,7 @@ S-sized "remove legacy readers". The operator ruled a SPLIT (2026-06-11):
 | Non-test runtime files reading legacy identity symbols | ~80 | ≈80 (64 profiles ∪ 18 accounts ∪ 15 family_links ∪ 11 consent_states ∪ 19 subscriptions) | **78** by symbol-grep union (Appendix B) + `routes/revenuecat-webhook.ts` and `middleware/metering.ts`, which reach legacy tables only through service imports → **~80** | consistent |
 | Payment webhooks | both | both | `routes/stripe-webhook.ts` + `routes/revenuecat-webhook.ts` (handlers in `services/billing/`) | consistent |
 | Inngest functions | 22 | ~22 | **24 files** under `inngest/functions/` match; 2 of them (`quota-reset`, `filing-stranded-backfill`) touch only billing satellites / learning tables, not identity tables → **22** identity readers | consistent |
-| FK re-points | 57 | 57 across 23 schema files | 61 raw `references(() => profiles\|accounts\|subscriptions...)` declarations; minus 4 intra-legacy FKs that **drop** rather than re-point (`profiles.account_id`, `subscriptions.account_id`, `family_links.parent/child_profile_id`) → **57** | consistent |
+| FK re-points | 57 | 57 across 23 schema files | **v1.2 precise re-derivation: 56 re-points** — 52 × `profiles.id → person.id`, 4 × `subscriptions.id → subscription.id`, **0 × `accounts.id → organization.id`** (only two `accounts`-target FKs exist — `profiles.account_id`, `subscriptions.account_id` — both intra-legacy **drops**); further drops: `family_links` parent/child (2), `consent_states.profile_id` (1), the `birth_year_set_by` self-FK | consistent at ±1; static counts are advisory — `pg_constraint` at execution is authoritative (§2.7) |
 | Test files referencing legacy symbols | ~190 | 188 (+ 45/51 integration suites) | **194** (symbol grep over `*.test.*`) | consistent |
 
 No material divergence. The executor's per-table figures are adopted as authoritative;
@@ -199,7 +217,33 @@ CREATE INDEX consent_request_token_idx ON consent_request (token) WHERE token IS
 -- reminder/expiry sweep path (consent-reminders Inngest fn)
 CREATE INDEX consent_request_status_requested_idx ON consent_request (status, requested_at);
 ALTER TABLE consent_request ENABLE ROW LEVEL SECURITY;
+-- RLS policy ships WITH the table (never ENABLE-without-policy — see §1.2a):
+CREATE POLICY "consent_request_charge_isolation" ON consent_request
+  USING (charge_person_id =
+         NULLIF(current_setting('app.current_profile_id', true), '')::uuid)
+  WITH CHECK (charge_person_id =
+         NULLIF(current_setting('app.current_profile_id', true), '')::uuid);
 ```
+
+#### 1.2a `consent_request` RLS access model (CUT-A scope)
+
+The table has three distinct access classes; the policy above covers the first, and
+the other two are **named exceptions with an existing sanctioned pattern**, not
+accidents:
+
+| Access class | Path | RLS posture |
+|---|---|---|
+| Authenticated person-scoped reads/writes (child's own status, request/resend) | inside `withProfileScope` (the `app.current_profile_id` GUC; `person.id = profiles.id`, so the GUC value carries over unchanged) | `consent_request_charge_isolation` applies — same shape as `consent_states_profile_isolation` (0085 sweep) |
+| Guardian-side reads (parent viewing a child's status) | service-layer `guardianship` authority check (the §2.6 P3 pattern), then a scoped read as the charge | **not** an RLS-policy concern — identical to how the parent dashboard reads `consent_states` today |
+| Public token lookup (`/v1/consent-page*`, `/v1/consent/respond`) + Inngest sweeps (`consent-reminders` day-N steps) | run outside `withProfileScope` on the worker's table-owner role (RLS not forced) — **the exact posture today's `consent_states` token lookup and reminder sweep already use** | documented service-role exception |
+
+**Manifest registration (same PR):** `consent_request` enters
+`database-rls-coverage.ts` as a policy-carrying table with a new
+`predicateColumn: 'charge_person_id'` entry (the manifest currently knows
+`profile_id` / `owner_profile_id` / `or-fk-cols`; extending `RlsTableMeta` is named
+CUT-A scope so the coverage integration test pins the policy from day one — the
+manifest's "enabled-without-policy" bucket is explicitly **not** where this table
+lands).
 
 **State machine (legacy → new, with transitions):**
 
@@ -555,15 +599,27 @@ longer exist.
   identity twin. **No new endpoint and no mobile call-site change** — the mobile
   onboarding flow already calls exactly this route with exactly these inputs at
   exactly this moment; the contract was always "identity data exists once the owner
-  profile is created".
+  profile is created". The **server-side** route/middleware contract does change —
+  see the pre-graph bullet below.
 - **The single transaction.** One DB transaction inserting, in order:
   `organization` (name derived as today, timezone if provided) → `person`
-  (display_name, `birth_date` from the submitted birth year, jurisdiction from the
-  location input, §1.3 preference columns) → `login` (clerk_user_id + verified email
-  from the auth context, person_id) → `membership` (`roles = {admin, learner}`) →
-  `subscription` (trial, `payer_person_id` = the new person) →
-  `subscription_payers` (primary row) → `quota_pools`. All-or-nothing; no interim
-  state is observable.
+  (display_name, `birth_date`, jurisdiction from the location input, §1.3 preference
+  columns) → `login` (clerk_user_id + verified email from the auth context,
+  person_id) → `membership` (`roles = {admin, learner}`) → `subscription`
+  (`plan_tier = 'plus'`, `status = 'trial'`,
+  **`trial_ends_at = computeTrialEndDate(now, organization.timezone)`** — the FR108
+  14-day plus trial, end-of-day in the user's timezone, same function
+  `services/account.ts:305` calls today; without it `findExpiredTrials`
+  (`billing/trial.ts:178`, `trial_ends_at <= now`) would never expire the trial,
+  `payer_person_id` = the new person) → `subscription_payers` (primary row) →
+  `quota_pools`. All-or-nothing; no interim state is observable.
+  **`person.birth_date`:** from the full submitted date when the optional WI-297
+  `birthMonth`/`birthDay` inputs are present (`profileCreateSchema`,
+  `packages/schemas/src/profiles.ts:58` — today computed transiently for consent
+  precision and discarded), else `birthYear-01-01` matching the reseed convention.
+  This deliberately persists what WI-297 kept transient — the ratified model already
+  makes `birth_date` a full DATE NOT NULL (canon §4.1), and persisting it makes the
+  age computation exact instead of year-overestimated.
 - **Idempotency / retry.** The transaction is fenced by the existing
   `login.clerk_user_id UNIQUE` constraint. Retry after a network failure, a client
   double-tap, or two concurrent first requests: the second transaction hits the
@@ -571,12 +627,30 @@ longer exist.
   (insert-or-fetch, the same pattern `findOrCreateAccount` uses on `accounts.clerk_user_id`
   today). A partially-failed transaction left nothing behind (atomicity), so a retry
   is a clean first attempt.
-- **Pre-graph request surface.** Between sign-in and onboarding completion the only
-  API calls mobile makes are profile list/create, and they behave today-identically
-  (empty list / the bootstrap call). Endpoints that today lean on the JIT-created
-  account row (`GET` billing/subscription status, consent my-status) return their
-  documented empty/default shapes for a graphless login (free-tier default response,
-  `null` consent status) — enumerated and tested in CUT-B1.
+- **Pre-graph request surface — the middleware/route contract change (explicit).**
+  "No mobile call-site change" stands; **"no route/middleware contract change" does
+  not** — today's chain makes `account` a hard precondition of every authenticated
+  request (`requireAccountMiddleware`, `middleware/account.ts:110`, returns 401 when
+  `user` is set but `account` is not), and `POST /v1/profiles` consumes `account.id`
+  in both `assertProfileCreationAllowed()` and `createProfileWithLimitCheck()`
+  (`routes/profiles.ts:58-72`). The v2 (flag-on) contract, named CUT-B1 scope:
+  - `accountMiddleware` v2: when no `login` row exists for the Clerk user, it does
+    **not** JIT-create; it sets a **graphless identity context** —
+    `c.set('clerkIdentity', { clerkUserId, verifiedEmail })` with `account` unset.
+    When a login exists, it resolves the graph and sets the account-shaped context
+    as today.
+  - `requireAccountMiddleware` v2: keeps the 401 guard for all routes **except an
+    explicit pre-graph allowlist** (defined next to the middleware, tested in
+    CUT-B1): `GET /v1/profiles` (returns the empty list), `POST /v1/profiles` (the
+    bootstrap), `GET` billing/subscription status and consent my-status (return
+    their documented default shapes — free-tier defaults, `null` consent status).
+    Everything else keeps today's hard 401.
+  - `POST /v1/profiles` v2 path: dispatches **before** any `account.id` use —
+    `createIdentityGraph()` takes the graphless `clerkIdentity`, not `account.id`;
+    the first-profile (owner) authorization is trivially satisfied pre-graph, and
+    the v2 equivalents of `assertProfileCreationAllowed` /
+    `createProfileWithLimitCheck` (subsequent child creates) operate on
+    `membership.roles` + the org's profile count instead of `account.id`.
 - **Store webhooks arriving pre-graph (explicit).** *RevenueCat:* an event whose
   `app_user_id` resolves to no `login` row inherits **today's exact behavior** for
   an unresolvable account — ack `200` + `logger.error` + `captureException`
@@ -587,10 +661,14 @@ longer exist.
   app flow. *Stripe:* checkout sessions are created by an authed billing route that
   requires the identity graph, so `checkout.session.completed` cannot arrive
   pre-graph by construction.
-- **OQ-1 balance re-checked (v1.1):** specifying the boundary did not weaken
-  option (c) — it strengthened it (zero mobile change; idempotency rides an existing
-  constraint; webhook behavior is inherited, not invented). Recommendation stands;
-  option (d) remains the named alternative.
+- **OQ-1 balance re-checked (v1.1, re-affirmed v1.2):** specifying the boundary
+  surfaced a real cost — the graphless context + the `requireAccountMiddleware`
+  pre-graph allowlist are genuine middleware-contract scope, not free. The cost is
+  bounded (one context type, a four-route allowlist, all in CUT-B1) and buys
+  `inv 26` alignment plus the structural elimination of ownerless accounts; option
+  (d) (nullable `login.person_id`) avoids the allowlist but amends ratified canon
+  and keeps the ownerless class alive. Recommendation **stands at (c)**, with the
+  contract change now priced in rather than implied away.
 
 ### 2.3 Sensitive surface 2 — consent (full detail)
 
@@ -607,9 +685,9 @@ The whole of `services/consent.ts` gets a v2 twin (`consent-v2.ts`) writing
 | `processConsentResponse(deny)` | tx: request → `'denied'` + the existing child-deletion cascade (`deletion.ts` v2) |
 | `revokeConsent` | INSERT `consent_grant(granted=false… )` — implemented as `withdrawn_at` on the live grant + `prior_value`/`audit_fact` per the ratified direction-aware gate; nudge-clearing unchanged |
 | `restoreConsent` (7-day grace) | new `consent_grant` row (granted=true, `prior_value=false`); grace check against the withdrawal timestamp |
-| `getConsentStatus` | **compatibility resolver**: open request `'pending'`→`PENDING`, `'requested'`→`PARENTAL_CONSENT_REQUESTED`; else latest grant per `(charge,purpose,org)`: granted & not withdrawn → `CONSENTED`, withdrawn → `WITHDRAWN`; no rows → `null`. Mobile's `consentStatusSchema` is served unchanged. |
+| `getConsentStatus` | **compatibility resolver — basis-aware**: `resolveConsentStatus(personId, orgId, purpose, basis)` reads the request row for that `(charge, purpose, org, basis)` key and the latest grant filtered by the matching `lawful_basis` — open request `'pending'`→`PENDING`, `'requested'`→`PARENTAL_CONSENT_REQUESTED`; else granted & not withdrawn → `CONSENTED`, withdrawn → `WITHDRAWN`; no rows → `null`. **The basis parameter is required, not defaulted**: the GDPR-only call sites (`dashboard.ts:837` per BUG-466, `dashboard.ts:1075` per BUG-465) pass `'gdpr_parental_consent'` explicitly — a basis-blind "latest row" read is exactly the newer-COPPA-masks-GDPR bug those fixes closed, and the v2 resolver must not be able to express it. Mobile's `consentStatusSchema` is served unchanged. |
 | `getChildNameByToken` | token lookup on `consent_request_token_idx`, expiry check identical |
-| `isGdprProcessingAllowed` | resolver above ≠ `CONSENTED` → false (same semantics; shared helper — single re-point covers its 7+ Inngest callers) |
+| `isGdprProcessingAllowed` | resolver above with `basis = 'gdpr_parental_consent'` pinned ≠ `CONSENTED` → false (same semantics; shared helper — single re-point covers its 7+ Inngest callers) |
 
 `middleware/consent.ts` is already pure (reads `profileMeta`) — no change beyond the
 resolver feeding `profileMeta.consentStatus`. The Inngest `consent-reminders` /
@@ -687,16 +765,21 @@ new tables (person, login, organization, membership, guardianship, consent_reque
 consent_grant, subscription) — an explicit reviewer checkpoint in CUT-B2 because
 export completeness is a compliance surface.
 
-### 2.7 The 57-FK re-point list
+### 2.7 The FK re-point list (≈56 at today's schema; catalog-authoritative)
 
-57 FK constraints across 23 schema files re-point in their own migration (`0112`,
-§4 step 6 — **inside the freeze window, before the flip**; the drop is the separate
-`0113` at step 8) — **constraint re-point only; columns, values, and names stay**
-(OQ-7). Targets:
-`profiles.id → person.id` (47), `accounts.id → organization.id` (4: deletion-feedback
-/ export-adjacent tables keyed by account), `subscriptions.id → subscription.id` (6:
-quota satellites). The 4 intra-legacy FKs drop with their tables. Per-file counts in
-Appendix C; the authoritative enumeration at execution time is:
+The FK re-point set lands in its own migration (`0112`, §4 step 6 — **inside the
+freeze window, before the flip**; the drop is the separate `0113` at step 8) —
+**constraint re-point only; columns, values, and names stay** (OQ-7). At today's
+static schema (v1.2 re-derivation): **56 re-points** — 52 × `profiles.id → person.id`
+(learning tables + the kept profile-adjacent feature tables + the quota satellites'
+`profile_id` columns), 4 × `subscriptions.id → subscription.id` (`quota_pools`,
+`profile_quota_usage`, `usage_events`, `top_up_credits`), and **none to
+`organization`** — the only two `accounts`-target FKs (`profiles.account_id`,
+`subscriptions.account_id`) are intra-legacy and drop with their tables, as do the
+`family_links` pair, `consent_states.profile_id`, and the `birth_year_set_by`
+self-FK. **These static counts are advisory and MUST NOT be copied into the work
+order as fixed numbers** — the 0112 migration is generated from the live catalog
+immediately before ratification/execution; the authoritative enumeration is:
 
 ```sql
 SELECT conrelid::regclass AS child_table, conname
@@ -740,14 +823,14 @@ the same way — they are live product features, **not** legacy identity.
 
 ## 3. WP-CUT-B PR partition
 
-Three PRs, sequenced. Each lands twins + dispatchers + tests; **flag stays false in
-every environment until §4 step 6**. CUT-A precedes all of them (the twins read/write
-§1 objects).
+Three PRs, sequenced. Each lands twins + dispatchers + tests; **the flag stays
+`'false'` in every deployed environment until the §4 step-7 flip**. CUT-A precedes
+all of them (the twins read/write §1 objects).
 
 | PR | Domain | Contents | Depends on |
 |---|---|---|---|
 | **CUT-B1 — identity spine** | auth/account/person | typed-config flag plumbing (§2.1) + the **flag-off break test** (literal `'false'` and unset both select legacy, zero new-model DB calls); `resolveIdentityV2` + the onboarding-completion bootstrap `createIdentityGraph()` per §2.2a (transaction, idempotency on `login.clerk_user_id`, pre-graph default responses); `profileMeta` v2; person-scope twins (profile, settings, onboarding, learner-profile, session-cache/exchanges context, snapshot-aggregation, coaching-cards); shared helpers (ii)–(v); `test-seed` v2 core; the P1/P2 Inngest functions (B1 rows, §2.5) | CUT-A |
-| **CUT-B2 — consent + family** | consent/guardianship/deletion | `consent-v2.ts` + compatibility resolver; consent routes/web re-target; `deletion.ts`/`export.ts`/`notices` v2; `guardianship` reads (family-access, family-bridge, dashboard, nudge, notifications, solo-progress-reports, weekly-digest); the B2 Inngest functions | CUT-B1 (helpers, profileMeta) |
+| **CUT-B2 — consent + family** | consent/guardianship/deletion | `consent-v2.ts` + the basis-aware compatibility resolver (§2.3); **required GDPR/COPPA coexistence break tests** — replicate the BUG-466/BUG-465 scenario against v2: a person holding both bases where the COPPA row is newer; the GDPR-pinned resolver and the dashboard paths must report the GDPR status, red-green per the regression-AC pattern; consent routes/web re-target; `deletion.ts`/`export.ts`/`notices` v2; `guardianship` reads (family-access, family-bridge, dashboard, nudge, notifications, solo-progress-reports, weekly-digest); the B2 Inngest functions | CUT-B1 (helpers, profileMeta) |
 | **CUT-B3 — billing + webhooks** | subscriptions/quota | `subscription-core` v2; both webhook handler twins (+ re-run BUG-116/CR-M11 break tests); metering/tier/trial/top-up/quota-provision/reconcile/family v2; routes/billing; `trial-expiry` Inngest; `session-exchange-router` tier source; drop the dead `hasPremiumLlm` override | CUT-B1 |
 
 CUT-B2 ∥ CUT-B3 may run in parallel after B1 merges (disjoint service surfaces; both
@@ -755,10 +838,11 @@ touch only their own twins).
 
 **Single-live-store argument at each merge point** (the invariant, per PR):
 
-1. **CUT-B1:** every v2 module is reachable only behind `IDENTITY_V2_ENABLED=false`
-   ⇒ unreachable in every deploy. Legacy paths are byte-identical except the seam
-   indirection (dispatcher defaults to legacy). No write to any new table can occur
-   (v2 writes live inside v2 modules). Legacy = sole live store. ✓
+1. **CUT-B1:** every v2 module is reachable only when `IDENTITY_V2_ENABLED='true'`,
+   and no deployed environment sets it ⇒ v2 paths are unreachable in every deploy
+   (pinned by the §2.1 flag-off break test). Legacy paths are byte-identical except
+   the seam indirection (dispatcher defaults to legacy). No write to any new table
+   can occur (v2 writes live inside v2 modules). Legacy = sole live store. ✓
 2. **CUT-B2:** same argument; additionally the consent resolver is only constructed
    inside v2 modules, and `consent_request` has no flag-off writer. ✓
 3. **CUT-B3:** same; the §1.4 columns are written only by v2 handlers; webhooks
@@ -788,8 +872,13 @@ dev rehearsal of this entire runbook completed once before staging.
 
 Per environment — **dev first (full rehearsal), then staging**; production §4.1.
 
-1. **Freeze.** Announce; pause the Inngest app (no crons/fan-outs mid-reseed); deploy
-   with `MAINTENANCE_READONLY=true` (typed-config flag added in CUT-B1) so the API
+1. **Freeze.** Announce; pause the Inngest app, then **drain-gate**: verify zero
+   active or queued runs before proceeding (Inngest dashboard / REST runs query for
+   the app, statuses `Running`/`Queued` = 0) — pausing stops new triggers but
+   in-flight functions (a `session-completed` pipeline, a reminder fan-out) keep
+   executing and writing; the final reseed and the FK re-point must not race a live
+   writer. Let in-flight runs complete or cancel them, re-check, then deploy with
+   `MAINTENANCE_READONLY=true` (typed-config flag added in CUT-B1) so the API
    rejects writes with 503 + `Retry-After`. Pre-launch, the window is minutes and
    user-invisible.
 2. **Recovery posture (binding constraint).** Record the Neon PITR marker and create
@@ -829,7 +918,8 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
    ```
 6. **FK re-point migration** (`0112_repoint_identity_fks.sql`) *(STOP → shepherd
    go; still inside the freeze, BEFORE the flip)*. One transaction re-pointing the
-   57 FKs (§2.7 pattern; enumerated by the §2.7 catalog query). This is safe at this
+   full FK set (§2.7 pattern; ≈56 at today's schema, enumerated authoritatively by
+   the §2.7 catalog query at generation time). This is safe at this
    point and only at this point: step 5 has just proven `person` / `organization` /
    `subscription` contain every id the legacy tables do, and the freeze guarantees
    no write changes that between verify and re-point. **Why before the flip:** if
@@ -901,7 +991,7 @@ Re-derived for the v1.1 ordering (re-point at step 6, before the flip):
 | 1–2 (freeze, marker) | trivial | unfreeze (unset flag, resume Inngest) | none |
 | 3 (ownerless disposal) | PITR only | restore from the step-2 branch/marker | none of value (deleted rows are verified test junk) |
 | 4–5 (reseed + verify) | trivial | nothing to undo — legacy untouched; new tables can be re-converged or truncated and re-seeded at will | none |
-| 6 (FK re-point, still frozen) | clean reverse migration | inverse ALTERs re-point the 57 constraints back to the legacy tables — data-free and safe **while the freeze holds**: verify (step 5) proved legacy and new agree row-for-row and nothing has written since. Abort here = re-point back, unfreeze flag-off. | none |
+| 6 (FK re-point, still frozen) | clean reverse migration | inverse ALTERs re-point the full constraint set back to the legacy tables — data-free and safe **while the freeze holds**: verify (step 5) proved legacy and new agree row-for-row and nothing has written since. Abort here = re-point back, unfreeze flag-off. | none |
 | 7 (flip + unfreeze, soak) | **PITR-only** (narrow exception below) | Flipping `IDENTITY_V2_ENABLED` back to `false` is **no longer a clean rollback**: the FKs now reference `person`/`organization`/`subscription`, so legacy mode cannot create a new profile whose dependent learning-data rows satisfy those constraints (a new `profiles` row has no `person` counterpart → every FK insert against it fails), and writes made while flipped exist only in the new model. **Documented abort path: restore from the step-2 PITR marker / pre-drop branch.** *Narrow exception — zero-new-person flip-back:* if the flipped window verifiably created no new person/org/subscription rows and made no writes (e.g. an immediate smoke failure), flip back + reverse the step-6 re-point inside a re-freeze; valid only with that verification recorded in the WI evidence. **No reverse-sync will ever be built** (clean-cut doctrine). | post-flip writes (on PITR restore) |
 | 8 (drop) | **IMPOSSIBLE forward** | the five legacy tables and their enums are gone; no migration can recreate their data. Recovery = Neon PITR restore / promote the step-2 `pre-drop-*` branch — which rewinds the **entire database**, losing **all writes made after the marker** (including post-flip new-model writes). | everything after the marker, on a recovery event |
 | 9 (grep-clean) | normal git revert | code-only | none |
@@ -975,8 +1065,12 @@ the flip unfreezes the system, the abort path is PITR-only.**
 > ## Consequences
 > - The legacy drop (WI-586) becomes possible without losing the consent workflow,
 >   webhook idempotency, or live preference data.
-> - `consent_request` joins the RLS surface (person-scoped); the retain-tier is
->   unaffected (requests die with the person — no receipt obligation pre-consent).
+> - `consent_request` joins the RLS surface with its isolation policy shipping in
+>   the same migration (`charge_person_id`-anchored, mirroring
+>   `consent_states_profile_isolation`) plus named service-role exceptions for the
+>   public token lookup and the reminder sweeps, and a coverage-manifest
+>   registration; the retain-tier is unaffected (requests die with the person — no
+>   receipt obligation pre-consent).
 > - Canon lockstep: `docs/canon/identity/data-model.md` gains the §2B cutover
 >   amendments in the same change-set as this ADR.
 > - The purpose vocabulary (`platform_use`) and lawful-basis values are finalized as
@@ -1040,15 +1134,28 @@ Pattern per §2.6; PR per §3. Detail rows for sensitive surfaces are in §2.2�
 † reaches legacy tables through service imports only (not in the 78 symbol-grep list);
 included for completeness — the brief's ~80 ≈ 78 + these.
 
-## Appendix C — FK re-point counts per schema file (57 total after excluding 4 intra-legacy)
+## Appendix C — FK re-point counts per schema file (56 re-points at today's static schema — advisory; v1.2 re-derivation)
 
-`assessments` 4 · `billing` 8 (6 re-point to subscription/person; 2 intra-legacy drop) ·
-`bookmarks` 1 · `challenge-round-cooldowns` 1 · `concept-mastery` 2 · `dictation` 1 ·
-`embeddings` 1 · `language` 2 · `learning-profiles` 1 · `memory-dedup-decisions` 1 ·
-`memory-facts` 1 · `notes` 1 · `notifications` 2 · `nudges` 2 · `practice-activity` 2 ·
-`profiles` 7 (4 re-point — prefs/notices satellites; 3 intra-legacy drop) · `progress` 6 ·
-`quiz-mastery` 1 · `quiz` 2 · `sessions` 5 · `snapshots` 7 · `subjects` 2 · `support` 1.
-Authoritative enumeration at execution: the `pg_constraint` query in §2.7.
+Counting `references(() => profiles|subscriptions...)` declarations per file
+(re-points only; intra-legacy drops noted):
+
+`assessments` 4 · `billing` 7 of 8 re-point (4 → subscription: quota_pools /
+profile_quota_usage / usage_events / top_up_credits; 3 `profile_id` → person;
+`subscriptions.account_id` is an intra-legacy drop) · `bookmarks` 1 ·
+`challenge-round-cooldowns` 1 · `concept-mastery` 2 · `dictation` 1 · `embeddings` 1 ·
+`language` 2 · `learning-profiles` 1 · `memory-dedup-decisions` 1 · `memory-facts` 1 ·
+`notes` 1 · `notifications` 2 · `nudges` 2 · `practice-activity` 2 ·
+`profiles` 3 of 6 re-point (withdrawal_archive_preferences / family_preferences /
+pending_notices `owner_profile_id` → person; intra-legacy drops: `family_links` ×2,
+`consent_states.profile_id`; also dropping: `profiles.account_id` and the
+`birth_year_set_by` self-FK) · `progress` 6 · `quiz-mastery` 1 · `quiz` 2 ·
+`sessions` 5 · `snapshots` 7 · `subjects` 2 · `support` 1.
+
+**No `accounts.id → organization.id` re-points exist** — both `accounts`-target FKs
+are intra-legacy drops (v1.2 correction; v1.0/v1.1 stated 4, which was wrong).
+These counts are **advisory**: the 0112 migration is generated from `pg_constraint`
+(§2.7 query) at execution time, and any drift between this appendix and the catalog
+resolves in the catalog's favor.
 
 ## Appendix D — staging ownerless accounts (the OQ-3 case-by-case list)
 
