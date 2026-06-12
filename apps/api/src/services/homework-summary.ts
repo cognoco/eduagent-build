@@ -5,6 +5,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import { NotFoundError } from '@eduagent/schemas';
 import type {
   ConversationLanguage,
   HomeworkProblem,
@@ -230,7 +231,7 @@ export async function extractHomeworkSummary(
     .limit(1);
 
   if (!sessionRow) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   // BC-08: scope subjects query by profileId for defense-in-depth

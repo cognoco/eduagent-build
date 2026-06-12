@@ -10,6 +10,7 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import { NotFoundError } from '@eduagent/schemas';
 import type {
   LearningSession,
   SessionSummary,
@@ -149,7 +150,7 @@ export async function setSessionInputMode(
   const repo = createScopedRepository(db, profileId);
   const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
   if (!row) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   const existingMetadata =
@@ -178,7 +179,7 @@ export async function setSessionInputMode(
     .returning();
 
   if (!updated) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   return mapSessionRow(updated);

@@ -15,6 +15,7 @@ import {
   skipSummary,
   submitSummary,
 } from './session-summary';
+import { NotFoundError } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Minimal stub helpers
@@ -264,7 +265,7 @@ describe('getSessionSummary', () => {
 // ---------------------------------------------------------------------------
 
 describe('skipSummary', () => {
-  it('throws "Session not found" when getSession returns null', async () => {
+  it('throws NotFoundError when getSession returns null', async () => {
     const db = {
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
@@ -282,9 +283,9 @@ describe('skipSummary', () => {
       update: jest.fn(),
     } as unknown as import('@eduagent/database').Database;
 
-    await expect(skipSummary(db, 'prof-1', 'nonexistent-sess')).rejects.toThrow(
-      'Session not found',
-    );
+    await expect(
+      skipSummary(db, 'prof-1', 'nonexistent-sess'),
+    ).rejects.toBeInstanceOf(NotFoundError);
 
     expect(db.insert).not.toHaveBeenCalled();
   });
@@ -365,7 +366,7 @@ describe('skipSummary', () => {
 // ---------------------------------------------------------------------------
 
 describe('submitSummary', () => {
-  it('throws "Session not found" when session does not exist', async () => {
+  it('throws NotFoundError when session does not exist', async () => {
     const db = {
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
@@ -389,7 +390,7 @@ describe('submitSummary', () => {
 
     await expect(
       submitSummary(db, 'prof-1', 'nonexistent', { content: 'My summary' }),
-    ).rejects.toThrow('Session not found');
+    ).rejects.toBeInstanceOf(NotFoundError);
 
     expect(db.insert).not.toHaveBeenCalled();
   });

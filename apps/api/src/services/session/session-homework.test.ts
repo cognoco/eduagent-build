@@ -6,6 +6,7 @@ import {
   getHomeworkTrackingMetadata,
   syncHomeworkState,
 } from './session-homework';
+import { NotFoundError } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // getHomeworkTrackingMetadata — pure helper
@@ -156,12 +157,12 @@ function buildHwDb(
 }
 
 describe('syncHomeworkState', () => {
-  it('throws "Session not found" when the scoped repo returns nothing', async () => {
+  it('throws NotFoundError when the scoped repo returns nothing', async () => {
     const { db } = buildHwDb(null);
 
     await expect(
       syncHomeworkState(db, 'prof-1', 'nonexistent-sess', makeSyncInput([])),
-    ).rejects.toThrow('Session not found');
+    ).rejects.toBeInstanceOf(NotFoundError);
     expect(db.insert).not.toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
   });

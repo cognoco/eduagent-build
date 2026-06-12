@@ -6,6 +6,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { sessionSummaries, type Database } from '@eduagent/database';
 import {
   ConflictError,
+  NotFoundError,
   type ConversationLanguage,
   type SessionSummary,
   type SummarySubmitInput,
@@ -69,7 +70,7 @@ export async function skipSummary(
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   const existing = await findSessionSummaryRow(db, profileId, sessionId);
@@ -135,7 +136,7 @@ export async function submitSummary(
   // Fetch session for topicId and subject name
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   // [WI-247] Idempotent short-circuit: if a summary already exists in

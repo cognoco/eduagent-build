@@ -9,6 +9,7 @@ import {
   insertSessionEvent,
   setSessionInputMode,
 } from './session-events';
+import { NotFoundError } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Helpers — minimal DB stubs (no jest.mock of internal modules per GC1/GC6)
@@ -399,7 +400,7 @@ describe('insertSessionEvent', () => {
 // ---------------------------------------------------------------------------
 
 describe('setSessionInputMode', () => {
-  it('throws "Session not found" when scoped repo returns null', async () => {
+  it('throws NotFoundError when scoped repo returns null', async () => {
     // The scoped repo is createScopedRepository(db, profileId). We cannot
     // mock its internals (GC1). Instead, we drive the error path through a
     // db stub whose query chain terminates with null — which causes the
@@ -434,7 +435,38 @@ describe('setSessionInputMode', () => {
 
     await expect(
       setSessionInputMode(db, 'prof-1', 'sess-1', { inputMode: 'voice' }),
-    ).rejects.toThrow('Session not found');
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('[WI-650] throws NotFoundError when UPDATE … RETURNING yields no row', async () => {
+    // Covers the second guard in setSessionInputMode: the scoped-repo
+    // findFirst DOES return a row, but the session is deleted (or re-scoped)
+    // between the read and the write, so the UPDATE … RETURNING comes back
+    // empty and the !updated guard fires.
+    const fakeRow = makeSessionRow({
+      id: 'sess-gone',
+      profileId: 'prof-1',
+      metadata: {},
+    });
+
+    const returningChain = jest.fn().mockResolvedValue([]);
+    const whereChain = { returning: returningChain };
+    const setChain = { where: jest.fn().mockReturnValue(whereChain) };
+    const updateChain = { set: jest.fn().mockReturnValue(setChain) };
+
+    const db = {
+      update: jest.fn().mockReturnValue(updateChain),
+      query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(fakeRow),
+        },
+      },
+    } as never;
+
+    await expect(
+      setSessionInputMode(db, 'prof-1', 'sess-gone', { inputMode: 'voice' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(returningChain).toHaveBeenCalledTimes(1);
   });
 
   it('includes profileId in the WHERE predicate when updating', async () => {

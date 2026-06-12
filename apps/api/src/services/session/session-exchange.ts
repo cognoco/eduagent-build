@@ -34,6 +34,7 @@ import type {
 } from '@eduagent/schemas';
 import {
   ConflictError,
+  NotFoundError,
   LlmStreamError,
   classifyOrphanError,
   challengeRoundSessionStateSchema,
@@ -476,7 +477,9 @@ async function applyContinuationScore(
   });
 }
 
-async function persistChallengeRoundState(
+// Exported for unit testing (WI-650 NotFoundError regression); not part of
+// the session barrel's public surface.
+export async function persistChallengeRoundState(
   db: Database,
   profileId: string,
   sessionId: string,
@@ -486,7 +489,7 @@ async function persistChallengeRoundState(
     challengeRound,
   });
   if (!updated) {
-    throw new Error('Session not found while persisting Challenge Round state');
+    throw new NotFoundError('Session');
   }
 }
 
@@ -1196,7 +1199,7 @@ export async function checkExchangeLimit(
   const repo = createScopedRepository(db, profileId);
   const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
   if (!row) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
   if (row.status === 'completed' || row.status === 'auto_closed') {
     throw new ConflictError('Session is closed and cannot accept exchanges');
@@ -1369,7 +1372,7 @@ export async function prepareExchangeContext(
   // 1. Load session
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   const sessionMeta = ((session.metadata as
