@@ -1,4 +1,6 @@
-# MMT-ADR-0020 — Activity ledger is the template-first narration and moment substrate
+# MMT-ADR-0022 — Activity ledger is the template-first narration and moment substrate
+
+> **Note on numbering:** originally minted as `MMT-ADR-0020` on the new-llm branch (the next free number at the time of authoring); renumbered to `0022` on 2026-06-12 when merging into main — `MMT-ADR-0020` was yielded to the identity-foundation cutover-plan consent-request ADR (analysis C6, WI-678), and `MMT-ADR-0021` was taken by the freeform-threshold ADR (also renumbered from 0019 in the same merge).
 
 **Status:** Accepted · 2026-06-11 · **Scope:** Mentor V2 shell backend primitives · **Deciders:** PM (owner) + Codex · **Builds on:** MMT-ADR-0000 (decisions layer)
 
@@ -39,5 +41,6 @@ If the ledger ever needs to be removed before it carries user-visible state, for
 
 ## Links
 
+- **Canon edit (lockstep):** `docs/architecture.md` — "Activity Ledger — Narration and Moment Substrate (`MMT-ADR-0022`)" section. Per `MMT-ADR-0000` §II.2, the ADR and its canon line land in the same change-set.
 - Spec: `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §8.2 and §12.
 - Plan: `docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md`.

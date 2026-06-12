@@ -1,6 +1,6 @@
-# MMT-ADR-0019 — Freeform Ask Anything files to Library only after five exchanges, with no freeform Challenge or notes flow
+# MMT-ADR-0021 — Freeform Ask Anything files to Library only after five exchanges, with no freeform Challenge or notes flow
 
-> **Note on numbering:** originally minted as `MMT-ADR-0018` on a feature branch; renumbered to `0019` on 2026-06-09 when merging main, where `MMT-ADR-0018` had been taken by the LLM-orchestrator promotion (ex-`ARCH-8`).
+> **Note on numbering:** originally minted as `MMT-ADR-0018` on a feature branch; renumbered to `0019` on 2026-06-09 when merging main (where `MMT-ADR-0018` had been taken by the LLM-orchestrator promotion, ex-`ARCH-8`); renumbered again to `0021` on 2026-06-12 when merging the new-llm branch into main — `MMT-ADR-0019` was already taken by the OS-agnostic dev platforms ADR and `MMT-ADR-0020` was yielded to the identity-foundation cutover-plan consent-request ADR (analysis C6, WI-678).
 
 **Status:** Accepted · 2026-06-08 · **Scope:** Ask Anything / freeform session persistence and learning affordances · **Deciders:** PM (owner) + Codex · **Builds on:** MMT-ADR-0000 (decisions layer)
 
