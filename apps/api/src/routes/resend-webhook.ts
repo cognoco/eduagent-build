@@ -15,6 +15,7 @@ import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
 import { safeSend } from '../services/safe-non-core';
 import { captureException } from '../services/sentry';
+import { resendSignatureFailureEscalator } from '../services/webhooks/signature-failure-escalator';
 import {
   resendWebhookPayloadSchema,
   type ResendEmailEventData,
@@ -315,6 +316,10 @@ export const resendWebhookRoute = new Hono<{
       webhookId,
       webhookTimestamp,
     });
+    // Rate-limited escalation: a single failure stays log-only; sustained
+    // failures within the window fire exactly one deduplicated Sentry event.
+    // Per-isolate best-effort — see signature-failure-escalator.ts header.
+    resendSignatureFailureEscalator.record();
     return apiError(
       c,
       401,

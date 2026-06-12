@@ -115,6 +115,10 @@ import {
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 import { claimWebhookId } from '../services/webhook-idempotency';
+import {
+  stripeSignatureFailureEscalator,
+  SIGNATURE_FAILURE_THRESHOLD,
+} from '../services/webhooks/signature-failure-escalator';
 
 // ---------------------------------------------------------------------------
 // Test app with mock db middleware
@@ -2096,5 +2100,82 @@ describe('subscription tier verified against purchased price [WI-85]', () => {
         }),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sustained signature-failure escalation [WI-646]
+//
+// Route-wiring regression: removing the recordSignatureFailure() call from the
+// signature-verification catch block must fail these tests. The escalator's
+// threshold/window logic itself is unit-tested in
+// services/webhooks/signature-failure-escalator.test.ts.
+// ---------------------------------------------------------------------------
+
+describe('sustained signature-failure escalation [WI-646]', () => {
+  const warnSpies: jest.SpyInstance[] = [];
+
+  beforeEach(() => {
+    // The escalator singleton accumulates state across other tests in this
+    // file (several earlier tests trigger signature failures). Reset for
+    // deterministic threshold counting.
+    stripeSignatureFailureEscalator.__resetForTesting();
+    (verifyWebhookSignature as jest.Mock).mockRejectedValue(
+      new Error('Signature verification failed'),
+    );
+    // Silence the per-failure logger.warn console noise for the flood.
+    warnSpies.push(
+      jest.spyOn(console, 'warn').mockImplementation(() => undefined),
+    );
+  });
+
+  afterEach(() => {
+    for (const spy of warnSpies.splice(0)) spy.mockRestore();
+    // Leave clean state for any test that runs after this describe.
+    stripeSignatureFailureEscalator.__resetForTesting();
+  });
+
+  async function sendBadSignatureRequest(): Promise<Response> {
+    return app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'bad_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+  }
+
+  it('does not escalate to Sentry for a single signature failure (log-only)', async () => {
+    const res = await sendBadSignatureRequest();
+
+    expect(res.status).toBe(400);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('escalates to Sentry exactly once when threshold signature failures occur [WI-646 regression]', async () => {
+    for (let i = 0; i < SIGNATURE_FAILURE_THRESHOLD; i++) {
+      const res = await sendBadSignatureRequest();
+      expect(res.status).toBe(400);
+    }
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.sustained_signature_failure',
+        }),
+      }),
+    );
+  });
+
+  it('still escalates only once when failures continue beyond the threshold', async () => {
+    for (let i = 0; i < SIGNATURE_FAILURE_THRESHOLD * 2; i++) {
+      await sendBadSignatureRequest();
+    }
+
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 });
