@@ -9,6 +9,7 @@ import {
   insertSessionEvent,
   setSessionInputMode,
 } from './session-events';
+import { NotFoundError } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Helpers — minimal DB stubs (no jest.mock of internal modules per GC1/GC6)
@@ -399,7 +400,7 @@ describe('insertSessionEvent', () => {
 // ---------------------------------------------------------------------------
 
 describe('setSessionInputMode', () => {
-  it('throws "Session not found" when scoped repo returns null', async () => {
+  it('throws NotFoundError when scoped repo returns null', async () => {
     // The scoped repo is createScopedRepository(db, profileId). We cannot
     // mock its internals (GC1). Instead, we drive the error path through a
     // db stub whose query chain terminates with null — which causes the
@@ -434,7 +435,7 @@ describe('setSessionInputMode', () => {
 
     await expect(
       setSessionInputMode(db, 'prof-1', 'sess-1', { inputMode: 'voice' }),
-    ).rejects.toThrow('Session not found');
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('includes profileId in the WHERE predicate when updating', async () => {

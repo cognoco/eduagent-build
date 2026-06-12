@@ -1,7 +1,9 @@
 import {
   __sessionCrudTestHooks,
   buildTopicIntentMatcherMessages,
+  closeSession,
   flagContent,
+  getSessionCompletionContext,
   matchTopicByIntent,
   projectAiResponseContent,
   recordSessionEvent,
@@ -1113,6 +1115,31 @@ describe('[F-015] flagContent — typed NotFoundError for missing session', () =
     const db = makeNullSessionDb();
     await expect(
       flagContent(db, 'prof-1', 'sess-missing', { eventId: 'evt-1' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-650 sweep — closeSession / getSessionCompletionContext
+// ---------------------------------------------------------------------------
+
+describe('[WI-650] closeSession — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      closeSession(db, 'prof-1', 'sess-missing', {
+        reason: 'user_ended',
+        summaryStatus: 'pending',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[WI-650] getSessionCompletionContext — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    const db = makeNullSessionDb();
+    await expect(
+      getSessionCompletionContext(db, 'prof-1', 'sess-missing'),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

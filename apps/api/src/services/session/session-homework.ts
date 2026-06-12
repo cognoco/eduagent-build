@@ -8,6 +8,7 @@ import {
   sessionEvents,
   type Database,
 } from '@eduagent/database';
+import { NotFoundError } from '@eduagent/schemas';
 import type {
   HomeworkStateSyncInput,
   HomeworkSessionMetadata,
@@ -70,7 +71,7 @@ export async function syncHomeworkState(
       .limit(1);
 
     if (!row) {
-      throw new Error('Session not found');
+      throw new NotFoundError('Session');
     }
     if (row.sessionType !== 'homework') {
       throw new Error(
