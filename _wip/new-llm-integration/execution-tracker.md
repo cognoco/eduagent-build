@@ -5,7 +5,7 @@ first, gated by the 12-item reconciliation checklist + final rescan)
 **Owner:** Jorn (+ LLM shepherd session; program session orchestrates)
 **Source of truth for findings:** `_wip/umbrella-program/supporting-artefacts/new-llm-integration-analysis.md`
 (v1.4 @ `450e4c522` — §3 collision matrix C1–C12, §6 checklist, §7 lockstep, §8 rescan)
-**Plain-English account (for Zuzka):** `_wip/umbrella-program/supporting-artefacts/new-llm-exec-summary-for-zuzka.md`
+**Executive summary (stakeholder-facing):** `_wip/umbrella-program/supporting-artefacts/new-llm-integration-exec-summary.md`
 
 ## §1 Charter
 

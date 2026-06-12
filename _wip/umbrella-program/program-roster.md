@@ -457,8 +457,8 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
   adversarial passes: **merge new-llm first, then run the IF cutover on
   post-merge main**, gated by the 12-item reconciliation checklist + a final
   rescan of the reconciled SHA. Reconciliation executes through the program
-  pipeline (Zuzka's lane halted; exec summary delivered:
-  `supporting-artefacts/new-llm-exec-summary-for-zuzka.md`). Cosmo Workstream
+  pipeline (Zuzka's lane halted; stakeholder exec summary:
+  `supporting-artefacts/new-llm-integration-exec-summary.md`). Cosmo Workstream
   "new-llm Integration & Reconciliation" sliced as `WI-675…682` (2 Highs:
   deploy-gate false-positive that would brick all post-merge deploys; missing
   RLS on `mentor_activity_ledger`). Two-track sequencing confirmed: cutover
