@@ -7,9 +7,9 @@ marked no-behavior-change. No area is silently omitted.
 **Diff range:** `origin/main...origin/new-llm` (three-dot — changes since merge-base `853b3c242`)
 **Reconciliation state:** the fully-reconciled `new-llm` — all PRG-17 units merged (WI-675..687, incl. WI-685); stable merge-base `853b3c242`
 **Generated:** 2026-06-12 · **Regenerated against final state:** 2026-06-13
-**Diff stats:** **290 paths** — `git diff --name-only origin/main...origin/new-llm | wc -l` = **290** (the `--stat` summary agrees: 290 files changed, 22 454 insertions, 5 085 deletions), measured against the fully-reconciled new-llm with this inventory committed
+**Diff stats:** **290 paths** — `git diff --name-only origin/main...origin/new-llm | wc -l` = **290** (the `--shortstat` file count agrees: 290 files changed). Exact insertion/deletion line-totals are intentionally NOT pinned here: this inventory is part of its own diff, so those totals shift by a few lines every time the artifact is committed — the **path count (290)** is the stable, authoritative coverage number. Measured against the fully-reconciled new-llm with this inventory committed.
 
-> **This regeneration accounts for the PRG-17 reconciliation additions (WI-675..685)** — see §F. The count above is measured against `origin/main...origin/new-llm`. After this inventory file is itself committed to the branch, the authoritative count INCLUDING this file is stated in the *Artifact Coverage Confirmation* at the foot of the document, so `diff(main, new-llm)` after merge equals the number the artifact states.
+> **This regeneration accounts for the PRG-17 reconciliation additions (WI-675..687)** — see §F. The count above is measured against `origin/main...origin/new-llm`. After this inventory file is itself committed to the branch, the authoritative count INCLUDING this file is stated in the *Artifact Coverage Confirmation* at the foot of the document, so `diff(main, new-llm)` after merge equals the number the artifact states.
 
 ---
 
@@ -344,7 +344,7 @@ All documentation files below are non-code and carry no behavioral effect at run
 
 ---
 
-### F. PRG-17 Reconciliation Commits (WI-675..685)
+### F. PRG-17 Reconciliation Commits (WI-675..687)
 
 These files were added/changed by the reconciliation PRs that landed on `new-llm` AFTER the first inventory was written (which captured 274 files). They are merge-invariant CI tooling, deploy wiring, two behavioral additions (RLS isolation, GDPR export), and docs. Listed here so the regenerated count is complete.
 
@@ -429,7 +429,7 @@ Inventory groups (every changed area mapped or explicitly marked no-behavior-cha
 - §C Shared packages (`packages/`): database (schema, repository, reference-only-migration scripts), schemas (activity-ledger, now-feed, stream-fallback, account, learning-profiles) — all accounted for
 - §D CI/tooling (`.github/`, `.husky/`, `package.json`, `pnpm-lock.yaml`, `scripts/` incl. merge-invariant + merge-exclusions) — all accounted for
 - §E Documentation (`docs/`, `_wip/`, `.claude/memory/`, `AGENTS.md`) — all accounted for (no behavior change)
-- §F PRG-17 reconciliation commits (WI-675..685) — all accounted for, two behavioral (WI-676 RLS, WI-679 GDPR export + version bump)
+- §F PRG-17 reconciliation commits (WI-675..687) — all accounted for, two behavioral (WI-676 RLS, WI-679 GDPR export + version bump)
 
 **This inventory file itself** (`_wip/new-llm-integration/behavior-change-inventory.md`) — **no behavior change** (operator sign-off artifact; documents, does not modify runtime). Counted in the self-count above so the artifact does not under-report its own merge.
 
