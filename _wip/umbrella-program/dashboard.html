@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>IF cutover plan in v1.1 revision</b> — v1.0 delivered + adversarially reviewed: 3 High + 1 Medium findings verified (FK-ordering soak break, GDPR/COPPA key collapse, OQ-1 missing API boundary) and handed back to the planning session; IF shepherd holding; ratification on v1.1 · <b>PRG-12 GRADUATED 06-12</b> (8/8, third graduation; ratchet 361 → 12) · PRG-13 rolling (WI-665/666 both executing) · PRG-15 graduated 06-11 · standing: <b>WI-664</b> staging-KV deploy red · WI-587 on Zuzka's desk.</span>
+  <span class="txt"><b>Right now:</b> <b>IF cutover plan in v1.1 revision</b> — v1.0 delivered + adversarially reviewed: 3 High + 1 Medium findings verified (FK-ordering soak break, GDPR/COPPA key collapse, OQ-1 missing API boundary) and handed back to the planning session; IF shepherd holding; ratification on v1.1 · <b>new-llm integration analysis running</b> (9-surface sweep + adversarial verify; interim: API surface is live-on-merge, ledger FK into drop-listed profiles confirmed) · <b>PRG-13 GRADUATED 06-12</b> (fourth; under a day) · PRG-12 graduated 06-12 (8/8; ratchet 361 → 12) · PRG-15 graduated 06-11 · standing: <b>WI-664</b> staging-KV deploy red · WI-587 on Zuzka's desk.</span>
 </div>
 
 <nav>
@@ -593,7 +593,7 @@ const QUEUE = [
   ["3","PRG-02","Harness Hygiene — residue batch","HH PR merged (G1)"],
   ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
   ["5","PRG-15","Error handling","✓ GRADUATED 06-11 — activation → graduation inside a day (WI-639/640/641)"],
-  ["6","PRG-13","Background-job security","✅ ACTIVATED 06-11 — into PRG-15's freed lane (WI-665/666)"],
+  ["6","PRG-13","Background-job security","✓ GRADUATED 06-12 — both WPs, under a day"],
   ["7","PRG-10","API security","✅ both gates FIRED (G2 + G4) — activation is an attention-budget call"],
   ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
@@ -696,13 +696,13 @@ const INIT = [
   ],
   homes:["activation-planning.md §2 PRG-11 (charter)","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-13", name:"Background-job security", accent:"var(--teal)", lane:"now", status:"active", q:"#6",
-  tagline:"Six tight findings: minors' data sitting in job state, plus two correctness bugs. Small and surgical.",
-  owner:"Agent-sweep; PII changes reviewed", gate:"Shepherd LIVE 06-11 (lane freed by PRG-15's graduation). Subsumption scan vs WI-578: partial — F-028 shrunk 3→2 functions (freeform-filing already fixed); F-091 live.",
+{ id:"PRG-13", name:"Background-job security", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#6",
+  tagline:"Six tight findings: minors' data sitting in job state, plus two correctness bugs. OUTCOME MET — fourth graduation, fastest lane.",
+  owner:"Agent-sweep; PII changes reviewed", gate:"GRADUATED 06-12 — both WPs closed via the autonomous loop in under a day. All 6 findings remediated; zero residue. Shepherd standing down.",
   outcome:"No PII in step state or event payloads on non-rewrite jobs; the two correctness bugs fixed.",
   bundles:[
-    {n:"WI-665 · PII step-state & event payloads", s:"3 findings (F-028×2 legs · F-091 · F-090)", m:"mixed", st:"go", note:"P1. Extends WI-578's landed pattern + pii-scrub.ts."},
-    {n:"WI-666 · Config & correctness fixes", s:"3 findings (F-094 · F-162 · F-174)", m:"agent", st:"go", note:"P2. F-162 ruled to stay in PRG-13 (charter OQ2)."}
+    {n:"WI-665 · PII step-state & event payloads", s:"3 findings (F-028×2 legs · F-091 · F-090)", m:"mixed", st:"done", note:"P1. CLOSED 06-12 — extended WI-578's pii-scrub pattern."},
+    {n:"WI-666 · Config & correctness fixes", s:"3 findings (F-094 · F-162 · F-174)", m:"agent", st:"done", note:"P2. CLOSED 06-12."}
   ],
   homes:["_wip/security-pii-inngest/execution-tracker.md (THE entry point)","Cosmo Workstream: Inngest Security & Correctness","L-gap-delta.md (per-finding)"]},
 

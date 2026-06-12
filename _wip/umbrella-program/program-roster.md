@@ -221,7 +221,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 ---
 
-### PRG-13 · Background-Job Security — `active` (2026-06-11)
+### PRG-13 · Background-Job Security — `✓ graduated` (2026-06-12)
 - **Outcome:** all 6 `security-pii-inngest` audit findings resolved — minors' PII
   out of memoized Inngest step returns and event payloads, env-binding isolation
   across concurrent runs, the cursor-skip and grade-before-claim correctness bugs.
@@ -235,9 +235,14 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   PRG-15's graduation. Both charter OQs resolved at activation: OQ1 subsumption
   scan vs `WI-578` = **partial** (F-028 shrunk 3 functions → 2, freeform-filing
   already fixed; F-091 fully live; scan detail in tracker §3); OQ2 = F-162 stays.
-- **Execution state:** units in Backlog; shepherd kickoff prompt handed to
-  operator. Live state: Cosmo + `_wip/security-pii-inngest/execution-tracker.md`.
-- **Activate-when:** — (active)
+- **Execution state:** **GRADUATED 2026-06-12 (operator ruling)** — both WPs
+  (`WI-665` pii-step-state, `WI-666` config-correctness) Closed/Done via the
+  autonomous review loop; activation → slice-complete in under a day (fastest
+  lane yet). All 6 findings remediated; no exclusions or residue (the only
+  slice-time scope change was the F-028 shrink, a documented reduction). The
+  program's **fourth graduation**. Shepherd standing down after final
+  checkpoint + residue statement.
+- **Activate-when:** — (graduated)
 
 ---
 
@@ -366,7 +371,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
 | 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
 | 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
-| 6 | **PRG-13** security-pii-inngest | ✅ **ACTIVATED 06-11** — into the lane PRG-15's graduation freed (WI-665/666; subsumption scan: partial) |
+| 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
 | 7 | **PRG-10** security-pii-api | ✅ **both gates FIRED** (safe subset G2; auth/PII remainder G4 06-11 late) — activation = attention-budget call |
 | 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
 | 9 | **PRG-04** Cosmo top-down delivery layer | orchestrator pull on dogfood evidence (≥1 full Initiative cycle on the IF pattern) |
@@ -415,6 +420,15 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-12 — PRG-13 GRADUATED (fourth graduation, fastest lane).** Operator
+  ruling: `WI-665` + `WI-666` Closed/Done via the autonomous loop, activation →
+  slice-complete in under a day. All 6 `security-pii-inngest` findings
+  remediated (minors' PII out of step state/event payloads, env-binding
+  isolation, cursor-skip + grade-before-claim bugs); zero residue. Clear-out
+  scoreboard: 4 of the 6 audit clear-out initiatives now graduated
+  (PRG-12/13/15 + PRG-02); PRG-10 + PRG-11 remain armed. Live execution: IF
+  (cutover plan v1.1 in revision) + the new-llm integration analysis
+  (sweep workflow resumed after token-cap interruption).
 - **2026-06-12 — PRG-12 GRADUATED (third graduation, largest slice).** Operator
   ruling after program-session verification found nothing needing review:
   all 8 WPs (`WI-621…628`, ~34 findings) Closed/Done via the autonomous loop;
