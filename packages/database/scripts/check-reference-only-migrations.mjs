@@ -1,12 +1,11 @@
 // Preflight guard: refuse to run `drizzle-kit migrate` when a journaled migration
-// is marked "REFERENCE ONLY" / "DO NOT APPLY".
+// carries the structured reference-only marker on its first line.
 //
 // Why this exists
 // ---------------
 // Migrations 0106 (`identity_t1_org_membership`) and 0107 (`gorgeous_cardiac` —
-// the `concepts` / `concept_mastery` tables) open with a
-// `-- REFERENCE ONLY — DO NOT APPLY TO STAGING OR PRODUCTION.` comment, yet they
-// are full, hashed entries in `meta/_journal.json` with matching snapshots.
+// the `concepts` / `concept_mastery` tables) are journaled in
+// `meta/_journal.json` but must never be applied to a live database.
 // `drizzle-kit migrate` does not read SQL comments — it applies every journaled
 // migration not yet recorded in `drizzle.__drizzle_migrations`. Because these two
 // were never applied live, the next staging/prod migrate would execute them:
@@ -18,26 +17,53 @@
 // these from the effective chain. Until that lands, this guard converts a silent,
 // catastrophic auto-apply into a loud, safe deploy failure.
 //
+// Marker semantics (WI-675)
+// -------------------------
+// Detection uses a STRUCTURED FIRST-LINE marker only:
+//
+//   -- @reference-only
+//
+// The old free-text regex (`/REFERENCE ONLY|DO NOT APPLY/i`) scanned the whole
+// file, causing a false-positive on 0108's header (it MENTIONS that 0106/0107
+// are reference-only, but is itself a real, apply-safe migration). The new rule:
+// ONLY the SQL file's FIRST LINE is inspected, and ONLY an exact match of
+// `-- @reference-only` (case-insensitive, trimmed) triggers the gate. A prose
+// mention of those words anywhere else in the file is harmless.
+//
 // Scope: wired ONLY before the real staging/production migrate step in
 // `.github/workflows/deploy.yml`. It is intentionally NOT wired before the
 // ephemeral quality-gate migrate (a throwaway CI database where applying these on
 // empty data is harmless), so it does not break normal branch CI.
 //
-// Forward-only: any future migration carrying a reference-only marker is also
-// blocked here, so the "do not apply" intent is machine-enforced rather than
-// trusting a comment.
+// Forward-only: any future migration carrying the marker on its first line is
+// also blocked here, so the "do not apply" intent is machine-enforced.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 
-const MARKER_RE = /REFERENCE ONLY|DO NOT APPLY/i;
+/**
+ * Returns true when the SQL file's first non-empty line is exactly the
+ * structured reference-only marker `-- @reference-only` (case-insensitive,
+ * leading/trailing whitespace stripped).
+ *
+ * Checking ONLY the first line ensures that a prose mention of the phrase
+ * anywhere later in the file (e.g. in 0108's header commentary) does not
+ * trigger the gate.
+ *
+ * @param {string} sql
+ * @returns {boolean}
+ */
+function isReferenceOnly(sql) {
+  const firstLine = sql.split('\n')[0].trim();
+  return firstLine.toLowerCase() === '-- @reference-only';
+}
 
 /**
  * Pure scan: given the journal entries and a reader that returns each
- * migration's SQL text by tag, return the tags whose SQL carries a
- * reference-only marker. Exported for unit testing.
+ * migration's SQL text by tag, return the tags whose SQL carries the
+ * structured reference-only marker on its first line. Exported for unit testing.
  *
  * @param {{ entries: Array<{ tag: string }> }} journal
  * @param {(tag: string) => string} readSql
@@ -47,7 +73,7 @@ export function findReferenceOnlyMigrations(journal, readSql) {
   const blocked = [];
   for (const entry of journal.entries ?? []) {
     const sql = readSql(entry.tag);
-    if (MARKER_RE.test(sql)) {
+    if (isReferenceOnly(sql)) {
       blocked.push(entry.tag);
     }
   }

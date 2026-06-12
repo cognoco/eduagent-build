@@ -1,3 +1,4 @@
+-- @reference-only
 -- ============================================================================
 -- REFERENCE ONLY — DO NOT APPLY TO STAGING OR PRODUCTION.
 -- This migration (concept-capture: concepts + concept_mastery, for the B

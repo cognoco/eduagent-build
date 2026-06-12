@@ -1,3 +1,4 @@
+-- @reference-only
 -- ============================================================================
 -- REFERENCE ONLY — DO NOT APPLY TO STAGING OR PRODUCTION.
 -- This is stage T1 of the old 6-stage identity migration (empty
