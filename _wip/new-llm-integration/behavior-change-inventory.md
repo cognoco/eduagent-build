@@ -420,9 +420,9 @@ A new `.github/workflows/merge-invariant.yml` runs on every PR targeting `main` 
 
 Coverage is stated against the diff that INCLUDES this committed inventory file, so that after merge `diff(origin/main, origin/new-llm)` equals the number stated here.
 
-- **Files changed, `origin/main...HEAD` (this branch, including this committed inventory file): `__SELF_COUNT__`.**
-  - This is the count the operator should expect from `git diff origin/main...origin/new-llm --name-only | wc -l` once this inventory is merged.
-  - Measured at inventory time, `origin/main...origin/new-llm` (before this file lands) was **291 paths** (`--name-only`) / 288 in the `--stat` summary. Adding this one inventory file → the self-count above.
+- **Files changed, `origin/main...HEAD` (this branch, including this committed inventory file): 291 paths** (`--name-only`); 288 in the `--stat` file-summary (the difference is binary/asset accounting).
+  - This is the count the operator should expect from `git diff origin/main...origin/new-llm --name-only | wc -l` once this inventory regeneration is merged.
+  - The inventory file already existed on `new-llm` (from the prior merged commit), so this regeneration MODIFIES that path rather than adding a new one — the count is identical (291) whether measured as `origin/main...HEAD` or `origin/main...origin/new-llm`. Verified equal at regeneration time.
 
 Inventory groups (every changed area mapped or explicitly marked no-behavior-change; none silently omitted):
 - §A API (`apps/api/`): config, routes, services, inngest, drizzle (incl. 0112 RLS), scripts, wrangler, deploy.yml — all accounted for
