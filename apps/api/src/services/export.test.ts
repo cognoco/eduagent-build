@@ -636,13 +636,18 @@ describe('generateExport', () => {
     expect(exported['createdAt']).toBe('2025-01-15T10:00:00.000Z');
   });
 
-  it("[WI-679] does not include another profile's mentor_activity_ledger rows", async () => {
-    // profile p1 belongs to account-1; profile p2 belongs to a different account
-    // The mock for mentorActivityLedger is scoped: the service passes only the
-    // profileIds of the exporting account to the query.  Seeding p2's row in the
-    // mock and asserting it is absent proves the query is actually scoped.
+  it('[WI-679] passes a where clause to mentor_activity_ledger findMany (proves profile scoping)', async () => {
+    // createMockDb ignores where args — it always returns the seeded rows.
+    // What we prove: the service passes a non-undefined where argument to
+    // findMany, meaning profile scoping is wired.  A service that dropped
+    // inArray(...profileIds) would pass `undefined` and this assertion
+    // would catch it.
+    //
+    // Complementary proof (see test below): when profileIds is empty the
+    // service must NOT call findMany at all — the early-return guard is
+    // the second half of the scoping proof.
     const profileRow = mockProfileRow('p1', 'Alice');
-    const ownLedgerRow = {
+    const ledgerRow = {
       id: 'ledger-own',
       profileId: 'p1',
       actorJob: 'mentor',
@@ -656,25 +661,38 @@ describe('generateExport', () => {
 
     const db = createMockDb({
       profiles: [profileRow],
-      // Only p1's row is returned by the mock — the service must filter to profileIds
-      // of the exporting account. We verify the mock is called with the right scope
-      // by inspecting the exported result: it must contain exactly ownLedgerRow.
-      mentorActivityLedger: [ownLedgerRow],
+      mentorActivityLedger: [ledgerRow],
     });
 
-    const result = await generateExport(db, 'account-1');
+    await generateExport(db, 'account-1');
 
-    expect(result.mentorActivityLedger).toHaveLength(1);
-    const ids = (result.mentorActivityLedger as Record<string, unknown>[]).map(
-      (r) => r['id'],
-    );
-    expect(ids).toContain('ledger-own');
-    // Confirm the findMany mock was called (not bypassed)
     const mockDb = db as unknown as {
       query: {
         mentorActivityLedger: { findMany: jest.Mock };
       };
     };
     expect(mockDb.query.mentorActivityLedger.findMany).toHaveBeenCalledTimes(1);
+    // The call must include a where argument — undefined means no scoping.
+    const callArgs = mockDb.query.mentorActivityLedger.findMany.mock
+      .calls[0]![0] as { where?: unknown } | undefined;
+    expect(callArgs).toBeDefined();
+    expect(callArgs!.where).toBeDefined();
+  });
+
+  it('[WI-679] skips mentor_activity_ledger query when account has no profiles', async () => {
+    // When profileIds is empty the service must NOT call findMany at all.
+    // The inArray guard short-circuits to [] without touching the DB.
+    // If the where guard were missing, the service would call findMany
+    // unconditionally and return every row in the table.
+    const db = createMockDb({ profiles: [], consents: [] });
+
+    await generateExport(db, 'brand-new-account');
+
+    const mockDb = db as unknown as {
+      query: {
+        mentorActivityLedger: { findMany: jest.Mock };
+      };
+    };
+    expect(mockDb.query.mentorActivityLedger.findMany).not.toHaveBeenCalled();
   });
 });
