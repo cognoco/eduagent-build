@@ -1,0 +1,17 @@
+{
+  "pageId": "37b8bce9-1f7c-8114-91cf-fd489a1af48c",
+  "id": "WI-585",
+  "name": "WP-TAIL-reseed: re-seed live data into the new identity model",
+  "description": "Clean-cut tail (after W2 AND W3 AND W4 obligations land) — a single data-migration operation: seed the 8 target tables from the legacy source under the new model; verify row-level integrity before any drop. Must complete before legacy teardown (WP-TAIL-drop-legacy).",
+  "acceptanceCriteria": "All live entities present in the new model; integrity check passes; reversible until WP-TAIL-drop-legacy runs. Findings: tail-op (no F-ID). Source of truth: _wip/identity-foundation/2026-06-09-phase-o-master-plan.md §1 WP-TAIL-reseed (commit 23d0c01ad)",
+  "riskImpact": "M / risky — live-data migration.",
+  "type": "Task",
+  "altitude": "WP",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief (transcribed from the frozen Phase-O master plan SS1, WP-TAIL-reseed - source of truth at commit 23d0c01ad):\nBundle rationale: a single data-migration operation; must complete before legacy teardown.\nStrategy: seed the 8 target tables from the legacy source under the new model; verify row-level integrity before any drop.\nScope: IN - re-seed live data into the new model. OUT - the drop (WI-586 / WP-TAIL-drop-legacy).\nFindings: tail-op (no F-ID).\nAcceptance criteria: all live entities present in the new model; integrity check passes; the operation remains reversible until WP-TAIL-drop-legacy runs.\nRisk & blast radius: M / risky - live-data migration. Executor protocol hard rule applies: this is a destructive shared-infra step class - the executor must STOP and report the exact planned commands before running anything against a shared database, and wait for shepherd go.\nNotes: depends on all of W2 AND W3 AND W4 obligations landing (Cosmo Blocked-by edges: WI-575...WI-584)."
+}

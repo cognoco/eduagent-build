@@ -72,3 +72,65 @@ shepherd chooses, but small enough to run serially.
 
 - 2026-06-11 — Activated. Workstream + WI-665/WI-666 created (`Stage=Backlog`).
   Subsumption scan done (§3). Shepherd kickoff prompt handed to operator.
+- 2026-06-11 — Shepherd arrived. Review watcher wired for this workstream
+  (`review-watcher-v3.ts` 4th config entry, commit `9a314f736`; watcher restarted,
+  baseline confirms coverage). Restart-gap repair: WI-625 (L10n & A11y Mobile)
+  entered Reviewing during the ~45s watcher restart window — its review agent was
+  launched manually with the identical prompt contract.
+- 2026-06-11 — WI-665 brought through DoR bridge to `Stage=Ready`. Bundle brief
+  authored on the WP page; 4 children linked as absorbed provenance (ZDX-ADR-0001):
+  WI-638 (F-028 leg 1, auto-file-session — pre-existing capture from the WI-578
+  wave, adopted; dedup judge flagged it at 0.95), WI-667 (F-028 leg 2,
+  topic-probe-extract load-transcript — narrowed from the initial capture to avoid
+  overlap with WI-638), WI-668 (F-091), WI-669 (F-090). Execution Path=Assisted.
+  Executor dispatched (wi665-executor, plan-phase stop enforced).
+- 2026-06-11 — WI-666 brought through DoR bridge to `Stage=Ready` (brief authored;
+  children WI-670 (F-094), WI-671 (F-162), WI-672 (F-174) linked as absorbed
+  provenance; Execution Path=Assisted). Dedup adjudication: capture judge linked
+  WI-672 to WI-234 (Closed, PR #415, retention-data.ts) as duplicate@0.85 —
+  shepherd verified F-174 LIVE in `review-calibration-grade.ts:96` (grade step
+  precedes cooldown claim); kept as related-provenance, NOT a duplicate. WI-666
+  build dispatch deferred until WI-665 lands (serial per unit map order).
+- 2026-06-11 — WI-665 plan-phase stop reviewed and APPROVED with rulings:
+  (D1) F-090 via new `feedback_retry_queue` table, migration 0110 (enum alternative
+  rejected — PG enums irreversible); insert in failure path only, insert-failure
+  degrades gracefully (Sentry, no PII fallback into payload); support_to re-derived
+  from config if possible; unconsumed-row purge or tracked follow-up. (D2) 4→1 step
+  collapse in topic-probe-extract conditionally approved — executor must verify
+  seedRetentionCard idempotency under retry, else fall back to 2-step
+  reference-and-rehydrate shape. Corrections: event payload TYPE must drop
+  message/supportTo; GC1 hazard on DB mocks (requireActual pattern); migration
+  -before-deploy ordering in PR description. Executor implementing; next boundary
+  PR-open.
+- 2026-06-11 ~23:25 — wi665-executor killed mid-implementation by the account
+  usage-limit window (resets 00:40 Oslo). Worktree `.worktrees/WI-665` holds
+  uncommitted partial progress (F-028 legs + F-091 source/test edits;
+  F-090 schema + route-test started; no migration, no commits; `_plan-WI-665.md`
+  present). Recovery: shepherd scheduled a 00:47 one-shot wake-up to resume the
+  SAME executor from its transcript (context preserved). If this session dies
+  before the resume, a fresh executor must re-orient from `_plan-WI-665.md` +
+  `git status` in the worktree and the approved-plan rulings logged above.
+- 2026-06-12 ~01:10 — Executor resumed at 00:47, banked two worktree commits
+  (`0094499fe` F-028 legs + F-091; `893711d15` F-090), then was limit-killed a
+  second time (resets 04:30 Oslo). Tree near-clean; untracked
+  `webhook-idempotency-purge.test.ts` = half-done D1 purge piece. Remaining:
+  purge (or tracked follow-up), GC6 scan, typecheck/lint, push, PR. Next resume
+  scheduled 04:37.
+- 2026-06-12 ~01:4x — Operator-ordered immediate resume succeeded. **PR #1030
+  open** (head `a0799401d`), CI pending; shepherd owns the wait (backstop cron
+  cancelled). D2 outcome: `seedRetentionCard` NOT return-stable → two-step shape
+  taken (seed as own step before idempotent merged `extract-signals`). D1
+  outcomes: `supportTo` config-derivable → not stored; unconsumed-row purge
+  landed in-PR (no follow-up WI); enqueue-failure degrades gracefully.
+  Adversarial review: 1 round, SHIP. GC6 clean. Migration `0110` re-verified
+  free at PR time; migration-before-deploy note in PR description.
+- 2026-06-12 — Incident adjudicated: executor's first `/commit` forked into the
+  MAIN checkout and pushed `20b06b4c7` (19 ambient `.cosmo/` artifact files from
+  several sessions + the review-loop handoff-doc edit). Content benign (no code,
+  no secrets; handoff edit substantively correct — documents this workstream's
+  watcher extension). Ruling: ACCEPT, no revert — reverting would delete other
+  sessions' artifacts. Flagged for operator. Executor self-corrected to
+  worktree-directed commits afterward.
+- Open observation (executor): unrelated schema drift (concepts/identity churn)
+  sits unshipped on main — `drizzle-kit generate` would bundle it; deliberately
+  NOT absorbed into migration 0110. May deserve a capture by its owners.

@@ -1,0 +1,17 @@
+{
+  "pageId": "37c8bce9-1f7c-8161-8183-cdd3ce2a1ac2",
+  "id": "WI-624",
+  "name": "WP-L12-label-prop-strings: hardcoded a11y/dialog/prop strings through t()",
+  "description": "Route hardcoded English attribute/prop strings through i18n. Findings: F-063 (110 hardcoded accessibilityLabel screen-reader strings) · F-064 (25 platformAlert native dialog title+body pairs) · F-066 (60 label/title/placeholder/message prop literals outside auth). NOTE: JSX attribute literals are NOT covered by the existing ratchet — guard extension is a candidate follow-up capture, not in scope here. Full finding text: docs/audit/2026-05-29-full-audit/L-gap-delta.md (label l10n-a11y-mobile).",
+  "acceptanceCriteria": "All cited sites routed through t() with en.json keys in same PR; i18n checkers green.",
+  "riskImpact": "S-M / mechanical, copy-only.",
+  "type": "Task",
+  "altitude": "WP",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief (WP-L12-label-prop-strings)\nTranscribed from the PRG-12 execution tracker §1 (_wip/l10n-a11y/execution-tracker.md @ 9570f5b63) — bundle #4 of 8. Children are absorbed provenance (lifecycle rides this parent): WI-655 / WI-656.\nBundle rationale\nThe attribute-literal counterpart to WP-1: hardcoded English in accessibilityLabel props, native dialog copy, and label/title/placeholder props bypasses i18n invisibly (the jsx-literals ratchet deliberately excludes attributes).\nStrategy\nThree mechanical sweeps over distinct prop surfaces: (1) ~110 accessibilityLabel strings → t() (mind WI-622's landed common.loading pattern — reuse existing keys); (2) ~25 native dialog/platformAlert sites → t() for title/message/buttons; (3) ~60 label/title/placeholder props → t(). Keys namespaced per screen, same-PR en.json + pnpm translate. Candidate follow-up capture at review: extend the ratchet to attribute literals (per-prop allow/deny model — see AGENTS.md scope note and docs/audit/2026-05-29-full-audit/workflow-1/proposed-baseline.json).\nScope\nIn: F-063, F-064, F-066. Out: JSX text-children (WI-621, landing); building the attribute ratchet itself (capture as follow-up WI at review instead).\nFindings\nF-063 — 110 hardcoded English accessibilityLabel screen-reader strings.\nF-064 — 25 native dialog (platformAlert) call sites with hardcoded English.\nF-066 — 60 label/title/placeholder prop sites with hardcoded English.\nFull finding text: docs/audit/2026-05-29-full-audit/L-gap-delta.md (label l10n-a11y-mobile).\nAcceptance Criteria (bundle)\nAll in-scope attribute/prop/dialog literals routed through t(); en.json keys in the same PR; pnpm translate run.\nFollow-up WI captured for the attribute-literal ratchet extension with the per-prop model pointer.\ni18n checkers, typecheck, related tests green; no new hardcoded user-visible copy.\nRisk & blast radius\nLow/mechanical — prop-level string routing. Overlaps WI-623's component surface (run adjacent/serial with it). Sub-slice on demand if >PR-sized (~195 strings total — same screen-group split as WP-1 if needed, shepherd's call)."
+}

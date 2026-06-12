@@ -15,12 +15,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
   Bookmark,
   CurriculumTopic,
   RetentionStatus,
 } from '@eduagent/schemas';
+import type { Translate } from '../../../i18n';
 import { useBookWithTopics } from '../../../hooks/use-books';
 import {
   useTopicProgress,
@@ -90,6 +92,7 @@ function formatSessionDate(
 
 function formatSessionsSummary(
   sessions: { durationSeconds: number | null }[] | undefined,
+  t: Translate,
 ): string | null {
   if (!sessions || sessions.length === 0) return null;
 
@@ -101,8 +104,7 @@ function formatSessionsSummary(
     totalSeconds > 0 && totalSeconds < 60
       ? '<1'
       : String(Math.floor(totalSeconds / 60));
-  const sessionLabel = sessions.length === 1 ? 'session' : 'sessions';
-  return `${sessions.length} ${sessionLabel} · ${totalMinutes} min total`;
+  return `${t('library.sessionCount', { count: sessions.length })} · ${totalMinutes} min total`;
 }
 
 function formatBookmarkSourceLine(
@@ -133,6 +135,7 @@ function TopicSectionStrip({
   accentColor,
   onPress,
 }: TopicSectionStripProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   return (
@@ -140,9 +143,11 @@ function TopicSectionStrip({
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${label}. ${summary}. ${
-        expanded ? 'Collapse section' : 'Expand section'
-      }.`}
+      accessibilityLabel={
+        expanded
+          ? t('library.book.a11ySectionCollapse', { label, summary })
+          : t('library.book.a11ySectionExpand', { label, summary })
+      }
       style={{
         marginHorizontal: 20,
         marginTop: 14,
@@ -234,9 +239,10 @@ function TopicSectionStrip({
 function deriveStudyCTA(
   completionStatus: string | undefined,
   retentionStatus: RetentionStatus,
+  t: TFunction,
 ): { label: string; variant: 'primary' | 'outline' } {
   if (!completionStatus || completionStatus === 'not_started') {
-    return { label: 'Start studying', variant: 'primary' };
+    return { label: t('topic.ctaStartStudying'), variant: 'primary' };
   }
   if (
     completionStatus === 'completed' ||
@@ -244,10 +250,10 @@ function deriveStudyCTA(
     completionStatus === 'stable'
   ) {
     if (retentionStatus === 'strong') {
-      return { label: 'Practice again', variant: 'outline' };
+      return { label: t('topic.ctaPracticeAgain'), variant: 'outline' };
     }
   }
-  return { label: 'Review this topic', variant: 'primary' };
+  return { label: t('topic.ctaReview'), variant: 'primary' };
 }
 
 // ---------------------------------------------------------------------------
@@ -403,7 +409,7 @@ export default function TopicDetailScreen() {
   const lastStudiedText = lastReviewedAt
     ? t('topic.lastStudied', { when: relativeDate(lastReviewedAt) })
     : t('topic.neverStudied');
-  const sessionsSummary = formatSessionsSummary(topicSessions);
+  const sessionsSummary = formatSessionsSummary(topicSessions, t);
   const topicBookmarks = useMemo(
     () =>
       bookmarksQuery.data?.pages.flatMap((page) => page.bookmarks ?? []) ?? [],
@@ -413,26 +419,27 @@ export default function TopicDetailScreen() {
   const bookmarkCount = topicBookmarks.length;
   const sessionCount = topicSessions?.length ?? 0;
   const noteSummary = notesLoading
-    ? 'Loading notes...'
+    ? t('library.book.loadingNotes')
     : noteCount === 0
-      ? 'Add your first note for this topic'
-      : noteCount === 1
-        ? '1 note saved for this topic'
-        : `${noteCount} notes saved for this topic`;
+      ? t('topic.addFirstNoteSummary')
+      : t('library.topic.notesSavedCount', { count: noteCount });
   const bookmarkSummary = bookmarksQuery.isLoading
-    ? 'Loading saved explanations...'
+    ? t('topic.loadingBookmarks')
     : bookmarkCount === 0
       ? t('library.topic.bookmarks.emptyShort')
       : bookmarkCount === 1
-        ? (topicBookmarks[0]?.content ?? '1 saved explanation')
-        : `${bookmarkCount} saved explanations`;
+        ? (topicBookmarks[0]?.content ??
+          t('library.topic.bookmarks.savedExplanations', { count: 1 }))
+        : t('library.topic.bookmarks.savedExplanations', {
+            count: bookmarkCount,
+          });
   const sessionSummaryText = sessionsLoading
-    ? 'Loading sessions...'
-    : (sessionsSummary ?? 'No sessions yet');
+    ? t('topic.loadingSessions')
+    : (sessionsSummary ?? t('topic.noSessionsSummary'));
 
   const studyCTA = useMemo(
-    () => deriveStudyCTA(topicProgress?.completionStatus, retentionStatus),
-    [topicProgress?.completionStatus, retentionStatus],
+    () => deriveStudyCTA(topicProgress?.completionStatus, retentionStatus, t),
+    [topicProgress?.completionStatus, retentionStatus, t],
   );
 
   useEffect(() => {
@@ -527,7 +534,10 @@ export default function TopicDetailScreen() {
       onDelete: (id) =>
         deleteNote(id, {
           onError: (err) => {
-            platformAlert('Could not delete note', formatApiError(err));
+            platformAlert(
+              t('library.book.noteDeleteErrorTitle'),
+              formatApiError(err),
+            );
           },
         }),
     });
@@ -554,15 +564,15 @@ export default function TopicDetailScreen() {
       return (
         <ErrorFallback
           variant="centered"
-          title="Taking too long to open this topic"
-          message="Check your connection and try again."
+          title={t('topic.resolveTimeoutTitle')}
+          message={t('topic.resolveTimeoutMessage')}
           primaryAction={{
-            label: 'Retry',
+            label: t('common.retry'),
             onPress: () => setResolveTimedOut(false),
             testID: 'topic-resolve-timeout-retry',
           }}
           secondaryAction={{
-            label: 'Go to Library',
+            label: t('topic.recallTest.goToLibrary'),
             onPress: handleTopicBack,
             testID: 'topic-resolve-timeout-library',
           }}
@@ -594,7 +604,7 @@ export default function TopicDetailScreen() {
           onPress={handleTopicBack}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBackAction')}
           testID="topic-detail-missing-params-back"
         >
           <Text className="text-body font-semibold text-text-inverse">
@@ -624,7 +634,7 @@ export default function TopicDetailScreen() {
           }}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
           accessibilityRole="button"
-          accessibilityLabel="Retry loading topic"
+          accessibilityLabel={t('topic.a11yRetryTopic')}
           testID="topic-detail-retry"
         >
           <Text className="text-body font-semibold text-text-inverse">
@@ -635,7 +645,7 @@ export default function TopicDetailScreen() {
           onPress={handleTopicBack}
           className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBackAction')}
           testID="topic-detail-go-back"
         >
           <Text className="text-body font-semibold text-text-primary">
@@ -646,7 +656,7 @@ export default function TopicDetailScreen() {
           onPress={() => router.replace('/(app)')}
           className="py-2 items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go home"
+          accessibilityLabel={t('common.goHome')}
           testID="topic-detail-go-home"
         >
           <Text className="text-body-sm text-primary">
@@ -669,7 +679,7 @@ export default function TopicDetailScreen() {
           onPress={handleTopicBack}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="topic-detail-back"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBackAction')}
           accessibilityRole="button"
         >
           <Ionicons name="arrow-back" size={26} color={colors.primary} />
@@ -699,7 +709,7 @@ export default function TopicDetailScreen() {
           </View>
           {/* CTA visible but disabled while data loads */}
           <StudyCTA
-            label="Loading…"
+            label={t('common.loading')}
             variant="primary"
             onPress={noop}
             disabled
@@ -722,7 +732,7 @@ export default function TopicDetailScreen() {
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
             testID="topic-detail-empty-back"
             accessibilityRole="button"
-            accessibilityLabel="Back to previous screen"
+            accessibilityLabel={t('topic.a11yBackPrevious')}
           >
             <Text className="text-body font-semibold text-text-inverse">
               {t('common.goBackAction')}
@@ -824,7 +834,7 @@ export default function TopicDetailScreen() {
             <TopicSectionStrip
               testID="topic-notes-strip"
               icon="create-outline"
-              label="Notes for this topic"
+              label={t('topic.notesSection')}
               summary={noteSummary}
               meta={notesLoading ? '...' : String(noteCount)}
               expanded={notesExpanded}
@@ -975,7 +985,7 @@ export default function TopicDetailScreen() {
             <TopicSectionStrip
               testID="topic-sessions-strip"
               icon="time-outline"
-              label="Sessions"
+              label={t('topic.sessionsSection')}
               summary={sessionSummaryText}
               meta={sessionsLoading ? '...' : String(sessionCount)}
               expanded={sessionsExpanded}

@@ -9,6 +9,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 interface LivingBookProps {
@@ -35,6 +36,7 @@ export function LivingBook({
   isExpressive = false,
   onPress,
 }: LivingBookProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const prevCount = useRef(exchangeCount);
 
@@ -138,15 +140,13 @@ export function LivingBook({
         accessibilityRole: 'button' as const,
         accessibilityLabel: isComplete
           ? 'Your book is ready — tap to continue'
-          : `Book progress: ${exchangeCount} ${
-              exchangeCount === 1 ? 'page' : 'pages'
-            }`,
+          : t('session.livingBook.progressLabel', { count: exchangeCount }),
       }
     : {
         accessibilityRole: 'image' as const,
-        accessibilityLabel: `Book progress: ${exchangeCount} ${
-          exchangeCount === 1 ? 'page' : 'pages'
-        }`,
+        accessibilityLabel: t('session.livingBook.progressLabel', {
+          count: exchangeCount,
+        }),
       };
 
   return (
@@ -181,12 +181,11 @@ export function LivingBook({
       {/* Page counter — subtle text below icon */}
       <Text
         className="text-caption text-text-secondary mt-0.5"
-        style={{ fontSize: 10 }}
         testID="living-book-counter"
       >
         {exchangeCount === 0
           ? ''
-          : `${exchangeCount} ${exchangeCount === 1 ? 'page' : 'pages'}`}
+          : t('session.livingBook.pageCount', { count: exchangeCount })}
       </Text>
     </Wrapper>
   );

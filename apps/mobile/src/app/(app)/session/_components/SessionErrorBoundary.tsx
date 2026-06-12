@@ -110,7 +110,7 @@ export class SessionErrorBoundary extends Component<
                 >
                   <Text
                     style={{
-                      fontSize: 10,
+                      fontSize: 12,
                       color: tokens.light.colors.textPrimary,
                       fontFamily: 'monospace',
                     }}

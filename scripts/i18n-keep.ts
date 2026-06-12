@@ -251,6 +251,13 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/hooks/use-notification-response-handler.ts:93',
   },
   {
+    pattern: 'sessionSummary.takeaways.*',
+    reason:
+      'keys reached through the t function passed as a parameter (args.t), ' +
+      "invisible to the orphan walker: args.t('sessionSummary.takeaways.duration', { count }) " +
+      'at apps/mobile/src/app/session-summary/_view-models/session-summary-derived.ts:127',
+  },
+  {
     pattern: 'session.messageBubble.escalation.*',
     reason:
       'selected via escalation.labelKey from ESCALATION_STYLES[escalationRung] at ' +

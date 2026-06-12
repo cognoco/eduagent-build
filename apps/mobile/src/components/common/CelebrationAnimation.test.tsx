@@ -50,13 +50,19 @@ describe('CelebrationAnimation', () => {
     mockReduceMotion.mockReturnValue(false);
   });
 
-  it('renders with provided testID and accessibility attributes', () => {
+  it('renders with provided testID and is hidden from screen readers (decorative)', () => {
     render(<CelebrationAnimation testID="test-burst" />);
 
-    const element = screen.getByTestId('test-burst');
+    const element = screen.getByTestId('test-burst', {
+      includeHiddenElements: true,
+    });
     expect(element).toBeTruthy();
-    expect(element.props.accessibilityRole).toBe('image');
-    expect(element.props.accessibilityLabel).toBe('Celebration');
+    // Decorative animation — hidden from SR so users don't hear "image, Celebration".
+    // Both platform props required: importantForAccessibility is Android-only;
+    // accessibilityElementsHidden is the iOS (VoiceOver) equivalent.
+    expect(element.props.accessible).toBe(false);
+    expect(element.props.accessibilityElementsHidden).toBe(true);
+    expect(element.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('renders without crashing with default props', () => {
@@ -94,7 +100,9 @@ describe('CelebrationAnimation', () => {
   it('applies custom size to the container', () => {
     render(<CelebrationAnimation size={200} testID="test-burst" />);
 
-    const element = screen.getByTestId('test-burst');
+    const element = screen.getByTestId('test-burst', {
+      includeHiddenElements: true,
+    });
     const flatStyle = Array.isArray(element.props.style)
       ? Object.assign({}, ...element.props.style.filter(Boolean))
       : element.props.style;
@@ -218,7 +226,9 @@ describe('CelebrationAnimation', () => {
     // The component should render in its final state without crashing.
     // With the mock, shared values are plain objects, so progress=1 and
     // opacity=1 are set directly. If the code path threw, render would fail.
-    const element = screen.getByTestId('test-burst');
+    const element = screen.getByTestId('test-burst', {
+      includeHiddenElements: true,
+    });
     expect(element).toBeTruthy();
   });
 });

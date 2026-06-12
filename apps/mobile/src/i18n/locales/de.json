@@ -793,6 +793,16 @@
     "inputMode": {
       "text": "Textmodus",
       "voice": "Sprachmodus"
+    },
+    "milestoneDots": {
+      "reached_one": "1 Meilenstein erreicht",
+      "reached_other": "{{count}} Meilensteine erreicht"
+    },
+    "livingBook": {
+      "progressLabel_one": "Buchfortschritt: {{count}} Seite",
+      "progressLabel_other": "Buchfortschritt: {{count}} Seiten",
+      "pageCount_one": "{{count}} Seite",
+      "pageCount_other": "{{count}} Seiten"
     }
   },
   "quiz": {
@@ -1202,7 +1212,9 @@
       "bookmarks": {
         "savedFromChat": "Vom Chat gespeichert",
         "emptyShort": "Noch kein gespeicherter Chat für dieses Thema",
-        "emptyLong": "Noch keine gespeicherten Erklärungen für dieses Thema."
+        "emptyLong": "Noch keine gespeicherten Erklärungen für dieses Thema.",
+        "savedExplanations_one": "{{count}} gespeicherte Erklärung",
+        "savedExplanations_other": "{{count}} gespeicherte Erklärungen"
       },
       "challengeVerifiedBadge": "Herausforderung bestätigt",
       "practicedOftenHint": "Du übst dieses Thema oft — weiter so!",
@@ -1211,7 +1223,9 @@
       },
       "covers": "Dieses Thema behandelt",
       "mastered": "Gemeistert",
-      "strongReviewProgress": "{{strong}}/{{total}} starke Wiederholungen"
+      "strongReviewProgress": "{{strong}}/{{total}} starke Wiederholungen",
+      "notesSavedCount_one": "{{count}} Notiz für dieses Thema gespeichert",
+      "notesSavedCount_other": "{{count}} Notizen für dieses Thema gespeichert"
     },
     "book": {
       "readyToOpen": "Bereit zum Öffnen",
@@ -1247,7 +1261,39 @@
       "addFirstNote": "+ Füge deine erste Notiz für dieses Buch hinzu",
       "backToSubject": "Zurück zum Thema →",
       "finishedBody_one": "Du hast das einzige Thema in diesem Buch gelernt. Wiederhole es, damit es frisch im Gedächtnis bleibt, oder gehe zurück und wähle aus, was du als Nächstes lernen möchtest.",
-      "finishedBody_other": "Du hast alle {{count}} Themen in diesem Buch gelernt. Wiederhole sie, damit sie frisch im Gedächtnis bleiben, oder gehe zurück und wähle aus, was du als Nächstes lernen möchtest."
+      "finishedBody_other": "Du hast alle {{count}} Themen in diesem Buch gelernt. Wiederhole sie, damit sie frisch im Gedächtnis bleiben, oder gehe zurück und wähle aus, was du als Nächstes lernen möchtest.",
+      "notesSavedCount_one": "{{count}} Notiz für dieses Buch gespeichert",
+      "notesSavedCount_other": "{{count}} Notizen für dieses Buch gespeichert",
+      "deleteStartedTitle": "Angefangene Themen löschen?",
+      "deleteStartedMessage": "Dieses Buch hat {{started}}. Wenn du es löschst, werden auch diese Themen, ihr Lernverlauf, ihr Fortschritt und ihre Notizen gelöscht.",
+      "deleteEverything": "Alles löschen",
+      "deleteErrorTitle": "Buch konnte nicht gelöscht werden",
+      "deleteBookTitle": "Buch löschen?",
+      "deleteBookMessage": "Du kannst es später wieder hinzufügen. Wenn Themen begonnen wurden, wirst du gefragt, bevor auch diese Themen und ihr Lernverlauf gelöscht werden.",
+      "buildErrorTitle": "Dieses Buch konnte nicht erstellt werden",
+      "generationFailedTitle": "Inhalt nicht verfügbar",
+      "topicListErrorTitle": "Themenliste konnte nicht eingerichtet werden",
+      "movedTitle": "Verschoben",
+      "movedMessage": "„{{topic}}“ wurde nach {{book}} verschoben.",
+      "moveErrorTitle": "Verschieben fehlgeschlagen",
+      "movePromptMessage": "In ein anderes Buch verschieben?",
+      "startLearningErrorTitle": "Lernen konnte nicht gestartet werden",
+      "noteSaveErrorTitle": "Notiz nicht gespeichert",
+      "noteUpdateErrorTitle": "Notiz nicht aktualisiert",
+      "noteDeleteErrorTitle": "Notiz konnte nicht gelöscht werden",
+      "notesSection": "Notizen für dieses Buch",
+      "loadingNotes": "Notizen werden geladen ...",
+      "a11yDeleteBook": "Buch löschen",
+      "a11ySubjectBookmarks": "Gespeicherte Lesezeichen für dieses Fach ansehen",
+      "a11yRetryHistory": "Laden des Sitzungsverlaufs wiederholen",
+      "a11yRetryProgress": "Laden des Fortschritts wiederholen",
+      "a11yStartFirstLesson": "Erste Lektion starten",
+      "a11yStartReview": "Wiederholung mit Abständen starten",
+      "a11yBackToSubject": "Zurück zum Fach, um das nächste Lernthema auszuwählen",
+      "a11yBookComplete": "{{title}} abgeschlossen. {{topics}} Themen gelernt.",
+      "genericTitle": "Buch",
+      "a11ySectionCollapse": "{{label}}. {{summary}}. Abschnitt einklappen.",
+      "a11ySectionExpand": "{{label}}. {{summary}}. Abschnitt ausklappen."
     },
     "inactiveFallbackBanner": {
       "message": "Deine pausierten und archivierten Fächer konnten nicht geladen werden. Tippe zum Wiederholen – sie sind nicht weg."
@@ -1280,7 +1326,9 @@
       "stillStuck": "Hängst du fest?",
       "errorTitle": "Etwas ist schiefgelaufen",
       "timeoutTitle": "Noch am Warten…",
-      "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal."
+      "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal.",
+      "dontRememberFirst": "Weiß ich nicht mehr.",
+      "dontRememberAgain": "Stecke immer noch fest."
     },
     "lastStudied": "Zuletzt gelernt {{when}}",
     "neverStudied": "Nie gelernt",
@@ -1293,7 +1341,20 @@
     "noNotesYet": "Noch keine Notizen. Füge eine hinzu, wenn es Klick macht.",
     "noSessionsYet": "Noch keine Sitzungen. Starte unten eine!",
     "addNote": "+ Notiz hinzufügen",
-    "addFirstNote": "+ Füge deine erste Notiz für dieses Thema hinzu"
+    "addFirstNote": "+ Füge deine erste Notiz für dieses Thema hinzu",
+    "ctaStartStudying": "Lernen starten",
+    "ctaPracticeAgain": "Nochmal üben",
+    "ctaReview": "Thema wiederholen",
+    "resolveTimeoutTitle": "Öffnen dieses Themas dauert zu lange",
+    "resolveTimeoutMessage": "Überprüfe deine Verbindung und versuche es erneut.",
+    "a11yRetryTopic": "Laden des Themas wiederholen",
+    "a11yBackPrevious": "Zurück zum vorigen Bildschirm",
+    "notesSection": "Notizen zu diesem Thema",
+    "sessionsSection": "Sitzungen",
+    "addFirstNoteSummary": "Füge deine erste Notiz für dieses Thema hinzu",
+    "loadingBookmarks": "Gespeicherte Erklärungen werden geladen ...",
+    "loadingSessions": "Sitzungen werden geladen ...",
+    "noSessionsSummary": "Noch keine Sitzungen"
   },
   "subject": {
     "settings": {
@@ -1779,7 +1840,9 @@
       "goneSubtitle": "Es wurde möglicherweise entfernt oder in ein anderes Fach integriert.",
       "pastConversations": "Vergangene Gespräche",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "startedTopicsCount_one": "{{count}} Thema begonnen",
+      "startedTopicsCount_other": "{{count}} Themen begonnen"
     },
     "vocabulary": {
       "pageTitle": "Deine Vokabeln",
@@ -2015,7 +2078,22 @@
       "subjectRawMentorSummary": "Das begann mit „{{rawInput}}“, also findet {{name}} vielleicht noch die richtige Form für {{subject}}.",
       "subjectRawNextStep": "Eine kleine Sitzung kann dieses breite Interesse in ein konkretes Thema verwandeln.",
       "subjectQuietSummary": "{{subject}} ist bereit, wenn {{name}} dazu zurückkehren möchte.",
-      "subjectQuietNextStep": "Beginne mit einer leichten Frage oder einem Thema, damit der Neustart sich locker anfühlt."
+      "subjectQuietNextStep": "Beginne mit einer leichten Frage oder einem Thema, damit der Neustart sich locker anfühlt.",
+      "timeAgo": {
+        "justNow": "gerade eben",
+        "minutes_one": "vor {{count}} Min.",
+        "minutes_other": "vor {{count}} Min.",
+        "hours_one": "vor {{count}} Stunde",
+        "hours_other": "vor {{count}} Stunden",
+        "days_one": "vor {{count}} Tag",
+        "days_other": "vor {{count}} Tagen",
+        "weeks_one": "vor {{count}} Woche",
+        "weeks_other": "vor {{count}} Wochen",
+        "months_one": "vor {{count}} Monat",
+        "months_other": "vor {{count}} Monaten",
+        "years_one": "vor {{count}} Jahr",
+        "years_other": "vor {{count}} Jahren"
+      }
     },
     "mentorMemory": {
       "title": "Mentor-Gedächtnis",
@@ -2056,7 +2134,9 @@
         "low": "Frühes Signal",
         "medium": "Wiederholtes Muster",
         "high": "Starkes Signal"
-      }
+      },
+      "attemptCount_one": "{{count}} Mal bemerkt",
+      "attemptCount_other": "{{count}} Mal bemerkt"
     },
     "reports": {
       "title": "Berichte",
@@ -2572,7 +2652,13 @@
     "a11yStarters": "Vorschläge für Satzanfänge",
     "a11yWriteSummary": "Deine Lernzusammenfassung schreiben",
     "a11ySkipSummary": "Zusammenfassung überspringen",
-    "a11yStarterHint": "Tippen, um diesen Satzanfang zu verwenden"
+    "a11yStarterHint": "Tippen, um diesen Satzanfang zu verwenden",
+    "takeaways": {
+      "duration_one": "{{count}} Minute – tolle Sitzung!",
+      "duration_other": "{{count}} Minuten – tolle Sitzung!",
+      "exchanges_one": "Du hast {{count}} Austausch geschafft",
+      "exchanges_other": "Du hast {{count}} Austausche geschafft"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3078,7 +3164,30 @@
     "noneYetSessions": "Noch keine Sitzungen",
     "loadErrorNotes": "Notizen konnten nicht geladen werden",
     "loadErrorBookmarks": "Lesezeichen konnten nicht geladen werden",
-    "loadErrorSessions": "Sitzungen konnten nicht geladen werden"
+    "loadErrorSessions": "Sitzungen konnten nicht geladen werden",
+    "kinds": {
+      "sessions": "Sitzungen",
+      "notes": "Notizen",
+      "bookmarks": "Lesezeichen"
+    },
+    "types": {
+      "homework": "Hausaufgaben",
+      "review": "Wiederholung",
+      "learning": "Lernen",
+      "note": "Notiz",
+      "bookmark": "Lesezeichen"
+    },
+    "hub": {
+      "sessionsSubtitle": "Unterhaltungen, die du hattest",
+      "notesSubtitle": "Dinge, die du aufgeschrieben hast",
+      "bookmarksSubtitle": "Gespeicherte Antworten vom Tutor"
+    },
+    "unknownSubject": "Unbekanntes Fach",
+    "searchSessions": "Sitzungen suchen",
+    "searchNotes": "Notizen suchen",
+    "searchBookmarks": "Lesezeichen suchen",
+    "a11yGroupByDate": "Nach Datum gruppieren",
+    "a11yGroupBySubject": "Nach Fach gruppieren"
   },
   "createProfile": {
     "titleChild": "Erzähl uns von deinem Kind",
@@ -3136,7 +3245,11 @@
     "go": "Los",
     "skipStart": "Überspringen – trotzdem mit dem Lernen beginnen",
     "missingSubject": "Fehlendes Thema. Bitte geh zurück und versuch es erneut.",
-    "takingLonger": "Das dauert etwas länger als gewöhnlich ..."
+    "takingLonger": "Das dauert etwas länger als gewöhnlich ...",
+    "errorTitle": "Etwas wurde nicht geladen",
+    "setupErrorMessage": "Buch konnte nicht eingerichtet werden. Nochmal versuchen?",
+    "customPlaceholder": "Buch oder Thema zum Hinzufügen",
+    "organizingLibrary": "Deine Bibliothek wird organisiert ..."
   },
   "relearn": {
     "title": "Thema wiederholen",
@@ -3145,7 +3258,38 @@
     "overdueTopicCount_one": "{{count}} überfälliges Thema",
     "overdueTopicCount_other": "{{count}} überfällige Themen",
     "daysOverdue_one": "{{count}} Tag überfällig",
-    "daysOverdue_other": "{{count}} Tage überfällig"
+    "daysOverdue_other": "{{count}} Tage überfällig",
+    "methodVisualLabel": "Visuelle Diagramme",
+    "methodVisualDesc": "Lerne durch Grafiken, Diagramme und visuelle Darstellungen",
+    "methodVisualLabelYoung": "Zeig mir Bilder",
+    "methodVisualDescYoung": "Lerne mit Bildern, Grafiken und Zeichnungen",
+    "methodStepsLabel": "Schritt für Schritt",
+    "methodStepsDesc": "Konzepte in klare, aufeinanderfolgende Schritte unterteilen",
+    "methodStepsLabelYoung": "Führe mich da durch",
+    "methodStepsDescYoung": "In kleine, einfache Schritte unterteilen",
+    "methodExamplesLabel": "Beispiele aus der Praxis",
+    "methodExamplesDesc": "Konzepte mit praktischen Alltagssituationen verbinden",
+    "methodExamplesLabelYoung": "Zeig mir, wie es geht",
+    "methodExamplesDescYoung": "Lerne mit lustigen Alltagsbeispielen",
+    "methodPracticeLabel": "Übungsaufgaben",
+    "methodPracticeDesc": "Lerne durch das Bearbeiten von geführten Übungen",
+    "methodPracticeLabelYoung": "Ich will's versuchen",
+    "methodPracticeDescYoung": "Lerne, indem du mit Hilfe Aufgaben löst",
+    "copyTopicIntro": "Wähle ein Thema, bei dem du dich gerade am unsichersten fühlst.",
+    "copyTopicIntroYoung": "Wähle das Thema, das du nochmal versuchen möchtest.",
+    "copyMethodIntro": "Wähle einen Lernstil, der sich wie der beste nächste Schritt anfühlt.",
+    "copyMethodIntroYoung": "Wie möchtest du dieses Mal lernen?",
+    "copySubjectIntro": "Welches Fach möchtest du zuerst wiederholen?",
+    "copySubjectIntroYoung": "Mit welchem Fach sollen wir anfangen?",
+    "copyEmptyTitle": "Gerade nichts zu wiederholen",
+    "copyEmptyTitleYoung": "Gerade keine Wiederholungsthemen",
+    "copyEmptyBody": "Du hast alle überfälligen Themen aufgeholt. Gute Arbeit.",
+    "copyEmptyBodyYoung": "Du bist vorerst auf dem Laufenden. Super gemacht!",
+    "copyErrorTitle": "Wir konnten deine Wiederholungsthemen gerade nicht laden.",
+    "copyUsualMethod": "Übliche Methode",
+    "a11yOpenSubject": "{{name}} öffnen",
+    "a11yOpenTopic": "{{title}} öffnen",
+    "a11yLearnWith": "Mit {{method}} lernen"
   },
   "preview": {
     "backToSignIn": "Zurück zum Anmelden",
@@ -3169,5 +3313,15 @@
     "sampleBadge": "Beispiel",
     "sampleDataNote": "Beispieldaten – die echten Einblicke deines Kindes erscheinen nach der ersten Sitzung.",
     "sampleWeeklyBody": "Übte quadratische Gleichungen für 45 Minuten in drei Sitzungen. Wird sicherer beim Faktorisieren; arbeitet an der quadratischen Ergänzung."
+  },
+  "milestoneCard": {
+    "wordCount_one": "{{count}} Wort gelernt",
+    "wordCount_other": "{{count}} Wörter gelernt",
+    "topicCount_one": "{{count}} Thema gemeistert",
+    "topicCount_other": "{{count}} Themen gemeistert",
+    "sessionCount_one": "{{count}} Lernsitzung abgeschlossen",
+    "sessionCount_other": "{{count}} Lernsitzungen abgeschlossen",
+    "hourCount_one": "{{count}} Stunde gelernt",
+    "hourCount_other": "{{count}} Stunden gelernt"
   }
 }

@@ -1,0 +1,17 @@
+{
+  "pageId": "37c8bce9-1f7c-81aa-add1-c717cebe39fd",
+  "id": "WI-623",
+  "name": "WP-L12-modal-focus-roles: modal focus trap, roles, input labels, badge semantics",
+  "description": "Modal focus management + role/label annotation sweep. Findings: F-052 + F-070 (0 of 13 modals use accessibilityViewIsModal — coordinator-verified) · F-055 (form inputs lack accessibilityLabel; visible labels are detached siblings) · F-057 (tappables with text children but no accessibilityRole=button) · F-058 (escalation/verification badges convey state via color + tiny text, no role). Full finding text: docs/audit/2026-05-29-full-audit/L-gap-delta.md (label l10n-a11y-mobile).",
+  "acceptanceCriteria": "All 13 modals trap VoiceOver focus; form inputs programmatically labeled; tappables carry roles; badges expose state non-visually.",
+  "riskImpact": "S-M / attribute-level changes, low regression risk.",
+  "type": "Task",
+  "altitude": "WP",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief (WP-L12-modal-focus-roles)\nTranscribed from the PRG-12 execution tracker §1 (_wip/l10n-a11y/execution-tracker.md @ 9570f5b63) — bundle #3 of 8. Children are absorbed provenance (lifecycle rides this parent): WI-653 / WI-654.\nBundle rationale\nModal and role semantics travel together: the same 13 modal components need accessibilityViewIsModal AND correct roles/labels; one pass over that component surface fixes both classes.\nStrategy\nSweep the 13 modals: add accessibilityViewIsModal (iOS focus trap) and verify the Android back/dismiss path announces correctly. Then the semantics pass: attach labels to their inputs (accessibilityLabel/labelledBy patterns), add accessibilityRole to tappables, and give state badges a role + label so color+text is not the only channel. Any NEW user-visible strings route through t() (same-PR keys). Document the modal pattern in code for reuse.\nScope\nIn: F-052, F-070, F-055, F-057, F-058. Out: hardcoded label STRING extraction (WI-624 — if a label is missing entirely, add it via t(); if it exists but is hardcoded English, leave for WI-624); announcements (WI-622, landed); decorative hiding (WI-628).\nFindings\nF-052 — 0 of 13 modals use accessibilityViewIsModal; SR focus escapes behind the modal.\nF-070 — Coordinator synthesis: all 13 modals need focus management.\nF-055 — Form labels detached from their inputs.\nF-057 — Tappables missing accessibilityRole.\nF-058 — Badge conveys state by color+text with no role/label semantics.\nFull finding text: docs/audit/2026-05-29-full-audit/L-gap-delta.md (label l10n-a11y-mobile).\nAcceptance Criteria (bundle)\nAll 13 modals trap SR focus (accessibilityViewIsModal or equivalent) — verified per modal.\nInputs have attached labels; tappables have roles; state badges expose role+label semantics.\nNew strings through t() with same-PR en.json keys; i18n checkers + typecheck + related tests green.\nRisk & blast radius\nLow-medium — a11y props on existing components; overlaps WI-624's file surface (run adjacent/serial with it, never parallel)."
+}

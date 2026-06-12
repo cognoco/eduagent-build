@@ -793,6 +793,16 @@
     "inputMode": {
       "text": "テキストモード",
       "voice": "音声モード"
+    },
+    "milestoneDots": {
+      "reached_one": "マイルストーンを1つ達成",
+      "reached_other": "マイルストーンを{{count}}つ達成"
+    },
+    "livingBook": {
+      "progressLabel_one": "本の進捗：{{count}}ページ",
+      "progressLabel_other": "本の進捗：{{count}}ページ",
+      "pageCount_one": "{{count}}ページ",
+      "pageCount_other": "{{count}}ページ"
     }
   },
   "quiz": {
@@ -1202,7 +1212,9 @@
       "bookmarks": {
         "savedFromChat": "チャットから保存",
         "emptyShort": "このトピックで保存されたチャットはまだありません",
-        "emptyLong": "このトピックで保存された説明はまだありません。"
+        "emptyLong": "このトピックで保存された説明はまだありません。",
+        "savedExplanations_one": "保存した解説 {{count}} 件",
+        "savedExplanations_other": "保存した解説 {{count}} 件"
       },
       "challengeVerifiedBadge": "チャレンジ確認済み",
       "practicedOftenHint": "このトピックをよく練習しています — 続けましょう！",
@@ -1211,7 +1223,9 @@
       },
       "covers": "このトピックの内容",
       "mastered": "習得済み",
-      "strongReviewProgress": "{{strong}}/{{total}}回の強い復習"
+      "strongReviewProgress": "{{strong}}/{{total}}回の強い復習",
+      "notesSavedCount_one": "このトピックで保存したメモ {{count}} 件",
+      "notesSavedCount_other": "このトピックで保存したメモ {{count}} 件"
     },
     "book": {
       "readyToOpen": "開けます",
@@ -1247,7 +1261,39 @@
       "addFirstNote": "+ このブックの最初のノートを追加",
       "backToSubject": "科目に戻る →",
       "finishedBody_one": "この本の唯一のトピックを学習しました。復習して記憶を定着させるか、戻って次に学習することを選びましょう。",
-      "finishedBody_other": "この本の{{count}}個のトピックをすべて学習しました。復習して記憶を定着させるか、戻って次に学習することを選びましょう。"
+      "finishedBody_other": "この本の{{count}}個のトピックをすべて学習しました。復習して記憶を定着させるか、戻って次に学習することを選びましょう。",
+      "notesSavedCount_one": "この本で保存したメモ {{count}} 件",
+      "notesSavedCount_other": "この本で保存したメモ {{count}} 件",
+      "deleteStartedTitle": "開始済みのトピックを削除しますか？",
+      "deleteStartedMessage": "このブックには{{started}}があります。これを削除すると、これらのトピック、学習履歴、進捗、メモも削除されます。",
+      "deleteEverything": "すべて削除",
+      "deleteErrorTitle": "ブックを削除できませんでした",
+      "deleteBookTitle": "ブックを削除しますか？",
+      "deleteBookMessage": "後で再度追加できます。開始済みのトピックがある場合、それらのトピックと学習履歴も削除する前に確認メッセージが表示されます。",
+      "buildErrorTitle": "このブックを作成できませんでした",
+      "generationFailedTitle": "コンテンツが利用できません",
+      "topicListErrorTitle": "トピックリストを設定できませんでした",
+      "movedTitle": "移動しました",
+      "movedMessage": "「{{topic}}」を{{book}}に移動しました。",
+      "moveErrorTitle": "トピックを移動できませんでした",
+      "movePromptMessage": "別のブックに移動しますか？",
+      "startLearningErrorTitle": "学習を開始できませんでした",
+      "noteSaveErrorTitle": "メモを保存できませんでした",
+      "noteUpdateErrorTitle": "メモを更新できませんでした",
+      "noteDeleteErrorTitle": "メモを削除できませんでした",
+      "notesSection": "このブックのメモ",
+      "loadingNotes": "メモを読み込み中...",
+      "a11yDeleteBook": "ブックを削除",
+      "a11ySubjectBookmarks": "この科目の保存済みブックマークを表示",
+      "a11yRetryHistory": "セッション履歴の読み込みを再試行",
+      "a11yRetryProgress": "進捗の読み込みを再試行",
+      "a11yStartFirstLesson": "最初のレッスンを開始",
+      "a11yStartReview": "間隔反復レビューを開始",
+      "a11yBackToSubject": "科目に戻って次に学習する内容を選択",
+      "a11yBookComplete": "{{title}}が完了しました。{{topics}}個のトピックを学習しました。",
+      "genericTitle": "ブック",
+      "a11ySectionCollapse": "{{label}}。{{summary}}。セクションを折りたたむ。",
+      "a11ySectionExpand": "{{label}}。{{summary}}。セクションを展開する。"
     },
     "inactiveFallbackBanner": {
       "message": "一時停止中・アーカイブ済みの科目を読み込めませんでした。タップして再試行 — データは消えていません。"
@@ -1280,7 +1326,9 @@
       "stillStuck": "まだわかりません",
       "errorTitle": "問題が発生しました",
       "timeoutTitle": "まだ待機中…",
-      "timeoutMessage": "回答の送信に時間がかかっています。接続を確認してもう一度お試しください。"
+      "timeoutMessage": "回答の送信に時間がかかっています。接続を確認してもう一度お試しください。",
+      "dontRememberFirst": "思い出せません。",
+      "dontRememberAgain": "まだ分かりません。"
     },
     "lastStudied": "最終学習：{{when}}",
     "neverStudied": "未学習",
@@ -1293,7 +1341,20 @@
     "noNotesYet": "まだノートはありません。ひらめいた時に追加しましょう。",
     "noSessionsYet": "まだセッションがありません。下から開始しましょう！",
     "addNote": "+ ノートを追加",
-    "addFirstNote": "+ このトピックの最初のノートを追加"
+    "addFirstNote": "+ このトピックの最初のノートを追加",
+    "ctaStartStudying": "学習を開始",
+    "ctaPracticeAgain": "もう一度練習",
+    "ctaReview": "このトピックを復習",
+    "resolveTimeoutTitle": "このトピックを開くのに時間がかかりすぎています",
+    "resolveTimeoutMessage": "接続を確認して、もう一度お試しください。",
+    "a11yRetryTopic": "トピックの読み込みを再試行",
+    "a11yBackPrevious": "前の画面に戻る",
+    "notesSection": "このトピックのメモ",
+    "sessionsSection": "セッション",
+    "addFirstNoteSummary": "このトピックの最初のメモを追加",
+    "loadingBookmarks": "保存した解説を読み込み中...",
+    "loadingSessions": "セッションを読み込み中...",
+    "noSessionsSummary": "まだセッションがありません"
   },
   "subject": {
     "settings": {
@@ -1779,7 +1840,9 @@
       "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。",
       "pastConversations": "過去の会話",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "startedTopicsCount_one": "{{count}}個のトピックを開始",
+      "startedTopicsCount_other": "{{count}}個のトピックを開始"
     },
     "vocabulary": {
       "pageTitle": "あなたの語彙",
@@ -2015,7 +2078,22 @@
       "subjectRawMentorSummary": "これは「{{rawInput}}」から始まったので、{{name}}さんはまだ{{subject}}の学習の方向性を探っている段階かもしれません。",
       "subjectRawNextStep": "1回の短いセッションで、その漠然とした興味を具体的なトピックに変えることができます。",
       "subjectQuietSummary": "{{subject}}は、{{name}}さんが再開したいときにいつでも始められます。",
-      "subjectQuietNextStep": "簡単な質問やトピックから始めると、気軽に再開できます。"
+      "subjectQuietNextStep": "簡単な質問やトピックから始めると、気軽に再開できます。",
+      "timeAgo": {
+        "justNow": "たった今",
+        "minutes_one": "{{count}}分前",
+        "minutes_other": "{{count}}分前",
+        "hours_one": "{{count}}時間前",
+        "hours_other": "{{count}}時間前",
+        "days_one": "{{count}}日前",
+        "days_other": "{{count}}日前",
+        "weeks_one": "{{count}}週間前",
+        "weeks_other": "{{count}}週間前",
+        "months_one": "{{count}}か月前",
+        "months_other": "{{count}}か月前",
+        "years_one": "{{count}}年前",
+        "years_other": "{{count}}年前"
+      }
     },
     "mentorMemory": {
       "title": "メンターの記憶",
@@ -2056,7 +2134,9 @@
         "low": "初期のサイン",
         "medium": "繰り返し見られる傾向",
         "high": "強いサイン"
-      }
+      },
+      "attemptCount_one": "{{count}}回注目されました",
+      "attemptCount_other": "{{count}}回注目されました"
     },
     "reports": {
       "title": "レポート",
@@ -2572,7 +2652,13 @@
     "a11yStarters": "書き出しの提案",
     "a11yWriteSummary": "学習のまとめを書く",
     "a11ySkipSummary": "サマリーをスキップ",
-    "a11yStarterHint": "タップしてこの書き出しを使用"
+    "a11yStarterHint": "タップしてこの書き出しを使用",
+    "takeaways": {
+      "duration_one": "{{count}}分 - 素晴らしいセッションでした！",
+      "duration_other": "{{count}}分 - 素晴らしいセッションでした！",
+      "exchanges_one": "{{count}}個のやり取りを完了",
+      "exchanges_other": "{{count}}個のやり取りを完了"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3078,7 +3164,30 @@
     "noneYetSessions": "まだセッションはありません",
     "loadErrorNotes": "ノートを読み込めませんでした",
     "loadErrorBookmarks": "ブックマークを読み込めませんでした",
-    "loadErrorSessions": "セッションを読み込めませんでした"
+    "loadErrorSessions": "セッションを読み込めませんでした",
+    "kinds": {
+      "sessions": "セッション",
+      "notes": "メモ",
+      "bookmarks": "ブックマーク"
+    },
+    "types": {
+      "homework": "宿題",
+      "review": "復習",
+      "learning": "学習",
+      "note": "メモ",
+      "bookmark": "ブックマーク"
+    },
+    "hub": {
+      "sessionsSubtitle": "あなたの会話履歴",
+      "notesSubtitle": "あなたが書き留めたこと",
+      "bookmarksSubtitle": "あなたが保存したメンターの返信"
+    },
+    "unknownSubject": "不明な科目",
+    "searchSessions": "セッションを検索",
+    "searchNotes": "メモを検索",
+    "searchBookmarks": "ブックマークを検索",
+    "a11yGroupByDate": "日付でグループ化",
+    "a11yGroupBySubject": "科目でグループ化"
   },
   "createProfile": {
     "titleChild": "お子様について教えてください",
@@ -3136,7 +3245,11 @@
     "go": "実行",
     "skipStart": "スキップ — そのまま学習を開始",
     "missingSubject": "科目がありません。戻ってやり直してください。",
-    "takingLonger": "通常より少し時間がかかっています..."
+    "takingLonger": "通常より少し時間がかかっています...",
+    "errorTitle": "読み込みに失敗しました",
+    "setupErrorMessage": "そのブックを設定できませんでした。もう一度試しますか？",
+    "customPlaceholder": "追加するブックまたはトピック",
+    "organizingLibrary": "ライブラリを整理中..."
   },
   "relearn": {
     "title": "トピックの再学習",
@@ -3145,7 +3258,38 @@
     "overdueTopicCount_one": "期限切れのトピック {{count}}件",
     "overdueTopicCount_other": "期限切れのトピック {{count}}件",
     "daysOverdue_one": "{{count}}日期限切れ",
-    "daysOverdue_other": "{{count}}日期限切れ"
+    "daysOverdue_other": "{{count}}日期限切れ",
+    "methodVisualLabel": "図解",
+    "methodVisualDesc": "チャート、図、視覚的な表現を通して学習します",
+    "methodVisualLabelYoung": "絵を見せて",
+    "methodVisualDescYoung": "絵、チャート、図を使って学習します",
+    "methodStepsLabel": "ステップバイステップ",
+    "methodStepsDesc": "概念を明確で連続したステップに分解します",
+    "methodStepsLabelYoung": "手順を教えて",
+    "methodStepsDescYoung": "小さくて簡単なステップに分解します",
+    "methodExamplesLabel": "実世界の例",
+    "methodExamplesDesc": "概念を実用的で日常的な状況に結びつけます",
+    "methodExamplesLabelYoung": "どうやるのか見せて",
+    "methodExamplesDescYoung": "楽しくて日常的な例で学びます",
+    "methodPracticeLabel": "練習問題",
+    "methodPracticeDesc": "ガイド付きの演習を通して学習します",
+    "methodPracticeLabelYoung": "やってみる",
+    "methodPracticeDescYoung": "助けを借りながら問題を解いて学びます",
+    "copyTopicIntro": "今一番自信がないと感じるトピックを選んでください。",
+    "copyTopicIntroYoung": "もう一度挑戦したいトピックを選んでください。",
+    "copyMethodIntro": "次のステップに最適だと感じる教え方を選んでください。",
+    "copyMethodIntroYoung": "今回はどのように学習したいですか？",
+    "copySubjectIntro": "最初にどの科目を復習しますか？",
+    "copySubjectIntroYoung": "どの科目から始めますか？",
+    "copyEmptyTitle": "現在、再学習する項目はありません",
+    "copyEmptyTitleYoung": "現在、復習するトピックはありません",
+    "copyEmptyBody": "期限切れのトピックはすべて完了しました。よくできました。",
+    "copyEmptyBodyYoung": "今のところすべて完了しています。よくできました！",
+    "copyErrorTitle": "現在、復習トピックを読み込めませんでした。",
+    "copyUsualMethod": "通常の方法",
+    "a11yOpenSubject": "{{name}}を開く",
+    "a11yOpenTopic": "{{title}}を開く",
+    "a11yLearnWith": "{{method}}で学習"
   },
   "preview": {
     "backToSignIn": "サインインに戻る",
@@ -3169,5 +3313,15 @@
     "sampleBadge": "サンプル",
     "sampleDataNote": "これはサンプルデータです。お子様の実際の学習状況は、最初のセッションの後に表示されます。",
     "sampleWeeklyBody": "3回のセッションで45分間、二次方程式を練習しました。因数分解に慣れてきており、平方完成に取り組んでいます。"
+  },
+  "milestoneCard": {
+    "wordCount_one": "単語を{{count}}個学習",
+    "wordCount_other": "単語を{{count}}個学習",
+    "topicCount_one": "トピックを{{count}}個マスター",
+    "topicCount_other": "トピックを{{count}}個マスター",
+    "sessionCount_one": "学習セッションを{{count}}回完了",
+    "sessionCount_other": "学習セッションを{{count}}回完了",
+    "hourCount_one": "学習時間{{count}}時間",
+    "hourCount_other": "学習時間{{count}}時間"
   }
 }

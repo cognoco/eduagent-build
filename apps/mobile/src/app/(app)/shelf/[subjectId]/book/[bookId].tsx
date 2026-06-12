@@ -102,6 +102,7 @@ function BookSectionStrip({
   accentColor,
   onPress,
 }: BookSectionStripProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   return (
@@ -109,9 +110,11 @@ function BookSectionStrip({
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${label}. ${summary}. ${
-        expanded ? 'Collapse section' : 'Expand section'
-      }.`}
+      accessibilityLabel={
+        expanded
+          ? t('library.book.a11ySectionCollapse', { label, summary })
+          : t('library.book.a11ySectionExpand', { label, summary })
+      }
       style={{
         marginHorizontal: 20,
         marginTop: 14,
@@ -241,9 +244,6 @@ function getStartedTopicsDeleteDetails(
   };
 }
 
-function formatStartedTopicCount(count: number): string {
-  return count === 1 ? '1 started topic' : `${count} started topics`;
-}
 // ---------------------------------------------------------------------------
 // Book Screen
 // ---------------------------------------------------------------------------
@@ -339,16 +339,16 @@ export default function BookScreen() {
       } catch (error) {
         const startedTopicDetails = getStartedTopicsDeleteDetails(error);
         if (!confirmStartedTopics && startedTopicDetails) {
-          const startedLabel = formatStartedTopicCount(
-            startedTopicDetails.startedTopicCount,
-          );
+          const startedLabel = t('library.manage.deleteScopeStartedTopics', {
+            count: startedTopicDetails.startedTopicCount,
+          });
           platformAlert(
-            'Delete started topics?',
-            `This book has ${startedLabel}. Deleting it will also delete those topics, their learning history, progress, and notes.`,
+            t('library.book.deleteStartedTitle'),
+            t('library.book.deleteStartedMessage', { started: startedLabel }),
             [
-              { text: 'Cancel', style: 'cancel' },
+              { text: t('common.cancel'), style: 'cancel' },
               {
-                text: 'Delete everything',
+                text: t('library.book.deleteEverything'),
                 style: 'destructive',
                 onPress: () => {
                   void deleteBookWithConfirmation(true);
@@ -360,10 +360,13 @@ export default function BookScreen() {
           return;
         }
 
-        platformAlert('Could not delete book', formatApiError(error));
+        platformAlert(
+          t('library.book.deleteErrorTitle'),
+          formatApiError(error),
+        );
       }
     },
-    [bookId, deleteBookMutation, handleBookDeleted, subjectId],
+    [bookId, deleteBookMutation, handleBookDeleted, subjectId, t],
   );
 
   const handleDeleteBookPress = useCallback(() => {
@@ -371,12 +374,12 @@ export default function BookScreen() {
       return;
     }
     platformAlert(
-      'Delete book?',
-      'You can re-add it later. If any topics have been started, you will be asked before those topics and their learning history are deleted too.',
+      t('library.book.deleteBookTitle'),
+      t('library.book.deleteBookMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void deleteBookWithConfirmation(false);
@@ -390,6 +393,7 @@ export default function BookScreen() {
     deleteBookMutation.isPending,
     deleteBookWithConfirmation,
     subjectId,
+    t,
   ]);
 
   // --- Generation auto-trigger ---
@@ -466,9 +470,11 @@ export default function BookScreen() {
         setGenPhase('timed_out');
         alreadyPending.current = false;
         // BUG-81: Show user-visible error feedback on initial generation failure
-        platformAlert("Couldn't build this book", formatApiError(error), [
-          { text: t('common.ok') },
-        ]);
+        platformAlert(
+          t('library.book.buildErrorTitle'),
+          formatApiError(error),
+          [{ text: t('common.ok') }],
+        );
       },
     });
 
@@ -517,7 +523,10 @@ export default function BookScreen() {
         retryInFlight.current = false;
         for (const t of retryTimersRef.current) clearTimeout(t);
         retryTimersRef.current = [];
-        platformAlert('Generation failed', formatApiError(error));
+        platformAlert(
+          t('library.book.generationFailedTitle'),
+          formatApiError(error),
+        );
       },
     });
   };
@@ -543,11 +552,14 @@ export default function BookScreen() {
         },
         onError: (error) => {
           setIsExpandingThinTopicList(false);
-          platformAlert('Could not set up topic list', formatApiError(error));
+          platformAlert(
+            t('library.book.topicListErrorTitle'),
+            formatApiError(error),
+          );
         },
       },
     );
-  }, [activeTopics, bookQuery, generateMutation, isExpandingThinTopicList]);
+  }, [activeTopics, bookQuery, generateMutation, isExpandingThinTopicList, t]);
 
   // Cleanup retry timers on unmount
   useEffect(() => {
@@ -587,9 +599,7 @@ export default function BookScreen() {
     ? 'Loading notes...'
     : noteCount === 0
       ? 'Add your first note for this book'
-      : noteCount === 1
-        ? '1 note saved for this book'
-        : `${noteCount} notes saved for this book`;
+      : t('library.book.notesSavedCount', { count: noteCount });
 
   // --- Sessions data ---
   const sessions = useMemo(
@@ -1033,24 +1043,30 @@ export default function BookScreen() {
             {
               onSuccess: () => {
                 platformAlert(
-                  'Moved',
-                  `"${session.topicTitle}" moved to ${targetBook.title}.`,
+                  t('library.book.movedTitle'),
+                  t('library.book.movedMessage', {
+                    topic: session.topicTitle,
+                    book: targetBook.title,
+                  }),
                 );
               },
               onError: (err) => {
-                platformAlert('Could not move topic', formatApiError(err));
+                platformAlert(
+                  t('library.book.moveErrorTitle'),
+                  formatApiError(err),
+                );
               },
             },
           );
         },
       }));
 
-      platformAlert(session.topicTitle, 'Move to a different book?', [
+      platformAlert(session.topicTitle, t('library.book.movePromptMessage'), [
         ...moveButtons,
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ]);
     },
-    [subjectId, bookId, allBooksQuery.data, moveTopic],
+    [subjectId, bookId, allBooksQuery.data, moveTopic, t],
   );
 
   // --- Start learning: follow the status-first CTA priority ---
@@ -1158,7 +1174,10 @@ export default function BookScreen() {
         },
       } as Href);
     } catch (error) {
-      platformAlert('Could not start learning', formatApiError(error));
+      platformAlert(
+        t('library.book.startLearningErrorTitle'),
+        formatApiError(error),
+      );
     }
   }, [
     book?.title,
@@ -1169,6 +1188,7 @@ export default function BookScreen() {
     sessionCount,
     startFirstCurriculumSession,
     subjectId,
+    t,
   ]);
 
   const handleStartReview = useCallback(() => {
@@ -1217,12 +1237,15 @@ export default function BookScreen() {
             setSelectedTopicId(null);
           },
           onError: (err) => {
-            platformAlert('Could not save note', formatApiError(err));
+            platformAlert(
+              t('library.book.noteSaveErrorTitle'),
+              formatApiError(err),
+            );
           },
         },
       );
     },
-    [selectedTopicId, createNote],
+    [selectedTopicId, createNote, t],
   );
 
   const handleNoteInputCancel = useCallback(() => {
@@ -1238,12 +1261,15 @@ export default function BookScreen() {
         {
           onSuccess: () => setEditingNote(null),
           onError: (err) => {
-            platformAlert('Could not update note', formatApiError(err));
+            platformAlert(
+              t('library.book.noteUpdateErrorTitle'),
+              formatApiError(err),
+            );
           },
         },
       );
     },
-    [editingNote, updateNote],
+    [editingNote, updateNote, t],
   );
 
   const handleNoteEditCancel = useCallback(() => {
@@ -1269,13 +1295,16 @@ export default function BookScreen() {
         onDelete: (id) => {
           deleteNoteById.mutate(id, {
             onError: (err) => {
-              platformAlert('Could not delete note', formatApiError(err));
+              platformAlert(
+                t('library.book.noteDeleteErrorTitle'),
+                formatApiError(err),
+              );
             },
           });
         },
       });
     },
-    [notes, deleteNoteById],
+    [notes, deleteNoteById, t],
   );
 
   // --- Screen states ---
@@ -1326,7 +1355,7 @@ export default function BookScreen() {
               onPress={handleBack}
               className="p-2 -ms-2 me-2"
               accessibilityRole="button"
-              accessibilityLabel="Back"
+              accessibilityLabel={t('common.back')}
               testID="book-loading-back"
             >
               <Ionicons
@@ -1355,8 +1384,8 @@ export default function BookScreen() {
             <BookSectionStrip
               testID="book-notes-strip-loading"
               icon="create-outline"
-              label="Notes for this book"
-              summary="Loading notes..."
+              label={t('library.book.notesSection')}
+              summary={t('library.book.loadingNotes')}
               meta="..."
               expanded={false}
               accentColor={themeColors.accent}
@@ -1481,7 +1510,7 @@ export default function BookScreen() {
               disabled={startFirstCurriculumSession.isPending}
               className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
               accessibilityRole="button"
-              accessibilityLabel="Set up this book"
+              accessibilityLabel={t('library.book.setUpBook')}
               testID="book-gen-build-path"
             >
               <Text className="text-text-primary text-body font-semibold">
@@ -1493,7 +1522,7 @@ export default function BookScreen() {
               className="px-5 py-3"
               testID="book-gen-back"
               accessibilityRole="button"
-              accessibilityLabel="Go back"
+              accessibilityLabel={t('common.goBackAction')}
             >
               <Text className="text-body text-primary font-semibold">
                 {t('common.goBackAction')}
@@ -1506,7 +1535,7 @@ export default function BookScreen() {
           <Pressable
             onPress={handleBack}
             className="mt-6 px-5 py-3"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBackAction')}
             accessibilityRole="button"
             testID="book-gen-back-idle"
           >
@@ -1536,7 +1565,7 @@ export default function BookScreen() {
             onPress={handleBack}
             className="p-2 -ms-2 me-2"
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('common.back')}
             testID="book-back"
           >
             <Ionicons name="arrow-back" size={24} color={themeColors.accent} />
@@ -1547,7 +1576,7 @@ export default function BookScreen() {
             disabled={deleteBookMutation.isPending}
             className="p-2 me-1"
             accessibilityRole="button"
-            accessibilityLabel="Delete book"
+            accessibilityLabel={t('library.book.a11yDeleteBook')}
             accessibilityState={{ disabled: deleteBookMutation.isPending }}
             testID="book-delete-button"
           >
@@ -1565,7 +1594,7 @@ export default function BookScreen() {
             onPress={handleSubjectBookmarksPress}
             className="p-2 -me-2"
             accessibilityRole="button"
-            accessibilityLabel="View saved bookmarks for this subject"
+            accessibilityLabel={t('library.book.a11ySubjectBookmarks')}
             testID="book-subject-bookmarks"
           >
             <Ionicons
@@ -1661,7 +1690,7 @@ export default function BookScreen() {
           <BookSectionStrip
             testID="book-notes-strip"
             icon="create-outline"
-            label="Notes for this book"
+            label={t('library.book.notesSection')}
             summary={noteSummary}
             meta={notesQuery.isLoading ? '...' : String(noteCount)}
             expanded={notesExpanded}
@@ -1783,7 +1812,7 @@ export default function BookScreen() {
                 onPress={() => void refetchSessions()}
                 testID="sessions-error-retry"
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading session history"
+                accessibilityLabel={t('library.book.a11yRetryHistory')}
                 className="px-3 py-1"
               >
                 <Text className="text-body-sm font-semibold text-primary">
@@ -1811,7 +1840,7 @@ export default function BookScreen() {
                 onPress={() => void refetchRetention()}
                 testID="retention-error-retry"
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading progress"
+                accessibilityLabel={t('library.book.a11yRetryProgress')}
                 className="px-3 py-1"
               >
                 <Text className="text-body-sm font-semibold text-primary">
@@ -1837,7 +1866,7 @@ export default function BookScreen() {
               className="min-h-[48px] self-center items-center justify-center rounded-button bg-primary px-5 py-3"
               testID="topics-empty-build"
               accessibilityRole="button"
-              accessibilityLabel="Set up this book"
+              accessibilityLabel={t('library.book.setUpBook')}
             >
               <Text className="text-body font-semibold text-text-inverse">
                 {t('library.book.setUpBook')}
@@ -1912,7 +1941,7 @@ export default function BookScreen() {
                 className="min-h-[48px] flex-row items-center justify-center rounded-button bg-primary px-5 py-3"
                 testID="fallback-start"
                 accessibilityRole="button"
-                accessibilityLabel="Start first lesson"
+                accessibilityLabel={t('library.book.a11yStartFirstLesson')}
               >
                 <Text className="text-body font-semibold text-text-inverse">
                   {t('library.book.startFirstLesson')}
@@ -1929,9 +1958,10 @@ export default function BookScreen() {
               className="rounded-card bg-surface-elevated p-5"
               style={{ borderColor: themeColors.success, borderWidth: 1 }}
               accessible
-              accessibilityLabel={`${book?.title ?? 'Book'} complete. ${
-                activeTopics.length
-              } topics studied.`}
+              accessibilityLabel={t('library.book.a11yBookComplete', {
+                title: book?.title ?? t('library.book.genericTitle'),
+                topics: activeTopics.length,
+              })}
             >
               <Text
                 className="mb-2 text-3xl"
@@ -1963,7 +1993,7 @@ export default function BookScreen() {
                 className="mb-2 min-h-[48px] flex-row items-center justify-center rounded-button bg-primary px-5 py-3"
                 testID="book-complete-review"
                 accessibilityRole="button"
-                accessibilityLabel="Start spaced-repetition review"
+                accessibilityLabel={t('library.book.a11yStartReview')}
               >
                 <Text className="text-body font-semibold text-text-inverse">
                   {t('library.book.startReview')}
@@ -1975,7 +2005,7 @@ export default function BookScreen() {
                 className="items-center py-2"
                 testID="book-complete-next"
                 accessibilityRole="button"
-                accessibilityLabel="Back to subject to pick what to learn next"
+                accessibilityLabel={t('library.book.a11yBackToSubject')}
               >
                 <Text className="text-body-sm font-semibold text-primary">
                   {t('library.book.backToSubject')}
@@ -2129,7 +2159,7 @@ export default function BookScreen() {
                     className="mt-2 items-center py-2"
                     testID="book-build-path-link"
                     accessibilityRole="button"
-                    accessibilityLabel="Set up this book"
+                    accessibilityLabel={t('library.book.setUpBook')}
                   >
                     <Text className="text-body-sm text-text-secondary underline">
                       {t('library.book.setUpBook')}

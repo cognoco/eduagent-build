@@ -356,7 +356,13 @@ export function BrandCelebration({
   const g = MASCOT_BADGE;
 
   return (
-    <Animated.View style={[styles.container, containerStyle]} testID={testID}>
+    <Animated.View
+      style={[styles.container, containerStyle]}
+      testID={testID}
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <Svg width={size} height={size} viewBox={g.viewBox}>
         <Defs>
           <LinearGradient

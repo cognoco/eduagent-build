@@ -793,6 +793,16 @@
     "inputMode": {
       "text": "Tekstmodus",
       "voice": "Talemodus"
+    },
+    "milestoneDots": {
+      "reached_one": "1 milepæl nådd",
+      "reached_other": "{{count}} milepæler nådd"
+    },
+    "livingBook": {
+      "progressLabel_one": "Bokfremdrift: {{count}} side",
+      "progressLabel_other": "Bokfremdrift: {{count}} sider",
+      "pageCount_one": "{{count}} side",
+      "pageCount_other": "{{count}} sider"
     }
   },
   "quiz": {
@@ -1202,7 +1212,9 @@
       "bookmarks": {
         "savedFromChat": "Lagret fra chat",
         "emptyShort": "Ingen lagret chat for dette emnet ennå",
-        "emptyLong": "Ingen lagrede forklaringer for dette emnet ennå."
+        "emptyLong": "Ingen lagrede forklaringer for dette emnet ennå.",
+        "savedExplanations_one": "{{count}} lagret forklaring",
+        "savedExplanations_other": "{{count}} lagrede forklaringer"
       },
       "challengeVerifiedBadge": "Utfordring bekreftet",
       "practicedOftenHint": "Du øver ofte på dette emnet — fortsett slik!",
@@ -1211,7 +1223,9 @@
       },
       "covers": "Dette emnet dekker",
       "mastered": "Mestret",
-      "strongReviewProgress": "{{strong}}/{{total}} sterke repetisjoner"
+      "strongReviewProgress": "{{strong}}/{{total}} sterke repetisjoner",
+      "notesSavedCount_one": "{{count}} notat lagret for dette emnet",
+      "notesSavedCount_other": "{{count}} notater lagret for dette emnet"
     },
     "book": {
       "readyToOpen": "Klar til å åpne",
@@ -1247,7 +1261,39 @@
       "addFirstNote": "+ Legg til ditt første notat for denne boken",
       "backToSubject": "Tilbake til emne →",
       "finishedBody_one": "Du har studert det eneste emnet i denne boken. Repeter det for å holde det friskt i minne, eller gå tilbake og velg hva du vil lære neste gang.",
-      "finishedBody_other": "Du har studert alle de {{count}} emnene i denne boken. Repeter dem for å holde dem friske i minne, eller gå tilbake og velg hva du vil lære neste gang."
+      "finishedBody_other": "Du har studert alle de {{count}} emnene i denne boken. Repeter dem for å holde dem friske i minne, eller gå tilbake og velg hva du vil lære neste gang.",
+      "notesSavedCount_one": "{{count}} notat lagret for denne boken",
+      "notesSavedCount_other": "{{count}} notater lagret for denne boken",
+      "deleteStartedTitle": "Slette påbegynte emner?",
+      "deleteStartedMessage": "Denne boken har {{started}}. Hvis du sletter den, slettes også disse emnene, læringshistorikken, fremdriften og notatene.",
+      "deleteEverything": "Slett alt",
+      "deleteErrorTitle": "Kunne ikke slette boken",
+      "deleteBookTitle": "Slette boken?",
+      "deleteBookMessage": "Du kan legge den til igjen senere. Hvis noen emner er påbegynt, vil du bli spurt før disse emnene og læringshistorikken deres også slettes.",
+      "buildErrorTitle": "Kunne ikke bygge denne boken",
+      "generationFailedTitle": "Innhold utilgjengelig",
+      "topicListErrorTitle": "Kunne ikke sette opp emnelisten",
+      "movedTitle": "Flyttet",
+      "movedMessage": "\"{{topic}}\" ble flyttet til {{book}}.",
+      "moveErrorTitle": "Kunne ikke flytte emnet",
+      "movePromptMessage": "Flytte til en annen bok?",
+      "startLearningErrorTitle": "Kunne ikke starte læringen",
+      "noteSaveErrorTitle": "Kunne ikke lagre notatet",
+      "noteUpdateErrorTitle": "Kunne ikke oppdatere notatet",
+      "noteDeleteErrorTitle": "Kunne ikke slette notatet",
+      "notesSection": "Notater for denne boken",
+      "loadingNotes": "Laster inn notater ...",
+      "a11yDeleteBook": "Slett bok",
+      "a11ySubjectBookmarks": "Vis lagrede bokmerker for dette faget",
+      "a11yRetryHistory": "Prøv å laste økthistorikk på nytt",
+      "a11yRetryProgress": "Prøv å laste fremdrift på nytt",
+      "a11yStartFirstLesson": "Start første leksjon",
+      "a11yStartReview": "Start repetisjonsgjennomgang",
+      "a11yBackToSubject": "Tilbake til faget for å velge hva du vil lære neste gang",
+      "a11yBookComplete": "{{title}} fullført. {{topics}} emner studert.",
+      "genericTitle": "Bok",
+      "a11ySectionCollapse": "{{label}}. {{summary}}. Skjul seksjon.",
+      "a11ySectionExpand": "{{label}}. {{summary}}. Utvid seksjon."
     },
     "inactiveFallbackBanner": {
       "message": "Kunne ikke laste inn de pausede og arkiverte emnene dine. Trykk for å prøve igjen – de er ikke borte."
@@ -1280,7 +1326,9 @@
       "stillStuck": "Sitter fortsatt fast",
       "errorTitle": "Noe gikk galt",
       "timeoutTitle": "Venter fortsatt…",
-      "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen."
+      "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen.",
+      "dontRememberFirst": "Jeg husker ikke.",
+      "dontRememberAgain": "Sitter fortsatt fast."
     },
     "lastStudied": "Sist studert {{when}}",
     "neverStudied": "Aldri studert",
@@ -1293,7 +1341,20 @@
     "noNotesYet": "Ingen notater ennå. Legg til ett når noe klikker.",
     "noSessionsYet": "Ingen økter ennå. Start en nedenfor!",
     "addNote": "+ Legg til et notat",
-    "addFirstNote": "+ Legg til ditt første notat for dette temaet"
+    "addFirstNote": "+ Legg til ditt første notat for dette temaet",
+    "ctaStartStudying": "Start å studere",
+    "ctaPracticeAgain": "Øv igjen",
+    "ctaReview": "Gjennomgå dette emnet",
+    "resolveTimeoutTitle": "Tar for lang tid å åpne dette emnet",
+    "resolveTimeoutMessage": "Sjekk tilkoblingen din og prøv igjen.",
+    "a11yRetryTopic": "Prøv å laste emnet på nytt",
+    "a11yBackPrevious": "Tilbake til forrige skjerm",
+    "notesSection": "Notater for dette emnet",
+    "sessionsSection": "Økter",
+    "addFirstNoteSummary": "Legg til ditt første notat for dette emnet",
+    "loadingBookmarks": "Laster inn lagrede forklaringer ...",
+    "loadingSessions": "Laster inn økter ...",
+    "noSessionsSummary": "Ingen økter ennå"
   },
   "subject": {
     "settings": {
@@ -1779,7 +1840,9 @@
       "goneSubtitle": "Det kan ha blitt fjernet eller slått sammen med et annet emne.",
       "pastConversations": "Tidligere samtaler",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "startedTopicsCount_one": "{{count}} emne påbegynt",
+      "startedTopicsCount_other": "{{count}} emner påbegynt"
     },
     "vocabulary": {
       "pageTitle": "Ditt vokabular",
@@ -2015,7 +2078,22 @@
       "subjectRawMentorSummary": "Dette startet fra «{{rawInput}}», så {{name}} prøver kanskje fortsatt å finne den rette formen for {{subject}}.",
       "subjectRawNextStep": "Én liten økt kan gjøre den brede interessen om til et konkret emne.",
       "subjectQuietSummary": "{{subject}} er klar når {{name}} vil vende tilbake til det.",
-      "subjectQuietNextStep": "Start med ett enkelt spørsmål eller emne, så omstarten føles lett."
+      "subjectQuietNextStep": "Start med ett enkelt spørsmål eller emne, så omstarten føles lett.",
+      "timeAgo": {
+        "justNow": "akkurat nå",
+        "minutes_one": "for {{count}} min siden",
+        "minutes_other": "for {{count}} min siden",
+        "hours_one": "for {{count}} time siden",
+        "hours_other": "for {{count}} timer siden",
+        "days_one": "for {{count}} dag siden",
+        "days_other": "for {{count}} dager siden",
+        "weeks_one": "for {{count}} uke siden",
+        "weeks_other": "for {{count}} uker siden",
+        "months_one": "for {{count}} måned siden",
+        "months_other": "for {{count}} måneder siden",
+        "years_one": "for {{count}} år siden",
+        "years_other": "for {{count}} år siden"
+      }
     },
     "mentorMemory": {
       "title": "Mentorens minne",
@@ -2056,7 +2134,9 @@
         "low": "Tidlig signal",
         "medium": "Gjentatt mønster",
         "high": "Sterkt signal"
-      }
+      },
+      "attemptCount_one": "lagt merke til {{count}} gang",
+      "attemptCount_other": "lagt merke til {{count}} ganger"
     },
     "reports": {
       "title": "Rapporter",
@@ -2572,7 +2652,13 @@
     "a11yStarters": "Forslag til setningsstartere",
     "a11yWriteSummary": "Skriv læringssammendraget ditt",
     "a11ySkipSummary": "Hopp over sammendraget",
-    "a11yStarterHint": "Trykk for å bruke denne setningsstarteren"
+    "a11yStarterHint": "Trykk for å bruke denne setningsstarteren",
+    "takeaways": {
+      "duration_one": "{{count}} minutt – flott økt!",
+      "duration_other": "{{count}} minutter – flott økt!",
+      "exchanges_one": "Du jobbet deg gjennom {{count}} utveksling",
+      "exchanges_other": "Du jobbet deg gjennom {{count}} utvekslinger"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3078,7 +3164,30 @@
     "noneYetSessions": "Ingen økter ennå",
     "loadErrorNotes": "Kunne ikke laste notater",
     "loadErrorBookmarks": "Kunne ikke laste bokmerker",
-    "loadErrorSessions": "Kunne ikke laste økter"
+    "loadErrorSessions": "Kunne ikke laste økter",
+    "kinds": {
+      "sessions": "Økter",
+      "notes": "Notater",
+      "bookmarks": "Bokmerker"
+    },
+    "types": {
+      "homework": "Hjemmelekser",
+      "review": "Gjennomgang",
+      "learning": "Læring",
+      "note": "Notat",
+      "bookmark": "Bokmerke"
+    },
+    "hub": {
+      "sessionsSubtitle": "Samtaler du hadde",
+      "notesSubtitle": "Ting du skrev ned",
+      "bookmarksSubtitle": "Veiledersvar du lagret"
+    },
+    "unknownSubject": "Ukjent fag",
+    "searchSessions": "Søk i økter",
+    "searchNotes": "Søk i notater",
+    "searchBookmarks": "Søk i bokmerker",
+    "a11yGroupByDate": "Grupper etter dato",
+    "a11yGroupBySubject": "Grupper etter fag"
   },
   "createProfile": {
     "titleChild": "Fortell oss om barnet ditt",
@@ -3136,7 +3245,11 @@
     "go": "Gå",
     "skipStart": "Hopp over – start å lære uansett",
     "missingSubject": "Mangler emne. Gå tilbake og prøv igjen.",
-    "takingLonger": "Dette tar litt lengre tid enn vanlig ..."
+    "takingLonger": "Dette tar litt lengre tid enn vanlig ...",
+    "errorTitle": "Noe ble ikke lastet inn",
+    "setupErrorMessage": "Kunne ikke sette opp den boken. Prøve igjen?",
+    "customPlaceholder": "Bok eller emne å legge til",
+    "organizingLibrary": "Organiserer biblioteket ditt ..."
   },
   "relearn": {
     "title": "Lær tema på nytt",
@@ -3145,7 +3258,38 @@
     "overdueTopicCount_one": "{{count}} forfalt tema",
     "overdueTopicCount_other": "{{count}} forfalte temaer",
     "daysOverdue_one": "{{count}} dag på overtid",
-    "daysOverdue_other": "{{count}} dager på overtid"
+    "daysOverdue_other": "{{count}} dager på overtid",
+    "methodVisualLabel": "Visuelle diagrammer",
+    "methodVisualDesc": "Lær gjennom diagrammer, grafer og visuelle fremstillinger",
+    "methodVisualLabelYoung": "Vis meg bilder",
+    "methodVisualDescYoung": "Lær med bilder, diagrammer og tegninger",
+    "methodStepsLabel": "Steg for steg",
+    "methodStepsDesc": "Bryt ned konsepter i klare, sekvensielle steg",
+    "methodStepsLabelYoung": "Vis meg hvordan",
+    "methodStepsDescYoung": "Bryt det ned i små, enkle steg",
+    "methodExamplesLabel": "Eksempler fra virkeligheten",
+    "methodExamplesDesc": "Koble konsepter til praktiske, hverdagslige situasjoner",
+    "methodExamplesLabelYoung": "Vis meg hvordan det fungerer",
+    "methodExamplesDescYoung": "Lær med morsomme, hverdagslige eksempler",
+    "methodPracticeLabel": "Øvingsoppgaver",
+    "methodPracticeDesc": "Lær ved å jobbe deg gjennom veiledede øvelser",
+    "methodPracticeLabelYoung": "La meg prøve",
+    "methodPracticeDescYoung": "Lær ved å løse problemer med hjelp",
+    "copyTopicIntro": "Velg et emne du føler deg mest usikker på akkurat nå.",
+    "copyTopicIntroYoung": "Velg emnet du vil prøve igjen.",
+    "copyMethodIntro": "Velg en undervisningsstil som føles som ditt beste neste steg.",
+    "copyMethodIntroYoung": "Hvordan vil du lære denne gangen?",
+    "copySubjectIntro": "Hvilket fag vil du gjennomgå først?",
+    "copySubjectIntroYoung": "Hvilket fag skal vi begynne med?",
+    "copyEmptyTitle": "Ingenting å lære på nytt akkurat nå",
+    "copyEmptyTitleYoung": "Ingen emner å gjennomgå akkurat nå",
+    "copyEmptyBody": "Du er ajour med forfalte emner. Bra jobbet.",
+    "copyEmptyBodyYoung": "Du er ajour for nå. Kjempebra!",
+    "copyErrorTitle": "Vi kunne ikke laste inn emnene dine for gjennomgang akkurat nå.",
+    "copyUsualMethod": "Vanlig metode",
+    "a11yOpenSubject": "Åpne {{name}}",
+    "a11yOpenTopic": "Åpne {{title}}",
+    "a11yLearnWith": "Lær med {{method}}"
   },
   "preview": {
     "backToSignIn": "Tilbake til pålogging",
@@ -3169,5 +3313,15 @@
     "sampleBadge": "Eksempel",
     "sampleDataNote": "Eksempeldata – barnets virkelige innsikt vises etter den første økten.",
     "sampleWeeklyBody": "Øvde på andregradsligninger i 45 minutter over tre økter. Blir komfortabel med faktorisering; jobber med å fullføre kvadratet."
+  },
+  "milestoneCard": {
+    "wordCount_one": "{{count}} ord lært",
+    "wordCount_other": "{{count}} ord lært",
+    "topicCount_one": "{{count}} emne mestret",
+    "topicCount_other": "{{count}} emner mestret",
+    "sessionCount_one": "{{count}} læringsøkt fullført",
+    "sessionCount_other": "{{count}} læringsøkter fullført",
+    "hourCount_one": "{{count}} time med læring",
+    "hourCount_other": "{{count}} timer med læring"
   }
 }

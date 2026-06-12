@@ -116,8 +116,9 @@ export function CheckmarkPopAnimation({
     <Animated.View
       style={containerStyle}
       testID={testID}
-      accessibilityLabel="Success"
-      accessibilityRole="image"
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
     >
       <Svg width={size} height={size} viewBox="0 0 80 80">
         <AnimatedCircle

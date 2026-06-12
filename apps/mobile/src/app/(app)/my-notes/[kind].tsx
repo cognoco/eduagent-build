@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { AllNote, Bookmark, ChildSession } from '@eduagent/schemas';
 import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { useAllNotes } from '../../../hooks/use-notes';
@@ -62,14 +63,25 @@ function myNotesReturnTo(value: string | string[] | undefined): string {
   return firstParam(value) ?? OWN_LEARNING_RETURN_TO;
 }
 
-function titleForKind(kind: MyNotesKind): string {
+function titleForKind(kind: MyNotesKind, t: TFunction): string {
   switch (kind) {
     case 'notes':
-      return 'Notes';
+      return t('myNotes.kinds.notes');
     case 'bookmarks':
-      return 'Bookmarks';
+      return t('myNotes.kinds.bookmarks');
     case 'sessions':
-      return 'Sessions';
+      return t('myNotes.kinds.sessions');
+  }
+}
+
+function searchPlaceholderForKind(kind: MyNotesKind, t: TFunction): string {
+  switch (kind) {
+    case 'notes':
+      return t('myNotes.searchNotes');
+    case 'bookmarks':
+      return t('myNotes.searchBookmarks');
+    case 'sessions':
+      return t('myNotes.searchSessions');
   }
 }
 
@@ -92,14 +104,14 @@ function formatInlineDate(iso: string): string {
   });
 }
 
-function normalizeSessionType(type: string): string {
+function normalizeSessionType(type: string, t: TFunction): string {
   switch (type) {
     case 'homework':
-      return 'Homework';
+      return t('myNotes.types.homework');
     case 'interleaved':
-      return 'Review';
+      return t('myNotes.types.review');
     default:
-      return 'Learning';
+      return t('myNotes.types.learning');
   }
 }
 
@@ -108,23 +120,23 @@ function truncate(text: string, max = 120): string {
   return compact.length > max ? `${compact.slice(0, max - 3)}...` : compact;
 }
 
-function sessionToItem(session: ChildSession): ArchiveItem {
+function sessionToItem(session: ChildSession, t: TFunction): ArchiveItem {
   return {
     id: session.sessionId,
     kind: 'sessions',
     subjectId: session.subjectId,
-    subjectName: session.subjectName ?? 'Unknown subject',
+    subjectName: session.subjectName ?? t('myNotes.unknownSubject'),
     topicId: session.topicId,
     topicTitle: session.topicTitle,
     date: session.startedAt,
-    typeLabel: normalizeSessionType(session.sessionType),
+    typeLabel: normalizeSessionType(session.sessionType, t),
     preview: session.highlight ?? session.displaySummary ?? null,
     durationSeconds: session.wallClockSeconds ?? session.durationSeconds,
     sessionId: session.sessionId,
   };
 }
 
-function noteToItem(note: AllNote): ArchiveItem {
+function noteToItem(note: AllNote, t: TFunction): ArchiveItem {
   return {
     id: note.id,
     kind: 'notes',
@@ -133,14 +145,14 @@ function noteToItem(note: AllNote): ArchiveItem {
     topicId: note.topicId,
     topicTitle: note.topicTitle,
     date: note.updatedAt,
-    typeLabel: 'Note',
+    typeLabel: t('myNotes.types.note'),
     preview: truncate(note.content),
     durationSeconds: null,
     sessionId: note.sessionId,
   };
 }
 
-function bookmarkToItem(bookmark: Bookmark): ArchiveItem {
+function bookmarkToItem(bookmark: Bookmark, t: TFunction): ArchiveItem {
   return {
     id: bookmark.id,
     kind: 'bookmarks',
@@ -149,7 +161,7 @@ function bookmarkToItem(bookmark: Bookmark): ArchiveItem {
     topicId: bookmark.topicId,
     topicTitle: bookmark.topicTitle,
     date: bookmark.createdAt,
-    typeLabel: 'Bookmark',
+    typeLabel: t('myNotes.types.bookmark'),
     preview: truncate(bookmark.content),
     durationSeconds: null,
     sessionId: bookmark.sessionId,
@@ -210,7 +222,11 @@ function GroupToggle({
               selected ? 'bg-surface' : ''
             }`}
             accessibilityRole="button"
-            accessibilityLabel={`Group by ${value}`}
+            accessibilityLabel={
+              value === 'date'
+                ? t('myNotes.a11yGroupByDate')
+                : t('myNotes.a11yGroupBySubject')
+            }
             testID={`my-notes-group-${value}`}
           >
             <Text
@@ -330,22 +346,23 @@ export default function MyNotesListScreen(): React.ReactElement {
     if (kind === 'sessions') {
       return (
         sessionsQuery.data?.pages.flatMap((page) =>
-          page.sessions.map(sessionToItem),
+          page.sessions.map((session) => sessionToItem(session, t)),
         ) ?? []
       );
     }
     if (kind === 'notes') {
       return (
-        notesQuery.data?.pages.flatMap((page) => page.notes.map(noteToItem)) ??
-        []
+        notesQuery.data?.pages.flatMap((page) =>
+          page.notes.map((note) => noteToItem(note, t)),
+        ) ?? []
       );
     }
     return (
       bookmarksQuery.data?.pages.flatMap((page) =>
-        page.bookmarks.map(bookmarkToItem),
+        page.bookmarks.map((bookmark) => bookmarkToItem(bookmark, t)),
       ) ?? []
     );
-  }, [bookmarksQuery.data, kind, notesQuery.data, sessionsQuery.data]);
+  }, [bookmarksQuery.data, kind, notesQuery.data, sessionsQuery.data, t]);
 
   const items = useMemo(
     () => rawItems.filter((item) => matchesQuery(item, query)),
@@ -441,7 +458,7 @@ export default function MyNotesListScreen(): React.ReactElement {
                 }
                 className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Back"
+                accessibilityLabel={t('common.back')}
                 testID="my-notes-list-back"
               >
                 <Ionicons
@@ -452,7 +469,7 @@ export default function MyNotesListScreen(): React.ReactElement {
               </Pressable>
               <View className="flex-1">
                 <Text className="text-h2 font-bold text-text-primary">
-                  {titleForKind(kind)}
+                  {titleForKind(kind, t)}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-0.5">
                   {subtitleForKind(kind, rawItems.length)}
@@ -470,9 +487,9 @@ export default function MyNotesListScreen(): React.ReactElement {
               <TextInput
                 value={query}
                 onChangeText={setQuery}
-                placeholder={`Search ${titleForKind(kind).toLowerCase()}`}
+                placeholder={searchPlaceholderForKind(kind, t)}
                 placeholderTextColor={colors.textSecondary}
-                accessibilityLabel={`Search ${titleForKind(kind).toLowerCase()}`}
+                accessibilityLabel={`Search ${titleForKind(kind, t).toLowerCase()}`}
                 className="flex-1 text-body text-text-primary"
                 testID="my-notes-search"
               />
@@ -508,7 +525,7 @@ export default function MyNotesListScreen(): React.ReactElement {
                 onPress={() => void activeQuery.refetch()}
                 className="mt-4 rounded-button bg-primary px-5 py-3"
                 accessibilityRole="button"
-                accessibilityLabel="Try again"
+                accessibilityLabel={t('common.tryAgainAction')}
                 testID="my-notes-retry"
               >
                 <Text className="text-body font-semibold text-text-inverse">
@@ -541,7 +558,7 @@ export default function MyNotesListScreen(): React.ReactElement {
               onPress={handleEndReached}
               className="my-3 rounded-button border border-border bg-surface px-5 py-3 items-center"
               accessibilityRole="button"
-              accessibilityLabel="Load more"
+              accessibilityLabel={t('myNotes.loadMore')}
               testID="my-notes-load-more"
             >
               <Text className="text-body font-semibold text-text-primary">

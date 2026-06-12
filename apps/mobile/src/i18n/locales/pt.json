@@ -820,6 +820,16 @@
     "inputMode": {
       "text": "Modo texto",
       "voice": "Modo voz"
+    },
+    "milestoneDots": {
+      "reached_one": "1 marco alcançado",
+      "reached_other": "{{count}} marcos alcançados"
+    },
+    "livingBook": {
+      "progressLabel_one": "Progresso do livro: {{count}} página",
+      "progressLabel_other": "Progresso do livro: {{count}} páginas",
+      "pageCount_one": "{{count}} página",
+      "pageCount_other": "{{count}} páginas"
     }
   },
   "quiz": {
@@ -1229,7 +1239,9 @@
       "bookmarks": {
         "savedFromChat": "Salvo do chat",
         "emptyShort": "Nenhum chat salvo para este tópico",
-        "emptyLong": "Ainda não há explicações salvas para este tópico."
+        "emptyLong": "Ainda não há explicações salvas para este tópico.",
+        "savedExplanations_one": "{{count}} explicação salva",
+        "savedExplanations_other": "{{count}} explicações salvas"
       },
       "challengeVerifiedBadge": "Desafio verificado",
       "practicedOftenHint": "Você pratica muito este tópico — continue assim!",
@@ -1238,7 +1250,9 @@
       },
       "covers": "Este tópico aborda",
       "mastered": "Dominado",
-      "strongReviewProgress": "{{strong}}/{{total}} revisões fortes"
+      "strongReviewProgress": "{{strong}}/{{total}} revisões fortes",
+      "notesSavedCount_one": "{{count}} nota salva para este tópico",
+      "notesSavedCount_other": "{{count}} notas salvas para este tópico"
     },
     "book": {
       "readyToOpen": "Pronto para abrir",
@@ -1274,7 +1288,39 @@
       "addFirstNote": "+ Adicione sua primeira nota para este livro",
       "backToSubject": "Voltar ao assunto →",
       "finishedBody_one": "Você estudou o único tópico deste livro. Revise-o para manter o conteúdo atualizado, ou volte e escolha o que aprender a seguir.",
-      "finishedBody_other": "Você estudou todos os {{count}} tópicos deste livro. Revise-os para manter o conteúdo atualizado, ou volte e escolha o que aprender a seguir."
+      "finishedBody_other": "Você estudou todos os {{count}} tópicos deste livro. Revise-os para manter o conteúdo atualizado, ou volte e escolha o que aprender a seguir.",
+      "notesSavedCount_one": "{{count}} nota salva para este livro",
+      "notesSavedCount_other": "{{count}} notas salvas para este livro",
+      "deleteStartedTitle": "Excluir tópicos iniciados?",
+      "deleteStartedMessage": "Este livro tem {{started}}. Excluí-lo também excluirá esses tópicos, seu histórico de aprendizado, progresso e notas.",
+      "deleteEverything": "Excluir tudo",
+      "deleteErrorTitle": "Não foi possível excluir o livro",
+      "deleteBookTitle": "Excluir livro?",
+      "deleteBookMessage": "Você pode adicioná-lo novamente mais tarde. Se algum tópico tiver sido iniciado, será perguntado antes que esses tópicos e seu histórico de aprendizado também sejam excluídos.",
+      "buildErrorTitle": "Não foi possível criar este livro",
+      "generationFailedTitle": "Conteúdo indisponível",
+      "topicListErrorTitle": "Não foi possível configurar a lista de tópicos",
+      "movedTitle": "Movido",
+      "movedMessage": "\"{{topic}}\" movido para {{book}}.",
+      "moveErrorTitle": "Não foi possível mover o tópico",
+      "movePromptMessage": "Mover para um livro diferente?",
+      "startLearningErrorTitle": "Não foi possível iniciar o aprendizado",
+      "noteSaveErrorTitle": "Não foi possível salvar a nota",
+      "noteUpdateErrorTitle": "Não foi possível atualizar a nota",
+      "noteDeleteErrorTitle": "Não foi possível excluir a nota",
+      "notesSection": "Notas para este livro",
+      "loadingNotes": "Carregando notas...",
+      "a11yDeleteBook": "Excluir livro",
+      "a11ySubjectBookmarks": "Ver marcadores salvos para esta matéria",
+      "a11yRetryHistory": "Tentar carregar o histórico de sessões novamente",
+      "a11yRetryProgress": "Tentar carregar o progresso novamente",
+      "a11yStartFirstLesson": "Começar a primeira lição",
+      "a11yStartReview": "Começar a revisão de repetição espaçada",
+      "a11yBackToSubject": "Voltar à matéria para escolher o que aprender a seguir",
+      "a11yBookComplete": "{{title}} concluído. {{topics}} tópicos estudados.",
+      "genericTitle": "Livro",
+      "a11ySectionCollapse": "{{label}}. {{summary}}. Recolher secção.",
+      "a11ySectionExpand": "{{label}}. {{summary}}. Expandir secção."
     },
     "inactiveFallbackBanner": {
       "message": "Não foi possível carregar as tuas matérias pausadas e arquivadas. Toca para tentar de novo — elas não desapareceram."
@@ -1307,7 +1353,9 @@
       "stillStuck": "Ainda com dificuldade",
       "errorTitle": "Algo deu errado",
       "timeoutTitle": "Ainda aguardando…",
-      "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente."
+      "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente.",
+      "dontRememberFirst": "Não me lembro.",
+      "dontRememberAgain": "Ainda não sei."
     },
     "lastStudied": "Estudado pela última vez {{when}}",
     "neverStudied": "Nunca estudado",
@@ -1320,7 +1368,20 @@
     "noNotesYet": "Ainda não há notas. Adicione uma quando algo fizer sentido.",
     "noSessionsYet": "Ainda não há sessões. Comece uma abaixo!",
     "addNote": "+ Adicionar uma nota",
-    "addFirstNote": "+ Adicione sua primeira nota para este tópico"
+    "addFirstNote": "+ Adicione sua primeira nota para este tópico",
+    "ctaStartStudying": "Começar a estudar",
+    "ctaPracticeAgain": "Praticar novamente",
+    "ctaReview": "Revisar este tópico",
+    "resolveTimeoutTitle": "Demorando muito para abrir este tópico",
+    "resolveTimeoutMessage": "Verifique sua conexão e tente novamente.",
+    "a11yRetryTopic": "Tentar carregar o tópico novamente",
+    "a11yBackPrevious": "Voltar para a tela anterior",
+    "notesSection": "Notas para este tópico",
+    "sessionsSection": "Sessões",
+    "addFirstNoteSummary": "Adicione sua primeira nota para este tópico",
+    "loadingBookmarks": "Carregando explicações salvas...",
+    "loadingSessions": "Carregando sessões...",
+    "noSessionsSummary": "Nenhuma sessão ainda"
   },
   "subject": {
     "settings": {
@@ -1806,7 +1867,9 @@
       "goneSubtitle": "Ela pode ter sido removida ou mesclada com outra matéria.",
       "pastConversations": "Conversas anteriores",
       "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "startedTopicsCount_one": "{{count}} tópico iniciado",
+      "startedTopicsCount_other": "{{count}} tópicos iniciados"
     },
     "vocabulary": {
       "pageTitle": "Seu Vocabulário",
@@ -2042,7 +2105,22 @@
       "subjectRawMentorSummary": "Isso começou com \"{{rawInput}}\", então {{name}} ainda pode estar encontrando o formato certo para {{subject}}.",
       "subjectRawNextStep": "Uma pequena sessão pode transformar esse interesse geral em um tópico concreto.",
       "subjectQuietSummary": "{{subject}} está pronto para quando {{name}} quiser retornar.",
-      "subjectQuietNextStep": "Comece com uma pergunta ou tópico fácil para que o recomeço seja leve."
+      "subjectQuietNextStep": "Comece com uma pergunta ou tópico fácil para que o recomeço seja leve.",
+      "timeAgo": {
+        "justNow": "agora mesmo",
+        "minutes_one": "há {{count}} min",
+        "minutes_other": "há {{count}} min",
+        "hours_one": "há {{count}} hora",
+        "hours_other": "há {{count}} horas",
+        "days_one": "há {{count}} dia",
+        "days_other": "há {{count}} dias",
+        "weeks_one": "há {{count}} semana",
+        "weeks_other": "há {{count}} semanas",
+        "months_one": "há {{count}} mês",
+        "months_other": "há {{count}} meses",
+        "years_one": "há {{count}} ano",
+        "years_other": "há {{count}} anos"
+      }
     },
     "mentorMemory": {
       "title": "Memória do mentor",
@@ -2083,7 +2161,9 @@
         "low": "Sinal inicial",
         "medium": "Padrão repetido",
         "high": "Sinal forte"
-      }
+      },
+      "attemptCount_one": "{{count}} vez notado",
+      "attemptCount_other": "{{count}} vezes notado"
     },
     "reports": {
       "title": "Relatórios",
@@ -2599,7 +2679,13 @@
     "a11yStarters": "Sugestões de início de frase",
     "a11yWriteSummary": "Escreva seu resumo do aprendizado",
     "a11ySkipSummary": "Pular o resumo",
-    "a11yStarterHint": "Toque para usar este início de frase"
+    "a11yStarterHint": "Toque para usar este início de frase",
+    "takeaways": {
+      "duration_one": "{{count}} minuto - ótima sessão!",
+      "duration_other": "{{count}} minutos - ótima sessão!",
+      "exchanges_one": "Você concluiu {{count}} troca",
+      "exchanges_other": "Você concluiu {{count}} trocas"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3078,7 +3164,30 @@
     "noneYetSessions": "Ainda sem sessões",
     "loadErrorNotes": "Erro ao carregar notas",
     "loadErrorBookmarks": "Erro ao carregar favoritos",
-    "loadErrorSessions": "Erro ao carregar sessões"
+    "loadErrorSessions": "Erro ao carregar sessões",
+    "kinds": {
+      "sessions": "Sessões",
+      "notes": "Notas",
+      "bookmarks": "Marcadores"
+    },
+    "types": {
+      "homework": "Dever de casa",
+      "review": "Revisão",
+      "learning": "Aprendizado",
+      "note": "Nota",
+      "bookmark": "Marcador"
+    },
+    "hub": {
+      "sessionsSubtitle": "Conversas que você teve",
+      "notesSubtitle": "Coisas que você anotou",
+      "bookmarksSubtitle": "Respostas do tutor que você salvou"
+    },
+    "unknownSubject": "Matéria desconhecida",
+    "searchSessions": "Buscar sessões",
+    "searchNotes": "Buscar notas",
+    "searchBookmarks": "Buscar marcadores",
+    "a11yGroupByDate": "Agrupar por data",
+    "a11yGroupBySubject": "Agrupar por matéria"
   },
   "createProfile": {
     "titleChild": "Conte-nos sobre seu/sua filho(a)",
@@ -3136,7 +3245,11 @@
     "go": "Ir",
     "skipStart": "Pular — começar a aprender mesmo assim",
     "missingSubject": "Assunto em falta. Por favor, volte e tente novamente.",
-    "takingLonger": "Isto está a demorar um pouco mais que o normal..."
+    "takingLonger": "Isto está a demorar um pouco mais que o normal...",
+    "errorTitle": "Algo não carregou",
+    "setupErrorMessage": "Não foi possível configurar esse livro. Tentar novamente?",
+    "customPlaceholder": "Livro ou tópico para adicionar",
+    "organizingLibrary": "Organizando sua biblioteca..."
   },
   "relearn": {
     "title": "Reaprender Tópico",
@@ -3145,7 +3258,38 @@
     "overdueTopicCount_one": "{{count}} tópico em atraso",
     "overdueTopicCount_other": "{{count}} tópicos em atraso",
     "daysOverdue_one": "{{count}} dia de atraso",
-    "daysOverdue_other": "{{count}} dias de atraso"
+    "daysOverdue_other": "{{count}} dias de atraso",
+    "methodVisualLabel": "Diagramas Visuais",
+    "methodVisualDesc": "Aprenda com gráficos, diagramas e representações visuais",
+    "methodVisualLabelYoung": "Mostre-me Figuras",
+    "methodVisualDescYoung": "Aprenda com figuras, gráficos e desenhos",
+    "methodStepsLabel": "Passo a Passo",
+    "methodStepsDesc": "Divida os conceitos em passos claros e sequenciais",
+    "methodStepsLabelYoung": "Explique-me o Caminho",
+    "methodStepsDescYoung": "Divida em passos pequenos e fáceis",
+    "methodExamplesLabel": "Exemplos do Mundo Real",
+    "methodExamplesDesc": "Conecte conceitos a situações práticas do dia a dia",
+    "methodExamplesLabelYoung": "Mostre-me Como Funciona",
+    "methodExamplesDescYoung": "Aprenda com exemplos divertidos do dia a dia",
+    "methodPracticeLabel": "Problemas Práticos",
+    "methodPracticeDesc": "Aprenda resolvendo exercícios guiados",
+    "methodPracticeLabelYoung": "Deixe-me Tentar",
+    "methodPracticeDescYoung": "Aprenda resolvendo problemas com ajuda",
+    "copyTopicIntro": "Escolha o tópico em que você tem mais dificuldade agora.",
+    "copyTopicIntroYoung": "Escolha o tópico que você quer tentar de novo.",
+    "copyMethodIntro": "Escolha um estilo de ensino que pareça ser o melhor próximo passo para você.",
+    "copyMethodIntroYoung": "Como você gostaria de aprender desta vez?",
+    "copySubjectIntro": "Qual matéria você gostaria de revisar primeiro?",
+    "copySubjectIntroYoung": "Com qual matéria devemos começar?",
+    "copyEmptyTitle": "Nada para reaprender agora",
+    "copyEmptyTitleYoung": "Nenhum tópico para revisar agora",
+    "copyEmptyBody": "Você está em dia com os tópicos atrasados. Bom trabalho.",
+    "copyEmptyBodyYoung": "Você está em dia por enquanto. Ótimo trabalho!",
+    "copyErrorTitle": "Não conseguimos carregar seus tópicos de revisão agora.",
+    "copyUsualMethod": "Método usual",
+    "a11yOpenSubject": "Abrir {{name}}",
+    "a11yOpenTopic": "Abrir {{title}}",
+    "a11yLearnWith": "Aprender com {{method}}"
   },
   "preview": {
     "backToSignIn": "Voltar para o login",
@@ -3169,5 +3313,15 @@
     "sampleBadge": "Amostra",
     "sampleDataNote": "Dados de amostra — os insights reais do seu filho aparecem após a primeira sessão dele.",
     "sampleWeeklyBody": "Praticou equações quadráticas por 45 minutos em três sessões. Está se familiarizando com a fatoração; trabalhando em completar o quadrado."
+  },
+  "milestoneCard": {
+    "wordCount_one": "{{count}} palavra aprendida",
+    "wordCount_other": "{{count}} palavras aprendidas",
+    "topicCount_one": "{{count}} tópico dominado",
+    "topicCount_other": "{{count}} tópicos dominados",
+    "sessionCount_one": "{{count}} sessão de aprendizagem concluída",
+    "sessionCount_other": "{{count}} sessões de aprendizagem concluídas",
+    "hourCount_one": "{{count}} hora de aprendizagem",
+    "hourCount_other": "{{count}} horas de aprendizagem"
   }
 }

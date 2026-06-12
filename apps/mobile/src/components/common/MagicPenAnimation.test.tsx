@@ -28,21 +28,23 @@ function hasNodeWithProps(
 describe('MagicPenAnimation', () => {
   it('renders without crashing at default size', () => {
     const { getByTestId } = render(<MagicPenAnimation testID="pen" />);
-    getByTestId('pen');
+    getByTestId('pen', { includeHiddenElements: true });
   });
 
-  it('has an accessibility label and role', () => {
+  it('is hidden from screen readers (decorative animation)', () => {
     const { getByTestId } = render(<MagicPenAnimation testID="pen" />);
-    const el = getByTestId('pen');
-    expect(el.props.accessibilityLabel).toBe('Writing animation');
-    expect(el.props.accessibilityRole).toBe('image');
+    const el = getByTestId('pen', { includeHiddenElements: true });
+    // Decorative animation — hidden from SR so users don't hear "image, Writing animation"
+    expect(el.props.accessible).toBe(false);
+    expect(el.props.accessibilityElementsHidden).toBe(true);
+    expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('accepts size prop at 48px', () => {
     const { getByTestId } = render(
       <MagicPenAnimation testID="pen" size={48} />,
     );
-    const el = getByTestId('pen');
+    const el = getByTestId('pen', { includeHiddenElements: true });
     expect(el.props.style).toMatchObject({ width: 48, height: 48 });
   });
 
@@ -50,7 +52,7 @@ describe('MagicPenAnimation', () => {
     const { getByTestId } = render(
       <MagicPenAnimation testID="pen" size={100} />,
     );
-    const el = getByTestId('pen');
+    const el = getByTestId('pen', { includeHiddenElements: true });
     expect(el.props.style).toMatchObject({ width: 100, height: 100 });
   });
 
@@ -121,8 +123,11 @@ describe('MagicPenAnimation', () => {
 
     try {
       const { getByTestId } = render(<MagicPenAnimation testID="pen" />);
-      const el = getByTestId('pen');
-      expect(el.props.accessibilityLabel).toBe('Writing animation');
+      const el = getByTestId('pen', { includeHiddenElements: true });
+      // Decorative even in reduced-motion — hidden from SR
+      expect(el.props.accessible).toBe(false);
+      expect(el.props.accessibilityElementsHidden).toBe(true);
+      expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
     } finally {
       reanimated.useReducedMotion = original;
     }
@@ -137,7 +142,7 @@ describe('MagicPenAnimation', () => {
       const { getByTestId } = render(
         <MagicPenAnimation testID="pen" size={80} color="#8b5cf6" />,
       );
-      const el = getByTestId('pen');
+      const el = getByTestId('pen', { includeHiddenElements: true });
       expect(el.props.style).toMatchObject({ width: 80, height: 80 });
     } finally {
       reanimated.useReducedMotion = original;

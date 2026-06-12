@@ -147,11 +147,11 @@ overlapping component files — keep adjacent/serial).
 | 1 | WI-621 WP-L12-jsx-strings | **done** — 3 PRs (A #942 · B #961 · C #985), baseline 361→12, translate-pipeline plural fix shipped; CLOSED Done first-pass 2026-06-11 |
 | 2 | WI-622 WP-L12-sr-announcements | **done** — PR #940 merged `ce8b10ab9`; children WI-635/636 swept; CLOSED Done by autonomous review 2026-06-11 (first WP through the PRG-12 loop, zero human touches) |
 | 3 | WI-623 WP-L12-modal-focus-roles | **done** — PR #997 `82dc84c9f` (functional) + PR #1006 `bec39899f` (forward-only modal-a11y guard, 3 hardening rounds); one bounce on `dod.cross_cutting_sweep` converted into the guard; CLOSED Done on re-review 2026-06-11 |
-| 4 | WI-624 WP-L12-label-prop-strings | in-progress — dispatched wi624-executor (adjacency cleared: WI-621 + WI-623 landed); sizing checkpoint mandated at ~120 strings/35 files |
-| 5 | WI-625 WP-L12-pluralization | in-progress — dispatched wi625-executor (unblocked by #985's translate-pipeline fix; scope includes the 36 pre-existing families lacking pl few/many) |
+| 4 | WI-624 WP-L12-label-prop-strings | in-progress — sub-sliced 3 serial PRs: PR-A #1008 MERGED `2071b31e4` · PR-B #1017 MERGED `b61c0d79c` (one stale-baseline-hash round) · PR-C building on `WI-624-c` (final PR of the slice). Deferred forward-guard WI created: **WI-673 (attribute-literal ratchet extension)** |
+| 5 | WI-625 WP-L12-pluralization | **done** — PR #1011 `ddf462f3e` (in-PR forward guard caught 3 audit-missed sites; pl 71/71 families complete); CLOSED Done first-pass 2026-06-11 |
 | 6 | WI-626 WP-L12-mobile-logic-bugs | **done** — PR #959 merged `0a7b07dbe` (5 CI rounds, all red-verified); one bounce on a flaky landing check refuted (program adjudication: the session-test red was one-off suite-interference flake on WI-626's own merge run, rerun green; the shepherd's interim "#931 broke main" theory was WRONG — #931 was an innocent comment-only sweep); CLOSED Done on re-review 2026-06-11 |
 | 7 | WI-627 WP-L12-dates-locale | **done** — PR #993 merged `1f5574e63` (3 rounds); children WI-659/660 swept; CLOSED Done 2026-06-11 |
-| 8 | WI-628 WP-L12-decorative-lowvision | in-progress — dispatched wi628-executor (last bundle; amendment-16 guard question briefed explicitly) |
+| 8 | WI-628 WP-L12-decorative-lowvision | **done** — PR #1014 `78992f529` (3 rounds incl. iOS accessibilityElementsHidden); two human-parks resolved by shepherd evidence/ruling (landing checks + decorative-guard exception, WI-623 precedent); CLOSED Done 2026-06-12 |
 
 **Sub-slice watch:** WP-1 absorbs the ~358-string aggregate (F-069) — it is the one
 bundle likely to exceed PR size. Sub-slice on demand at execution (planning-reference
@@ -171,6 +171,25 @@ watching **Identity Foundation + L10n & A11y Mobile**, trigger `Stage=Reviewing`
 review outputs named `<WI>.<ws-slug>.<ts>.*` under `/tmp/cosmo-watch/reviews/`.
 WI-621 and WI-622 bridged (briefs in page bodies; provenance children WI-633/634
 and WI-635/636; Sub-item set) and refined to `Stage=Ready`, `Execution Path=Assisted`.
+**ENDGAME CONTEXT (compaction-safe, 2026-06-12 ~00:55): 7 of 8 Closed; only WI-624
+PR-C remains.** Exact remaining procedure once PR-C opens (executor agent
+`a51bdff87ce4a3426`, resumable via SendMessage; cron 25b2232f re-fires it 04:32 if
+the token window stalled it again):
+1. Merge-gate PR-C (CI green on exact head · Claude COMMENT verdict · all
+   Codex/CodeRabbit threads dispositioned · diff-vs-scope) → merge.
+2. Sweep WI-624's provenance children with the PR-C merge commit, Completed/Resolved
+   dates set: **WI-655** page `37c8bce9-1f7c-819c-b9e6-e339ffff0feb`, **WI-656** page
+   `37c8bce9-1f7c-8159-8c29-ccd13214358c` (PATCH Stage=Closed, Resolution=Done,
+   Fixed In=commit URL — same shape as all prior sweeps).
+3. Executor runs `complete` citing all three PRs: A #1008 `2071b31e4` · B #1017
+   `b61c0d79c` · C (new) — Fixed In = PR-C merge commit; deferred forward-guard block
+   cites **WI-673** (attribute-literal ratchet extension, created 2026-06-12).
+   HEAD-race guard: run from worktree detached at the merge commit.
+4. Reviewer closes WI-624 → **ALL 8 CLOSED → graduation-candidate boundary report to
+   the operator** (include: 34/34 findings disposition, baseline 361→12, the 3 new CI
+   guards, WI-673 + the weeklyDelta translation-rot + pl-glossary incidental captures,
+   loop stats — bounces, rulings, lessons → amendments file).
+
 **HALF-SLICE REACHED 2026-06-11 (~21:30 CEST): 4 of 8 Closed** — WI-621 (3 PRs,
 baseline 361→12), WI-622, WI-626, WI-627 all Closed/Done. In flight: WI-623 (PR #997,
 rebase+NudgeBanner-label round; executor hit a "Not logged in" auth error ~21:20,

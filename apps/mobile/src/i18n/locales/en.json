@@ -809,6 +809,16 @@
     "inputMode": {
       "text": "Text mode",
       "voice": "Voice mode"
+    },
+    "milestoneDots": {
+      "reached_one": "1 milestone reached",
+      "reached_other": "{{count}} milestones reached"
+    },
+    "livingBook": {
+      "progressLabel_one": "Book progress: {{count}} page",
+      "progressLabel_other": "Book progress: {{count}} pages",
+      "pageCount_one": "{{count}} page",
+      "pageCount_other": "{{count}} pages"
     }
   },
   "quiz": {
@@ -1290,8 +1300,12 @@
       "bookmarks": {
         "savedFromChat": "Saved from chat",
         "emptyShort": "No saved chat for this topic yet",
-        "emptyLong": "No saved explanations for this topic yet."
+        "emptyLong": "No saved explanations for this topic yet.",
+        "savedExplanations_one": "{{count}} saved explanation",
+        "savedExplanations_other": "{{count}} saved explanations"
       },
+      "notesSavedCount_one": "{{count}} note saved for this topic",
+      "notesSavedCount_other": "{{count}} notes saved for this topic",
       "challengeVerifiedBadge": "Challenge verified",
       "practicedOftenHint": "You practice this topic often — keep it up!",
       "relatedRail": {
@@ -1335,7 +1349,39 @@
       "noNotesYet": "No notes yet. Add one when something clicks.",
       "addNote": "+ Add a note",
       "addFirstNote": "+ Add your first note for this book",
-      "backToSubject": "Back to subject →"
+      "notesSavedCount_one": "{{count}} note saved for this book",
+      "notesSavedCount_other": "{{count}} notes saved for this book",
+      "backToSubject": "Back to subject →",
+      "deleteStartedTitle": "Delete started topics?",
+      "deleteStartedMessage": "This book has {{started}}. Deleting it will also delete those topics, their learning history, progress, and notes.",
+      "deleteEverything": "Delete everything",
+      "deleteErrorTitle": "Could not delete book",
+      "deleteBookTitle": "Delete book?",
+      "deleteBookMessage": "You can re-add it later. If any topics have been started, you will be asked before those topics and their learning history are deleted too.",
+      "buildErrorTitle": "Couldn't build this book",
+      "generationFailedTitle": "Content unavailable",
+      "topicListErrorTitle": "Could not set up topic list",
+      "movedTitle": "Moved",
+      "movedMessage": "\"{{topic}}\" moved to {{book}}.",
+      "moveErrorTitle": "Could not move topic",
+      "movePromptMessage": "Move to a different book?",
+      "startLearningErrorTitle": "Could not start learning",
+      "noteSaveErrorTitle": "Could not save note",
+      "noteUpdateErrorTitle": "Could not update note",
+      "noteDeleteErrorTitle": "Could not delete note",
+      "notesSection": "Notes for this book",
+      "loadingNotes": "Loading notes...",
+      "a11yDeleteBook": "Delete book",
+      "a11ySubjectBookmarks": "View saved bookmarks for this subject",
+      "a11yRetryHistory": "Retry loading session history",
+      "a11yRetryProgress": "Retry loading progress",
+      "a11yStartFirstLesson": "Start first lesson",
+      "a11yStartReview": "Start spaced-repetition review",
+      "a11yBackToSubject": "Back to subject to pick what to learn next",
+      "a11yBookComplete": "{{title}} complete. {{topics}} topics studied.",
+      "genericTitle": "Book",
+      "a11ySectionCollapse": "{{label}}. {{summary}}. Collapse section.",
+      "a11ySectionExpand": "{{label}}. {{summary}}. Expand section."
     },
     "notStartedCount": "{{notStarted}} / {{total}} not started",
     "chooseTopic": "Choose a topic",
@@ -1367,7 +1413,9 @@
       "stillStuck": "Still stuck",
       "errorTitle": "Something went wrong",
       "timeoutTitle": "Still waiting…",
-      "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again."
+      "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again.",
+      "dontRememberFirst": "I don't remember.",
+      "dontRememberAgain": "Still stuck."
     },
     "notFoundTitle": "Topic not found",
     "notFoundMessage": "This topic could not be opened. Please go back and try again.",
@@ -1378,7 +1426,20 @@
     "noNotesYet": "No notes yet. Add one when something clicks.",
     "noSessionsYet": "No sessions yet. Start one below!",
     "addNote": "+ Add a note",
-    "addFirstNote": "+ Add your first note for this topic"
+    "addFirstNote": "+ Add your first note for this topic",
+    "ctaStartStudying": "Start studying",
+    "ctaPracticeAgain": "Practice again",
+    "ctaReview": "Review this topic",
+    "resolveTimeoutTitle": "Taking too long to open this topic",
+    "resolveTimeoutMessage": "Check your connection and try again.",
+    "a11yRetryTopic": "Retry loading topic",
+    "a11yBackPrevious": "Back to previous screen",
+    "notesSection": "Notes for this topic",
+    "sessionsSection": "Sessions",
+    "addFirstNoteSummary": "Add your first note for this topic",
+    "loadingBookmarks": "Loading saved explanations...",
+    "loadingSessions": "Loading sessions...",
+    "noSessionsSummary": "No sessions yet"
   },
   "subject": {
     "settings": {
@@ -1909,7 +1970,9 @@
       "hideErrorTitle": "Could not hide subject",
       "goneTitle": "This subject is no longer available",
       "goneSubtitle": "It may have been removed or merged into another subject.",
-      "pastConversations": "Past conversations"
+      "pastConversations": "Past conversations",
+      "startedTopicsCount_one": "{{count}} topic started",
+      "startedTopicsCount_other": "{{count}} topics started"
     },
     "vocabulary": {
       "pageTitle": "Your Vocabulary",
@@ -2107,7 +2170,22 @@
       "withdrawConsent": "Withdraw consent",
       "withdrawConsentConfirmTitle": "Withdraw consent?",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
-      "confirmWithdrawConsent": "Confirm — withdraw consent"
+      "confirmWithdrawConsent": "Confirm — withdraw consent",
+      "timeAgo": {
+        "justNow": "just now",
+        "minutes_one": "{{count}} min ago",
+        "minutes_other": "{{count}} mins ago",
+        "hours_one": "{{count}} hour ago",
+        "hours_other": "{{count}} hours ago",
+        "days_one": "{{count}} day ago",
+        "days_other": "{{count}} days ago",
+        "weeks_one": "{{count}} week ago",
+        "weeks_other": "{{count}} weeks ago",
+        "months_one": "{{count}} month ago",
+        "months_other": "{{count}} months ago",
+        "years_one": "{{count}} year ago",
+        "years_other": "{{count}} years ago"
+      }
     },
     "mentorMemory": {
       "title": "Mentor memory",
@@ -2148,7 +2226,9 @@
       "whatSeemsWrongDescription": "Describe the correction and the mentor will take it into account",
       "correctionNoted": "Correction noted",
       "couldNotSaveCorrection": "Could not save correction",
-      "submit": "Submit"
+      "submit": "Submit",
+      "attemptCount_one": "{{count}} time noticed",
+      "attemptCount_other": "{{count}} times noticed"
     },
     "reports": {
       "title": "Reports",
@@ -2693,7 +2773,13 @@
     "a11yStarters": "Sentence starter suggestions",
     "a11yWriteSummary": "Write your learning summary",
     "a11ySkipSummary": "Skip the summary",
-    "a11yStarterHint": "Tap to use this sentence starter"
+    "a11yStarterHint": "Tap to use this sentence starter",
+    "takeaways": {
+      "duration_one": "{{count}} minute - great session!",
+      "duration_other": "{{count}} minutes - great session!",
+      "exchanges_one": "You worked through {{count}} exchange",
+      "exchanges_other": "You worked through {{count}} exchanges"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3122,7 +3208,30 @@
     "loadErrorNotes": "Couldn't load notes",
     "loadErrorBookmarks": "Couldn't load bookmarks",
     "loadErrorSessions": "Couldn't load sessions",
-    "loadMore": "Load more"
+    "loadMore": "Load more",
+    "kinds": {
+      "sessions": "Sessions",
+      "notes": "Notes",
+      "bookmarks": "Bookmarks"
+    },
+    "types": {
+      "homework": "Homework",
+      "review": "Review",
+      "learning": "Learning",
+      "note": "Note",
+      "bookmark": "Bookmark"
+    },
+    "hub": {
+      "sessionsSubtitle": "Conversations you had",
+      "notesSubtitle": "Things you wrote down",
+      "bookmarksSubtitle": "Mentor replies you saved"
+    },
+    "unknownSubject": "Unknown subject",
+    "searchSessions": "Search sessions",
+    "searchNotes": "Search notes",
+    "searchBookmarks": "Search bookmarks",
+    "a11yGroupByDate": "Group by date",
+    "a11yGroupBySubject": "Group by subject"
   },
   "pickBook": {
     "subjectFallback": "Subject",
@@ -3136,7 +3245,11 @@
     "go": "Go",
     "skipStart": "Skip — start learning anyway",
     "missingSubject": "Missing subject. Please go back and try again.",
-    "takingLonger": "This is taking a bit longer than usual..."
+    "takingLonger": "This is taking a bit longer than usual...",
+    "errorTitle": "Something didn't load",
+    "setupErrorMessage": "Couldn't set up that book. Try again?",
+    "customPlaceholder": "Book or topic to add",
+    "organizingLibrary": "Organizing your library..."
   },
   "relearn": {
     "title": "Relearn Topic",
@@ -3145,7 +3258,38 @@
     "overdueTopicCount_one": "{{count}} overdue topic",
     "overdueTopicCount_other": "{{count}} overdue topics",
     "daysOverdue_one": "{{count}} day overdue",
-    "daysOverdue_other": "{{count}} days overdue"
+    "daysOverdue_other": "{{count}} days overdue",
+    "methodVisualLabel": "Visual Diagrams",
+    "methodVisualDesc": "Learn through charts, diagrams, and visual representations",
+    "methodVisualLabelYoung": "Show Me Pictures",
+    "methodVisualDescYoung": "Learn with pictures, charts, and drawings",
+    "methodStepsLabel": "Step-by-Step",
+    "methodStepsDesc": "Break concepts down into clear, sequential steps",
+    "methodStepsLabelYoung": "Walk Me Through It",
+    "methodStepsDescYoung": "Break it down into small, easy steps",
+    "methodExamplesLabel": "Real-World Examples",
+    "methodExamplesDesc": "Connect concepts to practical, everyday situations",
+    "methodExamplesLabelYoung": "Show Me How It Works",
+    "methodExamplesDescYoung": "Learn with fun, everyday examples",
+    "methodPracticeLabel": "Practice Problems",
+    "methodPracticeDesc": "Learn by working through guided exercises",
+    "methodPracticeLabelYoung": "Let Me Try It",
+    "methodPracticeDescYoung": "Learn by solving problems with help",
+    "copyTopicIntro": "Pick a topic that feels the shakiest right now.",
+    "copyTopicIntroYoung": "Pick the topic you want to try again.",
+    "copyMethodIntro": "Choose a teaching style that feels like your best next step.",
+    "copyMethodIntroYoung": "How would you like to learn this time?",
+    "copySubjectIntro": "Which subject would you like to review first?",
+    "copySubjectIntroYoung": "Which subject should we start with?",
+    "copyEmptyTitle": "Nothing to relearn right now",
+    "copyEmptyTitleYoung": "No review topics right now",
+    "copyEmptyBody": "You're all caught up on overdue topics. Nice work.",
+    "copyEmptyBodyYoung": "You're all caught up for now. Great job!",
+    "copyErrorTitle": "We couldn't load your review topics right now.",
+    "copyUsualMethod": "Usual method",
+    "a11yOpenSubject": "Open {{name}}",
+    "a11yOpenTopic": "Open {{title}}",
+    "a11yLearnWith": "Learn with {{method}}"
   },
   "preview": {
     "backToSignIn": "Back to sign in",
@@ -3169,5 +3313,15 @@
     "sampleBadge": "Sample",
     "sampleDataNote": "Sample data — your child's real insights appear after their first session.",
     "sampleWeeklyBody": "Practiced quadratic equations for 45 minutes across three sessions. Getting comfortable with factoring; working on completing the square."
+  },
+  "milestoneCard": {
+    "wordCount_one": "{{count}} word learned",
+    "wordCount_other": "{{count}} words learned",
+    "topicCount_one": "{{count}} topic mastered",
+    "topicCount_other": "{{count}} topics mastered",
+    "sessionCount_one": "{{count}} learning session completed",
+    "sessionCount_other": "{{count}} learning sessions completed",
+    "hourCount_one": "{{count}} hour of learning",
+    "hourCount_other": "{{count}} hours of learning"
   }
 }

@@ -666,7 +666,7 @@ export default function MentorMemoryScreen() {
         >
           {(profile?.struggles ?? []).length > 0 ? (
             profile?.struggles.map((entry) => {
-              const progress = getFocusAreaProgress(entry);
+              const progress = getFocusAreaProgress(entry, t);
               return (
                 <MemoryRow
                   key={`${entry.subject ?? 'freeform'}:${entry.topic}`}

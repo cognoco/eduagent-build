@@ -1,5 +1,7 @@
 import { View, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { MilestoneRecord } from '@eduagent/schemas';
+import type { Translate } from '../../i18n';
 
 const MILESTONE_COPY: Record<
   MilestoneRecord['milestoneType'],
@@ -7,52 +9,49 @@ const MILESTONE_COPY: Record<
     icon: string;
     label: (
       threshold: number,
+      t: Translate,
       metadata?: Record<string, unknown> | null,
     ) => string;
   }
 > = {
   vocabulary_count: {
     icon: '📚',
-    label: (threshold) =>
-      `${threshold} ${threshold === 1 ? 'word' : 'words'} learned`,
+    label: (threshold, t) => t('milestoneCard.wordCount', { count: threshold }),
   },
   topic_mastered_count: {
     icon: '🎯',
-    label: (threshold) =>
-      `${threshold} ${threshold === 1 ? 'topic' : 'topics'} mastered`,
+    label: (threshold, t) =>
+      t('milestoneCard.topicCount', { count: threshold }),
   },
   session_count: {
     icon: '🧭',
-    label: (threshold) =>
-      `${threshold} learning ${
-        threshold === 1 ? 'session' : 'sessions'
-      } completed`,
+    label: (threshold, t) =>
+      t('milestoneCard.sessionCount', { count: threshold }),
   },
   streak_length: {
     icon: '🔥',
-    label: (threshold) => `${threshold}-day streak`,
+    label: (threshold, _t) => `${threshold}-day streak`,
   },
   subject_mastered: {
     icon: '🏁',
-    label: (_threshold, metadata) =>
+    label: (_threshold, _t, metadata) =>
       `Mastered ${String(metadata?.['subjectName'] ?? 'a subject')}`,
   },
   book_completed: {
     icon: '📖',
-    label: () => 'Completed a book',
+    label: (_threshold, _t) => 'Completed a book',
   },
   learning_time: {
     icon: '⏱',
-    label: (threshold) =>
-      `${threshold} ${threshold === 1 ? 'hour' : 'hours'} of learning`,
+    label: (threshold, t) => t('milestoneCard.hourCount', { count: threshold }),
   },
   cefr_level_up: {
     icon: '🗣',
-    label: () => 'Language level increased',
+    label: (_threshold, _t) => 'Language level increased',
   },
   topics_explored: {
     icon: '🧠',
-    label: (threshold, metadata) =>
+    label: (threshold, _t, metadata) =>
       `Explored ${threshold} topics in ${String(
         metadata?.['subjectName'] ?? 'a subject',
       )}`,
@@ -66,6 +65,7 @@ interface MilestoneCardProps {
 export function MilestoneCard({
   milestone,
 }: MilestoneCardProps): React.ReactElement {
+  const { t } = useTranslation();
   const config = MILESTONE_COPY[milestone.milestoneType];
   const createdAt = new Date(milestone.createdAt);
 
@@ -75,7 +75,7 @@ export function MilestoneCard({
         <Text className="text-xl me-3">{config.icon}</Text>
         <View className="flex-1">
           <Text className="text-body font-semibold text-text-primary">
-            {config.label(milestone.threshold, milestone.metadata ?? null)}
+            {config.label(milestone.threshold, t, milestone.metadata ?? null)}
           </Text>
           <Text className="text-caption text-text-secondary mt-1">
             {createdAt.toLocaleDateString(undefined, {

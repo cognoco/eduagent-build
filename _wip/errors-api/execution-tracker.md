@@ -128,6 +128,28 @@ parallel with either.
 
 ## 5. Current position
 
+**2026-06-12 — GRADUATED & WOUND DOWN.** Graduation ratified and processed by the
+umbrella orchestrator (roster: `✓ graduated 2026-06-11`; PRG-13 took the lane).
+Shepherd shutdown complete: residue items **WI-646** (stripe-webhook Sentry
+escalation) and **WI-650** (raw 'Session not found' sweep) triaged → Backlog
+(Assisted/P3) via `/cosmo:triage`, deliberately NOT attached to this graduated
+workstream — tails are roster-level constructs (PRG-02 precedent); they sit in
+normal backlog flow, retrievable for any future quick-land batch. Stage monitor
+stopped; WI-639/640/641 worktrees already swept (no local branches remain). The
+reviewer-watcher's "API Error Handling" config entry is left in place (shared
+infra, harmless — flag for removal at the next watcher maintenance touch).
+This stream is dormant; nothing executes from here.
+
+*Residue addendum (2026-06-12):* on operator request, WI-646 and WI-650 were
+autonomously refined to **Ready** (Assisted) — WI-650's AC enumerates the 11
+live raw-throw sites (grep-verified) against the PR #966 pattern; WI-646's AC
+is outcome-level (deduplicated Sentry escalation on sustained webhook signature
+failure, mechanism implementer-chosen, webhook path never blocked). Both sit
+in the general Ready pool, unattached to this workstream; executable whenever
+capacity allows.
+
+---
+
 **2026-06-11 — ALL 3 UNITS CLOSED — GRADUATION CANDIDATE.** WI-639, WI-640,
 WI-641 all Closed/Done via the autonomous review loop, same day as activation.
 All 8 charter findings resolved on `main`: F-022/047/048/049 (PR #948,

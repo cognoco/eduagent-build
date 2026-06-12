@@ -33,11 +33,15 @@ export function ProxyBanner({
       testID="proxy-banner"
     >
       <View className="flex-row items-center flex-1">
+        {/* decorative leading icon — banner text carries the meaning */}
         <Ionicons
           name="eye-outline"
           size={20}
           color={colors.warning}
           style={{ marginRight: 10 }}
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
         />
         <View className="flex-1 pr-3">
           <Text className="text-caption font-bold text-warning uppercase">
