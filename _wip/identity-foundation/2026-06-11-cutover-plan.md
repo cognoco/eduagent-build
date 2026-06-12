@@ -1,6 +1,6 @@
 # IF Application Cutover Plan — WP-CUT-A → WP-CUT-B → WI-586 convergence
 
-**Date:** 2026-06-11 · **Status:** DRAFT v1.3 — awaiting ratification (program session + operator)
+**Date:** 2026-06-11 · **Status:** DRAFT v1.4 — awaiting ratification (program session + operator)
 **Author:** dedicated architecture/planning session (per `cutover-planning-brief.md`)
 **Profile:** design (plan only; no code, no migrations, no Cosmo writes)
 
@@ -49,6 +49,24 @@
 > quiet → Inngest pause + drain → reseed**; (5) WI-297 full dates get **pairwise
 > real-calendar validation** (today's `Date.UTC` silently normalizes Feb 31) before
 > `person.birth_date` persists.
+>
+> **Revision v1.4 (2026-06-11).** Four fourth-round audit findings folded, all verified:
+> (1) the freeze's maintenance gate is now **mounted before auth/account resolution
+> and blocks ALL authenticated traffic** — `accountMiddleware` runs globally and
+> JIT-inserts `accounts` + trial `subscriptions` on any authed request, so a
+> route/method-scoped gate would let a fresh user's `GET` create legacy rows after
+> the final reseed; (2) §2.3a now defines the **executable current-state reducer**
+> for the v2 split state (per-basis reduction, ordering key incl. NULL
+> `requested_at` PENDING rows, direct grants with no request row, withdrawal,
+> restore, the batched form, and a withdrawal-safe EXISTS that also replicates the
+> legacy adult `notExists` branch); (3) the BUG-411 guard's **unique-violation catch
+> discriminates by constraint** (Clerk-id ⇒ idempotent fetch; email ⇒ the audited
+> refusal) closing the concurrent-signup race, with the regression test extended;
+> (4) the **withdrawal persistence model is fixed** — stamp `withdrawn_at` on the
+> live grant (the ratified schema's own column + partial index + the 0109 mapping);
+> restore/re-grant appends a new row; the contradictory "INSERT granted=false"
+> phrasing removed and the ADR text amended to state the one sanctioned in-row
+> transition.
 
 **Inputs (read in full):**
 - `_wip/identity-foundation/cutover-planning-brief.md` — the mandate
@@ -75,7 +93,7 @@ real design alternatives; the rest are confirmations.**
 | **OQ-1** | **v2 signup bootstrap timing.** `login.person_id` is NOT NULL, but today's JIT bootstrap (`findOrCreateAccount` at first authed request) runs *before* birth-date capture — `person.birth_date NOT NULL` cannot be satisfied at signup. Option (c): defer the whole graph (organization + person + login + membership + subscription) to **onboarding completion**, when birth date is known — matches `inv 26` (age-gate precedes collection) and eliminates the ownerless-account class by construction, but moves the trial-clock start from signup to onboarding completion. Option (d): make `login.person_id` nullable (canon amendment) and keep signup-time creation. **v1.1:** (c)'s executable boundary is now specified in §2.2a (the existing `POST /v1/profiles` owner-create call becomes the graph transaction — **no mobile call-site change**; idempotent on `login.clerk_user_id`; pre-graph webhooks inherit today's ack-200 + Sentry-escalation path). The design did not weaken (c) — the mobile-unchanged finding strengthens it; recommendation stands. | **(c)** — boundary in §2.2a; trial-clock shift + pre-graph webhook window called out | Operator (product) |
 | **OQ-2** | **Re-homes beyond the accepted sub-rulings.** The brief's accepted set covers `conversation_language` → person, store IDs, `consent_request`, `has_premium_llm` derived, ownerless accounts. This plan additionally re-homes `pronouns`, `avatar_url`, `default_app_context`, `archived_at` to `person` and folds `birth_year_set_by` into `knowledge_assertions` (§1.3). | as designed §1.3 | Ratification |
 | **OQ-3** | **Staging ownerless accounts (6)** — case-by-case list produced (Appendix D): all six are test artifacts (`@test.local` ×3, `@test.test` ×1, `@integration.test` ×2; created 2026-05-31/06-10). | bulk-delete pre-drop, same as dev | Operator |
-| **OQ-4** | **Freeze mechanics + soak length** at convergence: proposal = gate write ingress first (`MAINTENANCE_READONLY`, 503 incl. webhooks), wait HTTP quiet, then pause + drain Inngest (v1.3 ordering, §4 step 1); 24 h staging soak between flip and drop. | as proposed §4 | Operator |
+| **OQ-4** | **Freeze mechanics + soak length** at convergence: proposal = gate **all** traffic first via a maintenance middleware mounted before auth/account resolution (`MAINTENANCE_READONLY` — v1.4: must kill the global JIT provisioning that runs even on authed `GET`s; 503 incl. webhooks), wait HTTP quiet, then pause + drain Inngest (§4 step 1); 24 h staging soak between flip and drop. | as proposed §4 | Operator |
 | **OQ-5** | **`consent_request` single-row recycling** (one row per charge × purpose × org × **basis**, counters monotonic — preserves WI-374 exactly, per-basis like legacy) vs append-per-cycle rows (counters reset per cycle — weakens WI-374 unless windowed sums added). v1.1: the unique key gained `requested_basis` so the guarded GDPR/COPPA dual-row coexistence survives (§1.2). | single-row, basis-keyed (§1.2 design rationale) | Ratification |
 | **OQ-6** | **Deviation from the executor's sketch:** the scope report suggested "new signups write the new model from the first cutover PR". This plan **rejects** that — it is a partial dual-write and violates the single-live-store invariant. The 0109 precondition window is closed by the convergent final reseed at freeze instead (§4 step 4). | reject early dual-writes | Ratification |
 | **OQ-7** | **`profileId` symbol / `profile_id` column rename** to `personId`/`person_id` across learning tables: out of grep-clean scope (FK constraints re-point; names stay — `person.id = profiles.id` by construction). Rename = a separate post-cutover hygiene item if ever wanted. | out of scope | Ratification |
@@ -658,10 +676,20 @@ longer exist.
 - **Idempotency / retry.** The transaction is fenced by the existing
   `login.clerk_user_id UNIQUE` constraint. Retry after a network failure, a client
   double-tap, or two concurrent first requests: the second transaction hits the
-  unique violation, catches it, and **reads-and-returns the existing graph**
-  (insert-or-fetch, the same pattern `findOrCreateAccount` uses on `accounts.clerk_user_id`
-  today). A partially-failed transaction left nothing behind (atomicity), so a retry
-  is a clean first attempt.
+  unique violation and catches it. **The 23505 catch discriminates by constraint
+  (v1.4)** — `login.clerk_user_id` is not the only unique on the table:
+  - violation on the **clerk-id** unique → genuine idempotent replay:
+    read-and-return the existing graph by Clerk id (insert-or-fetch, the pattern
+    `findOrCreateAccount` uses on `accounts.clerk_user_id` today).
+  - violation on the **email** unique → this is the BUG-411 case arriving through
+    the race window (two concurrent signups, same verified email, different Clerk
+    ids: both pass the pre-insert lookup, one inserts, the loser lands here). A
+    fetch-by-Clerk-id finds nothing — an undiscriminated catch would surface a raw
+    error. Route it through **the same audited refusal** as the pre-insert guard
+    (warn log + `captureException` + reclaim-attempt dispatch, no rewire).
+  - any other constraint → rethrow (never swallow).
+  A partially-failed transaction left nothing behind (atomicity), so a retry is a
+  clean first attempt.
 - **The BUG-411 email-reclaim guard (required, before insert).** `login.email` is
   **also** UNIQUE (`identity.ts:131`), and Clerk-id idempotency alone does not cover
   it: a same-email/different-Clerk registration would miss the insert-or-fetch by
@@ -671,10 +699,13 @@ longer exist.
   inserting: look up `login` by email; if a row exists with a different
   `clerk_user_id`, **block loudly** — `logger.warn('account.reclaim_attempt_blocked',
   { emailHash, … })` + `captureException` + the `app/account.reclaim_attempt`
-  dispatch — and never rewire. **Regression test (CUT-B1, red-green):** registering
-  with an existing login's email under a new Clerk id is refused with the audited
-  failure, no `login`/`person`/`organization` row is created or mutated, and the
-  victim's graph is untouched.
+  dispatch — and never rewire. **Regression tests (CUT-B1, red-green), two cases:**
+  (a) sequential — registering with an existing login's email under a new Clerk id
+  is refused with the audited failure, no `login`/`person`/`organization` row is
+  created or mutated, and the victim's graph is untouched; (b) concurrent — two
+  simultaneous same-email/different-Clerk bootstraps: exactly one graph is created,
+  the loser receives the audited refusal via the constraint-discriminating 23505
+  catch (idempotency bullet below), never a raw 500.
 - **Pre-graph request surface — the middleware/route contract change (explicit).**
   "No mobile call-site change" stands; **"no route/middleware contract change" does
   not** — today's chain makes `account` a hard precondition of every authenticated
@@ -731,11 +762,25 @@ The whole of `services/consent.ts` gets a v2 twin (`consent-v2.ts`) writing
 | `resendConsent` | same row, `resend_count++` under cap, fresh token |
 | `processConsentResponse(approve)` | tx: request → `'approved'` + INSERT `consent_grant` + set `consent_grant_id` |
 | `processConsentResponse(deny)` | tx: request → `'denied'` + the existing child-deletion cascade (`deletion.ts` v2) |
-| `revokeConsent` | INSERT `consent_grant(granted=false… )` — implemented as `withdrawn_at` on the live grant + `prior_value`/`audit_fact` per the ratified direction-aware gate; nudge-clearing unchanged |
+| `revokeConsent` | **stamp `withdrawn_at` on the live grant** + `prior_value`/`audit_fact` per the ratified direction-aware gate — the **single sanctioned in-row transition** (v1.4; no `granted=false` insert — see the persistence-model note below the table); nudge-clearing unchanged |
 | `restoreConsent` (7-day grace) | new `consent_grant` row (granted=true, `prior_value=false`); grace check against the withdrawal timestamp |
 | `getConsentStatus` | **compatibility resolver — basis-aware**: `resolveConsentStatus(personId, orgId, purpose, basis)` reads the request row for that `(charge, purpose, org, basis)` key and the latest grant filtered by the matching `lawful_basis` — open request `'pending'`→`PENDING`, `'requested'`→`PARENTAL_CONSENT_REQUESTED`; else granted & not withdrawn → `CONSENTED`, withdrawn → `WITHDRAWN`; no rows → `null`. **The basis parameter is required, not defaulted**: the GDPR-only call sites (`dashboard.ts:837` per BUG-466, `dashboard.ts:1075` per BUG-465) pass `'gdpr_parental_consent'` explicitly — a basis-blind "latest row" read is exactly the newer-COPPA-masks-GDPR bug those fixes closed, and this resolver cannot express it. (The legacy *generic* latest-any surfaces map to the separately-named `AnyBasis` compatibility variant — full disposition in §2.3a.) Mobile's `consentStatusSchema` is served unchanged. |
 | `getChildNameByToken` | token lookup on `consent_request_token_idx`, expiry check identical |
 | `isGdprProcessingAllowed` | resolver above with `basis = 'gdpr_parental_consent'` pinned ≠ `CONSENTED` → false (same semantics; shared helper — single re-point covers its 7+ Inngest callers) |
+
+**Withdrawal persistence model (v1.4 — one model, stated once).** Earlier drafts
+described withdrawal both as "INSERT `consent_grant(granted=false)`" and as
+"`withdrawn_at` on the live grant" — two different persistence models driving
+different current-state SQL. The plan fixes **the latter**: withdrawal **stamps
+`withdrawn_at` (+ `prior_value`, `audit_fact`) on the live grant row**, and
+restore / re-grant / age-transition **appends a new row**. This is what the
+ratified schema itself encodes — `consent_grant.withdrawn_at` with its partial
+index (`data-model.md` §4.8), §5.3's "re-granting after withdrawal is a new row…
+current state is a read-time aggregate", and 0109's mapping of legacy `WITHDRAWN`
+to a single grant row with `withdrawn_at` set. "Append-only" means **no row is
+ever deleted and no decision is ever rewritten**; the `withdrawn_at` stamp is the
+one sanctioned in-row state transition. The §2.3a reducer and the CUT-B2 tests are
+written against this model; Appendix A states it in the ADR text.
 
 #### 2.3a Consent-read disposition — every status surface, explicitly (v1.3)
 
@@ -753,6 +798,51 @@ variants**, and every surface is dispositioned to one of them:
   bug-compatible read**: latest row across bases, exactly today's
   `getConsentStatus` / L7-F1 semantics. The name carries the warning; no caller may
   reach for it without meaning it.
+
+**The current-state reducer (v1.4 — both variants are defined in terms of it).**
+Legacy "latest" was trivial (`ORDER BY consent_states.requested_at DESC` over one
+mutable row per basis); the v2 state is split across `consent_request` (workflow)
+and `consent_grant` (event log), so the reduction must be stated, not implied:
+
+1. **Per-basis reduction** `reduceBasisState(charge, purpose, org, basis)`:
+   - *Current grant* = the row with `max(granted_at)` (tiebreak `id DESC`, the
+     BUG-394 pattern) among grants for `(charge, purpose, org)` whose
+     `lawful_basis` belongs to the basis. Withdrawal stamps `withdrawn_at` on this
+     row and restore appends a newer row (§2.3 / Appendix A, v1.4 model), so:
+     current grant exists ∧ `withdrawn_at IS NULL` → **CONSENTED**
+     (effective-ts = `granted_at`); current grant exists ∧ `withdrawn_at IS NOT
+     NULL` → **WITHDRAWN** (effective-ts = `withdrawn_at`). A **direct grant with
+     no request row** (the parent-created-child path) reduces here identically.
+   - *No grant* → the request row for the basis-keyed unique (≤1 by §1.2):
+     `'pending'` → **PENDING** (effective-ts = `COALESCE(requested_at, created_at)`
+     — reseeded legacy `PENDING` rows carry `requested_at = NULL`); `'requested'`
+     → **PARENTAL_CONSENT_REQUESTED** (effective-ts = `requested_at`); `'denied'`
+     → **WITHDRAWN** (legacy parity — deny wrote `WITHDRAWN`; deletion in flight);
+     `'expired'` → **PARENTAL_CONSENT_REQUESTED** (legacy parity — legacy has no
+     EXPIRED status; an expired cycle stayed `PARENTAL_CONSENT_REQUESTED` until the
+     day-30 delete). `'approved'` with no grant is unreachable (the approval
+     transaction writes both).
+   - No rows at all → **null**.
+2. **`AnyBasis` (single)** = run the reduction for each basis; return the state
+   with the **greatest effective-ts** (tie → `id DESC`). This mirrors the legacy
+   cross-row `requested_at DESC` pick; the residual nuance (legacy ordered by
+   request time even after consent, the reducer by last-transition time) only
+   reorders *dual-basis* profiles and is part of the named `AnyBasis` follow-up
+   below.
+3. **Batched** = the same reduction window-functioned over `personIds`
+   (`row_number() OVER (PARTITION BY charge_person_id, basis ORDER BY …)` on each
+   table, reduced in one pass) — the L7-F1 replacement.
+4. **Scan-side EXISTS (withdrawal-safe)** — naive `EXISTS(granted = true)` over the
+   event log would keep allowing **after withdrawal** (the granted row still
+   exists). Under the v1.4 withdrawal model the correct predicate is cheap, no
+   subquery-max needed:
+   `EXISTS (SELECT 1 FROM consent_grant cg WHERE cg.charge_person_id = person.id
+   AND cg.purpose = 'platform_use' AND cg.granted AND cg.withdrawn_at IS NULL)`
+   — withdrawal stamps the live row so no un-withdrawn granted row survives it, and
+   restore appends a fresh un-withdrawn row. The legacy filter's **adult branch
+   must come along** (`review-due-scan.ts:99`: `…CONSENTED EXISTS … OR notExists(any
+   consent rows)`): v2 form is `… OR (NOT EXISTS(any consent_request for person) AND
+   NOT EXISTS(any consent_grant for person))`.
 
 | Legacy surface | v2 call | Basis |
 |---|---|---|
@@ -918,7 +1008,7 @@ all of them (the twins read/write §1 objects).
 
 | PR | Domain | Contents | Depends on |
 |---|---|---|---|
-| **CUT-B1 — identity spine** | auth/account/person | typed-config flag plumbing (§2.1) + the **flag-off break test** (literal `'false'` and unset both select legacy, zero new-model DB calls); `resolveIdentityV2` + the onboarding-completion bootstrap `createIdentityGraph()` per §2.2a (transaction incl. the reverse `person.login_id` wire, idempotency on `login.clerk_user_id`, the BUG-411 email-reclaim guard + regression test, calendar-valid birth dates, pre-graph default responses); the consent-status **read** module per §2.3a (basis-explicit + `AnyBasis` variants — `profileMeta` depends on it); `profileMeta` v2; person-scope twins (profile, settings, onboarding, learner-profile, session-cache/exchanges context, snapshot-aggregation, coaching-cards); shared helpers (ii)–(v); `test-seed` v2 core; the P1/P2 Inngest functions (B1 rows, §2.5) | CUT-A |
+| **CUT-B1 — identity spine** | auth/account/person | typed-config flag plumbing (§2.1) + the **flag-off break test** (literal `'false'` and unset both select legacy, zero new-model DB calls); the `MAINTENANCE_READONLY` gate middleware (mounted before auth/account resolution per §4 step 1a — must kill JIT provisioning); `resolveIdentityV2` + the onboarding-completion bootstrap `createIdentityGraph()` per §2.2a (transaction incl. the reverse `person.login_id` wire, idempotency on `login.clerk_user_id`, the BUG-411 email-reclaim guard + regression test, calendar-valid birth dates, pre-graph default responses); the consent-status **read** module per §2.3a (basis-explicit + `AnyBasis` variants — `profileMeta` depends on it); `profileMeta` v2; person-scope twins (profile, settings, onboarding, learner-profile, session-cache/exchanges context, snapshot-aggregation, coaching-cards); shared helpers (ii)–(v); `test-seed` v2 core; the P1/P2 Inngest functions (B1 rows, §2.5) | CUT-A |
 | **CUT-B2 — consent + family** | consent/guardianship/deletion | `consent-v2.ts` — the consent **write machine** (request lifecycle, grants, deletion; the read module ships in CUT-B1 per §2.3a); **required GDPR/COPPA coexistence break tests** — replicate the BUG-466/BUG-465 scenario against v2: a person holding both bases where the COPPA row is newer; the GDPR-pinned resolver and the dashboard paths must report the GDPR status, red-green per the regression-AC pattern; consent routes/web re-target; `deletion.ts`/`export.ts`/`notices` v2; `guardianship` reads (family-access, family-bridge, dashboard, nudge, notifications, solo-progress-reports, weekly-digest); the B2 Inngest functions | CUT-B1 (helpers, profileMeta) |
 | **CUT-B3 — billing + webhooks** | subscriptions/quota | `subscription-core` v2; both webhook handler twins (+ re-run BUG-116/CR-M11 break tests); metering/tier/trial/top-up/quota-provision/reconcile/family v2; routes/billing; `trial-expiry` Inngest; `session-exchange-router` tier source; drop the dead `hasPremiumLlm` override | CUT-B1 |
 
@@ -962,12 +1052,21 @@ dev rehearsal of this entire runbook completed once before staging.
 Per environment — **dev first (full rehearsal), then staging**; production §4.1.
 
 1. **Freeze — write-ingress gate FIRST, then drain (v1.3 ordering).** Announce, then:
-   (a) **Gate the write ingress:** deploy with `MAINTENANCE_READONLY=true`
-   (typed-config flag added in CUT-B1) so the API rejects writes — **including both
-   store webhooks** — with 503 + `Retry-After` (Stripe and RevenueCat retry on 5xx,
-   so gated webhook deliveries are deferred, not lost). Gating first matters: a
-   request accepted before the gate can commit *after* a later step starts, so the
-   gate must precede everything that assumes quiet.
+   (a) **Gate ALL traffic, mounted before account resolution (v1.4 precision):**
+   deploy with `MAINTENANCE_READONLY=true` (typed-config flag added in CUT-B1). The
+   gate is a dedicated middleware **mounted at the top of the chain in `index.ts` —
+   before `authMiddleware` and `accountMiddleware`** — that 503s (+ `Retry-After`)
+   every request except the health check. A route/method-scoped "reject writes"
+   gate is NOT sufficient: `accountMiddleware` runs globally and
+   `findOrCreateAccount()` **lazily inserts `accounts` + a trial `subscriptions`
+   row on any authenticated request, including `GET`** (`index.ts:225`,
+   `middleware/account.ts:79`, `services/account.ts:137`) — so a fresh user hitting
+   `GET /v1/profiles` after the final reseed would create legacy rows the new model
+   never sees. Blocking all traffic kills JIT provisioning by construction; both
+   store webhooks are likewise 503'd (Stripe and RevenueCat retry on 5xx, so gated
+   deliveries are deferred, not lost). Gating first matters: a request accepted
+   before the gate can commit *after* a later step starts, so the gate must precede
+   everything that assumes quiet.
    (b) **HTTP quiet:** wait out the in-flight request tail (Workers requests are
    seconds-scale; wait ≥60 s and observe zero write-path traffic in the worker
    logs/analytics before proceeding).
@@ -1133,6 +1232,11 @@ the flip unfreezes the system, the abort path is PITR-only.**
 >    back-links it (`consent_grant_id`). Requests are operational state; grants
 >    remain the sole audit record. Approval never creates a guardianship edge
 >    (inv 14); withdrawal/restore are grant-layer events, never request states.
+>    **Withdrawal persistence (amends the append-only reading):** withdrawal stamps
+>    `withdrawn_at` (+ `prior_value`/`audit_fact`) on the live grant row — the one
+>    sanctioned in-row transition, already encoded by the ratified schema's
+>    `withdrawn_at` column + partial index; restore and re-grant append new rows.
+>    Append-only = no deletes, no decision rewrites; not "no `withdrawn_at` stamp".
 > 2. **Additive `subscription` columns** for store correlation + idempotency
 >    (`stripe_customer_id`, `stripe_subscription_id`, `last_stripe_event_id`(+ts),
 >    `revenuecat_original_app_user_id`, `last_revenuecat_event_id`(+ts_ms),
