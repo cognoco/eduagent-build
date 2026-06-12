@@ -1,0 +1,17 @@
+{
+  "pageId": "37c8bce9-1f7c-81d1-82ac-dd07375a8669",
+  "id": "WI-646",
+  "name": "Stripe webhook signature-failure: add rate-limited Sentry escalation beyond structured log",
+  "description": "Follow-up from WI-639 review (PR #948, claude[bot] CONSIDER, non-blocking): stripe-webhook.ts signature-verification failure now emits a structured logger.warn event (queryable) but no captureException — deliberate, to avoid alert storms. Gap: sustained misconfiguration produces queryable logs but never pages. Proposal from review: rate-limited/threshold-based captureException or a deduplicated Inngest metric flush when the signature-failure rate exceeds a threshold.",
+  "acceptanceCriteria": "Outcome: sustained Stripe webhook signature-verification failure (sustained = repeated failures within a bounded window; threshold/window are implementer-chosen and documented) produces a deduplicated escalation signal visible in Sentry, while isolated failures remain log-only (no per-event alert storm — the deliberate WI-639 design holds). Mechanism is implementer's choice within repo conventions (rate-limited captureException, or threshold flush via safeSend()/Inngest); must not block or slow the webhook response path, and must not leak signature/secret material into the signal. Regression: test demonstrating N failures within the window emit exactly one escalation and a single failure emits none. Resend webhook: assess for the same treatment in-scope or record explicit out-of-scope rationale.",
+  "riskImpact": "",
+  "type": "Enhancement",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

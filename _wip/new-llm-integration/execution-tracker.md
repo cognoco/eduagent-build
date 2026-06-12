@@ -87,3 +87,9 @@ carried in the planner hand-off (`_wip/identity-foundation/cutover-plan-delta-ne
 - **2026-06-12** — Activated (fifth run of the §2.1 recipe). Strategy O2 ruled by
   operator; tracker + Cosmo workstream + 8-unit slice created; exec summary for
   Zuzka written; planner hand-off (cutover-plan delta) issued the same day.
+- **2026-06-12** — Dedicated review watcher armed separately from the general
+  multi-workstream watcher because this workstream has two scoped review-policy
+  differences: PR landing evidence is against `new-llm`, and missing Work
+  Package child/sub-item formality is an approved Cosmo dogfooding override.
+  Watcher log: `/tmp/cosmo-watch-new-llm/logs/new-llm-reviewing-watcher.log`;
+  review outputs: `/tmp/cosmo-watch-new-llm/reviews/`.
