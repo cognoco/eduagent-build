@@ -260,7 +260,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **Decomposition:** `_wip/new-llm-integration/execution-tracker.md` (charter +
   unit map + merge gate). Cosmo **Workstream "new-llm Integration &
   Reconciliation"** (`37d8bce9-1f7c-8145-80ef-cec4b55dcba4`) with
-  **WI-675…682** (6 WPs + 2 Tasks, `Stage=Backlog`, order 1–8): deploy-gate fix
+  **WI-675…682** (8 Items, order 1–8 — altitude corrected WP→Item 2026-06-12
+  per the childless-WP inversion ruling; refine-writer fix captured as
+  `WI-683` (refuse-with-remedy: split or demote at Ready promotion)): deploy-gate fix
   (High) · ledger RLS (High) · baselines · ADR/V2-replan · export+OTA ·
   merge-check · behavior inventory · provisioning (= WI-664 fix landing).
 - **Activated 2026-06-12** — fifth run of the §2.1 recipe, out-of-band of the
