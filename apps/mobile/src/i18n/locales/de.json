@@ -3313,7 +3313,7 @@
     "defaultDescription": "Dies ermöglicht dem Tutor, sich zu merken, welche Erklärungen funktionieren, was noch schwierig ist und welche Beispiele relevant erscheinen.",
     "grant": "Ja, aktivieren",
     "a11yEnable": "Mentor-Gedächtnis aktivieren",
-    "a11yDecline": "Mentor-Gedächtnis überspringen"
+    "a11ySkip": "Tutor-Gedächtnis überspringen"
   },
   "saveWizard": {
     "title": "Super, lass uns das speichern und loslegen.",

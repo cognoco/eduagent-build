@@ -240,7 +240,11 @@ describe('reconnect-prompt copy (BUG-151)', () => {
 
   it('reconnectPromptForError returns the same wording for network errors', () => {
     const networkErr = new TypeError('Network request failed');
-    expect(reconnectPromptForError(networkErr)).toBe(reconnectPrompt());
+    // Assert the resolved en copy, not reconnectPrompt() itself — comparing
+    // the function to itself would pass even if the key resolved to garbage.
+    expect(reconnectPromptForError(networkErr)).toBe(
+      'Lost connection — check your network and tap Reconnect to try again.',
+    );
     expect(reconnectPromptForError(networkErr).toLowerCase()).not.toContain(
       'button below',
     );

@@ -3313,7 +3313,7 @@
     "defaultDescription": "This lets the mentor remember what kinds of explanations work, what is still tricky, and which examples feel relevant.",
     "grant": "Yes, enable",
     "a11yEnable": "Enable mentor memory",
-    "a11yDecline": "Skip mentor memory"
+    "a11ySkip": "Skip mentor memory"
   },
   "saveWizard": {
     "title": "Great, let's save this and get you started.",

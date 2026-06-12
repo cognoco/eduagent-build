@@ -48,7 +48,7 @@ export function MemoryConsentPrompt({
           disabled={isPending}
           className="flex-1 bg-background rounded-button px-4 py-3 items-center border border-border"
           accessibilityRole="button"
-          accessibilityLabel={t('memoryConsent.a11yDecline')}
+          accessibilityLabel={t('memoryConsent.a11ySkip')}
           testID="memory-consent-decline"
         >
           <Text className="text-body font-semibold text-text-primary">

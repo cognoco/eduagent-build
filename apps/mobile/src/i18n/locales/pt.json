@@ -3313,7 +3313,7 @@
     "defaultDescription": "Isso permite que o tutor se lembre de quais tipos de explicações funcionam, o que ainda é difícil e quais exemplos parecem relevantes.",
     "grant": "Sim, ativar",
     "a11yEnable": "Ativar memória do tutor",
-    "a11yDecline": "Pular memória do mentor"
+    "a11ySkip": "Pular memória do tutor"
   },
   "saveWizard": {
     "title": "Ótimo, vamos guardar isto e começar.",

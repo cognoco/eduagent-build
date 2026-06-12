@@ -3453,7 +3453,7 @@
     "defaultDescription": "Dzięki temu tutor zapamięta, jakie wyjaśnienia działają, co wciąż jest trudne i które przykłady są trafne.",
     "grant": "Tak, włącz",
     "a11yEnable": "Włącz pamięć mentora",
-    "a11yDecline": "Pomiń pamięć mentora"
+    "a11ySkip": "Pomiń pamięć mentora"
   },
   "saveWizard": {
     "title": "Świetnie, zapiszmy to i zacznijmy.",

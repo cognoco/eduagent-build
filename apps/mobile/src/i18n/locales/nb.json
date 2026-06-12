@@ -3313,7 +3313,7 @@
     "defaultDescription": "Dette lar veilederen huske hva slags forklaringer som fungerer, hva som fortsatt er vanskelig, og hvilke eksempler som føles relevante.",
     "grant": "Ja, aktiver",
     "a11yEnable": "Aktiver veilederhukommelse",
-    "a11yDecline": "Hopp over veileder-minne"
+    "a11ySkip": "Hopp over veilederminne"
   },
   "saveWizard": {
     "title": "Flott, la oss lagre dette og komme i gang.",

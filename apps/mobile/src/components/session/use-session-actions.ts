@@ -478,7 +478,6 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       }
 
       const chipPrompt = quickChipPrompt(chip);
-      if (!chipPrompt) return;
 
       if (activeSessionId) {
         try {
@@ -510,10 +509,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         setConsumedQuickChipMessageId(sourceMessageId);
       }
 
-      const confirmation = chipConfirmationMessage(chip);
-      if (confirmation) {
-        showConfirmation(confirmation);
-      }
+      showConfirmation(chipConfirmationMessage(chip));
 
       await handleSend(chipPrompt);
     },
