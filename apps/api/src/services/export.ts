@@ -29,6 +29,7 @@ import {
   subscriptions,
   quotaPools,
   topUpCredits,
+  mentorActivityLedger,
   type Database,
 } from '@eduagent/database';
 import type { DataExport, ConsentStatus, Profile } from '@eduagent/schemas';
@@ -396,6 +397,15 @@ export async function generateExport(
         })
       : [];
 
+  // [WI-679] GDPR Art-15 gap: mentor_activity_ledger was missing from the
+  // export — erasure via FK cascade was covered but portability was not.
+  const mentorActivityLedgerRows =
+    profileIds.length > 0
+      ? await db.query.mentorActivityLedger.findMany({
+          where: inArray(mentorActivityLedger.profileId, profileIds),
+        })
+      : [];
+
   return {
     account: {
       email: account.email,
@@ -491,6 +501,7 @@ export async function generateExport(
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })) as DataExport['learningProfiles'],
+    mentorActivityLedger: mentorActivityLedgerRows.map(serializeDates),
     exportedAt: new Date().toISOString(),
   };
 }
