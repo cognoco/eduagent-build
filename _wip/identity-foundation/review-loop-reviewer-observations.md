@@ -128,6 +128,17 @@ with a direct productionization implication.
   all other DoD evidence still applies. *Production:* overrides should be
   modeled as structured, scoped policy (`wi_id`, `rule_id`, `reason`,
   `expires_at`, `approved_by`) rather than free-text prompt instructions.
+- **2026-06-12 — branch-target and broad-WP overrides should be isolated until
+  policy is structured.** The `new-llm Integration & Reconciliation` workstream
+  uses PRs targeting `new-llm`, so landed-change evidence must check
+  `origin/new-llm` rather than `origin/main`. It also has an approved
+  workstream-wide exception for Work Package altitude items without sub-items.
+  That combination changes review invariants enough that the safer PoC move is
+  a separate watcher/session rather than stacking more prompt conditionals into
+  the shared watcher. A kickoff prompt was captured in
+  `new-llm-review-watcher-kickoff-prompt.md`. *Production:* this is the forcing
+  case for first-class per-workstream policy: `base_branch`, `landing_ref`,
+  `allowed_dod_overrides`, `approval_reason`, and `scope`.
 
 ## Open design questions for productionization
 

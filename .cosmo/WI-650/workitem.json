@@ -1,0 +1,17 @@
+{
+  "pageId": "37c8bce9-1f7c-813c-8a7b-db7a02ee45e5",
+  "id": "WI-650",
+  "name": "Sweep remaining raw Error('Session not found') throw sites to typed NotFoundError",
+  "description": "Deferred sweep from WI-640 (WP-E15-typed-errors, PR #966): F-015 fixed the three audit-cited handlers (recordSystemPrompt, recordSessionEvent, flagContent in session-crud.ts), but ~11 sibling sites across the API still throw raw Error('Session not found') (or equivalent) -> 500 instead of typed NotFoundError -> 404. Same fix pattern as PR #966; mechanical sweep + per-site regression assertion. Sites enumerated in WI-640's completion summary, or rediscoverable by grepping apps/api/src for the raw 'Session not found' throw.",
+  "acceptanceCriteria": "All 11 raw Error('Session not found') throw sites (session-summary.ts x2, session-crud.ts x2 — lines 1066/1276, homework-summary.ts, session-exchange.ts x3 incl. the Challenge-Round-state variant, session-events.ts x2, session-homework.ts; enumerated 2026-06-12, re-grep before starting) are converted to the typed NotFoundError pattern landed in PR #966. Outcome: no route-reachable path returns 500 for a missing session — global onError maps to 404. Sites reached only from background jobs (Inngest) get explicit judgment on retry semantics: if NotFoundError changes retry behavior, preserve current behavior and note it. Regression: per-file or shared test asserting typed-error mapping, red against pre-fix code; zero raw 'Session not found' Error throws remain in apps/api/src (grep-clean), making this a complete sweep — no forward-only guard needed unless sites are deliberately left.",
+  "riskImpact": "",
+  "type": "Hygiene",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
