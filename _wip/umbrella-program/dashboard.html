@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>new-llm strategy RULED (O2) + PRG-17 ACTIVATED 06-12</b> — merge new-llm first, then the IF cutover runs on merged main; 8 reconciliation units sliced (WI-675…682; two Highs: a deploy-gate false-positive that would brick all post-merge deploys, and missing RLS on the new ledger table); LLM shepherd kickoff next; exec summary for Zuzka delivered · <b>IF cutover plan at v1.5</b> (five adversarial rounds) — the v1.6 delta (ledger FK + deletion/export twins + merge-freeze + canon intake) handed to the planning session; planning + ratification run in parallel, <b>EXECUTION gated on the new-llm merge</b> (CUT-A generates on the post-merge journal); IF shepherd holding · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · standing: <b>WI-664</b> staging-KV red — fix lands via WI-682 · WI-587 on Zuzka's desk (PR imminent).</span>
+  <span class="txt"><b>Right now:</b> <b>IF CUTOVER PLAN RATIFIED (v1.7, 06-13)</b> — all 11 OQs ruled (signup graph at onboarding completion; two-stage freeze + 24h soak); sliced as WI-689 CUT-A · WI-690 canon-intake · WI-691/692/693 CUT-B1/B2/B3, WI-586 shrunk to the convergence runbook; <b>execution gated on the PRG-17 merge</b> · <b>PRG-17 nearly slice-complete</b> — 5 of 8 original units closed (incl. both Highs), WI-678 + WI-681 in rework, WI-682 provisioning executing (dev → stg pre-approved, prod held); residue WI-687 (ledger TS-side RLS registration, pre-merge) + guard-blind-spot capture WI-688 from the v1.7 review · then: final rescan → operator merge approval → merge unlocks cutover execution · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · standing: <b>WI-664</b> staging-KV red — fix landing via WI-682/685 · WI-587 on Zuzka's desk.</span>
 </div>
 
 <nav>
@@ -604,7 +604,7 @@ const QUEUE = [
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired) — BUT the app still runs on legacy tables: the cutover was hidden inside WI-586's scope. Split RULED 06-11; cutover plan now at v1.5 after five adversarial rounds; the v1.6 delta (new-llm ledger/twins/merge-freeze) handed 06-12. Planning + ratification proceed in parallel; EXECUTION starts when PRG-17's merge lands (CUT-A generates on the post-merge journal). Shepherd holding.",
+  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired). Cutover plan RATIFIED 06-13 at v1.7 (six adversarial rounds; all 11 OQs ruled — signup graph at onboarding completion, two-stage freeze + 24h soak, account-detachment canon intake). Sliced: WI-689 CUT-A · WI-690 canon-intake · WI-691/692/693 CUT-B1/B2/B3; WI-586 shrunk to the convergence runbook. EXECUTION starts when PRG-17's merge lands; shepherd resume packet ready.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
@@ -613,7 +613,7 @@ const INIT = [
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
     {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"done", note:"All six CLOSED 06-11 — fired G4 (and the envelope-router boundary event for PRG-15)."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
-    {n:"Clean-cut tail · cutover + drop", s:"2 units → likely 4–6", m:"human", st:"go", note:"WI-585 first reseed CLOSED; WI-586 PAUSED. Split RULED: CUT-A (additive) → CUT-B (reader cutover, legacy live) → shrunk drop. Plan v1.5 delivered (five review rounds); v1.6 delta folding new-llm. Ratification + Cosmo re-slice next; execution gated on the PRG-17 merge. Fires G5."}
+    {n:"Clean-cut tail · cutover + drop", s:"6 units (WI-689–693 + shrunk WI-586)", m:"human", st:"go", note:"RATIFIED + SLICED 06-13 (plan v1.7): CUT-A additive schema → CUT-B1 identity spine → CUT-B2 consent/family ∥ CUT-B3 billing/webhooks → WI-586 convergence runbook (freeze → reseed → re-point → flip → soak → drop). Execution gated on the PRG-17 merge. Fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
 

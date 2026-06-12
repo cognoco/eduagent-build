@@ -454,6 +454,18 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-13 — IF CUTOVER PLAN RATIFIED (v1.7) + CUT SLICE LIVE.** Operator
+  ruled all 11 OQs (OQ-1 = option c, graph at onboarding completion; OQ-3
+  bulk-delete; OQ-4 two-stage freeze + 24h soak; OQ-11 = account-detachment §4
+  canon deltas as the intake; OQ-2/5/6/7/8 as recommended). Plan reached v1.7
+  through six adversarial rounds. Sliced into the IF workstream as
+  `WI-689` (CUT-A) · `WI-690` (canon intake) · `WI-691/692/693` (CUT-B1/B2/B3),
+  orders 202–206; `WI-586` re-scoped to the §4 convergence runbook (stubs
+  WI-631/632 ride unchanged). Execution gated on the PRG-17 merge. The v1.7
+  review also exposed a WI-676 residue — ledger RLS registered DB-level only —
+  routed back to PRG-17 as `WI-687` (TS-side registration, pre-merge) with the
+  guard blind spot captured as `WI-688` (hand-maintained table list passes
+  unregistered tables vacuously).
 - **2026-06-12 — new-llm strategy RULED (O2) + PRG-17 ACTIVATED (fifth lane).**
   Operator approved the integration analysis's recommendation after four
   adversarial passes: **merge new-llm first, then run the IF cutover on
