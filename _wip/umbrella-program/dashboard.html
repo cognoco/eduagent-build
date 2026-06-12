@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>IF cutover plan in v1.1 revision</b> — v1.0 delivered + adversarially reviewed: 3 High + 1 Medium findings verified (FK-ordering soak break, GDPR/COPPA key collapse, OQ-1 missing API boundary) and handed back to the planning session; IF shepherd holding; ratification on v1.1 · <b>new-llm integration analysis running</b> (9-surface sweep + adversarial verify; interim: API surface is live-on-merge, ledger FK into drop-listed profiles confirmed) · <b>PRG-13 GRADUATED 06-12</b> (fourth; under a day) · PRG-12 graduated 06-12 (8/8; ratchet 361 → 12) · PRG-15 graduated 06-11 · standing: <b>WI-664</b> staging-KV deploy red · WI-587 on Zuzka's desk.</span>
+  <span class="txt"><b>Right now:</b> <b>new-llm strategy RULED (O2) + PRG-17 ACTIVATED 06-12</b> — merge new-llm first, then the IF cutover runs on merged main; 8 reconciliation units sliced (WI-675…682; two Highs: a deploy-gate false-positive that would brick all post-merge deploys, and missing RLS on the new ledger table); LLM shepherd kickoff next; exec summary for Zuzka delivered · <b>IF cutover plan at v1.5</b> (five adversarial rounds) — the v1.6 delta (ledger FK + deletion/export twins + merge-freeze + canon intake) handed to the planning session; planning + ratification run in parallel, <b>EXECUTION gated on the new-llm merge</b> (CUT-A generates on the post-merge journal); IF shepherd holding · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · standing: <b>WI-664</b> staging-KV red — fix lands via WI-682 · WI-587 on Zuzka's desk (PR imminent).</span>
 </div>
 
 <nav>
@@ -598,12 +598,13 @@ const QUEUE = [
   ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
   ["10","PRG-20","Estate-canon drain","IF clean-cut tail done (G5), or a named pull-forward earlier"],
-  ["11","PRG-21","Learning-domain canon","Product trigger — Zuzka starts learning-feature work"]
+  ["11","PRG-21","Learning-domain canon","Product trigger — Zuzka starts learning-feature work"],
+  ["12","PRG-17","new-llm integration","✅ ACTIVATED 06-12 out-of-band (O2 ruling) — its merge gate unlocks IF cutover execution"]
 ];
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired) — BUT the app still runs on legacy tables: the cutover was hidden inside WI-586's scope. Split RULED 06-11; dedicated planning session designing the cutover plan (CUT-A schema deltas · reader map · PR partition · convergence runbook). Shepherd holding; ratification + Cosmo re-slice at program level next.",
+  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired) — BUT the app still runs on legacy tables: the cutover was hidden inside WI-586's scope. Split RULED 06-11; cutover plan now at v1.5 after five adversarial rounds; the v1.6 delta (new-llm ledger/twins/merge-freeze) handed 06-12. Planning + ratification proceed in parallel; EXECUTION starts when PRG-17's merge lands (CUT-A generates on the post-merge journal). Shepherd holding.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
@@ -612,9 +613,25 @@ const INIT = [
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
     {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"done", note:"All six CLOSED 06-11 — fired G4 (and the envelope-router boundary event for PRG-15)."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
-    {n:"Clean-cut tail · cutover + drop", s:"2 units → likely 4–6", m:"human", st:"go", note:"WI-585 first reseed CLOSED; WI-586 PAUSED. Split RULED: CUT-A (additive) → CUT-B (reader cutover, legacy live) → shrunk drop. Planning session designing the full plan now (brief: cutover-planning-brief.md · seed: wi586-scope-report.md). Fires G5."}
+    {n:"Clean-cut tail · cutover + drop", s:"2 units → likely 4–6", m:"human", st:"go", note:"WI-585 first reseed CLOSED; WI-586 PAUSED. Split RULED: CUT-A (additive) → CUT-B (reader cutover, legacy live) → shrunk drop. Plan v1.5 delivered (five review rounds); v1.6 delta folding new-llm. Ratification + Cosmo re-slice next; execution gated on the PRG-17 merge. Fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
+
+{ id:"PRG-17", name:"new-llm integration", accent:"var(--teal)", lane:"now", status:"active", q:"#12",
+  tagline:"Zuzka's V2-shell + bugfix branch, audited (four adversarial passes) and ruled: merge FIRST, then run the identity cutover on merged main.",
+  owner:"Jorn + LLM shepherd; program orchestrates (Zuzka's lane halted; she reviews the merge PR)", gate:"ACTIVATED 06-12 on the O2 strategy ruling. Merge gate: all 8 units closed → final rescan of the reconciled SHA (incl. Inngest drift) → operator approval vs the behavior inventory → merge. The merge unlocks IF cutover EXECUTION.",
+  outcome:"new-llm reconciled per the 12-item checklist and merged to main: deploy gate fixed, ledger RLS'd, baselines intact, ADRs renumbered, GDPR export + OTA bump in, WI-664 KV fix landed.",
+  bundles:[
+    {n:"WI-675 · Deploy-gate code fix", s:"C5 · High", m:"agent", st:"go", note:"P1. False-positive on journaled 0108 would brick ALL post-merge staging/prod deploys."},
+    {n:"WI-676 · Ledger RLS", s:"item 12 · High", m:"agent", st:"go", note:"P1. 0111 ships zero RLS on a profile-scoped table; guaranteed CI red on main."},
+    {n:"WI-677 · Guard baselines", s:"C1 + C7", m:"agent", st:"go", note:"i18n ratchet by intersection (protects the 361→12 burn-down); restore the locales key."},
+    {n:"WI-678 · ADR surgery + V2 re-key", s:"C6 + item 11", m:"agent", st:"go", note:"Renumber the duplicate 0019; re-key S4–S6 to post-IF-flip; drop S4's duplicate repoint."},
+    {n:"WI-679 · GDPR export + OTA bump", s:"items 9–10", m:"agent", st:"go", note:"Ledger into export.ts (Art-15); app.json version bump kills the stale-binary OTA hazard."},
+    {n:"WI-680 · Merge-verification check", s:"C9", m:"agent", st:"go", note:"Bidirectional content-level check on the merge PR (two prior silent main-batch drops)."},
+    {n:"WI-681 · Behavior-change inventory", s:"item 7", m:"agent", st:"go", note:"Complete per-module live-on-merge inventory for operator sign-off."},
+    {n:"WI-682 · Doppler/CF provisioning", s:"item 6", m:"mixed", st:"go", note:"= the WI-664 staging-KV fix landing; operator may hold the Cloudflare leg."}
+  ],
+  homes:["_wip/new-llm-integration/execution-tracker.md (THE entry point)","Cosmo Workstream: new-llm Integration & Reconciliation","supporting-artefacts/new-llm-integration-analysis.md (v1.4)"]},
 
 { id:"PRG-02", name:"Harness Hygiene", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#3",
   tagline:"The pipeline rework that made everything else safe to execute. OUTCOME MET — the program's first graduation.",
