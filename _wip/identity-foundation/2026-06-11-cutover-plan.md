@@ -1,6 +1,6 @@
 # IF Application Cutover Plan — WP-CUT-A → WP-CUT-B → WI-586 convergence
 
-**Date:** 2026-06-11 · **Status:** DRAFT v1.6 — awaiting ratification (program session + operator)
+**Date:** 2026-06-11 · **Status:** DRAFT v1.7 — awaiting ratification (program session + operator)
 **Author:** dedicated architecture/planning session (per `cutover-planning-brief.md`)
 **Profile:** design (plan only; no code, no migrations, no Cosmo writes)
 
@@ -102,6 +102,28 @@
 > runtime freeze's sibling, active step 1 → `M-DROP` completion; (D7) a mechanical
 > **citation-refresh pass at ratification** added (citations verified pre-merge;
 > expect line drift in the ~25 audit-fix modules + 6 rewritten Inngest functions).
+>
+> **Revision v1.7 (2026-06-13).** Three sixth-round audit findings folded, all
+> verified: (1) the §2.7 "authoritative" `M-REPOINT` enumeration was
+> **parent-table-whitelist-driven and over-broad** — it would also emit the
+> intra-legacy drop-only constraints (`profiles.account_id`, `subscriptions.account_id`,
+> the `family_links` pair, `consent_states.profile_id`, the `birth_year_set_by`
+> self-FK) as re-points; the generator is now **mapping-driven** (explicit
+> legacy-parent → live-target map; `accounts` deliberately has no mapping) with a
+> drop-list child exclusion and a fail-loud completeness assertion; (2) the v1.6/D4
+> claim that `mentor_activity_ledger` "ships RLS-complete — no work for this plan"
+> was **wrong on the manifest dimension**: branch migration 0112 does ship the
+> DB-level `ENABLE` + policy, but `origin/new-llm` registers the table neither in
+> `database-rls-coverage.ts` nor the test's hand-maintained `KNOWN_PROFILE_TABLES`
+> nor as source-schema `.enableRLS()` — and nothing fails at merge CI (the coverage
+> tests only check manifest → `pg_policies`, never the reverse), so the gap is
+> silent; the preferred fix is upstream pre-merge (PRG-17 `WI-676` scope), with
+> CUT-A's manifest PR as the named verified-fallback; (3) the §1.5(d)
+> `knowledge_assertions` backfill was `ON CONFLICT DO NOTHING` — **non-convergent**
+> under the final-reseed contract (a `birth_year_set_by` change between rehearsal
+> and freeze would leave method/confidence/actor stale); now a field-convergent
+> `DO UPDATE` (safe: the backfill owns the deterministic `id = person.id` row;
+> post-flip live writes append new UUIDs and are never touched).
 
 **Inputs (read in full):**
 - `_wip/identity-foundation/cutover-planning-brief.md` — the mandate
@@ -344,9 +366,20 @@ accidents:
 `profile_id` / `owner_profile_id` / `or-fk-cols`; extending `RlsTableMeta` is named
 CUT-A scope so the coverage integration test pins the policy from day one — the
 manifest's "enabled-without-policy" bucket is explicitly **not** where this table
-lands). *(v1.6/D4 awareness: the manifest CUT-A registers against will already
-contain `mentor_activity_ledger` — the ledger ships RLS-complete pre-merge under
-PRG-17 `WI-676`; no work for this plan.)*
+lands). *(v1.7 correction of the v1.6/D4 awareness note: `mentor_activity_ledger`
+is **DB-level RLS-complete** on `origin/new-llm` — branch migration
+`0112_rls_mentor_activity_ledger.sql` ships `ENABLE ROW LEVEL SECURITY` + the
+`mentor_activity_ledger_profile_isolation` policy — but it is registered
+**nowhere on the TS side**: not in `database-rls-coverage.ts`, not in the unit
+test's hand-maintained `KNOWN_PROFILE_TABLES` list, and `activity-ledger.ts`
+lacks `.enableRLS()`. Nothing catches this at merge CI — the coverage tests
+assert manifest → `pg_policies` only, never the reverse, and the omission guard
+is a static list. **Preferred fix: upstream on `new-llm` pre-merge** (it is the
+branch's own table; natural home is PRG-17 `WI-676`, the work item that shipped
+0112). **Fallback owned here:** CUT-A's manifest PR — which already touches
+`database-rls-coverage.ts` for `consent_request` — verifies the ledger entries
+exist and adds them if the upstream fix did not land. Either way, §4
+preconditions gate execution on the registration being present post-merge.)*
 
 **State machine (legacy → new, with transitions):**
 
@@ -579,6 +612,11 @@ UPDATE subscription sn SET
 FROM subscriptions s WHERE s.id = sn.id AND (...) IS DISTINCT FROM (...);
 
 -- (d) birth_year_set_by → knowledge_assertions (deterministic id = person.id; one row each)
+-- v1.7: convergent DO UPDATE, not DO NOTHING — the final-reseed contract (§4 step 4)
+-- converges drift, and birth_year_set_by can legitimately change between the
+-- rehearsal seed and the freeze (a parent setting a child's birth year). Safe to
+-- update: the backfill OWNS the id = person.id row; post-flip live writes append
+-- new assertion rows under fresh UUIDs and are never touched by this upsert.
 INSERT INTO knowledge_assertions (id, person_id, axis, method, confidence, source, asserted_at, actor_id)
 SELECT p.id, p.id, 'age',
   CASE WHEN p.birth_year_set_by IS NOT NULL AND p.birth_year_set_by <> p.id
@@ -587,14 +625,22 @@ SELECT p.id, p.id, 'age',
        THEN 1.00 ELSE 0.80 END,          -- provisional (OQ-9)
   'reseed_cutover_backfill', p.created_at, p.birth_year_set_by
 FROM profiles p
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  method = EXCLUDED.method, confidence = EXCLUDED.confidence,
+  asserted_at = EXCLUDED.asserted_at, actor_id = EXCLUDED.actor_id
+WHERE (knowledge_assertions.method, knowledge_assertions.confidence,
+       knowledge_assertions.asserted_at, knowledge_assertions.actor_id)
+      IS DISTINCT FROM
+      (EXCLUDED.method, EXCLUDED.confidence, EXCLUDED.asserted_at, EXCLUDED.actor_id);
 -- + matching person.age_knowing cache update
 ```
 
 **Verify-script extension** (same PR): `verify-identity-reseed.mjs` gains
 forward/reverse checks for `consent_request` (every `consent_states` row has its
 request, status-mapped, caps equal; no orphans), the §1.3/§1.4 field-convergence
-checks, and the knowledge-assertion backfill check; the
+checks, and the knowledge-assertion backfill check (**field-convergent** per the
+v1.7 `DO UPDATE` — it compares method/confidence/actor against a fresh derivation
+from `profiles`, not mere row existence); the
 `PENDING/PARENTAL_CONSENT_REQUESTED … not seeded` **exception is deleted** (it becomes
 a hard check). Sample added check (runbook §4 uses these):
 
@@ -1067,13 +1113,45 @@ static count to 57 — the catalog query picks it up automatically; the table is
 **re-pointed to `person`, never drop-listed** (a live feature table, like the kept
 profile-adjacent satellites). The V2 plan's own independently-scheduled second
 repoint migration is dropped on the branch pre-merge (PRG-17 `WI-678`), so there is
-no double-migration contention. The authoritative enumeration is:
+no double-migration contention.
+
+The authoritative enumeration is **mapping-driven, not parent-table-driven**
+(v1.7): a bare "every FK whose parent is `profiles`/`accounts`/`subscriptions`"
+query would also emit the intra-legacy drop-only constraints
+(`profiles.account_id` → `accounts`, `subscriptions.account_id` → `accounts`, the
+`family_links` pair, `consent_states.profile_id`, the `birth_year_set_by`
+self-FK) as re-points. Only constraints with an explicit live-target mapping are
+emitted, and children on the drop list are excluded:
 
 ```sql
-SELECT conrelid::regclass AS child_table, conname
-FROM pg_constraint
-WHERE confrelid IN ('profiles'::regclass, 'accounts'::regclass, 'subscriptions'::regclass)
+WITH target_map(legacy_parent, new_parent) AS (
+  VALUES ('profiles', 'person'),
+         ('subscriptions', 'subscription')
+  -- 'accounts' deliberately has NO mapping: every accounts-target FK is
+  -- intra-legacy and drops with its child table (0 re-points → organization).
+),
+drop_list(t) AS (
+  VALUES ('profiles'), ('accounts'), ('subscriptions'),
+         ('family_links'), ('consent_states')
+)
+SELECT c.conrelid::regclass AS child_table, c.conname, m.new_parent
+FROM pg_constraint c
+JOIN target_map m ON c.confrelid = m.legacy_parent::regclass
+WHERE c.contype = 'f'
+  AND c.conrelid NOT IN (SELECT t::regclass FROM drop_list)
 ORDER BY 1;
+
+-- Completeness assertion (fail loud, do not skip silently): every FK targeting
+-- a legacy table that the query above did NOT emit must have its child on the
+-- drop list. With profiles/subscriptions mapped, the only way to be un-emitted
+-- with a live child is an FK targeting unmapped 'accounts'. A non-empty result
+-- means a live table grew an accounts FK — stop and re-derive (assign a mapping
+-- or extend the drop list) before generating M-REPOINT.
+SELECT c.conrelid::regclass AS unmapped_child, c.conname
+FROM pg_constraint c
+WHERE c.contype = 'f'
+  AND c.confrelid = 'accounts'::regclass
+  AND c.conrelid NOT IN ('profiles'::regclass, 'subscriptions'::regclass);
 ```
 
 Re-point pattern (per constraint, one transaction; pre-launch data sizes make
@@ -1156,7 +1234,11 @@ and waits for shepherd go.
 
 **Preconditions (gate, verified before step 1):** the **new-llm merge landed on
 `main`** (O2 ruling — this gates all cutover *execution* from CUT-A onward, §1
-preflight; planning/ratification ran in parallel); CUT-A + CUT-B1/B2/B3 merged; CI
+preflight; planning/ratification ran in parallel); **`mentor_activity_ledger` is
+registered in `database-rls-coverage.ts` + `KNOWN_PROFILE_TABLES` + source
+`.enableRLS()` on post-merge `main`** (v1.7 — the branch ships only the DB-level
+0112 RLS; upstream fix preferred, CUT-A manifest PR is the named fallback, §1.2a);
+CUT-A + CUT-B1/B2/B3 merged; CI
 green on `main`; OQ-1…OQ-11 ruled at ratification; ownerless disposal ruled (OQ-3);
 the **citation-refresh pass** done at ratification (v1.6/D7 — the plan's file:line
 citations were verified against pre-merge `main`; refresh mechanically post-merge,
