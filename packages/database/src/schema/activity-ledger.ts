@@ -47,4 +47,4 @@ export const mentorActivityLedger = pgTable(
       .where(sql`${table.surfacedAt} IS NULL`),
     index('mentor_activity_ledger_profile_id_idx').on(table.profileId),
   ],
-);
+).enableRLS();

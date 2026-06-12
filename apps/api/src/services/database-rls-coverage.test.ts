@@ -127,6 +127,8 @@ const KNOWN_PROFILE_TABLES: readonly string[] = [
   'top_up_credits',
   'challenge_round_cooldowns',
   'usage_events',
+  // Added migration 0112 (WI-676/WI-687): mentor_activity_ledger profile-scoped.
+  'mentor_activity_ledger',
   // Owner-scoped (owner_profile_id FK)
   'withdrawal_archive_preferences',
   'pending_notices',
