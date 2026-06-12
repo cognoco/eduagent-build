@@ -211,7 +211,7 @@ export function ProfileBasicsStep({
               : t('saveWizard.aboutYouParent')}
           </Text>
           <TextInput
-            placeholder="Your name"
+            placeholder={t('saveWizard.yourNamePlaceholder')}
             value={parentName}
             onChangeText={setParentName}
             className="bg-surface text-text-primary rounded-input px-4 py-3 mb-3"
@@ -223,7 +223,7 @@ export function ProfileBasicsStep({
             accessibilityLabel={t('saveWizard.yourNameLabel')}
           />
           <TextInput
-            placeholder="Birth year (e.g. 1985)"
+            placeholder={t('saveWizard.yourBirthYearPlaceholder')}
             value={parentBirthYear}
             onChangeText={setParentBirthYear}
             keyboardType="number-pad"
@@ -245,7 +245,7 @@ export function ProfileBasicsStep({
             {t('saveWizard.aboutChild')}
           </Text>
           <TextInput
-            placeholder="Their name or nickname"
+            placeholder={t('saveWizard.childNamePlaceholder')}
             value={childName}
             onChangeText={setChildName}
             className="bg-surface text-text-primary rounded-input px-4 py-3 mb-3"
@@ -253,7 +253,7 @@ export function ProfileBasicsStep({
             accessibilityLabel={t('saveWizard.childNameLabel')}
           />
           <TextInput
-            placeholder="Birth year"
+            placeholder={t('saveWizard.childBirthYearPlaceholder')}
             value={childBirthYear}
             onChangeText={setChildBirthYear}
             keyboardType="number-pad"

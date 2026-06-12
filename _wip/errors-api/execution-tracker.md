@@ -141,12 +141,17 @@ infra, harmless — flag for removal at the next watcher maintenance touch).
 This stream is dormant; nothing executes from here.
 
 *Residue addendum (2026-06-12):* on operator request, WI-646 and WI-650 were
-autonomously refined to **Ready** (Assisted) — WI-650's AC enumerates the 11
-live raw-throw sites (grep-verified) against the PR #966 pattern; WI-646's AC
-is outcome-level (deduplicated Sentry escalation on sustained webhook signature
-failure, mechanism implementer-chosen, webhook path never blocked). Both sit
-in the general Ready pool, unattached to this workstream; executable whenever
-capacity allows.
+autonomously refined to Ready, then **executed and merged the same day**:
+WI-650 → PR #1036 (merge `8184ecafb`) — all 11 raw throws converted, grep-clean,
+Inngest retry semantics verified unchanged (NotFoundError extends plain Error;
+no instanceof checks in inngest/). WI-646 → PR #1035 (merge `9d3a1910f`) —
+`services/webhooks/signature-failure-escalator.ts`, 5-failures-per-5-min
+threshold → one deduplicated captureException per episode (per-isolate
+best-effort on Workers, documented), Resend webhook included; two Codex P2s
+(flag-before-capture, unbounded timestamp array) fixed in review. Both
+finalized via `complete` and **rest at Stage=Reviewing pending a manual
+`/cosmo:review`** — they are deliberately outside this workstream, so the
+autonomous reviewer does not cover them. Executor worktrees/branches removed.
 
 ---
 

@@ -534,7 +534,7 @@ export function LearnerScreen({
               }
               className="min-h-[56px] min-w-[64px] rounded-card bg-highlight-bg items-center justify-center px-2"
               accessibilityRole="button"
-              accessibilityLabel="Open My Notes"
+              accessibilityLabel={t('home.learner.a11yOpenMyNotes')}
               testID="home-my-notes"
             >
               <Ionicons
@@ -713,7 +713,7 @@ export function LearnerScreen({
                   onPress={() => void refetch()}
                   className="bg-surface-elevated rounded-xl px-5 py-2.5 mt-1"
                   accessibilityRole="button"
-                  accessibilityLabel="Retry loading subjects"
+                  accessibilityLabel={t('home.learner.a11yRetrySubjects')}
                 >
                   <Text className="text-body-sm font-bold text-text-primary">
                     {t('common.retry')}

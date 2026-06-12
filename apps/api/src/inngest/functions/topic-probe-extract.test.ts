@@ -81,6 +81,11 @@ jest.mock(
 );
 
 import {
+  curriculumTopics,
+  learningSessions,
+  sessionEvents,
+} from '@eduagent/database';
+import {
   handleTopicProbeExtract,
   topicProbeExtract,
 } from './topic-probe-extract';
@@ -211,9 +216,9 @@ describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]',
   it('rehydrates the learner message and topic title from the DB by reference', async () => {
     stubDb([
       [SESSION_ROW], // load-session
-      TRANSCRIPT_ROWS, // load-transcript
-      [{ id: SESSION_ROW.topicId, title: 'Atomic structure' }], // topic + title
-      [{ content: 'I know atoms have protons and electrons.' }], // learner message by id
+      [{ id: SESSION_ROW.topicId, title: 'Atomic structure' }], // topic + title (seed-retention-card)
+      [{ content: 'I know atoms have protons and electrons.' }], // learner message by id (seed-retention-card)
+      TRANSCRIPT_ROWS, // transcript (extract-signals, rehydrated in-step)
     ]);
 
     const { result } = await execute(topicProbePayload());
@@ -231,9 +236,9 @@ describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]',
   it('skips retention seeding when the referenced message row is gone (e.g. transcript purged)', async () => {
     stubDb([
       [SESSION_ROW], // load-session
-      TRANSCRIPT_ROWS, // load-transcript
-      [{ id: SESSION_ROW.topicId, title: 'Atomic structure' }], // topic + title
-      [], // learner message row missing
+      [{ id: SESSION_ROW.topicId, title: 'Atomic structure' }], // topic + title (seed-retention-card)
+      [], // learner message row missing (seed-retention-card)
+      TRANSCRIPT_ROWS, // transcript (extract-signals, rehydrated in-step)
     ]);
 
     const { result } = await execute(topicProbePayload());
@@ -258,6 +263,108 @@ describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]',
 
     expect(result).toEqual({ skipped: 'invalid_payload' });
     expect(mockEvaluateRecallQuality).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Memoized step returns are persisted in Inngest's third-party state store;
+  // topic-probe extraction operates on a (possibly minor's) session
+  // transcript and derives learner signals from it, so step returns must
+  // carry neither the transcript (F-028) nor the inferred signals (F-091).
+  // The DB stub here dispatches on the drizzle table object — not call
+  // order — so the test stays valid across step restructurings.
+  // -------------------------------------------------------------------------
+  describe('memoized step-state PII break test [F-028 / F-091]', () => {
+    // Must satisfy extractedInterviewSignalsSchema — an invalid shape would
+    // silently fall back to defaultExtractedSignals and the assertions below
+    // would pass vacuously.
+    const DISTINCT_SIGNALS = {
+      goals: ['pass the fractions exam'],
+      experienceLevel: 'beginner',
+      currentKnowledge: 'knows long division but not fractions',
+      interests: ['minecraft'],
+    };
+
+    function stubDbByTable() {
+      const makeChain = () => {
+        let table: unknown;
+        const chain = {
+          from: (t: unknown) => {
+            table = t;
+            return chain;
+          },
+          innerJoin: () => chain,
+          where: () => chain,
+          orderBy: async () => (table === sessionEvents ? TRANSCRIPT_ROWS : []),
+          limit: async () => {
+            if (table === learningSessions) return [SESSION_ROW];
+            if (table === curriculumTopics) {
+              return [{ id: SESSION_ROW.topicId, title: 'Atomic structure' }];
+            }
+            if (table === sessionEvents) {
+              return [{ content: 'I know atoms have protons.' }];
+            }
+            return [];
+          },
+        };
+        return chain;
+      };
+      const update = jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
+        }),
+      });
+      mockGetStepDatabase.mockReturnValue({
+        select: () => makeChain(),
+        update,
+      });
+      return { update };
+    }
+
+    it('never memoizes transcript content or extracted signals in any step return', async () => {
+      mockExtractSignals.mockResolvedValue(DISTINCT_SIGNALS);
+      const { update } = stubDbByTable();
+
+      const memoized: unknown[] = [];
+      const runner = createInngestStepRunner();
+      const recordingStep = {
+        ...runner.step,
+        run: async <T>(name: string, cb: () => T | Promise<T>): Promise<T> => {
+          const value = await runner.step.run(name, cb);
+          memoized.push(value);
+          return value as T;
+        },
+      };
+      const result = await handleTopicProbeExtract({
+        event: { data: topicProbePayload() },
+        step: recordingStep,
+      });
+
+      const serialized = JSON.stringify(memoized);
+      // F-028: raw transcript content must not ride memoized step state.
+      expect(serialized).not.toContain('I know atoms have protons');
+      expect(serialized).not.toContain('Good — and electrons?');
+      // F-091: inferred learner signals must not ride memoized step state.
+      expect(serialized).not.toContain('pass the fractions exam');
+      expect(serialized).not.toContain('minecraft');
+      expect(serialized).not.toContain('knows long division');
+      // The function-level return is memoized too.
+      const resultSerialized = JSON.stringify(result);
+      expect(resultSerialized).not.toContain('pass the fractions exam');
+      expect(resultSerialized).not.toContain('minecraft');
+
+      // The extraction still ran on the real transcript and the signals were
+      // persisted (the metadata update fired).
+      expect(mockExtractSignals).toHaveBeenCalledWith([
+        { role: 'user', content: 'I know atoms have protons.' },
+        { role: 'assistant', content: 'Good — and electrons?' },
+      ]);
+      expect(update).toHaveBeenCalled();
+      expect(result).toMatchObject({
+        sessionId: SESSION_ROW.id,
+        signalCount: 3,
+        priorKnowledgeQuality: 4,
+      });
+    });
   });
 });
 

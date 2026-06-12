@@ -123,7 +123,7 @@ export function SaveWizardGate({
           <Pressable
             onPress={() => setStep((s) => (s - 1) as WizardStep)}
             accessibilityRole="button"
-            accessibilityLabel="Back to previous step"
+            accessibilityLabel={t('saveWizard.a11yBack')}
             testID="save-wizard-back"
             className="p-1"
           >
@@ -135,7 +135,7 @@ export function SaveWizardGate({
         <Pressable
           onPress={handleCancel}
           accessibilityRole="button"
-          accessibilityLabel="Cancel and exit"
+          accessibilityLabel={t('saveWizard.a11yCancel')}
           testID="save-wizard-cancel"
           className="p-1"
         >

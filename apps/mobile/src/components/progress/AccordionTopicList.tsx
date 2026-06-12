@@ -81,7 +81,7 @@ export function AccordionTopicList({
             void refetch();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading topics. Tap here to retry, or close the subject card to dismiss."
+          accessibilityLabel={t('progress.accordion.a11yRetry')}
           testID="accordion-topics-retry"
         >
           <Text className="text-caption text-text-secondary text-center py-2">
@@ -117,7 +117,9 @@ export function AccordionTopicList({
             }}
             className="flex-row items-center justify-between py-2"
             accessibilityRole="link"
-            accessibilityLabel={`View ${topic.title} details`}
+            accessibilityLabel={t('progress.accordion.a11yViewTopic', {
+              title: topic.title,
+            })}
             testID={`accordion-topic-${topic.topicId}`}
           >
             <Text className="text-body-sm text-text-primary flex-1 me-3">
@@ -150,7 +152,7 @@ export function AccordionTopicList({
               router.push('/(app)/library');
             }}
             accessibilityRole="button"
-            accessibilityLabel="Browse topics in your library"
+            accessibilityLabel={t('progress.accordion.a11yBrowseLibrary')}
             testID="accordion-topics-browse"
           >
             <Text className="text-caption font-semibold text-primary">

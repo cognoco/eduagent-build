@@ -133,7 +133,7 @@ export function ModeSwitcher(): React.ReactElement | null {
             testID="mode-switcher-error-retry"
             onPress={() => switchMode(switchError)}
             accessibilityRole="button"
-            accessibilityLabel={t('common.retry')}
+            accessibilityLabel={t('modeSwitcher.a11yRetry')}
             className="px-3 py-1 rounded-full bg-error"
           >
             <Text className="text-body-sm font-semibold text-on-error">

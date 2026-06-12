@@ -127,7 +127,7 @@ export function NoteDisplay({
               onPress={onEdit}
               className="p-1"
               accessibilityRole="button"
-              accessibilityLabel="Edit note"
+              accessibilityLabel={t('library.a11yEditNote')}
             >
               {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
               <View
@@ -145,7 +145,7 @@ export function NoteDisplay({
               onPress={onDelete}
               className="p-1"
               accessibilityRole="button"
-              accessibilityLabel="Delete note"
+              accessibilityLabel={t('library.a11yDeleteNote')}
             >
               {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
               <View

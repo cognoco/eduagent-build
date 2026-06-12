@@ -15,6 +15,7 @@ import {
   extractHomeworkSummary,
   parseHomeworkSummaryResponse,
 } from './homework-summary';
+import { NotFoundError } from '@eduagent/schemas';
 
 function createSelectChain(result: unknown[]) {
   // The tx.select chain inside the WI-216 H2 transaction adds .for('update')
@@ -439,6 +440,31 @@ describe('extractHomeworkSummary — [BUG-934] envelope projection', () => {
     expect(userMessage.content).toContain('Nice work on fractions!');
     expect(userMessage.content).not.toContain('"signals"');
     expect(userMessage.content).not.toContain('"ui_hints"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractHomeworkSummary — NotFoundError regression (WI-650 sweep)
+// ---------------------------------------------------------------------------
+
+describe('extractHomeworkSummary — NotFoundError when session not found', () => {
+  it('throws NotFoundError (not raw Error) when session row is missing', async () => {
+    // extractHomeworkSummary does a raw db.select() → from() → where() → limit(1).
+    // When the result is empty the !sessionRow guard fires. Stub that path narrowly.
+    const db = {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+      query: { sessionEvents: { findMany: jest.fn().mockResolvedValue([]) } },
+    } as unknown as Database;
+
+    await expect(
+      extractHomeworkSummary(db, 'prof-1', 'nonexistent-sess'),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 

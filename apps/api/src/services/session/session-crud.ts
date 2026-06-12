@@ -1070,7 +1070,7 @@ export async function closeSession(
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   const now = new Date();
@@ -1280,7 +1280,7 @@ export async function getSessionCompletionContext(
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotFoundError('Session');
   }
 
   // [BUG-913 sweep] Tie-break by id when created_at collides — see

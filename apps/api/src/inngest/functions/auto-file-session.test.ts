@@ -27,33 +27,55 @@ jest.mock('../helpers' /* gc1-allow: Inngest step DB boundary */, () => {
   };
 });
 
-jest.mock('../../services/session' /* gc1-allow: service boundary */, () => ({
-  claimSessionForAutoFiling: (...args: unknown[]) =>
-    mockClaimSessionForAutoFiling(...args),
-  markSessionAutoFiled: (...args: unknown[]) =>
-    mockMarkSessionAutoFiled(...args),
-  markSessionAutoFilingFailed: (...args: unknown[]) =>
-    mockMarkSessionAutoFilingFailed(...args),
-  getSessionTranscript: (...args: unknown[]) =>
-    mockGetSessionTranscript(...args),
-}));
+jest.mock('../../services/session' /* gc1-allow: service boundary */, () => {
+  const actual = jest.requireActual(
+    '../../services/session',
+  ) as typeof import('../../services/session');
+  return {
+    ...actual,
+    claimSessionForAutoFiling: (...args: unknown[]) =>
+      mockClaimSessionForAutoFiling(...args),
+    markSessionAutoFiled: (...args: unknown[]) =>
+      mockMarkSessionAutoFiled(...args),
+    markSessionAutoFilingFailed: (...args: unknown[]) =>
+      mockMarkSessionAutoFilingFailed(...args),
+    getSessionTranscript: (...args: unknown[]) =>
+      mockGetSessionTranscript(...args),
+  };
+});
 
-jest.mock('../../services/filing' /* gc1-allow: LLM filing boundary */, () => ({
-  buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
-  fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
-  resolveFilingResult: (...args: unknown[]) => mockResolveFilingResult(...args),
-}));
+jest.mock('../../services/filing' /* gc1-allow: LLM filing boundary */, () => {
+  const actual = jest.requireActual(
+    '../../services/filing',
+  ) as typeof import('../../services/filing');
+  return {
+    ...actual,
+    buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
+    fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
+    resolveFilingResult: (...args: unknown[]) =>
+      mockResolveFilingResult(...args),
+  };
+});
 
-jest.mock(
-  '../../services/curriculum' /* gc1-allow: cleanup boundary */,
-  () => ({
+jest.mock('../../services/curriculum' /* gc1-allow: cleanup boundary */, () => {
+  const actual = jest.requireActual(
+    '../../services/curriculum',
+  ) as typeof import('../../services/curriculum');
+  return {
+    ...actual,
     deleteTopicIfSafe: (...args: unknown[]) => mockDeleteTopicIfSafe(...args),
-  }),
-);
+  };
+});
 
-jest.mock('../../services/llm' /* gc1-allow: LLM router boundary */, () => ({
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
+jest.mock('../../services/llm' /* gc1-allow: LLM router boundary */, () => {
+  const actual = jest.requireActual(
+    '../../services/llm',
+  ) as typeof import('../../services/llm');
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
+});
 
 jest.mock(
   '../../services/activity-ledger' /* gc1-allow: non-core ledger writer boundary */,
@@ -65,21 +87,33 @@ jest.mock(
 
 jest.mock(
   '../../services/logger' /* gc1-allow: logger observability boundary */,
-  () => ({
-    createLogger: () => ({
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: (...args: unknown[]) => mockLoggerWarn(...args),
-      error: (...args: unknown[]) => mockLoggerError(...args),
-    }),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/logger',
+    ) as typeof import('../../services/logger');
+    return {
+      ...actual,
+      createLogger: () => ({
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: (...args: unknown[]) => mockLoggerWarn(...args),
+        error: (...args: unknown[]) => mockLoggerError(...args),
+      }),
+    };
+  },
 );
 
 jest.mock(
   '../../services/sentry' /* gc1-allow: Sentry observability boundary */,
-  () => ({
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
 );
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
@@ -300,6 +334,79 @@ describe('autoFileSession', () => {
     expect(mockBuildLibraryIndex).not.toHaveBeenCalled();
     expect(mockFileToLibrary).not.toHaveBeenCalled();
     expect(result).toMatchObject({ status: 'failed', reason: 'retry_cap' });
+  });
+
+  // -------------------------------------------------------------------------
+  // Memoized step returns are persisted in Inngest's third-party state store;
+  // auto-filing operates on a (possibly minor's) session transcript, so step
+  // returns must never carry transcript content. The transcript is rehydrated
+  // from the DB inside the file-session step closure instead (same pattern as
+  // freeform-filing's retry-filing step).
+  // -------------------------------------------------------------------------
+  describe('memoized step-state PII break test [F-028]', () => {
+    it('never memoizes transcript content in any step return', async () => {
+      const memoized: unknown[] = [];
+      const runner = createInngestStepRunner();
+      const recordingStep = {
+        ...runner.step,
+        run: async (name: string, cb: () => Promise<unknown>) => {
+          const value = await runner.step.run(name, cb);
+          memoized.push(value);
+          return value;
+        },
+      };
+      const handler = (autoFileSession as any).fn;
+      const result = await handler({
+        event: {
+          name: 'app/session.auto_file_requested',
+          data: eventData(),
+        },
+        step: recordingStep,
+      });
+
+      const serialized = JSON.stringify(memoized);
+      expect(serialized).not.toContain('What is gravity?');
+      expect(serialized).not.toContain('Gravity attracts masses.');
+      expect(serialized).not.toContain('Learner:');
+      expect(serialized).not.toContain('Tutor:');
+
+      // The filing still ran with the real transcript — rehydrated inside the
+      // file-session step closure, never from memoized step state.
+      expect(mockFileToLibrary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionTranscript:
+            'Learner: What is gravity?\nTutor: Gravity attracts masses.',
+        }),
+        expect.anything(),
+        expect.any(Function),
+      );
+      expect(result).toMatchObject({ status: 'completed' });
+    });
+
+    it('marks filing_failed when the transcript vanishes between the availability check and file-session', async () => {
+      // First read (fetch-transcript availability) sees the transcript; the
+      // second read (file-session rehydration) finds it purged.
+      mockGetSessionTranscript
+        .mockResolvedValueOnce({
+          archived: false,
+          exchanges: [{ role: 'user', content: 'What is gravity?' }],
+        })
+        .mockResolvedValueOnce(null);
+
+      const { result, sendEventCalls } = await execute();
+
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+      expect(mockMarkSessionAutoFilingFailed).toHaveBeenCalledWith(
+        db,
+        profileId,
+        sessionId,
+      );
+      expect(sendEventCalls).toHaveLength(0);
+      expect(result).toMatchObject({
+        status: 'failed',
+        reason: 'transcript_unavailable',
+      });
+    });
   });
 
   it('marks filing_failed from onFailure after Inngest exhausts handler retries', async () => {

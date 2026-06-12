@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -19,20 +20,22 @@ interface Option {
   testID: string;
 }
 
-const OPTIONS: ReadonlyArray<Option> = [
-  {
-    priority: 'child_first',
-    label: 'Set up my child first',
-    description: "We'll get your child going, then come back to you.",
-    testID: 'both-priority-child-first',
-  },
-  {
-    priority: 'self_first',
-    label: 'Try a lesson myself first',
-    description: 'See how it works, then set up your child after sign-up.',
-    testID: 'both-priority-self-first',
-  },
-];
+function buildOptions(t: TFunction): ReadonlyArray<Option> {
+  return [
+    {
+      priority: 'child_first',
+      label: t('preview.bothChildFirstLabel'),
+      description: t('preview.bothChildFirstDescription'),
+      testID: 'both-priority-child-first',
+    },
+    {
+      priority: 'self_first',
+      label: t('preview.bothSelfFirstLabel'),
+      description: t('preview.bothSelfFirstDescription'),
+      testID: 'both-priority-self-first',
+    },
+  ];
+}
 
 export default function PreviewBothScreen() {
   const { t } = useTranslation();
@@ -100,7 +103,7 @@ export default function PreviewBothScreen() {
         className="self-start min-h-[44px] justify-center mb-2"
         testID="preview-both-back"
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.goBackAction')}
       >
         <Text className="text-body-sm font-semibold text-primary">
           {t('preview.backToSignIn')}
@@ -112,7 +115,7 @@ export default function PreviewBothScreen() {
       <Text className="text-body text-text-secondary mb-8 text-center">
         {t('preview.bothHint')}
       </Text>
-      {OPTIONS.map((opt) => (
+      {buildOptions(t).map((opt) => (
         <Pressable
           key={opt.priority}
           onPress={() => void onSelect(opt.priority)}

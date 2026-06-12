@@ -317,10 +317,10 @@ export default function CameraScreen(): React.ReactNode {
             // we append the manual-picker recovery instruction so the learner is
             // never stranded without an actionable next step.
             platformAlert(
-              'Could not detect subject',
-              `${formatApiError(
-                autoCreateErr,
-              )} Please select your subject manually.`,
+              t('homework.detectSubjectErrorTitle'),
+              t('homework.detectSubjectErrorBody', {
+                error: formatApiError(autoCreateErr),
+              }),
             );
             setShowSubjectPicker(true);
           }
@@ -338,8 +338,10 @@ export default function CameraScreen(): React.ReactNode {
           },
         });
         platformAlert(
-          "Couldn't identify the subject",
-          `${formatApiError(err)} Please pick the subject manually.`,
+          t('homework.identifySubjectErrorTitle'),
+          t('homework.identifySubjectErrorBody', {
+            error: formatApiError(err),
+          }),
         );
         setShowSubjectPicker(true);
       }
@@ -358,11 +360,11 @@ export default function CameraScreen(): React.ReactNode {
     } catch (error) {
       console.error('[HomeworkCamera] Failed to capture photo:', error);
       platformAlert(
-        'Could not take photo',
-        'Please try again. If the problem continues, try importing from your gallery instead.',
+        t('homework.capturePhotoErrorTitle'),
+        t('homework.capturePhotoErrorBody'),
       );
     }
-  }, []);
+  }, [t]);
 
   const handlePickFromGallery = useCallback(async () => {
     try {
@@ -379,8 +381,8 @@ export default function CameraScreen(): React.ReactNode {
       const selectedImage = result.assets?.[0];
       if (!selectedImage?.uri) {
         platformAlert(
-          "Couldn't open your photos",
-          'Please try again or use the camera instead.',
+          t('homework.galleryOpenErrorTitle'),
+          t('homework.galleryOpenErrorBody'),
         );
         return;
       }
@@ -398,12 +400,12 @@ export default function CameraScreen(): React.ReactNode {
         await ImagePicker.getMediaLibraryPermissionsAsync().catch(() => null);
       if (permission && !permission.granted && !permission.canAskAgain) {
         platformAlert(
-          'Photo access needed',
-          'Please enable photo library access in Settings to import homework from your gallery.',
+          t('homework.photoAccessTitle'),
+          t('homework.photoAccessBody'),
           [
-            { text: 'Cancel', style: 'cancel' },
+            { text: t('common.cancel'), style: 'cancel' },
             {
-              text: 'Open Settings',
+              text: t('homework.openSettings'),
               onPress: () => {
                 void Linking.openSettings();
               },
@@ -414,11 +416,11 @@ export default function CameraScreen(): React.ReactNode {
       }
 
       platformAlert(
-        "Couldn't open your photos",
-        'Please try again or use the camera instead.',
+        t('homework.galleryOpenErrorTitle'),
+        t('homework.galleryOpenErrorBody'),
       );
     }
-  }, []);
+  }, [t]);
 
   const handleConfirmPhoto = useCallback(async () => {
     if (!state.imageUri) return;
@@ -499,8 +501,8 @@ export default function CameraScreen(): React.ReactNode {
       // decide whether to raise MAX_PARAM_LENGTH or migrate off URL params.
       if (truncation) {
         platformAlert(
-          'Heads up',
-          getHomeworkProblemTruncationAlertMessage(truncation),
+          t('homework.truncationTitle'),
+          getHomeworkProblemTruncationAlertMessage(truncation, t),
         );
         Sentry.captureMessage('homework problems truncated for URL budget', {
           level: 'warning',
@@ -518,7 +520,7 @@ export default function CameraScreen(): React.ReactNode {
         params,
       } as Href);
     },
-    [imageMimeType, returnTo, router],
+    [imageMimeType, returnTo, router, t],
   );
 
   const handleConfirmResult = useCallback(() => {
@@ -527,16 +529,13 @@ export default function CameraScreen(): React.ReactNode {
       subjectName ?? autoDetectedSubject?.subjectName ?? '';
     if (!combinedProblemText.trim()) {
       platformAlert(
-        'No problems found',
-        'Please keep at least one problem card.',
+        t('homework.noProblemsTitle'),
+        t('homework.noProblemsBody'),
       );
       return;
     }
     if (!effectiveSubjectId) {
-      platformAlert(
-        'No subject selected',
-        'Please go back and select a subject first.',
-      );
+      platformAlert(t('homework.noSubjectTitle'), t('homework.noSubjectBody'));
       return;
     }
     navigateToSession(
@@ -558,6 +557,7 @@ export default function CameraScreen(): React.ReactNode {
     state.imageUri,
     ocrText,
     homeworkCaptureSource,
+    t,
   ]);
 
   const handlePickSubject = useCallback(
@@ -618,7 +618,7 @@ export default function CameraScreen(): React.ReactNode {
         homeworkCaptureSource,
       );
     } catch (err: unknown) {
-      platformAlert('Could not create subject', formatApiError(err));
+      platformAlert(t('homework.createSubjectErrorTitle'), formatApiError(err));
     }
   }, [
     combinedProblemText,
@@ -630,6 +630,7 @@ export default function CameraScreen(): React.ReactNode {
     homeworkCaptureSource,
     state.imageUri,
     subjects,
+    t,
   ]);
 
   const handleManualContinue = useCallback(async () => {
@@ -672,8 +673,8 @@ export default function CameraScreen(): React.ReactNode {
         tags: { component: 'HomeworkCamera', action: 'manual-classify' },
       });
       platformAlert(
-        'Could not identify the subject',
-        'Please pick the subject this homework belongs to.',
+        t('homework.classifyErrorTitle'),
+        t('homework.classifyErrorBody'),
         [{ text: t('common.ok') }],
       );
       setShowSubjectPicker(true);

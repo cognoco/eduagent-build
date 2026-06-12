@@ -4,10 +4,12 @@ import {
   feedbackSubmissionSchema,
   feedbackResponseSchema,
   ERROR_CODES,
+  type FeedbackDeliveryFailedEvent,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Database } from '@eduagent/database';
 import { sendEmail } from '../services/notifications';
+import { enqueueFeedbackRetry } from '../services/feedback-retry';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
 import { createSlidingWindowRateLimiter } from '../services/rate-limit';
@@ -109,27 +111,39 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
     );
 
     if (!emailResult.sent) {
-      await safeSend(
-        () =>
-          inngest.send({
-            name: 'app/feedback.delivery_failed',
-            data: {
-              profileId,
-              userId,
-              category: body.category,
-              message: body.message,
-              supportTo,
-              metaLines,
-              ...(body.appVersion ? { appVersion: body.appVersion } : {}),
-              ...(body.platform ? { platform: body.platform } : {}),
-              ...(body.osVersion ? { osVersion: body.osVersion } : {}),
-            },
-          }),
-        'feedback.delivery-failed',
-        { profileId },
-      );
+      // PII egress: the feedback free-text and the support address must not
+      // ride in the Inngest event (third-party event store). Park the payload
+      // in the first-party retry queue; the event carries the opaque row id
+      // only and the consumer rehydrates by it. An enqueue failure (already
+      // captured to Sentry inside the service) loses the retry gracefully —
+      // never fall back to placing the message in the event payload.
+      const retryId = await enqueueFeedbackRetry(c.get('db'), {
+        profileId,
+        userId,
+        category: body.category,
+        message: body.message,
+        metaLines,
+      });
+      if (retryId) {
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/feedback.delivery_failed',
+              data: {
+                retryId,
+                profileId,
+                userId,
+              } satisfies FeedbackDeliveryFailedEvent,
+            }),
+          'feedback.delivery-failed',
+          { profileId },
+        );
+      }
       return c.json(
-        feedbackResponseSchema.parse({ success: true, queued: true }),
+        feedbackResponseSchema.parse({
+          success: true,
+          queued: retryId !== null,
+        }),
       );
     }
 

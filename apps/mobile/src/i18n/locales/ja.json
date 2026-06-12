@@ -218,7 +218,9 @@
       "greetingNoName": "こんにちは！",
       "myNotes": "マイノート",
       "subjectsLoadError": "現在、教科を読み込めませんでした",
-      "subjectsLoadErrorHint": "セッションを開始したり、他のアクションを試すことはできます。"
+      "subjectsLoadErrorHint": "セッションを開始したり、他のアクションを試すことはできます。",
+      "a11yOpenMyNotes": "マイノートを開く",
+      "a11yRetrySubjects": "科目の再読み込み"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -317,10 +319,13 @@
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
     "coachBand": {
-      "estimatedMinutes": "{{minutes}}分"
+      "estimatedMinutes": "{{minutes}}分",
+      "a11yDismiss": "おすすめを非表示",
+      "a11yLoadingCard": "メンターカードを読み込み中"
     },
     "earlyAdopter": {
-      "badge": "早期ユーザー — あなたのフィードバックがMentoMateを形作ります"
+      "badge": "早期ユーザー — あなたのフィードバックがMentoMateを形作ります",
+      "a11ySendFeedback": "フィードバックを送信 — あなたの意見がMentoMateを形作ります"
     },
     "subjectTile": {
       "topicsProgress": "{{completed}}/{{total}} トピック"
@@ -577,7 +582,11 @@
       "typeSubjectPlaceholder": "科目を入力",
       "typeSubjectLabel": "科目を入力",
       "useTypedSubject": "使う",
-      "useTypedSubjectLabel": "入力した科目を使う"
+      "useTypedSubjectLabel": "入力した科目を使う",
+      "a11yAddSubject": "{{name}}を新しい科目として追加",
+      "a11yChooseSubject": "{{name}}を選択",
+      "a11yHideProblem": "問題文を隠す",
+      "a11yShowProblem": "問題文を表示する"
     },
     "quota": {
       "dailyLimitReached": "1日の上限に達しました",
@@ -612,7 +621,9 @@
       "dismissLabel": "流暢さドリルのヒントを閉じる",
       "title": "流暢さドリル",
       "skip": "スキップ",
-      "skipLabel": "このドリル項目をスキップ"
+      "skipLabel": "このドリル項目をスキップ",
+      "a11yScore": "ドリル完了：{{total}}問中{{correct}}問正解、正答率{{pct}}パーセント",
+      "a11yTimer": "流暢さドリル：残り{{time}}"
     },
     "chatShell": {
       "defaultSubtitle": "お手伝いします",
@@ -742,9 +753,6 @@
       "stopRecording": "録音停止"
     },
     "expiredSystemMessage": "セッションが期限切れです。新しいセッションを開始して続けてください。",
-    "timer": {
-      "accessibilityLabel": "セッション時間: {{time}}"
-    },
     "errorBoundary": {
       "crashTitle": "セッション画面がクラッシュしました",
       "unknownError": "不明なエラー",
@@ -766,7 +774,9 @@
       "a11yHelpful": "役に立った — この返信を「役に立った」とマーク",
       "a11yNotHelpful": "役に立たなかった — この返信を「役に立たなかった」とマーク",
       "a11yIncorrect": "この返信を不正確としてフラグを立てる",
-      "wrongSubject": "話題がずれている"
+      "wrongSubject": "話題がずれている",
+      "a11yRemoveBookmark": "ブックマークを削除",
+      "a11yAddBookmark": "この回答をブックマーク"
     },
     "questionCounter": {
       "question": "質問 {{count}}"
@@ -792,7 +802,8 @@
     },
     "inputMode": {
       "text": "テキストモード",
-      "voice": "音声モード"
+      "voice": "音声モード",
+      "saveError": "現在、そのモードを保存できませんでした。"
     },
     "milestoneDots": {
       "reached_one": "マイルストーンを1つ達成",
@@ -803,6 +814,39 @@
       "progressLabel_other": "本の進捗：{{count}}ページ",
       "pageCount_one": "{{count}}ページ",
       "pageCount_other": "{{count}}ページ"
+    },
+    "quickChips": {
+      "hintLabel": "ヒント",
+      "hintPrompt": "ヒントをください。",
+      "hintConfirm": "ヒントを追加しています。",
+      "exampleLabel": "例",
+      "examplePrompt": "似たような例を見せてくれますか？",
+      "exampleConfirm": "新しい例を提示します。",
+      "knowThisLabel": "これは知っています",
+      "knowThisPrompt": "この部分はもう知っています。先に進めますか？",
+      "knowThisConfirm": "先に進みます。",
+      "explainDifferentlyLabel": "別の説明",
+      "explainDifferentlyPrompt": "違う方法で説明してもらえますか？",
+      "explainDifferentlyConfirm": "別の角度から試してみます。",
+      "tooEasyLabel": "簡単すぎる",
+      "tooEasyPrompt": "簡単すぎます。もっと難しくできますか？",
+      "tooEasyConfirm": "難易度を上げています。",
+      "tooHardLabel": "難しすぎる",
+      "tooHardPrompt": "難しすぎます。もっと細かく説明してもらえますか？",
+      "tooHardConfirm": "さらに細かく説明します。"
+    },
+    "streamErrors": {
+      "reconnect": "接続が切れました — ネットワークを確認し、「再接続」をタップして再試行してください。",
+      "timeout": "セッションがタイムアウトしました。もう一度お試しください。",
+      "serverError": "サーバーエラー — 「再接続」をタップして再試行してください。",
+      "configError": "サーバー設定エラー — しばらくしてからもう一度お試しください。"
+    },
+    "a11yQuestionCount": "質問 {{number}}",
+    "a11ySessionTime": "セッション時間：{{time}}",
+    "feedbackConfirm": {
+      "helpful": "このペースで続けます。",
+      "notHelpful": "説明を調整します。",
+      "incorrect": "修正します。"
     }
   },
   "quiz": {
@@ -940,7 +984,9 @@
       "correctAnnounceNoAnswer": "正解！",
       "wrongAnnounce": "残念。答えは{{answer}}でした",
       "wrongAnnounceNoAnswer": "残念。",
-      "questionProgress": "{{current}} / {{total}}"
+      "questionProgress": "{{current}} / {{total}}",
+      "checkErrorTitle": "回答を確認できませんでした",
+      "a11yElapsed": "経過時間：{{seconds}}秒"
     },
     "results": {
       "viewHistory": "履歴を見る",
@@ -1303,7 +1349,11 @@
     "provenanceFrom": "{{name}}より",
     "recentlyAdded": "最近追加された項目",
     "sessionCount_one": "{{count}} セッション",
-    "sessionCount_other": "{{count}} セッション"
+    "sessionCount_other": "{{count}} セッション",
+    "a11yClearSearch": "検索をクリア",
+    "a11yEditNote": "ノートを編集",
+    "a11yDeleteNote": "ノートを削除",
+    "a11yCloseTopicPicker": "トピック選択を閉じる"
   },
   "topic": {
     "relevance": {
@@ -1471,7 +1521,8 @@
     "warningBody1": "これにより、あなたのアカウントと、プロフィール、学習進捗、同意記録を含むすべての関連データが完全に削除されます。",
     "warningBody2": "7日間の猶予期間があり、その間に考え直すことができます。その後は、データを復元することはできません。",
     "understandDelete": "理解しました、アカウントを削除します",
-    "understandDeleteLabel": "理解しました、アカウントを削除します"
+    "understandDeleteLabel": "理解しました、アカウントを削除します",
+    "signOutErrorTitle": "サインアウトできませんでした"
   },
   "legal": {
     "privacy": {
@@ -1669,7 +1720,28 @@
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
     "microphoneUnavailableTitle": "マイクが利用できません",
-    "microphoneUnavailableBody": "現在マイクを使用できませんでした。アプリにマイクへのアクセス権があることを確認してもう一度お試しいただくか、入力してください。"
+    "microphoneUnavailableBody": "現在マイクを使用できませんでした。アプリにマイクへのアクセス権があることを確認してもう一度お試しいただくか、入力してください。",
+    "detectSubjectErrorTitle": "科目を検出できませんでした",
+    "detectSubjectErrorBody": "{{error}} 手動で科目を選択してください。",
+    "identifySubjectErrorTitle": "科目を特定できませんでした",
+    "identifySubjectErrorBody": "{{error}} 手動で科目を選択してください。",
+    "capturePhotoErrorTitle": "写真を撮影できませんでした",
+    "capturePhotoErrorBody": "もう一度お試しください。問題が解決しない場合は、代わりにギャラリーからインポートしてみてください。",
+    "galleryOpenErrorTitle": "写真を開けませんでした",
+    "galleryOpenErrorBody": "もう一度お試しいただくか、代わりにカメラを使用してください。",
+    "photoAccessTitle": "写真へのアクセスが必要です",
+    "photoAccessBody": "ギャラリーから宿題をインポートするには、設定で写真へのアクセスを許可してください。",
+    "truncationTitle": "ご注意",
+    "truncationSavedAndShortened": "一部の問題が長すぎました。最初の{{saved}}問のみが保存され、最後の問題は短縮されました。",
+    "truncationSingleShortened": "この問題は長すぎて全文を送信できなかったため、短縮されました。",
+    "truncationSavedOnly": "一部の問題が長すぎたため、{{input}}問のうち最初の{{saved}}問のみが保存されました。",
+    "noProblemsTitle": "問題が見つかりません",
+    "noProblemsBody": "問題カードを1枚以上残してください。",
+    "noSubjectTitle": "科目が選択されていません",
+    "noSubjectBody": "戻って先に科目を選択してください。",
+    "createSubjectErrorTitle": "科目を作成できませんでした",
+    "classifyErrorTitle": "科目を特定できませんでした",
+    "classifyErrorBody": "この宿題が属する科目を選択してください。"
   },
   "progress": {
     "pageTitleMine": "自分の進捗",
@@ -1948,7 +2020,10 @@
     "accordion": {
       "loadErrorRetry": "トピックを読み込めませんでした。タップして再試行するか、科目カードを閉じてください。",
       "noTopicsYet": "まだトピックがありません",
-      "browseTopics": "トピックを閲覧"
+      "browseTopics": "トピックを閲覧",
+      "a11yRetry": "トピックの再読み込み。ここをタップして再試行するか、科目カードを閉じて非表示にしてください。",
+      "a11yViewTopic": "{{title}}の詳細を表示",
+      "a11yBrowseLibrary": "ライブラリのトピックを閲覧"
     },
     "subjectRow": {
       "hideTopics": "▴ トピックを非表示",
@@ -2898,7 +2973,30 @@
       "tryAgain": "再試行",
       "checkAgain": "再度確認",
       "topUpConnectionErrorTitle": "ネットワークエラー",
-      "topUpConnectionErrorBody": "インターネット接続を確認して再度お試しください。"
+      "topUpConnectionErrorBody": "インターネット接続を確認して再度お試しください。",
+      "topUpUnavailableTitle": "利用不可",
+      "topUpUnavailableBody": "現在、クレジットの追加購入はできません。後でもう一度試すか、サポートにお問い合わせください。",
+      "topUpConfirmedBody": "500クレジットが追加されています。通常1分以内に反映されます — 下にスワイプして利用状況を更新してください。",
+      "contactSupportTitle": "サポートに連絡",
+      "contactSupportBody": "サブスクリプションに関するヘルプは、support@mentomate.appまでメールでお問い合わせください。",
+      "removeFamilyTitle": "ファミリーから削除しますか？",
+      "removeFamilyBody": "{{name}}のプロフィールはこのファミリープランから削除され、プロフィール切り替え画面に表示されなくなります。",
+      "removeAction": "削除",
+      "familyUpdatedTitle": "ファミリー情報を更新しました",
+      "familyUpdatedBody": "{{name}}をファミリープランから削除しました。",
+      "removeFailedTitle": "プロフィールを削除できませんでした",
+      "removeFailedBody": "接続を確認して、もう一度お試しください。",
+      "checkLaterTitle": "後で確認",
+      "checkLaterBody": "クレジットはまもなく反映されます — 更新をタップして確認してください。"
+    },
+    "a11yUpgradePlan": "プランをアップグレード",
+    "a11yRemoveMember": "{{name}}をファミリーから削除",
+    "a11yBuyCredits": "500クレジットを購入",
+    "a11yCancelTopUp": "追加購入の確認をキャンセル",
+    "a11yManageBilling": "請求情報を管理",
+    "poll": {
+      "confirming": "ご購入を確認中です...",
+      "slowPoll": "まだ確認中です。最大30秒ほどかかる場合があります。ご購入は安全に処理されています。"
     }
   },
   "passwordInput": {
@@ -3107,7 +3205,15 @@
     "createFirstHint": "最初のプロフィールを作成して始めましょう",
     "createProfile": "プロフィールを作成",
     "addProfile": "+ プロフィールを追加",
-    "renameTitle": "プロフィールの名前を変更"
+    "renameTitle": "プロフィールの名前を変更",
+    "renameErrorTitle": "プロフィール名を変更できませんでした",
+    "timeoutTitle": "予想以上に時間がかかっています",
+    "switchErrorTitle": "プロフィールを切り替えられませんでした",
+    "switchedTitle": "プロフィールを切り替えました",
+    "switchPersistenceWarning": "このデバイスにプロフィールの選択を保存できませんでした。アプリを再起動した後、もう一度選択する必要があるかもしれません。",
+    "a11yRename": "{{name}}の名前を変更",
+    "namePlaceholder": "名前",
+    "a11yNameInput": "プロフィール名"
   },
   "time": {
     "relative": {
@@ -3201,7 +3307,14 @@
     "webDateFormatHint": "生年月日を「YYYY-MM-DD」の形式で入力してください。",
     "childWebDateFormatHint": "お子様の生年月日を「YYYY-MM-DD」の形式で入力してください。",
     "selectDob": "生年月日を選択",
-    "selectChildDob": "お子様の生年月日を選択"
+    "selectChildDob": "お子様の生年月日を選択",
+    "createdTitle": "プロフィールを作成しました",
+    "createdChildBody": "{{name}}のプロフィールが作成されました。ファミリーモードから開くことができます。",
+    "createdSwitchFailedBody": "プロフィールは作成されましたが、自動で切り替えることができませんでした。プロフィール画面から切り替えることができます。",
+    "upgradeRequiredTitle": "アップグレードが必要です",
+    "upgradeRequiredBody": "ご契約のサブスクリプションでは、追加のプロフィールを作成できません。ファミリープランまたはプロプランにアップグレードしてください。",
+    "seePlans": "プランを見る",
+    "a11yCloseDatePicker": "日付ピッカーを閉じる"
   },
   "clerkGate": {
     "timeoutTitle": "予想以上に時間がかかっています",
@@ -3211,13 +3324,16 @@
     "connecting": "安全に接続中..."
   },
   "modeSwitcher": {
-    "switchError": "切り替えられませんでした。タップして再試行してください。"
+    "switchError": "切り替えられませんでした。タップして再試行してください。",
+    "a11yRetry": "モード切り替えを再試行"
   },
   "memoryConsent": {
     "defaultTitle": "チューターが{{name}}さんについて学習するのを手伝う",
     "defaultTitleNoName": "チューターがお子様について学習するのを手伝う",
     "defaultDescription": "これにより、チューターはどのような説明が効果的か、何がまだ難しいか、どの例が関連性があるかを記憶できます。",
-    "grant": "はい、有効にする"
+    "grant": "はい、有効にする",
+    "a11yEnable": "メンターの記憶を有効にする",
+    "a11ySkip": "メンターの記憶をスキップ"
   },
   "saveWizard": {
     "title": "素晴らしい！これを保存して始めましょう。",
@@ -3231,7 +3347,13 @@
     "yourNameLabel": "名前",
     "yourBirthYearLabel": "生まれた年",
     "childNameLabel": "お子様の名前",
-    "childBirthYearLabel": "お子様の生まれた年"
+    "childBirthYearLabel": "お子様の生まれた年",
+    "yourNamePlaceholder": "あなたの名前",
+    "yourBirthYearPlaceholder": "誕生年（例：1985）",
+    "childNamePlaceholder": "お子様の名前またはニックネーム",
+    "childBirthYearPlaceholder": "誕生年",
+    "a11yBack": "前のステップに戻る",
+    "a11yCancel": "キャンセルして終了"
   },
   "pickBook": {
     "subjectFallback": "科目",
@@ -3312,7 +3434,19 @@
     "weeklyHighlight": "週のハイライト",
     "sampleBadge": "サンプル",
     "sampleDataNote": "これはサンプルデータです。お子様の実際の学習状況は、最初のセッションの後に表示されます。",
-    "sampleWeeklyBody": "3回のセッションで45分間、二次方程式を練習しました。因数分解に慣れてきており、平方完成に取り組んでいます。"
+    "sampleWeeklyBody": "3回のセッションで45分間、二次方程式を練習しました。因数分解に慣れてきており、平方完成に取り組んでいます。",
+    "intentSelfLabel": "自分用",
+    "intentSelfDescription": "自分で使うために設定します。",
+    "intentChildLabel": "子ども用",
+    "intentChildDescription": "子どもの学習をサポートしたい。",
+    "intentBothLabel": "両方",
+    "intentBothDescription": "自分と子どもの両方で使います。",
+    "intentNotSureLabel": "まだわからない",
+    "intentNotSureDescription": "まずは使い方を見てみたい。",
+    "bothChildFirstLabel": "まず子どもの設定をする",
+    "bothChildFirstDescription": "まず子どもの設定をして、その後であなたの設定をします。",
+    "bothSelfFirstLabel": "まず自分でレッスンを試す",
+    "bothSelfFirstDescription": "使い方を確認してから、登録後に子どもの設定をします。"
   },
   "milestoneCard": {
     "wordCount_one": "単語を{{count}}個学習",

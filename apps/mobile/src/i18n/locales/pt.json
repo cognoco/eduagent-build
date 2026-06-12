@@ -218,7 +218,9 @@
       "greetingNoName": "Olá!",
       "myNotes": "Minhas Notas",
       "subjectsLoadError": "Não foi possível carregar as tuas disciplinas agora",
-      "subjectsLoadErrorHint": "Ainda podes iniciar uma sessão ou tentar outra ação."
+      "subjectsLoadErrorHint": "Ainda podes iniciar uma sessão ou tentar outra ação.",
+      "a11yOpenMyNotes": "Abrir minhas notas",
+      "a11yRetrySubjects": "Tentar carregar matérias novamente"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -317,10 +319,13 @@
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
     "coachBand": {
-      "estimatedMinutes": "{{minutes}} min"
+      "estimatedMinutes": "{{minutes}} min",
+      "a11yDismiss": "Dispensar recomendação",
+      "a11yLoadingCard": "Carregando cartão do tutor"
     },
     "earlyAdopter": {
-      "badge": "Utilizador pioneiro — o teu feedback molda o MentoMate"
+      "badge": "Utilizador pioneiro — o teu feedback molda o MentoMate",
+      "a11ySendFeedback": "Enviar feedback — sua opinião molda o MentoMate"
     },
     "subjectTile": {
       "topicsProgress": "{{completed}}/{{total}} tópicos"
@@ -604,7 +609,11 @@
       "typeSubjectPlaceholder": "Digite uma matéria",
       "typeSubjectLabel": "Digite uma matéria",
       "useTypedSubject": "Usar",
-      "useTypedSubjectLabel": "Usar matéria digitada"
+      "useTypedSubjectLabel": "Usar matéria digitada",
+      "a11yAddSubject": "Adicionar {{name}} como uma nova matéria",
+      "a11yChooseSubject": "Escolher {{name}}",
+      "a11yHideProblem": "Ocultar texto do problema",
+      "a11yShowProblem": "Mostrar texto do problema"
     },
     "quota": {
       "dailyLimitReached": "Limite diário atingido",
@@ -639,7 +648,9 @@
       "dismissLabel": "Dispensar exercício de fluência",
       "title": "Exercício de fluência",
       "skip": "Pular",
-      "skipLabel": "Pular este item do exercício"
+      "skipLabel": "Pular este item do exercício",
+      "a11yScore": "Exercício concluído: {{correct}} de {{total}} corretas, {{pct}} por cento",
+      "a11yTimer": "Exercício de fluência: {{time}} restantes"
     },
     "chatShell": {
       "defaultSubtitle": "Estou aqui para ajudar",
@@ -769,9 +780,6 @@
       "stopRecording": "Parar de gravar"
     },
     "expiredSystemMessage": "Sessão expirada. Comece uma nova para continuar.",
-    "timer": {
-      "accessibilityLabel": "Tempo de sessão: {{time}}"
-    },
     "errorBoundary": {
       "crashTitle": "O ecrã da sessão falhou",
       "unknownError": "Erro desconhecido",
@@ -793,7 +801,9 @@
       "a11yHelpful": "Útil — marcar esta resposta como útil",
       "a11yNotHelpful": "Não útil — marcar esta resposta como não útil",
       "a11yIncorrect": "Sinalizar esta resposta como imprecisa",
-      "wrongSubject": "Fora do assunto"
+      "wrongSubject": "Fora do assunto",
+      "a11yRemoveBookmark": "Remover marcador",
+      "a11yAddBookmark": "Marcar esta resposta"
     },
     "questionCounter": {
       "question": "Pergunta {{count}}"
@@ -819,7 +829,8 @@
     },
     "inputMode": {
       "text": "Modo texto",
-      "voice": "Modo voz"
+      "voice": "Modo voz",
+      "saveError": "Não foi possível salvar esse modo agora."
     },
     "milestoneDots": {
       "reached_one": "1 marco alcançado",
@@ -830,6 +841,39 @@
       "progressLabel_other": "Progresso do livro: {{count}} páginas",
       "pageCount_one": "{{count}} página",
       "pageCount_other": "{{count}} páginas"
+    },
+    "quickChips": {
+      "hintLabel": "Dica",
+      "hintPrompt": "Dê-me uma dica.",
+      "hintConfirm": "Adicionando uma dica.",
+      "exampleLabel": "Exemplo",
+      "examplePrompt": "Pode mostrar um exemplo semelhante?",
+      "exampleConfirm": "Buscando um novo exemplo.",
+      "knowThisLabel": "Já sei isto",
+      "knowThisPrompt": "Já sei esta parte. Podemos avançar?",
+      "knowThisConfirm": "Avançando.",
+      "explainDifferentlyLabel": "Explicar de outra forma",
+      "explainDifferentlyPrompt": "Pode explicar isso de outra forma?",
+      "explainDifferentlyConfirm": "Tentando uma abordagem diferente.",
+      "tooEasyLabel": "Muito fácil",
+      "tooEasyPrompt": "Isso parece muito fácil. Pode tornar mais desafiador?",
+      "tooEasyConfirm": "Aumentando o desafio.",
+      "tooHardLabel": "Muito difícil",
+      "tooHardPrompt": "Isso parece muito difícil. Pode dividir mais?",
+      "tooHardConfirm": "Dividindo mais."
+    },
+    "streamErrors": {
+      "reconnect": "Conexão perdida — verifique sua rede e toque em Reconectar para tentar novamente.",
+      "timeout": "Sua sessão expirou. Tente novamente.",
+      "serverError": "Erro no servidor — toque em Reconectar para tentar novamente.",
+      "configError": "Erro de configuração do servidor — tente novamente em um instante."
+    },
+    "a11yQuestionCount": "Pergunta {{number}}",
+    "a11ySessionTime": "Tempo da sessão: {{time}}",
+    "feedbackConfirm": {
+      "helpful": "Mantendo este ritmo.",
+      "notHelpful": "Ajustando a explicação.",
+      "incorrect": "Vou corrigir isso."
     }
   },
   "quiz": {
@@ -967,7 +1011,9 @@
       "correctAnnounceNoAnswer": "Correto!",
       "wrongAnnounce": "Quase. A resposta era {{answer}}",
       "wrongAnnounceNoAnswer": "Quase.",
-      "questionProgress": "{{current}} de {{total}}"
+      "questionProgress": "{{current}} de {{total}}",
+      "checkErrorTitle": "Não foi possível verificar sua resposta",
+      "a11yElapsed": "Tempo decorrido: {{seconds}} segundos"
     },
     "results": {
       "viewHistory": "Ver Histórico",
@@ -1330,7 +1376,11 @@
     "provenanceFrom": "De {{name}}",
     "recentlyAdded": "Adicionado recentemente",
     "sessionCount_one": "{{count}} sessão",
-    "sessionCount_other": "{{count}} sessões"
+    "sessionCount_other": "{{count}} sessões",
+    "a11yClearSearch": "Limpar busca",
+    "a11yEditNote": "Editar anotação",
+    "a11yDeleteNote": "Excluir anotação",
+    "a11yCloseTopicPicker": "Fechar seletor de tópicos"
   },
   "topic": {
     "relevance": {
@@ -1498,7 +1548,8 @@
     "warningBody1": "Isso excluirá permanentemente sua conta e todos os dados associados, incluindo perfis, progresso de aprendizado e registros de consentimento.",
     "warningBody2": "Você terá um período de carência de 7 dias para mudar de ideia. Depois disso, seus dados não poderão ser recuperados.",
     "understandDelete": "Eu entendo, excluir minha conta",
-    "understandDeleteLabel": "Eu entendo, excluir minha conta"
+    "understandDeleteLabel": "Eu entendo, excluir minha conta",
+    "signOutErrorTitle": "Não foi possível sair"
   },
   "legal": {
     "privacy": {
@@ -1696,7 +1747,28 @@
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
     "microphoneUnavailableTitle": "Microfone indisponível",
-    "microphoneUnavailableBody": "Não foi possível usar o microfone agora. Verifique se o app tem acesso ao microfone e tente novamente, ou digite."
+    "microphoneUnavailableBody": "Não foi possível usar o microfone agora. Verifique se o app tem acesso ao microfone e tente novamente, ou digite.",
+    "detectSubjectErrorTitle": "Não foi possível detectar a matéria",
+    "detectSubjectErrorBody": "{{error}} Selecione sua matéria manualmente.",
+    "identifySubjectErrorTitle": "Não foi possível identificar a matéria",
+    "identifySubjectErrorBody": "{{error}} Escolha a matéria manualmente.",
+    "capturePhotoErrorTitle": "Não foi possível tirar a foto",
+    "capturePhotoErrorBody": "Tente novamente. Se o problema persistir, tente importar da sua galeria.",
+    "galleryOpenErrorTitle": "Não foi possível abrir suas fotos",
+    "galleryOpenErrorBody": "Tente novamente ou use a câmera.",
+    "photoAccessTitle": "Acesso a fotos necessário",
+    "photoAccessBody": "Permita o acesso às fotos nas Configurações para importar tarefas da sua galeria.",
+    "truncationTitle": "Atenção",
+    "truncationSavedAndShortened": "Alguns problemas eram longos demais. Apenas os primeiros {{saved}} foram salvos e o último foi encurtado.",
+    "truncationSingleShortened": "Este problema era longo demais para ser enviado por completo e foi encurtado.",
+    "truncationSavedOnly": "Alguns problemas eram longos demais; apenas os primeiros {{saved}} de {{input}} foram salvos.",
+    "noProblemsTitle": "Nenhum problema encontrado",
+    "noProblemsBody": "Mantenha pelo menos um cartão de problema.",
+    "noSubjectTitle": "Nenhuma matéria selecionada",
+    "noSubjectBody": "Volte e selecione uma matéria primeiro.",
+    "createSubjectErrorTitle": "Não foi possível criar a matéria",
+    "classifyErrorTitle": "Não foi possível identificar a matéria",
+    "classifyErrorBody": "Escolha a matéria a que esta tarefa pertence."
   },
   "progress": {
     "pageTitleMine": "Meu progresso",
@@ -1975,7 +2047,10 @@
     "accordion": {
       "loadErrorRetry": "Não foi possível carregar os tópicos. Toque para tentar novamente ou feche o cartão do assunto para dispensar.",
       "noTopicsYet": "Ainda não há tópicos",
-      "browseTopics": "Procurar tópicos"
+      "browseTopics": "Procurar tópicos",
+      "a11yRetry": "Tentar carregar tópicos novamente. Toque aqui para tentar novamente ou feche o cartão da matéria para dispensar.",
+      "a11yViewTopic": "Ver detalhes de {{title}}",
+      "a11yBrowseLibrary": "Navegar pelos tópicos na sua biblioteca"
     },
     "subjectRow": {
       "hideTopics": "▴ Ocultar tópicos",
@@ -2898,7 +2973,30 @@
       "tryAgain": "Tentar novamente",
       "checkAgain": "Verificar novamente",
       "topUpConnectionErrorTitle": "Erro de rede",
-      "topUpConnectionErrorBody": "Por favor verifique sua conexão com a internet e tente novamente."
+      "topUpConnectionErrorBody": "Por favor verifique sua conexão com a internet e tente novamente.",
+      "topUpUnavailableTitle": "Não disponível",
+      "topUpUnavailableBody": "Créditos de recarga não estão disponíveis no momento. Tente novamente mais tarde ou entre em contato com o suporte.",
+      "topUpConfirmedBody": "Seus 500 créditos estão sendo adicionados. Eles geralmente aparecem em um minuto — puxe para baixo para atualizar seu uso.",
+      "contactSupportTitle": "Contatar o suporte",
+      "contactSupportBody": "Envie um e-mail para support@mentomate.app para obter ajuda com assinaturas.",
+      "removeFamilyTitle": "Remover da família?",
+      "removeFamilyBody": "O perfil de {{name}} será removido deste plano familiar e ocultado da troca de perfis.",
+      "removeAction": "Remover",
+      "familyUpdatedTitle": "Família atualizada",
+      "familyUpdatedBody": "{{name}} foi removido(a) do seu plano familiar.",
+      "removeFailedTitle": "Não foi possível remover o perfil",
+      "removeFailedBody": "Verifique sua conexão e tente novamente.",
+      "checkLaterTitle": "Verificar mais tarde",
+      "checkLaterBody": "Os créditos aparecerão em breve — toque em atualizar para verificar."
+    },
+    "a11yUpgradePlan": "Fazer upgrade do plano",
+    "a11yRemoveMember": "Remover {{name}} da família",
+    "a11yBuyCredits": "Comprar 500 créditos",
+    "a11yCancelTopUp": "Cancelar confirmação de recarga",
+    "a11yManageBilling": "Gerenciar cobrança",
+    "poll": {
+      "confirming": "A confirmar a sua compra...",
+      "slowPoll": "Ainda a confirmar — isto pode demorar até 30 segundos. A sua compra está segura."
     }
   },
   "passwordInput": {
@@ -3107,7 +3205,15 @@
     "createFirstHint": "Crie seu primeiro perfil para começar",
     "createProfile": "Criar perfil",
     "addProfile": "+ Adicionar perfil",
-    "renameTitle": "Renomear perfil"
+    "renameTitle": "Renomear perfil",
+    "renameErrorTitle": "Não foi possível renomear o perfil",
+    "timeoutTitle": "Demorando mais que o esperado",
+    "switchErrorTitle": "Não foi possível trocar de perfil",
+    "switchedTitle": "Perfil trocado",
+    "switchPersistenceWarning": "Não foi possível salvar a escolha deste perfil neste dispositivo. Pode ser necessário escolhê-lo novamente após reabrir o aplicativo.",
+    "a11yRename": "Renomear {{name}}",
+    "namePlaceholder": "Nome",
+    "a11yNameInput": "Nome do perfil"
   },
   "time": {
     "relative": {
@@ -3201,7 +3307,14 @@
     "webDateFormatHint": "Insira sua data de nascimento como AAAA-MM-DD.",
     "childWebDateFormatHint": "Insira a data de nascimento do seu/sua filho(a) como AAAA-MM-DD.",
     "selectDob": "Selecione a data de nascimento",
-    "selectChildDob": "Selecione a data de nascimento do seu/sua filho(a)"
+    "selectChildDob": "Selecione a data de nascimento do seu/sua filho(a)",
+    "createdTitle": "Perfil criado",
+    "createdChildBody": "O perfil de {{name}} está pronto. Você pode abri-lo no modo Família.",
+    "createdSwitchFailedBody": "Criamos o perfil, mas não foi possível trocar para ele automaticamente. Você pode trocar na tela de Perfis.",
+    "upgradeRequiredTitle": "Upgrade necessário",
+    "upgradeRequiredBody": "Sua assinatura não suporta perfis adicionais. Faça o upgrade para o plano Família ou Pro.",
+    "seePlans": "Ver planos",
+    "a11yCloseDatePicker": "Fechar seletor de data"
   },
   "clerkGate": {
     "timeoutTitle": "Demorando mais que o esperado",
@@ -3211,13 +3324,16 @@
     "connecting": "Conectando com segurança..."
   },
   "modeSwitcher": {
-    "switchError": "Não foi possível trocar. Toque para tentar novamente."
+    "switchError": "Não foi possível trocar. Toque para tentar novamente.",
+    "a11yRetry": "Tentar trocar modo"
   },
   "memoryConsent": {
     "defaultTitle": "Ajude o tutor a aprender sobre {{name}}",
     "defaultTitleNoName": "Ajude o tutor a aprender sobre seu/sua filho(a)",
     "defaultDescription": "Isso permite que o tutor se lembre de quais tipos de explicações funcionam, o que ainda é difícil e quais exemplos parecem relevantes.",
-    "grant": "Sim, ativar"
+    "grant": "Sim, ativar",
+    "a11yEnable": "Ativar memória do tutor",
+    "a11ySkip": "Pular memória do tutor"
   },
   "saveWizard": {
     "title": "Ótimo, vamos guardar isto e começar.",
@@ -3231,7 +3347,13 @@
     "yourNameLabel": "Seu nome",
     "yourBirthYearLabel": "Seu ano de nascimento",
     "childNameLabel": "Nome da criança",
-    "childBirthYearLabel": "Ano de nascimento da criança"
+    "childBirthYearLabel": "Ano de nascimento da criança",
+    "yourNamePlaceholder": "Seu nome",
+    "yourBirthYearPlaceholder": "Ano de nascimento (ex: 1985)",
+    "childNamePlaceholder": "Nome ou apelido",
+    "childBirthYearPlaceholder": "Ano de nascimento",
+    "a11yBack": "Voltar para a etapa anterior",
+    "a11yCancel": "Cancelar e sair"
   },
   "pickBook": {
     "subjectFallback": "Assunto",
@@ -3312,7 +3434,19 @@
     "weeklyHighlight": "Destaque semanal",
     "sampleBadge": "Amostra",
     "sampleDataNote": "Dados de amostra — os insights reais do seu filho aparecem após a primeira sessão dele.",
-    "sampleWeeklyBody": "Praticou equações quadráticas por 45 minutos em três sessões. Está se familiarizando com a fatoração; trabalhando em completar o quadrado."
+    "sampleWeeklyBody": "Praticou equações quadráticas por 45 minutos em três sessões. Está se familiarizando com a fatoração; trabalhando em completar o quadrado.",
+    "intentSelfLabel": "Eu",
+    "intentSelfDescription": "Estou a configurar isto para mim.",
+    "intentChildLabel": "O meu filho",
+    "intentChildDescription": "Quero ajudar o meu filho.",
+    "intentBothLabel": "Ambos",
+    "intentBothDescription": "Para mim e para o meu filho.",
+    "intentNotSureLabel": "Não sei",
+    "intentNotSureDescription": "Mostre-me primeiro como funciona.",
+    "bothChildFirstLabel": "Configurar primeiro para o meu filho",
+    "bothChildFirstDescription": "Vamos começar com o seu filho e depois voltamos a si.",
+    "bothSelfFirstLabel": "Experimentar primeiro uma lição",
+    "bothSelfFirstDescription": "Veja como funciona e depois configure para o seu filho após o registo."
   },
   "milestoneCard": {
     "wordCount_one": "{{count}} palavra aprendida",

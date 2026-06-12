@@ -1,3 +1,4 @@
+import i18next from 'i18next';
 import React from 'react';
 import {
   View,
@@ -153,7 +154,9 @@ function SubscriptionContent(): React.ReactElement | null {
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
-  const [pollMessage, setPollMessage] = useState('Confirming your purchase...');
+  const [pollMessage, setPollMessage] = useState(() =>
+    i18next.t('subscriptionScreen.poll.confirming'),
+  );
   const topUpInFlightRef = useRef(false);
 
   // Restore-purchase polling state (BUG-397)
@@ -468,11 +471,11 @@ function SubscriptionContent(): React.ReactElement | null {
 
     if (!topUpPkg) {
       platformAlert(
-        'Not available',
-        "Top-up credits aren't available right now. Try again later or contact support.",
+        t('subscriptionScreen.alerts.topUpUnavailableTitle'),
+        t('subscriptionScreen.alerts.topUpUnavailableBody'),
         [
           {
-            text: 'Retry',
+            text: t('common.retry'),
             onPress: () => {
               void refetchOfferings();
             },
@@ -496,14 +499,14 @@ function SubscriptionContent(): React.ReactElement | null {
       if (isPurchaseCancelledError(error)) return;
       if (isNetworkError(error)) {
         platformAlert(
-          'Network error',
-          'Please check your internet connection and try again.',
+          t('subscriptionScreen.alerts.networkErrorTitle'),
+          t('subscriptionScreen.alerts.networkErrorBody'),
         );
         return;
       }
       platformAlert(
-        'Purchase failed',
-        'Something unexpected happened with your purchase. Please try again.',
+        t('subscriptionScreen.alerts.purchaseFailedTitle'),
+        t('subscriptionScreen.alerts.purchaseFailedBody'),
       );
       return;
     }
@@ -513,7 +516,7 @@ function SubscriptionContent(): React.ReactElement | null {
     setTopUpPurchasing(false);
     topUpCancelledRef.current = false;
     setTopUpPolling(true);
-    setPollMessage('Confirming your purchase...');
+    setPollMessage(t('subscriptionScreen.poll.confirming'));
     const baseCredits = usage?.topUpCreditsRemaining ?? 0;
     const topUpOutcome = await poll.run({
       fetchProbe: () =>
@@ -523,10 +526,7 @@ function SubscriptionContent(): React.ReactElement | null {
           queryFn: () => fetchUsageData(client),
         }),
       isConfirmed: (u) => u.topUpCreditsRemaining > baseCredits,
-      onSlowPoll: () =>
-        setPollMessage(
-          'Still confirming \u2014 this can take up to 30 seconds. Your purchase is safe.',
-        ),
+      onSlowPoll: () => setPollMessage(t('subscriptionScreen.poll.slowPoll')),
     });
 
     if (topUpOutcome === 'unmounted') return;
@@ -545,8 +545,8 @@ function SubscriptionContent(): React.ReactElement | null {
       );
     } else {
       platformAlert(
-        'Purchase confirmed',
-        'Your 500 credits are being added. They usually appear within a minute \u2014 pull down to refresh your usage.',
+        t('subscription.alerts.purchaseConfirmedTitle'),
+        t('subscriptionScreen.alerts.topUpConfirmedBody'),
         [{ text: t('common.ok') }],
       );
     }
@@ -570,21 +570,21 @@ function SubscriptionContent(): React.ReactElement | null {
       );
     } catch {
       platformAlert(
-        'Contact support',
-        'Email support@mentomate.app for help with subscriptions.',
+        t('subscriptionScreen.alerts.contactSupportTitle'),
+        t('subscriptionScreen.alerts.contactSupportBody'),
       );
     }
-  }, []);
+  }, [t]);
 
   const handleRemoveFamilyProfile = useCallback(
     (profileId: string, displayName: string) => {
       platformAlert(
-        'Remove from family?',
-        `${displayName}'s profile will be removed from this family plan and hidden from profile switching.`,
+        t('subscriptionScreen.alerts.removeFamilyTitle'),
+        t('subscriptionScreen.alerts.removeFamilyBody', { name: displayName }),
         [
           { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Remove',
+            text: t('subscriptionScreen.alerts.removeAction'),
             style: 'destructive',
             onPress: () => {
               void (async () => {
@@ -596,13 +596,15 @@ function SubscriptionContent(): React.ReactElement | null {
                     refetchFamilySubscription(),
                   ]);
                   platformAlert(
-                    'Family updated',
-                    `${displayName} was removed from your family plan.`,
+                    t('subscriptionScreen.alerts.familyUpdatedTitle'),
+                    t('subscriptionScreen.alerts.familyUpdatedBody', {
+                      name: displayName,
+                    }),
                   );
                 } catch {
                   platformAlert(
-                    'Could not remove profile',
-                    'Please check your connection and try again.',
+                    t('subscriptionScreen.alerts.removeFailedTitle'),
+                    t('subscriptionScreen.alerts.removeFailedBody'),
                   );
                 }
               })();
@@ -888,7 +890,7 @@ function SubscriptionContent(): React.ReactElement | null {
                   }}
                   className="bg-primary rounded-button py-2.5 px-4 mt-3 items-center"
                   testID="free-upgrade-button"
-                  accessibilityLabel="Upgrade plan"
+                  accessibilityLabel={t('subscriptionScreen.a11yUpgradePlan')}
                   accessibilityRole="button"
                 >
                   <Text className="text-body font-semibold text-text-inverse">
@@ -967,7 +969,12 @@ function SubscriptionContent(): React.ReactElement | null {
                           disabled={removeFamilyProfile.isPending}
                           className="min-h-[44px] justify-center px-2"
                           accessibilityRole="button"
-                          accessibilityLabel={`Remove ${member.displayName} from family`}
+                          accessibilityLabel={t(
+                            'subscriptionScreen.a11yRemoveMember',
+                            {
+                              name: member.displayName,
+                            },
+                          )}
                           testID={`remove-family-member-${member.profileId}`}
                         >
                           <Text className="text-caption font-semibold text-danger">
@@ -1194,7 +1201,7 @@ function SubscriptionContent(): React.ReactElement | null {
                 onPress={handleTopUp}
                 disabled={topUpPurchasing || topUpPolling}
                 className="bg-surface rounded-card px-4 py-3.5"
-                accessibilityLabel="Buy 500 credits"
+                accessibilityLabel={t('subscriptionScreen.a11yBuyCredits')}
                 accessibilityRole="button"
                 testID="top-up-button"
               >
@@ -1229,13 +1236,13 @@ function SubscriptionContent(): React.ReactElement | null {
                     topUpCancelledRef.current = true;
                     setTopUpPolling(false);
                     platformAlert(
-                      'Check later',
-                      'Credits will appear shortly — tap refresh to check.',
+                      t('subscriptionScreen.alerts.checkLaterTitle'),
+                      t('subscriptionScreen.alerts.checkLaterBody'),
                     );
                   }}
                   className="mt-2 items-center py-2"
                   accessibilityRole="button"
-                  accessibilityLabel="Cancel top-up confirmation"
+                  accessibilityLabel={t('subscriptionScreen.a11yCancelTopUp')}
                   testID="top-up-polling-cancel"
                 >
                   <Text className="text-body-sm text-primary font-semibold">
@@ -1276,7 +1283,7 @@ function SubscriptionContent(): React.ReactElement | null {
                 <Pressable
                   onPress={handleManageBilling}
                   className="bg-surface rounded-card px-4 py-3.5 mb-2"
-                  accessibilityLabel="Manage billing"
+                  accessibilityLabel={t('subscriptionScreen.a11yManageBilling')}
                   accessibilityRole="button"
                   testID="manage-billing-button"
                 >

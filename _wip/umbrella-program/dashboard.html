@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>IF cutover plan in design</b> — split ruled; dedicated planning session running against <code>cutover-planning-brief.md</code> (seed: <code>wi586-scope-report.md</code>); IF shepherd holding; ratification next · <b>PRG-15 GRADUATED 06-11</b> (second graduation — whole slice closed within a day of activation) · PRG-12 rolling (5/8 closed, 3 executing) · <b>PRG-13 shepherd LIVE</b> (WI-665/666; subsumption scan: partial) · CI incident resolved: nothing code-broken — chronic staging-KV deploy red captured as <b>WI-664</b> · WI-587 on Zuzka's desk.</span>
+  <span class="txt"><b>Right now:</b> <b>IF cutover plan in v1.1 revision</b> — v1.0 delivered + adversarially reviewed: 3 High + 1 Medium findings verified (FK-ordering soak break, GDPR/COPPA key collapse, OQ-1 missing API boundary) and handed back to the planning session; IF shepherd holding; ratification on v1.1 · <b>PRG-12 GRADUATED 06-12</b> (8/8, third graduation; ratchet 361 → 12) · PRG-13 rolling (WI-665/666 both executing) · PRG-15 graduated 06-11 · standing: <b>WI-664</b> staging-KV deploy red · WI-587 on Zuzka's desk.</span>
 </div>
 
 <nav>
@@ -588,7 +588,7 @@ const TRIGGERS = [
   {glyph:"◎", name:"Dogfood pull", body:"<b>PRG-04</b> fires by deliberate pull once one full initiative cycle has run on the pattern — the evidence the design needs."}
 ];
 const QUEUE = [
-  ["1","PRG-12","UI language & accessibility","✓ ACTIVATED 06-11 — first parallel activation"],
+  ["1","PRG-12","UI language & accessibility","✓ GRADUATED 06-12 — 8/8 WPs, ratchet 361 → 12"],
   ["2","PRG-14","Agent instructions","Light fixes: now · skill-building: after doc convergence (PRG-03/B4)"],
   ["3","PRG-02","Harness Hygiene — residue batch","HH PR merged (G1)"],
   ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
@@ -649,19 +649,19 @@ const INIT = [
   ],
   homes:["activation-planning.md §2 PRG-14 + §3 (dedupe analysis)","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-12", name:"UI language & accessibility", accent:"var(--teal)", lane:"now", status:"active", q:"#1",
-  tagline:"358 hardcoded English strings, silent screen-readers, 13 modals without focus management. The first parallel lane — now open.",
-  owner:"Agent-heavy, low supervision", gate:"Shepherd live — 5 of 8 WPs CLOSED through the autonomous loop (WI-621/622/623/626/627); WI-624/625/628 executing — every WP now started or done.",
+{ id:"PRG-12", name:"UI language & accessibility", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#1",
+  tagline:"358 hardcoded English strings, silent screen-readers, 13 modals without focus management. OUTCOME MET — third graduation, largest slice.",
+  owner:"Agent-heavy, low supervision", gate:"GRADUATED 06-12 — all 8 WPs closed via the autonomous loop in ~1.5 days. Ratchet baseline verified 361 → 12; F-163 confirmed never-residue (Closed via WI-584). Shepherd standing down.",
   outcome:"Every user-visible string through translation, screen-reader parity on core flows, pluralization & dates locale-correct. 34 findings.",
   bundles:[
     {n:"WI-621 · JSX/auth strings sweep", s:"5 findings · ~358 strings", m:"agent", st:"done", note:"P1. CLOSED 06-11 (sub-sliced; PRs #942/#961) — ratchet burn-down landed."},
     {n:"WI-622 · Screen-reader announcements", s:"5 findings", m:"agent", st:"done", note:"P1. CLOSED 06-11 — first PRG-12 WP through the full autonomous loop."},
     {n:"WI-623 · Modal focus & roles", s:"5 findings", m:"agent", st:"done", note:"CLOSED 06-11 — reviewer bounce reworked and re-passed (the loop self-correcting)."},
-    {n:"WI-624 · A11y-label / prop strings", s:"3 findings", m:"agent", st:"go"},
-    {n:"WI-625 · Pluralization model", s:"2 findings", m:"agent", st:"go"},
+    {n:"WI-624 · A11y-label / prop strings", s:"3 findings", m:"agent", st:"done", note:"CLOSED 06-12 — the slice-completing close."},
+    {n:"WI-625 · Pluralization model", s:"2 findings", m:"agent", st:"done", note:"CLOSED 06-11."},
     {n:"WI-626 · Mobile logic bugs", s:"7 findings", m:"mixed", st:"done", note:"CLOSED 06-11 — reviewer bounce on red main; CI rerun proved the red a flake, closure stands."},
     {n:"WI-627 · Dates & locale", s:"4 findings", m:"agent", st:"done", note:"CLOSED 06-11."},
-    {n:"WI-628 · Decorative / low-vision", s:"3 findings", m:"agent", st:"go"}
+    {n:"WI-628 · Decorative / low-vision", s:"3 findings", m:"agent", st:"done", note:"CLOSED 06-12."}
   ],
   homes:["_wip/l10n-a11y/execution-tracker.md (THE entry point)","Cosmo Workstream: L10n & A11y Mobile","L-gap-delta.md (per-finding)"]},
 

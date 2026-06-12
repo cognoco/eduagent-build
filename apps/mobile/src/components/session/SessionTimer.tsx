@@ -25,7 +25,7 @@ export function SessionTimer() {
     <View
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       testID="session-timer"
-      accessibilityLabel={t('session.timer.accessibilityLabel', {
+      accessibilityLabel={t('session.a11ySessionTime', {
         time: formatTimer(elapsed),
       })}
       accessibilityRole="timer"

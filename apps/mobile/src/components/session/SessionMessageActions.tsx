@@ -8,7 +8,7 @@ import { QuotaExceededCard } from './QuotaExceededCard';
 import type { QuotaExceededDetails } from '../../lib/api-client';
 import {
   getContextualQuickChips,
-  QUICK_CHIP_CONFIG,
+  quickChipLabel,
   type QuickChipId,
   type MessageFeedbackState,
   type ConversationStage,
@@ -114,7 +114,7 @@ export function SessionMessageActions({
   }> = [
     ...contextualQuickChips.map((chipId) => ({
       id: chipId as QuickChipId,
-      label: QUICK_CHIP_CONFIG[chipId].label,
+      label: quickChipLabel(chipId),
     })),
     ...(showWrongSubjectChip && message.id === latestAiMessageId
       ? [
@@ -278,8 +278,8 @@ export function SessionMessageActions({
               accessibilityRole="button"
               accessibilityLabel={
                 bookmarkState?.[message.eventId]
-                  ? 'Remove bookmark'
-                  : 'Bookmark this response'
+                  ? t('session.messageActions.a11yRemoveBookmark')
+                  : t('session.messageActions.a11yAddBookmark')
               }
               testID={`bookmark-toggle-${message.eventId}`}
             >

@@ -42,7 +42,7 @@ export function LibrarySearchBar({
           className="p-1"
           testID="library-search-clear"
           accessibilityRole="button"
-          accessibilityLabel={t('library.search.clear')}
+          accessibilityLabel={t('library.a11yClearSearch')}
         >
           {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
           <View

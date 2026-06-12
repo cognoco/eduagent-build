@@ -7,6 +7,8 @@ import {
   resolveChallengeRoundRuntimeSignalState,
   resolveChallengeRoundRuntimeStartState,
   checkExchangeLimit,
+  prepareExchangeContext,
+  persistChallengeRoundState,
   resolveReadyToFinish,
   resolvePromptLearnerName,
   type ExchangeHistoryEvent,
@@ -14,6 +16,7 @@ import {
 import type { processMessage, streamMessage } from './session-exchange';
 import {
   ConflictError,
+  NotFoundError,
   MAX_EXCHANGES_PER_SESSION,
   type ChallengeRoundEvaluationItem,
   type ChallengeRoundSessionState,
@@ -822,11 +825,11 @@ function makeExchangeLimitDb(
 }
 
 describe('checkExchangeLimit', () => {
-  it('throws "Session not found" when scoped repo returns no row', async () => {
+  it('throws NotFoundError when scoped repo returns no row', async () => {
     const db = makeExchangeLimitDb(null);
     await expect(
       checkExchangeLimit(db, 'prof-1', 'nonexistent-sess'),
-    ).rejects.toThrow('Session not found');
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('throws SessionExchangeLimitError when exchangeCount equals the limit', async () => {
@@ -893,7 +896,55 @@ describe('checkExchangeLimit', () => {
     const db = makeExchangeLimitDb(null); // null → not found for wrong profile
     await expect(
       checkExchangeLimit(db, 'attacker-profile', 'sess-owned-by-victim'),
-    ).rejects.toThrow('Session not found');
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-650 sweep — prepareExchangeContext NotFoundError regression
+// ---------------------------------------------------------------------------
+
+describe('[WI-650] prepareExchangeContext — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when session does not exist', async () => {
+    // getSession → createScopedRepository(db, profileId).sessions.findFirst.
+    // Stub to return null/undefined so the !session guard fires immediately.
+    const db = {
+      query: {
+        learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
+      },
+    } as never;
+
+    await expect(
+      prepareExchangeContext(db, 'prof-1', 'sess-missing', 'hello'),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[WI-650] persistChallengeRoundState — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when persistSessionMetadata finds no session', async () => {
+    // persistChallengeRoundState → persistSessionMetadata, which runs a
+    // db.transaction whose in-tx SELECT ... FOR UPDATE returns no row →
+    // returns null → the !updated guard fires. Stub the transaction to
+    // invoke the callback with a tx whose select chain resolves empty.
+    const txLimit = jest.fn().mockResolvedValue([]);
+    const tx = {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            for: jest.fn().mockReturnValue({ limit: txLimit }),
+          }),
+        }),
+      }),
+    };
+    const db = {
+      transaction: jest.fn(async (fn: (t: typeof tx) => Promise<unknown>) =>
+        fn(tx),
+      ),
+    } as never;
+
+    await expect(
+      persistChallengeRoundState(db, 'prof-1', 'sess-missing', undefined),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 

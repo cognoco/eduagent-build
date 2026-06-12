@@ -38,9 +38,31 @@ type FeedbackEnv = {
   };
 };
 
+// Stub db for the feedback retry queue enqueue (the real
+// enqueueFeedbackRetry service runs against it). Captures inserted values so
+// tests can assert what was parked in the first-party row.
+const TEST_RETRY_ID = '00000000-0000-7000-8000-0000000000fe';
+const insertedRetryRows: Record<string, unknown>[] = [];
+function createDbStub(options?: { failInsert?: boolean }) {
+  return {
+    insert: () => ({
+      values: (values: Record<string, unknown>) => ({
+        returning: async () => {
+          if (options?.failInsert) {
+            throw new Error('insert failed (stub)');
+          }
+          insertedRetryRows.push(values);
+          return [{ id: TEST_RETRY_ID }];
+        },
+      }),
+    }),
+  };
+}
+
 function createTestApp(
   bindings?: Partial<FeedbackEnv['Bindings']>,
   userOverride?: { userId: string; profileId?: string },
+  dbStub: unknown = createDbStub(),
 ) {
   const app = new Hono<FeedbackEnv>();
   app.use('*', async (c, next) => {
@@ -49,6 +71,7 @@ function createTestApp(
       email: 'test@example.com',
     });
     c.set('profileId', userOverride?.profileId ?? 'profile-1');
+    c.set('db', dbStub as FeedbackEnv['Variables']['db']);
     // Inject bindings so sendEmail actually attempts the Resend fetch
     c.env = {
       RESEND_API_KEY: TEST_API_KEY,
@@ -65,6 +88,7 @@ const originalFetch = globalThis.fetch;
 let fetchSpy: jest.SpiedFunction<typeof globalThis.fetch>;
 
 beforeEach(() => {
+  insertedRetryRows.length = 0;
   fetchSpy = jest
     .spyOn(globalThis, 'fetch')
     .mockImplementation(async (input, init) => {
@@ -254,24 +278,57 @@ describe('POST /feedback', () => {
     });
 
     expect(inngest.send).toHaveBeenCalledTimes(1);
+    // [F-090] The event carries only the opaque retryId reference + scoping
+    // identifiers — the message/metaLines were parked in the first-party
+    // feedback_retry_queue row instead (asserted below).
     expect(inngest.send).toHaveBeenCalledWith({
       name: 'app/feedback.delivery_failed',
-      data: expect.objectContaining({
+      data: {
+        retryId: TEST_RETRY_ID,
         profileId: 'profile-bug767-fail',
         userId: 'user-bug767-fail',
-        category: 'bug',
-        message: 'Crash on launch',
-        supportTo: 'support@mentomate.com',
-        // FCR-2026-05-23-L2.L2.4: metaLines now contains truncated identifiers
-        // (first 8 chars + ellipsis) for data-minimisation. The Inngest event
-        // still carries the full profileId/userId at the top level so the
-        // delivery-failed consumer can look up the record.
-        metaLines: expect.stringContaining('Profile ID: profile-…'),
-        appVersion: '1.2.3',
-        platform: 'ios',
-        osVersion: '17.5',
-      }),
+      },
     });
+    expect(insertedRetryRows).toHaveLength(1);
+    expect(insertedRetryRows[0]).toMatchObject({
+      profileId: 'profile-bug767-fail',
+      userId: 'user-bug767-fail',
+      category: 'bug',
+      message: 'Crash on launch',
+      // FCR-2026-05-23-L2.L2.4: metaLines contains truncated identifiers
+      // (first 8 chars + ellipsis) for data-minimisation.
+      metaLines: expect.stringContaining('Profile ID: profile-…'),
+    });
+  });
+
+  // [F-090] Graceful degradation: a queue-insert failure must NOT break the
+  // user's feedback action and must NOT fall back to placing the message in
+  // the event payload — the retry is lost (Sentry has the case) and the
+  // response reports queued:false honestly.
+  it('[F-090] queue-insert failure: returns success with queued:false and dispatches NO event', async () => {
+    const { inngest } = require('../inngest/client');
+    (inngest.send as jest.Mock).mockClear();
+
+    fetchSpy.mockImplementationOnce(async () => {
+      return new Response(JSON.stringify({ error: 'rate_limited' }), {
+        status: 429,
+      });
+    });
+
+    const app = createTestApp(
+      undefined,
+      { userId: 'user-f090-enqueue-fail', profileId: 'profile-f090-eq' },
+      createDbStub({ failInsert: true }),
+    );
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'bug', message: 'Crash on launch' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, queued: false });
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
   it('[BUG-767 / A-24] does NOT dispatch retry event when sendEmail succeeds', async () => {
@@ -290,6 +347,58 @@ describe('POST /feedback', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true, queued: false });
     expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------
+  // PII egress break test: Inngest persists event payloads in its
+  // third-party event store, so the user's feedback free-text and the
+  // support address must never ride in the app/feedback.delivery_failed
+  // event. The route parks the payload in the first-party
+  // feedback_retry_queue row and the event carries the opaque row id only.
+  // ---------------------------------------------------------------------
+  it('[F-090] delivery_failed event carries an opaque retryId — never the feedback free-text or support address', async () => {
+    const { inngest } = require('../inngest/client');
+    (inngest.send as jest.Mock).mockClear();
+
+    fetchSpy.mockImplementationOnce(async () => {
+      return new Response(JSON.stringify({ error: 'rate_limited' }), {
+        status: 429,
+      });
+    });
+
+    const app = createTestApp(undefined, {
+      userId: 'user-f090-fail',
+      profileId: 'profile-f090-fail',
+    });
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: 'bug',
+        message: 'My name is Milo Janssen and the quiz crashed',
+        appVersion: '1.2.3',
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, queued: true });
+
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+    const [eventArg] = (inngest.send as jest.Mock).mock.calls[0] as [
+      { name: string; data: Record<string, unknown> },
+    ];
+    expect(eventArg.name).toBe('app/feedback.delivery_failed');
+    // Opaque reference + scoping identifiers only.
+    expect(eventArg.data).toEqual({
+      retryId: expect.any(String),
+      profileId: 'profile-f090-fail',
+      userId: 'user-f090-fail',
+    });
+    // The free-text and the support address must not appear ANYWHERE in the
+    // event payload, under any key.
+    const serialized = JSON.stringify(eventArg);
+    expect(serialized).not.toContain('Milo Janssen');
+    expect(serialized).not.toContain('quiz crashed');
+    expect(serialized).not.toContain('support@mentomate.com');
   });
 
   it('returns success even if Resend fetch throws (network failure)', async () => {

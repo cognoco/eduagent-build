@@ -99,7 +99,7 @@ export default function PreviewTopicScreen() {
         className="self-start min-h-[44px] justify-center mb-2"
         testID="preview-topic-back"
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.goBackAction')}
       >
         <Text className="text-body-sm font-semibold text-primary">
           {t('preview.backToSignIn')}

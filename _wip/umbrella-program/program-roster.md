@@ -168,7 +168,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   pattern, with pointers to the five `_wip/identity-foundation/review-loop-*` /
   `executor-protocol*` artifacts. Pull remains deliberate (attention budget).
 
-### PRG-12 · L10n & A11y Mobile — `active` (2026-06-11)
+### PRG-12 · L10n & A11y Mobile — `✓ graduated` (2026-06-12)
 - **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
   English strings routed through `t()`, screen-reader announcements + modal focus
   + role annotations wired, pluralization on the i18n-native model, date/locale
@@ -185,11 +185,15 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   INV-1 pre-checked at slice (i18n ratchet exists, 361-entry baseline → burn-down
   scope). **Shepherd session SPAWNED 2026-06-11 (late)** — wired the reviewer
   watcher to multi-workstream on arrival.
-- **Execution state:** **first WP CLOSED 2026-06-11 night — `WI-622`
-  (sr-announcements)**, full claim→build→review→close loop autonomous; validates
-  the multi-workstream reviewer watcher on a second lane. Live state: Cosmo +
-  `_wip/l10n-a11y/execution-tracker.md`.
-- **Activate-when:** — (active)
+- **Execution state:** **GRADUATED 2026-06-12 (operator ruling)** — all 8 WPs
+  (`WI-621…628`) Closed/Done through the autonomous review loop in ~1.5 days,
+  including two reviewer bounces correctly adjudicated (WI-623 reworked;
+  WI-626's bounce disproven by CI rerun). The program's **third graduation**
+  and largest slice. Verified at graduation: INV-1 ratchet baseline burned
+  **361 → 12** (remaining = legitimate non-translatable entries); F-163 was
+  never residue (delivered + Closed via `WI-584`/PR #874, label overlap only).
+  Shepherd standing down after final checkpoint + residue statement.
+- **Activate-when:** — (graduated)
 
 ### PRG-15 · API Error Handling — `✓ graduated` (2026-06-11)
 - **Outcome:** all 8 `errors-api` audit findings resolved — silent-failure catch
@@ -357,7 +361,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 
 | # | Initiative | Gate (activate / proceed when) |
 |---|---|---|
-| 1 | **PRG-12** l10n-a11y-mobile | ✅ **ACTIVATED 2026-06-11** (was: pipeline-proven — first parallel activation) |
+| 1 | **PRG-12** l10n-a11y-mobile | ✓ **GRADUATED 06-12** — 8/8 WPs closed in ~1.5 days; ratchet baseline 361 → 12 |
 | 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
 | 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
@@ -411,6 +415,15 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-12 — PRG-12 GRADUATED (third graduation, largest slice).** Operator
+  ruling after program-session verification found nothing needing review:
+  all 8 WPs (`WI-621…628`, ~34 findings) Closed/Done via the autonomous loop;
+  INV-1 ratchet baseline verified burned 361 → 12; F-163 confirmed
+  never-residue (Closed via `WI-584`/PR #874 — register label overlap, not
+  scope). Two reviewer bounces correctly adjudicated en route (WI-623 rework;
+  WI-626 flake disproof). Second lane freed. Live lanes now: IF (cutover plan
+  v1.1 in revision after adversarial review — 3 High + 1 Medium findings
+  verified and handed back) + PRG-13 (WI-665/666 both executing).
 - **2026-06-11 (late) — PRG-13 ACTIVATED into the freed lane.** Fourth run of the
   §2.1 recipe on operator go ("prep PRG-13"). Charter OQ1 subsumption scan run
   pre-slice against `WI-578`/PR #933 + live code: **partial** — F-028 shrunk
