@@ -438,6 +438,37 @@ describe('setSessionInputMode', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it('[WI-650] throws NotFoundError when UPDATE … RETURNING yields no row', async () => {
+    // Covers the second guard in setSessionInputMode: the scoped-repo
+    // findFirst DOES return a row, but the session is deleted (or re-scoped)
+    // between the read and the write, so the UPDATE … RETURNING comes back
+    // empty and the !updated guard fires.
+    const fakeRow = makeSessionRow({
+      id: 'sess-gone',
+      profileId: 'prof-1',
+      metadata: {},
+    });
+
+    const returningChain = jest.fn().mockResolvedValue([]);
+    const whereChain = { returning: returningChain };
+    const setChain = { where: jest.fn().mockReturnValue(whereChain) };
+    const updateChain = { set: jest.fn().mockReturnValue(setChain) };
+
+    const db = {
+      update: jest.fn().mockReturnValue(updateChain),
+      query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(fakeRow),
+        },
+      },
+    } as never;
+
+    await expect(
+      setSessionInputMode(db, 'prof-1', 'sess-gone', { inputMode: 'voice' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(returningChain).toHaveBeenCalledTimes(1);
+  });
+
   it('includes profileId in the WHERE predicate when updating', async () => {
     let capturedWhere: unknown = undefined;
 

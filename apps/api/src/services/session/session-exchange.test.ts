@@ -8,6 +8,7 @@ import {
   resolveChallengeRoundRuntimeStartState,
   checkExchangeLimit,
   prepareExchangeContext,
+  persistChallengeRoundState,
   resolveReadyToFinish,
   resolvePromptLearnerName,
   type ExchangeHistoryEvent,
@@ -915,6 +916,34 @@ describe('[WI-650] prepareExchangeContext — typed NotFoundError for missing se
 
     await expect(
       prepareExchangeContext(db, 'prof-1', 'sess-missing', 'hello'),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('[WI-650] persistChallengeRoundState — typed NotFoundError for missing session', () => {
+  it('throws NotFoundError (not raw Error) when persistSessionMetadata finds no session', async () => {
+    // persistChallengeRoundState → persistSessionMetadata, which runs a
+    // db.transaction whose in-tx SELECT ... FOR UPDATE returns no row →
+    // returns null → the !updated guard fires. Stub the transaction to
+    // invoke the callback with a tx whose select chain resolves empty.
+    const txLimit = jest.fn().mockResolvedValue([]);
+    const tx = {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            for: jest.fn().mockReturnValue({ limit: txLimit }),
+          }),
+        }),
+      }),
+    };
+    const db = {
+      transaction: jest.fn(async (fn: (t: typeof tx) => Promise<unknown>) =>
+        fn(tx),
+      ),
+    } as never;
+
+    await expect(
+      persistChallengeRoundState(db, 'prof-1', 'sess-missing', undefined),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

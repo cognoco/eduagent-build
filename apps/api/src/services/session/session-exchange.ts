@@ -477,7 +477,9 @@ async function applyContinuationScore(
   });
 }
 
-async function persistChallengeRoundState(
+// Exported for unit testing (WI-650 NotFoundError regression); not part of
+// the session barrel's public surface.
+export async function persistChallengeRoundState(
   db: Database,
   profileId: string,
   sessionId: string,
