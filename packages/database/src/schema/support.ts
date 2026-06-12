@@ -22,6 +22,10 @@ import { profiles } from './profiles';
 // be the literal 'unknown', which a uuid FK to profiles.id would reject.
 // Retention is bounded by delete-on-success + the 7-day purge instead of an
 // ON DELETE CASCADE.
+//
+// RLS enabled (migration 0110) with the standard profile-isolation policy
+// (`feedback_retry_queue_profile_isolation`) — text-to-text GUC comparison
+// since profile_id is TEXT.
 export const feedbackRetryQueue = pgTable('feedback_retry_queue', {
   id: uuid('id')
     .primaryKey()
@@ -34,7 +38,7 @@ export const feedbackRetryQueue = pgTable('feedback_retry_queue', {
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export const supportMessages = pgTable(
   'support_messages',
