@@ -134,3 +134,22 @@ shepherd chooses, but small enough to run serially.
 - Open observation (executor): unrelated schema drift (concepts/identity churn)
   sits unshipped on main — `drizzle-kit generate` would bundle it; deliberately
   NOT absorbed into migration 0110. May deserve a capture by its owners.
+- 2026-06-12 ~11:0x — **PR #1030 MERGED** (merge commit, house precedent). Landing
+  sequence: CI red #1 = RLS-coverage invariant on new `feedback_retry_queue`
+  (fixed properly: ENABLE RLS + profile-isolation policy per 0085/BUG-216 pattern,
+  no exceptions escape). Review triage: 2 fixed (DELETE profileId scoping;
+  duplicate Inngest step name), 2 CodeRabbit nitpicks rejected with rationale.
+  claude-review crash on `ceff5b435` adjudicated per WI-378 (no verdict marker =
+  did not run) → re-run → APPROVED, 1 CONSIDER accepted-as-is in-thread.
+  Executor instructed to run `complete` (→ Reviewing; watcher closes
+  autonomously). **Ops note: migration 0110 merged but NOT applied to
+  staging/prod Neon — apply before/with next worker deploy** (enqueue degrades
+  gracefully until then).
+- 2026-06-12 ~11:15 — WI-665 `complete` ran: Stage=Reviewing, claim released,
+  Fixed In=`b7de23fdf` (PR #1030 merge commit; derived from detached-HEAD
+  worktree since main had advanced). Watcher caught the transition at 09:13Z and
+  launched the autonomous review (pid 9008) — first live proof of the 4th
+  workstream wiring. Worktree `.worktrees/WI-665` clean at `ceff5b435`; remove
+  after WP closes. **WI-666 executor dispatched** (wi666-executor; same protocol
+  + lessons: incremental commits, explicit worktree-directed first /commit, no
+  bare drizzle-kit generate, plan-phase stop).
