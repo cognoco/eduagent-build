@@ -332,8 +332,8 @@ export default function CreateProfileScreen() {
         handleClose();
         // Show confirmation — parent stays on their own profile
         platformAlert(
-          'Profile created',
-          `${trimmedName}'s profile is ready. You can open it from Family mode.`,
+          t('createProfile.createdTitle'),
+          t('createProfile.createdChildBody', { name: trimmedName }),
         );
         return;
       }
@@ -387,9 +387,8 @@ export default function CreateProfileScreen() {
       const switchResult = await switchProfile(result.profile.id);
       if (switchResult?.success === false) {
         platformAlert(
-          'Profile created',
-          switchResult.error ??
-            'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.',
+          t('createProfile.createdTitle'),
+          switchResult.error ?? t('createProfile.createdSwitchFailedBody'),
         );
       }
     } catch (err: unknown) {
@@ -414,13 +413,12 @@ export default function CreateProfileScreen() {
             ? (err as { message: string }).message
             : '';
         platformAlert(
-          'Upgrade required',
-          rawMessage ||
-            'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
+          t('createProfile.upgradeRequiredTitle'),
+          rawMessage || t('createProfile.upgradeRequiredBody'),
           [
-            { text: 'Not now', style: 'cancel' },
+            { text: t('common.notNow'), style: 'cancel' },
             {
-              text: 'See plans',
+              text: t('createProfile.seePlans'),
               onPress: () => router.push('/(app)/subscription'),
             },
           ],
@@ -457,6 +455,7 @@ export default function CreateProfileScreen() {
     handleClose,
     wantsFamily,
     updateAppContext,
+    t,
   ]);
 
   // [BUG-375] Auth gate — deep-link entry must not show create-profile form to
@@ -553,7 +552,7 @@ export default function CreateProfileScreen() {
           <Button
             variant="tertiary"
             size="small"
-            label="Cancel"
+            label={t('common.cancel')}
             onPress={handleClose}
             testID="create-profile-cancel"
           />
@@ -673,7 +672,7 @@ export default function CreateProfileScreen() {
                     onPress={() => setShowDatePicker(false)}
                     className="min-h-[44px] min-w-[44px] items-center justify-center"
                     accessibilityRole="button"
-                    accessibilityLabel="Close date picker"
+                    accessibilityLabel={t('createProfile.a11yCloseDatePicker')}
                     testID="date-picker-done"
                   >
                     <Text className="text-primary text-body font-semibold">

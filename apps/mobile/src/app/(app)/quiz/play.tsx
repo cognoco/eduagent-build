@@ -340,11 +340,11 @@ export default function QuizPlayScreen(): React.ReactElement {
         // user thinks their answer was validated when in fact it never was.
         setAnswerCheckFailed(true);
         Sentry.captureException(err);
-        platformAlert("Couldn't check your answer", formatApiError(err));
+        platformAlert(t('quiz.play.checkErrorTitle'), formatApiError(err));
         return false;
       }
     },
-    [roundId, checkAnswerMutateAsync, currentIndex, setAnswerCheckFailed],
+    [roundId, checkAnswerMutateAsync, currentIndex, setAnswerCheckFailed, t],
   );
 
   // [BUG-542] Extract onResolved from inline JSX to a stable useCallback.
@@ -590,7 +590,7 @@ export default function QuizPlayScreen(): React.ReactElement {
       correct = false;
       setAnswerCheckFailed(true);
       Sentry.captureException(err);
-      platformAlert("Couldn't check your answer", formatApiError(err));
+      platformAlert(t('quiz.play.checkErrorTitle'), formatApiError(err));
     }
 
     const nextResult: QuestionResult = {
@@ -820,7 +820,9 @@ export default function QuizPlayScreen(): React.ReactElement {
         <Text
           className="text-body-sm font-semibold text-text-secondary text-right"
           style={{ minWidth: 36 }}
-          accessibilityLabel={`Elapsed time: ${elapsedSeconds} seconds`}
+          accessibilityLabel={t('quiz.play.a11yElapsed', {
+            seconds: elapsedSeconds,
+          })}
           testID="quiz-play-elapsed"
         >
           {elapsedLabel}
@@ -1141,7 +1143,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             onPress={handleContinue}
             className="min-h-[52px] flex-row items-center justify-center gap-2 rounded-button bg-primary px-5 py-3"
             accessibilityRole="button"
-            accessibilityLabel="Next question"
+            accessibilityLabel={t('quiz.play.nextQuestion')}
             testID="quiz-next-question"
           >
             <Text className="text-body font-semibold text-text-inverse">

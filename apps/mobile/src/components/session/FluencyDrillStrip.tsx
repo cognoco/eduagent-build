@@ -64,7 +64,11 @@ export function FluencyDrillStrip({
         className="flex-row items-center justify-between bg-surface-elevated mx-4 my-1.5 px-4 py-2.5 rounded-button"
         testID="fluency-drill-score"
         accessibilityRole="summary"
-        accessibilityLabel={`Drill complete: ${correct} out of ${total} correct, ${pct} percent`}
+        accessibilityLabel={t('session.fluencyDrill.a11yScore', {
+          correct,
+          total,
+          pct,
+        })}
       >
         <View className="flex-row items-center gap-2">
           <Text className="text-body-sm font-semibold text-success">
@@ -99,7 +103,9 @@ export function FluencyDrillStrip({
       className="flex-row items-center justify-between bg-surface-elevated mx-4 my-1.5 px-4 py-2.5 rounded-button"
       testID="fluency-drill-timer"
       accessibilityRole="timer"
-      accessibilityLabel={`Fluency drill: ${formatTimer(remaining)} remaining`}
+      accessibilityLabel={t('session.fluencyDrill.a11yTimer', {
+        time: formatTimer(remaining),
+      })}
     >
       <View className="flex-row items-center gap-2">
         <Text className="text-caption font-semibold text-primary">

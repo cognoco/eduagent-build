@@ -68,7 +68,7 @@ export function EarlyAdopterCard({
         onPress={openFeedback}
         className="flex-1 flex-row items-center px-3 py-2 min-h-[44px]"
         accessibilityRole="button"
-        accessibilityLabel="Send feedback — your input shapes MentoMate"
+        accessibilityLabel={t('home.earlyAdopter.a11ySendFeedback')}
         testID="early-adopter-feedback-cta"
       >
         {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
@@ -100,7 +100,7 @@ export function EarlyAdopterCard({
         onPress={handleDismiss}
         className="min-h-[44px] min-w-[44px] items-center justify-center pe-2"
         accessibilityRole="button"
-        accessibilityLabel="Dismiss"
+        accessibilityLabel={t('common.dismiss')}
         hitSlop={4}
         testID="early-adopter-dismiss"
       >

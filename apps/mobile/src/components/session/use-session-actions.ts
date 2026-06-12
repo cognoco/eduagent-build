@@ -27,8 +27,8 @@ import {
   getInputModeKey,
   serializeMilestones,
   serializeCelebrations,
-  QUICK_CHIP_CONFIG,
-  CONFIRMATION_BY_CHIP,
+  quickChipPrompt,
+  chipConfirmationMessage,
   type QuickChipId,
   type MessageFeedbackState,
 } from './session-types';
@@ -176,7 +176,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         .mutateAsync({ inputMode: nextInputMode })
         .catch(() => {
           setInputMode(previousInputMode);
-          showConfirmation("Couldn't save that mode just now.");
+          showConfirmation(i18next.t('session.inputMode.saveError'));
         });
     },
     [
@@ -477,8 +477,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         return;
       }
 
-      const config = QUICK_CHIP_CONFIG[chip];
-      if (!config) return;
+      const chipPrompt = quickChipPrompt(chip);
 
       if (activeSessionId) {
         try {
@@ -510,12 +509,9 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         setConsumedQuickChipMessageId(sourceMessageId);
       }
 
-      const confirmation = CONFIRMATION_BY_CHIP[chip];
-      if (confirmation) {
-        showConfirmation(confirmation);
-      }
+      showConfirmation(chipConfirmationMessage(chip));
 
-      await handleSend(config.prompt);
+      await handleSend(chipPrompt);
     },
     [
       activeSessionId,
@@ -572,10 +568,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         setMessageFeedback((prev) => ({ ...prev, [message.id]: action }));
         showConfirmation(
           action === 'helpful'
-            ? 'Keeping this pace.'
+            ? i18next.t('session.feedbackConfirm.helpful')
             : action === 'not_helpful'
-              ? 'Adjusting the explanation.'
-              : "I'll correct that.",
+              ? i18next.t('session.feedbackConfirm.notHelpful')
+              : i18next.t('session.feedbackConfirm.incorrect'),
         );
 
         const followUpPrompt = followUpPromptByAction[action];

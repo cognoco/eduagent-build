@@ -1,4 +1,5 @@
 import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
+import type { TFunction } from 'i18next';
 
 import { serializeHomeworkProblems } from '../../../../components/homework/problem-cards';
 
@@ -70,16 +71,22 @@ export function buildHomeworkSessionParams(args: {
 
 export function getHomeworkProblemTruncationAlertMessage(
   truncation: HomeworkProblemTruncation,
+  t: TFunction,
 ): string {
   if (truncation.singleProblemTruncated) {
     if (truncation.droppedProblemCount > 0) {
-      return `Some problems were too long to fit. Only the first ${truncation.savedProblemCount} were saved, and the last one was shortened.`;
+      return t('homework.truncationSavedAndShortened', {
+        saved: truncation.savedProblemCount,
+      });
     }
 
-    return 'This problem was too long to send in full and was shortened.';
+    return t('homework.truncationSingleShortened');
   }
 
-  return `Some problems were too long; only the first ${truncation.savedProblemCount} of ${truncation.inputProblemCount} are saved.`;
+  return t('homework.truncationSavedOnly', {
+    saved: truncation.savedProblemCount,
+    input: truncation.inputProblemCount,
+  });
 }
 
 function serializeProblemsWithinBudget(args: {

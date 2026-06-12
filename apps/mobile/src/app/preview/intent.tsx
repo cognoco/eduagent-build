@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -17,32 +18,34 @@ interface Option {
   testID: string;
 }
 
-const OPTIONS: ReadonlyArray<Option> = [
-  {
-    intent: 'self',
-    label: 'Me',
-    description: "I'm setting this up for myself.",
-    testID: 'intent-self',
-  },
-  {
-    intent: 'child',
-    label: 'My child',
-    description: 'I want to help my child.',
-    testID: 'intent-child',
-  },
-  {
-    intent: 'both',
-    label: 'Both',
-    description: 'For me and my child.',
-    testID: 'intent-both',
-  },
-  {
-    intent: 'not_sure',
-    label: 'Not sure',
-    description: 'Show me how it works first.',
-    testID: 'intent-not-sure',
-  },
-];
+function buildOptions(t: TFunction): ReadonlyArray<Option> {
+  return [
+    {
+      intent: 'self',
+      label: t('preview.intentSelfLabel'),
+      description: t('preview.intentSelfDescription'),
+      testID: 'intent-self',
+    },
+    {
+      intent: 'child',
+      label: t('preview.intentChildLabel'),
+      description: t('preview.intentChildDescription'),
+      testID: 'intent-child',
+    },
+    {
+      intent: 'both',
+      label: t('preview.intentBothLabel'),
+      description: t('preview.intentBothDescription'),
+      testID: 'intent-both',
+    },
+    {
+      intent: 'not_sure',
+      label: t('preview.intentNotSureLabel'),
+      description: t('preview.intentNotSureDescription'),
+      testID: 'intent-not-sure',
+    },
+  ];
+}
 
 export default function PreviewIntentScreen() {
   const { t } = useTranslation();
@@ -121,7 +124,7 @@ export default function PreviewIntentScreen() {
         className="self-start min-h-[44px] justify-center mb-2"
         testID="preview-intent-back"
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.goBackAction')}
       >
         <Text className="text-body-sm font-semibold text-primary">
           {t('preview.backToSignIn')}
@@ -133,7 +136,7 @@ export default function PreviewIntentScreen() {
       <Text className="text-body text-text-secondary mb-8 text-center">
         {t('preview.intentHint')}
       </Text>
-      {OPTIONS.map((opt) => (
+      {buildOptions(t).map((opt) => (
         <Pressable
           key={opt.intent}
           onPress={() => void onSelect(opt.intent)}

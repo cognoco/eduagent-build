@@ -1,5 +1,6 @@
 import { Keyboard, Pressable, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 interface LibrarySearchBarProps {
@@ -13,6 +14,7 @@ export function LibrarySearchBar({
   onChangeText,
   placeholder,
 }: LibrarySearchBarProps): React.ReactElement {
+  const { t } = useTranslation();
   const themeColors = useThemeColors();
 
   return (
@@ -35,7 +37,7 @@ export function LibrarySearchBar({
           onPress={() => onChangeText('')}
           className="p-1"
           testID="library-search-clear"
-          accessibilityLabel="Clear search"
+          accessibilityLabel={t('library.a11yClearSearch')}
         >
           {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
           <View

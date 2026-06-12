@@ -40,7 +40,7 @@ export function TopicPickerSheet({
         className="flex-1 bg-black/40 justify-end"
         onPress={onClose}
         accessibilityRole="button"
-        accessibilityLabel="Close topic picker"
+        accessibilityLabel={t('library.a11yCloseTopicPicker')}
       >
         {/* Sheet content — stop touch propagation so taps inside don't close */}
         <Pressable

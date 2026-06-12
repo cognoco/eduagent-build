@@ -73,7 +73,7 @@ export default function ValuePropScreen() {
         className="self-start min-h-[44px] justify-center mb-2"
         testID="preview-value-prop-back"
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.goBackAction')}
       >
         <Text className="text-body-sm font-semibold text-primary">
           {t('preview.backToSignIn')}
