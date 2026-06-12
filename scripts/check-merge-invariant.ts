@@ -21,17 +21,21 @@
  *       A path that changed between main and the merge result, but was NOT touched
  *       by the feature branch, means main content was unexpectedly altered.
  *
- *   (b) BRANCH-SURVIVAL: every path in diff(MB, feature) MUST survive into the
- *       merge result with identical blob content (for additions/modifications) or
- *       be absent from the merge result (for deletions on the feature branch).
+ *   (b) BRANCH-SURVIVAL: scoped to BRANCH-ONLY paths — paths in diff(MB, feature)
+ *       that main did NOT touch since MB (i.e. NOT in diff(MB, main)). For those
+ *       there is no conflict to resolve, so the feature blob MUST land verbatim:
+ *       dropped (absent from merge) → FAIL; present but a different blob (silently
+ *       altered/lost) → FAIL; identical blob → survives. Both-sides-changed paths
+ *       are deliberately NOT run through (b)'s pass/fail — they belong to (c).
  *       Paths may be excluded via scripts/merge-exclusions.json with a documented
  *       reason — each exclusion is mandatory-documented (no reason = script fails).
  *
- *   (c) BOTH-SIDES-CHANGED: the intersection of diff(MB, feature) and diff(MB, main)
- *       is computed at merge time (never hardcoded). Each path in this set must have
- *       a named resolution rule in scripts/merge-exclusions.json. Paths without a
- *       rule are flagged for explicit review (non-blocking warning in this version,
- *       but they do appear in CI output for audit).
+ *   (c) BOTH-SIDES-CHANGED: the intersection of diff(MB, feature) and diff(MB, main),
+ *       computed live at merge time (never hardcoded). These are the ONLY paths where
+ *       the merge may legitimately differ from BOTH the feature and main blobs (a
+ *       synthesized conflict resolution), so a blob difference here is a WARNING (not
+ *       a failure) — each should have a named resolution rule in merge-exclusions.json;
+ *       undocumented ones are flagged for explicit review in CI output.
  *
  * EXCLUSIONS FILE: scripts/merge-exclusions.json
  *   {
@@ -211,17 +215,36 @@ function checkInvariant(
     );
   }
 
+  // Partition diff(MB→feature) into BRANCH-ONLY and BOTH-SIDES-CHANGED.
+  // A path is BOTH-SIDES if main also touched it since MB (it's in diff(MB→main)).
+  // A path is BRANCH-ONLY if main never touched it — for those there is NO
+  // conflict to resolve, so the feature blob must land verbatim. Both sets are
+  // computed LIVE from the diffs (never a hardcoded list).
+  const bothSides = new Set<string>();
+  const branchOnly = new Set<string>();
+  for (const p of diffMbToFeature) {
+    if (diffMbToMain.has(p)) {
+      bothSides.add(p);
+    } else {
+      branchOnly.add(p);
+    }
+  }
+
   // -------------------------------------------------------------------------
-  // (b) BRANCH-SURVIVAL RULE
-  // Every path in diff(MB, feature) must survive into the merge result.
-  // Survival semantics:
-  //   - Feature added/modified the file → merge must have same blob content as feature.
-  //   - Feature deleted the file → merge must also not have the file.
-  // Exclusions may document intentional non-survival.
+  // (b) BRANCH-SURVIVAL RULE (scoped to BRANCH-ONLY paths)
+  // For a path the feature introduced/modified that main NEVER touched, there
+  // is no conflict to resolve. The feature blob must survive verbatim:
+  //   - dropped (merge has no blob) → FAIL
+  //   - present but different blob (silently altered/lost) → FAIL
+  //   - identical blob → survival confirmed
+  // A documented exclusion lets a branch-only path legitimately not survive.
+  // Both-sides-changed paths are deliberately NOT run through (b)'s pass/fail —
+  // they are handled solely by direction (c) below.
   // -------------------------------------------------------------------------
   const branchDropped: string[] = [];
+  const branchAltered: string[] = [];
 
-  for (const p of diffMbToFeature) {
+  for (const p of branchOnly) {
     if (exclusions.has(p)) {
       // Documented exclusion: skip blob check, trust the documented reason.
       const excl = exclusions.get(p)!;
@@ -237,50 +260,55 @@ function checkInvariant(
     const mergeBlob = blobSha(cwd, mergeRef, p);
 
     if (featureBlob !== null) {
-      // Feature has the file (added or modified) — check it survived into the merge.
+      // Feature has the file (added or modified) — it must survive verbatim.
       if (mergeBlob === null) {
-        // The file exists on the feature branch but was DROPPED from the merge.
+        // Exists on the feature branch but DROPPED from the merge.
         branchDropped.push(p);
       } else if (featureBlob !== mergeBlob) {
-        // The file exists in both but with different content.
-        // This can be legitimate (conflict resolution) or a silent truncation.
-        // We flag it for review rather than hard-failing, because conflict
-        // resolution often produces a valid synthesis that differs from both sides.
-        // If this is unexpected, it should be documented in exclusions.
-        warnings.push(
-          `[WARN] "${p}": exists in both feature (${featureBlob.slice(0, 8)}) and merge ` +
-            `(${mergeBlob.slice(0, 8)}) but with different content — verify this is ` +
-            `an intentional conflict resolution or add to merge-exclusions.json`,
+        // Branch-only file present in the merge but with DIFFERENT content.
+        // Main never touched it → no synthesis is possible → the content was
+        // silently altered or lost. This is a hard failure.
+        branchAltered.push(
+          `${p} (feature ${featureBlob.slice(0, 8)} → merge ${mergeBlob.slice(0, 8)})`,
         );
       }
       // featureBlob === mergeBlob: identical content, survival confirmed.
     }
+    // featureBlob === null: feature DELETED this branch-only file. Its absence
+    // from the merge is fine; its presence (main's copy can't exist, main never
+    // had it) is impossible for a branch-only path, so no check is needed.
   }
 
   if (branchDropped.length > 0) {
     failures.push(
-      `[FAIL direction-b] BRANCH-SURVIVAL: the following paths exist on the feature ` +
-        `branch but are MISSING from the merge result — they were silently dropped:\n` +
+      `[FAIL direction-b] BRANCH-SURVIVAL: the following branch-only paths exist on ` +
+        `the feature branch but are MISSING from the merge result — they were ` +
+        `silently dropped:\n` +
         branchDropped.map((p) => `  - ${p}`).join('\n') +
         '\n  To suppress: document each path in scripts/merge-exclusions.json ' +
         'with a non-empty "reason".',
     );
   }
 
-  // -------------------------------------------------------------------------
-  // (c) BOTH-SIDES-CHANGED SET
-  // Paths changed on BOTH sides since MB. Each should have a named resolution.
-  // We compute this live from the diffs (never a hardcoded list).
-  // For now, we emit a WARNING for each intersecting path without an exclusion
-  // entry — the human reviewer should verify the resolution is correct.
-  // -------------------------------------------------------------------------
-  const bothSides = new Set<string>();
-  for (const p of diffMbToFeature) {
-    if (diffMbToMain.has(p)) {
-      bothSides.add(p);
-    }
+  if (branchAltered.length > 0) {
+    failures.push(
+      `[FAIL direction-b] BRANCH-SURVIVAL: the following branch-only paths exist on ` +
+        `both the feature branch and the merge result but with DIFFERENT content — ` +
+        `main never touched them, so there is no conflict to synthesize; the branch ` +
+        `content was silently altered and did not survive verbatim:\n` +
+        branchAltered.map((p) => `  - ${p}`).join('\n') +
+        '\n  To suppress: document each path in scripts/merge-exclusions.json ' +
+        'with a non-empty "reason".',
+    );
   }
 
+  // -------------------------------------------------------------------------
+  // (c) BOTH-SIDES-CHANGED SET (the conflict/synthesis set, computed live above)
+  // These are the ONLY paths where the merge result may legitimately differ
+  // from both the feature blob and the main blob (a synthesized resolution).
+  // Each should have a named resolution rule; undocumented ones emit a WARNING
+  // for the reviewer rather than a hard failure, because synthesis is valid.
+  // -------------------------------------------------------------------------
   if (bothSides.size > 0) {
     const undocumented: string[] = [];
     const documented: string[] = [];

@@ -1,15 +1,20 @@
 /**
  * TDD tests for check-merge-invariant.ts (WI-680).
  *
- * Constructs a synthetic three-way git fixture to verify both detection
- * directions:
- *   (a) MAIN-SIDE: a path that was modified on main but appears in the merge
- *       result unchanged from the feature side → merge silently altered main.
- *   (b) BRANCH-SURVIVAL: a path that exists only on new-llm is dropped from
- *       the merge result → a dropped feature path.
+ * Constructs a synthetic three-way git fixture (MB → main + feature → merge)
+ * to verify all three directions:
+ *   (a) MAIN-SIDE: a pure main-side path the merge altered (not introduced by
+ *       feature) → FAIL.
+ *   (b) BRANCH-SURVIVAL (branch-only paths only): a branch-only path the merge
+ *       DROPS → FAIL; a branch-only path the merge ALTERS (different blob, no
+ *       conflict possible since main never touched it) → FAIL.
+ *   (c) BOTH-SIDES-CHANGED: a path both branches touched since MB whose merge
+ *       result is a legitimate synthesis (differs from both blobs) → WARN, not
+ *       FAIL.
  *
- * The fixture deliberately seeds BOTH failure modes and asserts the script
- * catches them. A passing fixture (faithful merge) asserts the script exits 0.
+ * The fixture seeds three file classes — feature-only (branch-only),
+ * main-only (main-side), and both-sides — and the sabotage tests assert the
+ * script catches drops/alterations while letting synthesis through.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -85,9 +90,21 @@ function buildBaseFixture(): FixtureRefs {
   git(repo, ['config', 'user.email', 'test@example.com']);
   git(repo, ['config', 'user.name', 'Test']);
 
-  // MB commit: shared files that both sides will touch.
+  // MB commit. Three classes of file, distinguishing the three diff regions:
+  //   - feature-modifies-only ("shared.ts") → branch-only path
+  //   - main-modifies-only ("main-only.ts") → pure main-side path
+  //   - both-sides modify ("both-sides.ts") → conflict/synthesis path
+  //
+  // both-sides.ts has a top line and a bottom line separated by enough padding
+  // that each side can touch a DIFFERENT line and git auto-merges cleanly (the
+  // two edit hunks don't share diff context, so no conflict markers) — modeling
+  // a legitimate synthesis where the merge result differs from BOTH the feature
+  // blob and the main blob.
+  const bothSidesMb =
+    'export const top = 0;\n// pad1\n// pad2\n// pad3\n// pad4\n// pad5\nexport const bottom = 0;\n';
   writeFileSync(join(repo, 'shared.ts'), 'export const shared = 1;\n');
   writeFileSync(join(repo, 'main-only.ts'), 'export const m = 1;\n');
+  writeFileSync(join(repo, 'both-sides.ts'), bothSidesMb);
   git(repo, ['add', '.']);
   git(repo, ['commit', '-m', 'MB: initial commit']);
   const mbSha = git(repo, ['rev-parse', 'HEAD']);
@@ -95,7 +112,8 @@ function buildBaseFixture(): FixtureRefs {
   // Create feature branch from MB.
   git(repo, ['checkout', '-b', 'feature']);
 
-  // Feature adds feature-only-file.ts and modifies shared.ts.
+  // Feature adds feature-only.ts, modifies shared.ts (branch-only), and
+  // touches the TOP line of both-sides.ts.
   writeFileSync(
     join(repo, 'feature-only.ts'),
     'export const featureOnly = true;\n',
@@ -104,15 +122,28 @@ function buildBaseFixture(): FixtureRefs {
     join(repo, 'shared.ts'),
     'export const shared = 2; // modified by feature\n',
   );
+  writeFileSync(
+    join(repo, 'both-sides.ts'),
+    'export const top = 1; // feature\n// pad1\n// pad2\n// pad3\n// pad4\n// pad5\nexport const bottom = 0;\n',
+  );
   git(repo, ['add', '.']);
-  git(repo, ['commit', '-m', 'feature: add feature-only and modify shared']);
+  git(repo, [
+    'commit',
+    '-m',
+    'feature: add feature-only, modify shared + both-sides top',
+  ]);
   const featureSha = git(repo, ['rev-parse', 'HEAD']);
 
-  // Return to main; main modifies main-only.ts.
+  // Return to main; main modifies main-only.ts and the BOTTOM line of
+  // both-sides.ts (different line → clean auto-merge with feature's top edit).
   git(repo, ['checkout', 'main']);
   writeFileSync(join(repo, 'main-only.ts'), 'export const m = 2;\n');
+  writeFileSync(
+    join(repo, 'both-sides.ts'),
+    'export const top = 0;\n// pad1\n// pad2\n// pad3\n// pad4\n// pad5\nexport const bottom = 1; // main\n',
+  );
   git(repo, ['add', '.']);
-  git(repo, ['commit', '-m', 'main: update main-only']);
+  git(repo, ['commit', '-m', 'main: update main-only + both-sides bottom']);
   const mainSha = git(repo, ['rev-parse', 'HEAD']);
 
   return { repo, mbSha, mainSha, featureSha };
@@ -322,6 +353,65 @@ describe('check-merge-invariant', () => {
     // Both paths must be named.
     expect(out).toMatch(/feature-only\.ts/);
     expect(out).toMatch(/main-only\.ts/);
+  });
+
+  /**
+   * FAILING CASE — direction (b), branch-only ALTERATION (not a drop).
+   *
+   * This is the gap the WARN-only logic missed: `feature-only.ts` is
+   * branch-only (in diff(MB→feature), NOT in diff(MB→main)). Main never
+   * touched it, so there is NO conflict to resolve. If the merge rewrites it
+   * to different content, the branch's content was silently altered — this
+   * MUST fail, not merely warn.
+   */
+  it('FAILS and names branch-only path ALTERED (not dropped) by the merge (direction b)', () => {
+    const { repo, mainSha, featureSha } = buildBaseFixture();
+    repos.push(repo);
+
+    // Sabotage: rewrite (not drop) the branch-only file in the merge result.
+    const mergeSha = createMergeCommit(repo, mainSha, featureSha, {
+      'feature-only.ts':
+        'export const featureOnly = false; // SILENTLY ALTERED\n',
+    });
+
+    const result = runScript(repo, [mainSha, featureSha, mergeSha]);
+
+    expect(result.status).not.toBe(0);
+    const out = result.stdout + result.stderr;
+    // Must name the altered branch-only path.
+    expect(out).toMatch(/feature-only\.ts/);
+    // Must indicate a direction-b (branch-survival) FAILURE, not a WARN.
+    expect(out).toMatch(/FAIL direction-b|branch.*surviv/i);
+    // The alteration must be reported as a failure, not buried in a WARN.
+    expect(out).toMatch(/altered|different content|did not survive|mismatch/i);
+  });
+
+  /**
+   * PASSING CASE — direction (c): a BOTH-SIDES-CHANGED file whose merge result
+   * is a legitimate synthesis (differs from BOTH feature and main blobs).
+   *
+   * `both-sides.ts` is touched by both branches since MB (feature edits the
+   * top line, main edits the bottom line). A faithful merge auto-combines them
+   * into content that matches NEITHER side's blob. This must NOT fail
+   * direction (b) — it is handled solely by direction (c) as a WARN.
+   */
+  it('does NOT fail when a both-sides-changed file synthesizes (direction c WARN only)', () => {
+    const { repo, mainSha, featureSha } = buildBaseFixture();
+    repos.push(repo);
+
+    // Faithful merge: git auto-merges both-sides.ts (different lines) into a
+    // synthesis that differs from both feature's and main's blob.
+    const mergeSha = createMergeCommit(repo, mainSha, featureSha, {});
+
+    const result = runScript(repo, [mainSha, featureSha, mergeSha]);
+
+    // Must pass — synthesis is legitimate, no drop, no main-side alteration.
+    expect(result.status).toBe(0);
+    const out = result.stdout + result.stderr;
+    expect(out).not.toMatch(/FAIL/i);
+    // The synthesized both-sides path is surfaced for review under direction c.
+    expect(out).toMatch(/both-sides\.ts/);
+    expect(out).toMatch(/direction-c|both.sides.changed|BOTH-SIDES/i);
   });
 
   /**
