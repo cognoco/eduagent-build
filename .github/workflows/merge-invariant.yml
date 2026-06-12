@@ -1,0 +1,139 @@
+name: Merge Invariant Check
+
+# WI-680: Content-level merge verification as an executable CI invariant.
+#
+# This workflow runs ONLY on pull requests targeting `main`. It verifies that
+# the merge result satisfies the three-way content invariant:
+#
+#   (a) MAIN-SIDE: every path changed between main and the merge result was
+#       introduced by the feature branch — no silent main-content alterations.
+#   (b) BRANCH-SURVIVAL: every path the feature branch introduced or modified
+#       survives into the merge result with identical blob content (or is
+#       explicitly documented in scripts/merge-exclusions.json).
+#   (c) BOTH-SIDES-CHANGED: paths touched by both sides are listed for audit.
+#
+# This guard exists because the new-llm branch's merge history twice silently
+# dropped large batches of commits (20 and 239 commits) and the WI-677 i18n
+# re-inflation was itself an instance of this failure pattern (C9 in PRG-17).
+#
+# The check runs the script with:
+#   main-ref   = origin/main (the base branch tip)
+#   feature-ref = the PR's head SHA on the feature branch
+#   merge-ref  = GITHUB_SHA (the merge result commit GitHub creates for the PR)
+#
+# OUTPUT: the job records the script's full stdout to the step summary and
+# the CI log. Failures are loud: the job exits non-zero, blocking the merge.
+#
+# EXCLUSIONS: scripts/merge-exclusions.json documents intentional non-survival
+# (paths the reconciliation deliberately does not land). Every entry requires
+# a non-empty "reason" field — undocumented exclusions cause the script to fail.
+
+on:
+  pull_request:
+    branches:
+      - main
+
+# Only run on PRs to main (the on: trigger above already gates this, but the
+# if: below makes it explicit for clarity and future-proofing if this file
+# is ever merged into a shared workflow).
+#
+# No paths filter: this check must run on every PR to main regardless of what
+# files changed — a merge that drops routes/now.ts would not trigger any
+# specific path filter.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merge-invariant-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  merge-invariant:
+    name: Content-level merge invariant (WI-680)
+    runs-on: ubuntu-latest
+    # Belt-and-suspenders guard: this workflow is triggered by `on.pull_request.branches: [main]`
+    # but the if: below provides an additional in-job guard so this check never runs
+    # on PRs targeting any other branch, even if this workflow file is ever modified.
+    if: github.base_ref == 'main'
+
+    steps:
+      - name: Checkout PR merge commit (full history)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # fetch-depth: 0 is required so that:
+          #   - git merge-base can traverse history to find the common ancestor
+          #   - git diff can compare any two commits in the full graph
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch main branch for comparison
+        run: git fetch origin main:refs/remotes/origin/main
+
+      - name: Fetch feature branch tip
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git fetch origin "${HEAD_REF}:refs/remotes/origin/${HEAD_REF}" || true
+          # Ensure the head SHA is available even if the ref fetch didn't land it.
+          git fetch origin "${HEAD_SHA}" || true
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run merge invariant check
+        env:
+          # The feature branch tip SHA (what new-llm looked like before the merge).
+          FEATURE_SHA: ${{ github.event.pull_request.head.sha }}
+          # The merge result commit (the synthetic merge commit GitHub creates
+          # for the PR). This is GITHUB_SHA when checkout is a merge commit.
+          MERGE_SHA: ${{ github.sha }}
+        run: |
+          echo "## Merge Invariant Check (WI-680)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Ref | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| main-ref (base) | \`$(git rev-parse origin/main)\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| feature-ref | \`${FEATURE_SHA}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| merge-ref | \`${MERGE_SHA}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Run the invariant script. Capture output so we can write it to the
+          # step summary AND still let it stream to the CI log.
+          set +e
+          OUTPUT=$(pnpm exec tsx scripts/check-merge-invariant.ts \
+            "$(git rev-parse origin/main)" \
+            "${FEATURE_SHA}" \
+            "${MERGE_SHA}" 2>&1)
+          EXIT_CODE=$?
+          set -e
+
+          echo "${OUTPUT}"
+
+          # Write the script output to the job summary for easy PR review.
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${OUTPUT}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${EXIT_CODE}" -ne 0 ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**:x: Merge invariant FAILED.** " \
+              "Review the output above and either fix the merge or document " \
+              "intentional exclusions in \`scripts/merge-exclusions.json\`." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit "${EXIT_CODE}"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**:white_check_mark: All merge invariants satisfied.**" \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
