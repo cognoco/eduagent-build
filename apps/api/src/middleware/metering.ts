@@ -37,6 +37,16 @@ import {
   getOrProvisionProfileQuotaUsage,
   MeteringError,
 } from '../services/billing';
+// [CUT-B3 / WI-693] v2 store reads for the DB-fallback path, selected by the
+// flag. The quota-satellite hot-path ops (decrementQuota, getTopUpCreditsRemaining,
+// safeRefundQuota) are store-agnostic and unchanged.
+import {
+  ensureFreeSubscriptionV2,
+  getQuotaPoolV2,
+  getEffectiveAccessForSubscriptionV2,
+  getOrProvisionProfileQuotaUsageV2,
+} from '../services/billing/billing-v2';
+import { isIdentityV2Enabled } from '../config';
 import { getTierConfig } from '../services/subscription';
 import { checkQuota } from '../services/metering';
 import {
@@ -84,7 +94,14 @@ function captureKvFailure(
 // ---------------------------------------------------------------------------
 
 export type MeteringEnv = {
-  Bindings: { SUBSCRIPTION_KV?: KVNamespace; IDEMPOTENCY_KV?: KVNamespace };
+  Bindings: {
+    SUBSCRIPTION_KV?: KVNamespace;
+    IDEMPOTENCY_KV?: KVNamespace;
+    // [CUT-B3 / WI-693] Identity-foundation cutover flag — selects the v2
+    // subscription store in the DB-fallback path. 'false'/unset in every
+    // deployed env until the WI-586 flip.
+    IDENTITY_V2_ENABLED?: string;
+  };
   Variables: {
     db: Database;
     account: Account;
@@ -635,26 +652,38 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       subscriptionStatus = cached.status;
     } else {
       // KV miss — fall back to DB
+      // [CUT-B3 / WI-693] Select the v2 subscription store under the flag. The
+      // request-context account.id equals organization.id under the flag, so the
+      // same id keys both stores. Legacy path (flag-off) is byte-identical.
+      const identityV2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
       // CR1: Auto-provision free-tier subscription if none exists
-      const subscription = await ensureFreeSubscription(db, account.id);
+      const subscription = identityV2
+        ? await ensureFreeSubscriptionV2(db, account.id)
+        : await ensureFreeSubscription(db, account.id);
       subscriptionId = subscription.id;
       tier = subscription.tier;
       subscriptionStatus = subscription.status;
-      const access = await getEffectiveAccessForSubscription(
-        db,
-        subscriptionId,
-      );
+      const access = identityV2
+        ? await getEffectiveAccessForSubscriptionV2(db, subscriptionId)
+        : await getEffectiveAccessForSubscription(db, subscriptionId);
       effectiveAccessTier = access?.effectiveAccessTier ?? subscription.tier;
       billingAccess = access?.billingAccess ?? 'current';
       quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
 
       if (quotaModel === 'per-profile') {
-        const profileQuota = await getOrProvisionProfileQuotaUsage(
-          db,
-          subscriptionId,
-          profileId,
-          { tier: effectiveAccessTier },
-        );
+        const profileQuota = identityV2
+          ? await getOrProvisionProfileQuotaUsageV2(
+              db,
+              subscriptionId,
+              profileId,
+              { tier: effectiveAccessTier },
+            )
+          : await getOrProvisionProfileQuotaUsage(
+              db,
+              subscriptionId,
+              profileId,
+              { tier: effectiveAccessTier },
+            );
         if (!profileQuota) {
           return c.json(
             {
@@ -671,7 +700,9 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         usedToday = profileQuota.usedToday;
         cycleResetAt = profileQuota.cycleResetAt;
       } else {
-        const quota = await getQuotaPool(db, subscriptionId);
+        const quota = identityV2
+          ? await getQuotaPoolV2(db, subscriptionId)
+          : await getQuotaPool(db, subscriptionId);
         monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
         usedThisMonth = quota?.usedThisMonth ?? 0;
         dailyLimit = quota?.dailyLimit ?? null;
@@ -847,7 +878,19 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // premium flags unlock the same rung-gated behavior for Pro seats and AI
     // upgrade add-ons.
     const baseLlmTier = getTierConfig(effectiveAccessTier).llmTier;
-    c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
+    // [CUT-B3 / WI-693] `has_premium_llm` is derived, not stored (§1.3) — no
+    // application code ever wrote `profiles.has_premium_llm` (verified). Under v2
+    // the field is always the derived `false`, so the override is dead. Drop it
+    // on the v2 path (llmTier := base, derived from the subscription tier);
+    // keep the legacy override branch byte-identical.
+    c.set(
+      'llmTier',
+      isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+        ? baseLlmTier
+        : profileMeta?.hasPremiumLlm
+          ? 'premium'
+          : baseLlmTier,
+    );
 
     // [WI-133] Wrap handler invocation in try/catch so a thrown error refunds
     // quota before propagating. Without this, any uncaught handler exception
