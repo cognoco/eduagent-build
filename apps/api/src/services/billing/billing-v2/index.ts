@@ -54,6 +54,9 @@ export {
   resetExpiredQuotaCyclesV2,
 } from './trial-v2';
 
+export { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
+export { purchaseTopUpCreditsV2 } from './top-up-v2';
+
 export { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
 
 // Webhook handler twins

@@ -39,10 +39,8 @@ import type {
   RevenuecatWebhookUpdate,
   RevenuecatQuotaUpdate,
 } from '../revenuecat';
-import {
-  reattributeTopUpCreditsOnModelChange,
-  emitTopUpCreditsReattributedMetric,
-} from '../tier';
+import { emitTopUpCreditsReattributedMetric } from '../tier';
+import { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
 import { mapSubscriptionV2Row } from './types-v2';
 import { reconcileQuotaStateForSubscriptionV2 } from './quota-reconcile-v2';
 import { getSubscriptionByAccountIdV2 } from './subscription-core-v2';
@@ -143,7 +141,7 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhookV2(
       await reconcileQuotaStateForSubscriptionV2(txDb, updated.id);
 
       if (previousTier && updates.tier && previousTier !== updates.tier) {
-        reattributedCount = await reattributeTopUpCreditsOnModelChange(
+        reattributedCount = await reattributeTopUpCreditsOnModelChangeV2(
           txDb,
           updated.id,
           organizationId,

@@ -28,7 +28,7 @@ import {
   extractTierFromProductId,
   type RevenueCatEvent,
 } from '../revenuecat-webhook-handler';
-import { purchaseTopUpCredits } from '../tier';
+import { purchaseTopUpCreditsV2 } from './top-up-v2';
 import { getTierConfig } from '../../subscription';
 import { captureException, captureMessage } from '../../sentry';
 import { createLogger } from '../../logger';
@@ -606,8 +606,9 @@ export async function handleNonRenewingPurchaseV2(
   }
 
   // BS-02: Atomic idempotent credit grant — top_up_credits is a satellite keyed
-  // on subscriptionId + the unique revenuecatTransactionId index (unchanged).
-  const granted = await purchaseTopUpCredits(
+  // on subscriptionId + the unique revenuecatTransactionId index (unchanged). The
+  // v2 variant reads the subscription/owner from the new store.
+  const granted = await purchaseTopUpCreditsV2(
     db,
     sub.id,
     credits,
