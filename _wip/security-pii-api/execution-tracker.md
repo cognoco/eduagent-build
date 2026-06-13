@@ -72,50 +72,38 @@ Source: read-only finding-register + subsumption/coordination scan (sub-agent,
 5. **Charter OQ2 (per-finding blast-radius file-touch audit) — DONE at activation**
    (decisions 2+3 above), not deferred to execution. Per-PR fresh-grep still expected.
 
-## 4. Inherited mechanisms (wire from the start)
+## 4. How to run it (process lives in the protocols — this section is lane-specific only)
 
-- **Autonomous review loop (run by a SEPARATE reviewer session — NOT the shepherd):** the
-  reviewer session (currently Codex) owns `review-watcher-v3.ts`, polls all workstreams for
-  `Stage=Reviewing`, and launches the reviewers; it has already added "API Security & PII"
-  coverage. The shepherd does NOT edit/restart/own the watcher — just confirm coverage with the
-  operator/reviewer session on arrival. Recipe (reference only):
-  `_wip/identity-foundation/review-loop-productization-handoff.md`.
-  **DoD = Cosmo Close, not a green PR:** `complete` (→ Reviewing) hands off to this gate; the
-  shepherd owns each WI through the verdict but is NOT notified of it (separate session) — so it
-  MUST run its OWN standing watch on this workstream's WI stages (a Monitor/poll on the
-  `Workstream` relation, Stage field). On `rework` re-dispatch + re-`complete` (adjudicating
-  reviewer misfires per the PRG-13 absorbed-children precedent); on `done` verify the child
-  bulk-close ran; route only `human` verdicts to the operator. The lane closes only when all 7
-  WIs are Closed.
-- **Executor protocol:** dispatch build via `_wip/identity-foundation/executor-protocol.md`
-  (+ example). **Mandatory plan-phase stop before code** — load-bearing (it caught the
-  IF cutover gap).
-- **PR-per-unit, base `main`:** one PR per WI/WP against `main` (post-merge: new-llm is
-  in; `main` is the integration base). Preserves the proven Cosmo review loop. Worktrees
-  under `.worktrees/<branch>/` per the repo worktree-setup skill.
-- **Cosmo lifecycle:** claim before execute · `complete` → Reviewing · never self-close ·
-  WP DoR bridge (`refine --to-ready` authors the bundle brief + links absorbed-provenance
-  children) before claiming. Apply the childless-WP→Item rule at promotion (WI-683):
-  a WP that won't decompose gets demoted, not forced.
-- **Supervision profile (charter):** medium — agent-heavy on the hygiene/input-validation
-  sweeps (WI-700/702); human review on the auth/CI-permission changes (WI-698) and the
-  concurrency fixes (WI-699). Security fixes tagged HIGH need a red-green negative-path
-  break test (repo Fix Development Rules).
-- **Executor model/effort (general rule):** default **Sonnet, standard effort** for
-  executors (reserve Opus for shepherd adjudication); escalate a unit to **Opus** when
-  its difficulty is in the *reasoning*, not the typing — run that unit's plan-phase on
-  Opus, let Sonnet implement once locked. Severity alone is not the trigger. This lane's
-  escalations: **WI-699** (concurrency/atomicity — plan-phase on Opus) and the F-132/F-119
-  trust-boundary pieces of **WI-698**; WI-700–704 stay Sonnet. Full guidance:
-  `shepherd-kickoff-prompt.md` → EXECUTOR MODEL & EFFORT.
-- **Landing checks:** adjudicate red `main` at CI *step* level before bouncing. Known
-  ambient: confirm the chronic staging Deploy red is gone (WI-664 Closed post-merge); if
-  a new ambient red appears, capture it, don't fix it inline.
+Read the standard scaffolds; don't re-derive process here:
+- `_wip/identity-foundation/shepherd-protocol.md` — the shepherd scaffold: your job, the
+  three-role split (the **reviewer is a SEPARATE session** — you self-monitor Cosmo for
+  verdicts; **DoD = Cosmo Close, not a green PR**), dispatch + model/effort defaults, the
+  Cosmo lifecycle.
+- `_wip/identity-foundation/executor-protocol.md` (+ `-example`) — the scaffold your
+  executors follow (Claim → Worktree → Plan → Implement → adversarial-review loop →
+  PR-to-green → Complete) and the thin pointer-brief shape.
+
+Lane-specific only:
+- **Reviewer coverage:** the separate reviewer session already covers Workstream
+  "API Security & PII" (`37e8bce9-1f7c-8161-a3fc-c74c5300a88f`) — confirm on arrival.
+- **PR base `main`; no `Blocked-by` edges** — all 7 units are parallel-safe (slice scan §3)
+  and parallel-safe with the live IF cutover. Childless-WP→Item applies at refine (WI-683).
+- **Supervision (charter = medium):** human review on WI-698 (auth/CI-permission) and WI-699
+  (concurrency); WI-700/702/703/704 are agent-routine. HIGH-severity security fixes
+  (F-119, F-181, F-132) need a red-green negative-path break test.
+- **Model/effort escalations (default Sonnet per the protocol):** run WI-699
+  (concurrency/atomicity) and the F-132/F-119 trust-boundary pieces of WI-698 with an Opus
+  plan-phase; WI-700–704 stay Sonnet.
+- **Landing checks:** WI-664 staging-Deploy red was Closed post-merge — if a NEW ambient red
+  appears, capture it, don't fix inline.
 
 ## 5. Execution state
 
 - 2026-06-13 — **Activated** (program session). Cosmo Workstream "API Security & PII"
   (`37e8bce9-1f7c-8161-a3fc-c74c5300a88f`) + WI-698…704 created (`Stage=Backlog`,
   Workstream Order 1–7). Subsumption + cutover-coordination scan done (§3): 27/27 LIVE,
-  27/27 CLEAN, OQ1/OQ2 resolved. Roster + dashboard promoted to Active. Shepherd kickoff
-  prompt handed to operator; spawn pending.
+  27/27 CLEAN, OQ1/OQ2 resolved. Roster + dashboard promoted to Active.
+- 2026-06-13 — First shepherd shut down pre-execution (its bespoke kickoff was non-standard
+  and lineage-confused). Realigned to the standard machinery: deleted the bespoke kickoff;
+  process now lives in `shepherd-protocol.md` + `executor-protocol.md`, with §4 carrying only
+  the lane-specific bits. Clean thin kickoff handed to operator; fresh spawn pending.
