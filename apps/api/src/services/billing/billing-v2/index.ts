@@ -57,6 +57,17 @@ export {
 export { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
 export { purchaseTopUpCreditsV2 } from './top-up-v2';
 
+export {
+  getSubscriptionForProfileV2,
+  getProfileCountForSubscriptionV2,
+  canAddProfileV2,
+  listFamilyMembersV2,
+  addProfileToSubscriptionV2,
+  removeProfileFromSubscriptionV2,
+  getFamilyPoolStatusV2,
+  ProfileRemovalNotImplementedErrorV2,
+} from './family-v2';
+
 export { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
 
 // Webhook handler twins
