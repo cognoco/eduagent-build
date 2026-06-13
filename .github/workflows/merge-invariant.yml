@@ -1,4 +1,4 @@
-name: Merge Invariant Check
+name: Merge completeness check
 
 # WI-680: Content-level merge verification as an executable CI invariant.
 #
@@ -50,7 +50,7 @@ concurrency:
 
 jobs:
   merge-invariant:
-    name: Content-level merge invariant (WI-680)
+    name: Merge completeness check
     runs-on: ubuntu-latest
     # Belt-and-suspenders guard: this workflow is triggered by `on.pull_request.branches: [main]`
     # but the if: below provides an additional in-job guard so this check never runs

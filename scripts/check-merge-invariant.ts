@@ -357,7 +357,7 @@ function main(): void {
   const cwd = process.cwd();
 
   process.stdout.write(
-    '=== Merge Invariant Check (WI-680) ===\n' +
+    '=== Merge completeness check ===\n' +
       `  main-ref:    ${mainRef}\n` +
       `  feature-ref: ${featureRef}\n` +
       `  merge-ref:   ${mergeRef}\n\n`,
