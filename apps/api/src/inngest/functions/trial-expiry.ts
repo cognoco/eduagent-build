@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { getTierConfig } from '../../services/subscription';
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
@@ -71,6 +71,17 @@ import {
   downgradeExtendedTrialQuotaIfStillExpired,
   findExpiredTrialsByDaysSinceEnd,
 } from '../../services/billing';
+// [CUT-B3 / WI-693] v2 trial-store reads/writes, selected per-step by the
+// cutover flag (isIdentityV2EnabledInStep). The notification + rate-limit +
+// push helpers operate on the satellite/notification tables (store-agnostic).
+import {
+  findExpiredTrialsV2,
+  findSubscriptionsByTrialDateRangeV2,
+  transitionToExtendedTrialV2,
+  downgradeExtendedTrialQuotaIfStillExpiredV2,
+  findExpiredTrialsByDaysSinceEndV2,
+} from '../../services/billing/billing-v2';
+import { findOwnerPersonId } from '../../services/identity-v2/helpers';
 import {
   getTrialWarningMessage,
   getSoftLandingMessage,
@@ -90,8 +101,14 @@ async function sendTrialNotificationToAccountOwner(
     type: 'trial_expiry';
   },
 ): Promise<{ sent: boolean; reason?: string }> {
-  const ownerProfile = await findOwnerProfile(db, accountId);
-  if (!ownerProfile) {
+  // [CUT-B3 / WI-693 §2.5] v2 seam: the push recipient (owner) resolves via
+  // membership.roles @> '{admin}' (findOwnerPersonId) instead of
+  // profiles.is_owner (findOwnerProfile). account.id = organization.id, and
+  // person.id = profiles.id, so the resulting profileId is unchanged.
+  const ownerProfileId = isIdentityV2EnabledInStep()
+    ? await findOwnerPersonId(db, accountId)
+    : ((await findOwnerProfile(db, accountId))?.id ?? null);
+  if (!ownerProfileId) {
     return { sent: false, reason: 'no_owner_profile' };
   }
 
@@ -109,7 +126,7 @@ async function sendTrialNotificationToAccountOwner(
   // preserves the original "one push per 24h" semantics.
   const limited = await checkAndLogRateLimitInternal(
     db,
-    ownerProfile.id,
+    ownerProfileId,
     'trial_expiry',
     { hours: 24, maxCount: 1 },
   );
@@ -122,7 +139,7 @@ async function sendTrialNotificationToAccountOwner(
   // push itself fails, we accept the unsent-but-logged state — a duplicate
   // push (user-visible) is worse than an unsent one (recoverable).
   return sendPushNotification(db, {
-    profileId: ownerProfile.id,
+    profileId: ownerProfileId,
     title: payload.title,
     body: payload.body,
     type: payload.type,
@@ -153,17 +170,28 @@ export const trialExpiry = inngest.createFunction(
     const expiredResult = await step.run('process-expired-trials', async () => {
       const now = new Date(nowIso);
       const db = getStepDatabase();
-      const expiredTrials = await findExpiredTrials(db, now);
+      // [CUT-B3 / WI-693 §2.5] v2 seam: read/write trials in the new
+      // `subscription` store. Legacy (flag-off) is byte-identical.
+      const v2 = isIdentityV2EnabledInStep();
+      const expiredTrials = v2
+        ? await findExpiredTrialsV2(db, now)
+        : await findExpiredTrials(db, now);
 
       let count = 0;
       const failures: TrialExpiryFailureEvent[] = [];
       for (const trial of expiredTrials) {
         try {
-          const applied = await transitionToExtendedTrial(
-            db,
-            trial.id,
-            EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
-          );
+          const applied = v2
+            ? await transitionToExtendedTrialV2(
+                db,
+                trial.id,
+                EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
+              )
+            : await transitionToExtendedTrial(
+                db,
+                trial.id,
+                EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
+              );
           if (applied) {
             count++;
           } else {
@@ -211,13 +239,16 @@ export const trialExpiry = inngest.createFunction(
       async () => {
         const now = new Date(nowIso);
         const db = getStepDatabase();
+        const v2 = isIdentityV2EnabledInStep();
         // Find subscriptions whose trial ended exactly TRIAL_EXTENDED_DAYS ago
         // (i.e. they've been in extended trial for the full 14-day window)
-        const extendedTrials = await findExpiredTrialsByDaysSinceEnd(
-          db,
-          now,
-          TRIAL_EXTENDED_DAYS,
-        );
+        const extendedTrials = v2
+          ? await findExpiredTrialsByDaysSinceEndV2(
+              db,
+              now,
+              TRIAL_EXTENDED_DAYS,
+            )
+          : await findExpiredTrialsByDaysSinceEnd(db, now, TRIAL_EXTENDED_DAYS);
 
         let count = 0;
         const failures: TrialExpiryFailureEvent[] = [];
@@ -225,12 +256,19 @@ export const trialExpiry = inngest.createFunction(
 
         for (const trial of extendedTrials) {
           try {
-            const applied = await downgradeExtendedTrialQuotaIfStillExpired(
-              db,
-              trial.id,
-              freeTier.monthlyQuota,
-              freeTier.dailyLimit,
-            );
+            const applied = v2
+              ? await downgradeExtendedTrialQuotaIfStillExpiredV2(
+                  db,
+                  trial.id,
+                  freeTier.monthlyQuota,
+                  freeTier.dailyLimit,
+                )
+              : await downgradeExtendedTrialQuotaIfStillExpired(
+                  db,
+                  trial.id,
+                  freeTier.monthlyQuota,
+                  freeTier.dailyLimit,
+                );
             if (applied) {
               count++;
             } else {
@@ -289,6 +327,7 @@ export const trialExpiry = inngest.createFunction(
     const warningsSent = await step.run('send-trial-warnings', async () => {
       const now = new Date(nowIso);
       const db = getStepDatabase();
+      const v2 = isIdentityV2EnabledInStep();
       let sent = 0;
 
       for (const daysRemaining of [3, 1, 0]) {
@@ -309,12 +348,19 @@ export const trialExpiry = inngest.createFunction(
           targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
         );
 
-        const trialsToWarn = await findSubscriptionsByTrialDateRange(
-          db,
-          'trial',
-          targetDayStart,
-          targetDayEnd,
-        );
+        const trialsToWarn = v2
+          ? await findSubscriptionsByTrialDateRangeV2(
+              db,
+              'trial',
+              targetDayStart,
+              targetDayEnd,
+            )
+          : await findSubscriptionsByTrialDateRange(
+              db,
+              'trial',
+              targetDayStart,
+              targetDayEnd,
+            );
 
         for (const trial of trialsToWarn) {
           const result = await sendTrialNotificationToAccountOwner(
@@ -339,6 +385,7 @@ export const trialExpiry = inngest.createFunction(
       async () => {
         const now = new Date(nowIso);
         const db = getStepDatabase();
+        const v2 = isIdentityV2EnabledInStep();
         let sent = 0;
 
         for (const daysSinceEnd of [1, 7, 14]) {
@@ -355,12 +402,19 @@ export const trialExpiry = inngest.createFunction(
             targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
           );
 
-          const expiredTrials = await findSubscriptionsByTrialDateRange(
-            db,
-            'expired',
-            targetDayStart,
-            targetDayEnd,
-          );
+          const expiredTrials = v2
+            ? await findSubscriptionsByTrialDateRangeV2(
+                db,
+                'expired',
+                targetDayStart,
+                targetDayEnd,
+              )
+            : await findSubscriptionsByTrialDateRange(
+                db,
+                'expired',
+                targetDayStart,
+                targetDayEnd,
+              );
 
           for (const trial of expiredTrials) {
             const result = await sendTrialNotificationToAccountOwner(

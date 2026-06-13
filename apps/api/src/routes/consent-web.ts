@@ -4,6 +4,11 @@ import {
   processConsentResponse,
   getChildNameByToken,
 } from '../services/consent';
+import { isIdentityV2Enabled } from '../config';
+import {
+  processConsentResponseV2,
+  getChildNameByTokenV2,
+} from '../services/identity-v2/consent-v2';
 import {
   // The consent-respond limiter is a SHARED in-memory instance: the unauth
   // web POST and the authed JSON endpoint must throttle against the same map,
@@ -22,9 +27,24 @@ type ConsentWebEnv = {
   Bindings: {
     DATABASE_URL: string;
     CONSENT_POLICY_VERSION: string;
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: { db: Database };
 };
+
+/**
+ * [CUT-B2] Token → child name, dispatching to the v2 (consent_request) or
+ * legacy (consent_states) reader by the flag. Same null semantics.
+ */
+function dispatchGetChildNameByToken(
+  c: { env?: { IDENTITY_V2_ENABLED?: string } },
+  db: Database,
+  token: string,
+): Promise<string | null> {
+  return isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+    ? getChildNameByTokenV2(db, token)
+    : getChildNameByToken(db, token);
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -169,7 +189,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     }
 
     const db = c.get('db');
-    const childName = await getChildNameByToken(db, token);
+    const childName = await dispatchGetChildNameByToken(c, db, token);
 
     if (!childName) {
       return c.html(
@@ -233,7 +253,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     }
 
     const db = c.get('db');
-    const childName = await getChildNameByToken(db, token);
+    const childName = await dispatchGetChildNameByToken(c, db, token);
 
     if (!childName) {
       return c.html(
@@ -345,16 +365,22 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
 
     try {
       // Fetch child name BEFORE processing — denial deletes the profile
-      const childName = (await getChildNameByToken(db, token)) ?? 'Your child';
+      const childName =
+        (await dispatchGetChildNameByToken(c, db, token)) ?? 'Your child';
       // [Bug #872] Audit metadata captured at response time.
-      await processConsentResponse(db, token, approved, {
+      const audit = {
         policyVersion: c.env.CONSENT_POLICY_VERSION,
         requestIp:
           c.req.header('cf-connecting-ip') ??
           c.req.header('x-forwarded-for') ??
           undefined,
         userAgent: c.req.header('user-agent') ?? undefined,
-      });
+      };
+      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+        await processConsentResponseV2(db, token, approved, audit);
+      } else {
+        await processConsentResponse(db, token, approved, audit);
+      }
 
       if (approved) {
         // Approval landing — per UX spec: celebratory page with next steps

@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-81ce-9e4d-f8547a1c2b72",
+  "id": "WI-717",
+  "name": "WP-arch-correctness-races",
+  "description": "Three lost-update / non-atomic concurrency races where a read-compute-write can lose a concurrent update. F-169 — reviewVocabulary SM-2 update in services/vocabulary.ts: the wrapping transaction does not provide the isolation it appears to claim, so two concurrent reviews of the same vocab item can lose one update (corrupts SM-2 scheduling state: ease/interval/due). F-170 — pending celebration writes in services/celebrations.ts can lose concurrent updates. F-171 — celebration writes: the READ happens OUTSIDE the SELECT FOR UPDATE lock, so the lock does not actually protect the read-compute-write window. Fixes require precise lock-scope / isolation / atomic-SQL reasoning — Opus plan-phase, Sonnet implements.",
+  "acceptanceCriteria": "Each race closed so concurrent same-entity requests cannot lose an update — read-compute-write made atomic via correct lock scope (read INSIDE the SELECT FOR UPDATE / row lock), an appropriate isolation level, or an atomic SQL update. MANDATORY red-green concurrency break test per variant (F-169 SM-2, F-170 pending-celebration, F-171 read-outside-lock): each reproduces the lost update against the PRE-FIX code (demonstrated RED via revert/stash — write test -> pass -> revert fix -> fail -> restore) and passes after. No internal mocks (GC1/GC6) — exercise the real DB path. Outcome: under concurrent same-row writes the final persisted state reflects BOTH updates (no lost update); no new deadlock. Confirm exact current sites by reading services/vocabulary.ts (reviewVocabulary) and services/celebrations.ts before planning.",
+  "riskImpact": "P1 — silent data corruption under concurrency. Lost SM-2 updates degrade spaced-repetition scheduling correctness (wrong intervals/due dates); lost celebration/progress updates corrupt progress state. Failures are silent and hard to detect post-hoc, eroding learning-state integrity. Concurrency fixes are subtle (lock ordering / isolation) — a mis-fix risks deadlock or false confidence, hence the Opus plan-phase + mandatory negative-path proof.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

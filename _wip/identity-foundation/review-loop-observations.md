@@ -297,6 +297,39 @@ productionization implication.
   the foundational unit's phase-0 STOP caught two issues that a straight-to-PR flow
   would have pushed into the CI/review loop (or worse, the staging freeze).
 
+- **2026-06-13 — the CUT-B wave: the gate caught a real defect in every single
+  unit, several of which a green-CI read would have shipped.** Tally across the
+  application cutover: CUT-A (2 — actor_id convergence-abort via self-review, the
+  F14 RLS false-positive), CUT-B1 (8 — consent tiebreak, BUG-411 discrimination,
+  multi-membership fail-closed, TOCTOU, escalation parity, …), CUT-B2 (deletion
+  erase-vs-rehome + 2 child-safety concurrency races), CUT-B3 (a v2-cancel
+  split-brain). Three patterns worth productionizing:
+  - **"Behavior-preserving" is a trap when the NEW schema forbids the old
+    behavior.** CUT-B2's executor planned to ERASE `consent_grant` on deletion
+    (mirroring legacy's cascade) — which the new model's `ON DELETE RESTRICT` +
+    retain-tier were *explicitly designed to prevent* (canon §6.1: re-home the
+    receipt, don't destroy it). The catch came from the shepherd **verifying the
+    plan against canon instead of rubber-stamping it** — the executor even cited
+    "§4.8 re-home" while recommending erase. Lesson: at a cutover phase-0, diff the
+    proposed behavior against the *new* schema's intent, not just the legacy one;
+    a `RESTRICT`/retain-tier is a deliberate signal that the legacy behavior is the
+    bug being fixed.
+  - **Concurrency guards silently dropped in the re-write are the highest-severity
+    misses.** CUT-B2's v2 deletion dropped legacy's request-*generation* window
+    (`requested_at >= requestedAt`) and lacked the restore-vs-delete lock — two
+    races that could *wrongfully delete a child*. The reviewer (Codex) caught both
+    as P1; the shepherd triaged them to the WI-583 advisory-lock pattern. Lesson:
+    when re-platforming a guarded delete/update, enumerate the legacy guards
+    (generation windows, `FOR UPDATE`, advisory locks) and require each to be
+    re-proven red-green on the v2 path — they don't show up in a happy-path diff.
+  - **Stall recovery must RE-VERIFY, not blind-ship the branch.** CUT-B2's executor
+    stalled (watchdog) mid-final-verify with the implementation committed but
+    unpushed. Re-dispatching a fresh executor *to run the verification the dead one
+    didn't finish* caught a real unguarded `weekly-progress-push` legacy query
+    before the PR opened. Lesson: the recovery brief for a stalled executor is
+    "verify + ship," never "just push what's there" — the stall often happens
+    *because* verification was about to surface something.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no

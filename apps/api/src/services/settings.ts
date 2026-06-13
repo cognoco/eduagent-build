@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, sql, exists } from 'drizzle-orm';
+import { eq, and, gte, ne, sql, exists } from 'drizzle-orm';
 import { NotFoundError } from '../errors';
 import {
   notificationPreferences,
@@ -520,6 +520,11 @@ export async function getDailyNotificationCount(
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
 
+  // Exclude rate-limit-sentinel types that share the notification_log
+  // table but are NOT user-visible push notifications. Without this filter,
+  // each outbox-spillover rate-limit check inserts a row with type
+  // 'support_outbox_spillover' that counts toward the MAX_DAILY_PUSH cap and
+  // can silently block all push notifications for the day.
   const rows = await db
     .select()
     .from(notificationLog)
@@ -527,6 +532,7 @@ export async function getDailyNotificationCount(
       and(
         eq(notificationLog.profileId, profileId),
         gte(notificationLog.sentAt, startOfDay),
+        ne(notificationLog.type, 'support_outbox_spillover'),
       ),
     );
 

@@ -1,0 +1,17 @@
+{
+  "pageId": "37d8bce9-1f7c-81f2-aca5-fc224a017e1e",
+  "id": "WI-689",
+  "name": "CUT-A: additive identity schema extension (M-HOMES + M-RESEED2 + ADR + canon lockstep)",
+  "description": "EXECUTION GATE: starts only after the new-llm merge lands on main (PRG-17 boundary event 'new-llm merged') - CUT-A's drizzle generate must run against the post-merge journal. Plan sec-1. One additive, reversible change-set: role-named migrations M-HOMES (consent_request table per sec-1.2 - basis-keyed single-row recycling per OQ-5, GDPR/COPPA coexistence-safe unique key, RLS ENABLE + policy + coverage-manifest registration per sec-1.2a; person re-homes per sec-1.3 incl. pronouns/avatar_url/default_app_context/archived_at + birth_year_set_by -> knowledge_assertions with OQ-9 provisional confidence seeds; subscription store-correlation/idempotency columns per sec-1.4) and M-RESEED2 (reseed-block + verify-identity-reseed.mjs extension per sec-1.5 - lands in CUT-A, runs at convergence). Matching Drizzle defs in packages/database/src/schema/identity.ts. Canon lockstep IN THE SAME change-set: docs/canon/identity/data-model.md sec-2B + the Appendix A ADR (number at landing). MANDATORY generate-preflight before drizzle-kit generate: stray concepts/concept_mastery DDL (TS-defined, journal-removed 0107) must be deliberately shipped separately or excluded - never silently bundled; the branch's hand-curated 0111/0112 snapshots make this load-bearing. Migration numbers next-free at landing, never pre-assigned. FALLBACK duty (plan sec-1.2a): if PRG-17 WI-687 (ledger TS-side RLS registration) has not landed pre-merge, this unit's manifest PR carries the mentor_activity_ledger registration. Purpose vocabulary finalized as-is per OQ-8.",
+  "acceptanceCriteria": "Everything additive (no legacy object touched; reversible by dropping added objects); generate-preflight output recorded in the PR; consent_request RLS + manifest registration in; ADR + data-model sec-2B land in the same PR; verify script extended; CI green.",
+  "riskImpact": "P1: every CUT-B unit reads/writes these objects; preflight failure = stray DDL in prod migration.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

@@ -1,13 +1,24 @@
 // @inngest-admin: cross-profile
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { familyLinks, profiles, weeklyReports } from '@eduagent/database';
+import {
+  familyLinks,
+  person,
+  profiles,
+  weeklyReports,
+} from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import {
   listEligibleSelfReportProfileIds,
   listEligibleSelfReportProfileIdsAtLocalHour9,
 } from '../../services/solo-progress-reports';
+import {
+  listEligibleSelfReportPersonIdsV2,
+  listEligibleSelfReportPersonIdsAtLocalHour9V2,
+} from '../../services/identity-v2/solo-progress-reports-v2';
+import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { getGuardianPersonIds } from '../../services/identity-v2/guardianship';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import {
   filterProgressMetricsToActiveSubjects,
@@ -131,14 +142,10 @@ export const weeklySelfReportCron = inngest.createFunction(
 
     const profileIds = await step.run('find-weekly-self-profiles', async () => {
       const db = getStepDatabase();
-      return listEligibleSelfReportProfileIdsAtLocalHour9(
-        db,
-        {
-          start: trailingWeekStart,
-          endExclusive: currentWeekStart,
-        },
-        nowUtc,
-      );
+      const win = { start: trailingWeekStart, endExclusive: currentWeekStart };
+      return isIdentityV2EnabledInStep()
+        ? listEligibleSelfReportPersonIdsAtLocalHour9V2(db, win, nowUtc)
+        : listEligibleSelfReportProfileIdsAtLocalHour9(db, win, nowUtc);
     });
 
     if (profileIds.length === 0) {
@@ -190,11 +197,15 @@ export const weeklySelfReportGenerate = inngest.createFunction(
     try {
       const result = await step.run('generate-weekly-self-report', async () => {
         const db = getStepDatabase();
-
-        const eligibleProfileIds = await listEligibleSelfReportProfileIds(db, {
+        const v2 = isIdentityV2EnabledInStep();
+        const win = {
           start: activityWindowStart,
           endExclusive: reportWeekStartDate,
-        });
+        };
+
+        const eligibleProfileIds = v2
+          ? await listEligibleSelfReportPersonIdsV2(db, win)
+          : await listEligibleSelfReportProfileIds(db, win);
         if (!eligibleProfileIds.includes(profileId)) {
           return {
             status: 'skipped' as const,
@@ -203,7 +214,10 @@ export const weeklySelfReportGenerate = inngest.createFunction(
           };
         }
 
-        if (!(await isGdprProcessingAllowed(db, profileId))) {
+        const gdprOk = v2
+          ? await isGdprProcessingAllowedV2(db, profileId)
+          : await isGdprProcessingAllowed(db, profileId);
+        if (!gdprOk) {
           return {
             status: 'skipped' as const,
             reason: 'consent_not_granted',
@@ -211,11 +225,15 @@ export const weeklySelfReportGenerate = inngest.createFunction(
           };
         }
 
-        const linkedChild = await db.query.familyLinks.findFirst({
-          where: eq(familyLinks.childProfileId, profileId),
-          columns: { childProfileId: true },
-        });
-        if (linkedChild) {
+        // Linked-child exclusion: v2 = is the charge of an active guardianship
+        // edge; legacy = appears as a family_links child.
+        const isLinkedChild = v2
+          ? (await getGuardianPersonIds(db, profileId)).length > 0
+          : (await db.query.familyLinks.findFirst({
+              where: eq(familyLinks.childProfileId, profileId),
+              columns: { childProfileId: true },
+            })) != null;
+        if (isLinkedChild) {
           return {
             status: 'skipped' as const,
             reason: 'linked_child_profile',
@@ -223,10 +241,18 @@ export const weeklySelfReportGenerate = inngest.createFunction(
           };
         }
 
-        const profile = await db.query.profiles.findFirst({
-          where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
-          columns: { displayName: true },
-        });
+        const profile = v2
+          ? await db.query.person.findFirst({
+              where: and(eq(person.id, profileId), isNull(person.archivedAt)),
+              columns: { displayName: true },
+            })
+          : await db.query.profiles.findFirst({
+              where: and(
+                eq(profiles.id, profileId),
+                isNull(profiles.archivedAt),
+              ),
+              columns: { displayName: true },
+            });
         if (!profile) {
           return {
             status: 'skipped' as const,
@@ -360,10 +386,13 @@ export const selfProgressReportsBackfill = inngest.createFunction(
       'find-backfill-monthly-self-profiles',
       async () => {
         const db = getStepDatabase();
-        return listEligibleSelfReportProfileIds(db, {
+        const win = {
           start: lastMonthStart,
           endExclusive: lastMonthEndExclusive,
-        });
+        };
+        return isIdentityV2EnabledInStep()
+          ? listEligibleSelfReportPersonIdsV2(db, win)
+          : listEligibleSelfReportProfileIds(db, win);
       },
     );
 
@@ -379,13 +408,13 @@ export const selfProgressReportsBackfill = inngest.createFunction(
             currentWeekStart,
             weekOffset * 7,
           );
-          const eligibleProfileIds = await listEligibleSelfReportProfileIds(
-            db,
-            {
-              start: subtractDays(reportWeekStartDate, 7),
-              endExclusive: reportWeekStartDate,
-            },
-          );
+          const backfillWin = {
+            start: subtractDays(reportWeekStartDate, 7),
+            endExclusive: reportWeekStartDate,
+          };
+          const eligibleProfileIds = isIdentityV2EnabledInStep()
+            ? await listEligibleSelfReportPersonIdsV2(db, backfillWin)
+            : await listEligibleSelfReportProfileIds(db, backfillWin);
 
           targets.push(
             ...eligibleProfileIds.map((profileId) => ({

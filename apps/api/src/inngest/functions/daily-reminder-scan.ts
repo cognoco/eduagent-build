@@ -18,7 +18,7 @@
 
 import { sql, eq, gt, and, or, exists, notExists, isNull } from 'drizzle-orm';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import {
   profiles,
   accounts,
@@ -26,7 +26,11 @@ import {
   notificationPreferences,
   notificationLog,
   consentStates,
+  membership,
+  organization,
+  person,
 } from '@eduagent/database';
+import { consentGateSatisfiedSql } from '../../services/identity-v2/consent-status-v2';
 
 export const dailyReminderScan = inngest.createFunction(
   { id: 'daily-reminder-scan', name: 'Daily reminder scan (hourly)' },
@@ -35,6 +39,59 @@ export const dailyReminderScan = inngest.createFunction(
     // Step 1: Find profiles with active streaks at their local morning
     const eligible = await step.run('find-streak-profiles', async () => {
       const db = getStepDatabase();
+
+      // [CUT-B2] v2 scan: profiles×accounts → person×membership×organization;
+      // timezone from organization; the consent CONSENTED-EXISTS-OR-no-rows
+      // filter from the shared consentGateSatisfiedSql (current-row windowed).
+      if (isIdentityV2EnabledInStep()) {
+        const results = await db
+          .select({
+            profileId: person.id,
+            currentStreak: streaks.currentStreak,
+          })
+          .from(person)
+          .innerJoin(membership, eq(membership.personId, person.id))
+          .innerJoin(
+            organization,
+            eq(organization.id, membership.organizationId),
+          )
+          .innerJoin(
+            streaks,
+            and(eq(streaks.profileId, person.id), gt(streaks.currentStreak, 0)),
+          )
+          .innerJoin(
+            notificationPreferences,
+            and(
+              eq(notificationPreferences.profileId, person.id),
+              eq(notificationPreferences.pushEnabled, true),
+              eq(notificationPreferences.dailyReminders, true),
+            ),
+          )
+          .where(
+            and(
+              isNull(person.archivedAt),
+              consentGateSatisfiedSql(sql`${person.id}`),
+              sql`(NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::time >= TIME '08:30'
+                  AND (NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::time < TIME '09:30'`,
+              notExists(
+                db
+                  .select({ _: sql`1` })
+                  .from(notificationLog)
+                  .where(
+                    and(
+                      eq(notificationLog.profileId, person.id),
+                      eq(notificationLog.type, 'daily_reminder'),
+                      sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::date`,
+                    ),
+                  ),
+              ),
+            ),
+          );
+        return results.map((r) => ({
+          profileId: r.profileId,
+          streakDays: r.currentStreak,
+        }));
+      }
 
       const results = await db
         .select({

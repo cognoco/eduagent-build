@@ -21,9 +21,16 @@ import type {
   InterestEntry,
   Pronouns,
 } from '@eduagent/schemas';
-import { ForbiddenError, PRONOUNS_PROMPT_MIN_AGE } from '@eduagent/schemas';
+import {
+  ForbiddenError,
+  ConflictError,
+  PRONOUNS_PROMPT_MIN_AGE,
+} from '@eduagent/schemas';
 import { calculateAge } from '../consent';
-import { getOrCreateLearningProfile } from '../learner-profile';
+import {
+  getLearningProfile,
+  getOrCreateLearningProfile,
+} from '../learner-profile';
 import { sanitizeXmlValue } from '../llm/sanitize';
 
 /**
@@ -168,7 +175,9 @@ export async function updateInterestsContext(
 
   // Ensure the learning_profiles row exists — see the accommodation-mode
   // precedent at learner-profile.ts:updateAccommodationMode. Idempotent.
-  await getOrCreateLearningProfile(db, profileId);
+  // Returns the row including its current optimistic-concurrency version, which
+  // seeds the compare-and-set below.
+  let profile = await getOrCreateLearningProfile(db, profileId);
 
   // [WI-227 / DS-138] Sanitize at storage so a hostile label cannot smuggle
   // a `\nSystem:` directive through a consumer that skips re-sanitization.
@@ -182,14 +191,50 @@ export async function updateInterestsContext(
     }))
     .filter((entry) => entry.label.length > 0);
 
-  await db
-    .update(learningProfiles)
-    .set({
-      interests: safeInterests,
-      // Bump optimistic-concurrency version so other writers retry (mirrors
-      // the pattern used by applyAnalysis/mergeInterests).
-      version: sql`${learningProfiles.version} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(learningProfiles.profileId, profileId));
+  // Compare-and-set on the optimistic-concurrency version. The version bump
+  // alone (without checking it) was decorative: two concurrent picker submits
+  // would both pass and last-writer-wins would silently drop one. Gating the
+  // UPDATE on the version we read turns each write into a provable land
+  // (rowCount === 1) or a detected conflict that we retry, so a concurrent
+  // write can never silently vanish. The interests payload is
+  // caller-authoritative (a wholesale replace), so a retry simply re-reads the
+  // current version and re-applies the same submitted set.
+  const MAX_CAS_ATTEMPTS = 3;
+  for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt++) {
+    const expectedVersion = profile.version;
+    const updated = await db
+      .update(learningProfiles)
+      .set({
+        interests: safeInterests,
+        version: sql`${learningProfiles.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(learningProfiles.profileId, profileId),
+          eq(learningProfiles.version, expectedVersion),
+        ),
+      )
+      .returning({ id: learningProfiles.id });
+
+    if (updated.length > 0) {
+      return;
+    }
+
+    // A concurrent writer advanced the version between our read and this write.
+    // Re-read and retry. The row exists (we created it above), so a missing
+    // re-read is an anomaly worth surfacing rather than silently succeeding.
+    const refreshed = await getLearningProfile(db, profileId);
+    if (!refreshed) {
+      throw new OnboardingNotFoundError(profileId);
+    }
+    profile = refreshed;
+  }
+
+  // Bounded retries exhausted under sustained concurrent contention. Escalate
+  // explicitly (→ 409) rather than recover silently — the silent-recovery ban
+  // applies to writes that must provably land.
+  throw new ConflictError(
+    `updateInterestsContext: optimistic-concurrency retries exhausted for profile ${profileId}`,
+  );
 }
