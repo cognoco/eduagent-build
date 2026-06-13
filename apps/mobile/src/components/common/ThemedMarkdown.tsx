@@ -1,7 +1,24 @@
-import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
+import {
+  useCallback,
+  useMemo,
+  type ComponentProps,
+  type ComponentType,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { Text, type TextStyle } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useThemeColors } from '../../lib/theme';
+
+// The published @types for react-native-markdown-display omit allowedImageHandlers
+// even though the JS implementation supports it as a first-class prop (used to
+// restrict which image origins are rendered). Extend the inferred props type so
+// TypeScript accepts it without a cast.
+type MarkdownProps = ComponentProps<typeof Markdown> & {
+  allowedImageHandlers?: string[];
+  defaultImageHandler?: string;
+};
+const MarkdownComponent = Markdown as ComponentType<MarkdownProps>;
 
 // Themed markdown renderer for LLM-generated content (chat replies, saved
 // notes). The single rule that keeps text visible: prose colour and the
@@ -133,7 +150,7 @@ export function ThemedMarkdown({
   }, []);
 
   return (
-    <Markdown
+    <MarkdownComponent
       mergeStyle={false}
       style={mdStyles}
       onLinkPress={handleLinkPress}
@@ -158,6 +175,6 @@ export function ThemedMarkdown({
       }}
     >
       {children}
-    </Markdown>
+    </MarkdownComponent>
   );
 }
