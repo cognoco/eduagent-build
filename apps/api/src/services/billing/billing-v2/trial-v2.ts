@@ -257,6 +257,53 @@ export async function transitionToExtendedTrialFromRevenuecatEventV2(
   });
 }
 
+/**
+ * v2 of downgradeExtendedTrialQuotaIfStillExpired. The stale-selection guard
+ * joins the new `subscription` table (status='expired' AND plan_tier='free')
+ * instead of `subscriptions` (status='expired' AND tier='free'). The quota_pools
+ * write is unchanged.
+ */
+export async function downgradeExtendedTrialQuotaIfStillExpiredV2(
+  db: Database,
+  subscriptionId: string,
+  monthlyLimit: number,
+  dailyLimit: number | null = null,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const currentPool = await findQuotaPool__unscoped(txDb, subscriptionId);
+    if (
+      currentPool &&
+      currentPool.monthlyLimit === monthlyLimit &&
+      currentPool.dailyLimit === dailyLimit
+    ) {
+      return false;
+    }
+
+    const rows = await tx
+      .update(quotaPools)
+      .set({
+        monthlyLimit,
+        usedThisMonth: 0,
+        dailyLimit,
+        usedToday: 0,
+        updatedAt: new Date(),
+      })
+      .from(subscriptionTable)
+      .where(
+        and(
+          eq(quotaPools.subscriptionId, subscriptionId),
+          eq(subscriptionTable.id, subscriptionId),
+          eq(subscriptionTable.status, 'expired'),
+          eq(subscriptionTable.planTier, 'free'),
+        ),
+      )
+      .returning({ id: quotaPools.id });
+
+    return rows.length > 0;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Cycle reset (joins the subscription store for tier-aware limits)
 // ---------------------------------------------------------------------------

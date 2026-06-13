@@ -50,6 +50,7 @@ export {
   findExpiredTrialsByDaysSinceEndV2,
   transitionToExtendedTrialV2,
   transitionToExtendedTrialFromRevenuecatEventV2,
+  downgradeExtendedTrialQuotaIfStillExpiredV2,
   resetExpiredQuotaCyclesV2,
 } from './trial-v2';
 
