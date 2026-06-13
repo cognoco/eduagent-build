@@ -55,7 +55,10 @@ repo PR Review & CI Protocol. Triage findings:
 1. CI passes, AND
 2. no valid `blocker` / `must fix` / `should fix` findings remain.
 
-Do not claim completion until both hold.
+Do not claim completion until both hold. **"Green" is the strict shared definition** in
+`shepherd-protocol.md` → *Merging the WP*: every required check `SUCCESS`, `claude-review`
+actually green (a red/absent review is not approval), no valid blocker/must-fix/should-fix
+finding, `mergeStateStatus` `CLEAN`. Never call a PR with any red check "green".
 
 **Phase 7 — Complete.** Only after the PR is green: run `/cosmo:execute
 complete` (authors Fixed In + completion summary, → Stage=Reviewing, releases
