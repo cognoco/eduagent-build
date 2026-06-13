@@ -138,6 +138,21 @@ id = "00000000000000000000000000000000"
   assert.equal(hasConcreteKvBinding(toml, 'production', 'IDEMPOTENCY_KV'), false);
 });
 
+test('RED: a missing id is NOT borrowed from a following [vars] table (over-capture guard)', () => {
+  // The IDEMPOTENCY_KV block has a binding but NO id; a later single-bracket
+  // [vars] table carries a 32-hex `id`. The block boundary must stop at `[vars]`
+  // so the two are never mis-joined into a false pass.
+  const toml = `[env.production]
+
+[[env.production.kv_namespaces]]
+binding = "IDEMPOTENCY_KV"
+
+[vars]
+id = "0123456789abcdef0123456789abcdef"
+`;
+  assert.equal(hasConcreteKvBinding(toml, 'production', 'IDEMPOTENCY_KV'), false);
+});
+
 test('non-default binding name is honored (COACHING_KV concrete → true)', () => {
   assert.equal(hasConcreteKvBinding(productionToml(PRD_ID), 'production', 'COACHING_KV'), true);
 });

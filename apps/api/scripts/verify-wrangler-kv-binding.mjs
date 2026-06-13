@@ -15,20 +15,21 @@ const REAL_KV_ID_PATTERN = /^[0-9a-f]{32}$/;
  * section.
  *
  * Block capture: match each `[[env.<env>.kv_namespaces]]` body up to the next
- * table header or true end-of-input. The end-of-input alternative MUST be
+ * table header (`^\s*\[` — ANY `[...]` / `[[...]]`, so a following single-bracket
+ * table like `[vars]` cannot be swallowed into this body and have its `id`
+ * mis-attributed) or true end-of-input. The end-of-input alternative MUST be
  * `$(?![\s\S])`, not a bare `$`: under the `m` flag a bare `$` matches at every
  * line break, so the lazy `([\s\S]*?)` stops at the end of the header line and
  * captures an EMPTY body — which made the binding/id lookups below fail for
  * every block, even a correctly-rendered concrete one (the bug this fixes).
- * `$(?![\s\S])` only matches at the actual end of the string, so the lazy
- * capture extends until the next `^[[` / `^[env.` header.
+ * `$(?![\s\S])` only matches at the actual end of the string.
  */
 export function hasConcreteKvBinding(content, envName, bindingName) {
   const envTablePattern = envName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const blocks = Array.from(
     content.matchAll(
       new RegExp(
-        `^\\[\\[env\\.${envTablePattern}\\.kv_namespaces\\]\\]([\\s\\S]*?)(?=^\\[\\[|^\\[env\\.|$(?![\\s\\S]))`,
+        `^\\[\\[env\\.${envTablePattern}\\.kv_namespaces\\]\\]([\\s\\S]*?)(?=^\\s*\\[|$(?![\\s\\S]))`,
         'gm',
       ),
     ),
@@ -36,8 +37,8 @@ export function hasConcreteKvBinding(content, envName, bindingName) {
 
   return blocks.some((block) => {
     const body = block[1] ?? '';
-    const binding = body.match(/^binding\s*=\s*"([^"]+)"/m)?.[1];
-    const id = body.match(/^id\s*=\s*"([^"]+)"/m)?.[1];
+    const binding = body.match(/^\s*binding\s*=\s*"([^"]+)"/m)?.[1];
+    const id = body.match(/^\s*id\s*=\s*"([^"]+)"/m)?.[1];
     return binding === bindingName && Boolean(id) && REAL_KV_ID_PATTERN.test(id);
   });
 }
