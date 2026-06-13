@@ -268,16 +268,35 @@ export async function reviewVocabulary(
     throw new VocabularyNotFoundError();
   }
 
-  // Wrap read-compute-write in a transaction to prevent SM-2 race conditions:
-  // concurrent reviews reading the same consecutiveSuccesses would silently
-  // overwrite each other's SM-2 parameters without serialization.
+  // Wrap read-compute-write in a transaction AND acquire a row lock so that
+  // concurrent reviews of the same card serialise. The transaction alone gives
+  // atomicity, not isolation: under READ COMMITTED a plain read takes no lock,
+  // so two concurrent reviews would read the same consecutiveSuccesses and the
+  // later commit would silently overwrite the earlier (lost SM-2 update). The
+  // SELECT ... FOR UPDATE below blocks the second reviewer until the first
+  // commits, then it reads the already-updated row.
   const txResult = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
-    const card = await ensureVocabularyRetentionCard(
-      txDb,
-      profileId,
-      vocabularyId,
-    );
+    // Ensure a row exists (idempotent ON CONFLICT DO NOTHING) so the row lock
+    // below has something to lock, then acquire the lock and read the CURRENT
+    // state under it. The ensure() return value is intentionally discarded in
+    // favour of the locked re-read.
+    await ensureVocabularyRetentionCard(txDb, profileId, vocabularyId);
+    const [card] = await txDb
+      .select()
+      .from(vocabularyRetentionCards)
+      .where(
+        and(
+          eq(vocabularyRetentionCards.vocabularyId, vocabularyId),
+          eq(vocabularyRetentionCards.profileId, profileId),
+        ),
+      )
+      .for('update');
+    if (!card) {
+      throw new Error(
+        `Failed to lock retention card for vocabulary ${vocabularyId}`,
+      );
+    }
     const now = new Date().toISOString();
     const result = sm2({
       quality: input.quality,

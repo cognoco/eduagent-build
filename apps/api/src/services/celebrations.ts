@@ -80,8 +80,6 @@ export async function queueCelebration(
   reason: CelebrationReason,
   detail?: string | null,
 ): Promise<PendingCelebration[]> {
-  const row = await findHomeSurfaceCache(db, profileId);
-
   const nextEntry: PendingCelebration = {
     celebration,
     reason,
@@ -89,45 +87,58 @@ export async function queueCelebration(
     queuedAt: new Date().toISOString(),
   };
 
-  const existing = ((row?.pendingCelebrations as PendingCelebration[] | null) ??
-    []) as PendingCelebration[];
-  const seenByChildAt = row?.celebrationsSeenByChild ?? null;
-  const hasDuplicate = existing.some((entry) => {
-    if (
-      entry.celebration !== nextEntry.celebration ||
-      entry.reason !== nextEntry.reason ||
-      (entry.detail ?? null) !== nextEntry.detail
-    ) {
-      return false;
-    }
-
-    if (nextEntry.detail !== null || !seenByChildAt) {
-      return true;
-    }
-
-    const queuedAt = new Date(entry.queuedAt);
-    return Number.isNaN(queuedAt.getTime()) || queuedAt > seenByChildAt;
-  });
-
-  const pendingCelebrations = hasDuplicate
-    ? existing
-    : [...existing, nextEntry];
+  let pendingCelebrations: PendingCelebration[] = [];
+  let appended = false;
 
   await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+    // Reset on each transaction attempt so a retry never carries a stale flag
+    // (the reducer below sets it synchronously under the lock before the
+    // conditional recordCelebrationEvent reads it).
+    appended = false;
 
-    // [BUG-467] Pass inTransaction:true so writeHomeSurfacePendingCelebrations
-    // does not open a nested db.transaction inside this one. On neon-serverless
-    // a nested transaction either throws or silently degrades the SELECT FOR
-    // UPDATE row lock that serialises concurrent celebration writes.
+    // The read-dedup-append runs INSIDE the SELECT ... FOR UPDATE window via the
+    // reducer below — closing the lost-update races [F-170] (the write used to
+    // ignore the locked row's current array) and [F-171] (the read used to
+    // happen outside the lock, against a stale snapshot). Two concurrent
+    // queueCelebration calls for the same profile now serialise: the second
+    // reducer runs against the first's committed array, so both entries persist.
+    //
+    // [BUG-467] inTransaction:true so writeHomeSurfacePendingCelebrations does
+    // not open a nested db.transaction inside this one (neon-serverless throws
+    // on nested transactions or silently degrades the row lock).
     await writeHomeSurfacePendingCelebrations(
       txDb,
       profileId,
-      pendingCelebrations,
+      (existing, lockedRow) => {
+        const seenByChildAt = lockedRow?.celebrationsSeenByChild ?? null;
+        const hasDuplicate = existing.some((entry) => {
+          if (
+            entry.celebration !== nextEntry.celebration ||
+            entry.reason !== nextEntry.reason ||
+            (entry.detail ?? null) !== nextEntry.detail
+          ) {
+            return false;
+          }
+
+          if (nextEntry.detail !== null || !seenByChildAt) {
+            return true;
+          }
+
+          const queuedAt = new Date(entry.queuedAt);
+          return Number.isNaN(queuedAt.getTime()) || queuedAt > seenByChildAt;
+        });
+
+        pendingCelebrations = hasDuplicate
+          ? existing
+          : [...existing, nextEntry];
+        appended = !hasDuplicate;
+        return pendingCelebrations;
+      },
       { inTransaction: true },
     );
 
-    if (!hasDuplicate) {
+    if (appended) {
       await recordCelebrationEvent(txDb, {
         profileId,
         celebratedAt: new Date(nextEntry.queuedAt),
