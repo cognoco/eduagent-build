@@ -94,6 +94,13 @@ Source: read-only finding-register + subsumption/coordination scan (sub-agent,
   sweeps (WI-700/702); human review on the auth/CI-permission changes (WI-698) and the
   concurrency fixes (WI-699). Security fixes tagged HIGH need a red-green negative-path
   break test (repo Fix Development Rules).
+- **Executor model/effort (general rule):** default **Sonnet, standard effort** for
+  executors (reserve Opus for shepherd adjudication); escalate a unit to **Opus** when
+  its difficulty is in the *reasoning*, not the typing — run that unit's plan-phase on
+  Opus, let Sonnet implement once locked. Severity alone is not the trigger. This lane's
+  escalations: **WI-699** (concurrency/atomicity — plan-phase on Opus) and the F-132/F-119
+  trust-boundary pieces of **WI-698**; WI-700–704 stay Sonnet. Full guidance:
+  `shepherd-kickoff-prompt.md` → EXECUTOR MODEL & EFFORT.
 - **Landing checks:** adjudicate red `main` at CI *step* level before bouncing. Known
   ambient: confirm the chronic staging Deploy red is gone (WI-664 Closed post-merge); if
   a new ambient red appears, capture it, don't fix it inline.

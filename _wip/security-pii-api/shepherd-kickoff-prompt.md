@@ -63,6 +63,27 @@ WORKING MODE:
 - Order is priority-led, not serial: lead with the two P1 WPs (WI-698 auth/CI, WI-699
   DoS/race), then the P2 units. Parallelize as capacity allows.
 
+EXECUTOR MODEL & EFFORT (a general rule you apply — not a fixed table):
+- Default: dispatch executors on **Sonnet, standard effort**. The clear-out units are
+  multi-step implementation against well-scoped findings — Sonnet's tier. Reserve Opus
+  for your own (shepherd) adjudication, not routine executor turns.
+- Escalate a *specific* unit to **Opus** when its difficulty is in the *reasoning*, not
+  the typing — subtle concurrency/atomicity, a security fix whose correctness is
+  non-obvious, or any plan-phase stop that surfaces a non-mechanical design decision.
+  Severity alone is NOT the trigger; reasoning-difficulty is. The cheap move is to run
+  the plan-phase on Opus and let a Sonnet executor implement once the approach is locked.
+- This lane's known escalations:
+    - **WI-699 (JWKS DoS + 3 race/atomicity)** — concurrency is the trap: CAS semantics,
+      transaction boundaries, and the negative-path race tests are subtle and
+      high-blast-radius. Run its plan-phase on Opus.
+    - **WI-698 (auth / forgeable gate)** — the F-132 (forgeable review verdict) and F-119
+      (@claude agent auth) pieces are trust-boundary judgment; escalate *those pieces* to
+      Opus if their plan-phase isn't obviously mechanical. The YAML permission-narrowing
+      stays Sonnet.
+    - **WI-700 / WI-701 / WI-702 / WI-703 / WI-704** — Sonnet, standard effort.
+- If an executor's plan-phase stop shows a unit is trickier than its tier assumed,
+  re-dispatch it one tier up rather than pushing a shaky plan through.
+
 SUPERVISION (charter = medium):
 - WI-698 (CI/GHA permissions, gate integrity) and WI-699 (concurrency/atomicity) get
   human review attention even when the diff looks mechanical.
