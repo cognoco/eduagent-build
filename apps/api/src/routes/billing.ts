@@ -127,7 +127,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     );
 
     const freeTier = getTierConfig('free');
-    const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
     const subscription = v2
       ? await getSubscriptionByAccountIdV2(db, account.id)
@@ -255,7 +255,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       }
 
       const stripe = createStripeClient(stripeKey);
-      const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
       // Ensure a subscription row exists so the webhook has something to link
       if (v2) {
@@ -341,7 +341,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // [CR-2026-05-19-H1] Only the account owner can cancel a subscription.
     assertOwnerProfile(c, 'Only the account owner can cancel a subscription.');
 
-    const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
     const subscription = v2
       ? await getSubscriptionByAccountIdV2(db, account.id)
       : await getSubscriptionByAccountId(db, account.id);
@@ -417,7 +417,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
 
       // Check tier eligibility -- Free tier cannot purchase top-ups
-      const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
       const subscription = v2
         ? await getSubscriptionByAccountIdV2(db, account.id)
         : await getSubscriptionByAccountId(db, account.id);
@@ -488,7 +488,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
     const freeTier = getTierConfig('free');
-    const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
     const subscription = v2
       ? await getSubscriptionByAccountIdV2(db, account.id)
@@ -716,7 +716,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       'Only the account owner can access the billing portal.',
     );
 
-    const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
     const subscription = v2
       ? await getSubscriptionByAccountIdV2(db, account.id)
       : await getSubscriptionByAccountId(db, account.id);
@@ -760,7 +760,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     const kv = c.env.SUBSCRIPTION_KV;
     const freeTier = getTierConfig('free');
-    const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
     // Try KV first (fast path).
     // [BUG-97 / A1-MED] Wrap KV read in try/catch -- KV outages must not 500.
@@ -904,7 +904,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       'Only the family owner can view family subscription details.',
     );
 
-    const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
     const subscription = v2
       ? await getSubscriptionByAccountIdV2(db, account.id)
       : await getSubscriptionByAccountId(db, account.id);
@@ -954,7 +954,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         'Only the family owner can add a profile to the family subscription.',
       );
 
-      const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
       const subscription = v2
         ? await getSubscriptionByAccountIdV2(db, account.id)
         : await getSubscriptionByAccountId(db, account.id);
@@ -1002,7 +1002,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         'Only the family owner can remove a profile from the family subscription.',
       );
 
-      const v2 = isIdentityV2Enabled(c.env.IDENTITY_V2_ENABLED);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
       const subscription = v2
         ? await getSubscriptionByAccountIdV2(db, account.id)
         : await getSubscriptionByAccountId(db, account.id);
