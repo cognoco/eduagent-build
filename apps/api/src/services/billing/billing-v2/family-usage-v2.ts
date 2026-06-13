@@ -138,12 +138,24 @@ export async function getUsageBreakdownForProfileV2(
     orgMembers.find((m) => m.roles.includes('admin'))?.id ?? null;
 
   // (4) family-edge state via the CUT-B2 guardianship reader (NO family_links).
-  // hasChildLink: viewer holds ≥1 active edge as guardian.
-  // isChild:      viewer is the charge of ≥1 active edge.
+  // hasChildLink: viewer holds ≥1 active edge over an IN-ORG charge.
+  // isChild:      viewer is the charge of ≥1 active edge from an IN-ORG guardian.
+  //
+  // The guardianship reader returns GLOBAL edges (across all orgs, including
+  // edges whose other endpoint is non-member or archived). The legacy
+  // family_links predicate only counted a link whose OTHER endpoint was a
+  // non-archived profile in `viewer.accountId` (the EXISTS subquery — see
+  // family.ts:346-368: `account_id = viewer.accountId AND archived_at IS NULL`).
+  // So we intersect the edge endpoints with the same-org non-archived member
+  // set before deriving the booleans. `orgMembers` already enforces BOTH legacy
+  // conditions (same org via the membership join, non-archived via
+  // `isNull(person.archivedAt)`), so this restores byte-for-byte equivalence and
+  // closes the entitlement leak (an out-of-org edge must NOT flip these flags).
+  const orgMemberIds = new Set(orgMembers.map((m) => m.id));
   const chargeIds = await getChargePersonIds(db, viewer.id);
   const guardianIds = await getGuardianPersonIds(db, viewer.id);
-  const hasChildLink = chargeIds.length > 0;
-  const isChild = guardianIds.length > 0;
+  const hasChildLink = chargeIds.some((id) => orgMemberIds.has(id));
+  const isChild = guardianIds.some((id) => orgMemberIds.has(id));
 
   // (5) usage aggregation. profileId = person.id, so the same usage_events rows
   // aggregate as in legacy. The legacy LEFT JOIN (profiles ⟕ usage_events)
