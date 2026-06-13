@@ -246,12 +246,14 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 ---
 
-### PRG-17 · new-llm Integration (LLM) — `active`
+### PRG-17 · new-llm Integration (LLM) — `✓ graduated` (2026-06-13)
 - **Outcome:** the `origin/new-llm` branch (Zuzka's lane: V2-shell S0 "Now feed" +
   ~25-module audit-fix batch, FINAL feature SHA `6a81f7663`, all live-on-merge)
   reconciled and merged to `main` BEFORE IF cutover execution — strategy **O2**
   ruled by operator 2026-06-12 (analysis v1.4 @ `450e4c522`, four adversarial
-  passes; strategy core survived 4-for-4).
+  passes; strategy core survived 4-for-4). **OUTCOME MET** — merged `105b39ac0`
+  (`--no-ff`, full ancestor, `Merge completeness check` + all gates green),
+  post-merge deploy green, cutover unlocked.
 - **Owner:** Jorn (+ LLM shepherd session; program session orchestrates — Zuzka's
   lane halted, reconciliation runs through this pipeline; Zuzka gets the exec
   summary + a courtesy review slot on the merge PR).
@@ -274,6 +276,21 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   check) → operator approval vs the WI-681 inventory → merge with WI-680
   verification on the merge PR → boundary event "new-llm merged" unlocks IF
   cutover execution.
+- **Execution state:** **GRADUATED 2026-06-13 (operator ruling)** — the program's
+  **fifth graduation**, and its first *integration* (vs clear-out) lane. All
+  reconciliation units `WI-675…682` + the RLS residue `WI-687` Closed/Done and
+  merged; the §8 final rescan returned **GO** (zero blockers, the Inngest-drift
+  surface proved vacuous, two MEDIUMs were inventory-accuracy not code); merge
+  `105b39ac0` verified clean; post-merge `Deploy` green end-to-end → `WI-664`
+  (chronic staging-KV outage) Closed; `WI-694` (verifier hotfix, main-side,
+  detached) Closed; `Merge completeness check` now a required check on `main`.
+  **Deferred follow-ups tracked in the spillover register, not residue:** `WI-695`
+  (3 GC6 mocks), `WI-696` (type `app/session.completed` end-to-end), plus
+  `WI-683`/`684`/`688`. The new-llm shepherd stood down after final checkpoint;
+  its dedicated review-watcher stopped. **Key learnings deposited:** childless-WP
+  altitude inversion (`WI-683`), standalone-item review-loop gap + the spillover
+  mop-up mechanism, "verified then red-teamed" review bar.
+- **Activate-when:** — (graduated)
 - **Activate-when:** — (active)
 
 ---
@@ -409,7 +426,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 9 | **PRG-04** Cosmo top-down delivery layer | orchestrator pull on dogfood evidence (≥1 full Initiative cycle on the IF pattern) |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
-| 12 | **PRG-17** new-llm integration (LLM) | ✅ **ACTIVATED 06-12 out-of-band** (created by the O2 strategy ruling, not the ratified queue) — its merge gate in turn unlocks IF cutover execution |
+| 12 | **PRG-17** new-llm integration (LLM) | ✓ **GRADUATED 06-13** — fifth graduation (first integration lane); merged `105b39ac0`, deploy green, cutover unlocked |
 
 Attention budget is evaluated per activation window when a gate clears — it is
 never an edge (planning-reference §5.3/§6.3).
@@ -494,6 +511,13 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-13 — PRG-17 GRADUATED (fifth graduation; first integration lane).**
+  Operator ruling. new-llm reconciled + merged to `main` (`105b39ac0`), §8 rescan
+  GO, post-merge deploy green (WI-664 closed), WI-694 closed, branch protection
+  enforcing `Merge completeness check`. Deferred follow-ups (WI-695/696/683/684/688)
+  tracked in the spillover register, not residue. Shepherd stood down. 5 of the
+  program's lanes now graduated (PRG-02/12/13/15 clear-out + PRG-17 integration);
+  the IF cutover (PRG-01 tail) is now executing on post-merge main.
 - **2026-06-13 — PRG-17 new-llm MERGED to `main`** (`105b39ac0`, `--no-ff` merge
   commit, PR #1087). The reconciled `new-llm` is fully an ancestor of main;
   `Merge completeness check` passed on the merge ref; all deterministic gates
