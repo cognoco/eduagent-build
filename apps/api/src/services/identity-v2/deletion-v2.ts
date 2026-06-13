@@ -321,6 +321,15 @@ export async function executeDeletionV2(
     // schedule still holds. Clearing the stamp inside the same tx as the
     // re-home/delete makes the whole operation a single atomic step (§6.1: "a
     // half-done delete is not a valid state").
+    //
+    // WI-723 P2 — this claim ALSO serializes two concurrent same-org runs (so
+    // no per-person advisory lock is needed in this path): the UPDATE takes a
+    // row-level write lock on the organization, so a second run's identical
+    // UPDATE blocks on it. The winner ends by deleting the organization row
+    // (below); the loser then re-evaluates its WHERE against the now-missing
+    // row, matches 0 rows → claimed.length === 0 → returns 'already_deleted'
+    // and writes no financial_record / deletion_audit. Duplicate retain records
+    // are therefore impossible here without an extra lock.
     const claimed = await tx
       .update(organization)
       .set({ deletionScheduledAt: sql`${organization.deletionScheduledAt}` })
@@ -468,6 +477,14 @@ export async function deletePersonV2(
   deletedBy: string | null,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    // WI-723 race guard: lock + post-lock existence re-check. This path has no
+    // consent predicate (unconditional delete), so two concurrent same-person
+    // calls would BOTH commit side-writes (financial_record + deletion_audit)
+    // while only one delete removes the row — duplicate retain records with no
+    // unique constraint to absorb them. The lock serializes the two; the loser
+    // sees the committed delete and bails before writing anything.
+    await acquirePersonLockTx(tx, personId);
+    if (!(await personExistsTx(tx, personId))) return;
     await rehomeGrantsTx(tx, personId);
     await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
@@ -507,9 +524,7 @@ export async function deletePersonIfConsentWithdrawnV2(
     // delete (current.withdrawnAt is null on the new grant). Without the lock,
     // under READ COMMITTED a restore committing between this read and the
     // re-home/delete would let the delete remove a just-restored person.
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(personId)}, 0))`,
-    );
+    await acquirePersonLockTx(tx, personId);
     // Re-check current GDPR grant under the lock and verify it is withdrawn
     // (optionally at the given timestamp). currentGrant windowing:
     // max(granted_at), tiebreak id.
@@ -529,6 +544,13 @@ export async function deletePersonIfConsentWithdrawnV2(
     ) {
       return false;
     }
+    // WI-723 P2: the lock above already serializes same-person runs, and the
+    // winner's rehomeGrantsTx deletes the consent_grant so the loser's
+    // current-grant read returns nothing → it bails on the `!current` guard.
+    // That loser-guard is incidental (grant-gone ⇒ person-gone coupling), so we
+    // add an explicit person-existence re-check to guarantee no duplicate
+    // retain records even if that coupling ever changes.
+    if (!(await personExistsTx(tx, personId))) return false;
     await rehomeGrantsTx(tx, personId);
     await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
@@ -574,6 +596,17 @@ export async function deletePersonIfNoConsentV2(
     : undefined;
 
   return db.transaction(async (tx) => {
+    // WI-723 race guard: take the per-person advisory lock FIRST, before the
+    // predicate reads. This serializes two concurrent same-person day-30 runs;
+    // the loser blocks until the winner commits, then its reads (incl. the
+    // person-existence re-check below) see the committed delete. Without the
+    // lock, both runs pass the consent/open-request pre-checks, both commit
+    // their side-writes (financial_record + deletion_audit), and only one
+    // RETURNING delete wins — the loser leaves duplicate retain records (no
+    // unique constraint, no person FK on financial_record), so the dupes
+    // persist. Mirrors deletePersonIfConsentWithdrawnV2 / the archived sibling.
+    await acquirePersonLockTx(tx, personId);
+
     const current = await tx.query.consentGrant.findFirst({
       where: and(
         eq(consentGrant.chargePersonId, personId),
@@ -604,6 +637,15 @@ export async function deletePersonIfNoConsentV2(
       });
       if (!openRequestOfGeneration) return false;
     }
+
+    // Post-lock person-existence re-check (WI-723 P2): the open-request
+    // predicate above can match for BOTH concurrent runs (each read its OPEN
+    // request before either delete cascaded it away), so it is not on its own a
+    // sufficient loser-guard. The winner's person delete cascades the request
+    // away, but only after this read can have already passed for the loser.
+    // Gating the side-writes on the person still existing under the lock makes
+    // the loser write nothing.
+    if (!(await personExistsTx(tx, personId))) return false;
 
     await rehomeGrantsTx(tx, personId);
     await writeFinancialRecordsForPersonTx(tx, personId);
@@ -639,9 +681,10 @@ export async function deleteArchivedPersonIfStillEligibleV2(
     // and current-grant reads below see any in-flight restore's commit — a
     // restore that wins the lock un-archives the person (first predicate fails)
     // and re-grants (second predicate fails), and the delete is a no-op.
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(personId)}, 0))`,
-    );
+    await acquirePersonLockTx(tx, personId);
+    // The personRow read below also IS the WI-723 P2 existence re-check: a
+    // concurrent-delete winner leaves personRow undefined → the guard returns
+    // false before any side-write, so no duplicate retain records.
     const personRow = await tx.query.person.findFirst({
       where: eq(person.id, personId),
       columns: { archivedAt: true },
@@ -735,6 +778,38 @@ async function rehomeGrantsTx(
 }
 
 type DeletionTx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/**
+ * Acquire the per-person serializing advisory lock at the TOP of a deletion
+ * transaction (WI-583 pattern; same key as `consentPersonLockKey`). Two
+ * concurrent same-person deletes serialize on this lock; the loser blocks until
+ * the winner commits, so its subsequent reads see the committed person delete.
+ */
+async function acquirePersonLockTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(personId)}, 0))`,
+  );
+}
+
+/**
+ * Does the person still exist? Used as the post-lock re-check that prevents a
+ * concurrent-delete loser from committing duplicate retain records (WI-723 P2):
+ * after the lock serializes the runs, the loser sees the winner's committed
+ * delete and bails BEFORE writing any financial_record / deletion_audit row.
+ */
+async function personExistsTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<boolean> {
+  const row = await tx.query.person.findFirst({
+    where: eq(person.id, personId),
+    columns: { id: true },
+  });
+  return !!row;
+}
 
 /**
  * The subscription snapshot captured into the financial_record payload — the

@@ -586,6 +586,54 @@ const COPPA = 'coppa_parental_consent';
         });
         expect(personRow).toBeTruthy();
       });
+
+      // WI-723 (Codex P2): the day-30 path writes side-records (financial_record
+      // + deletion_audit) BEFORE its RETURNING delete. Without the per-person
+      // advisory lock + a post-lock person-existence re-check, two concurrent
+      // same-person runs both pass the consent/open-request pre-checks, both
+      // commit their side-writes, but only ONE delete removes the row — the
+      // loser commits duplicate retain-records with a 0-row delete. financial_
+      // record has no unique constraint and no person FK, so the dupes persist.
+      // Net of ONE deletion must be exactly 2 financial_record + 1 deletion_audit.
+      it('GREEN concurrent (two connections): two same-person day-30 runs delete ONCE and write exactly 2 financial_record + 1 deletion_audit (no duplicate retain records)', async () => {
+        const requestedAt = new Date('2026-01-01T00:00:00.000Z');
+        const { childId } = await seedChildWithOpenRequest(requestedAt);
+
+        // Separate connections so the two runs land on independent Postgres
+        // backends and genuinely contend (a single Neon-HTTP client serializes
+        // its own queries). RED (no lock): both pass the pre-checks, both write
+        // side-records → 4 financial_record + 2 deletion_audit. GREEN (lock +
+        // existence re-check): the loser blocks, re-reads, sees the person gone,
+        // and writes nothing.
+        const db2 = createDatabase(process.env.DATABASE_URL!);
+        const outcomes = await Promise.allSettled([
+          deletePersonIfNoConsentV2(db, childId, requestedAt),
+          deletePersonIfNoConsentV2(db2, childId, requestedAt),
+        ]);
+
+        // The person is deleted exactly once.
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(personRow).toBeUndefined();
+
+        // Exactly ONE run reports a successful delete; the other no-ops (false)
+        // or errors on the lost lock — never a second true.
+        const trueCount = outcomes.filter(
+          (o) => o.status === 'fulfilled' && o.value === true,
+        ).length;
+        expect(trueCount).toBe(1);
+
+        // The retain records reflect a SINGLE deletion — no duplicates.
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, childId),
+        });
+        expect(financialRecords).toHaveLength(2);
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, childId),
+        });
+        expect(audits).toHaveLength(1);
+      });
     });
 
     // -------------------------------------------------------------------------
