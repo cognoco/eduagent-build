@@ -450,13 +450,13 @@ footer .warn{color:var(--amber)}
   </div>
   <div class="hdr-right">
     <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐ theme</button>
-    <div class="stamp">snapshot <b>2026-06-11</b><br>11 initiatives · ~50 bundles · 5 gates<br>view · not a source of truth</div>
+    <div class="stamp">snapshot <b>2026-06-13</b><br>11 initiatives · ~50 bundles · 5 gates<br>view · not a source of truth</div>
   </div>
 </header>
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-17 new-llm MERGED to main (06-13, 105b39ac0)</b> — clean --no-ff merge commit, full ancestor, Merge completeness check + all deterministic gates green; the 4 advisory SHOULD_FIX are documented deferrals (WI-695 GC6 mocks / WI-696 event typing) · <b>IF CUTOVER EXECUTION now UNLOCKED</b> — plan ratified v1.7, sliced WI-689 CUT-A · WI-690 canon-intake · WI-691/692/693 CUT-B1/B2/B3 + shrunk WI-586; CUT-A may now generate on the post-merge journal — IF shepherd kickoff next · <b>Deploy/KV chain wired end-to-end</b> (WI-682 + WI-685 + WI-694 verifier + GH secrets) — WI-664 closes on first green post-merge deploy · follow-through: branch-protection add of Merge completeness check; WI-694 manual close · <b>PRG-10 (API security & PII) ACTIVATED 06-13</b> — 27 findings sliced to WI-698–704 (5 WP + 2 Item), 27/27 CLEAN vs the live cutover (parallel-safe), shepherd spawn pending · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
+  <span class="txt"><b>Right now:</b> <b>PRG-17 new-llm MERGED to main (06-13, 105b39ac0)</b> — clean --no-ff merge commit, full ancestor, Merge completeness check + all deterministic gates green; the 4 advisory SHOULD_FIX are documented deferrals (WI-695 GC6 mocks / WI-696 event typing) · <b>IF CUTOVER EXECUTING</b> — CUT-A + CUT-B1 closed; CUT-B2 (consent+family) ∥ CUT-B3 (billing+webhooks) in flight; WI-586 convergence/drop tail pending · <b>Deploy/KV chain wired end-to-end</b> (WI-682 + WI-685 + WI-694 verifier + GH secrets) — WI-664 closes on first green post-merge deploy · follow-through: branch-protection add of Merge completeness check; WI-694 manual close · <b>PRG-10 (API security & PII) ACTIVATED 06-13</b> — 27 findings sliced to WI-698–704 (5 WP + 2 Item), 27/27 CLEAN vs the live cutover (parallel-safe), shepherd RUNNING · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
 </div>
 
 <nav>
@@ -565,7 +565,7 @@ footer .warn{color:var(--amber)}
 </section>
 
 <footer>
-  <div>Generated <b>2026-06-11</b> from <code>program-roster.md</code> + <code>activation-planning.md</code> + initiative trackers.<br>
+  <div>Generated <b>2026-06-13</b> from <code>program-roster.md</code> + <code>activation-planning.md</code> + initiative trackers.<br>
   <span class="warn">⚠ View, not a home.</span> Live work-item state: Cosmo · rules: <code>planning-reference.md</code> · regenerate at umbrella touches.</div>
   <div style="text-align:right">Keys: <code>1 2 3</code> views · <code>t</code> theme · <code>esc</code> close<br>Prototype input to <code>PRG-04 / WI-590</code> (Cosmo top-down layer)</div>
 </footer>
@@ -594,7 +594,7 @@ const QUEUE = [
   ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
   ["5","PRG-15","Error handling","✓ GRADUATED 06-11 — activation → graduation inside a day (WI-639/640/641)"],
   ["6","PRG-13","Background-job security","✓ GRADUATED 06-12 — both WPs, under a day"],
-  ["7","PRG-10","API security & PII","✓ ACTIVATED 06-13 — 27 findings → WI-698–704 (5 WP + 2 Item); slice scan 27/27 LIVE + CLEAN, parallel-safe with the cutover; shepherd spawn pending"],
+  ["7","PRG-10","API security & PII","✓ ACTIVATED 06-13 — 27 findings → WI-698–704 (5 WP + 2 Item); slice scan 27/27 LIVE + CLEAN, parallel-safe with the cutover; shepherd RUNNING (Opus/medium + Sonnet executors; separate Codex reviewer)"],
   ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
   ["10","PRG-20","Estate-canon drain","IF clean-cut tail done (G5), or a named pull-forward earlier"],
@@ -604,7 +604,7 @@ const QUEUE = [
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired). Cutover plan RATIFIED 06-13 at v1.7 (six adversarial rounds; all 11 OQs ruled — signup graph at onboarding completion, two-stage freeze + 24h soak, account-detachment canon intake). Sliced: WI-689 CUT-A · WI-690 canon-intake · WI-691/692/693 CUT-B1/B2/B3; WI-586 shrunk to the convergence runbook. EXECUTION starts when PRG-17's merge lands; shepherd resume packet ready.",
+  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired). Cutover plan RATIFIED v1.7. EXECUTING on post-merge main: CUT-A (WI-689) CLOSED · CUT-B1 identity spine (WI-691) CLOSED · CUT-B2 consent+family (WI-692) ∥ CUT-B3 billing+webhooks (WI-693) IN FLIGHT · WI-586 convergence runbook pending B2+B3 close. G5 still cold.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
@@ -613,7 +613,7 @@ const INIT = [
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
     {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"done", note:"All six CLOSED 06-11 — fired G4 (and the envelope-router boundary event for PRG-15)."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
-    {n:"Clean-cut tail · cutover + drop", s:"6 units (WI-689–693 + shrunk WI-586)", m:"human", st:"go", note:"RATIFIED + SLICED 06-13 (plan v1.7): CUT-A additive schema → CUT-B1 identity spine → CUT-B2 consent/family ∥ CUT-B3 billing/webhooks → WI-586 convergence runbook (freeze → reseed → re-point → flip → soak → drop). Execution gated on the PRG-17 merge. Fires G5."}
+    {n:"Clean-cut tail · cutover + drop", s:"6 units (WI-689–693 + shrunk WI-586)", m:"human", st:"go", note:"EXECUTING: CUT-A (WI-689) CLOSED · CUT-B1 identity spine (WI-691) CLOSED · CUT-B2 consent/family (WI-692) ∥ CUT-B3 billing/webhooks (WI-693) IN FLIGHT · WI-586 convergence runbook (freeze → reseed → re-point → flip → soak → drop) blocked until B2+B3 close. Fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
 
@@ -682,9 +682,9 @@ const INIT = [
   ],
   homes:["_wip/l10n-a11y/execution-tracker.md (THE entry point)","Cosmo Workstream: L10n & A11y Mobile","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-10", name:"API security & PII", accent:"var(--amber)", lane:"now", status:"active · sliced", q:"#7",
+{ id:"PRG-10", name:"API security & PII", accent:"var(--amber)", lane:"now", status:"executing", q:"#7",
   tagline:"27 verified non-rewrite security findings. Slice scan cleared it: none subsumed by IF, none collide with the live cutover — fully parallel-safe.",
-  owner:"Mixed; human review on auth & CI permissions", gate:"ACTIVATED 06-13 (sixth §2.1 run, first post-cutover parallel activation). Both gates fired 06-11. Slice scan: 27/27 LIVE (IF subsumed none), 27/27 CLEAN vs CUT-B1/2/3. OQ1 → CI/GHA stays in PRG-10; OQ2 file-touch audit done at slice. Shepherd spawn pending.",
+  owner:"Mixed; human review on auth & CI permissions", gate:"ACTIVATED 06-13. Both gates fired 06-11. Slice scan: 27/27 LIVE (IF subsumed none), 27/27 CLEAN vs CUT-B1/2/3. Shepherd SPAWNED & RUNNING — separate Opus 4.8 / medium-effort session; Sonnet executors (Opus on hard concurrency/trust-boundary units); separate Codex reviewer session owns the review loop.",
   outcome:"Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized.",
   bundles:[
     {n:"WI-698 · CI/GHA permissions + gate integrity", s:"6 findings", m:"mixed", st:"go", note:"P1. F-024/119/127/129/132/154. Parallel-safe."},

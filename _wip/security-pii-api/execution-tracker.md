@@ -107,3 +107,20 @@ Lane-specific only:
   and lineage-confused). Realigned to the standard machinery: deleted the bespoke kickoff;
   process now lives in `shepherd-protocol.md` + `executor-protocol.md`, with §4 carrying only
   the lane-specific bits. Clean thin kickoff handed to operator; fresh spawn pending.
+- 2026-06-13 — **Fresh shepherd spawned; DoR bridge complete — all 7 units now `Ready`.**
+  Decision (per WI-683 split-or-demote + the WI-577/578 dogfooded precedent): the 5 WPs were
+  **kept as WPs and split into ≥2 coarse absorbed-provenance children**, not demoted to Item
+  and not one-child-per-finding — no `/cosmo:bundle` skill ships in cosmo 0.6.0, so the brief
+  (body) + child Items were authored via REST and promoted with `refine.ts --to-ready`.
+  Child WIs created (Item, no `Workstream` relation, `Parent item`→WP, bulk-close at WP close):
+  WI-698 → 705/706 · WI-699 → 709/710 · WI-700 → 707/708 · WI-701 → 711/712 · WI-702 → 713/714.
+  All 7 set `Execution Path=Assisted` (shepherd-dispatched, supervised — not Auto/dispatcher);
+  WI-698/699 also given `Risk/Impact` (P1). Next: stand up the verdict monitor and dispatch
+  executors (Sonnet default; Opus plan-phase for WI-699 and the F-132/F-119 pieces of WI-698).
+- 2026-06-13 — **Verdict monitor up** (90s poll on the 7 WIs' Stage, emits on change).
+  **Wave 1 dispatched** (background Sonnet executors, per `executor-protocol.md`): WI-704,
+  WI-703, WI-700 — two Items + one straightforward P2 WP, as pipeline validators before the
+  expensive units. Wave 2 (WI-701, WI-702 Sonnet; WI-698, WI-699 with Opus plan-phase) held
+  until a Wave-1 PR opens cleanly. Executors stop at green-PR-+-triaged and report; shepherd
+  owns merge, then resumes the executor to run `/cosmo:execute complete` (→ Reviewing) for the
+  separate reviewer session.

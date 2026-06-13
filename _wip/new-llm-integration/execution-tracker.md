@@ -93,6 +93,8 @@ carried in the planner hand-off (`_wip/identity-foundation/cutover-plan-delta-ne
   Package child/sub-item formality is an approved Cosmo dogfooding override.
   Watcher log: `/tmp/cosmo-watch-new-llm/logs/new-llm-reviewing-watcher.log`;
   review outputs: `/tmp/cosmo-watch-new-llm/reviews/`.
+- **2026-06-13** — PRG-17 delivered; dedicated review watcher stood down. Local
+  evidence retained under `/tmp/cosmo-watch-new-llm/` for audit/debug reference.
 - **2026-06-12 (shepherd run, preconditions)** — On pickup all 8 units were at
   `Stage=Backlog` (not Ready) and WI-675–680 at `Altitude=WP` with 0 children —
   neither claimable. Resolved: WI-675 via the approved WP-childless waiver +
@@ -272,8 +274,60 @@ carried in the planner hand-off (`_wip/identity-foundation/cutover-plan-delta-ne
   `main`/`Playwright web smoke`/`API Quality Gate` — merge-invariant is NOT required
   under any name, so no blocks-forever exposure; future protection will require the
   new name only, after it first reports on the new-llm→main PR.
-- **All shepherd work complete.** Baton fully with the program session: §8 final
-  rescan of `6a81f7663..4edd4c8b6` (new-llm HEAD) + main-drift (Inngest) + operator
-  merge approval. WI-694 landed on main pre-merge (its script home); WI-664/682/685
-  closed/Reviewing; findings ledger: WI-684 (open, main-side CI routing), WI-686
-  (open, decision-adr-link), WI-694 (Reviewing).
+- **2026-06-13 — new-llm→main RECONCILIATION PR #1087 OPENED (review-only, merge
+  operator-gated).** new-llm `4edd4c8b6`→main `a51844dd7`, 81 commits. Full CI green:
+  `main` ✓, `API Quality Gate` ✓, **Merge completeness check ✓** (three-way content
+  invariant holds on the merge commit — no silent main alterations, branch-survival
+  intact, exclusions documented), `Playwright web smoke` ✓, `reference-only-gate` ✓.
+  Initial `decision-adr-link` red (WI-686) → fixed: baseline-accept merged to new-llm
+  (#1088 → `62d1e6312`), #1087 auto-re-ran green.
+- **2026-06-13 — claude-review (advisory) triaged on #1087.** Ran green (=executed);
+  0 MUST_FIX. **Finding A** (`event.data.mode as string` on `app/session.completed`,
+  reviewer-marked blocking): verified it's NOT the one-field add the reviewer implied —
+  the Inngest client registers NO event schemas, so `event.data` is wholesale-untyped
+  and cast field-by-field (~6 casts incl. `mode` at L398 AND L641; topicId, exchangeCount,
+  qualityRating, reason). Recitation-skip works at runtime (send site `sessions.ts:1637`
+  really dispatches `mode`). Moderate fix w/ runtime risk → **deferred to WI-696** (P2,
+  operator-created; type the event end-to-end). **Findings B** (3 disputed `gc1-allow`
+  internal mocks; GC1 ratchet deterministically GREEN) → **WI-695** (GC6 burn-down,
+  operator-created). `resolveRateLimitIp` dead-re-export CONSIDER → NOT actionable
+  (referenced via `consent.test.ts:904` `jest.requireActual('./consent')`); skipped.
+  `MODE_NAV_V2_ENABLED` → expected, no action.
+- **2026-06-13 — WI-694 CLOSED** (Resolution=Done) via manual `close.ts` (operator-
+  authorized; the autonomous loop doesn't cover standalone/detached items). WI-694 had
+  been detached from the new-llm workstream (operator-confirmed) — it's a main-side
+  hotfix (a51844dd7), not a reconciliation unit; the new-llm-landing review rule was
+  re-bouncing it. Project link + WI-664 cross-link + provenance retained.
+- **SHEPHERD WORK COMPLETE — #1087 READY, held for operator's `--no-ff` merge go.**
+  Findings ledger: WI-684 (open, main-side CI routing), WI-695 (open, GC6 mocks),
+  WI-696 (open, type session.completed). WI-664/682/685/686/687/694 all closed/Reviewing.
+  Baton: program §8 rescan of `6a81f7663..62d1e6312` (current new-llm HEAD) + main-drift
+  (Inngest) + the operator merge. Post-merge: operator adds branch-protection enforcement
+  of `Merge completeness check`.
+- **2026-06-13 — ✅ MERGED. new-llm → main LANDED (PR #1087, `--no-ff` merge commit
+  `105b39ac0`).** Operator-gated merge executed after a deferral-disposition comment was
+  posted on the PR (Finding A→WI-696, Findings B→WI-695, resolveRateLimitIp kept,
+  MODE_NAV_V2 intentional). `git merge-base --is-ancestor new-llm main` = CONFIRMED;
+  feature SHA `6a81f7663` is now an ancestor of main. **BOUNDARY EVENT "new-llm merged"
+  REACHED → IF cutover execution UNLOCKED** (CUT-A generates against the post-merge
+  journal, per §1 of the merge gate). PRG-17 reconciliation workstream COMPLETE.
+  Remaining open follow-ups (not gating): WI-684, WI-695, WI-696. Operator to add
+  branch-protection enforcement of `Merge completeness check` now that it has reported.
+- **2026-06-13 — ✅ DEPLOY/KV CHAIN PROVEN GREEN; WI-664 + WI-694 CLOSED; STAND DOWN.**
+  Post-merge main deploys `105b39ac0` (run 27465212216) and `d5db6e3c7` (run 27465264522)
+  BOTH succeeded — **Verify Cloudflare KV bindings ✓**, Render ✓, Migrations ✓, Deploy ✓ —
+  vs the two immediately-preceding pre-merge deploys (`1edf7459b`, `3a3e3fd8c`) that FAILED
+  at the KV-verify step. Direct end-to-end evidence the chain works (WI-682 namespaces +
+  Doppler + GH secrets + render + WI-694 verifier). **WI-664** (chronic Deploy/KV P1) CLOSED
+  via `close.ts` (Resolution=Done, Fixed In = 105b39ac0 + a51844dd7, green-deploy evidence);
+  **WI-694** CLOSED (Done) earlier. PRG-17 reconciliation COMPLETE — shepherd standing down.
+  Spillover tracked in the umbrella register: WI-684, WI-695, WI-696.
+- **2026-06-13 — FINAL CHECKPOINT · LANE CLOSED.** Both watchers stopped: the dedicated
+  new-llm review-watcher (tmux `cosmo-new-llm-review-watch` / `/tmp/cosmo-watch-new-llm/watcher.ts`)
+  and the shepherd Stage monitor (`/tmp/cosmo-watch-new-llm-shepherd/`) — 0 processes remaining.
+  All shepherd worktrees removed; tracker is the durable record. **Residue: NONE on the
+  shepherd side.** The open items — WI-683, WI-684, WI-688, WI-695, WI-696 — are carried in
+  the umbrella program's spillover register for later adoption, NOT shepherd follow-up.
+  State: new-llm reconciled + merged to `main` (`105b39ac0`, `--no-ff`); Deploy/KV chain
+  proven green end-to-end; "new-llm merged" boundary reached → IF cutover (CUT-A) unlocked.
+  Shepherd stood down.
