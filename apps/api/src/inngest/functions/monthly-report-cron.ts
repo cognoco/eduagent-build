@@ -21,19 +21,30 @@ import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import {
   accounts,
   familyLinks,
+  guardianship,
+  login,
   monthlyReports,
   notificationPreferences,
+  person,
   profiles,
   progressSnapshots,
 } from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase, getStepResendApiKey } from '../helpers';
+import {
+  getStepDatabase,
+  getStepResendApiKey,
+  isIdentityV2EnabledInStep,
+} from '../helpers';
 import {
   generateMonthlyReportData,
   generateReportHighlights,
 } from '../../services/monthly-report';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { listEligibleSelfReportProfileIds } from '../../services/solo-progress-reports';
+import { listEligibleSelfReportPersonIdsV2 } from '../../services/identity-v2/solo-progress-reports-v2';
+import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { isGuardianOf } from '../../services/identity-v2/guardianship';
+import { isPersonLive } from '../../services/identity-v2/helpers';
 import {
   filterProgressMetricsToActiveSubjects,
   getSnapshotsInRange,
@@ -136,26 +147,50 @@ export const monthlyReportCron = inngest.createFunction(
             lte(progressSnapshots.snapshotDate, isoDate(lastMonthEnd)),
           ),
         );
+      const v2 = isIdentityV2EnabledInStep();
       const activeChildIds = activeRows.map((r) => r.childProfileId);
+      // Parent/child pairs for active children: v2 = active guardianship edges
+      // whose charge is an active child; legacy = family_links rows.
       const linkedPairs = activeChildIds.length
-        ? (
-            await db
-              .select({
-                parentProfileId: familyLinks.parentProfileId,
-                childProfileId: familyLinks.childProfileId,
-              })
-              .from(familyLinks)
-              .where(inArray(familyLinks.childProfileId, activeChildIds))
-          ).map((l) => ({
-            parentId: l.parentProfileId,
-            childId: l.childProfileId,
-          }))
+        ? v2
+          ? (
+              await db
+                .select({
+                  parentProfileId: guardianship.guardianPersonId,
+                  childProfileId: guardianship.chargePersonId,
+                })
+                .from(guardianship)
+                .where(
+                  and(
+                    inArray(guardianship.chargePersonId, activeChildIds),
+                    isNull(guardianship.revokedAt),
+                  ),
+                )
+            ).map((l) => ({
+              parentId: l.parentProfileId,
+              childId: l.childProfileId,
+            }))
+          : (
+              await db
+                .select({
+                  parentProfileId: familyLinks.parentProfileId,
+                  childProfileId: familyLinks.childProfileId,
+                })
+                .from(familyLinks)
+                .where(inArray(familyLinks.childProfileId, activeChildIds))
+            ).map((l) => ({
+              parentId: l.parentProfileId,
+              childId: l.childProfileId,
+            }))
         : [];
 
-      const selfProfileIds = await listEligibleSelfReportProfileIds(db, {
+      const selfWin = {
         start: lastMonthStart,
         endExclusive: lastMonthEndExclusive,
-      });
+      };
+      const selfProfileIds = v2
+        ? await listEligibleSelfReportPersonIdsV2(db, selfWin)
+        : await listEligibleSelfReportProfileIds(db, selfWin);
 
       const candidateProfileIds = Array.from(
         new Set([
@@ -165,13 +200,21 @@ export const monthlyReportCron = inngest.createFunction(
       );
       if (candidateProfileIds.length === 0) return [];
 
-      const activeProfileRows = await db.query.profiles.findMany({
-        where: and(
-          inArray(profiles.id, candidateProfileIds),
-          isNull(profiles.archivedAt),
-        ),
-        columns: { id: true },
-      });
+      const activeProfileRows = v2
+        ? await db.query.person.findMany({
+            where: and(
+              inArray(person.id, candidateProfileIds),
+              isNull(person.archivedAt),
+            ),
+            columns: { id: true },
+          })
+        : await db.query.profiles.findMany({
+            where: and(
+              inArray(profiles.id, candidateProfileIds),
+              isNull(profiles.archivedAt),
+            ),
+            columns: { id: true },
+          });
       const activeProfileIds = new Set(
         activeProfileRows.map((profile) => profile.id),
       );
@@ -264,23 +307,31 @@ export const monthlyReportGenerate = inngest.createFunction(
     const reportResult = await step.run('generate-monthly-report', async () => {
       try {
         const db = getStepDatabase();
+        const v2 = isIdentityV2EnabledInStep();
 
         // Consent gate (parity with weekly-progress-push and sendStruggleNotification):
         // skip child if their most-recent GDPR consent state is anything other than
         // CONSENTED. Missing row = no restriction (pre-consent-flow accounts).
-        if (!(await isGdprProcessingAllowed(db, childId))) {
+        const gdprOk = v2
+          ? await isGdprProcessingAllowedV2(db, childId)
+          : await isGdprProcessingAllowed(db, childId);
+        if (!gdprOk) {
           return { status: 'skipped' as const, reason: 'consent_not_granted' };
         }
 
         if (!isSelfReport) {
-          const parentChildLink = await db.query.familyLinks.findFirst({
-            where: and(
-              eq(familyLinks.parentProfileId, parentId),
-              eq(familyLinks.childProfileId, childId),
-            ),
-            columns: { id: true },
-          });
-          if (!parentChildLink) {
+          // Parent→child authority: active guardianship edge (v2) or
+          // family_links row (legacy).
+          const hasLink = v2
+            ? await isGuardianOf(db, parentId, childId)
+            : (await db.query.familyLinks.findFirst({
+                where: and(
+                  eq(familyLinks.parentProfileId, parentId),
+                  eq(familyLinks.childProfileId, childId),
+                ),
+                columns: { id: true },
+              })) != null;
+          if (!hasLink) {
             return {
               status: 'skipped' as const,
               reason: 'parent_child_link_missing',
@@ -288,22 +339,31 @@ export const monthlyReportGenerate = inngest.createFunction(
           }
         }
 
-        const child = await db.query.profiles.findFirst({
-          where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
-          columns: { displayName: true },
-        });
+        const child = v2
+          ? await db.query.person.findFirst({
+              where: and(eq(person.id, childId), isNull(person.archivedAt)),
+              columns: { displayName: true },
+            })
+          : await db.query.profiles.findFirst({
+              where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
+              columns: { displayName: true },
+            });
         if (!child) {
           return { status: 'skipped' as const, reason: 'child_missing' };
         }
         const parent = isSelfReport
           ? child
-          : await db.query.profiles.findFirst({
-              where: and(
-                eq(profiles.id, parentId),
-                isNull(profiles.archivedAt),
-              ),
-              columns: { id: true },
-            });
+          : v2
+            ? (await isPersonLive(db, parentId))
+              ? { id: parentId }
+              : null
+            : await db.query.profiles.findFirst({
+                where: and(
+                  eq(profiles.id, parentId),
+                  isNull(profiles.archivedAt),
+                ),
+                columns: { id: true },
+              });
         if (!parent) {
           return { status: 'skipped' as const, reason: 'parent_missing' };
         }
@@ -431,11 +491,19 @@ export const monthlyReportGenerate = inngest.createFunction(
 
         // i18n Phase 1 — parent receives the report so use the parent's
         // conversation_language for prose. For self-reports parentId === childId.
-        const [reportTargetProfile] = await db
-          .select({ conversationLanguage: profiles.conversationLanguage })
-          .from(profiles)
-          .where(and(eq(profiles.id, parentId), isNull(profiles.archivedAt)))
-          .limit(1);
+        const [reportTargetProfile] = v2
+          ? await db
+              .select({ conversationLanguage: person.conversationLanguage })
+              .from(person)
+              .where(and(eq(person.id, parentId), isNull(person.archivedAt)))
+              .limit(1)
+          : await db
+              .select({ conversationLanguage: profiles.conversationLanguage })
+              .from(profiles)
+              .where(
+                and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
+              )
+              .limit(1);
         const llmContent = await generateReportHighlights(reportData, {
           // DB returns string | null; parse to union before passing to LLM call.
           conversationLanguage: parseConversationLanguage(
@@ -533,19 +601,27 @@ export const monthlyReportGenerate = inngest.createFunction(
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' as const };
       }
-      const activeParent = await db.query.profiles.findFirst({
-        where: and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
-        columns: { id: true },
-      });
-      if (!activeParent) {
+      const pushStepV2 = isIdentityV2EnabledInStep();
+      const parentLive = pushStepV2
+        ? await isPersonLive(db, parentId)
+        : !!(await db.query.profiles.findFirst({
+            where: and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
+            columns: { id: true },
+          }));
+      if (!parentLive) {
         return { sent: false, reason: 'profile_archived' as const };
       }
       // Rehydrated at send time — the child's name never rides the memoized
       // generate-step return.
-      const activeChild = await db.query.profiles.findFirst({
-        where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
-        columns: { id: true, displayName: true },
-      });
+      const activeChild = pushStepV2
+        ? await db.query.person.findFirst({
+            where: and(eq(person.id, childId), isNull(person.archivedAt)),
+            columns: { id: true, displayName: true },
+          })
+        : await db.query.profiles.findFirst({
+            where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
+            columns: { id: true, displayName: true },
+          });
       if (!activeChild) {
         return { sent: false, reason: 'profile_archived' as const };
       }
@@ -595,23 +671,41 @@ export const monthlyReportGenerate = inngest.createFunction(
         if (!(prefs?.monthlyProgressEmail ?? true)) {
           return { sent: false, reason: 'email_pref_off' };
         }
-        const parentProfile = await db.query.profiles.findFirst({
-          where: and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
-          columns: { accountId: true },
-        });
-        const parentAccount = parentProfile?.accountId
-          ? await db.query.accounts.findFirst({
-              where: eq(accounts.id, parentProfile.accountId),
-              columns: { email: true },
-            })
-          : null;
-        const parentEmail = parentAccount?.email ?? null;
+        const emailStepV2 = isIdentityV2EnabledInStep();
+        let parentEmail: string | null;
+        if (emailStepV2) {
+          // v2: the parent's email lives on their login (person→login). Liveness
+          // is implied by the login existing on a live person; the child read
+          // below still gates the send.
+          const loginRow = await db.query.login.findFirst({
+            where: eq(login.personId, parentId),
+            columns: { email: true },
+          });
+          parentEmail = loginRow?.email ?? null;
+        } else {
+          const parentProfile = await db.query.profiles.findFirst({
+            where: and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
+            columns: { accountId: true },
+          });
+          const parentAccount = parentProfile?.accountId
+            ? await db.query.accounts.findFirst({
+                where: eq(accounts.id, parentProfile.accountId),
+                columns: { email: true },
+              })
+            : null;
+          parentEmail = parentAccount?.email ?? null;
+        }
         // Rehydrated at send time — name and struggle topics never ride the
         // memoized generate-step return.
-        const childProfile = await db.query.profiles.findFirst({
-          where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
-          columns: { id: true, displayName: true },
-        });
+        const childProfile = emailStepV2
+          ? await db.query.person.findFirst({
+              where: and(eq(person.id, childId), isNull(person.archivedAt)),
+              columns: { id: true, displayName: true },
+            })
+          : await db.query.profiles.findFirst({
+              where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
+              columns: { id: true, displayName: true },
+            });
 
         if (!childProfile) {
           return { sent: false, reason: 'profile_archived' };

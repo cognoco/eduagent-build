@@ -43,6 +43,16 @@ import {
   assertOwnerProfile,
   assertOwnerAndParentAccess,
 } from '../services/family-access';
+import { isIdentityV2Enabled } from '../config';
+import {
+  requestConsentV2,
+  resendConsentV2,
+  processConsentResponseV2,
+  revokeChildConsentV2,
+  restoreChildConsentV2,
+  getProfileConsentStateV2,
+} from '../services/identity-v2/consent-v2';
+import { getChildConsentForParentV2 } from '../services/identity-v2/family-v2';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
 import {
@@ -160,6 +170,7 @@ type ConsentRouteEnv = {
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
     CONSENT_POLICY_VERSION: string;
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -213,30 +224,55 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       if (!apiOrigin) {
         throw new Error('API_ORIGIN env var is required');
       }
-      let result;
+      // [Bug #872] Audit metadata — re-derivable after CF access logs roll over.
+      const audit = {
+        policyVersion: c.env.CONSENT_POLICY_VERSION,
+        requestIp:
+          c.req.header('cf-connecting-ip') ??
+          c.req.header('x-forwarded-for') ??
+          undefined,
+        userAgent: c.req.header('user-agent') ?? undefined,
+      };
+      let emailDelivered: boolean;
+      // The requestedAt the consent.requested event carries — the legacy path
+      // uses the DB-stored value; the v2 path uses request time (the v2 write
+      // does not return the row's requestedAt, and the event field is
+      // informational — both are within the same request).
+      let eventRequestedAt: string;
       try {
-        result = await requestConsent(
-          db,
-          input,
-          apiOrigin,
-          {
-            resendApiKey: c.env.RESEND_API_KEY,
-            emailFrom: c.env.EMAIL_FROM,
-          },
-          account.id,
-          // [Bug #872] Capture audit metadata so consent records remain
-          // re-derivable after Cloudflare access logs roll over. cf-connecting-ip
-          // is the canonical client IP on Cloudflare Workers; x-forwarded-for is
-          // the fallback for local dev / non-CF runtimes.
-          {
-            policyVersion: c.env.CONSENT_POLICY_VERSION,
-            requestIp:
-              c.req.header('cf-connecting-ip') ??
-              c.req.header('x-forwarded-for') ??
-              undefined,
-            userAgent: c.req.header('user-agent') ?? undefined,
-          },
-        );
+        if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+          // [CUT-B2] v2 write machine. organizationId = account.id; childName
+          // from the already-fetched profile. Same caps / audit / error types.
+          const res = await requestConsentV2(db, {
+            chargePersonId: input.childProfileId,
+            organizationId: account.id,
+            consentType: input.consentType,
+            guardianEmail: input.parentEmail,
+            childName: childProfile.displayName ?? 'your child',
+            appUrl: apiOrigin,
+            audit,
+            emailOptions: {
+              resendApiKey: c.env.RESEND_API_KEY,
+              emailFrom: c.env.EMAIL_FROM,
+            },
+          });
+          emailDelivered = res.emailDelivered;
+          eventRequestedAt = new Date().toISOString();
+        } else {
+          const res = await requestConsent(
+            db,
+            input,
+            apiOrigin,
+            {
+              resendApiKey: c.env.RESEND_API_KEY,
+              emailFrom: c.env.EMAIL_FROM,
+            },
+            account.id,
+            audit,
+          );
+          emailDelivered = res.emailDelivered;
+          eventRequestedAt = res.consentState.requestedAt;
+        }
       } catch (error) {
         // [WI-374] Both the resend cap (same email) and the recipient-change
         // cap (rotating email) surface as 429 — rotating the recipient can no
@@ -263,21 +299,21 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           inngest.send({
             name: 'app/consent.requested',
             data: {
-              profileId: result.consentState.profileId,
-              consentType: result.consentState.consentType,
-              requestedAt: result.consentState.requestedAt,
+              profileId: input.childProfileId,
+              consentType: input.consentType,
+              requestedAt: eventRequestedAt,
               timestamp: new Date().toISOString(),
             },
           }),
         'consent.requested',
-        { profileId: result.consentState.profileId },
+        { profileId: input.childProfileId },
       );
 
       return c.json(
         consentRequestResultSchema.parse({
           message: 'Consent request sent to parent',
           consentType: input.consentType,
-          emailStatus: result.emailDelivered ? 'sent' : 'failed',
+          emailStatus: emailDelivered ? 'sent' : 'failed',
         }),
         201,
       );
@@ -318,18 +354,42 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         throw new Error('API_ORIGIN env var is required');
       }
 
-      let result;
+      let emailDelivered: boolean;
+      let resultConsentType: typeof input.consentType;
+      let eventRequestedAt: string;
       try {
-        result = await resendConsent(
-          db,
-          input,
-          apiOrigin,
-          {
-            resendApiKey: c.env.RESEND_API_KEY,
-            emailFrom: c.env.EMAIL_FROM,
-          },
-          account.id,
-        );
+        if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+          // [CUT-B2] v2 resend. Reuses the stored recipient (WI-261) — the v2
+          // machine reads guardianEmail off the request row; no email supplied.
+          const res = await resendConsentV2(db, {
+            chargePersonId: input.childProfileId,
+            organizationId: account.id,
+            consentType: input.consentType,
+            childName: childProfile.displayName ?? 'your child',
+            appUrl: apiOrigin,
+            emailOptions: {
+              resendApiKey: c.env.RESEND_API_KEY,
+              emailFrom: c.env.EMAIL_FROM,
+            },
+          });
+          emailDelivered = res.emailDelivered;
+          resultConsentType = input.consentType;
+          eventRequestedAt = new Date().toISOString();
+        } else {
+          const res = await resendConsent(
+            db,
+            input,
+            apiOrigin,
+            {
+              resendApiKey: c.env.RESEND_API_KEY,
+              emailFrom: c.env.EMAIL_FROM,
+            },
+            account.id,
+          );
+          emailDelivered = res.emailDelivered;
+          resultConsentType = res.consentState.consentType;
+          eventRequestedAt = res.consentState.requestedAt;
+        }
       } catch (error) {
         if (error instanceof ConsentResendLimitError) {
           return apiError(c, 429, ERROR_CODES.RATE_LIMITED, error.message);
@@ -348,21 +408,21 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           inngest.send({
             name: 'app/consent.requested',
             data: {
-              profileId: result.consentState.profileId,
-              consentType: result.consentState.consentType,
-              requestedAt: result.consentState.requestedAt,
+              profileId: input.childProfileId,
+              consentType: resultConsentType,
+              requestedAt: eventRequestedAt,
               timestamp: new Date().toISOString(),
             },
           }),
         'consent.requested',
-        { profileId: result.consentState.profileId },
+        { profileId: input.childProfileId },
       );
 
       return c.json(
         consentRequestResultSchema.parse({
           message: 'Consent request sent to parent',
-          consentType: result.consentState.consentType,
-          emailStatus: result.emailDelivered ? 'sent' : 'failed',
+          consentType: resultConsentType,
+          emailStatus: emailDelivered ? 'sent' : 'failed',
         }),
         201,
       );
@@ -394,14 +454,24 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
 
       try {
         // [Bug #872] Audit metadata captured at response time.
-        await processConsentResponse(db, input.token, input.approved, {
+        const audit = {
           policyVersion: c.env.CONSENT_POLICY_VERSION,
           requestIp:
             c.req.header('cf-connecting-ip') ??
             c.req.header('x-forwarded-for') ??
             undefined,
           userAgent: c.req.header('user-agent') ?? undefined,
-        });
+        };
+        if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+          await processConsentResponseV2(
+            db,
+            input.token,
+            input.approved,
+            audit,
+          );
+        } else {
+          await processConsentResponse(db, input.token, input.approved, audit);
+        }
         return c.json(
           consentRespondResultSchema.parse({
             message: input.approved ? 'Consent granted' : 'Consent denied',
@@ -436,11 +506,20 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       );
     }
     const db = c.get('db');
-    const state = await getProfileConsentState(db, profileId);
+    const state = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+      ? await getProfileConsentStateV2(db, profileId)
+      : await getProfileConsentState(db, profileId);
+    // The v2 state names the recipient `guardianEmail`; legacy `parentEmail`.
+    const recipient =
+      state == null
+        ? null
+        : 'parentEmail' in state
+          ? state.parentEmail
+          : state.guardianEmail;
     return c.json(
       myConsentStatusSchema.parse({
         consentStatus: state?.status ?? null,
-        parentEmail: maskEmail(state?.parentEmail ?? null),
+        parentEmail: maskEmail(recipient ?? null),
         consentType: state?.consentType ?? null,
       }),
     );
@@ -455,11 +534,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     assertOwnerProfile(c, 'Only the account owner can manage child consent.');
 
     try {
-      const state = await getChildConsentForParent(
-        db,
-        childProfileId,
-        parentProfileId,
-      );
+      const state = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+        ? await getChildConsentForParentV2(db, childProfileId, parentProfileId)
+        : await getChildConsentForParent(db, childProfileId, parentProfileId);
       if (!state) {
         return c.json(
           childConsentStatusSchema.parse({
@@ -493,7 +570,17 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     assertOwnerProfile(c, 'Only the account owner can revoke child consent.');
 
     try {
-      const state = await revokeConsent(db, childProfileId, parentProfileId);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+      const { status, revokedAt } = v2
+        ? await revokeChildConsentV2(db, childProfileId, parentProfileId).then(
+            (r) => ({ status: r.status, revokedAt: r.withdrawnAt }),
+          )
+        : await revokeConsent(db, childProfileId, parentProfileId).then(
+            (s) => ({
+              status: s.status,
+              revokedAt: s.respondedAt,
+            }),
+          );
 
       await safeSend(
         () =>
@@ -502,7 +589,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             data: {
               childProfileId,
               parentProfileId,
-              revokedAt: state.respondedAt,
+              revokedAt,
               timestamp: new Date().toISOString(),
             },
           }),
@@ -514,7 +601,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         consentActionResultSchema.parse({
           message:
             'Consent revoked. Data will be deleted after 7-day grace period.',
-          consentStatus: state.status,
+          consentStatus: status,
         }),
       );
     } catch (error) {
@@ -537,7 +624,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     assertOwnerProfile(c, 'Only the account owner can restore child consent.');
 
     try {
-      const state = await restoreConsent(db, childProfileId, parentProfileId);
+      const state = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+        ? await restoreChildConsentV2(db, childProfileId, parentProfileId)
+        : await restoreConsent(db, childProfileId, parentProfileId);
       return c.json(
         consentActionResultSchema.parse({
           message: 'Consent restored. Deletion cancelled.',
