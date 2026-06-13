@@ -79,6 +79,12 @@ import {
   isProfileInDedupRollout,
 } from '../../config';
 import { runDedupForProfile } from '../../services/memory/dedup-pass';
+import {
+  ensureFreeSubscription,
+  decrementQuota,
+  safeRefundQuota,
+} from '../../services/billing';
+import { safeSend } from '../../services/safe-non-core';
 
 const logger = createLogger();
 
@@ -1771,17 +1777,102 @@ export const sessionCompleted = inngest.createFunction(
           const db = getStepDatabase();
           // i18n Phase 1 — thread conversation_language to the homework
           // summary LLM so the parent-facing card matches the learner locale.
+          // Also fetch accountId so we can gate this LLM call on quota.
           const [homeworkProfile] = await db
-            .select({ conversationLanguage: profiles.conversationLanguage })
+            .select({
+              conversationLanguage: profiles.conversationLanguage,
+              accountId: profiles.accountId,
+            })
             .from(profiles)
             .where(eq(profiles.id, profileId))
             .limit(1);
-          await extractAndStoreHomeworkSummary(db, profileId, sessionId, {
-            // DB returns string | null; parse to union before passing to LLM.
-            conversationLanguage: parseConversationLanguage(
-              homeworkProfile?.conversationLanguage,
-            ),
-          });
+
+          // Route through the metered wrapper. The HTTP middleware
+          // cannot gate Inngest steps, so we call decrementQuota directly.
+          // ensureFreeSubscription is idempotent — it returns the existing row
+          // for users who already have a subscription.
+          // Guard: profileId comes from the session event — the row should
+          // always exist, but if the DB returns nothing we skip metering.
+          if (!homeworkProfile) {
+            logger.warn(
+              '[metering] homework-summary: profile row missing, skipping quota gate',
+              { event: 'metering.homework_summary.profile_missing', profileId },
+            );
+            await extractAndStoreHomeworkSummary(db, profileId, sessionId, {
+              conversationLanguage: undefined,
+            });
+            return;
+          }
+          const subscription = await ensureFreeSubscription(
+            db,
+            homeworkProfile.accountId,
+          );
+          const decrementResult = await decrementQuota(
+            db,
+            subscription.id,
+            profileId,
+          );
+          if (!decrementResult.success) {
+            // Quota exhausted — skip the LLM call and emit a structured event
+            // so the silent-recovery ban is satisfied (bare logger.warn is not
+            // enough per AGENTS.md). The metering module emits this event for
+            // per-profile tiers; the shared-pool path does not, so we emit it
+            // here to guarantee coverage for all tiers.
+            await safeSend(
+              () =>
+                inngest.send({
+                  name: 'app/billing.profile_quota.exhausted',
+                  data: {
+                    subscriptionId: subscription.id,
+                    profileId,
+                    kind:
+                      decrementResult.source === 'daily_exceeded'
+                        ? 'daily_exceeded'
+                        : 'monthly_exceeded',
+                    resetsAt:
+                      decrementResult.resetsAt ?? new Date().toISOString(),
+                    occurredAt: new Date().toISOString(),
+                    source: 'homework_summary',
+                  },
+                }),
+              'billing.homework_summary.quota_exhausted',
+              { subscriptionId: subscription.id, profileId },
+            );
+            logger.warn(
+              '[metering] homework-summary skipped — quota exhausted',
+              {
+                event: 'metering.homework_summary.quota_exhausted',
+                subscriptionId: subscription.id,
+                profileId,
+                source: decrementResult.source,
+              },
+            );
+            return;
+          }
+
+          try {
+            await extractAndStoreHomeworkSummary(db, profileId, sessionId, {
+              // DB returns string | null; parse to union before passing to LLM.
+              conversationLanguage: parseConversationLanguage(
+                homeworkProfile?.conversationLanguage,
+              ),
+            });
+          } catch (err) {
+            // LLM call failed after quota was decremented — refund so
+            // the learner is not charged for a failed summary generation.
+            await safeRefundQuota(db, subscription.id, {
+              route: 'inngest.session_completed.homework_summary',
+              profileId,
+              source:
+                decrementResult.source === 'monthly' ||
+                decrementResult.source === 'top_up'
+                  ? decrementResult.source
+                  : undefined,
+              quotaModel: decrementResult.quotaModel,
+              topUpCreditId: decrementResult.topUpCreditId,
+            });
+            throw err;
+          }
         });
       }),
     );

@@ -102,6 +102,19 @@ jest.mock(
   },
 );
 
+jest.mock(
+  '../services/billing' /* gc1-allow: safeRefundQuota is an external boundary (billing pool) — cannot run against a real quota pool in route unit tests */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/billing',
+    ) as typeof import('../services/billing');
+    return {
+      ...actual,
+      safeRefundQuota: jest.fn().mockResolvedValue({ refunded: true }),
+    };
+  },
+);
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -122,6 +135,7 @@ import {
 import { getSession } from '../services/session';
 import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
+import { safeRefundQuota } from '../services/billing';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
 
@@ -192,6 +206,59 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
   return app;
 }
 
+// makeMeteredApp injects quota context variables the same way the metering
+// middleware does so we can test the app-help early-return quota-refund path.
+const SUBSCRIPTION_ID = 'sub-00000000-0000-4000-a000-000000000001';
+
+function makeMeteredApp(opts?: {
+  subscriptionId?: string | undefined;
+  omitSubscriptionId?: boolean;
+  isOwner?: boolean;
+}) {
+  const app = new Hono<
+    TestEnv & {
+      Variables: {
+        subscriptionId: string | undefined;
+        quotaDecrementSource: 'monthly' | 'top_up' | undefined;
+        quotaDecrementTopUpCreditId: string | undefined;
+        quotaDecrementQuotaModel: 'per-profile' | 'shared-pool' | undefined;
+        quotaRefunded: boolean | undefined;
+      };
+    }
+  >();
+  const profileId = PROFILE_ID;
+  const isOwner = opts?.isOwner ?? true;
+  const subscriptionId = opts?.omitSubscriptionId
+    ? undefined
+    : (opts?.subscriptionId ?? SUBSCRIPTION_ID);
+
+  app.use('*', async (c, next) => {
+    c.set('db', makeStubDb() as unknown as Database);
+    c.set('profileId', profileId);
+    c.set('profileMeta', {
+      birthYear: 2000,
+      location: 'EU',
+      consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      isOwner,
+    });
+    // Inject quota context as the metering middleware would set it.
+    c.set('subscriptionId', subscriptionId);
+    c.set('quotaDecrementSource', 'monthly');
+    c.set('quotaDecrementTopUpCreditId', undefined);
+    c.set('quotaDecrementQuotaModel', 'shared-pool');
+    c.set('quotaRefunded', undefined);
+    await next();
+  });
+  app.onError((err, c) => {
+    if (err instanceof HTTPException) return err.getResponse();
+    return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+  });
+  app.route('/v1', assessmentRoutes);
+  return app;
+}
+
 function makeStubDb(): Partial<Database> {
   return {
     transaction: jest
@@ -219,6 +286,7 @@ const lockAssessmentForAnswerSubmissionMock = jest.mocked(
 );
 const updateRetentionFromSessionMock = jest.mocked(updateRetentionFromSession);
 const insertSessionXpEntryMock = jest.mocked(insertSessionXpEntry);
+const safeRefundQuotaMock = jest.mocked(safeRefundQuota);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -622,6 +690,68 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       // XP silently skipped. In production the surrounding tx rolls back the
       // status UPDATE so the learner can retry.
       expect(res.status).toBe(500);
+    });
+  });
+
+  // [F-146] App-help early-return must refund quota, not charge the learner
+  // for a canned response that made no LLM call.
+  describe('[BREAK] app-help early-return quota refund', () => {
+    // "explorer mode" triggers APP_HELP_SPECIFIC in app-help-map.ts and makes
+    // buildAssessmentAppHelpEvaluation return a non-null canned evaluation.
+    const APP_HELP_ANSWER = 'What is explorer mode?';
+
+    it('[BREAK] calls safeRefundQuota when the answer hits the app-help path (no LLM called)', async () => {
+      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+
+      const res = await makeMeteredApp().request(
+        path,
+        validAnswerBody(APP_HELP_ANSWER),
+      );
+
+      // Route returns 200 with the canned evaluation.
+      expect(res.status).toBe(200);
+      // LLM was NOT called.
+      expect(evaluateAssessmentAnswerMock).not.toHaveBeenCalled();
+      // Quota refund WAS called — the learner must not be charged for a
+      // no-LLM response.
+      expect(safeRefundQuotaMock).toHaveBeenCalledTimes(1);
+      expect(safeRefundQuotaMock).toHaveBeenCalledWith(
+        expect.anything(),
+        SUBSCRIPTION_ID,
+        expect.objectContaining({ route: 'assessments.answer.app_help' }),
+      );
+    });
+
+    it('[BREAK] does NOT call safeRefundQuota when the answer reaches the LLM path', async () => {
+      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+      loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
+      evaluateAssessmentAnswerMock.mockResolvedValue(
+        makeEvaluation({ passed: true }),
+      );
+      resolveAssessmentStatusMock.mockReturnValue('in_progress');
+      updateAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+
+      const res = await makeMeteredApp().request(
+        path,
+        validAnswerBody('Water is H2O'),
+      );
+
+      expect(res.status).toBe(200);
+      expect(evaluateAssessmentAnswerMock).toHaveBeenCalled();
+      // No refund — the LLM ran, the quota decrement was legitimate.
+      expect(safeRefundQuotaMock).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] skips the refund when subscriptionId is absent (unmetered call)', async () => {
+      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+
+      // Make an app that does NOT inject subscriptionId (simulates unmetered).
+      const app = makeMeteredApp({ omitSubscriptionId: true });
+      const res = await app.request(path, validAnswerBody(APP_HELP_ANSWER));
+
+      expect(res.status).toBe(200);
+      // No subscription context — refund is a no-op; function must not throw.
+      expect(safeRefundQuotaMock).not.toHaveBeenCalled();
     });
   });
 });
