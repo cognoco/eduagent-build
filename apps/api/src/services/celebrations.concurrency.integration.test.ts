@@ -32,7 +32,11 @@ import type {
   PendingCelebration,
 } from '@eduagent/schemas';
 
-import { queueCelebration } from './celebrations';
+import {
+  getPendingCelebrations,
+  markCelebrationsSeen,
+  queueCelebration,
+} from './celebrations';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -50,10 +54,13 @@ function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
+// Per-run unique suffix so concurrent runs on a shared DB cannot delete each
+// other's fixtures during cleanup().
 const PREFIX = 'integration-celebrations-race';
+const RUN_SUFFIX = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const ACCOUNT = {
-  clerkUserId: `${PREFIX}-user`,
-  email: `${PREFIX}@integration.test`,
+  clerkUserId: `${PREFIX}-${RUN_SUFFIX}-user`,
+  email: `${PREFIX}-${RUN_SUFFIX}@integration.test`,
 };
 
 async function seedAccountAndProfile() {
@@ -188,5 +195,58 @@ describe('[F-170/F-171] queueCelebration concurrent lost-update guard (integrati
     expect(details).toEqual(all.map(([, , d]) => d).sort());
 
     expect(await countCelebrationEvents(db, profile.id)).toBe(10);
+  });
+
+  it('[F-171] a celebration queued after markCelebrationsSeen stays visible to the child', async () => {
+    // Forward guard for the queue-vs-seen interleave (CodeRabbit #1126). The
+    // appended entry's queuedAt is stamped INSIDE the row lock, so a celebration
+    // committed after a markCelebrationsSeen('child') carries a queuedAt strictly
+    // later than seenAt and is not hidden by filterPendingCelebrations (which
+    // drops entries with queuedAt <= seenAt). If queuedAt were captured before
+    // acquiring the lock and a seen-update committed in the interim, the entry
+    // would persist with queuedAt <= seenAt and vanish from the child's view.
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    // Seed an earlier celebration so a coaching_card_cache row exists (a bare
+    // markCelebrationsSeen is a no-op when no row exists yet) and so the child
+    // has something to "see".
+    await queueCelebration(db, profile.id, 'polar_star', 'streak_7', 'Warmup');
+    await markCelebrationsSeen(db, profile.id, 'child');
+    // Strictly-later wall clock than the seen timestamp, independent of clock
+    // resolution, so the assertion isolates the stamp-location invariant.
+    await new Promise((r) => setTimeout(r, 1100));
+    await queueCelebration(
+      db,
+      profile.id,
+      'comet',
+      'topic_mastered',
+      'Algebra',
+    );
+
+    // Only the post-seen celebration is visible to the child; the warmup was
+    // marked seen.
+    const visible = await getPendingCelebrations(db, profile.id, 'child');
+    expect(visible).toHaveLength(1);
+    expect(visible[0]).toMatchObject({
+      celebration: 'comet',
+      reason: 'topic_mastered',
+      detail: 'Algebra',
+    });
+
+    // The persisted queuedAt must be later than the seen timestamp — proving it
+    // was stamped at/after lock-acquisition, not before the seen-update.
+    const row = await db.query.coachingCardCache.findFirst({
+      where: eq(coachingCardCache.profileId, profile.id),
+    });
+    const seenAt = row?.celebrationsSeenByChild ?? null;
+    const entry = (
+      (row?.pendingCelebrations as PendingCelebration[] | null) ?? []
+    ).find((e) => e.detail === 'Algebra');
+    expect(seenAt).not.toBeNull();
+    expect(entry).toBeDefined();
+    expect(new Date(entry!.queuedAt).getTime()).toBeGreaterThan(
+      seenAt!.getTime(),
+    );
   });
 });

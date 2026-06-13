@@ -80,22 +80,19 @@ export async function queueCelebration(
   reason: CelebrationReason,
   detail?: string | null,
 ): Promise<PendingCelebration[]> {
-  const nextEntry: PendingCelebration = {
-    celebration,
-    reason,
-    detail: detail ?? null,
-    queuedAt: new Date().toISOString(),
-  };
-
   let pendingCelebrations: PendingCelebration[] = [];
-  let appended = false;
+  // The appended entry, set inside the locked reducer when this call genuinely
+  // queues a new celebration (null when deduped). Carries the locked-time
+  // queuedAt so recordCelebrationEvent and the dedupeKey stay consistent with
+  // the dedup decision made under the lock.
+  let appendedEntry: PendingCelebration | null = null;
 
   await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
-    // Reset on each transaction attempt so a retry never carries a stale flag
+    // Reset on each transaction attempt so a retry never carries a stale entry
     // (the reducer below sets it synchronously under the lock before the
     // conditional recordCelebrationEvent reads it).
-    appended = false;
+    appendedEntry = null;
 
     // The read-dedup-append runs INSIDE the SELECT ... FOR UPDATE window via the
     // reducer below — closing the lost-update races [F-170] (the write used to
@@ -104,6 +101,11 @@ export async function queueCelebration(
     // queueCelebration calls for the same profile now serialise: the second
     // reducer runs against the first's committed array, so both entries persist.
     //
+    // queuedAt is stamped INSIDE the reducer (under the lock), not before the
+    // transaction: a markCelebrationsSeen('child') that commits while this call
+    // waits on the row lock would otherwise let the appended entry land with
+    // queuedAt <= seenAt and be hidden immediately by filterPendingCelebrations.
+    //
     // [BUG-467] inTransaction:true so writeHomeSurfacePendingCelebrations does
     // not open a nested db.transaction inside this one (neon-serverless throws
     // on nested transactions or silently degrades the row lock).
@@ -111,17 +113,23 @@ export async function queueCelebration(
       txDb,
       profileId,
       (existing, lockedRow) => {
+        const candidate: PendingCelebration = {
+          celebration,
+          reason,
+          detail: detail ?? null,
+          queuedAt: new Date().toISOString(),
+        };
         const seenByChildAt = lockedRow?.celebrationsSeenByChild ?? null;
         const hasDuplicate = existing.some((entry) => {
           if (
-            entry.celebration !== nextEntry.celebration ||
-            entry.reason !== nextEntry.reason ||
-            (entry.detail ?? null) !== nextEntry.detail
+            entry.celebration !== candidate.celebration ||
+            entry.reason !== candidate.reason ||
+            (entry.detail ?? null) !== candidate.detail
           ) {
             return false;
           }
 
-          if (nextEntry.detail !== null || !seenByChildAt) {
+          if (candidate.detail !== null || !seenByChildAt) {
             return true;
           }
 
@@ -129,26 +137,27 @@ export async function queueCelebration(
           return Number.isNaN(queuedAt.getTime()) || queuedAt > seenByChildAt;
         });
 
+        appendedEntry = hasDuplicate ? null : candidate;
         pendingCelebrations = hasDuplicate
           ? existing
-          : [...existing, nextEntry];
-        appended = !hasDuplicate;
+          : [...existing, candidate];
         return pendingCelebrations;
       },
       { inTransaction: true },
     );
 
-    if (appended) {
+    if (appendedEntry) {
+      const entry: PendingCelebration = appendedEntry;
       await recordCelebrationEvent(txDb, {
         profileId,
-        celebratedAt: new Date(nextEntry.queuedAt),
+        celebratedAt: new Date(entry.queuedAt),
         celebrationType: celebration,
         reason,
         sourceType: 'home_surface_pending_celebration',
         sourceId: detail ?? null,
         dedupeKey:
           detail === null || detail === undefined
-            ? `${celebration}:${reason}:${nextEntry.queuedAt}`
+            ? `${celebration}:${reason}:${entry.queuedAt}`
             : undefined,
         metadata: { detail: detail ?? null },
       });

@@ -47,10 +47,13 @@ function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
+// Per-run unique suffix so concurrent runs on a shared DB cannot delete each
+// other's fixtures during cleanup().
 const PREFIX = 'integration-vocab-race-f169';
+const RUN_SUFFIX = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const ACCOUNT = {
-  clerkUserId: `${PREFIX}-user`,
-  email: `${PREFIX}@integration.test`,
+  clerkUserId: `${PREFIX}-${RUN_SUFFIX}-user`,
+  email: `${PREFIX}-${RUN_SUFFIX}@integration.test`,
 };
 
 async function seedVocabulary() {
