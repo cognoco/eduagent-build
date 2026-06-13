@@ -7,11 +7,17 @@
 
 jest.mock(
   '../services/child-cap-notifications' /* gc1-allow: route unit isolation; service covers DB behavior */,
-  () => ({
-    listActiveChildCapNotifications: jest.fn(),
-    dismissChildCapNotification: jest.fn(),
-    recordChildCapNotificationForAccount: jest.fn(),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../services/child-cap-notifications',
+    ) as typeof import('../services/child-cap-notifications');
+    return {
+      ...actual,
+      listActiveChildCapNotifications: jest.fn(),
+      dismissChildCapNotification: jest.fn(),
+      recordChildCapNotificationForAccount: jest.fn(),
+    };
+  },
 );
 
 import { Hono } from 'hono';
