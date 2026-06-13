@@ -34,10 +34,12 @@ on:
           - ios
           - all
 
+# Least-privilege default for every job. issues:write is granted per-job only
+# to the three jobs whose failure-notification step creates a GitHub issue
+# (api-deploy, api-smoke-test, api-production-smoke-test).
 permissions:
   actions: read
   contents: read
-  issues: write
 
 # Never deploy in parallel — one deployment at a time
 concurrency:
@@ -134,6 +136,11 @@ jobs:
        (needs.api-confirm-production.result == 'success' || needs.api-confirm-production.result == 'skipped'))
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
+    # issues:write for the "Notify on deploy failure" step (creates an issue).
+    permissions:
+      actions: read
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -372,6 +379,11 @@ jobs:
       needs.api-deploy.result == 'success' &&
       (github.event_name == 'push' || inputs.api_environment == 'staging')
     runs-on: ubuntu-latest
+    # issues:write for the "Notify on smoke-test failure" step (creates an issue).
+    permissions:
+      actions: read
+      contents: read
+      issues: write
     steps:
       - name: Resolve staging API URL
         id: resolve-url
@@ -502,6 +514,11 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       inputs.api_environment == 'production'
     runs-on: ubuntu-latest
+    # issues:write for the "Notify on smoke-test failure" step (creates an issue).
+    permissions:
+      actions: read
+      contents: read
+      issues: write
     steps:
       - name: Resolve production API URL
         id: resolve-url
