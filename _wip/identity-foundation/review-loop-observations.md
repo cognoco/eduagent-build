@@ -270,6 +270,33 @@ productionization implication.
   with a scope-fenced final round or an explicit operator waiver lane; and
   large WPs (28 files) should expect 3-4 rounds as the norm, not a smell.
 
+- **2026-06-13 — the pre-execution STOP earned its keep twice on WI-689 (CUT-A,
+  the foundational cutover migration).** (1) *Plan-vs-reality gap.* The mandated
+  generate-preflight surfaced **four** categories of pre-existing TS↔journal
+  baseline drift — the ratified plan anticipated only one (`concepts`/
+  `concept_mastery`). The other three (unique-constraint→index, CHECK rename,
+  column default) were latent on `main` before CUT-A started. The shepherd's
+  value at the STOP was adding three safety gates the executor's "reconcile it
+  all" proposal lacked: FK-target safety (a unique *index* can't always serve an
+  FK reference target, so constraint→index isn't a free no-op), physical-existence
+  (`IF NOT EXISTS` vs real CREATE — the tables pre-exist on push-managed dev), and
+  live constraint-name verification + `IF EXISTS` guards (dev/stg are journal-
+  drifted; `drizzle-kit migrate` aborted on this exact class in WI-585). Ruling:
+  the fix *rides the WI as a separated `0113` migration* per the plan's "stray DDL
+  → its own migration" clause — NOT a separate WI (avoids critical-path latency).
+  (2) *Dev-homogeneity blind spot.* The executor's pre-PR adversarial self-review
+  caught a genuine convergence-freeze abort — an unguarded `actor_id` FK in the
+  reseed that 23503-aborts on any `parent_reported` row whose parent person is
+  absent — that **dev data structurally could not surface** (all 173 dev rows are
+  `self_report`, actor_id null). *Production implications:* (a) foundational/
+  data-migration units warrant a mandated pre-PR "what does prod/staging data
+  exercise that dev's distribution does not?" self-review pass — homogeneous dev
+  data hides whole branches; (b) a generate-preflight belongs in the protocol for
+  ANY unit that runs `drizzle-kit generate` after an upstream merge, not just CUT-A;
+  (c) the per-risk-class DoD-depth knob extends upstream to DoR/STOP placement —
+  the foundational unit's phase-0 STOP caught two issues that a straight-to-PR flow
+  would have pushed into the CI/review loop (or worse, the staging freeze).
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no
