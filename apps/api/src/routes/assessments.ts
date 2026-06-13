@@ -10,6 +10,7 @@ import {
   chatExchangeSchema,
   declineAssessmentRefreshResponseSchema,
   getActiveAssessmentResponseSchema,
+  type QuotaModel,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { parseConversationLanguage } from '../services/llm';
@@ -34,11 +35,26 @@ import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
 import { getSession } from '../services/session';
+import { safeRefundQuota } from '../services/billing';
 import { notFound } from '../errors';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
 
 const logger = createLogger();
+
+// Extends the base RouteEnv with quota variables set by the metering
+// middleware. Typed here rather than in RouteEnv itself because these variables
+// are only meaningful for metered routes — adding them globally would mislead
+// readers of unmetered route handlers.
+type AssessmentRouteEnv = RouteEnv & {
+  Variables: RouteEnv['Variables'] & {
+    subscriptionId: string | undefined;
+    quotaDecrementSource: 'monthly' | 'top_up' | undefined;
+    quotaDecrementTopUpCreditId: string | undefined;
+    quotaDecrementQuotaModel: QuotaModel | undefined;
+    quotaRefunded: boolean | undefined;
+  };
+};
 
 function countLearnerAnswers(
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -46,7 +62,7 @@ function countLearnerAnswers(
   return history.filter((entry) => entry.role === 'user').length;
 }
 
-export const assessmentRoutes = new Hono<RouteEnv>()
+export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Start a topic completion assessment
   .post('/subjects/:subjectId/topics/:topicId/assessments', async (c) => {
     assertNotProxyMode(c);
@@ -110,6 +126,22 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         assessment.masteryScore ?? 0,
       );
       if (appHelpEvaluation) {
+        // The app-help branch returns a canned response without calling
+        // the LLM. The metering middleware has already decremented the quota pool
+        // before this handler ran. Refund it here so the learner is not charged
+        // for a turn that consumed no LLM capacity. Mark quotaRefunded so the
+        // middleware's post-handler status-based branch does not double-refund.
+        const subscriptionId = c.get('subscriptionId');
+        if (subscriptionId && !c.get('quotaRefunded')) {
+          await safeRefundQuota(db, subscriptionId, {
+            route: 'assessments.answer.app_help',
+            profileId,
+            source: c.get('quotaDecrementSource'),
+            quotaModel: c.get('quotaDecrementQuotaModel'),
+            topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+          });
+          c.set('quotaRefunded', true);
+        }
         return c.json(
           submitAssessmentAnswerResponseSchema.parse({
             evaluation: appHelpEvaluation,
