@@ -1,4 +1,4 @@
-import { useMemo, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { Text, type TextStyle } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useThemeColors } from '../../lib/theme';
@@ -16,6 +16,31 @@ import { useThemeColors } from '../../lib/theme';
 // Do NOT add an inline `style.color` to the prose rules below: a second,
 // independently-updating colour source is exactly what caused the
 // invisible-text regression. See docs/llm-issues.md.
+
+// Safe URL schemes allowed for link navigation in LLM-authored markdown (F-027).
+// Schemes outside this set (javascript:, data:, file:, etc.) are blocked to
+// prevent arbitrary-URL navigation injection.
+const SAFE_LINK_SCHEMES = ['https:', 'http:'];
+
+/**
+ * Returns true if the URL scheme is allowed; false if it should be blocked.
+ * Used as the `onLinkPress` handler — returning false suppresses navigation.
+ */
+export function isSafeLinkUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return SAFE_LINK_SCHEMES.includes(protocol);
+  } catch {
+    // Unparseable URL — block it.
+    return false;
+  }
+}
+
+// Image handler allowlist: only HTTPS images are permitted (F-027).
+// The library default also allows http:// and data:image/* origins;
+// restricting to https:// blocks zero-click remote-image loads from
+// plain-HTTP or data-URI sources.
+const ALLOWED_IMAGE_HANDLERS: string[] = ['https://'];
 
 function buildMarkdownStyles(
   textColor: string,
@@ -103,10 +128,16 @@ export function ThemedMarkdown({
     [colors.textPrimary],
   );
 
+  const handleLinkPress = useCallback((url: string): boolean => {
+    return isSafeLinkUrl(url);
+  }, []);
+
   return (
     <Markdown
       mergeStyle={false}
       style={mdStyles}
+      onLinkPress={handleLinkPress}
+      allowedImageHandlers={ALLOWED_IMAGE_HANDLERS}
       rules={{
         inline: (node: { key: string }, children: ReactNode) => (
           <Text

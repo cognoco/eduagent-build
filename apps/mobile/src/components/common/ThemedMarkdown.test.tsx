@@ -10,6 +10,8 @@ type CapturedMarkdownProps = {
   mergeStyle?: boolean;
   rules?: Record<string, MarkdownRule>;
   style?: Record<string, unknown>;
+  onLinkPress?: (url: string) => boolean;
+  allowedImageHandlers?: string[];
 };
 
 const mockMarkdownRender = jest.fn();
@@ -76,5 +78,49 @@ describe('ThemedMarkdown', () => {
     expect(textgroupElement.props.className).toContain('text-text-primary');
     expect(flattenRuleStyle(inlineElement)?.color).toBeUndefined();
     expect(flattenRuleStyle(textgroupElement)?.color).toBeUndefined();
+  });
+
+  describe('link-scheme guard (F-027)', () => {
+    it('blocks javascript: scheme links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      // onLinkPress returning false means the library suppresses navigation
+      // eslint-disable-next-line no-script-url -- intentional bad fixture for attack-blocking coverage
+      expect(onLinkPress?.('javascript:alert(1)')).toBe(false);
+    });
+
+    it('blocks data: scheme links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('data:text/html,<script>alert(1)</script>')).toBe(
+        false,
+      );
+    });
+
+    it('blocks file: scheme links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('file:///etc/passwd')).toBe(false);
+    });
+
+    it('allows https: links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('https://example.com')).toBe(true);
+    });
+
+    it('allows http: links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('http://example.com')).toBe(true);
+    });
+  });
+
+  describe('image-handler allowlist (F-027)', () => {
+    it('restricts allowedImageHandlers to https only, blocking data: and http: images', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { allowedImageHandlers } = latestMarkdownProps();
+      expect(allowedImageHandlers).toEqual(['https://']);
+    });
   });
 });
