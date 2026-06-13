@@ -16,7 +16,7 @@ import { useThemeColors } from '../../lib/theme';
 // TypeScript accepts it without a cast.
 type MarkdownProps = ComponentProps<typeof Markdown> & {
   allowedImageHandlers?: string[];
-  defaultImageHandler?: string;
+  defaultImageHandler?: string | null;
 };
 const MarkdownComponent = Markdown as ComponentType<MarkdownProps>;
 
@@ -53,11 +53,14 @@ export function isSafeLinkUrl(url: string): boolean {
   }
 }
 
-// Image handler allowlist: only HTTPS images are permitted (F-027).
-// The library default also allows http:// and data:image/* origins;
-// restricting to https:// blocks zero-click remote-image loads from
-// plain-HTTP or data-URI sources.
-const ALLOWED_IMAGE_HANDLERS: string[] = ['https://'];
+// Remote images are disabled entirely for this untrusted-markdown path (F-027).
+// Even an https-only allowlist would let LLM-authored markdown trigger zero-click
+// loads from arbitrary hosts — tracking pixels and viewer-IP leaks. An empty
+// allowlist combined with a null default handler makes the library's image rule
+// render nothing (see node_modules/react-native-markdown-display image rule:
+// `show === false && defaultImageHandler === null` returns null).
+const ALLOWED_IMAGE_HANDLERS: string[] = [];
+const DEFAULT_IMAGE_HANDLER = null;
 
 function buildMarkdownStyles(
   textColor: string,
@@ -155,6 +158,7 @@ export function ThemedMarkdown({
       style={mdStyles}
       onLinkPress={handleLinkPress}
       allowedImageHandlers={ALLOWED_IMAGE_HANDLERS}
+      defaultImageHandler={DEFAULT_IMAGE_HANDLER}
       rules={{
         inline: (node: { key: string }, children: ReactNode) => (
           <Text

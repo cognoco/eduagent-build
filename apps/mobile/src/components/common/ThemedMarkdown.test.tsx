@@ -12,6 +12,7 @@ type CapturedMarkdownProps = {
   style?: Record<string, unknown>;
   onLinkPress?: (url: string) => boolean;
   allowedImageHandlers?: string[];
+  defaultImageHandler?: string | null;
 };
 
 const mockMarkdownRender = jest.fn();
@@ -116,11 +117,41 @@ describe('ThemedMarkdown', () => {
     });
   });
 
-  describe('image-handler allowlist (F-027)', () => {
-    it('restricts allowedImageHandlers to https only, blocking data: and http: images', () => {
+  describe('remote images disabled (F-027)', () => {
+    // The library's image render rule renders null when
+    // `show === false && defaultImageHandler === null`. An empty
+    // allowedImageHandlers makes `show` false for every src (including https,
+    // http, and data: images), and a null defaultImageHandler triggers the
+    // null return — so no remote image (tracking pixel / IP leak) ever loads.
+    it('passes an empty allowedImageHandlers so no image src matches', () => {
       render(<ThemedMarkdown>Hello</ThemedMarkdown>);
       const { allowedImageHandlers } = latestMarkdownProps();
-      expect(allowedImageHandlers).toEqual(['https://']);
+      expect(allowedImageHandlers).toEqual([]);
+    });
+
+    it('passes a null defaultImageHandler so disallowed images render nothing', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { defaultImageHandler } = latestMarkdownProps();
+      expect(defaultImageHandler).toBeNull();
+    });
+
+    it('exercises the library image rule with these props and renders nothing', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { allowedImageHandlers, defaultImageHandler } =
+        latestMarkdownProps();
+
+      // Reproduce the library's image-rule decision (renderRules.image):
+      // an https remote image is blocked because no handler matches and the
+      // default handler is null.
+      const src = 'https://evil.example/tracker.png';
+      const show =
+        (allowedImageHandlers ?? []).filter((value) =>
+          src.toLowerCase().startsWith(value.toLowerCase()),
+        ).length > 0;
+      const rendersNothing = show === false && defaultImageHandler === null;
+
+      expect(show).toBe(false);
+      expect(rendersNothing).toBe(true);
     });
   });
 });
