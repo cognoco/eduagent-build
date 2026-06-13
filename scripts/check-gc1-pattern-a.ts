@@ -33,11 +33,23 @@ export type Violation = {
 };
 
 const MOCK_LINE = /jest\.(?:mock|doMock)\(\s*['"`](\.\.?\/[^'"`]+)['"`]/;
+// Detects a jest.mock( call that ends the physical line without a specifier —
+// the specifier sits on a subsequent line (multiline call form).
+const MOCK_OPEN = /jest\.(?:mock|doMock)\s*\(/;
+// Matches a leading specifier argument on its own line: `  './foo',` or `"../bar"`.
+const SPECIFIER_LINE = /^\s*['"`](\.\.?\/[^'"`]+)['"`]/;
 const GC1_ALLOW = /gc1-allow/i;
 
 export function extractSpecifier(line: string): string | null {
+  // Single-line form: jest.mock('./foo', ...) on one physical line.
   const m = line.match(MOCK_LINE);
-  return m?.[1] ?? null;
+  if (m) return m[1];
+  // Multiline form: content is "jest.mock(\n  './foo'," — check each part.
+  for (const part of line.split('\n')) {
+    const ms = part.match(SPECIFIER_LINE);
+    if (ms) return ms[1];
+  }
+  return null;
 }
 
 // Look at the factory body that follows `jest.mock(...)` (next ~30 lines).
@@ -86,12 +98,20 @@ export type StagedMockSite = { line: number; content: string };
 
 // Parse a `git diff --cached --unified=0` patch (already filtered to one file)
 // and return new-file line numbers of any added `jest.mock('./...')` lines.
+//
+// Handles both single-line and multiline call forms:
+//   Single:    jest.mock('./foo', () => ({}));
+//   Multiline: jest.mock(        ← detected here
+//                './foo',        ← specifier found by look-ahead
+//                () => ({})
+//              );
 export function findAddedMockLines(unifiedDiff: string): StagedMockSite[] {
   const lines = unifiedDiff.split('\n');
   const sites: StagedMockSite[] = [];
   let cur = 0;
   let inHunk = false;
-  for (const ln of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i];
     if (ln.startsWith('+++') || ln.startsWith('---')) continue;
     const hunk = ln.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
     if (hunk) {
@@ -103,7 +123,32 @@ export function findAddedMockLines(unifiedDiff: string): StagedMockSite[] {
     if (ln.startsWith('+')) {
       const content = ln.slice(1);
       if (MOCK_LINE.test(content)) {
+        // Single-line form: jest.mock('./foo', ...) — specifier on the same line.
         sites.push({ line: cur, content });
+      } else if (MOCK_OPEN.test(content)) {
+        // Multiline form: jest.mock( with no specifier on this line.
+        // Look ahead up to 3 diff lines (added or context) for the specifier.
+        const mockLine = cur;
+        const mockContent = content;
+        for (let j = i + 1; j <= i + 3 && j < lines.length; j++) {
+          const ahead = lines[j];
+          // Skip deletion lines — they don't appear in the new file.
+          if (ahead.startsWith('-')) continue;
+          const aheadContent = ahead.startsWith('+') ? ahead.slice(1) : ahead;
+          const specMatch = aheadContent.match(SPECIFIER_LINE);
+          if (specMatch) {
+            // Emit a site whose content is the full mock-call line (for gc1-allow
+            // checking) combined with the specifier (for extractSpecifier).
+            // Format: "<mock-line> <specifier-line>" joined with a newline so
+            // MOCK_LINE can still match after the two lines are joined.
+            sites.push({
+              line: mockLine,
+              content: `${mockContent}\n${aheadContent}`,
+            });
+          }
+          // Stop at the first non-deletion line regardless of whether it matched.
+          break;
+        }
       }
       cur++;
     } else if (ln.startsWith('-')) {

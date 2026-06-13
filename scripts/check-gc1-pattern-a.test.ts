@@ -113,6 +113,33 @@ describe('findAddedMockLines', () => {
     const diff = ['@@ -0,0 +5,1 @@', "+jest.mock('stripe');"].join('\n');
     expect(findAddedMockLines(diff)).toEqual([]);
   });
+
+  // Regression for F-156: multiline jest.mock calls where the specifier sits
+  // on a separate physical line from jest.mock( must be detected.
+  it('detects a multiline internal mock (specifier on next added line)', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const sites = findAddedMockLines(diff);
+    expect(sites).toHaveLength(1);
+    expect(sites[0].line).toBe(1);
+    expect(sites[0].content).toContain("'./services/foo'");
+  });
+
+  it('ignores a multiline mock whose specifier is a bare external package', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock(',
+      "+  'stripe',",
+      '+  () => ({})',
+      '+);',
+    ].join('\n');
+    expect(findAddedMockLines(diff)).toEqual([]);
+  });
 });
 
 describe('checkFile — integration', () => {
@@ -166,5 +193,66 @@ describe('checkFile — integration', () => {
     const v = checkFile('a.test.ts', diff, staged);
     expect(v).toHaveLength(1);
     expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // Regression for F-156: multiline mock with no gc1-allow and no Pattern A
+  // must be blocked even though jest.mock( and the specifier are on separate lines.
+  it('blocks a NEW multiline non-Pattern-A internal mock', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  it('allows a multiline internal mock with gc1-allow on the jest.mock( line', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock( // gc1-allow: unit-test boundary',
+      "+  './services/foo',",
+      '+  () => ({})',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock( // gc1-allow: unit-test boundary',
+      "  './services/foo',",
+      '  () => ({})',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  it('allows a multiline internal mock that is Pattern A', () => {
+    const diff = [
+      '@@ -0,0 +1,6 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  () => ({',
+      "+    ...jest.requireActual('./services/foo'),",
+      '+    bar: jest.fn(),',
+      '+  })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  () => ({',
+      "    ...jest.requireActual('./services/foo'),",
+      '    bar: jest.fn(),',
+      '  })',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
   });
 });

@@ -21,6 +21,8 @@ ruleTester.run('no-internal-jest-mock', rule, {
     // GC1 ratchet escape hatch — must be on the jest.mock/argument line.
     "jest.mock('./sentry' /* gc1-allow: unit test boundary */, () => ({}));",
     "jest.mock( // gc1-allow: handler control-flow test\n  '../services/notifications',\n  () => ({})\n);",
+    // Multiline Pattern A — specifier on its own line, factory spreads requireActual.
+    "jest.mock(\n  './services/foo',\n  () => ({\n    ...jest.requireActual('./services/foo'),\n    bar: jest.fn(),\n  })\n);",
     // Pattern A — inline spread of jest.requireActual(<same path>) is the
     // canonical GC1-compliant shape and must NOT require gc1-allow.
     "jest.mock('./services/foo', () => ({\n  ...jest.requireActual('./services/foo'),\n  bar: jest.fn(),\n}));",
@@ -29,6 +31,11 @@ ruleTester.run('no-internal-jest-mock', rule, {
     "jest.mock('../services/dashboard', () => {\n  const actual = jest.requireActual('../services/dashboard');\n  return { ...actual, foo: jest.fn() };\n});",
   ],
   invalid: [
+    // Multiline form without gc1-allow and without Pattern A must be caught.
+    {
+      code: "jest.mock(\n  './services/foo',\n  () => ({ bar: jest.fn() })\n);",
+      errors: [{ messageId: 'internalMock' }],
+    },
     {
       code: "jest.mock('./sentry');",
       errors: [{ messageId: 'internalMock' }],
