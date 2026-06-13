@@ -127,16 +127,20 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **N.0 routing (Phase N, 2026-06-09):** the audit `agent-instructions` doc-findings
   (F-037/038/039/040/041/042/045/046, F-113/114) were ruled to HH / PRG-03 (not
   Stream 2), all non-blocking → default-defer.
-- **WI-587 residue (registered 2026-06-10):** the 19 residual `WI-387`
-  memory-triage dispositions de-scoped from the HH exit gate (10 user-KEEPs ·
-  8 product/user/mixed REVISEs · 1 CONFLICT — `feedback_never_lock_topics`,
-  incl. the PRD FR119-vs-FR124 self-contradiction) → Cosmo **`WI-587`**
-  (Captured, MentoMate). Evidence base:
-  `supporting-artefacts/memory-cleanup.md` (full 55-memory triage results;
-  adopted from nexus 2026-06-10 — now a registered PRG-03 artifact, no longer
-  rogue). Needs a **~20-min operator ruling session** (queue entry 4). The
-  post-HH-merge sequencing hold on executing its edits **lifted 2026-06-11**
-  (PR #832 merged) — only the rulings themselves remain.
+- **WI-587 — RULED + EXECUTED (2026-06-11), now `Stage=Reviewing`:** the 19
+  residual `WI-387` memory-triage dispositions (10 user-KEEPs · 8
+  product/user/mixed REVISEs · 1 CONFLICT — `feedback_never_lock_topics` vs the
+  PRD FR119-vs-FR124 self-contradiction). **All 19 ruled by PM 2026-06-11** and
+  executed the same day; **landed on `main` in commit `7cc8a9a8d`** ("docs(memory):
+  apply PM-ruled dispositions", 22 files): PRD § Prerequisite Relationship Types
+  rewritten (REQUIRED = strong advisory, never a hard lock — conflict resolved
+  Option A "never lock", code-confirmed no locking logic exists), the 8 REVISE
+  corrections applied, the 10 KEEP memories re-confirmed `2026-06-11`. **Verified
+  landed 2026-06-13** (program session — all 18 + the conflict checked file-by-file).
+  Evidence base: `supporting-artefacts/wi-587-ruling-sheet.md` (all 19 cells filled,
+  status RULED) + `memory-cleanup.md` (full 55-memory triage). The "~20-min operator
+  ruling session" framing is now **spent** — only the **review-close** remains
+  (manual `/cosmo:review`; standalone item — PRG-03 has no shepherded loop).
 - **Singleton merge (2026-06-10):** F-036 (`autoMemoryDirectory` mis-point)
   merged in from the dissolved PRG-16 tail.
 - **Activate-when:** active — the matrix already *is* the agreed owner-map; no
@@ -456,7 +460,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 1 | **PRG-12** l10n-a11y-mobile | ✓ **GRADUATED 06-12** — 8/8 WPs closed in ~1.5 days; ratchet baseline 361 → 12 |
 | 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
-| 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
+| 4 | **PRG-03** `WI-587` memory dispositions | ✓ **RULED + EXECUTED 06-11** — all 19 landed on `main` (`7cc8a9a8d`); WI-587 now **Reviewing**; only a manual `/cosmo:review` close remains (verified landed 06-13) |
 | 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
 | 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
 | 7 | **PRG-10** security-pii-api | ✅ **both gates FIRED** (safe subset G2; auth/PII remainder G4 06-11 late) — activation = attention-budget call |
