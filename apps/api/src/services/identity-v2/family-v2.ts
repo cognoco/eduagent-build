@@ -18,8 +18,8 @@
 // person.id = profiles.id throughout. FLAG-GATED via the calling seam.
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
-import { membership, type Database } from '@eduagent/database';
+import { and, eq } from 'drizzle-orm';
+import { consentGrant, membership, type Database } from '@eduagent/database';
 import type { ConsentStatus } from '@eduagent/schemas';
 import {
   DEFAULT_CONSENT_PURPOSE,
@@ -27,6 +27,8 @@ import {
   resolveConsentStatusesForBasis,
 } from './consent-status-v2';
 import { getChargePersonIds, isGuardianOf } from './guardianship';
+import { findOwnerPersonId } from './helpers';
+import { ConsentNotAuthorizedError } from '../consent';
 
 /** The GDPR basis — every family/dashboard consent read is a GDPR decision. */
 const GDPR_BASIS = 'gdpr_parental_consent' as const;
@@ -97,6 +99,75 @@ export async function getChildrenGdprConsentStatusesV2(
     DEFAULT_CONSENT_PURPOSE,
     GDPR_BASIS,
   );
+}
+
+/**
+ * v2 `getChildConsentForParent`: the parent-dashboard child-status read
+ * (`GET /v1/consent/:child/status`). Verifies the active guardianship edge
+ * (throws ConsentNotAuthorizedError('view') on no edge — same as legacy), then
+ * returns the child's GDPR consent status + the latest grant response
+ * timestamp. Null when the child has no consent rows.
+ */
+export async function getChildConsentForParentV2(
+  db: Database,
+  childPersonId: string,
+  guardianPersonId: string,
+): Promise<{
+  status: ConsentStatus;
+  respondedAt: string | null;
+  consentType: 'GDPR';
+} | null> {
+  if (!(await isGuardianOf(db, guardianPersonId, childPersonId))) {
+    throw new ConsentNotAuthorizedError('view');
+  }
+  const status = await getChildGdprConsentStatusV2(db, childPersonId);
+  if (status === null) return null;
+
+  // respondedAt: the current GDPR grant's withdrawn_at (if withdrawn) or
+  // granted_at, mirroring the legacy responded_at the dashboard countdown reads.
+  const organizationId = await resolveOrgId(db, childPersonId);
+  let respondedAt: string | null = null;
+  if (organizationId) {
+    const grant = await db.query.consentGrant.findFirst({
+      where: and(
+        eq(consentGrant.chargePersonId, childPersonId),
+        eq(consentGrant.purpose, DEFAULT_CONSENT_PURPOSE),
+        eq(consentGrant.lawfulBasis, GDPR_BASIS),
+      ),
+      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
+      columns: { grantedAt: true, withdrawnAt: true },
+    });
+    if (grant) {
+      respondedAt = (grant.withdrawnAt ?? grant.grantedAt).toISOString();
+    }
+  }
+  return { status, respondedAt, consentType: 'GDPR' };
+}
+
+/** The org a person belongs to (v1 single home org). Null when no membership. */
+export async function resolveOrgIdForPerson(
+  db: Database,
+  personId: string,
+): Promise<string | null> {
+  return resolveOrgId(db, personId);
+}
+
+/**
+ * v2 `getFamilyOwnerProfileId`: the org owner (admin membership) person id for a
+ * child's home org — the consent-revocation notice recipient. The legacy version
+ * resolved the owner via family_links → owner profile; v2 resolves via the
+ * child's org → admin membership. Falls back to `fallbackGuardianPersonId` when
+ * no org/owner is found (matching legacy's fallback to the event-sender).
+ */
+export async function getFamilyOwnerPersonIdV2(
+  db: Database,
+  childPersonId: string,
+  fallbackGuardianPersonId: string,
+): Promise<string> {
+  const organizationId = await resolveOrgId(db, childPersonId);
+  if (!organizationId) return fallbackGuardianPersonId;
+  const ownerId = await findOwnerPersonId(db, organizationId);
+  return ownerId ?? fallbackGuardianPersonId;
 }
 
 // ---------------------------------------------------------------------------

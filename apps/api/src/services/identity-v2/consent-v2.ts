@@ -33,11 +33,12 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import {
   consentGrant,
   consentRequest,
+  membership,
   nudges,
   person,
   type Database,
 } from '@eduagent/database';
-import type { ConsentType } from '@eduagent/schemas';
+import type { ConsentStatus, ConsentType } from '@eduagent/schemas';
 import {
   sendEmail,
   formatConsentRequestEmail,
@@ -47,6 +48,7 @@ import { createLogger } from '../logger';
 import {
   type ConsentBasis,
   DEFAULT_CONSENT_PURPOSE,
+  resolveLatestConsentStatusAnyBasis,
 } from './consent-status-v2';
 import { isGuardianOf } from './guardianship';
 
@@ -791,8 +793,253 @@ export async function getChildNameByTokenV2(
 }
 
 // ---------------------------------------------------------------------------
+// Route-friendly revoke / restore wrappers — resolve org + GDPR basis from the
+// child person and return the resulting status, matching the legacy
+// revokeConsent/restoreConsent route shape (which returned a ConsentState the
+// route mapped to {status}). The route supplies only child + guardian person
+// ids; these resolve the rest. GDPR is the basis the parent-dashboard
+// revoke/restore acts on (the legacy machine keyed revoke on the latest row,
+// which for a child is the GDPR row).
+// ---------------------------------------------------------------------------
+
+/**
+ * v2 route wrapper for `PUT /v1/consent/:child/revoke`. Resolves the child's
+ * org, revokes the GDPR grant (stamp withdrawn_at), returns the resulting
+ * status (WITHDRAWN) + the withdrawal timestamp the route's Inngest dispatch
+ * needs. Throws ConsentNotAuthorizedError / ConsentRecordNotFoundError as legacy.
+ */
+export async function revokeChildConsentV2(
+  db: Database,
+  childPersonId: string,
+  guardianPersonId: string,
+): Promise<{ status: ConsentStatus; withdrawnAt: string }> {
+  const organizationId = await resolveOrgIdOrThrow(db, childPersonId);
+  const result = await revokeConsentV2(
+    db,
+    childPersonId,
+    guardianPersonId,
+    organizationId,
+    'GDPR',
+  );
+  return { status: 'WITHDRAWN', withdrawnAt: result.withdrawnAt.toISOString() };
+}
+
+/**
+ * v2 route wrapper for `PUT /v1/consent/:child/restore`. Resolves org, restores
+ * the GDPR grant (append a new grant), returns the resulting status (CONSENTED).
+ */
+export async function restoreChildConsentV2(
+  db: Database,
+  childPersonId: string,
+  guardianPersonId: string,
+): Promise<{ status: ConsentStatus }> {
+  const organizationId = await resolveOrgIdOrThrow(db, childPersonId);
+  await restoreConsentV2(
+    db,
+    childPersonId,
+    guardianPersonId,
+    organizationId,
+    'GDPR',
+  );
+  return { status: 'CONSENTED' };
+}
+
+// ---------------------------------------------------------------------------
+// (10) getProfileConsentStateV2 — legacy getProfileConsentState
+// (the GET /v1/consent/my-status read)
+// ---------------------------------------------------------------------------
+
+export interface ProfileConsentStateV2 {
+  status: ConsentStatus;
+  guardianEmail: string | null;
+  consentType: ConsentType;
+  requestedAt: string;
+}
+
+/**
+ * v2 `getProfileConsentState`: the my-status read. Returns the latest-any-basis
+ * status (the behavior-preserving AnyBasis read — same as legacy
+ * `getConsentStatus`'s order-by-requested_at) plus the request row's
+ * recipient/basis/timestamp for the winning basis. Null when the person has no
+ * consent rows or no membership (pre-graph). The org is resolved from the
+ * person's membership (person.id = profileId).
+ */
+export async function getProfileConsentStateV2(
+  db: Database,
+  chargePersonId: string,
+): Promise<ProfileConsentStateV2 | null> {
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, chargePersonId),
+    columns: { organizationId: true },
+  });
+  if (!membershipRow) return null;
+  const organizationId = membershipRow.organizationId;
+
+  const status = await resolveLatestConsentStatusAnyBasis(
+    db,
+    chargePersonId,
+    organizationId,
+    DEFAULT_CONSENT_PURPOSE,
+  );
+  if (status === null) return null;
+
+  // The request row carrying the recipient/timestamp — pick the most recently
+  // requested across bases (legacy ordered by requested_at desc).
+  const request = await db.query.consentRequest.findFirst({
+    where: and(
+      eq(consentRequest.chargePersonId, chargePersonId),
+      eq(consentRequest.purpose, DEFAULT_CONSENT_PURPOSE),
+      eq(consentRequest.organizationId, organizationId),
+    ),
+    orderBy: (r, { desc }) => [desc(r.requestedAt), desc(r.createdAt)],
+    columns: {
+      requestedBasis: true,
+      guardianEmail: true,
+      requestedAt: true,
+      createdAt: true,
+    },
+  });
+
+  return {
+    status,
+    guardianEmail: request?.guardianEmail ?? null,
+    consentType:
+      request?.requestedBasis === 'coppa_parental_consent' ? 'COPPA' : 'GDPR',
+    requestedAt: (
+      request?.requestedAt ??
+      request?.createdAt ??
+      new Date()
+    ).toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// (11) consent-revocation Inngest reads (v2 of consent.ts revocation helpers)
+// ---------------------------------------------------------------------------
+
+/**
+ * v2 `isConsentRevocationGenerationCurrent`: true when the current GDPR grant is
+ * withdrawn (optionally at a specific withdrawal timestamp). The consent-
+ * revocation grace job uses this to detect a restore (which appends a new
+ * un-withdrawn grant, so the current grant is no longer withdrawn → false).
+ */
+export async function isConsentRevocationGenerationCurrentV2(
+  db: Database,
+  chargePersonId: string,
+  revokedAt?: Date,
+): Promise<boolean> {
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, chargePersonId),
+    columns: { organizationId: true },
+  });
+  if (!membershipRow) return false;
+  const current = await currentGrant(
+    db,
+    chargePersonId,
+    membershipRow.organizationId,
+    'gdpr_parental_consent',
+  );
+  if (!current?.withdrawnAt) return false;
+  if (!revokedAt) return true;
+  return current.withdrawnAt.getTime() === revokedAt.getTime();
+}
+
+/**
+ * v2 `getProfileForConsentRevocation`: the person's displayName + birthYear +
+ * archivedAt the revocation grace job reads (for the age/archive decision).
+ * Null when the person is gone.
+ */
+export async function getPersonForConsentRevocationV2(
+  db: Database,
+  chargePersonId: string,
+): Promise<{
+  displayName: string;
+  birthYear: number;
+  archivedAt: Date | null;
+} | null> {
+  const row = await db.query.person.findFirst({
+    where: eq(person.id, chargePersonId),
+    columns: { displayName: true, birthDate: true, archivedAt: true },
+  });
+  if (!row) return null;
+  return {
+    displayName: row.displayName,
+    birthYear: Number(row.birthDate.slice(0, 4)),
+    archivedAt: row.archivedAt ?? null,
+  };
+}
+
+/** v2 `getProfileDisplayName`: a person's display name, or null. */
+export async function getPersonDisplayNameV2(
+  db: Database,
+  chargePersonId: string,
+): Promise<string | null> {
+  const row = await db.query.person.findFirst({
+    where: eq(person.id, chargePersonId),
+    columns: { displayName: true },
+  });
+  return row?.displayName ?? null;
+}
+
+/**
+ * v2 archive-on-revocation: atomically stamp `person.archived_at` ONLY when the
+ * current GDPR grant is withdrawn (optionally at the given timestamp) and the
+ * person isn't already archived and the guardian holds an active edge — the v2
+ * of the consent-revocation `UPDATE profiles SET archived_at` CTE (the BUG-662
+ * account-guard becomes the guardianship-edge guard). Returns true when archived.
+ */
+export async function archivePersonOnRevocationV2(
+  db: Database,
+  chargePersonId: string,
+  guardianPersonId: string,
+  archivedAt: Date,
+  withdrawnAt?: Date,
+): Promise<boolean> {
+  if (!(await isGuardianOf(db, guardianPersonId, chargePersonId))) {
+    return false;
+  }
+  return db.transaction(async (tx) => {
+    const current = await tx.query.consentGrant.findFirst({
+      where: and(
+        eq(consentGrant.chargePersonId, chargePersonId),
+        eq(consentGrant.purpose, DEFAULT_CONSENT_PURPOSE),
+        eq(consentGrant.lawfulBasis, 'gdpr_parental_consent'),
+      ),
+      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
+      columns: { withdrawnAt: true },
+    });
+    if (!current?.withdrawnAt) return false;
+    if (
+      withdrawnAt &&
+      current.withdrawnAt.getTime() !== withdrawnAt.getTime()
+    ) {
+      return false;
+    }
+    const updated = await tx
+      .update(person)
+      .set({ archivedAt, updatedAt: archivedAt })
+      .where(and(eq(person.id, chargePersonId), isNull(person.archivedAt)))
+      .returning({ id: person.id });
+    return updated.length > 0;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/** Resolve a person's org (v1 single home org). Throws if no membership. */
+async function resolveOrgIdOrThrow(
+  db: Database,
+  personId: string,
+): Promise<string> {
+  const row = await db.query.membership.findFirst({
+    where: eq(membership.personId, personId),
+    columns: { organizationId: true },
+  });
+  if (!row) throw new ConsentRecordNotFoundError();
+  return row.organizationId;
+}
 
 /** The basis-keyed request unique predicate. */
 function requestKey(

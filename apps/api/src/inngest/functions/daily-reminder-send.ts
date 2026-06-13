@@ -5,9 +5,10 @@
 // ---------------------------------------------------------------------------
 
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { profiles } from '@eduagent/database';
 import { and, eq, isNull } from 'drizzle-orm';
+import { isPersonLive } from '../../services/identity-v2/helpers';
 import {
   formatDailyReminderBody,
   sendPushNotification,
@@ -37,11 +38,15 @@ export const dailyReminderSend = inngest.createFunction(
     const result = await step.run('send-daily-reminder', async () => {
       const db = getStepDatabase();
 
-      const activeProfile = await db.query.profiles.findFirst({
-        where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
-        columns: { id: true },
-      });
-      if (!activeProfile) {
+      // [CUT-B2] Liveness check dispatches to person.archived_at (v2) or
+      // profiles.archived_at (legacy).
+      const live = isIdentityV2EnabledInStep()
+        ? await isPersonLive(db, profileId)
+        : !!(await db.query.profiles.findFirst({
+            where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
+            columns: { id: true },
+          }));
+      if (!live) {
         return {
           status: 'skipped' as const,
           reason: 'profile_archived',

@@ -5,16 +5,24 @@ import {
   getStepResendApiKey,
   getStepEmailFrom,
   getStepAppUrl,
+  isIdentityV2EnabledInStep,
 } from '../helpers';
 import { and, eq, gte, lt } from 'drizzle-orm';
-import { consentStates } from '@eduagent/database';
+import { consentRequest, consentStates } from '@eduagent/database';
 import { refreshConsentTokenForRequest } from '../../services/consent';
+import {
+  refreshConsentTokenForRequestV2,
+  type RefreshedConsentTokenForRequestV2,
+} from '../../services/identity-v2/consent-v2';
+import { resolveConsentStatus } from '../../services/identity-v2/consent-status-v2';
+import { resolveOrgIdForPerson } from '../../services/identity-v2/family-v2';
 import {
   sendEmail,
   formatConsentReminderEmail,
   type EmailOptions,
 } from '../../services/notifications';
 import { deleteProfileIfNoConsent } from '../../services/deletion';
+import { deletePersonIfNoConsentV2 } from '../../services/identity-v2/deletion-v2';
 import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 
 export const consentReminder = inngest.createFunction(
@@ -39,6 +47,17 @@ export const consentReminder = inngest.createFunction(
         eq(consentStates.consentType, 'GDPR'),
         gte(consentStates.requestedAt, requestedAtDate),
         lt(consentStates.requestedAt, requestedAtUpperBound),
+      );
+    }
+
+    // [CUT-B2] v2 equivalent of currentConsentRequestWhere over consent_request.
+    function currentConsentRequestWhereV2() {
+      if (!requestedAtDate || !requestedAtUpperBound) return null;
+      return and(
+        eq(consentRequest.chargePersonId, profileId),
+        eq(consentRequest.requestedBasis, 'gdpr_parental_consent'),
+        gte(consentRequest.requestedAt, requestedAtDate),
+        lt(consentRequest.requestedAt, requestedAtUpperBound),
       );
     }
 
@@ -68,11 +87,23 @@ export const consentReminder = inngest.createFunction(
       parentEmail: string | null;
       consentToken: string | null;
     }> {
+      const db = getStepDatabase();
+      if (isIdentityV2EnabledInStep()) {
+        const where = currentConsentRequestWhereV2();
+        if (!where) return { parentEmail: null, consentToken: null };
+        const row = await db.query.consentRequest.findFirst({
+          where,
+          columns: { guardianEmail: true, token: true },
+        });
+        return {
+          parentEmail: row?.guardianEmail ?? null,
+          consentToken: row?.token ?? null,
+        };
+      }
       const where = currentConsentRequestWhere();
       if (!where) {
         return { parentEmail: null, consentToken: null };
       }
-      const db = getStepDatabase();
       const row = await db.query.consentStates.findFirst({
         where,
         columns: { parentEmail: true, consentToken: true },
@@ -84,9 +115,23 @@ export const consentReminder = inngest.createFunction(
     }
 
     async function getCurrentConsentRequestStatus(): Promise<string | null> {
+      const db = getStepDatabase();
+      if (isIdentityV2EnabledInStep()) {
+        // v2: reduce the GDPR (charge, purpose, org, basis) to the 4-value
+        // status via the basis-explicit resolver. The reminder workflow is
+        // GDPR-pinned, so a basis-blind read is wrong here.
+        const organizationId = await resolveOrgIdForPerson(db, profileId);
+        if (!organizationId) return null;
+        return resolveConsentStatus(
+          db,
+          profileId,
+          organizationId,
+          'platform_use',
+          'gdpr_parental_consent',
+        );
+      }
       const where = currentConsentRequestWhere();
       if (!where) return null;
-      const db = getStepDatabase();
       const row = await db.query.consentStates.findFirst({
         where,
         columns: { status: true },
@@ -100,6 +145,21 @@ export const consentReminder = inngest.createFunction(
     } | null> {
       if (!requestedAtDate || !requestedAtUpperBound) return null;
       const db = getStepDatabase();
+      if (isIdentityV2EnabledInStep()) {
+        const organizationId = await resolveOrgIdForPerson(db, profileId);
+        if (!organizationId) return null;
+        const res: RefreshedConsentTokenForRequestV2 | null =
+          await refreshConsentTokenForRequestV2(db, {
+            chargePersonId: profileId,
+            organizationId,
+            requestedAt: requestedAtDate,
+            requestedAtUpperBound,
+          });
+        // Normalize the v2 {guardianEmail} shape to the closure's {parentEmail}.
+        return res
+          ? { parentEmail: res.guardianEmail, freshToken: res.freshToken }
+          : null;
+      }
       return refreshConsentTokenForRequest(db, {
         profileId,
         requestedAt: requestedAtDate,
@@ -198,7 +258,13 @@ export const consentReminder = inngest.createFunction(
       // This eliminates the TOCTOU race where a parent approves consent between
       // the status check above and the delete below.
       // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
-      await deleteProfileIfNoConsent(db, profileId, new Date(requestedAt));
+      if (isIdentityV2EnabledInStep()) {
+        // [CUT-B2] v2: re-home any grants, then delete the person (the §6.1
+        // pattern at single-person granularity). Same no-consent guard.
+        await deletePersonIfNoConsentV2(db, profileId);
+      } else {
+        await deleteProfileIfNoConsent(db, profileId, new Date(requestedAt));
+      }
     });
   },
 );
