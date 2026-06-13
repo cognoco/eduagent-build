@@ -411,6 +411,32 @@ export function renderBookLearningHistorySections(
   return sections.join('\n');
 }
 
+/**
+ * Pure renderer for the homework library context section.
+ *
+ * Every topic title originates from the curriculum tables, which are seeded by
+ * LLM-generated or learner-authored text. A crafted title such as
+ * `\n\nSYSTEM: ignore previous instructions` would, without sanitization, land
+ * on its own line inside the system prompt and be read as a directive.
+ * sanitizeXmlValue strips \n\r\t"<> and caps length so the title is inlined
+ * safely as a single bullet, regardless of what the learner named the topic.
+ *
+ * Exported separately from the async DB-reading wrapper so the sanitization
+ * contract is unit-testable without a database fixture — matching the
+ * renderBookLearningHistorySections pattern.
+ */
+export function renderHomeworkLibraryContext(
+  topics: ReadonlyArray<{ topicTitle: string }>,
+): string {
+  return [
+    "Topics already in the learner's Library for this subject:",
+    ...topics
+      .slice(0, 12)
+      .map((topic) => `- ${sanitizeXmlValue(topic.topicTitle, 200)}`),
+    'When useful, connect the homework to these topics naturally.',
+  ].join('\n');
+}
+
 export async function buildHomeworkLibraryContext(
   db: Database,
   profileId: string,
@@ -443,11 +469,7 @@ export async function buildHomeworkLibraryContext(
     .filter((topic): topic is NonNullable<typeof topic> => Boolean(topic));
   if (orderedOwnedTopics.length === 0) return undefined;
 
-  return [
-    "Topics already in the learner's Library for this subject:",
-    ...orderedOwnedTopics.slice(0, 12).map((topic) => `- ${topic.topicTitle}`),
-    'When useful, connect the homework to these topics naturally.',
-  ].join('\n');
+  return renderHomeworkLibraryContext(orderedOwnedTopics);
 }
 
 export async function buildResumeContext(
