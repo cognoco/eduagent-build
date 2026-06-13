@@ -231,8 +231,9 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   by IF), **27/27 CLEAN** (no cutover overlap); OQ1 ruled CI/GHA findings stay in PRG-10
   (WI-698), OQ2 file-touch audit done at activation. **Shepherd SPAWNED 2026-06-13**
   (separate session — Opus 4.8 / medium effort, Sonnet executors per the kickoff;
-  Opus-escalation on WI-699 concurrency + the F-132/F-119 pieces of WI-698). It wires
-  itself as the 5th `review-watcher-v3.ts` entry on arrival.
+  Opus-escalation on WI-699 concurrency + the F-132/F-119 pieces of WI-698). The Cosmo review
+  loop is owned by a **separate reviewer (Codex) session** — already covering this workstream;
+  the shepherd self-watches Cosmo for verdicts and does not own the watcher.
 - **Activate-when:** — (active)
 
 ### PRG-12 · L10n & A11y Mobile — `✓ graduated` (2026-06-12)

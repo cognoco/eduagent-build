@@ -38,17 +38,39 @@ Slice scan already done (tracker §3) — carry it, don't repeat it:
   parallel-safe with each other AND with the cutover. No Blocked-by edges exist; you
   may parallelize freely.
 
-FIRST ACTION — wire the review watcher (standard policy):
-1. Add `API Security & PII` (id 37e8bce9-1f7c-8161-a3fc-c74c5300a88f) as a new
-   (5th) entry in the `workstreams` array of
-   `_wip/identity-foundation/review-watcher-v3.ts`. Standard review policy — same as
-   Identity Foundation / L10n / API Error Handling / Inngest Security. Do NOT copy the
-   new-llm watcher's special rules (base-`new-llm`, WP-child override) — they do not
-   apply here.
-2. Restart the watcher; confirm baseline shows all 5 workstreams covered. Mind the
-   ~45s restart gap: if any WI in any workstream enters Reviewing during the restart,
-   launch its review manually with the identical prompt contract.
-3. Do NOT modify or stop the new-llm dedicated watcher if it is still running.
+FIRST ACTION — confirm review coverage (you do NOT own the watcher):
+- The Cosmo review loop is run by a **SEPARATE reviewer session** (currently a Codex session),
+  not by you. It owns `review-watcher-v3.ts`, polls every workstream for `Stage=Reviewing`, and
+  launches the autonomous reviewers. Coverage for `API Security & PII`
+  (id 37e8bce9-1f7c-8161-a3fc-c74c5300a88f) has ALREADY been added to that watcher by the
+  reviewer session — you do NOT edit, restart, or own `review-watcher-v3.ts`. Leave it alone.
+- Standard review policy applies to this workstream (PR base `main`, normal DoD) — not the
+  new-llm watcher's special rules (base-`new-llm`, WP-child override).
+- Your only loop responsibility is DOWNSTREAM of the watcher: confirm with the operator (or the
+  reviewer session) that this workstream is covered, then run your OWN verdict watch (next
+  section) — the reviewer session will NOT notify you of outcomes.
+
+DEFINITION OF DONE & THE COSMO REVIEW LOOP — your mandate runs to Close, NOT to a green PR:
+- A green PR + `complete` (→ Stage=Reviewing) is the HANDOFF to the Cosmo review gate, not the
+  finish line. A WI is done only at Stage=Closed / Resolution=Done; the lane is done only when
+  all 7 WIs are Closed (and any absorbed-provenance children closed via the WP ceremony).
+- The loop after you run `complete`: WI → Reviewing → the SEPARATE reviewer session's watcher
+  launches an autonomous reviewer (`/cosmo:review`, gathering `/cosmo:qa` evidence) → it applies
+  `done` (→ Closed), `rework` (→ back to Executing), or `human`. You own each WI THROUGH that verdict.
+- You do NOT run the watcher and the reviewer session will NOT notify you of the verdict — it is a
+  separate session. So you MUST stand up your OWN standing watch on this workstream's WI stages
+  (a Monitor/poll filtered on the `Workstream` relation, watching the Stage field) — that self-watch
+  is your ONLY reliable channel to a verdict. On each outcome:
+    - **rework** (Reviewing → Executing): re-claim, read the reviewer's rework note, re-dispatch
+      an executor to address it, re-run `complete`. ADJUDICATE reviewer misfires — PRG-13
+      precedent: open absorbed-provenance children are NOT a WP DoD gap (disposition-done + the
+      close ceremony handle them); a genuinely-complete WP bounced on that basis is a misfire —
+      post your adjudication on the WP page and return it to Reviewing rather than reworking.
+    - **done** (→ Closed): advance to the next WI; for a WP verify the child bulk-close actually
+      ran (review.ts's done path can strand children at Captured — replicate close.ts child
+      semantics via REST if so).
+    - **human**: escalate to the operator with the specific question. This is the ONLY verdict
+      that should reach Jorn — do not route routine done/rework to him.
 
 WORKING MODE:
 - PR-per-unit, base `main` (new-llm is merged; `main` is the integration base). One PR

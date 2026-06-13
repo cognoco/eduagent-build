@@ -74,12 +74,19 @@ Source: read-only finding-register + subsumption/coordination scan (sub-agent,
 
 ## 4. Inherited mechanisms (wire from the start)
 
-- **Autonomous review loop:** verify reviewer-watcher coverage for Workstream "API
-  Security & PII" on arrival (multi-workstream config array,
-  `_wip/identity-foundation/review-watcher-v3.ts`; extension recipe in
-  `_wip/identity-foundation/review-loop-productization-handoff.md`). Items moved to
-  Reviewing are closed/bounced autonomously. Mind the known restart-gap (a WP can enter
-  Reviewing during the ~45s watcher restart — launch its review manually if so).
+- **Autonomous review loop (run by a SEPARATE reviewer session — NOT the shepherd):** the
+  reviewer session (currently Codex) owns `review-watcher-v3.ts`, polls all workstreams for
+  `Stage=Reviewing`, and launches the reviewers; it has already added "API Security & PII"
+  coverage. The shepherd does NOT edit/restart/own the watcher — just confirm coverage with the
+  operator/reviewer session on arrival. Recipe (reference only):
+  `_wip/identity-foundation/review-loop-productization-handoff.md`.
+  **DoD = Cosmo Close, not a green PR:** `complete` (→ Reviewing) hands off to this gate; the
+  shepherd owns each WI through the verdict but is NOT notified of it (separate session) — so it
+  MUST run its OWN standing watch on this workstream's WI stages (a Monitor/poll on the
+  `Workstream` relation, Stage field). On `rework` re-dispatch + re-`complete` (adjudicating
+  reviewer misfires per the PRG-13 absorbed-children precedent); on `done` verify the child
+  bulk-close ran; route only `human` verdicts to the operator. The lane closes only when all 7
+  WIs are Closed.
 - **Executor protocol:** dispatch build via `_wip/identity-foundation/executor-protocol.md`
   (+ example). **Mandatory plan-phase stop before code** — load-bearing (it caught the
   IF cutover gap).

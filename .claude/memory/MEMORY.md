@@ -97,6 +97,7 @@
 
 ## Development Process & Feedback
 
+- [feedback_shepherd_kickoff_role_split.md](feedback_shepherd_kickoff_role_split.md) — Shepherd kickoffs must model the role-split: reviewer/watcher is a SEPARATE (Codex) session; shepherd self-watches Cosmo for verdicts (DoD=Close, not green PR); bake executor model/effort in. PRG-05 productization input.
 - [feedback_plan_cutover_ownership.md](feedback_plan_cutover_ownership.md) — Replace/rewrite plans need an owner for the cutover wave (switch-flip check); single-live-store invariant for piecemeal merges. From the WI-586 scope finding.
 
 - [project_agent_doc_and_memory_architecture_revisit.md](project_agent_doc_and_memory_architecture_revisit.md) — Open: AGENTS.md/CLAUDE.md content profile + cross-agent memory architecture. Memories currently Claude-only; Cortex (Nexus repo) is prior art for shared memory.
