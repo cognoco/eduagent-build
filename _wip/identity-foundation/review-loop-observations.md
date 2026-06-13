@@ -330,6 +330,49 @@ productionization implication.
     "verify + ship," never "just push what's there" — the stall often happens
     *because* verification was about to surface something.
 
+### 2026-06-14 — CUT-tail preconditions (WI-722/723): the autonomous reviewer outperformed the pre-merge gate
+
+- **The reviewer is a real second line of defense, not a rubber stamp.** WI-723
+  passed my full pre-merge gate (Codex + CodeRabbit triaged, all deterministic
+  checks green, scope sane) and I merged it — then the **autonomous reviewer
+  bounced it** (Reviewing→Executing) on a genuine DoD gap: `writeFinancialRecordsForPersonTx`
+  silently `return`ed when no org resolved, so a v2 deletion could complete with
+  **zero** §6.1 financial_record rows. The catch matched a **late Claude
+  CHANGES_REQUESTED** that posted *after* my merge. The loop caught what one gate
+  pass didn't. Don't treat the reviewer as ceremony.
+- **Know where each bot's verdict actually lives.** The Claude Code Review verdict
+  surfaces as a **`claude[bot]` ISSUE comment** ("## Claude Code Review:
+  APPROVED/CHANGES_REQUESTED …"), NOT a PR *review* object — so it does not show in
+  `gh api .../pulls/N/reviews`, only in `.../issues/N/comments`. Reading only the
+  reviews endpoint (as I did at the first #1139 gate) misses it, and it can post a
+  few minutes late. Gate step: read the issues-comments endpoint for the
+  `claude[bot]` verdict, and give it a beat to post, before merging.
+- **Codex re-emits a byte-identical finding on every push while the code *pattern*
+  persists — even after its own requested remedy is added right next to it.** Both
+  the WI-723 deletion-race P2 and the no-membership P2 kept re-posting on each new
+  commit at the same (line-shifted) location, with identical text, although the
+  advisory lock / the `personExistsTx` recheck the finding *asked for* were sitting
+  directly above the flagged line. Mechanical pattern-match, not fresh analysis.
+  Response: verify the remedy is present, **rebut-with-evidence on the PR** (the
+  autonomous reviewer accepts documented rebuttals), and merge — do NOT re-cycle the
+  executor on a re-emission, or the loop never terminates.
+- **The densest-concurrency surface earns the most iterations — and that's correct.**
+  WI-723 (v2 deletion path) took five gated rounds, each a *real* distinct
+  subtlety: duplicate-retain race (missing advisory lock on 2 of 5 paths),
+  test-robustness (allSettled masking), zero-rows-on-no-membership (silent skip),
+  the fail-closed throw's benign-race edge (spurious throw vs a winning
+  `executeDeletionV2` that doesn't share the per-person lock). None were churn;
+  each had a red-green proof. Lesson: don't anchor "too many rounds" to a count —
+  anchor it to "is each round a genuine, proven defect?" For a compliance-critical
+  deletion path, five real catches is the gate working, not thrashing.
+- **`complete` mis-cites Fixed In on a fast-moving shared `main`.** `execute.ts
+  complete` authors Fixed In from `gitHead()`; on a shared checkout that HEAD
+  routinely drifts onto *another session's* commit (here an architecture session's
+  unpushed local commit) between merge and complete. Pattern that worked: run
+  `complete`, then PATCH Fixed In to the actual squash-merge SHA. A
+  productionized complete should take the merge SHA explicitly rather than trust
+  ambient HEAD.
+
 ## Open design questions for productionization
 
 1. Event-driven outcome channel vs polling (and who owns the monitor when no
