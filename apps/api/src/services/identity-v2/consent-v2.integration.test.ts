@@ -16,7 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   byokWaitlist,

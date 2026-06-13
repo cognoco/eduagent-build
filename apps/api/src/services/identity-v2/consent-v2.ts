@@ -484,13 +484,16 @@ export async function processConsentResponseV2(
           },
         })
         .returning({ id: consentGrant.id });
+      if (!grant) {
+        throw new Error('consent_grant insert did not return a row');
+      }
 
       const [updated] = await tx
         .update(consentRequest)
         .set({
           status: 'approved',
           respondedAt: now,
-          consentGrantId: grant!.id,
+          consentGrantId: grant.id,
           updatedAt: now,
           ...(audit?.policyVersion !== undefined
             ? { policyVersion: audit.policyVersion }

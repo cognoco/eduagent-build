@@ -78,6 +78,21 @@ export async function getGuardianPersonIds(
   return rows.map((r) => r.guardianPersonId);
 }
 
+/**
+ * The DISTINCT active guardian person ids across all edges — the v2 replacement
+ * for the `selectDistinct(family_links.parent_profile_id)` "all parents" scan
+ * (weekly-progress-push / monthly-report-cron).
+ */
+export async function getAllActiveGuardianPersonIds(
+  db: Database,
+): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ guardianPersonId: guardianship.guardianPersonId })
+    .from(guardianship)
+    .where(isNull(guardianship.revokedAt));
+  return rows.map((r) => r.guardianPersonId);
+}
+
 /** One active guardianship edge: the v2 shape of a `family_links` row. */
 export interface GuardianshipEdge {
   guardianPersonId: string;
