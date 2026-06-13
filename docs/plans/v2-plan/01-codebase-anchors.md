@@ -6,7 +6,7 @@
 
 > All paths are repo-relative from the monorepo root. Expo Router root is `apps/mobile/src/app/`. Line anchors verified 2026-06-10 against the working tree on the checked-out branch.
 >
-> **Updated 2026-06-10 for spec amendment** (XP-kill anchors, streak-display anchor, voice/mic input anchor — see §6).
+> **Updated 2026-06-10 for spec amendment** (reward-system anchors, streak/rhythm display anchor, voice/mic input anchor — see §6). **Amended 2026-06-13:** XP/practice points and reflection bonus are retained as earned private learning receipts; only coercive presentation / fragile coupling is removed.
 
 ---
 
@@ -177,26 +177,26 @@ Per-phase merge/retire ledger. "Strangle" = kept flag-isolated until §7/S6 exec
 
 Added for the 2026-06-10 spec amendment — three surfaces the new S0-R / S1 / S2 / S3 plan tasks reference. All line anchors verified by reading the target on the checked-out branch 2026-06-10.
 
-### Backend XP system (S0-R kill target)
+### Earned reward system (preserve + re-home target)
 
-> **Audit 2026-06-10: a LIVE end-to-end XP system exists** — schema columns, a server writer wired into a passed-assessment hook, and at least one live mobile UI reader. P7 (§2.1) and §13 explicitly kill it ("no … XP on the new shell"); the spec routes the kill into its own implementation plan with break-tests + a `## Rollback` section because it touches mastery/review correctness. S0-R cites these anchors to scope the kill.
+> **Audit 2026-06-10: a LIVE end-to-end XP system exists** — schema columns, a server writer wired into a passed-assessment hook, reflection multiplier bookkeeping, quiz points, and live mobile UI readers. The 2026-06-13 product amendment keeps XP/practice points and the 1.5x reflection bonus as **earned private learning receipts**. S0-R may decouple reward bookkeeping from fragile retention-writer side effects, but must not delete reward persistence. S1/S2/S3/S6 cite these anchors to preserve and re-home rewards under the earned-motivation law.
 
 | File | Anchor | What it is | Disposition |
 |---|---|---|---|
-| `packages/database/src/schema/progress.ts` | `xpLedger` table `:49-93`; `amount` `:64`; `status: xpStatusEnum` `:65`; `verifiedAt` `:69`; `reflectionMultiplierApplied` `:73-75`; `(profile_id, topic_id)` unique index `:89-92` | **XP store** — one ledger row per (profile, topic), with reflection-multiplier bookkeeping. Imports `xpStatusEnum` from `./assessments` `:20`. | strangle-target (S0-R kill; migration drops a table → needs `## Rollback`) |
-| `packages/database/src/schema/assessments.ts` | `xpStatusEnum = pgEnum('xp_status', …)` `:35-39` (`pending`/`verified`/`decayed`); `assessments.xpStatus` column `:134` | XP-status enum + the per-assessment `xp_status` column it gates. | strangle-target (S0-R) |
-| `packages/database/src/schema/quiz.ts` | `quizRounds` table `:28`; `xpEarned: integer('xp_earned')` `:46` | Second XP-bearing column — per quiz-round XP earned (the source aggregated into the practice-hub `totalXp` reader below). | strangle-target (S0-R) |
-| `apps/api/src/services/xp.ts` | `calculateTopicXp` `:35`; `REFLECTION_XP_MULTIPLIER = 1.5` `:22`; `insertSessionXpEntry` `:84-105` (insert `:121-122`, `onConflictDoNothing` target `:132`); `applyReflectionMultiplier` `:168` | **The XP writer service** (Story 4.5). `insertSessionXpEntry` computes + inserts a verified XP row when a topic assessment passes; `applyReflectionMultiplier` 1.5×'s it on accepted reflection. | strangle-target (S0-R — remove writer; break-tests assert no XP rows written) |
-| `apps/api/src/routes/assessments.ts` | `import { insertSessionXpEntry }` `:35`; call site `:231-236` (guarded by `newStatus === 'passed'` `:230`) | **The only production XP write trigger** — fires on a newly-passed assessment inside the assessment-submit transaction. | strangle-target (S0-R — the dispatch point the kill removes) |
-| `apps/mobile/src/app/(app)/practice/index.tsx` | `totalXp` aggregate `:335` ([F-035] comment `:334`); rendered via `t('practiceHub.xpLabel', { xp: totalXp })` `:355,:362,:364,:493,:703` | **Live UI reader #1** — the Practice hub sums per-activity `totalXp` and renders it as a label ("the main gamification metric"). The most visible XP surface. | strangle-target (S0-R / S1 — practice hub copy drops the XP label) |
-| `apps/mobile/src/hooks/use-streaks.ts` | `useXpSummary()` `:29-48` (reads `GET /xp` `:38`) | **Live UI reader #2** — TanStack hook fetching the XP summary (`XpSummary` from `@eduagent/schemas`). | strangle-target (S0-R — hook + endpoint removed) |
-| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/_view-models/book-derived-state.ts` | `xpStatus?: string \| null` field `:21`; `xpStatus === 'verified'` gate `:113` | **Live UI reader #3** — book-detail derived state branches on a topic's `xpStatus`. | strangle-target (S0-R — replace with retention/mastery signal) |
-| `apps/mobile/src/components/progress/AccordionTopicList.tsx` | `topic.xpStatus === 'verified'` `:29`; `=== 'decayed'` `:33` | **Live UI reader #4** — progress topic list maps `xpStatus` to a visual badge. | strangle-target (S0-R) |
-| `packages/schemas/src/progress.ts` | `xpSummarySchema` `:93-101` (`totalXp`/`verifiedXp`/`pendingXp`/`decayedXp`); `topicProgressSchema.xpStatus` `:293`; `dashboardChildSchema.totalXp` `:377`; `challengeCardSchema.xpReward` `:465`; `xpSummaryEndpointResponseSchema` `:757-761` | The shared XP contract (response shapes the readers above consume). | strangle-target (S0-R — remove XP fields from the contract) |
+| `packages/database/src/schema/progress.ts` | `xpLedger` table `:49-93`; `amount` `:64`; `status: xpStatusEnum` `:65`; `verifiedAt` `:69`; `reflectionMultiplierApplied` `:73-75`; `(profile_id, topic_id)` unique index `:89-92` | **XP/practice-points store** — one ledger row per (profile, topic), with reflection-multiplier bookkeeping. Imports `xpStatusEnum` from `./assessments` `:20`. | preserve; S0-R may decouple fragile side effects, S6 must not drop without a replacement reward ledger |
+| `packages/database/src/schema/assessments.ts` | `xpStatusEnum = pgEnum('xp_status', …)` `:35-39` (`pending`/`verified`/`decayed`); `assessments.xpStatus` column `:134` | XP-status enum + the per-assessment `xp_status` column it gates. | preserve until a replacement reward-status contract exists |
+| `packages/database/src/schema/quiz.ts` | `quizRounds` table `:28`; `xpEarned: integer('xp_earned')` `:46` | Quiz reward column — per quiz-round points earned. | preserve; quiz games remain discoverable in V2 |
+| `apps/api/src/services/xp.ts` | `calculateTopicXp` `:35`; `REFLECTION_XP_MULTIPLIER = 1.5` `:22`; `insertSessionXpEntry` `:84-105` (insert `:121-122`, `onConflictDoNothing` target `:132`); `applyReflectionMultiplier` `:168` | **The XP writer service**. `insertSessionXpEntry` computes + inserts a verified XP row when a topic assessment passes; `applyReflectionMultiplier` 1.5×'s it on accepted learner reflection. | preserve; reflection bonus is a V2 carry-forward requirement |
+| `apps/api/src/routes/assessments.ts` | `import { insertSessionXpEntry }` `:35`; call site `:231-236` (guarded by `newStatus === 'passed'` `:230`) | Production reward write trigger — fires on a newly-passed assessment inside the assessment-submit transaction. | preserve or replace with equivalent earned-reward write |
+| `apps/mobile/src/app/(app)/practice/index.tsx` | `totalXp` aggregate `:335` ([F-035] comment `:334`); rendered via `t('practiceHub.xpLabel', { xp: totalXp })` `:355,:362,:364,:493,:703` | **Live UI reader #1** — the Practice hub sums per-activity `totalXp` and renders it as a label. | re-home under V2 light-practice / reward receipt surfaces |
+| `apps/mobile/src/hooks/use-streaks.ts` | `useXpSummary()` `:29-48` (reads `GET /xp` `:38`) | **Live UI reader #2** — TanStack hook fetching the XP summary (`XpSummary` from `@eduagent/schemas`). | preserve/reuse for private earned-reward summaries |
+| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/_view-models/book-derived-state.ts` | `xpStatus?: string \| null` field `:21`; `xpStatus === 'verified'` gate `:113` | **Live UI reader #3** — book-detail derived state branches on a topic's `xpStatus`. | re-home into S2 Subject hub progress/state display |
+| `apps/mobile/src/components/progress/AccordionTopicList.tsx` | `topic.xpStatus === 'verified'` `:29`; `=== 'decayed'` `:33` | **Live UI reader #4** — progress topic list maps `xpStatus` to a visual badge. | re-home into S2/S3 progress contexts if still useful |
+| `packages/schemas/src/progress.ts` | `xpSummarySchema` `:93-101` (`totalXp`/`verifiedXp`/`pendingXp`/`decayedXp`); `topicProgressSchema.xpStatus` `:293`; `dashboardChildSchema.totalXp` `:377`; `challengeCardSchema.xpReward` `:465`; `xpSummaryEndpointResponseSchema` `:757-761` | The shared XP/reward contract (response shapes the readers above consume). | preserve until a replacement earned-reward contract exists |
 
-### Streak display (S1 "on track" badge replaces this)
+### Streak/rhythm display (S1 "on track" / momentum signal replaces pressure)
 
-> S1 replaces the day-count streak with an "on track" badge. These anchors are what it supersedes. (Streak data itself stays — `streaks` table `packages/database/src/schema/progress.ts:29`, `useStreaks()` hook `apps/mobile/src/hooks/use-streaks.ts:8`; only the count *display* changes.)
+> S1 replaces pressure-style day-count streak display with a forgiving "on track" / momentum signal. Streak data itself stays — `streaks` table `packages/database/src/schema/progress.ts:29`, `useStreaks()` hook `apps/mobile/src/hooks/use-streaks.ts:8` — and may feed rhythm/momentum copy. Do not show loss-framed streak pressure.
 
 | File | Anchor | What it is | Disposition |
 |---|---|---|---|
