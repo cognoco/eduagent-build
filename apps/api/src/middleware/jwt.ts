@@ -185,12 +185,16 @@ async function fetchJWKSForced(url: string): Promise<JWKS> {
     }
     const jwks = body as JWKS;
     jwksCacheByUrl.set(url, { keys: jwks.keys, fetchedAt: Date.now() });
+    // Arm the cooldown ONLY on a successful re-fetch: a still-missing kid after
+    // a fresh, valid JWKS is genuinely absent, so suppressing further forced
+    // re-fetches within the window is correct. A FAILED re-fetch (timeout, 5xx,
+    // malformed 200) must NOT arm the cooldown — its error propagates so auth.ts
+    // classifies it as an infra failure (→ 503), and the next request is allowed
+    // to retry rather than have a real outage masked as an invalid token.
+    jwksForcedRefetchAtByUrl.set(url, Date.now());
     return jwks;
   })().finally(() => {
     jwksRefetchInFlight.delete(url);
-    // Arm the cooldown on settle (success or failure) so a failing upstream is
-    // not hammered and a bogus-kid stream cannot keep forcing re-fetches.
-    jwksForcedRefetchAtByUrl.set(url, Date.now());
   });
   jwksRefetchInFlight.set(url, promise);
   return promise;

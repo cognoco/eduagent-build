@@ -558,6 +558,46 @@ describe('[F-181] lookupJWKByKid forced re-fetch cooldown (DoS amplification)', 
     expect(jwk.kid).toBe('new-key');
     expect(globalThis.fetch).toHaveBeenCalledTimes(3);
   });
+
+  // A FAILED forced re-fetch must NOT arm the cooldown — otherwise a genuine
+  // Clerk/infra outage during the forced path would be masked: the next request
+  // would skip the re-fetch and throw "No matching JWK" (an invalid-token
+  // signal) instead of surfacing the infra error. The cooldown only suppresses
+  // re-fetches after a SUCCESSFUL refresh proved the kid genuinely absent.
+  it('does not arm the cooldown when the forced re-fetch fails (infra error not masked)', async () => {
+    globalThis.fetch = jest
+      .fn()
+      // Warm: valid set without the target kid.
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY] }),
+      } as unknown as Response)
+      // First forced re-fetch: upstream 503 → throws an infra-classified error.
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+      } as unknown as Response)
+      // Second forced re-fetch (must be ALLOWED — cooldown was not armed):
+      // upstream recovers and the rotated key is now present.
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY, NEW_KEY] }),
+      } as unknown as Response) as unknown as typeof fetch;
+
+    await fetchJWKS(JWKS_URL); // warm (fetch #1)
+
+    // First miss forces a re-fetch (fetch #2) that fails upstream → the infra
+    // error propagates (JWKS-classified), it is NOT swallowed into a token error.
+    await expect(lookupJWKByKid(JWKS_URL, 'new-key')).rejects.toThrow(/JWKS/i);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+    // Immediately retry: because the failed re-fetch did NOT arm the cooldown,
+    // a new forced re-fetch (fetch #3) is allowed and now succeeds.
+    const jwk = await lookupJWKByKid(JWKS_URL, 'new-key');
+    expect(jwk.kid).toBe('new-key');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+  });
 });
 
 // ---------------------------------------------------------------------------
