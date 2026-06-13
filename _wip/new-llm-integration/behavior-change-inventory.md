@@ -147,7 +147,13 @@ Each item verified present in the diff. Checked = present + correctly described 
 |------|--------|
 | `services/test-seed.ts` | **Hardcoded default seed password removed.** `SEED_PASSWORD` env var is now mandatory for real Clerk calls. Absence throws at call time. In the no-Clerk path (unit tests), falls back to a safe sentinel string. Operator-visible: Doppler stg/dev must have `SEED_PASSWORD` set — absence breaks E2E seed flows. |
 
-#### A16. Inngest Functions
+#### A16. Services — Quiz
+
+| File | Effect |
+|------|--------|
+| `services/quiz/complete-round.ts` | **New: quiz-completion celebration enqueue (live-on-merge).** `getQuizCompletionCelebration()` maps the result band to a celebration (`perfect → comet`, `great → twin_stars`, else → `polar_star`); `completeQuizRound()` now calls `queueCelebration(db, profileId, …)` via `safeWrite` after **every** round completion (0 call sites on `main` → 2 on branch). Reached from the live route `routes/quiz.ts:357` (after `completeQuizRound`). Bounded risk: `safeWrite` is non-core / fire-and-forget — a failure is captured in Sentry and never breaks the user's round completion. User-visible: a celebration moment is queued after finishing a quiz round. |
+
+#### A17. Inngest Functions
 
 | File | Effect |
 |------|--------|
@@ -159,7 +165,7 @@ Each item verified present in the diff. Checked = present + correctly described 
 | `inngest/functions/consent-reminders.test.ts` | Test-only changes — no behavior change. |
 | `inngest/functions/daily-reminder-send.test.ts` | Test-only changes — no behavior change. |
 
-#### A17. Database Migrations
+#### A18. Database Migrations
 
 | File | Effect |
 |------|--------|
@@ -169,7 +175,7 @@ Each item verified present in the diff. Checked = present + correctly described 
 | `drizzle/0112_rls_mentor_activity_ledger.sql` | **BEHAVIORAL — RLS data-isolation on the ledger (WI-676).** Enables Row-Level Security + a `profile_id`-isolation policy on `mentor_activity_ledger` (the table 0111 shipped with no RLS — a live data-isolation gap). Idempotent (`DO $$ IF NOT EXISTS` guard). Must be run after 0111. Post-merge effect: ledger reads/writes are enforced to the current profile at the DB layer, matching the rest of the scoped tables. |
 | `drizzle/meta/_journal.json`, `meta/0111_snapshot.json`, `meta/0112_snapshot.json` | Drizzle meta — no behavior change. |
 
-#### A18. Wrangler / Deployment
+#### A19. Wrangler / Deployment
 
 | File | Effect |
 |------|--------|
@@ -178,7 +184,7 @@ Each item verified present in the diff. Checked = present + correctly described 
 
 > Note: `check-reference-only-migrations.{mjs,test.mjs}` is the WI-675 deploy-gate tooling and lives under `packages/database/scripts/`, not `apps/api/scripts/` — see §F. (The prior inventory's `apps/api/scripts/` path here was a citation error, corrected in this regeneration.)
 
-#### A19. Middleware
+#### A20. Middleware
 
 | File | Effect |
 |------|--------|
@@ -206,7 +212,7 @@ Each item verified present in the diff. Checked = present + correctly described 
 | `src/app/(app)/practice/index.tsx` | **Assessment card: removed "navigate to library" fallback; always navigates to picker.** Previously `openAssessment` conditionally pushed to `assessment-picker` (if topics exist) or `library` (if none). Now always pushes to `assessment-picker`. The locked-state card (shown when `assessmentCount === 0`) is now a non-pressable view instead of a pressable with an alternate action. User-visible: tapping the assessment row when no topics are pending now shows a visual locked state rather than navigating to the library. |
 | `src/app/(app)/quiz/_layout.tsx` | **`prefetchedRoundId` context state removed.** The `QuizFlowProvider` no longer pre-fetches the next quiz round. "Play Again" button no longer has an eager round loaded; the fetch happens on demand when Play Again is pressed. User-visible: slight latency increase on "Play Again" tap (one extra GET per play-again). |
 | `src/app/(app)/quiz/play.tsx` | `setPrefetchedRoundId` removed from context usage — no other behavior change. |
-| `src/app/(app)/quiz/results.tsx` | **`useFetchRound` prefetch removed.** The eager next-round hydration on Results mount is gone. See above. |
+| `src/app/(app)/quiz/results.tsx` | **`usePrefetchRound` eager prefetch removed.** The eager next-round hydration on Results mount is gone. See above. |
 | `src/app/(app)/quiz/index.tsx` | `setPrefetchedRoundId` removed — no other behavior change. |
 | `src/app/(app)/session/index.tsx` | **`runChallengeAction` error now classified via `formatApiError` and captured in Sentry.** Previously a failed challenge action showed a generic "please try again" dialog. Now shows the classified error message and captures to Sentry. User-visible: error text in the challenge action dialog is more specific. |
 | `src/app/(app)/session/_components/SessionErrorBoundary.tsx` | **Error boundary body text changed.** Production shows the generic `session.errorBoundary.body` key ("This screen couldn't load. You can try again or go back home.") instead of `error.message`. Dev builds still show the raw message in a secondary debug block. User-visible in prod: error boundary copy change. |
@@ -238,7 +244,7 @@ Each item verified present in the diff. Checked = present + correctly described 
 | `src/components/home/LearnerScreen.tsx` | Minor guard and gate logic for `showParentHome` — no behavior change outside the navigation-contract refactor context. |
 | `src/components/session/SessionFooter.tsx` | **Note-prompt and note-input now gated on `topicId` being set.** Previously the note-save dialog was shown even for freeform sessions without a `topicId`, then threw an alert on save. Now both the prompt and the input are hidden when `topicId` is null. User-visible: freeform-session learners no longer see a note-save prompt that couldn't succeed. |
 | `src/components/session/sessionModeConfig.ts` | **New `gap_fill` session mode config added.** Title "Gap Check", subtitle "Close the gaps from your assessment". User-visible when a `gap_fill` session is started. |
-| `src/components/session/SessionSummaryLibraryFilingControls.tsx` | Minor threshold-enforcement guard — no standalone behavior change (effect is through session-crud). |
+| `src/components/session-summary/SessionSummaryLibraryFilingControls.tsx` | Minor threshold-enforcement guard — no standalone behavior change (effect is through session-crud). |
 | `src/components/chrome/ModeSwitcher.tsx` | Accessibility labels added (`accessibilityLabel`). A11y only — no behavior change. |
 | `src/components/library/LibrarySearchBar.tsx` | `accessibilityLabel` prop added. A11y only. |
 | `src/components/library/NoteInput.tsx` | `accessibilityRole` and `accessibilityState` added to mic button. A11y only. |
@@ -247,7 +253,7 @@ Each item verified present in the diff. Checked = present + correctly described 
 
 | File | Effect |
 |------|--------|
-| `src/hooks/use-quiz.ts` (deleted) | **`useFetchRound` hook removed** (backed the now-removed prefetch). |
+| `src/hooks/use-quiz.ts` (Modified) | **`usePrefetchRound` hook removed** (eager prefetch; backed the now-removed Results-mount hydration). The file is **Modified, not deleted** — it still exports 7 hooks, including `useFetchRound` (retained at :43). |
 
 #### B6. Hooks — Modified
 
@@ -351,7 +357,7 @@ These files were added/changed by the reconciliation PRs that landed on `new-llm
 | WI | File(s) | Effect |
 |----|---------|--------|
 | **WI-675** | `packages/database/scripts/check-reference-only-migrations.mjs` + `.test.mjs` | **No runtime behavior.** Deploy-gate tooling: validates that journaled reference-only migrations (0106, 0107) are not accidentally applied. CI/deploy guard only. |
-| **WI-676** | `apps/api/drizzle/0112_rls_mentor_activity_ledger.sql` + `drizzle/meta/0112_snapshot.json` | **BEHAVIORAL — RLS data-isolation on the ledger.** Enables Row-Level Security + `profile_id`-isolation policy on `mentor_activity_ledger`. Also cross-referenced in §A17. Post-merge: DB-layer profile isolation on ledger reads/writes. |
+| **WI-676** | `apps/api/drizzle/0112_rls_mentor_activity_ledger.sql` + `drizzle/meta/0112_snapshot.json` | **BEHAVIORAL — RLS data-isolation on the ledger.** Enables Row-Level Security + `profile_id`-isolation policy on `mentor_activity_ledger`. Also cross-referenced in §A18. Post-merge: DB-layer profile isolation on ledger reads/writes. |
 | **WI-677** | `apps/mobile/src/i18n/source-baseline.json` | **No runtime behavior.** i18n source-baseline re-inflation after the new-llm merge reconciled the ratchet. (Note: `scripts/i18n-jsx-literals-baseline.json` is NOT in this diff — it was not changed by the reconciliation; reported as fact, not inferred.) |
 | **WI-678** | `docs/adr/*`, `docs/INDEX.md`, `docs/architecture.md`, `docs/plans/v2-plan/*`, `docs/plans/v2-dossier/00-README.md`, `01-day-in-the-life.md`, `02-what-dies-in-user-terms.md`, `03-decision-ledger.md`, `04-reels.html` | **No runtime behavior.** Planning/ADR/dossier docs (S4 ledger-repoint ownership alignment + v2 dossier). The `v2-dossier/04-reels.html` is a static doc asset. |
 | **WI-679** | `apps/api/src/services/export.ts`, `packages/schemas/src/account.ts` | **BEHAVIORAL — `mentor_activity_ledger` now included in GDPR data export.** `generateExport` reads ledger rows for the export's profileIds and adds a `mentorActivityLedger` array to the export payload (GDPR Art-15 portability gap; erasure via FK cascade was already covered). `account.ts` adds `dataExportMentorActivityLedgerRowSchema` + the optional `mentorActivityLedger` field on `dataExportSchema`. |
