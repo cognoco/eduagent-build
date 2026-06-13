@@ -442,6 +442,125 @@ describe('lookupJWKByKid', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [F-181] Forced re-fetch cooldown — DoS amplification guard
+//
+// lookupJWKByKid runs on EVERY verification before the signature is checked,
+// keyed on the attacker-controlled `kid` header. A kid-miss against a warm
+// cache triggers a forced upstream JWKS fetch. The existing in-flight dedup
+// only collapses CONCURRENT misses for the same URL; a SEQUENTIAL stream of
+// distinct-bogus-kid tokens from an unauthenticated client therefore amplifies
+// 1 inbound request → 1 outbound Clerk fetch, unbounded. The cooldown bounds
+// forced re-fetches to ≤1 per cooldown window per URL, regardless of attacker
+// volume, while still letting a genuine key rotation be picked up once the
+// window elapses.
+//
+// External boundary mocked = globalThis.fetch (Clerk JWKS endpoint). No
+// internal mocks.
+// ---------------------------------------------------------------------------
+
+describe('[F-181] lookupJWKByKid forced re-fetch cooldown (DoS amplification)', () => {
+  const JWKS_URL = 'https://clerk.dev/.well-known/jwks.json';
+
+  const OLD_KEY = {
+    kty: 'RSA',
+    kid: 'old-key',
+    alg: 'RS256',
+    n: 'old-n',
+    e: 'AQAB',
+  };
+  const NEW_KEY = {
+    kty: 'RSA',
+    kid: 'new-key',
+    alg: 'RS256',
+    n: 'new-n',
+    e: 'AQAB',
+  };
+
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    clearJWKSCache();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    jest.useRealTimers();
+  });
+
+  // Break test: a sequential stream of distinct bogus kids must NOT each force
+  // an upstream fetch. Pre-fix, every miss forces a fetch → 1 warm + 5 = 6
+  // upstream calls. Post-fix, the cooldown allows exactly one forced re-fetch
+  // for the burst → 1 warm + 1 = 2.
+  it('bounds sequential distinct-kid misses to a single forced re-fetch within the cooldown', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ keys: [OLD_KEY] }),
+    } as unknown as Response) as unknown as typeof fetch;
+
+    // Warm the cache (1 fetch).
+    await fetchJWKS(JWKS_URL);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+    // 5 sequential lookups for distinct bogus kids — the attack pattern.
+    for (let i = 0; i < 5; i++) {
+      await expect(lookupJWKByKid(JWKS_URL, `bogus-${i}`)).rejects.toThrow(
+        /No matching JWK found/,
+      );
+    }
+
+    // Only ONE forced re-fetch fired across the whole burst (warm + 1 forced).
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  // The cooldown must not become a permanent negative cache: once it elapses, a
+  // genuine key rotation is still picked up by exactly one new forced re-fetch.
+  it('allows a fresh forced re-fetch after the cooldown elapses (rotation still works)', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-06-13T00:00:00Z'));
+
+    globalThis.fetch = jest
+      .fn()
+      // Warm: old key only.
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY] }),
+      } as unknown as Response)
+      // First forced re-fetch (still pre-rotation): old key only → miss.
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY] }),
+      } as unknown as Response)
+      // Second forced re-fetch (post-cooldown, post-rotation): new key present.
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY, NEW_KEY] }),
+      } as unknown as Response) as unknown as typeof fetch;
+
+    await fetchJWKS(JWKS_URL); // warm (fetch #1)
+
+    // First miss forces a re-fetch (fetch #2) → still absent → throws.
+    await expect(lookupJWKByKid(JWKS_URL, 'new-key')).rejects.toThrow(
+      /No matching JWK found/,
+    );
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+    // Immediately retry: inside cooldown, no upstream fetch, still throws.
+    await expect(lookupJWKByKid(JWKS_URL, 'new-key')).rejects.toThrow(
+      /No matching JWK found/,
+    );
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+    // Advance past the cooldown — the cache TTL (10 min) is longer than the
+    // cooldown, so the cached set is still served on the happy path; only the
+    // forced path re-arms. A real rotation now resolves via one new fetch.
+    jest.advanceTimersByTime(61_000);
+    const jwk = await lookupJWKByKid(JWKS_URL, 'new-key');
+    expect(jwk.kid).toBe('new-key');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // verifyJWT — real Web Crypto signing and verification
 // No mocks of internal crypto — the implementation exercises the full path.
 // ---------------------------------------------------------------------------

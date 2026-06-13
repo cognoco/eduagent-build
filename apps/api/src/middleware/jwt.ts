@@ -101,6 +101,18 @@ const jwksCacheByUrl = new Map<string, CachedJWKS>();
 // concurrent callers await the same network request.
 const jwksRefetchInFlight = new Map<string, Promise<JWKS>>();
 
+// Cooldown gate on the forced re-fetch path. lookupJWKByKid runs on every
+// verification keyed on the attacker-controlled `kid`, so a sequential stream
+// of distinct-bogus-kid tokens would otherwise amplify each unauthenticated
+// request into an upstream Clerk fetch (DoS). After a forced re-fetch settles
+// (success OR failure) we record the timestamp and suppress further forced
+// re-fetches for the same URL within the cooldown window. A still-missing kid
+// inside the window is treated as genuinely absent — the recent re-fetch is the
+// negative signal. The window is short enough that a genuine key rotation is
+// still picked up promptly once it elapses.
+const JWKS_FORCED_REFETCH_COOLDOWN_MS = 60 * 1000; // 1 minute
+const jwksForcedRefetchAtByUrl = new Map<string, number>();
+
 export async function fetchJWKS(url: string): Promise<JWKS> {
   const now = Date.now();
   const cached = jwksCacheByUrl.get(url);
@@ -176,6 +188,9 @@ async function fetchJWKSForced(url: string): Promise<JWKS> {
     return jwks;
   })().finally(() => {
     jwksRefetchInFlight.delete(url);
+    // Arm the cooldown on settle (success or failure) so a failing upstream is
+    // not hammered and a bogus-kid stream cannot keep forcing re-fetches.
+    jwksForcedRefetchAtByUrl.set(url, Date.now());
   });
   jwksRefetchInFlight.set(url, promise);
   return promise;
@@ -187,8 +202,11 @@ async function fetchJWKSForced(url: string): Promise<JWKS> {
  * Industry-standard key-rotation pattern:
  *   1. Check the cached JWKS first.
  *   2. If the kid is absent (Clerk rotated keys since last fetch), force a
- *      single TTL-ignoring re-fetch (deduped across concurrent requests).
- *   3. If kid is still missing after re-fetch, throw — the token is invalid.
+ *      single TTL-ignoring re-fetch (deduped across concurrent requests, and
+ *      rate-limited by a per-URL cooldown so a bogus-kid stream cannot amplify
+ *      into unbounded upstream fetches).
+ *   3. If kid is still missing after re-fetch — or a forced re-fetch already
+ *      ran within the cooldown — throw: the token is invalid.
  *
  * Only missing-kid triggers a re-fetch. All other verification failures
  * (bad signature, expired token, etc.) propagate immediately without an
@@ -203,7 +221,19 @@ export async function lookupJWKByKid(url: string, kid: string): Promise<JWK> {
     return found;
   }
 
-  // kid not in cached JWKS — Clerk may have rotated keys. Re-fetch once.
+  // kid not in cached JWKS — Clerk may have rotated keys. Force a re-fetch, but
+  // only if one has not already run within the cooldown window. Inside the
+  // window the cached set is authoritative and a still-missing kid is treated
+  // as genuinely absent, so an unauthenticated bogus-kid stream cannot drive
+  // repeated upstream fetches.
+  const lastForcedAt = jwksForcedRefetchAtByUrl.get(url);
+  if (
+    lastForcedAt !== undefined &&
+    Date.now() - lastForcedAt < JWKS_FORCED_REFETCH_COOLDOWN_MS
+  ) {
+    throw new Error(`No matching JWK found for kid: ${kid}`);
+  }
+
   const refreshed = await fetchJWKSForced(url);
   const foundAfterRefresh = refreshed.keys.find((k) => k.kid === kid);
   if (foundAfterRefresh) {
@@ -220,6 +250,7 @@ export async function lookupJWKByKid(url: string, kid: string): Promise<JWK> {
 export function clearJWKSCache(): void {
   jwksCacheByUrl.clear();
   jwksRefetchInFlight.clear();
+  jwksForcedRefetchAtByUrl.clear();
 }
 
 // ---------------------------------------------------------------------------
