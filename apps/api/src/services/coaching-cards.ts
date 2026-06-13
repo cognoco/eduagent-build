@@ -25,6 +25,7 @@ import {
 } from './home-surface-cache';
 import { captureException } from './sentry';
 import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
+import { getPersonBirthYear } from './identity-v2/helpers';
 
 // ---------------------------------------------------------------------------
 // silentDegrade — structured escalation for optional priority branches
@@ -143,6 +144,7 @@ function homeworkConnectionCopy(
 export async function precomputeCoachingCard(
   db: Database,
   profileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<CoachingCard> {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + TTL_MS).toISOString();
@@ -150,13 +152,17 @@ export async function precomputeCoachingCard(
   const id = generateUUIDv7();
 
   // FR165.4: Fetch learner age for warm, age-adapted card copy
+  // [CUT-B1 §2.5(iii)] v2 seam: birthYear from person.birth_date.
   let birthYear: number | null = null;
   try {
-    const profileRow = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
-      columns: { birthYear: true },
-    });
-    birthYear = profileRow?.birthYear ?? null;
+    birthYear = opts?.identityV2Enabled
+      ? await getPersonBirthYear(db, profileId)
+      : ((
+          await db.query.profiles.findFirst({
+            where: eq(profiles.id, profileId),
+            columns: { birthYear: true },
+          })
+        )?.birthYear ?? null);
   } catch (err) {
     silentDegrade(err, 'birthYear_lookup', { profileId });
     // Age lookup is optional — use neutral tone as fallback
@@ -1008,6 +1014,7 @@ export interface CoachingCardResponse {
 export async function getCoachingCardForProfile(
   db: Database,
   profileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<CoachingCardResponse> {
   // Check session count for cold-start detection (real activity only)
   const countResult = await db
@@ -1033,7 +1040,7 @@ export async function getCoachingCardForProfile(
   }
 
   // Cache miss: compute fresh and write to cache
-  const card = await precomputeCoachingCard(db, profileId);
+  const card = await precomputeCoachingCard(db, profileId, opts);
   await writeCoachingCardCache(db, profileId, card);
 
   return { coldStart: false, card, fallback: null };

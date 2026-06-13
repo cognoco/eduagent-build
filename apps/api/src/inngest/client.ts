@@ -68,6 +68,8 @@ const envBindingMiddleware = new InngestMiddleware({
             env,
             'MEMORY_FACTS_DEDUP_ROLLOUT_PCT',
           ),
+          // [CUT-B1] Identity cutover flag for the B1 Inngest functions.
+          identityV2Enabled: readStringBinding(env, 'IDENTITY_V2_ENABLED'),
         };
         enterWithEnvBindings(bindings);
         return {

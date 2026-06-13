@@ -8,10 +8,11 @@
 import { eq, and, gt, asc } from 'drizzle-orm';
 import { NonRetriableError } from 'inngest';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { curriculumBooks, profiles, subjects } from '@eduagent/database';
 import { bookTopicsGeneratedEventSchema } from '@eduagent/schemas';
 import { parseConversationLanguage } from '../../services/llm';
+import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
 
@@ -107,13 +108,22 @@ export const bookPreGeneration = inngest.createFunction(
         };
       }
 
-      const profile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
-      });
+      // [CUT-B1 §2.5(iii)] v2 seam: birthYear + conversation_language from person.
+      let birthYear: number | null;
+      let rawConversationLanguage: string | null | undefined;
+      if (isIdentityV2EnabledInStep()) {
+        const ctx = await getPersonLlmContext(db, profileId);
+        birthYear = ctx?.birthYear ?? null;
+        rawConversationLanguage = ctx?.conversationLanguage;
+      } else {
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, profileId),
+        });
+        birthYear = profile?.birthYear ?? null;
+        rawConversationLanguage = profile?.conversationLanguage;
+      }
       const currentYear = new Date().getFullYear();
-      const learnerAge = profile?.birthYear
-        ? currentYear - profile.birthYear
-        : 12;
+      const learnerAge = birthYear ? currentYear - birthYear : 12;
 
       return {
         status: 'pending' as const,
@@ -122,7 +132,7 @@ export const bookPreGeneration = inngest.createFunction(
         // i18n Phase 1 — surfaced topic titles render to the learner.
         // DB returns string | null; cast to the union before passing forward.
         conversationLanguage: parseConversationLanguage(
-          profile?.conversationLanguage,
+          rawConversationLanguage,
         ),
       };
     });

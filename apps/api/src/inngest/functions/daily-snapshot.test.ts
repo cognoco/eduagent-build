@@ -15,6 +15,10 @@ const mockSnapshotDb = createTransactionalMockDb({
     profiles: {
       findFirst: jest.fn().mockResolvedValue({ id: 'profile-001' }),
     },
+    // [CUT-B1] v2 liveness path reads person; default to a live row.
+    person: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'profile-001' }),
+    },
   },
 });
 
@@ -44,6 +48,11 @@ const mockDatabaseModule = createDatabaseModuleMock({
       startedAt: col('startedAt'),
     },
     profiles: {
+      id: col('id'),
+      archivedAt: col('archivedAt'),
+    },
+    // [CUT-B1] person table referenced by the v2 liveness path.
+    person: {
       id: col('id'),
       archivedAt: col('archivedAt'),
     },
@@ -305,6 +314,9 @@ describe('dailySnapshotRefresh', () => {
     expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
       mockSnapshotDb,
       'profile-001',
+      // [CUT-B1] the refresh now carries the identity-cutover flag (false in
+      // the flag-off legacy path the test exercises).
+      { identityV2Enabled: false },
     );
     expect(result).toEqual({
       status: 'completed',
@@ -312,6 +324,34 @@ describe('dailySnapshotRefresh', () => {
       snapshotDate: '2026-04-19',
       milestones: 2,
     });
+  });
+
+  it('[CUT-B1] Identity-V2-on: liveness reads person and the refresh carries { identityV2Enabled: true }', async () => {
+    const prev = process.env.IDENTITY_V2_ENABLED;
+    process.env.IDENTITY_V2_ENABLED = 'true';
+    try {
+      mockRefreshProgressSnapshot.mockResolvedValue({
+        snapshotDate: '2026-04-19',
+        milestones: [{ id: 'm1' }],
+        metrics: {},
+      });
+
+      const { result } = await executeRefreshSteps({
+        profileId: 'profile-001',
+      });
+
+      // Liveness was checked on the person table, not profiles.
+      expect(mockSnapshotDb.query.person.findFirst).toHaveBeenCalled();
+      // The refresh carries the v2 flag.
+      expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
+        mockSnapshotDb,
+        'profile-001',
+        { identityV2Enabled: true },
+      );
+      expect((result as { status: string }).status).toBe('completed');
+    } finally {
+      process.env.IDENTITY_V2_ENABLED = prev;
+    }
   });
 
   it('returns skipped status when profile does not exist', async () => {

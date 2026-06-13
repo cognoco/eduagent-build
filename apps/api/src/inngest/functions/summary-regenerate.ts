@@ -9,8 +9,9 @@ import { NonRetriableError } from 'inngest';
 import type { LlmSummary, SummaryEventPayload } from '@eduagent/schemas';
 import { summaryEventPayloadSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
+import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { generateAndStoreLlmSummary } from '../../services/session-llm-summary';
 import { generateLearnerRecap } from '../../services/session-recap';
@@ -92,14 +93,30 @@ async function regenerateLearnerRecapForSession(
     return { status: 'skipped_subject_missing' };
   }
 
-  const [profile] = await db
-    .select({
-      birthYear: profiles.birthYear,
-      conversationLanguage: profiles.conversationLanguage,
-    })
-    .from(profiles)
-    .where(eq(profiles.id, payload.profileId))
-    .limit(1);
+  // [CUT-B1 §2.5(iii)] v2 seam: birthYear + conversation_language from person.
+  let profile: {
+    birthYear: number;
+    conversationLanguage: string | null;
+  } | null;
+  if (isIdentityV2EnabledInStep()) {
+    const ctx = await getPersonLlmContext(db, payload.profileId);
+    profile = ctx
+      ? {
+          birthYear: ctx.birthYear,
+          conversationLanguage: ctx.conversationLanguage,
+        }
+      : null;
+  } else {
+    const [row] = await db
+      .select({
+        birthYear: profiles.birthYear,
+        conversationLanguage: profiles.conversationLanguage,
+      })
+      .from(profiles)
+      .where(eq(profiles.id, payload.profileId))
+      .limit(1);
+    profile = row ?? null;
+  }
 
   if (!profile) {
     throw new Error(
@@ -176,11 +193,19 @@ export const sessionSummaryCreate = inngest.createFunction(
       );
 
       // i18n Phase 1 — load conversation_language for summary prose.
-      const [createProfile] = await db
-        .select({ conversationLanguage: profiles.conversationLanguage })
-        .from(profiles)
-        .where(eq(profiles.id, payload.profileId))
-        .limit(1);
+      // [CUT-B1 §2.5(iii)] v2 seam: person.conversation_language.
+      let createConversationLanguage: string | null | undefined;
+      if (isIdentityV2EnabledInStep()) {
+        const ctx = await getPersonLlmContext(db, payload.profileId);
+        createConversationLanguage = ctx?.conversationLanguage;
+      } else {
+        const [createProfile] = await db
+          .select({ conversationLanguage: profiles.conversationLanguage })
+          .from(profiles)
+          .where(eq(profiles.id, payload.profileId))
+          .limit(1);
+        createConversationLanguage = createProfile?.conversationLanguage;
+      }
 
       const summary = await generateAndStoreLlmSummary(db, {
         sessionId: payload.sessionId,
@@ -190,7 +215,7 @@ export const sessionSummaryCreate = inngest.createFunction(
         topicId: payload.topicId ?? null,
         // DB returns string | null; parse to union before passing to LLM call.
         conversationLanguage: parseConversationLanguage(
-          createProfile?.conversationLanguage,
+          createConversationLanguage,
         ),
       });
 

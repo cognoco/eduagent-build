@@ -2,7 +2,7 @@
 import { eq, and, isNull, count } from 'drizzle-orm';
 import { z } from 'zod';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import {
   curriculumTopics,
   curriculumBooks,
@@ -12,6 +12,8 @@ import {
 } from '@eduagent/database';
 import { routeAndCall, parseConversationLanguage } from '../../services/llm';
 import { isGdprProcessingAllowed } from '../../services/consent';
+import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
 import { captureException } from '../../services/sentry';
@@ -111,7 +113,13 @@ export const postSessionSuggestions = inngest.createFunction(
       // filing event queued before consent withdrawal (or a replay) must not
       // send learner curriculum data to the LLM or persist derived suggestions
       // for a profile whose consent is no longer granted.
-      if (!(await isGdprProcessingAllowed(db, profileId))) {
+      // [CUT-B1 §2.5(i)] v2 seam: the GDPR gate reads the consent_grant/request
+      // resolver (basis-pinned GDPR); legacy reads consent_states.
+      const v2 = isIdentityV2EnabledInStep();
+      const gdprAllowed = v2
+        ? await isGdprProcessingAllowedV2(db, profileId)
+        : await isGdprProcessingAllowed(db, profileId);
+      if (!gdprAllowed) {
         return { status: 'skipped' as const, reason: 'consent_not_granted' };
       }
 
@@ -139,13 +147,21 @@ export const postSessionSuggestions = inngest.createFunction(
       // i18n Phase 1 — load conversation_language from the active profile so
       // the LLM-generated topic-title suggestions render in the learner's
       // language, not the DB default 'en'.
-      const ownerProfile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
-        columns: { conversationLanguage: true },
-      });
+      // [CUT-B1 §2.5(iii)] v2 seam: reads person.conversation_language.
+      let rawConversationLanguage: string | null | undefined;
+      if (v2) {
+        const ctx = await getPersonLlmContext(db, profileId);
+        rawConversationLanguage = ctx?.conversationLanguage;
+      } else {
+        const ownerProfile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, profileId),
+          columns: { conversationLanguage: true },
+        });
+        rawConversationLanguage = ownerProfile?.conversationLanguage;
+      }
       // DB returns string | null; parse to union before passing to LLM router.
       const conversationLanguage = parseConversationLanguage(
-        ownerProfile?.conversationLanguage,
+        rawConversationLanguage,
       );
 
       // [PROMPT-INJECT-8] book.title, book.description, topic titles, and

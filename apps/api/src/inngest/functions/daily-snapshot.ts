@@ -18,12 +18,12 @@
 // when scanning broadly.
 
 import { and, eq, gte, isNull } from 'drizzle-orm';
-import { learningSessions, profiles } from '@eduagent/database';
+import { learningSessions, person, profiles } from '@eduagent/database';
 // [BUG-248] Use the same canonical step-database helper everywhere else in
 // the file does — no new import needed for the SQL-side dedup; drizzle's
 // selectDistinct produces a `SELECT DISTINCT profile_id` plan.
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { captureException } from '../../services/sentry';
 
@@ -45,16 +45,29 @@ export const dailySnapshotCron = inngest.createFunction(
         // collapsed to one profileId); the SELECT DISTINCT plan now scales
         // with the number of active profiles instead — orders of magnitude
         // smaller payload over the wire and far less driver-side memory.
-        const rows = await db
-          .selectDistinct({ profileId: learningSessions.profileId })
-          .from(learningSessions)
-          .innerJoin(profiles, eq(learningSessions.profileId, profiles.id))
-          .where(
-            and(
-              gte(learningSessions.startedAt, since),
-              isNull(profiles.archivedAt),
-            ),
-          );
+        // [CUT-B1] v2 seam: liveness joins `person` (person.id = profiles.id);
+        // legacy joins `profiles`. The archived_at column exists on both.
+        const rows = isIdentityV2EnabledInStep()
+          ? await db
+              .selectDistinct({ profileId: learningSessions.profileId })
+              .from(learningSessions)
+              .innerJoin(person, eq(learningSessions.profileId, person.id))
+              .where(
+                and(
+                  gte(learningSessions.startedAt, since),
+                  isNull(person.archivedAt),
+                ),
+              )
+          : await db
+              .selectDistinct({ profileId: learningSessions.profileId })
+              .from(learningSessions)
+              .innerJoin(profiles, eq(learningSessions.profileId, profiles.id))
+              .where(
+                and(
+                  gte(learningSessions.startedAt, since),
+                  isNull(profiles.archivedAt),
+                ),
+              );
 
         return rows.map((row) => row.profileId);
       },
@@ -118,16 +131,25 @@ export const dailySnapshotRefresh = inngest.createFunction(
       // resolves the step successfully — Inngest only retries on thrown errors.
       // captureException + re-throw lets Inngest retry while still reporting to Sentry.
       const db = getStepDatabase();
-      const profile = await db.query.profiles.findFirst({
-        where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
-        columns: { id: true },
-      });
-      if (!profile) {
+      // [CUT-B1] v2 seam: liveness check reads `person` (person.id =
+      // profiles.id); legacy reads `profiles`.
+      const live = isIdentityV2EnabledInStep()
+        ? await db.query.person.findFirst({
+            where: and(eq(person.id, profileId), isNull(person.archivedAt)),
+            columns: { id: true },
+          })
+        : await db.query.profiles.findFirst({
+            where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
+            columns: { id: true },
+          });
+      if (!live) {
         return { status: 'skipped', reason: 'profile_missing' };
       }
 
       try {
-        const snapshot = await refreshProgressSnapshot(db, profileId);
+        const snapshot = await refreshProgressSnapshot(db, profileId, {
+          identityV2Enabled: isIdentityV2EnabledInStep(),
+        });
         return {
           status: 'completed',
           profileId,
