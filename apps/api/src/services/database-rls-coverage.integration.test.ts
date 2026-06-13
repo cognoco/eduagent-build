@@ -18,13 +18,9 @@ import { sql } from 'drizzle-orm';
 import { createIntegrationDb } from '../../../../tests/integration/helpers';
 import {
   ALL_RLS_TABLES,
-  OWNER_SCOPED_TABLES,
   OR_SCOPED_TABLES,
   RLS_TABLE_META,
 } from './database-rls-coverage';
-
-const PROFILE_ID_GEL_PATTERN = 'profile_id';
-const OWNER_PROFILE_ID_GEL_PATTERN = 'owner_profile_id';
 
 describe('Integration: RLS policy coverage (H8)', () => {
   it('every covered table has at least one policy in pg_policies', async () => {
@@ -87,9 +83,10 @@ describe('Integration: RLS policy coverage (H8)', () => {
         policies: [],
       });
 
-      const expectedColumn = OWNER_SCOPED_TABLES.includes(table)
-        ? OWNER_PROFILE_ID_GEL_PATTERN
-        : PROFILE_ID_GEL_PATTERN;
+      // Resolve the expected predicate column from the manifest metadata so
+      // charge-scoped tables (consent_request → charge_person_id) are checked
+      // against their own anchor, not the profile_id default.
+      const expectedColumn = meta.predicateColumn;
 
       const anyPolicyReferencesColumn = (policies ?? []).some((p) =>
         p.qual?.includes(expectedColumn),

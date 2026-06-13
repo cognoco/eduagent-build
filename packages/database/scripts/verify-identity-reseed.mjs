@@ -86,6 +86,9 @@ const INVENTORY = [
   ['new', 'consent_grant', 'SELECT count(*)::int AS n FROM consent_grant'],
   ['new', 'subscription', 'SELECT count(*)::int AS n FROM subscription'],
   ['new', 'subscription_payers', 'SELECT count(*)::int AS n FROM subscription_payers'],
+  // CUT-A homes (0114/0115 — MMT-ADR-0020):
+  ['new', 'consent_request', 'SELECT count(*)::int AS n FROM consent_request'],
+  ['new', 'knowledge_assertions (age backfill)', "SELECT count(*)::int AS n FROM knowledge_assertions WHERE source = 'reseed_cutover_backfill' AND axis = 'age'"],
 ];
 
 // ---------------------------------------------------------------------------
@@ -244,6 +247,109 @@ const CHECKS = [
     name: 'supportership is empty (no legacy source exists)',
     sql: `SELECT count(*)::int AS n FROM supportership`,
   },
+
+  // -------------------------------------------------------------------------
+  // CUT-A homes (0114 schema / 0115 reseed — MMT-ADR-0020). The mapping
+  // expressions mirror 0115_identity_cutover_reseed.sql exactly. The forward
+  // consent_request check is scoped to consent_states rows whose profile was
+  // reseeded into person (the reseed's JOIN person FK guard) — an orphan
+  // consent_states (no person) cannot have a request and is NOT a violation.
+  // -------------------------------------------------------------------------
+  {
+    // Forward: every consent_states row that HAS a person has its id-reused
+    // request, status-mapped, basis-mapped, caps equal.
+    name: 'every consent_states row (with a person) has its consent_request (id reuse, status/basis/caps)',
+    sql: `SELECT count(*)::int AS n FROM consent_states cs
+          JOIN profiles p   ON p.id   = cs.profile_id
+          JOIN person   per ON per.id = cs.profile_id
+          LEFT JOIN consent_request cr ON cr.id = cs.id
+          WHERE cr.id IS NULL
+             OR (cr.charge_person_id, cr.organization_id, cr.requested_basis,
+                 cr.status, cr.resend_count, cr.recipient_change_count)
+                IS DISTINCT FROM
+                (cs.profile_id, p.account_id,
+                 CASE cs.consent_type::text WHEN 'COPPA' THEN 'coppa_parental_consent'
+                      ELSE 'gdpr_parental_consent' END,
+                 CASE cs.status::text
+                   WHEN 'PENDING' THEN 'pending'
+                   WHEN 'PARENTAL_CONSENT_REQUESTED' THEN 'requested'
+                   ELSE 'approved' END,
+                 cs.resend_count, cs.recipient_change_count)`,
+  },
+  {
+    // Reverse: no consent_request without a live source consent_states row
+    // whose profile is a person (orphan-free).
+    name: 'no orphan consent_requests (reverse)',
+    sql: `SELECT count(*)::int AS n FROM consent_request cr
+          WHERE NOT EXISTS (
+            SELECT 1 FROM consent_states cs
+            JOIN person per ON per.id = cs.profile_id
+            WHERE cs.id = cr.id)`,
+  },
+  {
+    // Token / consent_grant back-link convergence for the mapped rows.
+    name: 'consent_request token + grant back-link converged',
+    sql: `SELECT count(*)::int AS n FROM consent_states cs
+          JOIN person per ON per.id = cs.profile_id
+          JOIN consent_request cr ON cr.id = cs.id
+          WHERE (cr.token, cr.consent_grant_id)
+            IS DISTINCT FROM
+            (CASE WHEN cs.status::text = 'PARENTAL_CONSENT_REQUESTED' THEN cs.consent_token END,
+             (SELECT cg.id FROM consent_grant cg
+              WHERE cg.id = cs.id AND cs.status::text IN ('CONSENTED','WITHDRAWN')))`,
+  },
+  {
+    // §1.3 person re-homes converged with the legacy profiles values.
+    name: 'person preference/lifecycle re-homes converged (conversation_language, pronouns, avatar_url, default_app_context, archived_at)',
+    sql: `SELECT count(*)::int AS n FROM profiles p
+          JOIN person per ON per.id = p.id
+          WHERE (per.conversation_language, per.pronouns, per.avatar_url,
+                 per.default_app_context, per.archived_at)
+            IS DISTINCT FROM
+                (p.conversation_language, p.pronouns, p.avatar_url,
+                 p.default_app_context, p.archived_at)`,
+  },
+  {
+    // §1.4 subscription store-correlation columns converged (owned accounts —
+    // subscription.id = subscriptions.id).
+    name: 'subscription store-correlation columns converged (Stripe/RevenueCat ids + fences, trial_ends_at, cancelled_at)',
+    sql: `SELECT count(*)::int AS n FROM subscriptions s
+          JOIN subscription sn ON sn.id = s.id
+          WHERE (sn.stripe_customer_id, sn.stripe_subscription_id,
+                 sn.last_stripe_event_id, sn.last_stripe_event_timestamp,
+                 sn.revenuecat_original_app_user_id, sn.last_revenuecat_event_id,
+                 sn.last_revenuecat_event_timestamp_ms, sn.trial_ends_at, sn.cancelled_at)
+            IS DISTINCT FROM
+                (s.stripe_customer_id, s.stripe_subscription_id,
+                 s.last_stripe_event_id, s.last_stripe_event_timestamp,
+                 s.revenuecat_original_app_user_id, s.last_revenuecat_event_id,
+                 s.last_revenuecat_event_timestamp_ms, s.trial_ends_at, s.cancelled_at)`,
+  },
+  {
+    // §1.5(d) knowledge-assertion age backfill — FIELD-CONVERGENT (v1.7
+    // DO UPDATE): method/confidence/actor compared against a fresh derivation
+    // from profiles, not mere row existence. One assertion per person.
+    // actor_id applies the SAME actor-exists guard the migration uses — the
+    // LEFT JOIN person actor resolves the expected actor to NULL when
+    // birth_year_set_by names a non-reseeded person, so the check asserts
+    // exactly what the migration writes (else every parent_reported row whose
+    // parent left the system would read as a false violation).
+    name: 'knowledge_assertions age backfill converged (one per person; method/confidence/actor field-convergent)',
+    sql: `SELECT count(*)::int AS n FROM profiles p
+          JOIN person per ON per.id = p.id
+          LEFT JOIN person actor
+            ON actor.id = p.birth_year_set_by AND p.birth_year_set_by <> p.id
+          LEFT JOIN knowledge_assertions ka
+            ON ka.id = p.id AND ka.axis = 'age'
+          WHERE ka.id IS NULL
+             OR (ka.method, ka.confidence, ka.actor_id)
+                IS DISTINCT FROM
+                (CASE WHEN p.birth_year_set_by IS NOT NULL AND p.birth_year_set_by <> p.id
+                      THEN 'parent_reported' ELSE 'self_report' END,
+                 (CASE WHEN p.birth_year_set_by IS NOT NULL AND p.birth_year_set_by <> p.id
+                      THEN 1.00 ELSE 0.80 END)::numeric(3,2),
+                 actor.id)`,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -266,14 +372,15 @@ const EXCEPTIONS = [
             SELECT 1 FROM profiles p WHERE p.account_id = s.account_id AND p.is_owner = true)`,
   },
   {
-    name: 'archived profiles seeded as persons (no archived marker in the new model)',
+    // CUT-A re-homes archived_at to person.archived_at; this exception is now
+    // informational only (the field-convergence is a hard check above).
+    name: 'archived profiles (now re-homed to person.archived_at — informational)',
     sql: `SELECT count(*)::int AS n FROM profiles WHERE archived_at IS NOT NULL`,
   },
-  {
-    name: 'PENDING/PARENTAL_CONSENT_REQUESTED consent_states (no consent event — not seeded)',
-    sql: `SELECT count(*)::int AS n FROM consent_states
-          WHERE status NOT IN ('CONSENTED','WITHDRAWN')`,
-  },
+  // NOTE: the former 'PENDING/PARENTAL_CONSENT_REQUESTED … not seeded' exception
+  // was DELETED in CUT-A (0115 seeds ALL consent_states statuses into
+  // consent_request) — it is now the hard forward check
+  // 'every consent_states row (with a person) has its consent_request' above.
 ];
 
 // ---------------------------------------------------------------------------

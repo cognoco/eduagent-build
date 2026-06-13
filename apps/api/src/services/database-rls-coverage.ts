@@ -22,10 +22,18 @@ export type RlsTableMeta = {
    * - 'profile_id'       for standard profile-scoped rows
    * - 'owner_profile_id' for owner-scoped tables (withdrawal_archive_preferences,
    *                      pending_notices, family_preferences)
+   * - 'charge_person_id' for charge-scoped CUT-A tables (consent_request — the
+   *                      isolation anchor is the charge person; person.id =
+   *                      profiles.id, so the app.current_profile_id GUC carries
+   *                      over unchanged). MMT-ADR-0020 / §1.2a.
    * - 'or-fk-cols'       used when metadata.policyType is 'or-both-fk-cols'
    *                      (family_links uses parent_profile_id OR child_profile_id)
    */
-  predicateColumn: 'profile_id' | 'owner_profile_id' | 'or-fk-cols';
+  predicateColumn:
+    | 'profile_id'
+    | 'owner_profile_id'
+    | 'charge_person_id'
+    | 'or-fk-cols';
   /**
    * 'standard'        — single-column USING predicate
    * 'or-both-fk-cols' — OR across two FK columns (family_links)
@@ -95,6 +103,17 @@ export const OWNER_SCOPED_TABLES: readonly string[] = [
 ] as const;
 
 /**
+ * Tables whose RLS USING clause references `charge_person_id` (CUT-A —
+ * MMT-ADR-0020 / §1.2a). The charge person is the isolation anchor; because
+ * person.id = profiles.id by the deterministic reseed, the
+ * app.current_profile_id GUC value carries over unchanged. consent_request's
+ * `consent_request_charge_isolation` policy mirrors `consent_states_profile_isolation`.
+ */
+export const CHARGE_SCOPED_TABLES: readonly string[] = [
+  'consent_request',
+] as const;
+
+/**
  * family_links uses OR across parent_profile_id and child_profile_id —
  * listed separately so callers can handle its special predicate.
  */
@@ -128,6 +147,7 @@ export const EXPLICITLY_EXCLUDED_TABLES: readonly string[] = [
 export const ALL_RLS_TABLES: readonly string[] = [
   ...PROFILE_SCOPED_TABLES,
   ...OWNER_SCOPED_TABLES,
+  ...CHARGE_SCOPED_TABLES,
   ...OR_SCOPED_TABLES,
 ] as const;
 
@@ -149,6 +169,15 @@ export const RLS_TABLE_META: Record<string, RlsTableMeta> = {
       t,
       {
         predicateColumn: 'owner_profile_id' as const,
+        policyType: 'standard' as const,
+      },
+    ]),
+  ),
+  ...Object.fromEntries(
+    CHARGE_SCOPED_TABLES.map((t) => [
+      t,
+      {
+        predicateColumn: 'charge_person_id' as const,
         policyType: 'standard' as const,
       },
     ]),
