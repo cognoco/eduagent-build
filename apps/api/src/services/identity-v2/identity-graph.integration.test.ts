@@ -292,6 +292,53 @@ async function cleanupByClerk(
       expect(loser.reason).toBeInstanceOf(ConflictError);
     },
   );
+
+  // [A2 regression] Concurrent SAME-clerk/SAME-email replay must NOT be treated
+  // as reclaim abuse — it is idempotent. The loser hits login_email_unique (or
+  // login_clerk_user_id_unique) but, because the clerk id matches, the 23505
+  // discrimination re-reads by email, finds the same clerk id, and returns the
+  // committed graph instead of refusing. Both calls succeed; exactly one graph.
+  (REPOINTED ? it : it.skip)(
+    '[A2 concurrent same-clerk replay] two same-email/SAME-clerk bootstraps both succeed idempotently (no ConflictError) [needs M-REPOINT]',
+    async () => {
+      const sharedEmail = `idemrace_${generateUUIDv7()}@test.local`;
+      const sameClerk = uniqueClerk();
+
+      const results = await Promise.allSettled([
+        createIdentityGraph(db, {
+          clerkUserId: sameClerk,
+          verifiedEmail: sharedEmail,
+          displayName: 'Same',
+          birthYear: 1990,
+          location: 'US',
+        }),
+        createIdentityGraph(db, {
+          clerkUserId: sameClerk,
+          verifiedEmail: sharedEmail,
+          displayName: 'Same',
+          birthYear: 1990,
+          location: 'US',
+        }),
+      ]);
+
+      // No ConflictError — idempotent replay, not reclaim abuse.
+      const rejected = results.filter((r) => r.status === 'rejected');
+      expect(rejected).toHaveLength(0);
+      const fulfilled = results.filter(
+        (
+          r,
+        ): r is PromiseFulfilledResult<
+          Awaited<ReturnType<typeof createIdentityGraph>>
+        > => r.status === 'fulfilled',
+      );
+      expect(fulfilled).toHaveLength(2);
+      // Both calls resolved to the SAME graph (one person, one org).
+      expect(fulfilled[0]!.value.personId).toBe(fulfilled[1]!.value.personId);
+      expect(fulfilled[0]!.value.organizationId).toBe(
+        fulfilled[1]!.value.organizationId,
+      );
+    },
+  );
 });
 
 // Pure-unit guards (no DB) — always run.

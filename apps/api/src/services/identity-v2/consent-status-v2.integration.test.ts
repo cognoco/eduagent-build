@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   consentGrant,
@@ -20,6 +20,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
+  consentedExistsSql,
   resolveConsentStatus,
   resolveLatestConsentStatusAnyBasis,
 } from './consent-status-v2';
@@ -192,6 +193,47 @@ const COPPA = 'coppa_parental_consent';
       expect(
         await resolveConsentStatus(db, personId, orgId, PURPOSE, GDPR),
       ).toBe('WITHDRAWN');
+    });
+
+    it('[A1 same-timestamp] id DESC tiebreak: two grants share granted_at, the higher-id one withdrawn → WITHDRAWN (reducer AND scan-side EXISTS)', async () => {
+      const { personId, orgId } = await seedPersonOrg();
+      const ts = new Date('2026-06-01T12:00:00.000Z');
+      // Two grants with the IDENTICAL granted_at. The uuid v7 id of the second
+      // insert is monotonically greater, so it is the "current" row by the
+      // (granted_at DESC, id DESC) tiebreak — and it is withdrawn.
+      await db.insert(consentGrant).values({
+        chargePersonId: personId,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: GDPR,
+        granted: true,
+        grantedAt: ts, // older by id, un-withdrawn
+      });
+      await db.insert(consentGrant).values({
+        chargePersonId: personId,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: GDPR,
+        granted: true,
+        grantedAt: ts, // same timestamp, higher id → the current row
+        withdrawnAt: new Date('2026-06-02T00:00:00.000Z'),
+      });
+
+      // Reducer: the higher-id row wins the tiebreak → WITHDRAWN.
+      expect(
+        await resolveConsentStatus(db, personId, orgId, PURPOSE, GDPR),
+      ).toBe('WITHDRAWN');
+
+      // Scan-side EXISTS: must NOT report consented (a max(granted_at)-only
+      // predicate would wrongly pass because grant₁ is granted+un-withdrawn at
+      // the same timestamp). The id-tiebroken form correctly excludes it.
+      const [scan] = await db
+        .select({
+          consented: consentedExistsSql(sql`${person.id}`),
+        })
+        .from(person)
+        .where(eq(person.id, personId));
+      expect(scan?.consented).toBe(false);
     });
 
     it('basis-explicit GDPR is NOT masked by a newer COPPA grant (the BUG-466/465 shape)', async () => {

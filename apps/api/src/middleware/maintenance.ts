@@ -41,9 +41,14 @@ type MaintenanceEnv = {
 const HEALTH_PATH = '/v1/health';
 const INNGEST_PATH = '/v1/inngest';
 
-/** Path match: exact equality or a sub-path under the segment separator. */
-function pathMatches(path: string, prefix: string): boolean {
-  return path === prefix || path.startsWith(prefix + '/');
+/**
+ * Strip a single trailing slash (but keep the root '/') so '/v1/inngest/' and
+ * '/v1/inngest' compare equal. The freeze gate exempts EXACT endpoints only —
+ * a prefix match would over-exempt any future '/v1/inngest/<sub>' route during
+ * the freeze, which must stay 503'd.
+ */
+function normalizePath(path: string): string {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
 }
 
 export const maintenanceGateMiddleware = createMiddleware<MaintenanceEnv>(
@@ -54,16 +59,16 @@ export const maintenanceGateMiddleware = createMiddleware<MaintenanceEnv>(
       return next();
     }
 
-    const path = c.req.path;
+    const path = normalizePath(c.req.path);
 
-    // Health check is exempt in both stages.
-    if (pathMatches(path, HEALTH_PATH)) {
+    // Health check is exempt in both stages (exact endpoint only).
+    if (path === HEALTH_PATH) {
       return next();
     }
 
     // The signed Inngest delivery endpoint is exempt in stage 1 (so the drain
-    // can complete) and hard-blocked only once stage 2 is set.
-    if (pathMatches(path, INNGEST_PATH)) {
+    // can complete) and hard-blocked only once stage 2 is set (exact only).
+    if (path === INNGEST_PATH) {
       const blockInngest = isMaintenanceBlockInngest(
         c.env?.MAINTENANCE_BLOCK_INNGEST,
       );

@@ -327,7 +327,19 @@ export async function createIdentityGraph(
         role: 'primary',
       });
 
-      // (9) quota_pools — same cycle-reset convention as legacy createSubscription.
+      // (9) quota_pools — same cycle-reset convention as legacy
+      // createSubscription. This row references the NEW `subscription.id`.
+      //
+      // SEQUENCING (plan §1.4 / §4 step 6): `quota_pools.subscription_id` is a
+      // kept satellite whose FK still targets LEGACY `subscriptions(id)` and is
+      // re-pointed to the new `subscription(id)` only at the convergence
+      // FK re-point (M-REPOINT, WI-586). Until then this insert cannot commit —
+      // which is coherent with the single-live-store invariant: the flag is
+      // `'false'` in EVERY deployed environment, so `createIdentityGraph` never
+      // runs in production before M-REPOINT, and M-REPOINT lands inside the same
+      // freeze window as the flag flip. The v2 graph and its quota row become
+      // simultaneously valid at convergence. Full-graph integration tests are
+      // gated on `IDENTITY_V2_REPOINTED` accordingly.
       const plusTier = getTierConfig('plus');
       const cycleResetAt = new Date();
       cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
@@ -370,13 +382,27 @@ export async function createIdentityGraph(
         );
       }
       if (constraint === LOGIN_EMAIL_UNIQUE) {
-        // The BUG-411 race window: two concurrent same-email/different-Clerk
-        // bootstraps. The loser lands here (the pre-insert guard missed it
-        // because both passed the lookup). Route through the SAME audited
-        // refusal — never a raw 500.
+        // The loser of a concurrent race landed on the email unique. Two cases
+        // (the discrimination MUST distinguish them — re-read the row by email):
+        //   - same Clerk id → a same-email/same-Clerk idempotent replay whose
+        //     pre-insert guard happened to miss the racing winner. Return the
+        //     now-committed graph (idempotent), NOT a refusal.
+        //   - different Clerk id → the BUG-411 reclaim race (two concurrent
+        //     same-email/different-Clerk bootstraps). Route through the SAME
+        //     audited refusal — never a raw 500.
+        const existingByEmail = await db.query.login.findFirst({
+          where: eq(login.email, input.verifiedEmail),
+        });
+        if (existingByEmail?.clerkUserId === input.clerkUserId) {
+          const resolved = await resolveIdentityV2(db, input.clerkUserId);
+          if (resolved) return resolved;
+          throw new ConflictError(
+            'Identity provisioning in progress; please retry.',
+          );
+        }
         return await refuseReclaim({
           incomingClerkUserId: input.clerkUserId,
-          existingClerkUserId: null, // racing row; clerk id not re-read
+          existingClerkUserId: existingByEmail?.clerkUserId ?? null,
           email: input.verifiedEmail,
         });
       }

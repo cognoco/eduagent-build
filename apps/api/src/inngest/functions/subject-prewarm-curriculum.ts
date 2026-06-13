@@ -169,7 +169,12 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
         // step a consent withdrawal that occurred after the first run would
         // otherwise be missed and stale-allowed learner data would still reach
         // the LLM. Re-evaluating here closes the cross-step memoization gap.
-        if (!(await isGdprProcessingAllowed(db, profileId))) {
+        // [CUT-B1 §2.5(i)] v2 seam — must mirror the first gate, else an
+        // Identity-V2 run would fall back to the legacy consent source here.
+        const stepGdprAllowed = isIdentityV2EnabledInStep()
+          ? await isGdprProcessingAllowedV2(db, profileId)
+          : await isGdprProcessingAllowed(db, profileId);
+        if (!stepGdprAllowed) {
           return false;
         }
 

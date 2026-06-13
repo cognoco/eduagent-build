@@ -18,7 +18,7 @@
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { membership, person, type Database } from '@eduagent/database';
-import type { ConsentStatus } from '@eduagent/schemas';
+import type { ConsentStatus, Profile } from '@eduagent/schemas';
 import type { ProfileMeta } from '../../middleware/profile-scope';
 import {
   resolveLatestConsentStatusAnyBasis,
@@ -143,6 +143,74 @@ export async function findOwnerPersonScope(
       isOwner: owner.roles.includes('admin'),
       consentStatus,
     }),
+  };
+}
+
+/**
+ * Resolve the owner person as a full byte-identical `Profile` (the v2
+ * equivalent of `findOwnerProfile` returning a Profile). Used by the
+ * owner-bootstrap REPLAY path: a retried owner-create POST under flag-on must
+ * return the already-created owner profile idempotently, never re-create or
+ * touch the legacy writer. Returns null when no owner exists.
+ */
+export async function getOwnerProfileV2(
+  db: Database,
+  organizationId: string,
+): Promise<Profile | null> {
+  const ownerRow = await db
+    .select({
+      personId: person.id,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl,
+      birthDate: person.birthDate,
+      residenceJurisdiction: person.residenceJurisdiction,
+      conversationLanguage: person.conversationLanguage,
+      pronouns: person.pronouns,
+      defaultAppContext: person.defaultAppContext,
+      createdAt: person.createdAt,
+      updatedAt: person.updatedAt,
+      roles: membership.roles,
+    })
+    .from(person)
+    .innerJoin(membership, eq(membership.personId, person.id))
+    .where(
+      and(
+        eq(membership.organizationId, organizationId),
+        isNull(person.archivedAt),
+        sql`${membership.roles} @> ARRAY['admin']::text[]`,
+      ),
+    )
+    .limit(1);
+
+  const owner = ownerRow[0];
+  if (!owner) return null;
+
+  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+    db,
+    owner.personId,
+    organizationId,
+    DEFAULT_CONSENT_PURPOSE,
+  );
+
+  return {
+    id: owner.personId,
+    accountId: organizationId, // account.id = organization.id
+    displayName: owner.displayName,
+    avatarUrl: owner.avatarUrl ?? null,
+    birthYear: Number(owner.birthDate.slice(0, 4)),
+    location: jurisdictionToLocation(owner.residenceJurisdiction),
+    isOwner: owner.roles.includes('admin'),
+    hasPremiumLlm: false, // derived (§1.3)
+    defaultAppContext:
+      (owner.defaultAppContext as Profile['defaultAppContext']) ?? null,
+    hasFamilyLinks: false,
+    conversationLanguage:
+      owner.conversationLanguage as Profile['conversationLanguage'],
+    pronouns: owner.pronouns ?? null,
+    consentStatus,
+    linkCreatedAt: null,
+    createdAt: owner.createdAt.toISOString(),
+    updatedAt: owner.updatedAt.toISOString(),
   };
 }
 

@@ -392,17 +392,26 @@ export async function isGdprProcessingAllowedV2(
  *   (e.g. `sql\`${person.id}\``), correlated into the subquery.
  */
 export function consentedExistsSql(personColumn: ReturnType<typeof sql>) {
+  // Select the CURRENT grant by the exact BUG-394 ordering key the reducer
+  // uses (granted_at DESC, id DESC) and require THAT row to be granted +
+  // un-withdrawn. A `granted_at = max(granted_at)` correlation alone is
+  // ambiguous when two grants share a timestamp: an older un-withdrawn row
+  // could satisfy EXISTS even when the true current (higher-id) row is
+  // withdrawn — incorrectly passing the gate. Keying on the id of the
+  // tie-broken current row closes that.
   return sql`EXISTS (
     SELECT 1 FROM consent_grant cg
     WHERE cg.charge_person_id = ${personColumn}
       AND cg.purpose = ${DEFAULT_CONSENT_PURPOSE}
       AND cg.granted AND cg.withdrawn_at IS NULL
-      AND cg.granted_at = (
-        SELECT max(cg2.granted_at) FROM consent_grant cg2
+      AND cg.id = (
+        SELECT cg2.id FROM consent_grant cg2
         WHERE cg2.charge_person_id = cg.charge_person_id
           AND cg2.purpose = cg.purpose
           AND cg2.organization_id = cg.organization_id
           AND cg2.lawful_basis = cg.lawful_basis
+        ORDER BY cg2.granted_at DESC, cg2.id DESC
+        LIMIT 1
       )
   )`;
 }

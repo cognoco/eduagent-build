@@ -61,14 +61,18 @@ export async function resolveIdentityV2(
 
   // The person's home-org membership (v1: a single home org per person —
   // MMT-ADR-0010). `membership.roles` carries {admin, learner}; isOwner derives
-  // from the admin role.
-  const membershipRow = await db.query.membership.findFirst({
+  // from the admin role. Fail CLOSED when the count is not exactly one: zero is
+  // a structurally-broken graph (the bootstrap writes membership in the same
+  // transaction), and more-than-one would let `findFirst` bind the request to
+  // an ARBITRARY org/account context — a security hazard. The DB contract
+  // permits multiple memberships per person even though v1 only writes one, so
+  // we must not assume singularity. Surface "unresolvable" rather than pick.
+  const membershipRows = await db.query.membership.findMany({
     where: eq(membership.personId, loginRow.personId),
+    limit: 2,
   });
-  if (!membershipRow) {
-    // A login with a person but no membership is a structurally-broken graph
-    // (the bootstrap writes membership in the same transaction). Surface as
-    // "unresolvable" rather than fabricating an account shape.
+  const membershipRow = membershipRows[0];
+  if (membershipRows.length !== 1 || !membershipRow) {
     return null;
   }
 

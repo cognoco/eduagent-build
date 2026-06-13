@@ -8,14 +8,19 @@ const mockPersistBookTopics = jest.fn();
 const mockGetProfileAge = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock(
-  '../helpers' /* gc1-allow: Inngest step runtime requires mocking helper abstractions */,
-  () => ({
+// GC6: real module via requireActual; override only the two step accessors the
+// Inngest runtime would otherwise require (DB binding) + pin the cutover flag to
+// the legacy path these tests exercise.
+jest.mock('../helpers', () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
-    // [CUT-B1] These tests exercise the legacy (flag-off) path.
     isIdentityV2EnabledInStep: () => false,
-  }),
-);
+  };
+});
 
 jest.mock(
   '../../services/book-generation' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,

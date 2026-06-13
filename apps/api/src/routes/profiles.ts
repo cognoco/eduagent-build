@@ -19,6 +19,7 @@ import type { ClerkIdentity } from '../middleware/account';
 import { requireAccount } from '../middleware/profile-scope';
 import { isIdentityV2Enabled } from '../config';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
+import { getOwnerProfileV2 } from '../services/identity-v2/profile-v2';
 
 import { notFound, forbidden, validationError, apiError } from '../errors';
 import {
@@ -106,15 +107,40 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const db = c.get('db');
     const input = c.req.valid('json');
 
-    // [CUT-B1 §2.2a] v2 owner-bootstrap seam. When the flag is on and this is a
-    // pre-graph request (no account resolved; the graphless clerkIdentity is
-    // set), this POST creates the whole identity graph in one transaction
-    // instead of the legacy owner-profile insert. The owner-create
-    // authorization is trivially satisfied pre-graph (first profile of a fresh
-    // login). Subsequent (child) creates — where the account/graph already
-    // exists — fall through to the legacy path here in CUT-B1 (the consent
-    // WRITE machine those need is CUT-B2 scope).
-    if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) && !c.get('account')) {
+    // [CUT-B1 §2.2a] v2 owner-bootstrap seam. Under IDENTITY_V2_ENABLED the
+    // owner-create POST creates the whole identity graph in one transaction.
+    // The legacy `createProfileWithLimitCheck` writer (which targets
+    // `profiles.account_id -> accounts.id`) MUST NOT run flag-on — the v2
+    // bootstrap created an `organization`/`person` graph, not a legacy
+    // `accounts` row, so the legacy writer would 500 on the FK or write to the
+    // wrong store. So the entire flag-on branch is self-contained and never
+    // falls through to the legacy path.
+    if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+      // Account resolved → the graph already exists (the bootstrap created the
+      // owner). This POST is therefore a post-graph request:
+      //   - an idempotent replay of the owner create (network retry /
+      //     double-submit) → return the existing owner profile, NOT a second
+      //     create (and NEVER the legacy writer).
+      //   - a genuine CHILD create → needs the consent WRITE machine, which is
+      //     CUT-B2 scope; refuse cleanly rather than corrupt the store.
+      const resolvedAccount = c.get('account');
+      if (resolvedAccount) {
+        const owner = await getOwnerProfileV2(db, resolvedAccount.id);
+        if (owner) {
+          // Idempotent replay of the owner bootstrap.
+          return c.json(profileResponseSchema.parse({ profile: owner }), 201);
+        }
+        // No owner under a resolved account is a structurally-broken graph;
+        // child creation is not yet wired (CUT-B2). Refuse, don't fall through.
+        return apiError(
+          c,
+          409,
+          ERROR_CODES.CONFLICT,
+          'Additional profile creation is not yet available.',
+        );
+      }
+
+      // Pre-graph (no account; the graphless clerkIdentity is set) → bootstrap.
       const clerkIdentity = c.get('clerkIdentity');
       if (!clerkIdentity) {
         return apiError(
@@ -136,7 +162,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
           conversationLanguage: input.conversationLanguage,
           pronouns: input.pronouns ?? null,
           avatarUrl: input.avatarUrl ?? null,
-          timezone: c.get('account')?.timezone ?? null,
+          timezone: null,
         });
         const profile = buildBootstrapProfile(graph, input);
         return c.json(profileResponseSchema.parse({ profile }), 201);
