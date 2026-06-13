@@ -753,6 +753,64 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       // No subscription context — refund is a no-op; function must not throw.
       expect(safeRefundQuotaMock).not.toHaveBeenCalled();
     });
+
+    it('[F-146 / WI-701] sets quotaRefunded=true on the 200 early-return so the metering middleware can invalidate KV', async () => {
+      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+
+      // Build a one-off app that wraps makeMeteredApp's middleware stack and
+      // captures the post-handler quotaRefunded value via a spy middleware so
+      // we can assert that the metering middleware's KV-invalidation branch
+      // (added in WI-701) will see quotaRefunded=true on a 200 app-help response.
+      let capturedQuotaRefunded: boolean | undefined = undefined;
+      const innerApp = new Hono<
+        TestEnv & {
+          Variables: {
+            subscriptionId: string | undefined;
+            quotaDecrementSource: 'monthly' | 'top_up' | undefined;
+            quotaDecrementTopUpCreditId: string | undefined;
+            quotaDecrementQuotaModel: 'per-profile' | 'shared-pool' | undefined;
+            quotaRefunded: boolean | undefined;
+          };
+        }
+      >();
+      innerApp.use('*', async (c, next) => {
+        c.set('db', makeStubDb() as unknown as Database);
+        c.set('profileId', PROFILE_ID);
+        c.set('profileMeta', {
+          birthYear: 2000,
+          location: 'EU',
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        });
+        c.set('subscriptionId', SUBSCRIPTION_ID);
+        c.set('quotaDecrementSource', 'monthly');
+        c.set('quotaDecrementTopUpCreditId', undefined);
+        c.set('quotaDecrementQuotaModel', 'shared-pool');
+        c.set('quotaRefunded', undefined);
+        await next();
+        // Capture the flag after the handler runs — this is what the metering
+        // middleware reads in its post-200 KV-update block.
+        capturedQuotaRefunded = c.get('quotaRefunded');
+      });
+      innerApp.onError((err, c) => {
+        if (err instanceof HTTPException) return err.getResponse();
+        return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+      });
+      innerApp.route('/v1', assessmentRoutes);
+
+      const res = await innerApp.request(
+        path,
+        validAnswerBody(APP_HELP_ANSWER),
+      );
+
+      expect(res.status).toBe(200);
+      // The handler must set quotaRefunded=true so the middleware's post-200
+      // safeWriteKV branch sees the flag and calls safeDeleteKV instead of
+      // writing stale post-decrement counters (WI-701 P2 fix).
+      expect(capturedQuotaRefunded).toBe(true);
+    });
   });
 });
 

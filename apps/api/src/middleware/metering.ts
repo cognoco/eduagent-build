@@ -948,31 +948,41 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // Derive from the atomic DB result (decrement.remainingMonthly/Daily) to
     // avoid stale-read races under concurrency — two requests reading the same
     // cached count would each write original+1, understating actual usage.
+    //
+    // [F-146 / WI-701] If the handler self-refunded (quotaRefunded=true on a
+    // 200 response — e.g. the assessments app-help early-return path), writing
+    // the pre-refund decremented counters here would leave KV stale until the
+    // next natural TTL expiry. Delete the entry instead so the next request
+    // falls through to DB and gets the correct post-refund counts.
     if (kv && quotaModel === 'shared-pool') {
-      // Single formula for both branches: `remainingMonthly` is already 0 in
-      // the top-up path, so `monthlyLimit - 0 - topUpRemainingAggregate` is
-      // the same accounting as the monthly-source path. Use the SAME aggregate
-      // we wrote into the header — earlier this used the single-batch
-      // `decrement.remainingTopUp`, which over-counted usage when multiple
-      // unexpired batches existed and could push the cached `usedThisMonth`
-      // close to or past `monthlyLimit` for the duration of the KV TTL.
-      const atomicUsedMonth =
-        monthlyLimit - decrement.remainingMonthly - topUpRemainingAggregate;
-      const atomicUsedToday =
-        dailyLimit !== null && decrement.remainingDaily !== null
-          ? dailyLimit - decrement.remainingDaily
-          : usedToday + 1;
-      await safeWriteKV(kv, account.id, {
-        subscriptionId,
-        tier,
-        effectiveAccessTier,
-        billingAccess,
-        status: subscriptionStatus,
-        monthlyLimit,
-        usedThisMonth: atomicUsedMonth,
-        dailyLimit,
-        usedToday: atomicUsedToday,
-      });
+      if (c.get('quotaRefunded')) {
+        await safeDeleteKV(kv, account.id);
+      } else {
+        // Single formula for both branches: `remainingMonthly` is already 0 in
+        // the top-up path, so `monthlyLimit - 0 - topUpRemainingAggregate` is
+        // the same accounting as the monthly-source path. Use the SAME aggregate
+        // we wrote into the header — earlier this used the single-batch
+        // `decrement.remainingTopUp`, which over-counted usage when multiple
+        // unexpired batches existed and could push the cached `usedThisMonth`
+        // close to or past `monthlyLimit` for the duration of the KV TTL.
+        const atomicUsedMonth =
+          monthlyLimit - decrement.remainingMonthly - topUpRemainingAggregate;
+        const atomicUsedToday =
+          dailyLimit !== null && decrement.remainingDaily !== null
+            ? dailyLimit - decrement.remainingDaily
+            : usedToday + 1;
+        await safeWriteKV(kv, account.id, {
+          subscriptionId,
+          tier,
+          effectiveAccessTier,
+          billingAccess,
+          status: subscriptionStatus,
+          monthlyLimit,
+          usedThisMonth: atomicUsedMonth,
+          dailyLimit,
+          usedToday: atomicUsedToday,
+        });
+      }
     }
     return;
   },
