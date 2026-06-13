@@ -163,10 +163,44 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   the IF pattern (dogfood evidence in hand). Earlier parallel build allowed if
   ZDX-side capacity appears. **Gate effectively MET 2026-06-11** — IF ran the
   full loop (W0–W2+W4 closed through the autonomous reviewer); PRG-12 is the
-  second instance. Design input captured on `WI-590` (comment, 2026-06-11): the
-  shepherd-kickoff skill + executor-protocol skill + reviewer-dispatcher
-  pattern, with pointers to the five `_wip/identity-foundation/review-loop-*` /
-  `executor-protocol*` artifacts. Pull remains deliberate (attention budget).
+  second instance. **Scope narrowed 2026-06-13 → top-down layer only**: the
+  loop/execution-mechanism productionization (shepherd-kickoff + executor-protocol
+  + reviewer-dispatcher + runtime-agnosticity) split out to **PRG-05**. PRG-04 +
+  PRG-05 are designed together via one combined design/grill, seeded by
+  `supporting-artefacts/mechanism-productionization-design-input.md`, gated behind
+  the agnosticity spike (**spike → grill → slice**). `WI-590` is double-loaded; its
+  loop-productization input re-homes to PRG-05 at slice time. Pull remains
+  deliberate (attention budget).
+
+### PRG-05 · Execution-mechanism productionization (the orchestration loop) — `embryo`
+- **Outcome:** the hand-built program-delivery mechanism — shepherd-kickoff,
+  executor-protocol/pointer-brief, the autonomous reviewer-dispatcher loop, and the
+  cross-runtime seam contracts — promoted from per-instance `_wip/` artifacts to a
+  parameterized, runtime-agnostic tooling layer. **Half B** of the mechanism
+  productionization (Half A = PRG-04, the top-down layer).
+- **Owner:** Hex + Jorn
+- **Embryo inputs:** the loop dogfood corpus in `_wip/identity-foundation/`
+  (`review-loop-{mechanics,observations,reviewer-observations,productization-handoff}.md`
+  + `executor-protocol{,-example}.md` + `new-llm-review-watcher-kickoff-prompt.md` +
+  the live `review-watcher-v3.ts`) + `planning-reference.md` §2.5–2.7 +
+  `supporting-artefacts/mechanism-productionization-design-input.md` (consolidated
+  design seed + locked decisions, 2026-06-13).
+- **Decomposition:** Cosmo **`WI-590`** is currently double-loaded (top-down + loop
+  input); the loop-productization half re-homes here at slice time. Skill-level
+  enhancements to ZDX (`zdx-core`/`cosmo`) — children-sweep into `complete`, a
+  published close-evidence contract, structured review-result + override policy —
+  are bug/enhancement WIs against those skills, captured at slice, **not** new
+  top-down structure.
+- **Agnosticity scope (locked 2026-06-13):** runtime-swap unit = the **role**; three
+  swappable role-units (orchestrator · shepherd-with-its-executors · reviewer);
+  agnostic contracts only at orchestrator↔shepherd + shepherd↔reviewer;
+  shepherd↔executor is **native-by-design** (never cross-runtime); reviewer ≠
+  executor runtime is a quality invariant.
+- **Activate-when:** combined design/grill with PRG-04 (seam-catalogue spine), itself
+  gated behind the **agnosticity spike** (Claude shepherd choosing Claude/Codex-model
+  executors via `codex-companion`; Claude executor → Codex nested adversarial
+  reviewer). Sequence **spike → grill → slice**; no Cosmo objects until post-grill.
+  Pull deliberate (attention budget), parallel-safe with execution streams.
 
 ### PRG-12 · L10n & A11y Mobile — `✓ graduated` (2026-06-12)
 - **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
@@ -423,7 +457,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
 | 7 | **PRG-10** security-pii-api | ✅ **both gates FIRED** (safe subset G2; auth/PII remainder G4 06-11 late) — activation = attention-budget call |
 | 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
-| 9 | **PRG-04** Cosmo top-down delivery layer | orchestrator pull on dogfood evidence (≥1 full Initiative cycle on the IF pattern) |
+| 9 | **PRG-04** top-down delivery layer + **PRG-05** execution-mechanism productionization | combined design/grill (seam-catalogue) behind the **agnosticity spike** — sequence spike → grill → slice; orchestrator pull on dogfood evidence (✓ met) + attention budget |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
 | 12 | **PRG-17** new-llm integration (LLM) | ✓ **GRADUATED 06-13** — fifth graduation (first integration lane); merged `105b39ac0`, deploy green, cutover unlocked |
@@ -511,6 +545,17 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-13 — Mechanism productionization split into two sibling Initiatives.**
+  The hand-built program-delivery mechanism is now **PRG-04** (top-down delivery
+  layer — narrowed) + **PRG-05** (execution/loop mechanism — new row); `WI-590` was
+  double-loaded and its loop half re-homes to PRG-05 at slice. Decisions persisted in
+  `supporting-artefacts/mechanism-productionization-design-input.md`: combined
+  design/grill before slicing; sequence **spike → grill → slice** (no Cosmo until
+  post-grill); agnosticity scoped to role-unit swap (orchestrator ·
+  shepherd-with-executors · reviewer) with shepherd↔executor native-by-design and
+  reviewer≠executor as a quality invariant. Pre-grill **agnosticity spike** defined
+  (Claude shepherd ↔ Claude/Codex-model executors via `codex-companion`; Claude
+  executor → Codex nested adversarial reviewer).
 - **2026-06-13 — PRG-17 GRADUATED (fifth graduation; first integration lane).**
   Operator ruling. new-llm reconciled + merged to `main` (`105b39ac0`), §8 rescan
   GO, post-merge deploy green (WI-664 closed), WI-694 closed, branch protection
