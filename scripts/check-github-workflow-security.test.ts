@@ -733,7 +733,30 @@ describe('checkGithubWorkflowSecurity', () => {
     );
   });
 
-  it('allows a verdict gate that constrains the comment author to github-actions[bot]', () => {
+  it('rejects a verdict gate whose only author constraint is Bot type', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-verdict-gate-bot-type-only.yml',
+      `
+      name: Bad verdict gate bot type only
+      on: pull_request
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          steps:
+            - name: Evaluate review verdict
+              run: |
+                comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
+                review_json="$(jq -c '[ .[] | select(.user.type == "Bot") | select(.body | contains("## Claude Code Review:")) ] | last' <<< "$comments_json")"
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'verdict gate parses comments without constraining the comment author to a trusted bot identity (forgeable verdict)',
+    );
+  });
+
+  it('allows a verdict gate that constrains the comment author to claude[bot]', () => {
     writeFixture(
       root,
       '.github/workflows/good-verdict-gate.yml',
@@ -747,7 +770,7 @@ describe('checkGithubWorkflowSecurity', () => {
             - name: Evaluate review verdict
               run: |
                 comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
-                review_json="$(jq -c '[ .[] | select(.user.login == "github-actions[bot]") | select(.body | contains("## Claude Code Review:")) ] | last' <<< "$comments_json")"
+                review_json="$(jq -c '[ .[] | select(.user.login == "claude[bot]") | select(.user.type == "Bot") | select(.body | contains("## Claude Code Review:")) ] | last' <<< "$comments_json")"
       `,
     );
 
