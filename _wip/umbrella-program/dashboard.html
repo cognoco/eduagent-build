@@ -487,7 +487,7 @@ footer .warn{color:var(--amber)}
   </div>
   <div class="hdr-right">
     <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐ theme</button>
-    <div class="stamp">snapshot <b>2026-06-13</b><br>11 initiatives · ~50 bundles · 5 gates<br>view · not a source of truth</div>
+    <div class="stamp">snapshot <b>2026-06-13</b><br>14 initiatives · ~53 bundles · 5 gates<br>view · not a source of truth</div>
   </div>
 </header>
 
@@ -529,7 +529,7 @@ footer .warn{color:var(--amber)}
 <!-- ================= FIELD GUIDE ================= -->
 <section class="view" id="v-guide">
   <div class="guide">
-    <p class="lede">A program this size feels unmanageable when you watch it at the wrong altitude. This page exists so two people can run eleven initiatives <em>without holding any of it in their heads.</em></p>
+    <p class="lede">A program this size feels unmanageable when you watch it at the wrong altitude. This page exists so two people can run fourteen initiatives <em>without holding any of it in their heads.</em></p>
 
     <div class="gsec">
       <h2><span class="no">01</span>The shape: four altitudes, watch one</h2>
@@ -573,13 +573,13 @@ footer .warn{color:var(--amber)}
     </div>
 
     <div class="gsec">
-      <h2><span class="no">05</span>Eleven initiatives in one breath</h2>
+      <h2><span class="no">05</span>Fourteen initiatives in one breath</h2>
       <ul>
         <li><b>Two big builds:</b> the Identity Foundation rewrite (PRG-01, the centerpiece — everything else schedules around its waves) and the Harness Hygiene pipeline rework (PRG-02, effectively done — merging).</li>
         <li><b>Six audit clean-outs:</b> waves of verified findings from the May full-audit, clustered by surface — UI language &amp; accessibility (12), API security (10), architecture (11), background-job security (13), error handling (15), agent instructions (14). Each waits behind the identity wave that touches the same files — the parallel-safe ones don't wait at all.</li>
         <li><b>Two doctrine streams:</b> agents' working-notes cleanup (PRG-03, nearly done — one PM ruling left) and the big estate-canon drain (PRG-20, deliberately after the rewrite so we don't document what's about to be rebuilt).</li>
         <li><b>One design stream waiting on product:</b> learning-domain canon (PRG-21, Zuzka's, fires when learning-feature work begins).</li>
-        <li><b>One meta-investment:</b> teaching our work system (Cosmo) to do top-down planning natively (PRG-04) — this very dashboard is its hand-built prototype.</li>
+        <li><b>One meta-investment, two halves:</b> teaching our work system (Cosmo) to do top-down planning natively (PRG-04 — this very dashboard is its hand-built prototype), and productionizing the bottom-up execution loop into a runtime-agnostic tooling layer (PRG-05, design-active now).</li>
       </ul>
     </div>
 
@@ -766,6 +766,17 @@ const INIT = [
   ],
   homes:["_wip/errors-api/execution-tracker.md (THE entry point)","Cosmo Workstream: API Error Handling","L-gap-delta.md (per-finding)"]},
 
+{ id:"PRG-05", name:"Execution-mechanism loop", accent:"var(--lav)", lane:"now", status:"active · design phase", q:"#9",
+  tagline:"Half B of the work-system build: promote the hand-run shepherd → executor → reviewer loop into a runtime-agnostic tooling layer. Designed jointly with PRG-04.",
+  owner:"Hex + Jorn", gate:"Execution slice gated on the joint PRG-04/05 design grill — sequence is spike → grill → slice.",
+  outcome:"Shepherd-kickoff, executor-protocol/pointer-brief, the autonomous reviewer-dispatcher loop, and the cross-runtime seam contracts promoted from per-instance _wip artifacts to a parameterized, agnostic layer.",
+  bundles:[
+    {n:"Agnosticity spike", s:"running", m:"mixed", st:"go", note:"First work: Claude shepherd picking Claude/Codex executors via codex-companion; Claude executor → Codex nested adversarial reviewer. Feeds the seam catalogue."},
+    {n:"Joint design grill (with PRG-04)", s:"design", m:"human", st:"hold", note:"Seam-catalogue spine — rules the three role-unit contracts (orchestrator↔shepherd, shepherd↔reviewer) before any slice."},
+    {n:"Build & harvest (WI-590 loop half)", s:"later", m:"mixed", st:"hold", note:"Sliced only post-grill; WI-590's loop half re-homes here at slice."}
+  ],
+  homes:["program-roster.md · PRG-05 row","supporting-artefacts/mechanism-productionization-design-input.md","Cosmo · WI-590 (loop half, project Nexus)"]},
+
 { id:"PRG-04", name:"Cosmo top-down layer", accent:"var(--lav)", lane:"later", status:"embryo", q:"#9",
   tagline:"Teach the work system to do what this dashboard does by hand. This page is its prototype.",
   owner:"Hex + Jorn", gate:"Dogfood pull — once one full initiative cycle has run on the pattern.",
@@ -819,6 +830,9 @@ const CATS = [
 function catOf(i){
   const s=(i.status||"").toLowerCase();
   if(s.includes("graduat")) return "graduated";
+  // active work — including a live design phase — is in motion, even if the
+  // status string also carries a "design" qualifier. This check wins first.
+  if(s.includes("active")) return "motion";
   if(i.lane==="later"||i.lane==="armed"||s.includes("embryo")||s.includes("backlog")||s.includes("design")||s.includes("park")) return "waiting";
   return "motion";
 }
