@@ -112,8 +112,11 @@ Lane-specific only:
   **kept as WPs and split into ≥2 coarse absorbed-provenance children**, not demoted to Item
   and not one-child-per-finding — no `/cosmo:bundle` skill ships in cosmo 0.6.0, so the brief
   (body) + child Items were authored via REST and promoted with `refine.ts --to-ready`.
-  Child WIs created (Item, no `Workstream` relation, `Parent item`→WP, bulk-close at WP close):
-  WI-698 → 705/706 · WI-699 → 709/710 · WI-700 → 707/708 · WI-701 → 711/712 · WI-702 → 713/714.
+  Child WIs created (Item, no `Workstream` relation, `Parent item`→WP, bulk-close at WP close).
+  **Actual mapping (ground-truth, read back from Cosmo — my initial brief labels were offset by
+  guessing sequential numbers instead of reading them back; corrected here):**
+  WI-698 → **709/710** · WI-699 → **711/712** · WI-700 → 707/708 · WI-701 → **713/714** ·
+  WI-702 → **715/716**. (Lesson: read child IDs back from the create response before citing them.)
   All 7 set `Execution Path=Assisted` (shepherd-dispatched, supervised — not Auto/dispatcher);
   WI-698/699 also given `Risk/Impact` (P1). Next: stand up the verdict monitor and dispatch
   executors (Sonnet default; Opus plan-phase for WI-699 and the F-132/F-119 pieces of WI-698).
@@ -124,3 +127,16 @@ Lane-specific only:
   until a Wave-1 PR opens cleanly. Executors stop at green-PR-+-triaged and report; shepherd
   owns merge, then resumes the executor to run `/cosmo:execute complete` (→ Reviewing) for the
   separate reviewer session.
+- 2026-06-13 — **First three landed; lane fully dispatched.** WI-700 (`6fea5bc5`, PR #1111),
+  WI-704 (`d2ba2ef8`, PR #1109), WI-703 (`71f94a1f`, PR #1108) squash-merged to `main` and
+  `/cosmo:execute complete`-d → **Stage=Reviewing** (awaiting the separate reviewer's
+  verdict + absorbed-child bulk-close: 707/708, and 705/706·709/710·711/712·713/714 at their
+  WPs' close). Triage handled in-loop: WI-704 took a valid Codex **P1** (disabled remote images
+  entirely vs https-allowlist); WI-703 took a Codex **P2** that was actually an incomplete-fix
+  vs the AC (added the `<library_topics>` delimiter layer over the strip layer). **Systemic:**
+  `claude-review` is failing lane-wide with "All review tokens exhausted" = the documented
+  advisory non-run; it is **not** a required check (required = `main`, `Playwright web smoke`,
+  `API Quality Gate`, `Merge completeness check`), so merges proceed on CodeRabbit + Codex +
+  executor-adversarial coverage. **Wave 2b dispatched:** WI-698, WI-699 on **Opus** with a
+  mandatory plan-approval checkpoint (P1, human-supervised) before they implement. WI-701,
+  WI-702 still implementing.

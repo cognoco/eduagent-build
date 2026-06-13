@@ -7,7 +7,7 @@
 > Moot scan: `_wip/umbrella-program/supporting-artefacts/prg-11-moot-scan.md`.
 
 **Activated:** 2026-06-13 (seventh run of the §2.1 recipe) · **Operator:** Jorn ·
-**Shepherd:** PRG-11 shepherd session (spawn pending; **trigger-gated** — see §4) ·
+**Shepherd:** PRG-11 shepherd session (running) ·
 **Cosmo Workstream:** "Architecture Clean-Out" (`37e8bce9-1f7c-81fe-be97-e063ce8f17e8`)
 
 ## 1. Charter (one paragraph)
@@ -33,7 +33,7 @@ gate and are recorded here so the lane scope is not lost and the lane does not g
 ### Tier 1 — AUTONOMOUS-NOW (in Cosmo · the shepherd's whole mandate today)
 
 Parallel-safe **and** mechanically-bounded (red-green testable, no decomposition decision).
-The shepherd executes these autonomously after the trigger (§4) fires.
+The shepherd executes these autonomously on spawn.
 
 | Unit | Name | Alt | Findings | Pri | Order | Model note |
 |---|---|---|---|---|---|---|
@@ -112,12 +112,6 @@ Read the standard scaffolds; don't re-derive process here:
 
 Lane-specific (THIS lane differs from the mechanical lanes — read carefully):
 
-- **TRIGGER GATE — you start in WATCH mode, you do NOT start work on arrival.** This lane is
-  spawned *primed but held*. Poll Cosmo **WI-721** ("TRIGGER — PRG-11 shepherd start gate",
-  standalone, no Workstream) ~every 90s. While its `Stage = Backlog`, **hold**: no claim, no
-  refine, no execution — just keep watching (resilient poll; tolerate transient API errors).
-  The moment its `Stage` is anything other than `Backlog` (the operator moves it →
-  `Executing`), proceed to execute Tier 1. Stand up your own Monitor/poll for this.
 - **SCOPE — Tier 1 ONLY.** Your entire mandate today is **WI-717, WI-718, WI-719, WI-720**
   (§2). Drive those four to Cosmo Close via the normal loop. Do **NOT** touch Tiers 2/3 —
   they are not in Cosmo by design; they await the operator decomposition gate. When all four
@@ -146,5 +140,5 @@ Lane-specific (THIS lane differs from the mechanical lanes — read carefully):
   (`37e8bce9-1f7c-81fe-be97-e063ce8f17e8`) created; **Tier 1 sliced** — WI-717…720
   (`Stage=Backlog`, order 1–4). Cutover-coordination scan done (§3): 16 parallel-safe / 9
   serialize / 0 moot-risk. Tiers 2/3 deferred to the operator decomposition gate (recorded
-  §2, not in Cosmo). **Trigger-gated spawn:** start-gate item **WI-721** created
-  (`Stage=Backlog`); shepherd holds until it flips to `Executing`. Roster + dashboard promoted.
+  §2, not in Cosmo). Roster + dashboard promoted. Shepherd spawned + running (normal
+  activation; the trigger-priming experiment was dropped for this lane).

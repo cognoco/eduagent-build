@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-8139-923f-d972cecf781e",
+  "id": "WI-699",
+  "name": "WP-secapi-dos-race",
+  "description": "Close one DoS vector and three race/atomicity defects: add a negative cache + cooldown to the unauthenticated JWKS forced re-fetch (F-181, HIGH); make same-day dictation writes non-destructive (F-120, data-loss); enforce CAS on the optimistic-concurrency version check in updateInterestsContext (F-164); wrap the regenerate ownership-check->delete-all->insert sequence in a transaction (F-167).",
+  "acceptanceCriteria": "F-181/120/164/167 each remediated with proof; concurrency negative-path tests for the CAS + transaction fixes; JWKS cooldown/negative-cache verified.",
+  "riskImpact": "P1: unauthenticated JWKS forced re-fetch is a DoS amplifier; the three race/atomicity defects cause data loss (dictation overwrite), lost updates (interests CAS), and partial-write corruption (regenerate) under concurrency.",
+  "type": "Task",
+  "altitude": "WP",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief — DoS + race/atomicity\nRationale: one unauthenticated DoS amplifier and three concurrency defects threaten availability and data integrity. Strategy: bound the JWKS forced re-fetch with a negative cache + cooldown; make concurrent writes safe via non-destructive upsert, compare-and-set on the optimistic version, and a transaction around the regenerate sequence. Scope: the JWKS fetcher + the three write paths; one PR.\nF-181 (HIGH) — negative cache + cooldown on unauthenticated JWKS forced re-fetch\nF-120 — same-day dictation writes made non-destructive (data-loss)\nF-164 — enforce CAS on the optimistic-concurrency version check in updateInterestsContext\nF-167 — wrap regenerate ownership-check→delete-all→insert in a transaction\nAcceptance Criteria: F-181/120/164/167 each remediated with proof; concurrency negative-path tests for the CAS + transaction fixes; JWKS cooldown/negative-cache verified. Children 709/710 are absorbed provenance; lands as one PR."
+}

@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-81a8-9f15-f0118e9cc73a",
+  "id": "WI-720",
+  "name": "WP-arch-mock-burndown",
+  "description": "GC6 burn-down of the internal jest.mock() backlog (INV-2): test files using internal jest.mock('./...') / jest.mock('../...') / jest.mock('@eduagent/...') should convert to the real implementation or jest.requireActual() targeted overrides (canonical pattern: apps/api/src/inngest/functions/archive-cleanup.test.ts). SCOPE FENCE (PRG-11 lane, HARD): EXCLUDE any test file whose module-under-test is in the live IF-cutover surface — identity / consent / family-access / billing / metering / auth / session-exchange / sessions / stripe-webhook / revenuecat-webhook — those collide with CUT-B2/B3 and are deferred post-flip. Per-file judgment at execution.",
+  "acceptanceCriteria": "A bounded batch of internal-mock test files OUTSIDE the cutover-surface fence converted from internal jest.mock to real impl / jest.requireActual targeted overrides, semantics preserved. Outcome: net reduction in the internal-mock backlog count with no test-behavior change; all touched suites green; the GC1 guard stays green (no NEW internal mocks); external-boundary mocks (LLM via routeAndCall, Stripe, Clerk JWKS, push, email, Inngest framework) are NOT touched. Any cutover-surface files encountered are explicitly listed as deferred (file + reason) in the commit message; a genuinely-unconvertible residual carries a // gc1-allow: <reason>. Batch size is the executor's judgment — bound it so the PR stays reviewable.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
