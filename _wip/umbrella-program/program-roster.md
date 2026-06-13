@@ -453,7 +453,45 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 
 ---
 
+## Spillover register — cross-cutting items spawned by umbrella work
+
+> Standalone Cosmo items (**no workstream**) that umbrella work spawned or
+> surfaced. They are in Cosmo, but they roll up to **no PRG**, so nothing in a
+> PRG's view mops them up — they are tracked **here** instead. These are still
+> umbrella obligations; "in Cosmo" ≠ "mopped up".
+>
+> **Why standalone (not forced into a PRG workstream):** these items target
+> different branches / policies (a main-side hotfix, a post-merge GC6 burndown, an
+> estate-tooling fix) — forcing them under one workstream's review policy mis-fires
+> (the WI-694 lesson). Standalone + this register is the clean model.
+>
+> **Mop-up guarantee — two parts:**
+> 1. **Backstop query (the guarantee):** at every program checkpoint, query Cosmo
+>    for items with **empty Workstream**, **State≠Closed**, in the MentoMate project,
+>    and reconcile against this table. The query does not depend on anyone
+>    remembering to log a row — it catches items **any** session created
+>    (e.g. `WI-684` was captured by the LLM shepherd, not the program session).
+> 2. **This table (the disposition record):** every floating item gets a row with
+>    its origin + intended home. The umbrella program **does not close** with an
+>    un-dispositioned row here — each must be resolved, adopted by an active
+>    initiative, or consciously parked with a reason.
+
+| WI | Spawned by | Class | Disposition | Status (2026-06-13) |
+|----|-----------|-------|-------------|---------|
+| `WI-683` Cosmo refine-writer childless-WP refuse-with-remedy | PRG-17 activation friction | estate Cosmo tooling | route to estate **ZDX/Cosmo** stream (Nexus governance) — not an eduagent-repo fix | Backlog |
+| `WI-684` CI change-class routing skips DB-package RLS tests | WI-676 (ledger RLS) discovery | eduagent CI infra | pairs with `WI-688`; adopt at next CI/platform activation (candidate PRG-11 or a CI initiative) | Captured |
+| `WI-688` RLS coverage-guard blind spot (hand-maintained table list) | WI-687 residue | eduagent guard-hardening | post-merge code-quality; pairs with `WI-684` | Backlog |
+| `WI-694` KV-verifier empty-body regex hotfix | WI-682 prod probe | main-side hotfix | detached from PRG-17; closing via generic review | Reviewing → Closing |
+| `WI-695` GC6 burndown — 3 new-llm test internal mocks | claude-review on #1087 | eduagent GC6 backlog | post-merge; standalone by design (avoids new-llm-landing policy) | Backlog |
+
+---
+
 ## Change log
+- **2026-06-13 — Spillover register added** (mop-up mechanism). Five standalone
+  Cosmo items spawned by umbrella work (`WI-683`/`684`/`688`/`694`/`695`) were
+  floating outside any PRG rollup; now tracked above with a backstop-query
+  guarantee so none drop. Rule going forward: every standalone item gets a row,
+  and the checkpoint query reconciles against it.
 - **2026-06-13 — IF CUTOVER PLAN RATIFIED (v1.7) + CUT SLICE LIVE.** Operator
   ruled all 11 OQs (OQ-1 = option c, graph at onboarding completion; OQ-3
   bulk-delete; OQ-4 two-stage freeze + 24h soak; OQ-11 = account-detachment §4
