@@ -7,15 +7,26 @@ const mockRecordSessionActivity = jest.fn();
 
 jest.mock(
   '../helpers' /* gc1-allow: Inngest step runtime requires mocking helper abstractions */,
-  () => ({ getStepDatabase: () => mockGetStepDatabase() }),
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return { ...actual, getStepDatabase: () => mockGetStepDatabase() };
+  },
 );
 
 jest.mock(
   '../../services/streaks' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,
-  () => ({
-    recordSessionActivity: (...args: unknown[]) =>
-      mockRecordSessionActivity(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/streaks',
+    ) as typeof import('../../services/streaks');
+    return {
+      ...actual,
+      recordSessionActivity: (...args: unknown[]) =>
+        mockRecordSessionActivity(...args),
+    };
+  },
 );
 
 const handler = (streakRecord as any).fn;

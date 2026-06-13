@@ -14,6 +14,7 @@
 //   1. pre-read login.email (memoized step input, as today's getAccountClerkUserId)
 //   2. re-home each consent_grant for every person in the org → consent_receipt
 //   3. delete the live consent_grant rows (RESTRICT now satisfied)
+//   3b. write financial_record rows per person (tax/chargeback retain-tier)
 //   4. write a deletion_audit row per person (deleted_by per path; reason)
 //   5. DELETE person (cascade → consent_request + membership + learning data)
 //   6. erase byok_waitlist WHERE email = login.email  (D2 GDPR Art-17 leg)
@@ -23,9 +24,14 @@
 // flag a counsel follow-up in the PR. We do NOT invent a legal retention
 // duration.
 //
-// financial_record (tax / chargeback on deletion, §6.1) is billing-domain — it
-// pairs with CUT-B3, not the consent side. NOT written here; coordination point
-// called out in the PR. The consent-side delete does not block on it.
+// financial_record (tax / chargeback on deletion, §6.1) IS written here per
+// WI-723: each deleted person gets retain-tier financial_record rows BEFORE the
+// person drop, inside the same transaction/lock as the consent re-home and the
+// audit write, so a row is never orphaned. §4.9 COUNSEL-OWNED: the record_type
+// taxonomy (tax / chargeback), the per-person row cardinality (2), the payload
+// shape, and retention_period (left NULL) are all PROVISIONAL pending counsel —
+// flagged in the PR. The financial_record table carries NO FK to person /
+// organization (it outlives both), so writing it before the drop is safe.
 //
 // person.id = profiles.id, organization.id = accounts.id (deterministic reseed).
 // FLAG-GATED: reachable only when IDENTITY_V2_ENABLED is 'true'.
@@ -38,10 +44,12 @@ import {
   consentReceipt,
   consentRequest,
   deletionAudit,
+  financialRecord,
   login,
   membership,
   organization,
   person,
+  subscription,
   type Database,
 } from '@eduagent/database';
 import type { AccountDeletionStatusResponse } from '@eduagent/schemas';
@@ -313,6 +321,15 @@ export async function executeDeletionV2(
     // schedule still holds. Clearing the stamp inside the same tx as the
     // re-home/delete makes the whole operation a single atomic step (§6.1: "a
     // half-done delete is not a valid state").
+    //
+    // WI-723 P2 — this claim ALSO serializes two concurrent same-org runs (so
+    // no per-person advisory lock is needed in this path): the UPDATE takes a
+    // row-level write lock on the organization, so a second run's identical
+    // UPDATE blocks on it. The winner ends by deleting the organization row
+    // (below); the loser then re-evaluates its WHERE against the now-missing
+    // row, matches 0 rows → claimed.length === 0 → returns 'already_deleted'
+    // and writes no financial_record / deletion_audit. Duplicate retain records
+    // are therefore impossible here without an extra lock.
     const claimed = await tx
       .update(organization)
       .set({ deletionScheduledAt: sql`${organization.deletionScheduledAt}` })
@@ -361,6 +378,11 @@ export async function executeDeletionV2(
     });
     const personIds = memberships.map((m) => m.personId);
 
+    // Step 3b prep — snapshot the org's subscriptions ONCE (read before any
+    // person drop; subscriptions outlive persons — data-model.md §3.2) for the
+    // per-person financial_record payload.
+    const orgSubscriptions = await readOrgSubscriptionsTx(tx, organizationId);
+
     for (const personId of personIds) {
       // Step 2 — re-home every live grant to the retain-tier receipt. Field
       // copy (snapshot columns carried verbatim); retention_period is left NULL
@@ -392,6 +414,15 @@ export async function executeDeletionV2(
           .where(eq(consentGrant.chargePersonId, personId));
       }
 
+      // Step 3b — financial_record (tax/chargeback retain-tier, §6.1) BEFORE
+      // the person drop, in the same tx. §4.9 COUNSEL-OWNED (provisional).
+      await writeFinancialRecordsTx(
+        tx,
+        personId,
+        organizationId,
+        orgSubscriptions,
+      );
+
       // Step 4 — the audit row (person_id, deleted_by per path, reason).
       await tx.insert(deletionAudit).values({
         personId,
@@ -403,6 +434,13 @@ export async function executeDeletionV2(
       // Step 5 — drop the person (cascade → consent_request, membership,
       // login, learning data). RESTRICT is now satisfied because the grants
       // were re-homed above.
+      //
+      // Out-of-scope (WI-723): subscription teardown is NOT handled here.
+      // `subscription.payer_person_id` (and `subscription.organization_id`)
+      // are ON DELETE RESTRICT, so a person who is a payer — or the org with a
+      // live subscription — cannot be dropped while a subscription row stands.
+      // That billing-domain teardown is a pre-existing gap owned by CUT-B3 /
+      // billing, intentionally outside this WI's financial_record scope.
       await tx.delete(person).where(eq(person.id, personId));
     }
 
@@ -439,7 +477,16 @@ export async function deletePersonV2(
   deletedBy: string | null,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    // WI-723 race guard: lock + post-lock existence re-check. This path has no
+    // consent predicate (unconditional delete), so two concurrent same-person
+    // calls would BOTH commit side-writes (financial_record + deletion_audit)
+    // while only one delete removes the row — duplicate retain records with no
+    // unique constraint to absorb them. The lock serializes the two; the loser
+    // sees the committed delete and bails before writing anything.
+    await acquirePersonLockTx(tx, personId);
+    if (!(await personExistsTx(tx, personId))) return;
     await rehomeGrantsTx(tx, personId);
+    await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
       deletedBy,
@@ -477,9 +524,7 @@ export async function deletePersonIfConsentWithdrawnV2(
     // delete (current.withdrawnAt is null on the new grant). Without the lock,
     // under READ COMMITTED a restore committing between this read and the
     // re-home/delete would let the delete remove a just-restored person.
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(personId)}, 0))`,
-    );
+    await acquirePersonLockTx(tx, personId);
     // Re-check current GDPR grant under the lock and verify it is withdrawn
     // (optionally at the given timestamp). currentGrant windowing:
     // max(granted_at), tiebreak id.
@@ -499,7 +544,15 @@ export async function deletePersonIfConsentWithdrawnV2(
     ) {
       return false;
     }
+    // WI-723 P2: the lock above already serializes same-person runs, and the
+    // winner's rehomeGrantsTx deletes the consent_grant so the loser's
+    // current-grant read returns nothing → it bails on the `!current` guard.
+    // That loser-guard is incidental (grant-gone ⇒ person-gone coupling), so we
+    // add an explicit person-existence re-check to guarantee no duplicate
+    // retain records even if that coupling ever changes.
+    if (!(await personExistsTx(tx, personId))) return false;
     await rehomeGrantsTx(tx, personId);
+    await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
       deletedBy: null,
@@ -543,6 +596,17 @@ export async function deletePersonIfNoConsentV2(
     : undefined;
 
   return db.transaction(async (tx) => {
+    // WI-723 race guard: take the per-person advisory lock FIRST, before the
+    // predicate reads. This serializes two concurrent same-person day-30 runs;
+    // the loser blocks until the winner commits, then its reads (incl. the
+    // person-existence re-check below) see the committed delete. Without the
+    // lock, both runs pass the consent/open-request pre-checks, both commit
+    // their side-writes (financial_record + deletion_audit), and only one
+    // RETURNING delete wins — the loser leaves duplicate retain records (no
+    // unique constraint, no person FK on financial_record), so the dupes
+    // persist. Mirrors deletePersonIfConsentWithdrawnV2 / the archived sibling.
+    await acquirePersonLockTx(tx, personId);
+
     const current = await tx.query.consentGrant.findFirst({
       where: and(
         eq(consentGrant.chargePersonId, personId),
@@ -574,7 +638,17 @@ export async function deletePersonIfNoConsentV2(
       if (!openRequestOfGeneration) return false;
     }
 
+    // Post-lock person-existence re-check (WI-723 P2): the open-request
+    // predicate above can match for BOTH concurrent runs (each read its OPEN
+    // request before either delete cascaded it away), so it is not on its own a
+    // sufficient loser-guard. The winner's person delete cascades the request
+    // away, but only after this read can have already passed for the loser.
+    // Gating the side-writes on the person still existing under the lock makes
+    // the loser write nothing.
+    if (!(await personExistsTx(tx, personId))) return false;
+
     await rehomeGrantsTx(tx, personId);
+    await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
       deletedBy: null,
@@ -607,9 +681,10 @@ export async function deleteArchivedPersonIfStillEligibleV2(
     // and current-grant reads below see any in-flight restore's commit — a
     // restore that wins the lock un-archives the person (first predicate fails)
     // and re-grants (second predicate fails), and the delete is a no-op.
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(personId)}, 0))`,
-    );
+    await acquirePersonLockTx(tx, personId);
+    // The personRow read below also IS the WI-723 P2 existence re-check: a
+    // concurrent-delete winner leaves personRow undefined → the guard returns
+    // false before any side-write, so no duplicate retain records.
     const personRow = await tx.query.person.findFirst({
       where: eq(person.id, personId),
       columns: { archivedAt: true },
@@ -631,6 +706,7 @@ export async function deleteArchivedPersonIfStillEligibleV2(
     });
     if (current && !current.withdrawnAt) return false;
     await rehomeGrantsTx(tx, personId);
+    await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
       deletedBy: null,
@@ -699,4 +775,149 @@ async function rehomeGrantsTx(
   await tx
     .delete(consentGrant)
     .where(eq(consentGrant.chargePersonId, personId));
+}
+
+type DeletionTx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/**
+ * Acquire the per-person serializing advisory lock at the TOP of a deletion
+ * transaction (WI-583 pattern; same key as `consentPersonLockKey`). Two
+ * concurrent same-person deletes serialize on this lock; the loser blocks until
+ * the winner commits, so its subsequent reads see the committed person delete.
+ */
+async function acquirePersonLockTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(personId)}, 0))`,
+  );
+}
+
+/**
+ * Does the person still exist? Used as the post-lock re-check that prevents a
+ * concurrent-delete loser from committing duplicate retain records (WI-723 P2):
+ * after the lock serializes the runs, the loser sees the winner's committed
+ * delete and bails BEFORE writing any financial_record / deletion_audit row.
+ */
+async function personExistsTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<boolean> {
+  const row = await tx.query.person.findFirst({
+    where: eq(person.id, personId),
+    columns: { id: true },
+  });
+  return !!row;
+}
+
+/**
+ * The subscription snapshot captured into the financial_record payload — the
+ * billing-correlation fields a tax/chargeback record would need to reconcile
+ * against the payment store after the person is gone.
+ */
+type SubscriptionSnapshot = {
+  id: string;
+  planTier: string;
+  status: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+};
+
+/**
+ * Read the org's subscription snapshot once, inside the deletion transaction,
+ * for the financial_record payload. Read before the person drop (subscriptions
+ * outlive persons in the retain-tier split — data-model.md §3.2). A no-op-safe
+ * empty array when the org has no subscription.
+ */
+async function readOrgSubscriptionsTx(
+  tx: DeletionTx,
+  organizationId: string,
+): Promise<SubscriptionSnapshot[]> {
+  return tx.query.subscription.findMany({
+    where: eq(subscription.organizationId, organizationId),
+    columns: {
+      id: true,
+      planTier: true,
+      status: true,
+      stripeCustomerId: true,
+      stripeSubscriptionId: true,
+    },
+  });
+}
+
+/**
+ * Write the retain-tier financial_record rows for a person being deleted (§6.1:
+ * "financial_record rows created for tax/chargeback"). Called BEFORE the person
+ * drop, inside the deletion transaction. financial_record has no FK to person /
+ * organization (it outlives both), so the subsequent person DELETE never
+ * cascade-removes these rows.
+ *
+ * §4.9 COUNSEL-OWNED (PROVISIONAL): the record_type values, the two-rows-per-
+ * person cardinality, the payload shape, and retention_period (NULL) are all
+ * provisional pending counsel — mirroring consent_receipt.retention_period. We
+ * do NOT invent a legal retention duration. See data-model.md §4.9.
+ */
+async function writeFinancialRecordsTx(
+  tx: DeletionTx,
+  personId: string,
+  organizationId: string,
+  subscriptions: SubscriptionSnapshot[],
+): Promise<void> {
+  const payload = {
+    deletedAt: new Date().toISOString(),
+    subscriptions,
+  };
+  await tx.insert(financialRecord).values([
+    {
+      personId,
+      organizationId,
+      // §4.9 COUNSEL-OWNED — provisional record_type taxonomy.
+      recordType: 'person_deletion_tax_retain',
+      payload,
+      // §4.9 COUNSEL-OWNED — NULL until counsel supplies the retention value.
+      retentionPeriod: null,
+    },
+    {
+      personId,
+      organizationId,
+      // §4.9 COUNSEL-OWNED — provisional record_type taxonomy.
+      recordType: 'person_deletion_chargeback_retain',
+      payload,
+      retentionPeriod: null,
+    },
+  ]);
+}
+
+/**
+ * The org a person belongs to (via membership) — the financial_record's
+ * organization key for the single-person delete paths, which take a personId
+ * but not an organizationId. Returns null when the person has no membership.
+ */
+async function personOrganizationIdTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<string | null> {
+  const row = await tx.query.membership.findFirst({
+    where: eq(membership.personId, personId),
+    columns: { organizationId: true },
+  });
+  return row?.organizationId ?? null;
+}
+
+/**
+ * Write a person's retain-tier financial_record rows inside the deletion
+ * transaction, resolving the org via membership and snapshotting its
+ * subscriptions. Used by the single-person delete paths (deletePersonV2 and the
+ * consent-gated sweeps), which have only a personId. A no-op when the person has
+ * no membership (org already gone). §4.9 COUNSEL-OWNED as above.
+ */
+async function writeFinancialRecordsForPersonTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<void> {
+  const organizationId = await personOrganizationIdTx(tx, personId);
+  if (!organizationId) return;
+  const subscriptions = await readOrgSubscriptionsTx(tx, organizationId);
+  await writeFinancialRecordsTx(tx, personId, organizationId, subscriptions);
 }

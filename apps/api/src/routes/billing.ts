@@ -44,9 +44,9 @@ import {
   getStartOfTodayInTimeZone,
 } from '../services/billing';
 // [CUT-B3 / WI-693] v2 billing reads/writes, selected per-call by the cutover
-// flag. Legacy (flag-off) calls are byte-identical. The usage-breakdown read is
-// intentionally NOT dispatched — it reads family_links (guardianship, CUT-B2's
-// surface); its v2 form is deferred to the B2/B3 seam ruling (see PR description).
+// flag. Legacy (flag-off) calls are byte-identical. [WI-722] The usage-breakdown
+// read is now dispatched too — its v2 twin reads guardianship via the CUT-B2
+// reader (not family_links) + usage_events.
 import {
   getSubscriptionByAccountIdV2,
   getQuotaPoolV2,
@@ -59,6 +59,7 @@ import {
   addProfileToSubscriptionV2,
   removeProfileFromSubscriptionV2,
   getFamilyPoolStatusV2,
+  getUsageBreakdownForProfileV2,
   ProfileRemovalNotImplementedErrorV2,
 } from '../services/billing/billing-v2';
 import { isIdentityV2Enabled } from '../config';
@@ -638,21 +639,28 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         ).toISOString();
       }
     })();
-    // [CUT-B3 / WI-693] NOT dispatched to a v2 twin: getUsageBreakdownForProfile
-    // reads family_links parent/child relationships (guardianship — CUT-B2's
-    // surface) interleaved with usage_events. Its v2 form needs CUT-B2's
-    // guardianship reader; deferred to the B2/B3 seam ruling. Flag-off (every
-    // deployed env until the flip) this is the live path; the breakdown is a
-    // read-only family-aggregate display, not a payment-state mutation.
+    // [WI-722] Dispatched to the v2 twin under the cutover flag — the same
+    // per-route `v2 ? fnV2 : fn` ternary CUT-B3 uses for every other billing-v2
+    // seam. The v2 twin reads guardianship via the CUT-B2 reader (not
+    // family_links) + usage_events; the legacy path stays the live one in every
+    // deployed env (flag-off) until the WI-586 flip and is byte-identical.
     const usageBreakdown =
       activeProfileId && supportsProfileBreakdown
-        ? await getUsageBreakdownForProfile(db, {
-            subscriptionId: subscription.id,
-            activeProfileId,
-            monthlyLimit,
-            cycleStartAt,
-            dayStartAt,
-          })
+        ? v2
+          ? await getUsageBreakdownForProfileV2(db, {
+              subscriptionId: subscription.id,
+              activeProfileId,
+              monthlyLimit,
+              cycleStartAt,
+              dayStartAt,
+            })
+          : await getUsageBreakdownForProfile(db, {
+              subscriptionId: subscription.id,
+              activeProfileId,
+              monthlyLimit,
+              cycleStartAt,
+              dayStartAt,
+            })
         : null;
     const visibleUsedThisMonth =
       usageBreakdown && !usageBreakdown.isOwnerBreakdownViewer

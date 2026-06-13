@@ -42,9 +42,15 @@ plan-phase that surfaces a real design decision; run that WI's plan-phase on Opu
 Sonnet executor implement once the approach is locked. Severity alone is not the trigger.
 Your lane tracker names any known escalations.
 
-## The review loop — DoD is Cosmo Close, NOT a green PR
-An executor's green PR + `/cosmo:execute complete` (→ Stage=Reviewing) is the **handoff** to
-the review gate, not the finish line. Because the reviewer is a separate session that will
+## The review loop — two mandatory gates: green-PR-to-merge, then Cosmo-Close-to-graduate
+There are **two** gates, in order, and **both** are mandatory. **Gate 1 — a green PR is the
+hard prerequisite to merge** (strict definition under *Merging the WP* below): never waived,
+never approximated, and the word "green" is never applied to a PR carrying a red check.
+**Gate 2 — Cosmo Close** (after the separate review) is what *graduates the lane*. An
+executor's green PR + the merge + `/cosmo:execute complete` (→ Stage=Reviewing) is the
+**handoff** to the review gate, not the finish line — it earns the merge and the review, it
+does **not** graduate the lane, and an un-green PR is never merged. Because the reviewer is a
+separate session that will
 not notify you, **stand up your own standing monitor** on your workstream's WI stages
 (a Monitor/poll filtered on the `Workstream` relation, watching the Stage field) — that is
 your only reliable channel to a verdict. React to each:
@@ -58,6 +64,28 @@ your only reliable channel to a verdict. React to each:
   that should reach the operator.
 
 The lane closes only when **every** WI is Closed (and any children closed via the ceremony).
+
+## Merging the WP — the green-PR gate (Gate 1)
+You (the shepherd) own the merge of each WP's PR to `main`. **Merge a PR only when it is green
+by the strict definition below — never on a red check, never on a private redefinition of
+"green".**
+
+A PR is **green** only when ALL hold:
+1. Every **required** branch-protection check is `SUCCESS` (lint, typecheck, test, build, and
+   the named required gates).
+2. **`claude-review` actually ran and is green.** A red or absent `claude-review` is *not*
+   approval — *silence is never approval*. If it is red, **diagnose the run before merging**:
+   it may be a broken review *workflow* (permissions / trigger / YAML regression), not merely
+   token exhaustion / timeout / crash. Fix the cause, or obtain an **explicit per-PR operator
+   exception** — never self-grant one.
+3. No valid `blocker` / `must fix` / `should fix` review finding remains.
+4. `mergeStateStatus` is `CLEAN`.
+
+**Forbidden:** applying the word "green" or "merge-ready" to a PR with any red check; merging
+on "deterministic gates pass" while a review/advisory check is red and undiagnosed; treating a
+red `claude-review` as automatically benign. Report PR state in literal terms — e.g.
+"deterministic gates green; `claude-review` red (cause: …); not merging until resolved" — and
+never round that up to "green".
 
 ## Cosmo lifecycle
 Executors claim before they execute · `complete` → Reviewing · **never self-close** · bring

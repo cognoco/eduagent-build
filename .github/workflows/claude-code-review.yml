@@ -256,15 +256,15 @@ jobs:
         run: |
           comments_json="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate)"
           # The verdict source of truth must be the review comment posted by the
-          # action itself (github-actions[bot]), not any comment that happens to
+          # Claude GitHub App (claude[bot]), not any comment that happens to
           # carry the verdict marker. Without the author constraint, a PR author
           # could post "## Claude Code Review: APPROVED" and forge the verdict.
-          # GitHub owns the github-actions[bot] identity; a PR author cannot post
-          # as it. The Bot type check is defence in depth.
+          # GitHub owns the claude[bot] identity; a PR author cannot post as it.
+          # The Bot type check is defence in depth.
           review_json="$(
             jq -c --arg started "$REVIEW_RUN_STARTED_AT" '
               [ .[]
-                | select(.user.login == "github-actions[bot]")
+                | select(.user.login == "claude[bot]")
                 | select(.user.type == "Bot")
                 | select(.created_at >= $started)
                 | select(.body | contains("## Claude Code Review:"))

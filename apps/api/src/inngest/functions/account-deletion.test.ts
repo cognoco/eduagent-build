@@ -12,29 +12,47 @@ const mockDeleteClerkUser = jest.fn();
 
 jest.mock(
   '../helpers' /* gc1-allow: getStepDatabase/getStepClerkSecretKey wrap Inngest step-level binding acquisition; must be intercepted to inject test doubles without a real Neon connection or CF env */,
-  () => ({
-    getStepDatabase: () => mockGetStepDatabase(),
-    getStepClerkSecretKey: () => mockGetStepClerkSecretKey(),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: () => mockGetStepDatabase(),
+      getStepClerkSecretKey: () => mockGetStepClerkSecretKey(),
+    };
+  },
 );
 
 jest.mock(
   '../../services/deletion' /* gc1-allow: prevents destructive account deletion in unit tests */,
-  () => ({
-    accountExists: (...args: unknown[]) => mockAccountExists(...args),
-    isDeletionCancelled: (...args: unknown[]) =>
-      mockIsDeletionCancelled(...args),
-    executeDeletion: (...args: unknown[]) => mockExecuteDeletion(...args),
-    getAccountClerkUserId: (...args: unknown[]) =>
-      mockGetAccountClerkUserId(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/deletion',
+    ) as typeof import('../../services/deletion');
+    return {
+      ...actual,
+      accountExists: (...args: unknown[]) => mockAccountExists(...args),
+      isDeletionCancelled: (...args: unknown[]) =>
+        mockIsDeletionCancelled(...args),
+      executeDeletion: (...args: unknown[]) => mockExecuteDeletion(...args),
+      getAccountClerkUserId: (...args: unknown[]) =>
+        mockGetAccountClerkUserId(...args),
+    };
+  },
 );
 
 jest.mock(
   '../../services/clerk-user' /* gc1-allow: deleteClerkUser performs a live DELETE against the Clerk Backend API (a true external boundary) — it cannot run in the unit test environment */,
-  () => ({
-    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+    };
+  },
 );
 
 describe('scheduledDeletion', () => {

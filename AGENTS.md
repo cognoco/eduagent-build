@@ -430,7 +430,7 @@ Assume the `doppler` CLI is installed and on PATH. Never suggest `wrangler secre
 Before declaring a PR ready to merge:
 
 1. Read the actual PR diff: `gh pr diff <number>`.
-2. Check all CI checks: `gh pr checks <number>`. Deterministic checks (lint, typecheck, test, build) must pass. Claude Code Review is **advisory** (WI-378): green = it ran (findings may still exist); red = it did NOT run (token exhaustion / timeout / crash) — investigate the run, not "findings to fix". Silence is never approval.
+2. Check all CI checks: `gh pr checks <number>`. Deterministic checks (lint, typecheck, test, build) must pass. Claude Code Review is **advisory**: green = it ran (findings may still exist); red = it did NOT run (token exhaustion / timeout / crash, **or the review workflow itself is broken — a permissions / trigger / YAML regression**) — investigate the run's *actual* failure before attributing it to tokens, not "findings to fix". Silence is never approval; a red review is never rounded up to "green".
 3. Always read the Claude Code Review comment and triage its findings — the check colour does not surface them: `gh api repos/{owner}/{repo}/pulls/<number>/reviews` and `gh api repos/{owner}/{repo}/pulls/<number>/comments`. Fix MUST_FIX / SHOULD_FIX before merge.
 4. Never dismiss advisory findings just because the check is green — advisory means triage it yourself, not ignore it.
 

@@ -80,64 +80,84 @@ export async function queueCelebration(
   reason: CelebrationReason,
   detail?: string | null,
 ): Promise<PendingCelebration[]> {
-  const row = await findHomeSurfaceCache(db, profileId);
-
-  const nextEntry: PendingCelebration = {
-    celebration,
-    reason,
-    detail: detail ?? null,
-    queuedAt: new Date().toISOString(),
-  };
-
-  const existing = ((row?.pendingCelebrations as PendingCelebration[] | null) ??
-    []) as PendingCelebration[];
-  const seenByChildAt = row?.celebrationsSeenByChild ?? null;
-  const hasDuplicate = existing.some((entry) => {
-    if (
-      entry.celebration !== nextEntry.celebration ||
-      entry.reason !== nextEntry.reason ||
-      (entry.detail ?? null) !== nextEntry.detail
-    ) {
-      return false;
-    }
-
-    if (nextEntry.detail !== null || !seenByChildAt) {
-      return true;
-    }
-
-    const queuedAt = new Date(entry.queuedAt);
-    return Number.isNaN(queuedAt.getTime()) || queuedAt > seenByChildAt;
-  });
-
-  const pendingCelebrations = hasDuplicate
-    ? existing
-    : [...existing, nextEntry];
+  let pendingCelebrations: PendingCelebration[] = [];
+  // The appended entry, set inside the locked reducer when this call genuinely
+  // queues a new celebration (null when deduped). Carries the locked-time
+  // queuedAt so recordCelebrationEvent and the dedupeKey stay consistent with
+  // the dedup decision made under the lock.
+  let appendedEntry: PendingCelebration | null = null;
 
   await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+    // Reset on each transaction attempt so a retry never carries a stale entry
+    // (the reducer below sets it synchronously under the lock before the
+    // conditional recordCelebrationEvent reads it).
+    appendedEntry = null;
 
-    // [BUG-467] Pass inTransaction:true so writeHomeSurfacePendingCelebrations
-    // does not open a nested db.transaction inside this one. On neon-serverless
-    // a nested transaction either throws or silently degrades the SELECT FOR
-    // UPDATE row lock that serialises concurrent celebration writes.
+    // The read-dedup-append runs INSIDE the SELECT ... FOR UPDATE window via the
+    // reducer below — closing the lost-update races [F-170] (the write used to
+    // ignore the locked row's current array) and [F-171] (the read used to
+    // happen outside the lock, against a stale snapshot). Two concurrent
+    // queueCelebration calls for the same profile now serialise: the second
+    // reducer runs against the first's committed array, so both entries persist.
+    //
+    // queuedAt is stamped INSIDE the reducer (under the lock), not before the
+    // transaction: a markCelebrationsSeen('child') that commits while this call
+    // waits on the row lock would otherwise let the appended entry land with
+    // queuedAt <= seenAt and be hidden immediately by filterPendingCelebrations.
+    //
+    // [BUG-467] inTransaction:true so writeHomeSurfacePendingCelebrations does
+    // not open a nested db.transaction inside this one (neon-serverless throws
+    // on nested transactions or silently degrades the row lock).
     await writeHomeSurfacePendingCelebrations(
       txDb,
       profileId,
-      pendingCelebrations,
+      (existing, lockedRow) => {
+        const candidate: PendingCelebration = {
+          celebration,
+          reason,
+          detail: detail ?? null,
+          queuedAt: new Date().toISOString(),
+        };
+        const seenByChildAt = lockedRow?.celebrationsSeenByChild ?? null;
+        const hasDuplicate = existing.some((entry) => {
+          if (
+            entry.celebration !== candidate.celebration ||
+            entry.reason !== candidate.reason ||
+            (entry.detail ?? null) !== candidate.detail
+          ) {
+            return false;
+          }
+
+          if (candidate.detail !== null || !seenByChildAt) {
+            return true;
+          }
+
+          const queuedAt = new Date(entry.queuedAt);
+          return Number.isNaN(queuedAt.getTime()) || queuedAt > seenByChildAt;
+        });
+
+        appendedEntry = hasDuplicate ? null : candidate;
+        pendingCelebrations = hasDuplicate
+          ? existing
+          : [...existing, candidate];
+        return pendingCelebrations;
+      },
       { inTransaction: true },
     );
 
-    if (!hasDuplicate) {
+    if (appendedEntry) {
+      const entry: PendingCelebration = appendedEntry;
       await recordCelebrationEvent(txDb, {
         profileId,
-        celebratedAt: new Date(nextEntry.queuedAt),
+        celebratedAt: new Date(entry.queuedAt),
         celebrationType: celebration,
         reason,
         sourceType: 'home_surface_pending_celebration',
         sourceId: detail ?? null,
         dedupeKey:
           detail === null || detail === undefined
-            ? `${celebration}:${reason}:${nextEntry.queuedAt}`
+            ? `${celebration}:${reason}:${entry.queuedAt}`
             : undefined,
         metadata: { detail: detail ?? null },
       });
