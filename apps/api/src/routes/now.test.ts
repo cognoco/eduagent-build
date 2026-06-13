@@ -4,18 +4,24 @@ import { nowRoutes } from './now';
 
 jest.mock(
   '../services/now-feed' /* gc1-allow: route delegates to service */,
-  () => ({
-    buildNowFeed: jest.fn(async () => ({
-      scope: 'self',
-      cards: [],
-      overflowCount: 0,
-      generatedAt: '2026-06-11T12:00:00.000Z',
-    })),
-    buildNowOverflow: jest.fn(async () => ({
-      scope: 'self',
-      items: [],
-    })),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../services/now-feed',
+    ) as typeof import('../services/now-feed');
+    return {
+      ...actual,
+      buildNowFeed: jest.fn(async () => ({
+        scope: 'self',
+        cards: [],
+        overflowCount: 0,
+        generatedAt: '2026-06-11T12:00:00.000Z',
+      })),
+      buildNowOverflow: jest.fn(async () => ({
+        scope: 'self',
+        items: [],
+      })),
+    };
+  },
 );
 
 type TestEnv = {

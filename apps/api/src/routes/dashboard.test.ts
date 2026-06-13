@@ -110,9 +110,16 @@ const mockGetProgressSummary = jest.fn().mockResolvedValue({
 
 jest.mock(
   '../services/progress-summary' /* gc1-allow: route test isolates progress summary service contract */,
-  () => ({
-    getProgressSummary: (...args: unknown[]) => mockGetProgressSummary(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../services/progress-summary',
+    ) as typeof import('../services/progress-summary');
+    return {
+      ...actual,
+      getProgressSummary: (...args: unknown[]) =>
+        mockGetProgressSummary(...args),
+    };
+  },
 );
 
 const mockListWeeklyReports = jest.fn().mockResolvedValue([]);

@@ -5,7 +5,7 @@
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: inngest unit test — prevents real Neon connection; real DB exercised via .integration.test.ts harness */,
@@ -16,10 +16,16 @@ const mockArchiveInactiveSubjects = jest.fn().mockResolvedValue([]);
 
 jest.mock(
   '../../services/subject' /* gc1-allow: prevents real DB subject archival from running in unit tests */,
-  () => ({
-    archiveInactiveSubjects: (...args: unknown[]) =>
-      mockArchiveInactiveSubjects(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/subject',
+    ) as typeof import('../../services/subject');
+    return {
+      ...actual,
+      archiveInactiveSubjects: (...args: unknown[]) =>
+        mockArchiveInactiveSubjects(...args),
+    };
+  },
 );
 
 import { subjectAutoArchive } from './subject-auto-archive';
