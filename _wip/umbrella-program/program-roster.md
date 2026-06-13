@@ -172,7 +172,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   loop-productization input re-homes to PRG-05 at slice time. Pull remains
   deliberate (attention budget).
 
-### PRG-05 · Execution-mechanism productionization (the orchestration loop) — `embryo`
+### PRG-05 · Execution-mechanism productionization (the orchestration loop) — `active` (design phase)
 - **Outcome:** the hand-built program-delivery mechanism — shepherd-kickoff,
   executor-protocol/pointer-brief, the autonomous reviewer-dispatcher loop, and the
   cross-runtime seam contracts — promoted from per-instance `_wip/` artifacts to a
@@ -196,11 +196,15 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   agnostic contracts only at orchestrator↔shepherd + shepherd↔reviewer;
   shepherd↔executor is **native-by-design** (never cross-runtime); reviewer ≠
   executor runtime is a quality invariant.
-- **Activate-when:** combined design/grill with PRG-04 (seam-catalogue spine), itself
-  gated behind the **agnosticity spike** (Claude shepherd choosing Claude/Codex-model
-  executors via `codex-companion`; Claude executor → Codex nested adversarial
-  reviewer). Sequence **spike → grill → slice**; no Cosmo objects until post-grill.
-  Pull deliberate (attention budget), parallel-safe with execution streams.
+- **Status (2026-06-13): DESIGN-PHASE ACTIVE.** The **agnosticity spike** is the
+  first work (Claude shepherd choosing Claude/Codex-model executors via
+  `codex-companion`; Claude executor → Codex nested adversarial reviewer), feeding
+  the combined design/grill with PRG-04 (seam-catalogue spine). This is a *design*
+  activation — decisions + spike + grill — **not** the §2.1 execution recipe: no
+  Cosmo Workstream/slice until the grill closes (sequence **spike → grill → slice**).
+  Spike status tracked in the design-input doc. *(The pre-slice design phase is
+  itself dogfood for PRG-04 — §2.1 has no design-activation altitude.)*
+- **Activate-when:** — (design-active 2026-06-13; execution activation = post-grill slice).
 
 ### PRG-12 · L10n & A11y Mobile — `✓ graduated` (2026-06-12)
 - **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
@@ -457,7 +461,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
 | 7 | **PRG-10** security-pii-api | ✅ **both gates FIRED** (safe subset G2; auth/PII remainder G4 06-11 late) — activation = attention-budget call |
 | 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
-| 9 | **PRG-04** top-down delivery layer + **PRG-05** execution-mechanism productionization | combined design/grill (seam-catalogue) behind the **agnosticity spike** — sequence spike → grill → slice; orchestrator pull on dogfood evidence (✓ met) + attention budget |
+| 9 | **PRG-04** top-down delivery layer + **PRG-05** execution-mechanism productionization | **PRG-05 design-ACTIVATED 06-13** (agnosticity spike = first work); PRG-04 design opens at the joint grill. Sequence spike → grill → slice; no Cosmo until post-grill |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
 | 12 | **PRG-17** new-llm integration (LLM) | ✓ **GRADUATED 06-13** — fifth graduation (first integration lane); merged `105b39ac0`, deploy green, cutover unlocked |
@@ -545,6 +549,13 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-13 — PRG-05 design-phase ACTIVATED (spike start).** Starting the
+  agnosticity spike moves **PRG-05** embryo → `active` — but as a *design* activation
+  (spike → grill), **not** the §2.1 execution recipe: no Cosmo Workstream/slice until
+  the grill closes. **PRG-04 stays embryo** (the spike is Half-B-scoped; PRG-04's
+  design opens at the joint grill). Queue row 9 marked design-activated. Note: this
+  pre-slice "design activation" is lighter than §2.1 and is itself dogfood for PRG-04
+  (the top-down layer must model a design phase before the Workstream slice).
 - **2026-06-13 — Mechanism productionization split into two sibling Initiatives.**
   The hand-built program-delivery mechanism is now **PRG-04** (top-down delivery
   layer — narrowed) + **PRG-05** (execution/loop mechanism — new row); `WI-590` was

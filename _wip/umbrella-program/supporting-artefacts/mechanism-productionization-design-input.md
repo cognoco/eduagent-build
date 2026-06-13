@@ -118,3 +118,11 @@ discover skills differently). Starting classification:
 PRG-04 narrowed to top-down-only; **PRG-05 added** (this Initiative); activation-queue
 row 9 now covers both behind the spike→grill→slice gate; change-log entry recorded.
 Cosmo `WI-590` split deferred to slice time (no Cosmo mutation pre-grill).
+
+## Spike status
+
+- **2026-06-13 — PRG-05 DESIGN-PHASE ACTIVE; spike scoped, not yet run.** Decision to
+  run the spike taken; PRG-05 moved embryo → active (design phase) on the roster.
+  Spike is pre-Cosmo (design activity, tracked here — no Cosmo WI; slicing is
+  post-grill). Next: scope the throwaway WI + decide run venue (this session vs
+  dedicated). Deliverable: one-page finding → required input to the grill.
