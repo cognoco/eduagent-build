@@ -56,6 +56,16 @@ import { getSentryQueryKeyTag } from '../lib/sentry-query-key';
 
 // BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
 // which crashes on web. Use our secure-storage wrapper instead.
+//
+// Security note (BUG-131): on web, secure-storage falls back to plain
+// localStorage (not encrypted, readable by same-origin JS). Clerk JWT tokens
+// persisted here are therefore only as safe as the browser's same-origin
+// sandbox allows. This is intentional — web is a non-primary platform used
+// for dev tooling and stakeholder previews, not production user sessions. The
+// alternative (crashing on web) is worse. See secure-storage.ts header for the
+// full disclosure and the one-shot console.warn that fires when the fallback
+// activates. Do not remove the Platform.OS guard — native must always use the
+// Keychain/Keystore path via nativeTokenCache.
 const webTokenCache = {
   getToken: (key: string) => SecureStore.getItemAsync(key).catch(() => null),
   saveToken: (key: string, value: string) =>

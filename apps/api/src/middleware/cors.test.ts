@@ -95,6 +95,46 @@ describe('CORS middleware', () => {
     });
   });
 
+  // Localhost is only allowed in non-production environments. In production,
+  // a local app running on a victim's machine must not make credentialed
+  // cross-origin requests against the production API.
+  describe('localhost CORS restricted to non-production (F-080)', () => {
+    it('rejects localhost origin when ENVIRONMENT=production', async () => {
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:8081',
+            'Access-Control-Request-Method': 'GET',
+          },
+        },
+        { ENVIRONMENT: 'production' },
+      );
+
+      const allowOrigin = res.headers.get('Access-Control-Allow-Origin');
+      expect(allowOrigin).not.toBe('http://localhost:8081');
+    });
+
+    it('allows localhost origin when ENVIRONMENT=development', async () => {
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:8081',
+            'Access-Control-Request-Method': 'GET',
+          },
+        },
+        { ENVIRONMENT: 'development' },
+      );
+
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
+        'http://localhost:8081',
+      );
+    });
+  });
+
   describe('actual cross-origin requests', () => {
     it('includes CORS headers on a real GET', async () => {
       const res = await app.request('/v1/health', {
