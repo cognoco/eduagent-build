@@ -137,7 +137,6 @@ jest.mock(
       setLanguageName: jest.fn(),
       setReturnTo: jest.fn(),
       setRound: jest.fn(),
-      setPrefetchedRoundId: jest.fn(),
       setCompletionResult: jest.fn(),
     }),
   }),

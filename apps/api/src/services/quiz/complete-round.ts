@@ -6,6 +6,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
+  CelebrationName,
+  CelebrationReason,
   CompleteRoundResponse,
   QuestionResult,
   QuizQuestion,
@@ -15,6 +17,7 @@ import { cefrLevelSchema, isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
+import { queueCelebration } from '../celebrations';
 import { recordPracticeActivityEvent } from '../practice-activity-events';
 import { safeWrite, type DeferredActivityEvent } from '../safe-non-core';
 import { createVocabulary, reviewVocabulary } from '../vocabulary';
@@ -353,7 +356,9 @@ export function inferVocabularyTypeFromTerm(term: string): 'word' | 'chunk' {
     'il',
     'lo',
     'gli',
-    'i',
+    // The Italian plural article 'i' is intentionally omitted: it collides with
+    // the English pronoun "I", which would misclassify English 2-word terms
+    // beginning with "I" (e.g. "I think") as a word+article instead of a chunk.
   ]);
 
   if (
@@ -437,6 +442,20 @@ export function getCelebrationTier(
   if (ratio >= QUIZ_CONFIG.celebrationThresholds.perfect) return 'perfect';
   if (ratio >= QUIZ_CONFIG.celebrationThresholds.great) return 'great';
   return 'nice';
+}
+
+export function getQuizCompletionCelebration(
+  celebrationTier: CompleteRoundResponse['celebrationTier'],
+): { celebration: CelebrationName; reason: CelebrationReason } {
+  if (celebrationTier === 'perfect') {
+    return { celebration: 'comet', reason: 'comet' };
+  }
+
+  if (celebrationTier === 'great') {
+    return { celebration: 'twin_stars', reason: 'twin_stars' };
+  }
+
+  return { celebration: 'polar_star', reason: 'polar_star' };
 }
 
 /**
@@ -839,6 +858,22 @@ export async function completeQuizRound(
       questionResults,
     };
   });
+
+  const quizCelebration = getQuizCompletionCelebration(
+    response.celebrationTier,
+  );
+  await safeWrite(
+    () =>
+      queueCelebration(
+        db,
+        profileId,
+        quizCelebration.celebration,
+        quizCelebration.reason,
+        roundId,
+      ),
+    'quiz.round-celebration',
+    { profileId, roundId, celebrationTier: response.celebrationTier },
+  );
 
   for (const evt of deferredEvents) {
     await safeWrite(

@@ -207,7 +207,6 @@ export default function SignUpScreen() {
           );
           router.replace({
             pathname: '/(auth)/sign-in',
-            params: { ssoNeedsSignIn: '1' },
           } as Parameters<typeof router.replace>[0]);
           return;
         }

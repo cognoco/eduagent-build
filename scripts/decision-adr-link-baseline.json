@@ -16,10 +16,6 @@
     "heading": "Key design decisions (locked 2026-05-30)"
   },
   {
-    "file": "docs/plans/2026-05-31-account-security-self-service.md",
-    "heading": "Clerk API Decisions"
-  },
-  {
     "file": "docs/plans/2026-05-31-billing-recovery-learner-capacity.md",
     "heading": "Product Decisions"
   },
@@ -56,6 +52,22 @@
     "heading": "Product Decisions"
   },
   {
+    "file": "docs/plans/2026-06-09-more-off-nav-home-launched.md",
+    "heading": "Decisions (resolved — no open forks)"
+  },
+  {
+    "file": "docs/plans/v2-dossier/03-decision-ledger.md",
+    "heading": "Open-decision ledger — with recommendations"
+  },
+  {
+    "file": "docs/plans/v2-dossier/03-decision-ledger.md",
+    "heading": "The decisions that are yours"
+  },
+  {
+    "file": "docs/plans/v2-plan/2026-06-10-s1-mentor-home.md",
+    "heading": "Open decision (blocks the copy-template task only)"
+  },
+  {
     "file": "docs/specs/2026-05-13-parent-child-surfaces-information-architecture.md",
     "heading": "Technical Decisions"
   },
@@ -66,9 +78,5 @@
   {
     "file": "docs/specs/2026-05-19-study-and-family-mode-navigation-FULL.md",
     "heading": "Technical Decisions"
-  },
-  {
-    "file": "docs/specs/2026-05-26-commit-pr-pipeline-gates.md",
-    "heading": "7. Decisions"
   }
 ]

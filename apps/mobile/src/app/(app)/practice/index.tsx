@@ -423,20 +423,7 @@ export default function PracticeScreen(): React.ReactElement {
   };
 
   const openAssessment = () => {
-    if (assessmentCount > 0) {
-      router.push('/(app)/practice/assessment-picker' as Href);
-      return;
-    }
-
-    if (nextStudySubject) {
-      router.push({
-        pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId: nextStudySubject.id },
-      } as Href);
-      return;
-    }
-
-    router.push('/(app)/library' as Href);
+    router.push('/(app)/practice/assessment-picker' as Href);
   };
 
   // V0 fallback: canEnter() blocks during profile-load when V1 is off — preserve
@@ -615,60 +602,88 @@ export default function PracticeScreen(): React.ReactElement {
                 </Pressable>
               </View>
             ) : null}
-            <Pressable
-              className="active:opacity-80"
-              style={[
-                styles.challengeRow,
-                {
-                  borderColor: colors.line,
-                  backgroundColor: colors.surface,
-                },
-                pointerStyle(),
-              ]}
-              onPress={openAssessment}
-              accessibilityRole="button"
-              accessibilityLabel={t('practiceHub.assessment.title')}
-              accessibilityHint={
-                assessmentCount > 0
-                  ? t('practiceHub.assessment.hintOpenPicker')
-                  : t('practiceHub.assessment.hintOpenLibrary')
-              }
-              testID="practice-assessment"
-            >
-              <View className="flex-row items-center">
-                <View
-                  className="mr-3"
-                  style={[
-                    styles.smallIconCircle,
-                    {
-                      backgroundColor:
-                        assessmentCount > 0 ? colors.mint : colors.surface,
-                    },
-                  ]}
-                >
+            {assessmentCount > 0 ? (
+              <Pressable
+                className="active:opacity-80"
+                style={[
+                  styles.challengeRow,
+                  {
+                    borderColor: colors.line,
+                    backgroundColor: colors.surface,
+                  },
+                  pointerStyle(),
+                ]}
+                onPress={openAssessment}
+                accessibilityRole="button"
+                accessibilityLabel={t('practiceHub.assessment.title')}
+                accessibilityHint={t('practiceHub.assessment.hintOpenPicker')}
+                testID="practice-assessment"
+              >
+                <View className="flex-row items-center">
+                  <View
+                    className="mr-3"
+                    style={[
+                      styles.smallIconCircle,
+                      { backgroundColor: colors.mint },
+                    ]}
+                  >
+                    <Ionicons
+                      name="checkmark"
+                      size={24}
+                      color={colors.chipStrongText}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-body font-semibold text-text-primary">
+                      {t('practiceHub.assessment.title')}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary mt-0.5">
+                      {assessmentSubtitle}
+                    </Text>
+                  </View>
                   <Ionicons
-                    name={assessmentCount > 0 ? 'checkmark' : 'lock-closed'}
-                    size={assessmentCount > 0 ? 24 : 18}
-                    color={
-                      assessmentCount > 0 ? colors.chipStrongText : colors.muted
-                    }
+                    name="chevron-forward"
+                    size={20}
+                    color={colors.muted}
                   />
                 </View>
-                <View className="flex-1">
-                  <Text className="text-body font-semibold text-text-primary">
-                    {t('practiceHub.assessment.title')}
-                  </Text>
-                  <Text className="text-body-sm text-text-secondary mt-0.5">
-                    {assessmentSubtitle}
-                  </Text>
+              </Pressable>
+            ) : (
+              <View
+                style={[
+                  styles.challengeRow,
+                  {
+                    borderColor: colors.line,
+                    backgroundColor: colors.surface,
+                  },
+                ]}
+                testID="practice-assessment-locked-hint"
+              >
+                <View className="flex-row items-center">
+                  <View
+                    className="mr-3"
+                    style={[
+                      styles.smallIconCircle,
+                      { backgroundColor: colors.surface },
+                    ]}
+                  >
+                    <Ionicons
+                      name="lock-closed"
+                      size={18}
+                      color={colors.muted}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-body font-semibold text-text-primary">
+                      {t('practiceHub.assessment.title')}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary mt-0.5">
+                      {assessmentSubtitle}
+                    </Text>
+                  </View>
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={colors.muted}
-                />
               </View>
-            </Pressable>
+            )}
           </View>
 
           <View className="gap-3">

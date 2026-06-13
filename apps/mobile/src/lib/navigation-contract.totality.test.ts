@@ -229,7 +229,6 @@ function assertCompleteContract(
     'showProgressProfilePicker',
     'showAccommodationChildEditor',
     'showCelebrationsChildEditor',
-    'showMentorMemoryChildConsent',
     'showInlineStudyInvite',
     'showLearnThisToo',
   ];

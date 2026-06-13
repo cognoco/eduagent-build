@@ -97,6 +97,8 @@ import { SessionFooter } from '../../../components/session/SessionFooter';
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
 import { useTranslation } from 'react-i18next';
 import { track } from '../../../lib/analytics';
+import { Sentry } from '../../../lib/sentry';
+import { formatApiError } from '../../../lib/format-api-error';
 import { SessionErrorBoundary } from './_components/SessionErrorBoundary';
 import { ConfirmationToast } from './_components/ConfirmationToast';
 import { SessionScreenChrome } from './_components/SessionScreenChrome';
@@ -990,8 +992,13 @@ function SessionScreenInner() {
       try {
         const response = await action();
         applyChallengeRouteResponse(response);
-      } catch {
-        platformAlert(title, t('common.pleaseTryAgain'));
+      } catch (err) {
+        // [UX-FM] Surface the classified reason instead of a generic retry
+        // string, and capture so the swallowed failure is observable.
+        Sentry.captureException(err, {
+          tags: { screen: 'session', action: 'runChallengeAction' },
+        });
+        platformAlert(title, formatApiError(err));
       } finally {
         challengeActionInFlightRef.current = false;
       }
@@ -1024,10 +1031,13 @@ function SessionScreenInner() {
         await challengeRoundActions.saveNote(content);
         setDraftedNote(null);
         showConfirmation(t('session.challenge.noteSaved'));
-      } catch {
+      } catch (err) {
+        Sentry.captureException(err, {
+          tags: { screen: 'session', action: 'saveDraftedNote' },
+        });
         platformAlert(
           t('session.challenge.noteSaveErrorTitle'),
-          t('common.pleaseTryAgain'),
+          formatApiError(err),
         );
       } finally {
         challengeActionInFlightRef.current = false;
@@ -1067,11 +1077,11 @@ function SessionScreenInner() {
   const handleSkipWarmup = useCallback(async () => {
     try {
       await clearContinuationDepth.mutateAsync();
-    } catch {
-      platformAlert(
-        t('session.skipWarmupErrorTitle'),
-        t('common.pleaseTryAgain'),
-      );
+    } catch (err) {
+      Sentry.captureException(err, {
+        tags: { screen: 'session', action: 'skipWarmup' },
+      });
+      platformAlert(t('session.skipWarmupErrorTitle'), formatApiError(err));
     }
   }, [clearContinuationDepth, t]);
 

@@ -250,7 +250,6 @@ describe('resolveNavigationContract — totality', () => {
           'showProgressProfilePicker',
           'showAccommodationChildEditor',
           'showCelebrationsChildEditor',
-          'showMentorMemoryChildConsent',
           'showInlineStudyInvite',
           'showLearnThisToo',
         ];

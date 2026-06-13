@@ -352,7 +352,6 @@
     "active": "Aktiv",
     "accommodation": {
       "sectionHeader": "Din læringstilpasning",
-      "viewAndManage": "Vis og administrer",
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "guideActive": "Aktiv",
       "childScreenTitle": "{{name}}s læringsinnstillinger"
@@ -679,8 +678,6 @@
     },
     "notePrompt": {
       "writeNote": "Skriv et notat",
-      "cannotSaveTitle": "Kan ikke lagre notat",
-      "cannotSaveMessage": "Notater kan ikke lagres akkurat nå. Prøv igjen.",
       "saveFailedTitle": "Kunne ikke lagre notat",
       "summaryPlaceholder": "Hva skal vi huske fra denne økten?"
     },
@@ -758,7 +755,8 @@
     "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette.",
     "errorBoundary": {
       "crashTitle": "Øktskjermen krasjet",
-      "unknownError": "Ukjent feil"
+      "unknownError": "Ukjent feil",
+      "body": "Noe gikk galt under lasting av denne skjermen. Du kan prøve igjen eller gå tilbake til hjem."
     },
     "screenChrome": {
       "wrapping": "Avslutter ...",
@@ -1078,7 +1076,6 @@
       "exit": "Avslutt"
     },
     "review": {
-      "couldNotSaveResult": "Vi kunne ikke lagre gjennomgangsresultatet ditt.",
       "couldNotSaveTitle": "Kunne ikke lagre resultat",
       "continueWithoutSaving": "Fortsett uten å lagre",
       "noDataFound": "Gjennomgangsdata ikke funnet.",
@@ -1105,7 +1102,6 @@
       "prepareErrorMessage": "Kunne ikke forberede diktatet ditt. Prøve igjen?",
       "tryAgain": "Prøv igjen",
       "title": "Sjekk teksten",
-      "subtitleFromPhoto": "Rediger eventuelle feil fra bildet, og start deretter diktatet.",
       "subtitleManual": "Gjennomgå teksten din, og start deretter diktatet.",
       "inputPlaceholder": "Skriv eller lim inn teksten din her ...",
       "inputLabel": "Diktattekst",
@@ -1345,6 +1341,9 @@
       "a11ySectionCollapse": "{{label}}. {{summary}}. Skjul seksjon.",
       "a11ySectionExpand": "{{label}}. {{summary}}. Utvid seksjon."
     },
+    "inactiveFallbackBanner": {
+      "message": "Kunne ikke laste inn de pausede og arkiverte emnene dine. Trykk for å prøve igjen – de er ikke borte."
+    },
     "notStartedCount": "{{notStarted}} / {{total}} ikke startet",
     "chooseTopic": "Velg et tema",
     "provenanceFrom": "Fra {{name}}",
@@ -1467,8 +1466,7 @@
     "deleteDialog": {
       "title": "Slett ord",
       "message": "Fjerne dette ordet fra vokabularet ditt?",
-      "errorTitle": "Kunne ikke slette",
-      "errorFallback": "Noe gikk galt. Prøv igjen."
+      "errorTitle": "Kunne ikke slette"
     },
     "noSubject": {
       "title": "Ingen emne valgt",
@@ -1722,6 +1720,7 @@
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
     "microphoneUnavailableTitle": "Mikrofon utilgjengelig",
+    "microphoneUnavailableBody": "Vi kunne ikke bruke mikrofonen akkurat nå. Sjekk at appen har tilgang til mikrofonen og prøv igjen, eller skriv i stedet.",
     "detectSubjectErrorTitle": "Kunne ikke gjenkjenne emne",
     "detectSubjectErrorBody": "{{error}} Velg emnet ditt manuelt.",
     "identifySubjectErrorTitle": "Kunne ikke identifisere emnet",
@@ -2133,7 +2132,6 @@
       "manageMentorMemoryForChild": "Administrer hva mentoren husker om {{name}}",
       "profileDetails": "Profildetaljer",
       "childProfileJoined": "Lagt til {{date}}",
-      "learningAccommodationTitle": "Læringstilpasning for {{name}}",
       "noLearningPreferenceSet": "Ingen læringspreferanse er satt",
       "consentTitle": "Samtykke",
       "consentDescription": "Administrer foreldresamtykke for {{name}}.",
@@ -2330,10 +2328,6 @@
       "exchangeDelta": {
         "title": "Meldinger denne uken",
         "body": "Hvor mange meldinger som ble utvekslet denne uken sammenlignet med forrige uke. Et enkelt signal om læringsaktivitet."
-      },
-      "guidedRatio": {
-        "title": "Veiledet øving",
-        "body": "Andelen mentorsvar der barnet ditt trengte et utarbeidet eksempel eller mer veiledning i stedet for et lett dytt."
       },
       "streakXp": {
         "title": "Rekke og XP",
@@ -2823,7 +2817,6 @@
       "topicsReady_other": "{{count}} temaer klare for test",
       "afterFinishTopic": "Tilgjengelig etter at du fullfører et tema",
       "hintOpenPicker": "Åpner vurderingsvelgeren",
-      "hintOpenLibrary": "Åpner biblioteket",
       "couldNotLoad": "Kunne ikke laste vurderingsemner",
       "studySubjectFirst": "Studer {{subject}} først for å låse opp dette"
     },
@@ -3265,6 +3258,43 @@
       "openUpdate": "Åpne oppdatering"
     }
   },
+  "myNotes": {
+    "loadMore": "Last mer",
+    "emptyHint": "De vil dukke opp her etter hvert som du lærer.",
+    "title": "Mine notater",
+    "subtitle": "Økter, notater og lagrede svar",
+    "sortDate": "Dato",
+    "sortSubject": "Emne",
+    "noneYetNotes": "Ingen notater ennå",
+    "noneYetBookmarks": "Ingen bokmerker ennå",
+    "noneYetSessions": "Ingen økter ennå",
+    "loadErrorNotes": "Kunne ikke laste notater",
+    "loadErrorBookmarks": "Kunne ikke laste bokmerker",
+    "loadErrorSessions": "Kunne ikke laste økter",
+    "kinds": {
+      "sessions": "Økter",
+      "notes": "Notater",
+      "bookmarks": "Bokmerker"
+    },
+    "types": {
+      "homework": "Hjemmelekser",
+      "review": "Gjennomgang",
+      "learning": "Læring",
+      "note": "Notat",
+      "bookmark": "Bokmerke"
+    },
+    "hub": {
+      "sessionsSubtitle": "Samtaler du hadde",
+      "notesSubtitle": "Ting du skrev ned",
+      "bookmarksSubtitle": "Veiledersvar du lagret"
+    },
+    "unknownSubject": "Ukjent fag",
+    "searchSessions": "Søk i økter",
+    "searchNotes": "Søk i notater",
+    "searchBookmarks": "Søk i bokmerker",
+    "a11yGroupByDate": "Grupper etter dato",
+    "a11yGroupBySubject": "Grupper etter fag"
+  },
   "createProfile": {
     "titleChild": "Fortell oss om barnet ditt",
     "titleSelf": "Hvem er det som skal lære?",
@@ -3297,16 +3327,6 @@
     "switchError": "Kunne ikke bytte. Trykk for å prøve igjen.",
     "a11yRetry": "Prøv modusbytte på nytt"
   },
-  "profileSwitcher": {
-    "fallbackName": "Profil",
-    "switchErrorTitle": "Kunne ikke bytte profil",
-    "a11yClose": "Lukk profilbytter",
-    "a11yChip": "Bytt profil. Nåværende: {{name}}",
-    "a11yOption": "{{name}}, {{role}}",
-    "a11yOptionActive": "{{name}}, {{role}}, aktiv",
-    "roleParent": "Foresatt",
-    "roleStudent": "Elev"
-  },
   "memoryConsent": {
     "defaultTitle": "Hjelp veilederen med å lære om {{name}}",
     "defaultTitleNoName": "Hjelp veilederen med å lære om barnet ditt",
@@ -3334,43 +3354,6 @@
     "childBirthYearPlaceholder": "Fødselsår",
     "a11yBack": "Tilbake til forrige trinn",
     "a11yCancel": "Avbryt og avslutt"
-  },
-  "myNotes": {
-    "title": "Mine notater",
-    "subtitle": "Økter, notater og lagrede svar",
-    "sortDate": "Dato",
-    "sortSubject": "Emne",
-    "emptyHint": "De vil dukke opp her etter hvert som du lærer.",
-    "loadMore": "Last mer",
-    "noneYetNotes": "Ingen notater ennå",
-    "noneYetBookmarks": "Ingen bokmerker ennå",
-    "noneYetSessions": "Ingen økter ennå",
-    "loadErrorNotes": "Kunne ikke laste notater",
-    "loadErrorBookmarks": "Kunne ikke laste bokmerker",
-    "loadErrorSessions": "Kunne ikke laste økter",
-    "kinds": {
-      "sessions": "Økter",
-      "notes": "Notater",
-      "bookmarks": "Bokmerker"
-    },
-    "types": {
-      "homework": "Hjemmelekser",
-      "review": "Gjennomgang",
-      "learning": "Læring",
-      "note": "Notat",
-      "bookmark": "Bokmerke"
-    },
-    "hub": {
-      "sessionsSubtitle": "Samtaler du hadde",
-      "notesSubtitle": "Ting du skrev ned",
-      "bookmarksSubtitle": "Veiledersvar du lagret"
-    },
-    "unknownSubject": "Ukjent fag",
-    "searchSessions": "Søk i økter",
-    "searchNotes": "Søk i notater",
-    "searchBookmarks": "Søk i bokmerker",
-    "a11yGroupByDate": "Grupper etter dato",
-    "a11yGroupBySubject": "Grupper etter fag"
   },
   "pickBook": {
     "subjectFallback": "Emne",

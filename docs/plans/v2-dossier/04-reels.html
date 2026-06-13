@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V2 Reels — Mentor-Is-The-App clickable walkthrough (Layer 2, internal fidelity)</title>
+<style>
+  :root{
+    --bg:#f2f1ec; --panel:#ffffff; --ink:#1d2433; --muted:#6b7280;
+    --brand:#4f5fd5; --brand-soft:#eef0fc; --accent:#e8913a; --accent-soft:#fdf0e1;
+    --good:#2e9e6b; --good-soft:#e3f4ec; --warn:#c2543a;
+    --line:#e4e2da; --chipbg:#f6f5f0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--ink); display:flex; min-height:100vh;}
+
+  /* ---------- Director panel ---------- */
+  #director{width:330px; min-width:330px; background:var(--panel); border-right:1px solid var(--line); padding:18px 16px; overflow-y:auto; height:100vh; position:sticky; top:0;}
+  #director h1{font-size:16px; margin-bottom:2px;}
+  #director .sub{font-size:11.5px; color:var(--muted); margin-bottom:14px; line-height:1.45;}
+  #director h2{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:14px 0 5px;}
+  #director button.nav{display:block; width:100%; text-align:left; border:0; background:none; padding:5px 8px; border-radius:7px; font-size:13px; cursor:pointer; color:var(--ink); line-height:1.3;}
+  #director button.nav:hover{background:var(--brand-soft);}
+  #director button.nav.active{background:var(--brand); color:#fff;}
+  #director button.nav .tag{font-size:9.5px; padding:1px 5px; border-radius:4px; margin-left:5px; vertical-align:1px; font-weight:600;}
+  .tag.s1{background:var(--good-soft); color:var(--good);}
+  .tag.s45{background:var(--accent-soft); color:#a05c12;}
+  .tag.gap{background:#fde8e4; color:var(--warn);}
+  button.nav.active .tag{filter:saturate(1.2);}
+
+  .toggles{border:1px solid var(--line); border-radius:10px; padding:10px; margin:12px 0; background:#fbfaf7;}
+  .toggles .trow{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;}
+  .toggles .trow:last-child{margin-bottom:0;}
+  .toggles label{font-size:12px; font-weight:600;}
+  .toggles .hint{font-size:10.5px; color:var(--muted); display:block; font-weight:400;}
+  .seg{display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden;}
+  .seg button{border:0; background:#fff; font-size:11.5px; padding:4px 9px; cursor:pointer; color:var(--muted);}
+  .seg button.on{background:var(--brand); color:#fff;}
+
+  #note{border-top:2px solid var(--brand); background:#fbfaf7; border-radius:0 0 10px 10px; padding:12px; font-size:12.5px; line-height:1.55; margin-top:14px;}
+  #note .ntitle{font-weight:700; font-size:12px; margin-bottom:4px;}
+  #note .cite{color:var(--muted); font-size:11px;}
+  #note .prop{display:inline-block; background:#fde8e4; color:var(--warn); font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; margin-bottom:4px;}
+
+  /* ---------- Stage / phone ---------- */
+  #stage{flex:1; display:flex; align-items:flex-start; justify-content:center; padding:26px 18px;}
+  #phone{width:392px; min-width:392px; height:800px; background:#fff; border:10px solid #20242e; border-radius:44px; overflow:hidden; position:relative; box-shadow:0 18px 60px rgba(30,35,60,.22); display:flex; flex-direction:column;}
+  .statusbar{height:26px; font-size:11px; color:var(--muted); display:flex; justify-content:space-between; padding:6px 22px 0; flex:none;}
+
+  .frame{display:none; flex:1; flex-direction:column; min-height:0;}
+  .frame.on{display:flex;}
+
+  .hdr{display:flex; align-items:center; justify-content:space-between; padding:8px 16px 6px; flex:none;}
+  .hdr .htitle{font-size:19px; font-weight:700;}
+  .avatar{width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,#7886e0,#4f5fd5); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; cursor:pointer; border:0;}
+  .avatar.parent{background:linear-gradient(135deg,#e0a878,#c97d35);}
+
+  .scopechips{display:flex; gap:6px; padding:2px 16px 8px; flex:none;}
+  .scopechip{font-size:12px; padding:4px 12px; border-radius:999px; border:1px solid var(--line); background:#fff; color:var(--muted); cursor:pointer;}
+  .scopechip.on{background:var(--ink); color:#fff; border-color:var(--ink);}
+
+  .content{flex:1; overflow-y:auto; padding:6px 16px 14px; min-height:0;}
+
+  .tabbar{flex:none; display:flex; border-top:1px solid var(--line); background:#fff; padding:6px 0 10px;}
+  .tabbar button{flex:1; border:0; background:none; font-size:10.5px; color:var(--muted); cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px;}
+  .tabbar button .ticon{font-size:19px;}
+  .tabbar button.on{color:var(--brand); font-weight:700;}
+
+  /* ---------- Cards & feed ---------- */
+  .card{border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; background:#fff;}
+  .card.anchor{border:2px solid var(--accent); background:var(--accent-soft); box-shadow:0 2px 10px rgba(232,145,58,.14);}
+  .card .kicker{font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:5px; font-weight:700;}
+  .card.anchor .kicker{color:#a05c12;}
+  .card .ctitle{font-size:15px; font-weight:700; line-height:1.35;}
+  .card .csub{font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.45;}
+  .card .cta{margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;}
+  .btn{border:0; border-radius:9px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; background:var(--brand); color:#fff;}
+  .btn.ghost{background:#fff; color:var(--ink); border:1px solid var(--line);}
+  .btn.warm{background:var(--accent);}
+  .btn.big{width:100%; padding:12px; font-size:14.5px;}
+  .decline{font-size:11.5px; color:var(--muted); background:none; border:0; cursor:pointer; text-decoration:underline; padding:6px 2px 0;}
+
+  .ontrack{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--good); background:var(--good-soft); border-radius:999px; padding:3px 10px; font-weight:600; margin:0 0 10px;}
+  .overflowlink{display:block; text-align:center; font-size:12.5px; color:var(--muted); padding:8px 0 2px; background:none; border:0; cursor:pointer; width:100%; text-decoration:underline;}
+
+  /* ---------- Conversation ---------- */
+  .bubble{max-width:84%; border-radius:16px; padding:10px 13px; font-size:13.5px; line-height:1.5; margin-bottom:8px;}
+  .bubble.mentor{background:var(--brand-soft); border-bottom-left-radius:5px;}
+  .bubble.user{background:var(--ink); color:#fff; margin-left:auto; border-bottom-right-radius:5px;}
+  .bubble .inreply{margin-top:9px;}
+  .photo{width:70%; border-radius:12px; margin-left:auto; margin-bottom:8px; background:#e8e6df; border:1px solid var(--line); padding:26px 10px; text-align:center; font-size:12px; color:var(--muted);}
+
+  /* ---------- Cold-start card / input ---------- */
+  .greet{font-size:21px; font-weight:700; text-align:center; margin:26px 0 16px; line-height:1.3;}
+  .coldcard{border:1.5px solid var(--line); border-radius:18px; padding:14px; background:#fff; box-shadow:0 3px 14px rgba(30,35,60,.07);}
+  .inputbar{display:flex; align-items:center; gap:8px; border:1.5px solid var(--line); border-radius:13px; padding:10px 12px; background:var(--chipbg);}
+  .inputbar .mic{font-size:17px;}
+  .inputbar .itext{flex:1; font-size:13.5px; color:var(--muted); min-height:18px;}
+  .inputbar .itext.filled{color:var(--ink); font-weight:600;}
+  .inputbar .send{border:0; background:#d8d6cf; color:#fff; width:30px; height:30px; border-radius:50%; font-size:15px; cursor:default; transition:background .25s;}
+  .inputbar.filled .send{background:var(--brand); cursor:pointer; animation:pulse 1.1s ease-in-out infinite;}
+  @keyframes pulse{50%{transform:scale(1.12);}}
+  .coldhint{font-size:12px; color:var(--muted); margin:10px 2px 8px; line-height:1.4;}
+  .chips{display:flex; flex-direction:column; gap:7px;}
+  .chip{border:1px solid var(--line); background:var(--chipbg); border-radius:11px; padding:10px 12px; font-size:13.5px; text-align:left; cursor:pointer; font-weight:600;}
+  .chip:hover{border-color:var(--brand);}
+  .chip.kick{border-color:#e7b96e; background:#fdf6e8;}
+  .caption{font-size:11px; color:var(--muted); text-align:center; margin-top:12px; line-height:1.45; padding:0 8px;}
+  .barbottom{flex:none; padding:8px 16px 6px; border-top:1px solid var(--line); background:#fff;}
+  .barbottom .inputbar{background:#fff;}
+  .barbottom .cam{font-size:19px; border:0; background:none; cursor:pointer;}
+  .hwchip{font-size:11.5px; border:1px solid var(--line); background:var(--chipbg); border-radius:999px; padding:3px 10px; cursor:pointer; margin-top:6px;}
+
+  /* ---------- Noticing loop animations ---------- */
+  .arrive{opacity:0; transform:translateY(14px) scale(.94);}
+  .arrive.shown{animation:arriveJoy .55s cubic-bezier(.2,1.4,.4,1) forwards;}
+  @keyframes arriveJoy{60%{opacity:1; transform:translateY(-3px) scale(1.03);}100%{opacity:1; transform:translateY(0) scale(1);}}
+  .burstwrap{position:relative;}
+  .burst{position:absolute; left:24px; top:-6px; width:14px; height:14px; border-radius:50%; background:radial-gradient(circle,#ffd27d 0%,rgba(255,210,125,0) 70%); opacity:0; pointer-events:none;}
+  .burst.gofire{animation:burst .9s ease-out forwards;}
+  @keyframes burst{0%{opacity:.95; transform:scale(.4);}100%{opacity:0; transform:scale(7);}}
+  .arc{display:flex; align-items:center; gap:4px; margin:8px 0 2px;}
+  .arc .nd{width:22px; height:22px; border-radius:50%; background:#e4e2da; display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff;}
+  .arc .nd.done{background:var(--good);}
+  .arc .nd.due{background:var(--accent);}
+  .arc .seg2{flex:1; height:3px; background:#e4e2da; border-radius:2px;}
+  .arc .seg2.done{background:var(--good);}
+  .nd.advance{animation:nodeGlow 1.1s ease forwards; animation-delay:.15s;}
+  @keyframes nodeGlow{0%{background:var(--accent); box-shadow:0 0 0 0 rgba(46,158,107,.55);}55%{background:var(--good); box-shadow:0 0 0 12px rgba(46,158,107,0);}100%{background:var(--good); box-shadow:none;}}
+  .arclabel{font-size:10.5px; color:var(--muted);}
+
+  /* ---------- Subject hub ---------- */
+  .nextup{border:2px solid var(--brand); border-radius:14px; padding:13px; background:var(--brand-soft); margin-bottom:12px;}
+  details.chap{border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:#fff;}
+  details.chap summary{padding:11px 13px; font-size:13.5px; font-weight:700; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;}
+  details.chap summary::-webkit-details-marker{display:none;}
+  details.chap .topics{padding:0 13px 10px;}
+  .topic{display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-top:1px solid #f0eee8; font-size:13px; cursor:pointer;}
+  .dot{width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:8px;}
+  .dot.g{background:var(--good);} .dot.a{background:var(--accent);} .dot.e{background:#d8d6cf;}
+  .mastery{font-size:10.5px; color:var(--muted);}
+
+  /* ---------- Sheets ---------- */
+  .sheet{position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:22px 22px 0 0; box-shadow:0 -8px 30px rgba(30,35,60,.25); padding:16px 18px 22px; transform:translateY(105%); transition:transform .3s ease; z-index:30; max-height:72%; overflow-y:auto;}
+  .sheet.open{transform:translateY(0);}
+  .grab{width:40px; height:4px; border-radius:2px; background:#d8d6cf; margin:0 auto 12px;}
+  .sheetrow{display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-bottom:1px solid #f0eee8; font-size:13.5px;}
+  .sheetrow .ric{margin-right:9px;}
+  .ownertag{font-size:9.5px; background:var(--brand-soft); color:var(--brand); border-radius:4px; padding:1px 5px; font-weight:700;}
+  .scrim{position:absolute; inset:0; background:rgba(20,24,35,.35); opacity:0; pointer-events:none; transition:opacity .3s; z-index:25;}
+  .scrim.open{opacity:1; pointer-events:auto;}
+
+  /* ---------- Misc ---------- */
+  .gapflag{display:inline-block; background:#fde8e4; color:var(--warn); font-size:10px; font-weight:700; padding:2px 7px; border-radius:5px; margin-bottom:8px;}
+  .propflag{display:inline-block; background:#fff5d6; color:#8a6a10; font-size:10px; font-weight:700; padding:2px 7px; border-radius:5px; margin-bottom:8px; margin-left:4px;}
+  .ghost{opacity:.55; border-style:dashed;}
+  .ghostlabel{font-size:10.5px; color:var(--muted); font-style:italic; margin-bottom:5px;}
+  .seglist{display:flex; gap:6px; margin-bottom:12px;}
+  .seglist button{flex:1; font-size:12px; padding:6px 4px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; color:var(--muted);}
+  .seglist button.on{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .trustline{font-size:11.5px; color:var(--muted); text-align:center; padding:10px 14px 2px; line-height:1.5; font-style:italic;}
+  .moments{display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px;}
+  .moment{flex:none; width:104px; border:1px solid var(--line); border-radius:11px; padding:9px; font-size:10.5px; line-height:1.4; background:#fff;}
+  .moment .mic2{font-size:17px; display:block; margin-bottom:4px;}
+  .visitstep{display:flex; gap:6px; margin-bottom:12px;}
+  .visitstep button{flex:1; font-size:11px; padding:5px 2px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; color:var(--muted);}
+  .visitstep button.on{background:var(--accent); color:#fff; border-color:var(--accent); font-weight:700;}
+  .masknote{font-size:11px; background:var(--brand-soft); color:var(--brand); border-radius:9px; padding:8px 11px; margin-bottom:10px; line-height:1.45; font-weight:600;}
+  .lifestep{display:flex; gap:5px; margin-bottom:12px;}
+  .lifestep button{flex:1; font-size:10px; padding:5px 2px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; color:var(--muted); line-height:1.25;}
+  .lifestep button.on{background:var(--brand); color:#fff; border-color:var(--brand); font-weight:700;}
+  .contractbox{border:1.5px solid var(--line); border-radius:13px; padding:13px; margin-bottom:10px;}
+  .contractbox h4{font-size:12.5px; margin-bottom:7px;}
+  .contractbox ul{margin-left:17px; font-size:12px; line-height:1.6;}
+  .never{color:var(--warn);}
+  .always{color:var(--good);}
+  .dial-push{display:none;}
+  body[data-dial="push"] .dial-relaxed{display:none;}
+  body[data-dial="push"] .dial-push{display:inline;}
+  .startcard{text-align:center; padding:40px 18px;}
+  .startcard h3{font-size:18px; margin-bottom:10px;}
+  .startcard p{font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:18px;}
+
+  @media (max-width:860px){ body{flex-direction:column;} #director{width:auto; min-width:0; height:auto; position:static;} #stage{padding:14px;} }
+</style>
+</head>
+<body data-dial="relaxed">
+
+<!-- ============================= DIRECTOR ============================= -->
+<div id="director">
+  <h1>V2 Reels — clickable walkthrough</h1>
+  <div class="sub">Layer 2 of the no-surprises package · internal fidelity · scripted from <b>01-day-in-the-life.md</b> · copy verbatim from the spec where it exists. Frames marked <span class="tag gap">GAP</span> are <b>proposals</b> — the spec is silent there; this prototype exists to let you accept or change them cheaply.</div>
+
+  <div class="toggles">
+    <div class="trow">
+      <label>§13.4 Tab name<span class="hint">kid-test: which reads as "mine"?</span></label>
+      <div class="seg">
+        <button id="jn-journal" class="on" onclick="setJName('Journal')">Journal</button>
+        <button id="jn-notebook" onclick="setJName('Notebook')">Notebook</button>
+      </div>
+    </div>
+    <div class="trow">
+      <label>§13.7 Mentor tone<span class="hint">changes proposal copy only</span></label>
+      <div class="seg">
+        <button id="dl-relaxed" class="on" onclick="setDial('relaxed')">relaxed</button>
+        <button id="dl-push" onclick="setDial('push')">push me</button>
+      </div>
+    </div>
+  </div>
+
+  <h2>Start here</h2>
+  <button class="nav active" data-f="start" onclick="go('start')">How to use this</button>
+
+  <h2>Scene 1 — Jakub, 13 · day one <span class="tag s1">S1</span></h2>
+  <button class="nav" data-f="s1-consent" onclick="go('s1-consent')">1.1 After consent <span class="tag gap">GAP 1</span></button>
+  <button class="nav" data-f="s1-coldstart" onclick="go('s1-coldstart')">1.2 The cold-start card</button>
+  <button class="nav" data-f="s1-reply" onclick="go('s1-reply')">1.3 Instant homework reply</button>
+  <button class="nav" data-f="s1-homework" onclick="go('s1-homework')">1.4 The homework session <span class="tag gap">GAP 2</span></button>
+  <button class="nav" data-f="s1-wrapup" onclick="go('s1-wrapup')">1.5 First-session wrap-up <span class="tag gap">GAP 3</span></button>
+  <button class="nav" data-f="s1-after" onclick="go('s1-after')">1.6 Tomorrow: cold-start is dead</button>
+
+  <h2>Scene 2 — Jakub · day eight <span class="tag s1">S1</span></h2>
+  <button class="nav" data-f="s2-feed" onclick="go('s2-feed')">2.1 The feed earns its place</button>
+  <button class="nav" data-f="s2-review" onclick="go('s2-review')">2.2 The 5-minute review</button>
+  <button class="nav" data-f="s2-noticing" onclick="go('s2-noticing')">2.3 ▶ The noticing loop (animated)</button>
+  <button class="nav" data-f="s2-overflow" onclick="go('s2-overflow')">2.4 Everything waiting (overflow)</button>
+
+  <h2>The shell — free roam <span class="tag s1">S1–S3</span></h2>
+  <button class="nav" data-f="hub-math" onclick="go('hub-math')">Subject hub (Math)</button>
+  <button class="nav" data-f="journal" onclick="go('journal')"><span class="jname">Journal</span> tab</button>
+  <button class="nav" data-f="avatarframe" onclick="go('avatarframe')">Avatar sheet (admin)</button>
+
+  <h2>Scene 3 — Petra · day one <span class="tag s45">S4–S5</span></h2>
+  <button class="nav" data-f="s3-variantzero" onclick="go('s3-variantzero')">3.1 Variant zero — add my child</button>
+  <button class="nav" data-f="s3-addchild" onclick="go('s3-addchild')">3.2 One question routes the tier</button>
+  <button class="nav" data-f="s3-ceremony" onclick="go('s3-ceremony')">3.3 The linking ceremony</button>
+  <button class="nav" data-f="s3-lifecycle" onclick="go('s3-lifecycle')">3.4 The morphing child card</button>
+  <button class="nav" data-f="s3-kickstart" onclick="go('s3-kickstart')">3.5 Kickstart → his chip <span class="tag gap">GAP 6</span></button>
+  <button class="nav" data-f="s3-staleidle" onclick="go('s3-staleidle')">3.6 If he stalls: de-escalation</button>
+
+  <h2>Scene 4 — Petra · week one <span class="tag s45">S4–S5</span></h2>
+  <button class="nav" data-f="s4-hub" onclick="go('s4-hub')">4.1 Support hub feed</button>
+  <button class="nav" data-f="s4-jmentor" onclick="go('s4-jmentor')">4.2 Jakub scope — ask the mentor</button>
+  <button class="nav" data-f="s4-jsubjects" onclick="go('s4-jsubjects')">4.3 Jakub scope — masked hub</button>
+  <button class="nav" data-f="s4-jjournal" onclick="go('s4-jjournal')">4.4 The shared record</button>
+
+  <div id="note"></div>
+</div>
+
+<!-- ============================= PHONE ============================= -->
+<div id="stage">
+<div id="phone">
+  <div class="statusbar"><span>9:41</span><span>MentoMate · prototype</span><span>📶 🔋</span></div>
+
+  <!-- ========== START ========== -->
+  <div class="frame on" id="start">
+    <div class="content">
+      <div class="startcard">
+        <h3>V2 shell — what you are getting</h3>
+        <p>Walk the scenes top-to-bottom in the left panel, or tap inside the phone — everything blue or outlined is clickable.<br><br>
+        The <b>S1</b>/<b>S4–S5</b> badges are build order only — launch ships the complete product (ruled 2026-06-12), so judge every frame as the launch experience.<br>Red <b>GAP</b> = the spec is silent; the frame shows a <b>proposal</b> for you to accept or change.</p>
+        <button class="btn big" onclick="go('s1-consent')">▶ Start Scene 1 — Jakub, day one</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 1.1 — consent handoff (GAP 1 proposal) ========== -->
+  <div class="frame" id="s1-consent">
+    <div class="content" style="display:flex; flex-direction:column; justify-content:center;">
+      <div class="startcard">
+        <span class="gapflag">GAP 1</span><span class="propflag">PROPOSAL</span>
+        <h3>You're all set, Jakub 🎉</h3>
+        <p>Your account is ready and your mum has approved it.<br>No tour. No setup form. No subject picker.</p>
+        <button class="btn big warm" onclick="go('s1-coldstart')">Meet your mentor →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 1.2 — cold start ========== -->
+  <div class="frame" id="s1-coldstart">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar" onclick="openSheet('avsheet')">J</button></div>
+    <div class="content">
+      <div class="greet">Hi — what do you want to work on?</div>
+      <div class="coldcard">
+        <div class="inputbar" id="cs-bar">
+          <span class="mic">🎤</span>
+          <span class="itext" id="cs-text">Tell me anything…</span>
+          <button class="send" id="cs-send" onclick="sendCold()">→</button>
+        </div>
+        <div class="coldhint">Not sure? Try one of these — or just type:</div>
+        <div class="chips">
+          <button class="chip" onclick="fillCold('I need help with my homework')">📷 Homework help</button>
+          <button class="chip" onclick="fillCold('I want to learn something new')">✨ Learn something</button>
+          <button class="chip" onclick="fillCold('I have a question')">💬 Ask a question</button>
+        </div>
+      </div>
+      <div class="caption">Tell me anything — homework, a question, or something you want to learn. I'll take you there.</div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('hub-math')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 1.3 — instant dual-path reply ========== -->
+  <div class="frame" id="s1-reply">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar">J</button></div>
+    <div class="content">
+      <div class="bubble user">I need help with my homework</div>
+      <div class="bubble mentor">Sure thing — snap a picture of it 📷. Or if you'd rather just ask, tell me about it here.
+        <div class="inreply"><button class="btn big" onclick="go('s1-homework')">📷 Snap a picture</button></div>
+      </div>
+      <div class="caption">Instant — template, no LLM wait. No "what subject is it?" preamble.<br>Latency here is an acceptance criterion (spec §3.1).</div>
+    </div>
+    <div class="barbottom">
+      <div class="inputbar"><button class="cam">📷</button><span class="mic">🎤</span><span class="itext">…or keep talking</span><button class="send">→</button></div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('hub-math')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 1.4 — homework session (GAP 2 proposal) ========== -->
+  <div class="frame" id="s1-homework">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar">J</button></div>
+    <div class="content">
+      <span class="gapflag">GAP 2</span><span class="propflag">PROPOSAL</span>
+      <div class="photo">📄 worksheet photo<br><span style="font-size:10px;">(3x + 5 = 17 …)</span></div>
+      <div class="bubble mentor">Got it — linear equations! Quick one: do you want to work it out together, or have you solved it and want me to check?
+        <div class="inreply" style="display:flex; gap:7px;">
+          <button class="btn" onclick="revealHw()">🧩 Help me solve it</button>
+          <button class="btn ghost" onclick="revealHw()">✅ Check my answer</button>
+        </div>
+      </div>
+      <div id="hw-more" style="display:none;">
+        <div class="bubble user">help me solve it</div>
+        <div class="bubble mentor">Okay. First — what do you think we should do with that +5?</div>
+        <div class="bubble user">move it to the other side?</div>
+        <div class="bubble mentor">Exactly — and what happens to its sign when it crosses? …</div>
+        <div class="caption">…20 minutes of guided help (the existing session engine, unchanged)…</div>
+        <button class="btn big ghost" onclick="go('s1-wrapup')">⏩ Skip to the end of the session</button>
+      </div>
+    </div>
+    <div class="barbottom">
+      <div class="inputbar"><button class="cam">📷</button><span class="mic">🎤</span><span class="itext">type your answer…</span><button class="send">→</button></div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 1.5 — wrap-up (GAP 3 proposal) ========== -->
+  <div class="frame" id="s1-wrapup">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar">J</button></div>
+    <div class="content">
+      <span class="gapflag">GAP 3</span><span class="propflag">PROPOSAL</span>
+      <div class="bubble mentor">That's the whole worksheet done 🎉 You cracked the sign-flip rule yourself on question 3 — that was the hard part, and it was your move, not mine.</div>
+      <div class="burstwrap">
+        <span class="burst gofire"></span>
+        <div class="bubble mentor arrive shown">I'll check in on those equations in a few days to make sure they stick. And hey — next time, just tell me what you need. <b>Anything.</b></div>
+      </div>
+      <div class="bubble user">cool 👍</div>
+      <button class="btn big ghost" onclick="go('s1-after')">Close the app for today →</button>
+      <div class="caption">No 3-screen exit funnel. The wrap-up IS the last conversation turn:<br>1-line honest recap · credit to his choice · the once-only teach line · a small warm burst.</div>
+    </div>
+    <div class="barbottom">
+      <div class="inputbar"><button class="cam">📷</button><span class="mic">🎤</span><span class="itext">Tell me anything…</span><button class="send">→</button></div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 1.6 — day two, cold start dead ========== -->
+  <div class="frame" id="s1-after">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar">J</button></div>
+    <div class="content">
+      <div class="card anchor">
+        <div class="kicker">next up</div>
+        <div class="ctitle dial-relaxed">Pick up where you left off — 2 questions to go</div>
+        <div class="ctitle dial-push">Finish that worksheet — 2 questions left. Now's good.</div>
+        <div class="csub">Yesterday's homework session, Math</div>
+        <div class="cta"><button class="btn">Continue</button><button class="decline">not today</button></div>
+      </div>
+      <div class="card">
+        <div class="kicker">while you were away</div>
+        <div class="ctitle" style="font-size:13.5px; font-weight:600;">I filed yesterday's equations under Math → Algebra and set up a check-in for Thursday.</div>
+      </div>
+      <div class="caption">First real state exists → the cold-start card has self-destructed <b>forever</b>.<br>The mentor's invisible work (Inngest jobs) shows up as a quiet ledger moment.</div>
+      <button class="btn big warm" onclick="go('s2-feed')">▶ Jump to day eight</button>
+    </div>
+    <div class="barbottom">
+      <div class="inputbar"><button class="cam">📷</button><span class="mic">🎤</span><span class="itext">Try: show my progress</span><button class="send">→</button></div>
+      <button class="hwchip">📷 Homework</button>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('hub-math')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 2.1 — day-eight feed ========== -->
+  <div class="frame" id="s2-feed">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar" onclick="openSheet('avsheet')">J</button></div>
+    <div class="content">
+      <span class="ontrack">✓ on track</span>
+      <div class="card anchor">
+        <div class="kicker">worth 5 minutes</div>
+        <div class="ctitle dial-relaxed">Patch up linear equations — 5 min</div>
+        <div class="ctitle dial-push">Linear equations are due — 5 min, let's do it now</div>
+        <div class="csub dial-relaxed">They got wobbly since last week. A quick run keeps them yours.</div>
+        <div class="csub dial-push">They slip a little more every day we wait. Quick run, right now.</div>
+        <div class="cta"><button class="btn warm" onclick="go('s2-review')">Let's go</button><button class="decline">not today</button></div>
+      </div>
+      <div class="card">
+        <div class="kicker">unfinished</div>
+        <div class="ctitle" style="font-size:14px;">Resume Tuesday's fractions session</div>
+        <div class="cta"><button class="btn ghost">Resume</button><button class="decline">dismiss</button></div>
+      </div>
+      <div class="card">
+        <div class="kicker">from your mentor</div>
+        <div class="ctitle" style="font-size:13.5px; font-weight:600;">Your Thursday plan is ready — geometry gets the spotlight.</div>
+      </div>
+      <button class="overflowlink" onclick="go('s2-overflow')">everything waiting (4) →</button>
+    </div>
+    <div class="barbottom">
+      <div class="inputbar"><button class="cam">📷</button><span class="mic">🎤</span><span class="itext">Tell me anything…</span><button class="send">→</button></div>
+      <button class="hwchip">📷 Homework</button>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('hub-math')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 2.2 — the review ========== -->
+  <div class="frame" id="s2-review">
+    <div class="hdr"><span class="htitle">Quick review · Math</span><button class="avatar">J</button></div>
+    <div class="content">
+      <div class="bubble mentor">Two quick ones and you're free. First: <b>5x − 3 = 12</b> — what's x?</div>
+      <div class="bubble user">x = 3</div>
+      <div class="bubble mentor">Clean. Second: <b>2(x + 4) = 18</b>?</div>
+      <div class="bubble user">x = 5</div>
+      <div class="caption">(the existing review engine, unchanged — V2 changes how he arrived, not the engine)</div>
+      <button class="btn big warm" onclick="go('s2-noticing')">Finish review →</button>
+    </div>
+    <div class="barbottom">
+      <div class="inputbar"><button class="cam">📷</button><span class="mic">🎤</span><span class="itext">type your answer…</span><button class="send">→</button></div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 2.3 — the noticing loop (animated) ========== -->
+  <div class="frame" id="s2-noticing">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar">J</button></div>
+    <div class="content">
+      <div class="bubble mentor arrive" id="nl-1">I asked you to patch up linear equations — you did, and it held. Last week you needed three hints; today, <b>none</b>.</div>
+      <div class="card arrive" id="nl-2">
+        <div class="kicker">Algebra · linear equations</div>
+        <div class="arc">
+          <span class="nd done">✓</span><span class="seg2 done"></span>
+          <span class="nd done">✓</span><span class="seg2 done"></span>
+          <span class="nd due" id="nl-node">!</span><span class="seg2"></span>
+          <span class="nd">4</span><span class="seg2"></span><span class="nd">5</span>
+        </div>
+        <div class="arclabel" id="nl-arclabel">review due → …</div>
+      </div>
+      <div class="burstwrap">
+        <span class="burst" id="nl-burst"></span>
+        <div class="bubble mentor arrive" id="nl-3">Since that held, we can skip the easy run and go straight at the hard part Thursday. 🎉 And remember — <b>you</b> decided to tackle it today. That was your call, and it paid off.</div>
+      </div>
+      <div class="arrive" id="nl-4" style="text-align:center;">
+        <button class="btn big ghost" onclick="go('s2-feed')">← back to the feed</button>
+        <div class="caption">All four channels, one beat: loop closed with memory · the arc advanced under his finger · the plan audibly upgraded · the message <i>arrived joyfully</i>. No XP. No streak. No confetti from "the app."</div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 2.4 — overflow ========== -->
+  <div class="frame" id="s2-overflow">
+    <div class="hdr"><span class="htitle">Everything waiting</span><button class="avatar">J</button></div>
+    <div class="content">
+      <div class="card"><div class="kicker">parked · from last Monday</div><div class="ctitle" style="font-size:14px;">"Why does dividing by a fraction flip it?" — you parked this</div><div class="cta"><button class="btn ghost">Unpark</button></div></div>
+      <div class="card"><div class="kicker">review due Friday</div><div class="ctitle" style="font-size:14px;">Fractions — common denominators</div></div>
+      <div class="card"><div class="kicker">review due next week</div><div class="ctitle" style="font-size:14px;">Geometry — angle sums</div></div>
+      <div class="card"><div class="kicker">challenge ready</div><div class="ctitle" style="font-size:14px;">Linear equations — prove it's mastered</div><div class="cta"><button class="btn ghost">Take the challenge</button></div></div>
+      <button class="btn big ghost" onclick="go('s2-feed')">← back</button>
+      <div class="caption">The ≤3 feed cards are the <b>highlight, not the ceiling</b> — nothing parked is ever unreachable (spec §8.1, EU-3).</div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('hub-math')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SUBJECT HUB ========== -->
+  <div class="frame" id="hub-math">
+    <div class="hdr"><span class="htitle">Math</span><button class="avatar" onclick="openSheet('avsheet')">J</button></div>
+    <div class="content">
+      <div class="nextup">
+        <div class="kicker" style="color:var(--brand);">next up</div>
+        <div class="ctitle">Linear equations — challenge round</div>
+        <div class="csub">You're close to mastering this. ~10 min.</div>
+        <div class="cta"><button class="btn">Start</button></div>
+      </div>
+      <details class="chap" open>
+        <summary>Algebra <span class="mastery">4/6 topics solid</span></summary>
+        <div class="topics">
+          <div class="topic" onclick="openSheet('topicsheet')"><span><span class="dot g"></span>Linear equations</span><span class="mastery">review due</span></div>
+          <div class="topic"><span><span class="dot g"></span>Order of operations</span><span class="mastery">mastered</span></div>
+          <div class="topic"><span><span class="dot a"></span>Fractions in equations</span><span class="mastery">wobbly</span></div>
+          <div class="topic"><span><span class="dot e"></span>Quadratic intro</span><span class="mastery">not started</span></div>
+        </div>
+      </details>
+      <details class="chap">
+        <summary>Geometry <span class="mastery">1/5 topics solid</span></summary>
+        <div class="topics">
+          <div class="topic"><span><span class="dot g"></span>Angle sums</span><span class="mastery">solid</span></div>
+          <div class="topic"><span><span class="dot e"></span>Triangles</span><span class="mastery">not started</span></div>
+        </div>
+      </details>
+      <details class="chap">
+        <summary>Statistics <span class="mastery">not started</span></summary>
+        <div class="topics"><div class="topic"><span><span class="dot e"></span>Mean, median, mode</span><span class="mastery">—</span></div></div>
+      </details>
+      <div class="card" style="margin-top:12px;">
+        <div class="kicker">my notes in Math (2)</div>
+        <div class="csub">"sign flips when crossing =" · "denominator trick from Tuesday"</div>
+      </div>
+      <div class="caption">Shelf + Progress merged into one hub. Max depth 2: chapters collapse on this page; a topic opens as a sheet (tap "Linear equations"). No XP pill anywhere.</div>
+    </div>
+    <div class="tabbar">
+      <button onclick="go('s2-feed')"><span class="ticon">💬</span>Mentor</button>
+      <button class="on"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== JOURNAL ========== -->
+  <div class="frame" id="journal">
+    <div class="hdr"><span class="htitle"><span class="jname">Journal</span></span><button class="avatar" onclick="openSheet('avsheet')">J</button></div>
+    <div class="content">
+      <div class="moments">
+        <div class="moment"><span class="mic2">🏅</span>First challenge passed<br><i>Tue</i></div>
+        <div class="moment"><span class="mic2">💡</span>Cracked sign-flips solo<br><i>Mon</i></div>
+        <div class="moment"><span class="mic2">🌱</span>Started Math<br><i>last week</i></div>
+      </div>
+      <div class="seglist">
+        <button class="on" onclick="jseg(this,'j-recaps')">Recaps</button>
+        <button onclick="jseg(this,'j-notes')">Notes</button>
+        <button onclick="jseg(this,'j-memory')">Mentor memory</button>
+      </div>
+      <div id="j-recaps">
+        <div class="card"><div class="kicker">this week</div><div class="csub">3 sessions · linear equations went from wobbly to holding · fractions parked once and picked back up.</div></div>
+        <div class="card"><div class="kicker">last week</div><div class="csub">First session ever — homework rescue, equations. Needed three hints; finished strong.</div></div>
+      </div>
+      <div id="j-notes" style="display:none;">
+        <div class="card"><div class="kicker">my note · Math</div><div class="csub">"sign flips when crossing ="</div></div>
+        <div class="card"><div class="kicker">saved from mentor · Math</div><div class="csub">"divide-by-a-fraction = multiply by its flip"</div></div>
+        <div class="caption">One store, two origins — authorship always visible. Browsable, never search-only (EU-6).</div>
+      </div>
+      <div id="j-memory" style="display:none;">
+        <div class="card"><div class="kicker">what your mentor knows about you</div><div class="csub">Prefers worked examples over theory · evening learner · gets terse when frustrated — back off the hints, let him drive.</div></div>
+      </div>
+      <div class="trustline">Your space is private — unless you're not safe.</div>
+    </div>
+    <div class="tabbar">
+      <button onclick="go('s2-feed')"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('hub-math')"><span class="ticon">📚</span>Subjects</button>
+      <button class="on"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== AVATAR FRAME (auto-opens sheet) ========== -->
+  <div class="frame" id="avatarframe">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar">J</button></div>
+    <div class="content">
+      <div class="caption" style="margin-top:40px;">(feed dimmed behind the sheet)</div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('hub-math')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 3.1 — variant zero ========== -->
+  <div class="frame" id="s3-variantzero">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar parent">P</button></div>
+    <div class="content">
+      <div class="greet">Hi — who are you supporting?</div>
+      <div class="coldcard" style="text-align:center;">
+        <button class="btn big warm" onclick="go('s3-addchild')">+ Add my child</button>
+        <div class="csub" style="margin-top:12px; text-align:left;">You'll see his recaps, progress and wins. And he always knows what you see.</div>
+      </div>
+      <div style="margin-top:16px;">
+        <div class="ghostlabel">Example — this is what you'll see after Jakub's first session:</div>
+        <div class="card ghost">
+          <div class="kicker">recap · example</div>
+          <div class="csub">"Jakub worked on linear equations for 25 minutes. He needed a few hints early on but solved the last problems on his own."</div>
+        </div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 3.2 — tier dispatch ========== -->
+  <div class="frame" id="s3-addchild">
+    <div class="hdr"><span class="htitle">Add my child</span><button class="avatar parent">P</button></div>
+    <div class="content">
+      <div class="greet" style="font-size:18px;">Does Jakub use his own<br>phone and login?</div>
+      <div class="chips">
+        <button class="chip" onclick="go('s3-ceremony')">Yes — he has his own phone</button>
+        <button class="chip" style="opacity:.5;">No — he'll use mine <span style="font-size:10px;">(managed tier — OFF at 13+ launch, §13.5)</span></button>
+      </div>
+      <div class="caption">One plain question routes managed vs credentialized. Petra never sees those words.</div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 3.3 — linking ceremony ========== -->
+  <div class="frame" id="s3-ceremony">
+    <div class="hdr"><span class="htitle">Linking ceremony</span><button class="avatar parent">P</button></div>
+    <div class="content">
+      <div class="caption" style="margin-bottom:10px;">Jakub accepted your invite. <b>You are both reading this same contract right now</b> — his phone shows the mirror of this screen.</div>
+      <div class="contractbox">
+        <h4 class="always">✓ What you will see</h4>
+        <ul>
+          <li>Weekly recaps of what he worked on</li>
+          <li>Subjects, chapters and mastery — the "grades layer"</li>
+          <li>Activity level and milestones</li>
+          <li>Attention items when something needs you</li>
+        </ul>
+      </div>
+      <div class="contractbox">
+        <h4 class="never">✗ What you will never see</h4>
+        <ul>
+          <li>His conversations with the mentor</li>
+          <li>His notes and his <span class="jname">Journal</span></li>
+          <li>What the mentor remembers about him</li>
+          <li>What he confides — worries and self-doubt are never reported</li>
+        </ul>
+      </div>
+      <div class="caption">Safety is the one exception — if he's ever not safe, that crosses every wall.<br>Your relation: <b>Parent</b> (he sees this claim and confirms it).</div>
+      <button class="btn big" onclick="go('s3-lifecycle')">I understand — link us</button>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 3.4 — morphing card ========== -->
+  <div class="frame" id="s3-lifecycle">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar parent">P</button></div>
+    <div class="content">
+      <div class="caption" style="margin-bottom:8px;">One live card per child — it <b>morphs</b>, it never becomes three screens. Step through:</div>
+      <div class="lifestep">
+        <button onclick="lifeStep(this,0)">invite sent</button>
+        <button onclick="lifeStep(this,1)">review &amp; approve</button>
+        <button class="on" onclick="lifeStep(this,2)">help him start</button>
+        <button onclick="lifeStep(this,3)">warm feed</button>
+      </div>
+      <div id="life-0" class="lifebody" style="display:none;">
+        <div class="card anchor"><div class="kicker">Jakub</div><div class="ctitle">Invite sent ✉️</div><div class="csub">We'll tell you the moment he accepts.</div></div>
+      </div>
+      <div id="life-1" class="lifebody" style="display:none;">
+        <div class="card anchor"><div class="kicker">Jakub</div><div class="ctitle">Jakub's waiting — review &amp; approve</div><div class="csub">He can't start until you approve the link. You'll both see the same contract.</div><div class="cta"><button class="btn warm" onclick="go('s3-ceremony')">Review &amp; approve →</button></div></div>
+      </div>
+      <div id="life-2" class="lifebody">
+        <div class="card anchor"><div class="kicker">Jakub</div><div class="ctitle">Help Jakub get started</div><div class="csub">Linked and ready — he hasn't had his first session yet. His recaps and progress appear here once he begins.</div><div class="cta"><button class="btn warm" onclick="go('s3-kickstart')">Send him a spark 💛</button></div></div>
+      </div>
+      <div id="life-3" class="lifebody" style="display:none;">
+        <div class="card"><div class="kicker">Jakub · this week</div><div class="ctitle" style="font-size:14px;">First session done! 🎉</div><div class="csub">Homework rescue — linear equations, 25 min. Needed a few hints early, finished strong.</div><div class="cta"><button class="btn ghost" onclick="go('s4-hub')">▶ continue to Scene 4</button></div></div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 3.5 — kickstart ========== -->
+  <div class="frame" id="s3-kickstart">
+    <div class="hdr"><span class="htitle">Send a spark</span><button class="avatar parent">P</button></div>
+    <div class="content" id="ks-compose">
+      <div class="caption" style="margin-bottom:10px;">Pick or write an encouragement — it lands in <b>his</b> app as a suggestion he can use or ignore. It never creates anything in his account.</div>
+      <div class="chips">
+        <button class="chip" onclick="ksSend()">💛 "You've got that math test coming — want a head start?"</button>
+        <button class="chip" onclick="ksSend()">💛 Suggest a topic: equations</button>
+        <button class="chip">✏️ Write my own…</button>
+      </div>
+    </div>
+    <div class="content" id="ks-sent" style="display:none;">
+      <span class="gapflag">GAP 6</span><span class="propflag">PROPOSAL — his side</span>
+      <div class="caption" style="margin-bottom:8px;">Sent ✓ — and this is what <b>Jakub</b> sees in his cold-start card:</div>
+      <div class="coldcard">
+        <div class="inputbar"><span class="mic">🎤</span><span class="itext">Tell me anything…</span><button class="send">→</button></div>
+        <div class="coldhint">Not sure? Try one of these — or just type:</div>
+        <div class="chips">
+          <button class="chip kick">💛 Petra suggested: equations</button>
+          <button class="chip">📷 Homework help</button>
+          <button class="chip">✨ Learn something</button>
+        </div>
+      </div>
+      <div class="caption">Her chip sits <b>on top, visually distinct</b> (warm tint, her name) — but it fills like every other chip: tapping types "I want to work on equations" into <b>his</b> input, for <b>him</b> to send. Her nudge becomes his choice.</div>
+      <button class="btn big ghost" onclick="go('s3-staleidle')">What if he ignores it? →</button>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 3.6 — stale idle ========== -->
+  <div class="frame" id="s3-staleidle">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar parent">P</button></div>
+    <div class="content">
+      <div class="caption" style="margin-bottom:8px;">If Jakub stalls, her card <b>de-escalates by her visit count</b> — it never gets louder. Step through her visits:</div>
+      <div class="visitstep">
+        <button class="on" onclick="visitStep(this,0)">visit 2</button>
+        <button onclick="visitStep(this,1)">visit 3</button>
+        <button onclick="visitStep(this,2)">visit 4</button>
+        <button onclick="visitStep(this,3)">visit 5+</button>
+      </div>
+      <div id="visit-0" class="visitbody">
+        <div class="card"><div class="kicker">Jakub</div><div class="csub">Your encouragement reached Jakub. He hasn't started yet — most teens start within the first week, usually when homework gets hard.</div></div>
+      </div>
+      <div id="visit-1" class="visitbody" style="display:none;">
+        <div class="card"><div class="kicker">Jakub</div><div class="ctitle" style="font-size:14px;">Start together</div><div class="csub">Next time you're with him, open his first session side by side.</div></div>
+      </div>
+      <div id="visit-2" class="visitbody" style="display:none;">
+        <div class="card"><div class="kicker">Jakub</div><div class="ctitle" style="font-size:14px;">Try it yourself</div><div class="csub">Experience exactly what Jakub will see — and help him get on board.</div><div class="cta"><button class="btn ghost">Start my own session</button></div></div>
+      </div>
+      <div id="visit-3" class="visitbody" style="display:none;">
+        <div class="card"><div class="kicker">while you wait</div><div class="ctitle" style="font-size:14px;">Learn something yourself?</div><div class="csub">Your first session opens your own learning space.</div><div class="cta"><button class="btn ghost">Pick a topic</button></div></div>
+      </div>
+      <div class="card" style="background:#fbfaf7;">
+        <div class="csub">🔔 <b>We'll let you know the moment Jakub starts.</b> (A push that genuinely fires — she never has to check an empty app.)</div>
+      </div>
+      <div class="caption">What she is <b>never</b> shown: whether he opened the app and bounced. Parent-visible state is binary — started / hasn't. No guilt copy, ever.</div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button><span class="ticon">📚</span>Subjects</button>
+      <button><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 4.1 — support hub ========== -->
+  <div class="frame" id="s4-hub">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar parent" onclick="openSheet('avsheet')">P</button></div>
+    <div class="scopechips">
+      <button class="scopechip on">Support hub</button>
+      <button class="scopechip" onclick="go('s4-jmentor')">Jakub</button>
+    </div>
+    <div class="content">
+      <div class="card anchor">
+        <div class="kicker">needs your attention</div>
+        <div class="ctitle">Fractions keep slipping for Jakub</div>
+        <div class="csub">Third wobbly review in a row. Worth asking how it's going — gently.</div>
+        <div class="cta"><button class="btn ghost">Acknowledge</button><button class="decline">snooze</button></div>
+      </div>
+      <div class="card">
+        <div class="kicker">milestone</div>
+        <div class="ctitle" style="font-size:14px;">Jakub passed his first challenge round 🏅</div>
+        <div class="csub">Linear equations — verified mastered, no hints.</div>
+      </div>
+      <div class="card">
+        <div class="kicker">weekly recap · Jakub</div>
+        <div class="csub">3 sessions, ~70 minutes. Equations now holding; fractions need patience. He works best in the evening.</div>
+      </div>
+      <div class="caption">"Decline" on an attention item is acknowledge/snooze — it re-surfaces while the condition persists (EU-8). It never silently clears.</div>
+    </div>
+    <div class="barbottom">
+      <div class="inputbar"><span class="mic">🎤</span><span class="itext">Ask about your family's learning…</span><button class="send">→</button></div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('s4-jsubjects')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('s4-jjournal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 4.2 — Jakub scope, mentor ========== -->
+  <div class="frame" id="s4-jmentor">
+    <div class="hdr"><span class="htitle">Mentor</span><button class="avatar parent">P</button></div>
+    <div class="scopechips">
+      <button class="scopechip" onclick="go('s4-hub')">Support hub</button>
+      <button class="scopechip on">Jakub</button>
+    </div>
+    <div class="content">
+      <div class="bubble user">how is Jakub really doing in math?</div>
+      <div class="bubble mentor">Honestly? Better than the wobbles suggest. Equations clicked last week — he solved the whole review without hints, which two weeks ago took three. Fractions are the sticking point: he understands the idea but rushes the denominators. If you want to help, a casual "show me the denominator trick" works better than "go practice fractions."</div>
+      <div class="caption">This is <b>her</b> mentor interpreting <b>his</b> data — pedagogical framing, never raw exhaust, never his words. His confided feelings aren't in it: they're never reported in the first place (the sealed class, §6.1).</div>
+      <button class="overflowlink">Not convinced? Request a detailed attention report →</button>
+      <div class="caption">The appeal affordance: a logged, deliberate, richer <i>structural</i> report — still no notes, no chats, no memory.</div>
+    </div>
+    <div class="barbottom">
+      <div class="inputbar"><span class="mic">🎤</span><span class="itext">Ask about Jakub's learning…</span><button class="send">→</button></div>
+    </div>
+    <div class="tabbar">
+      <button class="on"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('s4-jsubjects')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('s4-jjournal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 4.3 — Jakub scope, masked hub ========== -->
+  <div class="frame" id="s4-jsubjects">
+    <div class="hdr"><span class="htitle">Jakub · Math</span><button class="avatar parent">P</button></div>
+    <div class="scopechips">
+      <button class="scopechip" onclick="go('s4-hub')">Support hub</button>
+      <button class="scopechip on">Jakub</button>
+    </div>
+    <div class="content">
+      <div class="masknote">Structural view — Jakub's live progress, server-masked. His notes and conversations don't render here; no read path exists.</div>
+      <details class="chap" open>
+        <summary>Algebra <span class="mastery">4/6 topics solid</span></summary>
+        <div class="topics">
+          <div class="topic"><span><span class="dot g"></span>Linear equations</span><span class="mastery">mastered ✓</span></div>
+          <div class="topic"><span><span class="dot a"></span>Fractions in equations</span><span class="mastery">wobbly</span></div>
+          <div class="topic"><span><span class="dot e"></span>Quadratic intro</span><span class="mastery">not started</span></div>
+        </div>
+      </details>
+      <details class="chap">
+        <summary>Geometry <span class="mastery">1/5 topics solid</span></summary>
+        <div class="topics"><div class="topic"><span><span class="dot g"></span>Angle sums</span><span class="mastery">solid</span></div></div>
+      </details>
+      <div class="caption">The <b>same hub component</b> Jakub sees — the mask removed the notes block and every artifact. Compare with the free-roam Subject hub: the difference IS the privacy contract.</div>
+    </div>
+    <div class="tabbar">
+      <button onclick="go('s4-jmentor')"><span class="ticon">💬</span>Mentor</button>
+      <button class="on"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('s4-jjournal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 4.4 — shared record ========== -->
+  <div class="frame" id="s4-jjournal">
+    <div class="hdr"><span class="htitle"><span class="jname">Journal</span> · Jakub</span><button class="avatar parent">P</button></div>
+    <div class="scopechips">
+      <button class="scopechip" onclick="go('s4-hub')">Support hub</button>
+      <button class="scopechip on">Jakub</button>
+    </div>
+    <div class="content">
+      <div class="caption" style="margin-bottom:10px;">The shared record: <b>every report ever made to you about Jakub</b>. He can see the same facts, rendered for him — nothing is said about him behind his back.</div>
+      <div class="card"><div class="kicker">attention item · Wed</div><div class="csub">"Fractions keep slipping — third wobbly review."</div><div class="csub" style="font-style:italic; color:var(--good);">↔ Jakub sees: "I told your mum fractions need another run — here's the plan."</div></div>
+      <div class="card"><div class="kicker">milestone · Tue</div><div class="csub">"Jakub passed his first challenge round — linear equations verified."</div><div class="csub" style="font-style:italic; color:var(--good);">↔ Jakub sees: "Your mum saw your challenge win 🏅"</div></div>
+      <div class="card"><div class="kicker">weekly recap · Mon</div><div class="csub">"3 sessions, ~70 min. Equations holding; fractions need patience."</div><div class="csub" style="font-style:italic; color:var(--good);">↔ mirrored in Jakub's <span class="jname">Journal</span></div></div>
+    </div>
+    <div class="tabbar">
+      <button onclick="go('s4-jmentor')"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('s4-jsubjects')"><span class="ticon">📚</span>Subjects</button>
+      <button class="on"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SHEETS (shared overlays) ========== -->
+  <div class="scrim" id="scrim" onclick="closeSheets()"></div>
+  <div class="sheet" id="avsheet">
+    <div class="grab"></div>
+    <div class="sheetrow"><span><span class="ric">👤</span>Profile &amp; language</span><span>›</span></div>
+    <div class="sheetrow"><span><span class="ric">🔔</span>Notifications</span><span>›</span></div>
+    <div class="sheetrow"><span><span class="ric">💳</span>Billing &amp; subscription</span><span class="ownertag">owner</span></div>
+    <div class="sheetrow"><span><span class="ric">🔒</span>Account security</span><span class="ownertag">owner</span></div>
+    <div class="sheetrow"><span><span class="ric">🛡️</span>Privacy · export · delete</span><span class="ownertag">owner</span></div>
+    <div class="sheetrow"><span><span class="ric">👧</span>Add a child / linking</span><span class="ownertag">owner 18+</span></div>
+    <div class="sheetrow"><span><span class="ric">❓</span>Help</span><span>›</span></div>
+    <div class="caption" style="margin-top:10px;">The whole "More" tab, dissolved into an errand sheet. Owner gating exactly as today.</div>
+  </div>
+  <div class="sheet" id="topicsheet">
+    <div class="grab"></div>
+    <div class="kicker" style="font-size:10px; text-transform:uppercase; color:var(--muted); font-weight:700;">Algebra · topic</div>
+    <h3 style="font-size:17px; margin:4px 0 8px;">Linear equations</h3>
+    <div class="arc">
+      <span class="nd done">✓</span><span class="seg2 done"></span><span class="nd done">✓</span><span class="seg2 done"></span><span class="nd due">!</span><span class="seg2"></span><span class="nd">4</span><span class="seg2"></span><span class="nd">5</span>
+    </div>
+    <div class="arclabel" style="margin-bottom:12px;">review due — last seen 6 days ago</div>
+    <div class="cta" style="display:flex; gap:8px;">
+      <button class="btn warm">Review now (5 min)</button>
+      <button class="btn ghost">Challenge round</button>
+    </div>
+    <div class="card" style="margin-top:12px;"><div class="kicker">your note here</div><div class="csub">"sign flips when crossing ="</div></div>
+  </div>
+
+</div><!-- /phone -->
+</div><!-- /stage -->
+
+<script>
+/* ---------- frame navigation + director notes ---------- */
+const NOTES = {
+  start:`<div class="ntitle">How to read this prototype</div>It is internal fidelity: layout, copy, and interaction truth — not final visual design. Everything quoted in the scenes is verbatim spec copy; the three red-GAP frames are the only invented parts, and they are clearly flagged.<div class="cite">Script: 01-day-in-the-life.md · Spec: docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md</div>`,
+  's1-consent':`<span class="prop">PROPOSAL — gap 1</span><div class="ntitle">Onboarding → cold-start handoff</div>The spec is silent between consent and the first screen. Proposal: <b>no welcome tour, no setup form</b> — one confirmation beat, one button, straight onto the Mentor tab. Anything more (a wizard, a subject picker) would contradict §3.1's "onboarding is the product itself."<div class="cite">Gap register #1 · script-breaking</div>`,
+  's1-coldstart':`<div class="ntitle">The cold-start card (verbatim §3.1)</div><b>Try it: tap a chip.</b> It does NOT navigate — it types its words into the input and lights the send arrow. Jakub presses send himself. Chips fill, cards fire — the permanent interaction law (§15.15). The card never shows fake proposals and dies forever once real state exists.<div class="cite">Spec §3.1 · ruling 14/15</div>`,
+  's1-reply':`<div class="ntitle">Instant dual-path homework reply</div>Template, zero LLM latency. Camera as a big affordance <i>inside</i> the reply, chat continuing underneath — no "what subject is it?" preamble. The spec makes latency an acceptance criterion: slow, this is a worse homework app than a camera button; fast, it IS the thesis.<div class="cite">Spec §3.1 homework path</div>`,
+  's1-homework':`<span class="prop">PROPOSAL — gap 2</span><div class="ntitle">The homework session inside the new shell</div>Today's plans reuse the legacy camera flow verbatim with no V2 description. Proposal: the round-trip stays <b>in the conversation</b> — photo lands as a chat bubble, help-me vs check-answer are two buttons in the mentor's reply, the session runs in the same thread. No separate screen-stack to get lost in.<div class="cite">Gap register #2 · script-breaking</div>`,
+  's1-wrapup':`<span class="prop">PROPOSAL — gap 3</span><div class="ntitle">First-session wrap-up</div>The teach line and the first celebration both fire "at end of first session," but no plan designs the surface. Proposal: the wrap-up IS the final conversation turn — honest 1-line recap, credit to his choice (never obedience), the once-only teach line, a small warm burst. The legacy 3-screen exit funnel never appears.<div class="cite">Gap register #3 · script-breaking · §2.1</div>`,
+  's1-after':`<div class="ntitle">Day two — the cold-start card is dead forever</div>Real state exists, so proposals own the anchor slot. Note the quiet ledger moment: the mentor narrates its own invisible background work (P4). The placeholder now rotates navigational examples ("Try: show my progress") — the breadth lesson. The 📷 Homework chip is permanent and reachable without scrolling (EU-5).<div class="cite">Spec §3.1 · §8.2</div>`,
+  's2-feed':`<div class="ntitle">The bet, on screen</div>One anchor + ≤2 modules (P6). The anchor is visually unique — nothing else may share its color or weight (a compliance posture, not taste). Every card is an action with a decline. The calm "on track" badge sits where a streak counter would. <b>Try the §13.7 tone toggle</b> (left panel) — it changes proposal copy only.<div class="cite">Spec §2 P6/P7 · §8.1</div>`,
+  's2-review':`<div class="ntitle">The review itself is the existing engine</div>V2 changes how Jakub <i>arrived</i> (feed anchor, not Progress-tab spelunking), not the session machinery.<div class="cite">Dossier 02 — STAYS table</div>`,
+  's2-noticing':`<div class="ntitle">▶ The noticing loop — all four channels in one beat</div>Watch the sequence: (1) the mentor closes its own suggestion loop with memory-based specifics, (2) the journey arc advances under his finger — the node lights, (3) the plan audibly upgrades, (4) the message arrives joyfully with a warm burst. No XP, no streak, no app-confetti. Credit goes to his choice. <b>Re-click the frame to replay.</b><div class="cite">Spec §2.1 — the whole motivation system</div>`,
+  's2-overflow':`<div class="ntitle">The overflow — nothing is ever unreachable</div>Parked items, future reviews, ready challenges. This is what keeps the ≤3 cap honest: highlight, not ceiling. Park-and-return (P3) is the one principle that degrades silently, hence the eval gate + this deterministic backstop.<div class="cite">Spec §8.1 EU-3 · P3</div>`,
+  'hub-math':`<div class="ntitle">The Subject hub — shelf + progress merged</div>Next-up on top so a kid who just wants to continue never reads the tree. Chapters collapse on the page (max depth 2); <b>tap "Linear equations"</b> — topic detail is a slide-up sheet, not another screen. Subject-scoped notes live here. No XP pill (killed, not re-wired).<div class="cite">Spec §5 · S2</div>`,
+  journal:`<div class="ntitle">The paper trail of the relationship</div>Recaps · notes (one store, two origins, authorship visible) · mentor memory — plus the moments strip. Browsable, never search-only (EU-6). <b>Try the §13.4 name toggle</b> (left panel) and read the trust line at the bottom both ways — the name and the trust copy are tested together.<div class="cite">Spec §3 · §13.4/EU-9 · S3</div>`,
+  avatarframe:`<div class="ntitle">Admin is an errand, not a tab</div>The whole More tab dissolves into this sheet. Owner gating (billing, security, privacy, add-child) exactly as today. Nobody browses admin — zero discovery cost behind the avatar.<div class="cite">Spec §3 · S3</div>`,
+  's3-variantzero':`<div class="ntitle">The parent side — built last, launches with everything else</div>S4–S5 in build order (it needs the identity cutover), but launch waits for the full build (ruled 2026-06-12) — so this IS Petra's day-one launch experience. Variant zero: one anchor, positive-only trust copy (the artifact wall is disclosed at the ceremony, not the door), and a labeled ghost preview so the empty state sells the destination.<div class="cite">Spec §3.2 · S4–S5</div>`,
+  's3-addchild':`<div class="ntitle">Parent-language tier dispatch</div>"Does Jakub use his own phone and login?" routes managed vs credentialized without ever saying those words. At the 13+ launch only the credentialized path is live (§13.5 — managed tier built in S5, OFF until the 10–12 ruling).<div class="cite">Spec §3.2 · §6.2</div>`,
+  's3-ceremony':`<div class="ntitle">The linking ceremony — never one-tap</div>Both sides see and accept the <b>same contract</b>. The artifact wall is disclosed here, in full, including the sealed-confession class ("what he confides is never reported") and the safety exception. The claimed relation (Parent) is shown to Jakub for validation.<div class="cite">Spec §6.1/§6.2 · S5</div>`,
+  's3-lifecycle':`<div class="ntitle">One morphing card per child — the Wizz flight-card pattern</div>Step through the lifecycle: the same live object advances invite → approve → kickstart → warm feed. Never a pile of cards, never three screens. Urgency lives on the card ("Jakub's waiting"); deliberateness lives in the ceremony.<div class="cite">Spec §3.2 · ruling 14</div>`,
+  's3-kickstart':`<span class="prop">PROPOSAL — gap 6 (his-side rendering)</span><div class="ntitle">Kickstart creates a chip, not a subject</div>Petra's encouragement lands in Jakub's cold-start card as one more fillable chip — warm tint, her name, top position (this rendering is the proposal; the spec gives it one line). Tapping types the words into HIS input for HIM to send. Rate limits unchanged (4/24h, quiet hours).<div class="cite">Spec §3.2 kickstart · gap register #6</div>`,
+  's3-staleidle':`<div class="ntitle">De-escalation, never escalation</div>Step through her visits. The card redirects the screen's energy to <b>her</b> — start together, try it yourself, learn something — and never pressures him through her. Binary state only: she never learns he opened-and-bounced. The "we'll tell you the moment he starts" push genuinely fires.<div class="cite">Spec §3.2 stale-idle arc · ruling 18</div>`,
+  's4-hub':`<div class="ntitle">The Support hub — everything addressed to HER</div>Attention items, milestones, recaps across all her people. Note the scope chip: hub vs Jakub are different lenses, same three tabs. Declining an attention item only snoozes it — it re-surfaces while the condition persists (EU-8). With 2+ children, per-edge fairness guarantees each child representation (EU-3).<div class="cite">Spec §4 · §6.3 · S4</div>`,
+  's4-jmentor':`<div class="ntitle">Her mentor, about him — interpretation, not exhaust</div>The bar in Jakub's scope talks to HER mentor about him. Curated, pedagogically framed, actionable — never his words, never his confided feelings (sealed class: never reported in the first place). The appeal affordance is the release valve for a parent who doesn't trust "fine."<div class="cite">Spec §6.1 EU-1/EU-2 · S5</div>`,
+  's4-jsubjects':`<div class="ntitle">The masked structural hub — the privacy contract made visible</div>The same hub component Jakub sees, read live from his data through a server mask: chapters, mastery, activity — no notes, no chat, no artifacts. Not hidden client-side; <b>no read path exists</b>. Compare with the free-roam Subject hub.<div class="cite">Spec §6.1/§6.3 · S4</div>`,
+  's4-jjournal':`<div class="ntitle">The shared record — two-way transparency</div>Every report ever made to her about Jakub, with his-side mirror shown in green: same facts, rendered for each audience. Nothing is said about him behind his back — and because confided affect is never reported at all, transparency can't chill his confessions.<div class="cite">Spec §6.1/§6.3 · S5 · the second Bet-Sheet observable</div>`
+};
+
+let nlTimers = [];
+function go(id){
+  document.querySelectorAll('.frame').forEach(f=>f.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  document.querySelectorAll('#director button.nav').forEach(b=>b.classList.toggle('active', b.dataset.f===id));
+  document.getElementById('note').innerHTML = NOTES[id] || '';
+  closeSheets();
+  if(id==='avatarframe') setTimeout(()=>openSheet('avsheet'),150);
+  if(id==='s2-noticing') playNoticing();
+  const nb = document.querySelector('#director button.nav.active');
+  if(nb) nb.scrollIntoView({block:'nearest'});
+}
+
+/* ---------- cold-start chip fill ---------- */
+function fillCold(text){
+  const t = document.getElementById('cs-text');
+  t.textContent = '';
+  t.classList.add('filled');
+  document.getElementById('cs-bar').classList.add('filled');
+  let i = 0;
+  const tick = setInterval(()=>{ t.textContent = text.slice(0, ++i); if(i>=text.length) clearInterval(tick); }, 18);
+}
+function sendCold(){
+  if(document.getElementById('cs-bar').classList.contains('filled')) go('s1-reply');
+}
+
+/* ---------- homework reveal ---------- */
+function revealHw(){ document.getElementById('hw-more').style.display='block'; }
+
+/* ---------- noticing loop ---------- */
+function playNoticing(){
+  nlTimers.forEach(clearTimeout); nlTimers = [];
+  ['nl-1','nl-2','nl-3','nl-4'].forEach(i=>document.getElementById(i).classList.remove('shown'));
+  const node = document.getElementById('nl-node');
+  node.classList.remove('advance'); node.classList.add('due'); node.textContent='!';
+  document.getElementById('nl-burst').classList.remove('gofire');
+  document.getElementById('nl-arclabel').textContent = 'review due → …';
+  void node.offsetWidth; /* reflow to restart animations */
+  nlTimers.push(setTimeout(()=>document.getElementById('nl-1').classList.add('shown'), 350));
+  nlTimers.push(setTimeout(()=>document.getElementById('nl-2').classList.add('shown'), 1500));
+  nlTimers.push(setTimeout(()=>{
+    node.classList.add('advance'); node.textContent='✓';
+    document.getElementById('nl-arclabel').textContent = 'review due → holding ✓';
+  }, 2300));
+  nlTimers.push(setTimeout(()=>{
+    document.getElementById('nl-3').classList.add('shown');
+    document.getElementById('nl-burst').classList.add('gofire');
+  }, 3500));
+  nlTimers.push(setTimeout(()=>document.getElementById('nl-4').classList.add('shown'), 4800));
+}
+
+/* ---------- journal segments ---------- */
+function jseg(btn, id){
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  ['j-recaps','j-notes','j-memory'].forEach(s=>document.getElementById(s).style.display = s===id?'block':'none');
+}
+
+/* ---------- lifecycle + visit steppers ---------- */
+function lifeStep(btn, n){
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.lifebody').forEach((d,i)=>d.style.display = i===n?'block':'none');
+}
+function visitStep(btn, n){
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.visitbody').forEach((d,i)=>d.style.display = i===n?'block':'none');
+}
+
+/* ---------- kickstart ---------- */
+function ksSend(){
+  document.getElementById('ks-compose').style.display='none';
+  document.getElementById('ks-sent').style.display='block';
+}
+
+/* ---------- sheets ---------- */
+function openSheet(id){
+  document.getElementById('scrim').classList.add('open');
+  document.getElementById(id).classList.add('open');
+}
+function closeSheets(){
+  document.getElementById('scrim').classList.remove('open');
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
+}
+
+/* ---------- toggles ---------- */
+function setJName(n){
+  document.querySelectorAll('.jname').forEach(e=>e.textContent=n);
+  document.getElementById('jn-journal').classList.toggle('on', n==='Journal');
+  document.getElementById('jn-notebook').classList.toggle('on', n==='Notebook');
+}
+function setDial(d){
+  document.body.dataset.dial = d;
+  document.getElementById('dl-relaxed').classList.toggle('on', d==='relaxed');
+  document.getElementById('dl-push').classList.toggle('on', d==='push');
+}
+
+go('start');
+</script>
+</body>
+</html>

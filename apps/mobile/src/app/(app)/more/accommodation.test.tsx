@@ -232,9 +232,7 @@ describe('AccommodationScreen', () => {
     await active.result.findByTestId('accommodation-mode-error-back');
     fireEvent.press(active.result.getByTestId('accommodation-mode-error-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith(
-      '/(app)/more/learning-preferences',
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -408,7 +406,7 @@ describe('AccommodationScreen', () => {
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
-    it('replaces to learning-preferences when no back stack', async () => {
+    it('replaces to the More hub when no back stack', async () => {
       mockCanGoBack.mockReturnValue(false);
       active = renderScreen(<AccommodationScreen />, {
         profile: owner,
@@ -420,9 +418,7 @@ describe('AccommodationScreen', () => {
       });
       fireEvent.press(active.result.getByTestId('accommodation-back'));
 
-      expect(mockReplace).toHaveBeenCalledWith(
-        '/(app)/more/learning-preferences',
-      );
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
       expect(mockBack).not.toHaveBeenCalled();
     });
 

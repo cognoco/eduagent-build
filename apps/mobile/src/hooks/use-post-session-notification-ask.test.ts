@@ -200,6 +200,54 @@ describe('usePostSessionNotificationAsk', () => {
     expect(mockAlert).toHaveBeenCalledTimes(1);
   });
 
+  // [correctness High] A transient SecureStore failure must NOT permanently
+  // latch the guard. The original bug set firedForProfileRef at the top of the
+  // effect, so any blip on the first attempt suppressed the primer for the
+  // rest of the mount. After the fix, a later re-run (e.g. i18n language
+  // change re-fires the effect via the `t` dep) retries and can surface the
+  // primer.
+  it('retries the primer after a transient SecureStore failure (guard not latched on the same mount)', async () => {
+    // First attempt: SecureStore throws → early return. With the pre-fix code
+    // the guard was latched at the TOP of the effect, so the next effect run
+    // for the same profile short-circuited and the primer never appeared. The
+    // fix latches only at real terminal points, leaving the guard open here.
+    mockSecureGet.mockRejectedValueOnce(new Error('Keystore contention'));
+
+    // Re-run the effect on the SAME mount by toggling a real dependency
+    // (isParentProxy). This is the genuine retry the bug suppressed.
+    const { rerender } = renderHook(
+      ({ proxy }: { proxy: boolean }) =>
+        usePostSessionNotificationAsk('p1', true, proxy),
+      // Start in proxy mode so the first render does no work, then flip to
+      // non-proxy to drive the first real attempt (which fails on SecureStore).
+      { initialProps: { proxy: true } },
+    );
+
+    // Flip to non-proxy → first real attempt runs and hits the throwing get.
+    rerender({ proxy: false });
+    await waitFor(() => {
+      expect(mockSecureGet).toHaveBeenCalledTimes(1);
+    });
+    expect(mockGetPerm).not.toHaveBeenCalled();
+    expect(mockAlert).not.toHaveBeenCalled();
+
+    // SecureStore recovers. Toggle the dependency again to force a fresh
+    // effect run on the SAME mount. Because the guard was never latched, this
+    // run must proceed to the permission check and schedule the primer.
+    mockSecureGet.mockResolvedValue(null);
+    rerender({ proxy: true });
+    rerender({ proxy: false });
+
+    await waitFor(() => {
+      expect(mockGetPerm).toHaveBeenCalled();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+  });
+
   it('Not now marks seen and does not fire OS prompt', async () => {
     renderHook(() => usePostSessionNotificationAsk('p1', true, false));
 

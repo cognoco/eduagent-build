@@ -1,5 +1,6 @@
 import { scheduledDeletion } from './account-deletion';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import * as sentry from '../../services/sentry';
 
 const mockGetStepDatabase = jest.fn();
 const mockGetStepClerkSecretKey = jest.fn();
@@ -381,5 +382,96 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
 
     expect(result).toEqual({ status: 'deleted', accountId: 'acc-1' });
     expect(mockDeleteClerkUser).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [INNGEST-DELETION-ONFAILURE][BREAK] GDPR Art 17 erasure-completeness guard.
+//
+// When all `retries` of scheduledDeletion are exhausted (e.g. a sustained
+// Clerk outage so delete-clerk-user keeps throwing), the DB cascade may have
+// already run while the external Clerk login identity survives. Inngest calls
+// onFailure once at that point. Without an onFailure handler the only signal is
+// a generic dashboard failure — the half-completed erasure is not queryable.
+//
+// Red→green: remove the `onFailure` handler from account-deletion.ts and the
+// first test fails (opts.onFailure is undefined); the escalation assertion in
+// the second test also fails because captureException is never invoked with the
+// account-deletion.terminal_failure surface tag.
+// ---------------------------------------------------------------------------
+describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('[BREAK] declares an onFailure handler', () => {
+    const opts = (scheduledDeletion as any).opts;
+    expect(typeof opts.onFailure).toBe('function');
+  });
+
+  it('[BREAK] escalates to Sentry with the account-deletion.terminal_failure surface and accountId', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<unknown>;
+
+    const clerkOutage = new Error('Clerk delete failed with status 503');
+    const result = await onFailure({
+      event: {
+        data: {
+          event: { data: { accountId: 'acc-terminal' } },
+          run_id: 'run-xyz',
+        },
+      },
+      error: clerkOutage,
+    });
+
+    expect(result).toEqual({
+      status: 'terminal_failure',
+      accountId: 'acc-terminal',
+    });
+    expect(captureSpy).toHaveBeenCalledTimes(1);
+    expect(captureSpy).toHaveBeenCalledWith(
+      clerkOutage,
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'account-deletion.terminal_failure',
+          accountId: 'acc-terminal',
+          runId: 'run-xyz',
+        }),
+      }),
+    );
+  });
+
+  it('tolerates a missing original event payload (accountId null)', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<unknown>;
+
+    const result = await onFailure({
+      event: { data: {} },
+      error: 'non-error-rejection',
+    });
+
+    expect(result).toEqual({ status: 'terminal_failure', accountId: null });
+    expect(captureSpy).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'account-deletion.terminal_failure',
+          accountId: null,
+        }),
+      }),
+    );
   });
 });

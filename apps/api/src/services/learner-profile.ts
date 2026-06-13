@@ -1541,30 +1541,6 @@ export async function unsuppressInference(
   });
 }
 
-export async function toggleMemoryEnabled(
-  db: Database,
-  profileId: string,
-  accountId: string | undefined,
-  enabled: boolean,
-): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
-  const profile = await getOrCreateLearningProfile(db, profileId);
-  const canCollect = enabled
-    ? profile.memoryConsentStatus === 'granted'
-    : false;
-
-  await db
-    .update(learningProfiles)
-    .set({
-      memoryEnabled: enabled,
-      memoryCollectionEnabled: canCollect,
-      memoryInjectionEnabled: enabled,
-      version: sql`${learningProfiles.version} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(learningProfiles.profileId, profileId));
-}
-
 export async function toggleMemoryCollection(
   db: Database,
   profileId: string,

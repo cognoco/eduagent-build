@@ -78,6 +78,9 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   // existed since 0072 but were omitted from the manifest (S3-C2 fix).
   'practice_activity_events',
   'celebration_events',
+  // Added migration 0112 (WI-676): RLS + profile_isolation policy for
+  // mentor_activity_ledger. TS-side registration: WI-687.
+  'mentor_activity_ledger',
 ] as const;
 
 /**

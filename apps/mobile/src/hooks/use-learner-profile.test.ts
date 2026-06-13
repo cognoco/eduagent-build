@@ -452,31 +452,6 @@ describe('useToggleMemoryCollection', () => {
     queryClient.clear();
   });
 
-  it('PATCHes collection toggle for the active profile', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ success: true }), { status: 200 }),
-    );
-
-    const { result } = renderHook(() => useToggleMemoryCollection(), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      result.current.mutate({ memoryCollectionEnabled: false });
-    });
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-
-    const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(fetchInit.body as string) as Record<
-      string,
-      unknown
-    >;
-    expect(body.memoryCollectionEnabled).toBe(false);
-  });
-
   it('PATCHes collection toggle for a child profile', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ success: true }), { status: 200 }),
@@ -511,7 +486,10 @@ describe('useToggleMemoryCollection', () => {
     });
 
     await act(async () => {
-      result.current.mutate({ memoryCollectionEnabled: false });
+      result.current.mutate({
+        memoryCollectionEnabled: false,
+        childProfileId: 'child-profile-id',
+      });
     });
 
     await waitFor(() => {

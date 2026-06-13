@@ -18,6 +18,20 @@ jest.mock('../sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const mockQueueCelebration = jest.fn();
+jest.mock(
+  '../celebrations' /* gc1-allow: external DB/cache write; quiz tests assert enqueue contract without touching home cache tables */,
+  () => {
+    const actual = jest.requireActual(
+      '../celebrations',
+    ) as typeof import('../celebrations');
+    return {
+      ...actual,
+      queueCelebration: (...args: unknown[]) => mockQueueCelebration(...args),
+    };
+  },
+);
+
 import {
   assertAnswerInOptions,
   buildMasterySm2Input,
@@ -154,6 +168,13 @@ describe('inferVocabularyTypeFromTerm', () => {
   it('stores reusable daily phrases as chunks', () => {
     expect(inferVocabularyTypeFromTerm('Guten Morgen')).toBe('chunk');
     expect(inferVocabularyTypeFromTerm('Va bene')).toBe('chunk');
+  });
+
+  // Correctness-lens finding: the English pronoun "I" must not be treated as the
+  // Italian plural article 'i', which would misclassify English 2-word terms.
+  it('treats an English term beginning with "I" as a chunk, not a word', () => {
+    expect(inferVocabularyTypeFromTerm('I think')).toBe('chunk');
+    expect(inferVocabularyTypeFromTerm('I understand')).toBe('chunk');
   });
 });
 
@@ -824,6 +845,7 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
 
   afterEach(() => {
     mockCaptureException.mockClear();
+    mockQueueCelebration.mockClear();
     createScopedRepoSpy?.mockRestore();
   });
 
@@ -882,6 +904,30 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
       expect.objectContaining({
         extra: expect.objectContaining({ surface: 'quiz.mastery_upsert' }),
       }),
+    );
+  });
+
+  it('queues a home-surface celebration for a completed quiz round', async () => {
+    mockQueueCelebration.mockResolvedValue([]);
+    const repoSpy = makeRepoSpy(() => Promise.resolve({ id: 'mastery-1' }));
+    createScopedRepoSpy = jest
+      .spyOn(database, 'createScopedRepository')
+      .mockReturnValue(
+        repoSpy as unknown as ReturnType<
+          typeof database.createScopedRepository
+        >,
+      );
+
+    await completeQuizRound(makeMockDb(), PROFILE_ID, ROUND_ID, [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+    ]);
+
+    expect(mockQueueCelebration).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      'comet',
+      'comet',
+      ROUND_ID,
     );
   });
 });

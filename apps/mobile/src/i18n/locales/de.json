@@ -352,7 +352,6 @@
     "active": "Aktiv",
     "accommodation": {
       "sectionHeader": "Deine Lernanpassung",
-      "viewAndManage": "Anzeigen & verwalten",
       "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
       "guideActive": "Aktiv",
       "childScreenTitle": "{{name}}s Lernpräferenzen"
@@ -679,8 +678,6 @@
     },
     "notePrompt": {
       "writeNote": "Notiz schreiben",
-      "cannotSaveTitle": "Notiz nicht gespeichert",
-      "cannotSaveMessage": "Notizen können im Moment nicht gespeichert werden. Bitte versuche es erneut.",
       "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
       "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?"
     },
@@ -758,7 +755,8 @@
     "expiredSystemMessage": "Sitzung abgelaufen. Starte eine neue, um weiterzumachen.",
     "errorBoundary": {
       "crashTitle": "Sitzungsbildschirm abgestürzt",
-      "unknownError": "Unbekannter Fehler"
+      "unknownError": "Unbekannter Fehler",
+      "body": "Beim Laden dieses Bildschirms ist etwas schiefgelaufen. Du kannst es erneut versuchen oder zur Startseite zurückkehren."
     },
     "screenChrome": {
       "wrapping": "Wird abgeschlossen...",
@@ -1078,7 +1076,6 @@
       "exit": "Beenden"
     },
     "review": {
-      "couldNotSaveResult": "Wir konnten dein Überprüfungsergebnis nicht speichern.",
       "couldNotSaveTitle": "Ergebnis konnte nicht gespeichert werden",
       "continueWithoutSaving": "Ohne Speichern fortfahren",
       "noDataFound": "Überprüfungsdaten nicht gefunden.",
@@ -1105,7 +1102,6 @@
       "prepareErrorMessage": "Dein Diktat konnte nicht vorbereitet werden. Erneut versuchen?",
       "tryAgain": "Erneut versuchen",
       "title": "Text überprüfen",
-      "subtitleFromPhoto": "Korrigiere Fehler aus dem Foto und starte dann dein Diktat.",
       "subtitleManual": "Überprüfe deinen Text und starte dann dein Diktat.",
       "inputPlaceholder": "Gib deinen Text hier ein oder füge ihn ein...",
       "inputLabel": "Diktattext",
@@ -1345,6 +1341,9 @@
       "a11ySectionCollapse": "{{label}}. {{summary}}. Abschnitt einklappen.",
       "a11ySectionExpand": "{{label}}. {{summary}}. Abschnitt ausklappen."
     },
+    "inactiveFallbackBanner": {
+      "message": "Deine pausierten und archivierten Fächer konnten nicht geladen werden. Tippe zum Wiederholen – sie sind nicht weg."
+    },
     "notStartedCount": "{{notStarted}} / {{total}} nicht begonnen",
     "chooseTopic": "Wähle ein Thema",
     "provenanceFrom": "Von {{name}}",
@@ -1467,8 +1466,7 @@
     "deleteDialog": {
       "title": "Wort löschen",
       "message": "Dieses Wort aus deinem Vokabular entfernen?",
-      "errorTitle": "Konnte nicht gelöscht werden",
-      "errorFallback": "Etwas ist schiefgelaufen. Versuche es erneut."
+      "errorTitle": "Konnte nicht gelöscht werden"
     },
     "noSubject": {
       "title": "Kein Fach ausgewählt",
@@ -1722,6 +1720,7 @@
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
     "microphoneUnavailableTitle": "Mikrofon nicht verfügbar",
+    "microphoneUnavailableBody": "Das Mikrofon konnte gerade nicht verwendet werden. Prüfe, ob die App Zugriff auf das Mikrofon hat, und versuche es erneut, oder tippe stattdessen.",
     "detectSubjectErrorTitle": "Fach konnte nicht erkannt werden",
     "detectSubjectErrorBody": "{{error}} Bitte wähle dein Fach manuell aus.",
     "identifySubjectErrorTitle": "Fach konnte nicht identifiziert werden",
@@ -2133,7 +2132,6 @@
       "manageMentorMemoryForChild": "Verwalte, was der Mentor sich über {{name}} merkt",
       "profileDetails": "Profildetails",
       "childProfileJoined": "Hinzugefügt {{date}}",
-      "learningAccommodationTitle": "Lernanpassung für {{name}}",
       "noLearningPreferenceSet": "Keine Lernpräferenz festgelegt",
       "consentTitle": "Zustimmung",
       "consentDescription": "Verwalte die elterliche Zustimmung für {{name}}.",
@@ -2330,10 +2328,6 @@
       "exchangeDelta": {
         "title": "Nachrichten diese Woche",
         "body": "Wie viele Nachrichten diese Woche im Vergleich zur Vorwoche ausgetauscht wurden. Ein einfaches Signal für die Lernaktivität."
-      },
-      "guidedRatio": {
-        "title": "Geführtes Üben",
-        "body": "Der Anteil der Mentor-Antworten, bei denen dein Kind ein ausgearbeitetes Beispiel oder mehr Anleitung statt nur einen kleinen Anstoß brauchte."
       },
       "streakXp": {
         "title": "Serie und XP",
@@ -2823,7 +2817,6 @@
       "topicsReady_other": "{{count}} Themen testbereit",
       "afterFinishTopic": "Verfügbar, nachdem du ein Thema abgeschlossen hast",
       "hintOpenPicker": "Öffnet die Testauswahl",
-      "hintOpenLibrary": "Öffnet die Bibliothek",
       "couldNotLoad": "Testthemen konnten nicht geladen werden",
       "studySubjectFirst": "Lerne zuerst {{subject}}, um dies freizuschalten"
     },
@@ -3265,6 +3258,43 @@
       "openUpdate": "Update öffnen"
     }
   },
+  "myNotes": {
+    "loadMore": "Mehr laden",
+    "emptyHint": "Sie werden hier angezeigt, während du lernst.",
+    "title": "Meine Notizen",
+    "subtitle": "Sitzungen, Notizen und gespeicherte Antworten",
+    "sortDate": "Datum",
+    "sortSubject": "Thema",
+    "noneYetNotes": "Noch keine Notizen",
+    "noneYetBookmarks": "Noch keine Lesezeichen",
+    "noneYetSessions": "Noch keine Sitzungen",
+    "loadErrorNotes": "Notizen konnten nicht geladen werden",
+    "loadErrorBookmarks": "Lesezeichen konnten nicht geladen werden",
+    "loadErrorSessions": "Sitzungen konnten nicht geladen werden",
+    "kinds": {
+      "sessions": "Sitzungen",
+      "notes": "Notizen",
+      "bookmarks": "Lesezeichen"
+    },
+    "types": {
+      "homework": "Hausaufgaben",
+      "review": "Wiederholung",
+      "learning": "Lernen",
+      "note": "Notiz",
+      "bookmark": "Lesezeichen"
+    },
+    "hub": {
+      "sessionsSubtitle": "Unterhaltungen, die du hattest",
+      "notesSubtitle": "Dinge, die du aufgeschrieben hast",
+      "bookmarksSubtitle": "Gespeicherte Antworten vom Tutor"
+    },
+    "unknownSubject": "Unbekanntes Fach",
+    "searchSessions": "Sitzungen suchen",
+    "searchNotes": "Notizen suchen",
+    "searchBookmarks": "Lesezeichen suchen",
+    "a11yGroupByDate": "Nach Datum gruppieren",
+    "a11yGroupBySubject": "Nach Fach gruppieren"
+  },
   "createProfile": {
     "titleChild": "Erzähl uns von deinem Kind",
     "titleSelf": "Wer lernt hier?",
@@ -3297,16 +3327,6 @@
     "switchError": "Wechseln fehlgeschlagen. Zum Wiederholen tippen.",
     "a11yRetry": "Moduswechsel wiederholen"
   },
-  "profileSwitcher": {
-    "fallbackName": "Profil",
-    "switchErrorTitle": "Profil konnte nicht gewechselt werden",
-    "a11yClose": "Profilauswahl schließen",
-    "a11yChip": "Profil wechseln. Aktuell: {{name}}",
-    "a11yOption": "{{name}}, {{role}}",
-    "a11yOptionActive": "{{name}}, {{role}}, aktiv",
-    "roleParent": "Elternteil",
-    "roleStudent": "Schüler"
-  },
   "memoryConsent": {
     "defaultTitle": "Hilf dem Tutor, mehr über {{name}} zu lernen",
     "defaultTitleNoName": "Hilf dem Tutor, mehr über dein Kind zu lernen",
@@ -3334,43 +3354,6 @@
     "childBirthYearPlaceholder": "Geburtsjahr",
     "a11yBack": "Zurück zum vorigen Schritt",
     "a11yCancel": "Abbrechen und beenden"
-  },
-  "myNotes": {
-    "title": "Meine Notizen",
-    "subtitle": "Sitzungen, Notizen und gespeicherte Antworten",
-    "sortDate": "Datum",
-    "sortSubject": "Thema",
-    "emptyHint": "Sie werden hier angezeigt, während du lernst.",
-    "loadMore": "Mehr laden",
-    "noneYetNotes": "Noch keine Notizen",
-    "noneYetBookmarks": "Noch keine Lesezeichen",
-    "noneYetSessions": "Noch keine Sitzungen",
-    "loadErrorNotes": "Notizen konnten nicht geladen werden",
-    "loadErrorBookmarks": "Lesezeichen konnten nicht geladen werden",
-    "loadErrorSessions": "Sitzungen konnten nicht geladen werden",
-    "kinds": {
-      "sessions": "Sitzungen",
-      "notes": "Notizen",
-      "bookmarks": "Lesezeichen"
-    },
-    "types": {
-      "homework": "Hausaufgaben",
-      "review": "Wiederholung",
-      "learning": "Lernen",
-      "note": "Notiz",
-      "bookmark": "Lesezeichen"
-    },
-    "hub": {
-      "sessionsSubtitle": "Unterhaltungen, die du hattest",
-      "notesSubtitle": "Dinge, die du aufgeschrieben hast",
-      "bookmarksSubtitle": "Gespeicherte Antworten vom Tutor"
-    },
-    "unknownSubject": "Unbekanntes Fach",
-    "searchSessions": "Sitzungen suchen",
-    "searchNotes": "Notizen suchen",
-    "searchBookmarks": "Lesezeichen suchen",
-    "a11yGroupByDate": "Nach Datum gruppieren",
-    "a11yGroupBySubject": "Nach Fach gruppieren"
   },
   "pickBook": {
     "subjectFallback": "Thema",

@@ -367,11 +367,10 @@
     "screenTitle": "More",
     "active": "Active",
     "accommodation": {
-      "sectionHeader": "Your learning accommodation",
-      "viewAndManage": "View & manage",
       "notSureWhichToPick": "Not sure which to pick?",
       "guideActive": "Active",
-      "childScreenTitle": "{{name}}'s learning preferences"
+      "childScreenTitle": "{{name}}'s learning preferences",
+      "sectionHeader": "Your learning accommodation"
     },
     "learningPreferences": {
       "sectionHeader": "Your learning",
@@ -729,8 +728,6 @@
     },
     "notePrompt": {
       "writeNote": "Write a note",
-      "cannotSaveTitle": "Cannot save note",
-      "cannotSaveMessage": "Notes cannot be saved right now. Please try again.",
       "saveFailedTitle": "Could not save note",
       "summaryPlaceholder": "What should we remember from this session?"
     },
@@ -774,7 +771,8 @@
     },
     "errorBoundary": {
       "crashTitle": "Session screen crashed",
-      "unknownError": "Unknown error"
+      "unknownError": "Unknown error",
+      "body": "This screen couldn't load. You can try again or go back home."
     },
     "screenChrome": {
       "wrapping": "Wrapping...",
@@ -1065,7 +1063,6 @@
       "studySubjectFirst": "Study {{subject}} first to unlock this",
       "afterFinishTopic": "Available after you finish a topic",
       "hintOpenPicker": "Opens the assessment picker",
-      "hintOpenLibrary": "Opens the library",
       "couldNotLoad": "Could not load assessment topics"
     },
     "quiz": {
@@ -1164,7 +1161,6 @@
       "exit": "Exit"
     },
     "review": {
-      "couldNotSaveResult": "We couldn't save your review result.",
       "couldNotSaveTitle": "Couldn't save result",
       "continueWithoutSaving": "Continue without saving",
       "noDataFound": "Review data not found.",
@@ -1191,7 +1187,6 @@
       "prepareErrorMessage": "Could not prepare your dictation. Try again?",
       "tryAgain": "Try again",
       "title": "Check the text",
-      "subtitleFromPhoto": "Edit any mistakes from the photo, then start your dictation.",
       "subtitleManual": "Review your text, then start your dictation.",
       "inputPlaceholder": "Type or paste your text here...",
       "inputLabel": "Dictation text",
@@ -1224,6 +1219,9 @@
     },
     "staleBanner": {
       "message": "Showing your saved library. Tap to refresh."
+    },
+    "inactiveFallbackBanner": {
+      "message": "Couldn't load your paused and archived subjects. Tap to retry — they're not gone."
     },
     "empty": {
       "title": "Your library will grow as you learn",
@@ -1553,8 +1551,7 @@
     "deleteDialog": {
       "title": "Delete word",
       "message": "Remove this word from your vocabulary?",
-      "errorTitle": "Could not delete",
-      "errorFallback": "Something went wrong. Try again."
+      "errorTitle": "Could not delete"
     },
     "noSubject": {
       "title": "No subject selected",
@@ -1735,6 +1732,7 @@
   },
   "homework": {
     "microphoneUnavailableTitle": "Microphone unavailable",
+    "microphoneUnavailableBody": "We couldn't use the microphone right now. Check that the app has microphone access and try again, or type instead.",
     "permissionTitle": "Camera Access Needed",
     "permissionPrompt": "Snap a picture of your homework and I'll help you solve it step by step.",
     "permissionDenied": "Camera access was turned off. Your phone won't let us ask again — tap Open Settings, then turn the camera on for this app.",
@@ -2235,7 +2233,6 @@
       "manageMentorMemoryForChild": "Manage what the mentor remembers about {{name}}",
       "profileDetails": "Profile details",
       "childProfileJoined": "Added {{date}}",
-      "learningAccommodationTitle": "Learning accommodation for {{name}}",
       "noLearningPreferenceSet": "No learning preference set",
       "consentTitle": "Consent",
       "consentDescription": "Manage parental consent for {{name}}.",
@@ -2423,10 +2420,6 @@
       "exchangeDelta": {
         "title": "Exchanges this week",
         "body": "How many message turns happened this week compared with last week. It is a lightweight signal for learning activity."
-      },
-      "guidedRatio": {
-        "title": "Guided practice",
-        "body": "The share of mentor replies where your child needed a worked example or stronger guidance instead of light prompting."
       },
       "streakXp": {
         "title": "Streak and XP",
@@ -3296,16 +3289,6 @@
   "modeSwitcher": {
     "switchError": "Couldn't switch. Tap to try again.",
     "a11yRetry": "Retry mode switch"
-  },
-  "profileSwitcher": {
-    "fallbackName": "Profile",
-    "switchErrorTitle": "Could not switch profile",
-    "a11yClose": "Close profile switcher",
-    "a11yChip": "Switch profile. Current: {{name}}",
-    "a11yOption": "{{name}}, {{role}}",
-    "a11yOptionActive": "{{name}}, {{role}}, active",
-    "roleParent": "Parent",
-    "roleStudent": "Student"
   },
   "memoryConsent": {
     "defaultTitle": "Help the mentor learn about {{name}}",

@@ -16,7 +16,7 @@ export { ExplainedRedirect } from './ExplainedRedirect';
 export { LightBulbAnimation } from './LightBulbAnimation';
 export { LoadingMomentOverlay } from './LoadingMomentOverlay';
 export { MagicPenAnimation } from './MagicPenAnimation';
-export { ProfileSwitcher } from './ProfileSwitcher';
+export { MentorMascot } from './MentorMascot';
 export { RewardBurst } from './RewardBurst';
 export type { RewardBurstIntensity, RewardBurstVariant } from './RewardBurst';
 export { ShimmerSkeleton } from './ShimmerSkeleton';

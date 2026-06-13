@@ -17,6 +17,7 @@ import {
   weeklyReportsResponseSchema,
   childReportDetailResponseSchema,
   weeklyReportDetailResponseSchema,
+  reportViewedResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
@@ -26,6 +27,7 @@ import { listProfileSessions } from '../services/session/session-crud';
 import {
   getMonthlyReportForProfile,
   listMonthlyReportsForProfile,
+  markMonthlyReportViewedForProfile,
 } from '../services/monthly-report';
 import { getOverdueTopicsGrouped } from '../services/overdue-topics';
 import {
@@ -41,6 +43,7 @@ import { getProfileOverdueCount } from '../services/retention-data';
 import {
   getWeeklyReportForProfile,
   listWeeklyReportsForProfile,
+  markWeeklyReportViewedForProfile,
 } from '../services/weekly-report';
 
 type ProgressRouteEnv = {
@@ -142,6 +145,22 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     return c.json(childReportDetailResponseSchema.parse({ report }));
   })
 
+  // [LEARN-29] Mark the active profile's OWN monthly report viewed. Before this
+  // route existed the mobile self-view hook POSTed here and got a silent 404 on
+  // every open, so viewedAt never persisted and the NEW badge re-fired forever.
+  .post('/progress/reports/:reportId/view', async (c) => {
+    const { db, profileId } = withProfile(c);
+    const reportId = c.req.param('reportId');
+
+    const viewed = await markMonthlyReportViewedForProfile(
+      db,
+      profileId,
+      reportId,
+    );
+    if (!viewed) return notFound(c, 'Report not found');
+    return c.json(reportViewedResponseSchema.parse({ viewed: true }));
+  })
+
   // List weekly reports for the active profile.
   .get('/progress/weekly-reports', async (c) => {
     const { db, profileId } = withProfile(c);
@@ -158,6 +177,21 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const report = await getWeeklyReportForProfile(db, profileId, reportId);
     if (!report) return notFound(c, 'Report not found');
     return c.json(weeklyReportDetailResponseSchema.parse({ report }));
+  })
+
+  // [LEARN-29] Mark the active profile's OWN weekly report viewed (self-view
+  // twin of the monthly route above; previously a non-existent endpoint).
+  .post('/progress/weekly-reports/:weeklyReportId/view', async (c) => {
+    const { db, profileId } = withProfile(c);
+    const reportId = c.req.param('weeklyReportId');
+
+    const viewed = await markWeeklyReportViewedForProfile(
+      db,
+      profileId,
+      reportId,
+    );
+    if (!viewed) return notFound(c, 'Report not found');
+    return c.json(reportViewedResponseSchema.parse({ viewed: true }));
   })
 
   // Get active/paused session for a specific topic [F-4]

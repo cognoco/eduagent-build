@@ -151,3 +151,28 @@ describe('validateNoteDraft — Unicode + non-Latin tokenization (MED-10)', () =
     expect(validateNoteDraft(draft, quotes).ok).toBe(false);
   });
 });
+
+// Correctness-lens finding: when the draft and the learner source land in
+// different tokenization modes (word-tokens on one side, character-bigrams on
+// the other) the two sets are in different alphabets and overlap is
+// structurally 0, fail-closing a legitimately grounded draft. Both sides must
+// share one mode.
+describe('validateNoteDraft — shared tokenization mode across draft and source', () => {
+  it('does not fail-close a grounded draft when the learner answer is a single content word', () => {
+    // Pre-fix: the draft yields 3 word-tokens ("mitochondria", "make",
+    // "energy") so it tokenized in WORD mode, while the one-word learner source
+    // ("mitochondria") fell back to character-bigrams — the two sets were in
+    // different alphabets and overlap was structurally 0, wrongly rejecting a
+    // clearly-grounded draft. With a single shared mode (both fall back to
+    // bigrams) the substantial character overlap is recognized.
+    const verifiedEventContent = ['mitochondria'];
+    const draft = 'Mitochondria make energy.';
+    const result = validateNoteDraft(
+      draft,
+      ['mitochondria'],
+      verifiedEventContent,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.overlapRatio).toBeGreaterThan(0.4);
+  });
+});

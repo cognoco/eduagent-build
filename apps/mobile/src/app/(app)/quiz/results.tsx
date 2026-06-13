@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RewardBurst } from '../../../components/common/RewardBurst';
-import { useFetchRound } from '../../../hooks/use-quiz';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 import { rewardVariantForActivity } from './_quiz-utils';
@@ -15,15 +14,7 @@ export default function QuizResultsScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const {
-    activityType,
-    completionResult,
-    prefetchedRoundId,
-    returnTo,
-    round,
-    setPrefetchedRoundId,
-    setRound,
-  } = useQuizFlow();
+  const { activityType, completionResult, returnTo, round } = useQuizFlow();
   const practiceReturnParams = returnTo === 'practice' ? { returnTo } : {};
   // [BUG-777 / M-15] Pin the FIRST non-null round we see so a "Play Again"
   // press — which sets a NEW round into context BEFORE this screen unmounts
@@ -38,14 +29,6 @@ export default function QuizResultsScreen(): React.ReactElement {
     pinnedRoundRef.current = round;
   }
   const stableRound = pinnedRoundRef.current ?? round;
-  // [Q-13] Eagerly hydrate the prefetched round into the query cache as soon
-  // as the results screen mounts so "Play Again" is instantaneous. For users
-  // who tap Done we pay one extra GET /quiz/rounds/:id, which is intentional:
-  // the server-side round is already generated and persisted during mid-round
-  // prefetch, and the cached response warms the hook so the transition from
-  // results → play renders without a loading state. Deferring the fetch to
-  // the Play Again press would add a perceptible wait on the hot path.
-  const prefetchedRound = useFetchRound(prefetchedRoundId);
 
   // [MIN-6 / BUG-893] Guard against direct navigation with cleared context —
   // redirect to practice rather than rendering a meaningless "0/0" screen.
@@ -122,21 +105,6 @@ export default function QuizResultsScreen(): React.ReactElement {
     // quiz stack and the next round's completion will overwrite this value
     // before the user sees /quiz/results again. Navigating to /quiz/launch
     // does the same.
-    if (prefetchedRound.data) {
-      setRound(prefetchedRound.data);
-      setPrefetchedRoundId(null);
-      router.replace('/(app)/quiz/play' as Href);
-      return;
-    }
-
-    // [ASSUMP-F3] If the prefetched round id was set but its fetch failed,
-    // clear it here. Otherwise the stale id lingers in context and could
-    // confuse a future handler that assumes a non-null id implies a fetchable
-    // round.
-    if (prefetchedRoundId) {
-      setPrefetchedRoundId(null);
-    }
-
     if (!activityType) {
       router.replace('/(app)/practice' as Href);
       return;

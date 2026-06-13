@@ -1,0 +1,285 @@
+---
+title: S5 — Visibility Contract Surfaces (the trust layer) — Implementation Plan
+date: 2026-06-10
+profile: code
+spec: docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md
+status: draft
+---
+
+# S5 — Visibility Contract Surfaces — Implementation Plan
+
+> **Synced to spec amendment 2026-06-10 (§3.2 — linking-ceremony relation capture, Approve→ceremony, Handoff w/ managed activation).**
+
+**Goal:** Build the trust layer the mentor-is-the-app shell promises supporters and supportees — the linking ceremony, the server-enforced **non-reportable class** (confided affect never travels upward), the **render-equivalence** shared record (same facts, two framings), the **appeal affordance**, **kid-initiated revocation** for credentialized 13+, and the **graduation** moment — with the managed (under-13) tier **built but flag-gated off** at launch (launch floor 13+).
+**Approach:** S5 is **privacy/security-critical and identity-coupled**. It sits on top of the identity-foundation person/edge schema (W1) and consent/proxy/deletion runtime (W2), and on S4's scope chip + structural permission mask. The single load-bearing invention is a server-side **reportability gate** at report-generation time: an **allow-list** (`mastery | effort | observable_engagement`) — not a deny-list — so a never-before-seen affect signal cannot leak by omission. Every access-control criterion carries a **negative-path break-test** (red-green: write it, watch it block, revert the guard, watch it leak, restore). No new shell mechanics (chip/hub/mask) are built here — S4 owns those; S5 renders contract surfaces *through* them.
+
+---
+
+## Blocked-by / Prerequisites
+
+S5 **cannot start build** until all of the following are true. Each is a hard upstream dependency, not a soft ordering preference. (Per spec §9/§11, S5 is one of the two identity-coupled phases; per spec §11 it follows S4.)
+
+> **Status update (2026-06-12, WI-678):** The identity-foundation W1/W2 schema migrations now **exist in the codebase** (merged into `new-llm` via `main`). The 8 identity tables are present as committed migrations. However, they are **not yet live** — they become live only after the **IF flip** (the identity-foundation cutover + convergence). BP1 and BP2 below are no longer "not built" but are "built, not yet flipped." S5 is blocked on post-IF-flip + convergence complete, not on the migrations existing.
+
+| # | Prerequisite | What it provides S5 | Where it lives | Status as of 2026-06-12 |
+|---|---|---|---|---|
+| BP1 | **Identity-foundation IF flip + convergence complete** (W1 structural foundation live) | The 8-table person/edge schema live in the target environment: `person`, `organization`, `membership`, `subscription`, **`guardianship`**, **`supportership`**, `consent_grant`, `person_retain`. S5 reads/writes `supportership` (the link), `guardianship` (managed tier), `consent_grant` (the ceremony's recorded basis). `person_id` is the learning-data scope key. | `docs/canon/identity/data-model.md` §2/§2A; `_wip/identity-foundation/2026-06-11-cutover-plan.md` | **Migrations exist, not yet flipped.** The IF flip (`_wip/identity-foundation/2026-06-11-cutover-plan.md`) is the gate; tables are in committed SQL but not live in any environment. |
+| BP2 | **Identity-foundation IF flip + convergence complete** (W2 consent / proxy / deletion runtime live) | Person-scope ownership + two-layer RLS; the central guardian-act-for authority resolver (the clean successor to `getFamilyOwnerProfileId`, `MMT-ADR-0008`); atomic account-isolated deletion (inv 21); fail-closed central age-gate. S5's revocation + managed-tier paths ride this. | phase-o-master-plan W2; `domain-model.md` §4 (derived `op(G,C)` resolver) | **Same gate as BP1** — post-IF-flip + convergence. |
+| BP3 | **S4 — scope chip, Support hub, person scopes, structural mask** | The chip (`Support hub | <person> | Me`), the per-person scope, and the **server-enforced structural permission mask** that reads the supportee's own tables filtered to structural columns (subjects/mastery/activity/next-up) and exposes **no artifact read path** (spec §6.1/§6.3). S5 renders the *contract* surfaces (Journal shared-record cell, appeal, ceremony) inside these scopes; it does not build the mask. | `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §4/§6.3; [`2026-06-10-s4-scope-chip-support-hub.md`](2026-06-10-s4-scope-chip-support-hub.md); [`02-flow-map.md`](02-flow-map.md) | **NOT BUILT.** S4 is planned but not implemented. S5 build is gated on S4 landing. S4 is itself gated on BP1/BP2. |
+| BP4 | **S3 — Journal tab + avatar admin split** | The Journal tab host where the supporter's per-person "shared record" cell renders (spec §6.3, Journal × person-scope). S5 adds the shared-record content; S3 builds the tab shell. | spec §11 (S3 row); `docs/plans/v2-plan/01-codebase-anchors.md` §S3 | **NOT BUILT.** Identity-independent, sequenced before S4/S5. |
+| BP5 | **S0 — activity ledger + writer + `GET /now`** | The `mentor_activity_ledger` (`visibility 'self'|'supporter'|'both'`) that carries (a) the supporter shared-record rows and (b) the graduation narration moment; the writer helper `writeActivityMoment()`; the `/now` feed S5's supporter scope extends. **Column ownership split:** the IF cutover plan's **M-REPOINT** re-points the ledger `profile_id → person` (FK re-point only); **S4 adds the new `edge_id` column** (additive migration, FK → `supportership`). S5 reads both columns post-flip. | `docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md` (T1-T10); spec §8.2 | **PLANNED (draft).** S0 ships ledger `profileId`-keyed; post-IF-flip the `profile_id → person` re-point (M-REPOINT) and the S4 `edge_id` add are both done before S5 reads them. |
+
+**Hard gate:** if any S5 deliverable below is found to need an edge/person read that BP1-BP3 do not yet provide, the deliverable is **misclassified** and must wait — never stub `person`/`edge`/`supportership` against today's `profiles`/`family_links` (that would re-introduce the two-vocabulary risk the clean cut forbids, `prd.md` Part 9).
+
+**Existing revocation code S5 extends (BP2-adjacent):** `apps/api/src/inngest/functions/consent-revocation.ts` is **today's only revocation path** — guardian-initiated, for managed under-13 (`app/consent.revoked` → 7-day grace → cascade/archive). **Kid-initiated self-unlink for credentialized 13+ is NET-NEW** (EU-7); it reuses this function's grace-window + non-silent-notice *shape* but is a distinct trigger on the `supportership` edge, not the `guardianship`/`consent_states` path.
+
+---
+
+## ADR obligations (owed in lockstep BEFORE build, per MMT-ADR-0000)
+
+S5 carries spec §12 obligations **#2** and **#3**. Neither is ratified until its `MMT-ADR` lands in the same change-set as the canon line it changes (the `decision-adr-link` CI guard fails a decision block with no linked ADR). S0's T10 reserved `MMT-ADR-0022` (ledger — now exists); S4's T13 reserves `MMT-ADR-0023` (scope-chip — planned). The next free numbers for S5 are 0024/0025.
+
+- **`MMT-ADR-0024` — Supporter visibility contract** (spec §12 #2): the non-reportable class (allow-list `mastery|effort|observable_engagement`; confided affect/self-doubt never reported), render-equivalence (same facts, side-appropriate framing), mentor-as-channel + appeal affordance, the artifact wall (no supporter read path on any edge), and the safety-crosses-every-wall exception. **Reconcile with — do not duplicate —** `domain-model.md` §2/§4 (Supportership = Layer-2 edge-scoped visibility, no consent authority) and ontology inv 9/14/19. This ADR is the *product-contract* refinement of the canon's structural edge: it adds the reportability *narrowing* (the canon says "edge-scoped visibility"; the ADR says "even within the edge, affect is non-reportable"). Cite, don't restate, the canon.
+- **`MMT-ADR-0025` — Managed/credentialized as visibility-tier carrier; graduation** (spec §12 #3): the two account-types carry the reporting tier; managed (under-13) built-but-activation-deferred; graduation (managed→credentialized) as a contract upgrade + narrated ledger moment. **This may partially belong to the identity canon** — spec §12 #3 says reconcile with `_wip/identity-foundation/CANONICAL-SET.md` rather than duplicating. **Reconciliation finding (see "Canon reconciliation" below):** managed/credentialized = the canon's **login-presence axis** (`ontology.md` §3.1, inv 3/4: managed = no Login, credentialed = has Login), and graduation = the canon's **managed→credentialed transition** (`domain-model.md` §5 transition catalogue; `prd.md` R4). The ADR records only the **reporting-tier mapping onto** that existing axis (the §6.2 tier table) — it must NOT redefine managed/credentialized, which the identity canon owns.
+
+---
+
+## Scope
+
+In scope:
+- `packages/schemas/src/visibility-contract.ts` (new) — the reportable allow-list enum, contract-acceptance shape, appeal-request/response, revocation-notice shapes, render-audience enum.
+- `apps/api/src/services/reportability.ts` (new) — the server-side reportability gate (allow-list filter) applied at report-generation.
+- `apps/api/src/services/supporter-report.ts` (new) — the curated supporter read ("how is Emma really doing") + the appeal "detailed attention report" generator, both passing through the reportability gate.
+- `apps/api/src/services/shared-record.ts` (new) — the render-equivalence projector: one fact set → `{ supporterView, supporteeView }` (advisor-framed vs own-framing), both over the narrowed reportable set.
+- `apps/api/src/services/linking-ceremony.ts` (new) — create/accept a `supportership` link with a recorded contract-acceptance event (credentialized 13+) and a captured per-edge `relation` (§3.2, capture-only); the destination of S4's **Approve** anchor (both sides accept the same contract, never one-tap) and the artifact-wall/render-equivalence disclosure locus; managed = account-creation-is-the-ceremony branch.
+- `apps/api/src/services/supportership-revocation.ts` (new) — kid-initiated self-unlink trigger + grace/notice for credentialized 13+ (EU-7).
+- `apps/api/src/inngest/functions/supportership-revocation.ts` (new) — the grace-window + non-silent supporter notice job (mirrors `consent-revocation.ts` shape, distinct trigger `app/supportership.unlinked`).
+- `apps/api/src/inngest/functions/graduation-narration.ts` (new) — writes the graduation ledger moment (`visibility: 'both'`) on managed→credentialized transition.
+- `apps/api/src/routes/visibility.ts` (new) — `POST /links` (initiate), `POST /links/:id/accept`, `POST /links/:id/revoke` (kid-initiated), `GET /links/:id/contract`, `POST /reports/:personId/appeal` (request detailed attention report), `GET /reports/:personId/shared-record`.
+- `apps/api/src/index.ts` — register `visibilityRoutes` (one `.route(...)` line).
+- `apps/api/src/inngest/index.ts` (or the function registry) — register the two new Inngest functions.
+- Extend `packages/schemas/src/inngest-events.ts` — `app/supportership.unlinked`, `app/person.graduated` event payloads.
+- `apps/mobile/src/app/(app)/link/` (new) — the linking-ceremony screens (both sides see the same contract card; accept/decline).
+- `apps/mobile/src/components/visibility/` (new) — `ContractCard`, `SharedRecordView`, `AppealButton`, `RevocationNoticeCard`, `GraduationCard` — all behind `MODE_NAV_V2_ENABLED`, rendered inside S4's person/hub scopes.
+- `apps/mobile/src/lib/feature-flags.ts` — add `MANAGED_TIER_ACTIVE` (from `EXPO_PUBLIC_ENABLE_MANAGED_TIER`, default OFF) gating managed-tier activation only (§13.5).
+- `apps/api/src/config.ts` — add `MANAGED_TIER_ACTIVE` to the API env schema (parity; the server enforces the gate too).
+- `docs/adr/MMT-ADR-0024-supporter-visibility-contract.md`, `docs/adr/MMT-ADR-0025-managed-credentialized-visibility-tier-graduation.md` (new, lockstep).
+- Co-located unit/integration tests with **negative-path break-tests** (paths in `## Tests`).
+
+Out of scope (must not change):
+- **The scope chip, Support hub, person scopes, and the structural permission mask (S4).** S5 consumes the mask; it must not implement or alter it. If S5 needs a structural column the mask does not expose, that is an S4 change, filed against S4 — not done here.
+- **The activity-ledger table, writer helper, and `GET /now` ranking core (S0).** S5 writes ledger rows via the existing `writeActivityMoment()` and extends the supporter `/now` path conceptually, but does not re-implement the ranker or the table.
+- **Cutover / deletion / exit-funnel dissolution / V0-constraint retirement (S6).** S5 ships behind flags; nothing in today's V0/V1 shell regresses (§7 hard constraint).
+- **The identity schema itself (W1).** S5 reads `person`/`supportership`/`guardianship`/`consent_grant`; it does not define them. The managed-tier *consent mechanism* (VPC vendor, `consent_grant` write at account creation) is W2/identity-owned — S5 reads the resolved state, never re-adjudicates consent.
+- **The safety tripwire / escalation path** (`apps/api/src/services/safety-tripwire.ts`, `exchanges.crisis-redirect.test.ts`). Unchanged. S5 states the invariant (safety crosses every wall) and asserts the reportability gate does **not** suppress a safety escalation, but does not modify tripwire logic.
+- **Existing parent/child report services** (`monthly-report.ts`, `weekly-report.ts`, `recaps.ts`) beyond routing their supporter-facing output through the new reportability gate. The structural metrics they already compute (`ProgressMetrics`: mastery/explored/vocabulary/active-minutes/sessions) are *already* allow-list-shaped; S5 adds the gate as a defense-in-depth chokepoint, not a rewrite.
+
+---
+
+## Surface map (files × responsibility)
+
+| File | Responsibility |
+|---|---|
+| `schemas/src/visibility-contract.ts` | `reportableFactKindSchema` (allow-list), `visibilityContractSchema`, `contractAcceptanceSchema`, `appealRequestSchema`/`appealReportSchema`, `revocationNoticeSchema`, `renderAudienceSchema` (`'supporter'|'supportee'`), `supporterRelationSchema` (§3.2 capture-only per-edge relation) |
+| `services/reportability.ts` | `assertReportable()` / `filterToReportable()` — the allow-list gate; the single chokepoint every upward-flowing fact passes through |
+| `services/shared-record.ts` | `projectSharedRecord(facts) → { supporterView, supporteeView }` — render-equivalence over the reportable set |
+| `services/supporter-report.ts` | `buildCuratedRead()` (mentor-as-channel answer) + `buildAttentionReport()` (the appeal — richer structural + fuller write-up, artifact wall intact) |
+| `services/linking-ceremony.ts` | `initiateLink()` (captures per-edge `relation`, §3.2), `acceptLink()` (records `contract_accepted_at` + the contract version on the `supportership` edge); the **Approve** destination (S4 anchor → here, both sides accept same contract, no one-tap); the artifact-wall + render-equivalence **disclosure locus**; managed branch = ceremony-at-creation |
+| `services/supportership-revocation.ts` | `requestSelfUnlink()` (credentialized 13+) → dispatches `app/supportership.unlinked` |
+| `inngest/functions/supportership-revocation.ts` | grace/notice window → retire person scope → non-silent supporter hub card |
+| `inngest/functions/graduation-narration.ts` | on `app/person.graduated` → `writeActivityMoment({ kind: 'graduation', visibility: 'both', … })` |
+| `routes/visibility.ts` | the link/contract/appeal/shared-record HTTP surface |
+| `mobile/app/(app)/link/*`, `components/visibility/*` | the two-sided ceremony + contract/shared-record/appeal/revocation/graduation UI (V2-flag-gated) |
+| `docs/adr/MMT-ADR-0024/0025` | the two lockstep ADRs |
+
+---
+
+## Tasks
+
+- [ ] **T1: Define the reportable allow-list + contract schemas in `@eduagent/schemas`.**
+  Create `packages/schemas/src/visibility-contract.ts`; add `export * from './visibility-contract';` to `packages/schemas/src/index.ts`. The **non-reportable class is encoded as an allow-list, not a deny-list** (EU-1) — the only fact kinds that may ever flow to a supporter:
+  ```ts
+  import { z } from 'zod';
+
+  // EU-1: the ONLY fact kinds reportable upward. Allow-list by design — a new
+  // signal kind is non-reportable until explicitly added here with a test.
+  // Confided affect / self-doubt is NOT a member and has NO member it maps to.
+  export const reportableFactKindSchema = z.enum([
+    'mastery',               // topic/chapter mastery state + deltas
+    'effort',                // sessions, active minutes, streak, cards done
+    'observable_engagement', // attendance/recency/next-up readiness — observable, not confided
+  ]);
+  export type ReportableFactKind = z.infer<typeof reportableFactKindSchema>;
+
+  export const renderAudienceSchema = z.enum(['supporter', 'supportee']);
+  export type RenderAudience = z.infer<typeof renderAudienceSchema>;
+
+  export const visibilityTierSchema = z.enum(['managed', 'credentialized']);
+  export type VisibilityTier = z.infer<typeof visibilityTierSchema>;
+
+  // §3.2: captured at the linking ceremony, per-edge, CAPTURE-ONLY. NOT wired to
+  // permissions or reporting tiers — never read by any authorization decision.
+  // 'other' falls back to the supporter's display name as carrier.
+  export const supporterRelationSchema = z.enum(['parent', 'sibling', 'teacher', 'other']);
+  export type SupporterRelation = z.infer<typeof supporterRelationSchema>;
+
+  // Recorded at the ceremony (both sides accept the SAME contract, §6.2).
+  export const visibilityContractSchema = z.object({
+    version: z.string(),                 // bump → re-acceptance required
+    tier: visibilityTierSchema,
+    reportableKinds: z.array(reportableFactKindSchema), // = full allow-list at v1
+    artifactWall: z.literal(true),       // no supporter read path to notes/journal/memory/chats
+    safetyException: z.literal(true),    // safety escalations cross every wall
+  });
+  export type VisibilityContract = z.infer<typeof visibilityContractSchema>;
+
+  export const contractAcceptanceSchema = z.object({
+    supportershipId: z.string(),
+    contractVersion: z.string(),
+    acceptedBySupporter: z.boolean(),
+    acceptedBySupportee: z.boolean(),    // managed: true-by-construction at creation
+    acceptedAt: z.string(),              // ISO
+  });
+  export type ContractAcceptance = z.infer<typeof contractAcceptanceSchema>;
+  ```
+  Also define `appealRequestSchema` (`{ personId, reason?: string }`), `appealReportSchema` (richer structural detail + a `mentorWriteUp: string`, NO raw artifacts), `revocationNoticeSchema` (`{ supporteeDisplayName, retiresAt: string }`), and `supporterRelationSchema` (the §3.2 capture-only per-edge relation, above — carried in the ceremony contract payload, never read by authorization).
+  **done when:** `packages/schemas/src/visibility-contract.test.ts` (T1a) asserts `reportableFactKindSchema.options` deep-equals `['mastery','effort','observable_engagement']` and contains **no** affect/emotion/self-doubt member; `visibilityContractSchema` requires `artifactWall: true` and `safetyException: true` (rejects `false`); `contractAcceptanceSchema` round-trips; `supporterRelationSchema.options` deep-equals `['parent','sibling','teacher','other']`. `pnpm exec nx run schemas:typecheck` passes.
+
+- [ ] **T2: Implement the server-side reportability gate `assertReportable()` / `filterToReportable()`.**
+  Create `apps/api/src/services/reportability.ts`. This is the **single chokepoint** every fact passes through before it can reach a supporter surface (curated read, appeal report, shared record, supporter `/now`, weekly/monthly report supporter copy). Each candidate fact is tagged with a `ReportableFactKind`; the gate **drops any fact not in the allow-list** and `captureException`s a structured `reportability.blocked_nonreportable` breadcrumb when it drops something tagged with a known-but-non-reportable origin (so leakage attempts are queryable per the silent-recovery-banned rule).
+  ```ts
+  import { reportableFactKindSchema, type ReportableFactKind } from '@eduagent/schemas';
+
+  export interface TaggedFact<T = unknown> { kind: ReportableFactKind | string; value: T; }
+
+  /** Allow-list filter: only mastery|effort|observable_engagement survive. */
+  export function filterToReportable<T>(facts: TaggedFact<T>[]): TaggedFact<T>[] {
+    return facts.filter((f) => reportableFactKindSchema.safeParse(f.kind).success);
+  }
+
+  /** Throws if a fact tagged as confided affect is about to be reported. The
+   *  allow-list already drops it; this is the loud assertion for the break-test. */
+  export function assertReportable(fact: TaggedFact): void {
+    if (!reportableFactKindSchema.safeParse(fact.kind).success) {
+      throw new NonReportableFactError(fact.kind); // typed; never reaches a supporter
+    }
+  }
+  ```
+  (Define `NonReportableFactError` in `@eduagent/schemas` errors hierarchy per the repo typed-error rule.)
+  **done when (break-test):** `apps/api/src/services/reportability.test.ts` (T2a) — the **negative-path break-test for EU-1**: build a fact set containing a `kind: 'confided_affect'` fact (e.g. "Emma said she feels anxious about the exam"); assert `filterToReportable` returns a set that does **not** contain it and `assertReportable` throws `NonReportableFactError` for it; assert mastery/effort/engagement facts pass. **Red-green:** the test passes (affect blocked) → revert the allow-list to a permissive deny-list / pass-through → the affect fact leaks into the output (test fails) → restore. `pnpm exec nx run api:typecheck` + `pnpm exec nx run api:test` pass.
+
+- [ ] **T3: Route the supporter-facing report output through the gate (defense-in-depth chokepoint).**
+  Make the gate load-bearing on the **existing** supporter report paths so no supporter copy is generated except through it. In `apps/api/src/services/supporter-report.ts` (new), `buildCuratedRead()` and `buildAttentionReport()` assemble candidate facts, tag each with its `ReportableFactKind`, then call `filterToReportable()` **before** any LLM curation prompt or template render. The existing `monthly-report.ts` / `weekly-report.ts` already compute structural `ProgressMetrics` (mastery/explored/vocabulary/active-minutes/sessions — all allow-list-shaped); add a single `filterToReportable()` pass at the point their output crosses into a **supporter** audience (gated by `assertParentAccess` at `services/family-access.ts:46`), tagging each metric, so a future non-structural field added upstream cannot leak without failing T3's test. The curated-read LLM prompt is fed **only** the post-gate fact set — the model never sees confided affect to narrate.
+  **done when (break-test):** `apps/api/src/services/supporter-report.test.ts` (T3a) seeds a supportee whose mentor-memory / session free-text contains a confided-affect note; asserts `buildCuratedRead()` and `buildAttentionReport()` outputs contain the structural facts and **never** the affect string (substring assertion + the tagged-fact assertion). **Red-green:** passes → remove the `filterToReportable()` call from the assembly → the affect note surfaces in the curated read (fails) → restore. Internal services are real (no `jest.mock` of report/family-access per GC1); the LLM is mocked at the `routeAndCall` boundary. `pnpm exec nx run api:test` passes.
+
+- [ ] **T4: Implement the render-equivalence projector `projectSharedRecord()`.**
+  Create `apps/api/src/services/shared-record.ts`. Input: the **post-gate** reportable fact set for a `(supporter, supportee)` pair. Output: `{ supporterView, supporteeView }` — the **same facts**, rendered per audience (supporter = advisor-framed: "Emma mastered 3 of 5 algebra topics this week; one is overdue for review"; supportee = own-framing: "You nailed 3 algebra topics — one's ready for a review"). Both views derive from one `facts` array; **a fact present in one view MUST be present in the other** (render-equivalence, §6.1). The projector never reads raw artifacts; it reads only the gated fact set and the per-audience template. Persist each shared-record fact as a ledger row (`visibility: 'both'`, via `writeActivityMoment()`) so the supportee's Journal mirror and the supporter's Journal shared-record cell read the same row from two sides (spec §6.3).
+  **done when (break-test):** `apps/api/src/services/shared-record.test.ts` (T4a) — the **render-equivalence assertion**: for a fixed fact set, assert `supporterView` and `supporteeView` cover the **same fact ids** (set equality on the underlying fact ids, not on rendered text) and differ only in framing (rendered strings differ but fact-id sets are equal). **Negative-path break-test:** seed a fact that is rendered into `supporterView` but (by a deliberate bug) omitted from `supporteeView`; assert the equivalence check **fails** — proving the test catches "reported-but-not-mirrorable." Restore the projector so both views stay equal. `pnpm exec nx run api:test` passes.
+
+- [ ] **T5: Implement the linking ceremony — both sides accept the same contract (credentialized 13+).**
+  Create `apps/api/src/services/linking-ceremony.ts`. `initiateLink(supporterPersonId, supporteePersonId, relation)` creates a **pending** `supportership` edge (W1 table) carrying `contract_version`, the **per-edge relation** (see below), and null `accepted_*` timestamps; both sides are shown the **same** `visibilityContractSchema` payload (T1). `acceptLink(supportershipId, byPersonId)` stamps the accepting side; the edge becomes **active only when BOTH sides have accepted** (inv 15: supportee-if-consent-capable authorizes). **Managed branch:** for a managed (under-13) supportee, **account creation is the ceremony** (spec §6.2) — the guardian's creation flow records contract acceptance on the `guardianship` edge by construction; `acceptedBySupportee` is true-by-construction. Record the recorded basis on the identity `consent_grant`/edge (W2-owned); S5 reads/writes only the contract-acceptance stamp, never re-adjudicates consent.
+  **The ceremony is the Approve destination (spec §3.2).** The credentialized-pending **Approve** anchor is *rendered in S4* (the supporter hub's morphing per-child card, "Emma's waiting — review & approve"); the tap **lands here, in the ceremony** — both parties are shown the **same** contract and accept it separately. The card carries urgency (it genuinely blocks the child), but the flow is **deliberate, never a one-tap consent**: `acceptLink` requires an explicit accept from the side it stamps, and the edge stays pending until both sides have acted. S5 owns the ceremony as the destination; S4 owns the anchor that routes into it.
+  **The ceremony is the informed-consent locus that discloses the full visibility contract (spec §3.2/§6.2).** The S4 variant-zero add-child "door" uses **positive-only** trust copy and deliberately does **not** state the artifact wall ("never her chats/notes") — "door sells, ceremony informs; nothing hidden, just sequenced." So the **artifact wall and render-equivalence are disclosed *here***, at the ceremony, where informed consent actually lives: the shown `visibilityContractSchema` payload carries `artifactWall: true` + `safetyException: true` (T1) and the `ContractCard` (T11) renders the full contract — what the supporter sees (structural), what they never see (artifacts), what's mirrored (render-equivalence), and the safety exception. The positive-only door copy is an **S4 concern** that defers this disclosure to S5; do not duplicate the wall copy at the door.
+  **Relation captured + displayed + child-validated at the ceremony (spec §3.2, capture-only).** The S4 add-child/linking flow surfaces one question — *"What's your relation to Emma?"* → **Parent / Sibling / Teacher / Other** — but the **ceremony is where the claimed relation is shown to the child, validated by them, and stored**. Persist it as **structured per-edge metadata** on the `supportership` edge (`relation` field — `'parent' | 'sibling' | 'teacher' | 'other'`; the identity-foundation edge model carries this per-edge for free, so one person can be parent to one child and teacher to another). The child **sees** the claimed relation at the ceremony (*"Zuzana wants to support you as your teacher"*) — that display **is** the validation. Uses: warmer kid-side rendering (*"Zuzana — your teacher — suggested: French"*), mentor context, disambiguation among several supporters; **display name is the carrier for "Other" and the universal fallback**. **Capture-only, explicitly NOT wired to permissions or reporting tiers** — gating by relation would be a separate ruled decision; the reportability gate (T2/T3), the structural mask (S4), and the tier (T9) read `tier`/`reportableKinds`, **never `relation`**. Add `relation` to `visibilityContractSchema`-adjacent edge metadata (an edge column the W1 `supportership` table owns; if W1 does not yet carry it, the field is a BP1-adjacent additive column filed against W1, never stubbed against `family_links`).
+  **done when (break-test):** `apps/api/src/routes/visibility.integration.test.ts` (T5a, integration) seeds two credentialized persons; asserts (a) a pending link grants the supporter **no** structural read (the mask returns 403/empty) until **both** accept; (b) after both accept, the supporter scope reads structural columns only; (c) **the break-test** — a supporter who has accepted but whose supportee has **not** accepted attempts `GET /reports/:personId/shared-record` and gets `403 ForbiddenError` (no one-sided link grants visibility); (d) the captured `relation` is stored on the edge, returned in the ceremony contract payload (`GET /links/:id/contract`), and is **absent from every authorization decision** — assert that flipping `relation` between all four values does **not** change the structural-mask result, the reportability filter, or the tier (relation is capture-only, not a gate). **Red-green:** revert the "both accepted" guard to "supporter-accepted is enough" → the one-sided read leaks → restore. `pnpm exec nx test:integration api` passes.
+
+- [ ] **T6: Implement the appeal affordance — "request a detailed attention report" (EU-2).**
+  In `apps/api/src/services/supporter-report.ts`, `buildAttentionReport(supporterPersonId, supporteePersonId, reason?)` produces **richer STRUCTURAL detail** (per-chapter mastery, per-topic effort, review cadence) plus a **fuller mentor write-up** — and **passes the whole candidate set through `filterToReportable()`** so the artifact wall holds (never raw notes/chats/memory). Each appeal is a **deliberate, logged** action: write an audit ledger row (`actorJob: 'appeal-report'`, `visibility: 'supporter'`) recording who requested it and when (the §6.1 "deliberate, logged" requirement). Wire `POST /reports/:personId/appeal` in `routes/visibility.ts`; it requires an **active** (both-accepted) `supportership` and the structural mask, returns `appealReportSchema`.
+  **done when (break-test):** `apps/api/src/services/supporter-report.test.ts` (T6a) asserts the attention report contains richer structural detail than the curated read AND that an audit ledger row was written; **the artifact-wall break-test** — seed the supportee's notes/chat with a distinctive string, assert it appears in **no** field of the attention report (substring assertion across the serialized report). **Red-green:** add a (bug) raw-notes field to the report assembly bypassing the gate → the string leaks (fails) → remove it. `pnpm exec nx run api:test` passes.
+
+- [ ] **T7: Implement kid-initiated revocation for credentialized 13+ (EU-7) — net-new path.**
+  Create `apps/api/src/services/supportership-revocation.ts`: `requestSelfUnlink(supporteePersonId, supportershipId)` verifies the caller **is** the supportee on an **active credentialized** `supportership` (not the supporter, not a managed tier — managed stays guardian-initiated via the existing `consent-revocation.ts`), then dispatches `app/supportership.unlinked` (add to `schemas/src/inngest-events.ts`). Create `apps/api/src/inngest/functions/supportership-revocation.ts` mirroring the **shape** of `consent-revocation.ts` (grace/notice window, idempotency on `supportershipId + revokedAt`, concurrency limit 1): on fire it (a) writes a **non-silent** supporter hub card — a ledger row `kind: 'support_link_ended'`, `visibility: 'supporter'`, params `{ supporteeDisplayName }` ("Emma ended sharing"), **never a silent disappearance**; (b) after the grace window, **retires the person scope** by marking the `supportership` edge `revoked_at` (the chip drops it on next resolve — S4 reads `revoked_at IS NULL`). Define `SUPPORTERSHIP_GRACE_DAYS = 7` (mirrors the existing consent grace). The supportee never loses their own data — only the edge retires (inv 21: edge deletion never orphans the person).
+  **done when (break-test):** `apps/api/src/inngest/functions/supportership-revocation.test.ts` (T7a) asserts (a) on unlink, a `support_link_ended` ledger row with `visibility: 'supporter'` is written **before** the scope retires (non-silent guarantee); (b) after the grace window the edge is `revoked_at`-stamped and a subsequent supporter shared-record read returns `403`. **The authorization break-test:** assert `requestSelfUnlink` called by the **supporter** (not the supportee) throws `ForbiddenError`, and called on a **managed** supportership throws (managed routes through `consent-revocation.ts`, not this path). **Red-green:** revert the caller-is-supportee guard → a supporter can unilaterally sever the link via the kid path → restore. `pnpm exec nx run api:test` + `pnpm exec nx test:integration api` (for the route) pass.
+
+- [ ] **T8: Implement the graduation moment (managed → credentialized).**
+  Create `apps/api/src/inngest/functions/graduation-narration.ts`, subscribed to `app/person.graduated` (the identity-foundation transition fires this — `domain-model.md` §5 managed→credentialized; S5 **consumes** it, does not own the transition). On fire: (a) the visibility contract **visibly upgrades** — the tier flips `managed → credentialized` on the edge (the *transition* is W2-owned; S5 writes the **contract re-stamp** + version bump requiring fresh acceptance per §6.2 "linking ceremony" for the now-credentialized person); (b) write a graduation ledger moment via `writeActivityMoment({ kind: 'graduation', visibility: 'both', params: { whatChanges: [...the exact reporting-tier delta...] }, templateKey: 'ledger.graduation.default' })` so the mentor narrates "this is now your own space" and the kid is **told exactly what the supporter now sees** (spec §6.2). Add `'graduation'` to the S0 `ledgerKindSchema` and the matching `templateKey` (an additive schema PR — no migration, per S0 T3 convention).
+  **done when:** `apps/api/src/inngest/functions/graduation-narration.test.ts` (T8a) asserts on `app/person.graduated` a `graduation` ledger row is written with `visibility: 'both'` and `params.whatChanges` enumerating the tier delta, and that the contract version is bumped so the credentialized person must re-accept (a stale-acceptance read returns the re-consent prompt, not silent continuation). The kid-facing copy routes through `t()` (i18n) — no hardcoded JSX literal. `pnpm exec nx run api:test` passes.
+
+- [ ] **T9: Build managed tier but gate activation behind `MANAGED_TIER_ACTIVE` (deferred; §6.2/§13.5).**
+  The managed-tier mechanism (richer default reporting per §6.2 — fuller recaps, more granular attention items; the account-creation-is-ceremony branch in T5; guardian-initiated revocation already in `consent-revocation.ts`) is **fully built and tested**, but its **activation is flag-gated OFF** at launch (launch floor 13+, only credentialized live). Add `MANAGED_TIER_ACTIVE: process.env.EXPO_PUBLIC_ENABLE_MANAGED_TIER === 'true'` to `apps/mobile/src/lib/feature-flags.ts` (default OFF) **and** `MANAGED_TIER_ACTIVE: z.enum(['true','false']).default('false')` to `apps/api/src/config.ts` (the server enforces the gate too — a managed-tier link request returns `403` when the flag is off, so the gate is not client-only). Every managed-tier code path checks the flag at its entry; with the flag off, only credentialized links/contracts/reports are reachable.
+  **The §3.2 "Handoff" supporter cold-start variant ships with this activation.** Per spec §3.2, the supporter cold-start MANAGED variant — **Handoff** ("Emma's all set — whenever she's ready, hand her the phone"; the managed-tier create-profile-on-device path that switches the device to the child's own learner scope) — goes live **together with the managed tier**, gated by the same `MANAGED_TIER_ACTIVE` flag. At the 13+ launch only credentialized is live, so the day-one supporter cold-start variants are **Approve** and **Kickstart** (both rendered in S4); **Handoff + the managed-tier create-profile-on-device path activate when `MANAGED_TIER_ACTIVE` flips on**. The Handoff *card UI itself is S4* (the per-child hub card); S5 owns only that the managed-tier gate this task installs is what turns the Handoff path on — so the flag the supporter cold-start reads for the Handoff variant is this one, server-enforced (a managed create-profile-on-device request returns `403` when the flag is off).
+  **done when (break-test):** `apps/api/src/routes/visibility.integration.test.ts` (T9a) asserts with `MANAGED_TIER_ACTIVE=false` (the default) an attempt to initiate a **managed** (under-13 supportee) link returns `403 ForbiddenError`, while a **credentialized** link succeeds; with `MANAGED_TIER_ACTIVE=true` the managed link path is reachable (richer-reporting tier applies). **The gate is server-enforced:** the break-test sets the client flag true but the server flag false and asserts the server still `403`s. `pnpm exec nx test:integration api` + `pnpm exec nx run api:test` (config) pass.
+
+- [ ] **T10: State and test the safety-crosses-every-wall invariant (no change to tripwire).**
+  No modification to `apps/api/src/services/safety-tripwire.ts` or the escalate-not-refuse path. S5's only obligation is to **prove the reportability gate does not suppress a safety escalation**: a tripwire-flagged event must still reach its escalation channel regardless of the non-reportable class, contract state, or tier (spec §6.1: "your space is private, *unless you're not safe*"). Add an assertion at the gate's call site that the safety path is **upstream of and independent from** `filterToReportable()` — the gate filters *reporting*, never *escalation*.
+  **done when (break-test):** `apps/api/src/services/reportability.safety.test.ts` (T10a) asserts a safety-escalation event (the existing tripwire output) is delivered to its escalation handler **even when** the same session's confided affect is correctly blocked from the supporter report — i.e. blocking affect-as-report does NOT block affect-as-safety-signal. **Red-green:** route the safety escalation through `filterToReportable()` (the bug) → the escalation gets dropped as non-reportable (fails — proving the test catches it) → restore the independent path. `pnpm exec nx run api:test` passes.
+
+- [ ] **T11: Build the mobile contract surfaces behind `MODE_NAV_V2_ENABLED` (inside S4 scopes).**
+  Create `apps/mobile/src/components/visibility/{ContractCard,SharedRecordView,AppealButton,RevocationNoticeCard,GraduationCard}.tsx` and `apps/mobile/src/app/(app)/link/*` (the two-sided ceremony screens). **Both sides render the SAME `ContractCard`** (T1 contract payload) during the ceremony — and the `ContractCard` is the **informed-consent disclosure surface** (§3.2): it states the **full** contract — structural visibility, the **artifact wall** ("never her chats/notes"), **render-equivalence**, and the safety exception — i.e. the disclosure the S4 positive-only "door" deliberately defers to here. The child side also shows the captured **relation** as the validating line (*"Zuzana wants to support you as your teacher"*, T5). The ceremony is reached from S4's morphing per-child **Approve** card; the accept is an explicit tap on each side, never a one-tap consent. `SharedRecordView` renders the supporter's per-person Journal shared-record cell (the `supporterView` from T4); `AppealButton` calls `POST /reports/:personId/appeal`; `RevocationNoticeCard` is the non-silent "Emma ended sharing" hub card (the `support_link_ended` ledger row); `GraduationCard` shows "this is now your own space" + the tier delta. All consume shared infra per the anchors file: `ErrorFallback`/`TimeoutLoader` (`components/common`), typed errors via `@eduagent/schemas`, the API client (`api-client.ts` — never parse `res.status`), semantic theme tokens (no hardcoded hex), and **all copy through `t()`** (the JSX-literal ratchet fails new literals). These mount **inside S4's person/hub scopes** — S5 does not add tabs.
+  **done when:** `apps/mobile/src/components/visibility/SharedRecordView.test.tsx` (T11a) renders the supporter view from a fixed `supporterView` payload and asserts it shows structural facts only (no artifact text) and routes a fetch error through `ErrorFallback`; `ContractCard.test.tsx` (T11b) asserts both ceremony sides receive the same contract version/reportable-kinds **and that the card discloses the artifact wall + render-equivalence** (the disclosure the S4 door defers here), and that the child-side render surfaces the captured `relation` validating line. Run `cd apps/mobile && pnpm exec jest --findRelatedTests src/components/visibility/SharedRecordView.test.tsx --no-coverage`. With `MODE_NAV_V2_ENABLED` off, none of these mount (no V0/V1 regression).
+
+- [ ] **T12: Draft `MMT-ADR-0024` and `MMT-ADR-0025` in lockstep (spec §12 #2/#3).**
+  Create both ADRs following `MMT-ADR-0021`/`0022`'s format. **0024** (supporter visibility contract): records the non-reportable allow-list, render-equivalence, mentor-as-channel + appeal, artifact wall, safety exception — **citing** `domain-model.md` §2/§4 + ontology inv 9/14/19 (Supportership = Layer-2 edge-scoped visibility), adding only the reportability *narrowing*. **0025** (managed/credentialized tier carrier + graduation): records the reporting-tier mapping onto the canon's login-presence axis (`ontology.md` §3.1, inv 3/4) and the graduation transition (`domain-model.md` §5, `prd.md` R4), the built-but-deferred managed activation (§13.5), and the graduation ledger moment — **explicitly deferring** the definition of managed/credentialized to the identity canon (no duplication, per spec §12 #3). Both link the spec §6 canon lines they change. **Must land in the same change-set as T1-T11** (the `decision-adr-link` CI guard).
+  **done when:** both ADR files exist with all required sections, 0024 cites the Supportership canon (not restates it), 0025 cites the login-presence/transition canon (not restates it), and `scripts/check-decision-adr-link.ts` (the `docs-checks.yml` → `decision-adr-link` job) passes for the spec §6 decision blocks.
+
+---
+
+## Tests (negative-path break-tests are mandatory per the repo Fix Development Rules)
+
+All co-located (no `__tests__/`). Internal services/DB/middleware are **never** `jest.mock`'d (GC1) — mock only the LLM (`routeAndCall`), Clerk JWKS, Neon passthrough, push. Each access-control criterion below is a **red-green break-test**: write it → watch it block → revert the guard → watch it leak → restore.
+
+| ID | File | What it proves (and the leak it reverts to) |
+|---|---|---|
+| T1a | `schemas/src/visibility-contract.test.ts` | allow-list has no affect member; contract requires `artifactWall`/`safetyException` true |
+| **T2a** | `services/reportability.test.ts` | **EU-1 non-reportable class** — confided affect is dropped + `assertReportable` throws; revert to deny-list → affect leaks |
+| **T3a** | `services/supporter-report.test.ts` | supporter report never contains confided-affect text; revert gate call → affect surfaces in curated read |
+| **T4a** | `services/shared-record.test.ts` | **render-equivalence** — supporter/supportee views cover identical fact-ids; seed a one-sided fact → equivalence check fails (catches non-mirrored report) |
+| **T5a** | `routes/visibility.integration.test.ts` | **one-sided link grants no visibility** — supporter read 403s until both accept; revert "both accepted" → one-sided leak. Also: per-edge `relation` is captured + returned in the ceremony contract and is **capture-only** — flipping it across all four values never changes mask/reportability/tier (§3.2) |
+| **T6a** | `services/supporter-report.test.ts` | **appeal respects artifact wall** — attention report contains no raw notes/chat string + writes audit row; add raw field → string leaks |
+| **T7a** | `inngest/functions/supportership-revocation.test.ts` | **kid-initiated revocation** is non-silent (supporter card before retire) + caller-is-supportee guard; revert guard → supporter severs via kid path |
+| T8a | `inngest/functions/graduation-narration.test.ts` | graduation writes `visibility:'both'` moment + bumps contract version (forces re-accept) |
+| **T9a** | `routes/visibility.integration.test.ts` | **managed-tier activation gated** — managed link 403s with flag off (server-enforced even if client flag on); credentialized succeeds. The §3.2 **Handoff** path (managed create-profile-on-device) is reachable only with the flag on |
+| **T10a** | `services/reportability.safety.test.ts` | **safety crosses every wall** — escalation delivered even while affect-as-report is blocked; route escalation through gate → escalation dropped |
+| T11a/b | `components/visibility/*.test.tsx` | shared-record view shows structural-only + error fallback; both ceremony sides see same contract |
+
+**Run gates:** `pnpm exec nx run-many -t typecheck`, `pnpm exec nx run-many -t lint`, `pnpm exec nx run api:test`, `pnpm exec nx run schemas:test`, and **`pnpm exec nx test:integration api`** (required — the pre-commit/pre-push hooks skip `.integration.test.` files, so the link-authorization + managed-gate + appeal scoping tests must be run explicitly before commit per the repo Required-Validation rule). Mobile: `cd apps/mobile && pnpm exec jest --findRelatedTests <visibility component> --no-coverage`.
+
+---
+
+## Enumerated S5 acceptance criteria (spec §6.1/§6.2/§6.3/§4.2)
+
+Each is a checkable criterion with a named break-test:
+
+1. **Linking ceremony — both sides accept the same contract** (credentialized 13+; managed = creation-is-ceremony). It is the **destination of S4's Approve anchor** (no one-tap consent), the **informed-consent locus** that discloses the artifact wall + render-equivalence (the S4 positive-only door defers this here), and where the **per-edge `relation` is shown, child-validated, and stored** (§3.2, capture-only — not wired to permissions/tiers). *Done:* T5 + break-test T5a (one-sided link grants no visibility; relation is capture-only).
+2. **Sealed NON-REPORTABLE class (EU-1)** — confided affect/self-doubt is **never reported upward**, enforced server-side at report-generation via an **allow-list** (`mastery|effort|observable_engagement`). *Done:* T2 + T3 + break-tests T2a/T3a (affect dropped; revert → leak).
+3. **Render-equivalence** — the shared record is the same facts rendered per-audience; nothing reported that the person can't see the substance of. *Done:* T4 + break-test T4a (identical fact-id sets; one-sided fact fails the check).
+4. **Appeal affordance (EU-2)** — a deliberate, logged "request a detailed attention report": richer structural detail + fuller mentor write-up, artifact wall intact. *Done:* T6 + break-test T6a (no raw-artifact string; audit row written).
+5. **Kid-initiated revocation (EU-7)** — credentialized 13+ self-unlink; non-silent supporter hub card ("Emma ended sharing"); person scope retires after the grace/notice window; net-new vs the guardian-initiated managed path. *Done:* T7 + break-test T7a (non-silent + caller-is-supportee).
+6. **Graduation (managed→credentialized)** — contract visibly upgrades; kid told exactly what the supporter now sees; mentor narrates it as a `visibility:'both'` ledger moment. *Done:* T8 (+ T8a).
+7. **Managed vs credentialized tiers carry the visibility tier; managed built but activation deferred** (launch floor 13+, only credentialized live). The §3.2 supporter cold-start **Handoff** variant (managed create-profile-on-device) ships *with* managed-tier activation under the same `MANAGED_TIER_ACTIVE` flag; **Approve** + **Kickstart** are the day-one credentialized variants. *Done:* T9 + break-test T9a (server-enforced gate; Handoff path gated).
+8. **Safety escalations cross every wall** (escalate-not-refuse, unchanged) — the reportability gate filters *reporting*, never *escalation*. *Done:* T10 + break-test T10a.
+
+---
+
+## Canon reconciliation notes (ADR obligation #3 — reconcile, do NOT duplicate)
+
+The spec's product vocabulary maps onto existing identity-foundation canon; S5 must **cite** the canon, not re-define it. Findings:
+
+- **"Managed" / "credentialized" = the canon's login-presence axis, not new account types.** `ontology.md` §3.1 + inv 3/4: a Person **has a Login (credentialed)** or **does not (managed)** — an attribute of the Person, independent of consent-requirement. The spec's two "account types" are this axis, surfaced as a reporting-tier carrier. The spec's spelling "credential**ized**" ≠ canon "credential**ed**" — the same concept; the ADR should note the spelling variance and defer to canon's "credentialed." **S5 does not create an account-type entity** — it reads login-presence and maps it to a reporting tier.
+- **"Supporter" = the canon's Supportership edge (Layer 2), not "parent/family".** `domain-model.md` §2.3 + ontology §2.3/inv 9/14/19, `prd.md` Part 3: Supportership is a **dyadic, edge-scoped, consent-authority-free** visibility grant; the supporter may be **any age**; visibility is scoped to the named supportee, never org-wide. The spec's "role-generic supporter" is exactly this. The reportability narrowing (affect non-reportable) is an S5 *product-contract* refinement **on top of** the canon's structural "edge-scoped visibility" — `MMT-ADR-0024` records the refinement, citing the edge.
+- **The non-reportable class refines, does not contradict, inv 9/19.** inv 9 (edge-scoped visibility) and inv 19 (the wallet does not buy oversight; visibility is opt-in above consent age) bound *who* can see; S5's EU-1 bounds *what* is reportable even to an authorized supporter. These compose: an authorized supporter sees a **narrowed** structural set. No canon edit needed — `MMT-ADR-0024` is additive.
+- **Linking ceremony authorization follows inv 15/16.** A Supportership is granted by **the supportee if consent-capable, else the guardian** (inv 15); guardian-granted supporterships **lapse on graduation unless re-confirmed** (inv 16). S5's T5 "both sides accept" is the consent-capable (credentialized 13+) branch of inv 15; T8's contract re-stamp on graduation is the inv-16 re-confirmation. **S5 must not invent a parallel grant model** — it implements inv 15/16 over the `supportership` edge.
+- **Graduation = the canon's managed→credentialed transition.** `domain-model.md` §5 transition catalogue + `prd.md` R4: managed→credentialed **keeps the same `person_id`** (inv 20), converts guardian visibility to **learner opt-in default-off** (inv 19), and lapses unconfirmed guardian-granted supporterships (inv 16). S5's graduation moment **narrates** this transition (the ledger moment) — it does **not** drive the transition (W2/the unified sweep, `MMT-ADR-0009`, owns the firing). `app/person.graduated` is consumed by S5, fired by identity.
+- **Revocation reconciliation.** Managed-tier revocation stays the canon/existing `consent-revocation.ts` (guardian-initiated, consent-withdrawal cascade, `MMT-ADR-0008` consent authority). S5 adds **only** the credentialized supportee's **edge-revocation** (`supportership.revoked_at`) — inv 21: edge deletion never orphans the person, the supportee keeps all their data. The two paths are distinct triggers on distinct edges (`guardianship`/`consent_states` vs `supportership`); the ADR notes this so reviewers don't fold them.
+- **"Charge" terminology.** Canon uses **charge** (≡ consent-gated learner) for the guardianship far-end and **supportee** for the supportership far-end (`ontology.md` §2.2/§2.3, `data-model.md` §2A.4 charge terminology). S5 surfaces use **supportee** (the supporter relationship), reserving **charge** for the managed/guardianship tier. Mentor-facing/kid-facing copy uses neither term verbatim — it uses the person's name (spec §6.3 "the mentor reporting to you about Emma").
+
+---
+
+## Self-review
+
+**Spec coverage** (each S5 requirement → task):
+- Linking ceremony, same contract both sides, managed=creation (§6.2); Approve destination + artifact-wall/render-equivalence disclosure locus + per-edge relation capture (§3.2) → T1, T5 (+ T5a), T11/T11b.
+- Sealed non-reportable class, server-side at report-generation, allow-list (EU-1, §6.1) → T1, T2, T3 (+ T2a/T3a).
+- Render-equivalence, same facts two framings (§6.1) → T1, T4 (+ T4a).
+- Appeal affordance, deliberate+logged, artifact wall intact (EU-2, §6.1) → T6 (+ T6a).
+- Managed/credentialized tiers carry visibility tier; managed built, activation deferred (§6.2, §13.5) → T9 (+ T9a).
+- Graduation contract upgrade + told-exactly + narrated ledger moment (§6.2) → T8 (+ T8a).
+- Kid-initiated revocation, non-silent card, scope retires after grace, extends consent-revocation.ts (EU-7, §4.2) → T7 (+ T7a), event in inngest-events.
+- Safety crosses every wall, unchanged tripwire, invariant stated (§6.1) → T10 (+ T10a).
+- Mobile contract surfaces inside S4 scopes, V2-flag-gated, shared infra (§6.3) → T11.
+- ADR obligations #2/#3 in lockstep, reconcile-not-duplicate (§12) → T12 + Canon-reconciliation section.
+- Blocked-by post-IF-flip + convergence (the W1/W2 schema is in code but not live until the flip) + S4 (and S0/S3) → Blocked-by/Prerequisites section.
+
+**Name consistency:** `reportableFactKindSchema`/`ReportableFactKind`, `filterToReportable`/`assertReportable`/`NonReportableFactError`, `projectSharedRecord` → `{supporterView, supporteeView}`, `buildCuratedRead`/`buildAttentionReport`, `initiateLink(…, relation)`/`acceptLink`, `requestSelfUnlink`, `visibilityContractSchema`/`contractAcceptanceSchema`, `supporterRelationSchema`/`SupporterRelation` (capture-only `relation` field), `SUPPORTERSHIP_GRACE_DAYS`, events `app/supportership.unlinked`/`app/person.graduated`, ledger kinds `support_link_ended`/`graduation`, flag `MANAGED_TIER_ACTIVE`. Used identically across tasks, tests, and the criteria list.
+
+**Deferred-decision scan:** allow-list members are fixed (`mastery|effort|observable_engagement`); grace window concrete (`SUPPORTERSHIP_GRACE_DAYS = 7`); managed-tier gate is a named flag default-off, server-enforced, and is what turns on the §3.2 Handoff path; both-accept is the credentialized branch and creation-is-ceremony the managed branch (no ambiguity); the per-edge `relation` values are fixed (`parent|sibling|teacher|other`, `other`→display-name fallback) and are **capture-only by ruling** — *not* a deferred gate (any future relation-based gating is a separate ruled decision, §3.2); ADR numbers fixed (0021/0022, 0020 taken by S0). No "TBD"/"handle appropriately" remain. The one genuinely external dependency — the exact managed-tier reporting-richness delta (spec §13.3, open) — is correctly deferred to the S5 build's own §6.2 ruling and does not block the allow-list/wall/equivalence criteria.

@@ -385,7 +385,6 @@
     "active": "Aktywny",
     "accommodation": {
       "sectionHeader": "Twoje dostosowanie nauki",
-      "viewAndManage": "Wyświetl i zarządzaj",
       "notSureWhichToPick": "Nie wiesz, które wybrać?",
       "guideActive": "Aktywny",
       "childScreenTitle": "Preferencje nauki — {{name}}"
@@ -712,8 +711,6 @@
     },
     "notePrompt": {
       "writeNote": "Napisz notatkę",
-      "cannotSaveTitle": "Nie można zapisać notatki",
-      "cannotSaveMessage": "Notatek nie można teraz zapisać. Spróbuj ponownie.",
       "saveFailedTitle": "Nie można zapisać notatki",
       "summaryPlaceholder": "Co powinniśmy zapamiętać z tej sesji?"
     },
@@ -791,7 +788,8 @@
     "expiredSystemMessage": "Sesja wygasła. Rozpocznij nową, aby kontynuować.",
     "errorBoundary": {
       "crashTitle": "Ekran sesji uległ awarii",
-      "unknownError": "Nieznany błąd"
+      "unknownError": "Nieznany błąd",
+      "body": "Coś poszło nie tak podczas ładowania tego ekranu. Możesz spróbować ponownie lub wrócić do ekranu głównego."
     },
     "screenChrome": {
       "wrapping": "Kończenie...",
@@ -1119,7 +1117,6 @@
       "exit": "Wyjdź"
     },
     "review": {
-      "couldNotSaveResult": "Nie mogliśmy zapisać wyniku Twojej recenzji.",
       "couldNotSaveTitle": "Nie można zapisać wyniku",
       "continueWithoutSaving": "Kontynuuj bez zapisywania",
       "noDataFound": "Nie znaleziono danych recenzji.",
@@ -1150,7 +1147,6 @@
       "prepareErrorMessage": "Nie można przygotować dyktanda. Spróbować ponownie?",
       "tryAgain": "Spróbuj ponownie",
       "title": "Sprawdź tekst",
-      "subtitleFromPhoto": "Popraw błędy ze zdjęcia, a następnie rozpocznij dyktando.",
       "subtitleManual": "Przejrzyj swój tekst, a następnie rozpocznij dyktando.",
       "inputPlaceholder": "Wpisz lub wklej tutaj swój tekst...",
       "inputLabel": "Tekst dyktanda",
@@ -1412,6 +1408,9 @@
       "a11ySectionCollapse": "{{label}}. {{summary}}. Zwiń sekcję.",
       "a11ySectionExpand": "{{label}}. {{summary}}. Rozwiń sekcję."
     },
+    "inactiveFallbackBanner": {
+      "message": "Nie udało się wczytać wstrzymanych i zarchiwizowanych przedmiotów. Stuknij, aby spróbować ponownie — nie zniknęły."
+    },
     "notStartedCount": "{{notStarted}} / {{total}} nierozpoczętych",
     "chooseTopic": "Wybierz temat",
     "provenanceFrom": "Od {{name}}",
@@ -1536,8 +1535,7 @@
     "deleteDialog": {
       "title": "Usuń słowo",
       "message": "Usunąć to słowo ze swojego słownictwa?",
-      "errorTitle": "Nie można usunąć",
-      "errorFallback": "Coś poszło nie tak. Spróbuj ponownie."
+      "errorTitle": "Nie można usunąć"
     },
     "noSubject": {
       "title": "Nie wybrano przedmiotu",
@@ -1791,6 +1789,7 @@
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
     "microphoneUnavailableTitle": "Mikrofon niedostępny",
+    "microphoneUnavailableBody": "Nie mogliśmy teraz użyć mikrofonu. Sprawdź, czy aplikacja ma dostęp do mikrofonu, i spróbuj ponownie lub wpisz tekst.",
     "skippedFragments_few": "Pominęliśmy {{count}} niejasne fragmenty. Stuknij, aby je dodać z powrotem.",
     "skippedFragments_many": "Pominęliśmy {{count}} niejasnych fragmentów. Stuknij, aby je dodać z powrotem.",
     "detectSubjectErrorTitle": "Nie udało się wykryć przedmiotu",
@@ -2260,7 +2259,6 @@
       "manageMentorMemoryForChild": "Zarządzaj tym, co mentor pamięta o {{name}}",
       "profileDetails": "Szczegóły profilu",
       "childProfileJoined": "Dodano {{date}}",
-      "learningAccommodationTitle": "Dostosowanie nauki dla {{name}}",
       "noLearningPreferenceSet": "Nie ustawiono preferencji nauki",
       "consentTitle": "Zgoda",
       "consentDescription": "Zarządzaj zgodą rodzica dla {{name}}.",
@@ -2473,10 +2471,6 @@
       "exchangeDelta": {
         "title": "Wymiany wiadomości w tym tygodniu",
         "body": "Ile tur wiadomości miało miejsce w tym tygodniu w porównaniu z poprzednim. To prosty sygnał aktywności w nauce."
-      },
-      "guidedRatio": {
-        "title": "Ćwiczenia z prowadzeniem",
-        "body": "Udział odpowiedzi mentora, w których Twoje dziecko potrzebowało rozpisanego przykładu lub silniejszej wskazówki zamiast lekkiej podpowiedzi."
       },
       "streakXp": {
         "title": "Passa i XP",
@@ -2953,7 +2947,6 @@
       "topicsReady_other": "{{count}} tematów gotowych do testu",
       "afterFinishTopic": "Dostępne po ukończeniu tematu",
       "hintOpenPicker": "Otwiera wybór testów",
-      "hintOpenLibrary": "Otwiera bibliotekę",
       "couldNotLoad": "Nie udało się wczytać tematów testów",
       "studySubjectFirst": "Najpierw ucz się {{subject}}, aby to odblokować",
       "topicsReady_few": "{{count}} tematy gotowe do testu",
@@ -3405,6 +3398,43 @@
       "openUpdate": "Otwórz aktualizację"
     }
   },
+  "myNotes": {
+    "loadMore": "Wczytaj więcej",
+    "emptyHint": "Pojawią się tutaj w miarę Twojej nauki.",
+    "title": "Moje notatki",
+    "subtitle": "Sesje, notatki i zapisane odpowiedzi",
+    "sortDate": "Data",
+    "sortSubject": "Temat",
+    "noneYetNotes": "Brak notatek",
+    "noneYetBookmarks": "Brak zakładek",
+    "noneYetSessions": "Brak sesji",
+    "loadErrorNotes": "Nie udało się wczytać notatek",
+    "loadErrorBookmarks": "Nie udało się wczytać zakładek",
+    "loadErrorSessions": "Nie udało się wczytać sesji",
+    "kinds": {
+      "sessions": "Sesje",
+      "notes": "Notatki",
+      "bookmarks": "Zakładki"
+    },
+    "types": {
+      "homework": "Praca domowa",
+      "review": "Powtórka",
+      "learning": "Nauka",
+      "note": "Notatka",
+      "bookmark": "Zakładka"
+    },
+    "hub": {
+      "sessionsSubtitle": "Twoje rozmowy",
+      "notesSubtitle": "Twoje notatki",
+      "bookmarksSubtitle": "Zapisane odpowiedzi tutora"
+    },
+    "unknownSubject": "Nieznany przedmiot",
+    "searchSessions": "Szukaj w sesjach",
+    "searchNotes": "Szukaj w notatkach",
+    "searchBookmarks": "Szukaj w zakładkach",
+    "a11yGroupByDate": "Grupuj według daty",
+    "a11yGroupBySubject": "Grupuj według przedmiotu"
+  },
   "createProfile": {
     "titleChild": "Opowiedz nam o swoim dziecku",
     "titleSelf": "Kto się uczy?",
@@ -3437,16 +3467,6 @@
     "switchError": "Nie udało się przełączyć. Dotknij, aby spróbować ponownie.",
     "a11yRetry": "Spróbuj ponownie przełączyć tryb"
   },
-  "profileSwitcher": {
-    "fallbackName": "Profil",
-    "switchErrorTitle": "Nie udało się przełączyć profilu",
-    "a11yClose": "Zamknij przełącznik profili",
-    "a11yChip": "Przełącz profil. Obecny: {{name}}",
-    "a11yOption": "{{name}}, {{role}}",
-    "a11yOptionActive": "{{name}}, {{role}}, aktywny",
-    "roleParent": "Rodzic",
-    "roleStudent": "Uczeń"
-  },
   "memoryConsent": {
     "defaultTitle": "Pomóż tutorowi dowiedzieć się więcej o {{name}}",
     "defaultTitleNoName": "Pomóż tutorowi dowiedzieć się więcej o Twoim dziecku",
@@ -3474,43 +3494,6 @@
     "childBirthYearPlaceholder": "Rok urodzenia",
     "a11yBack": "Wróć do poprzedniego kroku",
     "a11yCancel": "Anuluj i wyjdź"
-  },
-  "myNotes": {
-    "title": "Moje notatki",
-    "subtitle": "Sesje, notatki i zapisane odpowiedzi",
-    "sortDate": "Data",
-    "sortSubject": "Temat",
-    "emptyHint": "Pojawią się tutaj w miarę Twojej nauki.",
-    "loadMore": "Wczytaj więcej",
-    "noneYetNotes": "Brak notatek",
-    "noneYetBookmarks": "Brak zakładek",
-    "noneYetSessions": "Brak sesji",
-    "loadErrorNotes": "Nie udało się wczytać notatek",
-    "loadErrorBookmarks": "Nie udało się wczytać zakładek",
-    "loadErrorSessions": "Nie udało się wczytać sesji",
-    "kinds": {
-      "sessions": "Sesje",
-      "notes": "Notatki",
-      "bookmarks": "Zakładki"
-    },
-    "types": {
-      "homework": "Praca domowa",
-      "review": "Powtórka",
-      "learning": "Nauka",
-      "note": "Notatka",
-      "bookmark": "Zakładka"
-    },
-    "hub": {
-      "sessionsSubtitle": "Twoje rozmowy",
-      "notesSubtitle": "Twoje notatki",
-      "bookmarksSubtitle": "Zapisane odpowiedzi tutora"
-    },
-    "unknownSubject": "Nieznany przedmiot",
-    "searchSessions": "Szukaj w sesjach",
-    "searchNotes": "Szukaj w notatkach",
-    "searchBookmarks": "Szukaj w zakładkach",
-    "a11yGroupByDate": "Grupuj według daty",
-    "a11yGroupBySubject": "Grupuj według przedmiotu"
   },
   "pickBook": {
     "subjectFallback": "Temat",

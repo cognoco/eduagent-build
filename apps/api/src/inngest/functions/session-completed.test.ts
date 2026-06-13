@@ -653,6 +653,14 @@ describe('sessionCompleted', () => {
     expect(mockStep.waitForEvent).not.toHaveBeenCalled();
   });
 
+  it('does not wait for filing for topicless recitation sessions', async () => {
+    const { mockStep } = (await executeSteps(
+      createEventData({ topicId: null, mode: 'recitation' }),
+    )) as any;
+
+    expect(mockStep.waitForEvent).not.toHaveBeenCalled();
+  });
+
   // [BUG-852] When step.waitForEvent('wait-for-filing') returns null (60s
   // timeout fired), we previously proceeded silently with stale topic
   // placement — invisible in production observability. The fix escalates

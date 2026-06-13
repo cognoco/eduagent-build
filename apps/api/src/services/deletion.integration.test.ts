@@ -18,6 +18,7 @@ import { sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
+  byokWaitlist,
   consentStates,
   createDatabase,
   generateUUIDv7,
@@ -55,6 +56,7 @@ describeIfDb(
     let db: Database;
     let accountId: string;
     let profileId: string;
+    const accountEmail = `acct_cascade_${RUN_ID}@test.invalid`;
 
     beforeAll(async () => {
       db = createDatabase(process.env.DATABASE_URL!);
@@ -63,10 +65,17 @@ describeIfDb(
         .insert(accounts)
         .values({
           clerkUserId: `clerk_integ_acct_cascade_${RUN_ID}`,
-          email: `acct_cascade_${RUN_ID}@test.invalid`,
+          email: accountEmail,
         })
         .returning({ id: accounts.id });
       accountId = account!.id;
+
+      // [R3] Seed a BYOK waitlist row sharing the account's email. The table
+      // has no FK to accounts, so the account-delete cascade cannot reach it;
+      // executeDeletion must erase it explicitly (GDPR Art 17). This is the
+      // break test for that fix — revert the byok delete in executeDeletion and
+      // the "byok_waitlist row is erased" assertion below goes red.
+      await db.insert(byokWaitlist).values({ email: accountEmail });
 
       const [profile] = await db
         .insert(profiles)
@@ -137,6 +146,11 @@ describeIfDb(
       if (accountId) {
         await db.execute(sql`DELETE FROM accounts WHERE id = ${accountId}`);
       }
+      // byok_waitlist has no FK to accounts, so it is not cleaned up by the
+      // account delete above — remove the seeded row explicitly.
+      await db.execute(
+        sql`DELETE FROM byok_waitlist WHERE email = ${accountEmail}`,
+      );
     });
 
     // -----------------------------------------------------------------------
@@ -194,6 +208,12 @@ describeIfDb(
       );
       expect((before.rows as Array<{ c: number }>)[0]!.c).toBeGreaterThan(0);
 
+      // [R3] BYOK waitlist row exists before deletion (no FK → no cascade).
+      const byokBefore = await db.execute(
+        sql`SELECT count(*)::int AS c FROM byok_waitlist WHERE email = ${accountEmail}`,
+      );
+      expect((byokBefore.rows as Array<{ c: number }>)[0]!.c).toBe(1);
+
       // executeDeletion only deletes when an active (non-cancelled) deletion is
       // scheduled — the [Bug #494] atomic guard requires deletionScheduledAt IS
       // NOT NULL. Production schedules via the account route before the Inngest
@@ -216,6 +236,14 @@ describeIfDb(
         sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${profileId}`,
       );
       expect((events.rows as Array<{ c: number }>)[0]!.c).toBe(0);
+
+      // [R3] The email-only BYOK waitlist row must be erased too — it has no FK
+      // to accounts, so without the explicit delete in executeDeletion it would
+      // survive account deletion. Revert that delete and this assertion fails.
+      const byokAfter = await db.execute(
+        sql`SELECT count(*)::int AS c FROM byok_waitlist WHERE email = ${accountEmail}`,
+      );
+      expect((byokAfter.rows as Array<{ c: number }>)[0]!.c).toBe(0);
     });
   },
 );

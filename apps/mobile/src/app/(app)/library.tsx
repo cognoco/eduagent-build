@@ -51,7 +51,6 @@ import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
 import { getSubjectTintMap } from '../../lib/subject-tints';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
-import { useFailedFreeformLibraryFilingSessions } from '../../hooks/use-sessions';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -253,12 +252,6 @@ function LibraryScreenContent({
   // [PR-4 / surface-ownership] Inline query replaced by useLibraryRetention()
   // — library is the canonical owner of /library/retention.
   const libraryRetentionQuery = useLibraryRetention();
-  const failedLibraryFilingQuery = useFailedFreeformLibraryFilingSessions();
-  const failedLibraryFilingSessions = useMemo(
-    () => failedLibraryFilingQuery.data ?? [],
-    [failedLibraryFilingQuery.data],
-  );
-
   const retentionDataBySubjectId = useMemo(() => {
     const map = new Map<string, SubjectRetentionResponse>();
     for (const s of libraryRetentionQuery.data?.subjects ?? []) {
@@ -423,21 +416,6 @@ function LibraryScreenContent({
     },
     [proxyChildProfileId, router],
   );
-
-  const handleFailedLibraryFilingPress = useCallback(() => {
-    const firstFailedSession = failedLibraryFilingSessions[0];
-    if (!firstFailedSession) return;
-
-    router.push(
-      buildSessionDetailHref({
-        sessionId: firstFailedSession.sessionId,
-        subjectId: firstFailedSession.subjectId,
-        topicId: firstFailedSession.topicId,
-        bookId: firstFailedSession.bookId,
-        childProfileId: proxyChildProfileId,
-      }),
-    );
-  }, [failedLibraryFilingSessions, proxyChildProfileId, router]);
 
   const handleRetry = (): void => {
     void subjectsQuery.refetch();
@@ -693,38 +671,6 @@ function LibraryScreenContent({
     </ShimmerSkeleton>
   );
 
-  const renderFailedLibraryFilingAttention = (): React.ReactElement | null => {
-    const failedCount = failedLibraryFilingSessions.length;
-    if (failedCount === 0) return null;
-
-    return (
-      <Pressable
-        onPress={handleFailedLibraryFilingPress}
-        className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
-        accessibilityRole="button"
-        accessibilityLabel={t('session.filingFailed.needsAttention')}
-        testID="library-filing-attention-row"
-      >
-        <View className="flex-1 pr-3">
-          <Text className="text-body font-semibold text-text-primary">
-            {t('session.filingFailed.needsAttention')}
-          </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
-            {t('session.filingFailed.progressSaved')}
-          </Text>
-        </View>
-        <View className="min-w-[28px] h-7 rounded-full bg-warning/15 items-center justify-center px-2">
-          <Text
-            className="text-caption font-bold text-warning"
-            testID="library-filing-attention-count"
-          >
-            {failedCount}
-          </Text>
-        </View>
-      </Pressable>
-    );
-  };
-
   // ---- Main content -------------------------------------------------------
 
   const renderContent = (): React.ReactElement => {
@@ -826,11 +772,21 @@ function LibraryScreenContent({
     }
 
     const isSearching = debouncedQuery.trim().length > 0;
+    // [LEARN-32] When the includeInactive query fails we fall back to an
+    // active-only list (subjectsQuery line ~200), which silently drops the
+    // learner's paused/archived subjects. Detect that exact case so we can tell
+    // them those rows are temporarily hidden (not deleted) instead of letting
+    // them vanish with no explanation.
+    const showingActiveOnlyFallback =
+      subjectsQuery.isError &&
+      !Array.isArray(subjectsQuery.data) &&
+      Array.isArray(activeSubjectsFallbackQuery.data);
     const showingStaleCachedData =
       (subjectsQuery.isError ||
         activeSubjectsFallbackQuery.isError ||
         progressQuery.isError) &&
-      subjects.length > 0;
+      subjects.length > 0 &&
+      !showingActiveOnlyFallback;
     const shelfGroups = SUBJECT_STATUS_GROUPS.map((status) => ({
       status,
       subjects: visibleSubjects.filter((subject) => subject.status === status),
@@ -839,8 +795,6 @@ function LibraryScreenContent({
 
     return (
       <>
-        {renderFailedLibraryFilingAttention()}
-
         {/* Stale-data banner — visible when cached data is shown after a refresh failure */}
         {showingStaleCachedData && (
           <Pressable
@@ -850,6 +804,25 @@ function LibraryScreenContent({
           >
             <Text className="text-body-sm text-text-secondary flex-1">
               {t('library.staleBanner.message')}
+            </Text>
+            <Text className="text-body-sm font-semibold text-primary ms-3">
+              {t('common.retry')}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* [LEARN-32] Active-only fallback banner — the full subject list
+            (including paused/archived) failed to load, so only active subjects
+            are shown. Say so honestly so the hidden rows read as "retry to see
+            them", not "they're gone". */}
+        {showingActiveOnlyFallback && (
+          <Pressable
+            onPress={handleRetry}
+            className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+            testID="library-inactive-fallback-banner"
+          >
+            <Text className="text-body-sm text-text-secondary flex-1">
+              {t('library.inactiveFallbackBanner.message')}
             </Text>
             <Text className="text-body-sm font-semibold text-primary ms-3">
               {t('common.retry')}
@@ -1131,8 +1104,6 @@ function LibraryScreenContent({
             testID="shelves-list"
             ListHeaderComponent={
               <>
-                {renderFailedLibraryFilingAttention()}
-
                 {showingStaleCachedData && (
                   <Pressable
                     onPress={handleRetry}

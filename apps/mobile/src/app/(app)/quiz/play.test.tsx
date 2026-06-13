@@ -9,11 +9,9 @@ import { Platform } from 'react-native';
 
 const mockReplace = jest.fn();
 const mockDismissTo = jest.fn();
-const mockSetPrefetchedRoundId = jest.fn();
 const mockSetCompletionResult = jest.fn();
 const mockSetRound = jest.fn();
 const mockCheckAnswer = jest.fn();
-const mockPrefetchMutate = jest.fn();
 const mockCompleteRoundMutate = jest.fn();
 const mockPlatformAlert = jest.fn();
 const mockSentryCapture = jest.fn();
@@ -111,9 +109,6 @@ jest.mock(
       isPending: false,
       mutate: mockCompleteRoundMutate,
     }),
-    usePrefetchRound: () => ({
-      mutate: mockPrefetchMutate,
-    }),
   }),
 );
 
@@ -165,7 +160,6 @@ jest.mock(
           : null,
       returnTo: mockReturnTo,
       subjectId: null,
-      setPrefetchedRoundId: mockSetPrefetchedRoundId,
       setRound: mockSetRound,
       setCompletionResult: mockSetCompletionResult,
     }),
@@ -236,15 +230,6 @@ describe('QuizPlayScreen', () => {
       screen.getByTestId('quiz-correct-celebration', {
         includeHiddenElements: true,
       });
-    });
-  });
-
-  it('does not auto-prefetch another round while the learner is playing', async () => {
-    render(<QuizPlayScreen />);
-
-    await waitFor(() => {
-      expect(mockPrefetchMutate).not.toHaveBeenCalled();
-      expect(mockSetPrefetchedRoundId).not.toHaveBeenCalled();
     });
   });
 

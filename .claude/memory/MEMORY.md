@@ -86,7 +86,7 @@
 ## Core Learning Philosophy
 
 - [project_language_pedagogy.md](project_language_pedagogy.md) — four_strands pedagogy mode (alongside socratic). Vocabulary CRUD, CEFR levels, language-progress routes.
-- [project_freeform_library_filing_decision.md](project_freeform_library_filing_decision.md) — Ask Anything saves sessions by default; Library filing is separate, auto-file when confident, keep-out-of-Library remains available.
+- [project_freeform_library_filing_decision.md](project_freeform_library_filing_decision.md) — Pointer to `MMT-ADR-0021`: Ask Anything freeform Library filing starts at 5 exchanges; no freeform Challenge or notes flow.
 - [project_language_assessments_production_first.md](project_language_assessments_production_first.md) — Language reviews must test production/translation/tiny exchanges, not abstract topic summaries or culture-ish "idea of a greeting" prompts.
 - [feedback_never_lock_topics.md](feedback_never_lock_topics.md) — NEVER lock/block topics. Prerequisites advisory. Ratified WI-587 (2026-06-11); PRD REQUIRED definition fixed to match.
 - [feedback_never_force_add_child.md](feedback_never_force_add_child.md) — Never force add-child. Solo/skip path always available for parent accounts.

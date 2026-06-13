@@ -9,6 +9,7 @@ export interface SessionModeConfig {
 
 export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> & {
   freeform: SessionModeConfig;
+  gap_fill: SessionModeConfig;
 } = {
   homework: {
     title: 'Homework Help',
@@ -44,6 +45,15 @@ export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> & {
     openingMessage:
       'Quick refresh — tell me the core idea from this topic in your own words.',
     showTimer: true,
+    showQuestionCount: false,
+  },
+  gap_fill: {
+    title: 'Gap Check',
+    subtitle: 'Close the gaps from your assessment',
+    placeholder: 'Answer in your own words...',
+    openingMessage:
+      "Let's close the gaps from your assessment. We'll focus on what still needs a little work.",
+    showTimer: false,
     showQuestionCount: false,
   },
   recitation: {
@@ -88,6 +98,8 @@ const FIRST_SESSION: Record<string, string> & { freeform: string } = {
     "Hi! I'm your learning mate. I'll teach you stuff and check if it sticks — ask me anything along the way. Ready to start?",
   review:
     "Welcome to your first practice session! Let's see what you know. Ready?",
+  gap_fill:
+    "Hi! Let's close the gaps from your assessment and make the tricky parts feel steadier.",
   recitation:
     "Hi! I'll listen while you recite something from memory — a poem, song lyrics, anything. What would you like to recite?",
   freeform:
@@ -98,6 +110,7 @@ export const EARLY_SESSIONS: Record<string, string> & { freeform: string } = {
   homework: 'Good to see you again! What homework are we tackling today?',
   learning: 'Back for more learning — awesome! What shall we dive into?',
   review: "Ready for another round? Let's test your knowledge.",
+  gap_fill: 'Ready to close the gaps from your assessment?',
   recitation:
     'Ready for another recitation? What would you like to recite today?',
   freeform: 'Hey again — what are you curious about?',
@@ -108,6 +121,7 @@ export const FAMILIAR_SESSIONS: Record<string, string> & { freeform: string } =
     homework: "Let's get this homework done. What do you need help with?",
     learning: 'What do you remember from our last session?',
     review: "Quick: what's the key concept we covered?",
+    gap_fill: "Let's close the gaps from your assessment.",
     recitation: 'What are we reciting today?',
     freeform: 'Hey again — what are you curious about?',
   };
@@ -207,6 +221,12 @@ export function getOpeningMessage(
     return `Let's approach ${
       safeTopicName ?? 'this topic'
     } from a fresh angle. What do you remember about it?`;
+  }
+
+  if (normalizedMode === 'gap_fill') {
+    return safeTopicName
+      ? `Let's close the gaps in "${safeTopicName}". We'll focus on what still needs a little work.`
+      : SESSION_MODE_CONFIGS.gap_fill.openingMessage;
   }
 
   if (problemText) {

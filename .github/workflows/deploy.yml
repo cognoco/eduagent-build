@@ -233,6 +233,9 @@ jobs:
           CF_KV_COACHING_ID_DEV: ${{ secrets.CF_KV_COACHING_ID_DEV }}
           CF_KV_COACHING_ID_STG: ${{ secrets.CF_KV_COACHING_ID_STG }}
           CF_KV_COACHING_ID_PRD: ${{ secrets.CF_KV_COACHING_ID_PRD }}
+          CF_KV_IDEMPOTENCY_ID_DEV: ${{ secrets.CF_KV_IDEMPOTENCY_ID_DEV }}
+          CF_KV_IDEMPOTENCY_ID_STG: ${{ secrets.CF_KV_IDEMPOTENCY_ID_STG }}
+          CF_KV_IDEMPOTENCY_ID_PRD: ${{ secrets.CF_KV_IDEMPOTENCY_ID_PRD }}
         run: node scripts/render-wrangler-kv.mjs wrangler.toml
 
       - name: Verify Cloudflare KV bindings before migrations
@@ -240,6 +243,15 @@ jobs:
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           node scripts/verify-wrangler-kv-binding.mjs wrangler.toml "${DEPLOY_ENV}" IDEMPOTENCY_KV
+
+      # [db-migration Critical #1] Refuse to migrate a live DB while a journaled
+      # migration is marked REFERENCE ONLY / DO NOT APPLY (today: 0106, 0107).
+      # drizzle-kit ignores the SQL comment and would apply them; this guard
+      # turns that silent catastrophe into a loud, safe failure until the
+      # baseline reset (MMT-ADR-0012) removes them from the chain.
+      - name: Guard against reference-only migrations
+        working-directory: packages/database
+        run: node scripts/check-reference-only-migrations.mjs
 
       - name: Run database migrations
         working-directory: packages/database

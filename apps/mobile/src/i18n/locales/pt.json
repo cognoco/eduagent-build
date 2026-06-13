@@ -379,7 +379,6 @@
     "active": "Ativo",
     "accommodation": {
       "sectionHeader": "Sua acomodação de aprendizagem",
-      "viewAndManage": "Ver e gerenciar",
       "notSureWhichToPick": "Não tem certeza de qual escolher?",
       "guideActive": "Ativo",
       "childScreenTitle": "Preferências de aprendizagem de {{name}}"
@@ -706,8 +705,6 @@
     },
     "notePrompt": {
       "writeNote": "Escrever uma nota",
-      "cannotSaveTitle": "Não é possível salvar a nota",
-      "cannotSaveMessage": "Não é possível salvar notas no momento. Tente novamente.",
       "saveFailedTitle": "Não foi possível salvar a nota",
       "summaryPlaceholder": "O que devemos lembrar desta sessão?"
     },
@@ -785,7 +782,8 @@
     "expiredSystemMessage": "Sessão expirada. Comece uma nova para continuar.",
     "errorBoundary": {
       "crashTitle": "O ecrã da sessão falhou",
-      "unknownError": "Erro desconhecido"
+      "unknownError": "Erro desconhecido",
+      "body": "Algo deu errado ao carregar esta tela. Você pode tentar novamente ou voltar ao início."
     },
     "screenChrome": {
       "wrapping": "A terminar...",
@@ -1105,7 +1103,6 @@
       "exit": "Sair"
     },
     "review": {
-      "couldNotSaveResult": "Não conseguimos salvar o resultado da sua revisão.",
       "couldNotSaveTitle": "Não foi possível salvar o resultado",
       "continueWithoutSaving": "Continuar sem salvar",
       "noDataFound": "Dados da revisão não encontrados.",
@@ -1132,7 +1129,6 @@
       "prepareErrorMessage": "Não foi possível preparar seu ditado. Tentar novamente?",
       "tryAgain": "Tentar novamente",
       "title": "Verifique o texto",
-      "subtitleFromPhoto": "Edite quaisquer erros da foto e, em seguida, comece seu ditado.",
       "subtitleManual": "Revise seu texto e, em seguida, comece seu ditado.",
       "inputPlaceholder": "Digite ou cole seu texto aqui...",
       "inputLabel": "Texto do ditado",
@@ -1372,6 +1368,9 @@
       "a11ySectionCollapse": "{{label}}. {{summary}}. Recolher secção.",
       "a11ySectionExpand": "{{label}}. {{summary}}. Expandir secção."
     },
+    "inactiveFallbackBanner": {
+      "message": "Não foi possível carregar as tuas matérias pausadas e arquivadas. Toca para tentar de novo — elas não desapareceram."
+    },
     "notStartedCount": "{{notStarted}} / {{total}} por começar",
     "chooseTopic": "Escolha um tópico",
     "provenanceFrom": "De {{name}}",
@@ -1494,8 +1493,7 @@
     "deleteDialog": {
       "title": "Excluir palavra",
       "message": "Remover esta palavra do seu vocabulário?",
-      "errorTitle": "Não foi possível excluir",
-      "errorFallback": "Algo deu errado. Tente novamente."
+      "errorTitle": "Não foi possível excluir"
     },
     "noSubject": {
       "title": "Nenhuma matéria selecionada",
@@ -1749,6 +1747,7 @@
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
     "microphoneUnavailableTitle": "Microfone indisponível",
+    "microphoneUnavailableBody": "Não foi possível usar o microfone agora. Verifique se o app tem acesso ao microfone e tente novamente, ou digite.",
     "detectSubjectErrorTitle": "Não foi possível detectar a matéria",
     "detectSubjectErrorBody": "{{error}} Selecione sua matéria manualmente.",
     "identifySubjectErrorTitle": "Não foi possível identificar a matéria",
@@ -2160,7 +2159,6 @@
       "manageMentorMemoryForChild": "Gerenciar o que o mentor lembra sobre {{name}}",
       "profileDetails": "Detalhes do perfil",
       "childProfileJoined": "Adicionado {{date}}",
-      "learningAccommodationTitle": "Acomodação de aprendizado para {{name}}",
       "noLearningPreferenceSet": "Nenhuma preferência de aprendizagem definida",
       "consentTitle": "Consentimento",
       "consentDescription": "Gerencie o consentimento dos pais para {{name}}.",
@@ -2357,10 +2355,6 @@
       "exchangeDelta": {
         "title": "Trocas nesta semana",
         "body": "Quantas trocas de mensagens aconteceram nesta semana em comparação com a semana passada. É um sinal leve de atividade de aprendizagem."
-      },
-      "guidedRatio": {
-        "title": "Prática guiada",
-        "body": "A proporção de respostas do mentor em que seu filho precisou de um exemplo desenvolvido ou de uma orientação mais forte em vez de apenas um empurrãozinho."
       },
       "streakXp": {
         "title": "Sequência e XP",
@@ -2823,7 +2817,6 @@
       "topicsReady_other": "{{count}} tópicos prontos para testar",
       "afterFinishTopic": "Disponível após concluir um tópico",
       "hintOpenPicker": "Abre o seletor de avaliações",
-      "hintOpenLibrary": "Abre a biblioteca",
       "couldNotLoad": "Não foi possível carregar os tópicos da avaliação",
       "studySubjectFirst": "Estude {{subject}} primeiro para desbloquear isto"
     },
@@ -3265,6 +3258,43 @@
       "openUpdate": "Abrir atualização"
     }
   },
+  "myNotes": {
+    "loadMore": "Carregar mais",
+    "emptyHint": "Eles aparecerão aqui conforme você aprende.",
+    "title": "Minhas Notas",
+    "subtitle": "Sessões, notas e respostas salvas",
+    "sortDate": "Data",
+    "sortSubject": "Assunto",
+    "noneYetNotes": "Ainda sem notas",
+    "noneYetBookmarks": "Ainda sem favoritos",
+    "noneYetSessions": "Ainda sem sessões",
+    "loadErrorNotes": "Erro ao carregar notas",
+    "loadErrorBookmarks": "Erro ao carregar favoritos",
+    "loadErrorSessions": "Erro ao carregar sessões",
+    "kinds": {
+      "sessions": "Sessões",
+      "notes": "Notas",
+      "bookmarks": "Marcadores"
+    },
+    "types": {
+      "homework": "Dever de casa",
+      "review": "Revisão",
+      "learning": "Aprendizado",
+      "note": "Nota",
+      "bookmark": "Marcador"
+    },
+    "hub": {
+      "sessionsSubtitle": "Conversas que você teve",
+      "notesSubtitle": "Coisas que você anotou",
+      "bookmarksSubtitle": "Respostas do tutor que você salvou"
+    },
+    "unknownSubject": "Matéria desconhecida",
+    "searchSessions": "Buscar sessões",
+    "searchNotes": "Buscar notas",
+    "searchBookmarks": "Buscar marcadores",
+    "a11yGroupByDate": "Agrupar por data",
+    "a11yGroupBySubject": "Agrupar por matéria"
+  },
   "createProfile": {
     "titleChild": "Conte-nos sobre seu/sua filho(a)",
     "titleSelf": "Quem é o(a) aprendiz?",
@@ -3297,16 +3327,6 @@
     "switchError": "Não foi possível trocar. Toque para tentar novamente.",
     "a11yRetry": "Tentar trocar modo"
   },
-  "profileSwitcher": {
-    "fallbackName": "Perfil",
-    "switchErrorTitle": "Não foi possível trocar de perfil",
-    "a11yClose": "Fechar seletor de perfis",
-    "a11yChip": "Trocar de perfil. Atual: {{name}}",
-    "a11yOption": "{{name}}, {{role}}",
-    "a11yOptionActive": "{{name}}, {{role}}, ativo",
-    "roleParent": "Responsável",
-    "roleStudent": "Estudante"
-  },
   "memoryConsent": {
     "defaultTitle": "Ajude o tutor a aprender sobre {{name}}",
     "defaultTitleNoName": "Ajude o tutor a aprender sobre seu/sua filho(a)",
@@ -3334,43 +3354,6 @@
     "childBirthYearPlaceholder": "Ano de nascimento",
     "a11yBack": "Voltar para a etapa anterior",
     "a11yCancel": "Cancelar e sair"
-  },
-  "myNotes": {
-    "title": "Minhas Notas",
-    "subtitle": "Sessões, notas e respostas salvas",
-    "sortDate": "Data",
-    "sortSubject": "Assunto",
-    "emptyHint": "Eles aparecerão aqui conforme você aprende.",
-    "loadMore": "Carregar mais",
-    "noneYetNotes": "Ainda sem notas",
-    "noneYetBookmarks": "Ainda sem favoritos",
-    "noneYetSessions": "Ainda sem sessões",
-    "loadErrorNotes": "Erro ao carregar notas",
-    "loadErrorBookmarks": "Erro ao carregar favoritos",
-    "loadErrorSessions": "Erro ao carregar sessões",
-    "kinds": {
-      "sessions": "Sessões",
-      "notes": "Notas",
-      "bookmarks": "Marcadores"
-    },
-    "types": {
-      "homework": "Dever de casa",
-      "review": "Revisão",
-      "learning": "Aprendizado",
-      "note": "Nota",
-      "bookmark": "Marcador"
-    },
-    "hub": {
-      "sessionsSubtitle": "Conversas que você teve",
-      "notesSubtitle": "Coisas que você anotou",
-      "bookmarksSubtitle": "Respostas do tutor que você salvou"
-    },
-    "unknownSubject": "Matéria desconhecida",
-    "searchSessions": "Buscar sessões",
-    "searchNotes": "Buscar notas",
-    "searchBookmarks": "Buscar marcadores",
-    "a11yGroupByDate": "Agrupar por data",
-    "a11yGroupBySubject": "Agrupar por matéria"
   },
   "pickBook": {
     "subjectFallback": "Assunto",

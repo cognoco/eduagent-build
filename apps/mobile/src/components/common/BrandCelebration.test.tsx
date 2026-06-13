@@ -40,15 +40,15 @@ describe('BrandCelebration', () => {
     reanimated.useReducedMotion = original;
   });
 
-  it('cancels all 14 shared values on unmount', () => {
+  it('cancels all 13 shared values on unmount', () => {
     const reanimated = require('react-native-reanimated');
     const cancelSpy = jest.spyOn(reanimated, 'cancelAnimation');
 
     const { unmount } = render(<BrandCelebration testID="brand-cel" />);
     unmount();
 
-    // 13 declared shared values + containerOp = 14 total cancelAnimation calls
-    expect(cancelSpy.mock.calls.length).toBeGreaterThanOrEqual(14);
+    // 12 declared shared values + containerOp = 13 total cancelAnimation calls
+    expect(cancelSpy.mock.calls.length).toBeGreaterThanOrEqual(13);
     cancelSpy.mockRestore();
   });
 });

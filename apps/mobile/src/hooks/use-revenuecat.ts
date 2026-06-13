@@ -150,6 +150,22 @@ export function useRevenueCatIdentity(): void {
           retryCountRef.current += 1;
           retryTimerRef.current = setTimeout(() => void syncIdentity(), 3000);
         } else {
+          // [error-observability H-2] Retries exhausted — RevenueCat stays in
+          // anonymous mode and billing receipts from this session would be
+          // mis-attributed. A breadcrumb alone is invisible unless a later
+          // exception fires in the same session, so escalate the underlying
+          // error to a real Sentry event with queryable tags (silent recovery
+          // without escalation is banned in billing code).
+          Sentry.captureException(
+            error instanceof Error ? error : new Error(String(error)),
+            {
+              tags: {
+                surface: 'revenuecat_identity',
+                reason: 'max_retries_exhausted',
+              },
+              extra: { userId },
+            },
+          );
           // [F-134] With the identity-sync gate in place, a terminal sync
           // failure leaves useCustomerInfo disabled for the session
           // (fail-closed: no RC snapshot beats another account's snapshot;

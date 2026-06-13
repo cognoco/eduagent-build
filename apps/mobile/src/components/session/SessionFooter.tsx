@@ -100,7 +100,10 @@ export function SessionFooter({
           </Pressable>
         </View>
       ) : null}
-      {notePromptOffered && !showNoteInput && !sessionNoteSavedRef.current ? (
+      {notePromptOffered &&
+      topicId &&
+      !showNoteInput &&
+      !sessionNoteSavedRef.current ? (
         <Pressable
           className="bg-primary/10 rounded-lg px-4 py-3 mx-4 mb-2 flex-row items-center"
           onPress={() => setShowNoteInput(true)}
@@ -118,20 +121,13 @@ export function SessionFooter({
           </Text>
         </Pressable>
       ) : null}
-      {showNoteInput ? (
+      {showNoteInput && topicId ? (
         <View className="px-4 mb-2">
           <NoteInput
             placeholder={t('session.notePrompt.summaryPlaceholder', {
               defaultValue: 'Summarize this in your own words...',
             })}
             onSave={(content) => {
-              if (!topicId) {
-                platformAlert(
-                  t('session.notePrompt.cannotSaveTitle'),
-                  t('session.notePrompt.cannotSaveMessage'),
-                );
-                return;
-              }
               createNote.mutate(
                 {
                   topicId,

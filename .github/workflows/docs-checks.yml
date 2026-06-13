@@ -16,6 +16,8 @@ on:
       - 'scripts/decision-adr-link-baseline.json'
       - 'apps/api/drizzle/**'
       - 'scripts/check-migration-rollback.sh'
+      - 'packages/database/scripts/check-reference-only-migrations.mjs'
+      - 'packages/database/scripts/check-reference-only-migrations.test.mjs'
       - '.github/workflows/docs-checks.yml'
       - 'apps/mobile/e2e/flows/**/*.yaml'
       - 'apps/mobile/e2e/flows/**/*.yml'
@@ -31,6 +33,8 @@ on:
       - 'scripts/decision-adr-link-baseline.json'
       - 'apps/api/drizzle/**'
       - 'scripts/check-migration-rollback.sh'
+      - 'packages/database/scripts/check-reference-only-migrations.mjs'
+      - 'packages/database/scripts/check-reference-only-migrations.test.mjs'
       - '.github/workflows/docs-checks.yml'
       - 'apps/mobile/e2e/flows/**/*.yaml'
       - 'apps/mobile/e2e/flows/**/*.yml'
@@ -118,3 +122,21 @@ jobs:
 
       - name: Validate Maestro flow integrity
         run: bash scripts/validate-maestro-flows.sh
+
+  reference-only-gate:
+    # WI-675: verify the deploy-gate unit tests pass against the real migration
+    # journal. Runs on any change to migrations or to the gate script/tests, so
+    # a PR that adds a new migration or changes the gate is always checked.
+    # Does NOT need pnpm install — the script and test use only Node built-ins.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Reference-only gate unit tests
+        run: node --test packages/database/scripts/check-reference-only-migrations.test.mjs

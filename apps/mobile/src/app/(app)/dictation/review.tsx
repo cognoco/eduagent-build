@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
+import { formatApiError } from '../../../lib/format-api-error';
 import { useDictationData } from './_layout';
 import { useRecordDictationResult } from '../../../hooks/use-dictation-api';
 import { toLocalDateString } from '../../../lib/local-date';
@@ -73,21 +74,21 @@ export default function DictationReviewScreen(): React.ReactElement {
       // [CRIT-2] Show user-visible feedback on failure — bare catch {} is forbidden.
       // Pattern matches complete.tsx [ASSUMP-F11].
       console.warn('[dictation] review result recording failed:', err);
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : t('dictation.review.couldNotSaveResult');
-      platformAlert(t('dictation.review.couldNotSaveTitle'), message, [
-        {
-          text: t('common.retry'),
-          onPress: () => void handleDone(),
-        },
-        {
-          text: t('dictation.review.continueWithoutSaving'),
-          style: 'cancel',
-          onPress: () => router.replace('/(app)/practice' as Href),
-        },
-      ]);
+      platformAlert(
+        t('dictation.review.couldNotSaveTitle'),
+        formatApiError(err),
+        [
+          {
+            text: t('common.retry'),
+            onPress: () => void handleDone(),
+          },
+          {
+            text: t('dictation.review.continueWithoutSaving'),
+            style: 'cancel',
+            onPress: () => router.replace('/(app)/practice' as Href),
+          },
+        ],
+      );
     }
   };
 

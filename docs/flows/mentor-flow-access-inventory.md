@@ -1,167 +1,121 @@
-> **STATUS: DRAFT** - mentor audience access map. Created 2026-05-22.
-Please walk every single flow on the list from end uers persepective using Playwrithe Chromium. Always rebase to the latest "main". After each phase you complete, check if you are still on the latest phase. If you find a blocker of the type that the flow is impossible to run (missing seed) or a blocker that blocks more than 3 flows address them directly, do not create notion bugs. Do not worry about i18n bugs, this will be a separate clean up. If a flow that is documented in the document is not accurate, missing something, is obsolete or if you find a flow that is not yet documented, amend this document directly. 
+> **STATUS: ACTIVE** — rebuilt 2026-06-09 from the refreshed `mobile-app-flow-inventory.md` (code-true). Rows describe how flows actually work for this audience today, not target behavior. Where a flag changes the experience, both states are stated in the row.
+
+Please walk every single flow on the list from end uers persepective using Playwrithe Chromium. Always rebase to the latest "main". After each phase you complete, check if you are still on the latest phase. If you find a blocker of the type that the flow is impossible to run (missing seed) or a blocker that blocks more than 3 flows address them directly, do not create notion bugs. Do not worry about i18n bugs, this will be a separate clean up. If a flow that is documented in the document is not accurate, missing something, is obsolete or if you find a flow that is not yet documented, amend this document directly.
 
 # Mentor Flow Access Inventory
 
-This document maps the existing mobile flow inventory to the **mentor / Family** audience.
+Audience-filtered access map for the **mentor / Family** audience: the supporter human — an adult owner with linked children. "Mentor" here is NOT the AI mentor persona and NOT the `mentor-memory` route. Every row traces to a flow ID in `docs/flows/mobile-app-flow-inventory.md` (rebuilt 2026-06-09). Audience model + supporter surfaces detail: `docs/flows/learning-path-flows.md` §1 and §11.
 
-Source of truth used for this map:
+Flag reality (build-time, `feature-flags.ts:30-31`): **production build ships `MODE_NAV_V0_ENABLED=on / MODE_NAV_V1_ENABLED=off`** (`eas.json:13`; V1 key absent → false). Dev/preview builds + preview-channel OTA ship both on. CLAUDE.md's "5-tab production mode when V0=false" describes the *flags-off* state, not the shipped prod config. All three states appear below where they differ.
 
-- `docs/flows/mobile-app-flow-inventory.md`
-- `docs/specs/2026-05-21-navigation-contract.md`
-If you during the walk through the flows find a missing flow, wrong flow or incomplete flow, please update this document. 
+## Supporter shell per flag state
 
-Notes:
-
-- This is not a new implementation plan and does not claim the Study/Family navigation contract is already shipped.
-- Current code has the navigation contract and selected contract consumers. Full Study/Family navigation is not in place; rows below are target mentor behavior unless explicitly marked as current V0 behavior.
-- Chrome walkthrough on 2026-05-25 (`d8d1ca6d2`, staging API, `parent-multi-child` seed) confirmed the current Family shell can sign in, show Children home, child detail, Reports, and Recaps, but still exposes old/extra navigation (`My Learning`, `Library`, and hidden route links with undefined params). Child subject drill-down from child detail reached the child subject URL and then made the browser automation session unresponsive.
-- Seeded Chrome/Playwright rerun on 2026-05-25 (`28eab43a5f`, local API at `http://127.0.0.1:8787` with staging Doppler config, Playwright `mentor-audit-registry-smoke`) exercised the 15 reachable `mentor-audit-*` registry landings and all 15 passed. This rerun used the seeded registry as the automated browser coverage lane; it does not replace the earlier 167-row manual inventory sweep.
-- Four seeded registry entries remain blocked/not covered by the default landing harness: post-approval consent redirect needs a separate API consent-page browser check, session-expired and session-revoked need deterministic auth/session invalidation that actually returns to sign-in banners, and MFA needs a standing Clerk MFA fixture because staging has authenticator-app MFA disabled.
-- During the rerun, the harness was updated for current app behavior: welcome intro is skipped by seed sign-in, seeded child profile IDs are preserved as the active profile, stale first-screen routes/test IDs were aligned to the current app, and the rich-child-history seed now inserts only one retention card per profile/topic to match the production uniqueness constraint.
-- The local API rerun emitted recurring `account.trial_missing_repair_attempted`, `[safe-send] non-core dispatch timed out`, and `billing.trial_missing_repair_failed` warnings for seeded accounts; the browser assertions still passed, but the noise should be kept visible for API/billing cleanup.
-- Latest-main rerun on 2026-05-26 (`44e20638e6`, local web/API with staging Doppler config) re-exercised the previously blocked seeded and browser-spec lanes. Evidence: 15/19 inclusive mentor registry entries passed, 28/47 broader auth/journey/navigation specs passed, and 4/4 learner smoke/UX specs passed. Several old "blocked" rows are now runnable, especially learner, consent-gate, retention, subscription-read, and language/pronoun setup surfaces. Remaining failures are concentrated in four buckets: current Family entry starts on adult `My Learning` with a `Children` switch while older specs expect `parent-home-screen` first; the consent approval URL is an API web page, not mobile `/consent/approve`; session-expired/session-revoked storage mutation still lands on home instead of the expected sign-in banners; and Clerk authenticator-app MFA remains disabled for the seed fixture (`TOTP attach failed (405)`).
-- Focused flow rerun on 2026-05-27 (`codex/student-flow-access-audit`, private local API `http://127.0.0.1:8788`, web `http://127.0.0.1:19008`, staging Doppler config, Playwright `mentor-audit-registry-smoke`) exercised the 15 default mentor-audit registry landings and all 15 passed. This run included `mentor-audit-paywall-child-notify`; the child-paywall seed now uses per-profile child quota usage, and the mobile child paywall gate treats owner-only subscription details as non-blocking when the child usage endpoint reports exceeded quota.
-- Fresh reclassification on 2026-05-26 separates Done historical Notion blockers from current evidence. The old splash-overlay, family-shell undefined-link, and add-to-learning hang blockers are Done/deleted in Notion and should not remain active blocker labels unless a new latest-main regression reproduces. The child subject route wedge and recap detail click hang remain open live-repro blockers. Family-first versus `My Learning`-first entry is now a product/spec decision, while post-approval consent, session invalidation, MFA, provider, native, and store branches are harness/environment gaps until dedicated fixtures exist.
-- Follow-up investigation on 2026-05-26 found why some "fixed" buckets still showed failures: they were not the same fixed bugs. The splash-overlay path now passes (`j24-subject16-conversation-language` 5/5). Parent journey failures are a new E2E/contract mismatch where setup accepts adult `My Learning` even though parent specs require `parent-home-screen` (Notion `36c8bce91f7c8196a766c9bc9ce12aad`). The inclusive mentor audit also now has separate Notion bugs for the wrong consent route (`36c8bce91f7c81b2ad33e27aab4f539a`), non-deterministic session expired/revoked fixtures (`36c8bce91f7c811a9243fdb4ab44a94b`), and the disabled Clerk TOTP seed path (`36c8bce91f7c819f96a1fdae498abaca`).
-- A full row-by-row refresh of the `Fail` and `Pass w/ issues` rows on 2026-05-26 started from 52 rows in scope: 16 `Fail` and 36 `Pass w/ issues`. After removing Done/deleted historical bugs from the active failure count, 11 rows remain in those statuses: 1 `Fail` and 10 `Pass w/ issues`. The stale-audit cleanup is tracked in Notion `36c8bce91f7c810dac87c81009503508`.
-- "Mentor" here means an adult family-support user. It does not mean the AI mentor/tutor voice or the `mentor-memory` route.
-- The original flow IDs are preserved so each row can be traced back to `mobile-app-flow-inventory.md`.
-- Adults can be both students and mentors. Mentor access must not replace the adult's own Study flows.
-- Mentor mode should expose parent-native child review/support surfaces. Normal mentor review should not require parent proxy/view-as-child mode.
-- Mentor-only rows that were previously listed as exclusions in the student inventory are owned here: `PARENT-*`, child memory/consent management, parent gateway/navigation/setup, child reports, and parent-facing cross-cutting vocabulary.
-- Student-only direct activity rows are owned by `docs/flows/student-flow-access-inventory.md` and are not duplicated here.
-
-## Mentor Audience Contract
-
-| Decision | Mentor behavior |
-| --- | --- |
-| Primary context | An adult owner supports child learners they are allowed to see. |
-| Capability | Adult owner profile with server-sourced family links. Adults without links may see setup, not the final Family shell. |
-| Target tabs | `home`, `recaps`, `progress`, `more`. The minimal Recaps path is implemented in the navigation-contract branch; if Recaps is disabled or rolled back, the tab must not be surfaced as a dead tab. (V1 target; current V0 family-mode = `home, progress, more` only — recaps tab requires `MODE_NAV_V1_ENABLED=true`) |
-| Home surface | Family/Children home, replacing the old guardian hybrid home as the target experience. |
-| Child data access | Parent-native child routes and APIs scoped by family-link/consent rules. |
-| Learning routes | Not directly surfaced from Mentor mode. "Add to my learning" and similar bridges switch the adult into Study as themselves. |
-| Child curriculum | Reachable from child cards/details, not through the adult's top-level Library tab. |
-| Parent proxy | Compatibility/internal only. Normal mentor flows use child detail, Recaps, Progress, reports, and curriculum routes. |
-
-## Auth, Account, And Setup
-
-| Original ID | Mentor access | How it should work |
+| Flow ID(s) | Access (who in this audience) | Actual behavior and gating |
 | --- | --- | --- |
-| AUTH-01 through AUTH-14 | All mentors | Auth, launch, sign-in, SSO, sign-out, session expiry, redirects, and stuck-state recovery remain shared account access flows. Deep links to mentor-only routes must be checked against family access. |
-| ACCOUNT-01 | New adult owners | First profile creation can capture Study/Family intent after sign-up, but an adult without child links remains Study-safe until setup is complete. |
-| ACCOUNT-02 | Account owners | Additional profile creation supports creating adult/child profiles where allowed. |
-| ACCOUNT-03 | Adult owners | Add-child from More or Profiles is a mentor setup flow. It must stay optional; adults can keep studying without adding a child. |
-| ACCOUNT-04 | Adult owners and shared accounts | Profile switching should choose real profiles. Normal child review should route to parent-native mentor surfaces, not proxy mode. |
-| ACCOUNT-05 | Adult owners | Family-plan and max-profile gates protect add-child/setup flows and point to subscription where needed. |
-| ACCOUNT-06 | Adult owners, role-gated | More is the mentor settings hub too. Family rows such as add-child, family breakdown/sharing, child support links, and account controls appear only when allowed. |
-| ACCOUNT-07 | Adult owners | Notifications include mentor-relevant push/digest controls where supported. |
-| ACCOUNT-08 | Adult owners and child editors where allowed | Learning preferences can expose child accommodation/celebration editors only through mentor gates. |
-| ACCOUNT-09 through ACCOUNT-14 | Owner profiles | Change password, export, delete, privacy policy, and terms remain owner account controls. |
-| ACCOUNT-15 | Adult self only | Self mentor memory remains the adult's own student/account surface. It is not the child memory editor. |
-| ACCOUNT-16 | Adult owners with child access | Child mentor memory is a mentor child-support surface. It uses child routes and child consent rules, not the student's self memory route. |
-| ACCOUNT-17 | Adult owners with child access | Child memory consent prompts appear on child memory/detail surfaces where needed. They are not student self-service prompts. |
-| ACCOUNT-18 | Child or adult subject owner, depending on route | Subject analogy preference for a child belongs under child detail/curriculum access, not top-level adult Study Library. |
-| ACCOUNT-19 through ACCOUNT-24, ACCOUNT-26 | Adult owners/guardians and affected child profiles | Consent request, handoff, pending, withdrawn, post-approval, and regional variants determine whether child learning data can be shown to the mentor. |
-| ACCOUNT-25 | Adult owners with child access | Parent consent management for a child is a mentor flow under child detail. Current browser path is Family Home -> child avatar/profile -> child detail settings. Withdrawing consent switches to the screen-level `Sharing paused` state with a request-consent-again CTA; the old in-section grace-period banner is not the active child-detail surface for withdrawn consent. |
-| ACCOUNT-27 | Adult owners/guardians | Parent consent deny confirmation is a mentor/guardian action that affects whether the child can proceed, not a student self-service flow. |
-| ACCOUNT-28, ACCOUNT-29 | Adult owners | App language and the current mentor-language/account-language row remain account/profile settings. Do not create a separate "mentor identity" from these settings. |
-| ACCOUNT-30 | Compatibility only | Parent-proxy More restrictions apply only if retained proxy mode is entered. Normal mentor flows should not enter proxy. |
+| HOME-03 | Adult owner + linked children (family-capable) | Three states, not two. Flags-off: 5 tabs (`LEGACY_GUARDIAN_TABS`: home, own-learning, library, progress, more). **Prod build (V0-on)**: family mode (default) = **3 tabs** (home, progress, more); study mode = 4 learner tabs; ModeSwitcher in header. V1-on: family = **4 tabs** (home, **recaps**, progress, more); study = 4. |
+| HOME-03 | Non-adult / null-birthYear owner with children | Flags-off + prod V0-on: 5-tab guardian shell survives (`isFamilyCapableProfile` needs adult bracket). V1-on removes it → 4-tab study. |
+| HOME-11 | Family-capable adult owner only | Study/Family ModeSwitcher — prod-active under V0-on. Swaps entire tab set + home screen. V1: PATCHes `defaultAppContext` (optimistic + rollback); V0: local-only, never persisted. Solo/child/proxy never see it. No dedicated E2E. |
+| HOME-02 | Supporter only (never solo/child/proxy) | Parent gateway home (`ParentHomeScreen`) at `/(app)/home` when `contract.home.screen==='FamilyHome'`. Prod V0-on: family-capable owner in family mode. Flags-off: any owner with linked children (no age check) or hub-eligible. Reads dashboard (2-min stale / 5-min poll), per-child memory + progress-summary, child-cap notifications, family subscription; recaps reads V1-only (null in prod). |
+| HOME-13 | All; lands on supporter home for this audience | `/dashboard` is a permanent redirect to `/(app)/home` preserving `returnTo` (old deep links/notifications only). |
+| HOME-07 | Childless adult owner | Add-first-child CTA on learner home → More → add-child. Shows when `(showAddChild \|\| family/pro-tier fallback) && !hasLinkedChildren` — family/pro adults see it even when the contract gate is false. |
+| HOME-08 | Supporter in family mode | Home loading-timeout (10s) escape is `timeout-progress-button` → Progress (B-600), not the Library button learners get. |
+| HOME-09 | Guardian shapes per matrix | "Own Learning" bridge tab visible only flags-off 5-tab and V0-on non-capable shells; **NOT** in prod V0-on mode shells nor V1. Family-mode arrivals auto-switched to study; learner shapes get Redirect (BUG-135). |
+| HOME-10 | All signed-in | Shared gate stack + timeout/error recoveries apply before any supporter surface renders. |
 
-## Mentor Home, Navigation, And Family Setup
+## Setup, profiles, consent ownership
 
-| Original ID | Mentor access | How it should work |
+| Flow ID(s) | Access (who in this audience) | Actual behavior and gating |
 | --- | --- | --- |
-| HOME-02 | Adult owners with family access | Parent gateway home becomes the Family/Children home target. It should summarize children and route into child detail, Recaps, Progress, setup, or account actions. Current app mounts `LearnerScreen` at `/(app)/home`; the `ParentHomeScreen` branch activates inside `LearnerScreen` only when mode=family. |
-| HOME-03 | Adult owners with family access | Parent-mode navigation target is `home`, `recaps`, `progress`, `more`, not the old guardian hybrid tab set. Current V0 entry may start family-capable adults on adult Study/My Learning with a `Children` switch before the Family branch is shown. |
-| HOME-04 | All users | Animated splash and initial shell remain shared. |
-| HOME-07 | Adult owners without child links | Add-first-child/family setup is a mentor setup state, not the final Family tab shell. It must offer continue-studying/skip paths. Current Study-mode entry is the learner-home `Set up Family` CTA for eligible adult owners, which leads to More and then Add child rather than a parent-home-only branch. |
-| HOME-08 | All app contexts | Home loading-timeout fallback must recover to a Mentor-safe root when in Mentor mode. |
+| ACCOUNT-33 | New adult signup via "parent" door | Pre-auth audience carrier (1h TTL): parent + first profile + adult birth date → PATCH family context + auto-chain `/create-profile?for=child` (skippable). Minor-picked-parent falls back to solo. |
+| ACCOUNT-34 | Brand-new signup with preview state | Save wizard child/both targets: adult-owner gate (`ADULT_OWNER_GATE_ENABLED=true`) blocks child creation unless owner birthYear computes adult; child-POST failure keeps parent + inline retry; child branch lands home. |
+| ACCOUNT-03 | Adult owner (18+ via `isAdultOwner`) only | Add child: More hub `add-child-link` (gated `gates.showAddChild`), ParentHomeScreen "Add child", or auto-chain after first profile. Inline consent grant (parent is consenting adult); parent stays on own profile. Server enforces 11+ floor. Child/proxy blocked (ACCOUNT-36 blocked screen). |
+| ACCOUNT-05, ACCOUNT-35 | Owner at tier cap | More hub does NO tier check — enforcement is server 402 `PROFILE_LIMIT_EXCEEDED` → "Upgrade required" alert → "See plans" → `/(app)/subscription` (BUG-947). |
+| ACCOUNT-04 | All profiles on account; owner-special behavior | Profile switching = `/profiles` modal via More → Account (sole switching UI). Owner tapping a child row does NOT switch — sets mode=family + pushes child settings (BUG-774). Plain switch always clears proxy; no production UI passes `proxyMode:true`. |
+| ACCOUNT-37 | Owner renames anyone; non-owner self only | Inline rename modal in `/profiles`. |
+| ACCOUNT-25, ACCOUNT-41 | Owner with linked child only | GDPR consent management: child detail `?mode=settings` → `ConsentManagementSection`. Withdraw (destructive confirm) → `PUT /consent/:childId/revoke` → WITHDRAWN + 7-day deletion grace; restore (`410` if grace expired). WITHDRAWN child detail short-circuits to `consent-withdrawn-empty-state` + restore CTA; `grace-period-banner` shows days remaining; home shows per-child `WithdrawalCountdownBanner` with one-tap Reverse. E2E `parent/consent-management.yaml`. |
+| ACCOUNT-27 | Parent OUTSIDE the app | Consent approve/deny is **server-web only**: email link → `GET /v1/consent-page` → server-rendered pages; denial cascade-DELETES the child profile. No mobile route. Mobile JSON twin dormant. |
+| ACCOUNT-38 | 18+ adult sharing account with ≥1 minor | Consent-gate profile-switch escape (confirms destination by name); the gated child cannot escape. |
+| ACCOUNT-16, ACCOUNT-50, ACCOUNT-51, ACCOUNT-52 | Owner only (client IDOR guard + server `assertOwnerAndParentAccess` + consent-visibility gate WI-264) | Child mentor memory (parent-managed): toggles, tell-the-mentor (LLM parse), item delete, "Export memory summary" (share sheet / web .txt), correction escape hatch (`[parent_correction]` → tell endpoint). Consent-withdrawn child → whole screen replaced by dead-end gate + Back; reads hard-denied pre-render. Entry: child settings `mentor-memory-link`. |
+| ACCOUNT-17 | Owner (child route) | Child memory consent prompt renders in exactly two places: child mentor-memory screen + self mentor-memory screen — NOT on child detail. One tap sets `memoryConsentStatus` + flips collection/injection/enabled together. |
+| ACCOUNT-08, ACCOUNT-31 | Owner, !proxy (V1 adds family-shape requirement) | Child accommodation editor via `?childProfileId=` from child settings (`gates.showAccommodationChildEditor`); celebration-level editor reachable only through accommodation's inline link while mode is short-burst/predictable. |
+| ACCOUNT-44, ACCOUNT-45 | Owner with linked children | Family-pool breakdown-sharing toggle (More hub family section, visible with `showRemoveFamilyMember` + ≥1 linked non-owner); withdrawal-archive preference radio in Privacy & Data (server owner-assert). |
+| SUBJECT-17 | Parents via child settings only | Pronouns picker route is **orphaned** (no in-app navigation); the live way a parent sets a child's pronouns is from child settings → `PATCH /v1/onboarding/:profileId/pronouns`. |
+| ACCOUNT-40, ACCOUNT-42 | Parent as email recipient (no in-app surface) | Server-built consent reminder cascade: 7d fresh-token reminder, day-14, day-25 final warning, day-30 auto-delete of the unconsented child profile (no email at deletion). Email-delivery-failed → in-app retry copy on the child's `/consent` screen. |
+| HOME-15, ACCOUNT-41 | Owner only; proxy-suppressed | Home overlays the supporter sees: post-grace consent notice toast (`consent_archived`/`consent_deleted`, 5s, then `POST notices/:id/seen`), celebration overlay queue, withdrawal countdown banner per child in grace period. |
 
-## Child Setup And Curriculum
+## Child drill-downs (review surfaces)
 
-| Original ID | Mentor access | How it should work |
+Cross-cutting gate for all `child/*` rows: layered — `RequireFamilyContext` (V1 `canEnter` / V0 family-context / flags-off pass-through), IDOR screen guard, owner-enabled hooks, server `assertOwnerAndParentAccess` on every route. Solo owners, children, and proxy are all blocked (proxy: V1 `canEnter` allows only home/library/progress).
+
+| Flow ID(s) | Access (who in this audience) | Actual behavior and gating |
 | --- | --- | --- |
-| SUBJECT-01, SUBJECT-02 | Through child curriculum only | Creating a subject for a child should reuse the subject creation behavior but launch from child cards/details, scoped to the child, not from the adult top-level Library. |
-| SUBJECT-05 through SUBJECT-07 | Through child curriculum where supported | Subject resolution, broad/focused subject, and focused-book flows can be reused for child curriculum management if launched from a child route and scoped to that child. |
-| SUBJECT-08 | Child language subject setup where supported | Per-subject language setup belongs to the child learner's subject when a mentor is managing child curriculum. |
-| SUBJECT-12 | Child curriculum view | View curriculum without starting a student session should be reachable from child curriculum/detail surfaces. |
-| SUBJECT-14 | Child assessment only if product allows mentor-managed assessment | Placement/knowledge assessment should not silently run as the adult. It must be clearly scoped to the child or bridge to adult Study. |
-| SUBJECT-16, SUBJECT-17 | Child/profile setup where applicable | Conversation language and pronouns remain profile setup flows for the affected profile. Mentors may trigger/setup for child profiles where allowed. |
+| PARENT-01 | Supporter only | Mentoring hub `ChildCommandCard`: mentor-voice headline, status word, momentum chips, solid/coming-up lines, "try tonight" starter, 3-button row (Learn together / Reports / Nudge). `SamplePreview` no longer exists in the repo. |
+| PARENT-02 | Supporter, ≥2 children vs exactly 1 | ≥2 → family-summary panel (activity roll-up, attention row, profile-limit row, `isAdultOwner`-gated add-profile footer); exactly 1 → `SingleChildMentorSlot` + quiet add row. |
+| PARENT-03, PARENT-18, PARENT-19 | Supporter with linked children only | Child detail: subject mentor-note cards + RecentSessionsList; URL modes — default, `?mode=settings` (accommodation link, mentor-memory link, "Added <month year>", consent section), `?mode=progress` (nudge card, copy varies by session recency, deep-pushes child topic/subject). |
+| PARENT-04, PARENT-12, PARENT-17 | as PARENT-03 | Child subject → topic drill-down (skeletons, error+retry, new-learner empty split, recent-sessions fallback); retention badges data-gated (`retentionStatus && totalSessions>=1 && started`, suppressed for new learners); curriculum overview with raw-input + retention labels — the not-linked gate renders only under V1, flags-off falls to server 403 → error state. |
+| PARENT-05 | as PARENT-03 | Child session recap detail: narrative/highlight/engagement chip/conversation prompt + copy, AddToMyLearning, active-time (BUG-902). **No transcript link on this screen at all** (test asserts exchanges don't render) — read-only transcript is the learner-side LEARN-23 surface. |
+| PARENT-06, PARENT-13 | as PARENT-03 | Reports: monthly + weekly merged list with pinned latest-weekly hero, NEW badge, next-cron-date empty state. Monthly detail marks viewed once (`POST .../reports/:id/view`). Weekly detail (push-driven) marks viewed once server-guarded; empty-week CTA opens NudgeActionSheet in place. Child report view endpoints are dashboard child variants; the self-report twins now exist too (`POST /progress/reports/:reportId/view` + weekly; LEARN-29 fixed 2026-06-10, learner-side). |
+| PARENT-08, PARENT-09, PARENT-10 | as PARENT-03 | Raw-input audit ("Your child searched for…") on overview cards only when divergent AND no session yet, curriculum rows whenever divergent. Metric tooltips = `MetricInfoDot` bottom sheets for exactly time-on-app / understanding / review-status; `guided-ratio` copy is orphaned (no renderer). Understanding + retention cards NaN-guarded; + recent fluency-drill score strip. |
+| PARENT-21, PARENT-23, PARENT-24 | Supporter | Child-cap quota banners (dismissible, reset time — parent side of BILLING-13 loop); demo-dashboard fallback silently substitutes fixture data at zero children (can mask empty state); ambient layer: household pulse, ack-able `ParentTransitionNotice`, MentorSlot insight, avatar → `/(app)/more/account`. |
+| PARENT-22 | Flag-on builds | Study-mode user hitting `child/*` gets `family-route-blocked` + explicit "switch to family" CTA (capable users) + back-home; never auto-mutates mode. |
+| LEARN-17, PARENT-25 | Guardian in family mode | Progress tab = children picker (own profile excluded), child summary + `progress-nudge-cta` → NudgeActionSheet, per-subject breakdown, child report routing (BUG-524 chain push). Family Progress excludes the adult's own progress. |
+| LEARN-08, LEARN-21 | Family-shape supporter (V1) | V1 family shape: Library tab removed (`canEnter('library')` = `!familyShape` → Redirect; Recaps replaces it); vocabulary browser self-ejects (guardian gets read-only count chip only). On prod flags the supporter's study mode keeps the ordinary learner Library. There is NO child-content library view — V0 guardians on the Library tab see their OWN subjects. |
 
-## Child Review, Recaps, Reports, And Progress
+## Recaps (V1-only)
 
-These are mentor-owned flows. They are not duplicated in the student inventory as student rows.
-
-| Original ID | Mentor access | How it should work |
+| Flow ID(s) | Access (who in this audience) | Actual behavior and gating |
 | --- | --- | --- |
-| PARENT-01 | Adult owners with child access | Parent dashboard behavior becomes part of the Family/Children home target. Solo adults without child links should remain Study-safe plus setup CTA. (Today `/(app)/dashboard` already redirects to `/(app)/home`; actual parent surface is `ParentHomeScreen` branch inside `LearnerScreen`.) |
-| PARENT-02 | Adult owners with multiple children | Multi-child dashboard supports selecting or comparing linked children. |
-| PARENT-03 | Adult owners with child access | Child detail is the main mentor drill-down surface. |
-| PARENT-04 | Adult owners with child access | Child subject/topic drill-down remains parent-native and must enforce family-link/consent access. |
-| PARENT-05 | Adult owners with child access | Child session/transcript drill-down is a mentor review surface. Normal access should not depend on parent proxy. |
-| PARENT-06 | Adult owners with child access | Child reports list and report detail remain mentor review flows. Current routes include `/(app)/progress/reports/` and `/(app)/progress/reports/[reportId]`; these are not student-facing Study rows. |
-| PARENT-07 | Transition target | Current parent library behavior should become child curriculum access from child routes. Adult self library remains LEARN-08 in Study; the final Mentor shell should not expose the adult top-level Library tab. |
-| PARENT-08 | Adult owners with child access | Subject raw-input audit remains a mentor review surface. |
-| PARENT-09 | Adult owners with child access | Guided label tooltip remains mentor-facing support copy. |
-| PARENT-10 | Adult owners with child access | Child topic Understanding and Retention cards remain mentor-facing interpretation surfaces. |
-| PARENT-11 | Adult owners with child access | Child session recap is the content basis for the target Recaps experience. Narrative, highlights, conversation prompt, copy states, and engagement signal remain mentor-facing. |
-| PARENT-12 | Adult owners with child access | Child subject retention badges remain mentor-facing and data-gated. |
-| PARENT-13 | Adult owners with child access | Child weekly report detail remains push/deep-link capable and marks reports viewed on mount. |
-| LEARN-07, LEARN-23 | Read-only source material for mentor recaps | Student session summary/transcript behavior stays owned by the student. Mentor access should use parent-native recap/session routes and family-link checks. |
-| LEARN-17 through LEARN-21 | Family progress only | In Mentor mode, Progress is child/family progress only. It must exclude the adult's own progress. |
+| PARENT-11 | V1 guardian only; all others redirected | **Flag-gated, dark in prod.** With prod flags (V0-on/V1-off) the screens `Redirect` home and `useRecaps` is disabled — parent-home `latestRecap` is always null in prod. V1-on: recaps tab (`FAMILY_TABS`) + push notifications (`struggle_*`, `weekly_progress`, `monthly_report` route here); feed from `session_summaries` fields, newest-first, owner-only server scoping; detail has exchangeCount, AddToMyLearning, "Open session" → child session with `returnTo=family-recaps`; layout seeds 2-deep stack. |
 
-## Child Curriculum Bridges
+## Nudges
 
-| Original ID | Mentor access | How it should work |
+| Flow ID(s) | Access (who in this audience) | Actual behavior and gating |
 | --- | --- | --- |
-| LEARN-08 through LEARN-16, LEARN-22, LEARN-25, LEARN-26 | Child curriculum or adult Study, depending on entry | Library/book/topic/review/vocabulary behavior remains student-owned. Mentor mode can expose child curriculum read/manage paths, but learning sessions and writes must be clearly scoped to the child or bridge to adult Study. |
+| PARENT-15 | Supporter (server `assertNotProxyMode`) | Send-nudge sheet (child card heart; weekly-report empty CTA; progress tab PARENT-25): 4 templates → `POST /nudges` → row + push to child. Consent gate: PENDING/WITHDRAWN/REQUESTED → error; null consent row allowed for 17+. Push suppressed during recipient-local quiet hours 21:00–07:00 (`skipDailyCap`). Typed inline errors. Prod-active (no flag). |
+| PARENT-16 | Supporter | Rate limit: 4 per recipient child per rolling 24h, counted on `toProfileId` regardless of sender, `pg_advisory_xact_lock`; 5th attempt → inline rate-limit copy, sheet stays open. |
 
-## Recaps Target
+## Learn This Too clone — the ONE supporter→learning entry
 
-The Recaps tab route lives at `apps/mobile/src/app/(app)/recaps.tsx`. It is gated behind `MODE_NAV_V1_ENABLED=true` in the navigation contract; the V0 guardian bridge for the 5-tab `LEGACY_GUARDIAN_TABS` shape is `apps/mobile/src/app/(app)/own-learning.tsx`.
-
-The original inventory did not have a first-class Recaps flow. The target Mentor/Family map derives the minimal Recaps feed from these existing flows:
-
-| Source IDs | Target Recaps behavior |
-| --- | --- |
-| PARENT-11 | Recaps list item/detail reuses child session recap narrative, highlight, conversation prompt, copy states, and engagement signal. |
-| PARENT-05 | Recap detail can reuse or deep-link to child session detail if the route remains parent-native and has `/(app)/recaps` as back fallback. |
-| PARENT-06, PARENT-13 | Reports and weekly reports remain adjacent mentor review surfaces and can deep-link into Recaps where appropriate. |
-| LEARN-07 | Student session summary remains the source event, but mentor Recaps must not write or mutate the student session. |
-
-## Billing And Monetization
-
-| Original ID | Mentor access | How it should work |
+| Flow ID(s) | Access (who in this audience) | Actual behavior and gating |
 | --- | --- | --- |
-| BILLING-01 through BILLING-05 | Adult owners | Subscription details, upgrades, trial/usage, restore, and manage billing are available from owner account surfaces. |
-| BILLING-06 | Child path plus mentor notification | ChildPaywall belongs to the student side, but notify-parent creates a mentor-facing response path. |
-| BILLING-07 | Adult owner quota | Daily quota paywall for the adult remains account/student billing behavior, not child progress review. |
-| BILLING-08 | Family owners | Family pool details are mentor/family billing content and should be visible to eligible family owners. |
-| BILLING-09 through BILLING-12 | Adult owners | Top-up, BYOK waitlist, trial, and static comparison cards remain owner subscription surfaces. |
+| PARENT-14, PARENT-20, LEARN-15 | V1 guardian-owner only — `showLearnThisToo` = owner ∧ familyShape ∧ !proxy ∧ hasFamilyLinks → **the button never renders on prod flags** | 4 surfaces (child topic, child session, recap detail, LearnTogetherSheet). Clone = `POST /curriculum/clone-from-child`: owner-gated, IDOR-safe 404, dedupe modes, provenance (`sourceChildProfileId`), requestId idempotency, undo with `session_started` refusal. Lands in relearn direct-entry with "Added from <child>" header — a session **for the adult as themselves**, never as/for the child; writes scoped to the ADULT. LearnTogetherSheet also offers up to 3 conversation proposals (these work on prod; only the clone section is V1-dark). |
 
-## Mentor-Only Or Mentor-Primary Cross-Cutting Behaviors
+This is the only supporter entry into a learning flow. Supporters do NOT create subjects, start sessions, or run practice for a child — no such launch path exists in code.
 
-| Original ID | Mentor access |
-| --- | --- |
-| CC-04 | Mentor child/detail/recap routes need explicit back fallbacks such as Family home or Recaps, not stale Study routes. |
-| CC-07 | Accommodation badge and child accommodation controls are mentor-gated when editing a child. |
-| CC-08 | Parent-facing metric vocabulary applies to child topic/session/report surfaces. |
-| CC-09 | Opaque layout backgrounds apply to nested Family/child/Recaps stacks. |
-| CC-11 | Mentor copy must use i18n keys like the rest of the app. |
-| CC-12 | Feedback sheet applies to gates and More in mentor contexts. |
-| CC-17 | Profile-as-lens pattern is especially important for child routes: child profile IDs must come through the navigation lens and server checks, not screen-level guesses. |
-| CC-18 | Stable list refs apply to child lists, Recaps feed, reports, and family progress. |
+## Billing and family-pool ownership
 
-## Validation Focus
+| Flow ID(s) | Access (who in this audience) | Actual behavior and gating |
+| --- | --- | --- |
+| BILLING-01, BILLING-11, BILLING-16 | Owner (`showBilling` = owner && !proxy); `GET /subscription` owner-gated 403 (BUG-644) | Subscription screen: plan, status badge, trial banner, usage card (monthly meter + daily sub-meter + top-up credits + per-profile breakdown + family aggregate). 15s TimeoutLoader + error retry states. |
+| BILLING-02, BILLING-04, BILLING-05, BILLING-09 | Owner; native-only for purchase/restore (web = static cards) | Upgrade purchase + 15×2s confirmation polling; restore hidden on web; manage billing = native deep link with fallback / web static info card; top-up paid tiers only (500 credits, $10 plus / $5 family-pro). |
+| BILLING-03, BILLING-08 | Owner, tier `family` OR `pro` | Family-pool section: shared-pool usage + **member removal** (`remove-family-member-<id>`, gated `showRemoveFamilyMember`; confirm → `POST /subscription/family/remove` → cache invalidations). Pro owners also see the pool. |
+| BILLING-06, BILLING-13 + PARENT-21 | Child triggers; owner consumes | Child quota paywall + in-chat quota card notify-parent = **DB row only** (no push/email/Inngest); owner sees it as dismissible parent-home banners. The subscription-expired paywall mode is unreachable in prod (child `GET /subscription` 403s). Dormant subscribe variant would send push + Resend email. |
+| BILLING-10, BILLING-12, BILLING-14, BILLING-15 | Owner | BYOK waitlist renders unconditionally for owners; static tier comparison with no purchase action (BUG-899); cross-feature 402 upsells (create-profile, clone quota, assessment quota) → subscription; `subscribe_request`/`trial_expiry` push taps deep-navigate to subscription. |
 
-When the Study/Family navigation work starts, mentor tests should verify:
+## Parent-proxy mode (what it shows / blocks)
 
-- Mentor/Family tabs are exactly `home`, `recaps`, `progress`, `more` when V1 mode navigation is enabled.
-- Recaps remains guarded by route/API support and is not surfaced as a dead tab if that support is disabled.
-- Adults without child links see setup choices and a continue-studying option, not a dead Family shell.
-- Family Progress excludes the adult's own Study progress.
-- Child detail, reports, recaps, curriculum, memory, accommodation, and consent actions are available only for linked/visible children.
-- Normal mentor review does not enter parent proxy mode.
-- Bridges such as "Add to my learning" switch the adult into Study and write as the adult, not as the child.
+| Flow ID(s) | Access (who in this audience) | Actual behavior and gating |
+| --- | --- | --- |
+| HOME-12, LEARN-52, ACCOUNT-30 | Supporter by construction — but **code-only/dormant**: no production UI passes `proxyMode:true`; internal/test path only | When active: 3 tabs (home, library, progress — More removed entirely), `ProxyBanner` ("PARENT PREVIEW" + switch-back), recolored chrome, learner home with all learning actions hidden (`gates.showLearningActions=false`) + placeholder card → child detail. Any `/session/*` → `ExplainedRedirect` with switch-profile CTA. Residual More route renders locked panel, zero rows, no sign-out (BUG-915). Library read-only (`library-proxy-hint`); bookmarks list no trash; transcript entry hidden. Writes blocked server-side via `assertNotProxyMode` (known gap: child-cap notify endpoint lacks the proxy guard). Normal mentor review uses parent-native child routes, never proxy. |
+
+## Exclusions — student-owned flows
+
+Owned by `docs/flows/student-flow-access-inventory.md`, not duplicated here: AUTH-01..18 (shared account access), learner home (HOME-01), subject creation + library + sessions + retention + progress self-view (SUBJECT-*, LEARN-*), practice/quiz/dictation/homework (PRACTICE-*, QUIZ-*, DICT-*, HOMEWORK-*), self mentor-memory (ACCOUNT-15, ACCOUNT-49), child-side consent gates (ACCOUNT-19..24), child-side nudge consumption (HOME-16). An adult owner in **study mode** is a student for those rows — mentor access never replaces the adult's own Study flows. Note for V1: family-shape supporters lose the Library tab (`canEnter('library')` = `!familyShape`) and learning routes become owner-only in family shape; on prod flags the study-mode shells are the ordinary learner shells.
+
+## Known gaps affecting this audience (from the 2026-06-09 audit)
+
+- BILLING-06: `POST /notifications/child-cap/notify-parent` has owner-reject but no `assertNotProxyMode` — a proxying parent could self-notify.
+- Contract route-key mismatch: `FAMILY_CHILD_ROUTES` key `child/[profileId]/reports/weekly` has no matching screen file (actual: `weekly-report/[weeklyReportId].tsx`).
+- PARENT-23: demo-dashboard fallback at zero children can mask a genuine empty state.
+- E2E holes: no YAML for ModeSwitcher switching (HOME-11), proxy shell (HOME-12), Learn Together sheet (PARENT-20), child-cap banners (PARENT-21), in-chat quota card (BILLING-13).
+- Orphans relevant here: `guided-ratio` vocab copy (PARENT-09), child-paywall subscription mode (BILLING-06), proxy shell itself (HOME-12).
+
+## Historical walkthrough evidence (pre-2026-06-09, unverified)
+
+Compressed from the old edition; treat as stale evidence, not current state:
+- 2026-05-25 Chrome walkthrough (`d8d1ca6d2`, staging, `parent-multi-child` seed): Family shell signed in, showed Children home / child detail / Reports / Recaps; child subject drill-down wedged the automation session.
+- 2026-05-25 seeded Playwright rerun (`28eab43a5f`, local API): 15/15 `mentor-audit-*` registry landings passed.
+- 2026-05-26 latest-main rerun (`44e20638e6`): 15/19 inclusive registry entries, 28/47 broader specs, 4/4 learner smoke passed; remaining failures = My-Learning-first entry vs `parent-home-screen` expectation, consent-approval URL is an API web page, session-expired/revoked fixtures, Clerk TOTP disabled.
+- 2026-05-27 focused rerun (`codex/student-flow-access-audit`): 15/15 registry landings incl. `mentor-audit-paywall-child-notify` after per-profile child-quota seed fix.
+- Open Notion items from that era: E2E parent-entry contract mismatch (`36c8bce91f7c8196a766c9bc9ce12aad`), wrong consent route, non-deterministic session fixtures, disabled TOTP seed; stale-audit cleanup `36c8bce91f7c810dac87c81009503508`.
+- Row-status counts (1 Fail / 10 Pass-w/-issues) predate this rebuild and no longer map to current rows.

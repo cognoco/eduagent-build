@@ -36,7 +36,15 @@ export function usePostSessionNotificationAsk(
     if (!hasCompletedSession) return;
     if (isParentProxy) return;
 
-    firedForProfileRef.current = profileId;
+    // [correctness High] Do NOT latch the guard up-front. A transient
+    // SecureStore / permissions failure below must leave the guard un-latched
+    // so a later session-summary mount can retry — latching here permanently
+    // suppresses the one-time primer for the rest of the mount on any blip.
+    // The guard is latched only at the real terminal points (already-asked,
+    // already-granted/OS-blocked, or primer actually scheduled).
+    const latchGuard = (): void => {
+      firedForProfileRef.current = profileId;
+    };
     let cancelled = false;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 
@@ -48,9 +56,13 @@ export function usePostSessionNotificationAsk(
       try {
         const seen = await SecureStore.getItemAsync(key);
         if (cancelled) return;
-        if (seen === 'true') return;
+        if (seen === 'true') {
+          latchGuard();
+          return;
+        }
       } catch {
-        // SecureStore failure — safe default is to skip rather than spam.
+        // SecureStore failure — safe default is to skip rather than spam, but
+        // leave the guard un-latched so a later mount can retry.
         return;
       }
 
@@ -67,6 +79,7 @@ export function usePostSessionNotificationAsk(
           level: 'warning',
           data: { error: String(err) },
         });
+        // Transient permissions failure — leave the guard un-latched to retry.
         return;
       }
       if (cancelled) return;
@@ -74,6 +87,7 @@ export function usePostSessionNotificationAsk(
       if (status === 'granted' || !canAskAgain) {
         // Already granted or OS-blocked — no point asking. Mark seen so we
         // don't keep probing on every session-summary mount.
+        latchGuard();
         void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
         return;
       }
@@ -81,6 +95,11 @@ export function usePostSessionNotificationAsk(
       const markSeen = (): void => {
         void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
       };
+
+      // We've cleared all transient-failure gates and are about to surface the
+      // primer — latch now so a re-run during the delay window does not
+      // double-schedule the alert.
+      latchGuard();
 
       const handle = setTimeout(() => {
         if (cancelled) return;
