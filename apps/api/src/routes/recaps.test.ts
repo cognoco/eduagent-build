@@ -11,10 +11,16 @@
 
 jest.mock(
   '../services/recaps' /* gc1-allow: unit-route isolation; real service covered by integration tests */,
-  () => ({
-    listRecapsForParent: jest.fn(),
-    getRecapForParent: jest.fn(),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../services/recaps',
+    ) as typeof import('../services/recaps');
+    return {
+      ...actual,
+      listRecapsForParent: jest.fn(),
+      getRecapForParent: jest.fn(),
+    };
+  },
 );
 
 import { Hono } from 'hono';

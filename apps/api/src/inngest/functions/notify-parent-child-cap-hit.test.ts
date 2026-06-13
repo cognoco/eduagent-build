@@ -3,17 +3,27 @@ const mockGetStepDatabase = jest.fn();
 
 jest.mock(
   '../helpers' /* gc1-allow: getStepDatabase wraps Inngest step DB acquisition; test injects a fake handle */,
-  () => ({
-    getStepDatabase: () => mockGetStepDatabase(),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return { ...actual, getStepDatabase: () => mockGetStepDatabase() };
+  },
 );
 
 jest.mock(
   '../../services/child-cap-notifications' /* gc1-allow: handler unit delegates DB behavior to service tests */,
-  () => ({
-    recordChildCapNotificationForSubscription: (...args: unknown[]): unknown =>
-      mockRecordChildCapNotificationForSubscription(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/child-cap-notifications',
+    ) as typeof import('../../services/child-cap-notifications');
+    return {
+      ...actual,
+      recordChildCapNotificationForSubscription: (
+        ...args: unknown[]
+      ): unknown => mockRecordChildCapNotificationForSubscription(...args),
+    };
+  },
 );
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
