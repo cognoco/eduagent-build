@@ -828,6 +828,8 @@ describe('checkGithubWorkflowSecurity', () => {
             github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') &&
             contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
           runs-on: ubuntu-latest
+          permissions:
+            id-token: write
           steps:
             - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
               with:
@@ -836,5 +838,31 @@ describe('checkGithubWorkflowSecurity', () => {
     );
 
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  it('requires id-token write for Claude Code action default GitHub App auth', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-claude-oidc.yml',
+      `
+      name: Bad Claude OIDC
+      on: pull_request
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          permissions:
+            contents: read
+            pull-requests: write
+            issues: read
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'Claude Code action using default GitHub App auth must grant id-token: write',
+    );
   });
 });

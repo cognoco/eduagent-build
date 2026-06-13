@@ -29,6 +29,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: read
+      id-token: write
     env:
       # Attacker-controllable PR metadata is passed through environment
       # variables (data), never interpolated into the prompt body where it

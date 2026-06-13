@@ -288,6 +288,7 @@ function validateVerdictGateAuthorFilter(
 const CLAUDE_AGENT_SECRET =
   /claude-code-action|CLAUDE_CODE_OAUTH_TOKEN|claude_code_oauth_token/;
 const CLAUDE_MENTION_GATE = /contains\([^)]*,\s*['"]@claude['"]\)/;
+const CLAUDE_CODE_ACTION = /^anthropics\/claude-code-action@/;
 
 function validateClaudeAgentTriggerGuard(
   file: string,
@@ -321,6 +322,36 @@ function validateClaudeAgentTriggerGuard(
     file,
     message:
       '@claude secret-backed agent must gate on a trusted author_association',
+  };
+}
+
+function jobGrantsIdTokenWrite(job: Record<string, unknown>): boolean {
+  if (!isRecord(job.permissions)) return false;
+  return job.permissions['id-token'] === 'write';
+}
+
+function stepProvidesGithubToken(step: Record<string, unknown>): boolean {
+  if (!isRecord(step.with)) return false;
+  return (
+    typeof step.with.github_token === 'string' &&
+    step.with.github_token.trim() !== ''
+  );
+}
+
+function validateClaudeCodeActionOidcPermission(
+  file: string,
+  job: Record<string, unknown>,
+  step: Record<string, unknown>,
+): { file: string; message: string } | null {
+  const uses = step.uses;
+  if (typeof uses !== 'string' || !CLAUDE_CODE_ACTION.test(uses)) return null;
+  if (stepProvidesGithubToken(step)) return null;
+  if (jobGrantsIdTokenWrite(job)) return null;
+
+  return {
+    file,
+    message:
+      'Claude Code action using default GitHub App auth must grant id-token: write',
   };
 }
 
@@ -405,6 +436,13 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
 
       const verdictGateViolation = validateVerdictGateAuthorFilter(file, step);
       if (verdictGateViolation) violations.push(verdictGateViolation);
+
+      const claudeCodeOidcViolation = validateClaudeCodeActionOidcPermission(
+        file,
+        job,
+        step,
+      );
+      if (claudeCodeOidcViolation) violations.push(claudeCodeOidcViolation);
     }
   }
 
