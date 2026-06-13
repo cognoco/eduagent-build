@@ -215,6 +215,73 @@ the same change**. The kill-switch is backend-enforced; the "knowingly under-13"
 
 ---
 
+## §2B — Cutover-completion amendments (application cutover — WP-CUT-A)
+
+> **Traces to:** `MMT-ADR-0020` (cutover-completion amendments). **Lockstep:** this
+> section and the ADR move in one change-set. These are **additive** homes the
+> WI-586 cutover inventory found missing in the ratified model; CUT-A adds them,
+> CUT-B wires the readers, WI-586 drops legacy. No legacy object is touched.
+
+### 2B.1 `consent_request` — the consent-REQUEST workflow table
+
+`consent_grant` (§4.8) is the append-only consent **event log**. Legacy
+`consent_states` conflated that log with a pre-grant **workflow**; that workflow
+is re-homed here. **Requests are operational state; grants remain the sole audit
+record. The two never merge.**
+
+- **Key:** `(charge_person_id × purpose × organization_id × requested_basis)`
+  UNIQUE. The `requested_basis` dimension preserves the legacy GDPR/COPPA
+  dual-row coexistence (legacy uniqueness is `(profile_id, consent_type)`), and
+  single-row recycling per basis preserves the WI-374 monotonic abuse caps
+  (`resend_count`, `recipient_change_count`) 1:1.
+- **States:** `pending | requested | approved | denied | expired` (1:1 image of
+  the legacy `PENDING / PARENTAL_CONSENT_REQUESTED / CONSENTED / WITHDRAWN`).
+- **Approval** writes a `consent_grant` row and back-links it (`consent_grant_id`).
+  Approval **never** creates a guardianship edge (inv 14). Withdrawal/restore are
+  grant-layer events (`consent_grant.withdrawn_at` stamp / new appended rows),
+  never request states.
+- **`guardian_person_id`** is nullable — in child-self-signup the responding
+  parent exists only as an email; in-family it binds to the guardianship edge's
+  guardian end.
+- **Audit fields** (`policy_version`, `request_ip`, `user_agent` — Bug #872) and
+  the token lifecycle carry over 1:1. Purpose vocabulary is finalized as
+  `'platform_use'`; `requested_basis ∈ {coppa_parental_consent,
+  gdpr_parental_consent}`.
+- **Scope:** `consent_request` is charge-scoped — RLS policy
+  `consent_request_charge_isolation` on `charge_person_id` (mirrors
+  `consent_states_profile_isolation`; `person.id = profiles.id`, so the
+  `app.current_profile_id` GUC carries over). Service-role exceptions (public
+  token lookup, reminder sweeps) match today's `consent_states` posture.
+
+### 2B.2 `subscription` store-correlation / idempotency columns (additive)
+
+`subscription` (§4.5) gains the payment-store correlation and idempotency
+identifiers that dropping legacy `subscriptions` would otherwise lose:
+`stripe_customer_id`, `stripe_subscription_id`, `last_stripe_event_id` (+ts),
+`revenuecat_original_app_user_id`, `last_revenuecat_event_id` (+ts_ms),
+`trial_ends_at`, `cancelled_at`. The BUG-116 / CR-2026-05-19-M11 webhook-race
+fences re-key to `(organization_id, last_*_event_id)` partial-unique
+(`organization.id = accounts.id` by reseed). Quota satellites are kept, not
+replaced. The legacy `tier`/`status` pgEnums map onto the new TEXT
+`plan_tier` (`free|plus|family|pro`) / `status`
+(`trial|active|past_due|cancelled|expired`) with CHECKs.
+
+### 2B.3 `person` re-homes
+
+`person` (§4.1) gains the presentation/preference/lifecycle columns that had no
+other home: `conversation_language` (NOT NULL default `'en'`, 10-language CHECK
+— the conversation-language superset), `pronouns` (≤32 CHECK), `avatar_url`,
+`default_app_context` (study|family CHECK), `archived_at` (operational lifecycle
+marker; the consent *why* stays in the grant layer — inv 2 governs consent
+decisions, which this column is **not**). Derived / re-provenanced, **not**
+re-homed as columns: `birth_year_set_by` → `knowledge_assertions` provenance
+(§2A.2; one `'age'` assertion per person, provisional confidence per OQ-9,
+DB-mastered thereafter); `is_owner` → `membership.roles @> '{admin}'`;
+`has_premium_llm` → derived per MMT-ADR-0014 (no application writer exists;
+behavior-neutral).
+
+---
+
 ## §3 — Edge diagrams
 
 ### 3.1 The active graph
