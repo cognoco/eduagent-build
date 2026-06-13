@@ -549,6 +549,7 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 | `WI-694` KV-verifier empty-body regex hotfix | WI-682 prod probe | main-side hotfix | detached from PRG-17; closing via generic review | Reviewing → Closing |
 | `WI-695` GC6 burndown — 3 new-llm test internal mocks | claude-review on #1087 | eduagent GC6 backlog | post-merge; standalone by design (avoids new-llm-landing policy) | Backlog |
 | `WI-696` Type `app/session.completed` event end-to-end (Finding A) | claude-review on #1087 | eduagent schema-contract | post-merge; proper fix of the pervasive untyped-event pattern (not the one-field add the reviewer implied) | Backlog |
+| `WI-697` [SPIKE THROWAWAY] agnosticity probe fixture (clamp + test) | PRG-05 agnosticity spike | throwaway spike fixture | **Cancel post-spike** (program session) — not real work; exists only to give the spike an executor task | Ready (standalone) |
 
 ---
 
