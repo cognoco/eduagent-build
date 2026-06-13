@@ -606,6 +606,9 @@ describe('validateProductionBindings', () => {
     ADULT_OWNER_GATE_ENABLED: 'true',
     LLM_ROUTING_V2_ENABLED: 'false',
     MODE_NAV_V2_ENABLED: 'false',
+    IDENTITY_V2_ENABLED: 'false',
+    MAINTENANCE_READONLY: 'false',
+    MAINTENANCE_BLOCK_INNGEST: 'false',
   };
 
   const fakeKv = {} as unknown;

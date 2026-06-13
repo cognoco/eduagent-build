@@ -1432,6 +1432,9 @@ describe('sessionCompleted', () => {
       expect(mockPrecomputeCoachingCard).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
+        // [CUT-B1] coaching-card precompute now carries the identity-cutover
+        // flag (false in the flag-off legacy path).
+        { identityV2Enabled: false },
       );
       expect(mockWriteCoachingCardCache).toHaveBeenCalledWith(
         expect.anything(),

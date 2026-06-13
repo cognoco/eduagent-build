@@ -10,7 +10,11 @@ const mockCaptureException = jest.fn();
 
 jest.mock(
   '../helpers' /* gc1-allow: Inngest step runtime requires mocking helper abstractions */,
-  () => ({ getStepDatabase: () => mockGetStepDatabase() }),
+  () => ({
+    getStepDatabase: () => mockGetStepDatabase(),
+    // [CUT-B1] These tests exercise the legacy (flag-off) path.
+    isIdentityV2EnabledInStep: () => false,
+  }),
 );
 
 jest.mock(

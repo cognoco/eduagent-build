@@ -305,6 +305,9 @@ describe('dailySnapshotRefresh', () => {
     expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
       mockSnapshotDb,
       'profile-001',
+      // [CUT-B1] the refresh now carries the identity-cutover flag (false in
+      // the flag-off legacy path the test exercises).
+      { identityV2Enabled: false },
     );
     expect(result).toEqual({
       status: 'completed',

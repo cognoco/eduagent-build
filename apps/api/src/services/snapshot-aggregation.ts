@@ -36,6 +36,7 @@ import {
 import { queueCelebration } from './celebrations';
 import { getCurrentLanguageProgress } from './language-curriculum';
 import { getCurrentlyWorkingOn } from './learner-profile';
+import { getPersonBirthYear } from './identity-v2/helpers';
 // [EP15-I7] Static import of milestone-detection. No circular dependency
 // (milestone-detection does not import snapshot-aggregation), so the prior
 // dynamic `await import()` added per-call module-resolution overhead on a
@@ -1233,6 +1234,12 @@ export interface RefreshProgressSnapshotOptions {
    * refresh is always desired.
    */
   sessionEndedAt?: Date;
+  /**
+   * [CUT-B1 §2.5(iii)] When true, the learner-age lookup reads person.birth_date
+   * instead of profiles.birth_year. Threaded from the caller's flag (request
+   * c.env or the Inngest step flag).
+   */
+  identityV2Enabled?: boolean;
 }
 
 export async function refreshProgressSnapshot(
@@ -1291,10 +1298,13 @@ export async function refreshProgressSnapshot(
     // sends.
     let profile: { birthYear: number | null } | undefined;
     try {
-      profile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
-        columns: { birthYear: true },
-      });
+      // [CUT-B1 §2.5(iii)] v2 seam: learner age from person.birth_date.
+      profile = options.identityV2Enabled
+        ? { birthYear: await getPersonBirthYear(db, profileId) }
+        : await db.query.profiles.findFirst({
+            where: eq(profiles.id, profileId),
+            columns: { birthYear: true },
+          });
     } catch (err) {
       captureException(err, {
         extra: {

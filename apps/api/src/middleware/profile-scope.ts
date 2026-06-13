@@ -11,6 +11,11 @@ import type { Database } from '@eduagent/database';
 import { forbidden } from '../errors';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
+import { isIdentityV2Enabled } from '../config';
+import {
+  findOwnerPersonScope,
+  getPersonScope,
+} from '../services/identity-v2/profile-v2';
 
 const logger = createLogger();
 
@@ -45,6 +50,9 @@ export interface ProfileMeta {
 }
 
 export type ProfileScopeEnv = {
+  Bindings: {
+    IDENTITY_V2_ENABLED?: string;
+  };
   Variables: {
     db: Database;
     account: Account;
@@ -115,6 +123,18 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       const account = c.get('account');
       if (db && account) {
         try {
+          // [CUT-B1] v2 seam: resolve the owner person scope (person.id =
+          // profiles.id, account.id = organization.id). The returned meta is
+          // byte-identical to the legacy ProfileMeta.
+          if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+            const ownerScope = await findOwnerPersonScope(db, account.id);
+            if (ownerScope) {
+              c.set('profileId', ownerScope.profileId);
+              c.set('profileMeta', ownerScope.meta);
+            }
+            await next();
+            return;
+          }
           const owner = await findOwnerProfile(db, account.id);
           if (owner) {
             c.set('profileId', owner.id);
@@ -182,6 +202,23 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
         401,
       );
     }
+    // [CUT-B1] v2 seam: verify the person belongs to the org (membership) and
+    // build the byte-identical ProfileMeta. account.id = organization.id.
+    if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+      const scope = await getPersonScope(db, profileIdHeader, account.id);
+      if (!scope) {
+        logger.warn('profile_scope.ownership_mismatch', {
+          accountId: account.id,
+          requestedProfileId: profileIdHeader,
+        });
+        return forbidden(c, 'Profile does not belong to this account');
+      }
+      c.set('profileId', scope.profileId);
+      c.set('profileMeta', scope.meta);
+      await next();
+      return;
+    }
+
     const profile = await getProfile(db, profileIdHeader, account.id);
     if (!profile) {
       logger.warn('profile_scope.ownership_mismatch', {
