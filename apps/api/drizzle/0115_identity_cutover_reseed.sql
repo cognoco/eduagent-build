@@ -213,17 +213,29 @@ BEGIN
     p.id,
     p.id,
     'age',
+    -- method/confidence reflect the PROVENANCE (a parent set this child's birth
+    -- year), independent of whether the actor person still exists — a
+    -- parent_reported assertion whose parent later left the system is still
+    -- parent_reported (honest provenance; do not downgrade to self_report).
     CASE WHEN p.birth_year_set_by IS NOT NULL AND p.birth_year_set_by <> p.id
          THEN 'parent_reported' ELSE 'self_report' END,
     CASE WHEN p.birth_year_set_by IS NOT NULL AND p.birth_year_set_by <> p.id
          THEN 1.00 ELSE 0.80 END,  -- provisional (OQ-9); DB-mastered thereafter
     'reseed_cutover_backfill',
     p.created_at,
-    p.birth_year_set_by
+    -- actor_id FKs to person(id). The LEFT JOIN resolves it to the actor person
+    -- only when that person exists (actor.id), else NULL — birth_year_set_by may
+    -- point to a profile not (or no longer) reseeded as a person (deleted
+    -- parent), which would otherwise abort the whole block with a 23503.
+    actor.id
   FROM profiles p
   -- Only persons reseeded by 0109 (person.id = profiles.id) can receive the
-  -- assertion (person_id / actor_id FK to person).
+  -- assertion (person_id FK to person).
   JOIN person per ON per.id = p.id
+  -- actor person is OPTIONAL — present only when birth_year_set_by names a
+  -- reseeded, non-self person (the parent_reported case with a live parent).
+  LEFT JOIN person actor
+    ON actor.id = p.birth_year_set_by AND p.birth_year_set_by <> p.id
   ON CONFLICT (id) DO UPDATE SET
     method      = excluded.method,
     confidence  = excluded.confidence,

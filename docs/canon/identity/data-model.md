@@ -275,10 +275,21 @@ other home: `conversation_language` (NOT NULL default `'en'`, 10-language CHECK
 marker; the consent *why* stays in the grant layer — inv 2 governs consent
 decisions, which this column is **not**). Derived / re-provenanced, **not**
 re-homed as columns: `birth_year_set_by` → `knowledge_assertions` provenance
-(§2A.2; one `'age'` assertion per person, provisional confidence per OQ-9,
-DB-mastered thereafter); `is_owner` → `membership.roles @> '{admin}'`;
-`has_premium_llm` → derived per MMT-ADR-0014 (no application writer exists;
-behavior-neutral).
+(§2A.2; one `'age'` assertion per person, `method ∈ {self_report,
+parent_reported}` per the §2A.2 v1 `age_method` set, provisional confidence per
+OQ-9, DB-mastered thereafter; `actor_id` = the parent person when it exists in
+the graph, else NULL — `parent_reported` provenance is preserved regardless);
+`is_owner` → `membership.roles @> '{admin}'`; `has_premium_llm` → derived per
+MMT-ADR-0014 (no application writer exists; behavior-neutral).
+
+**`age_knowing` cache supersession (CUT-A).** The CUT-A reseed supersedes the
+provisional `person.age_knowing` stub the 0109 identity reseed wrote
+(`{method: 'self_attested_birth_year', source, last_updated}` — no confidence
+invented). Running after 0109 at the convergence freeze, CUT-A masters the field
+with the canonical §2A.2 shape `{method, confidence, last_updated}` (the
+assertion-mirrored `method` + OQ-9 `confidence`); the 0109 `source` key is dropped
+(provenance lives in the `knowledge_assertions.source` column). Intentional and
+recorded per `MMT-ADR-0020`, not a silent overwrite.
 
 ---
 

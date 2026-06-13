@@ -63,11 +63,27 @@ store-id fences are partial-unique on the non-null value. The quota satellites
 `archived_at` (operational lifecycle marker; the consent *why* stays in the
 grant layer — inv 2 governs consent decisions, which this column is not).
 `birth_year_set_by` folds into `knowledge_assertions` provenance (one `'age'`
-assertion per person; `parent_reported` when set and ≠ self, else `self_report`;
-provisional confidence 1.00 / 0.80 per OQ-9, DB-mastered thereafter).
+assertion per person; `parent_reported` when set and ≠ self, else `self_report`
+— the `age_method` v1 vocabulary per data-model §2A.2; provisional confidence
+1.00 / 0.80 per OQ-9, DB-mastered thereafter). The assertion's `actor_id` is set
+to the parent person **only when that person exists** in the reseeded graph
+(else NULL — the `parent_reported` provenance is preserved either way; the
+parent having left the system does not downgrade the method).
 `is_owner` derives from `membership.roles @> '{admin}'`. `has_premium_llm` is
 **not** stored — premium routing derives per MMT-ADR-0014 + the model register
 (no application writer of the legacy column exists; behavior-neutral).
+
+**`person.age_knowing` cache supersession.** The CUT-A reseed (0115) **supersedes**
+the provisional `age_knowing` stub written by the 0109 identity reseed. 0109
+wrote `{method: 'self_attested_birth_year', source: 'reseed_0109:profiles.birth_year',
+last_updated}` (a provenance-honest stub with no confidence invented); 0115 — which
+runs **after** 0109 at the convergence freeze and therefore masters the field —
+adopts the canonical cache shape `{method, confidence, last_updated}` (data-model
+§2A.2), mirroring the backfilled assertion's `method` (`self_report` /
+`parent_reported`) and OQ-9 `confidence` (0.80 / 1.00). The 0109 `source` key is
+dropped (the provenance now lives in the `knowledge_assertions` row's `source`
+column, not the cache). This is an intentional, recorded supersession — not a
+silent overwrite.
 
 ## Alternatives considered
 

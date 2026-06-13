@@ -329,9 +329,16 @@ const CHECKS = [
     // §1.5(d) knowledge-assertion age backfill — FIELD-CONVERGENT (v1.7
     // DO UPDATE): method/confidence/actor compared against a fresh derivation
     // from profiles, not mere row existence. One assertion per person.
+    // actor_id applies the SAME actor-exists guard the migration uses — the
+    // LEFT JOIN person actor resolves the expected actor to NULL when
+    // birth_year_set_by names a non-reseeded person, so the check asserts
+    // exactly what the migration writes (else every parent_reported row whose
+    // parent left the system would read as a false violation).
     name: 'knowledge_assertions age backfill converged (one per person; method/confidence/actor field-convergent)',
     sql: `SELECT count(*)::int AS n FROM profiles p
           JOIN person per ON per.id = p.id
+          LEFT JOIN person actor
+            ON actor.id = p.birth_year_set_by AND p.birth_year_set_by <> p.id
           LEFT JOIN knowledge_assertions ka
             ON ka.id = p.id AND ka.axis = 'age'
           WHERE ka.id IS NULL
@@ -341,7 +348,7 @@ const CHECKS = [
                       THEN 'parent_reported' ELSE 'self_report' END,
                  (CASE WHEN p.birth_year_set_by IS NOT NULL AND p.birth_year_set_by <> p.id
                       THEN 1.00 ELSE 0.80 END)::numeric(3,2),
-                 p.birth_year_set_by)`,
+                 actor.id)`,
   },
 ];
 
