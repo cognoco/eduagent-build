@@ -399,7 +399,7 @@ describe('checkGithubWorkflowSecurity', () => {
     );
   });
 
-  it('allows workflow_run jobs that skip pull_request runs before secret-backed jobs', () => {
+  it('allows secret-bearing workflow_run jobs that carry a self-contained fork-exclusion guard alongside the skip output', () => {
     writeFixture(
       root,
       '.github/workflows/good-workflow-run-pr-skip.yml',
@@ -426,7 +426,10 @@ describe('checkGithubWorkflowSecurity', () => {
                 fi
         e2e:
           needs: check-changes
-          if: needs.check-changes.outputs.run-mobile-e2e == 'true'
+          if: >-
+            needs.check-changes.outputs.run-mobile-e2e == 'true' &&
+            github.event.workflow_run.event != 'pull_request' &&
+            github.event.workflow_run.head_repository.full_name == github.repository
           runs-on: ubuntu-latest
           steps:
             - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -439,6 +442,50 @@ describe('checkGithubWorkflowSecurity', () => {
     );
 
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  // [F-154] A secret-bearing workflow_run job that checks out head_sha must
+  // carry its OWN fork-exclusion guard; relying solely on an upstream
+  // skip-output is a single point of failure.
+  it('rejects secret-bearing workflow_run jobs gated solely by an upstream skip output (no self-contained guard)', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-workflow-run-sole-output-gate.yml',
+      `
+      name: Bad workflow run sole output gate
+      on:
+        workflow_run:
+          workflows: ["CI"]
+      jobs:
+        check-changes:
+          runs-on: ubuntu-latest
+          outputs:
+            run-mobile-e2e: \${{ steps.analyze.outputs.run-mobile-e2e }}
+          steps:
+            - name: Analyze changed file types
+              id: analyze
+              run: |
+                if [ "\${{ github.event_name }}" = "workflow_run" ] && [ "\${{ github.event.workflow_run.event }}" = "pull_request" ]; then
+                  echo "run-mobile-e2e=false" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+        e2e:
+          needs: check-changes
+          if: needs.check-changes.outputs.run-mobile-e2e == 'true'
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+              with:
+                ref: \${{ github.event.workflow_run.head_sha }}
+            - run: pnpm test:e2e
+              env:
+                TEST_SEED_SECRET: \${{ secrets.TEST_SEED_SECRET }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'secret-bearing workflow_run job relies solely on an upstream skip output',
+    );
   });
 
   it('rejects workflow_run jobs with inverted pull_request skip-output conditions', () => {
@@ -634,5 +681,160 @@ describe('checkGithubWorkflowSecurity', () => {
     jobs['build-preview'].if = `${jobs['build-preview'].if} || true`;
 
     expect(() => expectSensitiveMobileIfExpressions(workflow)).toThrow('toBe');
+  });
+
+  // [F-132] The review-verdict gate must not parse a comment as the verdict
+  // source unless the comment author is constrained to a trusted bot identity.
+  // Otherwise a PR author can post the verdict marker and forge the gate.
+  it('rejects a verdict gate that selects comments without a trusted-author constraint', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-verdict-gate.yml',
+      `
+      name: Bad verdict gate
+      on: pull_request
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          steps:
+            - name: Evaluate review verdict
+              run: |
+                comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
+                review_json="$(jq -c '[ .[] | select(.body | contains("## Claude Code Review:")) ] | last' <<< "$comments_json")"
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'verdict gate parses comments without constraining the comment author to a trusted bot identity (forgeable verdict)',
+    );
+  });
+
+  it('rejects a verdict gate whose only author reference is a no-op author_association mention', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-verdict-gate-noop-author.yml',
+      `
+      name: Bad verdict gate noop author
+      on: pull_request
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          steps:
+            - name: Evaluate review verdict
+              run: |
+                # author_association is checked elsewhere
+                comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
+                review_json="$(jq -c '[ .[] | select(.body | contains("## Claude Code Review:")) ] | last' <<< "$comments_json")"
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'verdict gate parses comments without constraining the comment author to a trusted bot identity (forgeable verdict)',
+    );
+  });
+
+  it('allows a verdict gate that constrains the comment author to github-actions[bot]', () => {
+    writeFixture(
+      root,
+      '.github/workflows/good-verdict-gate.yml',
+      `
+      name: Good verdict gate
+      on: pull_request
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          steps:
+            - name: Evaluate review verdict
+              run: |
+                comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
+                review_json="$(jq -c '[ .[] | select(.user.login == "github-actions[bot]") | select(.body | contains("## Claude Code Review:")) ] | last' <<< "$comments_json")"
+      `,
+    );
+
+    expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  // [F-119] A secret-backed @claude agent job triggered by issue/comment/review
+  // events must gate on a trusted author_association, or any external account
+  // can invoke the secret-backed path by mentioning @claude.
+  it('rejects an @claude secret-backed agent without an author_association guard', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-claude-agent.yml',
+      `
+      name: Bad claude agent
+      on:
+        issue_comment:
+          types: [created]
+        issues:
+          types: [opened]
+      jobs:
+        claude:
+          if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')
+          runs-on: ubuntu-latest
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      '@claude secret-backed agent must gate on a trusted author_association',
+    );
+  });
+
+  it('rejects an @claude secret-backed agent whose author_association is a bare no-op mention', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-claude-agent-noop-author.yml',
+      `
+      name: Bad claude agent noop author
+      on:
+        issue_comment:
+          types: [created]
+      jobs:
+        claude:
+          # Real @claude mention gate, but author_association appears only as a
+          # bare unenforced token in a string literal — no field ref, no allowlist.
+          if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') && contains(github.event.comment.body, 'author_association')
+          runs-on: ubuntu-latest
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      '@claude secret-backed agent must gate on a trusted author_association',
+    );
+  });
+
+  it('allows an @claude secret-backed agent that gates on a trusted author_association', () => {
+    writeFixture(
+      root,
+      '.github/workflows/good-claude-agent.yml',
+      `
+      name: Good claude agent
+      on:
+        issue_comment:
+          types: [created]
+        issues:
+          types: [opened]
+      jobs:
+        claude:
+          if: |
+            github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+          runs-on: ubuntu-latest
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(checkGithubWorkflowSecurity(root)).toEqual([]);
   });
 });
