@@ -119,7 +119,10 @@ import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from '../curriculum-topic-ownership';
-import { captureConceptMastery } from '../concept-capture';
+import {
+  CONCEPT_CAPTURE_ENABLED,
+  captureConceptMastery,
+} from '../concept-capture';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
   decideMasteryAndReview,
@@ -718,7 +721,11 @@ async function finalizeChallengeRoundIfReady(
     );
   }
 
-  if (session.subjectId) {
+  // Concept-capture is parked until the baseline reset applies the
+  // `concepts`/`concept_mastery` tables (see CONCEPT_CAPTURE_ENABLED). Gating
+  // here keeps the function + its integration tests intact while stopping the
+  // live `relation does not exist` Sentry noise on staging/prod.
+  if (CONCEPT_CAPTURE_ENABLED && session.subjectId) {
     await safeWrite(
       () =>
         captureConceptMastery(

@@ -352,7 +352,6 @@
     "active": "アクティブ",
     "accommodation": {
       "sectionHeader": "あなたの学習サポート",
-      "viewAndManage": "表示・管理",
       "notSureWhichToPick": "どれを選べばいいかわからない？",
       "guideActive": "アクティブ",
       "childScreenTitle": "{{name}}の学習設定"
@@ -679,8 +678,6 @@
     },
     "notePrompt": {
       "writeNote": "メモを書く",
-      "cannotSaveTitle": "メモを保存できません",
-      "cannotSaveMessage": "現在メモを保存できません。もう一度お試しください。",
       "saveFailedTitle": "メモを保存できませんでした",
       "summaryPlaceholder": "このセッションで覚えておくことは何ですか？"
     },
@@ -758,7 +755,8 @@
     "expiredSystemMessage": "セッションが期限切れです。新しいセッションを開始して続けてください。",
     "errorBoundary": {
       "crashTitle": "セッション画面がクラッシュしました",
-      "unknownError": "不明なエラー"
+      "unknownError": "不明なエラー",
+      "body": "この画面の読み込み中に問題が発生しました。再試行するか、ホームに戻ってください。"
     },
     "screenChrome": {
       "wrapping": "まとめ中...",
@@ -1078,7 +1076,6 @@
       "exit": "終了"
     },
     "review": {
-      "couldNotSaveResult": "レビュー結果を保存できませんでした。",
       "couldNotSaveTitle": "結果を保存できませんでした",
       "continueWithoutSaving": "保存せずに続ける",
       "noDataFound": "レビューデータが見つかりません。",
@@ -1105,7 +1102,6 @@
       "prepareErrorMessage": "ディクテーションを準備できませんでした。もう一度試しますか？",
       "tryAgain": "再試行",
       "title": "テキストを確認",
-      "subtitleFromPhoto": "写真からの間違いを編集してから、ディクテーションを開始してください。",
       "subtitleManual": "テキストを確認してから、ディクテーションを開始してください。",
       "inputPlaceholder": "ここにテキストを入力または貼り付け...",
       "inputLabel": "ディクテーションテキスト",
@@ -1345,6 +1341,9 @@
       "a11ySectionCollapse": "{{label}}。{{summary}}。セクションを折りたたむ。",
       "a11ySectionExpand": "{{label}}。{{summary}}。セクションを展開する。"
     },
+    "inactiveFallbackBanner": {
+      "message": "一時停止中・アーカイブ済みの科目を読み込めませんでした。タップして再試行 — データは消えていません。"
+    },
     "notStartedCount": "{{notStarted}} / {{total}} 未開始",
     "chooseTopic": "トピックを選択",
     "provenanceFrom": "{{name}}より",
@@ -1467,8 +1466,7 @@
     "deleteDialog": {
       "title": "単語を削除",
       "message": "この単語を語彙から削除しますか？",
-      "errorTitle": "削除できませんでした",
-      "errorFallback": "問題が発生しました。もう一度お試しください。"
+      "errorTitle": "削除できませんでした"
     },
     "noSubject": {
       "title": "科目が選択されていません",
@@ -1722,6 +1720,7 @@
       "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     },
     "microphoneUnavailableTitle": "マイクが利用できません",
+    "microphoneUnavailableBody": "現在マイクを使用できませんでした。アプリにマイクへのアクセス権があることを確認してもう一度お試しいただくか、入力してください。",
     "detectSubjectErrorTitle": "科目を検出できませんでした",
     "detectSubjectErrorBody": "{{error}} 手動で科目を選択してください。",
     "identifySubjectErrorTitle": "科目を特定できませんでした",
@@ -2133,7 +2132,6 @@
       "manageMentorMemoryForChild": "{{name}}についてメンターが覚えておく内容を管理",
       "profileDetails": "プロフィール詳細",
       "childProfileJoined": "{{date}}に追加",
-      "learningAccommodationTitle": "{{name}}さんのための学習サポート",
       "noLearningPreferenceSet": "学習設定はまだありません",
       "consentTitle": "同意",
       "consentDescription": "{{name}}の保護者同意を管理します。",
@@ -2330,10 +2328,6 @@
       "exchangeDelta": {
         "title": "今週のやり取り",
         "body": "今週と先週を比較したメッセージのやり取り数。学習活動の手軽な目安です。"
-      },
-      "guidedRatio": {
-        "title": "ガイド付き練習",
-        "body": "お子さまが軽い促しではなく、解き方の例やより強いガイドを必要とした返答の割合。"
       },
       "streakXp": {
         "title": "連続記録とXP",
@@ -2823,7 +2817,6 @@
       "topicsReady_other": "{{count}}トピックがテスト可能",
       "afterFinishTopic": "トピック完了後に利用可能",
       "hintOpenPicker": "アセスメントピッカーを開く",
-      "hintOpenLibrary": "ライブラリを開く",
       "couldNotLoad": "アセスメントトピックを読み込めませんでした",
       "studySubjectFirst": "これをアンロックするには、まず{{subject}}を学習しましょう"
     },
@@ -3265,6 +3258,43 @@
       "openUpdate": "アップデートを開く"
     }
   },
+  "myNotes": {
+    "loadMore": "もっと読み込む",
+    "emptyHint": "学習を進めると、ここに表示されます。",
+    "title": "マイノート",
+    "subtitle": "セッション、ノート、保存した返信",
+    "sortDate": "日付",
+    "sortSubject": "科目",
+    "noneYetNotes": "まだノートはありません",
+    "noneYetBookmarks": "まだブックマークはありません",
+    "noneYetSessions": "まだセッションはありません",
+    "loadErrorNotes": "ノートを読み込めませんでした",
+    "loadErrorBookmarks": "ブックマークを読み込めませんでした",
+    "loadErrorSessions": "セッションを読み込めませんでした",
+    "kinds": {
+      "sessions": "セッション",
+      "notes": "メモ",
+      "bookmarks": "ブックマーク"
+    },
+    "types": {
+      "homework": "宿題",
+      "review": "復習",
+      "learning": "学習",
+      "note": "メモ",
+      "bookmark": "ブックマーク"
+    },
+    "hub": {
+      "sessionsSubtitle": "あなたの会話履歴",
+      "notesSubtitle": "あなたが書き留めたこと",
+      "bookmarksSubtitle": "あなたが保存したメンターの返信"
+    },
+    "unknownSubject": "不明な科目",
+    "searchSessions": "セッションを検索",
+    "searchNotes": "メモを検索",
+    "searchBookmarks": "ブックマークを検索",
+    "a11yGroupByDate": "日付でグループ化",
+    "a11yGroupBySubject": "科目でグループ化"
+  },
   "createProfile": {
     "titleChild": "お子様について教えてください",
     "titleSelf": "学習するのはどなたですか？",
@@ -3297,16 +3327,6 @@
     "switchError": "切り替えられませんでした。タップして再試行してください。",
     "a11yRetry": "モード切り替えを再試行"
   },
-  "profileSwitcher": {
-    "fallbackName": "プロフィール",
-    "switchErrorTitle": "プロフィールを切り替えられませんでした",
-    "a11yClose": "プロフィール切り替えを閉じる",
-    "a11yChip": "プロフィールを切り替え。現在：{{name}}",
-    "a11yOption": "{{name}}、{{role}}",
-    "a11yOptionActive": "{{name}}、{{role}}、アクティブ",
-    "roleParent": "保護者",
-    "roleStudent": "生徒"
-  },
   "memoryConsent": {
     "defaultTitle": "チューターが{{name}}さんについて学習するのを手伝う",
     "defaultTitleNoName": "チューターがお子様について学習するのを手伝う",
@@ -3334,43 +3354,6 @@
     "childBirthYearPlaceholder": "誕生年",
     "a11yBack": "前のステップに戻る",
     "a11yCancel": "キャンセルして終了"
-  },
-  "myNotes": {
-    "title": "マイノート",
-    "subtitle": "セッション、ノート、保存した返信",
-    "sortDate": "日付",
-    "sortSubject": "科目",
-    "emptyHint": "学習を進めると、ここに表示されます。",
-    "loadMore": "もっと読み込む",
-    "noneYetNotes": "まだノートはありません",
-    "noneYetBookmarks": "まだブックマークはありません",
-    "noneYetSessions": "まだセッションはありません",
-    "loadErrorNotes": "ノートを読み込めませんでした",
-    "loadErrorBookmarks": "ブックマークを読み込めませんでした",
-    "loadErrorSessions": "セッションを読み込めませんでした",
-    "kinds": {
-      "sessions": "セッション",
-      "notes": "メモ",
-      "bookmarks": "ブックマーク"
-    },
-    "types": {
-      "homework": "宿題",
-      "review": "復習",
-      "learning": "学習",
-      "note": "メモ",
-      "bookmark": "ブックマーク"
-    },
-    "hub": {
-      "sessionsSubtitle": "あなたの会話履歴",
-      "notesSubtitle": "あなたが書き留めたこと",
-      "bookmarksSubtitle": "あなたが保存したメンターの返信"
-    },
-    "unknownSubject": "不明な科目",
-    "searchSessions": "セッションを検索",
-    "searchNotes": "メモを検索",
-    "searchBookmarks": "ブックマークを検索",
-    "a11yGroupByDate": "日付でグループ化",
-    "a11yGroupBySubject": "科目でグループ化"
   },
   "pickBook": {
     "subjectFallback": "科目",

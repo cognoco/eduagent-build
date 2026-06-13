@@ -104,7 +104,18 @@ export async function sendEmail(
     if (!response.ok) {
       // Log only status code — error body may contain PII (echoed email addresses)
       // [logging sweep] structured logger so PII fields land as JSON context
-      logger.error('[email] Resend API error', { status: response.status });
+      // [C-2] Escalate via Sentry too — `logger.error` alone is not queryable
+      // for the "how often did this fire in 24h" question, the same reason the
+      // network-error path below captures. Status only, no PII in tags.
+      logger.error('[email] Resend API error', {
+        event: 'notification.email.resend_api_error',
+        type: payload.type,
+        status: response.status,
+      });
+      captureException(new Error(`Resend API ${response.status}`), {
+        tags: { surface: 'email', reason: `http_${response.status}` },
+        extra: { type: payload.type },
+      });
       return { sent: false, reason: `resend_api_error_${response.status}` };
     }
 

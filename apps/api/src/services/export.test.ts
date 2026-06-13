@@ -71,6 +71,7 @@ function createMockDb({
   quotaPools = [] as Record<string, unknown>[],
   topUpCredits = [] as Record<string, unknown>[],
   learningProfiles = [] as Record<string, unknown>[],
+  mentorActivityLedger = [] as Record<string, unknown>[],
 } = {}): Database {
   return {
     query: {
@@ -145,6 +146,9 @@ function createMockDb({
       },
       learningProfiles: {
         findMany: jest.fn().mockResolvedValue(learningProfiles),
+      },
+      mentorActivityLedger: {
+        findMany: jest.fn().mockResolvedValue(mentorActivityLedger),
       },
     },
   } as unknown as Database;
@@ -593,5 +597,102 @@ describe('generateExport', () => {
     expect(result.subscriptions).toEqual([]);
     expect(result.quotaPools).toEqual([]);
     expect(result.topUpCredits).toEqual([]);
+    expect(result.mentorActivityLedger).toEqual([]);
+  });
+
+  // [WI-679] GDPR Art-15 gap: mentor_activity_ledger (added by migration 0111)
+  // was written from merge day but was missing from the export — erasure via FK
+  // cascade was covered but portability was not.
+  it('[WI-679] includes mentor_activity_ledger rows for the owning profile in the export', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const ledgerRow = {
+      id: 'ledger-1',
+      profileId: 'p1',
+      actorJob: 'mentor',
+      kind: 'session_recap',
+      templateKey: 'recap.v1',
+      params: { score: 42 },
+      visibility: 'self',
+      createdAt: NOW,
+      surfacedAt: null,
+    };
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      mentorActivityLedger: [ledgerRow],
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    expect(result.mentorActivityLedger).toHaveLength(1);
+    const exported = (
+      result.mentorActivityLedger as Record<string, unknown>[]
+    )[0]!;
+    expect(exported['id']).toBe('ledger-1');
+    expect(exported['profileId']).toBe('p1');
+    expect(exported['templateKey']).toBe('recap.v1');
+    // Date serialisation: createdAt must be an ISO string, not a Date object
+    expect(typeof exported['createdAt']).toBe('string');
+    expect(exported['createdAt']).toBe('2025-01-15T10:00:00.000Z');
+  });
+
+  it('[WI-679] passes a where clause to mentor_activity_ledger findMany (proves profile scoping)', async () => {
+    // createMockDb ignores where args — it always returns the seeded rows.
+    // What we prove: the service passes a non-undefined where argument to
+    // findMany, meaning profile scoping is wired.  A service that dropped
+    // inArray(...profileIds) would pass `undefined` and this assertion
+    // would catch it.
+    //
+    // Complementary proof (see test below): when profileIds is empty the
+    // service must NOT call findMany at all — the early-return guard is
+    // the second half of the scoping proof.
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const ledgerRow = {
+      id: 'ledger-own',
+      profileId: 'p1',
+      actorJob: 'mentor',
+      kind: 'session_recap',
+      templateKey: 'recap.v1',
+      params: {},
+      visibility: 'self',
+      createdAt: NOW,
+      surfacedAt: null,
+    };
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      mentorActivityLedger: [ledgerRow],
+    });
+
+    await generateExport(db, 'account-1');
+
+    const mockDb = db as unknown as {
+      query: {
+        mentorActivityLedger: { findMany: jest.Mock };
+      };
+    };
+    expect(mockDb.query.mentorActivityLedger.findMany).toHaveBeenCalledTimes(1);
+    // The call must include a where argument — undefined means no scoping.
+    const callArgs = mockDb.query.mentorActivityLedger.findMany.mock
+      .calls[0]![0] as { where?: unknown } | undefined;
+    expect(callArgs).toBeDefined();
+    expect(callArgs!.where).toBeDefined();
+  });
+
+  it('[WI-679] skips mentor_activity_ledger query when account has no profiles', async () => {
+    // When profileIds is empty the service must NOT call findMany at all.
+    // The inArray guard short-circuits to [] without touching the DB.
+    // If the where guard were missing, the service would call findMany
+    // unconditionally and return every row in the table.
+    const db = createMockDb({ profiles: [], consents: [] });
+
+    await generateExport(db, 'brand-new-account');
+
+    const mockDb = db as unknown as {
+      query: {
+        mentorActivityLedger: { findMany: jest.Mock };
+      };
+    };
+    expect(mockDb.query.mentorActivityLedger.findMany).not.toHaveBeenCalled();
   });
 });

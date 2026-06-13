@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Access label:** Study-only  
 > **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/(app)/quiz/history.tsx`, `apps/mobile/src/app/(app)/quiz/[roundId].tsx`, `apps/mobile/src/app/(app)/quiz/index.tsx`, `apps/mobile/src/hooks/use-quiz.ts`, `apps/mobile/src/app/(app)/practice/index.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/report/[reportId].tsx`
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/(app)/quiz/history.tsx`, `apps/mobile/src/app/(app)/quiz/[roundId].tsx`, `apps/mobile/src/app/(app)/quiz/index.tsx`, `apps/mobile/src/app/(app)/practice/index.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/report/[reportId].tsx`
 
 ## Purpose
 
@@ -61,7 +61,7 @@ Quiz history belongs to the learner quiz system and is scoped to the active prof
 | --- | --- |
 | Web preview | Verify `/quiz/history` top inset, Today/Yesterday grouping, empty state, and back targets; verify detail back fallback from direct deep link. |
 | Native/emulator | `e2e/flows/quiz/quiz-full-flow.yaml` covers quiz index -> launch -> play -> results; audit says QUIZ-09 grouping and empty state remain partial coverage. |
-| API/unit tests | `apps/mobile/src/app/(app)/quiz/history.test.tsx`, `[roundId].test.tsx`, and `use-quiz.test.ts` cover current client behavior. Add Family contract tests to ensure quiz/history is not surfaced in Family. |
+| API/unit tests | `apps/mobile/src/app/(app)/quiz/history.test.tsx` and `[roundId].test.tsx` cover current client behavior. Add Family contract tests to ensure quiz/history is not surfaced in Family. |
 
 ## Known Bugs And Drift
 

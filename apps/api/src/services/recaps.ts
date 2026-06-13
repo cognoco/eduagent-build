@@ -1,8 +1,10 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import {
+  curriculumBooks,
   curriculumTopics,
   sessionSummaries,
+  subjects,
   type Database,
 } from '@eduagent/database';
 import type { RecapListItem } from '@eduagent/schemas';
@@ -81,14 +83,36 @@ async function loadNextTopicMap(
   }
 
   const nextTopic = alias(curriculumTopics, 'recap_next_topic');
+  const nextBook = alias(curriculumBooks, 'recap_next_book');
+  const nextSubject = alias(subjects, 'recap_next_subject');
+  // [DATA-INTEGRITY] Re-anchor ownership of the resolved next-topic title
+  // through the curriculum_topics → curriculum_books → subjects parent chain,
+  // constraining subjects.profileId to the SAME summary's profileId. Without
+  // this the title is pulled from whatever topic `next_topic_id` points at,
+  // regardless of owner — so a corrupt/cross-profile next_topic_id would render
+  // a foreign topic title on a parent's recap card. The joins are LEFT so a
+  // null/unowned next_topic_id simply yields a null title (the existing
+  // "no coming-up topic" state) rather than dropping the recap row.
   const rows = await db
     .select({
       sessionId: sessionSummaries.sessionId,
       nextTopicTitle: nextTopic.title,
+      // ownedSubjectId is non-null only when the owned parent chain resolved
+      // (subjects.profileId === the summary's profileId). The title is gated on
+      // this so a foreign/corrupt next_topic_id never surfaces its title.
+      ownedSubjectId: nextSubject.id,
       nextTopicReason: sessionSummaries.nextTopicReason,
     })
     .from(sessionSummaries)
     .leftJoin(nextTopic, eq(sessionSummaries.nextTopicId, nextTopic.id))
+    .leftJoin(nextBook, eq(nextBook.id, nextTopic.bookId))
+    .leftJoin(
+      nextSubject,
+      and(
+        eq(nextSubject.id, nextBook.subjectId),
+        eq(nextSubject.profileId, sessionSummaries.profileId),
+      ),
+    )
     .where(
       and(
         inArray(sessionSummaries.profileId, childProfileIds),
@@ -100,7 +124,11 @@ async function loadNextTopicMap(
     rows.map((row) => [
       row.sessionId,
       {
-        nextTopicTitle: row.nextTopicTitle ?? null,
+        // Only expose the title when ownership re-anchored through the parent
+        // chain; otherwise treat as "no coming-up topic".
+        nextTopicTitle: row.ownedSubjectId
+          ? (row.nextTopicTitle ?? null)
+          : null,
         nextTopicReason: row.nextTopicReason ?? null,
       },
     ]),

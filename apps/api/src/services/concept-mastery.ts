@@ -53,7 +53,6 @@ export async function getConceptMasterySignalsForTopics(
 
   for (const row of masteryRows) {
     const signal = signals.get(row.topicId) ?? emptySignal();
-    signal.hasTutorAddition ||= row.status !== 'solid';
     signals.set(row.topicId, signal);
     conceptCounts.set(row.topicId, (conceptCounts.get(row.topicId) ?? 0) + 1);
     if (row.status === 'solid') {
@@ -86,6 +85,15 @@ export async function getConceptMasterySignalsForTopics(
     const signal = signals.get(row.topicId);
     if (!signal || signal.tutorAdditions.includes(row.correction)) continue;
     signal.tutorAdditions.push(row.correction);
+  }
+
+  // Derive `hasTutorAddition` from the actual renderable corrections, not from
+  // "has a non-solid concept". A non-solid concept with no matching correction
+  // row would otherwise set the flag true while `tutorAdditions` stays empty,
+  // so a consumer that expands the additions list on the flag would render an
+  // empty affordance. The boolean now means exactly "there is something to show".
+  for (const signal of signals.values()) {
+    signal.hasTutorAddition = signal.tutorAdditions.length > 0;
   }
 
   return signals;

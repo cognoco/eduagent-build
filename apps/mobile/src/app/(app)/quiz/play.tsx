@@ -78,14 +78,8 @@ export default function QuizPlayScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const {
-    round,
-    activityType,
-    returnTo,
-    setPrefetchedRoundId,
-    setRound,
-    setCompletionResult,
-  } = useQuizFlow();
+  const { round, activityType, returnTo, setRound, setCompletionResult } =
+    useQuizFlow();
   const exitHref = returnTo
     ? homeHrefForReturnTo(returnTo)
     : ('/(app)/quiz' as Href);
@@ -209,10 +203,9 @@ export default function QuizPlayScreen(): React.ReactElement {
     return () => {
       if (!clearRoundAfterExitRef.current) return;
       setRound(null);
-      setPrefetchedRoundId(null);
       setCompletionResult(null);
     };
-  }, [setCompletionResult, setPrefetchedRoundId, setRound]);
+  }, [setCompletionResult, setRound]);
 
   // [CR-1] Callback for server-side answer checking, declared before the
   // early return so the rules-of-hooks invariant is satisfied.

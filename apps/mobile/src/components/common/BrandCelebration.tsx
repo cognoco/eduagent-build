@@ -3,6 +3,9 @@ import { StyleSheet } from 'react-native';
 import Svg, {
   Path,
   Circle,
+  Ellipse,
+  Rect,
+  G,
   Defs,
   LinearGradient,
   Stop,
@@ -20,42 +23,43 @@ import Animated, {
   runOnJS,
   useReducedMotion,
 } from 'react-native-reanimated';
+import { MASCOT_COLORS, MASCOT_BADGE } from './mentor-mascot-geometry';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+const AnimatedG = Animated.createAnimatedComponent(G);
 
-const PATH_LEN = 150;
-
-// Brand colors — use the brighter dark-mode variants for maximum pop
+// Brand colors — mascot palette + spark tints from the previous logo burst
 const C = {
-  violet: '#8b5cf6',
-  teal: '#14b8a6',
-  pink: '#f9a8d4',
-  ltViolet: '#c4b5fd',
-  mint: '#99f6e4',
-  lavender: '#f3e8ff',
-  ltMint: '#ccfbf1',
+  ...MASCOT_COLORS,
   sparkPink: '#fce7f3',
   sparkViolet: '#ede9fe',
   sparkMint: '#d1fae5',
 } as const;
 
+const HEAD = MASCOT_BADGE.head;
+const SKIRT = MASCOT_BADGE.skirt;
+const DOTS = MASCOT_BADGE.juggleDots;
+/** Dots launch from behind the head and spring up to their juggle spots. */
+const DOT_LAUNCH_CY = 55;
+
 type BrandCelebrationProps = {
   /** Diameter of the animation area (default 120) */
   size?: number;
-  /** Called when the animation completes (~700ms) */
+  /** Called when the animation completes (~750ms) */
   onComplete?: () => void;
   testID?: string;
 };
 
 /**
- * Brand-themed celebration animation.
+ * Brand-themed celebration animation — The Mentor mascot.
  *
- * The Mentomate logo icon performs a fast, explosive celebration:
- * student node pops → path zips → dots explode with sparks →
- * mentor node slams in → achievement ring flashes → happy bounce.
+ * The mentor octopus performs a fast, punchy celebration in the compact
+ * badge pose (geometry: mentor-mascot-geometry.ts): the teal dot POPS in →
+ * arms spring out → the beanie drops on → eyes blink open → the three
+ * milestone dots launch into a juggle with sparks → happy bounce.
  *
- * ~700ms total. Designed to be addictively satisfying.
+ * ~750ms total. Designed to be addictively satisfying.
  */
 export function BrandCelebration({
   size = 120,
@@ -65,36 +69,40 @@ export function BrandCelebration({
   const reduceMotion = useReducedMotion();
 
   // --- Shared values ---
-  const pathDraw = useSharedValue(0);
-  const studentR = useSharedValue(0);
-  const studentInR = useSharedValue(0);
-  const dot1R = useSharedValue(0);
-  const dot2R = useSharedValue(0);
-  const dot3R = useSharedValue(0);
+  const bodyR = useSharedValue(0); // head radius (the teal dot popping in)
+  const skirtP = useSharedValue(0); // skirt grow progress 0→1
+  const armsOp = useSharedValue(0); // arm group opacity
+  const beanieP = useSharedValue(0); // beanie drop progress 0→1
+  const faceOp = useSharedValue(0); // eyes + smirk group opacity (blink)
+  const dot1P = useSharedValue(0); // juggle dot launch progress 0→1
+  const dot2P = useSharedValue(0);
+  const dot3P = useSharedValue(0);
   const spark1 = useSharedValue(0);
   const spark2 = useSharedValue(0);
   const spark3 = useSharedValue(0);
-  const mentorR = useSharedValue(0);
-  const mentorInR = useSharedValue(0);
-  const ringOp = useSharedValue(0);
-  const happyBounce = useSharedValue(1);
+  const bounce = useSharedValue(1); // whole-mascot happy bounce
   const containerOp = useSharedValue(1);
 
   const done = useCallback(() => onComplete?.(), [onComplete]);
+
+  const jumpToFinal = useCallback(() => {
+    bodyR.value = HEAD.r;
+    skirtP.value = 1;
+    armsOp.value = 1;
+    beanieP.value = 1;
+    faceOp.value = 1;
+    dot1P.value = 1;
+    dot2P.value = 1;
+    dot3P.value = 1;
+    bounce.value = 1;
+    // Sparks stay at 0 — they are transient particles, invisible at rest.
+  }, [bodyR, skirtP, armsOp, beanieP, faceOp, dot1P, dot2P, dot3P, bounce]);
 
   useEffect(() => {
     // Accessibility: skip animation entirely
     if (reduceMotion) {
       containerOp.value = 1;
-      studentR.value = 15;
-      studentInR.value = 6.5;
-      dot1R.value = 4;
-      dot2R.value = 5;
-      dot3R.value = 6;
-      mentorR.value = 17;
-      mentorInR.value = 7;
-      ringOp.value = 0.18;
-      pathDraw.value = 1;
+      jumpToFinal();
       done();
       return;
     }
@@ -106,62 +114,58 @@ export function BrandCelebration({
     // Easing.out(Easing.cubic) equivalent — avoids jest mock gaps
     const sparkEase = Easing.bezier(0.33, 1, 0.68, 1);
 
-    // 0ms — Student node POPS
-    studentR.value = withSpring(15, pop);
-    studentInR.value = withDelay(30, withSpring(6.5, pop));
+    // 0ms — The teal dot POPS in (the mentor node, becoming a head)
+    bodyR.value = withSpring(HEAD.r, slam);
+    skirtP.value = withDelay(40, withSpring(1, pop));
 
-    // 50ms — Path ZIPS across
-    pathDraw.value = withDelay(
-      50,
-      withTiming(1, { duration: 250, easing: Easing.bezier(0.22, 1, 0.36, 1) }),
+    // 120ms — Arms spring out
+    armsOp.value = withDelay(
+      120,
+      withTiming(1, { duration: 120, easing: sparkEase }),
     );
 
-    // 100ms — Dot 1 (pink) EXPLODES
-    dot1R.value = withDelay(100, withSpring(4, slam));
-    spark1.value = withDelay(
-      100,
-      withTiming(1, { duration: 350, easing: sparkEase }),
-    );
+    // 180ms — The beanie drops on (the personality arrives)
+    beanieP.value = withDelay(180, withSpring(1, pop));
 
-    // 150ms — Dot 2 (violet) EXPLODES
-    dot2R.value = withDelay(150, withSpring(5, slam));
-    spark2.value = withDelay(
-      150,
-      withTiming(1, { duration: 350, easing: sparkEase }),
-    );
-
-    // 200ms — Dot 3 (mint) EXPLODES
-    dot3R.value = withDelay(200, withSpring(6, slam));
-    spark3.value = withDelay(
-      200,
-      withTiming(1, { duration: 350, easing: sparkEase }),
-    );
-
-    // 250ms — Mentor node SLAMS in
-    mentorR.value = withDelay(250, withSpring(17, slam));
-    mentorInR.value = withDelay(280, withSpring(7, pop));
-
-    // 300ms — Achievement ring FLASH
-    ringOp.value = withDelay(
-      300,
+    // 260ms — Eyes blink open, smirk settles
+    faceOp.value = withDelay(
+      260,
       withSequence(
-        withTiming(0.6, { duration: 100 }),
-        withTiming(0.18, { duration: 250 }),
+        withTiming(1, { duration: 60 }),
+        withTiming(0.2, { duration: 50 }),
+        withTiming(1, { duration: 80 }),
       ),
     );
 
-    // 400ms — Happy bounce (both nodes pulse)
-    happyBounce.value = withDelay(
-      400,
+    // 320/380/440ms — Milestone dots LAUNCH into the juggle, with sparks
+    dot1P.value = withDelay(320, withSpring(1, slam));
+    spark1.value = withDelay(
+      320,
+      withTiming(1, { duration: 350, easing: sparkEase }),
+    );
+    dot2P.value = withDelay(380, withSpring(1, slam));
+    spark2.value = withDelay(
+      380,
+      withTiming(1, { duration: 350, easing: sparkEase }),
+    );
+    dot3P.value = withDelay(440, withSpring(1, slam));
+    spark3.value = withDelay(
+      440,
+      withTiming(1, { duration: 350, easing: sparkEase }),
+    );
+
+    // 520ms — Happy bounce (the whole mascot pulses)
+    bounce.value = withDelay(
+      520,
       withSequence(
         withTiming(0.92, { duration: 80 }),
         withSpring(1, { damping: 6, stiffness: 300 }),
       ),
     );
 
-    // 700ms — Done
+    // 750ms — Done
     containerOp.value = withDelay(
-      700,
+      750,
       withTiming(1, { duration: 1 }, (finished) => {
         if (finished) runOnJS(done)();
       }),
@@ -172,90 +176,67 @@ export function BrandCelebration({
   }, [
     done,
     reduceMotion,
+    jumpToFinal,
     containerOp,
-    dot1R,
-    dot2R,
-    dot3R,
-    happyBounce,
-    mentorInR,
-    mentorR,
-    pathDraw,
-    ringOp,
+    bodyR,
+    skirtP,
+    armsOp,
+    beanieP,
+    faceOp,
+    dot1P,
+    dot2P,
+    dot3P,
     spark1,
     spark2,
     spark3,
-    studentInR,
-    studentR,
+    bounce,
   ]);
 
-  // Fabric safety net: if AnimatedCircle prop updates didn't fire after 500ms
+  // Fabric safety net: if animated prop updates didn't fire after 500ms
   // (cold start, JS thread busy, Fabric native module init delay), jump to
   // final static state so the celebration is always visible. 500ms is generous
   // enough to avoid false positives on slow devices while still well within
-  // the 700ms animation window.
+  // the 750ms animation window.
   useEffect(() => {
     if (reduceMotion) return;
     const fallback = setTimeout(() => {
-      if (studentR.value < 0.1) {
-        studentR.value = 15;
-        studentInR.value = 6.5;
-        dot1R.value = 4;
-        dot2R.value = 5;
-        dot3R.value = 6;
-        mentorR.value = 17;
-        mentorInR.value = 7;
-        ringOp.value = 0.18;
-        pathDraw.value = 1;
-        happyBounce.value = 1;
+      if (bodyR.value < 0.1) {
+        jumpToFinal();
       }
     }, 500);
     return () => clearTimeout(fallback);
-  }, [
-    reduceMotion,
-    studentR,
-    studentInR,
-    dot1R,
-    dot2R,
-    dot3R,
-    mentorR,
-    mentorInR,
-    ringOp,
-    pathDraw,
-    happyBounce,
-  ]);
+  }, [reduceMotion, bodyR, jumpToFinal]);
 
   // Cancel all in-flight animations on unmount to prevent warnings and memory leaks.
   useEffect(() => {
     return () => {
-      cancelAnimation(pathDraw);
-      cancelAnimation(studentR);
-      cancelAnimation(studentInR);
-      cancelAnimation(dot1R);
-      cancelAnimation(dot2R);
-      cancelAnimation(dot3R);
+      cancelAnimation(bodyR);
+      cancelAnimation(skirtP);
+      cancelAnimation(armsOp);
+      cancelAnimation(beanieP);
+      cancelAnimation(faceOp);
+      cancelAnimation(dot1P);
+      cancelAnimation(dot2P);
+      cancelAnimation(dot3P);
       cancelAnimation(spark1);
       cancelAnimation(spark2);
       cancelAnimation(spark3);
-      cancelAnimation(mentorR);
-      cancelAnimation(mentorInR);
-      cancelAnimation(ringOp);
-      cancelAnimation(happyBounce);
+      cancelAnimation(bounce);
       cancelAnimation(containerOp);
     };
   }, [
-    pathDraw,
-    studentR,
-    studentInR,
-    dot1R,
-    dot2R,
-    dot3R,
+    bodyR,
+    skirtP,
+    armsOp,
+    beanieP,
+    faceOp,
+    dot1P,
+    dot2P,
+    dot3P,
     spark1,
     spark2,
     spark3,
-    mentorR,
-    mentorInR,
-    ringOp,
-    happyBounce,
+    bounce,
     containerOp,
   ]);
 
@@ -266,49 +247,57 @@ export function BrandCelebration({
   const R_FLOOR = 0.01;
   const OP_THRESH = 0.1;
 
-  const pathProps = useAnimatedProps(() => ({
-    strokeDashoffset: PATH_LEN * (1 - pathDraw.value),
-    opacity: Math.min(pathDraw.value * 10, 1),
+  const headProps = useAnimatedProps(() => ({
+    r: Math.max(bodyR.value, R_FLOOR),
+    opacity: bodyR.value < OP_THRESH ? 0 : Math.min(bodyR.value / 4, 1),
   }));
+  const skirtProps = useAnimatedProps(() => ({
+    rx: Math.max(SKIRT.rx * skirtP.value, R_FLOOR),
+    ry: Math.max(SKIRT.ry * skirtP.value, R_FLOOR),
+    opacity: skirtP.value < OP_THRESH ? 0 : Math.min(skirtP.value * 2, 1),
+  }));
+  const armsProps = useAnimatedProps(() => ({ opacity: armsOp.value }));
+  const beanieProps = useAnimatedProps(() => {
+    const p = beanieP.value;
+    return {
+      // Drops in from above; spring overshoot squashes it slightly past rest.
+      y: -34 * (1 - p),
+      opacity: p < OP_THRESH ? 0 : Math.min(p * 3, 1),
+    };
+  });
+  const faceProps = useAnimatedProps(() => ({ opacity: faceOp.value }));
 
-  const studentOutProps = useAnimatedProps(() => ({
-    r: Math.max(studentR.value * happyBounce.value, R_FLOOR),
-    opacity: studentR.value < OP_THRESH ? 0 : Math.min(studentR.value / 2, 1),
-  }));
-  const studentInProps = useAnimatedProps(() => ({
-    r: Math.max(studentInR.value * happyBounce.value, R_FLOOR),
-    opacity: studentInR.value < OP_THRESH ? 0 : Math.min(studentInR.value, 1),
-  }));
-  const mentorOutProps = useAnimatedProps(() => ({
-    r: Math.max(mentorR.value * happyBounce.value, R_FLOOR),
-    opacity: mentorR.value < OP_THRESH ? 0 : Math.min(mentorR.value / 2, 1),
-  }));
-  const mentorInProps = useAnimatedProps(() => ({
-    r: Math.max(mentorInR.value * happyBounce.value, R_FLOOR),
-    opacity: mentorInR.value < OP_THRESH ? 0 : Math.min(mentorInR.value, 1),
-  }));
-  const ringProps = useAnimatedProps(() => ({ opacity: ringOp.value }));
+  const dot1Props = useAnimatedProps(() => {
+    const t = dot1P.value;
+    return {
+      cy: DOT_LAUNCH_CY - (DOT_LAUNCH_CY - DOTS[0].cy) * t,
+      r: Math.max(DOTS[0].r * Math.min(t * 2, 1), R_FLOOR),
+      opacity: t < OP_THRESH ? 0 : Math.min(t * 2, 1),
+    };
+  });
+  const dot2Props = useAnimatedProps(() => {
+    const t = dot2P.value;
+    return {
+      cy: DOT_LAUNCH_CY - (DOT_LAUNCH_CY - DOTS[1].cy) * t,
+      r: Math.max(DOTS[1].r * Math.min(t * 2, 1), R_FLOOR),
+      opacity: t < OP_THRESH ? 0 : Math.min(t * 2, 1),
+    };
+  });
+  const dot3Props = useAnimatedProps(() => {
+    const t = dot3P.value;
+    return {
+      cy: DOT_LAUNCH_CY - (DOT_LAUNCH_CY - DOTS[2].cy) * t,
+      r: Math.max(DOTS[2].r * Math.min(t * 2, 1), R_FLOOR),
+      opacity: t < OP_THRESH ? 0 : Math.min(t * 2, 1),
+    };
+  });
 
-  const dot1Props = useAnimatedProps(() => ({
-    r: Math.max(dot1R.value, R_FLOOR),
-    opacity: dot1R.value < OP_THRESH ? 0 : Math.min(dot1R.value / 4, 1) * 0.6,
-  }));
-  const dot2Props = useAnimatedProps(() => ({
-    r: Math.max(dot2R.value, R_FLOOR),
-    opacity: dot2R.value < OP_THRESH ? 0 : Math.min(dot2R.value / 5, 1) * 0.65,
-  }));
-  const dot3Props = useAnimatedProps(() => ({
-    r: Math.max(dot3R.value, R_FLOOR),
-    opacity: dot3R.value < OP_THRESH ? 0 : Math.min(dot3R.value / 6, 1) * 0.7,
-  }));
-
-  // --- Spark particles (3 per dot, varied directions) ---
-  // Dot 1 sparks (pink, center 33,73)
+  // --- Spark particles (2 per dot, varied directions) ---
   const s1a = useAnimatedProps(() => {
     const t = spark1.value;
     return {
-      cx: 33 - 12 * t,
-      cy: 73 - 12 * t,
+      cx: DOTS[0].cx - 12 * t,
+      cy: DOTS[0].cy - 10 * t,
       r: 2.5 * (1 - t * 0.6),
       opacity: 1 - t,
     };
@@ -316,28 +305,17 @@ export function BrandCelebration({
   const s1b = useAnimatedProps(() => {
     const t = spark1.value;
     return {
-      cx: 33 + 14 * t,
-      cy: 73 - 6 * t,
+      cx: DOTS[0].cx + 10 * t,
+      cy: DOTS[0].cy - 13 * t,
       r: 2 * (1 - t * 0.6),
       opacity: 1 - t,
     };
   });
-  const s1c = useAnimatedProps(() => {
-    const t = spark1.value;
-    return {
-      cx: 33 - 4 * t,
-      cy: 73 + 14 * t,
-      r: 1.5 * (1 - t * 0.6),
-      opacity: 1 - t,
-    };
-  });
-
-  // Dot 2 sparks (violet, center 60,55)
   const s2a = useAnimatedProps(() => {
     const t = spark2.value;
     return {
-      cx: 60 + 12 * t,
-      cy: 55 - 14 * t,
+      cx: DOTS[1].cx - 11 * t,
+      cy: DOTS[1].cy - 12 * t,
       r: 2.5 * (1 - t * 0.6),
       opacity: 1 - t,
     };
@@ -345,28 +323,17 @@ export function BrandCelebration({
   const s2b = useAnimatedProps(() => {
     const t = spark2.value;
     return {
-      cx: 60 - 14 * t,
-      cy: 55 - 8 * t,
+      cx: DOTS[1].cx + 13 * t,
+      cy: DOTS[1].cy - 9 * t,
       r: 2 * (1 - t * 0.6),
       opacity: 1 - t,
     };
   });
-  const s2c = useAnimatedProps(() => {
-    const t = spark2.value;
-    return {
-      cx: 60 + 6 * t,
-      cy: 55 + 12 * t,
-      r: 1.5 * (1 - t * 0.6),
-      opacity: 1 - t,
-    };
-  });
-
-  // Dot 3 sparks (mint, center 88,37)
   const s3a = useAnimatedProps(() => {
     const t = spark3.value;
     return {
-      cx: 88 + 14 * t,
-      cy: 37 - 10 * t,
+      cx: DOTS[2].cx + 12 * t,
+      cy: DOTS[2].cy - 11 * t,
       r: 2.5 * (1 - t * 0.6),
       opacity: 1 - t,
     };
@@ -374,25 +341,19 @@ export function BrandCelebration({
   const s3b = useAnimatedProps(() => {
     const t = spark3.value;
     return {
-      cx: 88 - 12 * t,
-      cy: 37 - 12 * t,
+      cx: DOTS[2].cx - 9 * t,
+      cy: DOTS[2].cy + 12 * t,
       r: 2 * (1 - t * 0.6),
-      opacity: 1 - t,
-    };
-  });
-  const s3c = useAnimatedProps(() => {
-    const t = spark3.value;
-    return {
-      cx: 88 + 2 * t,
-      cy: 37 + 15 * t,
-      r: 1.5 * (1 - t * 0.6),
       opacity: 1 - t,
     };
   });
 
   const containerStyle = useAnimatedStyle(() => ({
     opacity: containerOp.value,
+    transform: [{ scale: bounce.value }],
   }));
+
+  const g = MASCOT_BADGE;
 
   return (
     <Animated.View
@@ -402,94 +363,128 @@ export function BrandCelebration({
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Svg width={size} height={size} viewBox="-5 -15 130 130">
+      <Svg width={size} height={size} viewBox={g.viewBox}>
         <Defs>
-          <LinearGradient id="cel-arc" x1="0" y1="1" x2="1" y2="0">
-            <Stop offset="0%" stopColor={C.ltViolet} />
-            <Stop offset="100%" stopColor={C.mint} />
+          <LinearGradient
+            id="cel-mascot-body"
+            x1="0"
+            y1={g.gradient.y1}
+            x2="0"
+            y2={g.gradient.y2}
+            gradientUnits="userSpaceOnUse"
+          >
+            <Stop offset="0%" stopColor={C.tealBright} />
+            <Stop offset="100%" stopColor={C.tealDeep} />
           </LinearGradient>
         </Defs>
 
-        {/* Growth arc — zips fast */}
-        <AnimatedPath
-          d="M20,100 C20,55 100,55 100,10"
-          fill="none"
-          stroke="url(#cel-arc)"
-          strokeWidth={4}
-          strokeLinecap="round"
-          strokeDasharray={`${PATH_LEN}`}
-          animatedProps={pathProps}
-        />
-
-        {/* Spark particles (behind dots) */}
+        {/* Spark particles (behind everything) */}
         <AnimatedCircle fill={C.sparkPink} animatedProps={s1a} />
         <AnimatedCircle fill={C.sparkPink} animatedProps={s1b} />
-        <AnimatedCircle fill={C.sparkPink} animatedProps={s1c} />
         <AnimatedCircle fill={C.sparkViolet} animatedProps={s2a} />
         <AnimatedCircle fill={C.sparkViolet} animatedProps={s2b} />
-        <AnimatedCircle fill={C.sparkViolet} animatedProps={s2c} />
         <AnimatedCircle fill={C.sparkMint} animatedProps={s3a} />
         <AnimatedCircle fill={C.sparkMint} animatedProps={s3b} />
-        <AnimatedCircle fill={C.sparkMint} animatedProps={s3c} />
 
-        {/* Stepping stones — EXPLODE with massive overshoot */}
+        {/* Milestone dots — LAUNCH into the juggle */}
         <AnimatedCircle
-          cx={33}
-          cy={73}
-          fill={C.pink}
+          cx={DOTS[0].cx}
+          fill={DOTS[0].fill}
           animatedProps={dot1Props}
         />
         <AnimatedCircle
-          cx={60}
-          cy={55}
-          fill={C.ltViolet}
+          cx={DOTS[1].cx}
+          fill={DOTS[1].fill}
           animatedProps={dot2Props}
         />
         <AnimatedCircle
-          cx={88}
-          cy={37}
-          fill={C.mint}
+          cx={DOTS[2].cx}
+          fill={DOTS[2].fill}
           animatedProps={dot3Props}
         />
 
-        {/* Student node */}
+        {/* Arms spring out (under the body) */}
+        <AnimatedG animatedProps={armsProps}>
+          {g.arms.map((arm) => (
+            <Path key={arm.d} d={arm.d} fill={arm.fill} />
+          ))}
+        </AnimatedG>
+
+        {/* Body: the teal dot pops into a head; skirt grows under it */}
         <AnimatedCircle
-          cx={20}
-          cy={100}
-          fill={C.violet}
-          animatedProps={studentOutProps}
+          cx={HEAD.cx}
+          cy={HEAD.cy}
+          fill="url(#cel-mascot-body)"
+          animatedProps={headProps}
         />
-        <AnimatedCircle
-          cx={20}
-          cy={100}
-          fill={C.lavender}
-          animatedProps={studentInProps}
+        <AnimatedEllipse
+          cx={SKIRT.cx}
+          cy={SKIRT.cy}
+          fill="url(#cel-mascot-body)"
+          animatedProps={skirtProps}
         />
 
-        {/* Achievement ring FLASH */}
-        <AnimatedCircle
-          cx={100}
-          cy={10}
-          r={22}
-          fill="none"
-          stroke={C.teal}
-          strokeWidth={2}
-          animatedProps={ringProps}
-        />
+        {/* The beanie drops on */}
+        <AnimatedG animatedProps={beanieProps}>
+          <Path d={g.beanie.dome} fill={C.beanie} />
+          <Rect
+            x={g.beanie.band.x}
+            y={g.beanie.band.y}
+            width={g.beanie.band.width}
+            height={g.beanie.band.height}
+            rx={g.beanie.band.rx}
+            fill={C.beanieBand}
+          />
+        </AnimatedG>
 
-        {/* Mentor node */}
-        <AnimatedCircle
-          cx={100}
-          cy={10}
-          fill={C.teal}
-          animatedProps={mentorOutProps}
-        />
-        <AnimatedCircle
-          cx={100}
-          cy={10}
-          fill={C.ltMint}
-          animatedProps={mentorInProps}
-        />
+        {/* Face blinks open */}
+        <AnimatedG animatedProps={faceProps}>
+          <Circle
+            cx={g.eyes.left.cx}
+            cy={g.eyes.cy}
+            r={g.eyes.r}
+            fill={C.white}
+          />
+          <Circle
+            cx={g.eyes.left.cx}
+            cy={g.eyes.pupilCy}
+            r={g.eyes.pupilR}
+            fill={C.navy}
+          />
+          <Path d={g.eyes.left.lid} fill="url(#cel-mascot-body)" />
+          <Path
+            d={g.eyes.left.crease}
+            stroke={C.crease}
+            strokeWidth={g.eyes.creaseWidth}
+            strokeLinecap="round"
+          />
+          <Circle
+            cx={g.eyes.right.cx}
+            cy={g.eyes.cy}
+            r={g.eyes.r}
+            fill={C.white}
+          />
+          <Circle
+            cx={g.eyes.right.cx}
+            cy={g.eyes.pupilCy}
+            r={g.eyes.pupilR}
+            fill={C.navy}
+          />
+          <Path d={g.eyes.right.lid} fill="url(#cel-mascot-body)" />
+          <Path
+            d={g.eyes.right.crease}
+            stroke={C.crease}
+            strokeWidth={g.eyes.creaseWidth}
+            strokeLinecap="round"
+          />
+          <Path
+            d={g.smirk.d}
+            fill="none"
+            stroke={C.navy}
+            strokeWidth={g.smirk.width}
+            strokeLinecap="round"
+          />
+        </AnimatedG>
       </Svg>
     </Animated.View>
   );

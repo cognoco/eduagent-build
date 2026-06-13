@@ -16,7 +16,7 @@ import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
 interface ToggleCollectionInput {
-  childProfileId?: string;
+  childProfileId: string;
   memoryCollectionEnabled: boolean;
 }
 
@@ -167,28 +167,23 @@ export function useToggleMemoryCollection(): UseMutationResult<
 > {
   const client = useApiClient();
   const qc = useQueryClient();
-  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (input) => {
-      const res = input.childProfileId
-        ? await client['learner-profile'][':profileId'].collection.$patch({
-            param: { profileId: input.childProfileId },
-            json: {
-              memoryCollectionEnabled: input.memoryCollectionEnabled,
-            },
-          })
-        : await client['learner-profile'].collection.$patch({
-            json: {
-              memoryCollectionEnabled: input.memoryCollectionEnabled,
-            },
-          });
+      const res = await client['learner-profile'][
+        ':profileId'
+      ].collection.$patch({
+        param: { profileId: input.childProfileId },
+        json: {
+          memoryCollectionEnabled: input.memoryCollectionEnabled,
+        },
+      });
       await assertOk(res);
       return (await res.json()) as { success: boolean };
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
-        queryKey: learnerProfileKey(vars.childProfileId ?? activeProfile?.id),
+        queryKey: learnerProfileKey(vars.childProfileId),
       });
     },
   });

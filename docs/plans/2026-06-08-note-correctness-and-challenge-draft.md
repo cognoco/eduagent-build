@@ -17,6 +17,11 @@ status: parked
 > step here follows the 0107 posture — `db:push:dev` / author into the baseline at
 > reset — **never generate a numbered migration into the pre-reset chain.** See
 > `docs/canon/identity/data-model.md §1` and `docs/adr/MMT-ADR-0012`.
+>
+> **Boundary with freeform Ask Anything:** this plan is topic-bound. It covers
+> `topic_notes` and Challenge-Round-derived notes for sessions that already have a
+> real `topicId`. It does not amend `MMT-ADR-0021`: freeform Ask Anything still
+> has no Challenge Round and no learner-note flow.
 
 **Goal:** Give a `learner-note` at most one provenance mark — a **green checkmark**
 when the mentor grades the learner's hand-typed note text correct (model A), or a

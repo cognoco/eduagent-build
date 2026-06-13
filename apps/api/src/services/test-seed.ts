@@ -54,12 +54,11 @@ import { getTierConfig } from './subscription';
 /** Prefix used for all seed-created Clerk user IDs */
 export const SEED_CLERK_PREFIX = 'clerk_seed_';
 
-/** Default test password for all seed-created Clerk users.
- * Read from SEED_PASSWORD env var when available, falling back to a hardcoded default.
- * Must NOT appear in HaveIBeenPwned — Clerk blocks sign-in for breached passwords.
- * Avoid special characters (!, -, etc.) — they may cause encoding issues in Clerk's
- * Backend API user creation endpoint. */
-const DEFAULT_SEED_PASSWORD = 'Mentomate2026xK';
+// [M1 / config-secrets] Hardcoded default seed password removed. SEED_PASSWORD
+// must be supplied via env var (Doppler: stg/dev configs). Add to Doppler if
+// not already present. Absence throws at password-use time, not at module load,
+// so non-Clerk paths (unit tests with no Clerk key) also fail fast if the env
+// var is missing.
 
 /** Clerk REST API base URL */
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
@@ -157,7 +156,8 @@ export type SeedScenario =
 export interface SeedEnv {
   /** Clerk secret key for Backend API calls. Optional — falls back to fake IDs. */
   CLERK_SECRET_KEY?: string;
-  /** Override seed password via env. Falls back to DEFAULT_SEED_PASSWORD. */
+  /** Password for seed-created Clerk users. Required — no hardcoded fallback.
+   * Set via SEED_PASSWORD in Doppler (stg/dev). */
   SEED_PASSWORD?: string;
 }
 
@@ -250,14 +250,25 @@ async function createClerkTestUser(
   email: string,
   env: SeedEnv,
 ): Promise<{ clerkUserId: string; password: string }> {
-  const password = env.SEED_PASSWORD ?? DEFAULT_SEED_PASSWORD;
-
   if (!env.CLERK_SECRET_KEY) {
-    // Fallback for environments without Clerk (unit tests, CI without secrets)
+    // Fallback for environments without Clerk (unit tests, CI without secrets).
+    // SEED_PASSWORD is not required in the no-Clerk path — a synthetic sentinel
+    // is returned so callers that only need clerkUserId + any non-empty password
+    // string still work without env-var setup.
     return {
       clerkUserId: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
-      password,
+      password: env.SEED_PASSWORD ?? '__test_no_clerk__',
     };
+  }
+
+  // [M1] SEED_PASSWORD must be set via env var (Doppler stg/dev) for real Clerk
+  // calls. No fallback — a committed default would leak a known credential for
+  // seed accounts.
+  const password = env.SEED_PASSWORD;
+  if (!password) {
+    throw new Error(
+      'SEED_PASSWORD env var is required for test seeding. Add it to Doppler (stg/dev configs).',
+    );
   }
 
   // Step 1: Check if user already exists (avoids 422 on duplicate email)

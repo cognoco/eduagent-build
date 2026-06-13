@@ -395,7 +395,12 @@ export const sessionCompleted = inngest.createFunction(
     // Freeform sessions (no topicId) and homework sessions trigger filing
     // as a separate async step; we give it up to 60 s to land.
     const isAbandoned = summaryStatus === 'auto_closed';
-    if ((sessionType === 'homework' || !topicId) && !isAbandoned) {
+    const eventMode = event.data.mode as string | undefined;
+    const shouldWaitForFiling =
+      (sessionType === 'homework' || !topicId) &&
+      !isAbandoned &&
+      eventMode !== 'recitation';
+    if (shouldWaitForFiling) {
       const filingEvent = await step.waitForEvent('wait-for-filing', {
         event: 'app/filing.completed',
         match: 'data.sessionId',

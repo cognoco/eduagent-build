@@ -32,10 +32,6 @@
     "term": "wrong"
   },
   {
-    "path": "dictation.textPreview.subtitleFromPhoto",
-    "term": "mistakes"
-  },
-  {
     "path": "errorBoundary.title",
     "term": "wrong"
   },
@@ -133,10 +129,6 @@
   },
   {
     "path": "topic.recallTest.errorTitle",
-    "term": "wrong"
-  },
-  {
-    "path": "vocabulary.deleteDialog.errorFallback",
     "term": "wrong"
   }
 ]

@@ -331,6 +331,21 @@ describe('validateEnv', () => {
     expect(env.MEMORY_FACTS_READ_ENABLED).toBe('true');
   });
 
+  it('MODE_NAV_V2_ENABLED defaults to "false" and parses "true"', () => {
+    const defaultEnv = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(defaultEnv.MODE_NAV_V2_ENABLED).toBe('false');
+
+    const enabledEnv = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      MODE_NAV_V2_ENABLED: 'true',
+    });
+    expect(enabledEnv.MODE_NAV_V2_ENABLED).toBe('true');
+  });
+
   it('MEMORY_FACTS_RELEVANCE_RETRIEVAL defaults to "false" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
@@ -590,6 +605,7 @@ describe('validateProductionBindings', () => {
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
     LLM_ROUTING_V2_ENABLED: 'false',
+    MODE_NAV_V2_ENABLED: 'false',
   };
 
   const fakeKv = {} as unknown;

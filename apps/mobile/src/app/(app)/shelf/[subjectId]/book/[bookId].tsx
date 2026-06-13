@@ -264,14 +264,10 @@ export default function BookScreen() {
   const params = useLocalSearchParams<{
     subjectId: string;
     bookId: string;
-    readOnly?: string;
-    autoStart?: string;
   }>();
   const subjectId = params.subjectId;
   const bookId = params.bookId;
-  const isReadOnly = params.readOnly === 'true';
   const resumeTargetQuery = useLearningResumeTarget({ subjectId, bookId });
-  const autoStart = params.autoStart;
 
   // --- Data queries (called unconditionally for rules-of-hooks) ---
   const bookQuery = useBookWithTopics(subjectId, bookId);
@@ -336,7 +332,7 @@ export default function BookScreen() {
 
   const deleteBookWithConfirmation = useCallback(
     async (confirmStartedTopics: boolean) => {
-      if (!subjectId || !bookId || isReadOnly) return;
+      if (!subjectId || !bookId) return;
       try {
         await deleteBookMutation.mutateAsync({ confirmStartedTopics });
         handleBookDeleted();
@@ -370,11 +366,11 @@ export default function BookScreen() {
         );
       }
     },
-    [bookId, deleteBookMutation, handleBookDeleted, isReadOnly, subjectId, t],
+    [bookId, deleteBookMutation, handleBookDeleted, subjectId, t],
   );
 
   const handleDeleteBookPress = useCallback(() => {
-    if (!subjectId || !bookId || isReadOnly || deleteBookMutation.isPending) {
+    if (!subjectId || !bookId || deleteBookMutation.isPending) {
       return;
     }
     platformAlert(
@@ -396,7 +392,6 @@ export default function BookScreen() {
     bookId,
     deleteBookMutation.isPending,
     deleteBookWithConfirmation,
-    isReadOnly,
     subjectId,
     t,
   ]);
@@ -900,7 +895,7 @@ export default function BookScreen() {
     activeTopics.length === 1 && !isBookComplete;
 
   useEffect(() => {
-    if (!shouldAutoExpandThinTopicList || isReadOnly || !bookId) return;
+    if (!shouldAutoExpandThinTopicList || !bookId) return;
     if (thinTopicExpansionAttemptedBookIds.current.has(bookId)) return;
     if (isExpandingThinTopicList || generateMutation.isPending) return;
 
@@ -911,7 +906,6 @@ export default function BookScreen() {
     generateMutation.isPending,
     handleExpandThinTopicList,
     isExpandingThinTopicList,
-    isReadOnly,
     shouldAutoExpandThinTopicList,
   ]);
 
@@ -1017,7 +1011,7 @@ export default function BookScreen() {
   // --- Long-press: context menu for moving topic to a different book ---
   const handleSessionLongPress = useCallback(
     (session: BookSession) => {
-      if (!subjectId || !bookId || isReadOnly) return;
+      if (!subjectId || !bookId) return;
       // BUG-418 class: Array.isArray guard — select is bypassed when enabled=false,
       // so data can be a wrapped object instead of an array. ?? [] only guards null/undefined.
       const safeAllBooks = Array.isArray(allBooksQuery.data)
@@ -1072,7 +1066,7 @@ export default function BookScreen() {
         { text: t('common.cancel'), style: 'cancel' },
       ]);
     },
-    [subjectId, bookId, isReadOnly, allBooksQuery.data, moveTopic, t],
+    [subjectId, bookId, allBooksQuery.data, moveTopic, t],
   );
 
   // --- Start learning: follow the status-first CTA priority ---
@@ -1312,27 +1306,6 @@ export default function BookScreen() {
     },
     [notes, deleteNoteById, t],
   );
-
-  // --- Auto-start session when navigated with autoStart=true (M-12) ---
-  const autoStartTriggered = useRef(false);
-  useEffect(() => {
-    if (
-      autoStart === 'true' &&
-      !autoStartTriggered.current &&
-      !needsGeneration &&
-      !generateMutation.isPending &&
-      topics.length > 0
-    ) {
-      autoStartTriggered.current = true;
-      handleStartLearning();
-    }
-  }, [
-    autoStart,
-    topics,
-    needsGeneration,
-    generateMutation.isPending,
-    handleStartLearning,
-  ]);
 
   // --- Screen states ---
 
@@ -1598,27 +1571,25 @@ export default function BookScreen() {
             <Ionicons name="arrow-back" size={24} color={themeColors.accent} />
           </Pressable>
           <View className="flex-1" />
-          {!isReadOnly ? (
-            <Pressable
-              onPress={handleDeleteBookPress}
-              disabled={deleteBookMutation.isPending}
-              className="p-2 me-1"
-              accessibilityRole="button"
-              accessibilityLabel={t('library.book.a11yDeleteBook')}
-              accessibilityState={{ disabled: deleteBookMutation.isPending }}
-              testID="book-delete-button"
-            >
-              <Ionicons
-                name="trash-outline"
-                size={22}
-                color={
-                  deleteBookMutation.isPending
-                    ? withOpacity(themeColors.danger, 0.45)
-                    : themeColors.danger
-                }
-              />
-            </Pressable>
-          ) : null}
+          <Pressable
+            onPress={handleDeleteBookPress}
+            disabled={deleteBookMutation.isPending}
+            className="p-2 me-1"
+            accessibilityRole="button"
+            accessibilityLabel={t('library.book.a11yDeleteBook')}
+            accessibilityState={{ disabled: deleteBookMutation.isPending }}
+            testID="book-delete-button"
+          >
+            <Ionicons
+              name="trash-outline"
+              size={22}
+              color={
+                deleteBookMutation.isPending
+                  ? withOpacity(themeColors.danger, 0.45)
+                  : themeColors.danger
+              }
+            />
+          </Pressable>
           <Pressable
             onPress={handleSubjectBookmarksPress}
             className="p-2 -me-2"
@@ -2141,7 +2112,7 @@ export default function BookScreen() {
       </ScrollView>
 
       {/* Sticky CTA - adapts to learner state */}
-      {activeTopics.length > 0 && !isReadOnly
+      {activeTopics.length > 0
         ? (() => {
             const hasStarted = visibleStartedTopicIds.length > 0;
             const newestStartedId = visibleStartedTopicIds[0];

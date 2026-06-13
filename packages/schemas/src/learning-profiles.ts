@@ -235,15 +235,6 @@ export const deleteMemoryItemSchema = z
   .strict();
 export type DeleteMemoryItemInput = z.infer<typeof deleteMemoryItemSchema>;
 
-export const toggleMemoryEnabledSchema = z
-  .object({
-    memoryEnabled: z.boolean(),
-  })
-  .strict();
-export type ToggleMemoryEnabledInput = z.infer<
-  typeof toggleMemoryEnabledSchema
->;
-
 export const toggleMemoryCollectionSchema = z
   .object({
     memoryCollectionEnabled: z.boolean(),

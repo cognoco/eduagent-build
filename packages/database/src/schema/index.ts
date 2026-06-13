@@ -1,4 +1,5 @@
 export * from './identity';
+export * from './activity-ledger';
 export * from './profiles';
 export * from './subjects';
 export * from './sessions';

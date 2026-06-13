@@ -48,6 +48,20 @@ esac
 # shellcheck disable=SC2086 # intentional word-splitting of the flag
 pnpm exec lint-staged $LINT_STAGED_CONCURRENCY
 
+# [Low / deps-supply-chain] Guard: fail fast when a mobile-only dep is added to
+# the root package.json. The NativeWind double-copy bug means this check must
+# fire at commit time, not only in CI. Instantaneous — runs before tsc.
+if git diff --cached --name-only | grep -q 'package\.json'; then
+  pnpm run check:root-deps || exit 1
+fi
+
+# [Low / deps-supply-chain] Guard: fail fast when a dependency's postinstall
+# script can read secrets from the environment. Protects against supply-chain
+# attacks via malicious postinstall hooks.
+if git diff --cached --name-only | grep -q 'package\.json'; then
+  pnpm run verify:postinstall-safety || exit 1
+fi
+
 # Cross-runtime sync: .claude/skills/ is generated from .agents/skills/. Use
 # --print-changed so we stage exactly the files this sync run touched, not
 # every working-tree edit under .claude/skills/. That distinction matters for

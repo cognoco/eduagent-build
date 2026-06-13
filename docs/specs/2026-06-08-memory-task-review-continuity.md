@@ -5,6 +5,7 @@
 **Grain decision inherited:** [MMT-ADR-0017](../adr/MMT-ADR-0017-concept-capture-additive-layer.md) — topic-grained spine stays topic-keyed; this slice is **additive** and reuses `retention_cards.topicId`. No new ADR required (every item below is additive and reversible; see Open Items).
 **Findings source:** [Review & Re-learn findings](./2026-06-03-review-relearn-findings-and-high-impact-todos.md) — this spec commits RR-1, RR-9, RR-10 and the RR-5 ordering rule; RR-13 is partially served by the opener.
 **Ratified strategy:** `project_review_is_mentoring_backbone.md` — review must *feel* like one mentoring relationship (continuity + memory), built FEEL → CORRECT → LOAD-BEARING.
+**End-user review:** 2026-06-08 — adversarial pass from the learner's seat; 7 findings (EU-1…EU-7) folded in below and collected in the End-User Findings Map at the end of this spec.
 
 ---
 
@@ -95,6 +96,8 @@ Constraints / indexes:
 
 **Why append-only and separate from `retention_cards`.** `retention_cards` holds *current* SM-2 state (one row per topic, rewritten each grade); `retrieval_events` holds the *history of attempts* (many rows per topic). This mirrors the `assessments`/`retention_cards` and the concept-capture `concepts`/`concept_mastery` identity-vs-state split, and is the data the eval harness and the opener both need.
 
+**[EU-3] Retention decision — this log must not silently outlive the transcript-retention promise.** `retrieval_events` is append-only with `answerEventId` deliberately FK-free "so it survives the day-37 event purge". The side effect is a never-purged, durable catalogue of a (frequently minor) learner's wrong answers and named misconceptions — outliving the 37-day transcript purge the product's retention posture advertises. That is a data-retention decision, not a free engineering convenience, and a privacy-conscious parent or regulator will read it as the retention promise being undercut by a parallel store. **Default resolution:** keep the numeric/structured signal the eval corpus actually needs (`quality`, `verdict`, `gradedBy`, `nextAction`, `llmRoutingRung`) indefinitely, but purge or redact the free-text PII columns — `promptText`, `learnerAnswer`, `misconception`, `rubricRationale` — on the same 37-day clock as `session_events` (a `redactedAt` column + the existing purge job). If product instead wants the full text retained, state the lawful basis and the parent-facing disclosure explicitly. Decide before the migration's final shape lands (Open Items) — a TTL/redaction column is cheaper to add now than to retrofit.
+
 ### No new table for tiers 1's other two items
 
 - **R1 (opener)** reads existing tables only — no schema change.
@@ -114,6 +117,12 @@ Constraints / indexes:
 The block instructs the tutor to open by **naming the specific prior understanding and asking whether it held**, warmly and low-stakes (never "test", never "you failed"; obeys `feedback_positive_framing_no_struggle`). It removes the "now switch to review mode" framing.
 
 **Honest degradation.** If neither recap nor a prior retrieval event exists (first-ever review of a topic), the opener falls back to today's calibration question — never fabricates a memory it doesn't have (invariant 6: confident-but-wrong is the one fatal failure).
+
+**[EU-1] Accuracy guard — quote verbatim, never paraphrase the learner into a claim.** Invariant 6 covers *absent* memory; it does not cover *distorted* memory, which is the likelier and more damaging failure here. `learnerRecap` is LLM-generated and can subtly misstate — or faithfully capture a *confused* — prior understanding. Therefore a first-person "you said / you worked out X" claim may only quote the learner's **verbatim** prior `learnerAnswer` (from the most-recent `retrieval_events` row), never a paraphrased recap bullet. When only a recap exists, the opener may *gesture* at the area ("last time we looked at photosynthesis") but must not put specific words in the learner's mouth. A confidently-wrong "you understood X" erodes mentor-trust faster than a cold open ever would — treat it as a fatal failure, not a cosmetic one. The opener prompt and the assembler must enforce the quote-vs-gesture split.
+
+**[EU-4] No false recency; no anchoring on a confused prior.** The assembly reads the most-recent non-null `learnerRecap` regardless of age or quality. (a) Do not assert "last week" unless the real interval supports it — compute elapsed time and either state it truthfully or drop the temporal claim. (b) Do not anchor on a prior the grader marked weak: if the latest `retrieval_events` verdict for the topic is `missing`/`misconception`, open in a fresh, low-stakes framing rather than re-asserting the muddle as the learner's "understanding".
+
+**[EU-2] Honor the memory-consent gate.** `learnerMemoryContext` (the `memory_facts` injection) is consent-gated. The continuity opener injects `learnerRecap` + `retrieval_events.learnerAnswer`, which are the same class of personal-memory recall. The opener MUST ride the same consent gate: a learner/guardian who declined memory features must not be greeted with "last week you said X" — it degrades to today's generic calibration opener. This is both a trust and a minors-compliance requirement; confirm the exact gate during implementation and add a consent-declined test arm.
 
 **Eval-gated.** This is an LLM-prompt change: `pnpm eval:llm` (Tier 1 snapshot) before commit, `pnpm eval:llm --live` (Tier 2 schema validation) to confirm the opener still produces a valid envelope. A/B against the current opener via the flag (RR-1's "feature-flag and A/B").
 
@@ -137,6 +146,8 @@ Field population:
 
 **Deepen the grader (the RR-9 half).** `evaluateRecallQuality` is extended to (a) ask for a short rationale + a coarse verdict + any misconception in its structured output, and (b) accept richer context (curriculum topic description + the most-recent prior `learnerAnswer` from `retrieval_events`) instead of topic-title-only. The **fallback is changed from a fabricated char-count score to an explicit uncertain outcome**: on LLM failure, return `gradedBy='fallback_heuristic'` with a conservative `quality` and `nextAction='reschedule_soon'` (re-ask soon) — never a fabricated high score that advances the clock. This is itself eval-gated.
 
+**[EU-7] Watch the re-ask rate.** Replacing the fabricated advancing score with `reschedule_soon` is correct, but its learner-felt effect is *more repetition*: a topic the learner may have mastered is re-queued whenever the grader flakes. Track the real grader-failure rate; if it is not rare, the fallback becomes a low-grade "why does it keep asking me this" annoyance. Cap consecutive fallback reschedules per topic (e.g. don't `reschedule_soon` more than once in a row on back-to-back fallbacks for the same topic) so a flaky grader can't trap a mastered topic in a re-ask loop.
+
 **Eval-harness wiring.** The harness gains a reader over `retrieval_events` filtered to `gradedBy='llm'` to build a real graded-recall corpus (`apps/api/eval-llm/`). No per-PR CI gate (consistent with `project_eval_llm_signal_metrics`); seeding is a launch-checklist item.
 
 ---
@@ -149,7 +160,11 @@ Field population:
 
 **Merge + dedup by `topicId`.** A topic present in both collapses to one entry. Each entry carries a `reason` tag: `'overdue'`, `'flagged_weak'`, or `'both'`, plus the `concept`/`misconception`/`correction` from `needs_deepening_topics` when present (lets the relearn screen focus the session, aligning with concept-capture's "concept-targeted review").
 
-**Ranking (RR-5).** Default order by SM-2 urgency band (`retention.ts:187-203`: `forgotten > weak > fading > strong`) then most-overdue; `flagged_weak`-only rows (no overdue card) sort by `needs_deepening` recency. The mobile relearn screen (`relearn.tsx:82`) **stops asking the learner to "pick the shakiest topic"** and presents the ranked list, keeping manual pick as an override (`feedback_human_override_everywhere`).
+**Ranking (RR-5).** Default order by SM-2 urgency band (`retention.ts:187-203`: `forgotten > weak > fading > strong`) then most-overdue; `flagged_weak`-only rows (no overdue card) sort by `needs_deepening` recency.
+
+**[EU-5] Don't trade learner agency for an empty queue.** Per the honest-yield note above, the union delivers ~zero net-new rows in production until RR-12 flips — yet removing the "pick your shakiest topic" self-selection (`relearn.tsx:82`) is a real, immediately-felt UX change that would ship regardless. Self-selection is a metacognition + ownership moment, not just a sort order. **Resolution for tier 1:** ship the union + ranking (cheap, invisible) but **keep self-pick as the default presentation**, demoting auto-ranking to an assist (e.g. a "suggested first" hint / pre-sorted order the learner can still override freely). Promote auto-rank to the default once RR-12 lights the Challenge path and the queue actually carries net-new content worth ranking — not before.
+
+**[EU-6] Reason tags must not leak struggle-framing.** The `overdue` / `flagged_weak` / `both` tags are internal classifiers. Any learner-facing surfacing must be reworded to neutral, positive copy ("worth another look") — never "weak"/"flagged"/"struggling" (`feedback_positive_framing_no_struggle`). Specify the learner-facing strings in the read-side work, or keep the raw tags server-side only and map to safe copy at the boundary.
 
 **Honest yield note (must ship in the spec, not hidden).** In production today `needs_deepening_topics` rows come almost entirely from `startRelearn` (`source='system_signal'`), which writes a row for a topic the learner is *already* relearning — so it usually dedups against an overdue card. The genuinely net-new rows (a flagged-weak topic whose card is no longer overdue, and the `source='challenge_round'` rows) stay small **until `CHALLENGE_ROUND_RUNTIME_ENABLED` is flipped (RR-12)**. The union is still correct, cheap, and forward-ready — it is wiring that pays off the moment the Challenge path lights up — but tier-1 yield is modest and we say so.
 
@@ -195,6 +210,10 @@ Today: `verificationType ∈ {standard, evaluate, teach_back}` (`packages/schema
 | Flagged-weak list empty in prod | Challenge path dark, no surviving system_signal rows | Queue == today's overdue list | Expected pre-RR-12; union is forward-ready |
 | Promotion over-promotes | Wrong signal fires | (Tier-1 fix) only matching-signal rows promote | R5 break test guards it |
 | Cited source purged | `evidence_links` points to a day-37-purged transcript (tier 2) | Citation resolves to "source no longer available" | Raw-id, no-FK design (mirrors bookmarks); link row harmlessly dangles |
+| Opener misremembers the learner | Recap paraphrase characterizes a prior the learner didn't hold (EU-1) | A "you said X" that is wrong or distorted | Quote verbatim `learnerAnswer` only; gesture-not-quote when only a recap exists |
+| Opener under declined consent | Learner/guardian declined memory features (EU-2) | Today's generic calibration opener — no "last week you…" | Opener rides the `learnerMemoryContext` consent gate; consent-declined test arm |
+| Opener anchors on a confused prior | Latest topic verdict was `missing`/`misconception` (EU-4) | Fresh low-stakes framing, not a re-asserted muddle | Skip "you understood X" when the last verdict was weak |
+| Grader re-ask loop | Repeated grader failures on a mastered topic (EU-7) | Topic keeps reappearing "soon" | Cap consecutive fallback reschedules per topic |
 
 ---
 
@@ -225,6 +244,7 @@ They are distinct tables for distinct events at distinct grains. Tier 1 does not
 - **Capture (integration, real DB — no internal mocks, GC1/GC6):** a graded recall writes exactly one `retrieval_events` row with correct `quality`, `verdict`, `nextAction`, `gradedBy='llm'`; an injected grader failure writes one row `gradedBy='fallback_heuristic'`, null rationale, `nextAction='reschedule_soon'`, and **does not advance** the SM-2 clock with a fabricated score (regression of the old char-count fallback). Capture-write failure does not throw out of grading (break test).
 - **Scoped read:** a second profile never reads another profile's `retrieval_events` (scoped-read break test).
 - **Opener (eval-gated):** `pnpm eval:llm` snapshot diff for the new opener block; `pnpm eval:llm --live` confirms a valid envelope; with material present the opener references the prior `learnerAnswer`/recap, with none present it degrades to the calibration question (no fabricated memory).
+- **Opener accuracy + consent (EU-1/EU-2/EU-4):** a first-person "you said X" claim appears only when a verbatim `learnerAnswer` exists (recap-only → gesture, no quoted words); the opener degrades to generic calibration when memory consent is declined; the opener does not re-assert a prior whose latest `retrieval_events` verdict was `missing`/`misconception`; no "last week" claim when the real interval contradicts it.
 - **Union:** a topic both overdue and flagged-weak appears once tagged `both`; a flagged-weak-only topic appears tagged `flagged_weak`; ordering follows SM-2 band; `needs_deepening` not previously read is now read (assert against `overdue-topics` query).
 - **Promotion (break test, R5):** a `pending_review` row whose signal does not match the firing signal is **not** promoted; the matching signal promotes it. Watch it fail with the old ignored-`_signal` code, pass with the fix.
 - **Integration suite:** `pnpm exec nx test:integration api` before any commit touching `apps/api/` (hooks skip `.integration.test.`).
@@ -237,9 +257,40 @@ They are distinct tables for distinct events at distinct grains. Tier 1 does not
 - Confirm the exact `safeWrite` import path and signature used by `recordPracticeActivityEvent` when wiring the capture (it is the precedent; reuse it verbatim).
 - Confirm `evaluateRecallQuality`'s deepened structured-output schema against the envelope conventions (`llmResponseEnvelopeSchema`) during implementation — the grader output must parse through `parseEnvelope()` if it drives the `nextAction` decision.
 - Tier-2 `evidence_links` cardinality and whether OCR homework text is ever promoted to a first-class column — decide when slice 2a is scheduled, not now.
+- **[EU-3] Retrieval-log retention (gates the migration shape).** Decide whether the free-text PII columns (`promptText`, `learnerAnswer`, `misconception`, `rubricRationale`) purge/redact on the 37-day transcript clock (default) or persist with a stated lawful basis + parent disclosure. A `redactedAt`/TTL column is cheaper to add in the tier-1 migration than to retrofit.
+- **[EU-2] Opener consent gate.** Confirm the exact gate governing `learnerMemoryContext` and assert the continuity opener honors it (with a consent-declined test arm) before the flag is eval-validated.
+- **[EU-5] Relearn default presentation.** Confirm tier 1 keeps self-pick as the default (recommended until RR-12) versus shipping auto-rank-as-default now.
 
 ---
 
 ## Sequencing
 
 Tier 1, FEEL → CORRECT order: **Flow 2 (log) → Flow 1 (opener)** (the opener's richest input is the log) → **Flow 3 (union)** in parallel. Tier 2 (2a, 2b) follows tier 1 and is independent of it. Nothing here flips a production flag; RR-12 remains gated by the findings doc.
+
+---
+
+## Forward direction — this queue as the Library front door (design-only, not tier-1 scope)
+
+A 2026-06-09 Library/Home restructure exploration (`project_library_home_subject_hub_direction`) converged on **inverting** the Library's model: the front door becomes a **single adaptive queue** ("your next thing, and the two after it") and the subject/book/topic tree is demoted to an **opt-in "explore" lens** organized by knowledge state. The unified relearn queue specced in Flow 3 is the **engine behind that front door** — surfacing it as primary navigation (plus a "resume in-progress" lane and a "study something new" lane) is the restructure's main lift, not a new ranking system.
+
+Two consequences worth recording here so Flow 3 is built front-door-ready:
+- **Reason tags become first-class, learner-facing copy.** EU-6 already requires neutral wording; a front-door queue actively *shows* why each item surfaced ("worth another look", "carry on where you left off"), so the server-side `reason` tag is the copy source, not just an internal classifier.
+- **The queue must degrade to a non-empty, motivating state.** A front door can't be blank. The honest-yield note (queue ≈ today's overdue list until RR-12) is exactly why the un-specced "study something new" lane matters: when nothing is overdue/flagged, the front door offers new learning rather than an empty list.
+
+Design-direction only; does not expand tier-1 scope. Flow 3 ships the engine; the front-door surfacing is a separate, later Library-restructure work item.
+
+---
+
+## End-User Findings Map (2026-06-08)
+
+Adversarial pass from the learner's seat — where the engineering review didn't reach. The learner-felt value of this spec concentrates almost entirely in the Flow 1 opener (Flow 2 is invisible plumbing; Flow 3 is ~empty in production until RR-12), so the opener's failure modes carry the spec's emotional risk.
+
+| Finding | Severity | Concern | Addressed in |
+|---|---|---|---|
+| EU-1 | HIGH | Opener can confidently *distort* the learner (paraphrased LLM recap), not merely fabricate — invariant 6 only guards the *absent*-memory case | Flow 1 (accuracy guard: verbatim-only, quote-vs-gesture); Failure Modes; Test Plan |
+| EU-2 | HIGH | Opener may bypass the memory-consent gate that governs `learnerMemoryContext`, greeting a consent-declined learner with "last week you said X" | Flow 1 (consent gate); Failure Modes; Open Items; Test Plan |
+| EU-3 | HIGH | `retrieval_events` free-text PII (answers, misconceptions) is, by the no-FK design, never purged — silently outliving the 37-day transcript-retention promise | Data Model (retention decision: redact text on the 37-day clock); Open Items |
+| EU-4 | MEDIUM | "Last week" may be factually false; recap selection has no recency/quality filter, so the opener can anchor on a *confused* prior understanding | Flow 1 (no false recency; skip weak-verdict priors); Failure Modes; Test Plan |
+| EU-5 | MEDIUM | Flow 3 removes the "pick your shakiest topic" self-selection (real agency loss) in service of a union that yields nothing net-new until RR-12 | Flow 3 (keep self-pick default in tier 1); Open Items |
+| EU-6 | MEDIUM | `flagged_weak`/`overdue` reason tags risk leaking struggle-framing into learner-facing copy | Flow 3 (neutral copy / server-side-only tags) |
+| EU-7 | LOW | Grader-fallback `reschedule_soon` is correct but re-asks mastered topics whenever the LLM flakes — a low-grade repetition annoyance | Flow 2 (cap consecutive fallback reschedules); Failure Modes |

@@ -795,7 +795,7 @@ describe('session routes', () => {
         response: 'Sounds like we covered enough — ready to wrap up?',
         escalationRung: 1,
         isUnderstandingCheck: false,
-        exchangeCount: 3,
+        exchangeCount: 5,
         expectedResponseMinutes: 3,
         aiEventId: EVENT_ID,
         readyToFinish: true,
@@ -1210,7 +1210,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 3,
+        exchangeCount: 5,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
@@ -1246,7 +1246,7 @@ describe('session routes', () => {
       });
     });
 
-    it('does not dispatch close-path auto-file for below-threshold freeform sessions', async () => {
+    it('does not dispatch close-path auto-file for 4-exchange freeform sessions', async () => {
       useAutoFileProfile();
       (getSession as jest.Mock).mockResolvedValueOnce({
         id: SESSION_ID,
@@ -1257,7 +1257,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 2,
+        exchangeCount: 4,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
@@ -1293,7 +1293,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 3,
+        exchangeCount: 5,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
@@ -2046,7 +2046,7 @@ describe('session routes', () => {
         readyToFinish: true,
         notePrompt: true,
         notePromptPostSession: true,
-        fluencyDrill: { kind: 'vocabulary' },
+        fluencyDrill: { active: true, durationSeconds: 60 },
         confidence: 'high',
       });
 
@@ -2078,7 +2078,7 @@ describe('session routes', () => {
       expect(body).toContain('"notePromptPostSession":true');
       expect(body).toContain('"confidence":"high"');
       expect(body).toContain('"fluencyDrill"');
-      expect(body).toContain('"kind":"vocabulary"');
+      expect(body).toContain('"active":true');
     });
 
     it('[BUG-797] pre-stream fallback done frame includes completion/UI signals from processMessage', async () => {
@@ -2097,7 +2097,7 @@ describe('session routes', () => {
         readyToFinish: true,
         notePrompt: true,
         notePromptPostSession: true,
-        fluencyDrill: { kind: 'vocabulary' },
+        fluencyDrill: { active: true, durationSeconds: 45 },
         confidence: 'medium',
       });
 
@@ -2119,7 +2119,7 @@ describe('session routes', () => {
       expect(body).toContain('"notePromptPostSession":true');
       expect(body).toContain('"confidence":"medium"');
       expect(body).toContain('"fluencyDrill"');
-      expect(body).toContain('"kind":"vocabulary"');
+      expect(body).toContain('"active":true');
     });
 
     it('returns 400 with empty message', async () => {

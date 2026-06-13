@@ -47,7 +47,12 @@ const ENGAGED_RESPONSE_MIN_LENGTH = 30;
 /** Max consecutive holds from partial progress before escalation resumes (Gap 3 cap) */
 const MAX_PARTIAL_PROGRESS_HOLDS = 2;
 
-/** Phrases that indicate the learner is stuck — valid input, not failure (UX-16) */
+/**
+ * Phrases that indicate the learner is stuck — valid input, not failure (UX-16).
+ *
+ * Hard-stuck / method-seeking phrases that unambiguously signal being stuck even
+ * when embedded in longer prose. Matched as substrings anywhere in the message.
+ */
 const STUCK_INDICATORS = [
   "i don't know",
   'i dont know',
@@ -59,17 +64,25 @@ const STUCK_INDICATORS = [
   'idk',
   "i'm not sure",
   'im not sure',
-  'no idea',
   "i'm stuck",
   'im stuck',
-  'help me',
-  'can you explain',
   'i give up',
   "i'm confused",
   'im confused',
   "i don't understand",
   'i dont understand',
 ];
+
+/**
+ * Conversational filler that signals "stuck" ONLY when it is the dominant
+ * content of a short message. These collide with genuinely engaged answers —
+ * e.g. "Can you explain why the mitochondria does X — I think it's because…"
+ * contains "can you explain" but is real progress, not a stuck signal. So they
+ * are treated as stuck only when the whole trimmed message is short enough that
+ * the phrase cannot be incidental (below ENGAGED_RESPONSE_MIN_LENGTH). See the
+ * correctness-lens false-positive-escalation finding.
+ */
+const WEAK_STUCK_INDICATORS = ['help me', 'can you explain', 'no idea'];
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -140,9 +153,13 @@ export function evaluateEscalation(
   userResponse: string,
 ): EscalationDecision {
   const normalised = userResponse.toLowerCase().trim();
-  const isStuck = STUCK_INDICATORS.some((phrase) =>
-    normalised.includes(phrase),
-  );
+  // Hard-stuck phrases match anywhere; weak filler phrases only count when the
+  // message is short enough that the filler is its dominant content (otherwise a
+  // genuinely engaged answer containing "can you explain …" would false-escalate).
+  const isStuck =
+    STUCK_INDICATORS.some((phrase) => normalised.includes(phrase)) ||
+    (normalised.length < ENGAGED_RESPONSE_MIN_LENGTH &&
+      WEAK_STUCK_INDICATORS.some((phrase) => normalised.includes(phrase)));
 
   // Never escalate beyond rung 5
   if (state.currentRung >= 5) {

@@ -154,6 +154,11 @@ anchor), **phase** (FEEL / CORRECT / LOAD-BEARING / CONTINUITY / CLEANUP / STRAT
 unblocks the backbone or is a prerequisite; **P1** = high felt-quality win; **P2** =
 correctness/cleanup that must precede load-bearing.
 
+> **Failure-modes requirement (CH-MED).** Every RR here changes a learner-facing flow. When any
+> RR graduates from a to-do to a spec, it MUST carry a State/Trigger/User-sees/Recovery row per
+> the `CLAUDE.md` UX-resilience rule ("if the Recovery column can't be filled, the design isn't
+> complete"). The `*Constraint (CH-…)*` notes below are the seed of those rows, not a substitute.
+
 ### Backbone — make review feel like one relationship (FEEL)
 
 - **RR-1 — Replace "review mode" with a warm memory-callback opener. [P0 · FEEL · M]**
@@ -167,6 +172,15 @@ correctness/cleanup that must precede load-bearing.
   - *First action:* spec a review-callback prompt block in `exchange-prompts.ts` fed by
     `retention` due-state + last `learnerQuote`; stop hard-routing `mode:'review'`; feature-flag
     and A/B against the current button.
+  - *Constraint (CH-1 — outcome guard):* the opener MUST be conditioned on the learner's
+    **actual last outcome**, not just the presence of a quote. `learnerQuote` is a *verified/solid*
+    answer (`evaluation.ts:82-126`), so a naive "last week you cracked X" can confidently
+    misremember a **miss** as a success — the one fatal failure for a "tutor who remembers you."
+    Branch the copy: cracked-it / wobbled / first-time / long-gap, with a safe neutral default
+    ("Want to circle back to X?") whenever the outcome or quote is missing or stale. A "remembers
+    you" promise is only safe if it remembers *accurately*. Pairs with RR-13: a single last-quote
+    callback without the cross-session thread (RR-13) feels canned within a few sessions — gate
+    RR-1's richer copy on RR-13's minimal thread.
 
 - **RR-2 — Enable + dogfood the dark Challenge Round in staging; read transcripts. [P0 · FEEL · S]**
   - *Impact:* the rigor layer is fully built but has never run, so we have **zero real
@@ -183,6 +197,15 @@ correctness/cleanup that must precede load-bearing.
     same overdue cards with different dedup keys.
   - *First action:* deregister one cron in `inngest/index.ts`; unify copy; respect
     `reviewReminders` consistently.
+  - *Constraint (CH-2 — don't silently silence a cohort):* the two crons gate **differently**,
+    verified in code — `recall-nudge.ts:96-97` requires `pushEnabled` **only**, while
+    `review-due-scan.ts:91-93` requires `pushEnabled` **AND** `reviewReminders`. A learner with
+    push on but `reviewReminders` off **currently receives the recall-nudge**. Adopting the
+    stricter gate during consolidation would drop that whole cohort's review pushes with no
+    notice — a behavioral regression dressed as cleanup. Treat this as a **product decision**, not
+    a mechanical merge: if `reviewReminders` is the intended master switch for *all* review
+    pushes, migrate the affected prefs (or surface the change); if not, keep the looser
+    `pushEnabled`-only gate for the unified daily check-in. Decide explicitly before deregistering.
 
 - **RR-4 — Re-teach in place on the 3rd failed recall instead of ejecting to the library. [P1 · FEEL/CORRECT · M]**
   - *Impact:* `redirect_to_library` reads as a punishment dead-end — the opposite of a warm
@@ -190,6 +213,13 @@ correctness/cleanup that must precede load-bearing.
   - *Evidence:* `retention.ts:138-139` (`failureAction = '...redirect_to_library'`).
   - *First action:* route failure-3 into a guided re-teach within the same conversation;
     keep the SM-2 reset honest.
+  - *Constraint (CH-3 — replace the dead-end with an off-ramp, not with no exit):*
+    `redirect_to_library` reads as punishment, but it was also the **circuit-breaker**. In-place
+    re-teach with no exit condition just swaps one dead-end for a worse one — a learner who
+    genuinely isn't getting it hears the same concept re-explained on a loop. Define a **bounded
+    escalation**: re-teach with a *different* style → if still failing, a warm "let's park this and
+    come back" (honest SM-2 reset + graceful exit) → optionally loop the supporter. The goal is a
+    *warm* off-ramp, never an unbounded loop.
 
 - **RR-5 — System-suggested review ordering (stop making the learner self-diagnose). [P1 · FEEL · S]**
   - *Impact:* the relearn screen asks the person least able to self-assess to "pick the
@@ -197,6 +227,10 @@ correctness/cleanup that must precede load-bearing.
   - *Evidence:* `relearn.tsx:82`; SM-2 bands already available (`retention.ts:187-203`).
   - *First action:* default the relearn list to a system-ranked order; keep manual pick as
     override (`feedback_human_override_everywhere`).
+  - *Constraint (CH-LOW — preserve self-selection, don't disparage it):* knowing what you don't
+    know *is* a learning skill, valuable for capable/older learners. Frame this as "default to
+    system order, **preserve** self-selection," not "stop making the learner self-diagnose."
+    The override already exists — keep it prominent, not buried.
 
 ### Correctness — make it true before it's load-bearing (CORRECT)
 
@@ -207,6 +241,11 @@ correctness/cleanup that must precede load-bearing.
     `MIN_LEXICAL_OVERLAP_NOTE_DRAFT=0.4` is a TODO-flagged guess (`caps.ts`).
   - *First action:* histogram staging transcripts; decide whether "2 of 3 solid" warrants a
     softer outcome; run `pnpm eval:llm --live`.
+  - *Constraint (CH-4 — staging calibration is provisional):* pre-launch there are no real
+    learners (`project_pre_launch_no_users`); staging dogfooding yields **adult-team** transcripts,
+    not 13–17-year-old phrasing or real forgetting curves. Thresholds tuned on engineers will
+    mis-fire for the actual population. Label any staging-derived bar **provisional** and add a
+    **post-launch recalibration gate** against real learner data before treating it as settled.
 
 - **RR-7 — Fix the struggler lockout from re-verification. [P1 · CORRECT · M]**
   - *Impact:* the people who most need rigorous re-verification can never get a Challenge
@@ -216,6 +255,14 @@ correctness/cleanup that must precede load-bearing.
     `:2019-2046`).
   - *First action:* design an eligibility path that lets a recovering learner re-prove a
     previously-weak concept.
+  - *Constraint (CH-5 — the re-prove path must stay low-stakes):* the lockout is not purely a
+    bug — it also shields strugglers from an **all-or-nothing** test (one `partial` of three blocks
+    mastery entirely, `evaluation.ts:169`). Routing a recovering learner into the same binary
+    Challenge Round high performers get is exactly the "test you can fail" the north star forbids,
+    aimed at the most fragile learners. The recovering-learner re-prove path must be **low-stakes
+    and non-all-or-nothing** (e.g. per-concept re-verification that can partially succeed), not the
+    standard Challenge Round. Reconcile with "a check-in, never a test you can fail" *in the
+    design*, don't just remove the gate.
 
 - **RR-8 — Add a completion cooldown for the Challenge Round. [P2 · CORRECT · S]**
   - *Impact:* a just-aced topic can be re-offered immediately in a new session — feels
@@ -230,6 +277,10 @@ correctness/cleanup that must precede load-bearing.
   - *Evidence:* `evaluateRecallQuality` (`retention-data.ts:148-181`), fallback `:173,:179`.
   - *First action:* expand the grader prompt's context; replace the length-heuristic fallback
     with a safer default (e.g. "uncertain → re-ask," never a fabricated score).
+  - *Constraint (CH-3b — re-ask must not reveal the machinery):* a visible re-ask of the *same*
+    thing exposes the grading mechanism and breaks the smooth-mentor feel; the current char-count
+    fallback at least doesn't interrupt. Specify the re-ask as **in-band and natural** (a mentor
+    rephrases, never repeats verbatim), or silently defer the grade — not a conspicuous repeat.
 
 - **RR-10 — Reconcile the two weak-spot channels in one re-learn surface. [P1 · CORRECT · M]**
   - *Impact:* SM-2 "overdue" and Challenge `needs_deepening` are separate lists; the Relearn
@@ -249,14 +300,21 @@ correctness/cleanup that must precede load-bearing.
 
 ### Continuity / memory — the backbone's missing tissue (CONTINUITY)
 
-- **RR-13 — Build the cross-session memory thread + ordered path preview. [P2 · CONTINUITY · L]**
+- **RR-13 — Build the cross-session memory thread + ordered path preview. [minimal thread P1 · full preview P2 · CONTINUITY · M→L]**
   - *Impact:* there is no "last week you cracked X — has it stuck?" anywhere, and after a
     session the learner sees only one next topic. The "here's how I'll build this with you"
-    structure is unbuilt.
+    structure is unbuilt. **This is the north star's literal definition of the feature** ("feels
+    like mentoring = continuity + memory") — so a *minimal* thread is not P2 filler; it's what
+    makes RR-1's opener feel real instead of canned.
   - *Evidence:* `session-summary/[sessionId].tsx:1135` (single next topic); `topicOrder` has
     **zero mobile consumers**.
-  - *First action:* surface `topicOrder` as a path-preview component; add a remembering-opener
-    thread keyed off `nextReviewAt` + last `learnerQuote`. (Parallelizable with RR-1.)
+  - *Split (CH-MED — elevate the minimal thread):* **P1** — a minimal cross-session thread
+    (last-outcome-aware callback material keyed off `nextReviewAt` + last `learnerQuote`) that
+    RR-1's richer copy depends on; ship them together so the "remembers you" opener has substance.
+    **P2** — the full `topicOrder` path-preview component and the multi-step "here's how I'll build
+    this with you" structure.
+  - *First action:* build the minimal thread alongside RR-1 (gate RR-1's branched copy on it);
+    surface `topicOrder` as a path-preview component as the follow-on P2.
 
 ### Cleanup — drift to clear before load-bearing (CLEANUP)
 
@@ -290,9 +348,13 @@ correctness/cleanup that must precede load-bearing.
 ## Part 3 — Sequencing & non-negotiables
 
 **Order (FEEL → CORRECT → LOAD-BEARING):**
-`RR-2, RR-1, RR-3` (feel) → `RR-6, RR-7, RR-9, RR-10, RR-11` (correct) → `RR-14` (cleanup)
-→ `RR-12` (load-bearing, last). `RR-4, RR-5, RR-13` run in parallel as felt-quality wins.
-`RR-15` is gated on the user's strategic fork.
+`RR-2, RR-1 (+ RR-13 minimal thread, shipped together), RR-3` (feel) → `RR-6, RR-7, RR-9, RR-10,
+RR-11` (correct) → `RR-14` (cleanup) → `RR-12` (load-bearing, last). `RR-4, RR-5, RR-13 full path
+preview (P2)` run in parallel as felt-quality wins. `RR-15` is gated on the user's strategic fork.
+
+> **Note (CH-MED):** RR-1 and RR-13's *minimal* thread are no longer independent — RR-1's
+> branched, outcome-aware opener depends on the minimal memory thread to avoid feeling canned, so
+> they ship as one FEEL unit. Only RR-13's full path-preview component stays P2/parallel.
 
 **Non-negotiables / out of scope:**
 - Do **not** flip `CHALLENGE_ROUND_RUNTIME_ENABLED` in **production** before staging

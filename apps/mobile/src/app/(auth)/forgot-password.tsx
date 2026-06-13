@@ -342,7 +342,6 @@ export default function ForgotPasswordScreen() {
                   onPress={() =>
                     router.push({
                       pathname: '/(auth)/sign-in',
-                      params: { notice: 'reset_success' },
                     })
                   }
                   testID="reset-continue-to-sign-in"

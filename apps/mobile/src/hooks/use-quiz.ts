@@ -19,7 +19,6 @@ import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
-import { Sentry } from '../lib/sentry';
 
 export function useGenerateRound(): UseMutationResult<
   QuizRoundResponse,
@@ -37,39 +36,6 @@ export function useGenerateRound(): UseMutationResult<
       const res = await client.quiz.rounds.$post({ json: input });
       await assertOk(res);
       return (await res.json()) as QuizRoundResponse;
-    },
-  });
-}
-
-export function usePrefetchRound(): UseMutationResult<
-  { id: string },
-  Error,
-  {
-    activityType: QuizActivityType;
-    themePreference?: string;
-    subjectId?: string;
-  }
-> {
-  const client = useApiClient();
-
-  return useMutation({
-    mutationFn: async (input) => {
-      const res = await client.quiz.rounds.prefetch.$post({ json: input });
-      await assertOk(res);
-      return (await res.json()) as { id: string };
-    },
-    // Prefetch failures fall back to the normal launch path, so the UX is
-    // unaffected — but we still want visibility when the backend starts
-    // reliably rejecting prefetch (quota, backend outage, etc.). Silent
-    // recovery without any signal is banned per ~/.claude/AGENTS.md.
-    onError: (err) => {
-      // [IMP-5] Escalate to Sentry so prefetch failures are queryable,
-      // not just in local console. Per ~/.claude/AGENTS.md: silent recovery
-      // without escalation is banned on quota paths.
-      Sentry.captureMessage(
-        `[quiz] prefetch failed: ${err.message}`,
-        'warning',
-      );
     },
   });
 }

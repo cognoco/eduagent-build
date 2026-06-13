@@ -457,7 +457,6 @@ describe('resolveNavigationContract gates', () => {
         showExportDelete: true,
         showFamilyChildActivity: true,
         showLearnThisToo: true,
-        showMentorMemoryChildConsent: true,
         showProgressProfilePicker: true,
         showRemoveFamilyMember: true,
       }),
@@ -491,7 +490,6 @@ describe('resolveNavigationContract gates', () => {
         showExportDelete: false,
         showFamilyChildActivity: false,
         showLearnThisToo: false,
-        showMentorMemoryChildConsent: false,
         showProgressProfilePicker: false,
         showRemoveFamilyMember: false,
       }),
@@ -1031,7 +1029,6 @@ describe('V0 fallback - hard constraint (AGENTS.md, spec section Hard Constraint
     // Other child-editor gates stay V1-only — their consumers retain V0 splits.
     expect(contract.gates.showFamilyChildActivity).toBe(false);
     expect(contract.gates.showProgressProfilePicker).toBe(false);
-    expect(contract.gates.showMentorMemoryChildConsent).toBe(false);
   });
 
   it('hides V0 More-screen gates when the active profile is a proxy', () => {

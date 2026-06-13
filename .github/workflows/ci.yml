@@ -138,6 +138,27 @@ jobs:
       # script-level test fails the run early instead of after lint+test+
       # typecheck+build has already burned several minutes.
 
+      # Dependency vulnerability scan — surfaces High/Critical CVEs in the
+      # dependency tree so they are visible on every CI run rather than only
+      # discovered by manual audit.
+      #
+      # ADVISORY (continue-on-error) for now, deliberately: the tree currently
+      # carries a backlog of pre-existing High/Critical advisories (chiefly the
+      # @clerk/* authorization-bypass set, fixed only by the breaking Clerk
+      # Core-3 upgrade, plus Expo transitives) that a hard gate would fail every
+      # PR on. Flipping this to a blocking gate is tracked behind that vuln
+      # burndown; until then the step reports so newly-introduced CVEs are
+      # noticed in the log without blocking unrelated work.
+      - name: pnpm audit (High+, advisory)
+        continue-on-error: true
+        run: pnpm audit --audit-level=high
+
+      # [Low / deps-supply-chain] Verify no installed dependency's postinstall
+      # script can silently read secrets from the CI environment. Catches
+      # supply-chain attacks via malicious postinstall hooks before they ship.
+      - name: Verify postinstall safety
+        run: pnpm run verify:postinstall-safety
+
       # Forbid mobile-only deps in root package.json. Root + apps/mobile both
       # declaring the same RN/Expo/NativeWind package creates parallel pnpm
       # peer-dep contexts that silently break NativeWind className styling on
@@ -375,6 +396,17 @@ jobs:
           EXPO_PUBLIC_GIT_SHA: ${{ github.sha }}
           EXPO_PUBLIC_ENABLE_MODE_NAV: 'true'
           EXPO_PUBLIC_ENABLE_MODE_NAV_V1: 'true'
+          # [M4 / config-secrets] RevenueCat public keys — excluded from eas.json
+          # via EAS_JSON_DENYLIST but must be baked into every OTA bundle so
+          # Purchases.configure() receives non-empty strings. Missing → silent
+          # IAP disable for all users on the OTA channel.
+          EXPO_PUBLIC_REVENUECAT_API_KEY_IOS: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS }}
+          EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID }}
+          # [M2 / config-secrets] Analytics HMAC key — excluded from eas.json via
+          # EAS_JSON_DENYLIST. Without this the analytics helper falls back to
+          # 'unkeyed_' prefix, breaking cross-event profile correlation and
+          # silently removing the HMAC privacy boundary.
+          EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1: ${{ secrets.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B | head -1 | tr -cd '[:print:]' | cut -c1-200)
           printf 'Publishing OTA update: %s\n' "$COMMIT_MSG"

@@ -102,6 +102,8 @@ export function NoteInput({
           testID="note-mic-button"
           onPress={handleMicPress}
           className="p-2"
+          accessibilityRole="button"
+          accessibilityState={{ selected: isListening }}
           accessibilityLabel={
             isListening
               ? t('session.noteInput.stopRecording')
@@ -121,6 +123,7 @@ export function NoteInput({
           <Pressable
             onPress={onCancel}
             className="px-4 py-2"
+            accessibilityRole="button"
             accessibilityLabel={t('session.noteInput.cancel')}
           >
             <Text className="text-body text-text-secondary">
@@ -132,6 +135,8 @@ export function NoteInput({
             onPress={() => onSave(text)}
             disabled={isEmpty || saving}
             className="px-4 py-2 bg-primary rounded-md"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isEmpty || saving }}
             accessibilityLabel={t('session.noteInput.save')}
           >
             {saving ? (

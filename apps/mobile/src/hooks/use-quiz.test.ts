@@ -12,7 +12,6 @@ import {
 } from '../test-utils/screen-render';
 import {
   useGenerateRound,
-  usePrefetchRound,
   useFetchRound,
   useCheckAnswer,
   useCompleteRound,
@@ -28,18 +27,6 @@ import {
 let mockFetch: RoutedMockFetch;
 let queryClient: QueryClient;
 let prevFetch: typeof globalThis.fetch;
-
-// Sentry is used in usePrefetchRound's onError — mock the external SDK.
-// Bare specifier = external boundary (test-setup also mocks it globally; this
-// local mock is kept as the per-file source of truth for the escalation spy).
-jest.mock('@sentry/react-native', () => ({
-  captureMessage: jest.fn(),
-  captureException: jest.fn(),
-  init: jest.fn(),
-  getCurrentScope: jest.fn(() => ({ clear: jest.fn() })),
-  setUser: jest.fn(),
-  getClient: jest.fn(),
-}));
 
 beforeEach(() => {
   prevFetch = globalThis.fetch;
@@ -162,69 +149,6 @@ describe('useGenerateRound', () => {
     expect(body.activityType).toBe('vocabulary');
     expect(body.themePreference).toBe('space');
     expect(body.subjectId).toBe('subject-1');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// usePrefetchRound
-// ---------------------------------------------------------------------------
-
-describe('usePrefetchRound', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
-  it('POSTs to /quiz/rounds/prefetch and returns the round ID', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ id: 'prefetch-round-1' }), { status: 200 }),
-    );
-
-    const { result } = renderHook(() => usePrefetchRound(), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      result.current.mutate({ activityType: 'vocabulary' });
-    });
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-
-    expect(result.current.data?.id).toBe('prefetch-round-1');
-  });
-
-  it('reports prefetch failures to Sentry (not silent recovery)', async () => {
-    const { Sentry } =
-      require('../lib/sentry') as typeof import('../lib/sentry');
-    const captureSpy = jest.spyOn(Sentry, 'captureMessage');
-
-    mockFetch.mockResolvedValueOnce(
-      new Response('upstream timeout', { status: 504 }),
-    );
-
-    const { result } = renderHook(() => usePrefetchRound(), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      result.current.mutate({ activityType: 'vocabulary' });
-    });
-
-    await waitFor(() => {
-      expect(result.current.isError).toBe(true);
-    });
-
-    // Error recovery must escalate to Sentry — silent recovery is banned per AGENTS.md
-    expect(captureSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[quiz] prefetch failed'),
-      'warning',
-    );
   });
 });
 

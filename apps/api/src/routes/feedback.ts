@@ -12,6 +12,7 @@ import { sendEmail } from '../services/notifications';
 import { enqueueFeedbackRetry } from '../services/feedback-retry';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
+import { createSlidingWindowRateLimiter } from '../services/rate-limit';
 import { apiError } from '../errors';
 
 type FeedbackRouteEnv = {
@@ -35,34 +36,19 @@ const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
 // NOTE: Each Cloudflare Worker isolate maintains independent Map state. The
 // effective limit per user is 5 × N (N = active isolates). For higher-volume
 // endpoints, replace with a KV-backed rate limiter for global enforcement.
+// Shared windowed-Map implementation now lives in services/rate-limit.ts
+// (previously duplicated here and in routes/consent.ts).
 const FEEDBACK_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const FEEDBACK_RATE_LIMIT_MAX = 5;
 const FEEDBACK_MAP_MAX_ENTRIES = 10_000;
-const feedbackTimestamps = new Map<string, number[]>();
+const feedbackLimiter = createSlidingWindowRateLimiter({
+  windowMs: FEEDBACK_RATE_LIMIT_WINDOW_MS,
+  max: FEEDBACK_RATE_LIMIT_MAX,
+  maxEntries: FEEDBACK_MAP_MAX_ENTRIES,
+});
 
 function isFeedbackRateLimited(userId: string): boolean {
-  const now = Date.now();
-  const cutoff = now - FEEDBACK_RATE_LIMIT_WINDOW_MS;
-  const timestamps = (feedbackTimestamps.get(userId) ?? []).filter(
-    (t) => t > cutoff,
-  );
-  // Prune stale Map entry to prevent unbounded growth in long-lived isolates
-  if (timestamps.length === 0 && feedbackTimestamps.has(userId)) {
-    feedbackTimestamps.delete(userId);
-  }
-  // Evict oldest entries if the Map exceeds the size cap. Maps iterate in
-  // insertion order, so the first key is the oldest.
-  if (feedbackTimestamps.size >= FEEDBACK_MAP_MAX_ENTRIES) {
-    const oldest = feedbackTimestamps.keys().next().value;
-    if (oldest !== undefined) feedbackTimestamps.delete(oldest);
-  }
-  if (timestamps.length >= FEEDBACK_RATE_LIMIT_MAX) {
-    feedbackTimestamps.set(userId, timestamps);
-    return true;
-  }
-  timestamps.push(now);
-  feedbackTimestamps.set(userId, timestamps);
-  return false;
+  return feedbackLimiter.isLimited(userId);
 }
 
 export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(

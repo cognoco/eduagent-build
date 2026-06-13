@@ -7,11 +7,7 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
-import {
-  childSessionsPageResponseSchema,
-  getSessionEffectiveMode,
-  transcriptResponseSchema,
-} from '@eduagent/schemas';
+import { transcriptResponseSchema } from '@eduagent/schemas';
 import type {
   CelebrationReason,
   ContentFlagInput,
@@ -168,14 +164,6 @@ interface SkipSummaryResult {
     aiFeedback: string | null;
     status: 'skipped' | 'submitted' | 'accepted';
   };
-}
-
-export interface FailedFreeformLibraryFilingSession {
-  sessionId: string;
-  subjectId: string;
-  topicId: string | null;
-  bookId: string | null;
-  startedAt: string;
 }
 
 export function useStartSession(subjectId: string): UseMutationResult<
@@ -627,62 +615,6 @@ export function useSession(
       if (status && status >= 400 && status < 500) return false;
       return failureCount < 2;
     },
-  });
-}
-
-export function useFailedFreeformLibraryFilingSessions(): UseQueryResult<
-  FailedFreeformLibraryFilingSession[]
-> {
-  const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSessionNavigationScope();
-
-  return useQuery({
-    queryKey: ['library', 'failed-freeform-filing-sessions', mode, profileId],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const sessionsRes = await client.progress.sessions.$get(
-          { query: { limit: '50' } },
-          { init: { signal } },
-        );
-        await assertOk(sessionsRes);
-        const sessionsPage = childSessionsPageResponseSchema.parse(
-          await sessionsRes.json(),
-        );
-
-        const detailedSessions = await Promise.all(
-          sessionsPage.sessions.map(async (session) => {
-            const detailRes = await client.sessions[':sessionId'].$get(
-              { param: { sessionId: session.sessionId } },
-              { init: { signal } },
-            );
-            await assertOk(detailRes);
-            const data = (await detailRes.json()) as {
-              session: LearningSession;
-            };
-            return data.session;
-          }),
-        );
-
-        return detailedSessions
-          .filter(
-            (session) =>
-              session.filingStatus === 'filing_failed' &&
-              getSessionEffectiveMode(session) === 'freeform',
-          )
-          .map((session) => ({
-            sessionId: session.id,
-            subjectId: session.subjectId,
-            topicId: session.topicId,
-            bookId: null,
-            startedAt: session.startedAt,
-          }));
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
-    staleTime: 30_000,
   });
 }
 

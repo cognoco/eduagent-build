@@ -194,7 +194,15 @@ export default function CameraScreen(): React.ReactNode {
 
   useEffect(() => {
     if (!speech.error) return;
-    platformAlert(t('homework.microphoneUnavailableTitle'), speech.error);
+    // Keep the raw speech-module error for diagnostics only; never surface it.
+    Sentry.captureMessage('homework.speechRecognitionError', {
+      level: 'warning',
+      extra: { speechError: speech.error },
+    });
+    platformAlert(
+      t('homework.microphoneUnavailableTitle'),
+      t('homework.microphoneUnavailableBody'),
+    );
   }, [speech.error, t]);
 
   // Sync OCR hook status into reducer

@@ -7,12 +7,15 @@ interface LibrarySearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
+  /** Accessible name for the search field; falls back to the placeholder. */
+  accessibilityLabel?: string;
 }
 
 export function LibrarySearchBar({
   value,
   onChangeText,
   placeholder,
+  accessibilityLabel,
 }: LibrarySearchBarProps): React.ReactElement {
   const { t } = useTranslation();
   const themeColors = useThemeColors();
@@ -25,6 +28,7 @@ export function LibrarySearchBar({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={themeColors.muted}
+        accessibilityLabel={accessibilityLabel ?? placeholder}
         className="flex-1 text-body text-text-primary ms-2 py-1"
         testID="library-search-input"
         autoCapitalize="none"
@@ -37,6 +41,7 @@ export function LibrarySearchBar({
           onPress={() => onChangeText('')}
           className="p-1"
           testID="library-search-clear"
+          accessibilityRole="button"
           accessibilityLabel={t('library.a11yClearSearch')}
         >
           {/* [a11y sweep] decorative icon — Pressable parent carries the label */}

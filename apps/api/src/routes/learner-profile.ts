@@ -10,7 +10,6 @@ import {
   parseLearnerInputResultSchema,
   tellMentorInputSchema,
   toggleMemoryCollectionSchema,
-  toggleMemoryEnabledSchema,
   toggleMemoryInjectionSchema,
   unsuppressInferenceSchema,
   updateAccommodationModeSchema,
@@ -27,7 +26,6 @@ import {
   getOrCreateLearningProfile,
   grantMemoryConsent,
   toggleMemoryCollection,
-  toggleMemoryEnabled,
   toggleMemoryInjection,
   unsuppressInference,
   updateAccommodationMode,
@@ -182,41 +180,6 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     await deleteAllMemory(db, childProfileId, undefined);
     return c.json({ success: true });
   })
-  .patch(
-    '/learner-profile/memory-enabled',
-    zValidator('json', toggleMemoryEnabledSchema),
-    async (c) => {
-      // [CR-2026-05-21-010] Minor non-owner profiles cannot toggle memory
-      // enabled on self — consent is parent-controlled.
-      assertCanManageOwnConsent(c);
-      const { db, profileId } = withProfile(c);
-      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
-      const accountId = requireAccount(c.get('account')).id;
-      const { memoryEnabled } = c.req.valid('json');
-      await toggleMemoryEnabled(db, profileId, accountId, memoryEnabled);
-      return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true }),
-      );
-    },
-  )
-  .patch(
-    '/learner-profile/:profileId/memory-enabled',
-    zValidator('json', toggleMemoryEnabledSchema),
-    async (c) => {
-      const { db, profileId: parentProfileId } = withProfile(c);
-      const childProfileId = c.req.param('profileId');
-      // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
-      // [WI-156] No child-consent read-gate here: disabling memory is a
-      // privacy-reducing action that must remain available post-withdrawal.
-      const { memoryEnabled } = c.req.valid('json');
-      // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
-      await toggleMemoryEnabled(db, childProfileId, undefined, memoryEnabled);
-      return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true }),
-      );
-    },
-  )
   .patch(
     '/learner-profile/collection',
     zValidator('json', toggleMemoryCollectionSchema),

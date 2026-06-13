@@ -122,8 +122,10 @@ jest.mock(
 
 const mockListMonthlyReports = jest.fn();
 const mockGetMonthlyReport = jest.fn();
+const mockMarkMonthlyReportViewedForProfile = jest.fn();
 const mockListWeeklyReports = jest.fn();
 const mockGetWeeklyReport = jest.fn();
+const mockMarkWeeklyReportViewedForProfile = jest.fn();
 
 jest.mock(
   '../services/monthly-report' /* gc1-allow: pattern-a conversion */,
@@ -137,6 +139,8 @@ jest.mock(
         mockListMonthlyReports(...args),
       getMonthlyReportForProfile: (...args: unknown[]) =>
         mockGetMonthlyReport(...args),
+      markMonthlyReportViewedForProfile: (...args: unknown[]) =>
+        mockMarkMonthlyReportViewedForProfile(...args),
     };
   },
 );
@@ -153,6 +157,8 @@ jest.mock(
         mockListWeeklyReports(...args),
       getWeeklyReportForProfile: (...args: unknown[]) =>
         mockGetWeeklyReport(...args),
+      markWeeklyReportViewedForProfile: (...args: unknown[]) =>
+        mockMarkWeeklyReportViewedForProfile(...args),
     };
   },
 );
@@ -680,6 +686,52 @@ describe('progress routes', () => {
     });
   });
 
+  // ---- POST /v1/progress/reports/:reportId/view [LEARN-29] -----------------
+
+  describe('POST /v1/progress/reports/:reportId/view', () => {
+    it('returns 200 {viewed:true} and scopes the mark to the active profile', async () => {
+      mockMarkMonthlyReportViewedForProfile.mockResolvedValueOnce(true);
+
+      const res = await app.request(
+        `/v1/progress/reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ viewed: true });
+      expect(mockMarkMonthlyReportViewedForProfile).toHaveBeenCalledTimes(1);
+      const [, profileIdArg, reportIdArg] =
+        mockMarkMonthlyReportViewedForProfile.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(reportIdArg).toBe(REPORT_ID);
+    });
+
+    it('returns 404 when no report matches the active profile (foreign/unknown id)', async () => {
+      mockMarkMonthlyReportViewedForProfile.mockResolvedValueOnce(false);
+
+      const res = await app.request(
+        `/v1/progress/reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.code).toBe('NOT_FOUND');
+    });
+
+    it('returns 401 without auth', async () => {
+      const res = await app.request(
+        `/v1/progress/reports/${REPORT_ID}/view`,
+        { method: 'POST' },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(401);
+    });
+  });
+
   // ---- GET /v1/progress/weekly-reports -------------------------------------
 
   describe('GET /v1/progress/weekly-reports', () => {
@@ -774,6 +826,52 @@ describe('progress routes', () => {
       const res = await app.request(
         `/v1/progress/weekly-reports/${REPORT_ID}`,
         {},
+        TEST_ENV,
+      );
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // ---- POST /v1/progress/weekly-reports/:weeklyReportId/view [LEARN-29] ----
+
+  describe('POST /v1/progress/weekly-reports/:weeklyReportId/view', () => {
+    it('returns 200 {viewed:true} and scopes the mark to the active profile', async () => {
+      mockMarkWeeklyReportViewedForProfile.mockResolvedValueOnce(true);
+
+      const res = await app.request(
+        `/v1/progress/weekly-reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ viewed: true });
+      expect(mockMarkWeeklyReportViewedForProfile).toHaveBeenCalledTimes(1);
+      const [, profileIdArg, reportIdArg] =
+        mockMarkWeeklyReportViewedForProfile.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(reportIdArg).toBe(REPORT_ID);
+    });
+
+    it('returns 404 when no weekly report matches the active profile', async () => {
+      mockMarkWeeklyReportViewedForProfile.mockResolvedValueOnce(false);
+
+      const res = await app.request(
+        `/v1/progress/weekly-reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.code).toBe('NOT_FOUND');
+    });
+
+    it('returns 401 without auth', async () => {
+      const res = await app.request(
+        `/v1/progress/weekly-reports/${REPORT_ID}/view`,
+        { method: 'POST' },
         TEST_ENV,
       );
       expect(res.status).toBe(401);

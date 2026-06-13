@@ -16,6 +16,7 @@ import {
 import { useSubjects } from '../../../hooks/use-subjects';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
+import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import type { Vocabulary } from '@eduagent/schemas';
@@ -156,9 +157,7 @@ export default function VocabularyListScreen() {
               onError: (err) => {
                 platformAlert(
                   t('vocabulary.deleteDialog.errorTitle'),
-                  err instanceof Error
-                    ? err.message
-                    : t('vocabulary.deleteDialog.errorFallback'),
+                  formatApiError(err),
                   [{ text: t('common.ok') }],
                 );
               },

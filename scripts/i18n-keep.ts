@@ -46,19 +46,19 @@ const raw: readonly KeepPattern[] = [
     pattern: 'parentView.metricTooltips.*.title',
     reason:
       'selected via METRIC_TOOLTIP_I18N_KEYS[metricKey].title at ' +
-      'apps/mobile/src/lib/parent-vocab.ts:98',
+      'apps/mobile/src/lib/parent-vocab.ts:92',
   },
   {
     pattern: 'parentView.metricTooltips.*.body',
     reason:
       'selected via METRIC_TOOLTIP_I18N_KEYS[metricKey].body at ' +
-      'apps/mobile/src/lib/parent-vocab.ts:99',
+      'apps/mobile/src/lib/parent-vocab.ts:93',
   },
   {
     pattern: 'parentView.topic.understandingLevels.*',
     reason:
       'returned by getUnderstandingLabel(masteryPercent) at ' +
-      'apps/mobile/src/lib/parent-vocab.ts:117 (consumed by t() at ' +
+      'apps/mobile/src/lib/parent-vocab.ts:111 (consumed by t() at ' +
       'apps/mobile/src/app/(app)/child/[profileId]/topic/[topicId].tsx:203)',
   },
   {
@@ -268,6 +268,15 @@ const raw: readonly KeepPattern[] = [
     reason:
       'selected via VERIFICATION_BADGE_KEY[verificationBadge] at ' +
       'apps/mobile/src/components/session/MessageBubble.tsx:274',
+  },
+  {
+    pattern: 'more.accommodation.sectionHeader',
+    reason:
+      'consumed cross-package by the API app-help map (the help prompt + its ' +
+      'in-sync guard test assert this exact en.json label) at ' +
+      'apps/api/src/services/app-help-map.ts:28; no mobile t() call references ' +
+      'it (the accommodation screen title moved to learningPreferences.screenTitle), ' +
+      'so the mobile-only orphan walker cannot see the API consumer',
   },
 ];
 

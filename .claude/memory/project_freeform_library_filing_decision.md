@@ -1,13 +1,13 @@
 ---
 name: Freeform chat library filing decision
-description: Product decision for Ask Anything/freeform chats, session history, and Library filing.
+description: Product decision for Ask Anything/freeform chats, bookmarks, Library filing, Challenge Round, and notes.
 type: project
 ---
 
-Ask Anything/freeform chat should be low-friction: let the learner ask first, then classify quietly after a few meaningful exchanges.
+Ask Anything/freeform chat should stay low-friction: let the learner ask first, then classify quietly as needed. Do not mint a hidden topic during the chat just to unlock topic-bound features.
 
-**Decision:** Sessions are saved as conversation history by default. Library filing is separate: when a chat becomes meaningful learning, the app should auto-file it into the best subject/book/topic when confident, ask only when ambiguous, and always allow correction. The user may choose to keep the session out of Library; that keeps the session history/summary/transcript but does not create or attach a curriculum topic, does not show as a Library topic, and should not drive topic progress/retention.
+**Decision source:** [`MMT-ADR-0021`](../../docs/adr/MMT-ADR-0021-freeform-library-filing-threshold.md), with the living product rule in [`docs/PRD.md`](../../docs/PRD.md). Use those docs as the source of truth.
 
-**Why:** Users should not be forced through subject setup before getting value, and they should not hit a manual "Add to library?" decision gate after pressing Done. Meaningful learning should not disappear from the self-building Library. "Don't save" copy is misleading because the session remains saved; use language like "Keep out of Library" instead.
+**Why this memory remains:** It is only a recall pointer so future sessions do not reopen the hidden-topic / freeform-note / freeform-Challenge debate without first reading the ADR.
 
-**How to apply:** When implementing this, replace the current post-close `Add to library?` footer prompt with quiet auto-filing plus summary status/opt-out. Reconcile scattered docs in one pass: `LEARN-01` freeform chat, `SUBJECT-03` chat-created subject, `SUBJECT-05` subject resolution, `LEARN-07` session summary/filing, `LEARN-08` Library, `HOME-01` Ask Anything entry, and any supporting specs/tests. Library topics must still belong to subjects.
+**How to apply:** If a future change wants to file shorter freeform sessions, add freeform notes, or enable Challenge Round in freeform, treat it as superseding/amending `MMT-ADR-0021`.

@@ -64,16 +64,6 @@ jest.mock('expo-router', () => ({
 
 // ── External native/UI module boundaries (gc1-allow) ────────────────────────
 
-const mockFormatApiError = jest.fn((err: unknown) =>
-  err instanceof Error ? `classified:${err.message}` : 'classified:unknown',
-);
-jest.mock(
-  '../../../lib/format-api-error' /* gc1-allow: format-api-error calls i18next which requires expo-localization/async-storage init unavailable in jest */,
-  () => ({
-    formatApiError: (err: unknown) => mockFormatApiError(err),
-  }),
-);
-
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: unit test boundary; real impl requires expo-router Router */,
   () => ({
@@ -286,15 +276,18 @@ describe('SavedBookmarksScreen', () => {
     });
 
     it('[F-110] routes load error through formatApiError boundary, not raw instanceof check', () => {
+      // The screen routes the thrown error through the REAL formatApiError
+      // instead of rendering err.message verbatim. A plain Error whose message
+      // contains "network" classifies as a network error, so the friendly
+      // networkError copy is shown and the raw "Network failure" string never
+      // reaches the UI — this verifies the boundary rule (screens must never
+      // bypass the shared error classifier) against the real classifier.
       mockHooks({ isError: true });
       render(<SavedBookmarksScreen />);
-      // The error message is the classified output of formatApiError, not the
-      // raw Error.message — this verifies the boundary rule (screens must never
-      // bypass the shared error classifier).
-      expect(mockFormatApiError).toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'Network failure' }),
+      expect(screen.queryByText('Network failure')).toBeNull();
+      screen.getByText(
+        "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
       );
-      screen.getByText('classified:Network failure');
     });
 
     it('shows retry button with correct testID', () => {
@@ -458,7 +451,10 @@ describe('SavedBookmarksScreen', () => {
     });
 
     it('[F-110] routes delete error through formatApiError boundary, not raw instanceof check', async () => {
-      const deleteErr = new Error('Server failure');
+      // A message containing "network" makes the REAL classifier return the
+      // friendly networkError copy — distinguishable from the raw err.message,
+      // so this fails if the screen ever renders err.message directly again.
+      const deleteErr = new Error('network failure during delete');
       mockDeleteBookmarkMutateAsync.mockRejectedValueOnce(deleteErr);
       mockHooks({ bookmarks: [BOOKMARK_1] });
       render(<SavedBookmarksScreen />);
@@ -471,10 +467,9 @@ describe('SavedBookmarksScreen', () => {
       buttons.find((b) => b.text === 'Delete')?.onPress?.();
 
       await waitFor(() => {
-        expect(mockFormatApiError).toHaveBeenCalledWith(deleteErr);
         expect(mockPlatformAlert).toHaveBeenLastCalledWith(
           'Could not delete bookmark',
-          'classified:Server failure',
+          "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
         );
       });
     });

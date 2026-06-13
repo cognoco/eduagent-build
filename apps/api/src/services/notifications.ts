@@ -146,6 +146,24 @@ export async function sendPushNotification(
     });
 
     if (!response.ok) {
+      // [C-1] An HTTP error from the Expo Push API (rate-limit, malformed
+      // token, service outage) is a silent push-delivery failure. Mirror the
+      // network-error path below: escalate to Sentry + structured log so the
+      // failure is queryable, not just a reason string the caller swallows.
+      logger.error('[push] Expo API error', {
+        event: 'notification.push.expo_api_error',
+        profileId: payload.profileId,
+        type: payload.type,
+        status: response.status,
+      });
+      captureException(new Error(`Expo Push API ${response.status}`), {
+        profileId: payload.profileId,
+        tags: {
+          surface: 'push_notification',
+          reason: `http_${response.status}`,
+        },
+        extra: { type: payload.type },
+      });
       return { sent: false, reason: `expo_api_error_${response.status}` };
     }
 

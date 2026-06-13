@@ -23,12 +23,14 @@ interface SessionSummaryLibraryFilingControlsProps {
   sessionId: string;
 }
 
+const MIN_FREEFORM_LIBRARY_FILING_EXCHANGES = 5;
+
 function getDestinationLabel(session: EnrichedLibrarySession): string | null {
   return [session.bookTitle, session.subjectName].filter(Boolean).join(' - ');
 }
 
 function isAutoFileCandidate(session: EnrichedLibrarySession): boolean {
-  return session.exchangeCount >= 3;
+  return session.exchangeCount >= MIN_FREEFORM_LIBRARY_FILING_EXCHANGES;
 }
 
 export function SessionSummaryLibraryFilingControls({
@@ -51,13 +53,21 @@ export function SessionSummaryLibraryFilingControls({
 
   if (!session) return null;
 
+  const meetsFilingThreshold = isAutoFileCandidate(session);
+  if (
+    !meetsFilingThreshold &&
+    !filing.isFiledInLibrary &&
+    filing.filingStatus !== 'filing_pending'
+  ) {
+    return null;
+  }
+
   const isBusy =
     keepOut.isPending || add.isPending || restore.isPending || retry.isPending;
   const showPending =
     filing.filingStatus === 'filing_pending' ||
-    (filing.filingStatus == null && isAutoFileCandidate(session));
-  const showUnfiled =
-    filing.filingStatus == null && !isAutoFileCandidate(session);
+    (filing.filingStatus == null && meetsFilingThreshold);
+  const showUnfiled = filing.filingStatus == null && !meetsFilingThreshold;
 
   const handleMutationFailure = (): void => {
     setMessage(t('sessionSummary.libraryFiling.updateError'));

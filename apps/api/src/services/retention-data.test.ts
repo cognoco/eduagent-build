@@ -610,12 +610,16 @@ describe('processRecallTest', () => {
       answer: 'a real answer',
     });
 
-    // Atomicity contract: transaction must be invoked exactly once for the
-    // ownership + card-bootstrap bundle. The cooldown claim and post-LLM
-    // write deliberately remain outside the transaction (long LLM call).
+    // Atomicity contract: transaction is invoked twice.
+    // [BUG-657] First transaction: ownership check + retention-card bootstrap
+    // are atomic so a concurrent topic-transfer cannot slip between them.
+    // Second transaction: stampMasteryOnVerify wraps the card-mastery stamp +
+    // book-completeness re-check in their own transaction so the book NOT EXISTS
+    // subquery sees the just-committed mastered_at stamp (sibling-topic race fix).
+    // The cooldown claim and post-LLM SM-2 write remain outside any transaction.
     expect(
       (db as unknown as { transaction: jest.Mock }).transaction,
-    ).toHaveBeenCalledTimes(1);
+    ).toHaveBeenCalledTimes(2);
   });
 
   it('[WI-80] rejects mixed-parent topics before recall processing', async () => {

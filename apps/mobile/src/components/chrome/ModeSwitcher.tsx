@@ -51,6 +51,7 @@ export function ModeSwitcher(): React.ReactElement | null {
           onPress={() => switchMode('study')}
           disabled={isSwitching}
           accessibilityRole="button"
+          accessibilityLabel={t('tabs.myLearning')}
           accessibilityState={{
             selected: currentMode === 'study',
             disabled: isSwitching,
@@ -85,6 +86,7 @@ export function ModeSwitcher(): React.ReactElement | null {
           onPress={() => switchMode('family')}
           disabled={isSwitching}
           accessibilityRole="button"
+          accessibilityLabel={t('tabs.children')}
           accessibilityState={{
             selected: currentMode === 'family',
             disabled: isSwitching,

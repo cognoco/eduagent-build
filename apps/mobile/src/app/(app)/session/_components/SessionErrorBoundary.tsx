@@ -1,10 +1,10 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
-import i18next from 'i18next';
 import { router, type Href } from 'expo-router';
 import { tokens } from '../../../../lib/design-tokens';
 import { Sentry } from '../../../../lib/sentry';
+import { i18next } from '../../../../i18n';
 
 /**
  * Session-specific error boundary with visible diagnostics.
@@ -72,11 +72,22 @@ export class SessionErrorBoundary extends Component<
               fontWeight: '600',
             }}
           >
-            {this.state.error?.message ??
-              i18next.t('session.errorBoundary.unknownError')}
+            {i18next.t('session.errorBoundary.body')}
           </Text>
           {__DEV__ && (
             <>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: tokens.light.colors.danger,
+                  fontFamily: 'monospace',
+                  marginBottom: 12,
+                }}
+                selectable
+              >
+                {this.state.error?.message ??
+                  i18next.t('session.errorBoundary.unknownError')}
+              </Text>
               <Text
                 style={{
                   fontSize: 11,

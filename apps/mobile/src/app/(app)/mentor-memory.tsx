@@ -59,12 +59,11 @@ export default function MentorMemoryScreen() {
   const grantConsent = useGrantMemoryConsent();
   const updateInterestsContext = useUpdateInterestsContext();
   const navigationContract = useNavigationContract();
-  // Self-view mentor-memory uses sessionIsOwner (owner && !proxy), NOT the
-  // narrower showMentorMemoryChildConsent gate. The latter additionally
-  // requires familyShape and is the content gate for the child-consent
-  // editor at child/[profileId]/mentor-memory.tsx. A solo owner in study
-  // shape needs the consent-prompt + owner copy on their own screen, which
-  // only sessionIsOwner expresses.
+  // Self-view mentor-memory uses sessionIsOwner (owner && !proxy). A solo
+  // owner in study shape needs the consent-prompt + owner copy on their own
+  // screen, which sessionIsOwner expresses. The child-consent editor at
+  // child/[profileId]/mentor-memory.tsx is a separate screen that derives
+  // its access from the route's profileId, not from a contract gate.
   const isOwnerSelf = navigationContract.gates.sessionIsOwner;
   const [draft, setDraft] = useState('');
 
@@ -231,10 +230,6 @@ export default function MentorMemoryScreen() {
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
 
   const handleBack = useCallback(() => {
-    if (resolvedReturnTo === 'learning-preferences') {
-      router.replace('/(app)/more/learning-preferences');
-      return;
-    }
     if (resolvedReturnTo === 'more') {
       router.replace('/(app)/more');
       return;

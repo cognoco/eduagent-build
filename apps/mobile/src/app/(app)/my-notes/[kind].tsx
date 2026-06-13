@@ -489,6 +489,7 @@ export default function MyNotesListScreen(): React.ReactElement {
                 onChangeText={setQuery}
                 placeholder={searchPlaceholderForKind(kind, t)}
                 placeholderTextColor={colors.textSecondary}
+                accessibilityLabel={`Search ${titleForKind(kind, t).toLowerCase()}`}
                 className="flex-1 text-body text-text-primary"
                 testID="my-notes-search"
               />
