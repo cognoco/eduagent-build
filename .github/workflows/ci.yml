@@ -214,6 +214,16 @@ jobs:
       - name: scripts/* tests
         run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
 
+      # WI-694: regression guard for the deploy-time KV-binding verifier
+      # (apps/api/scripts/verify-wrangler-kv-binding.mjs). Its block-capture
+      # regex used a bare `$` under the `m` flag, capturing an empty body and
+      # false-failing EVERY binding — reding all main deploys at the "Verify
+      # Cloudflare KV bindings before migrations" step. These node:test cases
+      # lock the concrete-vs-placeholder behaviour. Lives under apps/api/scripts/,
+      # so the scripts/ jest config above does not see it.
+      - name: apps/api/scripts node:test guards (KV-binding verifier)
+        run: node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs
+
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
       # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
       # if a quarantined path no longer exists (a stale entry that would rot
