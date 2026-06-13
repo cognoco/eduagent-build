@@ -74,6 +74,11 @@ export {
   ProfileRemovalNotImplementedErrorV2,
 } from './family-v2';
 
+// [WI-722] v2 twin of getUsageBreakdownForProfile — reads guardianship via the
+// CUT-B2 reader (not family_links) + usage_events. Dispatched by the same
+// per-route flag ternary as the other billing-v2 seams.
+export { getUsageBreakdownForProfileV2 } from './family-usage-v2';
+
 export { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
 
 // Webhook handler twins
