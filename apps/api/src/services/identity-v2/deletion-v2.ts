@@ -14,6 +14,7 @@
 //   1. pre-read login.email (memoized step input, as today's getAccountClerkUserId)
 //   2. re-home each consent_grant for every person in the org → consent_receipt
 //   3. delete the live consent_grant rows (RESTRICT now satisfied)
+//   3b. write financial_record rows per person (tax/chargeback retain-tier)
 //   4. write a deletion_audit row per person (deleted_by per path; reason)
 //   5. DELETE person (cascade → consent_request + membership + learning data)
 //   6. erase byok_waitlist WHERE email = login.email  (D2 GDPR Art-17 leg)
@@ -23,9 +24,14 @@
 // flag a counsel follow-up in the PR. We do NOT invent a legal retention
 // duration.
 //
-// financial_record (tax / chargeback on deletion, §6.1) is billing-domain — it
-// pairs with CUT-B3, not the consent side. NOT written here; coordination point
-// called out in the PR. The consent-side delete does not block on it.
+// financial_record (tax / chargeback on deletion, §6.1) IS written here per
+// WI-723: each deleted person gets retain-tier financial_record rows BEFORE the
+// person drop, inside the same transaction/lock as the consent re-home and the
+// audit write, so a row is never orphaned. §4.9 COUNSEL-OWNED: the record_type
+// taxonomy (tax / chargeback), the per-person row cardinality (2), the payload
+// shape, and retention_period (left NULL) are all PROVISIONAL pending counsel —
+// flagged in the PR. The financial_record table carries NO FK to person /
+// organization (it outlives both), so writing it before the drop is safe.
 //
 // person.id = profiles.id, organization.id = accounts.id (deterministic reseed).
 // FLAG-GATED: reachable only when IDENTITY_V2_ENABLED is 'true'.
@@ -38,10 +44,12 @@ import {
   consentReceipt,
   consentRequest,
   deletionAudit,
+  financialRecord,
   login,
   membership,
   organization,
   person,
+  subscription,
   type Database,
 } from '@eduagent/database';
 import type { AccountDeletionStatusResponse } from '@eduagent/schemas';
@@ -361,6 +369,11 @@ export async function executeDeletionV2(
     });
     const personIds = memberships.map((m) => m.personId);
 
+    // Step 3b prep — snapshot the org's subscriptions ONCE (read before any
+    // person drop; subscriptions outlive persons — data-model.md §3.2) for the
+    // per-person financial_record payload.
+    const orgSubscriptions = await readOrgSubscriptionsTx(tx, organizationId);
+
     for (const personId of personIds) {
       // Step 2 — re-home every live grant to the retain-tier receipt. Field
       // copy (snapshot columns carried verbatim); retention_period is left NULL
@@ -392,6 +405,15 @@ export async function executeDeletionV2(
           .where(eq(consentGrant.chargePersonId, personId));
       }
 
+      // Step 3b — financial_record (tax/chargeback retain-tier, §6.1) BEFORE
+      // the person drop, in the same tx. §4.9 COUNSEL-OWNED (provisional).
+      await writeFinancialRecordsTx(
+        tx,
+        personId,
+        organizationId,
+        orgSubscriptions,
+      );
+
       // Step 4 — the audit row (person_id, deleted_by per path, reason).
       await tx.insert(deletionAudit).values({
         personId,
@@ -403,6 +425,13 @@ export async function executeDeletionV2(
       // Step 5 — drop the person (cascade → consent_request, membership,
       // login, learning data). RESTRICT is now satisfied because the grants
       // were re-homed above.
+      //
+      // Out-of-scope (WI-723): subscription teardown is NOT handled here.
+      // `subscription.payer_person_id` (and `subscription.organization_id`)
+      // are ON DELETE RESTRICT, so a person who is a payer — or the org with a
+      // live subscription — cannot be dropped while a subscription row stands.
+      // That billing-domain teardown is a pre-existing gap owned by CUT-B3 /
+      // billing, intentionally outside this WI's financial_record scope.
       await tx.delete(person).where(eq(person.id, personId));
     }
 
@@ -440,6 +469,7 @@ export async function deletePersonV2(
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await rehomeGrantsTx(tx, personId);
+    await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
       deletedBy,
@@ -500,6 +530,7 @@ export async function deletePersonIfConsentWithdrawnV2(
       return false;
     }
     await rehomeGrantsTx(tx, personId);
+    await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
       deletedBy: null,
@@ -575,6 +606,7 @@ export async function deletePersonIfNoConsentV2(
     }
 
     await rehomeGrantsTx(tx, personId);
+    await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
       deletedBy: null,
@@ -631,6 +663,7 @@ export async function deleteArchivedPersonIfStillEligibleV2(
     });
     if (current && !current.withdrawnAt) return false;
     await rehomeGrantsTx(tx, personId);
+    await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
       deletedBy: null,
@@ -699,4 +732,117 @@ async function rehomeGrantsTx(
   await tx
     .delete(consentGrant)
     .where(eq(consentGrant.chargePersonId, personId));
+}
+
+type DeletionTx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/**
+ * The subscription snapshot captured into the financial_record payload — the
+ * billing-correlation fields a tax/chargeback record would need to reconcile
+ * against the payment store after the person is gone.
+ */
+type SubscriptionSnapshot = {
+  id: string;
+  planTier: string;
+  status: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+};
+
+/**
+ * Read the org's subscription snapshot once, inside the deletion transaction,
+ * for the financial_record payload. Read before the person drop (subscriptions
+ * outlive persons in the retain-tier split — data-model.md §3.2). A no-op-safe
+ * empty array when the org has no subscription.
+ */
+async function readOrgSubscriptionsTx(
+  tx: DeletionTx,
+  organizationId: string,
+): Promise<SubscriptionSnapshot[]> {
+  return tx.query.subscription.findMany({
+    where: eq(subscription.organizationId, organizationId),
+    columns: {
+      id: true,
+      planTier: true,
+      status: true,
+      stripeCustomerId: true,
+      stripeSubscriptionId: true,
+    },
+  });
+}
+
+/**
+ * Write the retain-tier financial_record rows for a person being deleted (§6.1:
+ * "financial_record rows created for tax/chargeback"). Called BEFORE the person
+ * drop, inside the deletion transaction. financial_record has no FK to person /
+ * organization (it outlives both), so the subsequent person DELETE never
+ * cascade-removes these rows.
+ *
+ * §4.9 COUNSEL-OWNED (PROVISIONAL): the record_type values, the two-rows-per-
+ * person cardinality, the payload shape, and retention_period (NULL) are all
+ * provisional pending counsel — mirroring consent_receipt.retention_period. We
+ * do NOT invent a legal retention duration. See data-model.md §4.9.
+ */
+async function writeFinancialRecordsTx(
+  tx: DeletionTx,
+  personId: string,
+  organizationId: string,
+  subscriptions: SubscriptionSnapshot[],
+): Promise<void> {
+  const payload = {
+    deletedAt: new Date().toISOString(),
+    subscriptions,
+  };
+  await tx.insert(financialRecord).values([
+    {
+      personId,
+      organizationId,
+      // §4.9 COUNSEL-OWNED — provisional record_type taxonomy.
+      recordType: 'person_deletion_tax_retain',
+      payload,
+      // §4.9 COUNSEL-OWNED — NULL until counsel supplies the retention value.
+      retentionPeriod: null,
+    },
+    {
+      personId,
+      organizationId,
+      // §4.9 COUNSEL-OWNED — provisional record_type taxonomy.
+      recordType: 'person_deletion_chargeback_retain',
+      payload,
+      retentionPeriod: null,
+    },
+  ]);
+}
+
+/**
+ * The org a person belongs to (via membership) — the financial_record's
+ * organization key for the single-person delete paths, which take a personId
+ * but not an organizationId. Returns null when the person has no membership.
+ */
+async function personOrganizationIdTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<string | null> {
+  const row = await tx.query.membership.findFirst({
+    where: eq(membership.personId, personId),
+    columns: { organizationId: true },
+  });
+  return row?.organizationId ?? null;
+}
+
+/**
+ * Write a person's retain-tier financial_record rows inside the deletion
+ * transaction, resolving the org via membership and snapshotting its
+ * subscriptions. Used by the single-person delete paths (deletePersonV2 and the
+ * consent-gated sweeps), which have only a personId. A no-op when the person has
+ * no membership (org already gone). §4.9 COUNSEL-OWNED as above.
+ */
+async function writeFinancialRecordsForPersonTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<void> {
+  const organizationId = await personOrganizationIdTx(tx, personId);
+  if (!organizationId) return;
+  const subscriptions = await readOrgSubscriptionsTx(tx, organizationId);
+  await writeFinancialRecordsTx(tx, personId, organizationId, subscriptions);
 }

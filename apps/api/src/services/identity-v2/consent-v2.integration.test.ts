@@ -25,11 +25,13 @@ import {
   consentRequest,
   createDatabase,
   deletionAudit,
+  financialRecord,
   guardianship,
   login,
   membership,
   organization,
   person,
+  subscription,
   type Database,
 } from '@eduagent/database';
 import {
@@ -45,6 +47,7 @@ import {
   deleteArchivedPersonIfStillEligibleV2,
   deletePersonIfConsentWithdrawnV2,
   deletePersonIfNoConsentV2,
+  deletePersonV2,
   executeDeletionV2,
   scheduleDeletionV2,
 } from './deletion-v2';
@@ -90,12 +93,20 @@ const COPPA = 'coppa_parental_consent';
         await db.delete(consentReceipt).where(eq(consentReceipt.personId, pid));
         await db.delete(deletionAudit).where(eq(deletionAudit.personId, pid));
         await db
+          .delete(financialRecord)
+          .where(eq(financialRecord.personId, pid));
+        await db
           .delete(guardianship)
           .where(eq(guardianship.chargePersonId, pid));
         await db
           .delete(guardianship)
           .where(eq(guardianship.guardianPersonId, pid));
         await db.delete(membership).where(eq(membership.personId, pid));
+        // subscription.payer_person_id is ON DELETE RESTRICT — clear any
+        // subscription naming this person as payer before the person delete.
+        await db
+          .delete(subscription)
+          .where(eq(subscription.payerPersonId, pid));
         await db.delete(login).where(eq(login.personId, pid));
         await db.delete(person).where(eq(person.id, pid));
       }
@@ -398,6 +409,75 @@ const COPPA = 'coppa_parental_consent';
         });
         expect(audit?.reason).toBe('user_initiated');
         expect(audit?.deletedBy).toBe(ownerId);
+
+        // WI-723: the financial_record rows (tax + chargeback retain-tier,
+        // §6.1) survive the person drop. Provisional record types +
+        // null retention period are counsel-owned (§4.9). Empty-subscription
+        // case: payload.subscriptions is [] (the capture path with no sub).
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, ownerId),
+        });
+        expect(financialRecords).toHaveLength(2);
+        expect(financialRecords.map((r) => r.recordType).sort()).toEqual([
+          'person_deletion_chargeback_retain',
+          'person_deletion_tax_retain',
+        ]);
+        for (const r of financialRecords) {
+          expect(r.organizationId).toBe(orgId);
+          expect(r.retentionPeriod).toBeNull(); // §4.9 counsel-owned
+          expect(
+            (r.payload as { subscriptions: unknown[] }).subscriptions,
+          ).toEqual([]);
+        }
+      });
+
+      it('GREEN (non-empty subscription): the financial_record payload captures the org subscription snapshot', async () => {
+        // Exercise the capture path against a real subscription via the
+        // single-person deletePersonV2: the org keeps an OWNER who is the
+        // subscription payer (so the payer-RESTRICT is not tripped — that
+        // billing teardown is the out-of-scope CUT-B3 gap), and we delete a
+        // NON-payer CHILD member. orgSubscriptions is therefore non-empty and
+        // must land in the child's financial_record payload.
+        const orgId = await seedOrg();
+        const ownerId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+          displayName: 'Owner',
+        });
+        const childId = await seedPerson(orgId, { displayName: 'Child' });
+        const [sub] = await db
+          .insert(subscription)
+          .values({
+            organizationId: orgId,
+            planTier: 'plus',
+            status: 'trial',
+            payerPersonId: ownerId, // owner survives → no payer-RESTRICT trip
+            stripeCustomerId: `cus_${ownerId}`,
+            stripeSubscriptionId: `sub_${ownerId}`,
+          })
+          .returning();
+
+        await deletePersonV2(db, childId, 'guardian_initiated', ownerId);
+
+        const childRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(childRow).toBeUndefined();
+
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, childId),
+        });
+        expect(financialRecords).toHaveLength(2);
+        expect(financialRecords.map((r) => r.recordType).sort()).toEqual([
+          'person_deletion_chargeback_retain',
+          'person_deletion_tax_retain',
+        ]);
+        for (const r of financialRecords) {
+          expect(r.organizationId).toBe(orgId);
+          const captured = (r.payload as { subscriptions: { id: string }[] })
+            .subscriptions;
+          expect(captured).toHaveLength(1);
+          expect(captured[0]!.id).toBe(sub!.id);
+        }
       });
 
       it('RED guard: the consent_grant.charge_person_id RESTRICT blocks a raw person-delete with live grants (proves re-home is mandatory, not optional)', async () => {
