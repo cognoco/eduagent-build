@@ -229,8 +229,10 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **Activated 2026-06-13** — sixth run of the §2.1 recipe; first parallel activation
   *after* the IF cutover went live. Slice scan (sub-agent): **27/27 LIVE** (none subsumed
   by IF), **27/27 CLEAN** (no cutover overlap); OQ1 ruled CI/GHA findings stay in PRG-10
-  (WI-698), OQ2 file-touch audit done at activation. Shepherd kickoff handed to operator;
-  spawn pending.
+  (WI-698), OQ2 file-touch audit done at activation. **Shepherd SPAWNED 2026-06-13**
+  (separate session — Opus 4.8 / medium effort, Sonnet executors per the kickoff;
+  Opus-escalation on WI-699 concurrency + the F-132/F-119 pieces of WI-698). It wires
+  itself as the 5th `review-watcher-v3.ts` entry on arrival.
 - **Activate-when:** — (active)
 
 ### PRG-12 · L10n & A11y Mobile — `✓ graduated` (2026-06-12)
@@ -486,7 +488,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 4 | **PRG-03** `WI-587` memory dispositions | ✓ **RULED + EXECUTED 06-11** — all 19 landed on `main` (`7cc8a9a8d`); WI-587 now **Reviewing**; only a manual `/cosmo:review` close remains (verified landed 06-13) |
 | 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
 | 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
-| 7 | **PRG-10** security-pii-api | ✓ **ACTIVATED 06-13** — 27 findings sliced into WI-698…704 (5 WP + 2 Item); slice scan 27/27 LIVE + 27/27 CLEAN (parallel-safe with the IF cutover); shepherd spawn pending |
+| 7 | **PRG-10** security-pii-api | ✓ **ACTIVATED 06-13** — 27 findings sliced into WI-698…704 (5 WP + 2 Item); slice scan 27/27 LIVE + 27/27 CLEAN (parallel-safe with the IF cutover); shepherd **SPAWNED 06-13** (Opus/medium + Sonnet executors) |
 | 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
 | 9 | **PRG-04** top-down delivery layer + **PRG-05** execution-mechanism productionization | **PRG-05 design-ACTIVATED 06-13** (agnosticity spike = first work); PRG-04 design opens at the joint grill. Sequence spike → grill → slice; no Cosmo until post-grill |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
