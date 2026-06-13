@@ -784,7 +784,8 @@ export const subscriptionPayers = pgTable(
 // Keyed by the ratified consent key (charge_person_id × purpose ×
 // organization_id) extended by requested_basis — the workflow runs per
 // regulatory basis, mirroring the legacy GDPR/COPPA dual-row coexistence
-// (legacy uniqueness is (profile_id, consent_type)). See §1.2 / Appendix A.
+// (legacy consent_states uniqueness is the profile + consent_type pair).
+// See §1.2 / Appendix A.
 // ---------------------------------------------------------------------------
 
 export const consentRequest = pgTable(
