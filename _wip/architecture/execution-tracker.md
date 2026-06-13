@@ -44,22 +44,25 @@ The shepherd executes these autonomously on spawn.
 
 All four are independent — no `Blocked-by` edges, parallel-safe with the live cutover.
 
-### Tier 2 — PARALLEL-SAFE but HUMAN-GATED (NOT in Cosmo — operator decomposition gate)
+### Tier 2 — PARALLEL-SAFE, HUMAN-GATED (decomposition gate RUN 2026-06-13 → sliced to Cosmo)
 
-Parallel-safe vs the cutover (can run alongside it) **but** each carries an architectural
-decision (where to cut a cycle, which adapter wins, the nav-gating abstraction). Sliced into
-WPs at the operator decomposition session, **then** executed (not cutover-blocked).
+Each carried an architectural decision (where to cut a cycle, which adapter wins, the
+nav-gating abstraction). The operator decomposition session ran **2026-06-13**: 5 read-only
+investigators re-verified each finding against today's code and framed its cut; the operator
+approved; **6 are now sliced into the "Architecture Clean-Out" workstream** (WI-724…729 —
+the fresh Tier-2 shepherd's mandate). Two findings left the wave: **F-103 deferred**
+(cutover collision), **F-112 closed won't-fix** (no violators).
 
-| Finding | Theme | Decomposition decision |
-|---|---|---|
-| F-011 | circular-deps | `curriculum.ts` ⇄ `language-curriculum.ts` — which edge to cut / extract a shared module |
-| F-030 | circular-deps | `exchanges.ts` ⇄ `exchange-prompts.ts` type/runtime cycle break |
-| F-103 | god-modules (partial) | wire `challenge-round/persistence.ts` into the main flow, retire the private copy in `session-exchange.ts` |
-| F-104 | domain-org | promote `dispatchSessionCompletedEvent` from `routes/sessions.ts` to the service layer |
-| F-105 | domain-org | unify the drifted retry-filing cap across `routes/sessions.ts` + `routes/filing.ts` (live bug; bounded part + dedup decision) |
-| F-108 | mobile-nav | dedup V0/V1 entry-gating across 8 screens into `canEnter()` — nav-contract-sensitive |
-| F-109 | mobile-nav | eliminate the `showParentHome` magic-prop home routing |
-| F-112 | data-access | `createScopedRepository` vs parent-chain adapters — revisits a CLAUDE.md rule |
+| Finding | Theme | Cosmo | Approved cut |
+|---|---|---|---|
+| F-011 | circular-deps | **WI-724** | extract `ensureDefaultBook` → new `curriculum-core.ts` (break the runtime cycle one-way) |
+| F-030 | circular-deps | **WI-725** | extract `ExchangeContext` → `exchange-types.ts` (type-only cycle; land promptly vs the 586 re-point) |
+| F-104 | domain-org | **WI-726** | move `dispatchSessionCompletedEvent` → `services/session/session-filing-dispatch.ts` (G1/G5) |
+| F-105 | domain-org | **WI-727** | `filing.ts` imports `FILING_CONFIG.maxRetries`, drops the hardcoded `3` (live drift bug) |
+| F-108 | mobile-nav | **WI-728** | extract `useEntryGate()` hook over 7 screens (+ Sentry breadcrumb); mandatory flag-matrix regress test |
+| F-109 | mobile-nav | **WI-729** | remove the dead `showParentHome` prop+branch (home routing already migrated to `home.tsx`) |
+| F-103 | god-modules | **DEFERRED** | touches `session-exchange.ts` (active cutover surface; Tier-3 F-106/107 live there) → joins the post-586 wave |
+| F-112 | data-access | **CLOSED wont-fix** | no violators; AGENTS.md already sanctions the scoped-repo/parent-chain split (audit itself: "deliberate and working") |
 
 ### Tier 3 — CUTOVER-SERIALIZED (NOT in Cosmo — Blocked behind the cutover tail)
 
@@ -106,33 +109,41 @@ modules). Block on the relevant CUT-B unit or **WI-586**.
 Read the standard scaffolds; don't re-derive process here:
 - `_wip/identity-foundation/shepherd-protocol.md` — the shepherd scaffold: your job, the
   three-role split (the **reviewer is a SEPARATE session** — you self-monitor Cosmo for
-  verdicts; **DoD = Cosmo Close, not a green PR**), dispatch + model/effort defaults.
+  verdicts; **two mandatory gates — a green PR to *merge*, then Cosmo Close to *graduate***;
+  see shepherd-protocol.md → *Merging the WP*), dispatch + model/effort defaults.
 - `_wip/identity-foundation/executor-protocol.md` (+ `-example`) — the scaffold your
   executors follow and the thin pointer-brief shape.
 
-Lane-specific (THIS lane differs from the mechanical lanes — read carefully):
+Lane-specific — **CURRENT WAVE = TIER 2** (Tier 1 done; read carefully):
 
-- **SCOPE — Tier 1 ONLY.** Your entire mandate today is **WI-717, WI-718, WI-719, WI-720**
-  (§2). Drive those four to Cosmo Close via the normal loop. Do **NOT** touch Tiers 2/3 —
-  they are not in Cosmo by design; they await the operator decomposition gate. When all four
-  Tier-1 units are Closed, **do not declare the lane graduated** — post a checkpoint, report
-  "Tier 1 complete; Tiers 2/3 await the operator decomposition session", and stand by.
-- **Reviewer coverage:** the separate reviewer (Codex) session covers Workstream
-  "Architecture Clean-Out" (`37e8bce9-1f7c-81fe-be97-e063ce8f17e8`) — confirm on arrival; do
-  not wire/own the watcher.
-- **Supervision (Tier 1 is agent-routine):** the deferred human-led decomposition is Tiers
-  2/3, which you are NOT executing. Within Tier 1, WI-717 (concurrency) warrants care:
-  red-green concurrency break tests are mandatory; HIGH-correctness fixes need the negative
-  path proven (write test → pass → revert fix → fail → restore).
-- **Model/effort (default Sonnet per the protocol):** run **WI-717** with an **Opus
-  plan-phase** (subtle SELECT-FOR-UPDATE / read-lock ordering), Sonnet implements; WI-718 /
-  WI-719 / WI-720 stay Sonnet end-to-end.
-- **WI-720 scope fence:** the GC6 sweep must **exclude** any test file whose module-under-test
-  is in the live cutover surface (identity / consent / family-access / billing / metering /
-  auth / session-exchange / sessions / stripe-webhook / revenuecat-webhook) — those collide
-  with CUT-B2/B3; defer to post-flip. Per-file judgment at execution.
-- **Landing checks:** PR base `main`; re-grep each finding fresh at plan time (F-097 evidence
-  is B1-stale). If a NEW ambient red appears on `main`, capture it as a WI — don't fix inline.
+- **SCOPE — Tier 2.** Your mandate is **WI-724, WI-725, WI-726, WI-727, WI-728, WI-729**
+  (§2 Tier-2 table — F-011/030/104/105/108/109). Each WI carries its **operator-approved cut**
+  in its Acceptance Criteria + Description — execute WITHIN that cut; do **not** re-open the
+  architectural decision. Drive all six to Cosmo Close via the normal loop. Tier 1 is **DONE**;
+  **F-103 is DEFERRED** (not yours — post-586 wave); **F-112 is CLOSED won't-fix**; **Tier 3**
+  stays parked (post-flip + re-scan). When all six are Closed, post a checkpoint and **stand
+  by — do NOT declare the lane graduated** (Tier 3 remains).
+- **Green-PR merge gate — non-negotiable (corrected protocol).** Merge each PR ONLY when green
+  by the strict definition in `shepherd-protocol.md` → *Merging the WP*: every required check
+  `SUCCESS`, **`claude-review` actually green** (silence ≠ approval — diagnose a red review,
+  incl. a broken *workflow*, before merging; not just "tokens"), no valid
+  blocker/must-fix/should-fix, `mergeStateStatus` `CLEAN`. **NEVER call a red PR "green".**
+  (The Tier-1 run merged PRs while `claude-review` was red — do not repeat it.)
+- **Reviewer coverage:** the separate reviewer (Codex) covers Workstream "Architecture
+  Clean-Out" (`37e8bce9-1f7c-81fe-be97-e063ce8f17e8`) — confirm on arrival; don't wire/own it.
+- **Care items (most are S/M mechanical — the decision is already made):**
+  - **WI-728 (F-108) is nav-contract-sensitive:** the `useEntryGate()` refactor must NOT
+    regress any shipped flag state (flags-off / V0-on / V1-on) × proxy/non-proxy — a
+    flag-matrix regress test for ≥1 learning route is mandatory; no internal `jest.mock`
+    (GC1/GC6) — use the `__fixtures__/navigation-matrix` fixture pattern.
+  - **WI-725 / WI-726 / WI-727 touch cutover-adjacent files** (`exchanges.ts` / `sessions.ts`
+    / `filing.ts`): parallel-safe, but coordinate PR timing — land promptly; if a WI-586
+    re-point touches the same file first, rebase rather than fight it.
+- **Model/effort:** **Sonnet end-to-end** for all six — bounded refactors, architectural
+  decision pre-made; no Opus plan-phase needed.
+- **Landing checks:** PR base `main`; **re-grep each finding fresh at plan time** — the cuts
+  cite specific `file:line`s from the 2026-06-13 investigation that may have drifted. If a NEW
+  ambient red appears on `main`, capture it as a WI — don't fix inline.
 
 ## 5. Execution state
 
@@ -154,3 +165,12 @@ Lane-specific (THIS lane differs from the mechanical lanes — read carefully):
   (after a mid-run breakage from PR #1121's WI-698 workflow-hardening was reverted on main
   and each PR's `claude-code-review.yml` re-synced). **Tiers 2/3 still await the operator
   decomposition gate — lane NOT graduated.**
+- 2026-06-13 — **Tier 2 ACTIVATED** (operator decomposition gate run). 5 read-only
+  investigators re-verified the 8 Tier-2 findings against today's code; operator approved the
+  cuts. **6 sliced** to the workstream — **WI-724…729** (`Stage=Backlog`, each carrying its
+  approved cut as AC): F-011→724, F-030→725, F-104→726, F-105→727, F-108→728, F-109→729.
+  **F-103 deferred** to the post-586 wave (edits `session-exchange.ts`, the active cutover
+  surface — Tier-3 collision). **F-112 closed won't-fix** (no violators; AGENTS.md already
+  sanctions the scoped-repo / parent-chain split — audit itself: "deliberate and working").
+  Fresh Tier-2 shepherd to be spawned under the **corrected** shepherd-protocol (green-PR
+  -before-merge gate restored 2026-06-13). Tier 3 unchanged (post-flip + re-scan).
