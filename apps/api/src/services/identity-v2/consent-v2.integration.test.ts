@@ -425,9 +425,15 @@ const COPPA = 'coppa_parental_consent';
         for (const r of financialRecords) {
           expect(r.organizationId).toBe(orgId);
           expect(r.retentionPeriod).toBeNull(); // §4.9 counsel-owned
-          expect(
-            (r.payload as { subscriptions: unknown[] }).subscriptions,
-          ).toEqual([]);
+          const payload = r.payload as {
+            subscriptions: unknown[];
+            deletedAt: string;
+          };
+          expect(payload.subscriptions).toEqual([]);
+          // deletedAt must be present + a well-formed ISO timestamp (a
+          // regression that stops writing it is caught here).
+          expect(typeof payload.deletedAt).toBe('string');
+          expect(Number.isNaN(Date.parse(payload.deletedAt))).toBe(false);
         }
       });
 
@@ -617,12 +623,24 @@ const COPPA = 'coppa_parental_consent';
         });
         expect(personRow).toBeUndefined();
 
-        // Exactly ONE run reports a successful delete; the other no-ops (false)
-        // or errors on the lost lock — never a second true.
-        const trueCount = outcomes.filter(
-          (o) => o.status === 'fulfilled' && o.value === true,
-        ).length;
-        expect(trueCount).toBe(1);
+        // BOTH promises must FULFILL — neither rejects. This test is the
+        // guarantor of the race fix, so it must not be able to green on a thrown
+        // delete: the advisory lock makes the loser BLOCK then cleanly return
+        // false (it never errors). If a future regression makes one delete
+        // throw, `allSettled` would record a 'rejected' that the winner-count
+        // below would silently ignore — assert fulfillment explicitly to catch
+        // that.
+        for (const o of outcomes) {
+          expect(o.status).toBe('fulfilled');
+        }
+
+        // Exactly ONE run reports a successful delete; the other blocks on the
+        // lock, re-reads, sees the person gone, and cleanly returns false.
+        const values = outcomes.map((o) =>
+          o.status === 'fulfilled' ? o.value : undefined,
+        );
+        expect(values.filter((v) => v === true)).toHaveLength(1);
+        expect(values.filter((v) => v === false)).toHaveLength(1);
 
         // The retain records reflect a SINGLE deletion — no duplicates.
         const financialRecords = await db.query.financialRecord.findMany({
