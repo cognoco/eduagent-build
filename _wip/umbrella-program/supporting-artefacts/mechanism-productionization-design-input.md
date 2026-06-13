@@ -126,3 +126,15 @@ Cosmo `WI-590` split deferred to slice time (no Cosmo mutation pre-grill).
   Spike is pre-Cosmo (design activity, tracked here — no Cosmo WI; slicing is
   post-grill). Next: scope the throwaway WI + decide run venue (this session vs
   dedicated). Deliverable: one-page finding → required input to the grill.
+- **2026-06-13 — SPIKE COMPLETE.** Run 1 killed by a subscription-plan expiry (transient,
+  not a structural/depth limit — that theory was retracted); run 2 completed probe (b) +
+  the watch-item. Finding: `spike-agnosticity/finding.md`. Headline: **cross-runtime
+  dispatch is production-viable now, including nested Claude-executor → Codex-reviewer
+  adversarial review**; 7 seam-contract requirements captured (load-bearing: **#1 forced-cwd
+  write isolation** for Codex executors — the shared `codex-companion` is root-pinned and
+  would pollute the live checkout); reviewer≠executor independence delivered genuinely
+  additive findings → make it a **contract default**. Canonical Codex seam =
+  `codex exec --cd <wt>` (`-s workspace-write` exec / `-s read-only` review), NOT the
+  companion runtime or the task-only `codex:codex-rescue` wrapper. Throwaway WI-697
+  Cancelled. **Next gate: the combined PRG-04 + PRG-05 design/grill, with finding.md +
+  the 7 seam-contract points as required input to the seam catalogue.**

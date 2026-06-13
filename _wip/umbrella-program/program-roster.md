@@ -574,11 +574,19 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 | `WI-694` KV-verifier empty-body regex hotfix | WI-682 prod probe | main-side hotfix | detached from PRG-17; closing via generic review | Reviewing → Closing |
 | `WI-695` GC6 burndown — 3 new-llm test internal mocks | claude-review on #1087 | eduagent GC6 backlog | post-merge; standalone by design (avoids new-llm-landing policy) | Backlog |
 | `WI-696` Type `app/session.completed` event end-to-end (Finding A) | claude-review on #1087 | eduagent schema-contract | post-merge; proper fix of the pervasive untyped-event pattern (not the one-field add the reviewer implied) | Backlog |
-| `WI-697` [SPIKE THROWAWAY] agnosticity probe fixture (clamp + test) | PRG-05 agnosticity spike | throwaway spike fixture | **Cancel post-spike** (program session) — not real work; exists only to give the spike an executor task | Ready (standalone) |
+| `WI-697` [SPIKE THROWAWAY] agnosticity probe fixture (clamp + test) | PRG-05 agnosticity spike | throwaway spike fixture | not real work; existed only to give the spike an executor task | **Closed/Cancelled 06-13 ✓** — spike complete (`spike-agnosticity/finding.md`) |
 
 ---
 
 ## Change log
+- **2026-06-13 — PRG-05 agnosticity SPIKE COMPLETE.** First design-phase work for PRG-05
+  done. Run 1 died to a transient subscription-plan expiry (the "entitlement-gated at depth"
+  theory was wrong — retracted); run 2 completed the nested cross-runtime review probe.
+  Result: cross-runtime dispatch (incl. nested Claude-executor → Codex-reviewer adversarial
+  review) is production-viable; 7 seam-contract requirements + a "reviewer≠executor as
+  contract default" recommendation captured in `spike-agnosticity/finding.md`. Canonical
+  Codex seam = `codex exec --cd <wt>`. Throwaway WI-697 Cancelled. Next gate: the combined
+  PRG-04 + PRG-05 design/grill (finding = required seam-catalogue input).
 - **2026-06-13 — PRG-10 (security-pii-api) ACTIVATED — sixth §2.1 run, first
   post-cutover parallel activation.** Cosmo Workstream "API Security & PII"
   (`37e8bce9-1f7c-8161-a3fc-c74c5300a88f`) + `WI-698…704` created (5 WP + 2 Item,
