@@ -332,6 +332,38 @@ jest.mock(
   },
 );
 
+const mockEnsureFreeSubscription = jest.fn().mockResolvedValue({
+  id: 'sub-test-id',
+  accountId: 'account-test-id',
+  tier: 'free',
+  status: 'active',
+});
+const mockDecrementQuota = jest.fn().mockResolvedValue({
+  success: true,
+  source: 'monthly',
+  remainingMonthly: 9,
+  remainingTopUp: 0,
+  remainingDaily: null,
+  quotaModel: 'shared-pool',
+});
+const mockSafeRefundQuota = jest.fn().mockResolvedValue({ refunded: true });
+
+jest.mock(
+  '../../services/billing' /* gc1-allow: billing operations write Neon quota tables — no DB in the unit runtime */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/billing',
+    ) as typeof import('../../services/billing');
+    return {
+      ...actual,
+      ensureFreeSubscription: (...args: unknown[]) =>
+        mockEnsureFreeSubscription(...args),
+      decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
+      safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
+    };
+  },
+);
+
 const mockQueueCelebration = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
@@ -1619,6 +1651,115 @@ describe('sessionCompleted', () => {
         (o: any) => o.step === 'extract-homework-summary',
       );
       expect(outcome.status).toBe('ok');
+    });
+
+    // [F-128] Billing path tests — require a DB mock that returns a profile
+    // row with accountId so the quota gate runs. Override createDatabase in
+    // these tests to return a chainable mock that resolves the profiles select.
+    const ACCOUNT_ID = '00000000-0000-4000-8000-000000000099';
+
+    function makeDbWithProfile() {
+      let selectCallCount = 0;
+      const selectWithProfile = () => ({
+        from: () => ({
+          innerJoin: () => ({
+            innerJoin: () => ({
+              where: () => ({
+                orderBy: () => ({ limit: () => Promise.resolve([]) }),
+                limit: () => Promise.resolve([]),
+              }),
+            }),
+          }),
+          where: () => ({
+            orderBy: () => ({ limit: () => Promise.resolve([]) }),
+            limit: () => {
+              selectCallCount += 1;
+              // First select in the step is the profiles fetch for accountId
+              // and conversationLanguage.
+              return Promise.resolve([
+                { conversationLanguage: 'en', accountId: ACCOUNT_ID },
+              ]);
+            },
+          }),
+        }),
+      });
+      const db: Record<string, unknown> = {
+        ...mockSessionCompletedDb,
+        select: selectWithProfile,
+      };
+      db.transaction = jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+      return db;
+    }
+
+    it('[BREAK] decrements quota before calling extractAndStoreHomeworkSummary for homework sessions', async () => {
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+      await executeSteps(createEventData({ sessionType: 'homework' }));
+
+      expect(mockEnsureFreeSubscription).toHaveBeenCalledWith(
+        expect.anything(),
+        ACCOUNT_ID,
+      );
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-test-id',
+        PROFILE_ID,
+      );
+      expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalled();
+      // No refund — LLM succeeded.
+      expect(mockSafeRefundQuota).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] skips LLM and emits structured event when quota exhausted', async () => {
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+      mockDecrementQuota.mockResolvedValueOnce({
+        success: false,
+        source: 'monthly_exceeded',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+        resetsAt: '2026-07-01T00:00:00.000Z',
+      });
+
+      await executeSteps(createEventData({ sessionType: 'homework' }));
+
+      // LLM must NOT be called when quota is exhausted.
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+      // Must emit structured event (silent-recovery ban).
+      expect(mockSafeSend).toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.quota_exhausted',
+        expect.objectContaining({
+          subscriptionId: 'sub-test-id',
+          profileId: PROFILE_ID,
+        }),
+      );
+    });
+
+    it('[BREAK] refunds quota and rethrows when extractAndStoreHomeworkSummary throws', async () => {
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+      const llmError = new Error('LLM timeout');
+      mockExtractAndStoreHomeworkSummary.mockRejectedValueOnce(llmError);
+
+      const { result } = (await executeSteps(
+        createEventData({ sessionType: 'homework' }),
+      )) as any;
+
+      // Quota must be refunded on LLM failure.
+      expect(mockSafeRefundQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-test-id',
+        expect.objectContaining({
+          route: 'inngest.session_completed.homework_summary',
+          profileId: PROFILE_ID,
+        }),
+      );
+      // The step should record the failure (runIsolated catches + returns 'failed').
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'extract-homework-summary',
+      );
+      expect(outcome.status).toBe('failed');
     });
   });
 

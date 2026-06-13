@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   curriculumBooks,
@@ -14,6 +14,7 @@ import {
   profiles,
   subjects,
 } from '@eduagent/database';
+import { isPersonLive } from '../../services/identity-v2/helpers';
 import {
   formatReviewReminderBody,
   sendPushNotification,
@@ -36,11 +37,14 @@ export const reviewDueSend = inngest.createFunction(
     const result = await step.run('send-review-reminder', async () => {
       const db = getStepDatabase();
 
-      const activeProfile = await db.query.profiles.findFirst({
-        where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
-        columns: { id: true },
-      });
-      if (!activeProfile) {
+      // [CUT-B2] Liveness dispatch (person.archived_at vs profiles.archived_at).
+      const live = isIdentityV2EnabledInStep()
+        ? await isPersonLive(db, profileId)
+        : !!(await db.query.profiles.findFirst({
+            where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
+            columns: { id: true },
+          }));
+      if (!live) {
         return {
           status: 'skipped' as const,
           reason: 'profile_archived',

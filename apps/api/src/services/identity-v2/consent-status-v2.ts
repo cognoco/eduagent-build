@@ -336,6 +336,37 @@ export async function resolveLatestConsentStatusesAnyBasis(
   return result;
 }
 
+/**
+ * Batched basis-EXPLICIT resolution over many persons for ONE org — the v2 of
+ * the dashboard BUG-466/465 batch read (`dashboard.ts:840`, the GDPR-pinned
+ * `consentByProfile` map). Pass `basis = 'gdpr_parental_consent'` for the
+ * dashboard sites — a basis-blind read IS the newer-COPPA-masks-GDPR bug, so
+ * this batched form is also basis-required. Returns a Map keyed by person id;
+ * persons with no rows for the basis are absent (caller treats absent as null).
+ */
+export async function resolveConsentStatusesForBasis(
+  db: Database,
+  chargePersonIds: readonly string[],
+  organizationId: string,
+  purpose: string,
+  basis: ConsentBasis,
+): Promise<Map<string, ConsentStatus>> {
+  const result = new Map<string, ConsentStatus>();
+  await Promise.all(
+    chargePersonIds.map(async (personId) => {
+      const status = await resolveConsentStatus(
+        db,
+        personId,
+        organizationId,
+        purpose,
+        basis,
+      );
+      if (status !== null) result.set(personId, status);
+    }),
+  );
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // GDPR processing gate (§2.5 (i)) — the shared re-point for isGdprProcessingAllowed
 // ---------------------------------------------------------------------------

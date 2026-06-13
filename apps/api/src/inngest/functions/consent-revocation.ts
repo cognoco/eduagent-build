@@ -1,6 +1,6 @@
 // @inngest-admin: parent-chain (profiles updated with explicit childProfileId + archivedAt guard)
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { sql } from 'drizzle-orm';
 import {
   calculateAge,
@@ -9,6 +9,14 @@ import {
   getProfileForConsentRevocation,
   getProfileDisplayName,
 } from '../../services/consent';
+import {
+  isConsentRevocationGenerationCurrentV2,
+  getPersonForConsentRevocationV2,
+  getPersonDisplayNameV2,
+  archivePersonOnRevocationV2,
+} from '../../services/identity-v2/consent-v2';
+import { getFamilyOwnerPersonIdV2 } from '../../services/identity-v2/family-v2';
+import { deletePersonIfConsentWithdrawnV2 } from '../../services/identity-v2/deletion-v2';
 import { deleteProfileIfConsentWithdrawn } from '../../services/deletion';
 import { markAllNudgesRead } from '../../services/nudge';
 import { sendPushNotification } from '../../services/notifications';
@@ -55,6 +63,32 @@ export const consentRevocation = inngest.createFunction(
         ? revokedAtDate
         : undefined;
 
+    // [CUT-B2] Per-call flag dispatch to the v2 (consent_grant / person) or
+    // legacy (consent_states / profiles) revocation reads. The flag is read
+    // inside each step via isIdentityV2EnabledInStep() (the env binding the
+    // Inngest middleware sets per invocation).
+    type DB = ReturnType<typeof getStepDatabase>;
+    const isRevocationCurrent = (db: DB) =>
+      isIdentityV2EnabledInStep()
+        ? isConsentRevocationGenerationCurrentV2(
+            db,
+            childProfileId,
+            revocationRespondedAt,
+          )
+        : isConsentRevocationGenerationCurrent(
+            db,
+            childProfileId,
+            revocationRespondedAt,
+          );
+    const childDisplayName = (db: DB) =>
+      isIdentityV2EnabledInStep()
+        ? getPersonDisplayNameV2(db, childProfileId)
+        : getProfileDisplayName(db, childProfileId);
+    const loadChildForRevocation = (db: DB) =>
+      isIdentityV2EnabledInStep()
+        ? getPersonForConsentRevocationV2(db, childProfileId)
+        : getProfileForConsentRevocation(db, childProfileId);
+
     // Immediately soft-clear all unread nudges to the child so they don't
     // see stale encouragements during the 7-day grace period.
     await step.run('clear-unread-nudges', async () => {
@@ -67,11 +101,7 @@ export const consentRevocation = inngest.createFunction(
 
     await step.run('send-warning-push', async () => {
       const db = getStepDatabase();
-      const isCurrentRevocation = await isConsentRevocationGenerationCurrent(
-        db,
-        childProfileId,
-        revocationRespondedAt,
-      );
+      const isCurrentRevocation = await isRevocationCurrent(db);
       if (!isCurrentRevocation) {
         return { sent: false, reason: 'restored' };
       }
@@ -86,8 +116,7 @@ export const consentRevocation = inngest.createFunction(
         return { sent: false, reason: 'dedup_24h' };
       }
 
-      const childName =
-        (await getProfileDisplayName(db, childProfileId)) ?? 'Your child';
+      const childName = (await childDisplayName(db)) ?? 'Your child';
       await sendPushNotification(db, {
         profileId: parentProfileId,
         title: 'Account closing tomorrow',
@@ -102,11 +131,7 @@ export const consentRevocation = inngest.createFunction(
     // Check if consent was restored during grace period
     const restored = await step.run('check-restoration', async () => {
       const db = getStepDatabase();
-      return !(await isConsentRevocationGenerationCurrent(
-        db,
-        childProfileId,
-        revocationRespondedAt,
-      ));
+      return !(await isRevocationCurrent(db));
     });
 
     if (restored) {
@@ -119,7 +144,7 @@ export const consentRevocation = inngest.createFunction(
     // steps that consume them.
     const childProfile = await step.run('load-child-profile', async () => {
       const db = getStepDatabase();
-      const profile = await getProfileForConsentRevocation(db, childProfileId);
+      const profile = await loadChildForRevocation(db);
       return profile ? { found: true as const } : null;
     });
 
@@ -129,11 +154,9 @@ export const consentRevocation = inngest.createFunction(
 
     const archiveDecision = await step.run('choose-final-action', async () => {
       const db = getStepDatabase();
-      const ownerProfileId = await getFamilyOwnerProfileId(
-        db,
-        childProfileId,
-        parentProfileId,
-      );
+      const ownerProfileId = isIdentityV2EnabledInStep()
+        ? await getFamilyOwnerPersonIdV2(db, childProfileId, parentProfileId)
+        : await getFamilyOwnerProfileId(db, childProfileId, parentProfileId);
       const preference = await getWithdrawalArchivePreference(
         db,
         ownerProfileId,
@@ -141,7 +164,7 @@ export const consentRevocation = inngest.createFunction(
       // Rehydrated here instead of riding the load-child-profile step return.
       // A vanished profile (deleted between steps) conservatively routes to
       // the delete branch, where the consent-generation guard no-ops safely.
-      const profile = await getProfileForConsentRevocation(db, childProfileId);
+      const profile = await loadChildForRevocation(db);
       const age = profile ? calculateAge(profile.birthYear) : null;
       return {
         ownerProfileId,
@@ -161,6 +184,23 @@ export const consentRevocation = inngest.createFunction(
         'archive-child-profile',
         async () => {
           const db = getStepDatabase();
+          const archivedAt = new Date();
+          if (isIdentityV2EnabledInStep()) {
+            // [CUT-B2] v2 archive: stamp person.archived_at atomically when the
+            // current GDPR grant is withdrawn (at the matching timestamp) and
+            // the guardian holds an active edge — the guardianship-edge guard
+            // replaces the legacy account_id parent-chain guard (BUG-662).
+            const archived = await archivePersonOnRevocationV2(
+              db,
+              childProfileId,
+              archiveDecision.ownerProfileId,
+              archivedAt,
+              revocationRespondedAt,
+            );
+            return archived
+              ? { archived: true }
+              : { archived: false, reason: 'consent_restored' };
+          }
           const isCurrentRevocation =
             await isConsentRevocationGenerationCurrent(
               db,
@@ -170,7 +210,6 @@ export const consentRevocation = inngest.createFunction(
           if (!isCurrentRevocation) {
             return { archived: false, reason: 'consent_restored' };
           }
-          const archivedAt = new Date();
           // [BUG-662 / FCR-2026-05-23-L3.L3.3] Defense-in-depth parent-chain
           // guard: in addition to the consent_states scoping inside the CTE,
           // require the child profile's account_id to match the parent's
@@ -232,8 +271,7 @@ export const consentRevocation = inngest.createFunction(
           return { sent: false, reason: 'dedup_24h' };
         }
         // Rehydrated in-step: the archived profile row still exists.
-        const childName =
-          (await getProfileDisplayName(db, childProfileId)) ?? 'Your child';
+        const childName = (await childDisplayName(db)) ?? 'Your child';
         await sendPushNotification(db, {
           profileId: parentProfileId,
           title: 'Account archived',
@@ -245,8 +283,7 @@ export const consentRevocation = inngest.createFunction(
 
       await step.run('record-parent-archive-notice', async () => {
         const db = getStepDatabase();
-        const childName =
-          (await getProfileDisplayName(db, childProfileId)) ?? 'Your child';
+        const childName = (await childDisplayName(db)) ?? 'Your child';
         await recordPendingNotice(db, {
           ownerProfileId: archiveDecision.ownerProfileId,
           type: 'consent_archived',
@@ -268,11 +305,7 @@ export const consentRevocation = inngest.createFunction(
     // observability story consistent across cron-driven push paths.
     await step.run('notify-child', async () => {
       const db = getStepDatabase();
-      const isCurrentRevocation = await isConsentRevocationGenerationCurrent(
-        db,
-        childProfileId,
-        revocationRespondedAt,
-      );
+      const isCurrentRevocation = await isRevocationCurrent(db);
       if (!isCurrentRevocation) {
         return { sent: false, reason: 'consent_restored' };
       }
@@ -314,14 +347,19 @@ export const consentRevocation = inngest.createFunction(
     // multi-parent families.
     const deleteResult = await step.run('delete-child-profile', async () => {
       const db = getStepDatabase();
-      const childName =
-        (await getProfileDisplayName(db, childProfileId)) ?? 'Your child';
-      const deleted = await deleteProfileIfConsentWithdrawn(
-        db,
-        childProfileId,
-        revocationRespondedAt,
-        archiveDecision.ownerProfileId,
-      );
+      const childName = (await childDisplayName(db)) ?? 'Your child';
+      const deleted = isIdentityV2EnabledInStep()
+        ? await deletePersonIfConsentWithdrawnV2(
+            db,
+            childProfileId,
+            revocationRespondedAt,
+          )
+        : await deleteProfileIfConsentWithdrawn(
+            db,
+            childProfileId,
+            revocationRespondedAt,
+            archiveDecision.ownerProfileId,
+          );
       if (!deleted) {
         return { deleted: false as const, noticeId: null };
       }
