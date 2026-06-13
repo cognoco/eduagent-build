@@ -18,8 +18,13 @@
 // person.id = profiles.id throughout. FLAG-GATED via the calling seam.
 // ---------------------------------------------------------------------------
 
-import { and, eq } from 'drizzle-orm';
-import { consentGrant, membership, type Database } from '@eduagent/database';
+import { and, eq, isNull } from 'drizzle-orm';
+import {
+  consentGrant,
+  membership,
+  person,
+  type Database,
+} from '@eduagent/database';
 import type { ConsentStatus } from '@eduagent/schemas';
 import {
   DEFAULT_CONSENT_PURPOSE,
@@ -150,6 +155,40 @@ export async function resolveOrgIdForPerson(
   personId: string,
 ): Promise<string | null> {
   return resolveOrgId(db, personId);
+}
+
+/**
+ * v2 `resolveProfileRole`: 'guardian' when the person holds at least one active
+ * guardianship edge over a charge, else 'self_learner'. The legacy version read
+ * family_links by parent; v2 reads active guardianship edges.
+ */
+export async function resolveProfileRoleV2(
+  db: Database,
+  personId: string,
+): Promise<'guardian' | 'self_learner'> {
+  const charges = await getChargePersonIds(db, personId);
+  return charges.length > 0 ? 'guardian' : 'self_learner';
+}
+
+/**
+ * v2 of the recall-nudge-send guardian-child-name lookup: the display name of a
+ * guardian's first active, non-archived child. The legacy version read the first
+ * family_links child; v2 reads the first active guardianship charge. Null when
+ * the guardian has no active non-archived child.
+ */
+export async function getFirstActiveChildNameV2(
+  db: Database,
+  guardianPersonId: string,
+): Promise<string | null> {
+  const charges = await getChargePersonIds(db, guardianPersonId);
+  for (const chargeId of charges) {
+    const child = await db.query.person.findFirst({
+      where: and(eq(person.id, chargeId), isNull(person.archivedAt)),
+      columns: { displayName: true },
+    });
+    if (child) return child.displayName;
+  }
+  return null;
 }
 
 /**
