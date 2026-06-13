@@ -74,6 +74,10 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
 
   // Require TEST_SEED_SECRET on non-development environments (e.g., staging).
   // On local development, the secret is optional to simplify the dev workflow.
+  // IMPORTANT: never deploy with ENVIRONMENT=development pointing at a shared or
+  // real database — that would expose seeding, reset, and account-enumeration
+  // endpoints without a secret guard. Use 'staging' or 'production' for
+  // any shared environment.
   const secret = c.env.TEST_SEED_SECRET;
   const isDev = c.env.ENVIRONMENT === 'development';
 
@@ -89,6 +93,9 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
   }
 
   if (secret) {
+    // Secret is read from a request header (not a query param) — headers are
+    // not logged by proxies/CDNs or visible in browser history. Never accept
+    // this secret via a query string parameter.
     const headerSecret = c.req.header('X-Test-Secret') ?? '';
     // CI-06: HMAC-based constant-time comparison to prevent timing attacks.
     // Both inputs are hashed to fixed-length SHA-256 digests before XOR

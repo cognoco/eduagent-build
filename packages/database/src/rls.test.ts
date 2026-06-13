@@ -1,5 +1,5 @@
 // Unit tests only — these verify call order and error propagation using mocks.
-// Integration tests (context propagation, rollback, SET LOCAL guard) live in
+// Integration tests (context propagation, rollback, transaction-scoped GUC guard) live in
 // rls.integration.test.ts — Phase 0.3, docs/_archive/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md.
 
 import { withProfileScope } from './rls.js';
@@ -35,7 +35,7 @@ describe('withProfileScope', () => {
     expect(result).toBe('result');
   });
 
-  it('executes SET LOCAL before the callback', async () => {
+  it('executes the GUC scope statement before the callback', async () => {
     const db = createMockDb();
     const callOrder: string[] = [];
 
