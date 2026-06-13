@@ -20,22 +20,11 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { apiError } from '../errors';
-import {
-  ensureFreeSubscription,
-  isRevenuecatEventProcessed,
-} from '../services/billing';
-import {
-  handleInitialPurchase,
-  handleRenewal,
-  handleCancellation,
-  handleExpiration,
-  handleBillingIssue,
-  handleSubscriberAlias,
-  handleProductChange,
-  handleNonRenewingPurchase,
-  handleUncancellation,
-  resolveAccountId,
-} from '../services/billing/revenuecat-webhook-handler';
+// [CUT-B3 / WI-693] The handler seam dispatches: flag-off → legacy handlers
+// (byte-identical, accounts-keyed), flag-on → v2 handlers (login→membership→
+// organization resolution, new `subscription` store). The route body and the
+// bearer-auth / SANDBOX / idempotency-gate guards are unchanged.
+import { getRevenuecatWebhookHandlers } from '../services/billing/billing-v2/dispatch';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
@@ -131,11 +120,16 @@ export const revenuecatWebhookRoute = new Hono<{
     REVENUECAT_WEBHOOK_SECRET?: string;
     SUBSCRIPTION_KV?: KVNamespace;
     ENVIRONMENT?: string;
+    // [CUT-B3 / WI-693] Identity-foundation cutover flag — selects the v2
+    // subscription-store handlers. 'false'/unset in every deployed env.
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     db: Database;
   };
 }>().post('/revenuecat/webhook', async (c) => {
+  // [CUT-B3 / WI-693] Resolve the handler bundle once (legacy vs v2) — the seam.
+  const handlers = getRevenuecatWebhookHandlers(c.env);
   // Validate Authorization Bearer header
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -233,7 +227,7 @@ export const revenuecatWebhookRoute = new Hono<{
   const kv = c.env.SUBSCRIPTION_KV;
 
   // Resolve account — reject if the app_user_id cannot be mapped to an account
-  const accountId = await resolveAccountId(db, event.app_user_id);
+  const accountId = await handlers.resolveAccountId(db, event.app_user_id);
   if (!accountId) {
     // [SEC-11] appUserId is a Clerk pseudonymous identifier — GDPR data minimisation
     // requires it is NOT sent to Sentry (third-party processor). eventId + eventType
@@ -253,7 +247,7 @@ export const revenuecatWebhookRoute = new Hono<{
   }
 
   // Idempotency: skip already-processed events (BD-01: timestamp-based ordering)
-  const alreadyProcessed = await isRevenuecatEventProcessed(
+  const alreadyProcessed = await handlers.isRevenuecatEventProcessed(
     db,
     accountId,
     event.id,
@@ -313,36 +307,36 @@ export const revenuecatWebhookRoute = new Hono<{
     );
   }
 
-  await ensureFreeSubscription(db, accountId);
+  await handlers.ensureFreeSubscription(db, accountId);
 
   // Dispatch to event-specific handler
   switch (event.type) {
     case 'INITIAL_PURCHASE':
-      await handleInitialPurchase(db, kv, event);
+      await handlers.handleInitialPurchase(db, kv, event);
       break;
     case 'RENEWAL':
-      await handleRenewal(db, kv, event);
+      await handlers.handleRenewal(db, kv, event);
       break;
     case 'CANCELLATION':
-      await handleCancellation(db, kv, event);
+      await handlers.handleCancellation(db, kv, event);
       break;
     case 'EXPIRATION':
-      await handleExpiration(db, kv, event);
+      await handlers.handleExpiration(db, kv, event);
       break;
     case 'BILLING_ISSUE':
-      await handleBillingIssue(db, kv, event);
+      await handlers.handleBillingIssue(db, kv, event);
       break;
     case 'SUBSCRIBER_ALIAS':
-      await handleSubscriberAlias(db, kv, event);
+      await handlers.handleSubscriberAlias(db, kv, event);
       break;
     case 'PRODUCT_CHANGE':
-      await handleProductChange(db, kv, event);
+      await handlers.handleProductChange(db, kv, event);
       break;
     case 'UNCANCELLATION':
-      await handleUncancellation(db, kv, event);
+      await handlers.handleUncancellation(db, kv, event);
       break;
     case 'NON_RENEWING_PURCHASE': {
-      const result = await handleNonRenewingPurchase(db, kv, event);
+      const result = await handlers.handleNonRenewingPurchase(db, kv, event);
       if (result) {
         return c.json(result.body, result.status as ContentfulStatusCode);
       }

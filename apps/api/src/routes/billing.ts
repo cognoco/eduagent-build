@@ -43,6 +43,25 @@ import {
   getOrProvisionProfileQuotaUsage,
   getStartOfTodayInTimeZone,
 } from '../services/billing';
+// [CUT-B3 / WI-693] v2 billing reads/writes, selected per-call by the cutover
+// flag. Legacy (flag-off) calls are byte-identical. The usage-breakdown read is
+// intentionally NOT dispatched — it reads family_links (guardianship, CUT-B2's
+// surface); its v2 form is deferred to the B2/B3 seam ruling (see PR description).
+import {
+  getSubscriptionByAccountIdV2,
+  getQuotaPoolV2,
+  linkStripeCustomerV2,
+  ensureFreeSubscriptionV2,
+  markSubscriptionCancelledV2,
+  getEffectiveAccessForSubscriptionV2,
+  getOrProvisionProfileQuotaUsageV2,
+  listFamilyMembersV2,
+  addProfileToSubscriptionV2,
+  removeProfileFromSubscriptionV2,
+  getFamilyPoolStatusV2,
+  ProfileRemovalNotImplementedErrorV2,
+} from '../services/billing/billing-v2';
+import { isIdentityV2Enabled } from '../config';
 import {
   resolveWarningLevel,
   calculateRemainingQuestions,
@@ -78,6 +97,9 @@ type BillingRouteEnv = {
     STRIPE_PRICE_PRO_YEARLY?: string;
     APP_URL?: string;
     SUBSCRIPTION_KV?: KVNamespace;
+    // [CUT-B3 / WI-693] Identity-foundation cutover flag. 'false'/unset in every
+    // deployed env until the WI-586 flip.
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -106,8 +128,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     );
 
     const freeTier = getTierConfig('free');
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
-    const subscription = await getSubscriptionByAccountId(db, account.id);
+    const subscription = v2
+      ? await getSubscriptionByAccountIdV2(db, account.id)
+      : await getSubscriptionByAccountId(db, account.id);
 
     if (!subscription) {
       // No subscription yet -- return free-tier defaults
@@ -132,23 +157,34 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const access = await getEffectiveAccessForSubscription(db, subscription.id);
+    const access = v2
+      ? await getEffectiveAccessForSubscriptionV2(db, subscription.id)
+      : await getEffectiveAccessForSubscription(db, subscription.id);
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscription.tier;
     const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
     const activeProfileId = c.get('profileId');
     const profileQuota =
       quotaModel === 'per-profile' && activeProfileId
-        ? await getOrProvisionProfileQuotaUsage(
-            db,
-            subscription.id,
-            activeProfileId,
-            {
-              tier: effectiveAccessTier,
-            },
-          )
+        ? v2
+          ? await getOrProvisionProfileQuotaUsageV2(
+              db,
+              subscription.id,
+              activeProfileId,
+              { tier: effectiveAccessTier },
+            )
+          : await getOrProvisionProfileQuotaUsage(
+              db,
+              subscription.id,
+              activeProfileId,
+              { tier: effectiveAccessTier },
+            )
         : null;
-    const quota = profileQuota ? null : await getQuotaPool(db, subscription.id);
+    const quota = profileQuota
+      ? null
+      : v2
+        ? await getQuotaPoolV2(db, subscription.id)
+        : await getQuotaPool(db, subscription.id);
     const monthlyLimit =
       profileQuota?.monthlyLimit ??
       quota?.monthlyLimit ??
@@ -220,12 +256,19 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       }
 
       const stripe = createStripeClient(stripeKey);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
       // Ensure a subscription row exists so the webhook has something to link
-      await ensureFreeSubscription(db, account.id);
+      if (v2) {
+        await ensureFreeSubscriptionV2(db, account.id);
+      } else {
+        await ensureFreeSubscription(db, account.id);
+      }
 
       // Resolve or create Stripe customer
-      const subscription = await getSubscriptionByAccountId(db, account.id);
+      const subscription = v2
+        ? await getSubscriptionByAccountIdV2(db, account.id)
+        : await getSubscriptionByAccountId(db, account.id);
       let customerId = subscription?.stripeCustomerId;
 
       if (!customerId) {
@@ -234,7 +277,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           metadata: { accountId: account.id },
         });
         customerId = customer.id;
-        await linkStripeCustomer(db, account.id, customerId);
+        if (v2) {
+          await linkStripeCustomerV2(db, account.id, customerId);
+        } else {
+          await linkStripeCustomer(db, account.id, customerId);
+        }
       }
 
       // [BUG-101 / A1-LOW] Fail loudly instead of silently redirecting to
@@ -295,7 +342,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // [CR-2026-05-19-H1] Only the account owner can cancel a subscription.
     assertOwnerProfile(c, 'Only the account owner can cancel a subscription.');
 
-    const subscription = await getSubscriptionByAccountId(db, account.id);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+    const subscription = v2
+      ? await getSubscriptionByAccountIdV2(db, account.id)
+      : await getSubscriptionByAccountId(db, account.id);
     if (!subscription?.stripeSubscriptionId) {
       return notFound(c, 'No active subscription to cancel');
     }
@@ -335,8 +385,16 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       ? new Date(periodEndTs * 1000).toISOString()
       : new Date().toISOString();
 
-    // Mark local DB row so cancelAtPeriodEnd is reflected immediately
-    await markSubscriptionCancelled(db, subscription.id);
+    // Mark local DB row so cancelAtPeriodEnd is reflected immediately.
+    // [CUT-B3 / WI-693] Must write the SAME store the v2 read came from — a v2
+    // read + legacy write would stamp subscriptions.cancelled_at while v2 reads
+    // keep showing the row uncancelled until a webhook repairs it (split-brain
+    // at the flip). subscription.id is shared across stores by the reseed.
+    if (v2) {
+      await markSubscriptionCancelledV2(db, subscription.id);
+    } else {
+      await markSubscriptionCancelled(db, subscription.id);
+    }
 
     return c.json(
       cancelResponseSchema.parse({
@@ -368,7 +426,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
 
       // Check tier eligibility -- Free tier cannot purchase top-ups
-      const subscription = await getSubscriptionByAccountId(db, account.id);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+      const subscription = v2
+        ? await getSubscriptionByAccountIdV2(db, account.id)
+        : await getSubscriptionByAccountId(db, account.id);
       const tier = subscription?.tier ?? 'free';
       const priceCents = getTopUpPriceCents(tier);
 
@@ -398,7 +459,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           metadata: { accountId: account.id },
         });
         customerId = customer.id;
-        await linkStripeCustomer(db, account.id, customerId);
+        if (v2) {
+          await linkStripeCustomerV2(db, account.id, customerId);
+        } else {
+          await linkStripeCustomer(db, account.id, customerId);
+        }
       }
 
       // Tier-based pricing: Plus EUR10/500, Family/Pro EUR5/500
@@ -432,8 +497,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
     const freeTier = getTierConfig('free');
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
-    const subscription = await getSubscriptionByAccountId(db, account.id);
+    const subscription = v2
+      ? await getSubscriptionByAccountIdV2(db, account.id)
+      : await getSubscriptionByAccountId(db, account.id);
 
     if (!subscription) {
       return c.json(
@@ -455,7 +523,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     const activeProfileId = c.get('profileId');
     const activeProfileMeta = c.get('profileMeta');
-    const access = await getEffectiveAccessForSubscription(db, subscription.id);
+    const access = v2
+      ? await getEffectiveAccessForSubscriptionV2(db, subscription.id)
+      : await getEffectiveAccessForSubscription(db, subscription.id);
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscription.tier;
     // Profile-scoped quota views require active profile context before
@@ -473,14 +543,19 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     }
     const profileQuota =
       quotaModel === 'per-profile' && activeProfileId
-        ? await getOrProvisionProfileQuotaUsage(
-            db,
-            subscription.id,
-            activeProfileId,
-            {
-              tier: effectiveAccessTier,
-            },
-          )
+        ? v2
+          ? await getOrProvisionProfileQuotaUsageV2(
+              db,
+              subscription.id,
+              activeProfileId,
+              { tier: effectiveAccessTier },
+            )
+          : await getOrProvisionProfileQuotaUsage(
+              db,
+              subscription.id,
+              activeProfileId,
+              { tier: effectiveAccessTier },
+            )
         : null;
     const [quota, topUpCreditsRemaining] =
       quotaModel === 'per-profile' && profileQuota
@@ -496,7 +571,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
               : 0,
           ]
         : await Promise.all([
-            getQuotaPool(db, subscription.id),
+            v2
+              ? getQuotaPoolV2(db, subscription.id)
+              : getQuotaPool(db, subscription.id),
             getTopUpCreditsRemaining(db, subscription.id),
           ]);
     const monthlyLimit =
@@ -561,6 +638,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         ).toISOString();
       }
     })();
+    // [CUT-B3 / WI-693] NOT dispatched to a v2 twin: getUsageBreakdownForProfile
+    // reads family_links parent/child relationships (guardianship — CUT-B2's
+    // surface) interleaved with usage_events. Its v2 form needs CUT-B2's
+    // guardianship reader; deferred to the B2/B3 seam ruling. Flag-off (every
+    // deployed env until the flip) this is the live path; the breakdown is a
+    // read-only family-aggregate display, not a payment-state mutation.
     const usageBreakdown =
       activeProfileId && supportsProfileBreakdown
         ? await getUsageBreakdownForProfile(db, {
@@ -642,7 +725,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       'Only the account owner can access the billing portal.',
     );
 
-    const subscription = await getSubscriptionByAccountId(db, account.id);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+    const subscription = v2
+      ? await getSubscriptionByAccountIdV2(db, account.id)
+      : await getSubscriptionByAccountId(db, account.id);
     if (!subscription?.stripeCustomerId) {
       return notFound(c, 'No billing account found');
     }
@@ -683,6 +769,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     const kv = c.env.SUBSCRIPTION_KV;
     const freeTier = getTierConfig('free');
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
     // Try KV first (fast path).
     // [BUG-97 / A1-MED] Wrap KV read in try/catch -- KV outages must not 500.
@@ -733,7 +820,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     }
 
     // Fallback to DB
-    const subscription = await getSubscriptionByAccountId(db, account.id);
+    const subscription = v2
+      ? await getSubscriptionByAccountIdV2(db, account.id)
+      : await getSubscriptionByAccountId(db, account.id);
     if (!subscription) {
       return c.json(
         subscriptionStatusResponseSchema.parse({
@@ -751,7 +840,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const access = await getEffectiveAccessForSubscription(db, subscription.id);
+    const access = v2
+      ? await getEffectiveAccessForSubscriptionV2(db, subscription.id)
+      : await getEffectiveAccessForSubscription(db, subscription.id);
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscription.tier;
     const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
@@ -766,14 +857,25 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     }
     const profileQuota =
       quotaModel === 'per-profile' && activeProfileId
-        ? await getOrProvisionProfileQuotaUsage(
-            db,
-            subscription.id,
-            activeProfileId,
-            { tier: effectiveAccessTier },
-          )
+        ? v2
+          ? await getOrProvisionProfileQuotaUsageV2(
+              db,
+              subscription.id,
+              activeProfileId,
+              { tier: effectiveAccessTier },
+            )
+          : await getOrProvisionProfileQuotaUsage(
+              db,
+              subscription.id,
+              activeProfileId,
+              { tier: effectiveAccessTier },
+            )
         : null;
-    const quota = profileQuota ? null : await getQuotaPool(db, subscription.id);
+    const quota = profileQuota
+      ? null
+      : v2
+        ? await getQuotaPoolV2(db, subscription.id)
+        : await getQuotaPool(db, subscription.id);
 
     return c.json(
       subscriptionStatusResponseSchema.parse({
@@ -811,17 +913,24 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       'Only the family owner can view family subscription details.',
     );
 
-    const subscription = await getSubscriptionByAccountId(db, account.id);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+    const subscription = v2
+      ? await getSubscriptionByAccountIdV2(db, account.id)
+      : await getSubscriptionByAccountId(db, account.id);
     if (!subscription) {
       return notFound(c, 'No subscription found');
     }
 
-    const poolStatus = await getFamilyPoolStatus(db, subscription.id);
+    const poolStatus = v2
+      ? await getFamilyPoolStatusV2(db, subscription.id)
+      : await getFamilyPoolStatus(db, subscription.id);
     if (!poolStatus) {
       return notFound(c, 'No quota pool found');
     }
 
-    const members = await listFamilyMembers(db, subscription.id);
+    const members = v2
+      ? await listFamilyMembersV2(db, subscription.id)
+      : await listFamilyMembers(db, subscription.id);
 
     return c.json(
       familyResponseSchema.parse({
@@ -854,16 +963,17 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         'Only the family owner can add a profile to the family subscription.',
       );
 
-      const subscription = await getSubscriptionByAccountId(db, account.id);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+      const subscription = v2
+        ? await getSubscriptionByAccountIdV2(db, account.id)
+        : await getSubscriptionByAccountId(db, account.id);
       if (!subscription) {
         return notFound(c, 'No subscription found');
       }
 
-      const result = await addProfileToSubscription(
-        db,
-        subscription.id,
-        profileId,
-      );
+      const result = v2
+        ? await addProfileToSubscriptionV2(db, subscription.id, profileId)
+        : await addProfileToSubscription(db, subscription.id, profileId);
 
       if (!result) {
         return apiError(
@@ -901,20 +1011,30 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         'Only the family owner can remove a profile from the family subscription.',
       );
 
-      const subscription = await getSubscriptionByAccountId(db, account.id);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+      const subscription = v2
+        ? await getSubscriptionByAccountIdV2(db, account.id)
+        : await getSubscriptionByAccountId(db, account.id);
       if (!subscription) {
         return notFound(c, 'No subscription found');
       }
 
       let result: { removedProfileId: string } | null;
       try {
-        result = await removeProfileFromSubscription(
-          db,
-          subscription.id,
-          profileId,
-        );
+        result = v2
+          ? await removeProfileFromSubscriptionV2(
+              db,
+              subscription.id,
+              profileId,
+            )
+          : await removeProfileFromSubscription(db, subscription.id, profileId);
       } catch (err) {
-        if (err instanceof ProfileRemovalNotImplementedError) {
+        // Both the legacy and v2 not-implemented errors carry the same name; the
+        // v2 path throws its own class, so accept either.
+        if (
+          err instanceof ProfileRemovalNotImplementedError ||
+          err instanceof ProfileRemovalNotImplementedErrorV2
+        ) {
           return apiError(
             c,
             422,

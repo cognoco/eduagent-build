@@ -860,23 +860,26 @@ export function createScopedRepository(db: Database, profileId: string) {
         mode: (typeof dictationModeEnum.enumValues)[number];
         reviewed: boolean;
       }) {
-        // [WI-84 rollout] Keep the legacy conflict target for the expand
-        // deploy. Old Workers still need uniq_dictation_results_profile_date_mode
-        // during the migration-to-deploy window; a contract migration can move
-        // this upsert to completionKey after those Workers are gone.
+        // Conflict target is (profileId, completionKey): distinct dictation
+        // sessions carry distinct completionKeys, so they persist as distinct
+        // rows instead of overwriting each other on the legacy
+        // (profileId, date, mode) target. A genuine client retry of the same
+        // completionKey still updates in place — that is the intended
+        // idempotency key. (Legacy callers that omit completionKey share a
+        // per-day-per-mode derived key and still collapse, by design.)
         const [row] = await db
           .insert(dictationResults)
           .values({ profileId, ...values })
           .onConflictDoUpdate({
             target: [
               dictationResults.profileId,
-              dictationResults.date,
-              dictationResults.mode,
+              dictationResults.completionKey,
             ],
             set: {
-              completionKey: values.completionKey,
+              date: values.date,
               sentenceCount: values.sentenceCount,
               mistakeCount: values.mistakeCount,
+              mode: values.mode,
               reviewed: values.reviewed,
             },
           })

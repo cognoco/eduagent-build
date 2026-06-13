@@ -19,13 +19,10 @@ import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { apiError } from '../errors';
 import { verifyWebhookSignature } from '../services/stripe';
-import {
-  handleSubscriptionEvent,
-  handleSubscriptionDeleted,
-  handleCheckoutCompleted,
-  handlePaymentFailed,
-  handlePaymentSucceeded,
-} from '../services/billing/stripe-webhook-handler';
+// [CUT-B3 / WI-693] The handler seam dispatches: flag-off → legacy handlers
+// (byte-identical), flag-on → the v2 handlers (new `subscription` store). The
+// route body and the idempotency/signature/stale-event guards are unchanged.
+import { getStripeWebhookHandlers } from '../services/billing/billing-v2/dispatch';
 import type { StripePriceEnv } from '../services/billing-pricing';
 import { claimWebhookId } from '../services/webhook-idempotency';
 
@@ -49,6 +46,9 @@ export const stripeWebhookRoute = new Hono<{
     STRIPE_SECRET_KEY?: string;
     SUBSCRIPTION_KV?: KVNamespace;
     ENVIRONMENT?: string;
+    // [CUT-B3 / WI-693] Identity-foundation cutover flag — selects the v2
+    // subscription-store handlers. 'false'/unset in every deployed env.
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     db: Database;
@@ -136,6 +136,8 @@ export const stripeWebhookRoute = new Hono<{
   const db = c.get('db');
   const kv = c.env.SUBSCRIPTION_KV;
   const eventTimestamp = new Date(event.created * 1000).toISOString();
+  // [CUT-B3 / WI-693] Resolve the handler bundle once (legacy vs v2) — the seam.
+  const handlers = getStripeWebhookHandlers(c.env);
 
   // [BUG-113] Stale events (>48h old) are acknowledged (200) and dropped, NOT
   // rejected with 4xx. A 4xx response causes Stripe to RETRY the webhook for
@@ -214,7 +216,7 @@ export const stripeWebhookRoute = new Hono<{
           },
         );
       }
-      await handleCheckoutCompleted(
+      await handlers.handleCheckoutCompleted(
         db,
         kv,
         event.data.object as Stripe.Checkout.Session,
@@ -225,7 +227,7 @@ export const stripeWebhookRoute = new Hono<{
 
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
-      await handleSubscriptionEvent(
+      await handlers.handleSubscriptionEvent(
         db,
         kv,
         event.data.object as Stripe.Subscription,
@@ -236,7 +238,7 @@ export const stripeWebhookRoute = new Hono<{
       break;
 
     case 'customer.subscription.deleted':
-      await handleSubscriptionDeleted(
+      await handlers.handleSubscriptionDeleted(
         db,
         kv,
         event.data.object as Stripe.Subscription,
@@ -246,7 +248,7 @@ export const stripeWebhookRoute = new Hono<{
       break;
 
     case 'invoice.payment_failed':
-      await handlePaymentFailed(
+      await handlers.handlePaymentFailed(
         db,
         kv,
         event.data.object as Stripe.Invoice,
@@ -256,7 +258,7 @@ export const stripeWebhookRoute = new Hono<{
       break;
 
     case 'invoice.payment_succeeded':
-      await handlePaymentSucceeded(
+      await handlers.handlePaymentSucceeded(
         db,
         kv,
         event.data.object as Stripe.Invoice,

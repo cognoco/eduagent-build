@@ -1,12 +1,18 @@
 const mockRecordChildCapNotificationForSubscription = jest.fn();
 const mockGetStepDatabase = jest.fn();
 
-jest.mock(
-  '../helpers' /* gc1-allow: getStepDatabase wraps Inngest step DB acquisition; test injects a fake handle */,
-  () => ({
+// [GC6] requireActual + targeted override: only getStepDatabase needs a fake DB
+// handle; the rest of ../helpers (incl. isIdentityV2EnabledInStep, which the
+// CUT-B3 flag dispatch calls — default false in the Node test env) runs real.
+jest.mock('../helpers', () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
-  }),
-);
+  };
+});
 
 jest.mock(
   '../../services/child-cap-notifications' /* gc1-allow: handler unit delegates DB behavior to service tests */,

@@ -21,7 +21,12 @@
 
 import { eq, and, type SQL } from 'drizzle-orm';
 import type { Database } from './client';
-import { subscriptions, quotaPools, topUpCredits } from './schema/index';
+import {
+  subscriptions,
+  quotaPools,
+  topUpCredits,
+  subscription,
+} from './schema/index';
 
 /**
  * Creates an account-scoped repository for billing table reads.
@@ -158,5 +163,69 @@ export async function findTopUpByTransactionId__unscoped(
 ) {
   return db.query.topUpCredits.findFirst({
     where: eq(topUpCredits.revenuecatTransactionId, transactionId),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CUT-B3 (WI-693) — v2 subscription helpers (organization-keyed)
+//
+// The legacy helpers above read the `subscriptions` table keyed on
+// `account_id`. The identity-foundation cutover re-homes the billing subsystem
+// onto the `subscription` table keyed on `organization_id`. By the deterministic
+// reseed `organization.id = accounts.id`, so the SAME id value the request
+// context carries (account.id under flag-on = organization.id) keys both stores.
+// These helpers read the new table; the billing-v2 layer selects them behind
+// the IDENTITY_V2_ENABLED flag. Legacy helpers stay byte-identical.
+//
+// SECURITY: same `__unscoped` caller contract as the legacy helpers — webhook
+// handlers (authenticated by external event signature/transaction id) and
+// internal cron only. Verify ownership before returning to a client.
+// ---------------------------------------------------------------------------
+
+/**
+ * Find a subscription (v2 table) by its owning organization id.
+ *
+ * SECURITY: caller MUST verify ownership before returning data to a client;
+ * intended for webhook handlers and internal billing aggregates.
+ */
+export async function findSubscriptionByOrganizationId__unscoped(
+  db: Database,
+  organizationId: string,
+) {
+  return db.query.subscription.findFirst({
+    where: eq(subscription.organizationId, organizationId),
+  });
+}
+
+/**
+ * Lock-and-read a subscription (v2 table) row by organization id
+ * (SELECT … FOR UPDATE). Same in-transaction contract and rationale as
+ * lockSubscriptionByAccountId__unscoped.
+ */
+export async function lockSubscriptionByOrganizationId__unscoped(
+  db: Database,
+  organizationId: string,
+) {
+  const [row] = await db
+    .select()
+    .from(subscription)
+    .where(eq(subscription.organizationId, organizationId))
+    .limit(1)
+    .for('update');
+  return row;
+}
+
+/**
+ * Find a subscription (v2 table) by its Stripe subscription ID.
+ *
+ * SECURITY: caller MUST verify ownership before returning data to a client;
+ * intended for Stripe webhook handlers that authenticate via event signature.
+ */
+export async function findSubscriptionByStripeIdV2__unscoped(
+  db: Database,
+  stripeSubscriptionId: string,
+) {
+  return db.query.subscription.findFirst({
+    where: eq(subscription.stripeSubscriptionId, stripeSubscriptionId),
   });
 }

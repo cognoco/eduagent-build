@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-81f8-af6b-dbe04a72ee6e",
+  "id": "WI-701",
+  "name": "WP-secapi-quota-billing",
+  "description": "Fix three metering/quota correctness gaps: route the homework-summary LLM call through the metered wrapper (F-128); guard the /assessments/:id/answer early-return so it does not deduct quota without an LLM call (F-146); fix the outbox-spillover rate-limit rows silently consuming the daily push-notification cap (F-148). NOTE (slice scan): touches the quota metering path, NOT the Stripe/RevenueCat webhook handlers the IF CUT-B3 cutover rewrites - verified disjoint, parallel-safe.",
+  "acceptanceCriteria": "F-128/146/148 each remediated; billing/quota fixes emit a structured metric or Inngest event per the silent-recovery ban (console.warn alone insufficient); quota-charge correctness tested.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "WP",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Bundle brief — quota / billing correctness\nRationale: three metering gaps let usage be charged without service (or service without charge) and let internal rows consume user quota. Strategy: route all billable LLM calls through the metered wrapper, gate quota deduction on actual LLM use, and stop spillover rows from drawing the daily push cap; per the silent-recovery ban each correction emits a structured metric/Inngest event. Scope: quota metering path only — NOT the Stripe/RevenueCat webhook handlers (verified disjoint from the IF CUT-B3 cutover, parallel-safe). One PR.\nF-128 — homework-summary LLM call routed through the metered wrapper\nF-146 — assessments answer early-return no longer deducts quota without an LLM call\nF-148 — outbox-spillover rate-limit rows no longer consume the daily push cap\nAcceptance Criteria: F-128/146/148 each remediated; billing/quota fixes emit a structured metric or Inngest event per the silent-recovery ban (console.warn alone insufficient); quota-charge correctness tested. Children 711/712 are absorbed provenance; lands as one PR."
+}

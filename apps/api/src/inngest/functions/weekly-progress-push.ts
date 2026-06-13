@@ -22,12 +22,29 @@ import { z } from 'zod';
 import {
   accounts,
   familyLinks,
+  login,
+  membership,
   notificationPreferences,
+  organization,
+  person,
   profiles,
   weeklyReports,
 } from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase, getStepResendApiKey } from '../helpers';
+import {
+  getStepDatabase,
+  getStepResendApiKey,
+  isIdentityV2EnabledInStep,
+} from '../helpers';
+import {
+  getAllActiveGuardianPersonIds,
+  getChargePersonIds,
+} from '../../services/identity-v2/guardianship';
+import {
+  listEligibleSelfReportPersonIdsV2,
+  listEligibleSelfReportPersonIdsAtLocalHour9V2,
+} from '../../services/identity-v2/solo-progress-reports-v2';
+import { isPersonLive } from '../../services/identity-v2/helpers';
 import {
   sendPushNotification,
   sendEmail,
@@ -147,18 +164,27 @@ async function persistWeeklySelfReportForProfile(
   const reportWindowEnd = subtractDays(reportWeekStartDate, 1);
   const previousWindowEnd = subtractDays(reportWeekStartDate, 8);
 
-  const eligibleProfileIds = await listEligibleSelfReportProfileIds(db, {
+  const v2 = isIdentityV2EnabledInStep();
+  const selfWin = {
     start: activityWindowStart,
     endExclusive: reportWeekStartDate,
-  });
+  };
+  const eligibleProfileIds = v2
+    ? await listEligibleSelfReportPersonIdsV2(db, selfWin)
+    : await listEligibleSelfReportProfileIds(db, selfWin);
   if (!eligibleProfileIds.includes(profileId)) {
     return { status: 'skipped', reason: 'ineligible_self_profile' };
   }
 
-  const profile = await db.query.profiles.findFirst({
-    where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
-    columns: { displayName: true },
-  });
+  const profile = v2
+    ? await db.query.person.findFirst({
+        where: and(eq(person.id, profileId), isNull(person.archivedAt)),
+        columns: { displayName: true },
+      })
+    : await db.query.profiles.findFirst({
+        where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
+        columns: { displayName: true },
+      });
   if (!profile) {
     return { status: 'skipped', reason: 'self_profile_missing' };
   }
@@ -278,11 +304,18 @@ export const weeklyProgressPushCron = inngest.createFunction(
       // per link, removing duplicate parentProfileId rows. Combined with the
       // notificationPreferences filter below, the working set stays bounded
       // to parents who have at least one linked child.
-      const linkRows = await db
-        .selectDistinct({ parentProfileId: familyLinks.parentProfileId })
-        .from(familyLinks);
-
-      const linkedParentIds = linkRows.map((link) => link.parentProfileId);
+      const v2 = isIdentityV2EnabledInStep();
+      // All parents = distinct active guardians (v2) or distinct family_links
+      // parents (legacy).
+      const linkedParentIds = v2
+        ? await getAllActiveGuardianPersonIds(db)
+        : (
+            await db
+              .selectDistinct({
+                parentProfileId: familyLinks.parentProfileId,
+              })
+              .from(familyLinks)
+          ).map((link) => link.parentProfileId);
 
       if (linkedParentIds.length === 0) return [];
 
@@ -310,18 +343,33 @@ export const weeklyProgressPushCron = inngest.createFunction(
 
       if (eligibleProfileIds.length === 0) return [];
 
-      // 2. Fetch each parent profile's account timezone in one query.
-      //    profiles.accountId → accounts.timezone
-      const profileTimezones = await db
-        .select({ profileId: profiles.id, timezone: accounts.timezone })
-        .from(profiles)
-        .innerJoin(accounts, eq(profiles.accountId, accounts.id))
-        .where(
-          and(
-            inArray(profiles.id, eligibleProfileIds),
-            isNull(profiles.archivedAt),
-          ),
-        );
+      // 2. Fetch each parent's timezone. v2: person→membership→organization;
+      //    legacy: profiles.accountId → accounts.timezone.
+      const profileTimezones = v2
+        ? await db
+            .select({ profileId: person.id, timezone: organization.timezone })
+            .from(person)
+            .innerJoin(membership, eq(membership.personId, person.id))
+            .innerJoin(
+              organization,
+              eq(organization.id, membership.organizationId),
+            )
+            .where(
+              and(
+                inArray(person.id, eligibleProfileIds),
+                isNull(person.archivedAt),
+              ),
+            )
+        : await db
+            .select({ profileId: profiles.id, timezone: accounts.timezone })
+            .from(profiles)
+            .innerJoin(accounts, eq(profiles.accountId, accounts.id))
+            .where(
+              and(
+                inArray(profiles.id, eligibleProfileIds),
+                isNull(profiles.archivedAt),
+              ),
+            );
 
       const timezoneByProfileId = new Map(
         profileTimezones.map((r) => [r.profileId, r.timezone]),
@@ -357,14 +405,13 @@ export const weeklyProgressPushCron = inngest.createFunction(
       'find-weekly-self-report-profiles',
       async () => {
         const db = getStepDatabase();
-        return listEligibleSelfReportProfileIdsAtLocalHour9(
-          db,
-          {
-            start: subtractDays(currentWeekStart, 7),
-            endExclusive: currentWeekStart,
-          },
-          nowUtc,
-        );
+        const win = {
+          start: subtractDays(currentWeekStart, 7),
+          endExclusive: currentWeekStart,
+        };
+        return isIdentityV2EnabledInStep()
+          ? listEligibleSelfReportPersonIdsAtLocalHour9V2(db, win, nowUtc)
+          : listEligibleSelfReportProfileIdsAtLocalHour9(db, win, nowUtc);
       },
     );
     const selfReportProfileIdSet = new Set(selfReportProfileIds);
@@ -560,11 +607,17 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         'prepare-weekly-progress-digest',
         async () => {
           const db = getStepDatabase();
-          const parentProfile = await db.query.profiles.findFirst({
-            where: and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
-            columns: { id: true },
-          });
-          if (!parentProfile) {
+          const v2 = isIdentityV2EnabledInStep();
+          const parentLive = v2
+            ? await isPersonLive(db, parentId)
+            : !!(await db.query.profiles.findFirst({
+                where: and(
+                  eq(profiles.id, parentId),
+                  isNull(profiles.archivedAt),
+                ),
+                columns: { id: true },
+              }));
+          if (!parentLive) {
             return {
               status: 'skipped' as const,
               reason: 'parent_missing',
@@ -580,10 +633,18 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               )
             : null;
 
-          const links = await db.query.familyLinks.findMany({
-            where: eq(familyLinks.parentProfileId, parentId),
-            columns: { childProfileId: true },
-          });
+          // Parent's children: active guardianship charges (v2) or family_links
+          // children (legacy).
+          const links = v2
+            ? (await getChargePersonIds(db, parentId)).map(
+                (childProfileId) => ({
+                  childProfileId,
+                }),
+              )
+            : await db.query.familyLinks.findMany({
+                where: eq(familyLinks.parentProfileId, parentId),
+                columns: { childProfileId: true },
+              });
           if (links.length === 0) {
             if (selfReportResult?.status === 'completed') {
               return {
@@ -682,20 +743,29 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           // runs at all.
           let hasParentEmail = false;
           if (shouldSendEmail) {
-            const parentProfile = await db.query.profiles.findFirst({
-              where: and(
-                eq(profiles.id, parentId),
-                isNull(profiles.archivedAt),
-              ),
-              columns: { accountId: true },
-            });
-            const parentAccount = parentProfile?.accountId
-              ? await db.query.accounts.findFirst({
-                  where: eq(accounts.id, parentProfile.accountId),
-                  columns: { email: true },
-                })
-              : null;
-            hasParentEmail = Boolean(parentAccount?.email);
+            if (v2) {
+              // v2: the parent's email lives on their login (person→login).
+              const loginRow = await db.query.login.findFirst({
+                where: eq(login.personId, parentId),
+                columns: { email: true },
+              });
+              hasParentEmail = Boolean(loginRow?.email);
+            } else {
+              const parentProfile = await db.query.profiles.findFirst({
+                where: and(
+                  eq(profiles.id, parentId),
+                  isNull(profiles.archivedAt),
+                ),
+                columns: { accountId: true },
+              });
+              const parentAccount = parentProfile?.accountId
+                ? await db.query.accounts.findFirst({
+                    where: eq(accounts.id, parentProfile.accountId),
+                    columns: { email: true },
+                  })
+                : null;
+              hasParentEmail = Boolean(parentAccount?.email);
+            }
           }
 
           return {
@@ -717,25 +787,30 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
       const pushResult = prepared.shouldSendPush
         ? await step.run('send-weekly-progress-push', async () => {
             const db = getStepDatabase();
-            const activeParent = await db.query.profiles.findFirst({
-              where: and(
-                eq(profiles.id, parentId),
-                isNull(profiles.archivedAt),
-              ),
-              columns: { id: true },
-            });
-            if (!activeParent) {
+            const stepV2 = isIdentityV2EnabledInStep();
+            const parentLive = stepV2
+              ? await isPersonLive(db, parentId)
+              : !!(await db.query.profiles.findFirst({
+                  where: and(
+                    eq(profiles.id, parentId),
+                    isNull(profiles.archivedAt),
+                  ),
+                  columns: { id: true },
+                }));
+            if (!parentLive) {
               return { sent: false, reason: 'profile_archived' as const };
             }
             for (const { childProfileId } of prepared.childDigests) {
-              const activeChild = await db.query.profiles.findFirst({
-                where: and(
-                  eq(profiles.id, childProfileId),
-                  isNull(profiles.archivedAt),
-                ),
-                columns: { id: true },
-              });
-              if (!activeChild) {
+              const childLive = stepV2
+                ? await isPersonLive(db, childProfileId)
+                : !!(await db.query.profiles.findFirst({
+                    where: and(
+                      eq(profiles.id, childProfileId),
+                      isNull(profiles.archivedAt),
+                    ),
+                    columns: { id: true },
+                  }));
+              if (!childLive) {
                 return { sent: false, reason: 'profile_archived' as const };
               }
             }
@@ -777,37 +852,59 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           'send-weekly-progress-email',
           async () => {
             const db = getStepDatabase();
-            const activeParent = await db.query.profiles.findFirst({
-              where: and(
-                eq(profiles.id, parentId),
-                isNull(profiles.archivedAt),
-              ),
-              columns: { id: true, accountId: true },
-            });
-            if (!activeParent) {
+            const stepV2 = isIdentityV2EnabledInStep();
+            const parentLive = stepV2
+              ? await isPersonLive(db, parentId)
+              : !!(await db.query.profiles.findFirst({
+                  where: and(
+                    eq(profiles.id, parentId),
+                    isNull(profiles.archivedAt),
+                  ),
+                  columns: { id: true, accountId: true },
+                }));
+            if (!parentLive) {
               return { sent: false, reason: 'profile_archived' as const };
             }
             for (const { childProfileId } of prepared.childDigests) {
-              const activeChild = await db.query.profiles.findFirst({
-                where: and(
-                  eq(profiles.id, childProfileId),
-                  isNull(profiles.archivedAt),
-                ),
-                columns: { id: true },
-              });
-              if (!activeChild) {
+              const childLive = stepV2
+                ? await isPersonLive(db, childProfileId)
+                : !!(await db.query.profiles.findFirst({
+                    where: and(
+                      eq(profiles.id, childProfileId),
+                      isNull(profiles.archivedAt),
+                    ),
+                    columns: { id: true },
+                  }));
+              if (!childLive) {
                 return { sent: false, reason: 'profile_archived' as const };
               }
             }
-            // Re-read the address in-step — it never rides memoized step
-            // state (prepare memoized only the hasParentEmail boolean).
-            const parentAccount = activeParent.accountId
-              ? await db.query.accounts.findFirst({
-                  where: eq(accounts.id, activeParent.accountId),
-                  columns: { email: true },
-                })
-              : null;
-            const parentEmail = parentAccount?.email ?? null;
+            // Re-read the address in-step — it never rides memoized step state
+            // (prepare memoized only the hasParentEmail boolean). v2: the email
+            // is on the parent's login; legacy: on accounts via accountId.
+            let parentEmail: string | null;
+            if (stepV2) {
+              const loginRow = await db.query.login.findFirst({
+                where: eq(login.personId, parentId),
+                columns: { email: true },
+              });
+              parentEmail = loginRow?.email ?? null;
+            } else {
+              const parentProfile = await db.query.profiles.findFirst({
+                where: and(
+                  eq(profiles.id, parentId),
+                  isNull(profiles.archivedAt),
+                ),
+                columns: { accountId: true },
+              });
+              const parentAccount = parentProfile?.accountId
+                ? await db.query.accounts.findFirst({
+                    where: eq(accounts.id, parentProfile.accountId),
+                    columns: { email: true },
+                  })
+                : null;
+              parentEmail = parentAccount?.email ?? null;
+            }
             if (!parentEmail) {
               return { sent: false, reason: 'no_email' as const };
             }
