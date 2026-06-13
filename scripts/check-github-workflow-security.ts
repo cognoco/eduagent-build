@@ -256,13 +256,12 @@ const COMMENT_FETCH =
   /gh\s+api[^\n]*\/comments|gh\s+pr\s+view[^\n]*--json[^\n]*comments/;
 const VERDICT_MARKER =
   /Claude Code Review:|## Claude Code Review|verdict|Must-fix count|Should-fix count/i;
-// A bot/trusted-author constraint anchored to a real jq enforcement: a `[bot]`
-// login equality or a Bot user-type equality. A bare `author_association`
-// mention is intentionally NOT accepted here — it could be satisfied by a no-op
-// comment or unrelated echo without any enforcement, and the verdict gate is
-// jq-based on `.user.login` anyway.
-const TRUSTED_AUTHOR_CONSTRAINT =
-  /\.user\.login\s*==\s*['"][^'"]*\[bot\]['"]|\.user\.type\s*==\s*['"]Bot['"]/;
+// A bot/trusted-author constraint anchored to real jq enforcement. A bare
+// `author_association` mention is intentionally NOT accepted here — it could be
+// satisfied by a no-op comment or unrelated echo without any enforcement.
+const TRUSTED_VERDICT_BOT_LOGIN =
+  /\.user\.login\s*==\s*['"](github-actions|claude)\[bot\]['"]/;
+const TRUSTED_VERDICT_BOT_TYPE = /\.user\.type\s*==\s*['"]Bot['"]/;
 
 function validateVerdictGateAuthorFilter(
   file: string,
@@ -272,7 +271,12 @@ function validateVerdictGateAuthorFilter(
   if (typeof run !== 'string') return null;
   if (!COMMENT_FETCH.test(run)) return null;
   if (!VERDICT_MARKER.test(run)) return null;
-  if (TRUSTED_AUTHOR_CONSTRAINT.test(run)) return null;
+  if (
+    TRUSTED_VERDICT_BOT_LOGIN.test(run) &&
+    TRUSTED_VERDICT_BOT_TYPE.test(run)
+  ) {
+    return null;
+  }
 
   return {
     file,
