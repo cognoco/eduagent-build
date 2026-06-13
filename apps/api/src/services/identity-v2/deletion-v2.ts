@@ -909,15 +909,30 @@ async function personOrganizationIdTx(
  * Write a person's retain-tier financial_record rows inside the deletion
  * transaction, resolving the org via membership and snapshotting its
  * subscriptions. Used by the single-person delete paths (deletePersonV2 and the
- * consent-gated sweeps), which have only a personId. A no-op when the person has
- * no membership (org already gone). §4.9 COUNSEL-OWNED as above.
+ * consent-gated sweeps), which have only a personId.
+ *
+ * FAIL-CLOSED on no org (§6.1 compliance-critical; AGENTS.md billing-domain
+ * "no silent recovery"). If no organization resolves for the person we CANNOT
+ * write the §6.1 financial_record (`organization_id` is NOT NULL — no sentinel
+ * row is possible), and a person must never be deleted without its retain
+ * records. So we THROW, aborting the whole deletion transaction (person NOT
+ * deleted, no partial state) rather than silently skip. The throw IS the
+ * required escalation — it propagates to the Inngest/route boundary and is
+ * captured in Sentry. This anomaly should not occur in normal flow: every
+ * caller runs this BEFORE its `DELETE person`, inside the same transaction,
+ * while the membership still exists — so a missing membership signals a real
+ * data anomaly worth surfacing loudly.
  */
 async function writeFinancialRecordsForPersonTx(
   tx: DeletionTx,
   personId: string,
 ): Promise<void> {
   const organizationId = await personOrganizationIdTx(tx, personId);
-  if (!organizationId) return;
+  if (!organizationId) {
+    throw new Error(
+      `writeFinancialRecordsForPersonTx: no organization resolved for person ${personId} — cannot write the §6.1 financial_record retain rows; aborting the deletion (fail-closed, no silent skip).`,
+    );
+  }
   const subscriptions = await readOrgSubscriptionsTx(tx, organizationId);
   await writeFinancialRecordsTx(tx, personId, organizationId, subscriptions);
 }

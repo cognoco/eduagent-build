@@ -499,6 +499,54 @@ const COPPA = 'coppa_parental_consent';
         });
         expect(grants).toHaveLength(1);
       });
+
+      // WI-723 follow-up (Claude CHANGES_REQUESTED on #1139): the single-person
+      // delete paths resolve the financial_record org via the person's
+      // membership. If NO org resolves, the previous code SILENTLY skipped the
+      // financial_record write but still wrote deletion_audit + deleted the
+      // person — a v2 deletion completing with ZERO §6.1 retain records, a
+      // banned billing-domain silent recovery. The fix FAILS CLOSED: the helper
+      // throws, aborting the deletion transaction (person NOT deleted, no
+      // partial state). The throw is itself the required escalation (Sentry via
+      // the Inngest/route boundary). This anomaly should not occur in normal
+      // flow — the write runs before the person DELETE, while membership exists.
+      it('FAIL-CLOSED: an orphaned person (no membership) aborts the deletion — throws, person NOT deleted, no financial_record / deletion_audit written (tx rolled back)', async () => {
+        // Seed a person directly with NO membership (the orphan anomaly). Not
+        // via seedPerson (which always adds a membership).
+        const [orphan] = await db
+          .insert(person)
+          .values({
+            displayName: 'Orphan',
+            birthDate: '2015-01-01',
+            residenceJurisdiction: 'EU',
+          })
+          .returning();
+        personIds.push(orphan!.id);
+
+        // RED (silent `if (!organizationId) return;`): deletePersonV2 resolves,
+        // the person is deleted, and 0 financial_record rows exist — the §6.1
+        // violation. GREEN (fail-closed throw): it rejects and the tx rolls
+        // back, so the person survives and NOTHING was written.
+        await expect(
+          deletePersonV2(db, orphan!.id, 'abandonment', null),
+        ).rejects.toThrow(/organization/i);
+
+        // The transaction rolled back: the person still exists.
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, orphan!.id),
+        });
+        expect(personRow).toBeTruthy();
+
+        // No retain records and no audit were committed (the whole tx aborted).
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, orphan!.id),
+        });
+        expect(financialRecords).toHaveLength(0);
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, orphan!.id),
+        });
+        expect(audits).toHaveLength(0);
+      });
     });
 
     // -------------------------------------------------------------------------
