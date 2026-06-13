@@ -1,7 +1,7 @@
 # Identity Foundation — Execution Tracker
 
 **Stream:** identity-foundation (umbrella roster **PRG-01**) · **Activity:** clean-cut execution (waves W0–W4 + tail)
-**Last updated:** 2026-06-11 (WI-578 merged PR #933, 4 rounds, children swept; W3 build side done) · **Owner:** Jorn (+ runway session agents)
+**Last updated:** 2026-06-13 (CUT wave WI-689..693 bridged + sequenced to Ready; WI-689 CUT-A dispatched; new-llm execution gate cleared) · **Owner:** Jorn (+ runway session agents)
 
 > **This is the durable entry point for this activity.** Point a fresh session here:
 > it should be enough to know *what this is*, *where the detail lives*, and *where to
@@ -170,15 +170,21 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-583 | WP-W4-billing-credits | credit/quota correctness (F-124, F-096) | WP | P1 | WI-570 (+ soft-after WI-551 via Related Items) | **done** — Closed/Done 2026-06-11 on the 5th review pass (PRs #876 + #897). 4 bounces, 4 distinct classes (children gate, unmerged PR, residual defect, evidence form); ended with FOR UPDATE serialization both paths + full red-green-revert proof. W4 complete. WI-618 captured from the sweep |
 | WI-584 | IT-W4-l10n-accommodation | accommodation view-self fallback (F-163) | Item | P3 | WI-572 | **done** — Closed/Done 2026-06-11 by the autonomous reviewer (PR #874). First WI through the full loop with zero human touches |
-### CUT — cutover wave (split ruling, arrived in Cosmo 2026-06-13; NOT yet bridged/sequenced)
+### CUT — cutover wave (split ruling; ratified plan v1.7; bridged + sequenced 2026-06-13)
 
-| WI | unit | What | Pri | status |
-| --- | --- | --- | --- | --- |
-| WI-689 | CUT-A | additive identity schema extension (M-HOMES + M-RESEED2 + ADR + canon lockstep) | P1 | backlog — captured by planning session; Path unset, no deps/children |
-| WI-690 | CUT-canon-intake | account-detachment ruling sec-4 deltas into identity canon (OQ-11) | P2 | backlog — same |
-| WI-691 | CUT-B1 | identity spine cutover — flag plumbing, maintenance gates, bootstrap graph, person-scope twins | P1 | backlog — same |
-| WI-692 | CUT-B2 | consent + family cutover — write machine, coexistence break tests, deletion/export twins | P1 | backlog — same |
-| WI-693 | CUT-B3 | billing + webhooks cutover — subscription core, webhook twins, quota/trial chain | P1 | backlog — same |
+**SSOT for this wave:** `_wip/identity-foundation/2026-06-11-cutover-plan.md` (v1.7, ratified).
+The old WI-586 scope report (`wi586-scope-report.md`) is **superseded** by it.
+**Execution gate CLEARED:** new-llm merged to `main` (`105b39ac0`, PR #1087, 2026-06-13).
+All five are `Type=Task` (not WP) → no WP children-gate; DoR bridge = Execution Path + refine only.
+**Queue:** WI-689 → WI-691 → (WI-692 ∥ WI-693) → WI-586. WI-690 docs-only, interleaves.
+
+| WI | unit | What | Pri | dep | status |
+| --- | --- | --- | --- | --- | --- |
+| WI-689 | CUT-A | additive identity schema extension (M-HOMES + M-RESEED2 + verify-ext + ADR + canon lockstep) | P1 | — | **in-progress** — Ready+Assisted; `wi689-executor` (sonnet) dispatched 2026-06-13 with a phase-0 STOP (generate-preflight + D7 citation-refresh + ledger-RLS precondition → report before authoring migrations) |
+| WI-690 | CUT-canon-intake | account-detachment ruling sec-4 deltas into identity canon (OQ-11; 5 canon deltas, docs-only) | P2 | — | Ready+Assisted; free-standing, interleaves |
+| WI-691 | CUT-B1 | identity spine cutover — flag plumbing, maintenance gates, bootstrap graph, person-scope twins | P1 | WI-689 | Ready+Assisted (blocked-by 689) |
+| WI-692 | CUT-B2 | consent + family cutover — write machine, coexistence break tests, deletion/export twins | P1 | WI-691 | Ready+Assisted (blocked-by 691); ∥ B3 |
+| WI-693 | CUT-B3 | billing + webhooks cutover — subscription core, webhook twins, quota/trial chain | P1 | WI-691 | Ready+Assisted (blocked-by 691); ∥ B2 |
 
 
 ### Clean-cut tail (after W2 ∧ W3 ∧ W4)
@@ -186,7 +192,7 @@ are the live Cosmo entries (project MentoMate). Coarse status per §2 vocabulary
 | WI | O unit | What | Alt | Pri | dep | status |
 | --- | --- | --- | --- | --- | --- | --- |
 | WI-585 | WP-TAIL-reseed | re-seed live data into the new model | WP | P1 | ALL of WI-575…WI-584 (10 edges) | **done** — Closed/Done 2026-06-11 by the autonomous reviewer, first pass (PR #963). Dev + staging seeded and verified green; prd deferred. Detours: WI-649, CF-secrets fix, BUG-12 P1 capture |
-| WI-586 | WP-TAIL-drop-legacy | drop legacy tables/readers (irreversible) | WP | P1 | WI-585 | **PAUSED (operator ruling 2026-06-11)** — scope fork moved to the architecture/planning session; executor stood down, claim left to expire naturally; plan-phase report transcribed verbatim to `wi586-scope-report.md` (the standing handoff artifact). Original finding: — plan-phase stop delivered 2026-06-11: "remove legacy readers" = full app identity/billing/consent cutover (~80 runtime files, both payment webhooks, consent-request workflow has NO new-model home, ~190 test files, 57-FK re-point) vs the plan's S estimate. Executor recommends SPLIT: WP-CUT-A (additive model completion: conversation_language→person, store-correlation ids, consent_request table) + WP-CUT-B (domain-wise reader cutover, 2-3 PRs) + WI-586 shrinks to reseed-verify-drop. Claim held, no code written |
+| WI-586 | WP-TAIL-drop-legacy → **convergence runbook** | RE-SCOPED (plan v1.7 §4): freeze → reseed → verify → M-REPOINT → flip → soak → M-DROP → grep-clean. 3 absolute STOPs (steps 3/6/8); flip owner = Jorn | WP | P1 | WI-585 **+ WI-689/691/692/693** | **re-scoped + re-blocked 2026-06-13** — description updated upstream to the §4 runbook; blocked-by now the full CUT chain. ⚠ still sits at `Stage=Executing` with a dead `wi586-executor` claim (Claim Expires unset → won't self-lapse); not hand-resetting Stage per the lifecycle rule — flagged to operator. _Prior (2026-06-11):_ **PAUSED (operator ruling)** — scope fork moved to the architecture/planning session; executor stood down, claim left to expire naturally; plan-phase report transcribed verbatim to `wi586-scope-report.md` (the standing handoff artifact). Original finding: — plan-phase stop delivered 2026-06-11: "remove legacy readers" = full app identity/billing/consent cutover (~80 runtime files, both payment webhooks, consent-request workflow has NO new-model home, ~190 test files, 57-FK re-point) vs the plan's S estimate. Executor recommends SPLIT: WP-CUT-A (additive model completion: conversation_language→person, store-correlation ids, consent_request table) + WP-CUT-B (domain-wise reader cutover, 2-3 PRs) + WI-586 shrinks to reseed-verify-drop. Claim held, no code written |
 
 ---
 
