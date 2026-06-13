@@ -891,7 +891,10 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               parentEmail = loginRow?.email ?? null;
             } else {
               const parentProfile = await db.query.profiles.findFirst({
-                where: eq(profiles.id, parentId),
+                where: and(
+                  eq(profiles.id, parentId),
+                  isNull(profiles.archivedAt),
+                ),
                 columns: { accountId: true },
               });
               const parentAccount = parentProfile?.accountId
