@@ -150,9 +150,9 @@ distinction is load-bearing:
 
 | Transition | Trigger | Rebinds | Behaviour |
 |---|---|---|---|
-| managed → credentialed (gets a Login) | action | a Login attaches to the existing Person | invite-flow (`MMT-ADR-0010`) |
+| **account-detachment** (managed → credentialed; gets a Login) | action | a Login attaches to the existing `person_id`; consent + guardianship edge unchanged; guardian-grantable any age, child-claimable at 13+ | invite-flow (`MMT-ADR-0010`); *(ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.1/§1.3/§4.1/§4.2)* |
 | consent gate lifts (crosses consent age) | **time** | `consentRequired` re-evaluates false; guardian visibility → **teen opt-in, default off** | per-dimension |
-| minor → adult at 18 (graduation) | **time** | guardianship dissolves; org/billing **offered**, not forced | named interim states |
+| **18-crossing** (minor → adult; guardianship dissolves) | **time** | guardianship dissolves; org/billing **offered**, not forced | named interim states |
 | residence_jurisdiction change | action + scheduler backstop | `consentRequired` re-evaluates; gate may **re-engage** → suspend into a consent-holding state | suspend + re-prompt |
 | guardianship mutation (add/remove/withdraw) | action | the guardian edge(s); consent authority may move | — |
 | de-credential (credentialed → managed) | — | — | **disallowed**; manual audited ops only |

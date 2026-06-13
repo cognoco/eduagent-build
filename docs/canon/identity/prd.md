@@ -27,7 +27,7 @@ These are the load-bearing commitments, each a restatement of canon.
 1. **A Person owns their own identity and learning data, permanently.** Learning data is scoped to
    `person_id` (inv 2); a Person's own data is read+write by that Person regardless of roles, because
    self-ownership is **intrinsic to the Person**, not granted by a role (inv 7; CONTEXT: learner). It
-   survives graduation (inv 20) and is **never orphaned** by an edge or membership deletion (inv 21).
+   survives account-detachment (inv 20) and is **never orphaned** by an edge or membership deletion (inv 21).
 2. **A grouping never owns a Person or their data.** An Organization is a thin grouping/billing
    container that does no access work (CONTEXT: Organization); access to *another* Person's data is
    **edge-derived**, and membership alone grants only existence-visibility (inv 8). Billing and consent
@@ -208,8 +208,9 @@ touch the consent floor. (Whether to surface under-18 self-pay in the UX is rule
 
 Non-negotiable safety properties binding every flow:
 
-- **Graduation preserves identity (inv 20).** Managed → credentialed keeps the same `person_id` + all
-  history. Break test: row count and `person_id` identical before/after.
+- **Account-detachment preserves identity (inv 20).** Managed → credentialed (**account-detachment**;
+  inv 20) keeps the same `person_id` + all history; consent and guardianship edge ride through
+  unchanged. *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.1.)* Break test: row count and `person_id` identical before/after.
 - **No orphans (inv 21).** Edge deletion (guardianship / supportership / membership) never cascade-deletes
   the Person or their history — a managed Person (charge *or* the rare managed adult) is never orphaned.
 - **Time-triggered transitions are scheduler-driven (inv 24).** Consent-age / 18 crossings and
@@ -239,9 +240,14 @@ layer; the settled product rulings that shape them are in Part 10.
   assurance level (inv 30; VPC, §4.4).
 - **R3 — A consent holding state exists** as a named valid interim state with no dead-end (inv 25, 26;
   repo: UX-resilience) and unlocks the moment valid Consent lands (inv 11).
-- **R4 — Graduation (managed → credentialed) exists and preserves identity (inv 20);** on crossing the
-  consent age it converts guardian visibility to learner-opt-in (inv 19) and lapses unconfirmed
-  guardian-granted supporterships (inv 16).
+- **R4a — Account-detachment (managed → credentialed) exists and preserves identity (inv 20).** The
+  action-triggered login transition attaches a Login to the existing `person_id` via the invite-flow
+  (`MMT-ADR-0010`); consent and guardianship edge are untouched; guardian-grantable at any age,
+  child-claimable at 13+ (inv 13). *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.1/§1.3/§4.1/§4.2.)*
+- **R4b — Graduation (consent-capability crossing) exists, scheduler-driven (inv 24, 16, 19).** On
+  crossing the consent age it converts guardian visibility to learner-opt-in (inv 19) and lapses
+  unconfirmed guardian-granted supporterships (inv 16). Distinct from account-detachment (R4a) — time-
+  triggered, not action-triggered. *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.2/§4.3.)*
 - **R5 — Self-service consent withdrawal exists and actually stops processing (inv 12)** — the UI promise
   and system behaviour must match (inv 12; repo: silent-recovery-banned for the escalation path).
 - **R6 — Leaving / removal preserves the Person and history (inv 21);** edges detach, the Person is
@@ -395,11 +401,36 @@ age, edge-only); and the managed-adult "grandparent" (UC-1, §9). Copy to be aut
 - **Abandonment** is covered by a general **dormancy-deletion policy** applied to all accounts (~24 months
   inactivity → warn + export window → cleanup), riding the durable scheduler (inv 24, 25).
 
+**Supporter ceiling & notes wall.**
+*(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.5/§4.4.)*
+- **Supporter ceiling = the recap/grades layer.** A supporter — and a post-detachment
+  guardian-as-consent-holder — sees curated summaries (recaps, subjects, mastery, streaks, activity)
+  **only**. They never see notes, mentor memory, or transcripts.
+- **Notes stay walled at every tier.** Guardian access to a managed charge's full data (including notes
+  and transcripts) runs through the **explicit, audited export/rights path only** (inv 21
+  erasure/export pattern) — never ambient browsing.
+- **Mentor-memory management is a derived capability** (`operate`/`manage`; `MMT-ADR-0008` derivation:
+  `guardian-link ∧ shared-org ∧ charge-has-no-Login`). It is structurally **suppressed by
+  account-detachment** — a credentialed charge has a Login, so the derivation does not fire. No
+  per-screen flag; the capability derivation is the gate.
+- **Any future widening** of supporter or guardian data access must be **two-way-transparent** (the
+  child's UI states what the supporter/guardian can see) — never covert.
+
+**Proxy mode — no re-entry.**
+*(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.6/§4.4.)*
+- **No user-facing entry point.** Zero production call sites pass `proxyMode: true`
+  (`use-parent-proxy.ts:11-17`, `profile.ts:373` — comments only); proxy is dormant plumbing.
+  **Ruling: keep the mechanics** (candidate for guardian act-for, Part 9 crosswalk), but **never
+  re-wire a user-facing entry point without an explicit ADR.** Any future proxy surface requires
+  its own ADR + two-way-transparency obligation.
+
 **De-credential.**
-- **Disallowed; no self-service, no UI.** Graduation is one-directional (inv 20). Any genuine edge case
-  (data repair, mistaken account, legal/ops request) is a **manual, audited backend/ops intervention** that
-  still honours canon — it may not strip a consent-capable learner's data control (inv 19) or orphan a
-  Person (inv 21), and is append-only + audited (inv 25).
+- **Disallowed; no self-service, no UI.** Account-detachment is one-directional (inv 20) — once a
+  Login is attached, removing it (de-credentialing) is **not a user-accessible operation**. Any genuine
+  edge case (data repair, mistaken account, legal/ops request) is a **manual, audited backend/ops
+  intervention** that still honours canon — it may not strip a consent-capable learner's data control
+  (inv 19) or orphan a Person (inv 21), and is append-only + audited (inv 25).
+  *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §4.5.)*
 
 **Family-operator surface.**
 - **Split spaces, purpose-led landing.** The multi-role person sees separate spaces (a family/supporting

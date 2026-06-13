@@ -254,7 +254,9 @@ checked against.
     jurisdiction A may not *satisfy* jurisdiction B, so a held consent does not automatically transfer
     across a `residence_jurisdiction` change (§3.4).
 13. Below the credential-eligibility floor, Persons are **guardian-created only** (no self-sign-up).
-    *(The exact floor is a pending product decision — see ROADMAP.)*
+    **13 is the child-claimable account-detachment floor** — below it, detachment is guardian-grantable
+    only (via the "own device" path, Part 10). Guardian-grantable at any age; child-claimable at 13+.
+    *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.3.)*
 
 **D — Capacities: guardianship & supportership**
 14. **Guardianship (consent authority, Layer 1)** and **Supportership (granted visibility, Layer 2)** are
@@ -282,8 +284,12 @@ checked against.
     **opt-in**.
 
 **F — Lifecycle & safety**
-20. **Graduation preserves identity:** managed → credentialed keeps the **same `person_id`** + all
-    history.
+20. **Account-detachment preserves identity:** managed → credentialed (**account-detachment** — the
+    action-triggered, identity-preserving login transition via the invite-flow, `MMT-ADR-0010`) keeps the
+    **same `person_id`** + all history. Consent is untouched — guardianship edge and consent record ride
+    through unchanged. **"Graduation"** is reserved for the consent-capability crossing (inv 16 / §D
+    effects); the 18-crossing stays its own threshold.
+    *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.1/§4.1.)*
 21. Edge deletion (guardianship / supportership / membership) **never cascade-deletes** the Person or
     their learning history — a managed Person (charge *or* the rare managed adult) is **never orphaned as
     a *side-effect* of removing an edge**. An **explicit, authority-held, audited deletion** of a genuine
