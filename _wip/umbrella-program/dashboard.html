@@ -154,6 +154,43 @@ nav button.on::after{
 .lane.later .tag{color:var(--lav); background:var(--lav-dim); border:1px solid var(--lav)}
 .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
 
+/* ---------- status filter + card status badge ---------- */
+.filterbar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:2px 0 24px}
+.filterbar .fb-label{
+  font-family:'Martian Mono',monospace; font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink3); margin-right:4px;
+}
+.fbtn{
+  font-family:'Instrument Sans',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
+  padding:6px 13px; border-radius:999px; border:1px solid var(--line2); background:var(--panel);
+  color:var(--ink2); display:inline-flex; align-items:center; gap:7px; transition:all .18s;
+}
+.fbtn:hover{border-color:var(--ink3); color:var(--ink)}
+.fbtn .fb-dot{width:8px; height:8px; border-radius:50%; background:var(--c,var(--ink3)); transition:all .18s}
+.fbtn .fb-ct{
+  font-family:'Martian Mono',monospace; font-size:9.5px; color:var(--ink3);
+  border:1px solid var(--line); border-radius:5px; padding:0 5px;
+}
+.fbtn.on{border-color:var(--c); color:var(--ink); background:color-mix(in srgb, var(--c) 13%, var(--panel))}
+.fbtn.on .fb-ct{color:var(--c); border-color:var(--c)}
+.fbtn.off{opacity:.5; border-style:dashed}
+.fbtn.off .fb-dot{background:transparent; box-shadow:inset 0 0 0 1.5px var(--ink3)}
+.fbtn-clear{color:var(--ink3); border-style:dashed}
+.fbtn-clear:hover:not(:disabled){border-color:var(--coral); color:var(--coral)}
+.fbtn-clear:disabled{opacity:.3; cursor:default}
+.lane-head .tag{
+  color:var(--c,var(--teal)); border:1px solid var(--c,var(--teal));
+  background:color-mix(in srgb, var(--c,var(--teal)) 13%, transparent);
+}
+.lane-head .lane-ct{font-family:'Martian Mono',monospace; font-size:10px; color:var(--ink3); margin-left:auto}
+.card .top-r{display:flex; align-items:center; gap:8px}
+.card .cstat{
+  font-family:'Martian Mono',monospace; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+  padding:2px 7px; border-radius:99px; white-space:nowrap;
+  border:1px solid var(--c,var(--line2)); color:var(--c,var(--ink2));
+  background:color-mix(in srgb, var(--c,var(--ink3)) 12%, transparent);
+}
+
 /* ---------- initiative card ---------- */
 .card{
   background:var(--panel); border:1px solid var(--line); border-radius:14px;
@@ -772,25 +809,67 @@ const PARKED = [
 ];
 
 /* =============== RENDER =============== */
-const LANES = [
-  {k:"now",  t:"In motion",        d:"executing or finishing — shepherded at bundle level"},
-  {k:"armed",t:"Armed behind a gate", d:"charters ratified — each starts the moment its gate fires"},
-  {k:"later",t:"Waiting on a trigger", d:"real, scoped, deliberately later — triggers are written down"}
+// Status taxonomy drives BOTH the board grouping and the filter. A graduated
+// initiative is NOT "in motion" — it gets its own section.
+const CATS = [
+  {k:"motion",   t:"In motion",  glyph:"▸", c:"var(--teal)",  d:"executing or actively worked — shepherded at bundle level"},
+  {k:"waiting",  t:"Waiting",    glyph:"✦", c:"var(--lav)",   d:"charters ratified or backlogged — each starts when its gate or trigger fires"},
+  {k:"graduated",t:"Graduated",  glyph:"✓", c:"var(--green)", d:"outcome met — done, kept on the board for the record"}
 ];
-const stGlyph = {now:"▸", armed:"◈", later:"✦"};
+function catOf(i){
+  const s=(i.status||"").toLowerCase();
+  if(s.includes("graduat")) return "graduated";
+  if(i.lane==="later"||i.lane==="armed"||s.includes("embryo")||s.includes("backlog")||s.includes("design")||s.includes("park")) return "waiting";
+  return "motion";
+}
 
 function el(h){const t=document.createElement("template"); t.innerHTML=h.trim(); return t.content.firstChild}
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")}
 
+/* ---- status filter (toggle each status on/off; clear = show all) ---- */
+const ALL_CATS=CATS.map(c=>c.k);
+function loadFilter(){
+  try{const s=localStorage.getItem("flightdeck-filter"); if(s){const a=JSON.parse(s);
+    if(Array.isArray(a)&&a.length){const f=a.filter(k=>ALL_CATS.includes(k)); if(f.length) return new Set(f);}}}catch(e){}
+  return new Set(ALL_CATS);
+}
+let activeCats=loadFilter();
+function saveFilter(){try{localStorage.setItem("flightdeck-filter",JSON.stringify([...activeCats]))}catch(e){}}
+function renderFilterBar(){
+  let bar=document.getElementById("filterbar");
+  if(!bar){bar=el(`<div class="filterbar" id="filterbar"></div>`);
+    const b=document.getElementById("v-board"); b.insertBefore(bar, b.firstChild);}
+  const counts={}; CATS.forEach(c=>counts[c.k]=INIT.filter(i=>catOf(i)===c.k).length);
+  const allOn=activeCats.size===ALL_CATS.length;
+  bar.innerHTML=`<span class="fb-label">Show status</span>`+
+    CATS.map(c=>{const on=activeCats.has(c.k);
+      return `<button class="fbtn cat-${c.k} ${on?'on':'off'}" data-cat="${c.k}" style="--c:${c.c}" aria-pressed="${on}"><span class="fb-dot"></span>${c.t}<span class="fb-ct">${counts[c.k]}</span></button>`;
+    }).join("")+
+    `<button class="fbtn fbtn-clear" id="fbClear"${allOn?' disabled':''}>↺ clear</button>`;
+  bar.querySelectorAll(".fbtn[data-cat]").forEach(b=>b.addEventListener("click",()=>{
+    const k=b.dataset.cat;
+    if(activeCats.has(k)) activeCats.delete(k); else activeCats.add(k);
+    if(activeCats.size===0) activeCats=new Set(ALL_CATS);   // never blank the board
+    saveFilter(); renderBoard();
+  }));
+  const clr=document.getElementById("fbClear");
+  if(clr&&!allOn) clr.addEventListener("click",()=>{activeCats=new Set(ALL_CATS); saveFilter(); renderBoard();});
+}
+
 function renderBoard(){
+  renderFilterBar();
   const root=document.getElementById("lanes"); root.innerHTML="";
-  LANES.forEach(L=>{
-    const lane=el(`<div class="lane ${L.k}"><div class="lane-head"><span class="tag">${stGlyph[L.k]} ${L.t}</span><span class="desc">${L.d}</span></div><div class="cards"></div></div>`);
+  CATS.forEach(C=>{
+    if(!activeCats.has(C.k)) return;
+    const items=INIT.filter(i=>catOf(i)===C.k);
+    if(!items.length) return;
+    const lane=el(`<div class="lane cat-${C.k}"><div class="lane-head"><span class="tag" style="--c:${C.c}">${C.glyph} ${C.t}</span><span class="desc">${C.d}</span><span class="lane-ct">${items.length}</span></div><div class="cards"></div></div>`);
     const grid=lane.querySelector(".cards");
-    INIT.filter(i=>i.lane===L.k).forEach((i,idx)=>{
+    items.forEach((i,idx)=>{
       const chips=i.bundles.map(b=>`<span class="chip ${b.st}">${esc(b.n.split("·")[0].trim())}<span class="n">${esc(b.s)}</span></span>`).join("");
-      const c=el(`<article class="card" style="--accent:${i.accent}; animation-delay:${.06*idx+.1}s" data-id="${i.id}">
-        <div class="top"><span class="pid">${i.id}</span><span class="qpos">queue ${i.q}</span></div>
+      const st=esc((i.status||"").replace(/^✓\s*/,""));
+      const c=el(`<article class="card" style="--accent:${i.accent}; --c:${C.c}; animation-delay:${.05*idx+.06}s" data-id="${i.id}">
+        <div class="top"><span class="pid">${i.id}</span><span class="top-r"><span class="cstat">${st}</span><span class="qpos">queue ${i.q}</span></span></div>
         <h3>${esc(i.name)}</h3>
         <p class="tagline">${esc(i.tagline)}</p>
         <div class="gateline"><span class="glyph">⌖</span><span>${i.gate.split(".")[0]}.</span></div>
