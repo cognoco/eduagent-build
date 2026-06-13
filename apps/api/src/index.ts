@@ -172,11 +172,19 @@ const ALLOWED_PRODUCTION_ORIGINS: ReadonlySet<string> = new Set([
 api.use(
   '*',
   cors({
-    origin: (origin) => {
+    origin: (origin, c) => {
       if (!origin) return '';
-      // Allow any localhost / 127.0.0.1 port (Metro, Expo web, Playwright).
-      if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
-      if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+      const env = (c as unknown as { env?: Bindings }).env;
+      // Allow any localhost / 127.0.0.1 port in non-production only
+      // (Metro, Expo web, Playwright dev tooling). Gating this on ENVIRONMENT
+      // prevents a local-app running on a victim's machine from making
+      // credentialed cross-origin requests against the production API.
+      // When env is absent (e.g. unit tests calling app.request() without
+      // bindings), we treat it as non-production for ergonomic test defaults.
+      if (env?.ENVIRONMENT !== 'production') {
+        if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
+        if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+      }
       // Production: exact-match allowlist only. No subdomain wildcards.
       return ALLOWED_PRODUCTION_ORIGINS.has(origin) ? origin : '';
     },

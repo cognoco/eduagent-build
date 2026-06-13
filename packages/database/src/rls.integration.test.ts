@@ -143,22 +143,25 @@ describeIfDb('withProfileScope — integration against real Postgres', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Regression guard: rls.ts must use SET LOCAL, not plain SET
+// Regression guard: rls.ts must scope the GUC to the transaction only
+//
+// The implementation uses set_config('app.current_profile_id', $1, true)
+// which accepts a bound parameter (no raw interpolation) and scopes the
+// setting to the current transaction (is_local=true), equivalent to SET LOCAL.
+// This guard ensures a future edit cannot accidentally revert to unscoped SET.
 // ---------------------------------------------------------------------------
 
-describe('withProfileScope — SET LOCAL regression guard', () => {
-  it('rls.ts uses SET LOCAL (not plain SET) to prevent cross-session GUC leaks', () => {
+describe('withProfileScope — transaction-scoped GUC guard', () => {
+  it('rls.ts uses set_config with is_local=true to prevent cross-session GUC leaks', () => {
     const rlsSource = readFileSync(resolve(__dirname, 'rls.ts'), 'utf-8');
 
-    // Must contain SET LOCAL
-    expect(rlsSource).toMatch(/SET LOCAL app\.current_profile_id/);
+    // Must use set_config with true (is_local) to scope the GUC to the tx.
+    expect(rlsSource).toMatch(/set_config\s*\(\s*'app\.current_profile_id'/);
+    expect(rlsSource).toMatch(/set_config.*true/s);
 
-    // Must NOT use bare "SET app.current_profile_id" (without LOCAL).
-    // Regex: look for SET followed by optional whitespace and the GUC name,
-    // but exclude the "SET LOCAL" form via negative lookbehind.
-    const bareSetMatch = rlsSource.match(
-      /(?<!LOCAL\s{0,10})\bSET\s+app\.current_profile_id/,
-    );
+    // Must NOT use bare "SET app.current_profile_id" (without LOCAL / set_config).
+    // Regex: look for SET followed by optional whitespace and the GUC name.
+    const bareSetMatch = rlsSource.match(/\bSET\s+app\.current_profile_id/);
     expect(bareSetMatch).toBeNull();
   });
 });
