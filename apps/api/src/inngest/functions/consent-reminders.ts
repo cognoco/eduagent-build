@@ -260,8 +260,12 @@ export const consentReminder = inngest.createFunction(
       // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
       if (isIdentityV2EnabledInStep()) {
         // [CUT-B2] v2: re-home any grants, then delete the person (the §6.1
-        // pattern at single-person granularity). Same no-consent guard.
-        await deletePersonIfNoConsentV2(db, profileId);
+        // pattern at single-person granularity). Same no-consent guard AND the
+        // same request-generation guard as legacy: thread requestedAtDate so a
+        // stale day-30 run cannot delete a child who started a newer consent
+        // cycle (the legacy deleteProfileIfNoConsent(requestedAt) semantics).
+        if (!requestedAtDate || Number.isNaN(requestedAtDate.getTime())) return;
+        await deletePersonIfNoConsentV2(db, profileId, requestedAtDate);
       } else {
         await deleteProfileIfNoConsent(db, profileId, new Date(requestedAt));
       }

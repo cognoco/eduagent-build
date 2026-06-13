@@ -50,6 +50,7 @@ import {
   DEFAULT_CONSENT_PURPOSE,
   resolveLatestConsentStatusAnyBasis,
 } from './consent-status-v2';
+import { consentPersonLockKey } from './deletion-v2';
 import { isGuardianOf } from './guardianship';
 
 const logger = createLogger();
@@ -643,23 +644,45 @@ export async function restoreConsentV2(
   }
   const basis = consentTypeToBasis(consentType);
 
-  const current = await currentGrant(db, chargePersonId, organizationId, basis);
-  if (!current) {
-    throw new ConsentRecordNotFoundError();
-  }
-  // Not withdrawn → nothing to restore (idempotent no-op).
-  if (!current.withdrawnAt) {
-    return { chargePersonId };
-  }
-  if (
-    Date.now() - current.withdrawnAt.getTime() >
-    RESTORE_CONSENT_GRACE_PERIOD_MS
-  ) {
-    throw new ConsentGracePeriodExpiredError();
-  }
-
   const now = new Date();
-  await db.transaction(async (tx) => {
+  // WI-583 race guard: the grace-end delete/archive predicates
+  // (deletePersonIfConsentWithdrawnV2, deleteArchivedPersonIfStillEligibleV2)
+  // read the current grant then re-home/delete. Without serialization, under
+  // READ COMMITTED a delete could read the withdrawn grant, then this restore
+  // appends + un-archives, then the delete re-homes the just-restored grant and
+  // removes the person. Take the SAME per-person advisory lock FIRST and do the
+  // grace-check read + append inside the locked tx, so the restore and the
+  // delete cannot interleave — whichever takes the lock first wins, and the
+  // loser re-reads the other's committed state.
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(chargePersonId)}, 0))`,
+    );
+
+    const current = await tx.query.consentGrant.findFirst({
+      where: and(
+        eq(consentGrant.chargePersonId, chargePersonId),
+        eq(consentGrant.purpose, DEFAULT_CONSENT_PURPOSE),
+        eq(consentGrant.organizationId, organizationId),
+        eq(consentGrant.lawfulBasis, basis),
+      ),
+      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
+      columns: { id: true, withdrawnAt: true },
+    });
+    if (!current) {
+      throw new ConsentRecordNotFoundError();
+    }
+    // Not withdrawn → nothing to restore (idempotent no-op).
+    if (!current.withdrawnAt) {
+      return { chargePersonId };
+    }
+    if (
+      Date.now() - current.withdrawnAt.getTime() >
+      RESTORE_CONSENT_GRACE_PERIOD_MS
+    ) {
+      throw new ConsentGracePeriodExpiredError();
+    }
+
     await tx.insert(consentGrant).values({
       chargePersonId,
       organizationId,
@@ -674,9 +697,9 @@ export async function restoreConsentV2(
       .update(person)
       .set({ archivedAt: null, updatedAt: now })
       .where(eq(person.id, chargePersonId));
-  });
 
-  return { chargePersonId };
+    return { chargePersonId };
+  });
 }
 
 // ---------------------------------------------------------------------------

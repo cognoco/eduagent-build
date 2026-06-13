@@ -31,11 +31,12 @@
 // FLAG-GATED: reachable only when IDENTITY_V2_ENABLED is 'true'.
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import {
   byokWaitlist,
   consentGrant,
   consentReceipt,
+  consentRequest,
   deletionAudit,
   login,
   membership,
@@ -49,6 +50,25 @@ import { captureException } from '../sentry';
 
 const GRACE_PERIOD_DAYS = 7;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * Per-person serializing advisory-lock key (WI-583 pattern). A restore
+ * (`restoreConsentV2` — appends a new grant) and a grace-end delete/archive
+ * predicate (`deletePersonIfConsentWithdrawnV2`, `deleteArchivedPersonIfStillEligibleV2`)
+ * both read the current grant then mutate. Under READ COMMITTED a restore can
+ * commit between the delete's grant read and its re-home/delete, so the delete
+ * re-homes the just-restored grant and removes the person despite a successful
+ * restore. Acquiring `pg_advisory_xact_lock(consentPersonLockKey(personId))` at
+ * the TOP of each side's transaction — and re-checking consent status under the
+ * lock — serializes the two so restore-wins is observable and durable.
+ *
+ * MUST be identical across consent-v2.ts and deletion-v2.ts or the two take
+ * different locks and never serialize. Exported so consent-v2 imports the same
+ * key (one-way dep: deletion-v2 does not import consent-v2).
+ */
+export function consentPersonLockKey(personId: string): string {
+  return `consent-person:${personId}`;
+}
 
 /** Why a deletion fired — drives `deletion_audit.deleted_by` / `reason` (§6.1). */
 export type DeletionReason =
@@ -450,8 +470,19 @@ export async function deletePersonIfConsentWithdrawnV2(
   if (withdrawnAtDate && Number.isNaN(withdrawnAtDate.getTime())) return false;
 
   return db.transaction(async (tx) => {
-    // Lock the current GDPR grant and verify it is withdrawn (optionally at the
-    // given timestamp). currentGrant windowing: max(granted_at), tiebreak id.
+    // WI-583 race guard: serialize against a concurrent restoreConsentV2 (which
+    // appends a granted row) by taking the per-person advisory lock FIRST. The
+    // current-grant read below then happens AFTER any in-flight restore has
+    // committed, so a restore that wins the lock is visible here and blocks the
+    // delete (current.withdrawnAt is null on the new grant). Without the lock,
+    // under READ COMMITTED a restore committing between this read and the
+    // re-home/delete would let the delete remove a just-restored person.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(personId)}, 0))`,
+    );
+    // Re-check current GDPR grant under the lock and verify it is withdrawn
+    // (optionally at the given timestamp). currentGrant windowing:
+    // max(granted_at), tiebreak id.
     const current = await tx.query.consentGrant.findFirst({
       where: and(
         eq(consentGrant.chargePersonId, personId),
@@ -488,11 +519,29 @@ export async function deletePersonIfConsentWithdrawnV2(
  * current granted-and-un-withdrawn GDPR consent and no terminal (approved)
  * request — the consent-reminder day-30 GDPR auto-delete. Re-homes any grants
  * (e.g. a withdrawn one) before the delete. Returns true when deleted.
+ *
+ * `requestedAt` is the REQUEST-GENERATION guard, mirroring legacy
+ * `deleteProfileIfNoConsent(requestedAt)`: this day-30 run belongs to the
+ * consent cycle whose `consent_request.requested_at` equals `requestedAt`. A
+ * STALE run must NOT delete a child who has since started a NEWER consent cycle
+ * (a fresh `pending`/`requested` request with no grant yet). When `requestedAt`
+ * is given we require that an OPEN (non-terminal) request of THAT generation
+ * still exists — a newer cycle replaces the row's `requested_at`, so the
+ * window match fails and the stale run is a no-op. Omitting `requestedAt`
+ * preserves the unguarded behavior (delete on no-consent alone).
  */
 export async function deletePersonIfNoConsentV2(
   db: Database,
   personId: string,
+  requestedAt?: Date,
 ): Promise<boolean> {
+  // [requestedAt, requestedAt+1ms) window pins exactly one generation (the
+  // +1ms upper bound tolerates the ms-granularity of the requested_at column).
+  // Mirrors legacy deleteProfileIfNoConsent's requestGenerationPredicate.
+  const requestedAtUpperBound = requestedAt
+    ? new Date(requestedAt.getTime() + 1)
+    : undefined;
+
   return db.transaction(async (tx) => {
     const current = await tx.query.consentGrant.findFirst({
       where: and(
@@ -505,6 +554,26 @@ export async function deletePersonIfNoConsentV2(
     });
     // A current granted+un-withdrawn grant means consent stands — never delete.
     if (current && !current.withdrawnAt) return false;
+
+    // Request-generation guard: if this is a generation-scoped run, only delete
+    // when an OPEN request of that generation still exists. A newer consent
+    // cycle (newer requested_at, or an approved/denied terminal status) makes
+    // this match empty, so a stale day-30 run cannot delete a re-requested
+    // child.
+    if (requestedAt && requestedAtUpperBound) {
+      const openRequestOfGeneration = await tx.query.consentRequest.findFirst({
+        where: and(
+          eq(consentRequest.chargePersonId, personId),
+          eq(consentRequest.requestedBasis, 'gdpr_parental_consent'),
+          gte(consentRequest.requestedAt, requestedAt),
+          lt(consentRequest.requestedAt, requestedAtUpperBound),
+          sql`${consentRequest.status} NOT IN ('approved','denied')`,
+        ),
+        columns: { id: true },
+      });
+      if (!openRequestOfGeneration) return false;
+    }
+
     await rehomeGrantsTx(tx, personId);
     await tx.insert(deletionAudit).values({
       personId,
@@ -533,6 +602,14 @@ export async function deleteArchivedPersonIfStillEligibleV2(
   retentionCutoff: Date,
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
+    // WI-583 race guard: restoreConsentV2 BOTH clears archived_at AND appends a
+    // granted grant. Take the per-person advisory lock FIRST so the archived_at
+    // and current-grant reads below see any in-flight restore's commit — a
+    // restore that wins the lock un-archives the person (first predicate fails)
+    // and re-grants (second predicate fails), and the delete is a no-op.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(personId)}, 0))`,
+    );
     const personRow = await tx.query.person.findFirst({
       where: eq(person.id, personId),
       columns: { archivedAt: true },
