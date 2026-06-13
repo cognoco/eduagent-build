@@ -494,6 +494,17 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-13 — PRG-17 new-llm MERGED to `main`** (`105b39ac0`, `--no-ff` merge
+  commit, PR #1087). The reconciled `new-llm` is fully an ancestor of main;
+  `Merge completeness check` passed on the merge ref; all deterministic gates
+  green; the 4 claude-review SHOULD_FIX deferrals are documented on the PR + the
+  spillover register (`WI-695`/`WI-696`). **Boundary event "new-llm merged" fired
+  → IF cutover EXECUTION unlocked** (CUT-A may now generate against the post-merge
+  journal). Deploy/KV chain wired end-to-end (WI-682 + WI-685 + WI-694 verifier +
+  GH secrets) — `WI-664` closes on the first green post-merge deploy. PRG-17
+  reconciliation complete; graduation = operator ruling. Follow-through:
+  branch-protection add of `Merge completeness check`; WI-694 manual `/cosmo:review`
+  close; IF shepherd kickoff (CUT-A).
 - **2026-06-13 — Spillover register added** (mop-up mechanism). Five standalone
   Cosmo items spawned by umbrella work (`WI-683`/`684`/`688`/`694`/`695`) were
   floating outside any PRG rollup; now tracked above with a backstop-query
