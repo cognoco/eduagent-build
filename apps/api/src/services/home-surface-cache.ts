@@ -36,7 +36,18 @@ export type HomeSurfaceCacheData = {
   interactionStats: HomeCardInteractionStats;
 };
 
-type HomeSurfaceCacheRow = typeof coachingCardCache.$inferSelect;
+export type HomeSurfaceCacheRow = typeof coachingCardCache.$inferSelect;
+
+/**
+ * Reducer that computes the next `pendingCelebrations` array from the row's
+ * CURRENT (locked) value. Used by celebration writes so the read-dedup-append
+ * happens INSIDE the SELECT ... FOR UPDATE window rather than against a stale
+ * pre-lock snapshot.
+ */
+export type PendingCelebrationsReducer = (
+  current: PendingCelebration[],
+  lockedRow: HomeSurfaceCacheRow | undefined,
+) => PendingCelebration[];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -183,6 +194,7 @@ async function mergeHomeSurfaceCacheDataInTx(
   merge: (current: HomeSurfaceCacheData) => HomeSurfaceCacheData,
   options?: {
     pendingCelebrations?: PendingCelebration[];
+    computePending?: PendingCelebrationsReducer;
     expiresAt?: Date;
   },
 ): Promise<HomeSurfaceCacheData> {
@@ -219,14 +231,23 @@ async function mergeHomeSurfaceCacheDataInTx(
   const expiresAt =
     options?.expiresAt ?? new Date(now.getTime() + HOME_SURFACE_TTL_MS);
 
+  // Resolve the next celebrations array UNDER the held row lock. A
+  // computePending reducer (used by queueCelebration) computes from the locked
+  // row's current value so concurrent appends serialise without lost updates;
+  // a concrete pendingCelebrations array (used by pruning / write callers)
+  // overwrites; otherwise the locked row's value is preserved unchanged.
+  const lockedPending =
+    (lockedRow?.pendingCelebrations as PendingCelebration[] | null) ??
+    ([] as PendingCelebration[]);
+  const nextPending = options?.computePending
+    ? options.computePending(lockedPending, lockedRow)
+    : (options?.pendingCelebrations ?? lockedPending);
+
   await db
     .update(coachingCardCache)
     .set({
       cardData: next,
-      pendingCelebrations:
-        options?.pendingCelebrations ??
-        lockedRow?.pendingCelebrations ??
-        ([] as PendingCelebration[]),
+      pendingCelebrations: nextPending,
       expiresAt,
       updatedAt: now,
     })
@@ -260,6 +281,7 @@ export async function mergeHomeSurfaceCacheData(
   merge: (current: HomeSurfaceCacheData) => HomeSurfaceCacheData,
   options?: {
     pendingCelebrations?: PendingCelebration[];
+    computePending?: PendingCelebrationsReducer;
     expiresAt?: Date;
     /** Set true when `db` is already a transaction handle. Skips the inner
      *  db.transaction() wrapper to avoid nested transactions on neon-serverless. */
@@ -278,16 +300,28 @@ export async function mergeHomeSurfaceCacheData(
   });
 }
 
+/**
+ * Write the pending-celebrations array for a profile under the row lock.
+ *
+ * `pending` may be either a concrete array (overwrite — used by opportunistic
+ * pruning) or a {@link PendingCelebrationsReducer} that computes the next array
+ * from the locked row's CURRENT value. The reducer form is the race-free path
+ * for read-compute-append callers (e.g. queueCelebration): the read, dedup and
+ * append all run inside the SELECT ... FOR UPDATE window, so concurrent appends
+ * serialise instead of overwriting each other.
+ */
 export async function writeHomeSurfacePendingCelebrations(
   db: Database,
   profileId: string,
-  pendingCelebrations: PendingCelebration[],
+  pending: PendingCelebration[] | PendingCelebrationsReducer,
   options?: { inTransaction?: boolean },
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + HOME_SURFACE_TTL_MS);
 
   await mergeHomeSurfaceCacheData(db, profileId, (current) => current, {
-    pendingCelebrations,
+    ...(typeof pending === 'function'
+      ? { computePending: pending }
+      : { pendingCelebrations: pending }),
     expiresAt,
     inTransaction: options?.inTransaction,
   });

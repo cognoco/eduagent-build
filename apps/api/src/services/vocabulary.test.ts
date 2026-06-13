@@ -104,6 +104,14 @@ function createMockDb({
     from: jest.fn().mockReturnValue({
       where: jest.fn().mockReturnValue({
         orderBy: jest.fn().mockResolvedValue(selectRows),
+        // reviewVocabulary acquires the retention-card row lock via
+        // SELECT ... FOR UPDATE; the locked read resolves to the configured
+        // retention card row.
+        for: jest
+          .fn()
+          .mockResolvedValue(
+            retentionCardFindFirst ? [retentionCardFindFirst] : [],
+          ),
       }),
       leftJoin: jest.fn().mockReturnValue({
         where: jest.fn().mockReturnValue({
