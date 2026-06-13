@@ -117,6 +117,22 @@ Lane-specific only:
   guessing sequential numbers instead of reading them back; corrected here):**
   WI-698 → **709/710** · WI-699 → **711/712** · WI-700 → 707/708 · WI-701 → **713/714** ·
   WI-702 → **715/716**. (Lesson: read child IDs back from the create response before citing them.)
+- 2026-06-13 — **Two rework patterns learned (durable, both shepherd-side, no code defects):**
+  (A) **Absorbed children must be bulk-closed at WP merge, not left for the close ceremony** —
+  the reviewer's `/cosmo:review` DoD gate flags open WP children as a child-closure/evidence gap
+  (it bounced WI-702 for this). Shepherd fix: immediately after merging a WP's PR, PATCH each
+  child to `Stage=Closed, Resolution=Done, Fixed In=<merge commit>, Completed` (omit `Resolved`/
+  `State` in the PATCH — including them 422s). Done for WI-700 (707/708←6fea5bc5) and WI-702
+  (715/716←96d160b8). Do the same for 698/699/701 children at their merges.
+  (B) **Stale-branch merge-invariant** — the REQUIRED `Merge completeness check` (WI-680) fails a
+  PR whose branch predates sibling merges (it bounced WI-701 #1115: its merge preview would drop
+  WI-702's `index.ts`/`cors.test.ts`/`maintenance.ts`/`test-seed.ts`). Fix: `git merge origin/main`
+  into the feature branch (NOT rebase/force-push), push. Proactively warned WI-698/699 executors
+  to merge main before their PRs. As main advances per merge, every still-open branch is more stale.
+- 2026-06-13 — **Follow-up capture candidate (out of WI-698 scope):** the WI-698 executor found
+  `.github/workflows/eval-live.yml:30` carries workflow-scope `issues: write` (single-job) — the
+  same over-grant pattern as F-127 but on a different workflow, outside WI-698's named finding set.
+  Worth a `/cosmo:capture` as a sibling CI-hygiene item; not fixed inline (scope discipline).
   All 7 set `Execution Path=Assisted` (shepherd-dispatched, supervised — not Auto/dispatcher);
   WI-698/699 also given `Risk/Impact` (P1). Next: stand up the verdict monitor and dispatch
   executors (Sonnet default; Opus plan-phase for WI-699 and the F-132/F-119 pieces of WI-698).
