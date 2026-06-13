@@ -52,6 +52,7 @@ import {
   getQuotaPoolV2,
   linkStripeCustomerV2,
   ensureFreeSubscriptionV2,
+  markSubscriptionCancelledV2,
   getEffectiveAccessForSubscriptionV2,
   getOrProvisionProfileQuotaUsageV2,
   listFamilyMembersV2,
@@ -384,8 +385,16 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       ? new Date(periodEndTs * 1000).toISOString()
       : new Date().toISOString();
 
-    // Mark local DB row so cancelAtPeriodEnd is reflected immediately
-    await markSubscriptionCancelled(db, subscription.id);
+    // Mark local DB row so cancelAtPeriodEnd is reflected immediately.
+    // [CUT-B3 / WI-693] Must write the SAME store the v2 read came from — a v2
+    // read + legacy write would stamp subscriptions.cancelled_at while v2 reads
+    // keep showing the row uncancelled until a webhook repairs it (split-brain
+    // at the flip). subscription.id is shared across stores by the reseed.
+    if (v2) {
+      await markSubscriptionCancelledV2(db, subscription.id);
+    } else {
+      await markSubscriptionCancelled(db, subscription.id);
+    }
 
     return c.json(
       cancelResponseSchema.parse({

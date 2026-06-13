@@ -23,6 +23,18 @@
 // Billing silent-recovery ban (AGENTS.md): every recovery branch escalates via a
 // structured signal (captureException / safeSend Inngest), never bare console.warn.
 //
+// M-REPOINT PRECONDITION (WI-586 convergence runbook §4). The provisioning paths
+// here (createSubscriptionV2, ensureFreeSubscriptionV2, and the reconcile they
+// call) insert `quota_pools` rows referencing the NEW `subscription.id`. Until
+// the FK re-point (M-REPOINT, §4 step 6), `quota_pools.subscription_id` still
+// targets LEGACY `subscriptions(id)`, so such an insert would FK-fail. This is
+// safe in the sanctioned flow: §4 applies M-REPOINT (step 6) BEFORE the flip
+// (step 7), and IDENTITY_V2_ENABLED is 'false' in every deployed env until that
+// flip (single-live-store) — so these v2 writes never run against an
+// un-re-pointed FK. An out-of-order flip (flag flipped true before M-REPOINT)
+// would surface as a raw FK error on the quota_pools insert; that is the
+// expected loud failure, not a state this module guards against.
+//
 // Flag-gated: reachable only when IDENTITY_V2_ENABLED='true'. Legacy
 // subscription-core.ts stays byte-identical.
 // ---------------------------------------------------------------------------
