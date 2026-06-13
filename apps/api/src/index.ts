@@ -26,6 +26,7 @@ import {
 } from './errors';
 
 import { envValidationMiddleware } from './middleware/env-validation';
+import { maintenanceGateMiddleware } from './middleware/maintenance';
 import { authMiddleware } from './middleware/auth';
 import { databaseMiddleware } from './middleware/database';
 import {
@@ -122,6 +123,13 @@ type Bindings = {
   SUPPORT_EMAIL?: string;
   DEPLOY_SHA?: string;
   CONSENT_POLICY_VERSION?: string;
+  // Identity Foundation cutover (CUT-B / WI-691). Single flag for the whole
+  // identity surface; default 'false' in every deployed env until the WI-586
+  // convergence flip. Read by the identity seam dispatchers.
+  IDENTITY_V2_ENABLED?: string;
+  // Two-stage convergence freeze gate (maintenance.ts). Default 'false'.
+  MAINTENANCE_READONLY?: string;
+  MAINTENANCE_BLOCK_INNGEST?: string;
 };
 
 type Variables = {
@@ -164,11 +172,19 @@ const ALLOWED_PRODUCTION_ORIGINS: ReadonlySet<string> = new Set([
 api.use(
   '*',
   cors({
-    origin: (origin) => {
+    origin: (origin, c) => {
       if (!origin) return '';
-      // Allow any localhost / 127.0.0.1 port (Metro, Expo web, Playwright).
-      if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
-      if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+      const env = (c as unknown as { env?: Bindings }).env;
+      // Allow any localhost / 127.0.0.1 port in non-production only
+      // (Metro, Expo web, Playwright dev tooling). Gating this on ENVIRONMENT
+      // prevents a local-app running on a victim's machine from making
+      // credentialed cross-origin requests against the production API.
+      // When env is absent (e.g. unit tests calling app.request() without
+      // bindings), we treat it as non-production for ergonomic test defaults.
+      if (env?.ENVIRONMENT !== 'production') {
+        if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
+        if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+      }
       // Production: exact-match allowlist only. No subdomain wildcards.
       return ALLOWED_PRODUCTION_ORIGINS.has(origin) ? origin : '';
     },
@@ -215,6 +231,15 @@ api.use('*', requestLogger);
 
 // Env validation — validates c.env bindings on first request only; skipped in tests
 api.use('*', envValidationMiddleware);
+
+// [WI-586 §4 step 1] Maintenance gate — the two-stage convergence freeze.
+// Mounted BEFORE auth/account resolution so it 503s all user/API/webhook
+// traffic and thereby kills the JIT legacy-account provisioning that
+// accountMiddleware performs on any authed request (incl. GET). Inert in every
+// normal deploy (both MAINTENANCE_* flags default 'false'); /v1/health and (in
+// stage 1) the signed /v1/inngest endpoint stay exempt so the Inngest drain
+// can complete.
+api.use('*', maintenanceGateMiddleware);
 
 // Auth middleware — runs before all routes; public paths are skipped internally
 api.use('*', authMiddleware);

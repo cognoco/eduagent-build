@@ -98,8 +98,11 @@ Rules that bind the model:
   data is persisted until lawful basis is established.**
 - **Consent ≠ contract** (inv 28): a consent-gated Person's processing rests on verifiable guardian
   consent, never on the guardian's account-holder status.
-- **Below the credential-eligibility floor → guardian-created only** (inv 13); the real floor is a
-  per-jurisdiction policy value + app-store-rating call, not a constant.
+- **Below the credential-eligibility floor → guardian-created only** (inv 13). **The floor is 13** —
+  the child-claimable account-detachment age, closing inv 13's open floor decision (account-detachment is
+  guardian-grantable at any age; child-claimable at 13+). Per-jurisdiction policy + app-store-rating may
+  raise the floor (be **stricter**) for a given jurisdiction, **never lower it below 13**.
+  *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.3/§4.2.)*
 - **Decision transport** (`MMT-ADR-0001`): Clerk may carry the *resolved* decision as ~3 JWT claims;
   **we own** the consent receipts + age-assurance audit + event log in Neon. Clerk Organizations are not used.
 
@@ -150,9 +153,9 @@ distinction is load-bearing:
 
 | Transition | Trigger | Rebinds | Behaviour |
 |---|---|---|---|
-| managed → credentialed (gets a Login) | action | a Login attaches to the existing Person | invite-flow (`MMT-ADR-0010`) |
+| **account-detachment** (managed → credentialed; gets a Login) | action | a Login attaches to the existing `person_id`; consent + guardianship edge unchanged; guardian-grantable any age, child-claimable at 13+ | invite-flow (`MMT-ADR-0010`); *(ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.1/§1.3/§4.1/§4.2)* |
 | consent gate lifts (crosses consent age) | **time** | `consentRequired` re-evaluates false; guardian visibility → **teen opt-in, default off** | per-dimension |
-| minor → adult at 18 (graduation) | **time** | guardianship dissolves; org/billing **offered**, not forced | named interim states |
+| **18-crossing** (minor → adult; guardianship dissolves) | **time** | guardianship dissolves; org/billing **offered**, not forced | named interim states |
 | residence_jurisdiction change | action + scheduler backstop | `consentRequired` re-evaluates; gate may **re-engage** → suspend into a consent-holding state | suspend + re-prompt |
 | guardianship mutation (add/remove/withdraw) | action | the guardian edge(s); consent authority may move | — |
 | de-credential (credentialed → managed) | — | — | **disallowed**; manual audited ops only |

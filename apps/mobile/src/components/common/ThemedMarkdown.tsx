@@ -1,7 +1,24 @@
-import { useMemo, type ReactElement, type ReactNode } from 'react';
+import {
+  useCallback,
+  useMemo,
+  type ComponentProps,
+  type ComponentType,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { Text, type TextStyle } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useThemeColors } from '../../lib/theme';
+
+// The published @types for react-native-markdown-display omit allowedImageHandlers
+// even though the JS implementation supports it as a first-class prop (used to
+// restrict which image origins are rendered). Extend the inferred props type so
+// TypeScript accepts it without a cast.
+type MarkdownProps = ComponentProps<typeof Markdown> & {
+  allowedImageHandlers?: string[];
+  defaultImageHandler?: string | null;
+};
+const MarkdownComponent = Markdown as ComponentType<MarkdownProps>;
 
 // Themed markdown renderer for LLM-generated content (chat replies, saved
 // notes). The single rule that keeps text visible: prose colour and the
@@ -16,6 +33,34 @@ import { useThemeColors } from '../../lib/theme';
 // Do NOT add an inline `style.color` to the prose rules below: a second,
 // independently-updating colour source is exactly what caused the
 // invisible-text regression. See docs/llm-issues.md.
+
+// Safe URL schemes allowed for link navigation in LLM-authored markdown (F-027).
+// Schemes outside this set (javascript:, data:, file:, etc.) are blocked to
+// prevent arbitrary-URL navigation injection.
+const SAFE_LINK_SCHEMES = ['https:', 'http:'];
+
+/**
+ * Returns true if the URL scheme is allowed; false if it should be blocked.
+ * Used as the `onLinkPress` handler — returning false suppresses navigation.
+ */
+export function isSafeLinkUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return SAFE_LINK_SCHEMES.includes(protocol);
+  } catch {
+    // Unparseable URL — block it.
+    return false;
+  }
+}
+
+// Remote images are disabled entirely for this untrusted-markdown path (F-027).
+// Even an https-only allowlist would let LLM-authored markdown trigger zero-click
+// loads from arbitrary hosts — tracking pixels and viewer-IP leaks. An empty
+// allowlist combined with a null default handler makes the library's image rule
+// render nothing (see node_modules/react-native-markdown-display image rule:
+// `show === false && defaultImageHandler === null` returns null).
+const ALLOWED_IMAGE_HANDLERS: string[] = [];
+const DEFAULT_IMAGE_HANDLER = null;
 
 function buildMarkdownStyles(
   textColor: string,
@@ -103,10 +148,17 @@ export function ThemedMarkdown({
     [colors.textPrimary],
   );
 
+  const handleLinkPress = useCallback((url: string): boolean => {
+    return isSafeLinkUrl(url);
+  }, []);
+
   return (
-    <Markdown
+    <MarkdownComponent
       mergeStyle={false}
       style={mdStyles}
+      onLinkPress={handleLinkPress}
+      allowedImageHandlers={ALLOWED_IMAGE_HANDLERS}
+      defaultImageHandler={DEFAULT_IMAGE_HANDLER}
       rules={{
         inline: (node: { key: string }, children: ReactNode) => (
           <Text
@@ -127,6 +179,6 @@ export function ThemedMarkdown({
       }}
     >
       {children}
-    </Markdown>
+    </MarkdownComponent>
   );
 }

@@ -155,6 +155,28 @@ describe('quiz schemas', () => {
         }),
       ).toThrow();
     });
+
+    it('[F-142] rejects answerGiven exceeding 1000 chars', () => {
+      expect(() =>
+        questionResultSchema.parse({
+          questionIndex: 0,
+          correct: false,
+          answerGiven: 'x'.repeat(1001),
+          timeMs: 100,
+        }),
+      ).toThrow();
+    });
+
+    it('[F-142] accepts answerGiven at the 1000-char limit', () => {
+      expect(
+        questionResultSchema.parse({
+          questionIndex: 0,
+          correct: false,
+          answerGiven: 'x'.repeat(1000),
+          timeMs: 100,
+        }).answerGiven,
+      ).toHaveLength(1000);
+    });
   });
 
   describe('generateRoundInputSchema', () => {
@@ -203,6 +225,39 @@ describe('quiz schemas', () => {
     it('requires at least one result', () => {
       expect(() => completeRoundInputSchema.parse({ results: [] })).toThrow();
     });
+
+    it('[F-142] rejects more than 10 results', () => {
+      const result = {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 1000,
+      };
+      expect(() =>
+        completeRoundInputSchema.parse({
+          results: Array.from({ length: 11 }, (_, i) => ({
+            ...result,
+            questionIndex: i,
+          })),
+        }),
+      ).toThrow();
+    });
+
+    it('[F-142] accepts exactly 10 results', () => {
+      const result = {
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 1000,
+      };
+      expect(
+        completeRoundInputSchema.parse({
+          results: Array.from({ length: 10 }, (_, i) => ({
+            ...result,
+            questionIndex: i,
+          })),
+        }).results,
+      ).toHaveLength(10);
+    });
   });
 
   describe('questionCheckInputSchema', () => {
@@ -232,6 +287,24 @@ describe('quiz schemas', () => {
           cluesUsed: 6,
         }),
       ).toThrow();
+    });
+
+    it('[F-179] rejects answerGiven exceeding 1000 chars (DoS bound on Levenshtein)', () => {
+      expect(() =>
+        questionCheckInputSchema.parse({
+          questionIndex: 0,
+          answerGiven: 'x'.repeat(1001),
+        }),
+      ).toThrow();
+    });
+
+    it('[F-179] accepts answerGiven at the 1000-char limit', () => {
+      expect(
+        questionCheckInputSchema.parse({
+          questionIndex: 0,
+          answerGiven: 'x'.repeat(1000),
+        }).answerGiven,
+      ).toHaveLength(1000);
     });
   });
 

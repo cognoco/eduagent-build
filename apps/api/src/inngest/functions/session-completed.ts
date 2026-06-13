@@ -3,7 +3,10 @@ import {
   getStepDatabase,
   getStepMemoryFactsDedupConfig,
   getStepVoyageApiKey,
+  isIdentityV2EnabledInStep,
 } from '../helpers';
+import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
@@ -917,6 +920,7 @@ export const sessionCompleted = inngest.createFunction(
           // already updated after the session ended and returns it cached.
           await refreshProgressSnapshot(db, profileId, {
             sessionEndedAt: timestamp ? new Date(timestamp) : new Date(),
+            identityV2Enabled: isIdentityV2EnabledInStep(),
           });
           await createPendingSessionSummary(
             db,
@@ -927,7 +931,10 @@ export const sessionCompleted = inngest.createFunction(
           );
 
           // Precompute coaching card and write to cache (ARCH-11)
-          const card = await precomputeCoachingCard(db, profileId);
+          // [CUT-B1 §2.5(iii)] v2 seam threaded via the step flag.
+          const card = await precomputeCoachingCard(db, profileId, {
+            identityV2Enabled: isIdentityV2EnabledInStep(),
+          });
           await writeCoachingCardCache(db, profileId, card);
         }),
       ),
@@ -1018,14 +1025,29 @@ export const sessionCompleted = inngest.createFunction(
             // (router applies minor-safe default).
             // i18n Phase 1 — pull conversation_language so the parent-facing
             // insights render in the learner's selected language.
-            const [profileForBracket] = await db
-              .select({
-                birthYear: profiles.birthYear,
-                conversationLanguage: profiles.conversationLanguage,
-              })
-              .from(profiles)
-              .where(eq(profiles.id, profileId))
-              .limit(1);
+            // [CUT-B1 §2.5(iii)] v2 seam: birthYear + conversation_language from person.
+            let profileForBracket:
+              | { birthYear: number; conversationLanguage: string | null }
+              | undefined;
+            if (isIdentityV2EnabledInStep()) {
+              const ctx = await getPersonLlmContext(db, profileId);
+              profileForBracket = ctx
+                ? {
+                    birthYear: ctx.birthYear,
+                    conversationLanguage: ctx.conversationLanguage,
+                  }
+                : undefined;
+            } else {
+              const [row] = await db
+                .select({
+                  birthYear: profiles.birthYear,
+                  conversationLanguage: profiles.conversationLanguage,
+                })
+                .from(profiles)
+                .where(eq(profiles.id, profileId))
+                .limit(1);
+              profileForBracket = row;
+            }
             const ageBracket =
               profileForBracket?.birthYear != null
                 ? computeAgeBracket(profileForBracket.birthYear)
@@ -1403,7 +1425,11 @@ export const sessionCompleted = inngest.createFunction(
             // memory-granted profile's transcript would still be transmitted to
             // the external LLM provider (the regulated processing act under GDPR
             // Art. 7(3)) before applyAnalysis later blocks only the write.
-            if (!(await isGdprProcessingAllowed(db, profileId))) {
+            // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver.
+            const gdprAllowed = isIdentityV2EnabledInStep()
+              ? await isGdprProcessingAllowedV2(db, profileId)
+              : await isGdprProcessingAllowed(db, profileId);
+            if (!gdprAllowed) {
               return;
             }
 

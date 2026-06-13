@@ -15,6 +15,7 @@
 import {
   PROFILE_SCOPED_TABLES,
   OWNER_SCOPED_TABLES,
+  CHARGE_SCOPED_TABLES,
   OR_SCOPED_TABLES,
   ALL_RLS_TABLES,
   EXPLICITLY_EXCLUDED_TABLES,
@@ -22,10 +23,11 @@ import {
 } from './database-rls-coverage';
 
 describe('database-rls-coverage manifest', () => {
-  it('ALL_RLS_TABLES is the union of profile-scoped, owner-scoped, and or-scoped', () => {
+  it('ALL_RLS_TABLES is the union of profile-scoped, owner-scoped, charge-scoped, and or-scoped', () => {
     const union = new Set([
       ...PROFILE_SCOPED_TABLES,
       ...OWNER_SCOPED_TABLES,
+      ...CHARGE_SCOPED_TABLES,
       ...OR_SCOPED_TABLES,
     ]);
     expect(ALL_RLS_TABLES).toEqual(expect.arrayContaining(Array.from(union)));
@@ -55,6 +57,12 @@ describe('database-rls-coverage manifest', () => {
       const meta = RLS_TABLE_META[table];
       expect(meta).toBeDefined();
       expect(meta!.predicateColumn).toBe('owner_profile_id');
+    }
+
+    for (const table of CHARGE_SCOPED_TABLES) {
+      const meta = RLS_TABLE_META[table];
+      expect(meta).toBeDefined();
+      expect(meta!.predicateColumn).toBe('charge_person_id');
     }
   });
 
@@ -129,6 +137,9 @@ const KNOWN_PROFILE_TABLES: readonly string[] = [
   'usage_events',
   // Added migration 0112 (WI-676/WI-687): mentor_activity_ledger profile-scoped.
   'mentor_activity_ledger',
+  // Added migration 0114 (WI-689 / MMT-ADR-0020): consent_request charge-scoped
+  // (charge_person_id FK to person; person.id = profiles.id).
+  'consent_request',
   // Owner-scoped (owner_profile_id FK)
   'withdrawal_archive_preferences',
   'pending_notices',

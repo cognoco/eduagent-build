@@ -38,6 +38,7 @@ import {
   boolean,
   date,
   smallint,
+  integer,
   jsonb,
   decimal,
   timestamp,
@@ -102,6 +103,16 @@ export const person = pgTable(
     lastActivityAt: timestamp('last_activity_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // CUT-A re-homes (MMT-ADR-0020): presentation/preference/lifecycle columns
+    // with no other home in the ratified model, moved off legacy `profiles`.
+    /** LLM tutor-prose language. 10-language superset of the UI locales. */
+    conversationLanguage: text('conversation_language').notNull().default('en'),
+    pronouns: text('pronouns'),
+    avatarUrl: text('avatar_url'),
+    /** Last-selected app context: 'study' | 'family'. */
+    defaultAppContext: text('default_app_context'),
+    /** Operational lifecycle marker (NOT consent state — inv 2). */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -113,6 +124,25 @@ export const person = pgTable(
     index('person_birth_date_idx').on(table.birthDate),
     index('person_residence_jurisdiction_idx').on(table.residenceJurisdiction),
     index('person_last_activity_at_idx').on(table.lastActivityAt),
+    // CUT-A re-homes (MMT-ADR-0020):
+    index('person_archived_at_idx')
+      .on(table.archivedAt)
+      .where(sql`${table.archivedAt} IS NOT NULL`),
+    // Mirrors profiles_conversation_language_check (migration 0087):
+    check(
+      'person_conversation_language_check',
+      sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl','ja','nb')`,
+    ),
+    // Mirrors profiles_pronouns_length_check (BUG-978):
+    check(
+      'person_pronouns_length_check',
+      sql`${table.pronouns} IS NULL OR char_length(${table.pronouns}) <= 32`,
+    ),
+    // Mirrors profiles_default_app_context_check:
+    check(
+      'person_default_app_context_check',
+      sql`${table.defaultAppContext} IS NULL OR ${table.defaultAppContext} IN ('study','family')`,
+    ),
   ],
 );
 
@@ -259,6 +289,21 @@ export const subscription = pgTable(
     storePlatform: text('store_platform'),
     periodStartAt: timestamp('period_start_at', { withTimezone: true }),
     periodEndAt: timestamp('period_end_at', { withTimezone: true }),
+    // CUT-A store-correlation / idempotency columns (MMT-ADR-0020): close the
+    // gap that dropping legacy `subscriptions` would re-open (BUG-116 /
+    // CR-2026-05-19-M11 webhook races; both webhook handlers).
+    stripeCustomerId: text('stripe_customer_id'),
+    stripeSubscriptionId: text('stripe_subscription_id'),
+    lastStripeEventId: text('last_stripe_event_id'),
+    lastStripeEventTimestamp: timestamp('last_stripe_event_timestamp', {
+      withTimezone: true,
+    }),
+    revenuecatOriginalAppUserId: text('revenuecat_original_app_user_id'),
+    lastRevenuecatEventId: text('last_revenuecat_event_id'),
+    /** RevenueCat event ms timestamp — TEXT, carried over 1:1 from legacy. */
+    lastRevenuecatEventTimestampMs: text('last_revenuecat_event_timestamp_ms'),
+    trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -268,6 +313,32 @@ export const subscription = pgTable(
   },
   (table) => [
     index('subscription_organization_id_idx').on(table.organizationId),
+    // CUT-A (MMT-ADR-0020) store-correlation uniqueness (legacy: UNIQUE columns;
+    // new convention: partial unique index):
+    uniqueIndex('subscription_stripe_customer_id_idx')
+      .on(table.stripeCustomerId)
+      .where(sql`${table.stripeCustomerId} IS NOT NULL`),
+    uniqueIndex('subscription_stripe_subscription_id_idx')
+      .on(table.stripeSubscriptionId)
+      .where(sql`${table.stripeSubscriptionId} IS NOT NULL`),
+    // BUG-116: DB-level idempotency fence for RevenueCat webhook events.
+    // organization.id = accounts.id by the deterministic reseed.
+    uniqueIndex('subscription_org_revenuecat_event_id_idx')
+      .on(table.organizationId, table.lastRevenuecatEventId)
+      .where(sql`${table.lastRevenuecatEventId} IS NOT NULL`),
+    // CR-2026-05-19-M11: same fence for Stripe subscription events.
+    uniqueIndex('subscription_org_stripe_event_id_idx')
+      .on(table.organizationId, table.lastStripeEventId)
+      .where(sql`${table.lastStripeEventId} IS NOT NULL`),
+    // Legacy tier/status pgEnums map onto the new TEXT plan_tier/status:
+    check(
+      'subscription_plan_tier_check',
+      sql`${table.planTier} IN ('free','plus','family','pro')`,
+    ),
+    check(
+      'subscription_status_check',
+      sql`${table.status} IN ('trial','active','past_due','cancelled','expired')`,
+    ),
   ],
 );
 
@@ -697,3 +768,110 @@ export const subscriptionPayers = pgTable(
     ),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// CUT-A: consent_request (MMT-ADR-0020) — the consent-REQUEST workflow table.
+//
+// consent_grant is the ratified append-only consent EVENT log. Legacy
+// consent_states conflated that log with a pre-grant WORKFLOW (PENDING /
+// PARENTAL_CONSENT_REQUESTED states, parent-email contact, response token +
+// expiry, WI-374 abuse caps). That workflow has no home in the ratified model;
+// consent_request is its home. Requests are operational state; grants remain
+// the audit record. The two never merge. Approval writes a consent_grant row
+// and back-links it (consent_grant_id) — it NEVER creates a guardianship edge
+// (inv 14). Withdrawal/restore are grant-layer events, never request states.
+//
+// Keyed by the ratified consent key (charge_person_id × purpose ×
+// organization_id) extended by requested_basis — the workflow runs per
+// regulatory basis, mirroring the legacy GDPR/COPPA dual-row coexistence
+// (legacy consent_states uniqueness is the profile + consent_type pair).
+// See §1.2 / Appendix A.
+// ---------------------------------------------------------------------------
+
+export const consentRequest = pgTable(
+  'consent_request',
+  {
+    /**
+     * App-generated uuid v7; during the cutover reseed the id is REUSED from
+     * the source consent_states row (deterministic id-reuse, like 0109).
+     */
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    chargePersonId: uuid('charge_person_id')
+      .notNull()
+      .references(() => person.id, { onDelete: 'cascade' }),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    purpose: text('purpose').notNull().default('platform_use'),
+    requestedBasis: text('requested_basis').notNull(),
+    /**
+     * Nullable: in the child-self-signup flow the responding parent exists only
+     * as an email; in-family it binds to the guardianship edge's guardian end.
+     */
+    guardianPersonId: uuid('guardian_person_id').references(() => person.id, {
+      onDelete: 'set null',
+    }),
+    /** NULL in 'pending' (recipient not yet named). */
+    guardianEmail: text('guardian_email'),
+    status: text('status').notNull().default('pending'),
+    /** crypto.randomUUID(); NULL outside an open cycle. */
+    token: text('token'),
+    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+    resendCount: integer('resend_count').notNull().default(0),
+    recipientChangeCount: integer('recipient_change_count')
+      .notNull()
+      .default(0),
+    /** Bug #872 audit metadata, carried over 1:1. */
+    policyVersion: text('policy_version'),
+    requestIp: text('request_ip'),
+    userAgent: text('user_agent'),
+    requestedAt: timestamp('requested_at', { withTimezone: true }),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    /** Set on approval — back-link to the consent_grant decision record. */
+    consentGrantId: uuid('consent_grant_id').references(() => consentGrant.id),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    /**
+     * requested_basis IS part of the key (preserves the GDPR + COPPA dual-row
+     * coexistence the legacy clobber-guard protects — see consent.ts
+     * refreshConsentToken). A key without the basis dimension would collapse
+     * that pair into one row and break the reseed's id-reuse.
+     */
+    uniqueIndex('consent_request_charge_purpose_org_basis_unique').on(
+      table.chargePersonId,
+      table.purpose,
+      table.organizationId,
+      table.requestedBasis,
+    ),
+    // token-lookup hot path (mirrors legacy consent_states_token_idx):
+    index('consent_request_token_idx')
+      .on(table.token)
+      .where(sql`${table.token} IS NOT NULL`),
+    // reminder/expiry sweep path (consent-reminders Inngest fn):
+    index('consent_request_status_requested_idx').on(
+      table.status,
+      table.requestedAt,
+    ),
+    check(
+      'consent_request_requested_basis_check',
+      sql`${table.requestedBasis} IN ('coppa_parental_consent','gdpr_parental_consent')`,
+    ),
+    check(
+      'consent_request_status_check',
+      sql`${table.status} IN ('pending','requested','approved','denied','expired')`,
+    ),
+    check('consent_request_resend_count_check', sql`${table.resendCount} >= 0`),
+    check(
+      'consent_request_recipient_change_count_check',
+      sql`${table.recipientChangeCount} >= 0`,
+    ),
+  ],
+).enableRLS();

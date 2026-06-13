@@ -1,8 +1,9 @@
-import type {
-  HomeworkCaptureSource,
-  HomeworkMode,
-  HomeworkProblem,
-  HomeworkSessionMetadata,
+import {
+  homeworkProblemSchema,
+  type HomeworkCaptureSource,
+  type HomeworkMode,
+  type HomeworkProblem,
+  type HomeworkSessionMetadata,
 } from '@eduagent/schemas';
 
 let homeworkProblemCounter = 0;
@@ -218,9 +219,13 @@ export function parseHomeworkProblems(
 
   if (rawValue) {
     try {
-      const parsed = JSON.parse(rawValue) as HomeworkProblem[];
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((problem) => ({
+      // [F-158] Validate the parsed JSON against the shared schema before use.
+      // Raw JSON.parse trusted the deep-link payload without verification; schema
+      // validation ensures only well-formed HomeworkProblem objects are accepted.
+      const json = JSON.parse(rawValue) as unknown;
+      const result = homeworkProblemSchema.array().safeParse(json);
+      if (result.success && result.data.length > 0) {
+        return result.data.map((problem) => ({
           ...problem,
           selectedMode: problem.selectedMode ?? null,
         }));

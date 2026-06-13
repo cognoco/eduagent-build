@@ -9,12 +9,17 @@ import {
 } from '@eduagent/database';
 import { subjectCurriculumRetryRequestedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
 import { getProfileAge } from '../../services/profile';
 import { isGdprProcessingAllowed } from '../../services/consent';
+import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import {
+  getPersonAge,
+  getPersonLlmContext,
+} from '../../services/identity-v2/helpers';
 import { captureException } from '../../services/sentry';
 
 async function loadBook(
@@ -75,22 +80,38 @@ export const subjectRetryCurriculum = inngest.createFunction(
       // outside the HTTP consent middleware; a queued event must not load learner
       // age data, call the LLM, or persist derived topics for a profile whose
       // consent is no longer granted.
-      if (!(await isGdprProcessingAllowed(db, profileId))) {
+      // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver; legacy via consent_states.
+      const v2 = isIdentityV2EnabledInStep();
+      const gdprAllowed = v2
+        ? await isGdprProcessingAllowedV2(db, profileId)
+        : await isGdprProcessingAllowed(db, profileId);
+      if (!gdprAllowed) {
         return { status: 'consent-blocked' as const };
       }
 
-      const langRow = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
-        columns: { conversationLanguage: true },
-      });
+      // [CUT-B1 §2.5(iii)] v2 seam: age + conversation_language from person.
+      let rawConversationLanguage: string | null | undefined;
+      let learnerAge: number;
+      if (v2) {
+        const ctx = await getPersonLlmContext(db, profileId);
+        rawConversationLanguage = ctx?.conversationLanguage;
+        learnerAge = await getPersonAge(db, profileId);
+      } else {
+        const langRow = await db.query.profiles.findFirst({
+          where: eq(profiles.id, profileId),
+          columns: { conversationLanguage: true },
+        });
+        rawConversationLanguage = langRow?.conversationLanguage;
+        learnerAge = await getProfileAge(db, profileId);
+      }
       return {
         status: 'pending' as const,
         bookTitle: book.title,
         bookDescription: book.description ?? '',
-        learnerAge: await getProfileAge(db, profileId),
+        learnerAge,
         // DB returns string | null; parse to union before passing forward.
         conversationLanguage: parseConversationLanguage(
-          langRow?.conversationLanguage,
+          rawConversationLanguage,
         ),
       };
     });
@@ -170,7 +191,11 @@ export const subjectRetryCurriculum = inngest.createFunction(
         // load-retry-context is memoized by Inngest, so on a retry of this step a
         // consent withdrawal that occurred after the first run would otherwise be
         // missed and stale-allowed learner data would still reach the LLM.
-        if (!(await isGdprProcessingAllowed(db, profileId))) return;
+        // [CUT-B1 §2.5(i)] v2 seam.
+        const stepGdprAllowed = isIdentityV2EnabledInStep()
+          ? await isGdprProcessingAllowedV2(db, profileId)
+          : await isGdprProcessingAllowed(db, profileId);
+        if (!stepGdprAllowed) return;
 
         const result = await generateBookTopics(
           context.bookTitle,

@@ -48,6 +48,18 @@ const workstreams: Workstream[] = [
     id: "37c8bce9-1f7c-81d7-9377-e79356055ff3",
     overrides: new Map(),
   },
+  {
+    name: "API Security & PII",
+    slug: "security-pii-api",
+    id: "37e8bce9-1f7c-8161-a3fc-c74c5300a88f",
+    overrides: new Map(),
+  },
+  {
+    name: "Architecture Clean-Out",
+    slug: "architecture-clean-out",
+    id: "37e8bce9-1f7c-81fe-be97-e063ce8f17e8",
+    overrides: new Map(),
+  },
 ];
 
 mkdirSync(reviewDir, { recursive: true });

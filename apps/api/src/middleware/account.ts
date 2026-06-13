@@ -9,15 +9,67 @@ import { findOrCreateAccount, type Account } from '../services/account';
 import { resolveVerifiedClerkEmail } from '../services/clerk-user';
 import { withTransientDatabaseRetry } from '../services/transient-db-retry';
 import { createLogger } from '../services/logger';
+import { isIdentityV2Enabled } from '../config';
+import { resolveIdentityV2 } from '../services/identity-v2/identity-resolve';
 import type { AuthUser } from './auth';
 import type { Database } from '@eduagent/database';
 
 const logger = createLogger();
 
+/**
+ * [CUT-B1 §2.2a] The pre-graph identity context. Under IDENTITY_V2_ENABLED,
+ * when no `login` row exists yet (onboarding not completed), accountMiddleware
+ * does NOT JIT-create an account — it sets this graphless context and leaves
+ * `account` unset. The bootstrap route (POST /v1/profiles) reads it to create
+ * the graph. The legacy path never sets this.
+ */
+export interface ClerkIdentity {
+  clerkUserId: string;
+  verifiedEmail: string;
+}
+
 export type AccountEnv = {
-  Bindings: { CLERK_SECRET_KEY?: string };
-  Variables: { user: AuthUser; db: Database; account: Account };
+  Bindings: {
+    CLERK_SECRET_KEY?: string;
+    IDENTITY_V2_ENABLED?: string;
+  };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    // [CUT-B1] Set only on the v2 pre-graph path (no login row yet).
+    clerkIdentity: ClerkIdentity | undefined;
+  };
 };
+
+/**
+ * [CUT-B1 §2.2a] Routes reachable BEFORE the identity graph exists (flag-on).
+ * `requireAccountMiddleware` v2 keeps the hard 401 for everything except these
+ * — they return their documented default shapes pre-graph:
+ *   - GET  /v1/profiles            → empty list
+ *   - POST /v1/profiles            → the bootstrap (creates the graph)
+ *   - GET  /v1/billing/status      → free-tier defaults
+ *   - GET  /v1/subscription/status → free-tier defaults
+ *   - GET  /v1/consent/my-status   → null consent status
+ * Matched against the post-basePath path (includes /v1), like auth.ts.
+ */
+interface PreGraphRoute {
+  method: string;
+  path: string;
+}
+const PRE_GRAPH_ALLOWLIST: readonly PreGraphRoute[] = [
+  { method: 'GET', path: '/v1/profiles' },
+  { method: 'POST', path: '/v1/profiles' },
+  { method: 'GET', path: '/v1/billing/status' },
+  { method: 'GET', path: '/v1/subscription/status' },
+  { method: 'GET', path: '/v1/consent/my-status' },
+];
+
+function isPreGraphAllowed(method: string, path: string): boolean {
+  return PRE_GRAPH_ALLOWLIST.some(
+    (r) => r.method === method && r.path === path,
+  );
+}
 
 export const accountMiddleware = createMiddleware<AccountEnv>(
   async (c, next) => {
@@ -76,6 +128,29 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
       });
     }
 
+    // [CUT-B1 §2.2a] v2 seam: resolve the identity graph instead of the legacy
+    // account, and DEFER provisioning (no JIT create). When the graph exists,
+    // set the byte-identical account context as today; when it does not
+    // (pre-graph — onboarding not completed), set the graphless clerkIdentity
+    // and leave `account` unset for the pre-graph allowlist to handle.
+    if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+      const resolved = await withTransientDatabaseRetry(
+        'accountMiddleware.resolveIdentityV2',
+        () => resolveIdentityV2(db, user.userId),
+        // Pure read — safe to retry on a dropped connection.
+        { idempotent: true },
+      );
+      if (resolved) {
+        c.set('account', resolved.account);
+      } else {
+        c.set('clerkIdentity', {
+          clerkUserId: user.userId,
+          verifiedEmail: verifiedEmail.email,
+        });
+      }
+      return next();
+    }
+
     const account = await withTransientDatabaseRetry(
       'accountMiddleware.findOrCreateAccount',
       () => findOrCreateAccount(db, user.userId, verifiedEmail.email),
@@ -119,6 +194,17 @@ export const requireAccountMiddleware = createMiddleware<AccountEnv>(
     // 401 rather than letting the route handler crash with TypeError → 500.
     const account = c.get('account');
     if (!account) {
+      // [CUT-B1 §2.2a] v2 pre-graph allowlist. Under IDENTITY_V2_ENABLED a
+      // freshly-signed-up user has no graph yet (accountMiddleware set
+      // clerkIdentity instead of account). The bootstrap + a small set of
+      // status routes must be reachable pre-graph to return their documented
+      // defaults; everything else keeps today's hard 401.
+      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+        const clerkIdentity = c.get('clerkIdentity');
+        if (clerkIdentity && isPreGraphAllowed(c.req.method, c.req.path)) {
+          return next();
+        }
+      }
       return c.json(
         {
           code: ERROR_CODES.UNAUTHORIZED,

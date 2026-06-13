@@ -5,6 +5,10 @@
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
+## Shepherding & Cosmo Workflow
+
+- [project_cosmo_shepherd_finalization.md](project_cosmo_shepherd_finalization.md) — Finalizing Cosmo WIs for the autonomous /cosmo:review loop: replace_content + property PATCH (NOT execute complete, which appends + writes literal text the reviewer rejects); set Fixed In manually; single-line `Caveats / Follow-ups:`; refine can't promote childless WPs.
+
 ## Identity Foundation (re-platform)
 
 - [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to the ratified identity/policy-engine/router/safety ADRs + the `docs/registers/llm-models/` register. Current runway state lives in `_wip/identity-foundation/ROADMAP.md`; canon membership lives in `_wip/identity-foundation/CANONICAL-SET.md`.
@@ -93,6 +97,7 @@
 
 ## Development Process & Feedback
 
+- [feedback_shepherd_kickoff_role_split.md](feedback_shepherd_kickoff_role_split.md) — Use the standard layered machinery (executor-protocol.md + shepherd-protocol.md + thin pointer-briefs + lane tracker + thin kickoff); don't author bespoke shepherd kickoffs. Lineage: wi-execute.md (raw example) → executor-protocol.md (standardized, NOT embryo). Reviewer is a SEPARATE session; shepherd self-monitors Cosmo for verdicts (DoD=Close).
 - [feedback_plan_cutover_ownership.md](feedback_plan_cutover_ownership.md) — Replace/rewrite plans need an owner for the cutover wave (switch-flip check); single-live-store invariant for piecemeal merges. From the WI-586 scope finding.
 
 - [project_agent_doc_and_memory_architecture_revisit.md](project_agent_doc_and_memory_architecture_revisit.md) — Open: AGENTS.md/CLAUDE.md content profile + cross-agent memory architecture. Memories currently Claude-only; Cortex (Nexus repo) is prior art for shared memory.

@@ -156,6 +156,34 @@ const envSchema = z.object({
   // S1 mobile-shell flag; reserved at S0 so the name is final. No API code
   // reads this yet.
   MODE_NAV_V2_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Identity Foundation cutover (CUT-B WP). The SINGLE flag for the whole
+  // identity surface (auth/account/person/consent-read/billing) — never
+  // per-domain flags (partial activation = split-brain, banned). Default-OFF:
+  // while 'false', every identity seam dispatches to the legacy `accounts` /
+  // `profiles` / `consent_states` store and no v2 module performs a DB call.
+  // The flip to 'true' happens once, in the WI-586 convergence runbook, AFTER
+  // freeze + final reseed + verify + FK re-point. No deployed environment
+  // carries 'true' until then; only tests set it true in-process. The
+  // flag-off break test (config.identity-v2.test.ts) pins the typed-config
+  // `=== 'true'` semantics so the JS truthiness of the string 'false' can
+  // never select v2.
+  IDENTITY_V2_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Convergence maintenance gates (WI-586 runbook §4 step 1). Two-stage:
+  //   - MAINTENANCE_READONLY: stage 1. The maintenance gate (mounted at the
+  //     top of index.ts, before auth/account resolution) 503s every request
+  //     EXCEPT the health check and the signed Inngest delivery endpoint
+  //     /v1/inngest — which must stay deliverable so in-flight Inngest runs
+  //     can drain to zero. Mounted before account resolution because
+  //     accountMiddleware JIT-inserts legacy `accounts` + trial rows on ANY
+  //     authed request (incl. GET), which a route-scoped gate would not stop.
+  //   - MAINTENANCE_BLOCK_INNGEST: stage 2. After the drain reads zero, this
+  //     hard-blocks /v1/inngest too (belt-and-braces against a stray late
+  //     delivery mid-reseed).
+  // Both default-OFF; set in Doppler only during the convergence window.
+  MAINTENANCE_READONLY: z.enum(['true', 'false']).default('false'),
+  MAINTENANCE_BLOCK_INNGEST: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -225,6 +253,44 @@ export function isChallengeRoundRuntimeEnabled(
  * never accidentally cuts over. See the gpt-oss-cerebras-build spec.
  */
 export function isLlmRoutingV2Enabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * Identity Foundation cutover gate (CUT-B WP / WI-691). Read at each identity
+ * domain seam (account resolve, profile scope, the onboarding bootstrap, the
+ * person-scope twins, the B1 Inngest functions) to pick the v2 (`person` /
+ * `login` / `organization` / `consent_grant`) implementation over the legacy
+ * (`accounts` / `profiles` / `consent_states`) one.
+ *
+ * Default-closed by typed-config equality, NOT JS truthiness: the env value is
+ * the literal string `'true'` or `'false'` (or undefined when the binding is
+ * absent). A bare `if (config.IDENTITY_V2_ENABLED)` would treat the string
+ * `'false'` as truthy and silently cut over every deployed environment — the
+ * exact failure mode the flag-off break test (config.identity-v2.test.ts)
+ * pins. Only `=== 'true'` selects v2; everything else (incl. `'false'` and
+ * undefined) stays on legacy.
+ */
+export function isIdentityV2Enabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * Stage-1 convergence gate. When 'true', the maintenance middleware 503s every
+ * request except the health check and the signed `/v1/inngest` delivery
+ * endpoint (kept open so in-flight Inngest runs drain to zero). Default-closed.
+ */
+export function isMaintenanceReadonly(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * Stage-2 convergence gate. When 'true' (set only after the Inngest drain
+ * reads zero), the maintenance middleware also 503s `/v1/inngest`, hard-blocking
+ * any stray late delivery mid-reseed. Default-closed. Only meaningful while
+ * MAINTENANCE_READONLY is also 'true'.
+ */
+export function isMaintenanceBlockInngest(value: string | undefined): boolean {
   return value === 'true';
 }
 

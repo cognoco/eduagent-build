@@ -127,16 +127,20 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **N.0 routing (Phase N, 2026-06-09):** the audit `agent-instructions` doc-findings
   (F-037/038/039/040/041/042/045/046, F-113/114) were ruled to HH / PRG-03 (not
   Stream 2), all non-blocking → default-defer.
-- **WI-587 residue (registered 2026-06-10):** the 19 residual `WI-387`
-  memory-triage dispositions de-scoped from the HH exit gate (10 user-KEEPs ·
-  8 product/user/mixed REVISEs · 1 CONFLICT — `feedback_never_lock_topics`,
-  incl. the PRD FR119-vs-FR124 self-contradiction) → Cosmo **`WI-587`**
-  (Captured, MentoMate). Evidence base:
-  `supporting-artefacts/memory-cleanup.md` (full 55-memory triage results;
-  adopted from nexus 2026-06-10 — now a registered PRG-03 artifact, no longer
-  rogue). Needs a **~20-min operator ruling session** (queue entry 4). The
-  post-HH-merge sequencing hold on executing its edits **lifted 2026-06-11**
-  (PR #832 merged) — only the rulings themselves remain.
+- **WI-587 — RULED + EXECUTED (2026-06-11), now `Stage=Reviewing`:** the 19
+  residual `WI-387` memory-triage dispositions (10 user-KEEPs · 8
+  product/user/mixed REVISEs · 1 CONFLICT — `feedback_never_lock_topics` vs the
+  PRD FR119-vs-FR124 self-contradiction). **All 19 ruled by PM 2026-06-11** and
+  executed the same day; **landed on `main` in commit `7cc8a9a8d`** ("docs(memory):
+  apply PM-ruled dispositions", 22 files): PRD § Prerequisite Relationship Types
+  rewritten (REQUIRED = strong advisory, never a hard lock — conflict resolved
+  Option A "never lock", code-confirmed no locking logic exists), the 8 REVISE
+  corrections applied, the 10 KEEP memories re-confirmed `2026-06-11`. **Verified
+  landed 2026-06-13** (program session — all 18 + the conflict checked file-by-file).
+  Evidence base: `supporting-artefacts/wi-587-ruling-sheet.md` (all 19 cells filled,
+  status RULED) + `memory-cleanup.md` (full 55-memory triage). The "~20-min operator
+  ruling session" framing is now **spent** — only the **review-close** remains
+  (manual `/cosmo:review`; standalone item — PRG-03 has no shepherded loop).
 - **Singleton merge (2026-06-10):** F-036 (`autoMemoryDirectory` mis-point)
   merged in from the dissolved PRG-16 tail.
 - **Activate-when:** active — the matrix already *is* the agreed owner-map; no
@@ -163,10 +167,76 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   the IF pattern (dogfood evidence in hand). Earlier parallel build allowed if
   ZDX-side capacity appears. **Gate effectively MET 2026-06-11** — IF ran the
   full loop (W0–W2+W4 closed through the autonomous reviewer); PRG-12 is the
-  second instance. Design input captured on `WI-590` (comment, 2026-06-11): the
-  shepherd-kickoff skill + executor-protocol skill + reviewer-dispatcher
-  pattern, with pointers to the five `_wip/identity-foundation/review-loop-*` /
-  `executor-protocol*` artifacts. Pull remains deliberate (attention budget).
+  second instance. **Scope narrowed 2026-06-13 → top-down layer only**: the
+  loop/execution-mechanism productionization (shepherd-kickoff + executor-protocol
+  + reviewer-dispatcher + runtime-agnosticity) split out to **PRG-05**. PRG-04 +
+  PRG-05 are designed together via one combined design/grill, seeded by
+  `supporting-artefacts/mechanism-productionization-design-input.md`, gated behind
+  the agnosticity spike (**spike → grill → slice**). `WI-590` is double-loaded; its
+  loop-productization input re-homes to PRG-05 at slice time. Pull remains
+  deliberate (attention budget).
+
+### PRG-05 · Execution-mechanism productionization (the orchestration loop) — `active` (design phase)
+- **Outcome:** the hand-built program-delivery mechanism — shepherd-kickoff,
+  executor-protocol/pointer-brief, the autonomous reviewer-dispatcher loop, and the
+  cross-runtime seam contracts — promoted from per-instance `_wip/` artifacts to a
+  parameterized, runtime-agnostic tooling layer. **Half B** of the mechanism
+  productionization (Half A = PRG-04, the top-down layer).
+- **Owner:** Hex + Jorn
+- **Embryo inputs:** the loop dogfood corpus in `_wip/identity-foundation/`
+  (`review-loop-{mechanics,observations,reviewer-observations,productization-handoff}.md`
+  + `executor-protocol{,-example}.md` + `new-llm-review-watcher-kickoff-prompt.md` +
+  the live `review-watcher-v3.ts`) + `planning-reference.md` §2.5–2.7 +
+  `supporting-artefacts/mechanism-productionization-design-input.md` (consolidated
+  design seed + locked decisions, 2026-06-13).
+- **Decomposition:** Cosmo **`WI-590`** is currently double-loaded (top-down + loop
+  input); the loop-productization half re-homes here at slice time. Skill-level
+  enhancements to ZDX (`zdx-core`/`cosmo`) — children-sweep into `complete`, a
+  published close-evidence contract, structured review-result + override policy —
+  are bug/enhancement WIs against those skills, captured at slice, **not** new
+  top-down structure.
+- **Agnosticity scope (locked 2026-06-13):** runtime-swap unit = the **role**; three
+  swappable role-units (orchestrator · shepherd-with-its-executors · reviewer);
+  agnostic contracts only at orchestrator↔shepherd + shepherd↔reviewer;
+  shepherd↔executor is **native-by-design** (never cross-runtime); reviewer ≠
+  executor runtime is a quality invariant.
+- **Status (2026-06-13): DESIGN-PHASE ACTIVE.** The **agnosticity spike** is the
+  first work (Claude shepherd choosing Claude/Codex-model executors via
+  `codex-companion`; Claude executor → Codex nested adversarial reviewer), feeding
+  the combined design/grill with PRG-04 (seam-catalogue spine). This is a *design*
+  activation — decisions + spike + grill — **not** the §2.1 execution recipe: no
+  Cosmo Workstream/slice until the grill closes (sequence **spike → grill → slice**).
+  Spike status tracked in the design-input doc. *(The pre-slice design phase is
+  itself dogfood for PRG-04 — §2.1 has no design-activation altitude.)*
+- **Activate-when:** — (design-active 2026-06-13; execution activation = post-grill slice).
+
+### PRG-10 · API Security & PII — `active` (2026-06-13)
+- **Outcome:** all 27 `security-pii-api` clear-out findings (2026-05-29 full audit)
+  remediated — CI/GHA permission + gate hardening, API input-validation + resource
+  bounds, one JWKS DoS + three race/atomicity fixes, quota/billing correctness,
+  logging/config hygiene, one LLM prompt-injection fence, mobile markdown safety. Scope
+  is the **non-IF** API surface (`Defer-to-workstream=security-pii-api`), distinct from
+  the in-IF security findings IF's W2/W3 owned.
+- **Owner:** Jorn (+ PRG-10 shepherd session; medium supervision — agent-heavy on the
+  hygiene/input-validation sweeps, human review on auth/CI-permission + concurrency).
+- **Depends-on:** — both gates fired (G2 safe-subset + G4 auth/PII remainder, 06-11).
+  **Parallel-safe with the live IF cutover** — slice scan proved 27/27 CLEAN (zero
+  CUT-B1/2/3 overlap); no sequencing edge.
+- **Decomposition:** `_wip/security-pii-api/execution-tracker.md` (charter + unit map +
+  slice scan). Cosmo **Workstream "API Security & PII"**
+  (`37e8bce9-1f7c-8161-a3fc-c74c5300a88f`) with **WI-698…704** (5 WPs + 2 Items,
+  `Stage=Backlog`, order 1–7; no `Blocked-by` edges — all parallel-safe).
+- **Activated 2026-06-13** — sixth run of the §2.1 recipe; first parallel activation
+  *after* the IF cutover went live. Slice scan (sub-agent): **27/27 LIVE** (none subsumed
+  by IF), **27/27 CLEAN** (no cutover overlap); OQ1 ruled CI/GHA findings stay in PRG-10
+  (WI-698), OQ2 file-touch audit done at activation. **First shepherd shut down pre-execution
+  2026-06-13** (its bespoke kickoff was non-standard) → realigned to the **standard machinery**
+  (`shepherd-protocol.md` + `executor-protocol.md` + lane tracker + a thin kickoff); clean
+  kickoff ready, fresh spawn pending. Shepherd = separate Opus 4.8 / medium-effort session;
+  Sonnet executors (Opus plan-phase on WI-699 + the F-132/F-119 pieces of WI-698). The review
+  loop is owned by a **separate reviewer (Codex) session** — shepherd self-monitors Cosmo for
+  verdicts, does not own the watcher.
+- **Activate-when:** — (active)
 
 ### PRG-12 · L10n & A11y Mobile — `✓ graduated` (2026-06-12)
 - **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
@@ -246,12 +316,14 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 ---
 
-### PRG-17 · new-llm Integration (LLM) — `active`
+### PRG-17 · new-llm Integration (LLM) — `✓ graduated` (2026-06-13)
 - **Outcome:** the `origin/new-llm` branch (Zuzka's lane: V2-shell S0 "Now feed" +
   ~25-module audit-fix batch, FINAL feature SHA `6a81f7663`, all live-on-merge)
   reconciled and merged to `main` BEFORE IF cutover execution — strategy **O2**
   ruled by operator 2026-06-12 (analysis v1.4 @ `450e4c522`, four adversarial
-  passes; strategy core survived 4-for-4).
+  passes; strategy core survived 4-for-4). **OUTCOME MET** — merged `105b39ac0`
+  (`--no-ff`, full ancestor, `Merge completeness check` + all gates green),
+  post-merge deploy green, cutover unlocked.
 - **Owner:** Jorn (+ LLM shepherd session; program session orchestrates — Zuzka's
   lane halted, reconciliation runs through this pipeline; Zuzka gets the exec
   summary + a courtesy review slot on the merge PR).
@@ -274,6 +346,21 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   check) → operator approval vs the WI-681 inventory → merge with WI-680
   verification on the merge PR → boundary event "new-llm merged" unlocks IF
   cutover execution.
+- **Execution state:** **GRADUATED 2026-06-13 (operator ruling)** — the program's
+  **fifth graduation**, and its first *integration* (vs clear-out) lane. All
+  reconciliation units `WI-675…682` + the RLS residue `WI-687` Closed/Done and
+  merged; the §8 final rescan returned **GO** (zero blockers, the Inngest-drift
+  surface proved vacuous, two MEDIUMs were inventory-accuracy not code); merge
+  `105b39ac0` verified clean; post-merge `Deploy` green end-to-end → `WI-664`
+  (chronic staging-KV outage) Closed; `WI-694` (verifier hotfix, main-side,
+  detached) Closed; `Merge completeness check` now a required check on `main`.
+  **Deferred follow-ups tracked in the spillover register, not residue:** `WI-695`
+  (3 GC6 mocks), `WI-696` (type `app/session.completed` end-to-end), plus
+  `WI-683`/`684`/`688`. The new-llm shepherd stood down after final checkpoint;
+  its dedicated review-watcher stopped. **Key learnings deposited:** childless-WP
+  altitude inversion (`WI-683`), standalone-item review-loop gap + the spillover
+  mop-up mechanism, "verified then red-teamed" review bar.
+- **Activate-when:** — (graduated)
 - **Activate-when:** — (active)
 
 ---
@@ -310,7 +397,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 | ID | Initiative (clear-out) | Findings (bucket 3) | Blast-radius vs PRG-01 (N.1 signal; O is authority) | Activate-when (ratified 2026-06-10) |
 |---|---|---|---|---|
-| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **BOTH gates FIRED** — safe subset at G2 (06-11); auth/PII remainder at **G4 (06-11 late)** — full activation decision LIVE, ordered behind attention budget |
+| PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **ACTIVATED 2026-06-13** — promoted to Active row above (tracker + Workstream "API Security & PII" + WI-698…704 sliced; slice scan: 27/27 LIVE, 27/27 CLEAN vs the live cutover) |
 | PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | **moot scan DONE 2026-06-11**: 3 moot (F-029/F-010/F-153) · 23 live · 1 partial (F-103) · INV-2 live (~153 sites) — **scope ≈ intact**, all 7 flagged candidates LIVE (`supporting-artefacts/prg-11-moot-scan.md`). Activation = human-led decomposition, ordered behind attention budget |
 | PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-621…628 sliced) |
 | PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-665/666 sliced; OQ1 subsumption scan done: partial — F-028 3→2 legs) |
@@ -401,15 +488,15 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 1 | **PRG-12** l10n-a11y-mobile | ✓ **GRADUATED 06-12** — 8/8 WPs closed in ~1.5 days; ratchet baseline 361 → 12 |
 | 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
-| 4 | **PRG-03** `WI-587` ruling session | anytime — ~20-min operator session (10 KEEPs + 1 CONFLICT incl. PRD FR119-vs-FR124) |
+| 4 | **PRG-03** `WI-587` memory dispositions | ✓ **RULED + EXECUTED 06-11** — all 19 landed on `main` (`7cc8a9a8d`); WI-587 now **Reviewing**; only a manual `/cosmo:review` close remains (verified landed 06-13) |
 | 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
 | 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
-| 7 | **PRG-10** security-pii-api | ✅ **both gates FIRED** (safe subset G2; auth/PII remainder G4 06-11 late) — activation = attention-budget call |
+| 7 | **PRG-10** security-pii-api | ✓ **ACTIVATED 06-13** — 27 findings sliced into WI-698…704 (5 WP + 2 Item); slice scan 27/27 LIVE + 27/27 CLEAN (parallel-safe with the IF cutover); shepherd **SPAWNED 06-13** (Opus/medium + Sonnet executors) |
 | 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
-| 9 | **PRG-04** Cosmo top-down delivery layer | orchestrator pull on dogfood evidence (≥1 full Initiative cycle on the IF pattern) |
+| 9 | **PRG-04** top-down delivery layer + **PRG-05** execution-mechanism productionization | **PRG-05 design-ACTIVATED 06-13** (agnosticity spike = first work); PRG-04 design opens at the joint grill. Sequence spike → grill → slice; no Cosmo until post-grill |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
-| 12 | **PRG-17** new-llm integration (LLM) | ✅ **ACTIVATED 06-12 out-of-band** (created by the O2 strategy ruling, not the ratified queue) — its merge gate in turn unlocks IF cutover execution |
+| 12 | **PRG-17** new-llm integration (LLM) | ✓ **GRADUATED 06-13** — fifth graduation (first integration lane); merged `105b39ac0`, deploy green, cutover unlocked |
 
 Attention budget is evaluated per activation window when a gate clears — it is
 never an edge (planning-reference §5.3/§6.3).
@@ -453,7 +540,118 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 
 ---
 
+## Spillover register — cross-cutting items spawned by umbrella work
+
+> Standalone Cosmo items (**no workstream**) that umbrella work spawned or
+> surfaced. They are in Cosmo, but they roll up to **no PRG**, so nothing in a
+> PRG's view mops them up — they are tracked **here** instead. These are still
+> umbrella obligations; "in Cosmo" ≠ "mopped up".
+>
+> **Why standalone (not forced into a PRG workstream):** these items target
+> different branches / policies (a main-side hotfix, a post-merge GC6 burndown, an
+> estate-tooling fix) — forcing them under one workstream's review policy mis-fires
+> (the WI-694 lesson). Standalone + this register is the clean model.
+>
+> **Mop-up guarantee — two parts:**
+> 1. **Backstop query (the guarantee):** at every program checkpoint, query Cosmo
+>    for items with **empty Workstream**, **State≠Closed**, in the MentoMate project,
+>    and reconcile against this table. The query does not depend on anyone
+>    remembering to log a row — it catches items **any** session created
+>    (e.g. `WI-684` was captured by the LLM shepherd, not the program session).
+> 2. **This table (the disposition record):** every floating item gets a row with
+>    its origin + intended home. The umbrella program **does not close** with an
+>    un-dispositioned row here — each must be resolved, adopted by an active
+>    initiative, or consciously parked with a reason.
+>
+> **Review/close path:** standalone items are **not** covered by the workstream
+> autonomous review loops (those are workstream-scoped — proven by `WI-694` sitting
+> in Reviewing uncollected). Their `Reviewing → Closed` transition is a **manual
+> `/cosmo:review`** by the program session or shepherd. Tracking is not enough; the
+> close path is manual for these.
+
+| WI | Spawned by | Class | Disposition | Status (2026-06-13) |
+|----|-----------|-------|-------------|---------|
+| `WI-683` Cosmo refine-writer childless-WP refuse-with-remedy | PRG-17 activation friction | estate Cosmo tooling | route to estate **ZDX/Cosmo** stream (Nexus governance) — not an eduagent-repo fix | Backlog |
+| `WI-684` CI change-class routing skips DB-package RLS tests | WI-676 (ledger RLS) discovery | eduagent CI infra | pairs with `WI-688`; adopt at next CI/platform activation (candidate PRG-11 or a CI initiative) | Captured |
+| `WI-688` RLS coverage-guard blind spot (hand-maintained table list) | WI-687 residue | eduagent guard-hardening | post-merge code-quality; pairs with `WI-684` | Backlog |
+| `WI-694` KV-verifier empty-body regex hotfix | WI-682 prod probe | main-side hotfix | detached from PRG-17; closing via generic review | Reviewing → Closing |
+| `WI-695` GC6 burndown — 3 new-llm test internal mocks | claude-review on #1087 | eduagent GC6 backlog | post-merge; standalone by design (avoids new-llm-landing policy) | Backlog |
+| `WI-696` Type `app/session.completed` event end-to-end (Finding A) | claude-review on #1087 | eduagent schema-contract | post-merge; proper fix of the pervasive untyped-event pattern (not the one-field add the reviewer implied) | Backlog |
+| `WI-697` [SPIKE THROWAWAY] agnosticity probe fixture (clamp + test) | PRG-05 agnosticity spike | throwaway spike fixture | not real work; existed only to give the spike an executor task | **Closed/Cancelled 06-13 ✓** — spike complete (`spike-agnosticity/finding.md`) |
+
+---
+
 ## Change log
+- **2026-06-13 — PRG-05 agnosticity SPIKE COMPLETE.** First design-phase work for PRG-05
+  done. Run 1 died to a transient subscription-plan expiry (the "entitlement-gated at depth"
+  theory was wrong — retracted); run 2 completed the nested cross-runtime review probe.
+  Result: cross-runtime dispatch (incl. nested Claude-executor → Codex-reviewer adversarial
+  review) is production-viable; 7 seam-contract requirements + a "reviewer≠executor as
+  contract default" recommendation captured in `spike-agnosticity/finding.md`. Canonical
+  Codex seam = `codex exec --cd <wt>`. Throwaway WI-697 Cancelled. Next gate: the combined
+  PRG-04 + PRG-05 design/grill (finding = required seam-catalogue input).
+- **2026-06-13 — PRG-10 (security-pii-api) ACTIVATED — sixth §2.1 run, first
+  post-cutover parallel activation.** Cosmo Workstream "API Security & PII"
+  (`37e8bce9-1f7c-8161-a3fc-c74c5300a88f`) + `WI-698…704` created (5 WP + 2 Item,
+  `Stage=Backlog`, order 1–7, no `Blocked-by`). Slice scan (sub-agent): **27/27 LIVE**
+  (IF subsumed none), **27/27 CLEAN** (no overlap with the live CUT-B cutover — fully
+  parallel-safe); OQ1 ruled CI/GHA findings stay in PRG-10 (`WI-698`), OQ2 file-touch
+  audit done at slice. Promoted to Active row; Emerging table + queue entry 7 marked
+  activated. Tracker: `_wip/security-pii-api/execution-tracker.md`. Shepherd kickoff
+  handed to operator; spawn pending.
+- **2026-06-13 — PRG-05 design-phase ACTIVATED (spike start).** Starting the
+  agnosticity spike moves **PRG-05** embryo → `active` — but as a *design* activation
+  (spike → grill), **not** the §2.1 execution recipe: no Cosmo Workstream/slice until
+  the grill closes. **PRG-04 stays embryo** (the spike is Half-B-scoped; PRG-04's
+  design opens at the joint grill). Queue row 9 marked design-activated. Note: this
+  pre-slice "design activation" is lighter than §2.1 and is itself dogfood for PRG-04
+  (the top-down layer must model a design phase before the Workstream slice).
+- **2026-06-13 — Mechanism productionization split into two sibling Initiatives.**
+  The hand-built program-delivery mechanism is now **PRG-04** (top-down delivery
+  layer — narrowed) + **PRG-05** (execution/loop mechanism — new row); `WI-590` was
+  double-loaded and its loop half re-homes to PRG-05 at slice. Decisions persisted in
+  `supporting-artefacts/mechanism-productionization-design-input.md`: combined
+  design/grill before slicing; sequence **spike → grill → slice** (no Cosmo until
+  post-grill); agnosticity scoped to role-unit swap (orchestrator ·
+  shepherd-with-executors · reviewer) with shepherd↔executor native-by-design and
+  reviewer≠executor as a quality invariant. Pre-grill **agnosticity spike** defined
+  (Claude shepherd ↔ Claude/Codex-model executors via `codex-companion`; Claude
+  executor → Codex nested adversarial reviewer).
+- **2026-06-13 — PRG-17 GRADUATED (fifth graduation; first integration lane).**
+  Operator ruling. new-llm reconciled + merged to `main` (`105b39ac0`), §8 rescan
+  GO, post-merge deploy green (WI-664 closed), WI-694 closed, branch protection
+  enforcing `Merge completeness check`. Deferred follow-ups (WI-695/696/683/684/688)
+  tracked in the spillover register, not residue. Shepherd stood down. 5 of the
+  program's lanes now graduated (PRG-02/12/13/15 clear-out + PRG-17 integration);
+  the IF cutover (PRG-01 tail) is now executing on post-merge main.
+- **2026-06-13 — PRG-17 new-llm MERGED to `main`** (`105b39ac0`, `--no-ff` merge
+  commit, PR #1087). The reconciled `new-llm` is fully an ancestor of main;
+  `Merge completeness check` passed on the merge ref; all deterministic gates
+  green; the 4 claude-review SHOULD_FIX deferrals are documented on the PR + the
+  spillover register (`WI-695`/`WI-696`). **Boundary event "new-llm merged" fired
+  → IF cutover EXECUTION unlocked** (CUT-A may now generate against the post-merge
+  journal). Deploy/KV chain wired end-to-end (WI-682 + WI-685 + WI-694 verifier +
+  GH secrets) — `WI-664` closes on the first green post-merge deploy. PRG-17
+  reconciliation complete; graduation = operator ruling. Follow-through:
+  branch-protection add of `Merge completeness check`; WI-694 manual `/cosmo:review`
+  close; IF shepherd kickoff (CUT-A).
+- **2026-06-13 — Spillover register added** (mop-up mechanism). Five standalone
+  Cosmo items spawned by umbrella work (`WI-683`/`684`/`688`/`694`/`695`) were
+  floating outside any PRG rollup; now tracked above with a backstop-query
+  guarantee so none drop. Rule going forward: every standalone item gets a row,
+  and the checkpoint query reconciles against it.
+- **2026-06-13 — IF CUTOVER PLAN RATIFIED (v1.7) + CUT SLICE LIVE.** Operator
+  ruled all 11 OQs (OQ-1 = option c, graph at onboarding completion; OQ-3
+  bulk-delete; OQ-4 two-stage freeze + 24h soak; OQ-11 = account-detachment §4
+  canon deltas as the intake; OQ-2/5/6/7/8 as recommended). Plan reached v1.7
+  through six adversarial rounds. Sliced into the IF workstream as
+  `WI-689` (CUT-A) · `WI-690` (canon intake) · `WI-691/692/693` (CUT-B1/B2/B3),
+  orders 202–206; `WI-586` re-scoped to the §4 convergence runbook (stubs
+  WI-631/632 ride unchanged). Execution gated on the PRG-17 merge. The v1.7
+  review also exposed a WI-676 residue — ledger RLS registered DB-level only —
+  routed back to PRG-17 as `WI-687` (TS-side registration, pre-merge) with the
+  guard blind spot captured as `WI-688` (hand-maintained table list passes
+  unregistered tables vacuously).
 - **2026-06-12 — new-llm strategy RULED (O2) + PRG-17 ACTIVATED (fifth lane).**
   Operator approved the integration analysis's recommendation after four
   adversarial passes: **merge new-llm first, then run the IF cutover on

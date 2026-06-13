@@ -15,7 +15,11 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import type { ClerkIdentity } from '../middleware/account';
 import { requireAccount } from '../middleware/profile-scope';
+import { isIdentityV2Enabled } from '../config';
+import { createIdentityGraph } from '../services/identity-v2/identity-graph';
+import { getOwnerProfileV2 } from '../services/identity-v2/profile-v2';
 
 import { notFound, forbidden, validationError, apiError } from '../errors';
 import {
@@ -37,15 +41,59 @@ type ProfileEnv = {
     // [OPT-C] Kill switch for the server-side adult-owner rule. Set to 'false'
     // in Doppler to disable the gate (emergency rollback). Default 'true'.
     ADULT_OWNER_GATE_ENABLED?: string;
+    // [CUT-B1] Identity cutover flag — selects the v2 owner-bootstrap path.
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
+    account: Account | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    // [CUT-B1] Set on the v2 pre-graph path (no account yet).
+    clerkIdentity: ClerkIdentity | undefined;
   };
 };
+
+/**
+ * [CUT-B1] Map the v2 bootstrap result + the create input to the byte-identical
+ * `Profile` response shape the mobile onboarding flow expects. The owner is
+ * always isOwner=true with a fresh graph: no family links yet, consent status
+ * resolves to null pre-consent-write (the consent request/grant machine is
+ * CUT-B2), `hasPremiumLlm` is the derived value (false; §1.3). Presentation
+ * fields come from the validated input (the same values the graph persisted).
+ */
+function buildBootstrapProfile(
+  graph: { personId: string; account: { id: string } },
+  input: {
+    displayName: string;
+    avatarUrl?: string;
+    birthYear: number;
+    location?: 'EU' | 'US' | 'OTHER';
+    conversationLanguage?: string;
+    pronouns?: string | null;
+  },
+) {
+  const now = new Date().toISOString();
+  return {
+    id: graph.personId,
+    accountId: graph.account.id,
+    displayName: input.displayName,
+    avatarUrl: input.avatarUrl ?? null,
+    birthYear: input.birthYear,
+    location: input.location ?? null,
+    isOwner: true,
+    hasPremiumLlm: false,
+    defaultAppContext: null,
+    hasFamilyLinks: false,
+    conversationLanguage: input.conversationLanguage ?? 'en',
+    pronouns: input.pronouns ?? null,
+    consentStatus: null,
+    linkCreatedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 export const profileRoutes = new Hono<ProfileEnv>()
   .get('/profiles', async (c) => {
@@ -57,9 +105,77 @@ export const profileRoutes = new Hono<ProfileEnv>()
   })
   .post('/profiles', zValidator('json', profileCreateSchema), async (c) => {
     const db = c.get('db');
+    const input = c.req.valid('json');
+
+    // [CUT-B1 §2.2a] v2 owner-bootstrap seam. Under IDENTITY_V2_ENABLED the
+    // owner-create POST creates the whole identity graph in one transaction.
+    // The legacy `createProfileWithLimitCheck` writer (which targets
+    // `profiles.account_id -> accounts.id`) MUST NOT run flag-on — the v2
+    // bootstrap created an `organization`/`person` graph, not a legacy
+    // `accounts` row, so the legacy writer would 500 on the FK or write to the
+    // wrong store. So the entire flag-on branch is self-contained and never
+    // falls through to the legacy path.
+    if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+      // Account resolved → the graph already exists (the bootstrap created the
+      // owner). This POST is therefore a post-graph request:
+      //   - an idempotent replay of the owner create (network retry /
+      //     double-submit) → return the existing owner profile, NOT a second
+      //     create (and NEVER the legacy writer).
+      //   - a genuine CHILD create → needs the consent WRITE machine, which is
+      //     CUT-B2 scope; refuse cleanly rather than corrupt the store.
+      const resolvedAccount = c.get('account');
+      if (resolvedAccount) {
+        const owner = await getOwnerProfileV2(db, resolvedAccount.id);
+        if (owner) {
+          // Idempotent replay of the owner bootstrap.
+          return c.json(profileResponseSchema.parse({ profile: owner }), 201);
+        }
+        // No owner under a resolved account is a structurally-broken graph;
+        // child creation is not yet wired (CUT-B2). Refuse, don't fall through.
+        return apiError(
+          c,
+          409,
+          ERROR_CODES.CONFLICT,
+          'Additional profile creation is not yet available.',
+        );
+      }
+
+      // Pre-graph (no account; the graphless clerkIdentity is set) → bootstrap.
+      const clerkIdentity = c.get('clerkIdentity');
+      if (!clerkIdentity) {
+        return apiError(
+          c,
+          401,
+          ERROR_CODES.UNAUTHORIZED,
+          'Authentication required to create a profile.',
+        );
+      }
+      try {
+        const graph = await createIdentityGraph(db, {
+          clerkUserId: clerkIdentity.clerkUserId,
+          verifiedEmail: clerkIdentity.verifiedEmail,
+          displayName: input.displayName,
+          birthYear: input.birthYear,
+          birthMonth: input.birthMonth,
+          birthDay: input.birthDay,
+          location: input.location ?? null,
+          conversationLanguage: input.conversationLanguage,
+          pronouns: input.pronouns ?? null,
+          avatarUrl: input.avatarUrl ?? null,
+          timezone: null,
+        });
+        const profile = buildBootstrapProfile(graph, input);
+        return c.json(profileResponseSchema.parse({ profile }), 201);
+      } catch (err) {
+        if (err instanceof ProfileValidationError) {
+          return validationError(c, { [err.field]: [err.message] });
+        }
+        throw err;
+      }
+    }
+
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
-    const input = c.req.valid('json');
 
     // [CR-2026-05-19-H1 / BUG-407] Profile-creation authorization is owned by
     // the service layer (assertProfileCreationAllowed). It throws ForbiddenError
