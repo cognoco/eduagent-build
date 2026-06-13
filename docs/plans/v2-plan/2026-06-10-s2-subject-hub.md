@@ -307,9 +307,9 @@ All co-located (`*.test.tsx` next to source, no `__tests__/`). No internal `jest
 
 ## Evidence gate — S1+S2 ship-and-measure (S2 → S3)
 
-S2 is the second half of the validation bet: S1+S2 ship behind `MODE_NAV_V2_ENABLED` and are **measured** before S3+ proceeds (spec §11). S3–S6 proceed only if the feed + hub move discovery/engagement against the V1 baseline.
+S2 is the second half of the validation bet: S1+S2 ship behind `MODE_NAV_V2_ENABLED` and are **observed** before S3+ proceeds (spec §11/§13.6). S3–S6 proceed only if the observed cohort shows the feed + hub are doing real work.
 
-**Primary metric (discovery/engagement):** feed-card engagement rate on the Mentor tab (S1) and hub-reach rate from the Subjects tab (S2) vs. the V1 baseline. Owner: product (per §13.6).
+**Primary bar (discovery/engagement):** 3–5 friendly families with a 13+ teen. Pass = (a) the teen returns unprompted at least twice in week one and engages a feed/Subject action that is not only the camera, and (b) the parent can answer "what did my kid work on this week?" from the app alone in under one minute. Owner: product (per §13.6); formal PASS/FAIL recorded in the Bet Sheet / decision log before S3 starts.
 
 **Cold-start activation tripwire — named metric for the evidence gate (spec §3.1):**
 The §3.1 pre-committed tripwire measures the learner cold-start card built in S1 (surface: S1's cold-start anchor slot — input bar + three example chips). This tripwire is **measured during the S1+S2 ship-and-measure window** and feeds the S2→S3 gate decision.

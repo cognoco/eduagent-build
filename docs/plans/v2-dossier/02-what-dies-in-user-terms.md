@@ -62,8 +62,8 @@
    name. Same: needs an explicit S6 line.
 3. **own-learning** is already just a redirect — its row in the kill list is
    ceremonial.
-4. **The spec body still calls XP "backend-only"** (§13/§2.1 wording) — the plans
-   corrected this (XP is live in 4+ UI surfaces) but the spec never got the edit.
-   One-line fix owed so future readers aren't misled.
+4. **XP is not backend-only** — resolved 2026-06-13. The spec and plans now keep
+   earned private receipts (XP/practice points, reflection bonus, quiz personal
+   bests, mastery/progress deltas) while deleting coercive reward presentation.
 
-Last updated: 2026-06-12
+Last updated: 2026-06-13

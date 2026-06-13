@@ -1,12 +1,12 @@
 # Mentor-Is-The-App (V2 shell) — Implementation Plan Set
 
-**Date:** 2026-06-10 · **Status:** draft (8 phase plans + 2 references) · synced to the 2026-06-10 spec amendment (cold-start / motivation / interaction-law rulings)
-**Spec:** [`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`](../../specs/2026-06-09-mentor-is-the-app-shell-redesign.md) (incl. Annexes B/C/D — the adversarial + end-user review amendments **and** the 2026-06-10 cold-start/motivation/interaction-law fold-in: §2 P5/P6/P7, §2.1 noticing loop, §3.1 learner cold-start, §3.2 supporter cold-start, §4.2 cross-scope pointer, §13.7 assertiveness dial, §15.14–19, Annex D — these plans are written against all of it)
+**Date:** 2026-06-10 · **Status:** draft (8 phase plans + 2 references) · synced to the 2026-06-10 spec amendment and the 2026-06-13 no-surprises proposal fold-in
+**Spec:** [`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`](../../specs/2026-06-09-mentor-is-the-app-shell-redesign.md) (incl. Annexes B/C/D — the adversarial + end-user review amendments **and** the 2026-06-10 cold-start/motivation/interaction-law fold-in: §2 P5/P6/P7, §2.1 noticing loop, §3.1 learner cold-start, §3.2 supporter cold-start, §4.2 cross-scope pointer, §13.7 assertiveness dial, §15.14–19, Annex D — plus the 2026-06-13 no-surprises fold-in: post-auth handoff, V2 homework round-trip, first-session wrap-up, and observed-cohort evidence gate)
 **Planner:** `.claude/skills/writing-plans/SKILL.md`
 
 This folder decomposes the mentor-is-the-app shell redesign into **per-phase implementation plans** (spec §11 requires one plan per strangle phase before build). It is a *strangle, not a rewrite*: every phase ships behind `MODE_NAV_V2_ENABLED` alongside the existing V0/V1 nav, and nothing in the shipped V0 5-tab shape may regress until the §13.1 retirement ruling (see S6).
 
-> These are **plans, not code.** None of the surfaces below exists yet. The plans are forward-compatible with autonomous execution (numbered `T<n>` tasks, checkboxes, `done when:` verification), grounded in verified `file:line` anchors.
+> These are **plans, not code.** S0 backend primitives have since landed in code; the user-facing V2 surfaces below do not exist yet. The plans are forward-compatible with autonomous execution (numbered `T<n>` tasks, checkboxes, `done when:` verification), grounded in verified `file:line` anchors.
 
 ---
 
@@ -16,11 +16,11 @@ This folder decomposes the mentor-is-the-app shell redesign into **per-phase imp
 |---|---|---|---|---|---|
 | [`01-codebase-anchors.md`](01-codebase-anchors.md) | — | reference | — | — | The current-code anchor map (file:line) every plan cites; V2 flag-wiring recipe; shared-component inventory; screen-collapse ledger |
 | [`02-flow-map.md`](02-flow-map.md) | — | reference | — | — | The mobile-flow trigger map: who/when/why/how each current inventory row is preserved, re-homed, replaced, or retired by V2 |
-| [`2026-06-10-s0-backend-primitives.md`](2026-06-10-s0-backend-primitives.md) | **S0** | code | No | — | `mentor_activity_ledger` (`profileId`-keyed) + `writeActivityMoment()` + deterministic no-LLM `GET /now` (reads `retention_cards` as-is) |
+| [`2026-06-10-s0-backend-primitives.md`](2026-06-10-s0-backend-primitives.md) | **S0** | code | No | **Done in code** | `mentor_activity_ledger` (`profileId`-keyed) + `writeActivityMoment()` + deterministic no-LLM `GET /now` (reads `retention_cards` as-is) |
 | [`2026-06-10-s0r-retention-gate.md`](2026-06-10-s0r-retention-gate.md) | **S0-R** | change | No | parallel; must NOT block S1/S2 | `applyRetentionUpdate()` core-SRS chokepoint over 10 writers / 7 files; behavior-preserving; break-tests + rollback |
 | [`2026-06-10-s1-mentor-home.md`](2026-06-10-s1-mentor-home.md) | **S1** | ui | No | — | New Mentor home (≤3 card feed + overflow + ever-present bar + camera + Homework chip) behind the V2 flag as "screen #89" |
 | [`2026-06-10-s2-subject-hub.md`](2026-06-10-s2-subject-hub.md) | **S2** | ui | No | — | One Subject hub (shelf + progress merge; Next-up + chapter sections + topic sheet; subject-scoped notes); also linkable from current nav |
-| — | **EVIDENCE GATE** | — | — | **S2 → S3 (§11/§13.6)** | S1+S2 ship-and-measure behind the flag; S3–S6 proceed only on discovery evidence vs the V1 baseline |
+| — | **EVIDENCE GATE** | — | — | **S2 → S3 (§11/§13.6)** | S1+S2 ship behind the flag and are evaluated with the observed-cohort bar; S3–S6 proceed only on that evidence |
 | [`2026-06-10-s3-journal-and-avatar.md`](2026-06-10-s3-journal-and-avatar.md) | **S3** | ui | No | gated on the evidence gate | Journal tab (recaps + browsable cross-subject archive + mentor memory, Me-scope) + avatar admin sheet + **park-and-return P3 evals** |
 | [`2026-06-10-s4-scope-chip-support-hub.md`](2026-06-10-s4-scope-chip-support-hub.md) | **S4** | code | **Yes** | post-IF-flip + convergence | Scope chip, Support hub with scope-preserving Mentor/Subjects/Journal variants, person scopes, server-enforced structural mask; ledger `profile_id → person` re-point is M-REPOINT's (IF), S4 adds the new `edge_id` column (additive); mode/proxy/tab-matrix retire |
 | [`2026-06-10-s5-visibility-contract.md`](2026-06-10-s5-visibility-contract.md) | **S5** | code | **Yes** | post-IF-flip + convergence + S4 | The trust layer: linking ceremony, sealed non-reportable class, render-equivalence, appeal affordance, managed/credentialized tiers, graduation, kid-initiated revocation |
@@ -30,11 +30,11 @@ This folder decomposes the mentor-is-the-app shell redesign into **per-phase imp
 
 ## Three execution tiers
 
-**Tier 1 — buildable now (identity-independent, today's `profiles` model):** `S0`, `S0-R`, `S1`, `S2`.
-These are the validation bet. They cite no `person`/`edge`/`membership` table; the §9 contract guarantees it (if any deliverable is found to need an edge read, it is misclassified → moves to S4). S0 is the foundation; S0-R runs in parallel off the critical path; S1+S2 are the cheapest test of the whole direction.
+**Tier 1 — buildable now (identity-independent, today's `profiles` model):** `S0-R`, `S1`, `S2` (with `S0` already present in code).
+These are the validation bet. They cite no `person`/`edge`/`membership` table; the §9 contract guarantees it (if any deliverable is found to need an edge read, it is misclassified → moves to S4). S0 is the foundation and is already available; S0-R runs in parallel off the critical path; S1+S2 are the cheapest test of the whole direction.
 
 **Tier 2 — evidence-gated (still identity-independent):** `S3`.
-Authored and ready, but execution is gated on the **S2 → S3 evidence gate** (§11/§13.6): discovery/engagement must actually move against the V1 baseline. If it doesn't, the redesign validly stops at a measured S2. S3 also produces the **park-and-return eval coverage** that S6's exit-funnel deletion is contractually blocked on.
+Authored and ready, but execution is gated on the **S2 → S3 evidence gate** (§11/§13.6): observed-cohort evidence must show the feed/hub are doing real work before the back half proceeds. If it doesn't, the redesign validly stops at a measured S2. S3 also produces the **park-and-return eval coverage** that S6's exit-funnel deletion is contractually blocked on.
 
 **Tier 3 — identity-blocked (cannot start until the identity cutover flips):** `S4`, `S5`, then `S6`.
 These consume the person/edge model (`docs/canon/identity/`). The W1/W2 schema now **exists as committed migrations** (merged via `main`) but is **not live until the IF flip** (the identity-foundation cutover + convergence). They are written as real implementation plans, each opening with a hard **"## Blocked-by"** section. The blocker chain is **`WI-530` (Harness-Hygiene gate) → identity Phase P → baseline reset (`MMT-ADR-0012`) → W1 (schema) → W2 (consent/proxy/deletion) → IF flip + convergence**; S4/S5 gate on the **flip**, not merely on the migrations existing. Ledger split: the `profile_id → person` re-point is the IF plan's **M-REPOINT**; S4 adds the new `edge_id` column (additive migration) post-flip. No code in S4/S5 may stub `person`/`edge` against today's `profiles`/`family_links`.
@@ -53,7 +53,7 @@ S0-R (retention gate, parallel) ──┘                                       
                                                               S3 park-and-return evals ───────────────────────────┘ (gates S6 exit-funnel deletion)
 ```
 
-- **Build-now critical path:** `S0 → S1/S2`. S0-R is parallel and explicitly sequenced *not* to block (the feed reads `retention_cards` as-is until the gate hardens it).
+- **Build-now critical path:** `S1/S2`, because S0 is already built. S0-R is parallel and explicitly sequenced *not* to block (the feed reads `retention_cards` as-is until the gate hardens it).
 - **Identity critical path** (the long pole for S4–S6): the identity-foundation runway, which is itself blocked on `WI-530`. S4/S5 inherit that timeline; the mentor work neither blocks it nor is blocked by it for S0–S3 (spec §9).
 - **S6** needs all three: S3 eval coverage exists · evidence gate cleared · §13.1 V0-retirement ruling made by product.
 
@@ -97,6 +97,7 @@ Latest ADRs on disk: `MMT-ADR-0021` (freeform filing threshold) and `MMT-ADR-002
    - Whether a managed charge's *guardian* also gets a chip scope (vs supportership-derived scopes only) — deferred to S5; S4 surfaces supportership-derived scopes only (launch tier = credentialized).
 6. **§4.2 cross-scope pointer module (S4 ↔ S1).** S4 emits a single compact "1 thing needs you in the Support hub" pointer card into the **Me-scope** feed that S1 renders — it *points* into the hub, never *duplicates* a family-attention item (the hub/Me separation holds while the dual-role adult's signal can't be starved). It rides under the standard P6 ≤3 budget on the S1 home; S1 renders whatever `/now?scope=self` returns, so the pointer is a server-emitted `NowCard`, not a new S1 component.
 7. **Earned motivation spans S0-R + S1/S2/S3/S6 (spec §2.1 / §2.2 / §15.17).** The original plan said XP was "killed, not wired"; the 2026-06-13 product amendment supersedes that. XP/practice points, the 1.5x reflection bonus, quiz scores/personal bests, mastery counts, weekly deltas, and forgiving rhythm/momentum are retained as **earned private learning receipts**. What dies is coercive presentation: leaderboards, guilt/loss streaks, random reward schedules, public comparison, and rewards as the main Mentor-feed object. Consequences the plans honor: (a) S0-R may decouple reward bookkeeping from fragile retention side effects, but it must not delete XP/reward persistence; (b) S1 renders compact reward receipts and light-practice discovery without turning the feed into a scoreboard; (c) S2/S3 preserve browsable structure, concrete progress, and reward history in Subject/Journal contexts; (d) S6 may delete legacy reward-hosting screens only after the V2 heirs preserve the learning value: learner-written reflection + bonus, quiz rewards, and quantified progress.
+8. **No-surprises dossier proposals are now canonical (2026-06-13).** The three script-breaking prototype frames are no longer free-floating: post-auth/consent handoff (S1), V2 homework camera round-trip (S1), and first-session wrap-up (S1/S6) are spec requirements and S1/S6 acceptance criteria. The evidence gate is likewise specified as observed-cohort evidence until launch telemetry exists.
 
 ---
 
@@ -109,14 +110,14 @@ Latest ADRs on disk: `MMT-ADR-0021` (freeform filing threshold) and `MMT-ADR-002
 | §13.3 | Managed-tier reporting richness over credentialized | product | S5 build detail |
 | §13.4 | "Journal" vs "Notebook" name — kid-tested **with** the trust copy | product | S3 (name only) |
 | §13.5 | Managed-tier launch activation (launch floor is 13+) | product | managed *activation*, not the S5 build |
-| §13.6 | Evidence-gate metric + bar (S2 → S3) | product | S3 |
+| §13.6 | Observed-cohort evidence-gate pass/fail (S2 → S3) | product | S3 |
 | §13.7 | Assertiveness dial — mentor proposal tone + who moves it (recommendation on the table: calm default, two-position conversational dial, never age-inferred) | product (Zuzana) | S1 copy templates only (not the S1 build) |
 
 ---
 
 ## How to use this set
 
-1. **Start with `02-flow-map.md` + `S0`** — use the flow map as the coverage denominator, then build the smallest dark foundation. Every phase plan should cite the exact flow IDs it preserves, re-homes, replaces, or retires.
-2. **Stop at the evidence gate.** Do not author-execute S3+ until S1+S2's measured discovery result clears §13.6.
+1. **Start with `02-flow-map.md` + `S1/S2`** — use the flow map as the coverage denominator; S0 is already built, so do not duplicate it. Every phase plan should cite the exact flow IDs it preserves, re-homes, replaces, or retires.
+2. **Stop at the evidence gate.** Do not author-execute S3+ until S1+S2 clear the observed-cohort bar in §13.6.
 3. **S4–S6 wait on the identity cutover flip** — track `WI-530` → Phase P → baseline reset → W1/W2 → **IF flip + convergence** before scheduling them (the W1/W2 migrations exist in code, but S4/S5 gate on the flip making them live).
 4. Each plan's `done when:` lines are the executable contract; the `## Scope` "out of scope" lists are the guardrails against scope bleed between phases.

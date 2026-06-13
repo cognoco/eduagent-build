@@ -50,13 +50,18 @@ default until S4/S5 are scheduled.
 
 ### SURPRISE 2 — The S2→S3 evidence gate has no audience and no metric
 
-Spec §13.6 gates S3+ on a discovery/engagement metric "vs the V1 baseline" — but the
-metric is **undefined**, and pre-launch there is **no telemetry population** to
-measure it on. As designed, the gate cannot fire. Recommendation (ledger §13.6):
-replace the telemetry metric with **observed-cohort evidence** — 3–5 friendly
+The original spec §13.6 gated S3+ on a discovery/engagement metric "vs the V1
+baseline" — but the metric was **undefined**, and pre-launch there is **no
+telemetry population** to measure it on. As designed, the gate could not fire.
+Recommendation (ledger §13.6): replace the telemetry metric with
+**observed-cohort evidence** — 3–5 friendly
 families, watch for (a) the teen returning *unprompted* after the first homework
 session, (b) the parent answering "what did my kid work on this week?" from the app
 alone. Formalized in the Layer-3 Bet Sheet.
+
+> **Folded 2026-06-13:** the observed-cohort bar is now the planning default in
+> spec §11/§13.6, `v2-plan/00-README.md`, and the S6 gate. The cohort still needs
+> a recorded PASS before S3 starts.
 
 ### SURPRISE 3 — Eight cold-start gaps; three are script-breaking
 
@@ -72,16 +77,25 @@ day-one script:
    description of what the kid sees after snapping the photo.
 3. **The first-session wrap-up surface is undesigned** — the once-only teach line
    ("next time, just tell me what you need") and the first celebration both fire
-   "at end of first session," but the exit-funnel-dissolves-into-a-wrap-up-turn
-   surface exists in no plan (S1 leaves a `// S3: emit at first-session wrap-up`
-   annotation pointing at a plan that doesn't cover it).
+   "at end of first session," but, before the 2026-06-13 fold-in, the
+   exit-funnel-dissolves-into-a-wrap-up-turn surface existed in no plan.
 
-### SURPRISE 4 — The spec body still claims XP is backend-only
+> **Folded 2026-06-13:** these three script-breaking gaps are now spec
+> requirements (§3.1) and S1 plan tasks (T22 post-auth handoff, T23 homework
+> round-trip, T24 first-session wrap-up). S6 is gated on the wrap-up heir before
+> deleting the legacy exit funnel.
 
-The plan layer (S6 plan, `01-codebase-anchors.md` §6) correctly absorbed the audit
-finding that XP is **live in the UI** (Practice-hub pill, session-summary bonus
-banner, progress topic badges, book-detail gating). The **spec body (§13 / §2.1
-wording) was never edited**, so a spec-only reader is misled. One-line spec fix owed.
+### SURPRISE 4 — XP is not backend-only (resolved)
+
+The original audit found that the plan layer (S6 plan, `01-codebase-anchors.md`
+§6) correctly absorbed that XP is **live in the UI** (Practice-hub pill,
+session-summary bonus banner, progress topic badges, book-detail gating), while
+the spec body still sounded backend-only.
+
+> **Resolved 2026-06-13:** spec §2.1/§2.2 and the V2 plan layer now retain earned
+> private receipts: XP/practice points, the 1.5x reflection bonus, quiz scores /
+> personal bests, mastery counts, weekly deltas, and forgiving rhythm/momentum.
+> The redesign kills coercive presentation, not earned learning receipts.
 
 ### SURPRISE 5 — Some "dying" screens are already dead
 
