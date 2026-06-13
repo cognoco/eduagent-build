@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-81ac-9034-f71fae2b17d3",
+  "id": "WI-722",
+  "name": "Twin getUsageBreakdownForProfile onto the CUT-B2 guardianship reader (convergence blocker before WI-586)",
+  "description": "CUT-B3 (WI-693, PR #1120) deliberately left ONE billing-REST function un-twinned: getUsageBreakdownForProfile reads family_links parent/child relationships (guardianship — CUT-B2's domain) interleaved with usage_events (billing — CUT-B3's domain). The CUT-B3 executor correctly declined to re-derive family-edge logic in B3 (would diverge from CUT-B2's guardianship reader), leaving it on the legacy path. SAFE NOW: it is flag-off-inert (read-only family-aggregate usage display, not a payment mutation), so no deployed env exercises a v2 path through it. NOT SAFE AT CONVERGENCE: it reads legacy family_links directly; at the WI-586 §4 step-7 flip the legacy table is frozen (stale reads of post-flip guardianship changes), and at step-8 M-DROP it is dropped entirely (runtime break). It MUST be twinned before the WI-586 flip. Fix: twin getUsageBreakdownForProfile to read guardianship via CUT-B2's guardianship reader (services/identity-v2/guardianship.ts, landed once WI-692 merges) + usage_events; flag-dispatch like the other billing-v2 seams; flag-off byte-identical. This is a B2/B3 seam-coordination item — it needs CUT-B2's guardianship.ts on main first, so it lands as a fast-follow after both WI-692 and WI-693 merge.",
+  "acceptanceCriteria": "getUsageBreakdownForProfile has a v2 twin that reads guardianship via the CUT-B2 guardianship reader (no duplicated family-edge logic) + usage_events; flag-dispatched, legacy byte-identical flag-off; v2 test with the flag on; verified to no longer read family_links on the v2 path; this WI is CLOSED before WI-586's IDENTITY_V2_ENABLED flip (a hard convergence precondition — record it in the WI-586 runbook preconditions).",
+  "riskImpact": "If not landed before the WI-586 §4 step-7 flip, getUsageBreakdownForProfile keeps reading legacy family_links — frozen at the flip (stale guardianship reads) and dropped at step-8 M-DROP (runtime break on a billing-adjacent usage read). Flag-off-inert until the flip, so no pre-flip production risk; the risk is convergence-correctness, mitigated by closing this WI before the flip (now a hard WI-586 Blocked-by precondition).",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

@@ -133,6 +133,21 @@ Lane-specific only:
   `.github/workflows/eval-live.yml:30` carries workflow-scope `issues: write` (single-job) — the
   same over-grant pattern as F-127 but on a different workflow, outside WI-698's named finding set.
   Worth a `/cosmo:capture` as a sibling CI-hygiene item; not fixed inline (scope discipline).
+- 2026-06-13 — **✅ LANE COMPLETE — 7/7 units Closed (Resolution=Done), all 10 absorbed
+  children Closed (17 total).** Final close order: 703, 704 → 698 → 701 → 699 → 700 → 702.
+  All 27 `security-pii-api` findings remediated and landed on `main` (PRs #1108/1109/1111/1114/
+  1121/1122). Two units took rework loops, both shepherd-side evidence (no code defects):
+  child-evidence/PR-body child-ID mismatches (root cause: initial child-WI numbering guessed,
+  not read back) and stale-branch merge-invariant (each merge re-stales open branches → re-merge
+  `origin/main`). WI-699 migration-safety call (single-step `0116` retained) and WI-702 F-138
+  (web-localStorage fallback **risk-acceptance accepted by operator** — web non-prod, native
+  Keychain-guarded) were the two human-gate rulings. **Follow-ups (not blocking this lane):**
+  (1) `/cosmo:capture` the `eval-live.yml:30 issues:write` sibling over-grant; (2) deploy-time:
+  apply migration `0116` to staging/prod via `drizzle-kit migrate` before the new dictation
+  conflict-target code serves traffic (worker deploy ≠ Neon migrate; `## Rollback` in PR #1122);
+  (3) 2 unpushed local commits on the shared `main` checkout (`4051617f0`, `4b26734b5` — a
+  cross-program `/commit` misfire) await the program/operator's disposition before any `main`
+  push. Worktrees `.worktrees/WI-698…702` can be removed at the operator's convenience.
   All 7 set `Execution Path=Assisted` (shepherd-dispatched, supervised — not Auto/dispatcher);
   WI-698/699 also given `Risk/Impact` (P1). Next: stand up the verdict monitor and dispatch
   executors (Sonnet default; Opus plan-phase for WI-699 and the F-132/F-119 pieces of WI-698).

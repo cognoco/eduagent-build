@@ -142,3 +142,15 @@ Lane-specific (THIS lane differs from the mechanical lanes — read carefully):
   serialize / 0 moot-risk. Tiers 2/3 deferred to the operator decomposition gate (recorded
   §2, not in Cosmo). Roster + dashboard promoted. Shepherd spawned + running (normal
   activation; the trigger-priming experiment was dropped for this lane).
+- 2026-06-13 — **Tier 1 COMPLETE.** All four units **Closed / Resolution=Done** by the
+  separate reviewer (no rework rounds). WIs sliced WP→demoted to Item (single-PR units;
+  `/cosmo:bundle` unavailable), refined to Ready (Execution Path=Assisted), dispatched to
+  one executor each (WI-717 Opus plan-phase for the concurrency reasoning; rest Sonnet),
+  merged to `main` (squash) and finalized via `/cosmo:execute complete`. Landed commits:
+  WI-717 `d99562583` (F-169/170/171 lost-update races; CodeRabbit also caught + fixed a
+  TOCTOU in the fix), WI-718 `f70c02164` (F-098 regression test; F-097/F-099 pre-existed),
+  WI-719 `15f388414` (F-156 GC1 multiline-mock guard), WI-720 `620cca77b` (INV-2 GC6
+  burndown, cutover-surface fence honored). Claude Code Review APPROVED 0/0 on all four
+  (after a mid-run breakage from PR #1121's WI-698 workflow-hardening was reverted on main
+  and each PR's `claude-code-review.yml` re-synced). **Tiers 2/3 still await the operator
+  decomposition gate — lane NOT graduated.**

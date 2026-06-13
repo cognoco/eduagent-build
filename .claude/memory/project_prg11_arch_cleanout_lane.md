@@ -20,4 +20,4 @@ Shepherding PRG-11 "Architecture Clean-Out" (Workstream `37e8bce9-1f7c-81fe-be97
 
 **Key lane notes:** F-097 evidence B1-stale → executor re-greps orchestrate-round.ts. WI-720 GC6 sweep EXCLUDES cutover-surface test files (identity/consent/family-access/billing/metering/auth/session-exchange/sessions/stripe-webhook/revenuecat-webhook). WI-717 needs red-green concurrency break tests (revert-to-RED evidence mandatory).
 
-When all four Closed: checkpoint, report "Tier 1 complete; Tiers 2/3 await operator", stand by — do NOT declare graduation.
+**STATUS 2026-06-13: Tier 1 COMPLETE — all four Closed/Done, no rework.** Landed: WI-717 `d99562583`, WI-718 `f70c02164`, WI-719 `15f388414`, WI-720 `620cca77b`. Claude review APPROVED 0/0 on all (after PR #1121/WI-698 workflow-hardening broke claude-review repo-wide → reverted on main → each PR's claude-code-review.yml re-synced to match main, which is the fix when claude-review fails). Fixed In corrected to squash SHAs (operator-authorized). **Tiers 2/3 still await the operator decomposition gate — lane NOT graduated.** Open hygiene: merged remote branches WI-717..720 + local .worktrees/WI-7xx not yet cleaned.

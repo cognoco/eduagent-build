@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-81a0-8d11-efa6bb73cf56",
+  "id": "WI-723",
+  "name": "Implement financial_record creation on the v2 deletion path (compliance completeness, before WI-586 flip)",
+  "description": "data-model §6.1 (the retain-tier deletion model) specifies that person-deletion writes financial_record rows (tax/chargeback retain-tier) alongside re-homing consent_grant→consent_receipt and writing deletion_audit. CUT-B2 (WI-692) implemented the consent-side of the re-home model (consent_receipt + deletion_audit) but explicitly deferred financial_record as billing-domain; CUT-B3 (WI-693) merged without it. So the v2 deletion path currently re-homes the consent receipt + audit but does NOT create the financial_record rows §6.1 requires. NOT a runtime crash (deletion still succeeds), so flag-off-safe; it is a compliance-completeness gap on the v2 deletion path. The financial_record table exists (built in 0108). Fix: in the v2 deletion flow (deletion-v2.ts, the billing portion or a billing-v2 deletion hook), create financial_record rows for tax/chargeback per §6.1 before the person drop, keyed by person_id/organization_id. Like consent_receipt, the retention_period/record values may be counsel-owned (§4.9) — use provisional/nullable if no counsel value. Should land before the WI-586 IDENTITY_V2_ENABLED flip so the cutover's deletion path is canon-complete when it goes live.",
+  "acceptanceCriteria": "The v2 deletion path creates financial_record rows per data-model §6.1 (tax/chargeback retain-tier) for a deleted person; a test asserts the financial_record survives the person drop; counsel-owned values flagged if not yet set; closed before the WI-586 flip (record in the WI-586 runbook preconditions).",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
