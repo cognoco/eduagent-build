@@ -238,6 +238,34 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   verdicts, does not own the watcher.
 - **Activate-when:** — (active)
 
+### PRG-11 · Architecture Clean-Out — `active` (2026-06-13)
+- **Outcome:** all ~24 LIVE code-structural + correctness findings (2026-05-29 full
+  audit, `Defer-to-workstream=architecture`) remediated — circular deps, god-modules,
+  domain-org, architecture-class test-coverage gaps, mobile-nav copy-paste, data-access
+  seams, three correctness races (F-169/170/171), `architecture.md` doc-rot. Moot scan
+  (2026-06-11): 3 mooted (F-029/F-010/F-153) · 1 partial (F-103) · 23 LIVE + INV-2.
+- **Owner:** Jorn (+ PRG-11 shepherd session; **human-led** supervision — the one lane
+  where god-module / circular-dep / seam-extraction decomposition boundaries need
+  operator sign-off; agents execute within approved decomposition plans).
+- **Depends-on:** gate G3 (IF W1 landed) ✅ + moot scan ✅. **Not uniformly
+  parallel-safe** — the cutover-coordination scan (2026-06-13, sub-agent) split the
+  findings vs the LIVE IF cutover: **16 parallel-safe / 9 serialize** (behind the
+  in-flight CUT-B2/B3 + the WI-586 tail) **/ 0 moot-risk**.
+- **Decomposition:** `_wip/architecture/execution-tracker.md` (charter + 3-tier unit map
+  + scan). Cosmo **Workstream "Architecture Clean-Out"**
+  (`37e8bce9-1f7c-81fe-be97-e063ce8f17e8`). **Three tiers:** Tier 1 (autonomous-now, in
+  Cosmo) = **WI-717…720** (`Stage=Backlog`, order 1–4: races · tests · GC1 guard · GC6
+  sweep); Tier 2 (parallel-safe but human-gated, 8 findings) + Tier 3 (cutover-serialized,
+  9 findings) are recorded in the tracker, **not** in Cosmo — sliced at the operator
+  decomposition gate (Tier 2 any time; Tier 3 post-flip + re-scan).
+- **Activated 2026-06-13** — seventh run of the §2.1 recipe; first **tiered + trigger-gated**
+  activation. Only the autonomous tier was sliced into Cosmo so an unsupervised shepherd
+  cannot hit a decomposition decision or a cutover collision. **Trigger-gated spawn:**
+  shepherd primed in watch mode against start-gate item **WI-721** (move `Stage`
+  `Backlog`→`Executing` to release it). Shepherd = separate session; Sonnet executors
+  (Opus plan-phase on WI-717 concurrency); separate Codex reviewer owns the loop.
+- **Activate-when:** — (active)
+
 ### PRG-12 · L10n & A11y Mobile — `✓ graduated` (2026-06-12)
 - **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
   English strings routed through `t()`, screen-reader announcements + modal focus
@@ -398,7 +426,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 | ID | Initiative (clear-out) | Findings (bucket 3) | Blast-radius vs PRG-01 (N.1 signal; O is authority) | Activate-when (ratified 2026-06-10) |
 |---|---|---|---|---|
 | PRG-10 | security-pii-api | 27 | **mixed** — IF-slice in-radius (W2/W3); clear-out remainder = non-IF code | **ACTIVATED 2026-06-13** — promoted to Active row above (tracker + Workstream "API Security & PII" + WI-698…704 sliced; slice scan: 27/27 LIVE, 27/27 CLEAN vs the live cutover) |
-| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | **moot scan DONE 2026-06-11**: 3 moot (F-029/F-010/F-153) · 23 live · 1 partial (F-103) · INV-2 live (~153 sites) — **scope ≈ intact**, all 7 flagged candidates LIVE (`supporting-artefacts/prg-11-moot-scan.md`). Activation = human-led decomposition, ordered behind attention budget |
+| PRG-11 | architecture | 24 (+3 merged: F-169/170/171) | **partly in-radius** (god-modules/pkg-boundaries; some lands W1) | **ACTIVATED 2026-06-13** — promoted to Active row above (tracker + Workstream "Architecture Clean-Out" + Tier-1 autonomous slice WI-717…720). Cutover-coordination scan: 16 parallel-safe / 9 serialize / 0 moot-risk; Tiers 2/3 (human-gated + cutover-serialized) operator-gated, not yet in Cosmo; shepherd trigger-gated on WI-721 |
 | PRG-12 | l10n-a11y-mobile | 33 | **mostly outside** → parallel-safe | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-621…628 sliced) |
 | PRG-13 | security-pii-inngest | 6 | **mixed** — IF-slice in-radius (W3); remainder non-IF | **ACTIVATED 2026-06-11** — promoted to Active row above (tracker + Workstream + WI-665/666 sliced; OQ1 subsumption scan done: partial — F-028 3→2 legs) |
 | PRG-14 | agent-instructions | 10 (+3 merged: F-116 + the F-151/F-157 CI/Platform fold) | partial **inside** (overlaps PRG-03) | light thread (skill-description/sync fixes) **now**; skill-building after PRG-03 B4 (AGENTS/CLAUDE converge) |
@@ -492,7 +520,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
 | 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
 | 7 | **PRG-10** security-pii-api | ✓ **ACTIVATED 06-13** — 27 findings sliced into WI-698…704 (5 WP + 2 Item); slice scan 27/27 LIVE + 27/27 CLEAN (parallel-safe with the IF cutover); shepherd **SPAWNED 06-13** (Opus/medium + Sonnet executors) |
-| 8 | **PRG-11** architecture | IF "W1 landed" ✅ + moot scan ✅ **done 06-11** (scope ≈ intact: 3 moot / 23 live / 1 partial) — gate fully cleared; activation is now an attention-budget call (human-led decomposition) |
+| 8 | **PRG-11** architecture | ✓ **ACTIVATED 06-13** — Tier-1 autonomous slice WI-717…720 (races/tests/GC1-guard/GC6-sweep); cutover scan 16 parallel-safe / 9 serialize / 0 moot-risk; Tiers 2/3 operator-gated; shepherd **trigger-gated** on WI-721 |
 | 9 | **PRG-04** top-down delivery layer + **PRG-05** execution-mechanism productionization | **PRG-05 design-ACTIVATED 06-13** (agnosticity spike = first work); PRG-04 design opens at the joint grill. Sequence spike → grill → slice; no Cosmo until post-grill |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
@@ -582,6 +610,20 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-13 — PRG-11 (architecture) ACTIVATED — seventh §2.1 run; first TIERED +
+  trigger-gated activation.** Cosmo Workstream "Architecture Clean-Out"
+  (`37e8bce9-1f7c-81fe-be97-e063ce8f17e8`). A cutover-coordination scan (sub-agent) split
+  the ~24 LIVE findings vs the live IF cutover: **16 parallel-safe / 9 serialize** (behind
+  CUT-B2/B3 + the WI-586 tail) **/ 0 moot-risk**, crossed with mechanical-vs-architectural
+  → three tiers. **Only Tier 1 (autonomous: races, tests, GC1 guard, GC6 sweep) sliced into
+  Cosmo** — `WI-717…720` (`Stage=Backlog`, order 1–4) — so an unsupervised shepherd can't
+  hit a decomposition decision or a cutover collision. Tier 2 (8 parallel-safe-but-human-
+  gated) + Tier 3 (9 cutover-serialized) recorded in the tracker, sliced at the operator
+  decomposition gate (Tier 2 any time; Tier 3 post-flip + re-scan). **Trigger-primed
+  shepherd:** start-gate item `WI-721` (`Stage` `Backlog`→`Executing` fires); the shepherd
+  spawns in watch mode and holds until released. Tracker:
+  `_wip/architecture/execution-tracker.md`. Promoted to Active row; emerging table + queue
+  entry 8 marked activated.
 - **2026-06-13 — PRG-05 agnosticity SPIKE COMPLETE.** First design-phase work for PRG-05
   done. Run 1 died to a transient subscription-plan expiry (the "entitlement-gated at depth"
   theory was wrong — retracted); run 2 completed the nested cross-runtime review probe.
