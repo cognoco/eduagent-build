@@ -154,6 +154,43 @@ nav button.on::after{
 .lane.later .tag{color:var(--lav); background:var(--lav-dim); border:1px solid var(--lav)}
 .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
 
+/* ---------- status filter + card status badge ---------- */
+.filterbar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:2px 0 24px}
+.filterbar .fb-label{
+  font-family:'Martian Mono',monospace; font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink3); margin-right:4px;
+}
+.fbtn{
+  font-family:'Instrument Sans',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
+  padding:6px 13px; border-radius:999px; border:1px solid var(--line2); background:var(--panel);
+  color:var(--ink2); display:inline-flex; align-items:center; gap:7px; transition:all .18s;
+}
+.fbtn:hover{border-color:var(--ink3); color:var(--ink)}
+.fbtn .fb-dot{width:8px; height:8px; border-radius:50%; background:var(--c,var(--ink3)); transition:all .18s}
+.fbtn .fb-ct{
+  font-family:'Martian Mono',monospace; font-size:9.5px; color:var(--ink3);
+  border:1px solid var(--line); border-radius:5px; padding:0 5px;
+}
+.fbtn.on{border-color:var(--c); color:var(--ink); background:color-mix(in srgb, var(--c) 13%, var(--panel))}
+.fbtn.on .fb-ct{color:var(--c); border-color:var(--c)}
+.fbtn.off{opacity:.5; border-style:dashed}
+.fbtn.off .fb-dot{background:transparent; box-shadow:inset 0 0 0 1.5px var(--ink3)}
+.fbtn-clear{color:var(--ink3); border-style:dashed}
+.fbtn-clear:hover:not(:disabled){border-color:var(--coral); color:var(--coral)}
+.fbtn-clear:disabled{opacity:.3; cursor:default}
+.lane-head .tag{
+  color:var(--c,var(--teal)); border:1px solid var(--c,var(--teal));
+  background:color-mix(in srgb, var(--c,var(--teal)) 13%, transparent);
+}
+.lane-head .lane-ct{font-family:'Martian Mono',monospace; font-size:10px; color:var(--ink3); margin-left:auto}
+.card .top-r{display:flex; align-items:center; gap:8px}
+.card .cstat{
+  font-family:'Martian Mono',monospace; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+  padding:2px 7px; border-radius:99px; white-space:nowrap;
+  border:1px solid var(--c,var(--line2)); color:var(--c,var(--ink2));
+  background:color-mix(in srgb, var(--c,var(--ink3)) 12%, transparent);
+}
+
 /* ---------- initiative card ---------- */
 .card{
   background:var(--panel); border:1px solid var(--line); border-radius:14px;
@@ -456,7 +493,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-17 new-llm MERGED to main (06-13, 105b39ac0)</b> — clean --no-ff merge commit, full ancestor, Merge completeness check + all deterministic gates green; the 4 advisory SHOULD_FIX are documented deferrals (WI-695 GC6 mocks / WI-696 event typing) · <b>IF CUTOVER EXECUTING</b> — CUT-A + CUT-B1 closed; CUT-B2 (consent+family) ∥ CUT-B3 (billing+webhooks) in flight; WI-586 convergence/drop tail pending · <b>Deploy/KV chain wired end-to-end</b> (WI-682 + WI-685 + WI-694 verifier + GH secrets) — WI-664 closes on first green post-merge deploy · follow-through: branch-protection add of Merge completeness check; WI-694 manual close · <b>PRG-10 (API security & PII) ACTIVATED 06-13</b> — 27 findings sliced to WI-698–704 (5 WP + 2 Item), 27/27 CLEAN vs the live cutover (parallel-safe), shepherd RUNNING · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
+  <span class="txt"><b>Right now:</b> <b>PRG-17 new-llm MERGED to main (06-13, 105b39ac0)</b> — clean --no-ff merge commit, full ancestor, Merge completeness check + all deterministic gates green; the 4 advisory SHOULD_FIX are documented deferrals (WI-695 GC6 mocks / WI-696 event typing) · <b>IF CUTOVER EXECUTING</b> — CUT-A + CUT-B1 closed; CUT-B2 (consent+family) ∥ CUT-B3 (billing+webhooks) in flight; WI-586 convergence/drop tail pending · <b>Deploy/KV chain wired end-to-end</b> (WI-682 + WI-685 + WI-694 verifier + GH secrets) — WI-664 closes on first green post-merge deploy · follow-through: branch-protection add of Merge completeness check; WI-694 manual close · <b>PRG-10 (API security & PII) ACTIVATED 06-13</b> — 27 findings sliced to WI-698–704 (5 WP + 2 Item), 27/27 CLEAN vs the live cutover (parallel-safe), shepherd RUNNING · <b>PRG-11 (architecture) ACTIVATED 06-13</b> — Tier-1 autonomous slice (WI-717–720) sliced; cutover scan 16 parallel-safe / 9 serialize; Tiers 2/3 operator-gated · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
 </div>
 
 <nav>
@@ -595,7 +632,7 @@ const QUEUE = [
   ["5","PRG-15","Error handling","✓ GRADUATED 06-11 — activation → graduation inside a day (WI-639/640/641)"],
   ["6","PRG-13","Background-job security","✓ GRADUATED 06-12 — both WPs, under a day"],
   ["7","PRG-10","API security & PII","✓ ACTIVATED 06-13 — 27 findings → WI-698–704 (5 WP + 2 Item); slice scan 27/27 LIVE + CLEAN, parallel-safe with the cutover; shepherd RUNNING (Opus/medium + Sonnet executors; separate Codex reviewer)"],
-  ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
+  ["8","PRG-11","Architecture","✓ ACTIVATED 06-13 — Tier-1 autonomous slice WI-717–720; cutover scan 16 parallel-safe / 9 serialize; Tiers 2/3 operator-gated"],
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
   ["10","PRG-20","Estate-canon drain","IF clean-cut tail done (G5), or a named pull-forward earlier"],
   ["11","PRG-21","Learning-domain canon","Product trigger — Zuzka starts learning-feature work"],
@@ -697,21 +734,16 @@ const INIT = [
   ],
   homes:["_wip/security-pii-api/execution-tracker.md","Cosmo · Workstream “API Security & PII” (WI-698–704)","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-11", name:"Architecture clean-up", accent:"var(--amber)", lane:"armed", status:"armed", q:"#8",
-  tagline:"Circular deps, god-modules, smeared domains. Waits for W1 — much of it may be rebuilt for free.",
-  owner:"Human-led decomposition; agents execute", gate:"Gate chain CLEARED 06-11 — scan verdict: scope ≈ intact (3 moot / 23 live / 1 partial). Activation = attention-budget call.",
-  outcome:"27 structural findings resolved or proven moot; decomposition decisions made once, against the post-W1 codebase.",
+{ id:"PRG-11", name:"Architecture Clean-Out", accent:"var(--teal)", lane:"now", status:"active", q:"#8",
+  tagline:"Architecture audit clear-out — code-structural & correctness findings, hybrid/tiered: Tier 1 autonomous slice in Cosmo (WI-717–720); Tiers 2/3 operator-gated. Human-led on decomposition boundaries.",
+  owner:"Human-led decomposition; Sonnet executors (Opus plan-phase on WI-717); separate Codex reviewer", gate:"G3 (IF W1) ✅ + moot scan ✅; cutover scan split 16 parallel-safe / 9 serialize.",
+  outcome:"~24 architecture findings (3 moot / 1 partial / 23 LIVE + INV-2 per 06-11 scan) resolved across three tiers: structural correctness, test coverage, mock hygiene, and domain/dependency clean-out.",
   bundles:[
-    {n:"Moot-by-refactor scan", s:"gate task", m:"agent", st:"done", note:"DONE 06-11: 3 moot · 23 live · 1 partial. All 7 flagged candidates LIVE → supporting-artefacts/prg-11-moot-scan.md"},
-    {n:"Circular dependencies", s:"3 findings", m:"human", st:"hold"},
-    {n:"God modules", s:"3 findings", m:"human", st:"hold"},
-    {n:"Domain organisation", s:"4 findings", m:"mixed", st:"hold"},
-    {n:"Data access & profile-context", s:"3 findings", m:"mixed", st:"hold"},
-    {n:"Mobile nav & UX resilience", s:"4 findings", m:"mixed", st:"hold"},
-    {n:"Correctness races", s:"3 findings", m:"mixed", st:"hold", note:"Merged in from the singleton tail."},
-    {n:"Test-coverage gaps + mock backlog", s:"4 items", m:"agent", st:"hold"}
+    {n:"Tier 1 · autonomous (WI-717–720): races, tests, GC1 guard, GC6 sweep", s:"4 WIs · parallel-safe + mechanical", m:"agent", st:"go", note:"WI-717 correctness races F-169/170/171; WI-718 test coverage F-097/098/099; WI-719 GC1 multiline-mock guard F-156; WI-720 GC6 mock burn-down INV-2. Only tier in Cosmo."},
+    {n:"Tier 2 · parallel-safe but human-gated (8 findings)", s:"8 findings", m:"human", st:"hold", note:"Parallel-safe vs cutover but need operator decomposition sign-off before slicing. Recorded in tracker, NOT yet in Cosmo."},
+    {n:"Tier 3 · cutover-serialized behind WI-586 (9 findings)", s:"9 findings · behind CUT-B2/B3 + WI-586", m:"mixed", st:"hold", note:"Must serialize behind the live IF cutover. Recorded in tracker; gate = WI-586 convergence/drop closed."}
   ],
-  homes:["activation-planning.md §2 PRG-11 (charter)","L-gap-delta.md (per-finding)"]},
+  homes:["_wip/architecture/execution-tracker.md","Cosmo Workstream \"Architecture Clean-Out\""]},
 
 { id:"PRG-13", name:"Background-job security", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#6",
   tagline:"Six tight findings: minors' data sitting in job state, plus two correctness bugs. OUTCOME MET — fourth graduation, fastest lane.",
@@ -777,25 +809,67 @@ const PARKED = [
 ];
 
 /* =============== RENDER =============== */
-const LANES = [
-  {k:"now",  t:"In motion",        d:"executing or finishing — shepherded at bundle level"},
-  {k:"armed",t:"Armed behind a gate", d:"charters ratified — each starts the moment its gate fires"},
-  {k:"later",t:"Waiting on a trigger", d:"real, scoped, deliberately later — triggers are written down"}
+// Status taxonomy drives BOTH the board grouping and the filter. A graduated
+// initiative is NOT "in motion" — it gets its own section.
+const CATS = [
+  {k:"motion",   t:"In motion",  glyph:"▸", c:"var(--teal)",  d:"executing or actively worked — shepherded at bundle level"},
+  {k:"waiting",  t:"Waiting",    glyph:"✦", c:"var(--lav)",   d:"charters ratified or backlogged — each starts when its gate or trigger fires"},
+  {k:"graduated",t:"Graduated",  glyph:"✓", c:"var(--green)", d:"outcome met — done, kept on the board for the record"}
 ];
-const stGlyph = {now:"▸", armed:"◈", later:"✦"};
+function catOf(i){
+  const s=(i.status||"").toLowerCase();
+  if(s.includes("graduat")) return "graduated";
+  if(i.lane==="later"||i.lane==="armed"||s.includes("embryo")||s.includes("backlog")||s.includes("design")||s.includes("park")) return "waiting";
+  return "motion";
+}
 
 function el(h){const t=document.createElement("template"); t.innerHTML=h.trim(); return t.content.firstChild}
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")}
 
+/* ---- status filter (toggle each status on/off; clear = show all) ---- */
+const ALL_CATS=CATS.map(c=>c.k);
+function loadFilter(){
+  try{const s=localStorage.getItem("flightdeck-filter"); if(s){const a=JSON.parse(s);
+    if(Array.isArray(a)&&a.length){const f=a.filter(k=>ALL_CATS.includes(k)); if(f.length) return new Set(f);}}}catch(e){}
+  return new Set(ALL_CATS);
+}
+let activeCats=loadFilter();
+function saveFilter(){try{localStorage.setItem("flightdeck-filter",JSON.stringify([...activeCats]))}catch(e){}}
+function renderFilterBar(){
+  let bar=document.getElementById("filterbar");
+  if(!bar){bar=el(`<div class="filterbar" id="filterbar"></div>`);
+    const b=document.getElementById("v-board"); b.insertBefore(bar, b.firstChild);}
+  const counts={}; CATS.forEach(c=>counts[c.k]=INIT.filter(i=>catOf(i)===c.k).length);
+  const allOn=activeCats.size===ALL_CATS.length;
+  bar.innerHTML=`<span class="fb-label">Show status</span>`+
+    CATS.map(c=>{const on=activeCats.has(c.k);
+      return `<button class="fbtn cat-${c.k} ${on?'on':'off'}" data-cat="${c.k}" style="--c:${c.c}" aria-pressed="${on}"><span class="fb-dot"></span>${c.t}<span class="fb-ct">${counts[c.k]}</span></button>`;
+    }).join("")+
+    `<button class="fbtn fbtn-clear" id="fbClear"${allOn?' disabled':''}>↺ clear</button>`;
+  bar.querySelectorAll(".fbtn[data-cat]").forEach(b=>b.addEventListener("click",()=>{
+    const k=b.dataset.cat;
+    if(activeCats.has(k)) activeCats.delete(k); else activeCats.add(k);
+    if(activeCats.size===0) activeCats=new Set(ALL_CATS);   // never blank the board
+    saveFilter(); renderBoard();
+  }));
+  const clr=document.getElementById("fbClear");
+  if(clr&&!allOn) clr.addEventListener("click",()=>{activeCats=new Set(ALL_CATS); saveFilter(); renderBoard();});
+}
+
 function renderBoard(){
+  renderFilterBar();
   const root=document.getElementById("lanes"); root.innerHTML="";
-  LANES.forEach(L=>{
-    const lane=el(`<div class="lane ${L.k}"><div class="lane-head"><span class="tag">${stGlyph[L.k]} ${L.t}</span><span class="desc">${L.d}</span></div><div class="cards"></div></div>`);
+  CATS.forEach(C=>{
+    if(!activeCats.has(C.k)) return;
+    const items=INIT.filter(i=>catOf(i)===C.k);
+    if(!items.length) return;
+    const lane=el(`<div class="lane cat-${C.k}"><div class="lane-head"><span class="tag" style="--c:${C.c}">${C.glyph} ${C.t}</span><span class="desc">${C.d}</span><span class="lane-ct">${items.length}</span></div><div class="cards"></div></div>`);
     const grid=lane.querySelector(".cards");
-    INIT.filter(i=>i.lane===L.k).forEach((i,idx)=>{
+    items.forEach((i,idx)=>{
       const chips=i.bundles.map(b=>`<span class="chip ${b.st}">${esc(b.n.split("·")[0].trim())}<span class="n">${esc(b.s)}</span></span>`).join("");
-      const c=el(`<article class="card" style="--accent:${i.accent}; animation-delay:${.06*idx+.1}s" data-id="${i.id}">
-        <div class="top"><span class="pid">${i.id}</span><span class="qpos">queue ${i.q}</span></div>
+      const st=esc((i.status||"").replace(/^✓\s*/,""));
+      const c=el(`<article class="card" style="--accent:${i.accent}; --c:${C.c}; animation-delay:${.05*idx+.06}s" data-id="${i.id}">
+        <div class="top"><span class="pid">${i.id}</span><span class="top-r"><span class="cstat">${st}</span><span class="qpos">queue ${i.q}</span></span></div>
         <h3>${esc(i.name)}</h3>
         <p class="tagline">${esc(i.tagline)}</p>
         <div class="gateline"><span class="glyph">⌖</span><span>${i.gate.split(".")[0]}.</span></div>

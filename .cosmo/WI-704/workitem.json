@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-819c-b000-ef208adfef0a",
+  "id": "WI-704",
+  "name": "IT-secapi-mobile-markdown",
+  "description": "Harden ThemedMarkdown (apps/mobile): add an onLinkPress that validates the URL scheme and set an allowedImageHandlers allowlist (or disable remote images) so LLM-authored markdown cannot trigger arbitrary-URL navigation (F-027) or zero-click remote image loads.",
+  "acceptanceCriteria": "F-027 remediated; link-scheme validation + image-handler allowlist covered by a ThemedMarkdown test.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

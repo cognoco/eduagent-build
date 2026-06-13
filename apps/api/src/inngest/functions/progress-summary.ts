@@ -1,8 +1,13 @@
 // @inngest-admin: parent-chain (learningSessions and familyLinks queried with profileId enforced)
 import { and, desc, eq } from 'drizzle-orm';
-import { familyLinks, learningSessions, profiles } from '@eduagent/database';
+import {
+  familyLinks,
+  learningSessions,
+  person,
+  profiles,
+} from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
 import { buildKnowledgeInventory } from '../../services/snapshot-aggregation';
 import {
@@ -12,6 +17,8 @@ import {
   upsertProgressSummary,
 } from '../../services/progress-summary';
 import { isGdprProcessingAllowed } from '../../services/consent';
+import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { getGuardianPersonIds } from '../../services/identity-v2/guardianship';
 import { captureException } from '../../services/sentry';
 
 export const progressSummaryGeneration = inngest.createFunction(
@@ -32,27 +39,42 @@ export const progressSummaryGeneration = inngest.createFunction(
       return { status: 'skipped', reason: 'missing profileId or sessionId' };
     }
 
+    // [CUT-B2] GDPR gate + parent-link + person reads dispatch by the flag.
+    const gdprAllowed = (db: ReturnType<typeof getStepDatabase>) =>
+      isIdentityV2EnabledInStep()
+        ? isGdprProcessingAllowedV2(db, profileId)
+        : isGdprProcessingAllowed(db, profileId);
+
     const context = await step.run('gather-context', async () => {
       const db = getStepDatabase();
-      const parentLink = await db.query.familyLinks.findFirst({
-        where: eq(familyLinks.childProfileId, profileId),
-        columns: { id: true },
-      });
-      if (!parentLink) return null;
+      // Parent-link existence: v2 reads an active guardianship edge (any
+      // guardian over this person), legacy reads family_links.
+      const hasParent = isIdentityV2EnabledInStep()
+        ? (await getGuardianPersonIds(db, profileId)).length > 0
+        : (await db.query.familyLinks.findFirst({
+            where: eq(familyLinks.childProfileId, profileId),
+            columns: { id: true },
+          })) != null;
+      if (!hasParent) return null;
 
       // [WI-82] Re-check current GDPR consent at execution time. This job runs
       // outside the HTTP consent middleware; a queued event must not send learner
       // data to the LLM or persist derived data for a profile whose consent is
       // no longer granted.
-      if (!(await isGdprProcessingAllowed(db, profileId))) {
+      if (!(await gdprAllowed(db))) {
         return { status: 'consent-blocked' as const };
       }
 
-      const profile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
-        // i18n Phase 1 — read conversation_language for the summary LLM.
-        columns: { displayName: true, conversationLanguage: true },
-      });
+      const profile = isIdentityV2EnabledInStep()
+        ? await db.query.person.findFirst({
+            where: eq(person.id, profileId),
+            columns: { displayName: true, conversationLanguage: true },
+          })
+        : await db.query.profiles.findFirst({
+            where: eq(profiles.id, profileId),
+            // i18n Phase 1 — read conversation_language for the summary LLM.
+            columns: { displayName: true, conversationLanguage: true },
+          });
       if (!profile) return null;
 
       let latestSession = await findLatestCompletedLearningSession(
@@ -114,13 +136,18 @@ export const progressSummaryGeneration = inngest.createFunction(
       // must still block the LLM call (cross-step memoization gap). Persisting
       // in the same step also closes the old generate→persist gap.
       const db = getStepDatabase();
-      if (!(await isGdprProcessingAllowed(db, profileId))) {
+      if (!(await gdprAllowed(db))) {
         return { status: 'skipped' as const, reason: 'consent_not_granted' };
       }
-      const profile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
-        columns: { displayName: true },
-      });
+      const profile = isIdentityV2EnabledInStep()
+        ? await db.query.person.findFirst({
+            where: eq(person.id, profileId),
+            columns: { displayName: true },
+          })
+        : await db.query.profiles.findFirst({
+            where: eq(profiles.id, profileId),
+            columns: { displayName: true },
+          });
       if (!profile) {
         return { status: 'skipped' as const, reason: 'profile_missing' };
       }
@@ -152,7 +179,7 @@ export const progressSummaryGeneration = inngest.createFunction(
 
       // [WI-82] Re-check before persisting derived data — defense-in-depth
       // for a withdrawal that lands while the LLM call is in flight.
-      if (!(await isGdprProcessingAllowed(db, profileId))) {
+      if (!(await gdprAllowed(db))) {
         return { status: 'skipped' as const, reason: 'consent_not_granted' };
       }
       await upsertProgressSummary(db, {

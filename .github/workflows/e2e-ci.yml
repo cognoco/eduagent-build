@@ -182,7 +182,23 @@ jobs:
   mobile-maestro:
     name: Mobile Maestro E2E Tests
     needs: check-changes
-    if: needs.check-changes.outputs.run-mobile-e2e == 'true'
+    # This job is secret-bearing and checks out + executes PR head code, so it
+    # carries its OWN fork-exclusion guard in addition to the check-changes
+    # output gate — it never relies solely on an upstream job's output. Even if
+    # check-changes wrongly emitted run-mobile-e2e=true for a fork PR, this
+    # guard refuses to run the secret-backed job for any workflow_run originating
+    # from a pull_request or a fork repository.
+    if: >-
+      needs.check-changes.outputs.run-mobile-e2e == 'true' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event != 'pull_request' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
     runs-on: ubuntu-latest
     # Advisory — does not block merge
     continue-on-error: true

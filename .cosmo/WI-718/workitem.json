@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-8170-939f-cb4823d48f33",
+  "id": "WI-718",
+  "name": "WP-arch-test-coverage",
+  "description": "Three correctness/security guards in apps/api have no regression test, so a future change could silently remove them. Add a named regression test per guard, each demonstrated RED against code with the guard removed. (a) F-097 — IDOR ownership check in services/quiz/orchestrate-round.ts [evidence is B1-stale: PR #875 drift — re-grep orchestrate-round.ts to confirm the CURRENT ownership-check site before writing]. (b) F-098 — isClosePathAutoFileEligible guard in services/session/session-filing-dispatch.ts. (c) F-099 — retention cutoff math in inngest/functions/webhook-idempotency-purge.ts (BUG-672).",
+  "acceptanceCriteria": "Three variants, each a NAMED regression test that FAILS without the guard/logic (demonstrated RED via revert/stash of the guard) and PASSES with it: (a) orchestrate-round IDOR — an unauthorized/cross-profile caller is rejected; RE-GREP orchestrate-round.ts first to bind the current ownership-check site (B1-stale). (b) session-filing-dispatch isClosePathAutoFileEligible — the eligibility guard returns the correct decision across the close-path boundary cases. (c) webhook-idempotency-purge retention cutoff — records exactly at / inside / outside the cutoff are purged/retained correctly (BUG-672 math). No internal mocks added (GC1/GC6) — use real impl or jest.requireActual targeted overrides. All three suites green.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

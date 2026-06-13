@@ -8,6 +8,7 @@
 ## Shepherding & Cosmo Workflow
 
 - [project_cosmo_shepherd_finalization.md](project_cosmo_shepherd_finalization.md) — Finalizing Cosmo WIs for the autonomous /cosmo:review loop: replace_content + property PATCH (NOT execute complete, which appends + writes literal text the reviewer rejects); set Fixed In manually; single-line `Caveats / Follow-ups:`; refine can't promote childless WPs.
+- [project_prg11_arch_cleanout_lane.md](project_prg11_arch_cleanout_lane.md) — PRG-11 Architecture Clean-Out shepherd lane (Tier 1: WI-717/718/719/720). Gate-deletion=go; WP→Item demotion rationale; Assisted DoR; 4 background executors dispatched; reviewer is separate Codex; DoD=Cosmo Close.
 
 ## Identity Foundation (re-platform)
 

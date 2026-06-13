@@ -352,61 +352,78 @@ export async function regenerateLanguageCurriculum(
   languageCode: string,
   startingLevel: CefrLevel = 'A1',
 ): Promise<void> {
-  // [BUG-655 / L3.M3.1] Verify (subjectId, profileId) ownership BEFORE the
-  // delete. Without this, a leaked subjectId from another account could
-  // cascade-delete the victim's curriculum, topics, vocabulary and progress.
-  const ownedSubject = await db.query.subjects.findFirst({
-    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-    columns: { id: true },
-  });
-  if (!ownedSubject) {
-    throw new Error(
-      `[BUG-655] regenerateLanguageCurriculum: subject ${subjectId} does not belong to profile ${profileId}`,
-    );
-  }
-
-  // Delete old curricula — topics, progress, etc. cascade-delete via FKs.
-  // This prevents unique-constraint violations when the same bookId is reused.
-  await db.delete(curricula).where(eq(curricula.subjectId, subjectId));
-
-  const [curriculum] = await db
-    .insert(curricula)
-    .values({
-      subjectId,
-      version: 1,
-    })
-    .returning();
-
+  // Curriculum generation is a pure synchronous build (no LLM/network), so
+  // compute it before opening the transaction — nothing here can fail mid-swap.
   const topics = generateLanguageCurriculum(languageCode, startingLevel);
-  if (topics.length === 0) {
-    return;
-  }
-
-  if (!curriculum)
-    throw new Error('Insert into curricula did not return a row');
   // Resolve to a human-readable name for the book title — BUG-611:
   // previously passed `languageCode` (e.g. "es") which became the book title.
   const language = getLanguageByCode(languageCode);
   const languageLabel = language
     ? (language.names[0] ?? languageCode).replace(/^./, (c) => c.toUpperCase())
     : languageCode;
-  const bookId = await ensureDefaultBook(db, subjectId, languageLabel);
 
-  await db.insert(curriculumTopics).values(
-    topics.map((topic, index) => ({
-      curriculumId: curriculum.id,
-      bookId,
-      title: topic.title,
-      description: topic.description,
-      sortOrder: index,
-      relevance: topic.relevance,
-      estimatedMinutes: topic.estimatedMinutes,
-      cefrLevel: topic.cefrLevel ?? null,
-      cefrSublevel: topic.cefrSublevel ?? null,
-      targetWordCount: topic.targetWordCount ?? null,
-      targetChunkCount: topic.targetChunkCount ?? null,
-    })),
-  );
+  // Transact the ownership-check → delete → insert → add-topics swap so a
+  // crash mid-sequence cannot leave the learner with a deleted-but-unreplaced
+  // curriculum, and two concurrent same-user regenerations cannot interleave
+  // into duplicate curricula rows or orphaned topics. Mirrors the transactional
+  // swap in curriculum.ts:regenerateCurriculumWithFeedback. The ownership check
+  // is inside the transaction so the check → delete window is atomic.
+  await db.transaction(async (tx) => {
+    // [BUG-655 / L3.M3.1] Verify (subjectId, profileId) ownership BEFORE the
+    // delete. Without this, a leaked subjectId from another account could
+    // cascade-delete the victim's curriculum, topics, vocabulary and progress.
+    const ownedSubject = await tx.query.subjects.findFirst({
+      where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+      columns: { id: true },
+    });
+    if (!ownedSubject) {
+      throw new Error(
+        `[BUG-655] regenerateLanguageCurriculum: subject ${subjectId} does not belong to profile ${profileId}`,
+      );
+    }
+
+    // Delete old curricula — topics, progress, etc. cascade-delete via FKs.
+    // This prevents unique-constraint violations when the same bookId is reused.
+    await tx.delete(curricula).where(eq(curricula.subjectId, subjectId));
+
+    const [curriculum] = await tx
+      .insert(curricula)
+      .values({
+        subjectId,
+        version: 1,
+      })
+      .returning();
+
+    if (topics.length === 0) {
+      return;
+    }
+
+    if (!curriculum)
+      throw new Error('Insert into curricula did not return a row');
+    // Known Drizzle pattern: PgTransaction → Database cast (see
+    // feedback_drizzle_transaction_cast.md).
+    const bookId = await ensureDefaultBook(
+      tx as unknown as Database,
+      subjectId,
+      languageLabel,
+    );
+
+    await tx.insert(curriculumTopics).values(
+      topics.map((topic, index) => ({
+        curriculumId: curriculum.id,
+        bookId,
+        title: topic.title,
+        description: topic.description,
+        sortOrder: index,
+        relevance: topic.relevance,
+        estimatedMinutes: topic.estimatedMinutes,
+        cefrLevel: topic.cefrLevel ?? null,
+        cefrSublevel: topic.cefrSublevel ?? null,
+        targetWordCount: topic.targetWordCount ?? null,
+        targetChunkCount: topic.targetChunkCount ?? null,
+      })),
+    );
+  });
 }
 
 function calculateMilestoneProgress(

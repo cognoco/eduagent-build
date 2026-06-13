@@ -36,7 +36,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -148,7 +148,7 @@ describe('updateConversationLanguage (integration)', () => {
     const db = createIntegrationDb();
 
     await expect(
-      updateConversationLanguage(db, profileA.id, accountB.id, 'es')
+      updateConversationLanguage(db, profileA.id, accountB.id, 'es'),
     ).rejects.toThrow(OnboardingNotFoundError);
 
     // Verify the value was NOT changed
@@ -196,7 +196,7 @@ describe('updatePronouns (integration)', () => {
     const db = createIntegrationDb();
 
     await expect(
-      updatePronouns(db, profileA.id, accountB.id, 'he/him')
+      updatePronouns(db, profileA.id, accountB.id, 'he/him'),
     ).rejects.toThrow(OnboardingNotFoundError);
   });
 });
@@ -249,7 +249,7 @@ describe('updateInterestsContext (integration)', () => {
     await expect(
       updateInterestsContext(db, profileA.id, accountB.id, [
         { label: 'Hacking', context: 'free_time' as const },
-      ])
+      ]),
     ).rejects.toThrow(OnboardingNotFoundError);
 
     // Verify no learning_profiles row was created for profileA
@@ -265,7 +265,54 @@ describe('updateInterestsContext (integration)', () => {
     await expect(
       updateInterestsContext(db, TEST_NONEXISTENT_ID, account.id, [
         { label: 'Music', context: 'both' as const },
-      ])
+      ]),
     ).rejects.toThrow(OnboardingNotFoundError);
+  });
+
+  // [F-164] The version bump alone (without a compare-and-set on the version
+  // we read) was decorative: two concurrent picker submits both passed and
+  // last-writer-wins silently dropped one. The CAS makes each write provably
+  // land or retry. Two truly-concurrent writes (each via its own connection)
+  // with distinct interest sets must leave the row in exactly one of the two
+  // submitted states — never a torn or empty state — and the version must
+  // advance once per landed write.
+  it('[F-164] concurrent interest writes do not lose updates (CAS)', async () => {
+    const { account, profile } = await seedAccountAndProfile(0);
+
+    const setA = [{ label: 'Astronomy', context: 'free_time' as const }];
+    const setB = [{ label: 'Biology', context: 'school' as const }];
+
+    // Separate DB connections so the two writes genuinely race rather than
+    // serialize on a single client.
+    const dbA = createIntegrationDb();
+    const dbB = createIntegrationDb();
+
+    // Seed the learning_profiles row first so both writers start from the same
+    // known version and actually contend on the UPDATE (rather than one of them
+    // creating the row).
+    await updateInterestsContext(dbA, profile.id, account.id, [
+      { label: 'Seed', context: 'both' as const },
+    ]);
+    const seeded = await dbA.query.learningProfiles.findFirst({
+      where: eq(learningProfiles.profileId, profile.id),
+    });
+    const seededVersion = seeded!.version;
+
+    await Promise.all([
+      updateInterestsContext(dbA, profile.id, account.id, setA),
+      updateInterestsContext(dbB, profile.id, account.id, setB),
+    ]);
+
+    const lp = await createIntegrationDb().query.learningProfiles.findFirst({
+      where: eq(learningProfiles.profileId, profile.id),
+    });
+
+    // The persisted interests equal exactly ONE of the two submitted sets — no
+    // torn/empty state.
+    expect([setA, setB]).toContainEqual(lp?.interests);
+
+    // Both writes landed via CAS (one may have retried after a conflict), so the
+    // version advanced by exactly two from the seeded value.
+    expect(lp?.version).toBe(seededVersion + 2);
   });
 });

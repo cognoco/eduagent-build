@@ -229,12 +229,16 @@ describe('recordDictationResult (integration)', () => {
     expect(second.mode).toBe('surprise');
   });
 
-  it('[WI-84 rollout] keeps same-day same-mode writes on the legacy conflict target until contract migration', async () => {
+  it('[F-120] same-day same-mode writes with distinct completion keys are non-destructive', async () => {
     const db = createIntegrationDb();
     const today = getServerDate();
     const keyA = completionKey(5);
     const keyB = completionKey(6);
 
+    // Two DISTINCT dictation sessions, same day, same mode. Pre-fix these
+    // collided on the legacy (profile, date, mode) unique index and the second
+    // silently overwrote the first (data loss). Distinct completion keys must
+    // now persist as two separate rows.
     const first = await recordDictationResult(db, profileId, {
       completionKey: keyA,
       localDate: today,
@@ -253,6 +257,17 @@ describe('recordDictationResult (integration)', () => {
       reviewed: true,
     });
 
+    const rows = await db.query.dictationResults.findMany({
+      where: eq(dictationResults.profileId, profileId),
+    });
+    expect(rows).toHaveLength(2);
+    expect(second.id).not.toBe(first.id);
+    // Neither session's values were clobbered.
+    expect(rows.find((row) => row.id === first.id)?.sentenceCount).toBe(5);
+    expect(rows.find((row) => row.id === second.id)?.sentenceCount).toBe(6);
+
+    // A genuine retry of the SAME completion key still updates in place — the
+    // completion key is the intended idempotency target, so the row count holds.
     const retry = await recordDictationResult(db, profileId, {
       completionKey: keyA,
       localDate: today,
@@ -262,13 +277,14 @@ describe('recordDictationResult (integration)', () => {
       reviewed: true,
     });
 
-    const rows = await db.query.dictationResults.findMany({
+    const afterRetry = await db.query.dictationResults.findMany({
       where: eq(dictationResults.profileId, profileId),
     });
-    expect(rows).toHaveLength(1);
-    expect(second.id).toBe(first.id);
+    expect(afterRetry).toHaveLength(2);
     expect(retry.id).toBe(first.id);
-    expect(rows.find((row) => row.id === first.id)?.sentenceCount).toBe(7);
+    expect(afterRetry.find((row) => row.id === first.id)?.sentenceCount).toBe(
+      7,
+    );
   });
 
   it('[WI-84 review] derives the legacy completion key when old clients omit it', async () => {

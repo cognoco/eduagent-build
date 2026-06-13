@@ -496,6 +496,47 @@ describe('getDailyNotificationCount', () => {
 
     expect(result).toBe(3);
   });
+
+  it('[BREAK] WHERE clause includes ne(type, support_outbox_spillover) to exclude rate-limit sentinels from the push cap', async () => {
+    // Capture the predicate passed to .where() so we can assert the ne()
+    // filter is present. Without this filter, support_outbox_spillover rows
+    // inserted by the outbox-spillover rate-limit path would count toward
+    // MAX_DAILY_PUSH and silently block real push notifications.
+    const whereMock = jest.fn().mockResolvedValue([]);
+    const db = {
+      ...createMockDb({ selectResult: [] }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: whereMock,
+        }),
+      }),
+    } as unknown as Database;
+
+    await getDailyNotificationCount(db, profileId);
+
+    expect(whereMock).toHaveBeenCalledTimes(1);
+    const [predicate] = whereMock.mock.calls[0];
+    // The drizzle and() node stores its conditions in a 'chunks' array.
+    // Each condition is a SQL node wrapping column references and values.
+    // Serialise only the static value references to avoid circular PgTable
+    // refs, and verify 'support_outbox_spillover' appears somewhere.
+    const valueParts: unknown[] = [];
+    function collectValues(node: unknown): void {
+      if (!node || typeof node !== 'object') return;
+      const obj = node as Record<string, unknown>;
+      if ('value' in obj) valueParts.push(obj['value']);
+      for (const key of Object.keys(obj)) {
+        if (key === 'table') continue; // skip circular PgTable refs
+        if (Array.isArray(obj[key])) {
+          (obj[key] as unknown[]).forEach(collectValues);
+        } else if (typeof obj[key] === 'object') {
+          collectValues(obj[key]);
+        }
+      }
+    }
+    collectValues(predicate);
+    expect(valueParts).toContain('support_outbox_spillover');
+  });
 });
 
 describe('logNotification', () => {
