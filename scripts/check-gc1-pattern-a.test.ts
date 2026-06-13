@@ -140,6 +140,37 @@ describe('findAddedMockLines', () => {
     ].join('\n');
     expect(findAddedMockLines(diff)).toEqual([]);
   });
+
+  // Codex/CodeRabbit review: a comment or blank line between jest.mock( and the
+  // specifier must NOT defeat detection (it is valid JS trivia). The real-world
+  // shape is a multi-line gc1-allow rationale block — see
+  // tests/integration/stripe-webhook.integration.test.ts.
+  it('detects a multiline internal mock with comment+blank lines before the specifier', () => {
+    const diff = [
+      '@@ -0,0 +1,6 @@',
+      '+jest.mock(',
+      '+  // a rationale comment',
+      '+',
+      "+  './services/foo',",
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const sites = findAddedMockLines(diff);
+    expect(sites).toHaveLength(1);
+    expect(sites[0].line).toBe(1);
+    expect(sites[0].content).toContain("'./services/foo'");
+  });
+
+  it('stops at a non-specifier code line (variable specifier is not flagged)', () => {
+    const diff = [
+      '@@ -0,0 +1,3 @@',
+      '+jest.mock(',
+      '+  modulePath,',
+      '+  () => ({})',
+      '+);',
+    ].join('\n');
+    expect(findAddedMockLines(diff)).toEqual([]);
+  });
 });
 
 describe('checkFile — integration', () => {
@@ -251,6 +282,30 @@ describe('checkFile — integration', () => {
       "    ...jest.requireActual('./services/foo'),",
       '    bar: jest.fn(),',
       '  })',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // Real-world shape (stripe-webhook.integration.test.ts): a multi-line
+  // gc1-allow rationale block sits between jest.mock( and the specifier.
+  // The escape hatch must be honored even though it spans several comment lines.
+  it('allows a multiline internal mock with gc1-allow in a comment block before the specifier', () => {
+    const diff = [
+      '@@ -0,0 +1,6 @@',
+      '+jest.mock(',
+      '+  // gc1-allow: external boundary needs real crypto unavailable in tests;',
+      '+  // we requireActual the wrapper and stub only the signature check.',
+      "+  './services/stripe',",
+      '+  () => ({})',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      '  // gc1-allow: external boundary needs real crypto unavailable in tests;',
+      '  // we requireActual the wrapper and stub only the signature check.',
+      "  './services/stripe',",
+      '  () => ({})',
       ');',
     ].join('\n');
     expect(checkFile('a.test.ts', diff, staged)).toEqual([]);

@@ -126,27 +126,48 @@ export function findAddedMockLines(unifiedDiff: string): StagedMockSite[] {
         // Single-line form: jest.mock('./foo', ...) — specifier on the same line.
         sites.push({ line: cur, content });
       } else if (MOCK_OPEN.test(content)) {
-        // Multiline form: jest.mock( with no specifier on this line.
-        // Look ahead up to 3 diff lines (added or context) for the specifier.
+        // Multiline form: jest.mock( with no specifier on this line. The
+        // specifier (first argument) appears on a later line; blank and
+        // comment-only lines are valid JS trivia between the open paren and
+        // the first argument and must be skipped — a multi-line `// gc1-allow`
+        // rationale block legitimately sits here (see
+        // tests/integration/stripe-webhook.integration.test.ts).
+        //
+        // Accumulate the jest.mock( line plus every scanned line into the
+        // emitted content so (a) extractSpecifier finds the specifier and
+        // (b) GC1_ALLOW.test() still sees a gc1-allow comment placed anywhere
+        // between the paren and the specifier. The window is generous (15
+        // lines) so a long rationale block doesn't hide the specifier.
         const mockLine = cur;
-        const mockContent = content;
-        for (let j = i + 1; j <= i + 3 && j < lines.length; j++) {
+        const accumulated: string[] = [content];
+        let scanned = 0;
+        for (let j = i + 1; j < lines.length && scanned < 15; j++) {
           const ahead = lines[j];
-          // Skip deletion lines — they don't appear in the new file.
+          // Skip deletion lines — they don't appear in the new file and don't
+          // consume a look-ahead slot.
           if (ahead.startsWith('-')) continue;
           const aheadContent = ahead.startsWith('+') ? ahead.slice(1) : ahead;
-          const specMatch = aheadContent.match(SPECIFIER_LINE);
-          if (specMatch) {
-            // Emit a site whose content is the full mock-call line (for gc1-allow
-            // checking) combined with the specifier (for extractSpecifier).
-            // Format: "<mock-line> <specifier-line>" joined with a newline so
-            // MOCK_LINE can still match after the two lines are joined.
-            sites.push({
-              line: mockLine,
-              content: `${mockContent}\n${aheadContent}`,
-            });
+          scanned++;
+          accumulated.push(aheadContent);
+          // Blank or comment-only lines are trivia — keep scanning.
+          const trimmed = aheadContent.trim();
+          if (
+            trimmed === '' ||
+            trimmed.startsWith('//') ||
+            trimmed.startsWith('/*') ||
+            trimmed.startsWith('*')
+          ) {
+            continue;
           }
-          // Stop at the first non-deletion line regardless of whether it matched.
+          if (SPECIFIER_LINE.test(aheadContent)) {
+            // Emit a site whose content carries the full span from jest.mock(
+            // through the specifier line. extractSpecifier reads the specifier;
+            // GC1_ALLOW.test reads any gc1-allow comment in the span.
+            sites.push({ line: mockLine, content: accumulated.join('\n') });
+          }
+          // First non-trivia line decides: specifier → flagged above; anything
+          // else (e.g. a variable specifier) → not a string-literal mock.
+          // Either way, stop scanning.
           break;
         }
       }
