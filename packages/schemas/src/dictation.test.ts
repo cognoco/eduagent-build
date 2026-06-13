@@ -65,6 +65,37 @@ describe('dictationSentenceSchema', () => {
     const result = dictationSentenceSchema.safeParse(rest);
     expect(result.success).toBe(false);
   });
+
+  it('[F-180] rejects chunks array exceeding 100 entries', () => {
+    const result = dictationSentenceSchema.safeParse({
+      ...validSentence,
+      chunks: Array.from({ length: 101 }, (_, i) => `chunk-${i}`),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[F-180] rejects chunksWithPunctuation array exceeding 100 entries', () => {
+    const result = dictationSentenceSchema.safeParse({
+      ...validSentence,
+      chunksWithPunctuation: Array.from(
+        { length: 101 },
+        (_, i) => `chunk-${i}`,
+      ),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[F-180] accepts chunks and chunksWithPunctuation at the 100-entry limit', () => {
+    const result = dictationSentenceSchema.safeParse({
+      ...validSentence,
+      chunks: Array.from({ length: 100 }, (_, i) => `chunk-${i}`),
+      chunksWithPunctuation: Array.from(
+        { length: 100 },
+        (_, i) => `chunk-${i}`,
+      ),
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

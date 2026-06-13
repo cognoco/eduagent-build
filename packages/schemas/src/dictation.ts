@@ -25,10 +25,12 @@ export const dictationSentenceSchema = z.object({
     .max(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS)
     .describe('Sentence with punctuation spoken as words'),
   wordCount: z.number().int().positive(),
+  // [F-180] Cap chunk arrays so an oversized payload is rejected 4xx rather
+  // than processed. 100 chunks per sentence exceeds any realistic TTS scenario.
   /** Natural phrase-boundary chunks for TTS playback (original text). */
-  chunks: z.array(z.string()).optional(),
+  chunks: z.array(z.string()).max(100).optional(),
   /** Natural phrase-boundary chunks with punctuation spoken as words. */
-  chunksWithPunctuation: z.array(z.string()).optional(),
+  chunksWithPunctuation: z.array(z.string()).max(100).optional(),
 });
 export type DictationSentence = z.infer<typeof dictationSentenceSchema>;
 

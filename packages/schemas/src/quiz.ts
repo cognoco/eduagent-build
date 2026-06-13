@@ -114,7 +114,8 @@ export type ClientQuizQuestion = z.infer<typeof clientQuizQuestionSchema>;
 export const questionResultSchema = z.object({
   questionIndex: z.number().int().min(0),
   correct: z.boolean(),
-  answerGiven: z.string(),
+  // [F-142] Cap answerGiven so oversized input is rejected 4xx before DB.
+  answerGiven: z.string().max(1000),
   timeMs: z.number().int().min(0),
   cluesUsed: z.number().int().min(0).max(5).optional(),
   answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
@@ -147,7 +148,9 @@ export type GenerateRoundInput = z.infer<typeof generateRoundInputSchema>;
 
 export const completeRoundInputSchema = z
   .object({
-    results: z.array(questionResultSchema).min(1),
+    // [F-142] Cap to the max questions per round (10) so an attacker cannot
+    // submit a large results array to inflate server-side processing time.
+    results: z.array(questionResultSchema).min(1).max(10),
   })
   .strict();
 export type CompleteRoundInput = z.infer<typeof completeRoundInputSchema>;
@@ -155,7 +158,9 @@ export type CompleteRoundInput = z.infer<typeof completeRoundInputSchema>;
 export const questionCheckInputSchema = z
   .object({
     questionIndex: z.number().int().min(0),
-    answerGiven: z.string().min(1),
+    // [F-179] Cap answerGiven before the O(m×n) Levenshtein routine in
+    // isGuessWhoFuzzyMatch — an unbounded string lets an attacker inflate CPU.
+    answerGiven: z.string().min(1).max(1000),
     // [BUG-STALE-OPTIONS] Defense-in-depth: API uses answerMode to verify MC
     // answers are actually in question.options, catching stale-options race
     // conditions on the client before they corrupt the score.
