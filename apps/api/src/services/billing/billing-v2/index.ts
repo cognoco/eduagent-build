@@ -58,6 +58,12 @@ export { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
 export { purchaseTopUpCreditsV2 } from './top-up-v2';
 
 export {
+  listActiveChildCapNotificationsV2,
+  recordChildCapNotificationForSubscriptionV2,
+  recordChildCapNotificationForAccountV2,
+} from './child-cap-notifications-v2';
+
+export {
   getSubscriptionForProfileV2,
   getProfileCountForSubscriptionV2,
   canAddProfileV2,
