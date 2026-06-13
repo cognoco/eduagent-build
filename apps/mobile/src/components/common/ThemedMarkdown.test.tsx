@@ -10,6 +10,9 @@ type CapturedMarkdownProps = {
   mergeStyle?: boolean;
   rules?: Record<string, MarkdownRule>;
   style?: Record<string, unknown>;
+  onLinkPress?: (url: string) => boolean;
+  allowedImageHandlers?: string[];
+  defaultImageHandler?: string | null;
 };
 
 const mockMarkdownRender = jest.fn();
@@ -76,5 +79,79 @@ describe('ThemedMarkdown', () => {
     expect(textgroupElement.props.className).toContain('text-text-primary');
     expect(flattenRuleStyle(inlineElement)?.color).toBeUndefined();
     expect(flattenRuleStyle(textgroupElement)?.color).toBeUndefined();
+  });
+
+  describe('link-scheme guard (F-027)', () => {
+    it('blocks javascript: scheme links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      // onLinkPress returning false means the library suppresses navigation
+      // eslint-disable-next-line no-script-url -- intentional bad fixture for attack-blocking coverage
+      expect(onLinkPress?.('javascript:alert(1)')).toBe(false);
+    });
+
+    it('blocks data: scheme links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('data:text/html,<script>alert(1)</script>')).toBe(
+        false,
+      );
+    });
+
+    it('blocks file: scheme links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('file:///etc/passwd')).toBe(false);
+    });
+
+    it('allows https: links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('https://example.com')).toBe(true);
+    });
+
+    it('allows http: links', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('http://example.com')).toBe(true);
+    });
+  });
+
+  describe('remote images disabled (F-027)', () => {
+    // The library's image render rule renders null when
+    // `show === false && defaultImageHandler === null`. An empty
+    // allowedImageHandlers makes `show` false for every src (including https,
+    // http, and data: images), and a null defaultImageHandler triggers the
+    // null return — so no remote image (tracking pixel / IP leak) ever loads.
+    it('passes an empty allowedImageHandlers so no image src matches', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { allowedImageHandlers } = latestMarkdownProps();
+      expect(allowedImageHandlers).toEqual([]);
+    });
+
+    it('passes a null defaultImageHandler so disallowed images render nothing', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { defaultImageHandler } = latestMarkdownProps();
+      expect(defaultImageHandler).toBeNull();
+    });
+
+    it('exercises the library image rule with these props and renders nothing', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { allowedImageHandlers, defaultImageHandler } =
+        latestMarkdownProps();
+
+      // Reproduce the library's image-rule decision (renderRules.image):
+      // an https remote image is blocked because no handler matches and the
+      // default handler is null.
+      const src = 'https://evil.example/tracker.png';
+      const show =
+        (allowedImageHandlers ?? []).filter((value) =>
+          src.toLowerCase().startsWith(value.toLowerCase()),
+        ).length > 0;
+      const rendersNothing = show === false && defaultImageHandler === null;
+
+      expect(show).toBe(false);
+      expect(rendersNothing).toBe(true);
+    });
   });
 });
