@@ -11,6 +11,9 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 export interface XpEvent {
   profileId: string;
   topicId: string;
@@ -157,9 +160,10 @@ export async function syncXpLedgerStatus(
     .returning({ id: xpLedger.id });
 
   if (result.length === 0) {
-    console.debug(
-      `[syncXpLedgerStatus] No xp_ledger row for profile=${profileId} topic=${topicId} — skipped`,
-    );
+    logger.debug('[syncXpLedgerStatus] No xp_ledger row — skipped', {
+      profileId,
+      topicId,
+    });
     return false;
   }
   return true;

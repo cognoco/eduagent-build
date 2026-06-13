@@ -55,6 +55,9 @@ async function verifyMaintenanceSecret(c: {
   req: { header: (name: string) => string | undefined };
 }): Promise<boolean> {
   const expected = c.env.MAINTENANCE_SECRET;
+  // Secret is read from a request header (not a query param) — headers are
+  // not logged by proxies/CDNs or visible in browser history. Never accept
+  // this secret via a query string parameter.
   const provided = c.req.header('X-Maintenance-Secret');
   if (!expected || !provided) return false;
   return constantTimeEqual(provided, expected);

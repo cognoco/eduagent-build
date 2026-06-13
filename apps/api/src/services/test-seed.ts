@@ -252,12 +252,12 @@ async function createClerkTestUser(
 ): Promise<{ clerkUserId: string; password: string }> {
   if (!env.CLERK_SECRET_KEY) {
     // Fallback for environments without Clerk (unit tests, CI without secrets).
-    // SEED_PASSWORD is not required in the no-Clerk path — a synthetic sentinel
-    // is returned so callers that only need clerkUserId + any non-empty password
-    // string still work without env-var setup.
+    // A random UUID is used as the password sentinel — no static default
+    // credential exists, so there is nothing to leak if a future code path
+    // accidentally forwards this value to an external service.
     return {
       clerkUserId: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
-      password: env.SEED_PASSWORD ?? '__test_no_clerk__',
+      password: env.SEED_PASSWORD ?? generateUUIDv7(),
     };
   }
 
