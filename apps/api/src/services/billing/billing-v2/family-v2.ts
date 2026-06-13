@@ -26,7 +26,6 @@ import {
   guardianship,
   subscription as subscriptionTable,
   type Database,
-  findSubscriptionByOrganizationId__unscoped,
   findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { FamilyMember, SubscriptionTier } from '@eduagent/schemas';

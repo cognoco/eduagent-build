@@ -27,10 +27,7 @@
 
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
-import type {
-  AppliedSubscriptionRow,
-  WebhookSubscriptionUpdate,
-} from '../types';
+import type { WebhookSubscriptionUpdate } from '../types';
 import { getTierConfig } from '../../subscription';
 import {
   verifySubscriptionTier,

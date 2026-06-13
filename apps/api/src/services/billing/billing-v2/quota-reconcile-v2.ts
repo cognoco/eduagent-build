@@ -24,7 +24,6 @@ import {
   membership,
   person,
   profileQuotaUsage,
-  quotaPools,
   subscription as subscriptionTable,
   type Database,
 } from '@eduagent/database';

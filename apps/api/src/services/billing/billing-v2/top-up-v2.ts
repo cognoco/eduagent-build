@@ -17,7 +17,6 @@ import {
   topUpCredits,
   subscription as subscriptionTable,
   type Database,
-  findSubscriptionByOrganizationId__unscoped,
 } from '@eduagent/database';
 import { getTierConfig } from '../../subscription';
 import { findOwnerPersonId } from '../../identity-v2/helpers';
