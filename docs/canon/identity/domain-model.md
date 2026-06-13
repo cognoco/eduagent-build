@@ -98,8 +98,11 @@ Rules that bind the model:
   data is persisted until lawful basis is established.**
 - **Consent ≠ contract** (inv 28): a consent-gated Person's processing rests on verifiable guardian
   consent, never on the guardian's account-holder status.
-- **Below the credential-eligibility floor → guardian-created only** (inv 13); the real floor is a
-  per-jurisdiction policy value + app-store-rating call, not a constant.
+- **Below the credential-eligibility floor → guardian-created only** (inv 13). **The floor is 13** —
+  the child-claimable account-detachment age, closing inv 13's open floor decision (account-detachment is
+  guardian-grantable at any age; child-claimable at 13+). Per-jurisdiction policy + app-store-rating may
+  raise the floor (be **stricter**) for a given jurisdiction, **never lower it below 13**.
+  *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.3/§4.2.)*
 - **Decision transport** (`MMT-ADR-0001`): Clerk may carry the *resolved* decision as ~3 JWT claims;
   **we own** the consent receipts + age-assurance audit + event log in Neon. Clerk Organizations are not used.
 

@@ -403,9 +403,16 @@ age, edge-only); and the managed-adult "grandparent" (UC-1, §9). Copy to be aut
 
 **Supporter ceiling & notes wall.**
 *(Ruled 2026-06-09, OQ-11 — `_wip/identity-foundation/2026-06-09-account-detachment-decision-capture.md` §1.5/§4.4.)*
-- **Supporter ceiling = the recap/grades layer.** A supporter — and a post-detachment
-  guardian-as-consent-holder — sees curated summaries (recaps, subjects, mastery, streaks, activity)
-  **only**. They never see notes, mentor memory, or transcripts.
+- **Supporter ceiling = the recap/grades layer.** A supporter sees curated summaries (recaps, subjects,
+  mastery, streaks, activity) **only** — never notes, mentor memory, or transcripts. The
+  recap/grades layer is reached **only through a valid Supportership edge** (inv 9, 15); consent-authority
+  alone grants **no** visibility.
+- **A post-detachment guardian-as-consent-holder sees summaries only via a Supportership edge.** Once the
+  charge has a Login (account-detachment), `MMT-ADR-0008` suppresses the derived guardian `view`
+  (`view ⇐ guardian-link ∧ shared-org ∧ charge-has-no-Login` — the Login breaks the derivation), so a
+  consent-holding guardian who is *not also* a supportee-granted supporter sees nothing. Curated summaries
+  for the detached case ride the **guardian-granted Supportership edge** (decision-capture §2 tier table,
+  inv 15), not the consent edge — consent ≠ visibility (inv 22).
 - **Notes stay walled at every tier.** Guardian access to a managed charge's full data (including notes
   and transcripts) runs through the **explicit, audited export/rights path only** (inv 21
   erasure/export pattern) — never ambient browsing.
