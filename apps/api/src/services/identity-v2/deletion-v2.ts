@@ -912,16 +912,24 @@ async function personOrganizationIdTx(
  * consent-gated sweeps), which have only a personId.
  *
  * FAIL-CLOSED on no org (§6.1 compliance-critical; AGENTS.md billing-domain
- * "no silent recovery"). If no organization resolves for the person we CANNOT
- * write the §6.1 financial_record (`organization_id` is NOT NULL — no sentinel
- * row is possible), and a person must never be deleted without its retain
- * records. So we THROW, aborting the whole deletion transaction (person NOT
- * deleted, no partial state) rather than silently skip. The throw IS the
- * required escalation — it propagates to the Inngest/route boundary and is
- * captured in Sentry. This anomaly should not occur in normal flow: every
- * caller runs this BEFORE its `DELETE person`, inside the same transaction,
- * while the membership still exists — so a missing membership signals a real
- * data anomaly worth surfacing loudly.
+ * "no silent recovery") — but only for a GENUINE anomaly. If no organization
+ * resolves for the person we CANNOT write the §6.1 financial_record
+ * (`organization_id` is NOT NULL — no sentinel row is possible), and a person
+ * must never be deleted without its retain records. So we THROW, aborting the
+ * whole deletion transaction (person NOT deleted, no partial state) rather than
+ * silently skip. The throw IS the required escalation — it propagates to the
+ * Inngest/route boundary and is captured in Sentry.
+ *
+ * Anomaly vs. benign race (recheck existence before throwing). A no-org result
+ * has two causes: (a) a true orphaned-person anomaly — the person STILL exists
+ * but has no resolvable org; (b) a benign concurrent-deletion race — a
+ * person-scoped delete passed its earlier existence check, then
+ * `executeDeletionV2` (org-level; does NOT take the per-person advisory lock)
+ * won the same-org delete and cascaded this membership away. In case (b) the
+ * deletion is already accomplished and idempotent, so throwing would turn it
+ * into a spurious failure → Inngest retry → escalation. We therefore re-check
+ * person existence first: if the person is already gone, return a clean no-op;
+ * only fail-closed when the person still exists with no org (true corruption).
  */
 async function writeFinancialRecordsForPersonTx(
   tx: DeletionTx,
@@ -929,8 +937,12 @@ async function writeFinancialRecordsForPersonTx(
 ): Promise<void> {
   const organizationId = await personOrganizationIdTx(tx, personId);
   if (!organizationId) {
+    // Benign concurrent-deletion race: the person is already gone (e.g.
+    // executeDeletionV2 won and cascaded the membership). Idempotent no-op.
+    if (!(await personExistsTx(tx, personId))) return;
+    // Genuine anomaly: the person still exists but no org resolves. Fail closed.
     throw new Error(
-      `writeFinancialRecordsForPersonTx: no organization resolved for person ${personId} — cannot write the §6.1 financial_record retain rows; aborting the deletion (fail-closed, no silent skip).`,
+      `writeFinancialRecordsForPersonTx: orphaned person ${personId} — still exists but no organization resolved; cannot write the §6.1 financial_record retain rows; aborting the deletion (fail-closed, no silent skip).`,
     );
   }
   const subscriptions = await readOrgSubscriptionsTx(tx, organizationId);
