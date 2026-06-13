@@ -5,6 +5,10 @@
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
+## Shepherding & Cosmo Workflow
+
+- [project_cosmo_shepherd_finalization.md](project_cosmo_shepherd_finalization.md) — Finalizing Cosmo WIs for the autonomous /cosmo:review loop: replace_content + property PATCH (NOT execute complete, which appends + writes literal text the reviewer rejects); set Fixed In manually; single-line `Caveats / Follow-ups:`; refine can't promote childless WPs.
+
 ## Identity Foundation (re-platform)
 
 - [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to the ratified identity/policy-engine/router/safety ADRs + the `docs/registers/llm-models/` register. Current runway state lives in `_wip/identity-foundation/ROADMAP.md`; canon membership lives in `_wip/identity-foundation/CANONICAL-SET.md`.

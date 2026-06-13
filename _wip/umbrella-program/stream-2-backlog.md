@@ -191,6 +191,14 @@ and the **physical layout** (§I.4: `docs/canon|adr|specs|plans|runbooks` +
 - **Agent-doctrine / memory pointer cleanup** — the canon-class memories (see the
   instruction-surface disposition matrix and roster **PRG-03**; PRG-03 handles the
   operational class now, this is its canon-class remainder).
+  - **Size-ceiling outcome (added 2026-06-13).** The drain must return root `AGENTS.md`
+    under the harness 40k-char instruction-file limit — today **45.5k (+5.5k over)**, and
+    growing (worktree branches `WI-685`/`WI-681` already carry 46.9k). The over-limit state
+    is the *intended* consequence of `WI-386`'s single-source consolidation, **not** a
+    regression; routing the canon-class sections to their homes (Languages binding-rules →
+    `architecture.md`; Code Quality Guards + the Non-Negotiable Rules → `docs/canon/principles.md`)
+    brings it back under. Recorded as an explicit, checkable Stream-2 outcome so the ceiling
+    has an owner-on-paper and is not silently re-breached.
   - **`Docs`-tagged memories from the WI-387 triage feed in here.** The WI-387
     memory-tidy (PRG-03 / Harness Hygiene) triages `.claude/memory/` and tags each file
     in `_WIP/zdx-productionization/_state/2026-06-10-wi-387-memory-triage-prep.md`
@@ -268,6 +276,10 @@ archives it or reduces it to a pointer.
 ---
 
 ## Change log
+- **2026-06-13 — AGENTS.md size-ceiling outcome added.** Recorded the harness 40k-char
+  limit (root `AGENTS.md` at 45.5k) as an explicit outcome of the agent-doctrine canon
+  drain — the trim was previously only an implicit byproduct of the principles-catalog
+  promotion. No new Cosmo WI (PRG-20 not yet sliced); single home preserved.
 - **2026-06-10 — WI-387 memory-drain capture added.** Nine memory files dispositioned
   DRAIN by the WI-387 triage workflow (operator-confirmed) recorded as inbound items —
   see § Inbound — WI-387 memory-drain capture. Extract-before-cleanup binds their removal.
