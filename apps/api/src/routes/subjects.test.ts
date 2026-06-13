@@ -272,6 +272,12 @@ describe('POST /v1/subjects', () => {
 // ---------------------------------------------------------------------------
 
 describe('GET /v1/subjects/:id', () => {
+  it('[F-166] returns 400 for a malformed (non-UUID) subject id', async () => {
+    const res = await makeApp().request('/v1/subjects/not-a-uuid');
+    expect(res.status).toBe(400);
+    expect(getSubjectMock).not.toHaveBeenCalled();
+  });
+
   it('returns 200 when the subject is found for this profile', async () => {
     getSubjectMock.mockResolvedValue(makeSubjectRecord());
 
@@ -326,6 +332,15 @@ describe('PATCH /v1/subjects/:id', () => {
       body: JSON.stringify(body),
     };
   }
+
+  it('[F-166] returns 400 for a malformed (non-UUID) subject id', async () => {
+    const res = await makeApp().request(
+      '/v1/subjects/not-a-uuid',
+      patchRequest({ name: 'Updated' }),
+    );
+    expect(res.status).toBe(400);
+    expect(updateSubjectMock).not.toHaveBeenCalled();
+  });
 
   it('returns 200 on a valid update', async () => {
     updateSubjectMock.mockResolvedValue(
@@ -384,6 +399,15 @@ describe('PATCH /v1/subjects/:id', () => {
 
 describe('POST /v1/subjects/:id/retry-curriculum', () => {
   const path = `/v1/subjects/${SUBJECT_ID}/retry-curriculum`;
+
+  it('[F-166] returns 400 for a malformed (non-UUID) subject id', async () => {
+    const res = await makeApp().request(
+      '/v1/subjects/not-a-uuid/retry-curriculum',
+      { method: 'POST' },
+    );
+    expect(res.status).toBe(400);
+    expect(retryCurriculumForSubjectMock).not.toHaveBeenCalled();
+  });
 
   it('returns 200 with dispatched count on success', async () => {
     retryCurriculumForSubjectMock.mockResolvedValue(2);
@@ -528,6 +552,18 @@ describe('POST /v1/subjects/classify', () => {
 // ---------------------------------------------------------------------------
 
 describe('PUT /v1/subjects/:id/language-setup — cross-profile guard', () => {
+  it('[F-166] returns 400 for a malformed (non-UUID) subject id', async () => {
+    const res = await makeApp().request(
+      '/v1/subjects/not-a-uuid/language-setup',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nativeLanguage: 'en', startingLevel: 'A1' }),
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
   it('the service receives the requesting profileId, not a foreign one', async () => {
     // Existing subjects-language-setup.test.ts covers the error classification
     // in detail; here we verify that the route passes the middleware-resolved

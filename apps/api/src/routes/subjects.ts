@@ -114,17 +114,20 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
   })
   .put(
     '/subjects/:id/language-setup',
+    // [F-166] UUID guard: malformed :id is rejected 4xx before reaching the DB.
+    zValidator('param', subjectIdParamSchema),
     zValidator('json', languageSetupSchema),
     async (c) => {
       // [WI-177 / DS-088] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      const { id } = c.req.valid('param');
       try {
         const subject = await configureLanguageSubject(
           db,
           profileId,
-          c.req.param('id'),
+          id,
           c.req.valid('json'),
         );
         return c.json(subjectResponseSchema.parse({ subject }));
@@ -141,32 +144,40 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       }
     },
   )
-  .post('/subjects/:id/retry-curriculum', async (c) => {
-    // [WI-177 / DS-088] Server-derived proxy-mode write guard.
-    assertNotProxyMode(c);
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    try {
-      const dispatched = await retryCurriculumForSubject(
-        db,
-        profileId,
-        c.req.param('id'),
-      );
-      return c.json({ dispatched });
-    } catch (err) {
-      if (err instanceof SubjectNotFoundError) {
-        return notFound(c, err.message);
+  .post(
+    '/subjects/:id/retry-curriculum',
+    // [F-166] UUID guard: malformed :id is rejected 4xx before reaching the DB.
+    zValidator('param', subjectIdParamSchema),
+    async (c) => {
+      // [WI-177 / DS-088] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { id } = c.req.valid('param');
+      try {
+        const dispatched = await retryCurriculumForSubject(db, profileId, id);
+        return c.json({ dispatched });
+      } catch (err) {
+        if (err instanceof SubjectNotFoundError) {
+          return notFound(c, err.message);
+        }
+        throw err;
       }
-      throw err;
-    }
-  })
-  .get('/subjects/:id', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subject = await getSubject(db, profileId, c.req.param('id'));
-    if (!subject) return notFound(c, 'Subject not found');
-    return c.json(subjectResponseSchema.parse({ subject }));
-  })
+    },
+  )
+  .get(
+    '/subjects/:id',
+    // [F-166] UUID guard: malformed :id is rejected 4xx before reaching the DB.
+    zValidator('param', subjectIdParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { id } = c.req.valid('param');
+      const subject = await getSubject(db, profileId, id);
+      if (!subject) return notFound(c, 'Subject not found');
+      return c.json(subjectResponseSchema.parse({ subject }));
+    },
+  )
   .delete(
     '/subjects/:id',
     zValidator('param', subjectIdParamSchema),
@@ -189,6 +200,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
   )
   .patch(
     '/subjects/:id',
+    // [F-166] UUID guard: malformed :id is rejected 4xx before reaching the DB.
+    zValidator('param', subjectIdParamSchema),
     zValidator('json', subjectUpdateSchema),
     async (c) => {
       // [WI-177 / DS-088] Server-derived proxy-mode write guard.
@@ -196,12 +209,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       const db = c.get('db');
       const input = c.req.valid('json');
       const profileId = requireProfileId(c.get('profileId'));
-      const subject = await updateSubject(
-        db,
-        profileId,
-        c.req.param('id'),
-        input,
-      );
+      const { id } = c.req.valid('param');
+      const subject = await updateSubject(db, profileId, id, input);
       if (!subject) return notFound(c, 'Subject not found');
       return c.json(subjectResponseSchema.parse({ subject }));
     },
