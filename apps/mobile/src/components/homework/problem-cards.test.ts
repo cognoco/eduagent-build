@@ -190,6 +190,27 @@ describe('problem card helpers', () => {
     expect(parsed[0]?.text).toBe(problems[0]?.text);
   });
 
+  it('[F-158] returns empty array for malformed JSON in deep-link param', () => {
+    expect(parseHomeworkProblems('{not valid json}')).toHaveLength(0);
+  });
+
+  it('[F-158] rejects untrusted payload with invalid HomeworkProblem shape', () => {
+    // id must be string + text must be non-empty per homeworkProblemSchema
+    const malicious = JSON.stringify([
+      { id: 1234, text: '', source: 'evil', injected: 'payload' },
+    ]);
+    expect(parseHomeworkProblems(malicious)).toHaveLength(0);
+  });
+
+  it('[F-158] accepts a well-formed HomeworkProblem array from the deep link', () => {
+    const valid = JSON.stringify([
+      { id: 'p-1', text: 'What is 2 + 2?', source: 'ocr', originalText: null },
+    ]);
+    const result = parseHomeworkProblems(valid);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.text).toBe('What is 2 + 2?');
+  });
+
   it('applies per-problem status from the current index', () => {
     const problems = splitHomeworkProblems(
       '1. Add 2 + 2\n2. Add 3 + 3',
