@@ -54,8 +54,12 @@ function createApp() {
   return app;
 }
 
+// Valid UUID for the subject param (F-166: PUT /:id/language-setup now validates
+// the :id param with zValidator before reaching the service).
+const SUBJECT_UUID = 'a0000000-0000-4000-a000-000000000010';
+
 function languageSetupRequest() {
-  return createApp().request('/v1/subjects/subject-1/language-setup', {
+  return createApp().request(`/v1/subjects/${SUBJECT_UUID}/language-setup`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nativeLanguage: 'en', startingLevel: 'A1' }),
