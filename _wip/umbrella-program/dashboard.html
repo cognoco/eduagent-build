@@ -456,7 +456,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-17 new-llm MERGED to main (06-13, 105b39ac0)</b> — clean --no-ff merge commit, full ancestor, Merge completeness check + all deterministic gates green; the 4 advisory SHOULD_FIX are documented deferrals (WI-695 GC6 mocks / WI-696 event typing) · <b>IF CUTOVER EXECUTION now UNLOCKED</b> — plan ratified v1.7, sliced WI-689 CUT-A · WI-690 canon-intake · WI-691/692/693 CUT-B1/B2/B3 + shrunk WI-586; CUT-A may now generate on the post-merge journal — IF shepherd kickoff next · <b>Deploy/KV chain wired end-to-end</b> (WI-682 + WI-685 + WI-694 verifier + GH secrets) — WI-664 closes on first green post-merge deploy · follow-through: branch-protection add of Merge completeness check; WI-694 manual close · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
+  <span class="txt"><b>Right now:</b> <b>PRG-17 new-llm MERGED to main (06-13, 105b39ac0)</b> — clean --no-ff merge commit, full ancestor, Merge completeness check + all deterministic gates green; the 4 advisory SHOULD_FIX are documented deferrals (WI-695 GC6 mocks / WI-696 event typing) · <b>IF CUTOVER EXECUTION now UNLOCKED</b> — plan ratified v1.7, sliced WI-689 CUT-A · WI-690 canon-intake · WI-691/692/693 CUT-B1/B2/B3 + shrunk WI-586; CUT-A may now generate on the post-merge journal — IF shepherd kickoff next · <b>Deploy/KV chain wired end-to-end</b> (WI-682 + WI-685 + WI-694 verifier + GH secrets) — WI-664 closes on first green post-merge deploy · follow-through: branch-protection add of Merge completeness check; WI-694 manual close · <b>PRG-10 (API security & PII) ACTIVATED 06-13</b> — 27 findings sliced to WI-698–704 (5 WP + 2 Item), 27/27 CLEAN vs the live cutover (parallel-safe), shepherd spawn pending · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
 </div>
 
 <nav>
@@ -594,7 +594,7 @@ const QUEUE = [
   ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
   ["5","PRG-15","Error handling","✓ GRADUATED 06-11 — activation → graduation inside a day (WI-639/640/641)"],
   ["6","PRG-13","Background-job security","✓ GRADUATED 06-12 — both WPs, under a day"],
-  ["7","PRG-10","API security","✅ both gates FIRED (G2 + G4) — activation is an attention-budget call"],
+  ["7","PRG-10","API security & PII","✓ ACTIVATED 06-13 — 27 findings → WI-698–704 (5 WP + 2 Item); slice scan 27/27 LIVE + CLEAN, parallel-safe with the cutover; shepherd spawn pending"],
   ["8","PRG-11","Architecture","G3 ✓ + scan ✓ 06-11 (scope ≈ intact) — activation now an attention-budget call"],
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
   ["10","PRG-20","Estate-canon drain","IF clean-cut tail done (G5), or a named pull-forward earlier"],
@@ -682,20 +682,20 @@ const INIT = [
   ],
   homes:["_wip/l10n-a11y/execution-tracker.md (THE entry point)","Cosmo Workstream: L10n & A11y Mobile","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-10", name:"API security & PII", accent:"var(--amber)", lane:"armed", status:"armed · split", q:"#7",
-  tagline:"27 verified non-rewrite security findings. Splits cleanly: half can start early, the auth half waits for the new auth model.",
-  owner:"Mixed; human review on auth & CI permissions", gate:"BOTH gates FIRED 06-11 (safe subset at G2; auth/PII remainder at G4) — full activation is an attention-budget call. Per-finding split confirmed by file-touch scan at activation.",
+{ id:"PRG-10", name:"API security & PII", accent:"var(--amber)", lane:"now", status:"active · sliced", q:"#7",
+  tagline:"27 verified non-rewrite security findings. Slice scan cleared it: none subsumed by IF, none collide with the live cutover — fully parallel-safe.",
+  owner:"Mixed; human review on auth & CI permissions", gate:"ACTIVATED 06-13 (sixth §2.1 run, first post-cutover parallel activation). Both gates fired 06-11. Slice scan: 27/27 LIVE (IF subsumed none), 27/27 CLEAN vs CUT-B1/2/3. OQ1 → CI/GHA stays in PRG-10; OQ2 file-touch audit done at slice. Shepherd spawn pending.",
   outcome:"Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized.",
   bundles:[
-    {n:"CI/GHA permissions", s:"3 findings", m:"mixed", st:"hold", note:"Safe early."},
-    {n:"LLM prompt injection", s:"3 findings", m:"mixed", st:"hold", note:"Safe early."},
-    {n:"Input validation & unbounded input", s:"5 findings", m:"agent", st:"hold", note:"Safe early."},
-    {n:"Security hygiene misc", s:"6 findings", m:"agent", st:"hold", note:"Safe early."},
-    {n:"Auth & access control", s:"4 findings", m:"human", st:"hold", note:"After G4 — touches what W2/W3 rewrite."},
-    {n:"Races & data integrity", s:"4 findings", m:"mixed", st:"hold", note:"After G4."},
-    {n:"Quota-bypass metering", s:"2 findings", m:"mixed", st:"hold", note:"After G4."}
+    {n:"WI-698 · CI/GHA permissions + gate integrity", s:"6 findings", m:"mixed", st:"go", note:"P1. F-024/119/127/129/132/154. Parallel-safe."},
+    {n:"WI-699 · JWKS DoS + 3 race/atomicity", s:"4 findings", m:"mixed", st:"go", note:"P1. F-181/120/164/167."},
+    {n:"WI-700 · Input validation & bounds", s:"5 findings", m:"agent", st:"go", note:"P2. F-142/158/166/179/180."},
+    {n:"WI-701 · Quota / billing correctness", s:"3 findings", m:"mixed", st:"go", note:"P2. F-128/146/148. Disjoint from CUT-B3 webhooks."},
+    {n:"WI-702 · Logging + config hygiene", s:"7 findings", m:"agent", st:"go", note:"P2. F-077/079/080/081/082/138/143."},
+    {n:"WI-703 · LLM prompt-injection fence", s:"1 finding", m:"agent", st:"go", note:"P2 Item. F-139."},
+    {n:"WI-704 · Mobile markdown safety", s:"1 finding", m:"agent", st:"go", note:"P2 Item. F-027."}
   ],
-  homes:["activation-planning.md §2 PRG-10 (charter)","L-gap-delta.md (per-finding)"]},
+  homes:["_wip/security-pii-api/execution-tracker.md","Cosmo · Workstream “API Security & PII” (WI-698–704)","L-gap-delta.md (per-finding)"]},
 
 { id:"PRG-11", name:"Architecture clean-up", accent:"var(--amber)", lane:"armed", status:"armed", q:"#8",
   tagline:"Circular deps, god-modules, smeared domains. Waits for W1 — much of it may be rebuilt for free.",
