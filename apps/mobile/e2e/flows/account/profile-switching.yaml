@@ -45,8 +45,8 @@ tags:
       API_URL: ${API_URL}
 
 # 2. Wait for home screen — parent-with-children lands on parent-home-screen (BUG-566).
-#    ParentHomeScreen (testID: parent-home-screen) renders inside home.tsx via the
-#    showParentHome branch in LearnerScreen.tsx when the owner has linked children.
+#    ParentHomeScreen (testID: parent-home-screen) renders inside home.tsx when
+#    navigationContract.home.screen === 'FamilyHome' (owner has linked children).
 #    Source: apps/mobile/src/components/home/ParentHomeScreen.tsx:1021
 - extendedWaitUntil:
     visible:

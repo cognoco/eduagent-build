@@ -222,7 +222,7 @@ Skills under a **group directory** (currently `tech/`) are an exception to the 1
 
 The V1 guardian redesign replaces `own-learning` + `library` with a single `recaps` tab. V1 sets live in `apps/mobile/src/lib/navigation-contract.ts`; legacy/V0 sets in `apps/mobile/src/lib/legacy-navigation-contract.ts`. Which column is "production" depends on the build profile — check, don't assume (see the mode-check note above). Full matrix with file:line: `docs/flows/mobile-app-flow-inventory.md` → "Navigation shell matrix".
 
-Note: the learner-vs-parent home branch is in `home.tsx:161` — it renders `ParentHomeScreen` when `navigationContract.home.screen === 'FamilyHome'`, else `LearnerScreen` with `showParentHome={false}` (which kills the legacy in-`LearnerScreen` branch; that branch is dead from the home route). [was: documented as branching inside `LearnerScreen.tsx`]
+Note: the learner-vs-parent home branch is in `home.tsx:161` — it renders `ParentHomeScreen` when `navigationContract.home.screen === 'FamilyHome'`, else `LearnerScreen` directly. The legacy in-`LearnerScreen` `showParentHome` branch has been removed (WI-729). [was: documented as branching inside `LearnerScreen.tsx`]
 
 **`isOwner` gating** controls what appears INSIDE tabs (especially More and Progress). Billing/Security live inside `more/account.tsx`; Export/Delete live inside `more/privacy.tsx` — they are not top-level More rows:
 
