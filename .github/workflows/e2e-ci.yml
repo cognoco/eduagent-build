@@ -63,6 +63,7 @@ jobs:
           fi
 
           # workflow_run (non-pull_request): diff against previous commit
+          # C1: no base.ref interpolation here — BASE is HEAD~1 (safe)
           BASE="HEAD~1"
           FILES=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || git diff --name-only "$BASE" HEAD)
 

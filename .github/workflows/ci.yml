@@ -10,13 +10,12 @@ on:
       - '.vscode/**'
       - '.idea/**'
       - '.claude/**'
+  # No paths-ignore on PRs (intentional): docs/.claude-only PRs must still run the
+  # doc-validating checks (skills-sync, ADR-link, workflow-security) AND report the
+  # required `main` check — otherwise the required context never reports and the PR
+  # is stuck BLOCKED. Heavy code work is already affected-only, so a docs-only PR
+  # pays only the fixed job overhead, not the test suite. (push keeps paths-ignore.)
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.vscode/**'
-      - '.idea/**'
-      - '.claude/**'
 
 permissions:
   actions: read

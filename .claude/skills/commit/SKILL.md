@@ -1,8 +1,7 @@
 ---
 name: commit
-description: Use when committing in the EduAgent repo (commit, save changes,
-  commit staged/specific files, commit and push). Thin overlay over the global
-  /zdx-core:commit primitive — it adds only EduAgent's message conventions.
+description: Use when committing or pushing in the EduAgent repo (commit, save
+  changes, commit staged/specific files, commit and push, push).
 context: fork
 agent: general-purpose
 model: sonnet
