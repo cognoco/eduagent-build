@@ -98,6 +98,7 @@
 
 ## Development Process & Feedback
 
+- [feedback_monitor_silence_not_health.md](feedback_monitor_silence_not_health.md) — Session/host-scoped monitors die on reboot/session-end; silence ≠ healthy. Spot-check Cosmo; re-arm after restart.
 - [feedback_shepherd_kickoff_role_split.md](feedback_shepherd_kickoff_role_split.md) — Use the standard layered machinery (executor-protocol.md + shepherd-protocol.md + thin pointer-briefs + lane tracker + thin kickoff); don't author bespoke shepherd kickoffs. Lineage: wi-execute.md (raw example) → executor-protocol.md (standardized, NOT embryo). Reviewer is a SEPARATE session; shepherd self-monitors Cosmo for verdicts (DoD=Close).
 - [feedback_plan_cutover_ownership.md](feedback_plan_cutover_ownership.md) — Replace/rewrite plans need an owner for the cutover wave (switch-flip check); single-live-store invariant for piecemeal merges. From the WI-586 scope finding.
 
