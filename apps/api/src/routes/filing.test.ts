@@ -279,6 +279,7 @@ import { filingRoutes } from './filing';
 import { getSession, markSessionFiled } from '../services/session';
 import { fileToLibrary } from '../services/filing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { FILING_CONFIG } from '../config/filing';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -555,6 +556,51 @@ describe('filing routes', () => {
         .mockResolvedValueOnce(exhausted);
 
       // WHERE guard rejects (filingRetryCount < 3 is false) → 0 rows
+      stubDbUpdate([]);
+
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionId: SESSION_ID,
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(429);
+      const body = await res.json();
+      expect(body.code).toBe('RATE_LIMITED');
+      expect(inngest.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/filing.retry' }),
+      );
+    });
+
+    // Regression: the retry-cap check must derive from FILING_CONFIG.maxRetries,
+    // not a hardcoded literal. This test uses FILING_CONFIG.maxRetries directly
+    // so a future change to the config constant automatically changes the
+    // expected boundary — a hardcoded literal at :94 would still pass today
+    // (maxRetries === 3) but silently drift if the config ever changes.
+    //
+    // Red/green evidence (recorded for PR review):
+    //   RED  — routes/filing.ts reverted to `>= 3`, config set to maxRetries: 2,
+    //           count=2 → route allows (2 < 3), test expects 429, gets 409.
+    //   GREEN — fix in place: route checks `>= FILING_CONFIG.maxRetries` (2),
+    //           count=2 → rejected → 429. Test passes.
+    it('[WI-727] returns 429 when filingRetryCount equals FILING_CONFIG.maxRetries (config-sourced cap regression)', async () => {
+      const { inngest } = await import('../inngest/client');
+
+      const atCap = makeSession({
+        filingStatus: 'filing_failed',
+        filingRetryCount: FILING_CONFIG.maxRetries,
+      });
+      (getSession as jest.Mock)
+        .mockResolvedValueOnce(atCap)
+        .mockResolvedValueOnce(atCap);
+
       stubDbUpdate([]);
 
       const res = await app.request(

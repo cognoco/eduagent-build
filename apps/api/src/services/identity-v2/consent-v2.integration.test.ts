@@ -25,11 +25,14 @@ import {
   consentRequest,
   createDatabase,
   deletionAudit,
+  financialRecord,
+  generateUUIDv7,
   guardianship,
   login,
   membership,
   organization,
   person,
+  subscription,
   type Database,
 } from '@eduagent/database';
 import {
@@ -45,6 +48,7 @@ import {
   deleteArchivedPersonIfStillEligibleV2,
   deletePersonIfConsentWithdrawnV2,
   deletePersonIfNoConsentV2,
+  deletePersonV2,
   executeDeletionV2,
   scheduleDeletionV2,
 } from './deletion-v2';
@@ -90,12 +94,20 @@ const COPPA = 'coppa_parental_consent';
         await db.delete(consentReceipt).where(eq(consentReceipt.personId, pid));
         await db.delete(deletionAudit).where(eq(deletionAudit.personId, pid));
         await db
+          .delete(financialRecord)
+          .where(eq(financialRecord.personId, pid));
+        await db
           .delete(guardianship)
           .where(eq(guardianship.chargePersonId, pid));
         await db
           .delete(guardianship)
           .where(eq(guardianship.guardianPersonId, pid));
         await db.delete(membership).where(eq(membership.personId, pid));
+        // subscription.payer_person_id is ON DELETE RESTRICT — clear any
+        // subscription naming this person as payer before the person delete.
+        await db
+          .delete(subscription)
+          .where(eq(subscription.payerPersonId, pid));
         await db.delete(login).where(eq(login.personId, pid));
         await db.delete(person).where(eq(person.id, pid));
       }
@@ -398,6 +410,81 @@ const COPPA = 'coppa_parental_consent';
         });
         expect(audit?.reason).toBe('user_initiated');
         expect(audit?.deletedBy).toBe(ownerId);
+
+        // WI-723: the financial_record rows (tax + chargeback retain-tier,
+        // §6.1) survive the person drop. Provisional record types +
+        // null retention period are counsel-owned (§4.9). Empty-subscription
+        // case: payload.subscriptions is [] (the capture path with no sub).
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, ownerId),
+        });
+        expect(financialRecords).toHaveLength(2);
+        expect(financialRecords.map((r) => r.recordType).sort()).toEqual([
+          'person_deletion_chargeback_retain',
+          'person_deletion_tax_retain',
+        ]);
+        for (const r of financialRecords) {
+          expect(r.organizationId).toBe(orgId);
+          expect(r.retentionPeriod).toBeNull(); // §4.9 counsel-owned
+          const payload = r.payload as {
+            subscriptions: unknown[];
+            deletedAt: string;
+          };
+          expect(payload.subscriptions).toEqual([]);
+          // deletedAt must be present + a well-formed ISO timestamp (a
+          // regression that stops writing it is caught here).
+          expect(typeof payload.deletedAt).toBe('string');
+          expect(Number.isNaN(Date.parse(payload.deletedAt))).toBe(false);
+        }
+      });
+
+      it('GREEN (non-empty subscription): the financial_record payload captures the org subscription snapshot', async () => {
+        // Exercise the capture path against a real subscription via the
+        // single-person deletePersonV2: the org keeps an OWNER who is the
+        // subscription payer (so the payer-RESTRICT is not tripped — that
+        // billing teardown is the out-of-scope CUT-B3 gap), and we delete a
+        // NON-payer CHILD member. orgSubscriptions is therefore non-empty and
+        // must land in the child's financial_record payload.
+        const orgId = await seedOrg();
+        const ownerId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+          displayName: 'Owner',
+        });
+        const childId = await seedPerson(orgId, { displayName: 'Child' });
+        const [sub] = await db
+          .insert(subscription)
+          .values({
+            organizationId: orgId,
+            planTier: 'plus',
+            status: 'trial',
+            payerPersonId: ownerId, // owner survives → no payer-RESTRICT trip
+            stripeCustomerId: `cus_${ownerId}`,
+            stripeSubscriptionId: `sub_${ownerId}`,
+          })
+          .returning();
+
+        await deletePersonV2(db, childId, 'guardian_initiated', ownerId);
+
+        const childRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(childRow).toBeUndefined();
+
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, childId),
+        });
+        expect(financialRecords).toHaveLength(2);
+        expect(financialRecords.map((r) => r.recordType).sort()).toEqual([
+          'person_deletion_chargeback_retain',
+          'person_deletion_tax_retain',
+        ]);
+        for (const r of financialRecords) {
+          expect(r.organizationId).toBe(orgId);
+          const captured = (r.payload as { subscriptions: { id: string }[] })
+            .subscriptions;
+          expect(captured).toHaveLength(1);
+          expect(captured[0]!.id).toBe(sub!.id);
+        }
       });
 
       it('RED guard: the consent_grant.charge_person_id RESTRICT blocks a raw person-delete with live grants (proves re-home is mandatory, not optional)', async () => {
@@ -412,6 +499,90 @@ const COPPA = 'coppa_parental_consent';
           where: eq(consentGrant.chargePersonId, ownerId),
         });
         expect(grants).toHaveLength(1);
+      });
+
+      // WI-723 follow-up (Claude CHANGES_REQUESTED on #1139): the single-person
+      // delete paths resolve the financial_record org via the person's
+      // membership. If NO org resolves, the previous code SILENTLY skipped the
+      // financial_record write but still wrote deletion_audit + deleted the
+      // person — a v2 deletion completing with ZERO §6.1 retain records, a
+      // banned billing-domain silent recovery. The fix FAILS CLOSED: the helper
+      // throws, aborting the deletion transaction (person NOT deleted, no
+      // partial state). The throw is itself the required escalation (Sentry via
+      // the Inngest/route boundary). This anomaly should not occur in normal
+      // flow — the write runs before the person DELETE, while membership exists.
+      it('FAIL-CLOSED: an orphaned person (no membership) aborts the deletion — throws, person NOT deleted, no financial_record / deletion_audit written (tx rolled back)', async () => {
+        // Seed a person directly with NO membership (the orphan anomaly). Not
+        // via seedPerson (which always adds a membership).
+        const [orphan] = await db
+          .insert(person)
+          .values({
+            displayName: 'Orphan',
+            birthDate: '2015-01-01',
+            residenceJurisdiction: 'EU',
+          })
+          .returning();
+        personIds.push(orphan!.id);
+
+        // RED (silent `if (!organizationId) return;`): deletePersonV2 resolves,
+        // the person is deleted, and 0 financial_record rows exist — the §6.1
+        // violation. GREEN (fail-closed throw): it rejects and the tx rolls
+        // back, so the person survives and NOTHING was written.
+        await expect(
+          deletePersonV2(db, orphan!.id, 'abandonment', null),
+        ).rejects.toThrow(/organization/i);
+
+        // The transaction rolled back: the person still exists.
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, orphan!.id),
+        });
+        expect(personRow).toBeTruthy();
+
+        // No retain records and no audit were committed (the whole tx aborted).
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, orphan!.id),
+        });
+        expect(financialRecords).toHaveLength(0);
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, orphan!.id),
+        });
+        expect(audits).toHaveLength(0);
+      });
+
+      // WI-723 follow-up #2 (Codex P2 on #1144): an already-gone person must be
+      // a clean idempotent no-op, NEVER the fail-closed throw → retry →
+      // escalate. This asserts the user-visible contract at the public boundary:
+      // deleting a non-existent person resolves silently and writes nothing
+      // (here the caller's own pre-helper existence guard short-circuits).
+      //
+      // The deeper protection is the helper's existence-RECHECK inside
+      // `writeFinancialRecordsForPersonTx`: the cross-transaction race Codex
+      // flagged is `executeDeletionV2` (which does NOT take the per-person
+      // advisory lock) committing a person-delete AFTER the caller's guard
+      // passes but BEFORE the helper's org read — so the helper, not the caller,
+      // is where a no-org result must be re-classified as "already gone ⇒ no-op"
+      // vs "still exists ⇒ throw". That interleaving has no test-injectable yield
+      // point between the caller guard and the helper call inside one
+      // transaction, so it is covered by reasoning + the FAIL-CLOSED test above
+      // (which proves the still-exists branch still throws); this test pins the
+      // public idempotency contract that motivates the recheck.
+      it('BENIGN RACE: deleting an already-gone person is a clean no-op — does NOT throw and writes nothing', async () => {
+        // A personId that does not exist (the already-deleted-by-the-winner
+        // shape, no membership and no person row).
+        const goneId = generateUUIDv7();
+
+        await expect(
+          deletePersonV2(db, goneId, 'abandonment', null),
+        ).resolves.toBeUndefined();
+
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, goneId),
+        });
+        expect(financialRecords).toHaveLength(0);
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, goneId),
+        });
+        expect(audits).toHaveLength(0);
       });
     });
 
@@ -505,6 +676,66 @@ const COPPA = 'coppa_parental_consent';
           where: eq(person.id, childId),
         });
         expect(personRow).toBeTruthy();
+      });
+
+      // WI-723 (Codex P2): the day-30 path writes side-records (financial_record
+      // + deletion_audit) BEFORE its RETURNING delete. Without the per-person
+      // advisory lock + a post-lock person-existence re-check, two concurrent
+      // same-person runs both pass the consent/open-request pre-checks, both
+      // commit their side-writes, but only ONE delete removes the row — the
+      // loser commits duplicate retain-records with a 0-row delete. financial_
+      // record has no unique constraint and no person FK, so the dupes persist.
+      // Net of ONE deletion must be exactly 2 financial_record + 1 deletion_audit.
+      it('GREEN concurrent (two connections): two same-person day-30 runs delete ONCE and write exactly 2 financial_record + 1 deletion_audit (no duplicate retain records)', async () => {
+        const requestedAt = new Date('2026-01-01T00:00:00.000Z');
+        const { childId } = await seedChildWithOpenRequest(requestedAt);
+
+        // Separate connections so the two runs land on independent Postgres
+        // backends and genuinely contend (a single Neon-HTTP client serializes
+        // its own queries). RED (no lock): both pass the pre-checks, both write
+        // side-records → 4 financial_record + 2 deletion_audit. GREEN (lock +
+        // existence re-check): the loser blocks, re-reads, sees the person gone,
+        // and writes nothing.
+        const db2 = createDatabase(process.env.DATABASE_URL!);
+        const outcomes = await Promise.allSettled([
+          deletePersonIfNoConsentV2(db, childId, requestedAt),
+          deletePersonIfNoConsentV2(db2, childId, requestedAt),
+        ]);
+
+        // The person is deleted exactly once.
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(personRow).toBeUndefined();
+
+        // BOTH promises must FULFILL — neither rejects. This test is the
+        // guarantor of the race fix, so it must not be able to green on a thrown
+        // delete: the advisory lock makes the loser BLOCK then cleanly return
+        // false (it never errors). If a future regression makes one delete
+        // throw, `allSettled` would record a 'rejected' that the winner-count
+        // below would silently ignore — assert fulfillment explicitly to catch
+        // that.
+        for (const o of outcomes) {
+          expect(o.status).toBe('fulfilled');
+        }
+
+        // Exactly ONE run reports a successful delete; the other blocks on the
+        // lock, re-reads, sees the person gone, and cleanly returns false.
+        const values = outcomes.map((o) =>
+          o.status === 'fulfilled' ? o.value : undefined,
+        );
+        expect(values.filter((v) => v === true)).toHaveLength(1);
+        expect(values.filter((v) => v === false)).toHaveLength(1);
+
+        // The retain records reflect a SINGLE deletion — no duplicates.
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, childId),
+        });
+        expect(financialRecords).toHaveLength(2);
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, childId),
+        });
+        expect(audits).toHaveLength(1);
       });
     });
 

@@ -37,7 +37,6 @@ jest.mock(
 );
 
 let mockOnAllComplete: (() => void) | null = null;
-let mockLastLearnerScreenProps: Record<string, unknown> | null = null;
 
 jest.mock(
   '../../hooks/use-celebration' /* gc1-allow: avoids native celebration animation timers and async side effects in render tests */,
@@ -94,14 +93,11 @@ jest.mock(
   () => {
     const { Text, View } = require('react-native');
     return {
-      LearnerScreen: (props: Record<string, unknown>) => {
-        mockLastLearnerScreenProps = props;
-        return (
-          <View testID="learner-screen">
-            <Text>LearnerScreen</Text>
-          </View>
-        );
-      },
+      LearnerScreen: () => (
+        <View testID="learner-screen">
+          <Text>LearnerScreen</Text>
+        </View>
+      ),
       ParentHomeScreen: () => (
         <View testID="parent-home-screen">
           <Text>ParentHomeScreen</Text>
@@ -170,7 +166,6 @@ describe('HomeScreen intent router', () => {
     mockNavigationHomeScreen = 'LearnerHome';
     mockNavigationSessionIsOwner = true;
     mockNavigationIsParentProxy = false;
-    mockLastLearnerScreenProps = null;
   });
 
   it('renders LearnerScreen for owner with no children [BUG-522]', () => {
@@ -189,9 +184,6 @@ describe('HomeScreen intent router', () => {
     // BUG-522: owners without children always see LearnerScreen — no forced
     // add-child gate regardless of subscription tier
     screen.getByTestId('learner-screen');
-    expect(mockLastLearnerScreenProps).toEqual(
-      expect.objectContaining({ showParentHome: false }),
-    );
   });
 
   it('renders LearnerScreen directly for owner with linked children', () => {
@@ -214,9 +206,6 @@ describe('HomeScreen intent router', () => {
 
     screen.getByTestId('learner-screen');
     expect(screen.queryByTestId('parent-home-screen')).toBeNull();
-    expect(mockLastLearnerScreenProps).toEqual(
-      expect.objectContaining({ showParentHome: false }),
-    );
   });
 
   it('renders ParentHomeScreen when the navigation contract selects FamilyHome', () => {

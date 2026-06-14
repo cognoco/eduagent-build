@@ -57,6 +57,7 @@ import { getProfileAge } from './profile';
 
 const logger = createLogger();
 import { regenerateLanguageCurriculum } from './language-curriculum';
+import { ensureDefaultBook } from './curriculum-core';
 import {
   addTopicCompletion,
   isAcceptedSummaryStatus,
@@ -779,38 +780,10 @@ export async function createBooks(
   return rows.map(mapBookRow);
 }
 
-/**
- * Finds or creates a default book for a subject. Used by legacy flows
- * (narrow subjects, manual topic add, curriculum regeneration) that don't
- * go through the book-generation pipeline but still need a bookId now
- * that curriculum_topics.book_id is NOT NULL.
- */
-export async function ensureDefaultBook(
-  db: Database,
-  subjectId: string,
-  subjectName?: string,
-): Promise<string> {
-  const existing = await db.query.curriculumBooks.findFirst({
-    where: and(
-      eq(curriculumBooks.subjectId, subjectId),
-      eq(curriculumBooks.sortOrder, 0),
-    ),
-  });
-  if (existing) return existing.id;
-
-  const [book] = await db
-    .insert(curriculumBooks)
-    .values({
-      subjectId,
-      title: subjectName ?? 'Topics',
-      sortOrder: 0,
-      topicsGenerated: true,
-    })
-    .returning();
-  if (!book)
-    throw new Error('Insert into curriculumBooks did not return a row');
-  return book.id;
-}
+// ensureDefaultBook is defined in ./curriculum-core (extracted to break the
+// circular dependency with language-curriculum.ts) and re-exported from here
+// for callers that import it from this module.
+export { ensureDefaultBook };
 
 /**
  * Persists LLM-generated topics for a narrow subject.

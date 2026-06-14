@@ -39,7 +39,6 @@ export default function OwnLearningScreen(): React.ReactElement {
       <LearnerScreen
         profiles={activeProfile ? [activeProfile] : []}
         activeProfile={activeProfile}
-        showParentHome={false}
         returnToTab={OWN_LEARNING_RETURN_TO}
       />
     </View>

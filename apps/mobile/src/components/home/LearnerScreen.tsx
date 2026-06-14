@@ -48,7 +48,6 @@ import { NudgeBanner } from '../nudge/NudgeBanner';
 import { CoachBand } from './CoachBand';
 import { ChildQuotaLine } from './ChildQuotaLine';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
-import { ParentHomeScreen } from './ParentHomeScreen';
 import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
 
@@ -103,14 +102,12 @@ export interface LearnerScreenProps {
   profiles: Profile[];
   activeProfile: Profile | null;
   now?: Date;
-  showParentHome?: boolean;
   returnToTab?: string;
 }
 
 export function LearnerScreen({
   activeProfile,
   now,
-  showParentHome = true,
   returnToTab = LEARNER_HOME_RETURN_TO,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
@@ -502,10 +499,6 @@ export function LearnerScreen({
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
   const showLearningActions = navigationContract.gates.showLearningActions;
-
-  if (showParentHome && navigationContract.gates.showFamilyHome) {
-    return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
-  }
 
   return (
     <View className="flex-1 bg-background" testID="learner-screen">

@@ -50,12 +50,12 @@ import {
   auditExchangeSources,
   applySourceAuditSafetyFallback,
   inferObviousReliableSourceForAudit,
-  type ExchangeContext,
   type ExchangeFallback,
   type ExchangeSourceAudit,
   type FluencyDrillAnnotation,
   type ImageData,
 } from '../exchanges';
+import type { ExchangeContext } from '../exchange-types';
 import {
   evaluateEscalation,
   getRetentionAwareStartingRung,

@@ -39,7 +39,7 @@ import {
 } from '../../hooks/use-learner-profile';
 import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import { useEntryGate } from '../../hooks/use-entry-gate';
 import { useUpdateInterestsContext } from '../../hooks/use-onboarding-dimensions';
 
 export default function MentorMemoryScreen() {
@@ -238,11 +238,7 @@ export default function MentorMemoryScreen() {
     goBackOrReplace(router, '/(app)/more' as const);
   }, [resolvedReturnTo, router]);
 
-  // V0 fallback: canEnter() blocks during profile-load when V1 is off — preserve
-  // V0 behavior so cold deep-links don't redirect to /home. See H5.1 in branch CR.
-  const blocked = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? !navigationContract.canEnter('mentor-memory')
-    : navigationContract.isParentProxy;
+  const blocked = useEntryGate('mentor-memory');
 
   if (blocked) {
     return <Redirect href="/(app)/home" />;

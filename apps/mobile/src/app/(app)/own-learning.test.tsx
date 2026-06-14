@@ -94,7 +94,7 @@ describe('OwnLearningScreen', () => {
     mockIsParentProxy = false;
   });
 
-  it('renders LearnerScreen with showParentHome=false', () => {
+  it('renders LearnerScreen', () => {
     mockActiveProfile = {
       id: 'p1',
       accountId: 'acc-1',
@@ -109,7 +109,6 @@ describe('OwnLearningScreen', () => {
     render(<OwnLearningScreen />);
 
     screen.getByTestId('learner-screen');
-    expect(capturedProps.showParentHome).toBe(false);
   });
 
   it('passes activeProfile as single-element profiles array', () => {

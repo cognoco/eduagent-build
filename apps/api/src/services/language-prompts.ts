@@ -1,6 +1,6 @@
 import { getLanguageByCode } from '../data/languages';
 import { sanitizeXmlValue } from './llm/sanitize';
-import type { ExchangeContext } from './exchanges';
+import type { ExchangeContext } from './exchange-types';
 
 function formatKnownVocabulary(knownVocabulary: string[] | undefined): string {
   if (!knownVocabulary || knownVocabulary.length === 0) {
@@ -37,7 +37,7 @@ export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
   // subject name cannot inject directives into this section.
   const safeTargetLanguageName = sanitizeXmlValue(
     language?.names[0] ?? context.subjectName,
-    120
+    120,
   );
   const safeNativeLanguage = context.nativeLanguage
     ? sanitizeXmlValue(context.nativeLanguage, 80)
