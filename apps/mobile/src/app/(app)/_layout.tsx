@@ -611,7 +611,7 @@ export default function AppLayout() {
             onSwitchBack={() => void switchProfile(proxyBanner.parentProfileId)}
           />
         )}
-        <ModeSwitcher />
+        {!FEATURE_FLAGS.MODE_NAV_V2_ENABLED && <ModeSwitcher />}
         {/* ─── Whitelist tab pattern ────────────────────────────────────
            Only routes listed in visibleTabs render a tab button.
            Everything else is auto-hidden via screenOptions defaults.
@@ -668,6 +668,39 @@ export default function AppLayout() {
             };
           }}
         >
+          <Tabs.Screen
+            name="mentor"
+            options={{
+              title: t('tabs.mentor'),
+              tabBarButtonTestID: 'tab-mentor',
+              tabBarAccessibilityLabel: t('tabs.mentorLabel'),
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Home" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="subjects"
+            options={{
+              title: t('tabs.subjects'),
+              tabBarButtonTestID: 'tab-subjects',
+              tabBarAccessibilityLabel: t('tabs.subjectsLabel'),
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Book" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="journal"
+            options={{
+              title: t('tabs.journal'),
+              tabBarButtonTestID: 'tab-journal',
+              tabBarAccessibilityLabel: t('tabs.journalLabel'),
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Recaps" focused={focused} />
+              ),
+            }}
+          />
           <Tabs.Screen
             name="home"
             options={{

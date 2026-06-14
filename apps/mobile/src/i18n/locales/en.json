@@ -2581,6 +2581,12 @@
     },
     "home": "Home",
     "homeLabel": "Home",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
+    "subjects": "Subjects",
+    "subjectsLabel": "Subjects",
+    "journal": "Journal",
+    "journalLabel": "Journal",
     "familyHub": "Family Hub",
     "familyHubLabel": "Family Hub",
     "myLearning": "My Learning",
@@ -2595,6 +2601,24 @@
     "progressLabel": "Progress",
     "more": "More",
     "moreLabel": "More"
+  },
+  "mentorHome": {
+    "stub": {
+      "title": "Mentor",
+      "subtitle": "Your next learning step will appear here."
+    }
+  },
+  "subjectsBrowse": {
+    "stub": {
+      "title": "Subjects",
+      "subtitle": "Browse your learning structure from here."
+    }
+  },
+  "journal": {
+    "stub": {
+      "title": "Journal",
+      "subtitle": "Your saved learning record will live here."
+    }
   },
   "recaps": {
     "title": "Recaps",

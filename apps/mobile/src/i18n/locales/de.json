@@ -2502,7 +2502,13 @@
     "children": "Familie",
     "childrenLabel": "Familie",
     "recaps": "Zusammenfassungen",
-    "recapsLabel": "Zusammenfassungen"
+    "recapsLabel": "Zusammenfassungen",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
+    "subjects": "Fächer",
+    "subjectsLabel": "Fächer",
+    "journal": "Journal",
+    "journalLabel": "Journal"
   },
   "subscription": {
     "trial": {
@@ -3457,5 +3463,23 @@
     "sessionCount_other": "{{count}} Lernsitzungen abgeschlossen",
     "hourCount_one": "{{count}} Stunde gelernt",
     "hourCount_other": "{{count}} Stunden gelernt"
+  },
+  "mentorHome": {
+    "stub": {
+      "title": "Mentor",
+      "subtitle": "Dein nächster Lernschritt wird hier erscheinen."
+    }
+  },
+  "subjectsBrowse": {
+    "stub": {
+      "title": "Fächer",
+      "subtitle": "Durchsuche von hier aus deine Lernstruktur."
+    }
+  },
+  "journal": {
+    "stub": {
+      "title": "Journal",
+      "subtitle": "Deine gespeicherten Lernprotokolle findest du hier."
+    }
   }
 }

@@ -2502,7 +2502,13 @@
     "children": "家族",
     "childrenLabel": "家族",
     "recaps": "ふりかえり",
-    "recapsLabel": "ふりかえり"
+    "recapsLabel": "ふりかえり",
+    "mentor": "メンター",
+    "mentorLabel": "メンター",
+    "subjects": "科目",
+    "subjectsLabel": "科目",
+    "journal": "ジャーナル",
+    "journalLabel": "ジャーナル"
   },
   "subscription": {
     "trial": {
@@ -3457,5 +3463,23 @@
     "sessionCount_other": "学習セッションを{{count}}回完了",
     "hourCount_one": "学習時間{{count}}時間",
     "hourCount_other": "学習時間{{count}}時間"
+  },
+  "mentorHome": {
+    "stub": {
+      "title": "メンター",
+      "subtitle": "次の学習ステップはここに表示されます。"
+    }
+  },
+  "subjectsBrowse": {
+    "stub": {
+      "title": "科目",
+      "subtitle": "ここから学習の構成を閲覧できます。"
+    }
+  },
+  "journal": {
+    "stub": {
+      "title": "ジャーナル",
+      "subtitle": "保存した学習記録はここに表示されます。"
+    }
   }
 }

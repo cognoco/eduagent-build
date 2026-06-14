@@ -2529,7 +2529,13 @@
     "children": "Família",
     "childrenLabel": "Família",
     "recaps": "Resumos",
-    "recapsLabel": "Resumos"
+    "recapsLabel": "Resumos",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
+    "subjects": "Matérias",
+    "subjectsLabel": "Matérias",
+    "journal": "Diário",
+    "journalLabel": "Diário"
   },
   "subscription": {
     "trial": {
@@ -3457,5 +3463,23 @@
     "sessionCount_other": "{{count}} sessões de aprendizagem concluídas",
     "hourCount_one": "{{count}} hora de aprendizagem",
     "hourCount_other": "{{count}} horas de aprendizagem"
+  },
+  "mentorHome": {
+    "stub": {
+      "title": "Mentor",
+      "subtitle": "O seu próximo passo de aprendizagem aparecerá aqui."
+    }
+  },
+  "subjectsBrowse": {
+    "stub": {
+      "title": "Matérias",
+      "subtitle": "Navegue pela sua estrutura de aprendizagem a partir daqui."
+    }
+  },
+  "journal": {
+    "stub": {
+      "title": "Diário",
+      "subtitle": "O seu registo de aprendizagem guardado ficará aqui."
+    }
   }
 }

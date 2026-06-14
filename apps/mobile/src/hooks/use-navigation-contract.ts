@@ -19,6 +19,8 @@ import {
 } from '../lib/navigation-contract';
 import { useProfile } from '../lib/profile';
 
+const V2_TABS: ReadonlySet<string> = new Set(['mentor', 'subjects', 'journal']);
+
 interface ResolvedNavigationState {
   activeProfile: ReturnType<typeof useProfile>['activeProfile'];
   contract: NavigationContract;
@@ -179,6 +181,19 @@ export function useNavigationShellContract(): NavigationShellContract {
       );
 
   const proxy = useProxySurface(parentProxy);
+
+  if (FEATURE_FLAGS.MODE_NAV_V2_ENABLED) {
+    return {
+      contract,
+      homeTabPresentation: {
+        titleKey: 'tabs.mentor',
+        accessibilityLabelKey: 'tabs.mentorLabel',
+        iconName: 'Home',
+      },
+      proxy,
+      visibleTabs: V2_TABS,
+    };
+  }
 
   return {
     contract,

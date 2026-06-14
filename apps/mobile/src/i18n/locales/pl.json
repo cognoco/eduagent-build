@@ -2645,7 +2645,13 @@
     "children": "Rodzina",
     "childrenLabel": "Rodzina",
     "recaps": "Podsumowania",
-    "recapsLabel": "Podsumowania"
+    "recapsLabel": "Podsumowania",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
+    "subjects": "Przedmioty",
+    "subjectsLabel": "Przedmioty",
+    "journal": "Dziennik",
+    "journalLabel": "Dziennik"
   },
   "subscription": {
     "trial": {
@@ -3609,5 +3615,23 @@
     "topicCount_many": "Opanowano {{count}} tematów",
     "wordCount_few": "Nauczono się {{count}} słów",
     "wordCount_many": "Nauczono się {{count}} słów"
+  },
+  "mentorHome": {
+    "stub": {
+      "title": "Mentor",
+      "subtitle": "Tutaj pojawi się Twój następny krok w nauce."
+    }
+  },
+  "subjectsBrowse": {
+    "stub": {
+      "title": "Przedmioty",
+      "subtitle": "Przeglądaj stąd strukturę swojej nauki."
+    }
+  },
+  "journal": {
+    "stub": {
+      "title": "Dziennik",
+      "subtitle": "Tutaj będą przechowywane Twoje zapisane postępy."
+    }
   }
 }

@@ -2502,7 +2502,13 @@
     "children": "Familie",
     "childrenLabel": "Familie",
     "recaps": "Sammendrag",
-    "recapsLabel": "Sammendrag"
+    "recapsLabel": "Sammendrag",
+    "mentor": "Veileder",
+    "mentorLabel": "Veileder",
+    "subjects": "Fag",
+    "subjectsLabel": "Fag",
+    "journal": "Journal",
+    "journalLabel": "Journal"
   },
   "subscription": {
     "trial": {
@@ -3457,5 +3463,23 @@
     "sessionCount_other": "{{count}} læringsøkter fullført",
     "hourCount_one": "{{count}} time med læring",
     "hourCount_other": "{{count}} timer med læring"
+  },
+  "mentorHome": {
+    "stub": {
+      "title": "Veileder",
+      "subtitle": "Ditt neste læringssteg vil vises her."
+    }
+  },
+  "subjectsBrowse": {
+    "stub": {
+      "title": "Fag",
+      "subtitle": "Bla gjennom læringsstrukturen din herfra."
+    }
+  },
+  "journal": {
+    "stub": {
+      "title": "Journal",
+      "subtitle": "Din lagrede læringslogg vil ligge her."
+    }
   }
 }
