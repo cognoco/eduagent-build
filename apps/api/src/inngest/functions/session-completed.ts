@@ -1795,21 +1795,12 @@ export const sessionCompleted = inngest.createFunction(
           // always exist, but if the DB returns nothing we skip metering.
           if (!homeworkProfile) {
             // [WI-734] Hard-stop: the profile row is required to resolve
-            // subscription/language/accountId — cannot gate or attribute the
-            // LLM call without it.  Do NOT call extractAndStoreHomeworkSummary.
-            // Throwing lets Inngest retry the step (transient replication lag);
-            // captureException + safeSend satisfy the billing silent-recovery ban
-            // (AGENTS.md: "Emit a structured metric or Inngest event; console.warn
-            // alone is not enough") and are observable on every attempt so ops can
-            // detect the failure before all retries are exhausted.
-            const missingProfileErr = new Error(
-              '[billing] homework-summary: profile row missing — cannot resolve subscription/language/accountId',
-            );
-            logger.warn(
-              '[metering] homework-summary: profile row missing, step will retry',
-              { event: 'metering.homework_summary.profile_missing', profileId },
-            );
-            sentry.captureException(missingProfileErr, { profileId });
+            // subscription/language/accountId — do NOT call the homework-summary
+            // LLM. This step uses runIsolated (soft-step), so throwing records
+            // status='failed' and exits without an unmetered LLM call.
+            // runIsolated's catch block handles captureException; safeSend here
+            // satisfies the billing silent-recovery ban (AGENTS.md: bare warn is
+            // not enough — a structured event is required).
             await safeSend(
               () =>
                 inngest.send({
@@ -1823,7 +1814,9 @@ export const sessionCompleted = inngest.createFunction(
               'billing.homework_summary.profile_missing',
               { profileId },
             );
-            throw missingProfileErr;
+            throw new Error(
+              '[billing] homework-summary: profile row missing — cannot resolve subscription/language/accountId',
+            );
           }
           const subscription = await ensureFreeSubscription(
             db,
