@@ -231,4 +231,68 @@ describe('sync-skills.mjs --report-orphans', () => {
     const { status } = runReportOrphans(src, out);
     expect(status).toBe(0);
   });
+
+  it('detects a nested orphan dir inside a namespace that has ≥1 master', () => {
+    // Namespace 'my' has one real master (my/kept) and its generated copy,
+    // PLUS a stale generated child (my/removed-skill/) with no source. The
+    // top-level 'my' dir is "known", so only descending into it catches this.
+    mkdirSync(join(src, 'my', 'kept'), { recursive: true });
+    writeFileSync(
+      join(src, 'my', 'kept', 'SKILL.md'),
+      '---\nname: kept\ndescription: Use when kept.\n---\n\n# Kept\n',
+    );
+    mkdirSync(join(out, 'my', 'kept'), { recursive: true });
+    writeFileSync(
+      join(out, 'my', 'kept', 'SKILL.md'),
+      '---\nname: kept\ndescription: Use when kept.\n---\n\n# Kept\n',
+    );
+    // Stale generated child with no .agents/ source.
+    mkdirSync(join(out, 'my', 'removed-skill'), { recursive: true });
+    writeFileSync(
+      join(out, 'my', 'removed-skill', 'SKILL.md'),
+      '---\nname: removed\ndescription: Use when removed.\n---\n\n# Removed\n',
+    );
+
+    const { status, stderr } = runReportOrphans(src, out);
+    expect(status).toBe(1);
+    expect(stderr).toContain('removed-skill');
+  });
+
+  it('detects a nested orphan loose file inside a namespace that has ≥1 master', () => {
+    // my/kept/ is a real skill; my/old-skill.md is a stale flat generated file.
+    mkdirSync(join(src, 'my', 'kept'), { recursive: true });
+    writeFileSync(
+      join(src, 'my', 'kept', 'SKILL.md'),
+      '---\nname: kept\ndescription: Use when kept.\n---\n\n# Kept\n',
+    );
+    mkdirSync(join(out, 'my', 'kept'), { recursive: true });
+    writeFileSync(
+      join(out, 'my', 'kept', 'SKILL.md'),
+      '---\nname: kept\ndescription: Use when kept.\n---\n\n# Kept\n',
+    );
+    writeFileSync(join(out, 'my', 'old-skill.md'), '# Old\n');
+
+    const { status, stderr } = runReportOrphans(src, out);
+    expect(status).toBe(1);
+    expect(stderr).toContain('old-skill.md');
+  });
+
+  it('does not flag a nested child that has a matching .agents/ source child', () => {
+    // Both children of 'my' have masters — clean, exit 0.
+    for (const child of ['kept', 'also-kept']) {
+      mkdirSync(join(src, 'my', child), { recursive: true });
+      writeFileSync(
+        join(src, 'my', child, 'SKILL.md'),
+        `---\nname: ${child}\ndescription: Use when ${child}.\n---\n\n# ${child}\n`,
+      );
+      mkdirSync(join(out, 'my', child), { recursive: true });
+      writeFileSync(
+        join(out, 'my', child, 'SKILL.md'),
+        `---\nname: ${child}\ndescription: Use when ${child}.\n---\n\n# ${child}\n`,
+      );
+    }
+
+    const { status } = runReportOrphans(src, out);
+    expect(status).toBe(0);
+  });
 });

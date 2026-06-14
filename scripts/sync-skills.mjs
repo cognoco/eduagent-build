@@ -248,11 +248,24 @@ async function syncSkill({ sourceRel, targetName }) {
 }
 
 /**
- * Enumerate all top-level entries (dirs and loose files) under TARGET_ROOT,
- * then check each against the known sync units. An entry is an orphan when:
- *   - it is a directory and its name is not a known targetName in `units`
- *   - it is a loose file (e.g. .claude/skills/my/e2e-infra.md) whose parent
- *     dir is also not a known targetName
+ * Find orphaned generated entries under TARGET_ROOT — `.claude/skills/` content
+ * whose `.agents/skills/` master was removed but whose generated copy was left
+ * behind. Two orphan classes:
+ *
+ *   1. Top-level orphan — a `.claude/skills/<X>` dir (or loose file) whose name
+ *      is not a known `targetName`. The whole `<X>` tree has no master.
+ *
+ *   2. Nested orphan — inside a namespace dir whose top-level name IS a known
+ *      unit (e.g. `my/`, synced as one unit holding several distinct skills),
+ *      an immediate child that has no matching `.agents/` source child. This is
+ *      the class the top-level check is blind to: once `my/` has one master,
+ *      the whole `my/` tree looks "known", so a stale `my/old-skill.md` or a
+ *      removed `my/removed-skill/SKILL.md` would slip through.
+ *
+ * Detection is scoped to IMMEDIATE children of each unit dir — it does not
+ * recurse deeper, so legitimately-additive supplementary files inside a single
+ * skill (e.g. a Claude-only `references/` asset preserved by the additive sync)
+ * are not false-flagged; only a whole missing sibling skill is surfaced.
  *
  * Returns the repo-relative paths of all orphaned entries.
  *
@@ -262,18 +275,42 @@ async function syncSkill({ sourceRel, targetName }) {
 async function findOrphans(units) {
   if (!existsSync(TARGET_ROOT)) return [];
 
+  // Map each known targetName to its source dir so we can compare children.
+  const unitBySourceRel = new Map(units.map((u) => [u.targetName, u.sourceRel]));
   const knownTargetNames = new Set(units.map((u) => u.targetName));
   const orphans = [];
 
   const topEntries = await readdir(TARGET_ROOT, { withFileTypes: true });
   for (const entry of topEntries) {
-    if (entry.isDirectory()) {
-      if (!knownTargetNames.has(entry.name)) {
-        orphans.push(relative(REPO_ROOT, join(TARGET_ROOT, entry.name)));
-      }
-    } else if (entry.isFile()) {
+    if (entry.isFile()) {
       // A loose file directly under .claude/skills/ has no master directory.
       orphans.push(relative(REPO_ROOT, join(TARGET_ROOT, entry.name)));
+      continue;
+    }
+    if (!entry.isDirectory()) continue;
+
+    if (!knownTargetNames.has(entry.name)) {
+      // Class 1: whole top-level dir has no master.
+      orphans.push(relative(REPO_ROOT, join(TARGET_ROOT, entry.name)));
+      continue;
+    }
+
+    // Class 2: known unit dir — descend one level and compare each generated
+    // immediate child against the matching source child.
+    const sourceRel = unitBySourceRel.get(entry.name);
+    const sourceDir = join(SOURCE_ROOT, sourceRel);
+    const targetDir = join(TARGET_ROOT, entry.name);
+    const sourceChildren = existsSync(sourceDir)
+      ? new Set((await readdir(sourceDir, { withFileTypes: true })).map((e) => e.name))
+      : new Set();
+    for (const child of await readdir(targetDir, { withFileTypes: true })) {
+      // SKIP_DIRS (e.g. agents/) are intentionally never mirrored, so their
+      // absence from target is expected — but they only matter on the source
+      // side. On the target side, any child with no source counterpart is a
+      // nested orphan.
+      if (!sourceChildren.has(child.name)) {
+        orphans.push(relative(REPO_ROOT, join(targetDir, child.name)));
+      }
     }
   }
   return orphans.sort();
