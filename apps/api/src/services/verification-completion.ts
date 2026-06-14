@@ -20,6 +20,7 @@ import {
   parseTeachBackAssessment,
   mapTeachBackRubricToSm2,
 } from './teach-back';
+import { applyRetentionUpdate } from './apply-retention-update';
 
 // ---------------------------------------------------------------------------
 // EVALUATE completion
@@ -144,18 +145,14 @@ export async function processEvaluateCompletion(
   }
 
   // Update the retention card with new difficulty rung
-  await db
-    .update(retentionCards)
-    .set({
-      evaluateDifficultyRung: newRung,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(retentionCards.id, card.id),
-        eq(retentionCards.profileId, profileId),
-      ),
-    );
+  await applyRetentionUpdate({
+    db,
+    profileId,
+    cardId: card.id,
+    set: { evaluateDifficultyRung: newRung },
+    guard: { kind: 'none' },
+    updatedAt: new Date(),
+  });
 
   // Store structured assessment in the event that produced it (not blindly events[0])
   await db
