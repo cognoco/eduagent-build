@@ -82,8 +82,13 @@ in `WHERE` via the closest ancestor.
 ## 2. Writing data — profileId write-protection
 
 Every write (`INSERT`, `UPDATE`, `DELETE`) on a scoped table must include
-explicit `profileId` protection. The requirement is non-negotiable and
-lint-enforced by the G1/G5 rules in `eslint.config.mjs`.
+explicit `profileId` protection. The requirement is non-negotiable, but it is
+**not** lint-enforced — there is no eslint rule that checks for `profileId` in a
+write's `WHERE`/`values`. It is enforced by **code review** (the checklist below)
+and by preferring `createScopedRepository` where the table shape allows. (The
+G1/G5 rules in `eslint.config.mjs` enforce route/service *boundary* separation —
+keeping business logic out of route handlers — **not** write-ownership scoping;
+do not rely on them to catch a missing `profileId`.)
 
 ### Update — filter by both record id and profileId
 
@@ -107,27 +112,48 @@ is the hard stop.
 Canonical example: `apps/api/src/services/session/session-book.ts:106-122`
 (`markSessionFiled` — both `id` and `profileId` in `WHERE`).
 
-### Update through a parent chain — verify ownership first
+### Update through a parent chain — enforce ownership atomically
 
-When the target table does not carry `profileId` directly, verify ownership
-through the parent chain in a separate query before updating:
+When the target table does not carry `profileId` directly, enforce ownership
+through the parent chain **inside the write statement itself**, so the check and
+the write cannot be separated by a race.
+
+**⚠️ Do not** verify ownership in one statement and then write by bare id in a
+second. That is a TOCTOU (time-of-check-to-time-of-use) gap: between the check
+and the write, a concurrent transaction can re-parent the row (e.g. reassign the
+book's subject), and the by-id write then lands on a row the caller no longer
+owns.
 
 ```typescript
-// 1. Confirm ownership via the nearest profileId-bearing ancestor
-const [owned] = await db
-  .select({ id: curriculumBooks.id })
-  .from(curriculumBooks)
-  .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
-  .where(and(eq(curriculumBooks.id, bookId), eq(subjects.profileId, profileId)))
-  .limit(1);
-if (!owned) return;   // or throw — caller's choice
+// ✅ Ownership enforced inline — the UPDATE touches the row only while its parent
+//    subject still belongs to profileId. Check and write are one atomic statement.
+import { and, eq, exists, sql } from 'drizzle-orm';
 
-// 2. Now safe to write
-await db.update(curriculumBooks).set({ ... }).where(eq(curriculumBooks.id, bookId));
+await db
+  .update(curriculumBooks)
+  .set({ ... })
+  .where(
+    and(
+      eq(curriculumBooks.id, bookId),
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(subjects)
+          .where(
+            and(
+              eq(subjects.id, curriculumBooks.subjectId),
+              eq(subjects.profileId, profileId),
+            ),
+          ),
+      ),
+    ),
+  );
 ```
 
-Canonical example: `apps/api/src/services/session/session-book.ts:36-44`
-(ownership check before the session query).
+If you genuinely need a *separate* check (e.g. to distinguish a 404 from a 403),
+wrap the check **and** the write in one transaction and lock the ownership row
+(`.for('update')`) so it cannot be re-parented in between — never a bare
+check-then-write on the same connection without a lock.
 
 ### Insert — always include profileId in the values
 
@@ -143,8 +169,9 @@ ownership record exists, which breaks every downstream scoped read.
 - [ ] Every `UPDATE` on a scoped table has `eq(table.profileId, profileId)` in `WHERE`.
 - [ ] Every `DELETE` on a scoped table has `eq(table.profileId, profileId)` in `WHERE`.
 - [ ] Every `INSERT` on a scoped table includes `profileId` in `values`.
-- [ ] Writes to child tables (no `profileId` column) verify ownership through
-      the parent chain before writing.
+- [ ] Writes to child tables (no `profileId` column) enforce ownership through
+      the parent chain **inside the write** (or in one locked transaction) — never
+      a bare check-then-write by id.
 
 ---
 
@@ -218,7 +245,7 @@ Writing a query?
 
 Writing data?
 ├── Table has profileId column → include it in WHERE (updates/deletes) or values (inserts)
-└── Table is a child (no profileId) → verify ownership via parent chain first, then write
+└── Table is a child (no profileId) → enforce ownership via parent chain inline in the write (or one locked transaction)
 
 Changing schema?
 ├── Dev iteration → pnpm run db:push:dev (never against stg/prod)
