@@ -3,10 +3,23 @@ title: S6 — Cutover & Deletions (exit funnel dissolves · old tabs retire · V
 date: 2026-06-10
 profile: change
 spec: docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md
-status: draft
+status: deferred
 ---
 
 # S6 — Cutover & Deletions — Implementation Plan
+
+> ## ⛔ DEFERRED — DO NOT EXECUTE WITHOUT EXPLICIT HUMAN CONFIRMATION
+>
+> **S6 is the irreversible phase. It is DEFERRED and must never be started by an agent autonomously.**
+>
+> Up to and including S5, reverting the shell to V1 or V0 is a **build-time flag flip** (`EXPO_PUBLIC_ENABLE_MODE_NAV_V2` off / V1 on), shippable even as an **OTA (~5 min)** — because the V0/V1 code paths (`legacy-navigation-contract.ts`, the V0/V1 flag plumbing, the flags-off short-circuits) are deliberately kept alive.
+>
+> **S6 DELETES those paths** and flips V2 to the production default. **Once S6 runs there is NO flag-flip way back to V1 or V0** — rollback becomes a git-revert of the deletions plus a rebuild. (And the identity data cutover under S4/S5 is separately not reversible by flag at all.)
+>
+> **Confirmation protocol (MANDATORY).** Before executing ANY destructive step in this plan, an agent MUST stop and obtain explicit human confirmation. When asking, the agent MUST state plainly, in these terms:
+> > *"S6 deletes the V0 and V1 navigation shells. After this there is no way back to V1 or V0 by flag — rollback would require a git revert and rebuild. Confirm you want to proceed irreversibly."*
+>
+> Proceed only on an unambiguous human "yes" that acknowledges the irreversibility. **This human confirmation is in addition to gates (a)–(d) below; gates being green does NOT substitute for it.**
 
 > Synced to spec amendment 2026-06-10 (§2.1/§15.17 motivation end-state, §3.1/§3.2 cold-start in end state) and amended 2026-06-13 for lost-flow preservation before deletion.
 

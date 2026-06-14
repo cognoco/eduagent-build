@@ -14,6 +14,10 @@
 
 - [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to the ratified identity/policy-engine/router/safety ADRs + the `docs/registers/llm-models/` register. Current runway state lives in `_wip/identity-foundation/ROADMAP.md`; canon membership lives in `_wip/identity-foundation/CANONICAL-SET.md`.
 
+## V2 Shell Redesign (mentor-is-the-app)
+
+- [feedback_s6_deferred_irreversible.md](feedback_s6_deferred_irreversible.md) — S6 (V2 cutover & deletions) is DEFERRED + IRREVERSIBLE; no agent runs it autonomously; before any destructive step, get explicit human confirmation AND state that S6 removes the flag-flip path back to V1/V0 (rollback = git revert). Through S5, V1/V0 revert is a flag flip/OTA.
+
 ## Known Issues
 
 - [project_nx_expo_plugin_bug.md](project_nx_expo_plugin_bug.md) — @nx/expo/plugin stack overflow on Windows. Run Jest/eslint directly.
@@ -41,6 +45,7 @@
 
 ## Workflow Preferences
 
+- [feedback_verify_code_not_memory_or_docs.md](feedback_verify_code_not_memory_or_docs.md) — ANY code-related question: verify against current source (grep/read, cite file:line) BEFORE answering; never answer from memory or plan/spec docs alone.
 - Commit early + push after every commit. Never batch large changes.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
 - [feedback_agent_checkpoint_cadence.md](feedback_agent_checkpoint_cadence.md) — Long-running agents save durable checkpoints every 4 minutes; no git from subagents.

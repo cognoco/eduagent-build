@@ -60,6 +60,7 @@ S0-R (retention gate, parallel) ──┘                                       
 - **Build-now critical path:** `S1/S2`, because S0 is already built. S0-R is parallel and explicitly sequenced *not* to block (the feed reads `retention_cards` as-is until the gate hardens it).
 - **Identity critical path** (the long pole for S4–S6): the identity-foundation runway, which is itself blocked on `WI-530`. S4/S5 inherit that timeline; the mentor work neither blocks it nor is blocked by it for S0–S3 (spec §9).
 - **S6** needs all three: S3 eval coverage exists · evidence gate cleared · §13.1 V0-retirement ruling made by product.
+- ⛔ **S6 is DEFERRED and IRREVERSIBLE — requires explicit human confirmation.** Through S5, reverting to V1/V0 is a build-time flag flip (or OTA). S6 *deletes* the V0/V1 shells (`legacy-navigation-contract.ts` + flag plumbing), so **after S6 there is no flag-flip way back to V1 or V0**. No agent may start S6 autonomously; before any destructive step an agent must obtain explicit human confirmation and must state that S6 means there is no way back to V1/V0 (rollback = git revert). See the S6 plan's confirmation protocol.
 
 ---
 
