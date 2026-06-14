@@ -287,6 +287,47 @@ describe('recordDictationResult (integration)', () => {
     );
   });
 
+  it('[S4] completion-key retry does not clobber the original mode or date', async () => {
+    // Guards that `mode` and `date` are NOT in the onConflictDoUpdate set:
+    // a client reusing a completionKey across a mode switch must not silently
+    // overwrite the stored mode. The original values must survive the conflict.
+    const db = createIntegrationDb();
+    const today = getServerDate();
+    const key = completionKey(99);
+
+    const first = await recordDictationResult(db, profileId, {
+      completionKey: key,
+      localDate: today,
+      sentenceCount: 4,
+      mistakeCount: 0,
+      mode: 'homework',
+      reviewed: false,
+    });
+
+    // Same key, different mode — simulates a client-side key-reuse bug or a
+    // mode switch without rotating the completionKey.
+    await recordDictationResult(db, profileId, {
+      completionKey: key,
+      localDate: today,
+      sentenceCount: 5,
+      mistakeCount: 1,
+      mode: 'surprise',
+      reviewed: true,
+    });
+
+    const [row] = await db.query.dictationResults.findMany({
+      where: eq(dictationResults.profileId, profileId),
+    });
+
+    // mode and date must be the original values; only sentenceCount/mistakeCount/reviewed update.
+    expect(row.id).toBe(first.id);
+    expect(row.mode).toBe('homework'); // original mode preserved
+    expect(row.date).toBe(today); // date preserved (same in this case, but field not in set:)
+    expect(row.sentenceCount).toBe(5); // updated
+    expect(row.mistakeCount).toBe(1); // updated
+    expect(row.reviewed).toBe(true); // updated
+  });
+
   it('[WI-84 review] derives the legacy completion key when old clients omit it', async () => {
     const db = createIntegrationDb();
     const today = getServerDate();
