@@ -50,6 +50,12 @@
 //                                      edits in .claude/skills/, e.g. manual edits
 //                                      to the commit skill which is excluded from
 //                                      sync via SKIP_SKILLS).
+//   sync-skills.mjs --report-orphans — scan .claude/skills/ for entries with no
+//                                      .agents/skills/ master and no tech-group
+//                                      mapping; print each orphan and exit 1 if any
+//                                      are found. Does NOT apply any sync. Intended
+//                                      as an optional CI gate to catch removed masters
+//                                      whose generated copies were left behind.
 
 import { readdir, readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -89,6 +95,7 @@ const SKIP_SKILLS = new Set([
 
 const mode = process.argv.includes('--check') ? 'check' : 'sync';
 const printChanged = process.argv.includes('--print-changed');
+const reportOrphans = process.argv.includes('--report-orphans');
 
 // In --print-changed mode, status messages go to stderr so stdout is parseable.
 const info = printChanged
@@ -240,8 +247,53 @@ async function syncSkill({ sourceRel, targetName }) {
   }
 }
 
+/**
+ * Enumerate all top-level entries (dirs and loose files) under TARGET_ROOT,
+ * then check each against the known sync units. An entry is an orphan when:
+ *   - it is a directory and its name is not a known targetName in `units`
+ *   - it is a loose file (e.g. .claude/skills/my/e2e-infra.md) whose parent
+ *     dir is also not a known targetName
+ *
+ * Returns the repo-relative paths of all orphaned entries.
+ *
+ * @param {{ sourceRel: string; targetName: string }[]} units - known sync units
+ * @returns {Promise<string[]>} orphan paths relative to REPO_ROOT
+ */
+async function findOrphans(units) {
+  if (!existsSync(TARGET_ROOT)) return [];
+
+  const knownTargetNames = new Set(units.map((u) => u.targetName));
+  const orphans = [];
+
+  const topEntries = await readdir(TARGET_ROOT, { withFileTypes: true });
+  for (const entry of topEntries) {
+    if (entry.isDirectory()) {
+      if (!knownTargetNames.has(entry.name)) {
+        orphans.push(relative(REPO_ROOT, join(TARGET_ROOT, entry.name)));
+      }
+    } else if (entry.isFile()) {
+      // A loose file directly under .claude/skills/ has no master directory.
+      orphans.push(relative(REPO_ROOT, join(TARGET_ROOT, entry.name)));
+    }
+  }
+  return orphans.sort();
+}
+
 async function main() {
   const units = (await listUnits()).filter((u) => !SKIP_SKILLS.has(u.targetName));
+
+  if (reportOrphans) {
+    const orphans = await findOrphans(units);
+    if (orphans.length > 0) {
+      console.error('sync-skills: orphaned .claude/skills/ entries found (no .agents/skills/ master):');
+      for (const o of orphans) console.error(`  ${o}`);
+      console.error('\nPromote or delete each orphan, then re-run pnpm sync-skills.');
+      process.exit(1);
+    }
+    info('sync-skills: no orphans found');
+    return;
+  }
+
   for (const unit of units) await syncSkill(unit);
 
   // Note: we do NOT sweep stale skill directories or stale files in .claude/.
