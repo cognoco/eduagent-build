@@ -1804,6 +1804,10 @@ export const sessionCompleted = inngest.createFunction(
             await safeSend(
               () =>
                 inngest.send({
+                  // orphan-allow: observability-only signal (no handler needed);
+                  // consumed out-of-band by ops alerting. Paired with
+                  // captureException (via runIsolated catch) and logger.warn
+                  // above to satisfy the billing silent-recovery ban.
                   name: 'app/billing.homework_summary.profile_missing',
                   data: {
                     profileId,
