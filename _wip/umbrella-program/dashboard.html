@@ -493,7 +493,7 @@ footer .warn{color:var(--amber)}
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-10 (API security &amp; PII) fast-follow wave 06-14</b> — original 7 units LANE COMPLETE (06-13); fast-follow WI-734/735 (MUST_FIX) merged; WI-736/737/738 (SHOULD trio) merged; all 5 in Reviewing · <b>PRG-11 (architecture) Tier 2 COMPLETE 06-14</b> — WI-724…729 all Closed/Done via autonomous loop; Tier 1 was done 06-13; Tier 3 deferred post-WI-586 · <b>PRG-14 (agent instructions) ACTIVE 06-14</b> — sliced + released: WI-741…746; WI-743 (P1 CI hardening) first; two needs-operator decisions raised (prg14-001 orphan ruling; prg14-002 skill-content review gate); 5 executors dispatched · <b>IF CUTOVER EXECUTING</b> — CUT-A + CUT-B1 closed; CUT-B2 (consent+family) ∥ CUT-B3 (billing+webhooks) in flight; WI-586 convergence/drop tail pending · <b>PRG-03 WI-587 COMPLETE</b> — all 19 ruled+executed on main (7cc8a9a8d); only /cosmo:review close remains · graduated: PRG-17 (06-13) · PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
+  <span class="txt"><b>Right now:</b> <b>PRG-10 (API security &amp; PII) GRADUATED 06-14</b> — all 27 original findings + all 6 fast-follow WIs (WI-734–739, incl. WI-739 CONSIDER activated by operator) Closed/Done; OIDC gate-gap closed; prod `0116` migration rides next deploy · <b>PRG-14 (agent instructions) GRADUATED 06-14</b> — all 6 WIs (WI-741–746) Closed/Done; docs-PR ci.yml fix landed (`d790e04eb`); skill content gate cleared; carry-forwards (gha-hardening eval-inventory nit + lean-pointer rework) deferred to Stream 2 · <b>PRG-11 (architecture) Tiers 1+2 done</b> — WI-717–720 done 06-13; WI-724–729 done 06-14; Tier 3 (9 findings) deferred post-WI-586; lane NOT graduated · <b>BUG-12 CLOSED</b> — prod IDEMPOTENCY_KV binding live; prod /v1/health 200; caveat: RESEND/REVENUECAT_WEBHOOK_SECRET are placeholders, real values = pre-launch blocker (2 Captured WIs) · <b>IF CUTOVER NEXT</b> — all CUT blockers closed as of 06-14 (WI-586 blocked-by set: 0 open); staging cutover handoff written; staging is the first cutover; WI-586 Ready + Assisted · <b>PRG-03 WI-587 COMPLETE</b> — all 19 ruled+executed on main (7cc8a9a8d); only /cosmo:review close remains · graduated: PRG-10 + PRG-14 (06-14) · PRG-17 (06-13) · PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11).</span>
 </div>
 
 <nav>
@@ -626,12 +626,12 @@ const TRIGGERS = [
 ];
 const QUEUE = [
   ["1","PRG-12","UI language & accessibility","✓ GRADUATED 06-12 — 8/8 WPs, ratchet 361 → 12"],
-  ["2","PRG-14","Agent instructions","Light fixes: now · skill-building: after doc convergence (PRG-03/B4)"],
+  ["2","PRG-14","Agent instructions","✓ GRADUATED 06-14 — all 6 WIs (WI-741…746) Closed/Done; carry-forwards to Stream 2"],
   ["3","PRG-02","Harness Hygiene — residue batch","HH PR merged (G1)"],
   ["4","PRG-03","WI-587 ruling session","✓ RULED + EXECUTED 06-11 — all 19 landed on main (7cc8a9a8d); only /cosmo:review close remains (verified landed 06-13)"],
   ["5","PRG-15","Error handling","✓ GRADUATED 06-11 — activation → graduation inside a day (WI-639/640/641)"],
   ["6","PRG-13","Background-job security","✓ GRADUATED 06-12 — both WPs, under a day"],
-  ["7","PRG-10","API security & PII","Original 7/7 LANE COMPLETE 06-13. Fast-follow wave 06-14: WI-734/735 (MUST_FIX) + WI-736/737/738 (SHOULD trio) merged; 5 in Reviewing. WI-739 Backlog."],
+  ["7","PRG-10","API security & PII","✓ GRADUATED 06-14 — 27 original findings + 6 fast-follow WIs (WI-734–739, all MUST/SHOULD/CONSIDER) Closed/Done; OIDC gate-gap closed; prod 0116 migration pending deploy"],
   ["8","PRG-11","Architecture","Tiers 1+2 COMPLETE — Tier 1 (WI-717–720) done 06-13; Tier 2 (WI-724–729) done 06-14. Tier 3 (9 findings) deferred post-WI-586."],
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
   ["10","PRG-20","Estate-canon drain","IF clean-cut tail done (G5), or a named pull-forward earlier"],
@@ -641,7 +641,7 @@ const QUEUE = [
 const INIT = [
 { id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired). Cutover plan RATIFIED v1.7. EXECUTING on post-merge main: CUT-A (WI-689) CLOSED · CUT-B1 identity spine (WI-691) CLOSED · CUT-B2 consent+family (WI-692) ∥ CUT-B3 billing+webhooks (WI-693) IN FLIGHT · WI-586 convergence runbook pending B2+B3 close. G5 still cold.",
+  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired). Cutover plan RATIFIED v1.7. ALL CUT BLOCKERS CLOSED as of 06-14 (WI-689/691/692/693 + WI-722/723 all Closed). WI-586 (convergence/drop) Ready+Assisted — zero open code-side blockers. BUG-12 CLOSED (prod IDEMPOTENCY_KV live; prod 0108–0116 applied; placeholder webhook secrets = pre-launch blocker). Staging cutover handoff written (586-staging-cutover-handoff.md); staging is the NEXT cutover. G5 still cold.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
@@ -650,7 +650,7 @@ const INIT = [
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
     {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"done", note:"All six CLOSED 06-11 — fired G4 (and the envelope-router boundary event for PRG-15)."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
-    {n:"Clean-cut tail · cutover + drop", s:"6 units (WI-689–693 + shrunk WI-586)", m:"human", st:"go", note:"EXECUTING: CUT-A (WI-689) CLOSED · CUT-B1 identity spine (WI-691) CLOSED · CUT-B2 consent/family (WI-692) ∥ CUT-B3 billing/webhooks (WI-693) IN FLIGHT · WI-586 convergence runbook (freeze → reseed → re-point → flip → soak → drop) blocked until B2+B3 close. Fires G5."}
+    {n:"Clean-cut tail · cutover + drop", s:"6 units (WI-689–693 + shrunk WI-586)", m:"human", st:"go", note:"ALL CUT BLOCKERS CLOSED 06-14: CUT-A (WI-689) · CUT-B1 (WI-691) · CUT-B2 consent/family (WI-692) · CUT-B3 billing/webhooks (WI-693) · WI-722/723 all Closed. WI-586 (convergence runbook: freeze→reseed→re-point→flip→soak→drop) Ready+Assisted — zero open blockers. Staging cutover is NEXT. Fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
 
@@ -691,15 +691,15 @@ const INIT = [
   ],
   homes:["_wip/identity-foundation/…instruction-surface-disposition-matrix-v0.md","supporting-artefacts/wi-587-ruling-sheet.md"]},
 
-{ id:"PRG-14", name:"Agent instructions", accent:"var(--teal)", lane:"now", status:"executing", q:"#2",
-  tagline:"Sharper rule-books and two new repo-specific skills, so agents stop re-learning the same lessons. ACTIVATED 06-14 — sliced + released.",
-  owner:"Umbrella (agents execute)", gate:"ACTIVATED 06-14 — 6 WIs (WI-741…746) sliced Ready; WS-17 Open; shepherd GO-acted 06-14. WI-743 (P1 CI hardening) first; WI-744/745/746 merge-held pending human content review. PRG-03 B4 done — skill-building unblocked.",
-  outcome:"All 9 live agent-instruction findings closed (5 moot): skill descriptions fixed, sync gap closed, schemas/db/GHA repo skills built by extending the generic tech skills.",
+{ id:"PRG-14", name:"Agent instructions", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#2",
+  tagline:"Sharper rule-books and three new repo-specific skills. OUTCOME MET 06-14 — all 6 WIs Closed/Done. Carry-forwards to Stream 2.",
+  owner:"Umbrella (agents execute)", gate:"GRADUATED 06-14 — all 6 WIs (WI-741–746) Closed/Done. docs-PR ci.yml fix (d790e04eb) unblocked the merge-held PRs. Content gate cleared by operator (merge as-is; lean-pointer rework → Stream 2). Carry-forwards (gha-hardening eval-inventory nit + tech/* skill lean-pointer rework, prg14-008/009) deferred to Stream 2 (_wip/umbrella-program/stream-2-backlog.md). Shepherd stood down.",
+  outcome:"All 9 live agent-instruction findings closed (5 moot): skill descriptions fixed, sync gap closed, schemas/db/GHA repo skills built, CI injection + smoke-gate hardened.",
   bundles:[
-    {n:"WI-743 · CI hardening (P1)", s:"F-151, F-157", m:"agent", st:"go", note:"P1. Drop dead injection branch in e2e-ci.yml + fix always-green smoke gate in e2e-web.yml. Dispatched."},
-    {n:"WI-741 · Skill-description & hook ref fixes", s:"F-039,040,042", m:"agent", st:"go", note:"commit + worktree-setup descriptions + scope-keyword-check hook skill-ref. Dispatched."},
-    {n:"WI-742 · sync-skills orphan guard + cite fix", s:"F-046,041", m:"agent", st:"hold", note:"Held pending prg14-001 ruling (DELETE vs PROMOTE the e2e-infra orphan)."},
-    {n:"WI-744/745/746 · New repo skills (schemas, db, GHA)", s:"F-113,114,116", m:"mixed", st:"go", note:"Reduce-and-extend on tech/* skill group. Dispatched; merge-held for human content review (prg14-002)."}
+    {n:"WI-743 · CI hardening (P1)", s:"F-151, F-157", m:"agent", st:"done", note:"CLOSED 06-14 (f00473e22). 10-test regression guard added; red-green-revert evidence. Two Codex P2 hardenings included."},
+    {n:"WI-741 · Skill-description & hook ref fixes", s:"F-039,040,042", m:"agent", st:"done", note:"CLOSED 06-14 (2d76ed08). commit + worktree-setup descriptions + scope-keyword-check hook skill-ref."},
+    {n:"WI-742 · sync-skills orphan guard + cite fix", s:"F-046,041", m:"agent", st:"done", note:"CLOSED 06-14 (388b10dba). --report-orphans guard (11 tests); orphan PROMOTED vs /e2e; F-041 symbol cite."},
+    {n:"WI-744/745/746 · New repo skills (schemas, db, GHA)", s:"F-113,114,116", m:"mixed", st:"done", note:"CLOSED 06-14 (121371b3 / afb0ddd7 / a35df5b3). Merged as-is; lean-pointer rework deferred to Stream 2."}
   ],
   homes:["_wip/agent-instructions/execution-tracker.md","activation-planning.md §2 PRG-14 + §3 (dedupe analysis)","L-gap-delta.md (per-finding)"]},
 
@@ -719,16 +719,15 @@ const INIT = [
   ],
   homes:["_wip/l10n-a11y/execution-tracker.md (THE entry point)","Cosmo Workstream: L10n & A11y Mobile","L-gap-delta.md (per-finding)"]},
 
-{ id:”PRG-10”, name:”API security & PII”, accent:”var(--amber)”, lane:”now”, status:”executing · fast-follow”, q:”#7”,
-  tagline:”27 original findings LANE COMPLETE 06-13. Fast-follow wave (06-14): 2 MUST_FIX merged; SHOULD trio merged; all 5 in Reviewing. WI-739 (CONSIDER hygiene) Backlog.”,
-  owner:”Mixed; human review on auth & CI permissions”, gate:”Original 7/7 units Closed 06-13 (PRs #1108/1109/1111/1114/1121/1122). Fast-follow wave activated 06-14 from retroactive consolidated claude-review (0 BLOCKER · 2 MUST_FIX · 8 SHOULD_FIX). WI-734/735 (MUST_FIX) merged; WI-736/737/738 (SHOULD trio) merged; 5 in Reviewing. WI-739 Backlog.”,
-  outcome:”Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized. Fast-follow closes the consolidated-review residuals.”,
+{ id:”PRG-10”, name:”API security & PII”, accent:”var(--green)”, lane:”now”, status:”✓ graduated”, q:”#7”,
+  tagline:”27 original findings + 6 fast-follow WIs (WI-734–739) ALL Closed/Done 06-14. OIDC gate-gap closed. OUTCOME MET — eighth graduation.”,
+  owner:”Mixed; human review on auth & CI permissions”, gate:”GRADUATED 06-14 — all 27 original findings (PRs #1108/1109/1111/1114/1121/1122) + all 6 fast-follow WIs (WI-734–739, 2 MUST_FIX + 3 SHOULD + 1 CONSIDER operator-activated) Closed/Done via the strict gate (claude-review genuinely green end-to-end). OIDC gate-gap demonstrably closed. Caveat: prod migration 0116 rides next deploy (operator-owned); prod webhook secrets placeholders (pre-launch blocker, 2 Captured WIs). Shepherd stood down; channel POC complete.”,
+  outcome:”Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized, CONSIDER hygiene swept. All 33 items (27 original + 6 fast-follow) remediated.”,
   bundles:[
     {n:”WI-698–704 · original 7 units”, s:”27 findings”, m:”mixed”, st:”done”, note:”All 7 Closed/Done 06-13 (PRs #1108/1109/1111/1114/1121/1122). Two rework loops (child-evidence / stale-branch invariant) — no code defects.”},
-    {n:”WI-734 · Meter/hard-stop homework-summary (MUST_FIX)”, s:”M1 · F-128”, m:”mixed”, st:”go”, note:”Merged 06-14 (bf94cdf19). Reviewing.”},
-    {n:”WI-735 · Cap server-side homework problems array (MUST_FIX)”, s:”M2 · F-158”, m:”agent”, st:”go”, note:”Merged 06-14 (f031a15b9). Reviewing.”},
-    {n:”WI-736/737/738 · SHOULD trio (GHA + CAS + correctness)”, s:”S1–S9,C3,C7”, m:”mixed”, st:”go”, note:”Merged 06-14 (#1165/1166/1167). Reviewing. Gate breach on #1165 ratified post-remediation (claude-review re-ran green).”},
-    {n:”WI-739 · Defense-in-depth hygiene (CONSIDER)”, s:”C1,C2,C5,C6,C8,C9”, m:”agent”, st:”hold”, note:”Backlog. Not in the current push.”}
+    {n:”WI-734/735 · MUST_FIX (meter/hard-stop + cap problems array)”, s:”M1+M2”, m:”mixed”, st:”done”, note:”CLOSED 06-14 (bf94cdf19 / f031a15b9). Red-green break tests verified. claude-review genuinely green (OIDC fix confirmed).”},
+    {n:”WI-736/737/738 · SHOULD trio (GHA + CAS + correctness)”, s:”S1–S9,C3,C7”, m:”mixed”, st:”done”, note:”CLOSED 06-14 (#1165/1166/1167 + #1176 checker-gap rework). Gate breach on #1165 ratified post-remediation (claude-review re-ran green).”},
+    {n:”WI-739 · Defense-in-depth hygiene (CONSIDER)”, s:”C1,C2,C5,C6,C8,C9”, m:”agent”, st:”done”, note:”CLOSED 06-14 (#1181, 788f9a2f). Operator-activated after original push. claude-review APPROVED 0 findings.”}
   ],
   homes:[“_wip/security-pii-api/execution-tracker.md”,”Cosmo · Workstream “API Security & PII” (WI-698–704 + fast-follow WI-734–739)”,”L-gap-delta.md (per-finding)”]},
 
