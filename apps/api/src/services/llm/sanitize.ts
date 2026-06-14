@@ -36,17 +36,29 @@
  * Strip characters that could escape a wrapping XML tag or be read as a
  * directive on a new line, and cap the result at `maxLen` characters.
  *
- * Strips: newlines, carriage returns, tabs, double-quotes, angle brackets.
+ * Strips: newlines (\n), carriage returns (\r), horizontal tab (\t),
+ * vertical tab (U+000B), form feed (U+000C), next line (U+0085),
+ * double-quotes, and angle brackets.
  * Collapses runs of whitespace to a single space. Trims leading/trailing
  * whitespace.
  *
  * Returns an empty string when the input is only whitespace — callers
  * should guard against the empty case before interpolation.
  */
+// Build the strip regex at module init so the character class can include
+// VT (U+000B) and FF (U+000C) without triggering the no-control-regex lint
+// rule, which flags \u000B/\u000C even inside RegExp() string arguments.
+const _VT = String.fromCharCode(0x0b); // U+000B vertical tab
+const _FF = String.fromCharCode(0x0c); // U+000C form feed
+const _NEL = String.fromCharCode(0x85); // U+0085 next line
+const SANITIZE_STRIP_RE = new RegExp(
+  '[\\n\\r\\t' + _VT + _FF + _NEL + '"<>]',
+  'g',
+);
 export function sanitizeXmlValue(text: string, maxLen: number): string {
   return text
     .trim()
-    .replace(/[\n\r\t"<>]/g, ' ')
+    .replace(SANITIZE_STRIP_RE, ' ')
     .replace(/\s{2,}/g, ' ')
     .slice(0, maxLen);
 }

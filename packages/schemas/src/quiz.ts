@@ -45,9 +45,9 @@ export type VocabularyQuestion = z.infer<typeof vocabularyQuestionSchema>;
 export const guessWhoQuestionSchema = z
   .object({
     type: z.literal('guess_who'),
-    canonicalName: z.string(),
+    canonicalName: z.string().min(1).max(300),
     correctAnswer: z.string(),
-    acceptedAliases: z.array(z.string()).min(1),
+    acceptedAliases: z.array(z.string().min(1).max(300)).min(1),
     era: z.string().optional(),
     clues: z.array(z.string().max(200)).length(5),
     mcFallbackOptions: z.array(z.string()).length(4),

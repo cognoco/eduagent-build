@@ -179,9 +179,18 @@ api.use(
       // (Metro, Expo web, Playwright dev tooling). Gating this on ENVIRONMENT
       // prevents a local-app running on a victim's machine from making
       // credentialed cross-origin requests against the production API.
-      // When env is absent (e.g. unit tests calling app.request() without
-      // bindings), we treat it as non-production for ergonomic test defaults.
-      if (env?.ENVIRONMENT !== 'production') {
+      // When env is absent entirely (e.g. unit tests calling app.request()
+      // without bindings), we treat it as non-production for ergonomic test
+      // defaults. When env IS present but ENVIRONMENT is absent or unrecognised
+      // (misconfigured deployed Worker), we fail-closed → production behaviour,
+      // so localhost CORS is never open in a real deployment.
+      const isNonProduction =
+        env === undefined
+          ? true // no bindings at all → unit-test path, keep non-prod default
+          : env.ENVIRONMENT !== 'production' &&
+            env.ENVIRONMENT !== undefined &&
+            env.ENVIRONMENT !== '';
+      if (isNonProduction) {
         if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
         if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
       }

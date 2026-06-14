@@ -315,7 +315,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
-      const session = await getSession(db, profileId, c.req.param('sessionId'));
+      const session = await getSession(
+        db,
+        profileId,
+        c.req.valid('param').sessionId,
+      );
       if (!session) return notFound(c, 'Session not found');
       return c.json({ session });
     },
@@ -502,7 +506,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subscriptionId = c.get('subscriptionId');
-      const sessionId = c.req.param('sessionId');
+      const sessionId = c.req.valid('param').sessionId;
       // [BUG-100 / A1-LOW] Defensive length check in addition to the middleware
       // bound. Idempotency middleware already rejects keys > MAX length, but
       // this handler can also be reached via paths that bypass that
@@ -596,7 +600,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const transcript = await getSessionTranscript(
         db,
         profileId,
-        c.req.param('sessionId'),
+        c.req.valid('param').sessionId,
       );
       if (!transcript) return notFound(c, 'Session not found');
       return c.json(transcript);
@@ -609,7 +613,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      const sessionId = c.req.param('sessionId');
+      const sessionId = c.req.valid('param').sessionId;
       const transcript = await getSessionTranscript(db, profileId, sessionId);
       if (!transcript) return notFound(c, 'Session not found');
       if (transcript.archived) {
@@ -683,7 +687,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subscriptionId = c.get('subscriptionId');
-      const sessionId = c.req.param('sessionId');
+      const sessionId = c.req.valid('param').sessionId;
       const input = c.req.valid('json');
       // [BUG-100 / A1-LOW] Belt-and-suspenders length cap — see the matching
       // comment on /messages above.
@@ -1267,7 +1271,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const result = await closeSession(
         db,
         profileId,
-        c.req.param('sessionId'),
+        c.req.valid('param').sessionId,
         { ...body, summaryStatus: sanitizedSummaryStatus },
       );
 
@@ -1323,7 +1327,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       // Server owns the prompt text: recordSystemPrompt resolves the intent to
       // the canonical string and stamps provenance (metadata.source='server').
-      await recordSystemPrompt(db, profileId, c.req.param('sessionId'), intent);
+      await recordSystemPrompt(
+        db,
+        profileId,
+        c.req.valid('param').sessionId,
+        intent,
+      );
       return c.json({ ok: true });
     },
   )
@@ -1337,7 +1346,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const { db, profileId } = withProfile(c);
       const body = c.req.valid('json');
 
-      await recordSessionEvent(db, profileId, c.req.param('sessionId'), body);
+      await recordSessionEvent(
+        db,
+        profileId,
+        c.req.valid('param').sessionId,
+        body,
+      );
       return c.json({ ok: true });
     },
   )
@@ -1352,7 +1366,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const session = await setSessionInputMode(
         db,
         profileId,
-        c.req.param('sessionId'),
+        c.req.valid('param').sessionId,
         c.req.valid('json'),
       );
       return c.json({ session });
@@ -1371,7 +1385,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const result = await syncHomeworkState(
         db,
         profileId,
-        c.req.param('sessionId'),
+        c.req.valid('param').sessionId,
         c.req.valid('json'),
       );
 
@@ -1390,7 +1404,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const result = await flagContent(
         db,
         profileId,
-        c.req.param('sessionId'),
+        c.req.valid('param').sessionId,
         c.req.valid('json'),
       );
       return c.json(result);
