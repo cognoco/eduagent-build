@@ -174,3 +174,31 @@ Lane-specific — **CURRENT WAVE = TIER 2** (Tier 1 done; read carefully):
   sanctions the scoped-repo / parent-chain split — audit itself: "deliberate and working").
   Fresh Tier-2 shepherd to be spawned under the **corrected** shepherd-protocol (green-PR
   -before-merge gate restored 2026-06-13). Tier 3 unchanged (post-flip + re-scan).
+- 2026-06-14 — **Tier 2 COMPLETE.** All six units **Closed / Resolution=Done** by the
+  separate reviewer. Refined Backlog→Ready (Execution Path Auto→**Assisted** to prevent an
+  unsupervised Archon pickup racing the in-Harness executors; WI-727's AC amended for the
+  Bug DoR — explicit root cause + single-variant + regression test, within the operator
+  min-fix). One Sonnet executor each; merged to `main` (squash) + finalized via
+  `/cosmo:execute complete` (Fixed In authored from the landed squash commit via
+  detached-HEAD). Landed commits: WI-724 `f24f33d0d` (F-011 `ensureDefaultBook` →
+  `curriculum-core.ts`), WI-725 `f48b76909` (F-030 `ExchangeContext` → `exchange-types.ts`),
+  WI-726 `be9eb335f` (F-104 dispatch fn → service layer), WI-727 `ab70b7e3f` (F-105 retry-cap
+  → `FILING_CONFIG`), WI-729 `fed929522` (F-109 dead `showParentHome` removal), WI-728
+  `d5adf68bb` (F-108 `useEntryGate` hook) + rework `9d5ad0e4c`. Two notable events:
+  (1) a host **reboot** killed all six executors + the verdict monitor mid-flight (after
+  claim+worktree, before any commit) — recovered in-place from the partial worktrees;
+  WI-727's crashed run had wrongly set `config/filing.ts maxRetries 3→2` (a behavior change),
+  caught + reverted. (2) **WI-728 took one reviewer rework round** — the shepherd first
+  wrongly excluded `practice` (checked `practice/_layout.tsx`, which has no gate); the
+  reviewer's source-artifact check flagged the real ternary at `practice/index.tsx:431-433`
+  (cited by F-108); migrated it (PR #1158), all 7 screens now on the hook. Adjudication that
+  held: the `useEntryGate` hook keeps the `MODE_NAV_V1_ENABLED ? !canEnter : isParentProxy`
+  flag-branch verbatim (behavior-identical) — the cut's "collapse to `!canEnter()`" premise
+  was unsafe vs the V0 profile-load guard; the hook's `isParentProxy` read is registered in
+  the nav-usage ratchet's `V0_FALLBACK_FILES`. **Follow-up filed: WI-730** — the data-access
+  atomic claim predicate `claimSessionForFilingRetry` still hardcodes `lt(filingRetryCount, 3)`
+  (out of WI-727's operator-deferred data-access scope; surfaced as a Codex P2 on #1150).
+  Nothing stranded in Reviewing — all six verified `Closed/Done`. Tier-2 delivery branches +
+  worktrees cleaned up. **Lane NOT graduated — Tier 3 deferred to post-WI-586**
+  (cutover-serialized): to be kicked off fresh with a re-scan once WI-586 lands. Tier-2
+  shepherd stands down.
