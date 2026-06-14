@@ -3468,18 +3468,189 @@
     "stub": {
       "title": "Veileder",
       "subtitle": "Ditt neste læringssteg vil vises her."
+    },
+    "cards": {
+      "unfinished_session": {
+        "title": "Fortsett den siste økten din",
+        "cta": "Fortsett",
+        "arcDue": "Klar til å fortsette",
+        "arcAdvancing": "Du gjør fremskritt",
+        "arcMastered": "Økten er fullført"
+      },
+      "retention_due": {
+        "title": "Repeter det som forfaller",
+        "cta": "Repeter",
+        "arcDue": "Forfaller til øving",
+        "arcAdvancing": "Blir sterkere",
+        "arcMastered": "Repetisjon fullført"
+      },
+      "parked_item": {
+        "title": "Gå tilbake til et lagret spørsmål",
+        "cta": "Åpne",
+        "arcDue": "Venter på deg",
+        "arcAdvancing": "Tilbake i gang",
+        "arcMastered": "Arkivert"
+      },
+      "needs_deepening": {
+        "title": "Fordyp deg i en vanskelig idé",
+        "cta": "Jobb med det",
+        "arcDue": "Trenger en ny gjennomgang",
+        "arcAdvancing": "Forståelsen blir bedre",
+        "arcMastered": "Sitter nå"
+      },
+      "challenge_ready": {
+        "title": "Prøv en utfordringsrunde",
+        "cta": "Start utfordring",
+        "arcDue": "Klar til å testes",
+        "arcAdvancing": "Utfordring pågår",
+        "arcMastered": "Utfordring fullført"
+      },
+      "generic": {
+        "title": "Åpne ditt neste læringssteg",
+        "cta": "Åpne"
+      },
+      "complete": "Ferdig",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "Læringsøyeblikk",
+      "generic": {
+        "title": "Et læringsøyeblikk ble lagret."
+      },
+      "session_filed": {
+        "title": "Lagret {{topicTitle}} i læringsloggen din."
+      },
+      "quota": {
+        "title": "Et læringsøyeblikk ble lagret."
+      }
+    },
+    "overflow": {
+      "more": "{{count}} flere alternativer"
+    },
+    "empty": {
+      "title": "Ingenting trenger deg akkurat nå",
+      "cta": "Utforsk flere læringsalternativer"
+    },
+    "bar": {
+      "unavailable": "Veilederen er frakoblet et øyeblikk. Du kan fortsatt skrive.",
+      "cameraLabel": "Kamera",
+      "placeholder": "Spør, lim inn eller beskriv hva du vil lære.",
+      "micLabel": "Mikrofon",
+      "homeworkChip": "Lekser"
+    },
+    "onTrack": {
+      "label": "I rute",
+      "reviewsDue": "repetisjoner forfaller",
+      "dueCleared": "Ingen repetisjoner forfaller"
+    },
+    "rewards": {
+      "privateLabel": "Privat læringskvittering",
+      "practicePoints": "+{{amount}} øvingspoeng for {{topicTitle}}",
+      "practicePointsNoTopic": "+{{amount}} øvingspoeng",
+      "reflectionBonus": "{{multiplier}} refleksjonsbonus lagt til",
+      "quizPersonalBestCapitals": "Ny personlig rekord i hovedsteder: {{score}}",
+      "quizPersonalBestGuessWho": "Ny personlig rekord i Hvem er hvem: {{score}}",
+      "masteryDelta": "{{mastered}} mestret, +{{weeklyDelta}} denne uken",
+      "masteryDeltaNoWeekly": "{{mastered}} mestret"
+    },
+    "lightPractice": {
+      "prompt": "Foretrekker du noe lett?",
+      "fatigueReason": "Foreslått fordi denne strømmen er lett akkurat nå.",
+      "capitals": "Hovedsteder",
+      "guessWho": "Hvem er hvem",
+      "vocabulary": "Vokabular",
+      "dictation": "Diktat"
+    },
+    "celebration": {
+      "ownChoice": "Du valgte neste steg."
+    },
+    "coldStart": {
+      "caption": "Hva vil du jobbe med?",
+      "equalWeight": "Eksempelspørsmål",
+      "placeholderRotation": {
+        "one": "Skriv et spørsmål eller lim inn lekser ..."
+      },
+      "orJustType": "Eller start med en av disse.",
+      "chipHomework": "Hjelp meg med lekser",
+      "chipLearn": "Lær meg noe nytt",
+      "chipAsk": "Jeg har et spørsmål",
+      "homeworkReply": "Bruk kameraet til å ta bilde av oppgaven, eller skriv den her."
     }
   },
   "subjectsBrowse": {
     "stub": {
       "title": "Fag",
       "subtitle": "Bla gjennom læringsstrukturen din herfra."
-    }
+    },
+    "title": "Emner",
+    "searchPlaceholder": "Søk i emner",
+    "showEverything": "Vis meg alt",
+    "emptyTitle": "Ingen emner ennå",
+    "emptyMessage": "Opprett et emne for å begynne å bygge læringskartet ditt.",
+    "createSubject": "Opprett emne",
+    "openSubject": "Åpne emne",
+    "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
+    "reviewsDue": "{{count}} repetisjoner forfaller"
   },
   "journal": {
     "stub": {
       "title": "Journal",
       "subtitle": "Din lagrede læringslogg vil ligge her."
+    }
+  },
+  "subjectHub": {
+    "loading": "Laster inn emne ...",
+    "errors": {
+      "missingSubjectTitle": "Emne ikke funnet",
+      "missingSubjectMessage": "Gå tilbake og velg et emne på nytt.",
+      "loadTitle": "Kunne ikke laste inn dette emnet",
+      "loadMessage": "Prøv igjen, eller gå tilbake til emnene dine."
+    },
+    "progress": {
+      "threeState": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
+      "reviewsDue": "{{count}} repetisjoner forfaller",
+      "noReviewsDue": "Ingen repetisjoner forfaller",
+      "weeklyDelta": "+{{count}} mestret denne uken",
+      "noWeeklyDelta": "Ingen ny mestring denne uken",
+      "practicePoints": "{{points}} øvingspoeng nylig",
+      "noPracticePoints": "Ingen nylige øvingspoeng"
+    },
+    "nextUp": {
+      "heading": "Neste",
+      "allCaughtUp": "Alt er unnagjort",
+      "resume": "Fortsett",
+      "upNext": "Studer neste emne",
+      "review": "Repeter",
+      "structuralOnly": "Studiehandlinger er private for eleven i denne visningen."
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}} mestret"
+    },
+    "search": {
+      "placeholder": "Søk i temaer",
+      "micLabel": "Søk med stemmen",
+      "noResults": "Ingen temaer samsvarer med søket."
+    },
+    "notes": {
+      "heading": "Notater",
+      "authorSelf": "Mine notater",
+      "authorMentor": "Lagret fra veileder"
+    },
+    "sheet": {
+      "close": "Lukk",
+      "about": "Om dette temaet",
+      "masteryLine": "Status: {{state}}",
+      "study": "Studer",
+      "review": "Repeter",
+      "seeFullTopic": "Se hele temaet"
+    },
+    "topic": {
+      "continueNow": "Fortsett nå",
+      "started": "Startet",
+      "upNext": "Neste",
+      "later": "Senere",
+      "done": "Ferdig",
+      "mastered": "Mestret"
     }
   }
 }

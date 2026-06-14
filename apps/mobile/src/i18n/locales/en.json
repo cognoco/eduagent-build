@@ -2606,12 +2606,183 @@
     "stub": {
       "title": "Mentor",
       "subtitle": "Your next learning step will appear here."
+    },
+    "cards": {
+      "unfinished_session": {
+        "title": "Continue your last session",
+        "cta": "Continue",
+        "arcDue": "Ready to pick back up",
+        "arcAdvancing": "You are moving this forward",
+        "arcMastered": "Session wrapped"
+      },
+      "retention_due": {
+        "title": "Review what is due",
+        "cta": "Review",
+        "arcDue": "Due for practice",
+        "arcAdvancing": "Getting stronger",
+        "arcMastered": "Review cleared"
+      },
+      "parked_item": {
+        "title": "Return to a saved question",
+        "cta": "Open",
+        "arcDue": "Waiting for you",
+        "arcAdvancing": "Back in motion",
+        "arcMastered": "Filed"
+      },
+      "needs_deepening": {
+        "title": "Deepen a tricky idea",
+        "cta": "Work on it",
+        "arcDue": "Needs another pass",
+        "arcAdvancing": "Understanding is improving",
+        "arcMastered": "Solid now"
+      },
+      "challenge_ready": {
+        "title": "Try a challenge round",
+        "cta": "Start challenge",
+        "arcDue": "Ready to test",
+        "arcAdvancing": "Challenge in progress",
+        "arcMastered": "Challenge cleared"
+      },
+      "generic": {
+        "title": "Open your next learning step",
+        "cta": "Open"
+      },
+      "complete": "Done",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "Learning moment",
+      "generic": {
+        "title": "A learning moment was saved."
+      },
+      "session_filed": {
+        "title": "Saved {{topicTitle}} to your learning record."
+      },
+      "quota": {
+        "title": "A learning moment was saved."
+      }
+    },
+    "overflow": {
+      "more": "{{count}} more options"
+    },
+    "empty": {
+      "title": "Nothing needs you right now",
+      "cta": "Browse more learning options"
+    },
+    "bar": {
+      "unavailable": "The mentor is offline for a moment. You can still type.",
+      "cameraLabel": "Camera",
+      "placeholder": "Ask, paste, or describe what you want to learn.",
+      "micLabel": "Mic",
+      "homeworkChip": "Homework"
+    },
+    "onTrack": {
+      "label": "On track",
+      "reviewsDue": "reviews due",
+      "dueCleared": "No reviews due"
+    },
+    "rewards": {
+      "privateLabel": "Private learning receipt",
+      "practicePoints": "+{{amount}} practice points for {{topicTitle}}",
+      "practicePointsNoTopic": "+{{amount}} practice points",
+      "reflectionBonus": "{{multiplier}} reflection bonus applied",
+      "quizPersonalBestCapitals": "New capitals personal best: {{score}}",
+      "quizPersonalBestGuessWho": "New Guess Who personal best: {{score}}",
+      "masteryDelta": "{{mastered}} mastered, +{{weeklyDelta}} this week",
+      "masteryDeltaNoWeekly": "{{mastered}} mastered"
+    },
+    "lightPractice": {
+      "prompt": "Prefer something light?",
+      "fatigueReason": "Suggested because this feed is light right now.",
+      "capitals": "Capitals",
+      "guessWho": "Guess Who",
+      "vocabulary": "Vocabulary",
+      "dictation": "Dictation"
+    },
+    "celebration": {
+      "ownChoice": "You chose the next step."
+    },
+    "coldStart": {
+      "caption": "What do you want to work on?",
+      "equalWeight": "Example prompt",
+      "placeholderRotation": {
+        "one": "Type a question or paste homework..."
+      },
+      "orJustType": "Or start with one of these.",
+      "chipHomework": "Help me with homework",
+      "chipLearn": "Teach me something new",
+      "chipAsk": "I have a question",
+      "homeworkReply": "Use the camera to capture the problem, or type it here."
     }
   },
   "subjectsBrowse": {
     "stub": {
       "title": "Subjects",
       "subtitle": "Browse your learning structure from here."
+    },
+    "title": "Subjects",
+    "searchPlaceholder": "Search subjects",
+    "showEverything": "Show me everything",
+    "emptyTitle": "No subjects yet",
+    "emptyMessage": "Create a subject to start building your learning map.",
+    "createSubject": "Create subject",
+    "openSubject": "Open subject",
+    "subjectProgress": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
+    "reviewsDue": "{{count}} reviews due"
+  },
+  "subjectHub": {
+    "loading": "Loading subject...",
+    "errors": {
+      "missingSubjectTitle": "Subject not found",
+      "missingSubjectMessage": "Go back and choose a subject again.",
+      "loadTitle": "Could not load this subject",
+      "loadMessage": "Try again, or go back to your subjects."
+    },
+    "progress": {
+      "threeState": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
+      "reviewsDue": "{{count}} reviews due",
+      "noReviewsDue": "No reviews due",
+      "weeklyDelta": "+{{count}} mastered this week",
+      "noWeeklyDelta": "No new mastery this week",
+      "practicePoints": "{{points}} practice points recently",
+      "noPracticePoints": "No recent practice points"
+    },
+    "nextUp": {
+      "heading": "Next up",
+      "allCaughtUp": "All caught up",
+      "resume": "Resume",
+      "upNext": "Study the next topic",
+      "review": "Review",
+      "structuralOnly": "Study actions are private to the learner in this view."
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}} mastered"
+    },
+    "search": {
+      "placeholder": "Search topics",
+      "micLabel": "Search by voice",
+      "noResults": "No topics match that search."
+    },
+    "notes": {
+      "heading": "Notes",
+      "authorSelf": "My notes",
+      "authorMentor": "Saved from mentor"
+    },
+    "sheet": {
+      "close": "Close",
+      "about": "About this topic",
+      "masteryLine": "Status: {{state}}",
+      "study": "Study",
+      "review": "Review",
+      "seeFullTopic": "See full topic"
+    },
+    "topic": {
+      "continueNow": "Continue now",
+      "started": "Started",
+      "upNext": "Up next",
+      "later": "Later",
+      "done": "Done",
+      "mastered": "Mastered"
     }
   },
   "journal": {

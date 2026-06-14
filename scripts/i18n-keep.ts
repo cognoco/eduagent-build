@@ -251,6 +251,59 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/hooks/use-notification-response-handler.ts:93',
   },
   {
+    pattern: 'mentorHome.cards.*',
+    reason:
+      'selected via resolveNowCardCopyKeys(card) and arcCopyKey(card, arcState) ' +
+      'at apps/mobile/src/components/mentor/NowCard.tsx:100',
+  },
+  {
+    pattern: 'mentorHome.ledger.*',
+    reason:
+      'selected via ledgerCopyKey(card) at ' +
+      'apps/mobile/src/components/mentor/LedgerMomentCard.tsx:48',
+  },
+  {
+    pattern: 'mentorHome.rewards.*',
+    reason:
+      'selected via receiptCopyKey(receipt) at ' +
+      'apps/mobile/src/components/mentor/RewardReceiptCard.tsx:64',
+  },
+  {
+    pattern: 'mentorHome.lightPractice.*',
+    reason:
+      'selected via LABEL_KEYS[route] at ' +
+      'apps/mobile/src/components/mentor/LightPracticeAffordance.tsx:54',
+  },
+  {
+    pattern: 'mentorHome.coldStart.chip*',
+    reason:
+      'selected via chip.key at apps/mobile/src/components/mentor/ColdStartCard.tsx:38',
+  },
+  {
+    pattern: 'mentorHome.coldStart.equalWeight',
+    reason:
+      'selected via EQUAL_WEIGHT_TOKEN at ' +
+      'apps/mobile/src/components/mentor/ColdStartCard.tsx:63',
+  },
+  {
+    pattern: 'mentorHome.celebration.*',
+    reason:
+      'selected via messageKey at ' +
+      'apps/mobile/src/components/mentor/MentorCelebration.tsx:30',
+  },
+  {
+    pattern: 'subjectHub.nextUp.*',
+    reason:
+      'selected via NEXT_UP_ACTION_KEY[nextUp.kind] at ' +
+      'apps/mobile/src/components/subject-hub/SubjectHubNextUp.tsx:48',
+  },
+  {
+    pattern: 'subjectHub.topic.*',
+    reason:
+      'selected via STATE_KEY[hubTopic.state] at ' +
+      'apps/mobile/src/components/subject-hub/SubjectHubChapterSection.tsx:50',
+  },
+  {
     pattern: 'sessionSummary.takeaways.*',
     reason:
       'keys reached through the t function passed as a parameter (args.t), ' +

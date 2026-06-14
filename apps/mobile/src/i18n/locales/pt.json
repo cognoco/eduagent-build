@@ -3468,18 +3468,189 @@
     "stub": {
       "title": "Mentor",
       "subtitle": "O seu próximo passo de aprendizagem aparecerá aqui."
+    },
+    "cards": {
+      "unfinished_session": {
+        "title": "Continue sua última sessão",
+        "cta": "Continuar",
+        "arcDue": "Pronto para continuar",
+        "arcAdvancing": "Você está avançando",
+        "arcMastered": "Sessão concluída"
+      },
+      "retention_due": {
+        "title": "Revise o que está pendente",
+        "cta": "Revisar",
+        "arcDue": "Pendente para praticar",
+        "arcAdvancing": "Ficando mais forte",
+        "arcMastered": "Revisão concluída"
+      },
+      "parked_item": {
+        "title": "Volte para uma pergunta salva",
+        "cta": "Abrir",
+        "arcDue": "Esperando por você",
+        "arcAdvancing": "De volta à ativa",
+        "arcMastered": "Arquivado"
+      },
+      "needs_deepening": {
+        "title": "Aprofunde uma ideia complicada",
+        "cta": "Trabalhar nisso",
+        "arcDue": "Precisa de outra revisão",
+        "arcAdvancing": "A compreensão está melhorando",
+        "arcMastered": "Agora está sólido"
+      },
+      "challenge_ready": {
+        "title": "Tente uma rodada de desafio",
+        "cta": "Iniciar desafio",
+        "arcDue": "Pronto para testar",
+        "arcAdvancing": "Desafio em andamento",
+        "arcMastered": "Desafio concluído"
+      },
+      "generic": {
+        "title": "Abra seu próximo passo de aprendizado",
+        "cta": "Abrir"
+      },
+      "complete": "Concluído",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "Momento de aprendizado",
+      "generic": {
+        "title": "Um momento de aprendizado foi salvo."
+      },
+      "session_filed": {
+        "title": "Salvou {{topicTitle}} no seu registro de aprendizado."
+      },
+      "quota": {
+        "title": "Um momento de aprendizado foi salvo."
+      }
+    },
+    "overflow": {
+      "more": "{{count}} mais opções"
+    },
+    "empty": {
+      "title": "Nada precisa de você agora",
+      "cta": "Procurar mais opções de aprendizado"
+    },
+    "bar": {
+      "unavailable": "O tutor está offline por um momento. Você ainda pode digitar.",
+      "cameraLabel": "Câmera",
+      "placeholder": "Pergunte, cole ou descreva o que você quer aprender.",
+      "micLabel": "Microfone",
+      "homeworkChip": "Dever de casa"
+    },
+    "onTrack": {
+      "label": "Em dia",
+      "reviewsDue": "revisões pendentes",
+      "dueCleared": "Nenhuma revisão pendente"
+    },
+    "rewards": {
+      "privateLabel": "Recibo de aprendizado privado",
+      "practicePoints": "+{{amount}} pontos de prática para {{topicTitle}}",
+      "practicePointsNoTopic": "+{{amount}} pontos de prática",
+      "reflectionBonus": "Bônus de reflexão de {{multiplier}} aplicado",
+      "quizPersonalBestCapitals": "Novo recorde pessoal de capitais: {{score}}",
+      "quizPersonalBestGuessWho": "Novo recorde pessoal de Adivinhe Quem: {{score}}",
+      "masteryDelta": "{{mastered}} dominados, +{{weeklyDelta}} esta semana",
+      "masteryDeltaNoWeekly": "{{mastered}} dominados"
+    },
+    "lightPractice": {
+      "prompt": "Prefere algo leve?",
+      "fatigueReason": "Sugerido porque este feed está leve agora.",
+      "capitals": "Capitais",
+      "guessWho": "Adivinhe Quem",
+      "vocabulary": "Vocabulário",
+      "dictation": "Ditado"
+    },
+    "celebration": {
+      "ownChoice": "Você escolheu o próximo passo."
+    },
+    "coldStart": {
+      "caption": "No que você quer trabalhar?",
+      "equalWeight": "Exemplo de comando",
+      "placeholderRotation": {
+        "one": "Digite uma pergunta ou cole o dever de casa..."
+      },
+      "orJustType": "Ou comece com um destes.",
+      "chipHomework": "Ajude-me com o dever de casa",
+      "chipLearn": "Ensine-me algo novo",
+      "chipAsk": "Eu tenho uma pergunta",
+      "homeworkReply": "Use a câmera para capturar o problema ou digite-o aqui."
     }
   },
   "subjectsBrowse": {
     "stub": {
       "title": "Matérias",
       "subtitle": "Navegue pela sua estrutura de aprendizagem a partir daqui."
-    }
+    },
+    "title": "Matérias",
+    "searchPlaceholder": "Pesquisar matérias",
+    "showEverything": "Mostre-me tudo",
+    "emptyTitle": "Nenhuma matéria ainda",
+    "emptyMessage": "Crie uma matéria para começar a construir seu mapa de aprendizado.",
+    "createSubject": "Criar matéria",
+    "openSubject": "Abrir matéria",
+    "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
+    "reviewsDue": "{{count}} revisões pendentes"
   },
   "journal": {
     "stub": {
       "title": "Diário",
       "subtitle": "O seu registo de aprendizagem guardado ficará aqui."
+    }
+  },
+  "subjectHub": {
+    "loading": "Carregando matéria...",
+    "errors": {
+      "missingSubjectTitle": "Matéria não encontrada",
+      "missingSubjectMessage": "Volte e escolha uma matéria novamente.",
+      "loadTitle": "Não foi possível carregar esta matéria",
+      "loadMessage": "Tente novamente ou volte para suas matérias."
+    },
+    "progress": {
+      "threeState": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
+      "reviewsDue": "{{count}} revisões pendentes",
+      "noReviewsDue": "Nenhuma revisão pendente",
+      "weeklyDelta": "+{{count}} dominados esta semana",
+      "noWeeklyDelta": "Nenhum domínio novo esta semana",
+      "practicePoints": "{{points}} pontos de prática recentemente",
+      "noPracticePoints": "Nenhum ponto de prática recente"
+    },
+    "nextUp": {
+      "heading": "A seguir",
+      "allCaughtUp": "Tudo em dia",
+      "resume": "Retomar",
+      "upNext": "Estude o próximo tópico",
+      "review": "Revisar",
+      "structuralOnly": "As ações de estudo são privadas para o aluno nesta visualização."
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}} dominados"
+    },
+    "search": {
+      "placeholder": "Pesquisar tópicos",
+      "micLabel": "Pesquisar por voz",
+      "noResults": "Nenhum tópico corresponde a essa pesquisa."
+    },
+    "notes": {
+      "heading": "Notas",
+      "authorSelf": "Minhas notas",
+      "authorMentor": "Salvo do tutor"
+    },
+    "sheet": {
+      "close": "Fechar",
+      "about": "Sobre este tópico",
+      "masteryLine": "Status: {{state}}",
+      "study": "Estudar",
+      "review": "Revisar",
+      "seeFullTopic": "Ver tópico completo"
+    },
+    "topic": {
+      "continueNow": "Continuar agora",
+      "started": "Iniciado",
+      "upNext": "A seguir",
+      "later": "Mais tarde",
+      "done": "Concluído",
+      "mastered": "Dominado"
     }
   }
 }

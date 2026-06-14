@@ -36,7 +36,10 @@ describe('topicNoteSchema', () => {
   };
 
   it('accepts a valid note with sessionId', () => {
-    expect(topicNoteSchema.parse(validNote)).toEqual(validNote);
+    expect(topicNoteSchema.parse(validNote)).toEqual({
+      ...validNote,
+      origin: 'self',
+    });
   });
 
   it('accepts null sessionId', () => {
@@ -369,7 +372,10 @@ describe('allNoteSchema', () => {
   };
 
   it('accepts a valid all-note entry', () => {
-    expect(allNoteSchema.parse(validAllNote)).toEqual(validAllNote);
+    expect(allNoteSchema.parse(validAllNote)).toEqual({
+      ...validAllNote,
+      origin: 'self',
+    });
   });
 
   it('accepts null sessionId', () => {
