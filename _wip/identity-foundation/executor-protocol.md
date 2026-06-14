@@ -81,5 +81,13 @@ the merge SHA directly.) **Never self-close** — review/close is the operator's
 - **Report-back boundaries:** (a) pre-destructive-step (above), (b) green PR +
   `complete` fired, (c) blocked, or review-loop residuals after 3 rounds.
   Everything else stays inside your run.
+- **Scope boundary — authority ends at the green-PR report.** An executor's
+  authority ENDS at the green-PR report. Executors NEVER merge a PR, NEVER move
+  a sibling WI, and NEVER self-grant or waive a required-check failure (incl. a
+  red claude-review, even when plausibly benign). Merging through the strict
+  green-PR gate and granting any per-PR gate exception are SHEPHERD-only acts; a
+  claude-review exception is operator-only. On a red/blocked check, the executor
+  diagnoses it verbatim and reports to the shepherd — it does not act on its own
+  diagnosis.
 - Secrets via Doppler only; never `wrangler secret put` or ad-hoc env edits.
 - No `eslint-disable` / suppression to get green; fix the root cause.

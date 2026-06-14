@@ -90,6 +90,8 @@ red `claude-review` as automatically benign. Report PR state in literal terms �
 "deterministic gates green; `claude-review` red (cause: …); not merging until resolved" — and
 never round that up to "green".
 
+Merging and any per-PR gate exception are shepherd-only acts — executors never merge or self-grant a check exception (see executor-protocol.md → executor scope boundary).
+
 ## Cosmo lifecycle
 Executors claim before they execute · `complete` → Reviewing · **never self-close** · bring
 a WP through the DoR bridge (`refine --to-ready` — author the bundle brief + link
