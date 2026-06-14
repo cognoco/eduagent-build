@@ -958,6 +958,40 @@ describe('checkGithubWorkflowSecurity', () => {
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
   });
 
+  // Regression guard: a pre-existing fromJSON for the creator's association
+  // must NOT satisfy the sender-guard check. The checker must require the
+  // fromJSON/equality to be co-located with github.event.sender.author_association.
+  it('rejects issues:assigned when the only fromJSON check is for the creator association, not the sender', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-issues-assigned-creator-only-fromjson.yml',
+      `
+      name: Bad issues assigned creator-only fromJSON
+      on:
+        issues:
+          types: [opened, assigned]
+      jobs:
+        claude:
+          if: |
+            github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    // The fromJSON is for the creator (github.event.issue.author_association),
+    // not the sender — the checker must still flag this.
+    expect(messages(root)).toContain(
+      'issues:assigned event triggers a secret-backed job whose if: checks author_association of the issue creator, not the assigning actor (github.event.sender)',
+    );
+  });
+
   it('allows issues:assigned when the job if: also gates on github.event.sender association', () => {
     writeFixture(
       root,

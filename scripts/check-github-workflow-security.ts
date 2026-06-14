@@ -375,14 +375,26 @@ function validateIssuesAssignedWithoutSenderGuard(
 
   // Safe if the job if: also checks github.event.sender with an association
   // allowlist or equality. A bare mention of sender is not enough — it must
-  // be wired into a fromJSON allowlist or equality check.
-  const referencesSenderAssociation =
-    /github\.event\.sender\.[a-z_.]*author_association/.test(jobIf);
+  // be wired into a fromJSON allowlist or equality check that is anchored
+  // specifically to the sender's author_association field. We require a single
+  // combined match so that a pre-existing fromJSON (for the creator's
+  // association) cannot satisfy the check independently of the sender path.
+  //
+  // Accepted patterns:
+  //   fromJSON(...), github.event.sender.author_association   (allowlist membership)
+  //   github.event.sender.author_association == '...'         (equality)
+  //   '...' == github.event.sender.author_association         (equality, reversed)
   const enforcesSenderAssociation =
-    referencesSenderAssociation &&
-    /fromJSON\s*\(|author_association\s*==|==[^=]*author_association/.test(
+    // fromJSON allowlist: fromJSON(…) followed closely by the sender path, or vice versa
+    /fromJSON\s*\([^)]*\)\s*,\s*github\.event\.sender\.[a-z_.]*author_association/.test(
       jobIf,
-    );
+    ) ||
+    /contains\s*\(\s*fromJSON\s*\([^)]*\)\s*,\s*github\.event\.sender\.[a-z_.]*author_association/.test(
+      jobIf,
+    ) ||
+    // equality check: sender path == value or value == sender path
+    /github\.event\.sender\.[a-z_.]*author_association\s*==/.test(jobIf) ||
+    /==\s*github\.event\.sender\.[a-z_.]*author_association/.test(jobIf);
   if (enforcesSenderAssociation) return null;
 
   return {
