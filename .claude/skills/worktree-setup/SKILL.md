@@ -1,6 +1,6 @@
 ---
 name: worktree-setup
-description: Use when starting isolated work in this repo (parallel agents, autonomous WI execution, risky changes that should not touch the main checkout). Creates a git worktree at .worktrees/<branch>/ from origin/main, runs pnpm install, syncs secrets. Use this instead of Claude Code's EnterWorktree tool or superpowers:using-git-worktrees — both will place the worktree in the wrong location.
+description: Use when starting isolated work in this repo (parallel agents, autonomous WI execution, risky changes that should not touch the main checkout). Use this instead of Claude Code's EnterWorktree tool or superpowers:using-git-worktrees — both will place the worktree in the wrong location.
 ---
 
 <!--
