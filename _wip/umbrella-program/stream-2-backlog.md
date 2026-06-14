@@ -248,6 +248,13 @@ Recorded in their runway context; they resolve here:
 - **Glossary bucket 3** (cards / celebrations) from `docs/glossary.md`: principles →
   `ux-design-specification.md`; terms → product-owned per-area `CONTEXT.md`; inventories →
   L3 register. (Buckets 1/2 are NOT Stream 2 — see roster PRG-01 / PRG-21.)
+- **PRG-14 tech-skill lean-pointer rework** (`.agents/skills/tech/{eduagent-schemas,eduagent-db,gha-hardening}/`):
+  the three agent-facing reference skills (WI-744/745/746) were approved + merged **as-is**, but per the
+  operator-ruled agent-doc-architecture pattern (2026-06-14) — *facts live in L3 canon; skills are lean
+  trigger+pointer indexes, minted only for deep+situational topics* — they currently duplicate canon. Rework:
+  extract their factual rules into L3 docs (much already in `AGENTS.md` / `architecture.md`), slim each skill to
+  a thin trigger + pointer + key-invariants, and apply the same bar to future `tech/*` skill minting. Same family
+  as the *Agent-doctrine / memory pointer cleanup* inventory item above. Do NOT do in the PRG-14 lane.
 
 ---
 
@@ -276,6 +283,10 @@ archives it or reduces it to a pointer.
 ---
 
 ## Change log
+- **2026-06-14 — PRG-14 tech-skill lean-pointer rework added.** The three `tech/*` reference skills
+  (WI-744/745/746) merge as-is; their facts→L3 / skill→lean-pointer rework is deferred here per the operator's
+  agent-doc-architecture ruling (facts in L3 canon; skills = lean trigger+pointer, minted only when deep+situational).
+  Recorded under § Inbound feed-in; same family as the *Agent-doctrine / memory pointer cleanup* inventory bullet.
 - **2026-06-13 — AGENTS.md size-ceiling outcome added.** Recorded the harness 40k-char
   limit (root `AGENTS.md` at 45.5k) as an explicit outcome of the agent-doctrine canon
   drain — the trim was previously only an implicit byproduct of the principles-catalog
