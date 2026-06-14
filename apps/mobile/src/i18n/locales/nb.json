@@ -3465,10 +3465,6 @@
     "hourCount_other": "{{count}} timer med læring"
   },
   "mentorHome": {
-    "stub": {
-      "title": "Veileder",
-      "subtitle": "Ditt neste læringssteg vil vises her."
-    },
     "cards": {
       "unfinished_session": {
         "title": "Fortsett den siste økten din",
@@ -3575,13 +3571,19 @@
       "chipLearn": "Lær meg noe nytt",
       "chipAsk": "Jeg har et spørsmål",
       "homeworkReply": "Bruk kameraet til å ta bilde av oppgaven, eller skriv den her."
+    },
+    "title": "Mentor",
+    "subtitle": "Noen nyttige neste steg, pluss ett sted for å spørre eller notere hva som helst.",
+    "fallback": {
+      "cached": "Viser den sist lagrede strømmen mens vi kobler til på nytt."
+    },
+    "error": {
+      "title": "Vi kunne ikke laste inn dine neste steg",
+      "message": "Du kan prøve på nytt eller bla gjennom emner direkte.",
+      "subjects": "Bla gjennom emner"
     }
   },
   "subjectsBrowse": {
-    "stub": {
-      "title": "Fag",
-      "subtitle": "Bla gjennom læringsstrukturen din herfra."
-    },
     "title": "Emner",
     "searchPlaceholder": "Søk i emner",
     "showEverything": "Vis meg alt",
@@ -3590,13 +3592,9 @@
     "createSubject": "Opprett emne",
     "openSubject": "Åpne emne",
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
-    "reviewsDue": "{{count}} repetisjoner forfaller"
-  },
-  "journal": {
-    "stub": {
-      "title": "Journal",
-      "subtitle": "Din lagrede læringslogg vil ligge her."
-    }
+    "reviewsDue": "{{count}} repetisjoner forfaller",
+    "errorTitle": "Vi kunne ikke laste inn emner",
+    "errorMessage": "Prøv igjen, eller kom tilbake om et øyeblikk."
   },
   "subjectHub": {
     "loading": "Laster inn emne ...",
@@ -3651,6 +3649,34 @@
       "later": "Senere",
       "done": "Ferdig",
       "mastered": "Mestret"
+    }
+  },
+  "journal": {
+    "title": "Journal",
+    "trust": {
+      "privacyPromise": "Din private læringssti: lagrede øyeblikk, notater, rapporter og mentor-minne."
+    },
+    "sections": {
+      "recaps": "Oppsummeringer",
+      "recapsSubtitle": "Se gjennom nylige øktsoppsummeringer.",
+      "reports": "Mine rapporter",
+      "reportsSubtitle": "Åpne ukentlige og månedlige fremdriftsrapporter.",
+      "notes": "Lagrede notater",
+      "notesSubtitle": "Bla gjennom notater, bokmerker og lagrede økter.",
+      "memory": "Mentor-minne",
+      "memorySubtitle": "Se og administrer hva mentoren din husker."
+    },
+    "moments": {
+      "title": "Nylige øyeblikk",
+      "empty": "Nye læringsøyeblikk vil vises her.",
+      "errorTitle": "Kunne ikke laste nylige øyeblikk",
+      "generic": "Et læringsøyeblikk ble lagret.",
+      "session_filed": "Lagret {{topicTitle}} i læringsloggen din.",
+      "topic_mastered": "Merket {{topicTitle}} som mestret.",
+      "recap_ready": "En oppsummering er klar.",
+      "snapshot_ready": "Et læringsøyeblikksbilde er klart.",
+      "reflection_bonus": "Refleksjonsbonus lagret.",
+      "quiz_personal_best": "Personlig rekord lagret."
     }
   }
 }

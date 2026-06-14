@@ -3465,10 +3465,6 @@
     "hourCount_other": "{{count}} horas de aprendizagem"
   },
   "mentorHome": {
-    "stub": {
-      "title": "Mentor",
-      "subtitle": "O seu próximo passo de aprendizagem aparecerá aqui."
-    },
     "cards": {
       "unfinished_session": {
         "title": "Continue sua última sessão",
@@ -3575,13 +3571,19 @@
       "chipLearn": "Ensine-me algo novo",
       "chipAsk": "Eu tenho uma pergunta",
       "homeworkReply": "Use a câmera para capturar o problema ou digite-o aqui."
+    },
+    "title": "Mentor",
+    "subtitle": "Alguns próximos passos úteis, além de um lugar para perguntar ou anotar qualquer coisa.",
+    "fallback": {
+      "cached": "Mostrando o último feed salvo enquanto nos reconectamos."
+    },
+    "error": {
+      "title": "Não foi possível carregar seus próximos passos",
+      "message": "Você pode tentar novamente ou explorar as matérias diretamente.",
+      "subjects": "Explorar matérias"
     }
   },
   "subjectsBrowse": {
-    "stub": {
-      "title": "Matérias",
-      "subtitle": "Navegue pela sua estrutura de aprendizagem a partir daqui."
-    },
     "title": "Matérias",
     "searchPlaceholder": "Pesquisar matérias",
     "showEverything": "Mostre-me tudo",
@@ -3590,13 +3592,9 @@
     "createSubject": "Criar matéria",
     "openSubject": "Abrir matéria",
     "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
-    "reviewsDue": "{{count}} revisões pendentes"
-  },
-  "journal": {
-    "stub": {
-      "title": "Diário",
-      "subtitle": "O seu registo de aprendizagem guardado ficará aqui."
-    }
+    "reviewsDue": "{{count}} revisões pendentes",
+    "errorTitle": "Não foi possível carregar as matérias",
+    "errorMessage": "Tente novamente ou volte em um instante."
   },
   "subjectHub": {
     "loading": "Carregando matéria...",
@@ -3651,6 +3649,34 @@
       "later": "Mais tarde",
       "done": "Concluído",
       "mastered": "Dominado"
+    }
+  },
+  "journal": {
+    "title": "Diário",
+    "trust": {
+      "privacyPromise": "Seu histórico de aprendizado privado: momentos salvos, notas, relatórios e memória do mentor."
+    },
+    "sections": {
+      "recaps": "Resumos",
+      "recapsSubtitle": "Reveja os resumos das sessões recentes.",
+      "reports": "Meus relatórios",
+      "reportsSubtitle": "Abra os relatórios de progresso semanais e mensais.",
+      "notes": "Notas salvas",
+      "notesSubtitle": "Explore notas, favoritos e sessões salvas.",
+      "memory": "Memória do mentor",
+      "memorySubtitle": "Veja e gerencie o que seu mentor se lembra."
+    },
+    "moments": {
+      "title": "Momentos recentes",
+      "empty": "Novos momentos de aprendizado aparecerão aqui.",
+      "errorTitle": "Não foi possível carregar os momentos recentes",
+      "generic": "Um momento de aprendizado foi salvo.",
+      "session_filed": "{{topicTitle}} salvo no seu histórico de aprendizado.",
+      "topic_mastered": "{{topicTitle}} marcado como dominado.",
+      "recap_ready": "Um resumo está pronto.",
+      "snapshot_ready": "Um resumo do seu aprendizado está pronto.",
+      "reflection_bonus": "Bônus de reflexão salvo.",
+      "quiz_personal_best": "Recorde pessoal salvo."
     }
   }
 }

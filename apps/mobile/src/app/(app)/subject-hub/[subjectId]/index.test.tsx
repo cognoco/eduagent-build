@@ -190,7 +190,7 @@ describe('SubjectHubRoute', () => {
     );
   });
 
-  it('routes due-review next-up actions into the retention review flow', async () => {
+  it('routes due-review next-up actions into the existing topic review flow', async () => {
     mockFetch.setRoute('/progress/resume-target', { target: null });
     mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
       topics: [
@@ -214,8 +214,8 @@ describe('SubjectHubRoute', () => {
 
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/(app)/retention/review',
-        params: { topicId: TOPIC_ID },
+        pathname: '/(app)/topic/[topicId]',
+        params: { subjectId: SUBJECT_ID, topicId: TOPIC_ID },
       }),
     );
   });

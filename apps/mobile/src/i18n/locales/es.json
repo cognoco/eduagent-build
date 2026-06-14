@@ -3465,10 +3465,6 @@
     "hourCount_other": "{{count}} horas de aprendizaje"
   },
   "mentorHome": {
-    "stub": {
-      "title": "Mentor",
-      "subtitle": "Tu próximo paso de aprendizaje aparecerá aquí."
-    },
     "cards": {
       "unfinished_session": {
         "title": "Continúa tu última sesión",
@@ -3575,13 +3571,19 @@
       "chipLearn": "Enséñame algo nuevo",
       "chipAsk": "Tengo una pregunta",
       "homeworkReply": "Usa la cámara para capturar el problema o escríbelo aquí."
+    },
+    "title": "Tutor",
+    "subtitle": "Algunos próximos pasos útiles, además de un lugar para preguntar o apuntar cualquier cosa.",
+    "fallback": {
+      "cached": "Mostrando la última información guardada mientras nos reconectamos."
+    },
+    "error": {
+      "title": "No pudimos cargar tus próximos pasos",
+      "message": "Puedes reintentar o explorar las materias directamente.",
+      "subjects": "Explorar materias"
     }
   },
   "subjectsBrowse": {
-    "stub": {
-      "title": "Asignaturas",
-      "subtitle": "Explora tu estructura de aprendizaje desde aquí."
-    },
     "title": "Temas",
     "searchPlaceholder": "Buscar temas",
     "showEverything": "Muéstramelo todo",
@@ -3590,13 +3592,9 @@
     "createSubject": "Crear tema",
     "openSubject": "Abrir tema",
     "subjectProgress": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
-    "reviewsDue": "{{count}} repasos pendientes"
-  },
-  "journal": {
-    "stub": {
-      "title": "Diario",
-      "subtitle": "Tu registro de aprendizaje guardado estará aquí."
-    }
+    "reviewsDue": "{{count}} repasos pendientes",
+    "errorTitle": "No pudimos cargar las materias",
+    "errorMessage": "Inténtalo de nuevo o vuelve en un momento."
   },
   "subjectHub": {
     "loading": "Cargando tema...",
@@ -3651,6 +3649,34 @@
       "later": "Más tarde",
       "done": "Hecho",
       "mastered": "Dominado"
+    }
+  },
+  "journal": {
+    "title": "Diario",
+    "trust": {
+      "privacyPromise": "Tu historial de aprendizaje privado: momentos guardados, notas, informes y memoria del tutor."
+    },
+    "sections": {
+      "recaps": "Resúmenes",
+      "recapsSubtitle": "Revisa los resúmenes de sesiones recientes.",
+      "reports": "Mis informes",
+      "reportsSubtitle": "Abre los informes de progreso semanales y mensuales.",
+      "notes": "Notas guardadas",
+      "notesSubtitle": "Explora notas, marcadores y sesiones guardadas.",
+      "memory": "Memoria del tutor",
+      "memorySubtitle": "Ve y gestiona lo que tu tutor recuerda."
+    },
+    "moments": {
+      "title": "Momentos recientes",
+      "empty": "Aquí aparecerán nuevos momentos de aprendizaje.",
+      "errorTitle": "No se pudieron cargar los momentos recientes",
+      "generic": "Se ha guardado un momento de aprendizaje.",
+      "session_filed": "Se ha guardado {{topicTitle}} en tu historial de aprendizaje.",
+      "topic_mastered": "Se ha marcado {{topicTitle}} como dominado.",
+      "recap_ready": "Hay un resumen listo.",
+      "snapshot_ready": "Hay una instantánea de aprendizaje lista.",
+      "reflection_bonus": "Bono de reflexión guardado.",
+      "quiz_personal_best": "Récord personal guardado."
     }
   }
 }

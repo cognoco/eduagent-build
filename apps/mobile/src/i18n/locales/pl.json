@@ -3617,10 +3617,6 @@
     "wordCount_many": "Nauczono się {{count}} słów"
   },
   "mentorHome": {
-    "stub": {
-      "title": "Mentor",
-      "subtitle": "Tutaj pojawi się Twój następny krok w nauce."
-    },
     "cards": {
       "unfinished_session": {
         "title": "Kontynuuj ostatnią sesję",
@@ -3727,13 +3723,19 @@
       "chipLearn": "Naucz mnie czegoś nowego",
       "chipAsk": "Mam pytanie",
       "homeworkReply": "Użyj aparatu, aby sfotografować zadanie, lub wpisz je tutaj."
+    },
+    "title": "Mentor",
+    "subtitle": "Kilka przydatnych kroków i jedno miejsce na pytania i notatki.",
+    "fallback": {
+      "cached": "Wyświetlanie ostatniego zapisanego kanału podczas ponownego łączenia."
+    },
+    "error": {
+      "title": "Nie udało się wczytać kolejnych kroków",
+      "message": "Możesz spróbować ponownie lub bezpośrednio przeglądać tematy.",
+      "subjects": "Przeglądaj tematy"
     }
   },
   "subjectsBrowse": {
-    "stub": {
-      "title": "Przedmioty",
-      "subtitle": "Przeglądaj stąd strukturę swojej nauki."
-    },
     "title": "Przedmioty",
     "searchPlaceholder": "Szukaj przedmiotów",
     "showEverything": "Pokaż mi wszystko",
@@ -3742,13 +3744,9 @@
     "createSubject": "Utwórz przedmiot",
     "openSubject": "Otwórz przedmiot",
     "subjectProgress": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
-    "reviewsDue": "{{count}} zaległych powtórek"
-  },
-  "journal": {
-    "stub": {
-      "title": "Dziennik",
-      "subtitle": "Tutaj będą przechowywane Twoje zapisane postępy."
-    }
+    "reviewsDue": "{{count}} zaległych powtórek",
+    "errorTitle": "Nie udało się wczytać tematów",
+    "errorMessage": "Spróbuj ponownie lub wróć za chwilę."
   },
   "subjectHub": {
     "loading": "Ładowanie przedmiotu...",
@@ -3803,6 +3801,34 @@
       "later": "Później",
       "done": "Gotowe",
       "mastered": "Opanowane"
+    }
+  },
+  "journal": {
+    "title": "Dziennik",
+    "trust": {
+      "privacyPromise": "Twoja prywatna ścieżka nauki: zapisane chwile, notatki, raporty i pamięć mentora."
+    },
+    "sections": {
+      "recaps": "Podsumowania",
+      "recapsSubtitle": "Przeglądaj podsumowania ostatnich sesji.",
+      "reports": "Moje raporty",
+      "reportsSubtitle": "Otwieraj tygodniowe i miesięczne raporty postępów.",
+      "notes": "Zapisane notatki",
+      "notesSubtitle": "Przeglądaj notatki, zakładki i zapisane sesje.",
+      "memory": "Pamięć mentora",
+      "memorySubtitle": "Zobacz, co pamięta Twój mentor, i zarządzaj tym."
+    },
+    "moments": {
+      "title": "Ostatnie chwile",
+      "empty": "Nowe momenty nauki pojawią się tutaj.",
+      "errorTitle": "Nie udało się wczytać ostatnich chwil",
+      "generic": "Zapisano moment nauki.",
+      "session_filed": "Zapisano {{topicTitle}} w Twojej historii nauki.",
+      "topic_mastered": "Oznaczono {{topicTitle}} jako opanowane.",
+      "recap_ready": "Podsumowanie jest gotowe.",
+      "snapshot_ready": "Migawka postępów jest gotowa.",
+      "reflection_bonus": "Zapisano premię za refleksję.",
+      "quiz_personal_best": "Zapisano rekord osobisty."
     }
   }
 }

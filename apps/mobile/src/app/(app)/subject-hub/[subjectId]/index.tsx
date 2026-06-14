@@ -50,11 +50,11 @@ export default function SubjectHubRoute(): React.ReactElement {
   const handleReviewTopic = useCallback(
     (topicId: string) => {
       router.push({
-        pathname: '/(app)/retention/review',
-        params: { topicId },
+        pathname: '/(app)/topic/[topicId]',
+        params: { subjectId, topicId },
       } as Href);
     },
-    [router],
+    [router, subjectId],
   );
 
   const handleNextUp = useCallback(

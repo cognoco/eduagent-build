@@ -3465,10 +3465,6 @@
     "hourCount_other": "学習時間{{count}}時間"
   },
   "mentorHome": {
-    "stub": {
-      "title": "メンター",
-      "subtitle": "次の学習ステップはここに表示されます。"
-    },
     "cards": {
       "unfinished_session": {
         "title": "前回のセッションを続ける",
@@ -3575,13 +3571,19 @@
       "chipLearn": "新しいことを教えて",
       "chipAsk": "質問があります",
       "homeworkReply": "カメラで問題を撮影するか、ここに入力してください。"
+    },
+    "title": "メンター",
+    "subtitle": "次に役立ついくつかのステップと、質問や記録ができる場所です。",
+    "fallback": {
+      "cached": "再接続中に、最後に保存されたフィードを表示しています。"
+    },
+    "error": {
+      "title": "次のステップを読み込めませんでした",
+      "message": "再試行するか、教科を直接閲覧できます。",
+      "subjects": "教科を閲覧"
     }
   },
   "subjectsBrowse": {
-    "stub": {
-      "title": "科目",
-      "subtitle": "ここから学習の構成を閲覧できます。"
-    },
     "title": "科目",
     "searchPlaceholder": "科目を検索",
     "showEverything": "すべて表示",
@@ -3590,13 +3592,9 @@
     "createSubject": "科目を作成",
     "openSubject": "科目を開く",
     "subjectProgress": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
-    "reviewsDue": "{{count}}件の復習"
-  },
-  "journal": {
-    "stub": {
-      "title": "ジャーナル",
-      "subtitle": "保存した学習記録はここに表示されます。"
-    }
+    "reviewsDue": "{{count}}件の復習",
+    "errorTitle": "教科を読み込めませんでした",
+    "errorMessage": "再試行するか、しばらくしてからもう一度お試しください。"
   },
   "subjectHub": {
     "loading": "科目を読み込み中…",
@@ -3651,6 +3649,34 @@
       "later": "後で",
       "done": "完了",
       "mastered": "習得済み"
+    }
+  },
+  "journal": {
+    "title": "ジャーナル",
+    "trust": {
+      "privacyPromise": "あなたのプライベートな学習の記録：保存されたモーメント、ノート、レポート、メンターの記憶。"
+    },
+    "sections": {
+      "recaps": "要約",
+      "recapsSubtitle": "最近のセッションの概要を確認します。",
+      "reports": "マイレポート",
+      "reportsSubtitle": "週次および月次の進捗レポートを開きます。",
+      "notes": "保存したノート",
+      "notesSubtitle": "ノート、ブックマーク、保存したセッションを閲覧します。",
+      "memory": "メンターの記憶",
+      "memorySubtitle": "メンターが記憶している内容を確認・管理します。"
+    },
+    "moments": {
+      "title": "最近のモーメント",
+      "empty": "新しい学習モーメントはここに表示されます。",
+      "errorTitle": "最近のモーメントを読み込めませんでした",
+      "generic": "学習モーメントが保存されました。",
+      "session_filed": "{{topicTitle}}を学習記録に保存しました。",
+      "topic_mastered": "{{topicTitle}}を習得済みとしてマークしました。",
+      "recap_ready": "要約の準備ができました。",
+      "snapshot_ready": "学習スナップショットの準備ができました。",
+      "reflection_bonus": "振り返りボーナスが保存されました。",
+      "quiz_personal_best": "自己ベストが保存されました。"
     }
   }
 }

@@ -3465,10 +3465,6 @@
     "hourCount_other": "{{count}} Stunden gelernt"
   },
   "mentorHome": {
-    "stub": {
-      "title": "Mentor",
-      "subtitle": "Dein nächster Lernschritt wird hier erscheinen."
-    },
     "cards": {
       "unfinished_session": {
         "title": "Setze deine letzte Sitzung fort",
@@ -3575,13 +3571,19 @@
       "chipLearn": "Bring mir etwas Neues bei",
       "chipAsk": "Ich habe eine Frage",
       "homeworkReply": "Nutze die Kamera, um das Problem zu erfassen, oder tippe es hier ein."
+    },
+    "title": "Mentor",
+    "subtitle": "Ein paar nützliche nächste Schritte und ein Ort, an dem du alles fragen oder festhalten kannst.",
+    "fallback": {
+      "cached": "Zuletzt gespeicherter Feed wird angezeigt, während wir neu verbinden."
+    },
+    "error": {
+      "title": "Wir konnten deine nächsten Schritte nicht laden",
+      "message": "Versuche es erneut oder durchsuche direkt die Themen.",
+      "subjects": "Themen durchsuchen"
     }
   },
   "subjectsBrowse": {
-    "stub": {
-      "title": "Fächer",
-      "subtitle": "Durchsuche von hier aus deine Lernstruktur."
-    },
     "title": "Fächer",
     "searchPlaceholder": "Fächer suchen",
     "showEverything": "Zeig mir alles",
@@ -3590,13 +3592,9 @@
     "createSubject": "Fach erstellen",
     "openSubject": "Fach öffnen",
     "subjectProgress": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
-    "reviewsDue": "{{count}} fällige Wiederholungen"
-  },
-  "journal": {
-    "stub": {
-      "title": "Journal",
-      "subtitle": "Deine gespeicherten Lernprotokolle findest du hier."
-    }
+    "reviewsDue": "{{count}} fällige Wiederholungen",
+    "errorTitle": "Wir konnten die Themen nicht laden",
+    "errorMessage": "Versuche es erneut oder komme gleich wieder."
   },
   "subjectHub": {
     "loading": "Lade Fach ...",
@@ -3651,6 +3649,34 @@
       "later": "Später",
       "done": "Fertig",
       "mastered": "Gemeistert"
+    }
+  },
+  "journal": {
+    "title": "Journal",
+    "trust": {
+      "privacyPromise": "Dein privater Lernpfad: gespeicherte Momente, Notizen, Berichte und Mentor-Gedächtnis."
+    },
+    "sections": {
+      "recaps": "Zusammenfassungen",
+      "recapsSubtitle": "Zusammenfassungen letzter Sitzungen ansehen.",
+      "reports": "Meine Berichte",
+      "reportsSubtitle": "Wöchentliche und monatliche Fortschrittsberichte öffnen.",
+      "notes": "Gespeicherte Notizen",
+      "notesSubtitle": "Notizen, Lesezeichen und gespeicherte Sitzungen durchsuchen.",
+      "memory": "Mentor-Gedächtnis",
+      "memorySubtitle": "Sieh und verwalte, woran sich dein Mentor erinnert."
+    },
+    "moments": {
+      "title": "Letzte Momente",
+      "empty": "Neue Lernmomente werden hier erscheinen.",
+      "errorTitle": "Letzte Momente konnten nicht geladen werden",
+      "generic": "Ein Lernmoment wurde gespeichert.",
+      "session_filed": "{{topicTitle}} wurde in deinem Lernprotokoll gespeichert.",
+      "topic_mastered": "{{topicTitle}} wurde als gemeistert markiert.",
+      "recap_ready": "Zusammenfassung ist fertig.",
+      "snapshot_ready": "Eine Lern-Momentaufnahme ist fertig.",
+      "reflection_bonus": "Reflexionsbonus gespeichert.",
+      "quiz_personal_best": "Bestleistung gespeichert."
     }
   }
 }

@@ -2603,9 +2603,15 @@
     "moreLabel": "More"
   },
   "mentorHome": {
-    "stub": {
-      "title": "Mentor",
-      "subtitle": "Your next learning step will appear here."
+    "title": "Mentor",
+    "subtitle": "A few useful next steps, plus one place to ask or capture anything.",
+    "fallback": {
+      "cached": "Showing the last saved feed while we reconnect."
+    },
+    "error": {
+      "title": "We could not load your next steps",
+      "message": "You can retry or browse subjects directly.",
+      "subjects": "Browse subjects"
     },
     "cards": {
       "unfinished_session": {
@@ -2716,10 +2722,6 @@
     }
   },
   "subjectsBrowse": {
-    "stub": {
-      "title": "Subjects",
-      "subtitle": "Browse your learning structure from here."
-    },
     "title": "Subjects",
     "searchPlaceholder": "Search subjects",
     "showEverything": "Show me everything",
@@ -2727,6 +2729,8 @@
     "emptyMessage": "Create a subject to start building your learning map.",
     "createSubject": "Create subject",
     "openSubject": "Open subject",
+    "errorTitle": "We could not load subjects",
+    "errorMessage": "Try again, or come back in a moment.",
     "subjectProgress": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
     "reviewsDue": "{{count}} reviews due"
   },
@@ -2786,9 +2790,31 @@
     }
   },
   "journal": {
-    "stub": {
-      "title": "Journal",
-      "subtitle": "Your saved learning record will live here."
+    "title": "Journal",
+    "trust": {
+      "privacyPromise": "Your private learning trail: saved moments, notes, reports, and mentor memory."
+    },
+    "sections": {
+      "recaps": "Recaps",
+      "recapsSubtitle": "Review recent session summaries.",
+      "reports": "My reports",
+      "reportsSubtitle": "Open weekly and monthly progress reports.",
+      "notes": "Saved notes",
+      "notesSubtitle": "Browse notes, bookmarks, and saved sessions.",
+      "memory": "Mentor memory",
+      "memorySubtitle": "See and manage what your mentor remembers."
+    },
+    "moments": {
+      "title": "Recent moments",
+      "empty": "New learning moments will appear here.",
+      "errorTitle": "Could not load recent moments",
+      "generic": "A learning moment was saved.",
+      "session_filed": "Saved {{topicTitle}} to your learning record.",
+      "topic_mastered": "Marked {{topicTitle}} as mastered.",
+      "recap_ready": "A recap is ready.",
+      "snapshot_ready": "A learning snapshot is ready.",
+      "reflection_bonus": "Reflection bonus saved.",
+      "quiz_personal_best": "Personal best saved."
     }
   },
   "recaps": {
