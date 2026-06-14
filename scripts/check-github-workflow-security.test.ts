@@ -888,4 +888,144 @@ describe('checkGithubWorkflowSecurity', () => {
       'Claude Code action using default GitHub App auth must grant id-token: write',
     );
   });
+
+  // [S1 / WI-736 / F-119] issues:assigned + secret-backed agent without sender guard.
+  // For the `assigned` event the triggering actor is github.event.sender (the assigner),
+  // not the issue creator. A job that checks github.event.issue.author_association does
+  // NOT protect against an untrusted assigner. The safe fix is to drop `assigned` from
+  // the issues event types; the second safe option is to add a github.event.sender guard.
+  it('rejects issues:assigned on a secret-backed @claude agent that only checks creator author_association', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-issues-assigned.yml',
+      `
+      name: Bad issues assigned
+      on:
+        issue_comment:
+          types: [created]
+        issues:
+          types: [opened, assigned]
+      jobs:
+        claude:
+          if: |
+            (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') &&
+              contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+            (github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+              contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'issues:assigned event triggers a secret-backed job whose if: checks author_association of the issue creator, not the assigning actor (github.event.sender)',
+    );
+  });
+
+  it('allows issues:opened (without assigned) on a secret-backed @claude agent', () => {
+    writeFixture(
+      root,
+      '.github/workflows/good-issues-opened-only.yml',
+      `
+      name: Good issues opened only
+      on:
+        issue_comment:
+          types: [created]
+        issues:
+          types: [opened]
+      jobs:
+        claude:
+          if: |
+            (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') &&
+              contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+            (github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+              contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  // Regression guard: a pre-existing fromJSON for the creator's association
+  // must NOT satisfy the sender-guard check. The checker must require the
+  // fromJSON/equality to be co-located with github.event.sender.author_association.
+  it('rejects issues:assigned when the only fromJSON check is for the creator association, not the sender', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-issues-assigned-creator-only-fromjson.yml',
+      `
+      name: Bad issues assigned creator-only fromJSON
+      on:
+        issues:
+          types: [opened, assigned]
+      jobs:
+        claude:
+          if: |
+            github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    // The fromJSON is for the creator (github.event.issue.author_association),
+    // not the sender — the checker must still flag this.
+    expect(messages(root)).toContain(
+      'issues:assigned event triggers a secret-backed job whose if: checks author_association of the issue creator, not the assigning actor (github.event.sender)',
+    );
+  });
+
+  it('allows issues:assigned when the job if: also gates on github.event.sender association', () => {
+    writeFixture(
+      root,
+      '.github/workflows/good-issues-assigned-sender-guard.yml',
+      `
+      name: Good issues assigned with sender guard
+      on:
+        issues:
+          types: [opened, assigned]
+      jobs:
+        claude:
+          if: |
+            github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association) &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.sender.author_association)
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  // Verify the actual claude.yml does not trigger the issues:assigned violation.
+  it('passes the live claude.yml through the issues:assigned checker', () => {
+    const violations = checkGithubWorkflowSecurity(process.cwd());
+    const assignedViolations = violations.filter((v) =>
+      v.message.includes('issues:assigned'),
+    );
+    expect(assignedViolations).toEqual([]);
+  });
 });
