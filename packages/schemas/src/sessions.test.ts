@@ -46,6 +46,7 @@ import {
   ocrRegionSchema,
   ocrResultSchema,
   homeworkStateSyncSchema,
+  MAX_HOMEWORK_PROBLEMS,
   sessionInputModeSchema,
   interleavedSessionStartSchema,
   recallBridgeResultSchema,
@@ -291,6 +292,32 @@ describe('homeworkSessionMetadataSchema', () => {
       unknownField: 'should be stripped',
     });
     expect((result as Record<string, unknown>)['unknownField']).toBeUndefined();
+  });
+
+  // F-158 server-side follow-up: problems array must be capped at MAX_HOMEWORK_PROBLEMS.
+  const makeProblems = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `p-${i}`,
+      text: 'x',
+      source: 'manual' as const,
+    }));
+
+  it('accepts exactly MAX_HOMEWORK_PROBLEMS problems', () => {
+    const result = homeworkSessionMetadataSchema.safeParse({
+      problemCount: MAX_HOMEWORK_PROBLEMS,
+      currentProblemIndex: 0,
+      problems: makeProblems(MAX_HOMEWORK_PROBLEMS),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects MAX_HOMEWORK_PROBLEMS + 1 problems', () => {
+    const result = homeworkSessionMetadataSchema.safeParse({
+      problemCount: MAX_HOMEWORK_PROBLEMS + 1,
+      currentProblemIndex: 0,
+      problems: makeProblems(MAX_HOMEWORK_PROBLEMS + 1),
+    });
+    expect(result.success).toBe(false);
   });
 });
 
@@ -1280,6 +1307,25 @@ describe('homeworkStateSyncSchema', () => {
       metadata: { problemCount: 2, currentProblemIndex: 1, problems: [] },
     });
     expect(result.success).toBe(true);
+  });
+
+  it('rejects oversized problems array via homeworkSessionMetadataSchema propagation', () => {
+    const oversizedProblems = Array.from(
+      { length: MAX_HOMEWORK_PROBLEMS + 1 },
+      (_, i) => ({
+        id: `p-${i}`,
+        text: 'x',
+        source: 'manual' as const,
+      }),
+    );
+    const result = homeworkStateSyncSchema.safeParse({
+      metadata: {
+        problemCount: MAX_HOMEWORK_PROBLEMS + 1,
+        currentProblemIndex: 0,
+        problems: oversizedProblems,
+      },
+    });
+    expect(result.success).toBe(false);
   });
 });
 
