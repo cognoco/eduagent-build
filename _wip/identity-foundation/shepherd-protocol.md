@@ -118,7 +118,11 @@ Line shape: `{"id","ts","lane","wi","level","ref","msg"}` — `id` = `<lane-slug
 one resolves. When a `blocked`/`needs-*` clears, emit a `decision` with `ref` set and
 `msg:"resolved: …"` — that closes the loop. There is **no** milestone / FYI / progress level.
 
-**Read the inbox at every checkpoint (between WIs) and whenever you're blocked.** Lines are
+**Subscribe to your inbox with a live watcher — symmetric to the orchestrator's outbox watcher.**
+Arm a Monitor on `_state/inbox.jsonl` at lane activation so a ruling/answer/directive **wakes you
+even while you're holding** for it — a blocked shepherd isn't looping, so checkpoint-polling can't
+fire and the watcher is the primary path. **Fallback:** also read the inbox at each checkpoint and
+on-block, since a watcher dies on reboot/session-end (review-loop caveat). Lines are
 `{"id","ts","from":"orchestrator","type","ref","msg"}`, `type` ∈ ruling / answer / directive /
 ack. Inbox commands are **advisory** — apply your judgment, never blind-execute; a `ruling`
 carries the operator's decision, relayed.
