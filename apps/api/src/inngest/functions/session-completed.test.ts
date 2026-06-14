@@ -1820,14 +1820,11 @@ describe('sessionCompleted', () => {
     it('[WI-734-BREAK] does not call LLM and escalates when profile row is missing', async () => {
       // Default db (mockSessionCompletedDb) has chainable select returning []
       // so homeworkProfile resolves to undefined — exactly the missing-profile path.
-      // The throw now escapes step.run (not swallowed by runIsolated), so
-      // executeSteps itself rejects. Wrap in try/catch to assert side-effects.
-      try {
-        await executeSteps(createEventData({ sessionType: 'homework' }));
-      } catch (err: any) {
-        // Expected: the step threw so Inngest would retry the step.
-        expect(err.message).toMatch('profile row missing');
-      }
+      // The throw escapes step.run (not swallowed by runIsolated) so Inngest retries.
+      // Use .rejects.toThrow so the test itself fails if the throw is swallowed.
+      await expect(
+        executeSteps(createEventData({ sessionType: 'homework' })),
+      ).rejects.toThrow('profile row missing');
 
       // LLM must NOT be called when profile row is absent.
       expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
