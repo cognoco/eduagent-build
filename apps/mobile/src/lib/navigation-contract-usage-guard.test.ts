@@ -173,6 +173,13 @@ const CANONICAL_BOUNDARY_FILES: readonly string[] = [
 // when MODE_NAV_V0_ENABLED is retired.
 const V0_FALLBACK_FILES: readonly LegitimateRawNavigationGateFile[] = [
   {
+    file: 'apps/mobile/src/hooks/use-entry-gate.ts',
+    category: 'v0-fallback',
+    reason:
+      'V0-fallback: centralized entry-gate hook reads contract.isParentProxy in the V1-off arm to preserve V0 profile-load allow-through; replaces the per-screen ternaries (7 raw sites collapsed into 1).',
+    expectedFindings: { 'proxy-state-read': 1 },
+  },
+  {
     file: 'apps/mobile/src/app/(app)/own-learning.tsx',
     category: 'v0-fallback',
     reason:
