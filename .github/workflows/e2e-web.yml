@@ -10,6 +10,11 @@ name: E2E Web
 #   - manual workflow_dispatch -> the real smoke suite always runs.
 on:
   pull_request:
+    branches:
+      - main
+      - develop
+      - improvements
+      - language-add
   workflow_dispatch:
 
 concurrency:
@@ -28,7 +33,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run-real: ${{ steps.check.outputs.run-real }}
-      surface-changed: ${{ steps.check.outputs.surface-changed }}
       trusted: ${{ steps.check.outputs.trusted }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -53,7 +57,6 @@ jobs:
           # Manual dispatch always runs the full suite (secrets available).
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "trusted=true" >> "$GITHUB_OUTPUT"
-            echo "surface-changed=true" >> "$GITHUB_OUTPUT"
             echo "run-real=true" >> "$GITHUB_OUTPUT"
             echo "Manual dispatch — running full E2E suite"
             exit 0
@@ -64,7 +67,6 @@ jobs:
           # pass-through (reviewers validate via workflow_dispatch).
           if [[ "$IS_SAME_REPO" != "true" ]]; then
             echo "trusted=false" >> "$GITHUB_OUTPUT"
-            echo "surface-changed=unknown" >> "$GITHUB_OUTPUT"
             echo "run-real=false" >> "$GITHUB_OUTPUT"
             echo "Fork/untrusted PR — secret-backed smoke cannot run; gate is pass-through. Use workflow_dispatch after review."
             exit 0
@@ -85,7 +87,6 @@ jobs:
           done <<< "$FILES"
 
           echo "trusted=true" >> "$GITHUB_OUTPUT"
-          echo "surface-changed=$SURFACE_CHANGED" >> "$GITHUB_OUTPUT"
           echo "run-real=$SURFACE_CHANGED" >> "$GITHUB_OUTPUT"
           echo "Trusted PR — surface-changed=$SURFACE_CHANGED (changed files: $(echo "$FILES" | wc -l | tr -d ' '))"
 
@@ -126,6 +127,8 @@ jobs:
       E2E_ENV: staging
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
         with:
@@ -238,14 +241,18 @@ jobs:
     needs: [changes, run-smoke]
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+      # Route job results/outputs through env (GitHub substitutes expressions
+      # before the shell runs; env keeps the values out of the script text).
+      - env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SMOKE_RESULT: ${{ needs.run-smoke.result }}
+          RUN_REAL: ${{ needs.changes.outputs.run-real }}
+          TRUSTED: ${{ needs.changes.outputs.trusted }}
+        run: |
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
             echo "Change detection failed — failing closed"
             exit 1
           fi
-
-          RUN_REAL='${{ needs.changes.outputs.run-real }}'
-          SMOKE_RESULT='${{ needs.run-smoke.result }}'
 
           if [[ "$RUN_REAL" == "true" ]]; then
             # A real smoke run was required. The gate mirrors its outcome and
@@ -261,8 +268,9 @@ jobs:
           # No real run was required (fork/untrusted, or no web/mobile surface
           # change). This is an honest pass-through, not an always-green gate:
           # a trusted PR touching the surface would have set run-real=true above.
-          if [[ "${{ needs.changes.outputs.trusted }}" == "false" ]]; then
+          if [[ "$TRUSTED" == "false" ]]; then
             echo "Fork/untrusted PR — secret-backed smoke not run; validate via workflow_dispatch after review."
           else
             echo "E2E smoke skipped — no web/mobile surface changes in this PR."
           fi
+          exit 0
