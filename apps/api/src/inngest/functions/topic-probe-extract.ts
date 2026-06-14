@@ -5,7 +5,6 @@ import {
   curriculumBooks,
   curriculumTopics,
   learningSessions,
-  retentionCards,
   sessionEvents,
   subjects,
   type Database,
@@ -27,6 +26,7 @@ import {
   ensureRetentionCard,
   evaluateRecallQuality,
 } from '../../services/retention-data';
+import { applyRetentionUpdate } from '../../services/apply-retention-update';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
 
@@ -112,22 +112,19 @@ async function seedRetentionCard(params: {
   const seed = buildRetentionSeed(quality, seededAt);
   if (!seed) return quality;
 
-  await db
-    .update(retentionCards)
-    .set({
+  await applyRetentionUpdate({
+    db,
+    profileId,
+    cardId: card.id,
+    set: {
       easeFactor: seed.easeFactor,
       intervalDays: seed.intervalDays,
       repetitions: seed.repetitions,
       nextReviewAt: seed.nextReviewAt,
-      updatedAt: seededAt,
-    })
-    .where(
-      and(
-        eq(retentionCards.id, card.id),
-        eq(retentionCards.profileId, profileId),
-        eq(retentionCards.repetitions, 0),
-      ),
-    );
+    },
+    guard: { kind: 'repetitionsZero' },
+    updatedAt: seededAt,
+  });
 
   return quality;
 }

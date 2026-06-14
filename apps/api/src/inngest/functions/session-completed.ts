@@ -11,6 +11,7 @@ import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
 } from '../../services/retention-data';
+import { resetRetentionCardForRelearn } from '../../services/apply-retention-update';
 import { getCurrentLanguageProgress } from '../../services/language-curriculum';
 import { extractVocabularyFromTranscript } from '../../services/vocabulary-extract';
 import { upsertExtractedVocabulary } from '../../services/vocabulary';
@@ -638,13 +639,9 @@ export const sessionCompleted = inngest.createFunction(
     // `updatedAt` value — bumping it here would cause SM-2 to short-circuit
     // and skip the advance.
     //
-    // Previously this relied on Drizzle's implicit "omit field from SET =
-    // don't change it" behaviour. That contract is invisible at the call
-    // site: a future maintainer adding `$onUpdateFn(() => new Date())` to
-    // retentionCards in the schema would silently break the D-01 guard.
-    // The fix below makes the preservation explicit via a self-referencing
-    // SQL expression so the contract is visible in code and survives any
-    // future schema-level auto-update hook.
+    // The reset helper preserves updatedAt via a self-referencing SQL
+    // expression, so a future schema-level auto-update hook cannot silently
+    // break the D-01 guard used by update-retention.
     outcomes.push(
       await step.run('relearn-retention-reset', async () => {
         const sessionMode = event.data.mode as string | undefined;
@@ -662,30 +659,7 @@ export const sessionCompleted = inngest.createFunction(
 
         return runCritical('relearn-retention-reset', async () => {
           const db = getStepDatabase();
-          await db
-            .update(retentionCards)
-            .set({
-              easeFactor: 2.5,
-              intervalDays: 1,
-              repetitions: 0,
-              failureCount: 0,
-              consecutiveSuccesses: 0,
-              xpStatus: 'pending',
-              nextReviewAt: null,
-              lastReviewedAt: null,
-              // [BUG-185] Explicitly preserve updatedAt against the column
-              // itself. This is a no-op at the SQL level but documents the
-              // contract that update-retention depends on this value being
-              // unchanged, and prevents accidental bump from any future
-              // Drizzle $onUpdateFn on retentionCards.updatedAt.
-              updatedAt: sql`${retentionCards.updatedAt}`,
-            })
-            .where(
-              and(
-                eq(retentionCards.topicId, topicId),
-                eq(retentionCards.profileId, profileId),
-              ),
-            );
+          await resetRetentionCardForRelearn({ db, profileId, topicId });
         });
       }),
     );
