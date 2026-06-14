@@ -26,6 +26,7 @@ import {
   createDatabase,
   deletionAudit,
   financialRecord,
+  generateUUIDv7,
   guardianship,
   login,
   membership,
@@ -498,6 +499,90 @@ const COPPA = 'coppa_parental_consent';
           where: eq(consentGrant.chargePersonId, ownerId),
         });
         expect(grants).toHaveLength(1);
+      });
+
+      // WI-723 follow-up (Claude CHANGES_REQUESTED on #1139): the single-person
+      // delete paths resolve the financial_record org via the person's
+      // membership. If NO org resolves, the previous code SILENTLY skipped the
+      // financial_record write but still wrote deletion_audit + deleted the
+      // person — a v2 deletion completing with ZERO §6.1 retain records, a
+      // banned billing-domain silent recovery. The fix FAILS CLOSED: the helper
+      // throws, aborting the deletion transaction (person NOT deleted, no
+      // partial state). The throw is itself the required escalation (Sentry via
+      // the Inngest/route boundary). This anomaly should not occur in normal
+      // flow — the write runs before the person DELETE, while membership exists.
+      it('FAIL-CLOSED: an orphaned person (no membership) aborts the deletion — throws, person NOT deleted, no financial_record / deletion_audit written (tx rolled back)', async () => {
+        // Seed a person directly with NO membership (the orphan anomaly). Not
+        // via seedPerson (which always adds a membership).
+        const [orphan] = await db
+          .insert(person)
+          .values({
+            displayName: 'Orphan',
+            birthDate: '2015-01-01',
+            residenceJurisdiction: 'EU',
+          })
+          .returning();
+        personIds.push(orphan!.id);
+
+        // RED (silent `if (!organizationId) return;`): deletePersonV2 resolves,
+        // the person is deleted, and 0 financial_record rows exist — the §6.1
+        // violation. GREEN (fail-closed throw): it rejects and the tx rolls
+        // back, so the person survives and NOTHING was written.
+        await expect(
+          deletePersonV2(db, orphan!.id, 'abandonment', null),
+        ).rejects.toThrow(/organization/i);
+
+        // The transaction rolled back: the person still exists.
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, orphan!.id),
+        });
+        expect(personRow).toBeTruthy();
+
+        // No retain records and no audit were committed (the whole tx aborted).
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, orphan!.id),
+        });
+        expect(financialRecords).toHaveLength(0);
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, orphan!.id),
+        });
+        expect(audits).toHaveLength(0);
+      });
+
+      // WI-723 follow-up #2 (Codex P2 on #1144): an already-gone person must be
+      // a clean idempotent no-op, NEVER the fail-closed throw → retry →
+      // escalate. This asserts the user-visible contract at the public boundary:
+      // deleting a non-existent person resolves silently and writes nothing
+      // (here the caller's own pre-helper existence guard short-circuits).
+      //
+      // The deeper protection is the helper's existence-RECHECK inside
+      // `writeFinancialRecordsForPersonTx`: the cross-transaction race Codex
+      // flagged is `executeDeletionV2` (which does NOT take the per-person
+      // advisory lock) committing a person-delete AFTER the caller's guard
+      // passes but BEFORE the helper's org read — so the helper, not the caller,
+      // is where a no-org result must be re-classified as "already gone ⇒ no-op"
+      // vs "still exists ⇒ throw". That interleaving has no test-injectable yield
+      // point between the caller guard and the helper call inside one
+      // transaction, so it is covered by reasoning + the FAIL-CLOSED test above
+      // (which proves the still-exists branch still throws); this test pins the
+      // public idempotency contract that motivates the recheck.
+      it('BENIGN RACE: deleting an already-gone person is a clean no-op — does NOT throw and writes nothing', async () => {
+        // A personId that does not exist (the already-deleted-by-the-winner
+        // shape, no membership and no person row).
+        const goneId = generateUUIDv7();
+
+        await expect(
+          deletePersonV2(db, goneId, 'abandonment', null),
+        ).resolves.toBeUndefined();
+
+        const financialRecords = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, goneId),
+        });
+        expect(financialRecords).toHaveLength(0);
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, goneId),
+        });
+        expect(audits).toHaveLength(0);
       });
     });
 
