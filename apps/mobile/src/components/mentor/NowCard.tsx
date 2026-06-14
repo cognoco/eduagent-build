@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { NowCard as NowCardData } from '@eduagent/schemas';
 
+import type { TranslateKey } from '../../i18n';
 import { useThemeColors } from '../../lib/theme';
 
 export type NowCardVariant = 'anchor' | 'module';
@@ -19,7 +20,7 @@ export interface NowCardProps {
 const CARD_COPY_KEYS: Partial<
   Record<
     NowCardData['kind'],
-    { templateKey: string; title: string; cta: string }
+    { templateKey: string; title: TranslateKey; cta: TranslateKey }
   >
 > = {
   unfinished_session: {
@@ -56,8 +57,8 @@ const ARC_KEYS: Record<NowCardArcState, string> = {
 };
 
 export function resolveNowCardCopyKeys(card: NowCardData): {
-  title: string;
-  cta: string;
+  title: TranslateKey;
+  cta: TranslateKey;
 } {
   const entry = CARD_COPY_KEYS[card.kind];
   if (entry?.templateKey === card.templateKey) {
@@ -69,8 +70,11 @@ export function resolveNowCardCopyKeys(card: NowCardData): {
   };
 }
 
-function arcCopyKey(card: NowCardData, arcState: NowCardArcState): string {
-  return `mentorHome.cards.${card.kind}.${ARC_KEYS[arcState]}`;
+function arcCopyKey(
+  card: NowCardData,
+  arcState: NowCardArcState,
+): TranslateKey {
+  return `mentorHome.cards.${card.kind}.${ARC_KEYS[arcState]}` as TranslateKey;
 }
 
 export function NowCard({

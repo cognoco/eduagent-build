@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import type { TranslateKey } from '../../i18n';
 import type {
   HubChapter,
   HubTopic,
@@ -23,7 +24,7 @@ const STATE_MARK: Record<HubTopicState, string> = {
   mastered: 'M',
 };
 
-const STATE_KEY: Record<HubTopicState, string> = {
+const STATE_KEY: Record<HubTopicState, TranslateKey> = {
   'continue-now': 'subjectHub.topic.continueNow',
   started: 'subjectHub.topic.started',
   'up-next': 'subjectHub.topic.upNext',

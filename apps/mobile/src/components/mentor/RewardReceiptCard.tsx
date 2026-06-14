@@ -1,6 +1,8 @@
 import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import type { TranslateKey } from '../../i18n';
+
 export type RewardReceipt =
   | { kind: 'practice_points'; amount: number; topicTitle?: string }
   | { kind: 'reflection_bonus'; multiplier: 1.5; totalXp: number }
@@ -15,7 +17,7 @@ export interface RewardReceiptCardProps {
   receipt: RewardReceipt;
 }
 
-function receiptCopyKey(receipt: RewardReceipt): string {
+function receiptCopyKey(receipt: RewardReceipt): TranslateKey {
   switch (receipt.kind) {
     case 'practice_points':
       return receipt.topicTitle
@@ -61,7 +63,7 @@ export function RewardReceiptCard({ receipt }: RewardReceiptCardProps) {
         {t('mentorHome.rewards.privateLabel')}
       </Text>
       <Text className="mt-1 text-sm text-text-primary">
-        {t(receiptCopyKey(receipt), receipt)}
+        {t(receiptCopyKey(receipt), receipt as Record<string, unknown>)}
       </Text>
       <Text
         testID="mentor-reward-value"

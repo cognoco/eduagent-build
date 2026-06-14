@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import type { TranslateKey } from '../../i18n';
+
 export interface MentorCelebrationProps {
   eventId: string;
-  messageKey: string;
+  messageKey: TranslateKey;
   seenEventIds?: ReadonlySet<string>;
   onMarkSeen?: (eventId: string) => void;
 }

@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import type { TranslateKey } from '../../i18n';
 import type {
   HubTopic,
   HubTopicState,
@@ -17,7 +18,7 @@ interface TopicDetailSheetProps {
   onSeeFullTopic?: (topicId: string) => void;
 }
 
-const STATE_KEY: Record<HubTopicState, string> = {
+const STATE_KEY: Record<HubTopicState, TranslateKey> = {
   'continue-now': 'subjectHub.topic.continueNow',
   started: 'subjectHub.topic.started',
   'up-next': 'subjectHub.topic.upNext',

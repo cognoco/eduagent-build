@@ -34,7 +34,9 @@ jest.mock(
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
-let mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+let mockSearchParams: () => { subjectId?: string | string[] } = () => ({
+  subjectId: SUBJECT_ID,
+});
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams(),

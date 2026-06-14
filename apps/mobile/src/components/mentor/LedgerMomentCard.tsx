@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { NowCard as NowCardData } from '@eduagent/schemas';
 
+import type { TranslateKey } from '../../i18n';
 import { useThemeColors } from '../../lib/theme';
 
 export interface LedgerMomentCardProps {
@@ -10,7 +11,7 @@ export interface LedgerMomentCardProps {
   onDecline: (card: NowCardData) => void;
 }
 
-function ledgerCopyKey(card: NowCardData): string {
+function ledgerCopyKey(card: NowCardData): TranslateKey {
   const ledgerKind =
     typeof card.params['ledgerKind'] === 'string'
       ? card.params['ledgerKind']
@@ -18,7 +19,7 @@ function ledgerCopyKey(card: NowCardData): string {
   if (!ledgerKind || ledgerKind === card.templateKey) {
     return 'mentorHome.ledger.generic.title';
   }
-  return `mentorHome.ledger.${ledgerKind}.title`;
+  return `mentorHome.ledger.${ledgerKind}.title` as TranslateKey;
 }
 
 export function LedgerMomentCard({

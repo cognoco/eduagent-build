@@ -1,6 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import type { TranslateKey } from '../../i18n';
+
 export type LightPracticeRoute =
   | 'capitals'
   | 'guess_who'
@@ -13,7 +15,7 @@ export interface LightPracticeAffordanceProps {
   onSelect: (route: LightPracticeRoute) => void;
 }
 
-const LABEL_KEYS: Record<LightPracticeRoute, string> = {
+const LABEL_KEYS: Record<LightPracticeRoute, TranslateKey> = {
   capitals: 'mentorHome.lightPractice.capitals',
   guess_who: 'mentorHome.lightPractice.guessWho',
   vocabulary: 'mentorHome.lightPractice.vocabulary',

@@ -13,7 +13,6 @@ import type {
   HubNextUp,
   HubTopic,
   HubTopicState,
-  SubjectHubAggregate,
   SubjectHubData,
 } from '../components/subject-hub';
 import { assertOk } from '../lib/assert-ok';
@@ -212,7 +211,7 @@ function buildNextUp(input: {
   upNextTopic: CurriculumTopic | null;
   topicById: ReadonlyMap<string, CurriculumTopic>;
   topicBookIdByTopicId: ReadonlyMap<string, string>;
-}): SubjectHubNextUp {
+}): SubjectHubNextUpWithResume {
   if (input.resumeTarget?.topicId) {
     return {
       kind: 'resume',

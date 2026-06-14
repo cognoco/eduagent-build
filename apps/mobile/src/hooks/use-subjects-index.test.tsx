@@ -1,10 +1,7 @@
-import type {
-  CurriculumBook,
-  Subject,
-  SubjectProgress,
-} from '@eduagent/schemas';
+import type { CurriculumBook, Subject } from '@eduagent/schemas';
 
 import { buildSubjectsIndex } from './use-subjects-index';
+import type { OverallProgressResponse } from './use-progress';
 
 const SUBJECT_A = '550e8400-e29b-41d4-a716-446655440000';
 const SUBJECT_B = '660e8400-e29b-41d4-a716-446655440001';
@@ -46,8 +43,8 @@ function book(
 
 function progress(
   subjectId: string,
-  overrides: Partial<SubjectProgress> = {},
-): SubjectProgress {
+  overrides: Partial<OverallProgressResponse['subjects'][number]> = {},
+): OverallProgressResponse['subjects'][number] {
   return {
     subjectId,
     name: subjectId === SUBJECT_A ? 'Spanish' : 'Algebra',
@@ -92,10 +89,9 @@ describe('buildSubjectsIndex', () => {
       ],
     });
 
-    expect(result.map((item) => item.subjectName)).toEqual([
-      'Spanish',
-      'Algebra',
-    ]);
+    expect(
+      result.map((item: { subjectName: string }) => item.subjectName),
+    ).toEqual(['Spanish', 'Algebra']);
     expect(result[0]).toEqual(
       expect.objectContaining({
         subjectId: SUBJECT_A,

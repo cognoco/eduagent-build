@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import type { TranslateKey } from '../../i18n';
 import type { HubNextUp } from './_view-models/subject-hub-state';
 
 interface SubjectHubNextUpProps {
@@ -9,7 +10,10 @@ interface SubjectHubNextUpProps {
   onPressNextUp?: (nextUp: HubNextUp) => void;
 }
 
-const NEXT_UP_ACTION_KEY: Record<Exclude<HubNextUp['kind'], 'none'>, string> = {
+const NEXT_UP_ACTION_KEY: Record<
+  Exclude<HubNextUp['kind'], 'none'>,
+  TranslateKey
+> = {
   resume: 'subjectHub.nextUp.resume',
   'up-next': 'subjectHub.nextUp.upNext',
   'review-due': 'subjectHub.nextUp.review',
@@ -21,7 +25,8 @@ export function SubjectHubNextUp({
   onPressNextUp,
 }: SubjectHubNextUpProps): React.ReactElement {
   const { t } = useTranslation();
-  const canShowAction = canStudy && nextUp.kind !== 'none';
+  const actionKey =
+    nextUp.kind === 'none' ? null : NEXT_UP_ACTION_KEY[nextUp.kind];
 
   return (
     <View
@@ -41,11 +46,11 @@ export function SubjectHubNextUp({
         </Text>
       ) : null}
 
-      {canShowAction ? (
+      {canStudy && actionKey ? (
         <Pressable
           testID="subject-hub-next-up-action"
           accessibilityRole="button"
-          accessibilityLabel={t(NEXT_UP_ACTION_KEY[nextUp.kind])}
+          accessibilityLabel={t(actionKey)}
           className="mt-4 self-start rounded-full bg-primary px-4 py-2"
           onPress={() => onPressNextUp?.(nextUp)}
         >
@@ -53,7 +58,7 @@ export function SubjectHubNextUp({
             className="text-body-sm font-semibold text-text-inverse"
             testID="subject-hub-next-up-primary"
           >
-            {t(NEXT_UP_ACTION_KEY[nextUp.kind])}
+            {t(actionKey)}
           </Text>
         </Pressable>
       ) : null}
