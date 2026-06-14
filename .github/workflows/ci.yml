@@ -235,6 +235,14 @@ jobs:
       - name: scripts/* tests
         run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
 
+      # Optional advisory: detect .claude/skills/ entries whose .agents/skills/
+      # master was removed but the generated copy was left behind. continue-on-error
+      # keeps this non-blocking — the step surfaces orphans visibly in CI without
+      # gating unrelated PRs. Promote to required once the path has proven stable.
+      - name: sync-skills orphan check (advisory)
+        continue-on-error: true
+        run: node scripts/sync-skills.mjs --report-orphans
+
       # WI-694: regression guard for the deploy-time KV-binding verifier
       # (apps/api/scripts/verify-wrangler-kv-binding.mjs). Its block-capture
       # regex used a bare `$` under the `m` flag, capturing an empty body and
