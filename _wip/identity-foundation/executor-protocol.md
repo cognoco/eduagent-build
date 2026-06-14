@@ -62,7 +62,12 @@ finding, `mergeStateStatus` `CLEAN`. Never call a PR with any red check "green".
 
 **Phase 7 — Complete.** Only after the PR is green: run `/cosmo:execute
 complete` (authors Fixed In + completion summary, → Stage=Reviewing, releases
-the claim). **Never self-close** — review/close is the operator's gate
+the claim). **Squash-merge caveat:** `complete` derives `Fixed In` from your current `HEAD`;
+after a squash-merge your worktree branch HEAD is the *pre-squash* commit, not the commit that
+landed on `main`. In your worktree, detach HEAD to the squash commit (`git fetch origin main &&
+git checkout <squash-sha>`) before running `complete` so `Fixed In` cites the landed commit.
+(Workaround for the HEAD-based derivation — drop it if `/cosmo:execute complete` learns to take
+the merge SHA directly.) **Never self-close** — review/close is the operator's gate
 (`/cosmo:review`).
 
 ---
@@ -76,5 +81,13 @@ the claim). **Never self-close** — review/close is the operator's gate
 - **Report-back boundaries:** (a) pre-destructive-step (above), (b) green PR +
   `complete` fired, (c) blocked, or review-loop residuals after 3 rounds.
   Everything else stays inside your run.
+- **Scope boundary — authority ends at the green-PR report.** An executor's
+  authority ENDS at the green-PR report. Executors NEVER merge a PR, NEVER move
+  a sibling WI, and NEVER self-grant or waive a required-check failure (incl. a
+  red claude-review, even when plausibly benign). Merging through the strict
+  green-PR gate and granting any per-PR gate exception are SHEPHERD-only acts; a
+  claude-review exception is operator-only. On a red/blocked check, the executor
+  diagnoses it verbatim and reports to the shepherd — it does not act on its own
+  diagnosis.
 - Secrets via Doppler only; never `wrangler secret put` or ad-hoc env edits.
 - No `eslint-disable` / suppression to get green; fix the root cause.

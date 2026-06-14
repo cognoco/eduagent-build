@@ -96,6 +96,35 @@ describe('dictationSentenceSchema', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  // [S6] Per-string length cap on chunk elements
+  it('[S6] rejects a chunks entry exceeding DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS', () => {
+    const result = dictationSentenceSchema.safeParse({
+      ...validSentence,
+      chunks: ['x'.repeat(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS + 1)],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[S6] rejects a chunksWithPunctuation entry exceeding DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS', () => {
+    const result = dictationSentenceSchema.safeParse({
+      ...validSentence,
+      chunksWithPunctuation: [
+        'x'.repeat(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS + 1),
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[S6] accepts chunk entries exactly at the per-string cap', () => {
+    const atCap = 'x'.repeat(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS);
+    const result = dictationSentenceSchema.safeParse({
+      ...validSentence,
+      chunks: [atCap],
+      chunksWithPunctuation: [atCap],
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

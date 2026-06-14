@@ -1020,6 +1020,121 @@ describe('checkGithubWorkflowSecurity', () => {
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
   });
 
+  // [WI-736 rework / PR #1165 finding r3409590891] `on: issues` with NO `types:`
+  // filter subscribes to ALL issue activity — including `assigned`. The checker
+  // must treat a no-`types` issues trigger as exposed, exactly like an explicit
+  // `assigned`. Below: an object-form issues trigger that omits `types`.
+  it('rejects issues with no types filter (implies all activity incl. assigned) + creator-only author_association', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-issues-no-types.yml',
+      `
+      name: Bad issues no types
+      on:
+        issues:
+      jobs:
+        claude:
+          if: |
+            github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'issues:assigned event triggers a secret-backed job whose if: checks author_association of the issue creator, not the assigning actor (github.event.sender)',
+    );
+  });
+
+  // Array-form `on: [issues, ...]` cannot carry a types filter → all activity → assigned.
+  it('rejects array-form on:[issues] (no types possible) + creator-only author_association', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-issues-array-form.yml',
+      `
+      name: Bad issues array form
+      on: [issues, issue_comment]
+      jobs:
+        claude:
+          if: |
+            github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'issues:assigned event triggers a secret-backed job whose if: checks author_association of the issue creator, not the assigning actor (github.event.sender)',
+    );
+  });
+
+  // A secret-backed job with NO `if:` at all runs on every trigger incl. issues
+  // (no types) → completely unguarded → must be flagged.
+  it('rejects issues with no types and a secret-backed job that has no if: guard at all', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-issues-no-types-no-if.yml',
+      `
+      name: Bad issues no types no if
+      on:
+        issues:
+      jobs:
+        claude:
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'issues:assigned event triggers a secret-backed job whose if: checks author_association of the issue creator, not the assigning actor (github.event.sender)',
+    );
+  });
+
+  // The no-types issues trigger is safe when the job if: gates on the sender.
+  it('allows issues with no types when the job if: also gates on github.event.sender association', () => {
+    writeFixture(
+      root,
+      '.github/workflows/good-issues-no-types-sender-guard.yml',
+      `
+      name: Good issues no types with sender guard
+      on:
+        issues:
+      jobs:
+        claude:
+          if: |
+            github.event_name == 'issues' && contains(github.event.issue.body, '@claude') &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association) &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.sender.author_association)
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              with:
+                claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
   // Verify the actual claude.yml does not trigger the issues:assigned violation.
   it('passes the live claude.yml through the issues:assigned checker', () => {
     const violations = checkGithubWorkflowSecurity(process.cwd());

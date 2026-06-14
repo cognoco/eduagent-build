@@ -101,9 +101,12 @@ who never originates a `needs-operator` answer.
 ### Cadence
 - **Shepherd emits (outbox):** at the four triggers only — needs a human, needs the
   orchestrator, blocked, or a non-obvious decision — plus a `ref`-resolution when a thread clears.
-- **Shepherd reads (inbox):** at **checkpoints** (between WIs) and **on block**. Not a continuous
-  tail — urgent course-corrections are rare, and checkpoint+on-block bounds the wait without
-  standing machinery.
+- **Shepherd subscribes (inbox):** a **live watcher** on its inbox (a Monitor on `inbox.jsonl`),
+  armed at activation — **symmetric to the orchestrator's outbox watcher** — so a ruling wakes a
+  *held* shepherd. Read at checkpoint + on-block is the **fallback** for watcher death
+  (reboot/session-end). *(Corrected 2026-06-14 after the PRG-10 fast-follow POC: the original
+  checkpoint-only pull reintroduced the operator as transport — a blocked shepherd never reaches a
+  checkpoint, so a human had to nudge "check your inbox." Symmetric subscription removes that.)*
 - **Orchestrator:** watches each provisioned outbox; surfaces by level (`needs-*` / `blocked`
   loud → relay or answer; `decision` → record); writes `ruling`/`answer`/`directive` to the
   relevant inbox; keeps the roll-up current.
