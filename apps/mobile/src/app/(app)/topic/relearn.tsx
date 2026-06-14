@@ -29,10 +29,8 @@ import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
-import { useNavigationContract } from '../../../hooks/use-navigation-contract';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
+import { useEntryGate } from '../../../hooks/use-entry-gate';
 import { firstParam } from '../../../lib/route-params';
-import { Sentry } from '../../../lib/sentry';
 
 type TeachingMethodId =
   | 'visual_diagrams'
@@ -170,7 +168,6 @@ export default function RelearnScreen() {
   const overdueTopics = useOverdueTopics();
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
-  const navigationContract = useNavigationContract();
   const ageBracket =
     activeProfile?.birthYear != null
       ? computeAgeBracket(activeProfile.birthYear)
@@ -392,30 +389,11 @@ export default function RelearnScreen() {
     return allSubjects;
   }, [allSubjects, selectedSubject]);
 
-  // V0 fallback: canEnter() blocks during profile-load when V1 is off — preserve
-  // V0 behavior so cold deep-links don't redirect to /home. See H5.1 in branch CR.
-  const blocked = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? !navigationContract.canEnter('topic/relearn', {
-        for: isParentBridgeSource ? 'child' : 'self',
-      })
-    : navigationContract.isParentProxy;
+  const blocked = useEntryGate('topic/relearn', {
+    for: isParentBridgeSource ? 'child' : 'self',
+  });
 
   if (blocked) {
-    // Silent redirect masked legitimate routing bugs (race between mount and
-    // contract resolution, revoked family link, stale deep-link). Leave a
-    // breadcrumb so triage can see why the user ended up on home instead of
-    // the relearn flow they tapped.
-    Sentry.addBreadcrumb({
-      category: 'navigation',
-      level: 'info',
-      message: 'topic/relearn blocked by canEnter — redirecting to home',
-      data: {
-        source: isParentBridgeSource ? 'parent_bridge' : 'self',
-        isParentProxy: navigationContract.isParentProxy,
-        shape: navigationContract.shape,
-        v1Enabled: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
-      },
-    });
     return <Redirect href="/(app)/home" />;
   }
 
