@@ -329,6 +329,107 @@ function validateClaudeAgentTriggerGuard(
   };
 }
 
+// A secret-backed @claude agent that listens on issues:assigned fires for the
+// *assigner* (github.event.sender), not the issue creator. The standard
+// author_association check in the job `if:` reads github.event.issue.author_association
+// (the creator's association), which does NOT cover the assigning actor. A trusted
+// user can open an @claude issue; any write-access user who later assigns it will
+// trigger the secret-backed agent regardless of their trust level.
+//
+// Safe options:
+//   (a) drop `assigned` from the issues event types — `opened` is the useful trigger
+//       and the creator is the actor that author_association checks.
+//   (b) add an explicit github.event.sender association check.
+//
+// [S1 / WI-736 / F-119]
+//
+// GitHub treats `on: issues` with NO `types:` filter as subscribing to ALL
+// issue activity — which INCLUDES `assigned`. So an `issues` trigger that omits
+// `types` (or lists it as something that isn't an array/string we can read) is
+// just as exposed as one that lists `assigned` explicitly. Returning false on
+// the no-`types` case (the original bug) is a real bypass: a workflow with
+// `on: issues` + a secret-backed @claude job + creator-only author_association
+// would evade the checker entirely.
+function issuesEventHasAssignedType(workflowOn: unknown): boolean {
+  // Detect presence of the `issues` event across string / array / object forms.
+  if (!hasEvent(workflowOn, 'issues')) return false;
+
+  // String form (`on: issues`) or array form (`on: [issues, ...]`) cannot carry
+  // a `types:` filter, so they subscribe to all activity → includes `assigned`.
+  if (!isRecord(workflowOn)) return true;
+
+  const issues = workflowOn.issues;
+  // Object form. If the `issues` value isn't a record (e.g. `issues:` with a
+  // null/empty body), there is no `types` filter → all activity → includes
+  // `assigned`.
+  if (!isRecord(issues)) return true;
+
+  const types = issues.types;
+  if (Array.isArray(types)) return types.includes('assigned');
+  if (typeof types === 'string') return types === 'assigned';
+
+  // `issues:` present as a mapping but with no readable `types:` filter →
+  // GitHub default of all activity types → includes `assigned`.
+  return true;
+}
+
+function validateIssuesAssignedWithoutSenderGuard(
+  file: string,
+  workflowOn: unknown,
+  job: Record<string, unknown>,
+  inheritedSecrets: boolean,
+): { file: string; message: string } | null {
+  if (!issuesEventHasAssignedType(workflowOn)) return null;
+  const jobText = stringify(job);
+  if (!(inheritedSecrets || CLAUDE_AGENT_SECRET.test(jobText))) return null;
+
+  const hasIf = typeof job.if === 'string' && job.if.trim() !== '';
+  const jobIf = hasIf ? stringify(job.if) : '';
+  // A job with no `if:` runs on EVERY trigger the workflow subscribes to —
+  // including the issues:assigned exposure — so it is unguarded and must be
+  // flagged. Only when a non-empty `if:` exists do we narrow to jobs that
+  // actually respond to issue events (skip e.g. a pure `issue_comment` job in a
+  // multi-trigger workflow that scopes itself away from issues).
+  if (
+    hasIf &&
+    !jobIf.includes("'issues'") &&
+    !jobIf.includes('"issues"') &&
+    !jobIf.includes('github.event.issue')
+  ) {
+    return null;
+  }
+
+  // Safe if the job if: also checks github.event.sender with an association
+  // allowlist or equality. A bare mention of sender is not enough — it must
+  // be wired into a fromJSON allowlist or equality check that is anchored
+  // specifically to the sender's author_association field. We require a single
+  // combined match so that a pre-existing fromJSON (for the creator's
+  // association) cannot satisfy the check independently of the sender path.
+  //
+  // Accepted patterns:
+  //   fromJSON(...), github.event.sender.author_association   (allowlist membership)
+  //   github.event.sender.author_association == '...'         (equality)
+  //   '...' == github.event.sender.author_association         (equality, reversed)
+  const enforcesSenderAssociation =
+    // fromJSON allowlist: fromJSON(…) followed closely by the sender path, or vice versa
+    /fromJSON\s*\([^)]*\)\s*,\s*github\.event\.sender\.[a-z_.]*author_association/.test(
+      jobIf,
+    ) ||
+    /contains\s*\(\s*fromJSON\s*\([^)]*\)\s*,\s*github\.event\.sender\.[a-z_.]*author_association/.test(
+      jobIf,
+    ) ||
+    // equality check: sender path == value or value == sender path
+    /github\.event\.sender\.[a-z_.]*author_association\s*==/.test(jobIf) ||
+    /==\s*github\.event\.sender\.[a-z_.]*author_association/.test(jobIf);
+  if (enforcesSenderAssociation) return null;
+
+  return {
+    file,
+    message:
+      'issues:assigned event triggers a secret-backed job whose if: checks author_association of the issue creator, not the assigning actor (github.event.sender); drop "assigned" from types or add a github.event.sender association guard',
+  };
+}
+
 function jobGrantsIdTokenWrite(job: Record<string, unknown>): boolean {
   if (!isRecord(job.permissions)) return false;
   return job.permissions['id-token'] === 'write';
@@ -422,6 +523,14 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
       inheritedSecrets,
     );
     if (claudeAgentViolation) violations.push(claudeAgentViolation);
+
+    const issuesAssignedViolation = validateIssuesAssignedWithoutSenderGuard(
+      file,
+      workflowOn,
+      job,
+      inheritedSecrets,
+    );
+    if (issuesAssignedViolation) violations.push(issuesAssignedViolation);
 
     for (const step of getSteps(job)) {
       const actionViolation = validateActionRef(file, step);

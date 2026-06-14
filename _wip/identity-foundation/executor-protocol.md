@@ -62,7 +62,12 @@ finding, `mergeStateStatus` `CLEAN`. Never call a PR with any red check "green".
 
 **Phase 7 — Complete.** Only after the PR is green: run `/cosmo:execute
 complete` (authors Fixed In + completion summary, → Stage=Reviewing, releases
-the claim). **Never self-close** — review/close is the operator's gate
+the claim). **Squash-merge caveat:** `complete` derives `Fixed In` from your current `HEAD`;
+after a squash-merge your worktree branch HEAD is the *pre-squash* commit, not the commit that
+landed on `main`. In your worktree, detach HEAD to the squash commit (`git fetch origin main &&
+git checkout <squash-sha>`) before running `complete` so `Fixed In` cites the landed commit.
+(Workaround for the HEAD-based derivation — drop it if `/cosmo:execute complete` learns to take
+the merge SHA directly.) **Never self-close** — review/close is the operator's gate
 (`/cosmo:review`).
 
 ---

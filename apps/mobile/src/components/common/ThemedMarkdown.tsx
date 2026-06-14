@@ -35,8 +35,12 @@ const MarkdownComponent = Markdown as ComponentType<MarkdownProps>;
 // invisible-text regression. See docs/llm-issues.md.
 
 // Safe URL schemes allowed for link navigation in LLM-authored markdown (F-027).
-// Schemes outside this set (javascript:, data:, file:, etc.) are blocked to
-// prevent arbitrary-URL navigation injection.
+// [S9] This allowlist intentionally blocks ALL schemes except https/http,
+// including: javascript: (XSS), data: (content injection), file: (local
+// filesystem), mailto: (email harvesting from LLM-authored content), and
+// mentomate: (the app's own deep-link scheme — a malicious LLM reply must not
+// trigger in-app navigation). Static Linking.openURL('mailto:...') calls
+// elsewhere in the app use those schemes directly and are unaffected.
 const SAFE_LINK_SCHEMES = ['https:', 'http:'];
 
 /**
@@ -59,6 +63,11 @@ export function isSafeLinkUrl(url: string): boolean {
 // allowlist combined with a null default handler makes the library's image rule
 // render nothing (see node_modules/react-native-markdown-display image rule:
 // `show === false && defaultImageHandler === null` returns null).
+//
+// [S9] IMPORTANT: If this prop is ever removed (or the array populated),
+// the library reverts to its permissive default allowlist which includes
+// 'https://' — re-enabling remote image loading for all LLM-authored markdown.
+// Do not remove this prop.
 const ALLOWED_IMAGE_HANDLERS: string[] = [];
 const DEFAULT_IMAGE_HANDLER = null;
 

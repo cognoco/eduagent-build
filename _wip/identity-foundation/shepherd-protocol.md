@@ -53,7 +53,10 @@ does **not** graduate the lane, and an un-green PR is never merged. Because the 
 separate session that will
 not notify you, **stand up your own standing monitor** on your workstream's WI stages
 (a Monitor/poll filtered on the `Workstream` relation, watching the Stage field) — that is
-your only reliable channel to a verdict. React to each:
+your **primary** channel to a verdict — but it is **session/host-scoped: it does not survive a
+host reboot or session end, and its silence then reads identically to "no change."**
+Periodically spot-check Cosmo directly rather than trust prolonged silence, and re-arm the
+monitor after any restart. React to each:
 - **rework** (Reviewing → Executing): re-claim, read the reviewer's note, re-dispatch an
   executor to address it, re-`complete`. Adjudicate reviewer misfires — e.g. open
   absorbed-provenance children are NOT a WP DoD gap (disposition-done + the close ceremony
@@ -115,7 +118,11 @@ Line shape: `{"id","ts","lane","wi","level","ref","msg"}` — `id` = `<lane-slug
 one resolves. When a `blocked`/`needs-*` clears, emit a `decision` with `ref` set and
 `msg:"resolved: …"` — that closes the loop. There is **no** milestone / FYI / progress level.
 
-**Read the inbox at every checkpoint (between WIs) and whenever you're blocked.** Lines are
+**Subscribe to your inbox with a live watcher — symmetric to the orchestrator's outbox watcher.**
+Arm a Monitor on `_state/inbox.jsonl` at lane activation so a ruling/answer/directive **wakes you
+even while you're holding** for it — a blocked shepherd isn't looping, so checkpoint-polling can't
+fire and the watcher is the primary path. **Fallback:** also read the inbox at each checkpoint and
+on-block, since a watcher dies on reboot/session-end (review-loop caveat). Lines are
 `{"id","ts","from":"orchestrator","type","ref","msg"}`, `type` ∈ ruling / answer / directive /
 ack. Inbox commands are **advisory** — apply your judgment, never blind-execute; a `ruling`
 carries the operator's decision, relayed.
