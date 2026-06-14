@@ -1637,6 +1637,10 @@ describe('sessionCompleted', () => {
     });
 
     it('extracts and stores summary for homework sessions', async () => {
+      // [WI-734] Requires a profile row so the quota gate can resolve
+      // subscription/language/accountId; use makeDbWithProfile() rather than
+      // the default chainable mock (which returns [] → missing-profile path).
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
       const { result } = (await executeSteps(
         createEventData({ sessionType: 'homework' }),
       )) as any;
@@ -1645,7 +1649,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         SESSION_ID,
-        { conversationLanguage: undefined },
+        { conversationLanguage: 'en' },
       );
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'extract-homework-summary',
@@ -1756,6 +1760,43 @@ describe('sessionCompleted', () => {
         }),
       );
       // The step should record the failure (runIsolated catches + returns 'failed').
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'extract-homework-summary',
+      );
+      expect(outcome.status).toBe('failed');
+    });
+
+    // [WI-734] Negative-path break test: profile-missing branch must NOT call
+    // the homework-summary LLM (unmetered spend) and MUST escalate via
+    // captureException + safeSend (billing silent-recovery ban).
+    // Default db mock returns [] for all db.select().from().where().limit()
+    // calls, so homeworkProfile is undefined without any extra setup.
+    it('[WI-734-BREAK] does not call LLM and escalates when profile row is missing', async () => {
+      // Default db (mockSessionCompletedDb) has chainable select returning []
+      // so homeworkProfile resolves to undefined — exactly the missing-profile path.
+      const { result } = (await executeSteps(
+        createEventData({ sessionType: 'homework' }),
+      )) as any;
+
+      // LLM must NOT be called when profile row is absent.
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+
+      // Must captureException for Sentry observability (not warn-only).
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('profile row missing'),
+        }),
+        expect.objectContaining({ profileId: PROFILE_ID }),
+      );
+
+      // Must emit structured event (billing silent-recovery ban).
+      expect(mockSafeSend).toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.profile_missing',
+        expect.objectContaining({ profileId: PROFILE_ID }),
+      );
+
+      // The step records failure (runIsolated catches + returns 'failed').
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'extract-homework-summary',
       );

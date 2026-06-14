@@ -1794,14 +1794,36 @@ export const sessionCompleted = inngest.createFunction(
           // Guard: profileId comes from the session event — the row should
           // always exist, but if the DB returns nothing we skip metering.
           if (!homeworkProfile) {
+            // [WI-734] Hard-stop: the profile row is required to resolve
+            // subscription/language/accountId — cannot gate or attribute the
+            // LLM call without it.  Do NOT call extractAndStoreHomeworkSummary.
+            // Throwing lets Inngest retry the step (transient replication lag);
+            // captureException + safeSend satisfy the billing silent-recovery ban
+            // (AGENTS.md: "Emit a structured metric or Inngest event; console.warn
+            // alone is not enough") and are observable on every attempt so ops can
+            // detect the failure before all retries are exhausted.
+            const missingProfileErr = new Error(
+              '[billing] homework-summary: profile row missing — cannot resolve subscription/language/accountId',
+            );
             logger.warn(
-              '[metering] homework-summary: profile row missing, skipping quota gate',
+              '[metering] homework-summary: profile row missing, step will retry',
               { event: 'metering.homework_summary.profile_missing', profileId },
             );
-            await extractAndStoreHomeworkSummary(db, profileId, sessionId, {
-              conversationLanguage: undefined,
-            });
-            return;
+            sentry.captureException(missingProfileErr, { profileId });
+            await safeSend(
+              () =>
+                inngest.send({
+                  name: 'app/billing.homework_summary.profile_missing',
+                  data: {
+                    profileId,
+                    occurredAt: new Date().toISOString(),
+                    source: 'homework_summary',
+                  },
+                }),
+              'billing.homework_summary.profile_missing',
+              { profileId },
+            );
+            throw missingProfileErr;
           }
           const subscription = await ensureFreeSubscription(
             db,
