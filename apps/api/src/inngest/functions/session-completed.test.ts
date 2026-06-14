@@ -1879,10 +1879,16 @@ describe('sessionCompleted', () => {
         expect.anything(),
         'sub-test-id',
       );
+      // [S7] Assert that cycleResetAt is threaded through to the observable
+      // safeSend data — the plain call-check above would pass even if resetsAt
+      // were accidentally dropped from the payload.
       expect(mockSafeSend).toHaveBeenCalledWith(
         expect.any(Function),
         'billing.homework_summary.quota_exhausted',
-        expect.objectContaining({ subscriptionId: 'sub-test-id' }),
+        expect.objectContaining({
+          subscriptionId: 'sub-test-id',
+          resetsAt: expectedResetsAt,
+        }),
       );
     });
 

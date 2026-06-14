@@ -1912,7 +1912,9 @@ export const sessionCompleted = inngest.createFunction(
                   },
                 }),
               'billing.homework_summary.quota_exhausted',
-              { subscriptionId: subscription.id, profileId },
+              // [S7] Include resetsAt in the observable data so tests (and log
+              // correlators) can assert the value without invoking the closure.
+              { subscriptionId: subscription.id, profileId, resetsAt },
             );
             logger.warn(
               '[metering] homework-summary skipped — quota exhausted',
