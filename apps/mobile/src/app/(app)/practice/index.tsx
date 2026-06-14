@@ -31,8 +31,7 @@ import {
   PRACTICE_RETURN_TO,
 } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
-import { useNavigationContract } from '../../../hooks/use-navigation-contract';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
+import { useEntryGate } from '../../../hooks/use-entry-gate';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { useTheme, useThemeColors } from '../../../lib/theme';
 import { getSubjectTint } from '../../../lib/subject-tints';
@@ -300,7 +299,6 @@ export default function PracticeScreen(): React.ReactElement {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
-  const navigationContract = useNavigationContract();
   const { colorScheme } = useTheme();
   const colors = usePracticeColors();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
@@ -426,11 +424,7 @@ export default function PracticeScreen(): React.ReactElement {
     router.push('/(app)/practice/assessment-picker' as Href);
   };
 
-  // V0 fallback: canEnter() blocks during profile-load when V1 is off — preserve
-  // V0 behavior so cold deep-links don't redirect to /home. See H5.1 in branch CR.
-  const blocked = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? !navigationContract.canEnter('practice')
-    : navigationContract.isParentProxy;
+  const blocked = useEntryGate('practice');
 
   if (blocked) {
     return <Redirect href="/(app)/home" />;
