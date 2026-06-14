@@ -405,6 +405,37 @@ describe('quiz schemas', () => {
         }),
       ).toThrow();
     });
+
+    it('rejects canonicalName longer than 300 characters', () => {
+      expect(() =>
+        guessWhoQuestionSchema.parse({
+          ...validGuessWho,
+          canonicalName: 'a'.repeat(301),
+          correctAnswer: 'a'.repeat(301),
+        }),
+      ).toThrow();
+    });
+
+    it('rejects an alias longer than 300 characters', () => {
+      expect(() =>
+        guessWhoQuestionSchema.parse({
+          ...validGuessWho,
+          acceptedAliases: ['a'.repeat(301)],
+        }),
+      ).toThrow();
+    });
+
+    it('accepts canonicalName and alias at exactly 300 characters', () => {
+      const name = 'a'.repeat(300);
+      expect(() =>
+        guessWhoQuestionSchema.parse({
+          ...validGuessWho,
+          canonicalName: name,
+          correctAnswer: name,
+          acceptedAliases: [name],
+        }),
+      ).not.toThrow();
+    });
   });
 
   describe('quizQuestionSchema (discriminated union with guess_who)', () => {

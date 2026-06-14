@@ -36,6 +36,18 @@ describe('sanitizeXmlValue', () => {
       // 'a<b>c</b>d' → 'a b c /b d' after collapse
       expect(sanitizeXmlValue('a<b>c</b>d', 100)).toBe('a b c /b d');
     });
+
+    it('strips vertical tab (U+000B)', () => {
+      expect(sanitizeXmlValue('hello\x0Bworld', 100)).toBe('hello world');
+    });
+
+    it('strips form feed (U+000C)', () => {
+      expect(sanitizeXmlValue('hello\x0Cworld', 100)).toBe('hello world');
+    });
+
+    it('strips NEL (U+0085)', () => {
+      expect(sanitizeXmlValue('hello\x85world', 100)).toBe('hello world');
+    });
   });
 
   describe('whitespace normalization', () => {

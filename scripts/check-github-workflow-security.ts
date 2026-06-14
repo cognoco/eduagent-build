@@ -252,6 +252,11 @@ function validateWorkflowRunJob(
 // them must constrain the comment author to a trusted bot identity. Otherwise a
 // PR author can post a comment carrying the verdict marker and forge the gate's
 // source of truth.
+//
+// Scope limit (C2 / PRG-10): COMMENT_FETCH only matches `gh api …/comments` and
+// `gh pr view --json … comments` invocations. A future step that fetches comments
+// via `curl` (REST) or a `github-script` action would not be detected by this
+// regex. If those patterns are introduced, extend COMMENT_FETCH to cover them.
 const COMMENT_FETCH =
   /gh\s+api[^\n]*\/comments|gh\s+pr\s+view[^\n]*--json[^\n]*comments/;
 const VERDICT_MARKER =

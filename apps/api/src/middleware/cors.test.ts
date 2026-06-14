@@ -133,6 +133,23 @@ describe('CORS middleware', () => {
         'http://localhost:8081',
       );
     });
+
+    it('rejects localhost when env binding present but ENVIRONMENT absent (fail-closed, C8)', async () => {
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:8081',
+            'Access-Control-Request-Method': 'GET',
+          },
+        },
+        {} as Record<string, string>, // env present but ENVIRONMENT absent
+      );
+
+      const allowOrigin = res.headers.get('Access-Control-Allow-Origin');
+      expect(allowOrigin).not.toBe('http://localhost:8081');
+    });
   });
 
   describe('actual cross-origin requests', () => {
