@@ -93,6 +93,37 @@ a WP through the DoR bridge (`refine --to-ready` — author the bundle brief + l
 absorbed-provenance children) before it is claimed. A WP that will not decompose into
 children gets **demoted to Item**, not forced.
 
+## Progress channel — orchestrator ↔ shepherd (the needs-a-brain plane)
+Your **lifecycle** (each WI →Reviewing/→Closed) is already visible to the orchestrator via its
+Cosmo Stage monitor — **never narrate it here.** This channel carries only what a human or the
+program must *act on*. Two append-only files in your lane's `_state/` dir, provisioned by the
+orchestrator at activation:
+- `_wip/<lane>/_state/outbox.jsonl` — you → orchestrator (**you are the only writer**).
+- `_wip/<lane>/_state/inbox.jsonl`  — orchestrator → you (read-only to you).
+
+**Append one outbox line at exactly these four triggers — nothing else:**
+
+| `level` | when |
+|---|---|
+| `needs-operator` | a **human** decision (scope / product / risk) you can't make within mandate |
+| `needs-orchestrator` | a **program-level** question (cross-lane, process) |
+| `blocked` | stalled, can't proceed |
+| `decision` | a non-obvious choice you made *within* mandate, logged for the record |
+
+Line shape: `{"id","ts","lane","wi","level","ref","msg"}` — `id` = `<lane-slug>-<seq>`
+(e.g. `prg10ff-007`); `wi` null for a lane-level event; `ref` = the `id` of a prior event this
+one resolves. When a `blocked`/`needs-*` clears, emit a `decision` with `ref` set and
+`msg:"resolved: …"` — that closes the loop. There is **no** milestone / FYI / progress level.
+
+**Read the inbox at every checkpoint (between WIs) and whenever you're blocked.** Lines are
+`{"id","ts","from":"orchestrator","type","ref","msg"}`, `type` ∈ ruling / answer / directive /
+ack. Inbox commands are **advisory** — apply your judgment, never blind-execute; a `ruling`
+carries the operator's decision, relayed.
+
+**The bar is high:** no progress narration, no chatter. If a line wouldn't make the
+orchestrator act or the operator want to know, don't write it — when in doubt, don't emit. Full
+design + rationale: `_wip/identity-foundation/progress-channel-design.md`.
+
 ## Hard rules (cut across the lane)
 - Don't write production code yourself — dispatch executors.
 - **Shared checkout:** stage only your own files; never touch another session's
