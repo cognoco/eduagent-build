@@ -181,6 +181,21 @@ const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
 const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 
 const mockSessionCrudGetSession = jest.fn();
+const mockSessionCrudGetSessionCompletionContext = jest
+  .fn()
+  .mockImplementation(
+    (_db: unknown, _profileId: unknown, sessionId: unknown) => ({
+      sessionId,
+      topicId: null,
+      subjectId: SUBJECT_ID,
+      sessionType: 'learning',
+      verificationType: null,
+      escalationRungs: [1, 2],
+      exchangeCount: 0,
+      interleavedTopicIds: [],
+      mode: null,
+    }),
+  );
 
 jest.mock(
   '../services/session/session-crud' /* gc1-allow: route unit test routes extracted helper through real session-crud import; implementation covered by session-crud tests */,
@@ -192,6 +207,9 @@ jest.mock(
       ...actual,
       getSession: (...args: Parameters<typeof actual.getSession>) =>
         mockSessionCrudGetSession(...args),
+      getSessionCompletionContext: (
+        ...args: Parameters<typeof actual.getSessionCompletionContext>
+      ) => mockSessionCrudGetSessionCompletionContext(...args),
     };
   },
 );
