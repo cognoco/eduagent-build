@@ -347,6 +347,9 @@ const mockDecrementQuota = jest.fn().mockResolvedValue({
   quotaModel: 'shared-pool',
 });
 const mockSafeRefundQuota = jest.fn().mockResolvedValue({ refunded: true });
+const mockGetQuotaPool = jest.fn().mockResolvedValue({
+  cycleResetAt: '2026-08-01T00:00:00.000Z',
+});
 
 jest.mock(
   '../../services/billing' /* gc1-allow: billing operations write Neon quota tables — no DB in the unit runtime */,
@@ -360,6 +363,7 @@ jest.mock(
         mockEnsureFreeSubscription(...args),
       decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
       safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
+      getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
     };
   },
 );
@@ -1842,6 +1846,75 @@ describe('sessionCompleted', () => {
         expect.any(Function),
         'billing.homework_summary.profile_missing',
         expect.objectContaining({ profileId: PROFILE_ID }),
+      );
+    });
+
+    it('[S7] derives resetsAt from cycleResetAt when shared-pool decrement lacks resetsAt', async () => {
+      // Shared-pool decrementQuota does not set resetsAt on the result.
+      // The code must derive it from getQuotaPool.cycleResetAt, not fall
+      // back to new Date() ("resets now") which fires a spurious notification.
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+      const expectedResetsAt = '2026-08-01T00:00:00.000Z';
+      mockDecrementQuota.mockResolvedValueOnce({
+        success: false,
+        source: 'none', // shared-pool source — no resetsAt on the result
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+        // deliberately no resetsAt field
+      });
+      mockGetQuotaPool.mockResolvedValueOnce({
+        cycleResetAt: expectedResetsAt,
+      });
+
+      await executeSteps(createEventData({ sessionType: 'homework' }));
+
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+      // The safeSend callback invokes inngest.send — we check the payload via
+      // the registered mockSafeSend capture of the third positional arg, but
+      // the payload is inside the closure passed as arg 1. We verify that
+      // getQuotaPool was called (meaning the fallback path ran), and the
+      // safeSend fired (meaning the exhausted notification was still sent).
+      expect(mockGetQuotaPool).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-test-id',
+      );
+      expect(mockSafeSend).toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.quota_exhausted',
+        expect.objectContaining({ subscriptionId: 'sub-test-id' }),
+      );
+    });
+
+    it('[C7] guards profile_mismatch out of the quota-exhausted notification', async () => {
+      // A profile_mismatch decrement is a data-integrity anomaly — the profileId
+      // does not belong to this subscription's account. It must NOT fire the
+      // 'monthly_exceeded' parent quota notification (that is for real quota
+      // events). Instead it emits a separate profile_mismatch signal.
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+      mockDecrementQuota.mockResolvedValueOnce({
+        success: false,
+        source: 'profile_mismatch',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      await executeSteps(createEventData({ sessionType: 'homework' }));
+
+      // LLM must not be called.
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+      // Must NOT emit the quota-exhausted event (would misclassify as monthly_exceeded).
+      expect(mockSafeSend).not.toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.quota_exhausted',
+        expect.anything(),
+      );
+      // Must emit the profile_mismatch signal instead.
+      expect(mockSafeSend).toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.profile_mismatch',
+        expect.objectContaining({ subscriptionId: 'sub-test-id' }),
       );
     });
   });
