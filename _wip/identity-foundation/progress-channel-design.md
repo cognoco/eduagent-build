@@ -1,9 +1,10 @@
 # Orchestrator ↔ Shepherd Progress Channel — design note
 
-**Status:** Design (decisions locked 2026-06-14). **Not yet wired** — the running PRG-11
-Tier-2 shepherd does not use this; lifecycle visibility today comes from the Cosmo-Stage
-monitor. Wiring = a short "Progress channel" section in `shepherd-protocol.md` + one kickoff
-line + an orchestrator-side watcher.
+**Status:** Design locked 2026-06-14; **wired into the protocol 2026-06-14** and first activated
+as a POC on the **PRG-10 fast-follow lane** (`_wip/security-pii-api/_state/`). The
+`shepherd-protocol.md` "Progress channel" section + kickoff line are live; the orchestrator-side
+outbox watcher is armed per lane. (PRG-11 Tier-2 predates the wiring and runs on the Cosmo-Stage
+monitor only.)
 
 **Productization target:** PRG-5 (execution-mechanism / the orchestration loop). This is the
 `orchestrator↔shepherd` agnostic seam PRG-5 is scoped to own. Cross-ref:

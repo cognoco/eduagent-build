@@ -30,6 +30,7 @@ Up front (detail in shepherd-protocol.md): the review loop is run by a SEPARATE 
 session — do not touch the watcher. Set up your own Cosmo monitor on the "«WORKSTREAM NAME»"
 workstream to catch each WI's verdict (Closed vs rework→Executing) and re-engage.
 Two mandatory gates: a green PR to merge (shepherd-protocol.md → Merging the WP — never merge a red PR or call it "green"), then Cosmo Close to graduate.
+Progress channel: append exceptions/decisions to _wip/«LANE DIR»/_state/outbox.jsonl at the four triggers, and read _wip/«LANE DIR»/_state/inbox.jsonl at each checkpoint and on block (shepherd-protocol.md → Progress channel — four levels only, no chatter).
 ```
 
 ---
@@ -49,4 +50,5 @@ Up front (detail in shepherd-protocol.md): the review loop is run by a SEPARATE 
 session — do not touch the watcher. Set up your own Cosmo monitor on the "API Security & PII"
 workstream to catch each WI's verdict (Closed vs rework→Executing) and re-engage.
 Two mandatory gates: a green PR to merge (shepherd-protocol.md → Merging the WP — never merge a red PR or call it "green"), then Cosmo Close to graduate.
+Progress channel: append exceptions/decisions to _wip/security-pii-api/_state/outbox.jsonl at the four triggers, and read _wip/security-pii-api/_state/inbox.jsonl at each checkpoint and on block (shepherd-protocol.md → Progress channel — four levels only, no chatter).
 ```

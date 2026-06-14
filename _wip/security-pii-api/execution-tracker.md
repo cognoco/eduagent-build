@@ -171,3 +171,38 @@ Lane-specific only:
   executor-adversarial coverage. **Wave 2b dispatched:** WI-698, WI-699 on **Opus** with a
   mandatory plan-approval checkpoint (P1, human-supervised) before they implement. WI-701,
   WI-702 still implementing.
+
+## 6. Fast-follow wave (PRG-10 gate-gap residuals) — activated 2026-06-14
+
+**Why this wave exists.** All 7 original units (17 WIs) closed via Cosmo review + QA — but every
+one of the 7 PRs (#1108/1109/1111/1114/1121/1122) merged with `claude-review` **red**: the OIDC
+outage (PR #1121 stripped `id-token: write`; fixed in `daba25e62`) that read lane-wide as "all
+review tokens exhausted." A **retroactive consolidated Claude review** (read-only,
+`_wip/security-pii-api/prg-10-consolidated-review-result.md`) closed that gate gap:
+**0 BLOCKER · 2 MUST_FIX · 8 SHOULD_FIX · 9 CONSIDER** — safe-as-merged, but real residuals.
+Operator-decomposed into 6 Items (program session, 2026-06-14).
+
+**Units** (all `Stage=Ready` except WI-739 `Backlog`; `Execution Path=Assisted`):
+
+| WI | Sev | P | Title | Findings |
+|----|-----|---|-------|----------|
+| WI-734 | MUST | P1 | Meter/hard-stop homework-summary on profile-missing path (+ escalation) | M1 · F-128 · PR #1115 |
+| WI-735 | MUST | P1 | Cap server-side homework `problems` array | M2 · F-158 · PR #1111 |
+| WI-736 | SHOULD | P2 | GHA hardening: `@claude` actor-guard + env-var-indirection doc | S1+S2 · F-119,F-129 · PR #1121 |
+| WI-737 | SHOULD | P2 | Account-scope the interests CAS update (TOCTOU) | S5+C3 · F-164 · PR #1122 |
+| WI-738 | SHOULD | P2 | API correctness & observability top-ups (bundle) | S3,S4,S6,S7,S8,S9,C7 |
+| WI-739 | CONSIDER | P3 | Defense-in-depth hygiene sweep (backlog) | C1,C2,C5,C6,C8,C9 |
+
+**Sequencing.** MUST_FIX first (WI-734, WI-735 — each carries a red-green break test per Fix
+Development Rules), then the SHOULD trio (736/737/738); WI-739 is backlog. **WI-734 carries an
+explicit operator product-question** (best-effort-LLM-at-any-cost vs hard-stop) — raise it on the
+progress channel as `needs-operator` before assuming hard-stop.
+
+**Gate (non-negotiable).** `claude-review` OIDC is now fixed — these residuals merge **only**
+through the strict green-PR gate (`shepherd-protocol.md` → *Merging the WP*): every required check
+SUCCESS, `claude-review` actually green, no open blocker/must/should, `mergeStateStatus=CLEAN`.
+
+**Continuity + POC.** Same lane/workstream, **same shepherd re-engaged** (not a fresh spawn) —
+these are this lane's own gate-gap. First lane to run with the **orchestrator↔shepherd progress
+channel** wired: mailboxes at `_wip/security-pii-api/_state/{outbox,inbox}.jsonl`
+(`shepherd-protocol.md` → *Progress channel*; design `_wip/identity-foundation/progress-channel-design.md`).
