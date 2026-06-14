@@ -16,7 +16,7 @@ import { getEvaluateRungDescription } from './evaluate';
 import { buildFourStrandsPrompt } from './language-prompts';
 import type { EscalationRung } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
-import type { ExchangeContext } from './exchanges';
+import type { ExchangeContext } from './exchange-types';
 
 // ---------------------------------------------------------------------------
 // Exchange prompt builders
