@@ -59,16 +59,54 @@ function allRunScripts(workflow: Record<string, unknown>): string[] {
   return scripts;
 }
 
+const SMOKE_RESULT_EXPR = /needs\s*\.\s*run-smoke\s*\.\s*result/;
+
+/**
+ * True if a single gate step branches its exit on the run-smoke result — i.e.
+ * it either references `needs.run-smoke.result` inline in the script, or it
+ * surfaces that result via an env var that then appears inside an `if [[ … ]]`
+ * test condition (the shape a hard gate uses to drive a failing exit). Used by
+ * the F-157 gate guard, which scans EVERY gate run: step with this predicate.
+ */
+function gateStepBranchesOnSmokeResult(step: Record<string, unknown>): boolean {
+  const script = typeof step.run === 'string' ? step.run : '';
+  if (SMOKE_RESULT_EXPR.test(script)) return true;
+
+  const stepEnv = (step.env ?? {}) as Record<string, unknown>;
+  const smokeEnvVars = Object.entries(stepEnv)
+    .filter(([, v]) => SMOKE_RESULT_EXPR.test(String(v)))
+    .map(([k]) => k);
+  for (const v of smokeEnvVars) {
+    const conditionRef = new RegExp(String.raw`if\s*\[\[[^\n]*\$\{?${v}\b`);
+    if (conditionRef.test(script)) return true;
+  }
+  return false;
+}
+
 describe('[F-151] e2e-ci.yml has no workflow_run.pull_requests injection sink', () => {
   const raw = loadWorkflowRaw('e2e-ci.yml');
   const workflow = loadWorkflow('e2e-ci.yml');
 
-  // Matches a `pull_requests` access off the workflow_run event payload in BOTH
-  // GitHub-expression notations — dot (`workflow_run.pull_requests`) and bracket
-  // (`workflow_run['pull_requests']`), plus mixed forms — so a bracket-notation
-  // rewrite cannot dodge the guard.
-  const WORKFLOW_RUN_PR_ACCESS =
-    /workflow_run\s*(?:\.\s*pull_requests|\[\s*['"]pull_requests['"]\s*\])/;
+  // Matches a `pull_requests` access reached through the workflow_run event
+  // payload in EITHER GitHub-expression notation, on BOTH hops:
+  //   - workflow_run reached by dot (`...workflow_run...`) OR bracket
+  //     (`github.event['workflow_run']...`);
+  //   - pull_requests reached by dot (`.pull_requests`) OR bracket
+  //     (`['pull_requests']`).
+  // So none of these dodge the guard:
+  //   ${{ github.event.workflow_run.pull_requests[0].base.ref }}
+  //   ${{ github.event.workflow_run['pull_requests'][0].base.ref }}
+  //   ${{ github.event['workflow_run'].pull_requests[0].base.ref }}
+  //   ${{ github.event['workflow_run']['pull_requests'][0].base.ref }}
+  const WORKFLOW_RUN_REF = /(?:workflow_run|\[\s*['"]workflow_run['"]\s*\])/
+    .source;
+  const PULL_REQUESTS_REF =
+    /(?:\.\s*pull_requests|\[\s*['"]pull_requests['"]\s*\])/.source;
+  // Allow only intervening whitespace between the two hops (the bracket form
+  // `['workflow_run']` is immediately followed by the pull_requests access).
+  const WORKFLOW_RUN_PR_ACCESS = new RegExp(
+    `${WORKFLOW_RUN_REF}\\s*${PULL_REQUESTS_REF}`,
+  );
 
   it('no shell run: block accesses a workflow_run.pull_requests field', () => {
     // The injection sink was `${{ github.event.workflow_run.pull_requests[0].base.ref }}`
@@ -95,6 +133,29 @@ describe('[F-151] e2e-ci.yml has no workflow_run.pull_requests injection sink', 
     );
     expect(analyze).toBeDefined();
     expect(analyze!).toMatch(/BASE="HEAD~1"/);
+  });
+
+  it('the matcher catches every workflow_run.pull_requests notation (incl. bracketed workflow_run) and ignores benign access', () => {
+    // Proves the guard would catch the sink reintroduced in ANY of the four
+    // dot/bracket combinations — including bracketed access to workflow_run
+    // itself — without false-positiving on benign workflow_run fields.
+    const sinkShapes = [
+      '${{ github.event.workflow_run.pull_requests[0].base.ref }}',
+      "${{ github.event.workflow_run['pull_requests'][0].base.ref }}",
+      "${{ github.event['workflow_run'].pull_requests[0].base.ref }}",
+      "${{ github.event['workflow_run']['pull_requests'][0].base.ref }}",
+    ];
+    for (const shape of sinkShapes) {
+      expect(WORKFLOW_RUN_PR_ACCESS.test(shape)).toBe(true);
+    }
+    const benign = [
+      '${{ github.event.workflow_run.head_sha }}',
+      '${{ github.event.workflow_run.event }}',
+      "${{ github.event['workflow_run'].conclusion }}",
+    ];
+    for (const shape of benign) {
+      expect(WORKFLOW_RUN_PR_ACCESS.test(shape)).toBe(false);
+    }
   });
 });
 
@@ -133,37 +194,58 @@ describe('[F-157] e2e-web.yml required smoke check is an honest pass-through', (
     expect(ifVal === 'always()' || ifVal === '${{always()}}').toBe(true);
   });
 
-  it('the required gate exits 0 and never branches its exit on the run-smoke result', () => {
+  it('the required gate exits 0 and no gate step branches its exit on the run-smoke result', () => {
     const [[, gate]] = jobsWithName(REQUIRED_CHECK_NAME);
-    const step = (gate.steps ?? []).find((s) => typeof s.run === 'string');
-    const script = String(step?.run ?? '');
-    const stepEnv = (step?.env ?? {}) as Record<string, unknown>;
+    const runSteps = (gate.steps ?? []).filter(
+      (s) => typeof s.run === 'string',
+    );
+    expect(runSteps.length).toBeGreaterThan(0);
 
-    // Honest pass-through: the script reaches exit 0 ...
-    expect(script).toMatch(/exit 0/);
+    // Honest pass-through: at least one gate step reaches exit 0 ...
+    const combinedScript = runSteps.map((s) => String(s.run)).join('\n');
+    expect(combinedScript).toMatch(/exit 0/);
 
-    // ... and never branches its exit code on run-smoke's outcome. That is the
-    // precise F-157 invariant: the required check is advisory-only over the
-    // smoke (secret-backed smoke is un-runnable in CI until DOPPLER_TOKEN_STG is
-    // provisioned, so gating on it would make the required check permanently red
-    // on trusted web PRs). run-smoke's result may be referenced for LOGGING via
-    // an env var, but the gate must not read needs.run-smoke.result to decide a
-    // failing exit. We assert the gate does not consume run-smoke's result as a
-    // control signal: it is either unreferenced, or referenced only as a
-    // log-only env var whose name does not appear in any conditional/exit branch.
-    expect(script).not.toMatch(/needs\s*\.\s*run-smoke\s*\.\s*result/);
-    // If run-smoke's result is surfaced as an env var (log-only), it must not be
-    // used in a conditional that drives a failing exit. Catch the regression
-    // shape `if [[ ... $SMOKE_RESULT ... ]]; then ... exit 1`.
-    const smokeEnvVars = Object.entries(stepEnv)
-      .filter(([, v]) => /needs\s*\.\s*run-smoke\s*\.\s*result/.test(String(v)))
-      .map(([k]) => k);
-    for (const v of smokeEnvVars) {
-      // The env var may appear in echo/log lines, but never inside an `if [[ ... ]]`
-      // test condition (which is how a hard gate would branch to exit 1).
-      const conditionRefs = new RegExp(String.raw`if\s*\[\[[^\n]*\$\{?${v}\b`);
-      expect(script).not.toMatch(conditionRefs);
-    }
+    // ... and NO gate step branches its exit code on run-smoke's outcome. That
+    // is the precise F-157 invariant: the required check is advisory-only over
+    // the smoke (secret-backed smoke is un-runnable in CI until DOPPLER_TOKEN_STG
+    // is provisioned, so gating on it would make the required check permanently
+    // red on trusted web PRs). We scan EVERY run: step (not just the first) and
+    // its env mapping, so a regression that splits the gate into a harmless
+    // logging step followed by a second step that branches on the smoke result
+    // is still caught.
+    const branching = runSteps.filter(gateStepBranchesOnSmokeResult);
+    expect(branching).toEqual([]);
+  });
+
+  it('the multi-step gate scan catches a SECOND step that branches on the smoke result (not just the first)', () => {
+    // Synthetic proof of the P2-fixed coverage: a regression that hides the
+    // hard gate in a later step — a benign `exit 0` logging step first, then a
+    // step that branches to `exit 1` on the smoke result — must be detected.
+    // Exercises the exact predicate the real-workflow guard above uses.
+    const gateSteps: Array<Record<string, unknown>> = [
+      { run: 'echo "advisory smoke ran"; exit 0' },
+      {
+        env: { SMOKE_RESULT: '${{ needs.run-smoke.result }}' },
+        run: 'if [[ "$SMOKE_RESULT" == "failure" ]]; then exit 1; fi',
+      },
+    ];
+    const runSteps = gateSteps.filter((s) => typeof s.run === 'string');
+
+    // First step alone looks innocent ...
+    expect(gateStepBranchesOnSmokeResult(runSteps[0]!)).toBe(false);
+    // ... but the second step branches on the smoke result and is caught.
+    expect(gateStepBranchesOnSmokeResult(runSteps[1]!)).toBe(true);
+    // The whole-gate scan (every step) therefore flags the regression.
+    expect(runSteps.some(gateStepBranchesOnSmokeResult)).toBe(true);
+
+    // Also catch the inline (no-env) form in a later step.
+    const inlineLater: Array<Record<string, unknown>> = [
+      { run: 'echo "log"; exit 0' },
+      {
+        run: 'if [[ "${{ needs.run-smoke.result }}" != "success" ]]; then exit 1; fi',
+      },
+    ];
+    expect(inlineLater.some(gateStepBranchesOnSmokeResult)).toBe(true);
   });
 
   it('run-smoke runs the real suite, is reachable (not if:false), and is advisory only', () => {
