@@ -35,6 +35,7 @@ import { captureException } from '../services/sentry';
 import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
 import { safeSend } from '../services/safe-non-core';
+import { FILING_CONFIG } from '../config/filing';
 
 const logger = createLogger();
 
@@ -91,7 +92,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       if (!claimed) {
         const fresh = await getSession(db, profileId, sessionId);
         if (!fresh) return notFound(c, 'Session not found');
-        if ((fresh.filingRetryCount ?? 0) >= 3) {
+        if ((fresh.filingRetryCount ?? 0) >= FILING_CONFIG.maxRetries) {
           throw new RateLimitedError(
             'Retry limit reached for this session.',
             ERROR_CODES.RATE_LIMITED,

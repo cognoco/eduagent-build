@@ -164,11 +164,7 @@ export default function HomeScreen(): React.ReactElement {
       {navigationContract.home.screen === 'FamilyHome' ? (
         <ParentHomeScreen activeProfile={activeProfile} />
       ) : (
-        <LearnerScreen
-          profiles={profiles}
-          activeProfile={activeProfile}
-          showParentHome={false}
-        />
+        <LearnerScreen profiles={profiles} activeProfile={activeProfile} />
       )}
       {CelebrationOverlay}
       {firstNotice && visibleNoticeId === firstNotice.id ? (
