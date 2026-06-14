@@ -599,6 +599,46 @@ function createEventData(
 }
 
 // ---------------------------------------------------------------------------
+// [WI-734] Shared DB factory that returns a non-null profile row for the
+// homework-summary quota gate. Required by any test that uses
+// sessionType: 'homework' after the profile fetch was moved outside
+// runIsolated (so a missing profile now throws and triggers Inngest retry
+// instead of returning status='failed'). Defined here so both the
+// extract-homework-summary describe block and the BUG-852 tests can use it.
+// ---------------------------------------------------------------------------
+const WI734_ACCOUNT_ID = '00000000-0000-4000-8000-000000000099';
+
+function makeDbWithProfile() {
+  const selectWithProfile = () => ({
+    from: () => ({
+      innerJoin: () => ({
+        innerJoin: () => ({
+          where: () => ({
+            orderBy: () => ({ limit: () => Promise.resolve([]) }),
+            limit: () => Promise.resolve([]),
+          }),
+        }),
+      }),
+      where: () => ({
+        orderBy: () => ({ limit: () => Promise.resolve([]) }),
+        limit: () =>
+          Promise.resolve([
+            { conversationLanguage: 'en', accountId: WI734_ACCOUNT_ID },
+          ]),
+      }),
+    }),
+  });
+  const db: Record<string, unknown> = {
+    ...mockSessionCompletedDb,
+    select: selectWithProfile,
+  };
+  db.transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+  return db;
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -700,6 +740,9 @@ describe('sessionCompleted', () => {
   it('[BUG-852] escalates via Sentry when filing waitForEvent times out', async () => {
     // Default mockStep.waitForEvent already returns null (= timeout). Use a
     // homework-type session with no topicId so the if-branch is entered.
+    // [WI-734] Profile row required: profile fetch is now outside runIsolated
+    // so a missing profile throws and Inngest retries (instead of soft-fail).
+    (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
     const consoleWarnSpy = jest
       .spyOn(console, 'warn')
       .mockImplementation(() => undefined);
@@ -749,6 +792,9 @@ describe('sessionCompleted', () => {
   // would drown out real timeouts in alerting.
   it('[BUG-852] does NOT escalate when filing waitForEvent returns an event', async () => {
     mockCaptureException.mockClear();
+    // [WI-734] Profile row required for homework sessions after the profile
+    // fetch moved outside runIsolated (missing profile now throws → retry).
+    (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
     const localMockStep = {
       run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
       sendEvent: jest.fn().mockResolvedValue(undefined),
@@ -1637,6 +1683,10 @@ describe('sessionCompleted', () => {
     });
 
     it('extracts and stores summary for homework sessions', async () => {
+      // [WI-734] Requires a profile row so the quota gate can resolve
+      // subscription/language/accountId; use makeDbWithProfile() rather than
+      // the default chainable mock (which returns [] → missing-profile path).
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
       const { result } = (await executeSteps(
         createEventData({ sessionType: 'homework' }),
       )) as any;
@@ -1645,7 +1695,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         SESSION_ID,
-        { conversationLanguage: undefined },
+        { conversationLanguage: 'en' },
       );
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'extract-homework-summary',
@@ -1760,6 +1810,39 @@ describe('sessionCompleted', () => {
         (o: any) => o.step === 'extract-homework-summary',
       );
       expect(outcome.status).toBe('failed');
+    });
+
+    // [WI-734] Negative-path break test: profile-missing branch must NOT call
+    // the homework-summary LLM (unmetered spend) and MUST escalate via
+    // captureException + safeSend (billing silent-recovery ban).
+    // Default db mock returns [] for all db.select().from().where().limit()
+    // calls, so homeworkProfile is undefined without any extra setup.
+    it('[WI-734-BREAK] does not call LLM and escalates when profile row is missing', async () => {
+      // Default db (mockSessionCompletedDb) has chainable select returning []
+      // so homeworkProfile resolves to undefined — exactly the missing-profile path.
+      // The throw escapes step.run (not swallowed by runIsolated) so Inngest retries.
+      // Use .rejects.toThrow so the test itself fails if the throw is swallowed.
+      await expect(
+        executeSteps(createEventData({ sessionType: 'homework' })),
+      ).rejects.toThrow('profile row missing');
+
+      // LLM must NOT be called when profile row is absent.
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+
+      // Must captureException for Sentry observability (not warn-only).
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('profile row missing'),
+        }),
+        expect.objectContaining({ profileId: PROFILE_ID }),
+      );
+
+      // Must emit structured event (billing silent-recovery ban).
+      expect(mockSafeSend).toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.profile_missing',
+        expect.objectContaining({ profileId: PROFILE_ID }),
+      );
     });
   });
 
