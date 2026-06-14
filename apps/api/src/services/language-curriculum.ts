@@ -6,7 +6,7 @@ import {
   vocabulary,
   type Database,
 } from '@eduagent/database';
-import { ensureDefaultBook } from './curriculum';
+import { ensureDefaultBook } from './curriculum-core';
 import type {
   CefrLevel,
   GeneratedTopic,
