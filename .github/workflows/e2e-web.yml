@@ -1,14 +1,19 @@
 name: E2E Web
 
-# Secret-backed Playwright smoke — runs only on manual dispatch after review.
-# On pull_request, the required 'Playwright web smoke' check is reported by
-# e2e-web-pr-gate.yml (a lightweight pass-through) so the gate is never stuck
-# pending and never silently always-green.
+# Secret-backed Playwright smoke. The 'Playwright web smoke' job is the required
+# branch-protection check and reports an HONEST result in every case:
+#   - trusted same-repo PR that touches the web/mobile surface -> the real smoke
+#     suite runs and the required check gates on its actual outcome;
+#   - fork/untrusted PR (secrets unavailable) -> pass-through (cannot run a
+#     secret-bearing smoke; reviewers run it via workflow_dispatch after review);
+#   - PR with no web/mobile surface changes -> pass-through report (~seconds);
+#   - manual workflow_dispatch -> the real smoke suite always runs.
 on:
+  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: e2e-web-${{ github.ref }}
+  group: e2e-web-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -16,8 +21,77 @@ permissions:
   contents: read
 
 jobs:
+  # Decide whether the real, secret-backed smoke suite should run.
+  # run-real is true only when secrets are actually available (manual dispatch,
+  # or a trusted same-repo PR) AND the change set touches the web/mobile surface.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run-real: ${{ steps.check.outputs.run-real }}
+      surface-changed: ${{ steps.check.outputs.surface-changed }}
+      trusted: ${{ steps.check.outputs.trusted }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+      - name: Decide whether to run the real smoke suite
+        id: check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          # Same-repo PRs are trusted (secrets are exposed to them); forks are not.
+          IS_SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          # Manual dispatch always runs the full suite (secrets available).
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "trusted=true" >> "$GITHUB_OUTPUT"
+            echo "surface-changed=true" >> "$GITHUB_OUTPUT"
+            echo "run-real=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — running full E2E suite"
+            exit 0
+          fi
+
+          # Fork/untrusted PR: secrets are not available, so the real
+          # secret-bearing smoke cannot run. The gate falls back to a
+          # pass-through (reviewers validate via workflow_dispatch).
+          if [[ "$IS_SAME_REPO" != "true" ]]; then
+            echo "trusted=false" >> "$GITHUB_OUTPUT"
+            echo "surface-changed=unknown" >> "$GITHUB_OUTPUT"
+            echo "run-real=false" >> "$GITHUB_OUTPUT"
+            echo "Fork/untrusted PR — secret-backed smoke cannot run; gate is pass-through. Use workflow_dispatch after review."
+            exit 0
+          fi
+
+          # Trusted same-repo PR: run the real smoke iff the change set touches
+          # the web/mobile surface. Docs-only / config-only PRs pass through.
+          FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+          SURFACE_CHANGED=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              apps/*|packages/*|pnpm-lock.yaml|.github/workflows/e2e-web.yml)
+                SURFACE_CHANGED=true
+                break
+                ;;
+            esac
+          done <<< "$FILES"
+
+          echo "trusted=true" >> "$GITHUB_OUTPUT"
+          echo "surface-changed=$SURFACE_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "run-real=$SURFACE_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "Trusted PR — surface-changed=$SURFACE_CHANGED (changed files: $(echo "$FILES" | wc -l | tr -d ' '))"
+
   run-smoke:
-    # workflow_dispatch always runs the full suite
+    needs: changes
+    if: needs.changes.outputs.run-real == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -151,19 +225,44 @@ jobs:
             apps/mobile/e2e-web/test-results
           retention-days: 14
 
-  # Gate job — advisory result for this manual-dispatch workflow.
-  # The branch-protection required check ('Playwright web smoke') is owned by
-  # e2e-web-pr-gate.yml on pull_request. This job records the smoke outcome
-  # for workflow_dispatch runs and is registered as optional in branch protection.
+  # Required branch-protection check. Always runs so the check is never stuck
+  # "pending". Reports an honest result:
+  #   - real smoke ran and failed/cancelled -> fail
+  #   - real smoke ran and passed           -> pass
+  #   - genuine pass-through (fork, or no surface change) -> pass with a note
+  #   - real smoke SHOULD have run but didn't (trusted + surface-changed yet
+  #     run-smoke skipped) -> fail closed, so a regression can't sneak through
   smoke:
     name: Playwright web smoke
     if: always()
-    needs: [run-smoke]
+    needs: [changes, run-smoke]
     runs-on: ubuntu-latest
     steps:
       - run: |
-          if [[ "${{ needs.run-smoke.result }}" == "failure" || "${{ needs.run-smoke.result }}" == "cancelled" ]]; then
-            echo "E2E smoke tests failed"
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "Change detection failed — failing closed"
             exit 1
           fi
-          echo "E2E smoke tests passed"
+
+          RUN_REAL='${{ needs.changes.outputs.run-real }}'
+          SMOKE_RESULT='${{ needs.run-smoke.result }}'
+
+          if [[ "$RUN_REAL" == "true" ]]; then
+            # A real smoke run was required. The gate mirrors its outcome and
+            # fails closed for any non-success state (including an unexpected skip).
+            if [[ "$SMOKE_RESULT" == "success" ]]; then
+              echo "E2E smoke tests passed"
+              exit 0
+            fi
+            echo "E2E smoke required but did not pass (run-smoke result: $SMOKE_RESULT) — failing"
+            exit 1
+          fi
+
+          # No real run was required (fork/untrusted, or no web/mobile surface
+          # change). This is an honest pass-through, not an always-green gate:
+          # a trusted PR touching the surface would have set run-real=true above.
+          if [[ "${{ needs.changes.outputs.trusted }}" == "false" ]]; then
+            echo "Fork/untrusted PR — secret-backed smoke not run; validate via workflow_dispatch after review."
+          else
+            echo "E2E smoke skipped — no web/mobile surface changes in this PR."
+          fi
