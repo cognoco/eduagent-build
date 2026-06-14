@@ -342,14 +342,35 @@ function validateClaudeAgentTriggerGuard(
 //   (b) add an explicit github.event.sender association check.
 //
 // [S1 / WI-736 / F-119]
+//
+// GitHub treats `on: issues` with NO `types:` filter as subscribing to ALL
+// issue activity — which INCLUDES `assigned`. So an `issues` trigger that omits
+// `types` (or lists it as something that isn't an array/string we can read) is
+// just as exposed as one that lists `assigned` explicitly. Returning false on
+// the no-`types` case (the original bug) is a real bypass: a workflow with
+// `on: issues` + a secret-backed @claude job + creator-only author_association
+// would evade the checker entirely.
 function issuesEventHasAssignedType(workflowOn: unknown): boolean {
-  if (!isRecord(workflowOn)) return false;
+  // Detect presence of the `issues` event across string / array / object forms.
+  if (!hasEvent(workflowOn, 'issues')) return false;
+
+  // String form (`on: issues`) or array form (`on: [issues, ...]`) cannot carry
+  // a `types:` filter, so they subscribe to all activity → includes `assigned`.
+  if (!isRecord(workflowOn)) return true;
+
   const issues = workflowOn.issues;
-  if (!isRecord(issues)) return false;
+  // Object form. If the `issues` value isn't a record (e.g. `issues:` with a
+  // null/empty body), there is no `types` filter → all activity → includes
+  // `assigned`.
+  if (!isRecord(issues)) return true;
+
   const types = issues.types;
   if (Array.isArray(types)) return types.includes('assigned');
   if (typeof types === 'string') return types === 'assigned';
-  return false;
+
+  // `issues:` present as a mapping but with no readable `types:` filter →
+  // GitHub default of all activity types → includes `assigned`.
+  return true;
 }
 
 function validateIssuesAssignedWithoutSenderGuard(
@@ -362,10 +383,15 @@ function validateIssuesAssignedWithoutSenderGuard(
   const jobText = stringify(job);
   if (!(inheritedSecrets || CLAUDE_AGENT_SECRET.test(jobText))) return null;
 
-  const jobIf = stringify(job.if);
-  // Only flag jobs that actually gate on an issues event (they mention the
-  // issues event_name or check the issue body/title for @claude).
+  const hasIf = typeof job.if === 'string' && job.if.trim() !== '';
+  const jobIf = hasIf ? stringify(job.if) : '';
+  // A job with no `if:` runs on EVERY trigger the workflow subscribes to —
+  // including the issues:assigned exposure — so it is unguarded and must be
+  // flagged. Only when a non-empty `if:` exists do we narrow to jobs that
+  // actually respond to issue events (skip e.g. a pure `issue_comment` job in a
+  // multi-trigger workflow that scopes itself away from issues).
   if (
+    hasIf &&
     !jobIf.includes("'issues'") &&
     !jobIf.includes('"issues"') &&
     !jobIf.includes('github.event.issue')

@@ -160,6 +160,12 @@ export async function syncXpLedgerStatus(
     .returning({ id: xpLedger.id });
 
   if (result.length === 0) {
+    // [S8 / F-077] This call is intentionally dark in production: service-level
+    // loggers are created at module load without access to the per-request
+    // LOG_LEVEL Cloudflare binding (only request-logger.ts has it). Wiring
+    // LOG_LEVEL into every module-level createLogger() call would require
+    // non-surgical changes across all service files. The signal remains
+    // available when LOG_LEVEL is set to 'debug' in a local worker invocation.
     logger.debug('[syncXpLedgerStatus] No xp_ledger row — skipped', {
       profileId,
       topicId,
