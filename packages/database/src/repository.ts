@@ -875,11 +875,13 @@ export function createScopedRepository(db: Database, profileId: string) {
               dictationResults.profileId,
               dictationResults.completionKey,
             ],
+            // [S4] Omit `date` and `mode` from the retry update set. A genuine
+            // client retry carries the same values so updating them is a no-op;
+            // keeping them here would silently clobber the original row's mode
+            // if a client ever reuses a completionKey across a mode switch.
             set: {
-              date: values.date,
               sentenceCount: values.sentenceCount,
               mistakeCount: values.mistakeCount,
-              mode: values.mode,
               reviewed: values.reviewed,
             },
           })

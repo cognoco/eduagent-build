@@ -50,6 +50,12 @@
 //                                      edits in .claude/skills/, e.g. manual edits
 //                                      to the commit skill which is excluded from
 //                                      sync via SKIP_SKILLS).
+//   sync-skills.mjs --report-orphans — scan .claude/skills/ for entries with no
+//                                      .agents/skills/ master and no tech-group
+//                                      mapping; print each orphan and exit 1 if any
+//                                      are found. Does NOT apply any sync. Intended
+//                                      as an optional CI gate to catch removed masters
+//                                      whose generated copies were left behind.
 
 import { readdir, readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -79,7 +85,13 @@ const GROUP_DIRS = new Set(['tech']);
 // allowed to diverge. Add a comment explaining why each is here. When the
 // content can be unified, remove from this set and run sync; the .agents/
 // master will then propagate.
-const SKIP_SKILLS = new Set([
+//
+// Overridable via SYNC_SKILLS_SKIP (comma-separated) so the test harness can
+// exercise the SKIP_SKILLS path without editing this set (mirrors the
+// SOURCE_ROOT/TARGET_ROOT env overrides above).
+const SKIP_SKILLS = process.env.SYNC_SKILLS_SKIP
+  ? new Set(process.env.SYNC_SKILLS_SKIP.split(',').map((s) => s.trim()).filter(Boolean))
+  : new Set([
   // (empty) — `commit` was unified onto one master in WI-388: the
   // runtime-neutral body lives in .agents/skills/commit/SKILL.md and the
   // Claude harness frontmatter is injected from agents/claude.yaml by the
@@ -89,6 +101,7 @@ const SKIP_SKILLS = new Set([
 
 const mode = process.argv.includes('--check') ? 'check' : 'sync';
 const printChanged = process.argv.includes('--print-changed');
+const reportOrphans = process.argv.includes('--report-orphans');
 
 // In --print-changed mode, status messages go to stderr so stdout is parseable.
 const info = printChanged
@@ -240,8 +253,97 @@ async function syncSkill({ sourceRel, targetName }) {
   }
 }
 
+/**
+ * Find orphaned generated entries under TARGET_ROOT — `.claude/skills/` content
+ * whose `.agents/skills/` master was removed but whose generated copy was left
+ * behind. Two orphan classes:
+ *
+ *   1. Top-level orphan — a `.claude/skills/<X>` dir (or loose file) whose name
+ *      is not a known `targetName`. The whole `<X>` tree has no master.
+ *
+ *   2. Nested orphan — inside a namespace dir whose top-level name IS a known
+ *      unit (e.g. `my/`, synced as one unit holding several distinct skills),
+ *      an immediate child that has no matching `.agents/` source child. This is
+ *      the class the top-level check is blind to: once `my/` has one master,
+ *      the whole `my/` tree looks "known", so a stale `my/old-skill.md` or a
+ *      removed `my/removed-skill/SKILL.md` would slip through.
+ *
+ * Detection is scoped to IMMEDIATE children of each unit dir — it does not
+ * recurse deeper, so legitimately-additive supplementary files inside a single
+ * skill (e.g. a Claude-only `references/` asset preserved by the additive sync)
+ * are not false-flagged; only a whole missing sibling skill is surfaced.
+ *
+ * Returns the repo-relative paths of all orphaned entries.
+ *
+ * @param {{ sourceRel: string; targetName: string }[]} units - known sync units
+ * @returns {Promise<string[]>} orphan paths relative to REPO_ROOT
+ */
+async function findOrphans(units) {
+  if (!existsSync(TARGET_ROOT)) return [];
+
+  // Map each known targetName to its source dir so we can compare children.
+  const unitBySourceRel = new Map(units.map((u) => [u.targetName, u.sourceRel]));
+  const knownTargetNames = new Set(units.map((u) => u.targetName));
+  const orphans = [];
+
+  const topEntries = await readdir(TARGET_ROOT, { withFileTypes: true });
+  for (const entry of topEntries) {
+    if (entry.isFile()) {
+      // A loose file directly under .claude/skills/ has no master directory.
+      orphans.push(relative(REPO_ROOT, join(TARGET_ROOT, entry.name)));
+      continue;
+    }
+    if (!entry.isDirectory()) continue;
+
+    // SKIP_SKILLS dirs are intentionally allowed to diverge from their master
+    // (the .claude/ and .agents/ copies are not kept in sync), so they are
+    // neither a missing-master orphan nor subject to child comparison. `units`
+    // is already SKIP_SKILLS-filtered, so without this guard a skipped skill
+    // would be misread as a Class-1 orphan once the set is repopulated.
+    if (SKIP_SKILLS.has(entry.name)) continue;
+
+    if (!knownTargetNames.has(entry.name)) {
+      // Class 1: whole top-level dir has no master.
+      orphans.push(relative(REPO_ROOT, join(TARGET_ROOT, entry.name)));
+      continue;
+    }
+
+    // Class 2: known unit dir — descend one level and compare each generated
+    // immediate child against the matching source child.
+    const sourceRel = unitBySourceRel.get(entry.name);
+    const sourceDir = join(SOURCE_ROOT, sourceRel);
+    const targetDir = join(TARGET_ROOT, entry.name);
+    const sourceChildren = existsSync(sourceDir)
+      ? new Set((await readdir(sourceDir, { withFileTypes: true })).map((e) => e.name))
+      : new Set();
+    for (const child of await readdir(targetDir, { withFileTypes: true })) {
+      // SKIP_DIRS (e.g. agents/) are intentionally never mirrored, so their
+      // absence from target is expected — but they only matter on the source
+      // side. On the target side, any child with no source counterpart is a
+      // nested orphan.
+      if (!sourceChildren.has(child.name)) {
+        orphans.push(relative(REPO_ROOT, join(targetDir, child.name)));
+      }
+    }
+  }
+  return orphans.sort();
+}
+
 async function main() {
   const units = (await listUnits()).filter((u) => !SKIP_SKILLS.has(u.targetName));
+
+  if (reportOrphans) {
+    const orphans = await findOrphans(units);
+    if (orphans.length > 0) {
+      console.error('sync-skills: orphaned .claude/skills/ entries found (no .agents/skills/ master):');
+      for (const o of orphans) console.error(`  ${o}`);
+      console.error('\nPromote or delete each orphan, then re-run pnpm sync-skills.');
+      process.exit(1);
+    }
+    info('sync-skills: no orphans found');
+    return;
+  }
+
   for (const unit of units) await syncSkill(unit);
 
   // Note: we do NOT sweep stale skill directories or stale files in .claude/.

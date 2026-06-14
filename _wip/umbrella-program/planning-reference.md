@@ -101,6 +101,22 @@ review costs an executor-day). Routine sub-agents (state syncs, lookups,
 mechanical sweeps) run on mid/low tiers. Tier follows the role; effort follows
 the turn.
 
+2.8 **Graduating an Initiative** is the symmetric close of §2.1. When the lane's
+outcome is met — every Work Item `Closed`/`Done` — perform the close ceremony, in
+order:
+- **Set the Cosmo Workstream `Status` → `Closed`.** §2.1 created it `Open`;
+  graduation must close the **container**, not just its Work Items. This is the
+  easy-to-miss step — the shepherd's DoD stops at the last WI, so closing the
+  Workstream is the **program session's** job, not the shepherd's. (Status options:
+  `Open` · `On hold` · `Closed`.)
+- Write the final **tracker** checkpoint + residue statement; stand the shepherd down.
+- Flip the **roster** entry to `graduated` (outcome + date) and update the **dashboard**.
+- Route any residue / spillover (ZDX-stream · backlog · spillover register).
+
+A Workstream stays `Open` only while work remains: a legitimately **reopened** lane (a
+fast-follow wave, or a deferred tier still pending) is correctly `Open` — only a
+*fully* graduated one is `Closed`.
+
 ## 3. Planning method — reconcile-and-route
 
 3.1 **The roster is the standing hypothesis.** Planning passes do not start

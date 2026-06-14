@@ -487,13 +487,13 @@ footer .warn{color:var(--amber)}
   </div>
   <div class="hdr-right">
     <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐ theme</button>
-    <div class="stamp">snapshot <b>2026-06-13</b><br>14 initiatives · ~53 bundles · 5 gates<br>view · not a source of truth</div>
+    <div class="stamp">snapshot <b>2026-06-14</b><br>14 initiatives · ~53 bundles · 5 gates<br>view · not a source of truth</div>
   </div>
 </header>
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-17 new-llm MERGED to main (06-13, 105b39ac0)</b> — clean --no-ff merge commit, full ancestor, Merge completeness check + all deterministic gates green; the 4 advisory SHOULD_FIX are documented deferrals (WI-695 GC6 mocks / WI-696 event typing) · <b>IF CUTOVER EXECUTING</b> — CUT-A + CUT-B1 closed; CUT-B2 (consent+family) ∥ CUT-B3 (billing+webhooks) in flight; WI-586 convergence/drop tail pending · <b>Deploy/KV chain wired end-to-end</b> (WI-682 + WI-685 + WI-694 verifier + GH secrets) — WI-664 closes on first green post-merge deploy · follow-through: branch-protection add of Merge completeness check; WI-694 manual close · <b>PRG-10 (API security & PII) ACTIVATED 06-13</b> — 27 findings sliced to WI-698–704 (5 WP + 2 Item), 27/27 CLEAN vs the live cutover (parallel-safe), shepherd RUNNING · <b>PRG-11 (architecture) ACTIVATED 06-13</b> — Tier-1 autonomous slice (WI-717–720) sliced; cutover scan 16 parallel-safe / 9 serialize; Tiers 2/3 operator-gated · graduated: PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
+  <span class="txt"><b>Right now:</b> <b>PRG-10 (API security &amp; PII) fast-follow wave 06-14</b> — original 7 units LANE COMPLETE (06-13); fast-follow WI-734/735 (MUST_FIX) merged; WI-736/737/738 (SHOULD trio) merged; all 5 in Reviewing · <b>PRG-11 (architecture) Tier 2 COMPLETE 06-14</b> — WI-724…729 all Closed/Done via autonomous loop; Tier 1 was done 06-13; Tier 3 deferred post-WI-586 · <b>PRG-14 (agent instructions) ACTIVE 06-14</b> — sliced + released: WI-741…746; WI-743 (P1 CI hardening) first; two needs-operator decisions raised (prg14-001 orphan ruling; prg14-002 skill-content review gate); 5 executors dispatched · <b>IF CUTOVER EXECUTING</b> — CUT-A + CUT-B1 closed; CUT-B2 (consent+family) ∥ CUT-B3 (billing+webhooks) in flight; WI-586 convergence/drop tail pending · <b>PRG-03 WI-587 COMPLETE</b> — all 19 ruled+executed on main (7cc8a9a8d); only /cosmo:review close remains · graduated: PRG-17 (06-13) · PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11) · spillover register live (WI-683/684/688/695/696).</span>
 </div>
 
 <nav>
@@ -602,7 +602,7 @@ footer .warn{color:var(--amber)}
 </section>
 
 <footer>
-  <div>Generated <b>2026-06-13</b> from <code>program-roster.md</code> + <code>activation-planning.md</code> + initiative trackers.<br>
+  <div>Generated <b>2026-06-14</b> from <code>program-roster.md</code> + <code>activation-planning.md</code> + initiative trackers.<br>
   <span class="warn">⚠ View, not a home.</span> Live work-item state: Cosmo · rules: <code>planning-reference.md</code> · regenerate at umbrella touches.</div>
   <div style="text-align:right">Keys: <code>1 2 3</code> views · <code>t</code> theme · <code>esc</code> close<br>Prototype input to <code>PRG-04 / WI-590</code> (Cosmo top-down layer)</div>
 </footer>
@@ -628,11 +628,11 @@ const QUEUE = [
   ["1","PRG-12","UI language & accessibility","✓ GRADUATED 06-12 — 8/8 WPs, ratchet 361 → 12"],
   ["2","PRG-14","Agent instructions","Light fixes: now · skill-building: after doc convergence (PRG-03/B4)"],
   ["3","PRG-02","Harness Hygiene — residue batch","HH PR merged (G1)"],
-  ["4","PRG-03","WI-587 ruling session","Anytime — ~20 min of Zuzka's time (sheet ready)"],
+  ["4","PRG-03","WI-587 ruling session","✓ RULED + EXECUTED 06-11 — all 19 landed on main (7cc8a9a8d); only /cosmo:review close remains (verified landed 06-13)"],
   ["5","PRG-15","Error handling","✓ GRADUATED 06-11 — activation → graduation inside a day (WI-639/640/641)"],
   ["6","PRG-13","Background-job security","✓ GRADUATED 06-12 — both WPs, under a day"],
-  ["7","PRG-10","API security & PII","✓ ACTIVATED 06-13 — 27 findings → WI-698–704 (5 WP + 2 Item); slice scan 27/27 LIVE + CLEAN, parallel-safe with the cutover; shepherd RUNNING (Opus/medium + Sonnet executors; separate Codex reviewer)"],
-  ["8","PRG-11","Architecture","✓ ACTIVATED 06-13 — Tier-1 autonomous slice WI-717–720; cutover scan 16 parallel-safe / 9 serialize; Tiers 2/3 operator-gated"],
+  ["7","PRG-10","API security & PII","Original 7/7 LANE COMPLETE 06-13. Fast-follow wave 06-14: WI-734/735 (MUST_FIX) + WI-736/737/738 (SHOULD trio) merged; 5 in Reviewing. WI-739 Backlog."],
+  ["8","PRG-11","Architecture","Tiers 1+2 COMPLETE — Tier 1 (WI-717–720) done 06-13; Tier 2 (WI-724–729) done 06-14. Tier 3 (9 findings) deferred post-WI-586."],
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
   ["10","PRG-20","Estate-canon drain","IF clean-cut tail done (G5), or a named pull-forward earlier"],
   ["11","PRG-21","Learning-domain canon","Product trigger — Zuzka starts learning-feature work"],
@@ -682,26 +682,26 @@ const INIT = [
 
 { id:"PRG-03", name:"Instruction surface & memory", accent:"var(--teal)", lane:"now", status:"active", q:"#4",
   tagline:"Cleaning the agents' rule-books and working notes so three streams stop colliding on the same files.",
-  owner:"Cross-stream QA", gate:"One PM ruling outstanding (WI-587) — anytime, ~20 min.",
+  owner:"Cross-stream QA", gate:"WI-587 RULED + EXECUTED 06-11 (all 19 landed on main, 7cc8a9a8d; verified 06-13). Only the /cosmo:review close remains.",
   outcome:"Doctrine converged to single homes, memory triaged 55→clean, every standing rule confirmed by its actual owner.",
   bundles:[
     {n:"Doctrine & memory batches (B0–B6)", s:"55 notes", m:"agent", st:"done", note:"Triaged + executed: 25 archived, 14 revised, 9 drains captured. Rides the HH merge."},
-    {n:"WI-587 · the 19-decision ruling session", s:"19 rulings", m:"human", st:"go", note:"Sheet on Zuzka's desk — incl. the topic-locking contradiction. Edits land post-merge."},
-    {n:"Config fix (F-036)", s:"1 finding", m:"agent", st:"hold", note:"Memory-directory mis-point. Anytime."}
+    {n:"WI-587 · the 19-decision ruling session", s:"19 rulings", m:"human", st:"done", note:"All 19 ruled by PM 2026-06-11 and landed on main (7cc8a9a8d). Only manual /cosmo:review close remains."},
+    {n:"Config fix (F-036)", s:"1 finding", m:"agent", st:"done", note:"Merged in from dissolved PRG-16 tail (2026-06-10)."}
   ],
   homes:["_wip/identity-foundation/…instruction-surface-disposition-matrix-v0.md","supporting-artefacts/wi-587-ruling-sheet.md"]},
 
-{ id:"PRG-14", name:"Agent instructions", accent:"var(--teal)", lane:"now", status:"active-light", q:"#2",
-  tagline:"Sharper rule-books and two new repo-specific skills, so agents stop re-learning the same lessons.",
-  owner:"Umbrella (agents execute)", gate:"Light half gated on nothing. Skill-building waits for doc convergence (B4).",
-  outcome:"All 13 agent-instruction findings closed: skill descriptions fixed, sync gap closed, schemas/db/GHA repo skills built by extending the generic tech skills.",
+{ id:"PRG-14", name:"Agent instructions", accent:"var(--teal)", lane:"now", status:"executing", q:"#2",
+  tagline:"Sharper rule-books and two new repo-specific skills, so agents stop re-learning the same lessons. ACTIVATED 06-14 — sliced + released.",
+  owner:"Umbrella (agents execute)", gate:"ACTIVATED 06-14 — 6 WIs (WI-741…746) sliced Ready; WS-17 Open; shepherd GO-acted 06-14. WI-743 (P1 CI hardening) first; WI-744/745/746 merge-held pending human content review. PRG-03 B4 done — skill-building unblocked.",
+  outcome:"All 9 live agent-instruction findings closed (5 moot): skill descriptions fixed, sync gap closed, schemas/db/GHA repo skills built by extending the generic tech skills.",
   bundles:[
-    {n:"Skill-description & sync fixes", s:"6 findings", m:"agent", st:"go", note:"Trivial, can run today as a background thread."},
-    {n:"New repo skills: schemas + database", s:"2 builds", m:"mixed", st:"hold", note:"Extend-not-rebuild on the tech/* skill group. After B4."},
-    {n:"GHA-hardening skill extension", s:"1 finding", m:"agent", st:"hold", note:"Repo workflow inventory + agent-job surface, on the generic base."},
-    {n:"CI/Platform pair", s:"2 findings", m:"agent", st:"go", note:"Folded in by ruling: dead-branch injection sink + no-op smoke check."}
+    {n:"WI-743 · CI hardening (P1)", s:"F-151, F-157", m:"agent", st:"go", note:"P1. Drop dead injection branch in e2e-ci.yml + fix always-green smoke gate in e2e-web.yml. Dispatched."},
+    {n:"WI-741 · Skill-description & hook ref fixes", s:"F-039,040,042", m:"agent", st:"go", note:"commit + worktree-setup descriptions + scope-keyword-check hook skill-ref. Dispatched."},
+    {n:"WI-742 · sync-skills orphan guard + cite fix", s:"F-046,041", m:"agent", st:"hold", note:"Held pending prg14-001 ruling (DELETE vs PROMOTE the e2e-infra orphan)."},
+    {n:"WI-744/745/746 · New repo skills (schemas, db, GHA)", s:"F-113,114,116", m:"mixed", st:"go", note:"Reduce-and-extend on tech/* skill group. Dispatched; merge-held for human content review (prg14-002)."}
   ],
-  homes:["activation-planning.md §2 PRG-14 + §3 (dedupe analysis)","L-gap-delta.md (per-finding)"]},
+  homes:["_wip/agent-instructions/execution-tracker.md","activation-planning.md §2 PRG-14 + §3 (dedupe analysis)","L-gap-delta.md (per-finding)"]},
 
 { id:"PRG-12", name:"UI language & accessibility", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#1",
   tagline:"358 hardcoded English strings, silent screen-readers, 13 modals without focus management. OUTCOME MET — third graduation, largest slice.",
@@ -719,29 +719,27 @@ const INIT = [
   ],
   homes:["_wip/l10n-a11y/execution-tracker.md (THE entry point)","Cosmo Workstream: L10n & A11y Mobile","L-gap-delta.md (per-finding)"]},
 
-{ id:"PRG-10", name:"API security & PII", accent:"var(--amber)", lane:"now", status:"executing", q:"#7",
-  tagline:"27 verified non-rewrite security findings. Slice scan cleared it: none subsumed by IF, none collide with the live cutover — fully parallel-safe.",
-  owner:"Mixed; human review on auth & CI permissions", gate:"ACTIVATED 06-13. Both gates fired 06-11. Slice scan: 27/27 LIVE (IF subsumed none), 27/27 CLEAN vs CUT-B1/2/3. Shepherd SPAWNED & RUNNING — separate Opus 4.8 / medium-effort session; Sonnet executors (Opus on hard concurrency/trust-boundary units); separate Codex reviewer session owns the review loop.",
-  outcome:"Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized.",
+{ id:”PRG-10”, name:”API security & PII”, accent:”var(--amber)”, lane:”now”, status:”executing · fast-follow”, q:”#7”,
+  tagline:”27 original findings LANE COMPLETE 06-13. Fast-follow wave (06-14): 2 MUST_FIX merged; SHOULD trio merged; all 5 in Reviewing. WI-739 (CONSIDER hygiene) Backlog.”,
+  owner:”Mixed; human review on auth & CI permissions”, gate:”Original 7/7 units Closed 06-13 (PRs #1108/1109/1111/1114/1121/1122). Fast-follow wave activated 06-14 from retroactive consolidated claude-review (0 BLOCKER · 2 MUST_FIX · 8 SHOULD_FIX). WI-734/735 (MUST_FIX) merged; WI-736/737/738 (SHOULD trio) merged; 5 in Reviewing. WI-739 Backlog.”,
+  outcome:”Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized. Fast-follow closes the consolidated-review residuals.”,
   bundles:[
-    {n:"WI-698 · CI/GHA permissions + gate integrity", s:"6 findings", m:"mixed", st:"go", note:"P1. F-024/119/127/129/132/154. Parallel-safe."},
-    {n:"WI-699 · JWKS DoS + 3 race/atomicity", s:"4 findings", m:"mixed", st:"go", note:"P1. F-181/120/164/167."},
-    {n:"WI-700 · Input validation & bounds", s:"5 findings", m:"agent", st:"go", note:"P2. F-142/158/166/179/180."},
-    {n:"WI-701 · Quota / billing correctness", s:"3 findings", m:"mixed", st:"go", note:"P2. F-128/146/148. Disjoint from CUT-B3 webhooks."},
-    {n:"WI-702 · Logging + config hygiene", s:"7 findings", m:"agent", st:"go", note:"P2. F-077/079/080/081/082/138/143."},
-    {n:"WI-703 · LLM prompt-injection fence", s:"1 finding", m:"agent", st:"go", note:"P2 Item. F-139."},
-    {n:"WI-704 · Mobile markdown safety", s:"1 finding", m:"agent", st:"go", note:"P2 Item. F-027."}
+    {n:”WI-698–704 · original 7 units”, s:”27 findings”, m:”mixed”, st:”done”, note:”All 7 Closed/Done 06-13 (PRs #1108/1109/1111/1114/1121/1122). Two rework loops (child-evidence / stale-branch invariant) — no code defects.”},
+    {n:”WI-734 · Meter/hard-stop homework-summary (MUST_FIX)”, s:”M1 · F-128”, m:”mixed”, st:”go”, note:”Merged 06-14 (bf94cdf19). Reviewing.”},
+    {n:”WI-735 · Cap server-side homework problems array (MUST_FIX)”, s:”M2 · F-158”, m:”agent”, st:”go”, note:”Merged 06-14 (f031a15b9). Reviewing.”},
+    {n:”WI-736/737/738 · SHOULD trio (GHA + CAS + correctness)”, s:”S1–S9,C3,C7”, m:”mixed”, st:”go”, note:”Merged 06-14 (#1165/1166/1167). Reviewing. Gate breach on #1165 ratified post-remediation (claude-review re-ran green).”},
+    {n:”WI-739 · Defense-in-depth hygiene (CONSIDER)”, s:”C1,C2,C5,C6,C8,C9”, m:”agent”, st:”hold”, note:”Backlog. Not in the current push.”}
   ],
-  homes:["_wip/security-pii-api/execution-tracker.md","Cosmo · Workstream “API Security & PII” (WI-698–704)","L-gap-delta.md (per-finding)"]},
+  homes:[“_wip/security-pii-api/execution-tracker.md”,”Cosmo · Workstream “API Security & PII” (WI-698–704 + fast-follow WI-734–739)”,”L-gap-delta.md (per-finding)”]},
 
-{ id:"PRG-11", name:"Architecture Clean-Out", accent:"var(--teal)", lane:"now", status:"active", q:"#8",
-  tagline:"Architecture audit clear-out — code-structural & correctness findings, hybrid/tiered: Tier 1 autonomous slice in Cosmo (WI-717–720); Tiers 2/3 operator-gated. Human-led on decomposition boundaries.",
-  owner:"Human-led decomposition; Sonnet executors (Opus plan-phase on WI-717); separate Codex reviewer", gate:"G3 (IF W1) ✅ + moot scan ✅; cutover scan split 16 parallel-safe / 9 serialize.",
+{ id:"PRG-11", name:"Architecture Clean-Out", accent:"var(--teal)", lane:"now", status:"active · Tiers 1+2 done", q:"#8",
+  tagline:"Tier 1 COMPLETE 06-13 (WI-717–720). Tier 2 COMPLETE 06-14 (WI-724–729 all Closed/Done). Tier 3 deferred post-WI-586. Lane NOT graduated.",
+  owner:"Human-led decomposition; Sonnet executors; separate Codex reviewer", gate:"G3 (IF W1) ✅ + moot scan ✅ + Tier-1 done ✅ + Tier-2 decomp gate run 06-13 ✅. Tier 3 (9 findings) gated on WI-586 + fresh re-scan post-flip.",
   outcome:"~24 architecture findings (3 moot / 1 partial / 23 LIVE + INV-2 per 06-11 scan) resolved across three tiers: structural correctness, test coverage, mock hygiene, and domain/dependency clean-out.",
   bundles:[
-    {n:"Tier 1 · autonomous (WI-717–720): races, tests, GC1 guard, GC6 sweep", s:"4 WIs · parallel-safe + mechanical", m:"agent", st:"go", note:"WI-717 correctness races F-169/170/171; WI-718 test coverage F-097/098/099; WI-719 GC1 multiline-mock guard F-156; WI-720 GC6 mock burn-down INV-2. Only tier in Cosmo."},
-    {n:"Tier 2 · parallel-safe but human-gated (8 findings)", s:"8 findings", m:"human", st:"hold", note:"Parallel-safe vs cutover but need operator decomposition sign-off before slicing. Recorded in tracker, NOT yet in Cosmo."},
-    {n:"Tier 3 · cutover-serialized behind WI-586 (9 findings)", s:"9 findings · behind CUT-B2/B3 + WI-586", m:"mixed", st:"hold", note:"Must serialize behind the live IF cutover. Recorded in tracker; gate = WI-586 convergence/drop closed."}
+    {n:"Tier 1 · autonomous (WI-717–720): races, tests, GC1 guard, GC6 sweep", s:"4 WIs", m:"agent", st:"done", note:"All 4 Closed/Done 06-13. Commits: WI-717 d99562583, WI-718 f70c02164, WI-719 15f388414, WI-720 620cca77b."},
+    {n:"Tier 2 · parallel-safe, human-gated (WI-724–729)", s:"6 WIs · F-011/030/104/105/108/109", m:"human", st:"done", note:"All 6 Closed/Done 06-14. Decomp gate run 06-13; F-103 deferred; F-112 closed won't-fix. WI-728 took one rework round (practice/index.tsx gate found)."},
+    {n:"Tier 3 · cutover-serialized behind WI-586 (9 findings)", s:"9 findings · behind CUT-B2/B3 + WI-586", m:"mixed", st:"hold", note:"Must serialize behind the live IF cutover. Recorded in tracker; gate = WI-586 convergence/drop closed + fresh re-scan."}
   ],
   homes:["_wip/architecture/execution-tracker.md","Cosmo Workstream \"Architecture Clean-Out\""]},
 
@@ -771,7 +769,7 @@ const INIT = [
   owner:"Hex + Jorn", gate:"Execution slice gated on the joint PRG-04/05 design grill — sequence is spike → grill → slice.",
   outcome:"Shepherd-kickoff, executor-protocol/pointer-brief, the autonomous reviewer-dispatcher loop, and the cross-runtime seam contracts promoted from per-instance _wip artifacts to a parameterized, agnostic layer.",
   bundles:[
-    {n:"Agnosticity spike", s:"running", m:"mixed", st:"go", note:"First work: Claude shepherd picking Claude/Codex executors via codex-companion; Claude executor → Codex nested adversarial reviewer. Feeds the seam catalogue."},
+    {n:"Agnosticity spike", s:"complete 06-13", m:"mixed", st:"done", note:"COMPLETE 06-13. Cross-runtime dispatch (incl. Claude executor → Codex nested adversarial reviewer) production-viable. 7 seam-contract requirements captured in spike-agnosticity/finding.md. Feeds the joint grill."},
     {n:"Joint design grill (with PRG-04)", s:"design", m:"human", st:"hold", note:"Seam-catalogue spine — rules the three role-unit contracts (orchestrator↔shepherd, shepherd↔reviewer) before any slice."},
     {n:"Build & harvest (WI-590 loop half)", s:"later", m:"mixed", st:"hold", note:"Sliced only post-grill; WI-590's loop half re-homes here at slice."}
   ],

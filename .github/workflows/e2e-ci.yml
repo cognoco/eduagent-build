@@ -62,18 +62,8 @@ jobs:
             exit 0
           fi
 
-          # workflow_run: diff against PR base or previous commit
-          if [ "${{ github.event.workflow_run.event }}" = "pull_request" ]; then
-            PR_BASE="${{ github.event.workflow_run.pull_requests[0].base.ref }}"
-            if [ -n "$PR_BASE" ]; then
-              git fetch origin "$PR_BASE"
-              BASE="origin/$PR_BASE"
-            else
-              BASE="HEAD~1"
-            fi
-          else
-            BASE="HEAD~1"
-          fi
+          # workflow_run (non-pull_request): diff against previous commit
+          BASE="HEAD~1"
           FILES=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || git diff --name-only "$BASE" HEAD)
 
           echo "=== Changed files ==="
