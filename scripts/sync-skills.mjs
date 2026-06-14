@@ -85,7 +85,13 @@ const GROUP_DIRS = new Set(['tech']);
 // allowed to diverge. Add a comment explaining why each is here. When the
 // content can be unified, remove from this set and run sync; the .agents/
 // master will then propagate.
-const SKIP_SKILLS = new Set([
+//
+// Overridable via SYNC_SKILLS_SKIP (comma-separated) so the test harness can
+// exercise the SKIP_SKILLS path without editing this set (mirrors the
+// SOURCE_ROOT/TARGET_ROOT env overrides above).
+const SKIP_SKILLS = process.env.SYNC_SKILLS_SKIP
+  ? new Set(process.env.SYNC_SKILLS_SKIP.split(',').map((s) => s.trim()).filter(Boolean))
+  : new Set([
   // (empty) — `commit` was unified onto one master in WI-388: the
   // runtime-neutral body lives in .agents/skills/commit/SKILL.md and the
   // Claude harness frontmatter is injected from agents/claude.yaml by the
@@ -288,6 +294,13 @@ async function findOrphans(units) {
       continue;
     }
     if (!entry.isDirectory()) continue;
+
+    // SKIP_SKILLS dirs are intentionally allowed to diverge from their master
+    // (the .claude/ and .agents/ copies are not kept in sync), so they are
+    // neither a missing-master orphan nor subject to child comparison. `units`
+    // is already SKIP_SKILLS-filtered, so without this guard a skipped skill
+    // would be misread as a Class-1 orphan once the set is repopulated.
+    if (SKIP_SKILLS.has(entry.name)) continue;
 
     if (!knownTargetNames.has(entry.name)) {
       // Class 1: whole top-level dir has no master.

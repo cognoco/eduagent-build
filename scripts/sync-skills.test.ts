@@ -28,11 +28,13 @@ function runSync(sourceRoot: string, targetRoot: string): void {
 
 /**
  * Run sync-skills.mjs --report-orphans against fixture roots.
+ * `skip` populates SYNC_SKILLS_SKIP (comma-separated) to exercise SKIP_SKILLS.
  * Returns { status, stdout, stderr } — does NOT throw on non-zero exit.
  */
 function runReportOrphans(
   sourceRoot: string,
   targetRoot: string,
+  skip?: string,
 ): { status: number | null; stdout: string; stderr: string } {
   const result = spawnSync('node', [SCRIPT, '--report-orphans'], {
     cwd: REPO_ROOT,
@@ -40,6 +42,7 @@ function runReportOrphans(
       ...process.env,
       SYNC_SKILLS_SOURCE_ROOT: sourceRoot,
       SYNC_SKILLS_TARGET_ROOT: targetRoot,
+      ...(skip ? { SYNC_SKILLS_SKIP: skip } : {}),
     },
     encoding: 'utf8',
   });
@@ -293,6 +296,19 @@ describe('sync-skills.mjs --report-orphans', () => {
     }
 
     const { status } = runReportOrphans(src, out);
+    expect(status).toBe(0);
+  });
+
+  it('does not flag a SKIP_SKILLS dir as a Class-1 orphan', () => {
+    // 'diverged' is in SKIP_SKILLS: its .claude/ copy intentionally has no
+    // synced .agents/ master, so it must NOT be reported as an orphan.
+    mkdirSync(join(out, 'diverged'), { recursive: true });
+    writeFileSync(
+      join(out, 'diverged', 'SKILL.md'),
+      '---\nname: diverged\ndescription: Use when diverged.\n---\n\n# Diverged\n',
+    );
+
+    const { status } = runReportOrphans(src, out, 'diverged');
     expect(status).toBe(0);
   });
 });
