@@ -2,11 +2,13 @@
 
 **Status:** Reference · 2026-06-10 · for the Mentor-Is-The-App shell redesign (`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`)
 **Scope:** READ-ONLY recon of the CURRENT code the V2 shell strangles. This is the anchor map the S1/S2/S3/S4/S6 mobile plans cite so each downstream plan references REAL files + line anchors instead of inventing them.
-**Honor:** §7 hard constraint — `MODE_NAV_V0_ENABLED=false` (production V0 5-tab shape) must not regress; V2 rides its own flag alongside V0/V1, mirroring the V1 staging pattern.
+**Honor:** §7 hard constraint — all current flag states must not regress: the flags-off legacy guardian 5-tab fallback, the current production V0-on/V1-off mode shells (`apps/mobile/eas.json` sets `EXPO_PUBLIC_ENABLE_MODE_NAV=true` in production), and V1 preview/staging. V2 rides its own flag alongside V0/V1, mirroring the V1 staging pattern, until S6 executes the §13.1 retirement ruling.
 
 > All paths are repo-relative from the monorepo root. Expo Router root is `apps/mobile/src/app/`. Line anchors verified 2026-06-10 against the working tree on the checked-out branch.
 >
 > **Updated 2026-06-10 for spec amendment** (reward-system anchors, streak/rhythm display anchor, voice/mic input anchor — see §6). **Amended 2026-06-13:** XP/practice points and reflection bonus are retained as earned private learning receipts; only coercive presentation / fragile coupling is removed.
+
+> **Verified audit amendments (2026-06-13).** This anchor map has a few volatile line anchors; prefer symbol anchors when executing. Current branch verification found: `_layout.tsx` mounts `<ModeSwitcher />` around `:614` and the OTA nav env block is around `.github/workflows/ci.yml:397-398`; `ModeSwitcher` will still render under V1+V2 unless S1 explicitly suppresses it with `!FEATURE_FLAGS.MODE_NAV_V2_ENABLED`; S0 `/now` and `mentor_activity_ledger` are already landed in code; and mobile currently defines local `NetworkError`/`UpstreamError` classes, so schema `instanceof` is not a universal truth for transport errors until that refactor lands.
 
 ---
 
@@ -22,11 +24,11 @@
 | `apps/mobile/src/lib/navigation-contract.ts` | `resolveNavigationContract` `:244-508`; tab sets `STUDY_TABS`/`FAMILY_TABS`/`PROXY_TABS`/`LEGACY_GUARDIAN_TABS` `:145-168`; `home.screen` branch `:376-386`; `legacyV0ModeNavActive` `:257-259` | V1 nav contract — tab visibility + `isOwner`/family gates + `canEnter`/`isSurfaced` route guards. | strangle-target (S4 — chip scopes replace shape matrix); keep behind flags until S6 |
 | `apps/mobile/src/lib/legacy-navigation-contract.ts` | `resolveTabShape` `:62-77`; `computeModeVisibleTabs` `:93-97`; `resolveShellVisibleTabs` `:151-183` | V0/legacy tab-shape + mode-tab helpers (5-tab guardian, 3/4-tab Study/Family). The flags-off + V0-on production path. | strangle-target (S6 retirement ruling, §13); **must-not-regress floor** until then |
 | `apps/mobile/src/hooks/use-navigation-contract.ts` | `useNavigationShellContract` `:142-189`; `useNavigationContract` `:115-122`; `useNavigationHomeContract` `:191-208` | Hooks that wire profile/subscription/proxy/role into the contract + pick V0-vs-V1 path via flags. | extend (S4 adds a V2 branch); shell reads `visibleTabs` from here |
-| `apps/mobile/src/app/(app)/_layout.tsx` | `AppLayout` `:136`; `<Tabs>` whitelist `:612-749`; `FULL_SCREEN_ROUTES` `:60-70`; `HIDDEN_TAB_ROUTES` `:83-100`; gate ordering `:493-583`; `<ModeSwitcher/>` mount `:602` | The Tabs navigator + the whole signed-in gate stack (auth → preview wizard → consent → tabs). Whitelist tab pattern: only `visibleTabs.has(route.name)` renders a tab. | strangle-target shell (S1 mounts V2 as a parallel tab set behind the flag; §2). Gate stack above tabs = keep |
+| `apps/mobile/src/app/(app)/_layout.tsx` | `AppLayout` `:136`; `<Tabs>` whitelist around `:612-749`; `FULL_SCREEN_ROUTES` `:60-70`; `HIDDEN_TAB_ROUTES` `:83-100`; gate ordering around `:493-583`; `<ModeSwitcher/>` mount now around `:614` | The Tabs navigator + the whole signed-in gate stack (auth → preview wizard → consent → tabs). Whitelist tab pattern: only `visibleTabs.has(route.name)` renders a tab. | strangle-target shell (S1 mounts V2 as a parallel tab set behind the flag; §2). Gate stack above tabs = keep |
 | `apps/mobile/src/lib/app-context.tsx` | `familyCapable` `:60-68`; `derivedMode` `:70-80`; `setMode` `:99-171`; flags-off short-circuits `:64,77,152` | `AppMode` (`study`/`family`) provider + ModeSwitcher backing state. Returns `mode: null` when both flags off. | strangle-target (S4/S7 — ModeSwitcher + proxy die); keep until S6 |
 | `apps/mobile/src/components/chrome/ModeSwitcher.tsx` | (file) | The Study/Family global-header switcher. | strangle-target (§7 — replaced by scope chip, S4) |
 | `apps/mobile/eas.json` | prod `:11-15` (V0=true only); dev `:21-26` + preview `:37-42` (V0+V1=true) | Build-profile env that sets the nav flags per environment. | reuse (add V2 flag to dev/preview, §2) |
-| `.github/workflows/ci.yml` | OTA env `:326-327` | Preview-channel OTA duplicates `EXPO_PUBLIC_ENABLE_MODE_NAV(_V1)` because `eas update` ignores build-profile env. | reuse (add V2 flag here for staging OTA, §2) |
+| `.github/workflows/ci.yml` | OTA env now around `:397-398` | Preview-channel OTA duplicates `EXPO_PUBLIC_ENABLE_MODE_NAV(_V1)` because `eas update` ignores build-profile env. | reuse (add V2 flag here for staging OTA, §2) |
 
 ### S1 — Mentor home surfaces
 
@@ -68,7 +70,7 @@
 | `apps/mobile/src/app/(app)/my-notes/index.tsx` | `HUB_ITEMS` `:23-47` (sessions/notes/bookmarks) | The "My Notes" hub — sessions, notes, bookmarks. The You-tab-ish cross-subject notes surface. | merge-into-S3 (cross-subject notes view in Journal, §5.4; "one store two views") |
 | `apps/mobile/src/app/(app)/my-notes/[kind].tsx` | (file) | Notes/bookmarks/sessions list by kind. | merge-into-S3 |
 | `apps/mobile/src/app/(app)/mentor-memory.tsx` | (file); also `child/[profileId]/mentor-memory.tsx` | Mentor-memory surface ("what the mentor knows about me"). | merge-into-S3 (Journal mentor-memory column, §6.3) |
-| `apps/mobile/src/app/session-summary/[sessionId].tsx` | `:1-60`; `useSkipSummary`/`useSubmitSummary`/`useRecallBridge` `:30-36`; summary-draft `:46-50` | The post-session **exit funnel** screen (reflection → summary → filing). | strangle-target (§7/S6 — dissolves into mentor wrap-up turn, **only after** P3 park-and-return eval coverage exists, §2) |
+| `apps/mobile/src/app/session-summary/[sessionId].tsx` | `:1-60`; `useSkipSummary`/`useSubmitSummary`/`useRecallBridge` `:30-36`; summary-draft `:46-50` | The post-session **exit funnel** screen (reflection → summary → filing). | strangle-target (§7/S6 — dissolves into mentor wrap-up turn, **only after** P3 park-and-return eval coverage exists **and** the V2 wrap-up heir preserves learner-written "Your Words", filing/mentor-memory handoff, and the visible 1.5x reflection receipt) |
 | `apps/mobile/src/app/session-transcript/[sessionId].tsx` | (file) | Archived transcript viewer. | keep (deep-linkable artifact) |
 | `apps/mobile/src/app/(app)/child/[profileId]/*` | dir (index, reports, curriculum, session, subjects, topic, mentor-memory, weekly-report) | The parent→child supporter surfaces (V1 family-child routes). | strangle-target (§7 — replaced by chip person-scopes, S4/S5); structural rendering reuses these read shapes server-masked |
 
@@ -91,19 +93,24 @@
 | `apps/mobile/src/components/persona-fossil-guard.test.ts` | (file) | Forbids reintroducing `personaFromBirthYear`/`isLearner`/local `Persona`. Use `computeAgeBracket` (`@eduagent/schemas`) for theming only, never gating. | honor (V2 scope is the chip/account-type, not persona) |
 | `packages/schemas` | barrel | The shared contract (`@eduagent/schemas`) — error classes, `Profile`, `computeAgeBracket`, `isAdultOwner`. | reuse (don't redefine API-facing types locally) |
 
-### Backend stores the `/now` feed + ledger touch (S0)
+### Current S0 primitives already in code (`/now` feed + ledger touch)
 
 | File | Anchor | What it is | Disposition |
 |---|---|---|---|
+| `packages/database/src/schema/activity-ledger.ts` | `mentorActivityLedger`; `.enableRLS()` current branch | Landed `mentor_activity_ledger` Drizzle table, S0-profile-keyed. Migration `0111_zippy_gateway.sql` creates it; `0112_rls_mentor_activity_ledger.sql` enables RLS + `mentor_activity_ledger_profile_isolation`. | reuse; do not recreate in S0 follow-up |
+| `apps/api/src/services/activity-ledger.ts` | `writeActivityMoment`, `markMomentSurfaced` | Landed best-effort ledger writer (`safeWrite` posture) + surfacing marker. | reuse; S5 render-equivalence/audit writes must not rely on best-effort if the write is load-bearing |
+| `apps/api/src/services/now-feed.ts` | `ROUTE_CATALOG`, `rankCandidates`, `buildNowFeed`, `buildNowOverflow` | Landed deterministic ranking service and closed route catalog. `rankCandidates()` is the pure seam S3 evals should call. | reuse; S1/S2 must validate route expansion against real mobile routes |
+| `apps/api/src/routes/now.ts` | `nowRoutes` | Landed Hono route group for `GET /now` and overflow. | reuse |
+| `packages/schemas/src/now-feed.ts` | `nowCardKindSchema`, `nowDeepLinkRouteSchema`, `nowResponseSchema` | Landed shared `/now` contract. `cards` is max 3; `chain` is currently `string[]` on the client schema, so clients must validate before indexing or S0 must tighten it. | reuse; do not invent card kinds such as `quota_exhausted` without S0 schema work |
 | `packages/database/src/schema/sessions.ts` | `parkingLotItems` `:306-336`; `explored` boolean `:322` (**no expiry**) | Park-and-return store #1 (P3 backstop, §8.1). | reuse (the `/now` aging-window backstop reads this) |
 | `packages/database/src/schema/assessments.ts` | `needsDeepeningTopics` `:163-207`; `status` enum `:178`; `pendingExpiresAt` `:186` | Park-and-return store #2 — has an expiry clock the backstop must reconcile with (§8.1), NOT a competing clock. | reuse |
-| `apps/api/src/services/safe-non-core.ts` | `safeSend()` | Non-throwing Sentry-captured dispatch posture. The ledger writer (§8.2) mirrors this **posture** for a DB insert (not a literal `safeSend` call). | reuse the pattern (S0) |
+| `apps/api/src/services/safe-non-core.ts` | `safeWrite()` | Non-throwing Sentry-captured DB-write posture used by `writeActivityMoment()`. | reuse the pattern only when loss is allowed |
 
 ---
 
 ## 2. V2 flag wiring recommendation
 
-**Goal:** mount the new shell as "screen #89" behind `MODE_NAV_V2_ENABLED`, alongside V0/V1, with zero behavioral change to either when V2 is off. Honor §7: `MODE_NAV_V0_ENABLED=false` (prod) must keep producing today's exact shell.
+**Goal:** mount the new shell as "screen #89" behind `MODE_NAV_V2_ENABLED`, alongside V0/V1, with zero behavioral change to either when V2 is off. Honor §7: both the flags-off legacy fallback and the current production V0-on/V1-off shell must keep producing today's exact shells.
 
 **Env var:** `EXPO_PUBLIC_ENABLE_MODE_NAV_V2` → flag `MODE_NAV_V2_ENABLED`.
 
@@ -115,11 +122,11 @@
 
 2. **Resolution point — `use-navigation-contract.ts`, not the contract files.** The cleanest seam is a NEW top-level branch in `useNavigationShellContract` (`:142-189`): when `FEATURE_FLAGS.MODE_NAV_V2_ENABLED`, return the V2 three-tab set (Mentor/Subjects/Journal) instead of `resolveShellVisibleTabs(...)`. Do **not** edit `resolveNavigationContract` or `legacy-navigation-contract.ts` — leaving both untouched is what guarantees the V0/V1 no-regress. The V2 branch is additive and short-circuits before the V0/V1 logic runs. (S4 later extends this seam with the scope chip; S1–S3 only need the new tab set + new screens behind the flag.)
 
-3. **Tabs layout — `(app)/_layout.tsx`.** The `<Tabs>` whitelist already renders only `visibleTabs.has(route.name)` routes (`:613-614`), so a V2 `visibleTabs` of `{mentor, subjects, journal}` plus new `Tabs.Screen` entries for those three route files is sufficient; every legacy tab auto-hides via the existing `href:null` default. Register the three new screens; add them to `HIDDEN_TAB_ROUTES` is NOT needed (they're in the whitelist). The avatar admin entry is a header element, not a tab.
+3. **Tabs layout — `(app)/_layout.tsx`.** The `<Tabs>` whitelist already renders only `visibleTabs.has(route.name)` routes, so a V2 `visibleTabs` of `{mentor, subjects, journal}` plus new `Tabs.Screen` entries for those three route files hides legacy tab buttons. This is not sufficient by itself: `<ModeSwitcher />` is mounted outside the whitelist and gates through the V1 contract, so S1 must render it only when `!FEATURE_FLAGS.MODE_NAV_V2_ENABLED` until S4 replaces it with `<ScopeChip />`. Add a V1+V2+family-capable regression asserting no mode switcher and exactly Mentor/Subjects/Journal tabs; V2-off V0/V1 shells remain unchanged. The avatar admin entry is a header/custom chrome element, not a tab.
 
 4. **`eas.json` profiles** — add `EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'` to `build.development.env` (`:21`) and `build.preview.env` (`:37`) ONLY. Leave `build.production.env` (`:11`) untouched (V2 stays off in prod). This mirrors exactly how V1 is staged (dev+preview on, prod off).
 
-5. **`.github/workflows/ci.yml` OTA step** — add `EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'` to the OTA env block at `:325` (next to the V0/V1 lines `:326-327`), because `eas update` does not read build-profile env. This makes V2 visible on the preview-channel OTA (the staging validation surface, S1+S2 evidence gate).
+5. **`.github/workflows/ci.yml` OTA step** — add `EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'` to the OTA env block now around `:397-398` (next to the V0/V1 lines), because `eas update` does not read build-profile env. This makes V2 visible on the preview-channel OTA (the staging validation surface, S1+S2 evidence gate).
 
 **Net effect:** prod = V0-on/V1-off/**V2-off** (unchanged); dev+preview+staging-OTA = V1-and-V2-on (V2 branch wins where it short-circuits). No flag combination removes or alters the V0/V1 code paths.
 
@@ -130,7 +137,7 @@
 Downstream V2 plans MUST consume these, not rebuild them:
 
 - **Error fallback:** `import { ErrorFallback, TimeoutLoader } from '../../components/common'` (barrel `components/common/index.ts:9,23`). `ErrorFallback` takes `{title, message, primaryAction, secondaryAction, variant: 'card'|'centered'}`. Every spec §14 failure-mode Recovery cell renders through this.
-- **Typed errors:** `import { ForbiddenError, ResourceGoneError, QuotaExceededError, NetworkError, UnauthorizedError, RateLimitedError, … } from '@eduagent/schemas'` (canonical, `packages/schemas/src/errors.ts`) — or via the mobile re-export `'../../lib/api-client'`. Cross-package `instanceof` works because there is ONE class per error. Never define a parallel mobile copy.
+- **Typed errors:** `import { ForbiddenError, ResourceGoneError, QuotaExceededError, UnauthorizedError, RateLimitedError, … } from '@eduagent/schemas'` for shared API-domain errors, or consume the mobile re-export from `'../../lib/api-client'`. Current mobile still defines local `NetworkError` and `UpstreamError` in `apps/mobile/src/lib/api-errors.ts`, so do **not** branch on schema `instanceof NetworkError/UpstreamError` until that refactor lands; use the api-client re-export / `classifyApiError` boundary for transport errors.
 - **API client + error classification:** `import { useApiClient } from '../../lib/api-client'`. The client's `customFetch` (`api-client.ts:185-370`) classifies HTTP status → typed error ONCE. Screens switch on the typed error; they must NEVER parse `res.status`. New `/now` + hub calls are typed off `AppType` automatically.
 - **Classify-then-format:** `import { classifyApiError, recoveryActions, formatApiError } from '../../lib/format-api-error'`. Call `classifyApiError(rawError)` first; pass the result to `recoveryActions({retry, goBack, goHome})` to get `{primary, secondary}` for `ErrorFallback`. Never string-match `formatApiError` output to branch on type.
 - **Hono RPC client (type-only AppType):** `import type { AppType } from '@eduagent/api'` (the one sanctioned mobile→api dependency; `api-client.ts:11`). Type-only — erased at compile time, zero API runtime in the bundle.
@@ -155,7 +162,7 @@ Per-phase merge/retire ledger. "Strangle" = kept flag-isolated until §7/S6 exec
 **S3 (Journal + avatar) — the You-tab hodgepodge + More tab die:**
 - `more/index.tsx` + `more/account.tsx` + `more/privacy.tsx` + `more/{notifications,accommodation,celebrations,help,security-sessions}.tsx` → avatar admin sheet (owner-gated).
 - `recaps/index.tsx` + `my-notes/index.tsx` + `my-notes/[kind].tsx` + `mentor-memory.tsx` → ONE Journal tab (recaps + cross-subject notes + mentor memory, §3/§5.4).
-- `session-summary/[sessionId].tsx` (3-screen exit funnel) → dissolves into mentor wrap-up turn, **gated on P3 evals** (S6).
+- `session-summary/[sessionId].tsx` (3-screen exit funnel) → dissolves into mentor wrap-up turn, **gated on P3 evals plus the reflection/bonus V2 heir being live** (S6).
 
 **S4 (chip / identity — strangle, not yet collapsed at S1–S3):**
 - `navigation-contract.ts` tab-shape matrix + `legacy-navigation-contract.ts` + `app-context.tsx` ModeSwitcher + `ModeSwitcher.tsx` + proxy mode + `child/[profileId]/*` → scope chip + person scopes. These stay alive behind flags until S6 (the must-not-regress floor).

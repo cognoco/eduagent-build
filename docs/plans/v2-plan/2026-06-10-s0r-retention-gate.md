@@ -163,6 +163,20 @@ Cross-cutting observations the chokepoint must preserve:
 
 ---
 
+## Verified audit amendments (2026-06-13)
+
+The writer inventory above was verified stale against the current branch. These amendments are part of the executable plan and override the old count/rows where they conflict.
+
+1. **Add W11 — relearn retention reset.** `apps/api/src/inngest/functions/session-completed.ts` contains a production `relearn-retention-reset` writer that resets SRS columns and deliberately preserves `updatedAt` with `sql\`${retentionCards.updatedAt}\``. Add this file to scope, add W11 to the writer map, and either extend `applyRetentionUpdate()` with a `{ target: { topicId } }` plus `updatedAt: { kind: 'preserveExisting' }` mode or explicitly carve W11 out and weaken the "all writers" claim. Required test: pin the reset column set and the BUG-185 `updatedAt` preservation contract.
+2. **Split W5 calibration into W5a/W5b.** Current `review-calibration-grade.ts` has `claim-cooldown-slot` before the paid LLM call and `finalize-retention-update` after grading. W5a needs a cooldown-claim guard with a re-entrant `lastReviewedAt === eventAt` predicate; W5b uses `guard: none`, `id + profileId`, and writes SM-2/status plus `lastReviewedAt=eventAt`. Keep the no-grade-on-claim-loss test as a required done-when.
+3. **Replace the chokepoint sweep grep.** The old exact grep misses multiline update calls and catches fixtures. Final validation must use a production-only sweep such as:
+   ```powershell
+   rg -n "\.(update|insert)\(retentionCards\)" apps/api/src --glob "!*.test.ts" --glob "!*.integration.test.ts" --glob "!services/test-seed.ts"
+   ```
+   The result must be only `apply-retention-update.ts` plus explicitly documented carve-outs.
+4. **Add a GC6 pre-step for every touched test file.** Several likely target tests already contain internal mocks. Before editing a test file, record the GC6 disposition: remove the internal mock, convert to a real implementation / targeted `jest.requireActual()` override, or document a narrow deferral if burn-down would blow up the focused task.
+5. **Correct the reward boundary wording.** W1/W3/W5 write `xpStatus`; W9 consumes `xpChange` to stamp mastery and does not write `xpStatus`. T12 runs after the consolidation but must be followed by a final full sweep (`api:lint`, `api:typecheck`, `api:test`, and routed integration tests) because it changes reward-boundary behavior after the old T11 validation point.
+
 ## The `applyRetentionUpdate()` signature + consolidated write contract
 
 The function lives in `apps/api/src/services/apply-retention-update.ts`. Two
