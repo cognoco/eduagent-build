@@ -9,7 +9,7 @@ import type {
 
 /**
  * Centralized entry-gate predicate shared by the learning-flow screens
- * (session/homework/dictation/quiz/practice layouts, mentor-memory, topic/relearn).
+ * (session/homework/dictation/quiz layouts, mentor-memory, topic/relearn).
  *
  * The flag branch is intentional and must not be collapsed to `!canEnter(...)`:
  * when V1 is off, the contract's `canEnter()` returns false during the
