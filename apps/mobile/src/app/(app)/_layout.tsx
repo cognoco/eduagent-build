@@ -26,6 +26,7 @@ import {
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 import { ErrorFallback } from '../../components/common';
 import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
+import { AccountAvatar } from '../../components/account/AccountAvatar';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
@@ -58,6 +59,7 @@ initNotificationHandler();
 // host tab bar, making the audience scope ambiguous. Adding it here collapses
 // the tab bar (height: 0) the same way quiz/homework/dictation already do.
 const FULL_SCREEN_ROUTES = new Set([
+  'account',
   'onboarding',
   'session',
   'homework',
@@ -81,6 +83,7 @@ const FULL_SCREEN_ROUTES = new Set([
 // non-tab route below; this is the same pattern Expo Router docs recommend
 // for hidden routes.
 const HIDDEN_TAB_ROUTES = [
+  'account',
   'dashboard',
   'subscription',
   'mentor-memory',
@@ -97,6 +100,17 @@ const HIDDEN_TAB_ROUTES = [
   'vocabulary',
   'topic',
   'onboarding',
+] as const;
+
+const ACCOUNT_AVATAR_HIDDEN_PATHS = [
+  '/account',
+  '/onboarding',
+  '/session',
+  '/homework',
+  '/dictation',
+  '/quiz',
+  '/practice',
+  '/shelf',
 ] as const;
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
@@ -601,6 +615,12 @@ export default function AppLayout() {
           parentProfileId: navigationShell.proxy.parentProfileId,
         }
       : null;
+  const showAccountAvatar =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
+    !isProxyChromeActive &&
+    !ACCOUNT_AVATAR_HIDDEN_PATHS.some((hiddenPath) =>
+      pathname.startsWith(hiddenPath),
+    );
 
   return (
     <FeedbackProvider>
@@ -612,6 +632,14 @@ export default function AppLayout() {
           />
         )}
         {!FEATURE_FLAGS.MODE_NAV_V2_ENABLED && <ModeSwitcher />}
+        {showAccountAvatar ? (
+          <View
+            className="absolute right-4 z-40"
+            style={{ top: insets.top + 8 }}
+          >
+            <AccountAvatar />
+          </View>
+        ) : null}
         {/* ─── Whitelist tab pattern ────────────────────────────────────
            Only routes listed in visibleTabs render a tab button.
            Everything else is auto-hidden via screenOptions defaults.

@@ -3677,6 +3677,30 @@
       "snapshot_ready": "学習スナップショットの準備ができました。",
       "reflection_bonus": "振り返りボーナスが保存されました。",
       "quiz_personal_best": "自己ベストが保存されました。"
+    },
+    "recaps": {
+      "empty": "完了したセッションの概要はここに表示されます。",
+      "error": "概要を読み込めませんでした。",
+      "openLabel": "{{title}}の概要を開く"
+    },
+    "reports": {
+      "error": "レポートを読み込めませんでした。"
+    },
+    "notes": {
+      "sessions": "最近の学習セッション",
+      "notes": "保存した学習ノート",
+      "bookmarks": "保存したメンターの返信"
+    },
+    "memory": {
+      "title": "メンターの記憶の管理",
+      "body": "メンターが記憶している内容を、記憶の全画面から確認、編集、非表示、エクスポート、または消去できます。",
+      "open": "記憶の管理を開く"
     }
+  },
+  "accountAdmin": {
+    "title": "アカウント",
+    "openAccount": "アカウント設定を開く",
+    "security": "アカウントのセキュリティ",
+    "familySettings": "ファミリー設定"
   }
 }

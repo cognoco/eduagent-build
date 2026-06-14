@@ -3677,6 +3677,30 @@
       "snapshot_ready": "Eine Lern-Momentaufnahme ist fertig.",
       "reflection_bonus": "Reflexionsbonus gespeichert.",
       "quiz_personal_best": "Bestleistung gespeichert."
+    },
+    "recaps": {
+      "empty": "Zusammenfassungen deiner abgeschlossenen Sitzungen erscheinen hier.",
+      "error": "Deine Zusammenfassungen konnten nicht geladen werden.",
+      "openLabel": "Zusammenfassung für {{title}} öffnen"
+    },
+    "reports": {
+      "error": "Deine Berichte konnten nicht geladen werden."
+    },
+    "notes": {
+      "sessions": "Letzte Lernsitzungen",
+      "notes": "Deine gespeicherten Lernnotizen",
+      "bookmarks": "Gespeicherte Tutor-Antworten"
+    },
+    "memory": {
+      "title": "Steuerung des Tutor-Gedächtnisses",
+      "body": "Überprüfe, bearbeite, verberge, exportiere oder lösche, was dein Tutor sich merkt, im vollständigen Gedächtnis-Bildschirm.",
+      "open": "Gedächtnis-Steuerung öffnen"
     }
+  },
+  "accountAdmin": {
+    "title": "Konto",
+    "openAccount": "Kontoeinstellungen öffnen",
+    "security": "Kontosicherheit",
+    "familySettings": "Familieneinstellungen"
   }
 }

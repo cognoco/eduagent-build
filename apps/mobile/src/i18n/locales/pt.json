@@ -3677,6 +3677,30 @@
       "snapshot_ready": "Um resumo do seu aprendizado está pronto.",
       "reflection_bonus": "Bônus de reflexão salvo.",
       "quiz_personal_best": "Recorde pessoal salvo."
+    },
+    "recaps": {
+      "empty": "Os resumos das suas sessões concluídas aparecerão aqui.",
+      "error": "Não foi possível carregar seus resumos.",
+      "openLabel": "Abrir resumo para {{title}}"
+    },
+    "reports": {
+      "error": "Não foi possível carregar seus relatórios."
+    },
+    "notes": {
+      "sessions": "Sessões de aprendizado recentes",
+      "notes": "Anotações de estudo que você salvou",
+      "bookmarks": "Respostas salvas do tutor"
+    },
+    "memory": {
+      "title": "Controles de memória do tutor",
+      "body": "Revise, edite, oculte, exporte ou limpe o que seu tutor lembra na tela de memória completa.",
+      "open": "Abrir controles de memória"
     }
+  },
+  "accountAdmin": {
+    "title": "Conta",
+    "openAccount": "Abrir configurações da conta",
+    "security": "Segurança da conta",
+    "familySettings": "Configurações da família"
   }
 }

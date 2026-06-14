@@ -45,6 +45,13 @@ export interface QualityCheckContext<Input = unknown> {
   scenarioId?: string;
 }
 
+export interface DeterministicCheckContext<Input = unknown> {
+  input: Input;
+  messages: PromptMessages;
+  profile: EvalProfile;
+  scenarioId?: string;
+}
+
 /**
  * A scenario groups a scenarioId with the Input it generates. Used by flows
  * that exercise the same prompt builder across multiple branches — e.g. the
@@ -121,6 +128,15 @@ export interface FlowDefinition<Input = unknown> {
    */
   evaluateQuality?(
     context: QualityCheckContext<Input>,
+  ): QualityIssue[] | Promise<QualityIssue[]>;
+
+  /**
+   * Optional deterministic quality gate for non-LLM checks. This runs during
+   * Tier 1 after buildPrompt(), does not require --live, and contributes to
+   * the same quality warning/failure counters as live semantic checks.
+   */
+  evaluateDeterministic?(
+    context: DeterministicCheckContext<Input>,
   ): QualityIssue[] | Promise<QualityIssue[]>;
 
   /**

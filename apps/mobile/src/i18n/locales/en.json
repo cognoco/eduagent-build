@@ -105,6 +105,12 @@
     "languageChangeFailedTitle": "Couldn't change language",
     "languageChangeFailedMessage": "We couldn't switch the app language. Please try again."
   },
+  "accountAdmin": {
+    "title": "Account",
+    "openAccount": "Open account settings",
+    "security": "Account security",
+    "familySettings": "Family settings"
+  },
   "friendlyErrors": {
     "notLanguageLearning": "This subject isn't set up for language learning. Try the standard learning path instead.",
     "subjectPaused": "This subject is on pause right now. You can resume it from your subjects list.",
@@ -2815,6 +2821,24 @@
       "snapshot_ready": "A learning snapshot is ready.",
       "reflection_bonus": "Reflection bonus saved.",
       "quiz_personal_best": "Personal best saved."
+    },
+    "recaps": {
+      "empty": "Your finished session summaries will appear here.",
+      "error": "Could not load your recaps.",
+      "openLabel": "Open recap for {{title}}"
+    },
+    "reports": {
+      "error": "Could not load your reports."
+    },
+    "notes": {
+      "sessions": "Recent learning sessions",
+      "notes": "Study notes you saved",
+      "bookmarks": "Saved mentor replies"
+    },
+    "memory": {
+      "title": "Mentor memory controls",
+      "body": "Review, edit, hide, export, or clear what your mentor remembers from the full memory screen.",
+      "open": "Open memory controls"
     }
   },
   "recaps": {

@@ -3677,6 +3677,30 @@
       "snapshot_ready": "Et læringsøyeblikksbilde er klart.",
       "reflection_bonus": "Refleksjonsbonus lagret.",
       "quiz_personal_best": "Personlig rekord lagret."
+    },
+    "recaps": {
+      "empty": "Sammendragene fra dine fullførte økter vil vises her.",
+      "error": "Kunne ikke laste inn sammendragene dine.",
+      "openLabel": "Åpne sammendrag for {{title}}"
+    },
+    "reports": {
+      "error": "Kunne ikke laste inn rapportene dine."
+    },
+    "notes": {
+      "sessions": "Nylige læringsøkter",
+      "notes": "Studienotatene du lagret",
+      "bookmarks": "Lagrede veiledersvar"
+    },
+    "memory": {
+      "title": "Kontroller for veilederens minne",
+      "body": "Se gjennom, rediger, skjul, eksporter eller slett det veilederen din husker fra hele minneskjermen.",
+      "open": "Åpne minnekontroller"
     }
+  },
+  "accountAdmin": {
+    "title": "Konto",
+    "openAccount": "Åpne kontoinnstillinger",
+    "security": "Kontosikkerhet",
+    "familySettings": "Familieinnstillinger"
   }
 }

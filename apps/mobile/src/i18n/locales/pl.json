@@ -3829,6 +3829,30 @@
       "snapshot_ready": "Migawka postępów jest gotowa.",
       "reflection_bonus": "Zapisano premię za refleksję.",
       "quiz_personal_best": "Zapisano rekord osobisty."
+    },
+    "recaps": {
+      "empty": "Podsumowania ukończonych sesji pojawią się tutaj.",
+      "error": "Nie udało się wczytać podsumowań.",
+      "openLabel": "Otwórz podsumowanie dla {{title}}"
+    },
+    "reports": {
+      "error": "Nie udało się wczytać raportów."
+    },
+    "notes": {
+      "sessions": "Ostatnie sesje nauki",
+      "notes": "Zapisane notatki",
+      "bookmarks": "Zapisane odpowiedzi tutora"
+    },
+    "memory": {
+      "title": "Zarządzanie pamięcią tutora",
+      "body": "Przeglądaj, edytuj, ukrywaj, eksportuj lub usuwaj to, co pamięta Twój tutor, na pełnym ekranie pamięci.",
+      "open": "Otwórz zarządzanie pamięcią"
     }
+  },
+  "accountAdmin": {
+    "title": "Konto",
+    "openAccount": "Otwórz ustawienia konta",
+    "security": "Bezpieczeństwo konta",
+    "familySettings": "Ustawienia rodzinne"
   }
 }

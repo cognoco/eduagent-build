@@ -15,7 +15,11 @@ import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { notFound } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
-import { getRecapForParent, listRecapsForParent } from '../services/recaps';
+import {
+  getRecapForParent,
+  listRecapsForParent,
+  listRecapsForProfile,
+} from '../services/recaps';
 
 type RecapsRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -37,6 +41,16 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
 
     const recaps = await listRecapsForParent(db, parentProfileId, {
       childProfileId: query.childProfileId,
+      limit: query.limit,
+    });
+    return c.json(recapsResponseSchema.parse({ recaps }));
+  })
+  .get('/recaps/self', zValidator('query', recapsQuerySchema), async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const query = c.req.valid('query');
+
+    const recaps = await listRecapsForProfile(db, profileId, {
       limit: query.limit,
     });
     return c.json(recapsResponseSchema.parse({ recaps }));

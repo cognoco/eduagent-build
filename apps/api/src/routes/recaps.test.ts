@@ -18,6 +18,7 @@ jest.mock(
     return {
       ...actual,
       listRecapsForParent: jest.fn(),
+      listRecapsForProfile: jest.fn(),
       getRecapForParent: jest.fn(),
     };
   },
@@ -30,7 +31,11 @@ import { ERROR_CODES, ForbiddenError, NotFoundError } from '@eduagent/schemas';
 
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
-import { getRecapForParent, listRecapsForParent } from '../services/recaps';
+import {
+  getRecapForParent,
+  listRecapsForParent,
+  listRecapsForProfile,
+} from '../services/recaps';
 import { recapsRoutes } from './recaps';
 
 // ---------------------------------------------------------------------------
@@ -94,10 +99,12 @@ function makeApp(overrides?: {
 }
 
 const listRecapsForParentMock = jest.mocked(listRecapsForParent);
+const listRecapsForProfileMock = jest.mocked(listRecapsForProfile);
 const getRecapForParentMock = jest.mocked(getRecapForParent);
 
 beforeEach(() => {
   listRecapsForParentMock.mockReset();
+  listRecapsForProfileMock.mockReset();
   getRecapForParentMock.mockReset();
 });
 
@@ -198,6 +205,49 @@ describe('GET /v1/recaps', () => {
 
     expect(res.status).toBe(400);
     expect(listRecapsForParentMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /v1/recaps/self
+// ---------------------------------------------------------------------------
+
+describe('GET /v1/recaps/self', () => {
+  it('returns self-scope recaps for the active profile without owner gating', async () => {
+    const recap = makeRecapItem({ recapId: RECAP_ID });
+    listRecapsForProfileMock.mockResolvedValue([recap]);
+
+    const res = await makeApp({ isOwner: false }).request('/v1/recaps/self');
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ recaps: [{ recapId: RECAP_ID }] });
+    expect(listRecapsForProfileMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      expect.objectContaining({ limit: 20 }),
+    );
+    expect(listRecapsForParentMock).not.toHaveBeenCalled();
+  });
+
+  it('honors the bounded limit query for self recaps', async () => {
+    listRecapsForProfileMock.mockResolvedValue([]);
+
+    const res = await makeApp().request('/v1/recaps/self?limit=5');
+
+    expect(res.status).toBe(200);
+    expect(listRecapsForProfileMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      expect.objectContaining({ limit: 5 }),
+    );
+  });
+
+  it('returns 400 when self recap limit is outside the schema bounds', async () => {
+    const res = await makeApp().request('/v1/recaps/self?limit=999');
+
+    expect(res.status).toBe(400);
+    expect(listRecapsForProfileMock).not.toHaveBeenCalled();
   });
 });
 
