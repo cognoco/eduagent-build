@@ -1773,55 +1773,65 @@ export const sessionCompleted = inngest.createFunction(
             status: 'skipped' as const,
           };
         }
-        return runIsolated('extract-homework-summary', profileId, async () => {
-          const db = getStepDatabase();
-          // i18n Phase 1 — thread conversation_language to the homework
-          // summary LLM so the parent-facing card matches the learner locale.
-          // Also fetch accountId so we can gate this LLM call on quota.
-          const [homeworkProfile] = await db
-            .select({
-              conversationLanguage: profiles.conversationLanguage,
-              accountId: profiles.accountId,
-            })
-            .from(profiles)
-            .where(eq(profiles.id, profileId))
-            .limit(1);
 
-          // Route through the metered wrapper. The HTTP middleware
-          // cannot gate Inngest steps, so we call decrementQuota directly.
-          // ensureFreeSubscription is idempotent — it returns the existing row
-          // for users who already have a subscription.
-          // Guard: profileId comes from the session event — the row should
-          // always exist, but if the DB returns nothing we skip metering.
-          if (!homeworkProfile) {
-            // [WI-734] Hard-stop: the profile row is required to resolve
-            // subscription/language/accountId — do NOT call the homework-summary
-            // LLM. This step uses runIsolated (soft-step), so throwing records
-            // status='failed' and exits without an unmetered LLM call.
-            // runIsolated's catch block handles captureException; safeSend here
-            // satisfies the billing silent-recovery ban (AGENTS.md: bare warn is
-            // not enough — a structured event is required).
-            await safeSend(
-              () =>
-                inngest.send({
-                  // orphan-allow: observability-only signal (no handler needed);
-                  // consumed out-of-band by ops alerting. Paired with
-                  // captureException (via runIsolated catch) and logger.warn
-                  // above to satisfy the billing silent-recovery ban.
-                  name: 'app/billing.homework_summary.profile_missing',
-                  data: {
-                    profileId,
-                    occurredAt: new Date().toISOString(),
-                    source: 'homework_summary',
-                  },
-                }),
-              'billing.homework_summary.profile_missing',
-              { profileId },
-            );
-            throw new Error(
-              '[billing] homework-summary: profile row missing — cannot resolve subscription/language/accountId',
-            );
-          }
+        // [WI-734] Profile fetch is OUTSIDE runIsolated so a missing-profile
+        // error escapes to step.run and Inngest retries the step — absorbing
+        // transient replication lag. The quota gate + LLM call remain inside
+        // runIsolated (soft-step): quota exhaustion and LLM failures record
+        // status='failed' without triggering a step retry.
+        const db = getStepDatabase();
+        // i18n Phase 1 — thread conversation_language to the homework
+        // summary LLM so the parent-facing card matches the learner locale.
+        // Also fetch accountId so we can gate this LLM call on quota.
+        const [homeworkProfile] = await db
+          .select({
+            conversationLanguage: profiles.conversationLanguage,
+            accountId: profiles.accountId,
+          })
+          .from(profiles)
+          .where(eq(profiles.id, profileId))
+          .limit(1);
+
+        // Route through the metered wrapper. The HTTP middleware
+        // cannot gate Inngest steps, so we call decrementQuota directly.
+        // ensureFreeSubscription is idempotent — it returns the existing row
+        // for users who already have a subscription.
+        if (!homeworkProfile) {
+          // Hard-stop: profile row required to resolve subscription/language/
+          // accountId. Throw reaches step.run so Inngest retries (handles
+          // transient replication lag). captureException fires here (not via
+          // runIsolated catch) so it is recorded on every retry attempt.
+          // safeSend emits a structured event to satisfy the billing
+          // silent-recovery ban (AGENTS.md: bare warn is not enough).
+          const missingProfileErr = new Error(
+            '[billing] homework-summary: profile row missing — cannot resolve subscription/language/accountId',
+          );
+          logger.warn(
+            '[metering] homework-summary: profile row missing, step will retry',
+            { event: 'metering.homework_summary.profile_missing', profileId },
+          );
+          sentry.captureException(missingProfileErr, { profileId });
+          await safeSend(
+            () =>
+              inngest.send({
+                // orphan-allow: observability-only signal (no handler needed);
+                // consumed out-of-band by ops alerting. Paired with
+                // captureException above and logger.warn to satisfy the
+                // billing silent-recovery ban.
+                name: 'app/billing.homework_summary.profile_missing',
+                data: {
+                  profileId,
+                  occurredAt: new Date().toISOString(),
+                  source: 'homework_summary',
+                },
+              }),
+            'billing.homework_summary.profile_missing',
+            { profileId },
+          );
+          throw missingProfileErr;
+        }
+
+        return runIsolated('extract-homework-summary', profileId, async () => {
           const subscription = await ensureFreeSubscription(
             db,
             homeworkProfile.accountId,
