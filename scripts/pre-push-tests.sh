@@ -208,14 +208,14 @@ else
 
     # Mobile with memory bump
     if [[ -n "$MOBILE_FILES" ]]; then
-      abs_mobile_files=""
+      mobile_files_for_jest=""
       for f in $MOBILE_FILES; do
-        abs_mobile_files="$abs_mobile_files $WORKSPACE_ROOT/$f"
+        mobile_files_for_jest="$mobile_files_for_jest ${f#apps/mobile/}"
       done
       echo ""
       echo "── jest [apps/mobile] ─────────────────────────────────────────"
       # shellcheck disable=SC2086
-      if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $abs_mobile_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+      if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $mobile_files_for_jest --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
         JEST_FAILED=1
       fi
     fi
