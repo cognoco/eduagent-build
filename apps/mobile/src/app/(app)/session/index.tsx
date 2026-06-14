@@ -151,6 +151,7 @@ function SessionScreenInner() {
     homeworkProblems,
     ocrText,
     captureSource,
+    entrySource,
     rawInput,
     recap,
     resumeFromSessionId,
@@ -171,6 +172,7 @@ function SessionScreenInner() {
     homeworkProblems?: string;
     ocrText?: string;
     captureSource?: HomeworkCaptureSource;
+    entrySource?: string;
     rawInput?: string;
     recap?: string;
     resumeFromSessionId?: string;
@@ -210,6 +212,7 @@ function SessionScreenInner() {
         homeworkProblems,
         ocrText,
         captureSource,
+        entrySource,
         gaps: rawGaps,
         returnTo: rawReturnTo,
         returnId: rawReturnId,
@@ -218,6 +221,7 @@ function SessionScreenInner() {
       }),
     [
       captureSource,
+      entrySource,
       homeworkProblems,
       mode,
       ocrText,
@@ -1003,7 +1007,7 @@ function SessionScreenInner() {
         challengeActionInFlightRef.current = false;
       }
     },
-    [applyChallengeRouteResponse, t],
+    [applyChallengeRouteResponse],
   );
 
   const handleAcceptChallengeRound = useCallback(() => {

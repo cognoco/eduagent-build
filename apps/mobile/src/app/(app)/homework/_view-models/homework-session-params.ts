@@ -1,9 +1,14 @@
+import type { Href } from 'expo-router';
 import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
 import type { TFunction } from 'i18next';
 
 import { serializeHomeworkProblems } from '../../../../components/homework/problem-cards';
+import { homeHrefForReturnTo } from '../../../../lib/navigation';
 
 export const HOMEWORK_SESSION_PARAM_BUDGET = 8000;
+export const MENTOR_HOMEWORK_ENTRY_SOURCE = 'mentor';
+
+export type HomeworkEntrySource = typeof MENTOR_HOMEWORK_ENTRY_SOURCE;
 
 export interface HomeworkSessionParams extends Record<
   string,
@@ -18,6 +23,7 @@ export interface HomeworkSessionParams extends Record<
   imageUri?: string;
   imageMimeType?: string;
   captureSource?: HomeworkCaptureSource;
+  entrySource?: HomeworkEntrySource;
   returnTo?: string;
 }
 
@@ -37,6 +43,7 @@ export function buildHomeworkSessionParams(args: {
   imageUri?: string;
   sourceOcrText?: string;
   captureSource?: HomeworkCaptureSource;
+  entrySource?: HomeworkEntrySource;
   imageMimeType?: string | null;
   returnTo?: string;
   maxParamLength?: number;
@@ -63,10 +70,30 @@ export function buildHomeworkSessionParams(args: {
       ...(args.imageUri ? { imageUri: args.imageUri } : {}),
       ...(args.imageMimeType ? { imageMimeType: args.imageMimeType } : {}),
       ...(args.captureSource ? { captureSource: args.captureSource } : {}),
+      ...(args.entrySource ? { entrySource: args.entrySource } : {}),
       ...(args.returnTo ? { returnTo: args.returnTo } : {}),
     },
     truncation: serializedResult.truncation,
   };
+}
+
+export function normalizeHomeworkEntrySource(
+  entrySource: string | string[] | undefined,
+): HomeworkEntrySource | undefined {
+  const value = Array.isArray(entrySource) ? entrySource[0] : entrySource;
+  return value === MENTOR_HOMEWORK_ENTRY_SOURCE ? value : undefined;
+}
+
+export function homeworkReturnHrefForReturnTo(
+  returnTo: string | string[] | undefined,
+  returnId?: string | string[] | undefined,
+): Href {
+  const value = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  if (value === MENTOR_HOMEWORK_ENTRY_SOURCE) {
+    return '/(app)/mentor' as Href;
+  }
+
+  return homeHrefForReturnTo(returnTo, returnId);
 }
 
 export function getHomeworkProblemTruncationAlertMessage(

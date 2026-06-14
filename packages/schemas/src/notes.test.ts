@@ -2,6 +2,7 @@ import {
   topicNoteSchema,
   createNoteInputSchema,
   updateNoteInputSchema,
+  noteOriginSchema,
   noteResponseSchema,
   bookNotesResponseSchema,
   topicNotesResponseSchema,
@@ -145,7 +146,10 @@ describe('noteResponseSchema', () => {
   };
 
   it('accepts valid note response', () => {
-    expect(noteResponseSchema.parse(valid)).toEqual(valid);
+    expect(noteResponseSchema.parse(valid)).toEqual({
+      ...valid,
+      origin: 'self',
+    });
   });
 
   it('accepts null sessionId', () => {
@@ -166,6 +170,20 @@ describe('noteResponseSchema', () => {
     if (!result.success) {
       expect(result.error.issues[0]!.path).toContain('updatedAt');
     }
+  });
+
+  it('defaults missing origin to self', () => {
+    expect(noteResponseSchema.parse(valid).origin).toBe('self');
+  });
+
+  it('exports the additive note origin enum', () => {
+    expect(noteOriginSchema.options).toEqual(['self', 'mentor']);
+  });
+
+  it('round-trips mentor origin when supplied', () => {
+    expect(
+      noteResponseSchema.parse({ ...valid, origin: 'mentor' }).origin,
+    ).toBe('mentor');
   });
 });
 

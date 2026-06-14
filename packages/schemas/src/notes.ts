@@ -4,6 +4,9 @@ import { isoDateField } from './common.ts';
 // From the ./session-enums.ts leaf to keep notes.ts off the sessions.ts import graph.
 import { sessionTypeSchema } from './session-enums.ts';
 
+export const noteOriginSchema = z.enum(['self', 'mentor']);
+export type NoteOrigin = z.infer<typeof noteOriginSchema>;
+
 /**
  * [BUG-212] Canonical client-facing note shape. The previously-duplicated
  * `topicNoteSchema` (DB row, included `profileId`) and `noteResponseSchema`
@@ -20,6 +23,7 @@ export const noteResponseSchema = z.object({
   topicId: z.string().uuid(),
   sessionId: z.string().uuid().nullable(),
   content: z.string(),
+  origin: noteOriginSchema.default('self'),
   createdAt: isoDateField,
   updatedAt: isoDateField,
 });
@@ -59,6 +63,7 @@ const _noteDbRowSchema = z.object({
   topicId: z.string().uuid(),
   sessionId: z.string().uuid().nullable(),
   content: z.string(),
+  origin: noteOriginSchema.default('self'),
   createdAt: _dateField,
   updatedAt: _dateField,
 });
@@ -78,6 +83,7 @@ const _noteGetRowSchema = z.object({
   id: z.string().uuid(),
   topicId: z.string().uuid(),
   content: z.string(),
+  origin: noteOriginSchema.default('self'),
   updatedAt: _dateField,
 });
 export const noteGetResponseSchema = z.object({
@@ -115,6 +121,7 @@ export const allNoteSchema = z.object({
   subjectName: z.string(),
   sessionId: z.string().uuid().nullable(),
   content: z.string(),
+  origin: noteOriginSchema.default('self'),
   createdAt: isoDateField,
   updatedAt: isoDateField,
 });
