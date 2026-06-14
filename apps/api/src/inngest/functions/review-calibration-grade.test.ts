@@ -109,7 +109,6 @@ describe('reviewCalibrationGrade', () => {
         'grade-recall-quality': 4,
         'finalize-retention-update': undefined,
         'stamp-mastery-on-verify': undefined,
-        'sync-xp-ledger': undefined,
       },
     );
 
@@ -119,7 +118,7 @@ describe('reviewCalibrationGrade', () => {
       quality: 4,
       passed: true,
     });
-    expect(runCalls).toHaveLength(6);
+    expect(runCalls).toHaveLength(5);
     // F-174: the cooldown claim MUST precede the paid LLM grade step.
     expect(runCalls.map((c) => c.name)).toEqual([
       'load-retention-card',
@@ -127,7 +126,6 @@ describe('reviewCalibrationGrade', () => {
       'grade-recall-quality',
       'finalize-retention-update',
       'stamp-mastery-on-verify',
-      'sync-xp-ledger',
     ]);
   });
 
