@@ -27,10 +27,7 @@ import {
   PRONOUNS_PROMPT_MIN_AGE,
 } from '@eduagent/schemas';
 import { calculateAge } from '../consent';
-import {
-  getLearningProfile,
-  getOrCreateLearningProfile,
-} from '../learner-profile';
+import { getOrCreateLearningProfile } from '../learner-profile';
 import { sanitizeXmlValue } from '../llm/sanitize';
 
 /**
@@ -199,6 +196,14 @@ export async function updateInterestsContext(
   // write can never silently vanish. The interests payload is
   // caller-authoritative (a wholesale replace), so a retry simply re-reads the
   // current version and re-applies the same submitted set.
+  //
+  // [WI-737 / S5+C3] The accountId ownership check (above) sits outside this
+  // loop and is not atomic with the UPDATE. Mirror the defense-in-depth pattern
+  // from updateConversationLanguage/updatePronouns: scope the UPDATE WHERE to
+  // the owning account via an EXISTS subquery on profiles so the authz guard
+  // and the write are atomic even if profiles were transferable in the future.
+  // The retry re-read is similarly scoped so the CAS loop never operates on a
+  // row whose ownership cannot be confirmed.
   const MAX_CAS_ATTEMPTS = 3;
   for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt++) {
     const expectedVersion = profile.version;
@@ -213,6 +218,7 @@ export async function updateInterestsContext(
         and(
           eq(learningProfiles.profileId, profileId),
           eq(learningProfiles.version, expectedVersion),
+          sql`EXISTS (SELECT 1 FROM ${profiles} WHERE ${profiles.id} = ${profileId} AND ${profiles.accountId} = ${accountId})`,
         ),
       )
       .returning({ id: learningProfiles.id });
@@ -224,7 +230,42 @@ export async function updateInterestsContext(
     // A concurrent writer advanced the version between our read and this write.
     // Re-read and retry. The row exists (we created it above), so a missing
     // re-read is an anomaly worth surfacing rather than silently succeeding.
-    const refreshed = await getLearningProfile(db, profileId);
+    // [WI-737 / C3] Scope the re-read through profiles to keep accountId
+    // enforcement in place across the full retry loop.
+    const [refreshed] = await db
+      .select({
+        id: learningProfiles.id,
+        profileId: learningProfiles.profileId,
+        learningStyle: learningProfiles.learningStyle,
+        interests: learningProfiles.interests,
+        strengths: learningProfiles.strengths,
+        struggles: learningProfiles.struggles,
+        communicationNotes: learningProfiles.communicationNotes,
+        suppressedInferences: learningProfiles.suppressedInferences,
+        interestTimestamps: learningProfiles.interestTimestamps,
+        effectivenessSessionCount: learningProfiles.effectivenessSessionCount,
+        memoryEnabled: learningProfiles.memoryEnabled,
+        memoryConsentStatus: learningProfiles.memoryConsentStatus,
+        consentPromptDismissedAt: learningProfiles.consentPromptDismissedAt,
+        memoryCollectionEnabled: learningProfiles.memoryCollectionEnabled,
+        memoryInjectionEnabled: learningProfiles.memoryInjectionEnabled,
+        accommodationMode: learningProfiles.accommodationMode,
+        celebrationLevel: learningProfiles.celebrationLevel,
+        recentlyResolvedTopics: learningProfiles.recentlyResolvedTopics,
+        memoryFactsBackfilledAt: learningProfiles.memoryFactsBackfilledAt,
+        memoryFactsAnalysedAt: learningProfiles.memoryFactsAnalysedAt,
+        version: learningProfiles.version,
+        createdAt: learningProfiles.createdAt,
+        updatedAt: learningProfiles.updatedAt,
+      })
+      .from(learningProfiles)
+      .innerJoin(profiles, eq(profiles.id, learningProfiles.profileId))
+      .where(
+        and(
+          eq(learningProfiles.profileId, profileId),
+          eq(profiles.accountId, accountId),
+        ),
+      );
     if (!refreshed) {
       throw new OnboardingNotFoundError(profileId);
     }

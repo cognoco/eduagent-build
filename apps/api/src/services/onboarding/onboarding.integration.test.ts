@@ -269,6 +269,56 @@ describe('updateInterestsContext (integration)', () => {
     ).rejects.toThrow(OnboardingNotFoundError);
   });
 
+  // [WI-737 / S5+C3] Regression guard for the TOCTOU gap: the accountId check
+  // that sits before the CAS loop is not atomic with the version-gated UPDATE.
+  // Profiles are not account-transferable today, so there is no live trigger for
+  // this race window — but the defense-in-depth fix closes the gap permanently.
+  // This test asserts the end-to-end behavior: a cross-account write on an
+  // existing learning_profiles row is rejected (either at the outer pre-check
+  // or, with the fix, at the atomic UPDATE WHERE) and the stored state is
+  // untouched. Removing the EXISTS clause in the UPDATE WHERE would not cause
+  // this test to fail because the outer pre-check catches it first; the test
+  // instead confirms the invariant holds across the full call.
+  it('[WI-737] CAS UPDATE rejects mismatched accountId even when learning_profiles row exists', async () => {
+    const { account: accountA, profile: profileA } =
+      await seedAccountAndProfile(0);
+    const { account: accountB } = await seedAccountAndProfile(1);
+    const db = createIntegrationDb();
+
+    // Seed a real learning_profiles row for profileA so the retry path can be
+    // exercised and the row is present in the DB.
+    const originalInterests = [
+      { label: 'Science', context: 'school' as const },
+    ];
+    await updateInterestsContext(
+      db,
+      profileA.id,
+      accountA.id,
+      originalInterests,
+    );
+
+    // Confirm the row exists and has the expected interests.
+    const before = await db.query.learningProfiles.findFirst({
+      where: eq(learningProfiles.profileId, profileA.id),
+    });
+    expect(before?.interests).toEqual(originalInterests);
+    const versionBefore = before!.version;
+
+    // Attempt a cross-account write: accountB tries to overwrite profileA's interests.
+    await expect(
+      updateInterestsContext(db, profileA.id, accountB.id, [
+        { label: 'Hacking', context: 'free_time' as const },
+      ]),
+    ).rejects.toThrow(OnboardingNotFoundError);
+
+    // The row must be completely unmodified — same interests, same version.
+    const after = await db.query.learningProfiles.findFirst({
+      where: eq(learningProfiles.profileId, profileA.id),
+    });
+    expect(after?.interests).toEqual(originalInterests);
+    expect(after?.version).toBe(versionBefore);
+  });
+
   // [F-164] The version bump alone (without a compare-and-set on the version
   // we read) was decorative: two concurrent picker submits both passed and
   // last-writer-wins silently dropped one. The CAS makes each write provably
