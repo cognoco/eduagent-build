@@ -104,12 +104,13 @@ const jwksRefetchInFlight = new Map<string, Promise<JWKS>>();
 // Cooldown gate on the forced re-fetch path. lookupJWKByKid runs on every
 // verification keyed on the attacker-controlled `kid`, so a sequential stream
 // of distinct-bogus-kid tokens would otherwise amplify each unauthenticated
-// request into an upstream Clerk fetch (DoS). After a forced re-fetch settles
-// (success OR failure) we record the timestamp and suppress further forced
-// re-fetches for the same URL within the cooldown window. A still-missing kid
-// inside the window is treated as genuinely absent — the recent re-fetch is the
-// negative signal. The window is short enough that a genuine key rotation is
-// still picked up promptly once it elapses.
+// request into an upstream Clerk fetch (DoS). After a forced re-fetch succeeds
+// we record the timestamp and suppress further forced re-fetches for the same
+// URL within the cooldown window (success only — a failed re-fetch throws
+// before the cooldown is armed, so infra outages don't mask as 401s). A
+// still-missing kid inside the window is treated as genuinely absent — the
+// recent re-fetch is the negative signal. The window is short enough that a
+// genuine key rotation is still picked up promptly once it elapses.
 const JWKS_FORCED_REFETCH_COOLDOWN_MS = 60 * 1000; // 1 minute
 const jwksForcedRefetchAtByUrl = new Map<string, number>();
 
