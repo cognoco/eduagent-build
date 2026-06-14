@@ -329,6 +329,81 @@ function validateClaudeAgentTriggerGuard(
   };
 }
 
+// A secret-backed @claude agent that listens on issues:assigned fires for the
+// *assigner* (github.event.sender), not the issue creator. The standard
+// author_association check in the job `if:` reads github.event.issue.author_association
+// (the creator's association), which does NOT cover the assigning actor. A trusted
+// user can open an @claude issue; any write-access user who later assigns it will
+// trigger the secret-backed agent regardless of their trust level.
+//
+// Safe options:
+//   (a) drop `assigned` from the issues event types — `opened` is the useful trigger
+//       and the creator is the actor that author_association checks.
+//   (b) add an explicit github.event.sender association check.
+//
+// [S1 / WI-736 / F-119]
+function issuesEventHasAssignedType(workflowOn: unknown): boolean {
+  if (!isRecord(workflowOn)) return false;
+  const issues = workflowOn.issues;
+  if (!isRecord(issues)) return false;
+  const types = issues.types;
+  if (Array.isArray(types)) return types.includes('assigned');
+  if (typeof types === 'string') return types === 'assigned';
+  return false;
+}
+
+function validateIssuesAssignedWithoutSenderGuard(
+  file: string,
+  workflowOn: unknown,
+  job: Record<string, unknown>,
+  inheritedSecrets: boolean,
+): { file: string; message: string } | null {
+  if (!issuesEventHasAssignedType(workflowOn)) return null;
+  const jobText = stringify(job);
+  if (!(inheritedSecrets || CLAUDE_AGENT_SECRET.test(jobText))) return null;
+
+  const jobIf = stringify(job.if);
+  // Only flag jobs that actually gate on an issues event (they mention the
+  // issues event_name or check the issue body/title for @claude).
+  if (
+    !jobIf.includes("'issues'") &&
+    !jobIf.includes('"issues"') &&
+    !jobIf.includes('github.event.issue')
+  ) {
+    return null;
+  }
+
+  // Safe if the job if: also checks github.event.sender with an association
+  // allowlist or equality. A bare mention of sender is not enough — it must
+  // be wired into a fromJSON allowlist or equality check that is anchored
+  // specifically to the sender's author_association field. We require a single
+  // combined match so that a pre-existing fromJSON (for the creator's
+  // association) cannot satisfy the check independently of the sender path.
+  //
+  // Accepted patterns:
+  //   fromJSON(...), github.event.sender.author_association   (allowlist membership)
+  //   github.event.sender.author_association == '...'         (equality)
+  //   '...' == github.event.sender.author_association         (equality, reversed)
+  const enforcesSenderAssociation =
+    // fromJSON allowlist: fromJSON(…) followed closely by the sender path, or vice versa
+    /fromJSON\s*\([^)]*\)\s*,\s*github\.event\.sender\.[a-z_.]*author_association/.test(
+      jobIf,
+    ) ||
+    /contains\s*\(\s*fromJSON\s*\([^)]*\)\s*,\s*github\.event\.sender\.[a-z_.]*author_association/.test(
+      jobIf,
+    ) ||
+    // equality check: sender path == value or value == sender path
+    /github\.event\.sender\.[a-z_.]*author_association\s*==/.test(jobIf) ||
+    /==\s*github\.event\.sender\.[a-z_.]*author_association/.test(jobIf);
+  if (enforcesSenderAssociation) return null;
+
+  return {
+    file,
+    message:
+      'issues:assigned event triggers a secret-backed job whose if: checks author_association of the issue creator, not the assigning actor (github.event.sender); drop "assigned" from types or add a github.event.sender association guard',
+  };
+}
+
 function jobGrantsIdTokenWrite(job: Record<string, unknown>): boolean {
   if (!isRecord(job.permissions)) return false;
   return job.permissions['id-token'] === 'write';
@@ -422,6 +497,14 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
       inheritedSecrets,
     );
     if (claudeAgentViolation) violations.push(claudeAgentViolation);
+
+    const issuesAssignedViolation = validateIssuesAssignedWithoutSenderGuard(
+      file,
+      workflowOn,
+      job,
+      inheritedSecrets,
+    );
+    if (issuesAssignedViolation) violations.push(issuesAssignedViolation);
 
     for (const step of getSteps(job)) {
       const actionViolation = validateActionRef(file, step);

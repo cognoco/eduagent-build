@@ -115,6 +115,23 @@ describe('ThemedMarkdown', () => {
       const { onLinkPress } = latestMarkdownProps();
       expect(onLinkPress?.('http://example.com')).toBe(true);
     });
+
+    // [S9] Explicit tests for schemes that are silently blocked but require
+    // documented intent — mailto: is used elsewhere in the app via static
+    // Linking.openURL; mentomate: is the app's own deep-link scheme. Both
+    // must be blocked in LLM-authored markdown to prevent harvesting / forced
+    // in-app navigation from a malicious LLM reply.
+    it('blocks mailto: scheme links (email harvesting / unintended contact policy)', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('mailto:victim@example.com')).toBe(false);
+    });
+
+    it('blocks mentomate: deep-link scheme (prevents LLM-driven in-app navigation)', () => {
+      render(<ThemedMarkdown>Hello</ThemedMarkdown>);
+      const { onLinkPress } = latestMarkdownProps();
+      expect(onLinkPress?.('mentomate://some/deep/path')).toBe(false);
+    });
   });
 
   describe('remote images disabled (F-027)', () => {

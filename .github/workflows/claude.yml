@@ -7,7 +7,14 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    types: [opened]
+    # `assigned` is intentionally omitted: for that event the triggering actor
+    # is github.event.sender (the assigner), not github.event.issue.author_association
+    # (the issue creator). The job if: only checks the creator's association, so any
+    # triage/write user who assigns a trusted-user's @claude issue would fire the
+    # secret-backed agent unchecked. `opened` is the useful trigger and is safe
+    # because the opener and the association-checked actor are the same person.
+    # See: WI-736 / S1 (PRG-10 security review F-119).
   pull_request_review:
     types: [submitted]
 

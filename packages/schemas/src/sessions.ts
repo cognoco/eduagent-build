@@ -114,11 +114,19 @@ export const homeworkProblemSchema = z.object({
 });
 export type HomeworkProblem = z.infer<typeof homeworkProblemSchema>;
 
+/**
+ * Maximum number of homework problems allowed in a single session sync.
+ * The mobile UI is URL-budget-capped well below this value; the server-side
+ * cap guards the write path (POST /v1/sessions/:id/homework-state) against
+ * resource-exhaustion via oversized arrays (F-158 server-side follow-up).
+ */
+export const MAX_HOMEWORK_PROBLEMS = 50;
+
 export const homeworkSessionMetadataSchema = z
   .object({
     problemCount: z.number().int().min(0),
     currentProblemIndex: z.number().int().min(0),
-    problems: z.array(homeworkProblemSchema),
+    problems: z.array(homeworkProblemSchema).max(MAX_HOMEWORK_PROBLEMS),
     ocrText: z.string().optional(),
     source: homeworkCaptureSourceSchema.optional(),
   })

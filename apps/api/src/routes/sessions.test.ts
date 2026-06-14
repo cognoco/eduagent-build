@@ -525,7 +525,7 @@ import { Hono } from 'hono';
 import { app } from '../index';
 import { sessionRoutes } from './sessions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
-import { NotFoundError } from '@eduagent/schemas';
+import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -1573,6 +1573,61 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    // F-158 server-side follow-up (WI-735): oversized problems array must be
+    // rejected at the schema boundary before reaching the service layer.
+    // Red-green: the test passes with the .max() cap and would fail without it.
+    const makeMinimalProblem = (i: number) => ({
+      id: `p-${i}`,
+      text: 'x',
+      source: 'manual',
+    });
+
+    it('returns 400 when problems array exceeds MAX_HOMEWORK_PROBLEMS', async () => {
+      const oversizedProblems = Array.from(
+        { length: MAX_HOMEWORK_PROBLEMS + 1 },
+        (_, i) => makeMinimalProblem(i),
+      );
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/homework-state`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            metadata: {
+              problemCount: MAX_HOMEWORK_PROBLEMS + 1,
+              currentProblemIndex: 0,
+              problems: oversizedProblems,
+            },
+          }),
+        },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 200 when problems array is exactly MAX_HOMEWORK_PROBLEMS', async () => {
+      const atCapProblems = Array.from(
+        { length: MAX_HOMEWORK_PROBLEMS },
+        (_, i) => makeMinimalProblem(i),
+      );
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/homework-state`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            metadata: {
+              problemCount: MAX_HOMEWORK_PROBLEMS,
+              currentProblemIndex: 0,
+              problems: atCapProblems,
+            },
+          }),
+        },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(200);
     });
   });
 

@@ -347,6 +347,9 @@ const mockDecrementQuota = jest.fn().mockResolvedValue({
   quotaModel: 'shared-pool',
 });
 const mockSafeRefundQuota = jest.fn().mockResolvedValue({ refunded: true });
+const mockGetQuotaPool = jest.fn().mockResolvedValue({
+  cycleResetAt: '2026-08-01T00:00:00.000Z',
+});
 
 jest.mock(
   '../../services/billing' /* gc1-allow: billing operations write Neon quota tables — no DB in the unit runtime */,
@@ -360,6 +363,7 @@ jest.mock(
         mockEnsureFreeSubscription(...args),
       decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
       safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
+      getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
     };
   },
 );
@@ -599,6 +603,46 @@ function createEventData(
 }
 
 // ---------------------------------------------------------------------------
+// [WI-734] Shared DB factory that returns a non-null profile row for the
+// homework-summary quota gate. Required by any test that uses
+// sessionType: 'homework' after the profile fetch was moved outside
+// runIsolated (so a missing profile now throws and triggers Inngest retry
+// instead of returning status='failed'). Defined here so both the
+// extract-homework-summary describe block and the BUG-852 tests can use it.
+// ---------------------------------------------------------------------------
+const WI734_ACCOUNT_ID = '00000000-0000-4000-8000-000000000099';
+
+function makeDbWithProfile() {
+  const selectWithProfile = () => ({
+    from: () => ({
+      innerJoin: () => ({
+        innerJoin: () => ({
+          where: () => ({
+            orderBy: () => ({ limit: () => Promise.resolve([]) }),
+            limit: () => Promise.resolve([]),
+          }),
+        }),
+      }),
+      where: () => ({
+        orderBy: () => ({ limit: () => Promise.resolve([]) }),
+        limit: () =>
+          Promise.resolve([
+            { conversationLanguage: 'en', accountId: WI734_ACCOUNT_ID },
+          ]),
+      }),
+    }),
+  });
+  const db: Record<string, unknown> = {
+    ...mockSessionCompletedDb,
+    select: selectWithProfile,
+  };
+  db.transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+  return db;
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -700,6 +744,9 @@ describe('sessionCompleted', () => {
   it('[BUG-852] escalates via Sentry when filing waitForEvent times out', async () => {
     // Default mockStep.waitForEvent already returns null (= timeout). Use a
     // homework-type session with no topicId so the if-branch is entered.
+    // [WI-734] Profile row required: profile fetch is now outside runIsolated
+    // so a missing profile throws and Inngest retries (instead of soft-fail).
+    (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
     const consoleWarnSpy = jest
       .spyOn(console, 'warn')
       .mockImplementation(() => undefined);
@@ -749,6 +796,9 @@ describe('sessionCompleted', () => {
   // would drown out real timeouts in alerting.
   it('[BUG-852] does NOT escalate when filing waitForEvent returns an event', async () => {
     mockCaptureException.mockClear();
+    // [WI-734] Profile row required for homework sessions after the profile
+    // fetch moved outside runIsolated (missing profile now throws → retry).
+    (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
     const localMockStep = {
       run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
       sendEvent: jest.fn().mockResolvedValue(undefined),
@@ -1637,6 +1687,10 @@ describe('sessionCompleted', () => {
     });
 
     it('extracts and stores summary for homework sessions', async () => {
+      // [WI-734] Requires a profile row so the quota gate can resolve
+      // subscription/language/accountId; use makeDbWithProfile() rather than
+      // the default chainable mock (which returns [] → missing-profile path).
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
       const { result } = (await executeSteps(
         createEventData({ sessionType: 'homework' }),
       )) as any;
@@ -1645,7 +1699,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         SESSION_ID,
-        { conversationLanguage: undefined },
+        { conversationLanguage: 'en' },
       );
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'extract-homework-summary',
@@ -1760,6 +1814,114 @@ describe('sessionCompleted', () => {
         (o: any) => o.step === 'extract-homework-summary',
       );
       expect(outcome.status).toBe('failed');
+    });
+
+    // [WI-734] Negative-path break test: profile-missing branch must NOT call
+    // the homework-summary LLM (unmetered spend) and MUST escalate via
+    // captureException + safeSend (billing silent-recovery ban).
+    // Default db mock returns [] for all db.select().from().where().limit()
+    // calls, so homeworkProfile is undefined without any extra setup.
+    it('[WI-734-BREAK] does not call LLM and escalates when profile row is missing', async () => {
+      // Default db (mockSessionCompletedDb) has chainable select returning []
+      // so homeworkProfile resolves to undefined — exactly the missing-profile path.
+      // The throw escapes step.run (not swallowed by runIsolated) so Inngest retries.
+      // Use .rejects.toThrow so the test itself fails if the throw is swallowed.
+      await expect(
+        executeSteps(createEventData({ sessionType: 'homework' })),
+      ).rejects.toThrow('profile row missing');
+
+      // LLM must NOT be called when profile row is absent.
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+
+      // Must captureException for Sentry observability (not warn-only).
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('profile row missing'),
+        }),
+        expect.objectContaining({ profileId: PROFILE_ID }),
+      );
+
+      // Must emit structured event (billing silent-recovery ban).
+      expect(mockSafeSend).toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.profile_missing',
+        expect.objectContaining({ profileId: PROFILE_ID }),
+      );
+    });
+
+    it('[S7] derives resetsAt from cycleResetAt when shared-pool decrement lacks resetsAt', async () => {
+      // Shared-pool decrementQuota does not set resetsAt on the result.
+      // The code must derive it from getQuotaPool.cycleResetAt, not fall
+      // back to new Date() ("resets now") which fires a spurious notification.
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+      const expectedResetsAt = '2026-08-01T00:00:00.000Z';
+      mockDecrementQuota.mockResolvedValueOnce({
+        success: false,
+        source: 'none', // shared-pool source — no resetsAt on the result
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+        // deliberately no resetsAt field
+      });
+      mockGetQuotaPool.mockResolvedValueOnce({
+        cycleResetAt: expectedResetsAt,
+      });
+
+      await executeSteps(createEventData({ sessionType: 'homework' }));
+
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+      // The safeSend callback invokes inngest.send — we check the payload via
+      // the registered mockSafeSend capture of the third positional arg, but
+      // the payload is inside the closure passed as arg 1. We verify that
+      // getQuotaPool was called (meaning the fallback path ran), and the
+      // safeSend fired (meaning the exhausted notification was still sent).
+      expect(mockGetQuotaPool).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-test-id',
+      );
+      // [S7] Assert that cycleResetAt is threaded through to the observable
+      // safeSend data — the plain call-check above would pass even if resetsAt
+      // were accidentally dropped from the payload.
+      expect(mockSafeSend).toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.quota_exhausted',
+        expect.objectContaining({
+          subscriptionId: 'sub-test-id',
+          resetsAt: expectedResetsAt,
+        }),
+      );
+    });
+
+    it('[C7] guards profile_mismatch out of the quota-exhausted notification', async () => {
+      // A profile_mismatch decrement is a data-integrity anomaly — the profileId
+      // does not belong to this subscription's account. It must NOT fire the
+      // 'monthly_exceeded' parent quota notification (that is for real quota
+      // events). Instead it emits a separate profile_mismatch signal.
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+      mockDecrementQuota.mockResolvedValueOnce({
+        success: false,
+        source: 'profile_mismatch',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      await executeSteps(createEventData({ sessionType: 'homework' }));
+
+      // LLM must not be called.
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+      // Must NOT emit the quota-exhausted event (would misclassify as monthly_exceeded).
+      expect(mockSafeSend).not.toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.quota_exhausted',
+        expect.anything(),
+      );
+      // Must emit the profile_mismatch signal instead.
+      expect(mockSafeSend).toHaveBeenCalledWith(
+        expect.any(Function),
+        'billing.homework_summary.profile_mismatch',
+        expect.objectContaining({ subscriptionId: 'sub-test-id' }),
+      );
     });
   });
 
