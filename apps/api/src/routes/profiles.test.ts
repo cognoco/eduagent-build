@@ -271,6 +271,45 @@ describe('GET /v1/profiles', () => {
     );
     expect(listProfilesV2Mock).not.toHaveBeenCalled();
   });
+
+  // [WI-799] Guardian family list with ≥13 children must serialize to 200, not
+  // 500. profileListResponseSchema.parse() enforces the v1 13+ birthYear floor;
+  // a sub-13 child row throws → 500. Red-green: change childBirthYear below to
+  // currentYear - 12 (sub-13) and this test flips to 500.
+  it('[WI-799] returns 200 (not 500) when guardian family list includes ≥13 children (IDENTITY_V2_ENABLED)', async () => {
+    const currentYear = new Date().getFullYear();
+    const parentProfile = makeProfileRow({ id: PROFILE_ID_A, isOwner: true });
+    const childProfile = makeProfileRow({
+      id: PROFILE_ID_B,
+      isOwner: false,
+    });
+    // Override birthYear on the child to a year-relative ≥13 value (age 14),
+    // matching the CHILD_BIRTH_YEAR constant introduced by WI-799.
+    const childProfileWithBirthYear = {
+      ...childProfile,
+      birthYear: currentYear - 14,
+    };
+    listProfilesV2Mock.mockResolvedValue([
+      parentProfile,
+      childProfileWithBirthYear,
+    ]);
+
+    const res = await makeApp().request(
+      '/v1/profiles',
+      {},
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.profiles).toHaveLength(2);
+    expect(
+      body.profiles.find((p: { id: string }) => p.id === PROFILE_ID_B),
+    ).toMatchObject({
+      id: PROFILE_ID_B,
+      birthYear: currentYear - 14,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
