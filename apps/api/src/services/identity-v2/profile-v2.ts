@@ -16,12 +16,18 @@
 //   - consentStatus        := AnyBasis resolver (latest-any, behavior-preserving)
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { membership, person, type Database } from '@eduagent/database';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import {
+  guardianship,
+  membership,
+  person,
+  type Database,
+} from '@eduagent/database';
 import type { ConsentStatus, Profile } from '@eduagent/schemas';
 import type { ProfileMeta } from '../../middleware/profile-scope';
 import {
   resolveLatestConsentStatusAnyBasis,
+  resolveLatestConsentStatusesAnyBasis,
   DEFAULT_CONSENT_PURPOSE,
 } from './consent-status-v2';
 
@@ -264,4 +270,149 @@ export async function getPersonScope(
       consentStatus,
     }),
   };
+}
+
+// ---------------------------------------------------------------------------
+// listProfilesV2 — the v2 twin of services/profile.ts::listProfiles
+// (cutover-plan §2.2; WP-1 enumeration §4.1).
+//
+// SECURITY (org/person ownership scoping — the IDOR guard). The legacy
+// listProfiles(db, accountId) scoped profiles to an accounts.id. The v2 read
+// scopes persons to an organization.id via the `membership` join. The org id is
+// always the CALLER's own resolved org (identity-resolve.ts: account.id =
+// organization.id, resolved from the caller's login→membership→organization
+// chain), never a request parameter — so the membership-scoped predicate IS the
+// IDOR guard: a caller resolved to org A can never enumerate persons of org B,
+// because a person in org B has no membership row with organization_id = A.
+//
+// This is the parent-chain pattern (direct db.select() enforcing the owning
+// ancestor — membership.organizationId — in WHERE), the sanctioned alternative
+// to the scoped repo when a read joins through a parent (AGENTS.md
+// "Non-Negotiable Engineering Rules").
+//
+// Field derivations are byte-identical to legacy listProfiles + getOwnerProfileV2:
+//   - isOwner       := membership.roles @> '{admin}'
+//   - consentStatus := the batched AnyBasis reducer (behavior-preserving L7-F1 twin)
+//   - hasFamilyLinks/linkCreatedAt := active guardianship edges (family_links twin):
+//       owner/guardian → hasFamilyLinks if ANY active edge as guardian; linkCreatedAt null
+//       non-owner/charge → hasFamilyLinks if an active charge edge; linkCreatedAt = edge.grantedAt
+//   - hasPremiumLlm  := false (derived, §1.3 — matches getOwnerProfileV2)
+// ---------------------------------------------------------------------------
+
+/**
+ * List every non-archived person in the caller's organization as a byte-identical
+ * `Profile[]`. `organizationId` MUST be the caller's own resolved org id
+ * (account.id = organization.id); the `membership` join scopes the read to that
+ * org and is the IDOR guard against cross-org/cross-person enumeration.
+ */
+export async function listProfilesV2(
+  db: Database,
+  organizationId: string,
+): Promise<Profile[]> {
+  // Org-scoped person read (the IDOR guard): only persons with a membership in
+  // THIS org, non-archived. person.id = profiles.id; account.id = organization.id.
+  const rows = await db
+    .select({
+      id: person.id,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl,
+      birthDate: person.birthDate,
+      residenceJurisdiction: person.residenceJurisdiction,
+      conversationLanguage: person.conversationLanguage,
+      pronouns: person.pronouns,
+      defaultAppContext: person.defaultAppContext,
+      createdAt: person.createdAt,
+      updatedAt: person.updatedAt,
+      roles: membership.roles,
+    })
+    .from(person)
+    .innerJoin(membership, eq(membership.personId, person.id))
+    .where(
+      and(
+        eq(membership.organizationId, organizationId),
+        isNull(person.archivedAt),
+      ),
+    );
+
+  if (rows.length === 0) return [];
+
+  const personIds = rows.map((r) => r.id);
+
+  // Active guardianship edges touching this org's persons (the family_links
+  // twin). Scoped at the query: only active edges where a listed person is the
+  // guardian OR the charge — bounding the read to this org's persons instead of
+  // scanning the whole table on every GET /v1/profiles (the mobile-launch hot
+  // path). personIds is non-empty here (the rows.length === 0 early-return
+  // guarantees it), so inArray is safe. The per-side personIdSet checks below
+  // still attribute each edge to the correct direction (an OR-matched edge may
+  // have only one side in this org).
+  const edges = await db
+    .select({
+      guardianPersonId: guardianship.guardianPersonId,
+      chargePersonId: guardianship.chargePersonId,
+      grantedAt: guardianship.grantedAt,
+    })
+    .from(guardianship)
+    .where(
+      and(
+        isNull(guardianship.revokedAt),
+        or(
+          inArray(guardianship.guardianPersonId, personIds),
+          inArray(guardianship.chargePersonId, personIds),
+        ),
+      ),
+    );
+  const personIdSet = new Set(personIds);
+  const guardianHasEdge = new Set<string>();
+  const chargeLinkGrantedAt = new Map<string, Date>();
+  for (const edge of edges) {
+    if (personIdSet.has(edge.guardianPersonId)) {
+      guardianHasEdge.add(edge.guardianPersonId);
+    }
+    if (personIdSet.has(edge.chargePersonId)) {
+      // A charge has at most one active edge (partial unique); first wins.
+      if (!chargeLinkGrantedAt.has(edge.chargePersonId)) {
+        chargeLinkGrantedAt.set(edge.chargePersonId, edge.grantedAt);
+      }
+    }
+  }
+
+  // Batched consent status (the L7-F1 batch replacement; behavior-preserving
+  // latest-any-basis read). Persons with no consent rows are absent → null.
+  const consentByPersonId = await resolveLatestConsentStatusesAnyBasis(
+    db,
+    personIds,
+    organizationId,
+    DEFAULT_CONSENT_PURPOSE,
+  );
+
+  return rows.map((row) => {
+    const isOwner = row.roles.includes('admin');
+    // Legacy parity: owner → hasFamilyLinks from guardian-side edges, linkCreatedAt
+    // null; non-owner → hasFamilyLinks from a charge-side edge, linkCreatedAt = grantedAt.
+    const chargeGrantedAt = chargeLinkGrantedAt.get(row.id) ?? null;
+    const hasFamilyLinks = isOwner
+      ? guardianHasEdge.has(row.id)
+      : chargeGrantedAt !== null;
+    return {
+      id: row.id,
+      accountId: organizationId, // account.id = organization.id
+      displayName: row.displayName,
+      avatarUrl: row.avatarUrl ?? null,
+      birthYear: birthYearFromDate(row.birthDate),
+      location: jurisdictionToLocation(row.residenceJurisdiction),
+      isOwner,
+      hasPremiumLlm: deriveHasPremiumLlm(),
+      defaultAppContext:
+        (row.defaultAppContext as Profile['defaultAppContext']) ?? null,
+      hasFamilyLinks,
+      conversationLanguage:
+        row.conversationLanguage as Profile['conversationLanguage'],
+      pronouns: row.pronouns ?? null,
+      consentStatus: consentByPersonId.get(row.id) ?? null,
+      linkCreatedAt: isOwner ? null : (chargeGrantedAt?.toISOString() ?? null),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
 }

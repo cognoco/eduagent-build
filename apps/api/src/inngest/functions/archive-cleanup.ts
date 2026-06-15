@@ -1,10 +1,14 @@
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import {
   getConsentStatus,
   getProfileForConsentRevocation,
 } from '../../services/consent';
 import { deleteArchivedProfileIfStillEligible } from '../../services/deletion';
+import { resolveLatestConsentStatusAnyBasis } from '../../services/identity-v2/consent-status-v2';
+import { getPersonForConsentRevocationV2 } from '../../services/identity-v2/consent-v2';
+import { deleteArchivedPersonIfStillEligibleV2 } from '../../services/identity-v2/deletion-v2';
+import { resolveOrgIdForPerson } from '../../services/identity-v2/family-v2';
 
 const ARCHIVE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -34,6 +38,40 @@ export const archiveCleanup = inngest.createFunction(
       // the dashboard distinguish WHY a run was a no-op). They do NOT guard the
       // delete on their own — a restoreConsent() landing after these reads but
       // before the delete is the F-122 TOCTOU.
+
+      // [CUT-B2] Dispatch to v2 consent model when flag is enabled.
+      if (isIdentityV2EnabledInStep()) {
+        const orgId = await resolveOrgIdForPerson(db, profileId);
+        if (orgId !== null) {
+          const consentStatus = await resolveLatestConsentStatusAnyBasis(
+            db,
+            profileId,
+            orgId,
+          );
+          if (consentStatus === 'CONSENTED') {
+            return { deleted: false, reason: 'consent_restored' };
+          }
+        }
+
+        const person = await getPersonForConsentRevocationV2(db, profileId);
+        if (!person?.archivedAt) {
+          return { deleted: false, reason: 'not_archived' };
+        }
+        if (Date.now() - person.archivedAt.getTime() < ARCHIVE_RETENTION_MS) {
+          return { deleted: false, reason: 'retention_window_not_elapsed' };
+        }
+
+        const retentionCutoff = new Date(Date.now() - ARCHIVE_RETENTION_MS);
+        const deleted = await deleteArchivedPersonIfStillEligibleV2(
+          db,
+          profileId,
+          retentionCutoff,
+        );
+        return deleted
+          ? { deleted: true }
+          : { deleted: false, reason: 'consent_restored_or_unarchived' };
+      }
+
       const consentStatus = await getConsentStatus(db, profileId);
       if (consentStatus === 'CONSENTED') {
         return { deleted: false, reason: 'consent_restored' };

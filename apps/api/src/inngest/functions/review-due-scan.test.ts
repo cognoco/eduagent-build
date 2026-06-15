@@ -16,6 +16,8 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
 
+import { person, profiles, consentStates } from '@eduagent/database';
+
 import { reviewDueScan } from './review-due-scan';
 
 function buildChainableDb(
@@ -88,3 +90,72 @@ describe('reviewDueScan — find-overdue-profiles step DB path', () => {
     expect(payload[0]?.data.topTopicIds).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-777] Identity-V2 wiring guard (CUT-B2).
+//
+// The find-overdue-profiles step branches on isIdentityV2EnabledInStep():
+//   - v2:     SELECT … FROM person  (canonical model — person × membership ×
+//             organization + consentGateSatisfiedSql; no consentStates subquery)
+//   - legacy: SELECT … FROM profiles (profiles × accounts × consentStates)
+// These tests assert the correct query root is chosen per flag, so a future
+// regression of the v2 wiring (e.g. dropping the branch) fails CI before
+// WP-FLAG removes the legacy tables. The DB module is NOT mocked here, so
+// `person` / `profiles` / `consentStates` are the real Drizzle table objects
+// the source passes to `.from(...)`.
+// ---------------------------------------------------------------------------
+
+describe('[WI-777] reviewDueScan identity-v2 wiring', () => {
+  it('flag-on: query reads the canonical `person` model, not legacy `profiles`', async () => {
+    const prev = process.env['IDENTITY_V2_ENABLED'];
+    process.env['IDENTITY_V2_ENABLED'] = 'true';
+    try {
+      const db = buildChainableDb([]);
+      mockGetStepDatabase.mockReturnValue(db);
+
+      const { step } = createInngestStepRunner();
+      const handler = (reviewDueScan as any).fn;
+      await handler({ step });
+
+      // v2 query roots on `person`; the legacy `profiles` / `consentStates`
+      // surfaces are absent (v2 uses consentGateSatisfiedSql, not a
+      // consentStates subquery).
+      expect(db.builder.from).toHaveBeenCalledWith(person);
+      expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
+      expect(db.builder.from).not.toHaveBeenCalledWith(consentStates);
+    } finally {
+      restoreFlag(prev);
+    }
+  });
+
+  it('flag-off: legacy path stays intact — query reads `profiles`, not `person`', async () => {
+    const prev = process.env['IDENTITY_V2_ENABLED'];
+    delete process.env['IDENTITY_V2_ENABLED'];
+    try {
+      const db = buildChainableDb([]);
+      mockGetStepDatabase.mockReturnValue(db);
+
+      const { step } = createInngestStepRunner();
+      const handler = (reviewDueScan as any).fn;
+      await handler({ step });
+
+      expect(db.builder.from).toHaveBeenCalledWith(profiles);
+      expect(db.builder.from).not.toHaveBeenCalledWith(person);
+    } finally {
+      restoreFlag(prev);
+    }
+  });
+});
+
+/**
+ * Restore IDENTITY_V2_ENABLED to its prior value. Assigning `undefined`
+ * directly coerces to the string "undefined", so delete when there was no
+ * prior value.
+ */
+function restoreFlag(prev: string | undefined): void {
+  if (prev === undefined) {
+    delete process.env['IDENTITY_V2_ENABLED'];
+  } else {
+    process.env['IDENTITY_V2_ENABLED'] = prev;
+  }
+}
