@@ -1,37 +1,35 @@
-# PRG-06 "Identity Cutover" — Shepherd Kickoff (PARKED — do not launch until §0 clears)
+# PRG-06 "Identity Cutover" — Shepherd Kickoff (standard launcher)
 
-> Thin pointer-brief (planning-reference §2.6: three pointers + checkpoint duty + boundary
-> events). **Operator-launched** (§2.5) — the orchestrator authored this; Jorn spawns the
-> shepherd session. Briefs are pointers, never pasted content — read the pointers.
+> Standard thin launcher per `_wip/identity-foundation/shepherd-kickoff-template.md`. The role,
+> the review-loop, the channel mechanics, and the Cosmo lifecycle all live in
+> `shepherd-protocol.md` — this file only *launches* a shepherd against it. **Operator-launched**
+> (planning-reference §2.5): the orchestrator authors this; Jorn spawns the session by pasting
+> the block below.
 
-## 0. Launch precondition (HARD GATE)
-**Do not start until `MMT-ADR-0020/0021/0022` cleanup is operator-confirmed complete.** Those
-three were reverse-engineered from the S0–S6 plans and are being re-vetted in a separate
-session. Once Jorn confirms cleanup done, they are **trusted canon** and you operate normally.
+## Launch model — prime-and-hold (this lane is gated)
+This lane has a launch precondition: the **ADR-0020/0021/0022 cleanup** (reverse-engineered from
+S0–S6; re-vetted in a separate session) must be **operator-confirmed complete** before execution.
+So the shepherd can be launched **early**: it primes (reads its scaffold, arms its inbox watcher
++ Cosmo monitor, confirms the reviewer covers WS-18) and then **holds**, waiting on the channel
+for the orchestrator's go — rather than the operator timing the spawn to the gate. Release is an
+inbox `directive` ("ADR gate cleared — proceed").
 
-## 1. The three pointers
-1. **Tracker (durable state):** `_wip/identity-cutover/execution-tracker.md` — charter,
-   canon authority, slice sequence, current position. Start here every resume.
-2. **Initiative brief + cutover mechanics:** `_wip/identity-foundation/586-completion-prg-handoff.md`,
-   then its cited artifacts (`586-staging-cutover-execution-log.md`, `2026-06-11-cutover-plan.md` §4,
-   `wi586-readiness-2026-06-14.md`, `pending-migrations/`).
-3. **Substrate operating rules:** repo `AGENTS.md`; worktrees via `.agents/skills/worktree-setup/SKILL.md`
-   (`.worktrees/<branch>`); commit via the commit skill (own-work scope); Doppler for secrets
-   (`--project mentomate`, never print values); read precise SQL/endpoint/constraint strings natively, not via rtk.
+## The launcher (paste to spawn the shepherd session)
 
-## 2. Standing rules (inherit these)
-- **Canon wins; S0–S6 design choices are NOT canonical.** Reconcile the reader/writer surface
-  *to canon*, not to what S0–S6 built.
-- **First work = WP-1: statically enumerate the full breaking reader/writer set** — do not
-  discover endpoint-by-endpoint. Fold the pre-graph 401 fix (`de8df6e86`) in as slice-1.
-- Missing twins (e.g. `listProfilesV2`) are **ownership-scoping security-sensitive → TDD**.
-- Run the real process: writing-plans → scoped WPs → reviewed PRs → full + 51 integration gate.
-  Not an ad-hoc 77-file sweep. **The legacy drop is the terminal step of the code migration.**
-- **Defer the S4–S6 fold-in decision** until WP-1 sizes the surface.
+```text
+You are the shepherd for PRG-06 — Cosmo Workstream "Identity Cutover"
+(WS-18, 3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8) — in repo /Users/vetinari/nexus/_dev/eduagent-build.
 
-## 3. Checkpoint duty + boundary events (report upward)
-- Write state back: Cosmo immediately; tracker §5 at checkpoint cadence (disposable-shepherd invariant).
-- A **separate reviewer** (different runtime) closes WIs — you self-monitor Cosmo for verdicts; you do not own the watcher.
-- **Boundary events to report to the orchestrator:** "code half complete + full/integration suites green"
-  (the precondition for the terminal data half), and "WI-586 closed" (PRG-06 outcome met → graduation).
-- **Operator-gated:** the staging flip and the prod cutover (flip owner = Jorn); all prod/irreversible steps surface for explicit go.
+Read these, then shepherd the workstream to Cosmo Close accordingly:
+1. _wip/identity-foundation/shepherd-protocol.md              — the standard shepherd process (your scaffold).
+2. _wip/identity-cutover/execution-tracker.md                 — this lane: charter, canon authority, slice (WP-1 = WI-765 enumeration first), launch gate, escalations.
+3. _wip/identity-foundation/executor-protocol.md (+ -example) — the scaffold your executors follow; the brief shape you hand them.
+
+Standing rule for this lane (also in the tracker): CANON WINS — the canonical architecture / identity-foundation design / specs / trusted ADRs / the to-be data model are the authority. S0–S6 design choices are NOT canonical: reconcile the app code TO canon, do not inherit S0–S6. A change that conforms to S0–S6 but diverges from canon is wrong.
+
+Up front (detail in shepherd-protocol.md): the review loop is run by a SEPARATE reviewer session — do not touch/own the watcher; confirm it covers "Identity Cutover" (WS-18) before relying on verdicts. Set up your own Cosmo monitor on the "Identity Cutover" workstream to catch each WI's verdict (Closed vs rework→Executing) and re-engage.
+Two mandatory gates: a green PR to merge (shepherd-protocol.md → Merging the WP — never merge a red PR or call it "green"), then Cosmo Close to graduate.
+Progress channel: append exceptions/decisions to _wip/identity-cutover/_state/outbox.jsonl at the four triggers only, and ARM a live inbox watcher (Monitor on _wip/identity-cutover/_state/inbox.jsonl) at activation so rulings wake you while holding — read at checkpoint/on-block as fallback (shepherd-protocol.md → Progress channel).
+
+LAUNCH GATE — PRIME AND HOLD: this lane is gated on the ADR-0020/0021/0022 cleanup. On arrival, PRIME ONLY — read the above, arm the inbox watcher + the Cosmo monitor, confirm the reviewer covers WS-18 — then emit ONE outbox `decision` line ("primed; holding for ADR-gate release") and HOLD. Do NOT claim or refine WP-1 (WI-765) until an orchestrator inbox `directive` ("ADR gate cleared — proceed") or a direct operator go arrives. First substantive work once released: refine WP-1 (WI-765) Backlog→Ready, then dispatch the enumeration (fold the pre-graph 401 fix de8df6e86 in as slice-1) per the tracker §4.
+```

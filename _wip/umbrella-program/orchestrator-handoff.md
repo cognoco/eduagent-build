@@ -31,9 +31,38 @@ makes you the orchestrator; that attachment tells you what is currently live.
   current.
 - **Lane coordination** — spin up / coordinate shepherd + executor lanes via the file-based
   channel (`_wip/<lane>/_state/{inbox,outbox}.jsonl`): **you rule + relay operator decisions,
-  executors / shepherds execute, a separate reviewer closes.**
+  executors / shepherds execute, a separate reviewer closes.** See **Lane activation** below for
+  the stand-up ceremony and the standard kickoff machinery — do not improvise it.
 - **Operator partnership** — surface decisions; gate irreversible / prod / outward-facing actions
   on the operator's explicit go.
+
+## Lane activation — use the standard machinery (never improvise a kickoff)
+
+Standing up a lane is a **defined ceremony**, not freehand. The mechanics already live in
+committed files — **read them before authoring anything**; do not reconstruct them from memory or
+from the terse planning-reference §2.1 rule. *(This section exists because a fresh orchestrator
+session skipped them and shipped a bespoke, role-blind kickoff — the exact failure
+`.claude/memory/feedback_shepherd_kickoff_role_split` already warned of.)*
+
+**Read first — the standard machinery** (cross-lane standard, co-located under `_wip/identity-foundation/`):
+- `shepherd-protocol.md` — the shepherd's role, review loop, channel, and Cosmo lifecycle.
+- `executor-protocol.md` (+ `-example`) — the executor scaffold + the thin pointer-brief shape.
+- `shepherd-kickoff-template.md` — the **standard thin shepherd launcher** (swap PRG-NN + workstream + tracker). **Never author a bespoke kickoff.**
+- `new-llm-review-watcher-kickoff-prompt.md` — the **reviewer (autonomous watcher) kickoff** template (separate session, separate runtime — reviewer ≠ executor is a quality invariant).
+- `progress-channel-design.md` — the orchestrator↔shepherd `_state/{inbox,outbox}.jsonl` channel.
+
+**Activation checklist (planning-reference §2.1 made concrete — every lane, in order):**
+1. **Tracker** — `_wip/<lane>/execution-tracker.md` (charter / canon authority / slice / launch gate / change log).
+2. **Cosmo Workstream** — create it; record WS-N + page id.
+3. **Slice** — create the WP/Item set (direct-to-WP), wire Blocked-by, set Workstream + Order.
+4. **Provision the channel** — create `_wip/<lane>/_state/{inbox,outbox}.jsonl` (the orchestrator provisions these at activation).
+5. **Shepherd kickoff** — author from `shepherd-kickoff-template.md`; if the lane is gated, make it **prime-and-hold** (orient + arm watchers, then wait on an inbox `directive`).
+6. **Reviewer kickoff** — author the separate reviewer/watcher launcher, or confirm a live general watcher will cover the workstream.
+7. **Arm the orchestrator outbox watcher** — a Monitor on `_wip/<lane>/_state/outbox.jsonl` (sibling of the Cosmo-Stage monitor), when the shepherd launches.
+8. **Roster + queue + dashboard** — add the PRG row + queue entry; regen the dashboard.
+
+**Launch is operator-led** (planning-reference §2.5): the orchestrator authors the kickoffs and
+hands them over; **the operator spawns** the shepherd + reviewer sessions — never as your own subagents.
 
 ## Orient on resume (first actions)
 

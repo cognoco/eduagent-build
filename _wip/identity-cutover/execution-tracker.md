@@ -76,6 +76,13 @@ Shepherd + reviewer are **operator-launched** (§2.5) — orchestrator prepares 
   immediately; this tracker at checkpoint). Kill the session, lose nothing but warm cache.
 
 ## 3. Pointers / index
+- **Process machinery (the orchestration standard — how the lane is operated):**
+  - `_wip/identity-foundation/shepherd-protocol.md` — standard shepherd scaffold (the shepherd's process).
+  - `_wip/identity-foundation/executor-protocol.md` (+ `-example`) — executor scaffold + thin pointer-brief shape.
+  - `_wip/identity-cutover/shepherd-kickoff.md` — the shepherd launcher (standard template; prime-and-hold).
+  - `_wip/identity-cutover/reviewer-kickoff.md` — the separate autonomous-reviewer launcher (Codex; standard policy).
+  - `_wip/identity-foundation/progress-channel-design.md` — the orchestrator↔shepherd channel design.
+  - **Lane channel (provisioned):** `_wip/identity-cutover/_state/{inbox,outbox}.jsonl`.
 - **Initiative brief:** `_wip/identity-foundation/586-completion-prg-handoff.md` (the brief that stood this up).
 - **Cutover mechanics (terminal data half):**
   - `_wip/identity-foundation/586-staging-cutover-execution-log.md` (steps 1–10 record + Rollback Plan + recovery markers).
@@ -119,14 +126,23 @@ to numbered `0117`/`0118` → prod cutover (prod near-empty; non-gating to close
   (`3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`); **WP-1 = WI-765** enumeration Item
   (`3808bce9-1f7c-816f-b1e8-f984b8dd3545`, `Stage=Backlog`, order 1); **WI-586 + its 2 sub-items
   moved in**, WI-586 Blocked-by re-pointed to WP-1, Description corrected; roster PRG-06 row +
-  queue + change log updated. **Pending:** PRG-01 Cosmo graduation (WS-9 open-WI audit →
-  `Status=Closed`); dashboard regen; commit. **Shepherd NOT launched** — gated on §6
-  (ADR-0020/0021/0022 cleanup).
+  queue + change log updated; **PRG-01 graduated** (WS-9 52/52 audit clean → `Status=Closed`);
+  committed (`2259fd04a` + `754c62cbb`). **Machinery provisioned 2026-06-15:** lane mailboxes
+  `_state/{inbox,outbox}.jsonl`; standard shepherd launcher (`shepherd-kickoff.md`, prime-and-hold)
+  + separate reviewer launcher (`reviewer-kickoff.md`). **Pending:** dashboard regen.
+  **Shepherd + reviewer NOT launched** — gated on §6; the shepherd primes-and-holds, released via
+  an inbox `directive`.
 
-## 6. Launch preconditions (shepherd does not start until ALL clear)
-1. **ADR cleanup complete** — `MMT-ADR-0020/0021/0022` re-vetting finished + **operator-confirmed**.
-2. Cosmo structure live — workstream created, WP-1 sliced Ready, WI-586 moved + re-blocked.
-3. Kickoff brief handed to operator; operator launches the shepherd session (§2.5).
+## 6. Launch sequence + preconditions
+- **Done (orchestrator):** Cosmo structure live (WS-18 + WI-765 + WI-586 moved/re-blocked); lane
+  mailboxes provisioned (`_state/{inbox,outbox}.jsonl`); standard shepherd launcher
+  (`shepherd-kickoff.md`, prime-and-hold) + separate reviewer launcher (`reviewer-kickoff.md`) authored.
+- **Gate (operator):** **ADR-0020/0021/0022 cleanup complete + operator-confirmed.**
+- **On gate clear (operator):** launch the **shepherd** (paste `shepherd-kickoff.md` launcher) and
+  the **separate reviewer** (paste `reviewer-kickoff.md`, or add WS-18 to a live general watcher).
+  The shepherd primes + holds; the orchestrator then **arms its outbox watcher** (Monitor on
+  `_state/outbox.jsonl`) and sends an inbox `directive` ("ADR gate cleared — proceed") to release
+  the shepherd into WP-1 (WI-765).
 
 ## 7. Change log
 - **2026-06-15 — created.** PRG-06 stood up per the B ruling on the WI-586 code-half
