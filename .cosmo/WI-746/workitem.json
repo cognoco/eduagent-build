@@ -1,0 +1,17 @@
+{
+  "pageId": "37f8bce9-1f7c-812f-9deb-f4b4f9ebdacd",
+  "id": "WI-746",
+  "name": "Extend tech/gha-hardening with repo-specific context (workflow inventory + @claude surface + PR-gate) [F-116]",
+  "description": "tech/gha-hardening covers generic GHA hardening but lacks the repo-specific workflow inventory, the @claude agent-invocation threat surface, and the PR-review-gate requirements.",
+  "acceptanceCriteria": "Add a '## Repo-specific context' section to .agents/skills/tech/gha-hardening/SKILL.md (sync via pnpm sync-skills), ~50 lines, citing the generic skill it sits in: (1) a 6+-entry workflow inventory with which carry secrets / id-token:write / run untrusted-or-fork code; (2) the claude-code-review.yml @claude agent-invocation threat model (PR title/author interpolated into the prompt; the F-119/F-127 scope-leak pattern); (3) PR review-gate security (F-132 unauthenticated-comment-as-verdict); (4) the mobile-maestro single-layer gate fragility (F-154). In-place extend (one skill load, not two). DoD: human review of inventory accuracy before merge.",
+  "riskImpact": "",
+  "type": "Documentation",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": null,
+  "bodyText": "Reduce-and-extend (in place)\nExtend tech/gha-hardening rather than create a second skill (simpler discovery — one load). The generic skill is near-complete for standard attack classes; the addendum is the repo's own workflow surface. Cross-refs to the live PRG-10 GHA findings (F-119/F-127/F-132/F-154) for the concrete patterns.\nNote\nWorkflow-inventory accuracy is review-sensitive — operator reviews before merge."
+}

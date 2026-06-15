@@ -1,0 +1,17 @@
+{
+  "pageId": "37f8bce9-1f7c-8144-a4c6-e55291743d86",
+  "id": "WI-745",
+  "name": "Build tech-eduagent-db skill (scoped-repo / profileId-safety / migration-rollback discipline) [F-114]",
+  "description": "No repo-local skill codifies createScopedRepository / profileId write-protection / migration-rollback discipline / db:push-vs-migrate split. Reduce-and-extend vs tech/drizzle-atomicity + tech/neon-postgres.",
+  "acceptanceCriteria": "Create .agents/skills/tech/eduagent-db/SKILL.md (sync to .claude/skills/tech-eduagent-db/). REDUCE: cite tech/drizzle-atomicity (atomic SQL, onConflictDoUpdate, transactions/locks) + tech/neon-postgres (connection/branching) by reference. EXTEND: (1) createScopedRepository(profileId) — when to use vs parent-chain join, with services/session/session-topic.ts as canonical example; (2) profileId write-protection as a hard WHERE-clause requirement; (3) migration rollback discipline (the ## Rollback section requirement + data-loss accounting); (4) db:push:dev (dev-only) vs drizzle-kit migrate (stg/prod) split. Trigger-only description. DoD: human review of skill content before merge.",
+  "riskImpact": "",
+  "type": "Documentation",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": null,
+  "bodyText": "Reduce-and-extend\ntech/drizzle-atomicity covers atomicity/transactions; tech/neon-postgres covers connection/branching — cite both. The gap is the repo data-access contract: scoped-repo vs parent-chain, profileId write protection, the ## Rollback + push-vs-migrate rules from AGENTS.md §Non-Negotiable + §Schema And Deploy Safety. Gate: PRG-03 B4 cleared.\nNote\nSkill-content design is human-led — executor authors, operator reviews before merge."
+}

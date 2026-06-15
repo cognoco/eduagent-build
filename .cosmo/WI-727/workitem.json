@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-818d-9119-dfebc52d9488",
+  "id": "WI-727",
+  "name": "Fix drifted retry-filing cap — filing.ts hardcodes 3 instead of FILING_CONFIG.maxRetries",
+  "description": "filing.ts:94 hardcodes 3; sessions.ts:380 reads FILING_CONFIG.maxRetries (config/filing.ts:3 = 3). Values agree TODAY but filing.ts has no config import, so the cap can silently diverge on any future config change — latent drift bug. Approved cut (minimum fix): import FILING_CONFIG in filing.ts, replace the literal. Do NOT move cap logic into the data-access layer (separate retry-logic work). filing.ts coincides with IF security work (F-126) — coordinate PR timing.",
+  "acceptanceCriteria": "Root cause: apps/api/src/routes/filing.ts:94 hardcodes the literal 3 for the retry cap and imports nothing from ../config/filing, while sessions.ts:380 reads FILING_CONFIG.maxRetries (config/filing.ts:3 = 3); the two agree today but filing.ts cannot follow a future config change — latent drift. Behavioral variants: SINGLE variant — one hardcoded literal at filing.ts:94; no other divergent retry-cap flow exists (sessions.ts already config-sourced). Fix (operator-approved minimum): import FILING_CONFIG in filing.ts and replace the :94 literal so both filing.ts and sessions.ts derive the cap from the single config constant. Regression test: asserts the cap derives from config — changing FILING_CONFIG.maxRetries changes both paths (test fails against the hardcoded literal, passes after the fix). Do NOT move cap logic into the data-access layer (separate retry-logic work). api tests green.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

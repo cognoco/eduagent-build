@@ -9,6 +9,7 @@
 
 - [project_cosmo_shepherd_finalization.md](project_cosmo_shepherd_finalization.md) — Finalizing Cosmo WIs for the autonomous /cosmo:review loop: replace_content + property PATCH (NOT execute complete, which appends + writes literal text the reviewer rejects); set Fixed In manually; single-line `Caveats / Follow-ups:`; refine can't promote childless WPs.
 - [project_prg11_arch_cleanout_lane.md](project_prg11_arch_cleanout_lane.md) — PRG-11 Architecture Clean-Out shepherd lane (Tier 1: WI-717/718/719/720). Gate-deletion=go; WP→Item demotion rationale; Assisted DoR; 4 background executors dispatched; reviewer is separate Codex; DoD=Cosmo Close.
+- [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — PRG-14 Agent-Instructions lane (WS-17) GRADUATED 6/6. Reusable lessons: Type=Bug DoD needs red-green-revert guard upfront; docs-PR ci.yml paths-ignore blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; reviewer honors operator approve-as-is deferrals.
 
 ## Identity Foundation (re-platform)
 
@@ -20,6 +21,7 @@
 - [project_known_bug_patterns.md](project_known_bug_patterns.md) — Systemic patterns: silent fallbacks + React state timing gaps.
 - [project_schema_drift_pattern.md](project_schema_drift_pattern.md) — push→migrate transition silently skips columns; `mentomate-api-dev` "column does not exist" → `db:push:dev` + `db:generate:dev`. Neon "staging" ≠ dev Worker's DB.
 - [project_expo_router_pollution.md](_archive/project_expo_router_pollution.md) — Helpers under `app/(app)/` treated as routes. Fix: `_components/`, `_hooks/` dirs.
+- [project_claude_review_self_referential_401.md](project_claude_review_self_referential_401.md) — A PR editing `.github/workflows/claude*.yml` shows a benign RED claude-review (self-referential 401, not token exhaustion). Confirm via rerun-after-merge or a non-workflow follow-up PR.
 
 ## Auth
 
