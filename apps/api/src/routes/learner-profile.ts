@@ -88,7 +88,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
     await assertChildDashboardDataVisible(db, childProfileId);
     const profile = await getOrCreateLearningProfile(db, childProfileId);
@@ -103,7 +105,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
     await assertChildDashboardDataVisible(db, childProfileId);
     const profile = await getOrCreateLearningProfile(db, childProfileId);
@@ -148,7 +152,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       // [WI-156] No child-consent read-gate here: erasure (right to erasure)
       // must remain available even when the child's consent is withdrawn.
       const input = c.req.valid('json');
@@ -182,7 +188,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     // [WI-156] No child-consent read-gate here: erasure (right to erasure)
     // must remain available even when the child's consent is withdrawn.
     // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
@@ -222,7 +230,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       // [WI-156] No child-consent read-gate here: disabling collection is a
       // privacy-reducing action that must remain available post-withdrawal.
       const { memoryCollectionEnabled } = c.req.valid('json');
@@ -271,7 +281,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       // [WI-156] No child-consent read-gate here: disabling injection is a
       // privacy-reducing action that must remain available post-withdrawal.
       const { memoryInjectionEnabled } = c.req.valid('json');
@@ -315,7 +327,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       // [WI-156] No child-consent read-gate here: this IS the consent-management
       // route (the narrow, explicit exception) — gating it would deadlock recovery.
       const { consent } = c.req.valid('json');
@@ -349,7 +363,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
       await assertChildDashboardDataVisible(db, childProfileId);
       const { text } = c.req.valid('json');
@@ -391,7 +407,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
       await assertChildDashboardDataVisible(db, childProfileId);
       const { value } = c.req.valid('json');
@@ -443,7 +461,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
       await assertChildDashboardDataVisible(db, childProfileId);
       const { accommodationMode } = c.req.valid('json');

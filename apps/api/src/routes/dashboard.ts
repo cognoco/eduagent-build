@@ -51,7 +51,6 @@ import {
 import { ForbiddenError, notFound } from '../errors';
 import { createLogger } from '../services/logger';
 import { isIdentityV2Enabled, isMemoryFactsReadEnabled } from '../config';
-import { validateGuardianChargeRelationshipV2 } from '../services/identity-v2/family-bridge-v2';
 import {
   getMemoryProjection,
   toCuratedView,
@@ -101,7 +100,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth: assert parent->child link at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     // [BUG-62] No consent-visibility gate here. The mobile child-detail screen
     // renders a dedicated consent-restricted panel for PENDING / REQUESTED /
@@ -122,7 +123,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const inventory = await getChildInventory(
       db,
@@ -137,7 +140,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const summary = await getProgressSummary(
@@ -158,7 +163,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
       // [BUG-834] Defense-in-depth at route entry.
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
 
       const history = await getChildProgressHistory(
         db,
@@ -178,7 +185,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const topics = await getChildSubjectTopics(
       db,
@@ -214,15 +223,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       // global error handler, not as 404.
       // Defense-in-depth: route-entry parent-link check before the service.
       // getChildTopicSnapshotForParent also runs the same guard.
-      if (identityV2Enabled) {
-        await validateGuardianChargeRelationshipV2(
-          db,
-          parentProfileId,
-          childProfileId,
-        );
-      } else {
-        await assertParentAccess(db, parentProfileId, childProfileId);
-      }
+      // [WI-786] Flag-gated: assertParentAccess dispatches to guardianship v2 or
+      // legacy family_links based on identityV2Enabled.
+      await assertParentAccess(db, parentProfileId, childProfileId, {
+        identityV2Enabled,
+      });
 
       const snapshot = await getChildTopicSnapshotForParent(
         db,
@@ -258,7 +263,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const sessions = await getChildSessions(
       db,
@@ -276,7 +283,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const session = await getChildSessionDetail(
       db,
@@ -296,7 +305,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const projection = await getMemoryProjection(db, childProfileId, {
@@ -334,7 +345,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const reports = await getChildReports(db, parentProfileId, childProfileId);
     return c.json(childReportsResponseSchema.parse({ reports }));
@@ -347,7 +360,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const report = await getChildReportDetail(
       db,
@@ -368,7 +383,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
     return c.json(reportViewedResponseSchema.parse({ viewed: true }));
@@ -381,7 +398,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const reports = await listWeeklyReportsForParentChild(
@@ -399,7 +418,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const report = await getWeeklyReportForParentChild(
@@ -423,7 +444,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
       // [BUG-834] Defense-in-depth at route entry.
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       await assertChildDashboardDataVisible(db, childProfileId);
 
       await markWeeklyReportViewed(

@@ -159,7 +159,10 @@ async function assertCanRequestConsentForChild<E extends ConsentRouteEnv>(
   // Parent-on-behalf: owner with a family link to the target child.
   // assertOwnerAndParentAccess throws ForbiddenError (→ 403) for a non-owner
   // profile or an owner with no link to this child (IDOR).
-  await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId);
+  // [WI-786] Flag-gated: flag-on resolves via guardianship, flag-off via family_links.
+  await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId, {
+    identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+  });
 }
 
 type ConsentRouteEnv = {
