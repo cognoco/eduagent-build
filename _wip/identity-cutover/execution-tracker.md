@@ -96,7 +96,7 @@ sites across the app (the ~868 reference sites / 77 non-test files are the upper
 classify each: (a) existing `*V2` twin + branched call site = OK; (b) existing twin,
 unbranched call site = wire-up; (c) **no twin = build** (TDD; ownership-scoping
 security-sensitive). Output sizes + sequences all downstream WPs. **Fold in the pre-graph
-401 fix (`de8df6e86`) as slice-1.** — *Cosmo: WP-1 (TBD), Stage=Ready.*
+401 fix (`de8df6e86`) as slice-1.** — *Cosmo: **WI-765**, Stage=Backlog (shepherd refines to Ready).*
 
 ### WP-2…N — Domain-wise reader/writer cutover  (firmed off WP-1, not pre-guessed)
 Domain-grouped PRs migrating readers/writers to v2 + building missing twins, TDD on the
@@ -115,8 +115,8 @@ to numbered `0117`/`0118` → prod cutover (prod near-empty; non-gating to close
 
 ## 5. Current position — pick up here
 - **2026-06-15 — PRG-06 STOOD UP (Cosmo structure live).** B ruled (new PRG ∥ PRG-01; WI-586
-  emigrates here; PRG-01 graduates). **Done:** Cosmo **Workstream "Identity Cutover"**
-  (`3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`); **WP-1** enumeration Item
+  emigrates here; PRG-01 graduates). **Done:** Cosmo **Workstream "Identity Cutover" (WS-18)**
+  (`3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`); **WP-1 = WI-765** enumeration Item
   (`3808bce9-1f7c-816f-b1e8-f984b8dd3545`, `Stage=Backlog`, order 1); **WI-586 + its 2 sub-items
   moved in**, WI-586 Blocked-by re-pointed to WP-1, Description corrected; roster PRG-06 row +
   queue + change log updated. **Pending:** PRG-01 Cosmo graduation (WS-9 open-WI audit →

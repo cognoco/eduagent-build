@@ -229,8 +229,8 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   canon, do not inherit S0–S6.
 - **Decomposition:** `_wip/identity-cutover/execution-tracker.md` (charter / canon authority /
   slice / launch gate) + parked `shepherd-kickoff.md`. Cosmo **Workstream "Identity Cutover"**
-  (`3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`) with **WP-1** (enumerate the breaking reader/writer
-  set, `Stage=Backlog`, order 1) + **WI-586** (moved in, with its 2 sub-items).
+  (WS-18, `3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`) with **WP-1 = WI-765** (enumerate the breaking
+  reader/writer set, `Stage=Backlog`, order 1) + **WI-586** (moved in, with its 2 sub-items).
 - **Launch gate:** shepherd NOT launched until **ADR-0020/0021/0022 cleanup operator-confirmed
   complete** (those three were reverse-engineered from S0–S6; re-vetting in a separate session →
   trusted canon once done).
