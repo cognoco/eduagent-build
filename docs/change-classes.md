@@ -37,6 +37,32 @@ scripts/check-change-class.sh --branch     # check all changes vs main
 | **eval-harness** | `apps/api/eval-llm/**` (non-snapshots) | `eval:llm` | — | |
 | **test-infra** | `packages/test-utils/**`, `packages/factory/**` | `test:api:unit`, `test:mobile:unit` | `test:api:integration` | |
 
+## Flag-ON Integration Lane (advisory / WI-789)
+
+The `integration-flag-on` CI job (`Flag-ON integration (IDENTITY_V2_ENABLED)`)
+runs the full integration suite with `IDENTITY_V2_ENABLED=true` against a fresh
+committed-migration DB (`drizzle-kit migrate`). It is the first flag-ON coverage
+for the identity-v2 HTTP-route surface (diagnostic root `prg06ic-021`).
+
+**Current status: NON-BLOCKING** (`continue-on-error: true` in `ci.yml`).
+Reds here are expected diagnostic signal while WI-790/791/792/793 (D1-D4) and
+:709/FG1 defects exist. They do not fail the `main` job or block unrelated PRs.
+
+**How to flip to REQUIRED (WI-586/WP-FLAG close gate):**
+
+Mirrors the i18n-ratchet precedent (`pnpm audit (High+, advisory)` and
+`sync-skills orphan check (advisory)` — both started `continue-on-error` and
+are promoted to required once blocking reds resolve).
+
+1. Confirm all D1-D4/FG1/:709 defect WIs are green on this job (watch the
+   "Flag-ON integration (IDENTITY_V2_ENABLED)" check in GitHub PR checks).
+2. Remove `continue-on-error: true` from the `integration-flag-on` job in
+   `.github/workflows/ci.yml`.
+3. Add `Flag-ON integration (IDENTITY_V2_ENABLED)` to branch protection
+   required-status-checks: GitHub Settings → Branches → main → Edit →
+   "Require status checks to pass" → search by name → add.
+4. This job is then the WI-586/WP-FLAG close gate.
+
 ## What the Commit / Push Hooks Already Cover
 
 The **pre-commit** hook (`.husky/pre-commit`) runs cheap, staged-only guards:
