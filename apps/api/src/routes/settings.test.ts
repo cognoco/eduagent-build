@@ -198,6 +198,7 @@ describe('settings routes', () => {
       'profile-1',
       'test-account-id',
       true,
+      { identityV2Enabled: false },
     );
   });
 

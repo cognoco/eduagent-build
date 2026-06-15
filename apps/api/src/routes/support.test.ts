@@ -182,6 +182,7 @@ describe('POST /outbox-spillover', () => {
       'test-account-id',
       'support_outbox_spillover',
       { hours: 1, maxCount: 20 },
+      { identityV2Enabled: false },
     );
     expect(mockRecordOutboxSpillover).toHaveBeenCalledTimes(1);
   });

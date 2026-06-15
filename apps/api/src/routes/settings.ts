@@ -51,6 +51,7 @@ import {
   setNativeLanguage,
 } from '../services/retention-data';
 import { forbidden, notFound, NotFoundError } from '../errors';
+import { isIdentityV2Enabled } from '../config';
 
 type SettingsRouteEnv = {
   Bindings: {
@@ -59,6 +60,7 @@ type SettingsRouteEnv = {
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -97,6 +99,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         profileId,
         accountId,
         body,
+        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
       );
       return c.json(getNotificationsResponseSchema.parse({ preferences }));
     },
@@ -152,6 +155,11 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
             profileId,
             accountId,
             body.celebrationLevel,
+            {
+              identityV2Enabled: isIdentityV2Enabled(
+                c.env?.IDENTITY_V2_ENABLED,
+              ),
+            },
           );
       return c.json(getCelebrationLevelResponseSchema.parse(result));
     },
@@ -187,6 +195,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           profileId,
           accountId,
           body.value,
+          {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          },
         );
         return c.json(
           updateWithdrawalArchivePreferenceResponseSchema.parse(result),
@@ -210,6 +221,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         db,
         profileId,
         accountId,
+        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
       );
       return c.json(
         getFamilyPoolBreakdownSharingResponseSchema.parse({ value }),
@@ -239,6 +251,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           profileId,
           accountId,
           body.value,
+          {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          },
         );
         return c.json(
           updateFamilyPoolBreakdownSharingResponseSchema.parse(result),
@@ -263,7 +278,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
-      await registerPushToken(db, profileId, accountId, body.token);
+      await registerPushToken(db, profileId, accountId, body.token, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       return c.json(
         pushTokenRegisteredResponseSchema.parse({ registered: true }),
       );

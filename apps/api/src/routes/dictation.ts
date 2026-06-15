@@ -33,6 +33,7 @@ import { getLearningProfile } from '../services/learner-profile';
 import { checkAndLogRateLimit } from '../services/settings';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
+import { isIdentityV2Enabled } from '../config';
 
 const logger = createLogger();
 
@@ -55,6 +56,7 @@ type DictationRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -234,6 +236,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         account.id,
         'dictation_review',
         { hours: 1 / 60, maxCount: 10 },
+        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
       );
       if (rateLimited) {
         return apiError(

@@ -374,6 +374,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
+        { identityV2Enabled: false },
       );
       // Family-link check is not required for self-scoped routes.
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
@@ -396,6 +397,7 @@ describe('learner-profile routes', () => {
         PARENT_PROFILE_ID,
         'test-account-id',
         'granted',
+        { identityV2Enabled: false },
       );
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });
@@ -424,6 +426,7 @@ describe('learner-profile routes', () => {
         'dinosaurs',
         true,
         undefined,
+        { identityV2Enabled: false },
       );
     });
 
@@ -461,6 +464,7 @@ describe('learner-profile routes', () => {
         PARENT_PROFILE_ID,
         'test-account-id',
         'short-burst',
+        { identityV2Enabled: false },
       );
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });

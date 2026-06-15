@@ -11,6 +11,7 @@ import {
   learningModes,
   learningProfiles,
   profiles,
+  membership,
   withdrawalArchivePreferences,
   familyPreferences,
   type Database,
@@ -23,6 +24,21 @@ import type {
 } from '@eduagent/schemas';
 import { ForbiddenError } from '@eduagent/schemas';
 import { assertParentAccess } from './family-access';
+import {
+  verifyPersonOwnershipV2,
+  verifyPersonIsOrgAdminV2,
+} from './identity-v2/ownership-v2';
+
+/**
+ * Identity-v2 dispatch options threaded from the route layer. When
+ * `identityV2Enabled` is true, the ownership guards scope to the caller's
+ * organization via `membership` (account.id = organization.id) instead of the
+ * legacy `profiles.accountId` column. Default-off keeps the legacy path
+ * byte-identical until WP-FLAG.
+ */
+export interface IdentityV2Opts {
+  identityV2Enabled?: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,7 +86,13 @@ async function verifyProfileOwnership(
   db: Database,
   profileId: string,
   accountId: string,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
+  if (opts?.identityV2Enabled) {
+    // v2: account.id = organization.id; ownership = membership in the org.
+    await verifyPersonOwnershipV2(db, profileId, accountId);
+    return;
+  }
   const [owner] = await db
     .select({ id: profiles.id })
     .from(profiles)
@@ -78,6 +100,28 @@ async function verifyProfileOwnership(
   if (!owner) {
     throw new Error(`Profile ${profileId} not found for account`);
   }
+}
+
+/**
+ * Whether the profile is the account/org owner. Legacy reads
+ * `profiles.isOwner`; v2 reads `membership.roles @> '{admin}'` scoped to the
+ * caller's org (data-model.md §2B.3: is_owner → admin membership). `accountId`
+ * is the caller's resolved org id under v2 (account.id = organization.id).
+ */
+async function isProfileOwner(
+  db: Database,
+  profileId: string,
+  accountId: string,
+  opts?: IdentityV2Opts,
+): Promise<boolean> {
+  if (opts?.identityV2Enabled) {
+    return verifyPersonIsOrgAdminV2(db, profileId, accountId);
+  }
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { isOwner: true },
+  });
+  return profile?.isOwner ?? false;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,8 +154,9 @@ export async function upsertNotificationPrefs(
   profileId: string,
   accountId: string,
   input: NotificationPrefsInput,
+  opts?: IdentityV2Opts,
 ): Promise<NotificationPrefs> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   const existing = await db.query.notificationPreferences.findFirst({
     where: eq(notificationPreferences.profileId, profileId),
   });
@@ -147,17 +192,31 @@ export async function upsertNotificationPrefs(
       .where(
         and(
           eq(notificationPreferences.profileId, profileId),
-          exists(
-            db
-              .select({ _: sql`1` })
-              .from(profiles)
-              .where(
-                and(
-                  eq(profiles.id, profileId),
-                  eq(profiles.accountId, accountId),
-                ),
+          opts?.identityV2Enabled
+            ? // v2 defense-in-depth: enforce the person↔org link via an EXISTS
+              // subquery against membership (account.id = organization.id).
+              exists(
+                db
+                  .select({ _: sql`1` })
+                  .from(membership)
+                  .where(
+                    and(
+                      eq(membership.personId, profileId),
+                      eq(membership.organizationId, accountId),
+                    ),
+                  ),
+              )
+            : exists(
+                db
+                  .select({ _: sql`1` })
+                  .from(profiles)
+                  .where(
+                    and(
+                      eq(profiles.id, profileId),
+                      eq(profiles.accountId, accountId),
+                    ),
+                  ),
               ),
-          ),
         ),
       )
       .returning({ id: notificationPreferences.id });
@@ -175,12 +234,22 @@ export async function upsertNotificationPrefs(
     // [BUG-661] Same defense-in-depth on insert: verify profile ownership
     // immediately before write to close the read-then-write TOCTOU window
     // (in addition to verifyProfileOwnership at the top of the function).
-    const [ownerCheck] = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(
-        and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
-      );
+    const [ownerCheck] = opts?.identityV2Enabled
+      ? await db
+          .select({ id: membership.personId })
+          .from(membership)
+          .where(
+            and(
+              eq(membership.personId, profileId),
+              eq(membership.organizationId, accountId),
+            ),
+          )
+      : await db
+          .select({ id: profiles.id })
+          .from(profiles)
+          .where(
+            and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
+          );
     if (!ownerCheck) {
       throw new Error(
         `notification_preferences upsert blocked: profile ${profileId} not owned by account ${accountId}`,
@@ -269,8 +338,9 @@ export async function upsertCelebrationLevel(
   profileId: string,
   accountId: string,
   celebrationLevel: CelebrationLevel,
+  opts?: IdentityV2Opts,
 ): Promise<{ celebrationLevel: CelebrationLevel }> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   const existing = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
   });
@@ -328,14 +398,11 @@ export async function upsertWithdrawalArchivePreference(
   ownerProfileId: string,
   accountId: string,
   value: WithdrawalArchivePreference,
+  opts?: IdentityV2Opts,
 ): Promise<{ value: WithdrawalArchivePreference }> {
-  await verifyProfileOwnership(db, ownerProfileId, accountId);
+  await verifyProfileOwnership(db, ownerProfileId, accountId, opts);
 
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, ownerProfileId),
-    columns: { isOwner: true },
-  });
-  if (!profile?.isOwner) {
+  if (!(await isProfileOwner(db, ownerProfileId, accountId, opts))) {
     throw new ForbiddenError('Profile owner required');
   }
 
@@ -370,14 +437,11 @@ export async function getOwnedFamilyPoolBreakdownSharing(
   db: Database,
   ownerProfileId: string,
   accountId: string,
+  opts?: IdentityV2Opts,
 ): Promise<boolean> {
-  await verifyProfileOwnership(db, ownerProfileId, accountId);
+  await verifyProfileOwnership(db, ownerProfileId, accountId, opts);
 
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, ownerProfileId),
-    columns: { isOwner: true },
-  });
-  if (!profile?.isOwner) {
+  if (!(await isProfileOwner(db, ownerProfileId, accountId, opts))) {
     throw new ForbiddenError('Profile owner required');
   }
 
@@ -389,14 +453,11 @@ export async function upsertFamilyPoolBreakdownSharing(
   ownerProfileId: string,
   accountId: string,
   value: boolean,
+  opts?: IdentityV2Opts,
 ): Promise<{ value: boolean }> {
-  await verifyProfileOwnership(db, ownerProfileId, accountId);
+  await verifyProfileOwnership(db, ownerProfileId, accountId, opts);
 
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, ownerProfileId),
-    columns: { isOwner: true },
-  });
-  if (!profile?.isOwner) {
+  if (!(await isProfileOwner(db, ownerProfileId, accountId, opts))) {
     throw new ForbiddenError('Profile owner required');
   }
 
@@ -467,8 +528,9 @@ export async function registerPushToken(
   profileId: string,
   accountId: string,
   token: string,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   const existing = await db.query.notificationPreferences.findFirst({
     where: eq(notificationPreferences.profileId, profileId),
   });
@@ -642,8 +704,9 @@ export async function checkAndLogRateLimit(
   accountId: string,
   type: NotificationPayload['type'],
   opts: { hours: number; maxCount: number },
+  identityOpts?: IdentityV2Opts,
 ): Promise<boolean> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, identityOpts);
   return db.transaction(async (tx) => {
     // Advisory lock per (profileId, notificationKey) — serializes concurrent
     // rate-limit checks for the same bucket without blocking unrelated ones.

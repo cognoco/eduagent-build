@@ -9,6 +9,7 @@ import { recordOutboxSpillover } from '../services/support/spillover';
 import { createLogger } from '../services/logger';
 import { checkAndLogRateLimit } from '../services/settings';
 import { apiError } from '../errors';
+import { isIdentityV2Enabled } from '../config';
 import { outboxSpilloverResultSchema, ERROR_CODES } from '@eduagent/schemas';
 
 const logger = createLogger();
@@ -46,6 +47,9 @@ const SPILLOVER_WINDOW_HOURS = 1;
 const SPILLOVER_RETRY_AFTER_SECONDS = SPILLOVER_WINDOW_HOURS * 60 * 60;
 
 type SupportRouteEnv = {
+  Bindings: {
+    IDENTITY_V2_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -72,6 +76,7 @@ export const supportRoutes = new Hono<SupportRouteEnv>().post(
       account.id,
       'support_outbox_spillover',
       { hours: SPILLOVER_WINDOW_HOURS, maxCount: SPILLOVER_MAX_PER_HOUR },
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     if (rateLimited) {
       c.header('Retry-After', String(SPILLOVER_RETRY_AFTER_SECONDS));

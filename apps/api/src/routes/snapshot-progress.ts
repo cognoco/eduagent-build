@@ -26,9 +26,14 @@ import {
   refreshProgressSnapshot,
 } from '../services/snapshot-aggregation';
 import { checkAndLogRateLimit } from '../services/settings';
+import { isIdentityV2Enabled } from '../config';
 
 type SnapshotProgressRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    IDENTITY_V2_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -102,6 +107,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
       requireAccount(c.get('account')).id,
       'progress_refresh',
       { hours: 1, maxCount: 10 },
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     if (rateLimited) {
       return apiError(

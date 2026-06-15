@@ -38,8 +38,20 @@ import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { isGdprProcessingAllowed } from './consent';
+import { verifyPersonOwnershipV2 } from './identity-v2/ownership-v2';
 
 const logger = createLogger();
+
+/**
+ * Identity-v2 dispatch options threaded from the route layer. When
+ * `identityV2Enabled` is true, the ownership guard scopes to the caller's
+ * organization via `membership` (account.id = organization.id) instead of the
+ * legacy `profiles.accountId` column. Default-off keeps the legacy path
+ * byte-identical until WP-FLAG.
+ */
+export interface IdentityV2Opts {
+  identityV2Enabled?: boolean;
+}
 
 const MAX_INTERESTS = 20;
 const MAX_COMMUNICATION_NOTES = 10;
@@ -1123,8 +1135,14 @@ async function verifyProfileOwnership(
   db: Database,
   profileId: string,
   accountId: string | undefined,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
   if (!accountId) return; // skipped when caller has verified via parent chain (assertParentAccess)
+  if (opts?.identityV2Enabled) {
+    // v2: account.id = organization.id; ownership = membership in the org.
+    await verifyPersonOwnershipV2(db, profileId, accountId);
+    return;
+  }
   const [owner] = await db
     .select({ id: profiles.id })
     .from(profiles)
@@ -1443,8 +1461,9 @@ export async function deleteMemoryItem(
   value: string,
   suppress = false,
   subject?: string,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   await db.transaction(async (tx) => {
     const [profile] = await tx
       .select()
@@ -1516,8 +1535,9 @@ export async function unsuppressInference(
   profileId: string,
   accountId: string | undefined,
   value: string,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   await db.transaction(async (tx) => {
     const [profile] = await tx
       .select()
@@ -1546,8 +1566,9 @@ export async function toggleMemoryCollection(
   profileId: string,
   accountId: string | undefined,
   enabled: boolean,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   const profile = await getOrCreateLearningProfile(db, profileId);
   const memoryConsentStatus: MemoryConsentStatus = enabled
     ? 'granted'
@@ -1571,8 +1592,9 @@ export async function toggleMemoryInjection(
   profileId: string,
   accountId: string | undefined,
   enabled: boolean,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   const profile = await getOrCreateLearningProfile(db, profileId);
 
   // [F-PV-09] Refuse to enable injection when consent is not granted.
@@ -1596,8 +1618,9 @@ export async function grantMemoryConsent(
   profileId: string,
   accountId: string | undefined,
   consent: 'granted' | 'declined',
+  opts?: IdentityV2Opts,
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   await getOrCreateLearningProfile(db, profileId);
   const granted = consent === 'granted';
 
@@ -1626,8 +1649,9 @@ export async function deleteAllMemory(
   db: Database,
   profileId: string,
   accountId: string | undefined,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   await db.transaction(async (tx) => {
     await tx.delete(memoryFacts).where(eq(memoryFacts.profileId, profileId));
     await tx
@@ -1941,8 +1965,9 @@ export async function updateAccommodationMode(
   profileId: string,
   accountId: string | undefined,
   mode: AccommodationMode,
+  opts?: IdentityV2Opts,
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, accountId);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   // FR253.4: create row if it doesn't exist
   await getOrCreateLearningProfile(db, profileId);
 
