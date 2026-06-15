@@ -9,33 +9,38 @@ Codex review agents to run `cosmo:review`.
 - **Active watcher process:** tmux session `cosmo-review-watcher` running
   `bun _wip/identity-foundation/review-watcher-v3.ts` from
   `/Users/vetinari/nexus/_dev/eduagent-build`.
-- **Active process ID at last check:** tmux wrapper `84057`, Bun process `84058`.
+- **Active process ID at last check:** Bun process `14930` after the
+  2026-06-14 WS-17 restart.
 - **Current scope:** one watcher covers `Identity Foundation`,
-  `L10n & A11y Mobile`, `API Error Handling`,
+  `Identity Cutover`, `L10n & A11y Mobile`, `API Error Handling`,
   `Inngest Security & Correctness`, `API Security & PII`
-  (`security-pii-api` slug), and `Architecture Clean-Out`.
+  (`security-pii-api` slug), `Architecture Clean-Out`, and
+  `Agent Instructions` (`WS-17`).
 - **Trigger:** work item relation is in monitored Workstream and `Stage`
   transitions into `Reviewing`.
 - **Runner:** launches `codex -a never exec --ephemeral ...` with a generated
   prompt and `shell_environment_policy.inherit="all"` so `NOTION_TOKEN` is
   available.
-- **Review action:** review agent reads the `cosmo:review` skill, gathers DoD
-  evidence, then applies `done`, `rework`, or `human`.
+- **Review action:** review agent reads `cosmo:qa` and `cosmo:review`, gathers
+  QA/DoD evidence, then applies `done`, `rework`, or `human` through review.
 
 ## Durable repo artifacts
 
 - `_wip/identity-foundation/review-watcher-v3.ts`
   - Current monitor/launcher script.
-  - Monitors `Identity Foundation`, `L10n & A11y Mobile`,
+  - Monitors `Identity Foundation`, `Identity Cutover`, `L10n & A11y Mobile`,
     `API Error Handling`, `Inngest Security & Correctness`, and
-    `API Security & PII`, and `Architecture Clean-Out`.
+    `API Security & PII`, `Architecture Clean-Out`, and
+    `Agent Instructions`.
   - Hardcoded workstream page ids:
     `37b8bce9-1f7c-81c2-bb42-cf7f47f839cc` and
+    `3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`, and
     `37c8bce9-1f7c-8169-8ce1-ddcf36b470c9`, and
     `37c8bce9-1f7c-817c-98ec-d1d4ba0a15e3`,
     `37c8bce9-1f7c-81d7-9377-e79356055ff3`, and
     `37e8bce9-1f7c-8161-a3fc-c74c5300a88f`, and
-    `37e8bce9-1f7c-81fe-be97-e063ce8f17e8`.
+    `37e8bce9-1f7c-81fe-be97-e063ce8f17e8`, and
+    `37f8bce9-1f7c-811d-b22f-e5d97d4b1951`.
   - Hardcoded Work Items DB id:
     `f170be9e04ae45d4961828f2438666bd`.
   - Hardcoded special override ids: `WI-585`, `WI-586`.
@@ -70,11 +75,13 @@ These are not durable repo state.
 Base prompt:
 
 ```text
-Live Cosmo watcher trigger for WI-NNN — Identity Foundation work item newly entered Stage=Reviewing. Execute the cosmo:review skill for real, not merely a mechanical check. Run from /Users/vetinari/nexus/_dev/eduagent-build. Follow repo AGENTS.md/RTK guidance and the cosmo:review skill exactly.
+Live Cosmo watcher trigger for WI-NNN — Identity Foundation work item newly entered Stage=Reviewing. Execute the cosmo:qa evidence pass and the cosmo:review disposition for real, not merely a mechanical check. Run from /Users/vetinari/nexus/_dev/eduagent-build. Follow repo AGENTS.md/RTK guidance and the cosmo:qa and cosmo:review skills exactly.
 
-Gather evidence for the manual checklist: read the completion summary/page, identify Fixed In/PR, verify PR merged/CI green if applicable, map Acceptance Criteria to evidence, and verify the original symptom/source artifact as far as possible.
+First run /cosmo:qa-style verification: read the completion summary/page, identify Fixed In/PR, verify cited commits/files/tests against the repo, re-run focused relevant tests where practical, and gather AC/source-artifact evidence. Post or cite the QA evidence where appropriate, but remember QA itself never transitions the item.
 
-If DoD passes with evidence, apply disposition done. If evidence fails, apply rework with a precise note. If you cannot responsibly decide automatically, apply human with a precise note.
+Then run /cosmo:review-style disposition: verify PR merged/CI green if applicable, map Acceptance Criteria to evidence, and verify the original symptom/source artifact as far as possible.
+
+If DoD and QA evidence pass, apply disposition done. If evidence fails, apply rework with a precise note and move the item Reviewing -> Executing through cosmo:review. If you cannot responsibly decide automatically, apply human with a precise note.
 
 Do not edit code. Do not revert or overwrite unrelated edits. Return the disposition, evidence gathered, commands run, any override applied, and any Cosmo mutation made.
 ```
@@ -136,6 +143,12 @@ const workstreams = [
     ]),
   },
   {
+    name: "Identity Cutover",
+    slug: "identity-cutover",
+    id: "3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8",
+    overrides: new Map(),
+  },
+  {
     name: "L10n & A11y Mobile",
     id: "37c8bce9-1f7c-8169-8ce1-ddcf36b470c9",
     overrides: new Map(),
@@ -160,6 +173,12 @@ const workstreams = [
     name: "Architecture Clean-Out",
     slug: "architecture-clean-out",
     id: "37e8bce9-1f7c-81fe-be97-e063ce8f17e8",
+    overrides: new Map(),
+  },
+  {
+    name: "Agent Instructions",
+    slug: "agent-instructions",
+    id: "37f8bce9-1f7c-811d-b22f-e5d97d4b1951",
     overrides: new Map(),
   },
 ];

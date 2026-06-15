@@ -31,6 +31,12 @@ const workstreams: Workstream[] = [
     ]),
   },
   {
+    name: "Identity Cutover",
+    slug: "identity-cutover",
+    id: "3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8",
+    overrides: new Map(),
+  },
+  {
     name: "L10n & A11y Mobile",
     slug: "l10n-a11y-mobile",
     id: "37c8bce9-1f7c-8169-8ce1-ddcf36b470c9",
@@ -58,6 +64,12 @@ const workstreams: Workstream[] = [
     name: "Architecture Clean-Out",
     slug: "architecture-clean-out",
     id: "37e8bce9-1f7c-81fe-be97-e063ce8f17e8",
+    overrides: new Map(),
+  },
+  {
+    name: "Agent Instructions",
+    slug: "agent-instructions",
+    id: "37f8bce9-1f7c-811d-b22f-e5d97d4b1951",
     overrides: new Map(),
   },
 ];
@@ -143,11 +155,13 @@ Operator-authorized experimental DoD override for ${id} only:
 }
 
 function promptFor(ws: Workstream, id: string) {
-  return `Live Cosmo watcher trigger for ${id} — ${ws.name} work item newly entered Stage=Reviewing. Execute the cosmo:review skill for real, not merely a mechanical check. Run from ${repo}. Follow repo AGENTS.md/RTK guidance and the cosmo:review skill exactly.${overrideNotice(ws, id)}
+  return `Live Cosmo watcher trigger for ${id} — ${ws.name} work item newly entered Stage=Reviewing. Execute the cosmo:qa evidence pass and the cosmo:review disposition for real, not merely a mechanical check. Run from ${repo}. Follow repo AGENTS.md/RTK guidance and the cosmo:qa and cosmo:review skills exactly.${overrideNotice(ws, id)}
 
-Gather evidence for the manual checklist: read the completion summary/page, identify Fixed In/PR, verify PR merged/CI green if applicable, map Acceptance Criteria to evidence, and verify the original symptom/source artifact as far as possible.
+First run /cosmo:qa-style verification: read the completion summary/page, identify Fixed In/PR, verify cited commits/files/tests against the repo, re-run focused relevant tests where practical, and gather AC/source-artifact evidence. Post or cite the QA evidence where appropriate, but remember QA itself never transitions the item.
 
-If DoD passes with evidence, apply disposition done. If evidence fails, apply rework with a precise note. If you cannot responsibly decide automatically, apply human with a precise note.
+Then run /cosmo:review-style disposition: verify PR merged/CI green if applicable, map Acceptance Criteria to evidence, and verify the original symptom/source artifact as far as possible.
+
+If DoD and QA evidence pass, apply disposition done. If evidence fails, apply rework with a precise note and move the item Reviewing -> Executing through cosmo:review. If you cannot responsibly decide automatically, apply human with a precise note.
 
 Do not edit code. Do not revert or overwrite unrelated edits. Return the disposition, evidence gathered, commands run, any override applied, and any Cosmo mutation made.`;
 }
