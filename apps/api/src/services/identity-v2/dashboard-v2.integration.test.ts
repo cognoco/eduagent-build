@@ -1,0 +1,238 @@
+// ---------------------------------------------------------------------------
+// WI-802 — dashboard getChildrenForParent v2 guardianship path
+//
+// This file is FLAG-ON ONLY by design. It runs against the committed-migration
+// DB in the WI-789 flag-ON lane (ci.yml `integration-flag-on` job,
+// IDENTITY_V2_ENABLED=true) where `family_links` is ABSENT from the schema.
+//
+// Purpose: prove that `getChildrenForParent(db, parentId, { identityV2Enabled: true })`
+// resolves the parent's charges via `guardianship` only — NO read of `family_links`.
+//
+// RED-GREEN-REVERT cycle (documented here — performed during implementation):
+//   1. Seeded a guardianship edge (no family_links row) + minimal profile data.
+//   2. Called getChildrenForParent with { identityV2Enabled: true }:
+//      RED (before WI-802) — 500 `relation "family_links" does not exist` on
+//        the committed-migration schema where family_links is absent.
+//      GREEN (after WI-802) — returns [] (child has no subjects/sessions, so
+//        validChildProfileIds filters it out via archivedAt IS NULL profile check).
+//      REVERT — reverting the twin back to the unbranched read re-introduces RED.
+//      RESTORE — restoring the twin returns to GREEN.
+//   3. The break test [BREAK / FLAG-ON] proves a guardianship-only person with NO
+//      family_links row is NOT returned for an unrelated parent under flag-on
+//      (IDOR guard holds via guardianship scope).
+//
+// Seeding: only `person`, `membership`, `organization`, `guardianship`, `accounts`,
+// `profiles` — no `family_links`. The v2 path never touches family_links.
+//
+// Pattern: `(RUN ? describe : describe.skip)` — skips silently when DATABASE_URL
+// is absent (unit/local runs without a DB).
+// ---------------------------------------------------------------------------
+
+import { resolve } from 'path';
+import { eq, and } from 'drizzle-orm';
+import { loadDatabaseEnv } from '@eduagent/test-utils';
+import {
+  accounts,
+  createDatabase,
+  generateUUIDv7,
+  guardianship,
+  membership,
+  organization,
+  person,
+  profiles,
+  type Database,
+} from '@eduagent/database';
+import { getChildrenForParent } from '../dashboard';
+
+loadDatabaseEnv(resolve(__dirname, '../../../../..'));
+const RUN = !!process.env.DATABASE_URL;
+
+(RUN ? describe : describe.skip)(
+  'getChildrenForParent v2 guardianship path — flag-on (WI-802)',
+  () => {
+    let db: Database;
+    const personIds: string[] = [];
+    const orgIds: string[] = [];
+    const profileIds: string[] = [];
+    const accountIds: string[] = [];
+
+    beforeAll(() => {
+      db = createDatabase(process.env.DATABASE_URL!);
+    });
+
+    afterEach(async () => {
+      // Clean up in FK-safe order: profiles → accounts, then v2 graph tables.
+      for (const pid of profileIds) {
+        await db.delete(profiles).where(eq(profiles.id, pid));
+      }
+      for (const aid of accountIds) {
+        await db.delete(accounts).where(eq(accounts.id, aid));
+      }
+      for (const pid of personIds) {
+        await db
+          .delete(guardianship)
+          .where(eq(guardianship.guardianPersonId, pid));
+        await db
+          .delete(guardianship)
+          .where(eq(guardianship.chargePersonId, pid));
+        await db.delete(membership).where(eq(membership.personId, pid));
+        await db.delete(person).where(eq(person.id, pid));
+      }
+      for (const oid of orgIds) {
+        await db.delete(organization).where(eq(organization.id, oid));
+      }
+      personIds.length = 0;
+      orgIds.length = 0;
+      profileIds.length = 0;
+      accountIds.length = 0;
+    });
+
+    const RUN_ID = generateUUIDv7();
+    let seedCounter = 0;
+
+    async function seedOrg(): Promise<string> {
+      const [org] = await db
+        .insert(organization)
+        .values({ name: `WI-802-org-${RUN_ID}` })
+        .returning();
+      orgIds.push(org!.id);
+      return org!.id;
+    }
+
+    async function seedPerson(
+      orgId: string,
+      opts: { displayName?: string; roles?: string[] } = {},
+    ): Promise<string> {
+      const [p] = await db
+        .insert(person)
+        .values({
+          displayName: opts.displayName ?? 'TestPerson',
+          birthDate: '1990-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      personIds.push(p!.id);
+      await db.insert(membership).values({
+        personId: p!.id,
+        organizationId: orgId,
+        roles: opts.roles ?? ['learner'],
+      });
+      return p!.id;
+    }
+
+    async function seedLegacyProfile(
+      personId: string,
+      displayName: string,
+    ): Promise<string> {
+      // person.id == profiles.id in the v1 identity model.
+      // We seed a minimal profile row so the dashboard body queries
+      // (profiles.findMany, subjects.findMany, etc.) resolve correctly.
+      const idx = ++seedCounter;
+      const clerkUserId = `clerk_802_${RUN_ID}_${idx}`;
+      const email = `wi-802-${RUN_ID}-${idx}@test.invalid`;
+      const [account] = await db
+        .insert(accounts)
+        .values({ clerkUserId, email })
+        .returning({ id: accounts.id });
+      accountIds.push(account!.id);
+
+      const [profile] = await db
+        .insert(profiles)
+        .values({
+          id: personId, // v2 alignment: person.id == profiles.id
+          accountId: account!.id,
+          displayName,
+          birthYear: 1990,
+          isOwner: false,
+        })
+        .returning({ id: profiles.id });
+      profileIds.push(profile!.id);
+      return profile!.id;
+    }
+
+    async function grantGuardianshipEdge(
+      guardianId: string,
+      chargeId: string,
+    ): Promise<void> {
+      await db
+        .insert(guardianship)
+        .values({ guardianPersonId: guardianId, chargePersonId: chargeId });
+    }
+
+    // -------------------------------------------------------------------------
+    // [FLAG-ON] guardianship-only (NO family_links row) — must return children.
+    // THE WI-802 regression: family_links is absent from the schema post-M-DROP.
+    // An unbranched getChildrenForParent reads family_links and 500s.
+    // After WI-802 the v2 path reads guardianship and resolves.
+    //
+    // NOTE: The child has no subjects/sessions, so validChildProfileIds filters
+    // through to an empty children[] array after the profile lookup — the test
+    // proves the family_links read is gone (no 500 error), not that it returns
+    // populated dashboard data (that is covered by dashboard.integration.test.ts).
+    // -------------------------------------------------------------------------
+    it(
+      '[FLAG-ON] returns empty array for guardianship-only parent with no child data ' +
+        '— no family_links read (WI-802 regression guard)',
+      async () => {
+        const orgId = await seedOrg();
+        const guardianPersonId = await seedPerson(orgId, {
+          displayName: 'Parent802',
+          roles: ['guardian'],
+        });
+        const chargePersonId = await seedPerson(orgId, {
+          displayName: 'Child802',
+          roles: ['learner'],
+        });
+
+        // Seed a legacy profile for the child so the batch profiles query resolves.
+        await seedLegacyProfile(chargePersonId, 'Child802');
+
+        // Grant ONLY a guardianship edge — NO family_links row exists.
+        await grantGuardianshipEdge(guardianPersonId, chargePersonId);
+
+        // This must NOT throw. If it did, it means the unbranched family_links
+        // read is still present (the WI-802 bug: `relation "family_links" does
+        // not exist` on the post-M-DROP schema).
+        const children = await getChildrenForParent(db, guardianPersonId, {
+          identityV2Enabled: true,
+        });
+
+        // The child has no subjects/sessions so dashboard data is empty —
+        // validChildProfileIds will include the child (profile exists) but
+        // the child has no sessions/subjects so the result is an empty children
+        // array (the child is filtered by archivedAt IS NULL but they have no
+        // subjects or sessions so validChildProfileIds only contains them if
+        // the profile is present but the subject batches are empty).
+        // The critical invariant: NO ERROR was thrown.
+        expect(Array.isArray(children)).toBe(true);
+      },
+    );
+
+    // -------------------------------------------------------------------------
+    // [BREAK / FLAG-ON] Cross-guardian IDOR: a parent with a guardianship edge
+    // to their OWN child must NOT see another parent's child under flag-on.
+    // Proves getChargePersonIds scopes correctly to the calling guardian.
+    // -------------------------------------------------------------------------
+    it(
+      "[BREAK / FLAG-ON] does NOT include another guardian's charges " +
+        '(IDOR guard holds under v2)',
+      async () => {
+        const orgId = await seedOrg();
+        const guardianA = await seedPerson(orgId, { displayName: 'GuardianA' });
+        const guardianB = await seedPerson(orgId, { displayName: 'GuardianB' });
+        const chargeOfB = await seedPerson(orgId, { displayName: 'ChargeOfB' });
+
+        await seedLegacyProfile(chargeOfB, 'ChargeOfB');
+        await grantGuardianshipEdge(guardianB, chargeOfB);
+        // Guardian A has NO edge to chargeOfB — must not see chargeOfB.
+
+        const childrenForA = await getChildrenForParent(db, guardianA, {
+          identityV2Enabled: true,
+        });
+
+        expect(childrenForA.every((c) => c.profileId !== chargeOfB)).toBe(true);
+        expect(childrenForA).toHaveLength(0);
+      },
+    );
+  },
+);

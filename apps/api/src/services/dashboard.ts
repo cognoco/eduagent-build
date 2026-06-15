@@ -75,6 +75,11 @@ import {
 } from './learner-profile';
 import { assertParentAccess } from './family-access';
 import {
+  getChildPersonIdsForParentV2,
+  getChildrenGdprConsentStatusesV2,
+  resolveOrgIdForPerson,
+} from './identity-v2/family-v2';
+import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from './curriculum-topic-ownership';
@@ -723,19 +728,27 @@ function parseSnapshotMetrics(input: unknown): ProgressMetrics {
 
 /**
  * Fetches aggregated dashboard data for all children linked to a parent.
+ *
+ * [WI-802] v2 seam: flag-on reads `guardianship` (active charges), flag-off
+ * reads legacy `family_links`. The rest of the function is byte-identical
+ * between the two paths.
  */
 export async function getChildrenForParent(
   db: Database,
   parentProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<DashboardChild[]> {
-  // 1. Query familyLinks for this parent
-  const links = await db.query.familyLinks.findMany({
-    where: eq(familyLinks.parentProfileId, parentProfileId),
-  });
-  if (links.length === 0) return [];
-
-  // Pre-fetch all subjects for all child profiles in a single query (avoids N+1)
-  const childProfileIds = links.map((l) => l.childProfileId);
+  // 1. Query familyLinks (legacy) or guardianship (v2) for this parent's children
+  let childProfileIds: string[];
+  if (opts?.identityV2Enabled) {
+    childProfileIds = await getChildPersonIdsForParentV2(db, parentProfileId);
+  } else {
+    const links = await db.query.familyLinks.findMany({
+      where: eq(familyLinks.parentProfileId, parentProfileId),
+    });
+    childProfileIds = links.map((l) => l.childProfileId);
+  }
+  if (childProfileIds.length === 0) return [];
   const allChildSubjects = await db.query.subjects.findMany({
     where: inArray(subjects.profileId, childProfileIds),
   });
@@ -790,8 +803,11 @@ export async function getChildrenForParent(
   // [PERF-BATCH] getOverallProgressBatch replaces N × getOverallProgress
   // calls with ~8 queries (constant count regardless of N children).
   // countGuidedMetricsBatch is already a single GROUP BY aggregate.
-  const validLinks = links.filter((l) => profilesById.has(l.childProfileId));
-  const validChildProfileIds = validLinks.map((l) => l.childProfileId);
+  // [WI-802] v2 path: filter childProfileIds by profilesById (same validity
+  // gate as the legacy validLinks filter — skip IDs with no matching profile).
+  const validChildProfileIds = childProfileIds.filter((id) =>
+    profilesById.has(id),
+  );
   const [progressByProfile, guidedMetricsByProfile] = await Promise.all([
     getOverallProgressBatch(db, validChildProfileIds),
     countGuidedMetricsBatch(db, validChildProfileIds, startOfLastWeek),
@@ -837,25 +853,45 @@ export async function getChildrenForParent(
   // [BUG-466] Filter to GDPR consent type only. Without this filter the first
   // row per profileId (ordered by requestedAt desc) could be a non-GDPR row
   // (e.g. COPPA), making dashboard show the wrong consent status.
-  const allConsentStates = await db.query.consentStates.findMany({
-    where: and(
-      inArray(consentStates.profileId, childProfileIds),
-      eq(consentStates.consentType, 'GDPR'),
-    ),
-    // [BUG-394] Stable tiebreak on id to make consent dedup deterministic when
-    // two rows share the same requestedAt timestamp.
-    orderBy: [desc(consentStates.requestedAt), desc(consentStates.id)],
-  });
+  //
+  // [WI-802] v2 seam: flag-on resolves consent via the canonical consent graph
+  // (consentGrant + basis-explicit resolver), flag-off reads legacy consentStates.
+  // respondedAt is set to null on the v2 path (basis-explicit resolution does not
+  // batch respondedAt without N queries per child — the dashboard countdown reads
+  // it but degrades gracefully to null, matching the pre-consent-grant state).
   const consentByProfile = new Map<
     string,
     { status: ConsentStatus; respondedAt: Date | null }
   >();
-  for (const state of allConsentStates) {
-    if (!consentByProfile.has(state.profileId)) {
-      consentByProfile.set(state.profileId, {
-        status: state.status,
-        respondedAt: state.respondedAt ?? null,
-      });
+  if (opts?.identityV2Enabled) {
+    const orgId = await resolveOrgIdForPerson(db, parentProfileId);
+    if (orgId && childProfileIds.length > 0) {
+      const v2Statuses = await getChildrenGdprConsentStatusesV2(
+        db,
+        orgId,
+        childProfileIds,
+      );
+      for (const [childId, status] of v2Statuses) {
+        consentByProfile.set(childId, { status, respondedAt: null });
+      }
+    }
+  } else {
+    const allConsentStates = await db.query.consentStates.findMany({
+      where: and(
+        inArray(consentStates.profileId, childProfileIds),
+        eq(consentStates.consentType, 'GDPR'),
+      ),
+      // [BUG-394] Stable tiebreak on id to make consent dedup deterministic when
+      // two rows share the same requestedAt timestamp.
+      orderBy: [desc(consentStates.requestedAt), desc(consentStates.id)],
+    });
+    for (const state of allConsentStates) {
+      if (!consentByProfile.has(state.profileId)) {
+        consentByProfile.set(state.profileId, {
+          status: state.status,
+          respondedAt: state.respondedAt ?? null,
+        });
+      }
     }
   }
 
@@ -877,8 +913,7 @@ export async function getChildrenForParent(
   }
 
   const prepared: PreparedChild[] = [];
-  for (const link of validLinks) {
-    const childProfileId = link.childProfileId;
+  for (const childProfileId of validChildProfileIds) {
     const profile = profilesById.get(childProfileId);
     if (!profile)
       throw new Error(`Profile not found for childProfileId=${childProfileId}`);

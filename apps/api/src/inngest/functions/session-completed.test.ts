@@ -3090,6 +3090,7 @@ describe('memoized step-state PII break test [F-089]', () => {
         type: 'struggle_noticed',
         topic: 'long division',
       }),
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
 
     // No memoized step return carries the struggle topic.

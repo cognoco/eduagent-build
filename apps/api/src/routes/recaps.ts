@@ -16,9 +16,14 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { notFound } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
 import { getRecapForParent, listRecapsForParent } from '../services/recaps';
+import { isIdentityV2Enabled } from '../config';
 
 type RecapsRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    IDENTITY_V2_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -38,6 +43,7 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
     const recaps = await listRecapsForParent(db, parentProfileId, {
       childProfileId: query.childProfileId,
       limit: query.limit,
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
     return c.json(recapsResponseSchema.parse({ recaps }));
   })
@@ -50,7 +56,9 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
       const db = c.get('db');
       const parentProfileId = requireProfileId(c.get('profileId'));
       const { recapId } = c.req.valid('param');
-      const recap = await getRecapForParent(db, parentProfileId, recapId);
+      const recap = await getRecapForParent(db, parentProfileId, recapId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
 
       if (!recap) return notFound(c, 'Recap not found');
       return c.json(recapDetailResponseSchema.parse({ recap }));

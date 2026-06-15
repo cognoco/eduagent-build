@@ -1543,7 +1543,9 @@ export const sessionCompleted = inngest.createFunction(
             struggleNotificationsDetected = analysisResult.notifications.length;
             for (const notification of analysisResult.notifications) {
               try {
-                await sendStruggleNotification(db, profileId, notification);
+                await sendStruggleNotification(db, profileId, notification, {
+                  identityV2Enabled: isIdentityV2EnabledInStep(),
+                });
                 struggleNotificationsSent += 1;
               } catch (err) {
                 struggleNotificationsFailed += 1;

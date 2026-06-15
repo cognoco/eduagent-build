@@ -767,6 +767,7 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
       PROFILE_ID_A,
       ACCOUNT_ID,
       'family',
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
   });
 
@@ -808,6 +809,7 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
       PROFILE_ID_A,
       ACCOUNT_ID,
       'family',
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
   });
 
@@ -885,6 +887,7 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
       PROFILE_ID_A,
       ACCOUNT_ID,
       'study',
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
   });
 });

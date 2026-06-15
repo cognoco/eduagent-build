@@ -14,6 +14,7 @@ import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { safeSend } from './safe-non-core';
 import { inngest } from '../inngest/client';
+import { getChargePersonIds } from './identity-v2/guardianship';
 
 const logger = createLogger();
 import type {
@@ -604,12 +605,16 @@ export async function updateProfile(
  *
  * Returns null if the profile does not exist or is not owned by the account.
  * The route layer enforces whether the caller may update this profile.
+ *
+ * [WI-802] v2 seam: under `opts.identityV2Enabled`, the family-context guard
+ * checks `guardianship` (active charges) instead of `family_links`.
  */
 export async function updateProfileAppContext(
   db: Database,
   profileId: string,
   accountId: string,
   defaultAppContext: AppContext,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<Profile | null> {
   const existing = await db.query.profiles.findFirst({
     where: and(
@@ -621,13 +626,20 @@ export async function updateProfileAppContext(
   if (!existing) return null;
 
   if (defaultAppContext === 'family') {
-    const familyLink = await db.query.familyLinks.findFirst({
-      where: eq(familyLinks.parentProfileId, profileId),
-    });
+    let hasFamilyLink: boolean;
+    if (opts?.identityV2Enabled) {
+      const charges = await getChargePersonIds(db, profileId);
+      hasFamilyLink = charges.length > 0;
+    } else {
+      const familyLink = await db.query.familyLinks.findFirst({
+        where: eq(familyLinks.parentProfileId, profileId),
+      });
+      hasFamilyLink = familyLink != null;
+    }
     if (
       existing.isOwner !== true ||
       computeAgeBracket(existing.birthYear) !== 'adult' ||
-      !familyLink
+      !hasFamilyLink
     ) {
       throw new ForbiddenError(
         'Family mode is only available to adult owner profiles with family links.',
