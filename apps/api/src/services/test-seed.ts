@@ -537,6 +537,9 @@ async function listSeedClerkUsers(
 // Relative birth years — keeps fixtures stable as calendar year advances.
 // Age 17 → LEARNER persona, one year clear of the consent gate (age ≤ 16).
 const LEARNER_BIRTH_YEAR = new Date().getFullYear() - 17;
+// Age 14 → real teen (≥ 13 v1 floor), used for guardian-with-children seeds
+// so they never silently cross the profileListResponseSchema birthYear floor.
+const CHILD_BIRTH_YEAR = new Date().getFullYear() - 14;
 
 function pastDate(daysAgo: number): Date {
   return new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
@@ -1613,7 +1616,7 @@ async function seedParentWithChildren(
   // Child profile (teen)
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Teen',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -1710,7 +1713,7 @@ async function seedParentMultiChild(
   // Child 1 — teen with active learning
   const child1ProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Emma',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -1833,7 +1836,7 @@ async function seedParentMultiChild(
   // Child 3 — teen with no sessions yet (fresh onboarding)
   const child3ProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Sofia',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -2249,7 +2252,7 @@ async function seedConsentWithdrawn(
   // Child profile (non-owner teen) with withdrawn consent
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Withdrawn Teen',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -3035,7 +3038,7 @@ async function seedParentProxy(
 
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Proxy Child',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -3391,7 +3394,7 @@ async function seedParentWithChildrenNoSessions(
 
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Teen',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -4521,7 +4524,7 @@ async function seedMentorAuditFamilyAtProfileLimit(
   for (let i = 0; i < childCount; i += 1) {
     const childProfileId = await createBaseProfile(db, accountId, {
       displayName: `Capped Child ${i + 1}`,
-      birthYear: 2014,
+      birthYear: CHILD_BIRTH_YEAR,
       isOwner: false,
     });
     childProfileIds.push(childProfileId);
@@ -4907,7 +4910,7 @@ async function seedMentorAuditRichChildHistory(
 
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Rich-History Child',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -5292,7 +5295,7 @@ async function seedMentorAuditFamilyPoolMembers(
   for (let i = 0; i < 2; i += 1) {
     const childProfileId = await createBaseProfile(db, accountId, {
       displayName: `Pool Child ${i + 1}`,
-      birthYear: 2014,
+      birthYear: CHILD_BIRTH_YEAR,
       isOwner: false,
     });
     childProfileIds.push(childProfileId);
@@ -5417,7 +5420,7 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
   // child1 but trimmed to a single child to keep the scenario semantic.
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Linked Learner',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -5541,7 +5544,7 @@ async function seedMentorAuditBridgeBackstack(
 
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Bridge Child',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
