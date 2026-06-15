@@ -8,17 +8,19 @@
 // person (has a `guardianship` edge, NO `family_links` row) is NOT 403'd
 // by the inner service guard under `identityV2Enabled: true`.
 //
-// Failure conditions:
-//   - Flag-on / guardianship-only → assertParentAccess throws ForbiddenError
-//     (means the v2 branch is not reached, bug is present)
-//   - Flag-off / guardianship-only → assertParentAccess throws ForbiddenError
-//     (expected: legacy path reads family_links, no row → deny)
-//   - Flag-on / cross-guardian → assertParentAccess throws ForbiddenError
-//     (required BREAK test: IDOR guard must hold under v2 flag)
+// This file is FLAG-ON ONLY by design. It runs against the committed-migration
+// DB in the WI-789 flag-ON lane (ci.yml `integration-flag-on` job,
+// IDENTITY_V2_ENABLED=true) — lane-green-on-main transitively gates the PROD
+// FLIP on WI-798 (ic-orch-032). It touches ONLY `person` + `guardianship` —
+// the canonical-model tables — so it does not depend on the legacy
+// `family_links` table existing on the committed-migration schema. The
+// flag-OFF legacy path is unchanged code (every opts arg defaults to undefined)
+// and is covered by the WI-786 dispatch unit tests in `family-access.test.ts`.
 //
-// Runs in the flag-ON committed-migration lane (WI-789, ci.yml
-// `integration-flag-on` job, IDENTITY_V2_ENABLED=true). `continue-on-error`
-// at job level keeps it non-blocking while WI-790–793 burn down.
+// Cases:
+//   - [FLAG-ON] guardianship-only (edge, NO family_links) → must NOT 403
+//     (THE WI-798 regression — red against an inner guard that ignores opts)
+//   - [BREAK / FLAG-ON] cross-guardian → must still 403 (IDOR guard holds)
 //
 // Pattern: `(RUN ? describe : describe.skip)` — skips silently when
 // DATABASE_URL is absent (unit/local runs without a DB).
@@ -29,7 +31,6 @@ import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
-  familyLinks,
   guardianship,
   person,
   type Database,
@@ -51,7 +52,9 @@ const RUN = !!process.env.DATABASE_URL;
     });
 
     afterEach(async () => {
-      // Clean up in dependency order: guardianship edges, family_links, person.
+      // Clean up canonical-model rows only: guardianship edges, then person.
+      // No family_links — this suite never writes the legacy table, so the
+      // committed-migration schema's legacy-table state is irrelevant here.
       for (const pid of personIds) {
         await db
           .delete(guardianship)
@@ -59,10 +62,6 @@ const RUN = !!process.env.DATABASE_URL;
         await db
           .delete(guardianship)
           .where(eq(guardianship.chargePersonId, pid));
-        await db
-          .delete(familyLinks)
-          .where(eq(familyLinks.parentProfileId, pid));
-        await db.delete(familyLinks).where(eq(familyLinks.childProfileId, pid));
         await db.delete(person).where(eq(person.id, pid));
       }
       personIds.length = 0;
@@ -91,17 +90,12 @@ const RUN = !!process.env.DATABASE_URL;
         .values({ guardianPersonId: guardianId, chargePersonId: chargeId });
     }
 
-    async function grantFamilyLink(
-      parentId: string,
-      childId: string,
-    ): Promise<void> {
-      await db
-        .insert(familyLinks)
-        .values({ parentProfileId: parentId, childProfileId: childId });
-    }
-
     // -------------------------------------------------------------------------
-    // Flag-ON: guardianship-only (no family_links row) — must NOT 403
+    // Flag-ON: guardianship-only (no family_links row) — must NOT 403.
+    // THE WI-798 regression: a guardianship edge exists but no family_links row.
+    // An inner guard that ignores opts reads legacy family_links, finds nothing,
+    // and 403s. With opts threaded, it takes the v2 guardianship path and
+    // resolves.
     // -------------------------------------------------------------------------
 
     it('[FLAG-ON] resolves for a guardianship-only person (no family_links row) — the WI-798 regression', async () => {
@@ -117,7 +111,7 @@ const RUN = !!process.env.DATABASE_URL;
     });
 
     // -------------------------------------------------------------------------
-    // Flag-ON: cross-guardian BREAK test — must still 403 (IDOR guard holds)
+    // Flag-ON: cross-guardian BREAK test — must still 403 (IDOR guard holds).
     // -------------------------------------------------------------------------
 
     it('[BREAK / FLAG-ON] throws ForbiddenError for an unrelated guardian under v2 flag (IDOR guard must hold)', async () => {
@@ -131,36 +125,6 @@ const RUN = !!process.env.DATABASE_URL;
           identityV2Enabled: true,
         }),
       ).rejects.toThrow(ForbiddenError);
-    });
-
-    // -------------------------------------------------------------------------
-    // Flag-OFF: guardianship-only (no family_links row) — legacy path, must 403
-    // This verifies the legacy path is byte-identical (untouched by this PR).
-    // -------------------------------------------------------------------------
-
-    it('[FLAG-OFF] throws ForbiddenError for a guardianship-only person (no family_links row) — legacy path unchanged', async () => {
-      const guardian = await seedPerson('GuardianLegacy');
-      const charge = await seedPerson('ChargeLegacy');
-      await grantGuardianshipEdge(guardian, charge);
-      // Flag is OFF: assertParentAccess reads family_links, no row → deny.
-      await expect(
-        assertParentAccess(db, guardian, charge, { identityV2Enabled: false }),
-      ).rejects.toThrow(ForbiddenError);
-    });
-
-    // -------------------------------------------------------------------------
-    // Flag-OFF: family_links row present — legacy path, must pass
-    // Confirms legacy path continues to work for existing family_links data.
-    // -------------------------------------------------------------------------
-
-    it('[FLAG-OFF] resolves when a family_links row exists — legacy path unchanged', async () => {
-      const parent = await seedPerson('ParentLegacy');
-      const child = await seedPerson('ChildLegacy');
-      await grantFamilyLink(parent, child);
-      // Flag is OFF: reads family_links, row exists → allow.
-      await expect(
-        assertParentAccess(db, parent, child, { identityV2Enabled: false }),
-      ).resolves.toBeUndefined();
     });
   },
 );
