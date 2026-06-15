@@ -224,6 +224,13 @@ type SessionRouteEnv = {
     quotaDecrementTopUpCreditId: string | undefined;
     /** Set by metering middleware; keeps refund routing stable if tier state changes mid-request. */
     quotaDecrementQuotaModel: QuotaModel | undefined;
+    /**
+     * [WI-776 / WP-7] Cutover flag the decrement ran under; threaded into
+     * safeRefundQuota so the refund's ownership check uses the same store
+     * (v2 vs legacy) the decrement did — otherwise under flag-on/post-DROP the
+     * refund's legacy join fails and the user is charged for a failed exchange.
+     */
+    quotaIdentityV2: boolean | undefined;
     quotaRemainingTurns: number | undefined;
     quotaFractionRemaining: number | undefined;
     profileMeta: ProfileMeta | undefined;
@@ -585,6 +592,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             source: c.get('quotaDecrementSource'),
             quotaModel: c.get('quotaDecrementQuotaModel'),
             topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+            // [WI-776 / WP-7] Refund via the store the decrement ran under.
+            identityV2: c.get('quotaIdentityV2'),
           });
         }
         throw err;
@@ -865,6 +874,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   source: c.get('quotaDecrementSource'),
                   quotaModel: c.get('quotaDecrementQuotaModel'),
                   topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+                  // [WI-776 / WP-7] Refund via the store the decrement ran under.
+                  identityV2: c.get('quotaIdentityV2'),
                 });
               } catch (refundErr) {
                 captureException(refundErr, {
@@ -965,6 +976,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     source: c.get('quotaDecrementSource'),
                     quotaModel: c.get('quotaDecrementQuotaModel'),
                     topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+                    // [WI-776 / WP-7] Refund via the store the decrement ran under.
+                    identityV2: c.get('quotaIdentityV2'),
                   });
                 } catch (refundErr) {
                   captureException(refundErr, {
@@ -1087,6 +1100,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   source: c.get('quotaDecrementSource'),
                   quotaModel: c.get('quotaDecrementQuotaModel'),
                   topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+                  // [WI-776 / WP-7] Refund via the store the decrement ran under.
+                  identityV2: c.get('quotaIdentityV2'),
                 });
               } catch (refundErr) {
                 captureException(refundErr, {
@@ -1234,6 +1249,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             source: c.get('quotaDecrementSource'),
             quotaModel: c.get('quotaDecrementQuotaModel'),
             topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+            // [WI-776 / WP-7] Refund via the store the decrement ran under.
+            identityV2: c.get('quotaIdentityV2'),
           });
         }
         throw err;

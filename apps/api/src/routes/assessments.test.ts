@@ -214,6 +214,7 @@ function makeMeteredApp(opts?: {
   subscriptionId?: string | undefined;
   omitSubscriptionId?: boolean;
   isOwner?: boolean;
+  identityV2?: boolean;
 }) {
   const app = new Hono<
     TestEnv & {
@@ -223,6 +224,7 @@ function makeMeteredApp(opts?: {
         quotaDecrementTopUpCreditId: string | undefined;
         quotaDecrementQuotaModel: 'per-profile' | 'shared-pool' | undefined;
         quotaRefunded: boolean | undefined;
+        quotaIdentityV2: boolean | undefined;
       };
     }
   >();
@@ -249,6 +251,8 @@ function makeMeteredApp(opts?: {
     c.set('quotaDecrementTopUpCreditId', undefined);
     c.set('quotaDecrementQuotaModel', 'shared-pool');
     c.set('quotaRefunded', undefined);
+    // [WI-776 / WP-7] The cutover flag the metering decrement ran under.
+    c.set('quotaIdentityV2', opts?.identityV2 ?? false);
     await next();
   });
   app.onError((err, c) => {
@@ -720,6 +724,92 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
         SUBSCRIPTION_ID,
         expect.objectContaining({ route: 'assessments.answer.app_help' }),
       );
+    });
+
+    // [WI-776 / WP-7] P1 fix — flag-on positive coverage. Under
+    // IDENTITY_V2_ENABLED the metering middleware decremented against the v2
+    // store; the handler self-refund MUST thread identityV2:true so the
+    // refund's ownership cross-check uses the SAME (v2) store. Without the
+    // threading (revert: drop `identityV2: c.get('quotaIdentityV2')` from the
+    // handler) this assertion goes red — the refund would default to the legacy
+    // join and, post-DROP, return false → the learner is charged for a no-LLM
+    // app-help turn.
+    it('[WI-776] threads identityV2=true into the refund under flag-on', async () => {
+      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+      safeRefundQuotaMock.mockResolvedValueOnce({ refunded: true });
+
+      const res = await makeMeteredApp({ identityV2: true }).request(
+        path,
+        validAnswerBody(APP_HELP_ANSWER),
+      );
+
+      expect(res.status).toBe(200);
+      expect(evaluateAssessmentAnswerMock).not.toHaveBeenCalled();
+      expect(safeRefundQuotaMock).toHaveBeenCalledWith(
+        expect.anything(),
+        SUBSCRIPTION_ID,
+        expect.objectContaining({
+          route: 'assessments.answer.app_help',
+          identityV2: true,
+        }),
+      );
+    });
+
+    // [WI-776 / WP-7] Silent-recovery ban — when the refund does NOT complete
+    // (e.g. the v2 ownership join finds no row, or any non-success), the handler
+    // must NOT claim it refunded. Marking quotaRefunded=true on a failed refund
+    // would suppress the middleware's own refund and charge the user for a
+    // no-LLM turn. Revert (set quotaRefunded unconditionally) → this goes red.
+    it('[WI-776] does NOT mark quotaRefunded when the refund did not complete', async () => {
+      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+      safeRefundQuotaMock.mockResolvedValueOnce({ refunded: false });
+
+      let capturedQuotaRefunded: boolean | undefined = 'sentinel' as never;
+      const app = new Hono<
+        TestEnv & {
+          Variables: {
+            subscriptionId: string | undefined;
+            quotaDecrementSource: 'monthly' | 'top_up' | undefined;
+            quotaDecrementTopUpCreditId: string | undefined;
+            quotaDecrementQuotaModel: 'per-profile' | 'shared-pool' | undefined;
+            quotaRefunded: boolean | undefined;
+            quotaIdentityV2: boolean | undefined;
+          };
+        }
+      >();
+      app.use('*', async (c, next) => {
+        c.set('db', makeStubDb() as unknown as Database);
+        c.set('profileId', PROFILE_ID);
+        c.set('profileMeta', {
+          birthYear: 2000,
+          location: 'EU',
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        });
+        c.set('subscriptionId', SUBSCRIPTION_ID);
+        c.set('quotaDecrementSource', 'monthly');
+        c.set('quotaDecrementTopUpCreditId', undefined);
+        c.set('quotaDecrementQuotaModel', 'shared-pool');
+        c.set('quotaRefunded', undefined);
+        c.set('quotaIdentityV2', true);
+        await next();
+        capturedQuotaRefunded = c.get('quotaRefunded');
+      });
+      app.onError((err, c) => {
+        if (err instanceof HTTPException) return err.getResponse();
+        return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+      });
+      app.route('/v1', assessmentRoutes);
+
+      const res = await app.request(path, validAnswerBody(APP_HELP_ANSWER));
+
+      expect(res.status).toBe(200);
+      expect(safeRefundQuotaMock).toHaveBeenCalledTimes(1);
+      // The refund failed → quotaRefunded must remain unset so the failure is
+      // visible (and the user is not falsely treated as refunded).
+      expect(capturedQuotaRefunded).toBeUndefined();
     });
 
     it('[BREAK] does NOT call safeRefundQuota when the answer reaches the LLM path', async () => {

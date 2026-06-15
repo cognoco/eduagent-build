@@ -53,6 +53,9 @@ type AssessmentRouteEnv = RouteEnv & {
     quotaDecrementTopUpCreditId: string | undefined;
     quotaDecrementQuotaModel: QuotaModel | undefined;
     quotaRefunded: boolean | undefined;
+    // [WI-776 / WP-7] Cutover flag the decrement ran under; threaded into
+    // safeRefundQuota so the refund's ownership check uses the same store.
+    quotaIdentityV2: boolean | undefined;
   };
 };
 
@@ -133,14 +136,33 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
         // middleware's post-handler status-based branch does not double-refund.
         const subscriptionId = c.get('subscriptionId');
         if (subscriptionId && !c.get('quotaRefunded')) {
-          await safeRefundQuota(db, subscriptionId, {
+          const { refunded } = await safeRefundQuota(db, subscriptionId, {
             route: 'assessments.answer.app_help',
             profileId,
             source: c.get('quotaDecrementSource'),
             quotaModel: c.get('quotaDecrementQuotaModel'),
             topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+            // [WI-776 / WP-7] Use the store the decrement ran under.
+            identityV2: c.get('quotaIdentityV2'),
           });
-          c.set('quotaRefunded', true);
+          // [WI-776 / WP-7] Only claim the refund happened when it actually did.
+          // Marking quotaRefunded=true on a failed refund would charge the user
+          // for a no-LLM branch — silent recovery in billing is banned. On
+          // failure escalate (safeRefundQuota already logged+Sentry'd a genuine
+          // outage; a structured warn here surfaces the unrefunded charge) and
+          // leave quotaRefunded unset so the failure is visible, not swallowed.
+          if (refunded) {
+            c.set('quotaRefunded', true);
+          } else {
+            logger.warn(
+              '[assessments] app-help quota refund did not complete — user may be charged for a no-LLM turn',
+              {
+                event: 'assessments.app_help.refund_incomplete',
+                subscriptionId,
+                profileId,
+              },
+            );
+          }
         }
         return c.json(
           submitAssessmentAnswerResponseSchema.parse({
