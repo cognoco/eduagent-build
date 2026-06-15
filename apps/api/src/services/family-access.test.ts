@@ -168,6 +168,7 @@ describe('hasParentAccess / assertParentAccess v2 dispatch (WI-786)', () => {
     guardianshipFindFirst: jest.Mock;
   } {
     const familyLinksFindFirst = jest.fn().mockResolvedValue(undefined);
+    // relies on isGuardianOf (called by validateGuardianshipEdgeV2) using db.query.guardianship.findFirst
     const guardianshipFindFirst = jest.fn().mockResolvedValue(undefined);
     const db = {
       query: {
