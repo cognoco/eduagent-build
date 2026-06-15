@@ -2,7 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
-import { profileQuotaUsage, person, type Database } from '@eduagent/database';
+import {
+  profileQuotaUsage,
+  person,
+  login,
+  membership,
+  type Database,
+} from '@eduagent/database';
 import { inArray } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
@@ -481,6 +487,51 @@ describe('resetDatabase', () => {
     global.fetch = originalFetch;
   });
 
+  // Reorder-insensitive select mock. resetDatabase + deleteOrganizationGraph
+  // issue four reads that all flow through db.select(projection).from(table)
+  // .where(cond). Dispatching on (table identity, projected column set) instead
+  // of a call-index counter means the fixtures stay correct even if the
+  // internal query order changes — the column set is the query's semantic
+  // fingerprint:
+  //   from(login)                              → seed logins
+  //   from(membership) proj {organizationId}   → resetDatabase: orgs for persons
+  //   from(membership) proj {personId}         → helper step 1: members of orgs
+  //   from(membership) proj {personId,organizationId} → helper step 1a: full set
+  function makeResetSelectMock(fixtures: {
+    logins: unknown[];
+    orgsForPersons: unknown[];
+    membersOfOrgs: unknown[];
+    fullMemberships: unknown[];
+  }): jest.Mock {
+    return jest
+      .fn()
+      .mockImplementation((projection: Record<string, unknown>) => {
+        const projKeys = new Set(Object.keys(projection ?? {}));
+        return {
+          from: jest.fn().mockImplementation((table: unknown) => ({
+            where: jest.fn().mockImplementation(() => {
+              if (table === login) {
+                return Promise.resolve(fixtures.logins);
+              }
+              if (table === membership) {
+                if (
+                  projKeys.has('organizationId') &&
+                  projKeys.has('personId')
+                ) {
+                  return Promise.resolve(fixtures.fullMemberships);
+                }
+                if (projKeys.has('organizationId')) {
+                  return Promise.resolve(fixtures.orgsForPersons);
+                }
+                return Promise.resolve(fixtures.membersOfOrgs);
+              }
+              return Promise.resolve([]);
+            }),
+          })),
+        };
+      });
+  }
+
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()
@@ -488,41 +539,22 @@ describe('resetDatabase', () => {
     const deleteWhere = jest.fn().mockReturnValue({
       returning: deleteReturning,
     });
-    // v2 resetDatabase flow (with deleteOrganizationGraph):
-    // select call 1: login rows by clerkUserId prefix  → [{personId,clerkUserId}]
-    // select call 2: membership rows by personId       → [{organizationId}]
-    // select call 3: membership rows by organizationId → [{personId}] (helper step 1)
-    // select call 4: membership rows by personId       → [{personId,organizationId}] (helper step 1a)
-    let selectCallCount = 0;
-    const selectFn = jest.fn().mockImplementation(() => ({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockImplementation(() => {
-          selectCallCount += 1;
-          if (selectCallCount === 1) {
-            return Promise.resolve([
-              { personId: 'p1', clerkUserId: `${SEED_CLERK_PREFIX}1` },
-              { personId: 'p2', clerkUserId: `${SEED_CLERK_PREFIX}2` },
-            ]);
-          }
-          if (selectCallCount === 2) {
-            return Promise.resolve([
-              { organizationId: 'org-1' },
-              { organizationId: 'org-2' },
-            ]);
-          }
-          if (selectCallCount === 3) {
-            // helper step 1: membership-by-orgId lookup
-            return Promise.resolve([{ personId: 'p1' }, { personId: 'p2' }]);
-          }
-          // call 4: helper step 1a membership-by-personId — both persons live
-          // entirely within the target orgs → both deletable.
-          return Promise.resolve([
-            { personId: 'p1', organizationId: 'org-1' },
-            { personId: 'p2', organizationId: 'org-2' },
-          ]);
-        }),
-      }),
-    }));
+    // Both persons live entirely within the target orgs → both deletable.
+    const selectFn = makeResetSelectMock({
+      logins: [
+        { personId: 'p1', clerkUserId: `${SEED_CLERK_PREFIX}1` },
+        { personId: 'p2', clerkUserId: `${SEED_CLERK_PREFIX}2` },
+      ],
+      orgsForPersons: [
+        { organizationId: 'org-1' },
+        { organizationId: 'org-2' },
+      ],
+      membersOfOrgs: [{ personId: 'p1' }, { personId: 'p2' }],
+      fullMemberships: [
+        { personId: 'p1', organizationId: 'org-1' },
+        { personId: 'p2', organizationId: 'org-2' },
+      ],
+    });
     const db = {
       select: selectFn,
       delete: jest.fn().mockReturnValue({
@@ -544,39 +576,22 @@ describe('resetDatabase', () => {
     // a member of BOTH org-1 (target) and org-2 (NON-target) — deleting pShared
     // would cascade their login + learning data + org-2 membership outside the
     // reset scope. The person delete must target only [p1].
-    let selectCallCount = 0;
-    const selectFn = jest.fn().mockImplementation(() => ({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockImplementation(() => {
-          selectCallCount += 1;
-          if (selectCallCount === 1) {
-            // login rows (seed-prefixed) → p1 + pShared
-            return Promise.resolve([
-              { personId: 'p1', clerkUserId: `${SEED_CLERK_PREFIX}1` },
-              { personId: 'pShared', clerkUserId: `${SEED_CLERK_PREFIX}2` },
-            ]);
-          }
-          if (selectCallCount === 2) {
-            // membership-by-personId → resolve target orgs (org-1 only)
-            return Promise.resolve([{ organizationId: 'org-1' }]);
-          }
-          if (selectCallCount === 3) {
-            // helper step 1: members of org-1
-            return Promise.resolve([
-              { personId: 'p1' },
-              { personId: 'pShared' },
-            ]);
-          }
-          // helper step 1a: full membership set for p1 + pShared. pShared also
-          // belongs to org-2 (non-target) → must be excluded from person delete.
-          return Promise.resolve([
-            { personId: 'p1', organizationId: 'org-1' },
-            { personId: 'pShared', organizationId: 'org-1' },
-            { personId: 'pShared', organizationId: 'org-2' },
-          ]);
-        }),
-      }),
-    }));
+    const selectFn = makeResetSelectMock({
+      logins: [
+        { personId: 'p1', clerkUserId: `${SEED_CLERK_PREFIX}1` },
+        { personId: 'pShared', clerkUserId: `${SEED_CLERK_PREFIX}2` },
+      ],
+      // resolve target orgs (org-1 only)
+      orgsForPersons: [{ organizationId: 'org-1' }],
+      // helper step 1: members of org-1
+      membersOfOrgs: [{ personId: 'p1' }, { personId: 'pShared' }],
+      // helper step 1a: pShared also belongs to org-2 (non-target) → excluded.
+      fullMemberships: [
+        { personId: 'p1', organizationId: 'org-1' },
+        { personId: 'pShared', organizationId: 'org-1' },
+        { personId: 'pShared', organizationId: 'org-2' },
+      ],
+    });
 
     // Capture the (table, whereCondition) of every db.delete().where() call.
     const deleteCalls: Array<{ table: unknown; cond: unknown }> = [];

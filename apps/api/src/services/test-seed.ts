@@ -1457,37 +1457,17 @@ async function seedParentWithChildren(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db);
 
-  // Parent profile — must use direct insert because createBaseProfile() does not
-  // pass defaultAppContext through. With MODE_NAV_V1_ENABLED=true (eas.json
+  // Parent profile in Family mode. With MODE_NAV_V1_ENABLED=true (eas.json
   // development + preview builds), showFamilyHome requires familyShape=true
   // which requires defaultAppContext='family'. Without this, the parent lands on
   // learner-screen (study mode) and open-family-dashboard.yaml cannot find
   // parent-home-check-child-* (only rendered inside ParentHomeScreen).
-  const parentProfileId = generateUUIDv7();
-  await db.insert(person).values({
-    id: parentProfileId,
+  const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
-    birthDate: '1990-01-01',
-    residenceJurisdiction: 'ROW',
+    birthYear: 1990,
+    email,
+    clerkUserId,
     defaultAppContext: 'family',
-  });
-  {
-    const loginId = generateUUIDv7();
-    await db.insert(login).values({
-      id: loginId,
-      personId: parentProfileId,
-      clerkUserId,
-      email,
-    });
-    await db
-      .update(person)
-      .set({ loginId })
-      .where(eq(person.id, parentProfileId));
-  }
-  await db.insert(membership).values({
-    personId: parentProfileId,
-    organizationId: accountId,
-    roles: ['admin', 'learner'],
   });
 
   // Child profile (teen)
@@ -1574,37 +1554,14 @@ async function seedParentMultiChild(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db);
 
-  // Parent profile — direct insert to set defaultAppContext='family' (see
-  // seedParentWithChildren: under MODE_NAV_V1_ENABLED=true, showFamilyHome
-  // requires familyShape=true which requires defaultAppContext='family';
-  // otherwise the parent lands on learner-screen and parent-home-screen /
-  // parent-home-check-child-* never render). createBaseProfile does not pass
-  // defaultAppContext through, so a direct insert is required.
-  const parentProfileId = generateUUIDv7();
-  await db.insert(person).values({
-    id: parentProfileId,
+  // Parent profile in Family mode (defaultAppContext='family' → V1 guardian
+  // shape; see seedParentWithChildren rationale).
+  const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
-    birthDate: '1990-01-01',
-    residenceJurisdiction: 'ROW',
+    birthYear: 1990,
+    email,
+    clerkUserId,
     defaultAppContext: 'family',
-  });
-  {
-    const loginId = generateUUIDv7();
-    await db.insert(login).values({
-      id: loginId,
-      personId: parentProfileId,
-      clerkUserId,
-      email,
-    });
-    await db
-      .update(person)
-      .set({ loginId })
-      .where(eq(person.id, parentProfileId));
-  }
-  await db.insert(membership).values({
-    personId: parentProfileId,
-    organizationId: accountId,
-    roles: ['admin', 'learner'],
   });
 
   // Parent also gets a subject so the inline "Learn something" view works
@@ -2309,6 +2266,11 @@ async function seedPreProfile(
   // reset and idempotency paths can never find an org with no login/membership,
   // so it would accumulate on every seed call. The Clerk user alone is enough;
   // GET /v1/profiles returns {profiles: []} for the graphless v2 user.
+  //
+  // Clerk-side cleanup is NOT orphaned: deleteClerkTestUsers (run by
+  // resetDatabase) reaps by scanning all Clerk users and filtering on the seed
+  // external_id prefix (clerk_seed_) — it does NOT depend on a login/DB row, so
+  // this graphless Clerk user is reclaimed by every reset like any other seed.
   const { password } = await createClerkTestUser(email, env);
 
   return {
@@ -3277,33 +3239,14 @@ async function seedParentWithChildrenNoSessions(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db);
 
-  // Parent profile — direct insert to set defaultAppContext='family' (see
-  // seedParentWithChildren rationale: V1 guardian shape requires this).
-  const parentProfileId = generateUUIDv7();
-  await db.insert(person).values({
-    id: parentProfileId,
+  // Parent profile in Family mode (defaultAppContext='family' → V1 guardian
+  // shape; see seedParentWithChildren rationale).
+  const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
-    birthDate: '1990-01-01',
-    residenceJurisdiction: 'ROW',
+    birthYear: 1990,
+    email,
+    clerkUserId,
     defaultAppContext: 'family',
-  });
-  {
-    const loginId = generateUUIDv7();
-    await db.insert(login).values({
-      id: loginId,
-      personId: parentProfileId,
-      clerkUserId,
-      email,
-    });
-    await db
-      .update(person)
-      .set({ loginId })
-      .where(eq(person.id, parentProfileId));
-  }
-  await db.insert(membership).values({
-    personId: parentProfileId,
-    organizationId: accountId,
-    roles: ['admin', 'learner'],
   });
 
   const childProfileId = await createBaseProfile(db, accountId, {
@@ -4393,34 +4336,14 @@ async function seedMentorAuditFamilyAtProfileLimit(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db);
 
-  // Parent profile — direct insert to set defaultAppContext='family'
-  // (createBaseProfile does not pass defaultAppContext through; see
-  // seedParentWithChildren for the rationale).
-  const parentProfileId = generateUUIDv7();
-  await db.insert(person).values({
-    id: parentProfileId,
+  // Parent profile in Family mode (defaultAppContext='family' → V1 guardian
+  // shape; see seedParentWithChildren rationale).
+  const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Capped Parent',
-    birthDate: '1985-01-01',
-    residenceJurisdiction: 'ROW',
+    birthYear: 1985,
+    email,
+    clerkUserId,
     defaultAppContext: 'family',
-  });
-  {
-    const loginId = generateUUIDv7();
-    await db.insert(login).values({
-      id: loginId,
-      personId: parentProfileId,
-      clerkUserId,
-      email,
-    });
-    await db
-      .update(person)
-      .set({ loginId })
-      .where(eq(person.id, parentProfileId));
-  }
-  await db.insert(membership).values({
-    personId: parentProfileId,
-    organizationId: accountId,
-    roles: ['admin', 'learner'],
   });
 
   await db.insert(consentGrant).values({
@@ -4823,34 +4746,14 @@ async function seedMentorAuditRichChildHistory(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db);
 
-  // Parent profile — direct insert to set defaultAppContext='family'
-  // (createBaseProfile does not pass defaultAppContext through; see
-  // seedParentWithChildren for the rationale).
-  const parentProfileId = generateUUIDv7();
-  await db.insert(person).values({
-    id: parentProfileId,
+  // Parent profile in Family mode (defaultAppContext='family' → V1 guardian
+  // shape; see seedParentWithChildren rationale).
+  const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Rich-History Parent',
-    birthDate: '1985-01-01',
-    residenceJurisdiction: 'ROW',
+    birthYear: 1985,
+    email,
+    clerkUserId,
     defaultAppContext: 'family',
-  });
-  {
-    const loginId = generateUUIDv7();
-    await db.insert(login).values({
-      id: loginId,
-      personId: parentProfileId,
-      clerkUserId,
-      email,
-    });
-    await db
-      .update(person)
-      .set({ loginId })
-      .where(eq(person.id, parentProfileId));
-  }
-  await db.insert(membership).values({
-    personId: parentProfileId,
-    organizationId: accountId,
-    roles: ['admin', 'learner'],
   });
 
   await db.insert(consentGrant).values({
@@ -5304,34 +5207,14 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db);
 
-  // Owner with defaultAppContext: 'family' — must use the direct insert
-  // because createBaseProfile() does not pass that field through. Pattern
-  // mirrors makeConsentThresholdSeeder() at the top of the mentor-audit pack.
-  const ownerProfileId = generateUUIDv7();
-  await db.insert(person).values({
-    id: ownerProfileId,
+  // Owner in Family mode (defaultAppContext='family' → V1 guardian shape; see
+  // seedParentWithChildren rationale).
+  const ownerProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Daily-Capped Family Owner',
-    birthDate: '1985-01-01',
-    residenceJurisdiction: 'ROW',
+    birthYear: 1985,
+    email,
+    clerkUserId,
     defaultAppContext: 'family',
-  });
-  {
-    const loginId = generateUUIDv7();
-    await db.insert(login).values({
-      id: loginId,
-      personId: ownerProfileId,
-      clerkUserId,
-      email,
-    });
-    await db
-      .update(person)
-      .set({ loginId })
-      .where(eq(person.id, ownerProfileId));
-  }
-  await db.insert(membership).values({
-    personId: ownerProfileId,
-    organizationId: accountId,
-    roles: ['admin', 'learner'],
   });
 
   await db.insert(consentGrant).values({
