@@ -233,8 +233,8 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   reader/writer set, `Stage=Backlog`, order 1) + **WI-586** (moved in, with its 2 sub-items).
 - **Launch gate CLEARED 2026-06-15:** operator confirmed ADR-0022 cleanup complete + ADR-0020/0021
   substantially correct (semantic-only remaining) → ADR-0020/0021/0022 trusted canon. Shepherd
-  released via inbox `directive` (refining WP-1 = WI-765 + dispatching the enumeration); reviewer
-  (WS-18, standard policy) handed to the operator to launch.
+  released via inbox `directive` (refining WP-1 = WI-765 + dispatching the enumeration); reviewer =
+  existing watcher session extended to cover WS-18 (running; out-of-band of the orchestrator channel).
 - **Activate-when:** — (active; execution gated on the launch gate above)
 
 ### PRG-10 · API Security & PII — `active` (2026-06-13)
