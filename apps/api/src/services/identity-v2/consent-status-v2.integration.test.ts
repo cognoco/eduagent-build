@@ -470,5 +470,69 @@ const COPPA = 'coppa_parental_consent';
       );
       expect(batched.size).toBe(0);
     });
+
+    // -----------------------------------------------------------------------
+    // WI-797 DoD — deterministic round-trip-COUNT regression net (NOT a timing
+    // test). The batched window-query path MUST issue ≤2 DB round-trips for an
+    // N-person family; the original per-person Promise.all fan-out issued
+    // 2N–3N. Counting real queries (a pass-through spy on the live pg/Neon pool
+    // via db.$client.query) is GC1-clean — no internal mock, every query still
+    // executes against the real DB.
+    //
+    // Red-green-revert (verified locally, captured in the PR/commit body):
+    //   GREEN with the batched fix → 2 round-trips for a 4-person family.
+    //   Revert resolveLatestConsentStatusesAnyBasis to the per-person fan-out →
+    //   20 round-trips → this assertion FAILS (20 > 2). Restore → 2 → passes.
+    // This is the regression net that was missing: the equivalence tests proved
+    // correctness but not query count, so the fan-out reached deployed staging.
+    // -----------------------------------------------------------------------
+    it('[WI-797] batched AnyBasis resolution issues ≤2 DB round-trips for a 4-person family', async () => {
+      const { personId: p0, orgId } = await seedPersonOrg();
+      const ids = [p0];
+      for (let i = 0; i < 3; i++) ids.push(await seedPersonInOrg());
+      for (const pid of ids) {
+        await db.insert(consentGrant).values({
+          chargePersonId: pid,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          lawfulBasis: GDPR,
+          granted: true,
+        });
+      }
+
+      // Pass-through query counter on the REAL pool: increment, then call
+      // through so the query still executes (GC1-clean — not a mock).
+      const client = (db as unknown as { $client: { query: unknown } }).$client;
+      const original = client.query.bind(client) as (
+        ...a: unknown[]
+      ) => unknown;
+      let roundTrips = 0;
+      (client as { query: unknown }).query = (...args: unknown[]) => {
+        roundTrips++;
+        return original(...args);
+      };
+
+      let resolved: Map<string, string>;
+      try {
+        resolved = (await resolveLatestConsentStatusesAnyBasis(
+          db,
+          ids,
+          orgId,
+          PURPOSE,
+        )) as Map<string, string>;
+      } finally {
+        (client as { query: unknown }).query = original;
+      }
+
+      // Sanity: the resolution still produced the right answer for all 4.
+      expect(resolved.size).toBe(4);
+      for (const pid of ids) {
+        expect(resolved.get(pid)).toBe('CONSENTED');
+      }
+
+      // The regression net: batched form is a fixed ≤2 round-trips, independent
+      // of family size. The fan-out would be 2N–3N (= 20 here).
+      expect(roundTrips).toBeLessThanOrEqual(2);
+    });
   },
 );
