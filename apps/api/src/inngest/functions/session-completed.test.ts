@@ -1558,9 +1558,10 @@ describe('sessionCompleted', () => {
       expect(mockPrecomputeCoachingCard).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        // [CUT-B1] coaching-card precompute now carries the identity-cutover
-        // flag (false in the flag-off legacy path).
-        { identityV2Enabled: false },
+        // [CUT-B1] coaching-card precompute carries the identity-cutover flag.
+        // Value depends on IDENTITY_V2_ENABLED env (worktree may have true from
+        // Doppler sync; main checkout defaults to false).
+        { identityV2Enabled: process.env['IDENTITY_V2_ENABLED'] === 'true' },
       );
       expect(mockWriteCoachingCardCache).toHaveBeenCalledWith(
         expect.anything(),
