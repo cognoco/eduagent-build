@@ -158,6 +158,58 @@ describe('GET /v1/profiles', () => {
     await expect(res.json()).resolves.toEqual({ profiles: [] });
   });
 
+  // [CUT-B1] v2 pre-graph: a freshly signed-up user under IDENTITY_V2_ENABLED
+  // has no identity graph yet — accountMiddleware sets `clerkIdentity` and leaves
+  // `account` unset, and the pre-graph allowlist routes GET /v1/profiles here to
+  // return the documented empty list. Without the handler's pre-graph branch,
+  // requireAccount() 401s, and the mobile client's 401→sign-out turns onboarding
+  // into an unbreakable sign-in loop. Red-green: delete the pre-graph branch in
+  // profiles.ts GET /profiles and this flips 200 → 401.
+  it('[CUT-B1] returns 200 empty list (not 401) for a graphless v2 owner', async () => {
+    type PreGraphEnv = {
+      Bindings: { IDENTITY_V2_ENABLED?: string };
+      Variables: {
+        db: Database;
+        account: Account | undefined;
+        profileId: string | undefined;
+        profileMeta: ProfileMeta | undefined;
+        clerkIdentity:
+          | { clerkUserId: string; verifiedEmail: string }
+          | undefined;
+      };
+    };
+    const app = new Hono<PreGraphEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      // Graphless: no account set; clerkIdentity present, as accountMiddleware
+      // sets it on the v2 pre-graph path.
+      c.set('clerkIdentity', {
+        clerkUserId: 'user_pre_graph',
+        verifiedEmail: 'newuser@example.com',
+      });
+      c.set('profileId', undefined);
+      c.set('profileMeta', undefined);
+      await next();
+    });
+    app.onError((err, c) =>
+      err instanceof HTTPException
+        ? c.json({ code: 'HTTP_ERROR', message: err.message }, err.status)
+        : c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    app.route('/v1', profileRoutes);
+
+    const res = await app.request(
+      '/v1/profiles',
+      {},
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ profiles: [] });
+    // Must short-circuit before the account-scoped service call.
+    expect(listProfilesMock).not.toHaveBeenCalled();
+  });
+
   it('propagates service errors to 500', async () => {
     listProfilesMock.mockRejectedValue(new Error('DB timeout'));
 
