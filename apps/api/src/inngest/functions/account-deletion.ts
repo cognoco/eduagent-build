@@ -148,11 +148,13 @@ export const scheduledDeletion = inngest.createFunction(
     // re-uses the memoized value. Null when no login exists (pre-graph edge
     // case) — executeDeletionV2 handles null ownerEmail as a no-op on that leg.
     const ownerEmail = await step.run('capture-owner-email', async () => {
-      const db = getStepDatabase();
-      if (useV2) {
-        return getOrganizationOwnerEmailV2(db, accountId);
+      // v1 has no owner-email pre-read leg — short-circuit before acquiring a
+      // DB connection so a legacy deletion does not open one needlessly.
+      if (!useV2) {
+        return null;
       }
-      return null;
+      const db = getStepDatabase();
+      return getOrganizationOwnerEmailV2(db, accountId);
     });
 
     // Check if deletion was cancelled

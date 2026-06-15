@@ -186,11 +186,12 @@ describe('scheduledDeletion', () => {
     });
 
     // getStepDatabase called once each for check-account-exists,
-    // capture-clerk-user-id ([R1]), capture-owner-email ([CUT-B2] v2 email pre-read),
-    // check-cancellation, delete-account-data ([BUG-844] added the existence check).
-    // The delete-clerk-user step uses getStepClerkSecretKey, not getStepDatabase,
-    // so it does not add here.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(5);
+    // capture-clerk-user-id ([R1]), check-cancellation, delete-account-data
+    // ([BUG-844] added the existence check). On the v1 path the
+    // capture-owner-email step short-circuits BEFORE acquiring a DB connection
+    // (v2-only leg), so it does not add here. The delete-clerk-user step uses
+    // getStepClerkSecretKey, not getStepDatabase, so it does not add either.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(4);
   });
 
   // [BREAK / BUG-844] If the account was removed during the 7-day sleep
