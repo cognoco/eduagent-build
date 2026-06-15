@@ -41,18 +41,20 @@ import {
   getOrCreateMemoryProjection,
   toLearnerSelfView,
 } from '../services/memory/projection';
-import { isMemoryFactsReadEnabled } from '../config';
+import { isMemoryFactsReadEnabled, isIdentityV2Enabled } from '../config';
 
 type LearnerProfileRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
     db: Database;
     account: Account;
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -129,6 +131,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         input.value,
         input.suppress ?? false,
         input.subject,
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
@@ -166,7 +172,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const { db, profileId } = withProfile(c);
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const accountId = requireAccount(c.get('account')).id;
-    await deleteAllMemory(db, profileId, accountId);
+    await deleteAllMemory(db, profileId, accountId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      callerPersonId: c.get('callerPersonId'),
+    });
     return c.json({ success: true });
   })
   .delete('/learner-profile/:profileId/all', async (c) => {
@@ -196,6 +205,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         profileId,
         accountId,
         memoryCollectionEnabled,
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
@@ -241,6 +254,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         profileId,
         accountId,
         memoryInjectionEnabled,
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
@@ -282,7 +299,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const { consent } = c.req.valid('json');
-      await grantMemoryConsent(db, profileId, accountId, consent);
+      await grantMemoryConsent(db, profileId, accountId, consent, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        callerPersonId: c.get('callerPersonId'),
+      });
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
@@ -355,7 +375,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const { value } = c.req.valid('json');
-      await unsuppressInference(db, profileId, accountId, value);
+      await unsuppressInference(db, profileId, accountId, value, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        callerPersonId: c.get('callerPersonId'),
+      });
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
@@ -403,6 +426,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         profileId,
         accountId,
         accommodationMode,
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),

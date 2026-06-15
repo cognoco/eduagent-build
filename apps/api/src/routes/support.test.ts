@@ -41,7 +41,10 @@ const mockCheckAndLogRateLimit = checkAndLogRateLimit as jest.MockedFunction<
 
 const NO_PROFILE = Symbol('no-profile');
 
-function createApp(profileId: string | typeof NO_PROFILE = 'test-profile-id') {
+function createApp(
+  profileId: string | typeof NO_PROFILE = 'test-profile-id',
+  callerPersonId?: string,
+) {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('db' as never, {});
@@ -54,6 +57,11 @@ function createApp(profileId: string | typeof NO_PROFILE = 'test-profile-id') {
       clerkUserId: 'user_test',
       email: 'test@example.com',
     });
+    // [WI-774] On the v2 path the account middleware sets callerPersonId; seed
+    // it here so the flag-on test exercises the route's threading of it.
+    if (callerPersonId) {
+      c.set('callerPersonId' as never, callerPersonId);
+    }
     await next();
   });
   app.route('/', supportRoutes);
@@ -182,8 +190,37 @@ describe('POST /outbox-spillover', () => {
       'test-account-id',
       'support_outbox_spillover',
       { hours: 1, maxCount: 20 },
+      { identityV2Enabled: false },
     );
     expect(mockRecordOutboxSpillover).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-774] flag-on arms the v2 write guard: identityV2Enabled:true + callerPersonId', async () => {
+    mockRecordOutboxSpillover.mockResolvedValue({ written: 1 });
+    mockCheckAndLogRateLimit.mockResolvedValue(false);
+    const app = createApp('test-profile-id', 'person-test-id');
+
+    const res = await app.request(
+      '/outbox-spillover',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: [makeEntry('e1')] }),
+      },
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+    // A wrong env-binding name or context key would leave the guard un-armed on
+    // the live staging (flag-on) path — assert the exact identity opts shape.
+    expect(mockCheckAndLogRateLimit).toHaveBeenCalledWith(
+      {},
+      'test-profile-id',
+      'test-account-id',
+      'support_outbox_spillover',
+      { hours: 1, maxCount: 20 },
+      { identityV2Enabled: true, callerPersonId: 'person-test-id' },
+    );
   });
 
   it('[WI-179] over-budget request returns 429 with Retry-After header and never inserts', async () => {
