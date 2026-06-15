@@ -1550,8 +1550,13 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         // [CUT-B1] coaching-card precompute carries the identity-cutover flag.
-        // Value depends on IDENTITY_V2_ENABLED env (worktree may have true from
-        // Doppler sync; main checkout defaults to false).
+        // env-adaptive (deliberate, not an oversight): this mirrors exactly what
+        // isIdentityV2EnabledInStep() returns at runtime, which reads
+        // IDENTITY_V2_ENABLED — true on this worktree (Doppler sync), false on the
+        // main checkout. The flag-on billing path is separately and explicitly
+        // asserted in [WI-784-BREAK]; this assertion only checks the flag is
+        // threaded through to precompute, so pinning it to a literal would make it
+        // fail in whichever env doesn't match the literal.
         { identityV2Enabled: process.env['IDENTITY_V2_ENABLED'] === 'true' },
       );
       expect(mockWriteCoachingCardCache).toHaveBeenCalledWith(

@@ -1803,6 +1803,14 @@ export const sessionCompleted = inngest.createFunction(
             .limit(1);
           homeworkProfile = personRow;
           if (personRow) {
+            // person → membership(org) resolution. No orderBy: this mirrors the
+            // canonical v2 resolver `organizationOfPerson` in billing-v2/family-v2.ts
+            // (and every other person→org site in identity-v2/), which all rely on
+            // the single-membership-per-person assumption the cutover seeds. The
+            // membership_person_org_unique index only bars duplicate (person,org)
+            // pairs, so if multi-org membership is ever introduced this — and the
+            // shared resolver — must gain a deterministic orderBy together; pinning
+            // only this site would diverge from the established pattern.
             const membershipRow = await db.query.membership.findFirst({
               where: eq(membership.personId, profileId),
               columns: { organizationId: true },
