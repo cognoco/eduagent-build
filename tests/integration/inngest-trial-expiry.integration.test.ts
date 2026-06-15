@@ -12,9 +12,13 @@
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
   accounts,
+  membership,
   notificationPreferences,
+  organization,
+  person,
   profiles,
   quotaPools,
+  subscription as subscriptionV2,
   subscriptions,
 } from '@eduagent/database';
 
@@ -56,6 +60,28 @@ async function seedAccountWithOwnerProfile(input: {
     })
     .returning();
 
+  // [WI-792] v2 identity rows — required by findOwnerPersonId (membership.roles
+  // @> '{admin}') and findExpiredTrialsV2 (subscription v2 table) under flag-ON.
+  // Deterministic reseed: organization.id = account.id, person.id = profile.id.
+  // Self-inerting under flag-OFF (the v2 reads are never reached).
+  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+    await db.insert(organization).values({
+      id: account!.id,
+      name: `Seed org ${account!.id.slice(0, 8)}`,
+    });
+    await db.insert(person).values({
+      id: profile!.id,
+      displayName: input.displayName,
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'US',
+    });
+    await db.insert(membership).values({
+      personId: profile!.id,
+      organizationId: account!.id,
+      roles: ['admin'],
+    });
+  }
+
   // Seed notification preferences with an Expo push token so the
   // real sendPushNotification function can deliver notifications
   await db.insert(notificationPreferences).values({
@@ -76,6 +102,7 @@ async function seedAccountWithOwnerProfile(input: {
 
 async function seedSubscriptionWithQuota(input: {
   accountId: string;
+  payerPersonId: string;
   tier: 'free' | 'plus' | 'family' | 'pro';
   status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
   trialEndsAt: Date;
@@ -97,6 +124,23 @@ async function seedSubscriptionWithQuota(input: {
     })
     .returning();
 
+  // [WI-792] v2 subscription row — required by findExpiredTrialsV2 / other
+  // billing-v2 reads under flag-ON. REUSES subscription.id so quota_pools
+  // (quota_pools.subscription_id → subscriptions) still resolves against the
+  // legacy row; the v2 row shares the same PK. Self-inerting under flag-OFF.
+  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+    await db.insert(subscriptionV2).values({
+      id: subscription!.id,
+      organizationId: input.accountId,
+      payerPersonId: input.payerPersonId,
+      planTier: input.tier,
+      status: input.status,
+      trialEndsAt: input.trialEndsAt,
+      periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
+      periodEndAt: new Date('2026-05-01T00:00:00.000Z'),
+    });
+  }
+
   const [quotaPool] = await db
     .insert(quotaPools)
     .values({
@@ -115,11 +159,26 @@ async function seedSubscriptionWithQuota(input: {
   };
 }
 
-async function loadSubscription(id: string) {
+async function loadSubscription(
+  id: string,
+): Promise<{ status: string; tier: string } | undefined> {
   const db = createIntegrationDb();
-  return db.query.subscriptions.findFirst({
+  // [WI-792] Under flag-ON the trial-expiry function transitions the v2
+  // `subscription` row (status→expired / planTier→free); the legacy
+  // `subscriptions` row is only an FK-parent anchor (WI-788) and is NOT updated
+  // by the v2 path. Read back the store the function actually wrote.
+  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+    const row = await db.query.subscription.findFirst({
+      where: eq(subscriptionV2.id, id),
+    });
+    return row ? { status: row.status, tier: row.planTier } : undefined;
+  }
+  const legacyRow = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, id),
   });
+  return legacyRow
+    ? { status: legacyRow.status, tier: legacyRow.tier }
+    : undefined;
 }
 
 async function loadQuotaPool(id: string) {
@@ -161,12 +220,62 @@ function dateAtUtcNoon(offsetDays: number): Date {
   return date;
 }
 
+// [WI-792] v2 identity cleanup — mirrors cleanupAccounts for the v2 tables.
+// Delete order matters because of the FK constraints:
+//   - subscription.organizationId → organization.id is RESTRICT: delete the v2
+//     subscription rows before their organization.
+//   - membership.organizationId → organization.id is CASCADE: deleting an
+//     organization removes its membership rows, but NOT the person rows
+//     (membership.personId → person.id flows person→membership, so person is the
+//     FK *parent* — it is never cascaded into). person has no FK to profiles, so
+//     cleanupAccounts (which deletes accounts/profiles) does not reach it either.
+//   Therefore person rows must be deleted EXPLICITLY. We resolve the person ids
+//   from membership (the v2 person↔org link) before the organization delete
+//   removes those membership rows.
+async function cleanupV2Rows(accountIds: string[]): Promise<void> {
+  if (
+    process.env['IDENTITY_V2_ENABLED'] !== 'true' ||
+    accountIds.length === 0
+  ) {
+    return;
+  }
+  const db = createIntegrationDb();
+  const memberRows = await db.query.membership.findMany({
+    where: inArray(membership.organizationId, accountIds),
+    columns: { personId: true },
+  });
+  const personIds = memberRows.map((r) => r.personId);
+
+  await db
+    .delete(subscriptionV2)
+    .where(inArray(subscriptionV2.organizationId, accountIds));
+  await db.delete(organization).where(inArray(organization.id, accountIds));
+  if (personIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
+}
+
 beforeAll(() => {
   mockExpoPush();
 });
 
 beforeEach(async () => {
   clearFetchCalls();
+
+  // Resolve the legacy account IDs for these test users so we can also
+  // clean up the v2 identity rows (organization/subscription) that share the
+  // same IDs. v2 cleanup must happen BEFORE cleanupAccounts because v2 tables
+  // have no cascade from the legacy accounts delete.
+  const dbForLookup = createIntegrationDb();
+  const testAccountRows = await dbForLookup.query.accounts.findMany({
+    where: inArray(accounts.clerkUserId, [
+      JUST_EXPIRED_USER_ID,
+      EXTENDED_USER_ID,
+      WARNING_USER_ID,
+    ]),
+    columns: { id: true },
+  });
+  await cleanupV2Rows(testAccountRows.map((r) => r.id));
 
   await cleanupAccounts({
     emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
@@ -214,6 +323,16 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+  const dbForLookup = createIntegrationDb();
+  const testAccountRows = await dbForLookup.query.accounts.findMany({
+    where: inArray(accounts.clerkUserId, [
+      JUST_EXPIRED_USER_ID,
+      EXTENDED_USER_ID,
+      WARNING_USER_ID,
+    ]),
+    columns: { id: true },
+  });
+  await cleanupV2Rows(testAccountRows.map((r) => r.id));
   await cleanupAccounts({
     emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
     clerkUserIds: [JUST_EXPIRED_USER_ID, EXTENDED_USER_ID, WARNING_USER_ID],
@@ -243,6 +362,7 @@ describe('Integration: trial-expiry Inngest function', () => {
 
     const justExpiredSeed = await seedSubscriptionWithQuota({
       accountId: justExpired.account.id,
+      payerPersonId: justExpired.profile.id,
       tier: 'plus',
       status: 'trial',
       trialEndsAt: dateAtUtcNoon(-1),
@@ -254,6 +374,7 @@ describe('Integration: trial-expiry Inngest function', () => {
 
     const extendedSeed = await seedSubscriptionWithQuota({
       accountId: extended.account.id,
+      payerPersonId: extended.profile.id,
       tier: 'free',
       status: 'expired',
       trialEndsAt: dateAtUtcNoon(-14),
@@ -265,6 +386,7 @@ describe('Integration: trial-expiry Inngest function', () => {
 
     await seedSubscriptionWithQuota({
       accountId: warning.account.id,
+      payerPersonId: warning.profile.id,
       tier: 'plus',
       status: 'trial',
       trialEndsAt: dateAtUtcNoon(3),
