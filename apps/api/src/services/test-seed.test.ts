@@ -65,6 +65,11 @@ function createMockDb(): Database {
     delete: jest.fn().mockReturnValue({
       where: deleteWhere,
     }),
+    // db.execute is used only by the WI-788 legacy-table existence probe
+    // (to_regclass). The unit mock has no legacy tables → return an empty
+    // result so tableExists() resolves false and the conditional legacy writes
+    // self-inert, keeping these tests focused on the v2 path.
+    execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
     query: {
       // Extended for scenarios that query curricula/topics (e.g. parent-subject-with-retention)
       curricula: {
