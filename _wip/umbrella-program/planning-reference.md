@@ -41,6 +41,8 @@ with a `_wip/<slug>/` workspace) → **Cosmo Workstream(s)** (substrate containe
 an Initiative creates **at activation**, 0..n per Initiative — never assume 1:1)
 → **Work Package** (`Altitude=WP`, PR-sized bundle) → **Work Item / Sub-item**.
 
+*That hierarchy is the **work** breakdown; the **execution roles** that drive it are the **Quartet** — orchestrator / shepherd / executor / reviewer (scaffolds: `_wip/**/{orchestrator,shepherd,executor,reviewer}-protocol.md`) — coordinating over the **Clacks** comms layer (`progress-channel-design.md`). Full stack: **ZDX → Cosmo → Clacks → Quartet**.*
+
 1.2 **Banned synonyms.** Initiatives are never called "workstreams" (locked to
 the ZDX/Cosmo object, ZDX-ADR-0001), "work tracks", or "streams". Proper names
 containing those words (e.g. a historical "Stream 2") stay reserved for their

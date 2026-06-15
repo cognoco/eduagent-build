@@ -9,6 +9,8 @@ execution tracker, and the master plan. Derived from the operator's
 **Precedence:** Cosmo lifecycle rules (AGENTS.md + `/cosmo:execute`) >
 this protocol > general habits.
 
+**Quartet.** The executor is one corner of the **Quartet** (orchestrator / shepherd / executor / reviewer — the four-role structure). It is native to its shepherd's runtime, reports only to the shepherd, and never touches the **Clacks** (the orchestrator↔shepherd comms layer).
+
 ---
 
 ## Phases

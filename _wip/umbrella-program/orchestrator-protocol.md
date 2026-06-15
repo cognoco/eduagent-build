@@ -5,7 +5,7 @@
 Cosmo workstreams. Carries *process only*: the program's live state lives in the program docs
 (roster / dashboard / planning-reference / stream-2 backlog) and the current **initiative
 handoff**. Sibling to `shepherd-protocol.md` (lane shepherd), `executor-protocol.md` (WI
-executor), and `reviewer-protocol.md` (autonomous reviewer) — together the **four role-scaffolds**
+executor), and `reviewer-protocol.md` (autonomous reviewer) — together the **Quartet** (the four role-scaffolds)
 of the orchestration machinery. **To spawn a fresh orchestrator, paste `orchestrator-kickoff.md`**
 (the thin launcher); it points here. *(This file replaced the ad-hoc `orchestrator-handoff.md`,
 2026-06-15 — promoted to a first-class peer protocol.)*
@@ -37,6 +37,8 @@ hand it to a dedicated session, never work it from this seat.
 - **Reviewer** (`reviewer-protocol.md`): a SEPARATE session in a SEPARATE runtime (**reviewer ≠
   executor is a quality invariant**); polls workstreams for `Stage=Reviewing` and closes via
   `/cosmo:review` (+ `/cosmo:qa`). Never owned by the shepherd.
+
+**Vocabulary.** The four roles are collectively the **Quartet** (the orchestration structure). They coordinate over the **Clacks** — the comms layer (`_state/{inbox,outbox}.jsonl` + Cosmo-Stage signaling + the Monitor watchers; spec: `progress-channel-design.md`). Full stack: **ZDX** (work-item standard) → **Cosmo** (work system) → **Clacks** (comms) → **Quartet** (the four roles).
 
 Session model + model tiering: `planning-reference.md` §2.5–2.7. Shepherd + reviewer are
 **operator-launched** (§2.5) — you author the kickoffs; the operator spawns the sessions. **Never
@@ -70,7 +72,7 @@ orchestrator session skipped them and shipped a bespoke, role-blind kickoff — 
 **Activation checklist (`planning-reference.md` §2.1 made concrete — every lane, in order):**
 1. **Tracker** — `_wip/<lane>/execution-tracker.md` (charter / canon authority / slice / launch gate / change log).
 2. **Cosmo Workstream** — create it; record WS-N + page id.
-3. **Slice** — create the WP/Item set (direct-to-WP), wire Blocked-by, set Workstream + Order.
+3. **Slice** — create the WP/Item set (direct-to-WP), wire Blocked-by, set Workstream + Order. **`Workstream Order` uses spaced increments (×100: 100, 200, 300…), never 1,2,3 — leaves room to insert (e.g. 150) between siblings without renumbering. (Cosmo also accepts decimals as a fallback, but author with gaps up front.)**
 4. **Provision the channel** — create `_wip/<lane>/_state/{inbox,outbox}.jsonl` (the orchestrator provisions these at activation).
 5. **Shepherd kickoff** — author from `shepherd-kickoff-template.md`; if the lane is gated, make it **prime-and-hold** (orient + arm watchers, then wait on an inbox `directive`).
 6. **Reviewer kickoff** — author from `reviewer-kickoff-template.md`, or confirm a live general watcher will cover the workstream.

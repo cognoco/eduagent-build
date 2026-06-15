@@ -5,7 +5,7 @@ workstream lane (one program-initiative slice) from Backlog to Cosmo Close. Carr
 *process only* — the lane's substance (charter, units, slice scan, lane-specific notes)
 lives in that lane's `execution-tracker.md`. Sibling to `executor-protocol.md` (which the
 executors you dispatch follow). Cross-lane standard; co-located here with the executor
-protocol. Standardized 2026-06-13 from the dogfooded loop.
+protocol. Standardized 2026-06-13 from the dogfooded loop. The shepherd is one corner of the **Quartet** (orchestrator / shepherd / executor / reviewer — the four-role structure); the orchestrator and shepherd signal over the **Clacks** (comms layer; the *Progress channel* section below).
 
 **Precedence:** Cosmo lifecycle rules (AGENTS.md + the `cosmo` skills) > this protocol > habits.
 
@@ -97,6 +97,11 @@ Executors claim before they execute · `complete` → Reviewing · **never self-
 a WP through the DoR bridge (`refine --to-ready` — author the bundle brief + link
 absorbed-provenance children) before it is claimed. A WP that will not decompose into
 children gets **demoted to Item**, not forced.
+
+**Workstream Order spacing.** When you instantiate or (re)order WPs in the workstream, set
+`Workstream Order` in spaced increments (×100: 100, 200, 300…), never 1,2,3 — so a new item slots
+into a gap (e.g. 150) without renumbering siblings. (Cosmo accepts decimals as a fallback, but
+author with gaps up front.)
 
 ## Progress channel — orchestrator ↔ shepherd (the needs-a-brain plane)
 Your **lifecycle** (each WI →Reviewing/→Closed) is already visible to the orchestrator via its

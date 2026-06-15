@@ -2,7 +2,7 @@
 
 **What this is.** The paste-able launcher for spawning a per-workstream **reviewer** session. Thin:
 points at `reviewer-protocol.md` + the workstream + its policy. Swap the «placeholders». The
-reviewer runs a **different runtime from the executors** (currently Codex). Generalized from
+reviewer runs a **different runtime from the executors** (currently Codex). It is the review corner of the **Quartet** (the four-role structure: orchestrator / shepherd / executor / reviewer) and stays context-agnostic — it signals only through Cosmo Stage and does **not** read the **Clacks** (the orchestrator↔shepherd comms layer). Generalized from
 `new-llm-review-watcher-kickoff-prompt.md` (the first instance). For our use; productizing into a
 slash command is PRG-05's job.
 
