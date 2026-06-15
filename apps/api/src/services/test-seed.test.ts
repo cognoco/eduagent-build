@@ -26,17 +26,38 @@ function createMockDb(): Database {
     returning: jest.fn().mockResolvedValue([]),
   });
 
+  // Fluent select chain: db.select({}).from(table).where(...) / .innerJoin(...).where(...).limit(n)
+  // Returns [] by default (no existing seed data — idempotency check finds nothing to clean up).
+  const selectChain = {
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockResolvedValue([]),
+    innerJoin: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockResolvedValue([]),
+  };
+  // Make `.where()` after `.innerJoin()` also resolve to []:
+  selectChain.innerJoin.mockReturnValue({
+    where: jest.fn().mockReturnValue({
+      limit: jest.fn().mockResolvedValue([]),
+    }),
+  });
+
+  // Fluent update chain: db.update(table).set({}).where(...)
+  const updateChain = {
+    set: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    }),
+  };
+
   return {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockResolvedValue(undefined),
     }),
+    update: jest.fn().mockReturnValue(updateChain),
+    select: jest.fn().mockReturnValue(selectChain),
     delete: jest.fn().mockReturnValue({
       where: deleteWhere,
     }),
     query: {
-      accounts: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
       // Extended for scenarios that query curricula/topics (e.g. parent-subject-with-retention)
       curricula: {
         findFirst: jest.fn().mockResolvedValue({
@@ -54,6 +75,9 @@ function createMockDb(): Database {
           .mockResolvedValue([
             { id: 'mock-topic-id', curriculumId: 'mock-curriculum-id' },
           ]),
+      },
+      subjects: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     },
   } as unknown as Database;
@@ -296,13 +320,20 @@ describe('seedScenario', () => {
 
   it('[WI-84 DS-091] does not delete an existing non-seed Clerk account with the same email', async () => {
     const db = createMockDb();
-    (db.query.accounts.findMany as jest.Mock).mockResolvedValueOnce([
-      {
-        id: 'real-account-id',
-        email: 'real@example.com',
-        clerkUserId: 'user_real_production_account',
-      },
-    ]);
+    // In v2, idempotency check queries login table (not accounts).
+    // Mock db.select to return a real (non-seed) login for this email.
+    (db.select as jest.Mock).mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              personId: 'real-person-id',
+              clerkUserId: 'user_real_production_account',
+            },
+          ]),
+      }),
+    });
 
     await seedScenario(db, 'onboarding-complete', 'real@example.com');
 
@@ -440,11 +471,38 @@ describe('resetDatabase', () => {
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()
-      .mockResolvedValue([{ id: 'acc-1' }, { id: 'acc-2' }]);
+      .mockResolvedValue([{ id: 'org-1' }, { id: 'org-2' }]);
     const deleteWhere = jest.fn().mockReturnValue({
       returning: deleteReturning,
     });
+    // v2 resetDatabase flow (with deleteOrganizationGraph):
+    // select call 1: login rows by clerkUserId prefix  → [{personId,clerkUserId}]
+    // select call 2: membership rows by personId       → [{organizationId}]
+    // select call 3: membership rows by organizationId → [{personId}] (inside deleteOrganizationGraph)
+    let selectCallCount = 0;
+    const selectFn = jest.fn().mockImplementation(() => ({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation(() => {
+          selectCallCount += 1;
+          if (selectCallCount === 1) {
+            return Promise.resolve([
+              { personId: 'p1', clerkUserId: `${SEED_CLERK_PREFIX}1` },
+              { personId: 'p2', clerkUserId: `${SEED_CLERK_PREFIX}2` },
+            ]);
+          }
+          if (selectCallCount === 2) {
+            return Promise.resolve([
+              { organizationId: 'org-1' },
+              { organizationId: 'org-2' },
+            ]);
+          }
+          // call 3: deleteOrganizationGraph membership-by-orgId lookup
+          return Promise.resolve([{ personId: 'p1' }, { personId: 'p2' }]);
+        }),
+      }),
+    }));
     const db = {
+      select: selectFn,
       delete: jest.fn().mockReturnValue({
         where: deleteWhere,
       }),
@@ -453,19 +511,21 @@ describe('resetDatabase', () => {
     const result = await resetDatabase(db);
 
     expect(result).toEqual({ deletedCount: 2, clerkUsersDeleted: 0 });
-    expect(db.delete).toHaveBeenCalled();
-    expect(deleteWhere).toHaveBeenCalled();
+    // deleteOrganizationGraph issues 5 deletes: consentGrant, subscription,
+    // guardianship, person, organization (only organization uses .returning()).
+    expect(db.delete).toHaveBeenCalledTimes(5);
+    expect(deleteReturning).toHaveBeenCalledTimes(1);
   });
 
   it('returns deletedCount: 0 when no seed accounts exist', async () => {
-    const deleteReturning = jest.fn().mockResolvedValue([]);
-    const deleteWhere = jest.fn().mockReturnValue({
-      returning: deleteReturning,
-    });
+    // v2 resetDatabase: select returns no login rows → returns early with count 0.
     const db = {
-      delete: jest.fn().mockReturnValue({
-        where: deleteWhere,
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
       }),
+      delete: jest.fn(),
     } as unknown as Database;
 
     const result = await resetDatabase(db);
@@ -474,25 +534,24 @@ describe('resetDatabase', () => {
   });
 
   it('[WI-84 DS-091] prefix reset does not delete non-seed Clerk accounts', async () => {
-    const deleteReturning = jest.fn().mockResolvedValue([]);
-    const deleteWhere = jest.fn().mockReturnValue({
-      returning: deleteReturning,
-    });
+    // v2 prefix reset: select login by email prefix, filter by seed marker.
+    // A non-seed clerkUserId won't pass isSeedManagedClerkUserId → no delete.
     const db = {
-      delete: jest.fn().mockReturnValue({
-        where: deleteWhere,
-      }),
-      query: {
-        accounts: {
-          findMany: jest.fn().mockResolvedValue([
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([
             {
-              id: 'real-account-id',
-              email: 'e2e-real@example.com',
+              personId: 'real-person-id',
               clerkUserId: 'user_real_production_account',
             },
           ]),
-        },
-      },
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest
+          .fn()
+          .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
+      }),
     } as unknown as Database;
 
     const result = await resetDatabase(db, {}, { prefix: 'e2e-' });
@@ -886,8 +945,8 @@ describe('mentor-audit seed pack returns required IDs', () => {
   });
 
   it('consent threshold seeders persist the configured location enum value', async () => {
-    // The per-region seeders rely on `profiles.location` to drive the consent
-    // gate. Capture the inserted row and assert the location value matches.
+    // The per-region seeders rely on `person.residenceJurisdiction` to drive the consent
+    // gate. Capture the inserted row and assert the jurisdiction value matches.
     const captured: Array<Record<string, unknown>> = [];
     const insertMock = jest.fn().mockImplementation(() => ({
       values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
@@ -895,14 +954,26 @@ describe('mentor-audit seed pack returns required IDs', () => {
         return Promise.resolve();
       }),
     }));
+    const selectChain = {
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([]),
+      }),
+    };
     const db = {
       insert: insertMock,
+      update: jest
+        .fn()
+        .mockReturnValue({
+          set: jest
+            .fn()
+            .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+        }),
+      select: jest.fn().mockReturnValue(selectChain),
       delete: jest.fn().mockReturnValue({
         where: jest
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
-      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
     } as unknown as Database;
 
     await seedScenario(
@@ -911,15 +982,19 @@ describe('mentor-audit seed pack returns required IDs', () => {
       'test@example.com',
     );
 
+    // In v2 person rows have `birthDate` and `residenceJurisdiction` (not `birthYear`/`location`).
     const profileRow = captured.find(
-      (row) => 'birthYear' in row && 'displayName' in row,
+      (row) =>
+        'birthDate' in row &&
+        'displayName' in row &&
+        'residenceJurisdiction' in row,
     );
     expect(profileRow).toBeDefined();
-    expect(profileRow?.location).toBe('US');
+    expect(profileRow?.residenceJurisdiction).toBe('US');
   });
 
   it('family-at-profile-limit creates exactly maxProfiles family profiles', async () => {
-    // Capture all profile inserts and assert the total equals
+    // Capture all inserts and assert the total person + membership counts equal
     // getTierConfig('family').maxProfiles (1 owner + 3 children = 4).
     const captured: Array<Record<string, unknown>> = [];
     const insertMock = jest.fn().mockImplementation(() => ({
@@ -928,14 +1003,26 @@ describe('mentor-audit seed pack returns required IDs', () => {
         return Promise.resolve();
       }),
     }));
+    const selectChain = {
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([]),
+      }),
+    };
     const db = {
       insert: insertMock,
+      update: jest
+        .fn()
+        .mockReturnValue({
+          set: jest
+            .fn()
+            .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+        }),
+      select: jest.fn().mockReturnValue(selectChain),
       delete: jest.fn().mockReturnValue({
         where: jest
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
-      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
     } as unknown as Database;
 
     await seedScenario(
@@ -944,12 +1031,30 @@ describe('mentor-audit seed pack returns required IDs', () => {
       'test@example.com',
     );
 
-    const profileRows = captured.filter(
-      (row) => 'birthYear' in row && 'displayName' in row && 'isOwner' in row,
+    // In v2: `person` rows have `birthDate` (not `birthYear` or `isOwner`).
+    // Owner is the membership with roles ['admin', 'learner'], children have ['learner'].
+    const personRows = captured.filter(
+      (row) => 'birthDate' in row && 'displayName' in row,
     );
-    expect(profileRows).toHaveLength(4);
-    expect(profileRows.filter((row) => row.isOwner === true)).toHaveLength(1);
-    expect(profileRows.filter((row) => row.isOwner === false)).toHaveLength(3);
+    expect(personRows).toHaveLength(4);
+
+    const membershipRows = captured.filter(
+      (row) => 'roles' in row && 'organizationId' in row && 'personId' in row,
+    );
+    expect(membershipRows).toHaveLength(4);
+    expect(
+      membershipRows.filter(
+        (row) =>
+          Array.isArray(row.roles) && (row.roles as string[]).includes('admin'),
+      ),
+    ).toHaveLength(1);
+    expect(
+      membershipRows.filter(
+        (row) =>
+          Array.isArray(row.roles) &&
+          !(row.roles as string[]).includes('admin'),
+      ),
+    ).toHaveLength(3);
   });
 
   // -------------------------------------------------------------------------
@@ -964,14 +1069,26 @@ describe('mentor-audit seed pack returns required IDs', () => {
         return Promise.resolve();
       }),
     }));
+    const selectChain = {
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([]),
+      }),
+    };
     const db = {
       insert: insertMock,
+      update: jest
+        .fn()
+        .mockReturnValue({
+          set: jest
+            .fn()
+            .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+        }),
+      select: jest.fn().mockReturnValue(selectChain),
       delete: jest.fn().mockReturnValue({
         where: jest
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
-      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
     } as unknown as Database;
 
     const result = await seedScenario(
@@ -980,12 +1097,24 @@ describe('mentor-audit seed pack returns required IDs', () => {
       'test@example.com',
     );
 
-    const profileRows = captured.filter(
-      (row) => 'birthYear' in row && 'displayName' in row && 'isOwner' in row,
+    // In v2: count membership rows (not profile rows with isOwner field).
+    const membershipRows = captured.filter(
+      (row) => 'roles' in row && 'organizationId' in row && 'personId' in row,
     );
-    expect(profileRows).toHaveLength(3);
-    expect(profileRows.filter((row) => row.isOwner === true)).toHaveLength(1);
-    expect(profileRows.filter((row) => row.isOwner === false)).toHaveLength(2);
+    expect(membershipRows).toHaveLength(3);
+    expect(
+      membershipRows.filter(
+        (row) =>
+          Array.isArray(row.roles) && (row.roles as string[]).includes('admin'),
+      ),
+    ).toHaveLength(1);
+    expect(
+      membershipRows.filter(
+        (row) =>
+          Array.isArray(row.roles) &&
+          !(row.roles as string[]).includes('admin'),
+      ),
+    ).toHaveLength(2);
 
     // Quota pool row must reflect partial use (~50% of monthly cap) — the
     // audit reads this to verify the steady-state pool readout.
@@ -1015,14 +1144,26 @@ describe('mentor-audit seed pack returns required IDs', () => {
         return Promise.resolve();
       }),
     }));
+    const selectChain = {
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([]),
+      }),
+    };
     const db = {
       insert: insertMock,
+      update: jest
+        .fn()
+        .mockReturnValue({
+          set: jest
+            .fn()
+            .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+        }),
+      select: jest.fn().mockReturnValue(selectChain),
       delete: jest.fn().mockReturnValue({
         where: jest
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
-      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
     } as unknown as Database;
 
     const result = await seedScenario(
@@ -1031,20 +1172,29 @@ describe('mentor-audit seed pack returns required IDs', () => {
       'test@example.com',
     );
 
-    // Owner profile must carry defaultAppContext: 'family' — this is the
-    // contract that drives the Mentor context for the audit's BILLING-07 row.
+    // Owner person row must carry defaultAppContext: 'family'.
+    // In v2 there is no `isOwner` on person; ownership is via membership.roles.
     const ownerRow = captured.find(
       (row) => row.id === result.ids.ownerProfileId,
     );
     expect(ownerRow).toBeDefined();
     expect(ownerRow?.defaultAppContext).toBe('family');
-    expect(ownerRow?.isOwner).toBe(true);
-
-    // Exactly one familyLinks row — 1 linked child, not 2 or 3.
-    const familyLinkRows = captured.filter(
-      (row) => 'parentProfileId' in row && 'childProfileId' in row,
+    // Verify owner membership has admin role.
+    const ownerMembership = captured.find(
+      (row) =>
+        'roles' in row &&
+        'personId' in row &&
+        row.personId === result.ids.ownerProfileId &&
+        Array.isArray(row.roles) &&
+        (row.roles as string[]).includes('admin'),
     );
-    expect(familyLinkRows).toHaveLength(1);
+    expect(ownerMembership).toBeDefined();
+
+    // Exactly one guardianship row — v2 replaces familyLinks with guardianship.
+    const guardianshipRows = captured.filter(
+      (row) => 'guardianPersonId' in row && 'chargePersonId' in row,
+    );
+    expect(guardianshipRows).toHaveLength(1);
 
     // Quota: daily cap fully consumed, monthly bucket deliberately below cap
     // so the failure attributable to the daily gate (not monthly).
@@ -1073,8 +1223,21 @@ describe('mentor-audit seed pack returns required IDs', () => {
         return Promise.resolve();
       }),
     }));
+    const selectChain = {
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([]),
+      }),
+    };
     const db = {
       insert: insertMock,
+      update: jest
+        .fn()
+        .mockReturnValue({
+          set: jest
+            .fn()
+            .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+        }),
+      select: jest.fn().mockReturnValue(selectChain),
       delete: jest.fn().mockReturnValue({
         where: jest
           .fn()

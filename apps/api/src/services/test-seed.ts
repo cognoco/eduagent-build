@@ -13,8 +13,14 @@
  */
 import { eq, like, inArray, or } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
+  organization,
+  person,
+  login,
+  membership,
+  guardianship,
+  consentGrant,
+  consentRequest,
+  subscription,
   learningProfiles,
   subjects,
   curricula,
@@ -28,11 +34,8 @@ import {
   weeklyReports,
   retentionCards,
   assessments,
-  subscriptions,
   quotaPools,
   profileQuotaUsage,
-  familyLinks,
-  consentStates,
   streaks,
   needsDeepeningTopics,
   vocabulary,
@@ -536,14 +539,13 @@ function futureDate(daysAhead: number): Date {
 
 async function createBaseAccount(
   db: Database,
-  email: string,
-  clerkUserId: string,
+  _email: string,
+  _clerkUserId: string,
 ): Promise<{ accountId: string }> {
   const accountId = generateUUIDv7();
-  await db.insert(accounts).values({
+  await db.insert(organization).values({
     id: accountId,
-    clerkUserId,
-    email,
+    name: `Seed org ${accountId.slice(0, 8)}`,
   });
   return { accountId };
 }
@@ -555,17 +557,52 @@ async function createBaseProfile(
     displayName: string;
     birthYear: number;
     isOwner?: boolean;
+    email?: string;
+    clerkUserId?: string;
+    defaultAppContext?: string;
+    residenceJurisdiction?: string;
   },
 ): Promise<string> {
   const profileId = generateUUIDv7();
+  const isOwner = opts.isOwner !== false;
 
-  await db.insert(profiles).values({
+  await db.insert(person).values({
     id: profileId,
-    accountId,
     displayName: opts.displayName,
-    birthYear: opts.birthYear,
-    isOwner: opts.isOwner ?? true,
+    birthDate: `${opts.birthYear}-01-01`,
+    residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
+    ...(opts.defaultAppContext
+      ? { defaultAppContext: opts.defaultAppContext }
+      : {}),
   });
+
+  if (isOwner) {
+    if (!opts.email || !opts.clerkUserId) {
+      throw new Error(
+        'createBaseProfile: email and clerkUserId required for owner profiles',
+      );
+    }
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: profileId,
+      clerkUserId: opts.clerkUserId,
+      email: opts.email,
+    });
+    await db.update(person).set({ loginId }).where(eq(person.id, profileId));
+    await db.insert(membership).values({
+      personId: profileId,
+      organizationId: accountId,
+      roles: ['admin', 'learner'],
+    });
+  } else {
+    await db.insert(membership).values({
+      personId: profileId,
+      organizationId: accountId,
+      roles: ['learner'],
+    });
+  }
+
   return profileId;
 }
 
@@ -923,15 +960,17 @@ async function seedOnboardingNoSubject(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   return {
@@ -954,15 +993,17 @@ async function seedOnboardingComplete(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   // BUG-34 fix: Add a subject so the home screen stays visible after sign-in.
@@ -1024,6 +1065,8 @@ async function seedLearningActive(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Active Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
@@ -1090,6 +1133,8 @@ async function seedRetentionDue(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Review Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
@@ -1134,6 +1179,8 @@ async function seedFailedRecall3x(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Struggling Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -1207,6 +1254,8 @@ async function seedTopicNotStarted(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Fresh Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
@@ -1243,6 +1292,8 @@ async function seedTopicOverdueReview(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Review Due Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
@@ -1294,6 +1345,8 @@ async function seedBookNoCurriculum(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'New Book Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const subjectId = generateUUIDv7();
@@ -1346,6 +1399,8 @@ async function seedSubjectWithBookSuggestions(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Suggestion Picker',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const subjectId = generateUUIDv7();
@@ -1413,13 +1468,30 @@ async function seedParentWithChildren(
   // learner-screen (study mode) and open-family-dashboard.yaml cannot find
   // parent-home-check-child-* (only rendered inside ParentHomeScreen).
   const parentProfileId = generateUUIDv7();
-  await db.insert(profiles).values({
+  await db.insert(person).values({
     id: parentProfileId,
-    accountId,
     displayName: 'Test Parent',
-    birthYear: 1990,
-    isOwner: true,
+    birthDate: '1990-01-01',
+    residenceJurisdiction: 'ROW',
     defaultAppContext: 'family',
+  });
+  {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: parentProfileId,
+      clerkUserId,
+      email,
+    });
+    await db
+      .update(person)
+      .set({ loginId })
+      .where(eq(person.id, parentProfileId));
+  }
+  await db.insert(membership).values({
+    personId: parentProfileId,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
   });
 
   // Child profile (teen)
@@ -1430,20 +1502,20 @@ async function seedParentWithChildren(
   });
 
   // Family link
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
   });
 
   // Consent for child
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   // Give child a subject with some progress
@@ -1513,13 +1585,30 @@ async function seedParentMultiChild(
   // parent-home-check-child-* never render). createBaseProfile does not pass
   // defaultAppContext through, so a direct insert is required.
   const parentProfileId = generateUUIDv7();
-  await db.insert(profiles).values({
+  await db.insert(person).values({
     id: parentProfileId,
-    accountId,
     displayName: 'Test Parent',
-    birthYear: 1990,
-    isOwner: true,
+    birthDate: '1990-01-01',
+    residenceJurisdiction: 'ROW',
     defaultAppContext: 'family',
+  });
+  {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: parentProfileId,
+      clerkUserId,
+      email,
+    });
+    await db
+      .update(person)
+      .set({ loginId })
+      .where(eq(person.id, parentProfileId));
+  }
+  await db.insert(membership).values({
+    personId: parentProfileId,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
   });
 
   // Parent also gets a subject so the inline "Learn something" view works
@@ -1532,19 +1621,19 @@ async function seedParentMultiChild(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId: child1ProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: child1ProfileId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: child1ProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: child1ProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId: subject1Id, topicIds: child1TopicIds } =
@@ -1597,19 +1686,19 @@ async function seedParentMultiChild(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId: child2ProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: child2ProfileId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: child2ProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: child2ProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId: subject2Id, topicIds: child2TopicIds } =
@@ -1655,19 +1744,19 @@ async function seedParentMultiChild(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId: child3ProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: child3ProfileId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: child3ProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: child3ProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId: subject3Id, topicIds: child3TopicIds } =
@@ -1710,17 +1799,20 @@ async function seedTrialActive(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Trial User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'plus',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'plus',
     status: 'trial',
     trialEndsAt: futureDate(7),
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(14),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(14),
   });
 
   await db.insert(quotaPools).values({
@@ -1762,17 +1854,20 @@ async function seedTrialExpired(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Expired Trial User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'expired',
     trialEndsAt: pastDate(3),
-    currentPeriodStart: pastDate(17),
-    currentPeriodEnd: pastDate(3),
+    periodStartAt: pastDate(17),
+    periodEndAt: pastDate(3),
   });
 
   await db.insert(quotaPools).values({
@@ -1815,6 +1910,8 @@ async function seedMultiSubject(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Multi-Subject Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId: activeSubjectId } = await createSubjectWithCurriculum(
@@ -1863,6 +1960,8 @@ async function seedMultiSubjectPractice(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Practice Picker Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId: physicsSubjectId } = await createSubjectWithCurriculum(
@@ -1899,6 +1998,8 @@ async function seedHomeworkReady(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Homework Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -1948,16 +2049,26 @@ async function seedTrialExpiredChild(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
+  // Parent profile (account owner)
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Paywall Parent',
+    birthYear: 1990,
+    isOwner: true,
+    email,
+    clerkUserId,
+  });
+
   // Expired subscription — child hits the paywall
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: parentProfileId,
+    planTier: 'free',
     status: 'expired',
     trialEndsAt: pastDate(3),
-    currentPeriodStart: pastDate(17),
-    currentPeriodEnd: pastDate(3),
+    periodStartAt: pastDate(17),
+    periodEndAt: pastDate(3),
   });
 
   await db.insert(quotaPools).values({
@@ -1968,13 +2079,6 @@ async function seedTrialExpiredChild(
     dailyLimit: freeTier.dailyLimit,
     usedToday: 10,
     cycleResetAt: futureDate(13),
-  });
-
-  // Parent profile (account owner)
-  const parentProfileId = await createBaseProfile(db, accountId, {
-    displayName: 'Paywall Parent',
-    birthYear: 1990,
-    isOwner: true,
   });
 
   // Child profile (non-owner teen)
@@ -1997,20 +2101,20 @@ async function seedTrialExpiredChild(
   });
 
   // Family link
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
   });
 
   // Consent for child
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   // Give child a subject with topics so "Browse Library" has content
@@ -2045,6 +2149,8 @@ async function seedConsentWithdrawn(
     displayName: 'Withdrawn Parent',
     birthYear: 1990,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
   // Child profile (non-owner teen) with withdrawn consent
@@ -2055,20 +2161,29 @@ async function seedConsentWithdrawn(
   });
 
   // Family link
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
   });
 
   // Consent state: WITHDRAWN
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'WITHDRAWN',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
+  });
+  await db.insert(consentGrant).values({
+    id: generateUUIDv7(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: false,
+    withdrawnAt: new Date(),
   });
 
   return {
@@ -2093,16 +2208,27 @@ async function seedConsentWithdrawnSolo(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Withdrawn Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   // Consent state: WITHDRAWN
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'WITHDRAWN',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
+  });
+  await db.insert(consentGrant).values({
+    id: generateUUIDv7(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: false,
+    withdrawnAt: new Date(),
   });
 
   return {
@@ -2128,25 +2254,28 @@ async function seedParentSolo(
     displayName: 'Solo Parent',
     birthYear: 1990,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: parentProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: parentProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'family',
+    organizationId: accountId,
+    payerPersonId: parentProfileId,
+    planTier: 'family',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -2205,18 +2334,23 @@ async function seedConsentPending(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Pending Learner',
     birthYear: 2014,
+    email,
+    clerkUserId,
   });
   const consentToken = `seed-consent-${generateUUIDv7()}`;
   const consentStateId = generateUUIDv7();
 
-  await db.insert(consentStates).values({
+  await db.insert(consentRequest).values({
     id: consentStateId,
-    profileId,
-    consentType: 'GDPR',
-    status: 'PARENTAL_CONSENT_REQUESTED',
-    parentEmail: 'parent-e2e-test@example.com',
-    consentToken,
-    expiresAt: futureDate(7),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    requestedBasis: 'gdpr_parental_consent',
+    guardianEmail: 'parent-e2e-test@example.com',
+    status: 'requested',
+    token: consentToken,
+    tokenExpiresAt: futureDate(7),
+    requestedAt: new Date(),
   });
 
   return {
@@ -2239,15 +2373,17 @@ async function seedLanguageLearner(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Language Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subjectId = generateUUIDv7();
@@ -2561,36 +2697,37 @@ async function seedAccountDeletionScheduled(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
 
   const accountId = generateUUIDv7();
-  await db.insert(accounts).values({
+  await db.insert(organization).values({
     id: accountId,
-    clerkUserId,
-    email,
-    // Scheduled for deletion in 30 days
+    name: `Seed org ${accountId.slice(0, 8)}`,
     deletionScheduledAt: futureDate(30),
   });
 
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Deletion Scheduled User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -2633,15 +2770,17 @@ async function seedSessionWithTranscript(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Transcript User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
@@ -2786,6 +2925,8 @@ async function seedParentProxy(
     displayName: 'Proxy Parent',
     birthYear: 1985,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
   const childProfileId = await createBaseProfile(db, accountId, {
@@ -2794,19 +2935,19 @@ async function seedParentProxy(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
@@ -2927,15 +3068,17 @@ async function seedWithBookmarks(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Bookmarks User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
@@ -3135,13 +3278,30 @@ async function seedParentWithChildrenNoSessions(
   // Parent profile — direct insert to set defaultAppContext='family' (see
   // seedParentWithChildren rationale: V1 guardian shape requires this).
   const parentProfileId = generateUUIDv7();
-  await db.insert(profiles).values({
+  await db.insert(person).values({
     id: parentProfileId,
-    accountId,
     displayName: 'Test Parent',
-    birthYear: 1990,
-    isOwner: true,
+    birthDate: '1990-01-01',
+    residenceJurisdiction: 'ROW',
     defaultAppContext: 'family',
+  });
+  {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: parentProfileId,
+      clerkUserId,
+      email,
+    });
+    await db
+      .update(person)
+      .set({ loginId })
+      .where(eq(person.id, parentProfileId));
+  }
+  await db.insert(membership).values({
+    personId: parentProfileId,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
   });
 
   const childProfileId = await createBaseProfile(db, accountId, {
@@ -3150,19 +3310,19 @@ async function seedParentWithChildrenNoSessions(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   // Subject + curriculum WITHOUT any learningSessions row. Keeps the child
@@ -3276,25 +3436,28 @@ async function seedSubscriptionFamilyActive(
     displayName: 'Family Subscriber',
     birthYear: 1985,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'family',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'family',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -3338,25 +3501,28 @@ async function seedSubscriptionProActive(
     displayName: 'Pro Subscriber',
     birthYear: 1982,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'pro',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'pro',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -3404,25 +3570,28 @@ async function seedPurchasePending(
     displayName: 'Purchase Pending User',
     birthYear: LEARNER_BIRTH_YEAR,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -3471,25 +3640,28 @@ async function seedPurchaseConfirmed(
     displayName: 'Confirmed Subscriber',
     birthYear: LEARNER_BIRTH_YEAR,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'plus',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'plus',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -3534,25 +3706,28 @@ async function seedQuotaExceeded(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Quota Exceeded User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -3604,15 +3779,17 @@ async function seedForbidden(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Forbidden User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   // Deliberately no subscription row — metering middleware returns FORBIDDEN
@@ -3652,26 +3829,29 @@ async function seedQuizMalformedRound(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Malformed Round User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -3746,26 +3926,29 @@ async function seedQuizDeterministicWrongAnswer(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Deterministic Quiz User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -3838,26 +4021,29 @@ async function seedQuizAnswerCheckFails(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Quiz Check Fails User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -3932,16 +4118,19 @@ async function seedDailyLimitReached(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Daily Cap User',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -4031,6 +4220,8 @@ async function seedReviewEmpty(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Caught Up Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -4092,15 +4283,17 @@ async function seedDictationWithMistakes(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Dictation Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId } = await createSubjectWithCurriculum(
@@ -4137,15 +4330,17 @@ async function seedDictationPerfectScore(
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Dictation Learner',
     birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId } = await createSubjectWithCurriculum(
@@ -4200,32 +4395,50 @@ async function seedMentorAuditFamilyAtProfileLimit(
   // (createBaseProfile does not pass defaultAppContext through; see
   // seedParentWithChildren for the rationale).
   const parentProfileId = generateUUIDv7();
-  await db.insert(profiles).values({
+  await db.insert(person).values({
     id: parentProfileId,
-    accountId,
     displayName: 'Capped Parent',
-    birthYear: 1985,
-    isOwner: true,
+    birthDate: '1985-01-01',
+    residenceJurisdiction: 'ROW',
     defaultAppContext: 'family',
   });
+  {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: parentProfileId,
+      clerkUserId,
+      email,
+    });
+    await db
+      .update(person)
+      .set({ loginId })
+      .where(eq(person.id, parentProfileId));
+  }
+  await db.insert(membership).values({
+    personId: parentProfileId,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
+  });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: parentProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: parentProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'family',
+    organizationId: accountId,
+    payerPersonId: parentProfileId,
+    planTier: 'family',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -4248,19 +4461,19 @@ async function seedMentorAuditFamilyAtProfileLimit(
     });
     childProfileIds.push(childProfileId);
 
-    await db.insert(familyLinks).values({
+    await db.insert(guardianship).values({
       id: generateUUIDv7(),
-      parentProfileId,
-      childProfileId,
+      guardianPersonId: parentProfileId,
+      chargePersonId: childProfileId,
     });
 
-    await db.insert(consentStates).values({
+    await db.insert(consentGrant).values({
       id: generateUUIDv7(),
-      profileId: childProfileId,
-      consentType: 'GDPR',
-      status: 'CONSENTED',
-      parentEmail: email,
-      respondedAt: new Date(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose: 'platform_use',
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
     });
   }
 
@@ -4295,15 +4508,17 @@ async function seedMentorAuditPostApprovalRedirect(
     displayName: 'Approving Parent',
     birthYear: 1985,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: parentProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: parentProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const childProfileId = await createBaseProfile(db, accountId, {
@@ -4312,22 +4527,25 @@ async function seedMentorAuditPostApprovalRedirect(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
   });
 
   const consentToken = `seed-consent-${generateUUIDv7()}`;
   const consentStateId = generateUUIDv7();
-  await db.insert(consentStates).values({
+  await db.insert(consentRequest).values({
     id: consentStateId,
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'PARENTAL_CONSENT_REQUESTED',
-    parentEmail: email,
-    consentToken,
-    expiresAt: futureDate(7),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    requestedBasis: 'gdpr_parental_consent',
+    guardianEmail: 'parent-e2e-test@example.com',
+    status: 'requested',
+    token: consentToken,
+    tokenExpiresAt: futureDate(7),
+    requestedAt: new Date(),
   });
 
   return {
@@ -4354,13 +4572,27 @@ function makeConsentThresholdSeeder(
     const { clerkUserId, password } = await createClerkTestUser(email, env);
     const { accountId } = await createBaseAccount(db, email, clerkUserId);
     const profileId = generateUUIDv7();
-    await db.insert(profiles).values({
+    await db.insert(person).values({
       id: profileId,
-      accountId,
       displayName: `Consent Threshold (${opts.location} ${opts.ageYears}y)`,
-      birthYear: new Date().getFullYear() - opts.ageYears,
-      location: opts.location,
-      isOwner: true,
+      birthDate: `${new Date().getFullYear() - opts.ageYears}-01-01`,
+      residenceJurisdiction:
+        opts.location === 'US' ? 'US' : opts.location === 'EU' ? 'EU' : 'ROW',
+    });
+    {
+      const loginId = generateUUIDv7();
+      await db.insert(login).values({
+        id: loginId,
+        personId: profileId,
+        clerkUserId,
+        email,
+      });
+      await db.update(person).set({ loginId }).where(eq(person.id, profileId));
+    }
+    await db.insert(membership).values({
+      personId: profileId,
+      organizationId: accountId,
+      roles: ['admin', 'learner'],
     });
 
     return {
@@ -4389,25 +4621,28 @@ async function seedMentorAuditQuotaOwnerDaily(
     displayName: 'Daily Cap Owner',
     birthYear: 1985,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -4450,25 +4685,28 @@ async function seedMentorAuditQuotaFamilyMonthly(
     displayName: 'Family Monthly Cap Owner',
     birthYear: 1985,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'family',
+    organizationId: accountId,
+    payerPersonId: profileId,
+    planTier: 'family',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   await db.insert(quotaPools).values({
@@ -4508,15 +4746,17 @@ async function seedMentorAuditResumableSession(
     displayName: 'Resume Learner',
     birthYear: LEARNER_BIRTH_YEAR,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: 'parent-seed@example.com',
-    respondedAt: new Date(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -4585,22 +4825,39 @@ async function seedMentorAuditRichChildHistory(
   // (createBaseProfile does not pass defaultAppContext through; see
   // seedParentWithChildren for the rationale).
   const parentProfileId = generateUUIDv7();
-  await db.insert(profiles).values({
+  await db.insert(person).values({
     id: parentProfileId,
-    accountId,
     displayName: 'Rich-History Parent',
-    birthYear: 1985,
-    isOwner: true,
+    birthDate: '1985-01-01',
+    residenceJurisdiction: 'ROW',
     defaultAppContext: 'family',
   });
+  {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: parentProfileId,
+      clerkUserId,
+      email,
+    });
+    await db
+      .update(person)
+      .set({ loginId })
+      .where(eq(person.id, parentProfileId));
+  }
+  await db.insert(membership).values({
+    personId: parentProfileId,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
+  });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: parentProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: parentProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const childProfileId = await createBaseProfile(db, accountId, {
@@ -4609,19 +4866,19 @@ async function seedMentorAuditRichChildHistory(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId,
-    childProfileId,
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   // 2 subjects, ≥3 topics — one Math (retention surface), one English (recap +
@@ -4952,25 +5209,28 @@ async function seedMentorAuditFamilyPoolMembers(
     displayName: 'Pool-Sharing Parent',
     birthYear: 1985,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: parentProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: parentProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'family',
+    organizationId: accountId,
+    payerPersonId: parentProfileId,
+    planTier: 'family',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   const usedThisMonth = Math.floor(familyTier.monthlyQuota / 2);
@@ -4992,19 +5252,19 @@ async function seedMentorAuditFamilyPoolMembers(
     });
     childProfileIds.push(childProfileId);
 
-    await db.insert(familyLinks).values({
+    await db.insert(guardianship).values({
       id: generateUUIDv7(),
-      parentProfileId,
-      childProfileId,
+      guardianPersonId: parentProfileId,
+      chargePersonId: childProfileId,
     });
 
-    await db.insert(consentStates).values({
+    await db.insert(consentGrant).values({
       id: generateUUIDv7(),
-      profileId: childProfileId,
-      consentType: 'GDPR',
-      status: 'CONSENTED',
-      parentEmail: email,
-      respondedAt: new Date(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose: 'platform_use',
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
     });
   }
 
@@ -5046,32 +5306,50 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
   // because createBaseProfile() does not pass that field through. Pattern
   // mirrors makeConsentThresholdSeeder() at the top of the mentor-audit pack.
   const ownerProfileId = generateUUIDv7();
-  await db.insert(profiles).values({
+  await db.insert(person).values({
     id: ownerProfileId,
-    accountId,
     displayName: 'Daily-Capped Family Owner',
-    birthYear: 1985,
-    isOwner: true,
+    birthDate: '1985-01-01',
+    residenceJurisdiction: 'ROW',
     defaultAppContext: 'family',
   });
+  {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: ownerProfileId,
+      clerkUserId,
+      email,
+    });
+    await db
+      .update(person)
+      .set({ loginId })
+      .where(eq(person.id, ownerProfileId));
+  }
+  await db.insert(membership).values({
+    personId: ownerProfileId,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
+  });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: ownerProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: ownerProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscriptions).values({
+  await db.insert(subscription).values({
     id: subscriptionId,
-    accountId,
-    tier: 'free',
+    organizationId: accountId,
+    payerPersonId: ownerProfileId,
+    planTier: 'free',
     status: 'active',
-    currentPeriodStart: new Date(),
-    currentPeriodEnd: futureDate(30),
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
   });
 
   // Daily quota maxed; monthly bucket deliberately well below cap so the
@@ -5118,19 +5396,19 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId: ownerProfileId,
-    childProfileId,
+    guardianPersonId: ownerProfileId,
+    chargePersonId: childProfileId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const { subjectId: childSubjectId, topicIds: childTopicIds } =
@@ -5216,15 +5494,17 @@ async function seedMentorAuditBridgeBackstack(
     displayName: 'Bridge Parent',
     birthYear: 1985,
     isOwner: true,
+    email,
+    clerkUserId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: ownerProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: ownerProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   // Adult library deliberately gets a *different* subject name from the
@@ -5240,19 +5520,19 @@ async function seedMentorAuditBridgeBackstack(
     isOwner: false,
   });
 
-  await db.insert(familyLinks).values({
+  await db.insert(guardianship).values({
     id: generateUUIDv7(),
-    parentProfileId: ownerProfileId,
-    childProfileId,
+    guardianPersonId: ownerProfileId,
+    chargePersonId: childProfileId,
   });
 
-  await db.insert(consentStates).values({
+  await db.insert(consentGrant).values({
     id: generateUUIDv7(),
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: email,
-    respondedAt: new Date(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
   });
 
   const childSubjectName = 'Mathematics';
@@ -5305,10 +5585,13 @@ async function findClerkUserIdForAccount(
   db: Database,
   accountId: string,
 ): Promise<string | null> {
-  const row = await db.query.accounts.findFirst({
-    where: eq(accounts.id, accountId),
-  });
-  return row?.clerkUserId ?? null;
+  const rows = await db
+    .select({ clerkUserId: login.clerkUserId })
+    .from(login)
+    .innerJoin(membership, eq(membership.personId, login.personId))
+    .where(eq(membership.organizationId, accountId))
+    .limit(1);
+  return rows[0]?.clerkUserId ?? null;
 }
 
 /** Revokes the most recently-created Clerk session for the given user.
@@ -5562,21 +5845,100 @@ export async function seedScenario(
       ? [seedMarkedClerkUser.id]
       : [];
 
-  // Idempotent: delete existing seed accounts with the same email before
-  // seeding. Defence-in-depth: look up by email first, then delete by PK only
-  // if the account has a recognizable local seed marker (clerk_seed_* prefix)
-  // or a real Clerk user ID that Clerk itself marks with our seed external_id.
+  // Idempotent: delete existing seed organizations with the same email before
+  // seeding. Defence-in-depth: look up login by email first, then delete the
+  // organization only if the login has a recognizable local seed marker
+  // (clerk_seed_* prefix) or a real Clerk user ID that Clerk itself marks
+  // with our seed external_id.
   // Child tables cascade via ON DELETE CASCADE.
-  const existingAccounts = await db.query.accounts.findMany({
-    where: eq(accounts.email, email),
-  });
-  for (const existing of existingAccounts) {
+  const existingLogins = await db
+    .select({ personId: login.personId, clerkUserId: login.clerkUserId })
+    .from(login)
+    .where(eq(login.email, email));
+  for (const existing of existingLogins) {
     if (isSeedManagedClerkUserId(existing.clerkUserId, seedClerkUserIds)) {
-      await db.delete(accounts).where(eq(accounts.id, existing.id));
+      const existingMemberships = await db
+        .select({ organizationId: membership.organizationId })
+        .from(membership)
+        .where(eq(membership.personId, existing.personId));
+      const orgIdsToDelete = existingMemberships.map((m) => m.organizationId);
+      await deleteOrganizationGraph(db, orgIdsToDelete);
     }
   }
 
   return seeder(db, email, env);
+}
+
+// ---------------------------------------------------------------------------
+// Internal helper: delete an organization and all RESTRICT-gated dependents.
+//
+// ON DELETE RESTRICT tables that block a bare DELETE FROM organization:
+//   - subscription   (organizationId RESTRICT)
+//   - consent_grant  (organizationId RESTRICT)
+//   - guardianship   (guardianPersonId RESTRICT, chargePersonId RESTRICT)
+//   - subscription   (payerPersonId RESTRICT)
+//
+// Safe cascade tables (no action needed before org delete):
+//   - membership     (CASCADE from both personId and organizationId)
+//   - consent_request (CASCADE from organizationId and chargePersonId)
+//   - login          (CASCADE from personId)
+//   - subjects + all learning data (CASCADE from profileId → person.id post-M-REPOINT)
+//
+// Deletion order:
+//   1. Collect all personIds in the orgs (via membership — includes managed children)
+//   2. Delete consent_grant rows (clears both chargePersonId and organizationId RESTRICT)
+//   3. Delete subscription rows (clears organizationId and payerPersonId RESTRICT)
+//   4. Delete guardianship rows for those persons (clears RESTRICT on person)
+//   5. Delete person rows (cascades login, membership, consent_request, subjects, sessions…)
+//   6. Delete organization rows (membership already gone; safe)
+// ---------------------------------------------------------------------------
+async function deleteOrganizationGraph(
+  db: Database,
+  orgIds: string[],
+): Promise<number> {
+  if (orgIds.length === 0) return 0;
+
+  // 1. Collect all person IDs (owners + managed children) across these orgs.
+  const members = await db
+    .select({ personId: membership.personId })
+    .from(membership)
+    .where(inArray(membership.organizationId, orgIds));
+  const personIds = [...new Set(members.map((m) => m.personId))];
+
+  // 2. Delete consent_grant rows (RESTRICT on organizationId).
+  await db
+    .delete(consentGrant)
+    .where(inArray(consentGrant.organizationId, orgIds));
+
+  // 3. Delete subscription rows (RESTRICT on organizationId and payerPersonId).
+  await db
+    .delete(subscription)
+    .where(inArray(subscription.organizationId, orgIds));
+
+  // 4. Delete guardianship rows (RESTRICT on both person FK columns).
+  if (personIds.length > 0) {
+    await db
+      .delete(guardianship)
+      .where(
+        or(
+          inArray(guardianship.guardianPersonId, personIds),
+          inArray(guardianship.chargePersonId, personIds),
+        ),
+      );
+  }
+
+  // 5. Delete person rows (cascades login, membership, consent_request, subjects, sessions…).
+  if (personIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
+
+  // 6. Delete organization rows (membership already cascaded via person delete above).
+  const deleted = await db
+    .delete(organization)
+    .where(inArray(organization.id, orgIds))
+    .returning({ id: organization.id });
+
+  return deleted.length;
 }
 
 export async function resetDatabase(
@@ -5622,41 +5984,67 @@ export async function resetDatabase(
   }
 
   if (prefix) {
-    const existingAccounts = await db.query.accounts.findMany({
-      where: like(accounts.email, `${prefix}%`),
-    });
-    const seedAccountIds = existingAccounts
-      .filter((account) =>
-        isSeedManagedClerkUserId(account.clerkUserId, clerkUserIds),
-      )
-      .map((account) => account.id);
+    const seedLogins = await db
+      .select({ personId: login.personId, clerkUserId: login.clerkUserId })
+      .from(login)
+      .where(like(login.email, `${prefix}%`));
+    const filteredLogins = seedLogins.filter((l) =>
+      isSeedManagedClerkUserId(l.clerkUserId, clerkUserIds),
+    );
+    const seedPersonIds = filteredLogins.map((l) => l.personId);
 
-    if (seedAccountIds.length === 0) {
+    if (seedPersonIds.length === 0) {
       return { deletedCount: 0, clerkUsersDeleted };
     }
 
-    const deleted = await db
-      .delete(accounts)
-      .where(inArray(accounts.id, seedAccountIds))
-      .returning({ id: accounts.id });
+    const seedMemberships = await db
+      .select({ organizationId: membership.organizationId })
+      .from(membership)
+      .where(inArray(membership.personId, seedPersonIds));
+    const seedOrgIds = [
+      ...new Set(seedMemberships.map((m) => m.organizationId)),
+    ];
 
-    return { deletedCount: deleted.length, clerkUsersDeleted };
+    if (seedOrgIds.length === 0) {
+      return { deletedCount: 0, clerkUsersDeleted };
+    }
+
+    const deletedCount = await deleteOrganizationGraph(db, seedOrgIds);
+
+    return { deletedCount, clerkUsersDeleted };
   }
 
   // Build WHERE clause: match fake clerk_seed_* IDs OR real Clerk user IDs
   // that were created by the seed service.
-  const conditions = [like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)];
+  const loginConditions = [like(login.clerkUserId, `${SEED_CLERK_PREFIX}%`)];
   if (clerkUserIds.length > 0) {
-    conditions.push(inArray(accounts.clerkUserId, clerkUserIds));
+    loginConditions.push(inArray(login.clerkUserId, clerkUserIds));
   }
 
-  // Child tables (profiles, subjects, sessions, etc.) cascade automatically.
-  const deleted = await db
-    .delete(accounts)
-    .where(or(...conditions))
-    .returning({ id: accounts.id });
+  const seedLogins = await db
+    .select({ personId: login.personId })
+    .from(login)
+    .where(or(...loginConditions));
+  const seedPersonIds = seedLogins.map((l) => l.personId);
 
-  return { deletedCount: deleted.length, clerkUsersDeleted };
+  if (seedPersonIds.length === 0) {
+    return { deletedCount: 0, clerkUsersDeleted };
+  }
+
+  const seedMemberships = await db
+    .select({ organizationId: membership.organizationId })
+    .from(membership)
+    .where(inArray(membership.personId, seedPersonIds));
+  const seedOrgIds = [...new Set(seedMemberships.map((m) => m.organizationId))];
+
+  if (seedOrgIds.length === 0) {
+    return { deletedCount: 0, clerkUsersDeleted };
+  }
+
+  // deleteOrganizationGraph handles RESTRICT-gated dependents before org delete.
+  const deletedCount = await deleteOrganizationGraph(db, seedOrgIds);
+
+  return { deletedCount, clerkUsersDeleted };
 }
 
 // ---------------------------------------------------------------------------
@@ -5684,25 +6072,56 @@ export async function debugAccountsByEmail(
   db: Database,
   email: string,
 ): Promise<DebugAccountChain[]> {
-  const accountRows = await db.query.accounts.findMany({
-    where: eq(accounts.email, email),
-  });
+  const loginRows = await db
+    .select({
+      personId: login.personId,
+      clerkUserId: login.clerkUserId,
+      email: login.email,
+    })
+    .from(login)
+    .where(eq(login.email, email));
 
   return Promise.all(
-    accountRows.map(async (acc) => {
-      const profileRows = await db.query.profiles.findMany({
-        where: eq(profiles.accountId, acc.id),
-      });
+    loginRows.map(async (l) => {
+      const membershipRows = await db
+        .select({
+          organizationId: membership.organizationId,
+          roles: membership.roles,
+        })
+        .from(membership)
+        .where(eq(membership.personId, l.personId));
+
+      const orgId = membershipRows[0]?.organizationId ?? '';
+
+      const personRows = await db
+        .select({
+          id: person.id,
+          displayName: person.displayName,
+          birthDate: person.birthDate,
+        })
+        .from(person)
+        .innerJoin(membership, eq(membership.personId, person.id))
+        .where(eq(membership.organizationId, orgId));
+
       const profilesWithSubjects = await Promise.all(
-        profileRows.map(async (prof) => {
+        personRows.map(async (prof) => {
           const subjectRows = await db.query.subjects.findMany({
             where: eq(subjects.profileId, prof.id),
           });
+          const isOwner = membershipRows.some(
+            (m) =>
+              m.organizationId === orgId &&
+              Array.isArray(m.roles) &&
+              m.roles.includes('admin'),
+          );
+          const birthYear = prof.birthDate
+            ? parseInt(prof.birthDate.slice(0, 4), 10)
+            : null;
           return {
             id: prof.id,
             displayName: prof.displayName,
-            birthYear: prof.birthYear,
-            isOwner: prof.isOwner,
+            birthYear,
+            isOwner,
             subjects: subjectRows.map((s) => ({
               id: s.id,
               name: s.name,
@@ -5712,9 +6131,9 @@ export async function debugAccountsByEmail(
         }),
       );
       return {
-        id: acc.id,
-        clerkUserId: acc.clerkUserId,
-        email: acc.email,
+        id: orgId,
+        clerkUserId: l.clerkUserId,
+        email: l.email,
         profiles: profilesWithSubjects,
       };
     }),
@@ -5730,8 +6149,8 @@ export interface DebugSubjectsResult {
 
 /**
  * Simulates the exact subjects query path the app uses.
- * Walks: clerkUserId → account → profile (owner) → subjects.
- * Returns null if no account or profile found.
+ * Walks: clerkUserId → login → membership → person (admin) → subjects.
+ * Returns null if no login or membership found.
  */
 export async function debugSubjectsByClerkUserId(
   db: Database,
@@ -5740,41 +6159,71 @@ export async function debugSubjectsByClerkUserId(
   | { result: DebugSubjectsResult }
   | { error: string; detail: Record<string, string> }
 > {
-  // Find account by clerkUserId — includes both seed and real Clerk users.
+  // Find login by clerkUserId — includes both seed and real Clerk users.
   // Safe because this endpoint is ENVIRONMENT-guarded.
-  const account = await db.query.accounts.findFirst({
-    where: eq(accounts.clerkUserId, clerkUserId),
-  });
+  const loginRows = await db
+    .select({ personId: login.personId, email: login.email })
+    .from(login)
+    .where(eq(login.clerkUserId, clerkUserId))
+    .limit(1);
+  const loginRow = loginRows[0];
 
-  if (!account) {
+  if (!loginRow) {
     return {
-      error: 'No account found for clerkUserId',
+      error: 'No login found for clerkUserId',
       detail: { clerkUserId },
     };
   }
 
-  const profileRows = await db.query.profiles.findMany({
-    where: eq(profiles.accountId, account.id),
-  });
+  const membershipRows = await db
+    .select({
+      organizationId: membership.organizationId,
+      roles: membership.roles,
+    })
+    .from(membership)
+    .where(eq(membership.personId, loginRow.personId));
 
-  const ownerProfile = profileRows.find((p) => p.isOwner) ?? profileRows[0];
-  if (!ownerProfile) {
-    return { error: 'No profiles found', detail: { accountId: account.id } };
+  const adminMembership =
+    membershipRows.find(
+      (m) => Array.isArray(m.roles) && m.roles.includes('admin'),
+    ) ?? membershipRows[0];
+
+  if (!adminMembership) {
+    return {
+      error: 'No membership found',
+      detail: { personId: loginRow.personId },
+    };
   }
 
-  const subjectList = await listSubjects(db, ownerProfile.id);
+  const orgId = adminMembership.organizationId;
+
+  const personRows = await db
+    .select({ id: person.id, displayName: person.displayName })
+    .from(person)
+    .where(eq(person.id, loginRow.personId))
+    .limit(1);
+  const ownerPerson = personRows[0];
+
+  if (!ownerPerson) {
+    return {
+      error: 'No person found',
+      detail: { personId: loginRow.personId },
+    };
+  }
+
+  const subjectList = await listSubjects(db, ownerPerson.id);
 
   return {
     result: {
       account: {
-        id: account.id,
-        clerkUserId: account.clerkUserId,
-        email: account.email,
+        id: orgId,
+        clerkUserId,
+        email: loginRow.email,
       },
       profile: {
-        id: ownerProfile.id,
-        displayName: ownerProfile.displayName,
-        isOwner: ownerProfile.isOwner,
+        id: ownerPerson.id,
+        displayName: ownerPerson.displayName,
+        isOwner: true,
       },
       subjects: subjectList,
       subjectCount: subjectList.length,
