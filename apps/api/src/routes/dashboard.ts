@@ -113,7 +113,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // Sub-routes (inventory, progress-history, sessions, memory, reports) keep
     // their own assertChildDashboardDataVisible guards because they don't have
     // a "restricted view" -- they should not return data at all.
-    const child = await getChildDetail(db, parentProfileId, childProfileId);
+    const child = await getChildDetail(db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     return c.json(childDetailResponseSchema.parse({ child }));
   })
 
@@ -131,6 +133,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     return c.json(childInventoryResponseSchema.parse({ inventory }));
   })
@@ -149,6 +152,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     return c.json(progressSummarySchema.parse(summary));
   })
@@ -172,6 +176,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
         parentProfileId,
         childProfileId,
         query,
+        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
       );
       return c.json(childProgressHistoryResponseSchema.parse({ history }));
     },
@@ -194,6 +199,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId,
       subjectId,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     return c.json(childSubjectTopicsResponseSchema.parse({ topics }));
   })
@@ -271,6 +277,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     return c.json(childSessionsResponseSchema.parse({ sessions }));
   })
@@ -292,6 +299,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId,
       sessionId,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     if (!session) {
       return notFound(c, 'Session not found');
@@ -349,7 +357,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
 
-    const reports = await getChildReports(db, parentProfileId, childProfileId);
+    const reports = await getChildReports(db, parentProfileId, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     return c.json(childReportsResponseSchema.parse({ reports }));
   })
 
@@ -369,6 +379,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId,
       reportId,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     if (!report) {
       return notFound(c, 'Report not found');
@@ -387,7 +398,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
 
-    await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
+    await markChildReportViewed(db, parentProfileId, childProfileId, reportId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     return c.json(reportViewedResponseSchema.parse({ viewed: true }));
   })
 
@@ -407,6 +420,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     return c.json(weeklyReportsResponseSchema.parse({ reports }));
   })
@@ -428,6 +442,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId,
       reportId,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     if (!report) {
       return notFound(c, 'Report not found');
@@ -454,6 +469,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
         parentProfileId,
         childProfileId,
         reportId,
+        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
       );
       return c.json(reportViewedResponseSchema.parse({ viewed: true }));
     },

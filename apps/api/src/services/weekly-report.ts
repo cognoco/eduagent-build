@@ -202,8 +202,9 @@ export async function listWeeklyReportsForParentChild(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<WeeklyReportSummary[]> {
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   const rows = await db.query.weeklyReports.findMany({
     where: and(
       eq(weeklyReports.profileId, parentProfileId),
@@ -249,8 +250,9 @@ export async function getWeeklyReportForParentChild(
   parentProfileId: string,
   childProfileId: string,
   reportId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<WeeklyReportRecord | null> {
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   const row = await db.query.weeklyReports.findFirst({
     where: and(
       eq(weeklyReports.id, reportId),
@@ -267,8 +269,9 @@ export async function markWeeklyReportViewed(
   parentProfileId: string,
   childProfileId: string,
   reportId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await db
     .update(weeklyReports)
     .set({ viewedAt: new Date() })

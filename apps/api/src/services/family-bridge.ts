@@ -407,16 +407,18 @@ export async function cloneTopicFromChild(
   db: Database,
   adultProfileId: string,
   input: CloneFromChildRequest,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<CloneFromChildResponse> {
   const cached = readCachedCloneResult(adultProfileId, input);
   if (cached) return cached;
 
-  await assertParentAccess(db, adultProfileId, input.childProfileId);
+  await assertParentAccess(db, adultProfileId, input.childProfileId, opts);
   const snapshot = await getChildTopicSnapshotForParent(
     db,
     adultProfileId,
     input.childProfileId,
     input.topicId,
+    opts,
   );
   if (!snapshot) throw new NotFoundError('Topic');
 
