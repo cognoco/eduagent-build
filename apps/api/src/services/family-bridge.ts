@@ -21,6 +21,7 @@ import type {
 
 import { NotFoundError } from '../errors';
 import { assertParentAccess } from './family-access';
+import { getChargeSubjectsForGuardianV2 } from './identity-v2/family-bridge-v2';
 import {
   findOwnedCurriculumTopic,
   type OwnedCurriculumTopic,
@@ -32,13 +33,16 @@ const cloneRequestCache = new Map<
   { expiresAt: number; result: CloneFromChildResponse }
 >();
 
-function hashTopicDescription(title: string, description: string): string {
+export function hashTopicDescription(
+  title: string,
+  description: string,
+): string {
   return createHash('sha256')
     .update(`${title.trim()}\n${description.trim()}`)
     .digest('hex');
 }
 
-function sourceAgeBracket(
+export function sourceAgeBracket(
   birthYear: number,
 ): ChildTopicSnapshot['sourceAgeBracket'] {
   const age = new Date().getUTCFullYear() - birthYear;
@@ -100,7 +104,21 @@ export async function getChildTopicSnapshotForParent(
   adultProfileId: string,
   childProfileId: string,
   topicId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<ChildTopicSnapshot | null> {
+  // [WP-6] v2 seam: the guardianship-edge guard + person/subject cross-person
+  // read. The v2 twin performs its own active-edge authorization (throwing
+  // ForbiddenError on no edge), so the legacy assertParentAccess + family_links
+  // join below run only on the flag-off legacy path.
+  if (opts?.identityV2Enabled) {
+    return getChargeSubjectsForGuardianV2(
+      db,
+      adultProfileId,
+      childProfileId,
+      topicId,
+    );
+  }
+
   await assertParentAccess(db, adultProfileId, childProfileId);
 
   const [row] = await db

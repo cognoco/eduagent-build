@@ -10,6 +10,10 @@ monitor only.)
 `orchestrator↔shepherd` agnostic seam PRG-5 is scoped to own. Cross-ref:
 `_wip/umbrella-program/supporting-artefacts/mechanism-productionization-design-input.md`.
 
+## Name
+
+This channel — the `_state/{inbox,outbox}.jsonl` mailboxes + the Cosmo-Stage signaling the orchestrator derives lifecycle from + the Monitor watchers on both sides — is collectively the **Clacks**, the **Quartet's** comms layer (the message-relay the four roles signal over). Stack: **ZDX → Cosmo → Clacks → Quartet**.
+
 ## Problem
 
 A shepherd runs as a **separate session** driving a lane. The orchestrator (program session)

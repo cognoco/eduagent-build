@@ -18,6 +18,8 @@ what, and where does each one's detail live.*
 **What this is NOT.** Not a tracker (each program keeps its own), not a Cosmo
 object, not a backlog. It holds **rows and pointers**, never content.
 
+**Vocabulary (execution machinery).** Lanes are driven by the **Quartet** — orchestrator / shepherd / executor / reviewer (scaffolds in `_wip/**/*-protocol.md`) — signalling over the **Clacks** comms layer. Stack: **ZDX → Cosmo → Clacks → Quartet**.
+
 ## The one hard rule
 
 **Pointers, never copies.** Every program's detail (charter, decomposition,

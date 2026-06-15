@@ -750,6 +750,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
       expect(mockSafeRefundQuota).toHaveBeenCalledWith(
         expect.anything(),
@@ -912,6 +913,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
       expect(res.status).toBe(200);
     });
@@ -945,6 +947,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
       expect(res.status).toBe(200);
     });
@@ -1036,6 +1039,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
       expect(res.status).toBe(200);
     });
@@ -1095,6 +1099,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
     });
 
@@ -1310,6 +1315,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
     });
 
@@ -1557,6 +1563,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-free',
         'test-profile-id',
+        false,
       );
     });
   });
@@ -1599,6 +1606,15 @@ describe('metering middleware', () => {
       // CR3: ensureFreeSubscription NOT called when KV has the data
       expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
     });
+
+    // [WI-776 / WP-7] Flag-on positive coverage for the cutover-flag threading
+    // lives at the handler self-refund surface — the actual P1 — in
+    // routes/assessments.test.ts ("threads identityV2=true into the refund under
+    // flag-on" + "does NOT mark quotaRefunded when the refund did not
+    // complete"). That surface isolates the threading without standing up the
+    // full v2 auth/identity chain (the account middleware's resolveIdentityV2
+    // path is exercised by its own suite). The flag-OFF threading is pinned here
+    // by the decrement assertions above (trailing `false` arg).
 
     it('backfills KV on cache miss (includes subscriptionId + daily fields)', async () => {
       // No seed — empty store = cache miss
@@ -1758,6 +1774,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
     });
 
@@ -2364,6 +2381,7 @@ describe('metering middleware', () => {
           expect.anything(),
           'sub-1',
           'test-profile-id',
+          false,
         );
       },
     );
@@ -2441,6 +2459,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
     });
 

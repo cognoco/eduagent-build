@@ -50,7 +50,8 @@ import {
 } from '../services/family-access';
 import { ForbiddenError, notFound } from '../errors';
 import { createLogger } from '../services/logger';
-import { isMemoryFactsReadEnabled } from '../config';
+import { isIdentityV2Enabled, isMemoryFactsReadEnabled } from '../config';
+import { validateGuardianChargeRelationshipV2 } from '../services/identity-v2/family-bridge-v2';
 import {
   getMemoryProjection,
   toCuratedView,
@@ -63,6 +64,7 @@ type DashboardRouteEnv = {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -201,20 +203,33 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // ("404, never 403, never reveal whether the topic ID exists").
     assertOwnerProfile(c);
 
+    // [WP-6] v2 seam: the guardianship-edge guard re-point. Flag-off keeps the
+    // legacy family_links route-entry guard + service path intact.
+    const identityV2Enabled = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+
     try {
       // GUARD: Do NOT move assertOwnerProfile() inside this try — every
       // ForbiddenError thrown here is converted to 404 below to preserve the
       // IDOR contract. Non-owners must continue to surface as 403 via the
       // global error handler, not as 404.
       // Defense-in-depth: route-entry parent-link check before the service.
-      // getChildTopicSnapshotForParent also calls assertParentAccess.
-      await assertParentAccess(db, parentProfileId, childProfileId);
+      // getChildTopicSnapshotForParent also runs the same guard.
+      if (identityV2Enabled) {
+        await validateGuardianChargeRelationshipV2(
+          db,
+          parentProfileId,
+          childProfileId,
+        );
+      } else {
+        await assertParentAccess(db, parentProfileId, childProfileId);
+      }
 
       const snapshot = await getChildTopicSnapshotForParent(
         db,
         parentProfileId,
         childProfileId,
         topicId,
+        { identityV2Enabled },
       );
       if (!snapshot) return notFound(c, 'Topic not found');
       return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));

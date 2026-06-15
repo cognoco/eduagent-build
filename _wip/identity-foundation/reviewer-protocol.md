@@ -3,7 +3,7 @@
 **What this is.** The standard process scaffold for the **autonomous reviewer** of a Cosmo
 workstream — the session that takes Work Items from `Stage=Reviewing` to a disposition (done /
 rework / human). Carries *process only*. Sibling to `shepherd-protocol.md`, `executor-protocol.md`,
-and `orchestrator-protocol.md` — one of the four role-scaffolds. To spawn a reviewer for a specific
+and `orchestrator-protocol.md` — one of the four role-scaffolds of the **Quartet** (the four-role structure; the reviewer is context-agnostic and signals only through Cosmo Stage — it does not read the **Clacks**). To spawn a reviewer for a specific
 workstream, paste `reviewer-kickoff-template.md` (it points here). *(Standardized 2026-06-15 from
 the dogfooded review loop — `review-loop-mechanics.md` + the watcher kickoff prompts; PRG-05
 role-scaffold input.)*
