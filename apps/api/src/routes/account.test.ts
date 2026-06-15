@@ -477,6 +477,8 @@ describe('account routes', () => {
         data: expect.objectContaining({
           accountId: 'test-account-id',
           profileIds: ['profile-1'],
+          // [CUT-B2] mode pinned at schedule time — legacy path stamps 'v1'.
+          identityVersion: 'v1',
           timestamp: expect.any(String),
         }),
       });
@@ -948,6 +950,16 @@ describe('account routes', () => {
         expect.anything(),
         'test-account-id',
       );
+      // [CUT-B2] mode pinned at schedule time — v2 path stamps 'v2' on the
+      // event so the 7-day-later resume runs against the org store even if the
+      // flag flips mid-grace-period (the CODEX-P1 GDPR-skip guard).
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'app/account.deletion-scheduled',
+        data: expect.objectContaining({
+          accountId: 'test-account-id',
+          identityVersion: 'v2',
+        }),
+      });
     });
 
     it('[CUT-B2] POST /v1/account/delete rolls back via cancelDeletionV2 when Inngest fails + flag on', async () => {
@@ -983,6 +995,25 @@ describe('account routes', () => {
         expect.anything(),
         'test-account-id',
       );
+    });
+
+    // [BUG-412 parity] The 409 "nothing to cancel" branch must hold on the v2
+    // path too: cancelDeletionV2 returning 'no_active_deletion' must produce a
+    // 409 CONFLICT, not a 200. Mirrors the v1 [BUG-412] test above.
+    it('[CUT-B2] POST /v1/account/cancel-deletion returns 409 when cancelDeletionV2 finds no active deletion', async () => {
+      (cancelDeletionV2 as jest.Mock).mockResolvedValueOnce(
+        'no_active_deletion',
+      );
+
+      const res = await app.request(
+        '/v1/account/cancel-deletion',
+        { method: 'POST', headers: makeAuthHeaders() },
+        V2_TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.code).toBe(ERROR_CODES.CONFLICT);
     });
 
     it('[CUT-B2] GET /v1/account/export calls generateExportV2 when flag on', async () => {

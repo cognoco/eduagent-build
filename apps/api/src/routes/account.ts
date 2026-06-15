@@ -160,11 +160,20 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       // Re-dispatch for already scheduled deletions too; the Inngest function
       // is idempotent by accountId, and retrying recovers a prior orphaned
       // schedule where the DB write succeeded but the durable handoff did not.
+      //
+      // [CUT-B2] Pin the identity mode at SCHEDULE time. The deletion was just
+      // written into the v1 (accounts) or v2 (organization) store under `v2`;
+      // the resume handler runs 7 days later, by which point the
+      // IDENTITY_V2_ENABLED flag may have flipped (cutover or rollback).
+      // Carrying the version in the event makes the run complete the erasure in
+      // the SAME store it was scheduled in, so a mid-grace-period flip can never
+      // route the run at the wrong store and silently skip a GDPR/COPPA deletion.
       await inngest.send({
         name: 'app/account.deletion-scheduled',
         data: {
           accountId: account.id,
           profileIds,
+          identityVersion: v2 ? 'v2' : 'v1',
           timestamp: new Date().toISOString(),
         },
       });

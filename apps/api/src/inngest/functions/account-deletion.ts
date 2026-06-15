@@ -89,6 +89,25 @@ export const scheduledDeletion = inngest.createFunction(
   async ({ event, step }) => {
     const { accountId } = event.data;
 
+    // [CUT-B2] Identity mode is PINNED at schedule time, not re-read here. The
+    // schedule handler (POST /account/delete) wrote the deletion stamp into the
+    // v1 (accounts) or v2 (organization) store and stamped the matching
+    // `identityVersion` onto this event. Reading the live flag at execution
+    // time would let a mid-grace-period flip (cutover or rollback) route every
+    // step below at the WRONG store: the resume would miss the active-deletion
+    // stamp and return cancelled/already_deleted WITHOUT erasing — a silently
+    // skipped GDPR/COPPA deletion. We therefore branch on the pinned version
+    // for EVERY step. Fallback to the live flag only when the field is absent
+    // (an in-flight event dispatched before this field existed).
+    const identityVersion = (event.data as { identityVersion?: 'v1' | 'v2' })
+      .identityVersion;
+    const useV2 =
+      identityVersion === 'v2'
+        ? true
+        : identityVersion === 'v1'
+          ? false
+          : isIdentityV2EnabledInStep();
+
     // Wait 7-day grace period
     await step.sleep('grace-period', '7d');
 
@@ -101,7 +120,7 @@ export const scheduledDeletion = inngest.createFunction(
     // telemetry for grace-period overruns vs. happy-path completions.
     const exists = await step.run('check-account-exists', async () => {
       const db = getStepDatabase();
-      if (isIdentityV2EnabledInStep()) {
+      if (useV2) {
         return organizationExistsV2(db, accountId);
       }
       return accountExists(db, accountId);
@@ -117,7 +136,7 @@ export const scheduledDeletion = inngest.createFunction(
     // the captured value rather than reading a now-deleted row.
     const clerkUserId = await step.run('capture-clerk-user-id', async () => {
       const db = getStepDatabase();
-      if (isIdentityV2EnabledInStep()) {
+      if (useV2) {
         return getOrganizationOwnerClerkUserIdV2(db, accountId);
       }
       return getAccountClerkUserId(db, accountId);
@@ -130,7 +149,7 @@ export const scheduledDeletion = inngest.createFunction(
     // case) — executeDeletionV2 handles null ownerEmail as a no-op on that leg.
     const ownerEmail = await step.run('capture-owner-email', async () => {
       const db = getStepDatabase();
-      if (isIdentityV2EnabledInStep()) {
+      if (useV2) {
         return getOrganizationOwnerEmailV2(db, accountId);
       }
       return null;
@@ -139,7 +158,7 @@ export const scheduledDeletion = inngest.createFunction(
     // Check if deletion was cancelled
     const cancelled = await step.run('check-cancellation', async () => {
       const db = getStepDatabase();
-      if (isIdentityV2EnabledInStep()) {
+      if (useV2) {
         return isDeletionCancelledV2(db, accountId);
       }
       return isDeletionCancelled(db, accountId);
@@ -157,7 +176,7 @@ export const scheduledDeletion = inngest.createFunction(
     // 'already_deleted' so telemetry is accurate.
     const deletionResult = await step.run('delete-account-data', async () => {
       const db = getStepDatabase();
-      if (isIdentityV2EnabledInStep()) {
+      if (useV2) {
         return executeDeletionV2(db, {
           organizationId: accountId,
           ownerEmail,
