@@ -54,6 +54,7 @@ type LearnerProfileRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -130,7 +131,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         input.value,
         input.suppress ?? false,
         input.subject,
-        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
@@ -170,6 +174,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const accountId = requireAccount(c.get('account')).id;
     await deleteAllMemory(db, profileId, accountId, {
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      callerPersonId: c.get('callerPersonId'),
     });
     return c.json({ success: true });
   })
@@ -200,7 +205,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         profileId,
         accountId,
         memoryCollectionEnabled,
-        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
@@ -246,7 +254,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         profileId,
         accountId,
         memoryInjectionEnabled,
-        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
@@ -290,6 +301,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { consent } = c.req.valid('json');
       await grantMemoryConsent(db, profileId, accountId, consent, {
         identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        callerPersonId: c.get('callerPersonId'),
       });
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
@@ -365,6 +377,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { value } = c.req.valid('json');
       await unsuppressInference(db, profileId, accountId, value, {
         identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        callerPersonId: c.get('callerPersonId'),
       });
       return c.json(
         learnerProfileSuccessResponseSchema.parse({ success: true }),
@@ -415,6 +428,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         accommodationMode,
         {
           identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
         },
       );
       return c.json(

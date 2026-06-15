@@ -38,6 +38,7 @@ type SnapshotProgressRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -107,7 +108,10 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
       requireAccount(c.get('account')).id,
       'progress_refresh',
       { hours: 1, maxCount: 10 },
-      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+      {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        callerPersonId: c.get('callerPersonId'),
+      },
     );
     if (rateLimited) {
       return apiError(

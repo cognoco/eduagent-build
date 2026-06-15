@@ -55,6 +55,7 @@ type SupportRouteEnv = {
     db: Database;
     profileId: string | undefined;
     account: Account;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -76,7 +77,10 @@ export const supportRoutes = new Hono<SupportRouteEnv>().post(
       account.id,
       'support_outbox_spillover',
       { hours: SPILLOVER_WINDOW_HOURS, maxCount: SPILLOVER_MAX_PER_HOUR },
-      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+      {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        callerPersonId: c.get('callerPersonId'),
+      },
     );
     if (rateLimited) {
       c.header('Retry-After', String(SPILLOVER_RETRY_AFTER_SECONDS));

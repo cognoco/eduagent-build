@@ -28,17 +28,9 @@ import {
   verifyPersonOwnershipV2,
   verifyPersonIsOrgAdminV2,
 } from './identity-v2/ownership-v2';
+import type { IdentityV2Opts } from './identity-v2/identity-v2-opts';
 
-/**
- * Identity-v2 dispatch options threaded from the route layer. When
- * `identityV2Enabled` is true, the ownership guards scope to the caller's
- * organization via `membership` (account.id = organization.id) instead of the
- * legacy `profiles.accountId` column. Default-off keeps the legacy path
- * byte-identical until WP-FLAG.
- */
-export interface IdentityV2Opts {
-  identityV2Enabled?: boolean;
-}
+export type { IdentityV2Opts };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -89,8 +81,15 @@ async function verifyProfileOwnership(
   opts?: IdentityV2Opts,
 ): Promise<void> {
   if (opts?.identityV2Enabled) {
-    // v2: account.id = organization.id; ownership = membership in the org.
-    await verifyPersonOwnershipV2(db, profileId, accountId);
+    // v2: account.id = organization.id; write authority = self OR guardian edge
+    // (membership alone is existence-visibility, not write authority).
+    // callerPersonId is the authenticated caller, never request-supplied.
+    await verifyPersonOwnershipV2(
+      db,
+      profileId,
+      accountId,
+      requireCallerPersonId(opts),
+    );
     return;
   }
   const [owner] = await db
@@ -100,6 +99,21 @@ async function verifyProfileOwnership(
   if (!owner) {
     throw new Error(`Profile ${profileId} not found for account`);
   }
+}
+
+/**
+ * The authenticated caller's own person id is mandatory on the v2 write path —
+ * the write-authority guard cannot prove self-or-edge without it. A missing
+ * value means the route failed to thread it (a wiring bug); fail closed rather
+ * than silently fall back to a membership-only (IDOR-prone) check.
+ */
+function requireCallerPersonId(opts: IdentityV2Opts): string {
+  if (!opts.callerPersonId) {
+    throw new Error(
+      'identity-v2 write guard requires callerPersonId (caller identity not threaded)',
+    );
+  }
+  return opts.callerPersonId;
 }
 
 /**

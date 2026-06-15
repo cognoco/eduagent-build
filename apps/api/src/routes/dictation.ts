@@ -62,6 +62,7 @@ type DictationRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -236,7 +237,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         account.id,
         'dictation_review',
         { hours: 1 / 60, maxCount: 10 },
-        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       if (rateLimited) {
         return apiError(

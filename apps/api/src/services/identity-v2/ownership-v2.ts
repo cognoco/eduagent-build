@@ -3,51 +3,62 @@
 // The v2 twins of the private `verifyProfileOwnership` guard that fronts every
 // write in `services/settings.ts` and `services/learner-profile.ts`.
 //
-// SECURITY (HIGH — the write-ownership boundary). The legacy guard
-// `verifyProfileOwnership(db, profileId, accountId)` scoped a write to a
-// profile owned by `accounts.id`. The v2 guard scopes the write to a person who
-// is a MEMBER of the caller's organization, via the `membership` join. The org
-// id is ALWAYS the caller's own resolved org (identity-resolve.ts:
-// account.id = organization.id, resolved from the caller's
-// login→membership→organization chain), NEVER a request parameter — so the
-// membership-scoped predicate IS the ownership boundary: a caller resolved to
-// org A can never mutate a person of org B, because a person in org B has no
-// membership row with organization_id = A.
+// SECURITY (HIGH — the write-AUTHORITY boundary, NOT mere visibility).
 //
-// This is the parent-chain pattern (direct db.select() enforcing the owning
-// ancestor — membership.organizationId — in WHERE), the sanctioned alternative
-// to the scoped repo for a guard that joins through a parent (AGENTS.md
-// "Non-Negotiable Engineering Rules": writes verify ownership through the
-// parent chain before mutating child records).
+// Canon (data-model.md §2A.4, ontology.md inv 8, domain-model.md): membership
+// grants **existence-visibility only**; WRITE authority is **self OR
+// edge-derived**. A person reads+writes their OWN data intrinsically; writing
+// ANOTHER person's data requires an authorized edge. So an org-membership check
+// is the WRONG guard for a write — in any org with >1 credentialed person
+// (every family org: guardian + charges), a same-org member who supplies
+// another member's id would pass a membership-only guard and mutate that
+// person's settings or memory. That is the IDOR this guard exists to deny.
+//
+// The guard therefore takes the AUTHENTICATED caller's own person id
+// (`callerPersonId`, resolved from the login→person binding by the account
+// middleware — NEVER request-supplied, exactly like `identityV2Enabled`) and
+// authorizes the write only when the caller is:
+//   - SELF     — callerPersonId === targetPersonId, OR
+//   - GUARDIAN — an active guardianship edge caller→target (isGuardianOf).
+// Supporter edges are excluded by canon: §2A.4 makes the supporter edge
+// data-access-only (read/visibility), never write.
+//
+// Org membership is retained as a defense-in-depth invariant (the target must
+// still be a member of the caller's org), but it is NOT sufficient on its own.
 //
 // Parity note: the legacy `verifyProfileOwnership` checks only (profiles.id,
-// profiles.accountId) — it does NOT filter `archivedAt`. Ownership is a
-// structural membership fact, not a lifecycle state, so the v2 guard mirrors
-// this: it checks membership existence and does NOT exclude archived persons.
-// (Contrast listProfilesV2, whose legacy twin `listProfiles` DID exclude
-// archived rows — so it does too. The guards diverge because their legacy
-// twins diverge.)
+// profiles.accountId) — it does NOT filter `archivedAt`. The v2 guard mirrors
+// this: it does not exclude archived persons. (Contrast listProfilesV2, whose
+// legacy twin `listProfiles` DID exclude archived rows — so it does too. The
+// guards diverge because their legacy twins diverge.)
 // ---------------------------------------------------------------------------
 
 import { and, eq, sql } from 'drizzle-orm';
 import { membership, type Database } from '@eduagent/database';
+import { isGuardianOf } from './guardianship';
 
 /**
- * Verify a person is a member of the caller's organization before a write.
- * The v2 twin of `verifyProfileOwnership(db, profileId, accountId)`.
+ * Verify the authenticated caller has WRITE authority over `personId` before a
+ * settings / learner-profile write. The v2 twin of
+ * `verifyProfileOwnership(db, profileId, accountId)`.
  *
  * `organizationId` MUST be the caller's own resolved org id
- * (account.id = organization.id); the `membership` join scopes the guard to
- * that org and is the ownership boundary against cross-org writes. Throws
- * (matching the legacy guard's throw-on-miss contract) when the person has no
- * membership in this org.
+ * (account.id = organization.id). `callerPersonId` MUST be the authenticated
+ * caller's own person id (resolved from the login binding, never
+ * request-supplied).
+ *
+ * Authorizes only when the target is a member of the org AND the caller is the
+ * target (self) OR holds an active guardianship edge over the target. Throws
+ * (matching the legacy guard's throw-on-miss contract) otherwise.
  */
 export async function verifyPersonOwnershipV2(
   db: Database,
   personId: string,
   organizationId: string,
+  callerPersonId: string,
 ): Promise<void> {
-  const [owner] = await db
+  // Defense-in-depth: the target must still be a member of the caller's org.
+  const [member] = await db
     .select({ personId: membership.personId })
     .from(membership)
     .where(
@@ -57,9 +68,21 @@ export async function verifyPersonOwnershipV2(
       ),
     )
     .limit(1);
-  if (!owner) {
+  if (!member) {
     throw new Error(`Person ${personId} not found for organization`);
   }
+
+  // Write authority: self OR an authorized guardianship edge. Membership alone
+  // is existence-visibility, not write authority (canon §2A.4).
+  if (callerPersonId === personId) {
+    return; // self-ownership is intrinsic
+  }
+  if (await isGuardianOf(db, callerPersonId, personId)) {
+    return; // guardian operate/manage over the charge
+  }
+  throw new Error(
+    `Person ${callerPersonId} lacks write authority over person ${personId}`,
+  );
 }
 
 /**

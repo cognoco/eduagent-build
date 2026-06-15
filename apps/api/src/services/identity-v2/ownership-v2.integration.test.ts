@@ -3,20 +3,20 @@
 // identity graph (WP-1 enumeration §4.2).
 //
 // verifyPersonOwnershipV2 is the v2 twin of the private `verifyProfileOwnership`
-// guard fronting every settings.ts / learner-profile.ts write. The legacy guard
-// scoped a write to a profile owned by `accounts.id`; the v2 guard scopes the
-// write to a person who is a MEMBER of the caller's `organization.id` via the
-// `membership` join. The org id is always the CALLER's own resolved org
-// (identity-resolve.ts: account.id = organization.id), never a request
-// parameter — so the membership-scoped predicate is the ownership boundary: a
-// caller resolved to org A can never mutate a person of org B.
+// guard fronting every settings.ts / learner-profile.ts write. It guards WRITE
+// AUTHORITY, not mere visibility. Canon (data-model.md §2A.4, ontology.md inv 8):
+// membership grants existence-visibility only; write authority is self OR
+// edge-derived. So the guard authorizes a write only when the authenticated
+// caller (callerPersonId, never request-supplied) is the target (self) OR holds
+// an active guardianship edge over the target. Supporter edges are excluded
+// (data-access-only). Org membership is a defense-in-depth invariant, not the
+// authority gate.
 //
-// The central test here is the cross-org write-ownership break test (§4.2): a
-// write targeting a person in a DIFFERENT org MUST be denied. Red-green-revert:
-// with the membership-scoped predicate the negative-path test is GREEN (the
-// guard throws for the foreign person); if the `organization_id` scope is
-// dropped, it goes RED (the foreign person passes the guard). The revert
-// demonstration is recorded in the WI-774 PR/commit.
+// The central test is the WRITE-AUTHORITY break test (§4.2): a same-org member
+// who is neither the target (self) nor a guardian, supplying the target's id,
+// MUST be denied. Red-green-revert: with the self/guardian gate the negative
+// test is GREEN (denied); with a membership-only guard it is RED (the foreign
+// same-org write passes). The revert demonstration is recorded in the WI-774 PR.
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
@@ -24,6 +24,7 @@ import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
+  guardianship,
   membership,
   organization,
   person,
@@ -50,6 +51,12 @@ const RUN = !!process.env.DATABASE_URL;
 
     afterEach(async () => {
       for (const pid of personIds) {
+        await db
+          .delete(guardianship)
+          .where(eq(guardianship.guardianPersonId, pid));
+        await db
+          .delete(guardianship)
+          .where(eq(guardianship.chargePersonId, pid));
         await db.delete(membership).where(eq(membership.personId, pid));
         await db.delete(person).where(eq(person.id, pid));
       }
@@ -102,66 +109,125 @@ const RUN = !!process.env.DATABASE_URL;
       return p!.id;
     }
 
+    async function grantGuardianEdge(
+      guardianPersonId: string,
+      chargePersonId: string,
+    ): Promise<void> {
+      await db
+        .insert(guardianship)
+        .values({ guardianPersonId, chargePersonId });
+    }
+
     // -----------------------------------------------------------------------
-    // The write-ownership break test (HIGH — §4.2). Red-green-revert:
-    //   - GREEN with the membership.organization_id scope (the foreign-org
-    //     write is denied / the guard throws).
-    //   - RED if verifyPersonOwnershipV2 drops the organization_id scope (the
-    //     foreign person passes the guard → cross-org write allowed).
+    // The WRITE-AUTHORITY break test (HIGH — §4.2). Red-green-revert:
+    //   - GREEN with the self/guardian gate (a same-org member who is neither
+    //     self nor guardian of the target is DENIED).
+    //   - RED if the gate degrades to membership-only (the same-org foreign
+    //     write passes — the IDOR).
+    //   - revert the gate → RED; restore → GREEN.
     // -----------------------------------------------------------------------
-    it('[OWNERSHIP] denies a write to a person in another org — never crosses the org boundary', async () => {
-      const orgA = await seedOrg('Org A');
-      const orgB = await seedOrg('Org B');
-      const personA = await seedMember(orgA, {
-        name: 'Person A',
+    it('[AUTHZ] denies a same-org member who is neither self nor guardian of the target', async () => {
+      const org = await seedOrg('Family Org');
+      const guardian = await seedMember(org, {
+        name: 'Guardian',
         roles: ['admin'],
       });
+      const other = await seedMember(org, {
+        name: 'Other Member',
+        roles: ['admin'],
+      });
+      const charge = await seedMember(org, {
+        name: 'Charge',
+        roles: ['learner'],
+      });
+
+      // `other` shares the org with `charge` (both members) but holds no
+      // guardianship edge and is not the charge → a write by `other` targeting
+      // `charge` is DENIED. Membership alone is NOT write authority.
+      await expect(
+        verifyPersonOwnershipV2(db, charge, org, other),
+      ).rejects.toThrow(/lacks write authority/);
+
+      // And `other` cannot write `guardian` either (same-org, non-self, no edge).
+      await expect(
+        verifyPersonOwnershipV2(db, guardian, org, other),
+      ).rejects.toThrow(/lacks write authority/);
+    });
+
+    it('[AUTHZ] allows self-write (caller is the target)', async () => {
+      const org = await seedOrg('Org');
+      const self = await seedMember(org, { name: 'Self', roles: ['admin'] });
+      await expect(
+        verifyPersonOwnershipV2(db, self, org, self),
+      ).resolves.toBeUndefined();
+    });
+
+    it('[AUTHZ] allows a guardian to write a charge (active guardianship edge)', async () => {
+      const org = await seedOrg('Org');
+      const guardian = await seedMember(org, {
+        name: 'Guardian',
+        roles: ['admin'],
+      });
+      const charge = await seedMember(org, {
+        name: 'Charge',
+        roles: ['learner'],
+      });
+      await grantGuardianEdge(guardian, charge);
+      await expect(
+        verifyPersonOwnershipV2(db, charge, org, guardian),
+      ).resolves.toBeUndefined();
+    });
+
+    it('[AUTHZ] denies a guardian whose edge has been revoked', async () => {
+      const org = await seedOrg('Org');
+      const guardian = await seedMember(org, {
+        name: 'Guardian',
+        roles: ['admin'],
+      });
+      const charge = await seedMember(org, {
+        name: 'Charge',
+        roles: ['learner'],
+      });
+      await db.insert(guardianship).values({
+        guardianPersonId: guardian,
+        chargePersonId: charge,
+        revokedAt: new Date(),
+      });
+      await expect(
+        verifyPersonOwnershipV2(db, charge, org, guardian),
+      ).rejects.toThrow(/lacks write authority/);
+    });
+
+    // -----------------------------------------------------------------------
+    // The org boundary (defense-in-depth) still holds: a target in another org
+    // is denied even for a self-claimed caller id.
+    // -----------------------------------------------------------------------
+    it('[ORG] denies a write to a person in another org (org membership invariant)', async () => {
+      const orgA = await seedOrg('Org A');
+      const orgB = await seedOrg('Org B');
       const personB = await seedMember(orgB, {
         name: 'Person B',
         roles: ['admin'],
       });
-
-      // Owned: org A's caller verifying its own member resolves.
+      // Even passing personB as both target and caller, org A's scope excludes
+      // personB (not a member of org A) → the org invariant denies first.
       await expect(
-        verifyPersonOwnershipV2(db, personA, orgA),
-      ).resolves.toBeUndefined();
-
-      // Cross-org write attempt: org A's caller targeting org B's person is
-      // DENIED — the membership scope holds (this is the IDOR/privilege-
-      // escalation boundary).
-      await expect(verifyPersonOwnershipV2(db, personB, orgA)).rejects.toThrow(
-        /not found for organization/,
-      );
-
-      // Symmetric: org B's caller cannot reach org A's person.
-      await expect(verifyPersonOwnershipV2(db, personA, orgB)).rejects.toThrow(
-        /not found for organization/,
-      );
+        verifyPersonOwnershipV2(db, personB, orgA, personB),
+      ).rejects.toThrow(/not found for organization/);
     });
 
     it('denies a write to a person with no membership anywhere', async () => {
       const org = await seedOrg('Org');
       const orphan = await seedOrphanPerson('Orphan');
-      await expect(verifyPersonOwnershipV2(db, orphan, org)).rejects.toThrow(
-        /not found for organization/,
-      );
-    });
-
-    it('allows a write to an owned non-admin (learner) member', async () => {
-      const org = await seedOrg('Org');
-      const learner = await seedMember(org, {
-        name: 'Learner',
-        roles: ['learner'],
-      });
       await expect(
-        verifyPersonOwnershipV2(db, learner, org),
-      ).resolves.toBeUndefined();
+        verifyPersonOwnershipV2(db, orphan, org, orphan),
+      ).rejects.toThrow(/not found for organization/);
     });
 
-    it('allows a write to an archived member (ownership is not lifecycle — legacy parity)', async () => {
+    it('allows self-write for an archived member (authority is not lifecycle — legacy parity)', async () => {
       // The legacy verifyProfileOwnership checks only (id, accountId) and does
-      // NOT filter archivedAt; the v2 guard mirrors that. An archived person is
-      // still owned by the org.
+      // NOT filter archivedAt; the v2 guard mirrors that. An archived person can
+      // still act on their own data.
       const org = await seedOrg('Org');
       const archived = await seedMember(org, {
         name: 'Archived',
@@ -169,12 +235,14 @@ const RUN = !!process.env.DATABASE_URL;
         archived: true,
       });
       await expect(
-        verifyPersonOwnershipV2(db, archived, org),
+        verifyPersonOwnershipV2(db, archived, org, archived),
       ).resolves.toBeUndefined();
     });
 
     // -----------------------------------------------------------------------
     // verifyPersonIsOrgAdminV2 — the isOwner twin (membership.roles @> admin).
+    // The self/guardian authority gate runs BEFORE this in every owner-only
+    // writer, so this stays a pure role check on the (already-authorized) target.
     // -----------------------------------------------------------------------
     it('[ADMIN] true for an admin member, false for a non-admin member', async () => {
       const org = await seedOrg('Org');

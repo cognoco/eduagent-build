@@ -66,6 +66,7 @@ type SettingsRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -99,7 +100,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         profileId,
         accountId,
         body,
-        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(getNotificationsResponseSchema.parse({ preferences }));
     },
@@ -159,6 +163,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
               identityV2Enabled: isIdentityV2Enabled(
                 c.env?.IDENTITY_V2_ENABLED,
               ),
+              callerPersonId: c.get('callerPersonId'),
             },
           );
       return c.json(getCelebrationLevelResponseSchema.parse(result));
@@ -197,6 +202,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           body.value,
           {
             identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+            callerPersonId: c.get('callerPersonId'),
           },
         );
         return c.json(
@@ -221,7 +227,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         db,
         profileId,
         accountId,
-        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         getFamilyPoolBreakdownSharingResponseSchema.parse({ value }),
@@ -253,6 +262,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           body.value,
           {
             identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+            callerPersonId: c.get('callerPersonId'),
           },
         );
         return c.json(
@@ -280,6 +290,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const body = c.req.valid('json');
       await registerPushToken(db, profileId, accountId, body.token, {
         identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        callerPersonId: c.get('callerPersonId'),
       });
       return c.json(
         pushTokenRegisteredResponseSchema.parse({ registered: true }),

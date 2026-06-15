@@ -39,19 +39,11 @@ import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { isGdprProcessingAllowed } from './consent';
 import { verifyPersonOwnershipV2 } from './identity-v2/ownership-v2';
+import type { IdentityV2Opts } from './identity-v2/identity-v2-opts';
+
+export type { IdentityV2Opts };
 
 const logger = createLogger();
-
-/**
- * Identity-v2 dispatch options threaded from the route layer. When
- * `identityV2Enabled` is true, the ownership guard scopes to the caller's
- * organization via `membership` (account.id = organization.id) instead of the
- * legacy `profiles.accountId` column. Default-off keeps the legacy path
- * byte-identical until WP-FLAG.
- */
-export interface IdentityV2Opts {
-  identityV2Enabled?: boolean;
-}
 
 const MAX_INTERESTS = 20;
 const MAX_COMMUNICATION_NOTES = 10;
@@ -1139,8 +1131,20 @@ async function verifyProfileOwnership(
 ): Promise<void> {
   if (!accountId) return; // skipped when caller has verified via parent chain (assertParentAccess)
   if (opts?.identityV2Enabled) {
-    // v2: account.id = organization.id; ownership = membership in the org.
-    await verifyPersonOwnershipV2(db, profileId, accountId);
+    // v2: account.id = organization.id; write authority = self OR guardian edge
+    // (membership alone is existence-visibility, not write authority).
+    // callerPersonId is the authenticated caller, never request-supplied.
+    if (!opts.callerPersonId) {
+      throw new Error(
+        'identity-v2 write guard requires callerPersonId (caller identity not threaded)',
+      );
+    }
+    await verifyPersonOwnershipV2(
+      db,
+      profileId,
+      accountId,
+      opts.callerPersonId,
+    );
     return;
   }
   const [owner] = await db
