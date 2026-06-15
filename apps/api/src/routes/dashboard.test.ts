@@ -476,6 +476,7 @@ describe('dashboard routes', () => {
         expect.anything(),
         'test-profile-id',
         PROFILE_ID,
+        expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
       );
     });
   });
@@ -560,6 +561,7 @@ describe('dashboard routes', () => {
         'test-profile-id',
         PROFILE_ID,
         REPORT_ID,
+        expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
       );
     });
 

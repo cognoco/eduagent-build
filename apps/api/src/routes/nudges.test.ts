@@ -144,6 +144,7 @@ describe('POST /v1/nudges', () => {
         toProfileId: CHILD_ID,
         template: 'you_got_this',
       }),
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
   });
 
