@@ -51,8 +51,8 @@
  * See `docs/incidents/2026-04-stg-push-incident.md`.
  *
  * Exit codes:
- *   0 — DOPPLER_CONFIG is absent or "dev"; push is permitted
- *   1 — DOPPLER_CONFIG is stg/prd/unknown; push is blocked
+ *   0 — DOPPLER_CONFIG="dev"; or DOPPLER_CONFIG absent AND DB_PUSH_LOCAL_DEV=1
+ *   1 — DOPPLER_CONFIG is stg/prd/unknown; or absent without DB_PUSH_LOCAL_DEV=1
  */
 
 const dopplerConfig = process.env.DOPPLER_CONFIG;
