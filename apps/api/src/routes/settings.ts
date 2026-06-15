@@ -123,7 +123,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         assertOwnerProfile(c);
       }
       const celebrationLevel = query.childProfileId
-        ? await getChildCelebrationLevel(db, profileId, query.childProfileId)
+        ? await getChildCelebrationLevel(db, profileId, query.childProfileId, {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          })
         : await getCelebrationLevel(db, profileId);
       return c.json(
         getCelebrationLevelResponseSchema.parse({ celebrationLevel }),
@@ -153,6 +155,11 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
             profileId,
             body.childProfileId,
             body.celebrationLevel,
+            {
+              identityV2Enabled: isIdentityV2Enabled(
+                c.env?.IDENTITY_V2_ENABLED,
+              ),
+            },
           )
         : await upsertCelebrationLevel(
             db,

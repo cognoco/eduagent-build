@@ -82,9 +82,10 @@ export async function createNudge(
     template: NudgeTemplate;
     now?: Date;
   },
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<{ nudge: Nudge; pushSent: boolean }> {
   const now = params.now ?? new Date();
-  await assertParentAccess(db, params.fromProfileId, params.toProfileId);
+  await assertParentAccess(db, params.fromProfileId, params.toProfileId, opts);
 
   // null means no consent_states row exists — which for the post-profile-create
   // state happens when consent isn't required for this profile's age (17+).
