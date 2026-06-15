@@ -71,7 +71,34 @@ jest.mock('../services/dictation' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [WI-774] Wrap checkAndLogRateLimit so the flag-on test can assert the identity
+// opts it receives, while the existing 429 test keeps the REAL implementation
+// (driven by meteringFixture). requireActual + a delegating spy = the GC6
+// targeted-override pattern; the spy defaults to the real impl (set in
+// beforeEach), so every other test is unchanged.
+const realCheckAndLogRateLimit = (
+  jest.requireActual(
+    '../services/settings',
+  ) as typeof import('../services/settings')
+).checkAndLogRateLimit;
+const mockCheckAndLogRateLimit = jest.fn();
+jest.mock(
+  '../services/settings' /* gc1-allow: requireActual + delegating spy — preserves the real rate-limit body for the 429 test while capturing call args for the WI-774 flag-on assertion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/settings',
+    ) as typeof import('../services/settings');
+    return {
+      ...actual,
+      checkAndLogRateLimit: (...args: unknown[]) =>
+        mockCheckAndLogRateLimit(...args),
+    };
+  },
+);
+
+import { Hono } from 'hono';
 import { app } from '../index';
+import { dictationRoutes } from './dictation';
 import {
   prepareHomework,
   generateDictation,
@@ -105,6 +132,12 @@ beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
   meteringFixture.reset();
+  // [WI-774] Default: delegate to the REAL checkAndLogRateLimit so the existing
+  // rate-limit tests (driven by meteringFixture) are unchanged. The flag-on
+  // test overrides this with a capturing stub.
+  mockCheckAndLogRateLimit.mockImplementation((...args: unknown[]) =>
+    (realCheckAndLogRateLimit as (...a: unknown[]) => unknown)(...args),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -780,6 +813,66 @@ describe('POST /v1/dictation/review', () => {
     const body = await res.json();
     expect(body.code).toBe('RATE_LIMITED');
     expect(reviewDictation).not.toHaveBeenCalled();
+  });
+
+  it('[WI-774] flag-on arms the v2 rate-limit guard: identityV2Enabled:true + callerPersonId', async () => {
+    // Mount dictationRoutes on a minimal app with a pre-seeded context so the
+    // test exercises the route handler's flag-on threading without the
+    // app-level metering middleware (whose v2 billing path is out of scope
+    // here). Same pattern as support.test.ts. The middleware seeds callerPersonId
+    // exactly as the real account middleware does on the v2 path.
+    mockCheckAndLogRateLimit.mockResolvedValue(false);
+    (reviewDictation as jest.Mock).mockResolvedValueOnce({
+      totalSentences: 1,
+      correctCount: 1,
+      mistakes: [],
+    });
+
+    const v2App = new Hono();
+    v2App.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'test-profile-id');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+      });
+      c.set('callerPersonId' as never, 'person-test-id');
+      c.set('profileMeta' as never, {
+        birthYear: 2016,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      });
+      await next();
+    });
+    v2App.route('/', dictationRoutes);
+
+    const res = await v2App.request(
+      '/dictation/review',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(REVIEW_BODY),
+      },
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+    // Under flag-on the route must pass identityV2Enabled:true AND the resolved
+    // callerPersonId. A wrong env-binding name or context key would silently
+    // mis-scope the rate limit on the live (staging, flag-on) path.
+    expect(mockCheckAndLogRateLimit).toHaveBeenCalledWith(
+      expect.anything(),
+      'test-profile-id',
+      'test-account-id',
+      'dictation_review',
+      { hours: 1 / 60, maxCount: 10 },
+      { identityV2Enabled: true, callerPersonId: 'person-test-id' },
+    );
   });
 
   // -------------------------------------------------------------------------

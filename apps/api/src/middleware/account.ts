@@ -39,6 +39,11 @@ export type AccountEnv = {
     account: Account;
     // [CUT-B1] Set only on the v2 pre-graph path (no login row yet).
     clerkIdentity: ClerkIdentity | undefined;
+    // [WI-774] The authenticated caller's own person id, resolved from the
+    // login→person binding on the v2 path. Used by the write-authority guard
+    // (verifyPersonOwnershipV2) to prove self-or-edge authority. Unset on the
+    // legacy path and pre-graph.
+    callerPersonId: string | undefined;
   };
 };
 
@@ -142,6 +147,10 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
       );
       if (resolved) {
         c.set('account', resolved.account);
+        // [WI-774] Surface the authenticated caller's own person id for the
+        // write-authority guard. resolved.personId is the login→person binding,
+        // never request-supplied.
+        c.set('callerPersonId', resolved.personId);
       } else {
         c.set('clerkIdentity', {
           clerkUserId: user.userId,
