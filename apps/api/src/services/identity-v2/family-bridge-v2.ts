@@ -28,17 +28,12 @@
 // WP-FLAG.
 // ---------------------------------------------------------------------------
 
-import { and, eq } from 'drizzle-orm';
-import {
-  curriculumBooks,
-  curriculumTopics,
-  person,
-  subjects,
-  type Database,
-} from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import { curriculumTopics, person, type Database } from '@eduagent/database';
 import type { ChildTopicSnapshot } from '@eduagent/schemas';
 import { ForbiddenError } from '../../errors';
 import { hashTopicDescription, sourceAgeBracket } from '../family-bridge';
+import { findOwnedCurriculumTopic } from '../curriculum-topic-ownership';
 import { isGuardianOf } from './guardianship';
 
 /**
@@ -78,8 +73,16 @@ export async function validateGuardianChargeRelationshipV2(
  * §4.5 — the v2 `getChildTopicSnapshotForParent`: the cross-person subject/topic
  * data read a guardian makes against a charge's curriculum (the "Learn this too"
  * bridge snapshot). Verifies the active guardianship edge FIRST (throws
- * `ForbiddenError` on no edge — the cross-person data-leak guard), then reads the
- * topic scoped to the charge's own subjects (`subjects.profile_id = chargePersonId`).
+ * `ForbiddenError` on no edge — the cross-person data-leak guard), then resolves
+ * the topic scoped to the charge's own subjects via the canonical
+ * `findOwnedCurriculumTopic` helper (`subjects.profile_id = chargePersonId`).
+ *
+ * The ownership join is delegated to `findOwnedCurriculumTopic` — the single
+ * sanctioned home of the `curriculumTopics → subjects` ownership-join shape
+ * (enforced by `curriculum-topic-ownership.guard.test.ts`); this twin does not
+ * re-implement it inline. `estimatedMinutes` (not on the helper's return shape)
+ * and the charge's display name / birth date are read separately by id — plain,
+ * already-scoped reads, not ownership joins.
  *
  * Returns null when no such topic belongs to the charge (the topic exists under a
  * different person, or not at all) — the scoped read, byte-identical to the legacy
@@ -100,47 +103,42 @@ export async function getChargeSubjectsForGuardianV2(
     chargePersonId,
   );
 
-  const [row] = await db
-    .select({
-      chargePersonId: person.id,
-      childDisplayName: person.displayName,
-      childBirthDate: person.birthDate,
-      subjectName: subjects.name,
-      subjectLanguage: subjects.languageCode,
-      bookTitle: curriculumBooks.title,
-      topicTitle: curriculumTopics.title,
-      topicDescription: curriculumTopics.description,
-      estimatedMinutes: curriculumTopics.estimatedMinutes,
-    })
-    .from(curriculumTopics)
-    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
-    .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
-    .innerJoin(person, eq(subjects.profileId, person.id))
-    .where(
-      and(
-        eq(curriculumTopics.id, topicId),
-        // Scope key: the topic must belong to the charge's own subjects.
-        eq(subjects.profileId, chargePersonId),
-      ),
-    )
-    .limit(1);
+  // Ownership join via the canonical helper, scoped to the charge's subjects.
+  const owned = await findOwnedCurriculumTopic(db, {
+    profileId: chargePersonId,
+    topicId,
+  });
+  if (!owned) return null;
 
-  if (!row) return null;
+  // Charge identity (display name + birth date) — plain person read by id.
+  const charge = await db.query.person.findFirst({
+    where: eq(person.id, chargePersonId),
+    columns: { displayName: true, birthDate: true },
+  });
+  if (!charge) return null;
+
+  // estimatedMinutes is not on the helper's return shape; plain topic read by id
+  // (already ownership-verified above). curriculumTopics.description is NOT NULL.
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: eq(curriculumTopics.id, topicId),
+    columns: { estimatedMinutes: true, description: true },
+  });
+  if (!topic) return null;
 
   return {
-    childProfileId: row.chargePersonId,
-    childDisplayName: row.childDisplayName,
-    subjectName: row.subjectName,
-    subjectLanguage: row.subjectLanguage,
-    bookTitle: row.bookTitle,
+    childProfileId: chargePersonId,
+    childDisplayName: charge.displayName,
+    subjectName: owned.subjectName,
+    subjectLanguage: owned.subjectLanguageCode,
+    bookTitle: owned.bookTitle,
     bookAuthor: null,
-    topicTitle: row.topicTitle,
-    topicDescription: row.topicDescription,
+    topicTitle: owned.topicTitle,
+    topicDescription: topic.description,
     topicDescriptionHash: hashTopicDescription(
-      row.topicTitle,
-      row.topicDescription,
+      owned.topicTitle,
+      topic.description,
     ),
-    estimatedMinutes: row.estimatedMinutes,
-    sourceAgeBracket: sourceAgeBracket(Number(row.childBirthDate.slice(0, 4))),
+    estimatedMinutes: topic.estimatedMinutes,
+    sourceAgeBracket: sourceAgeBracket(Number(charge.birthDate.slice(0, 4))),
   };
 }
