@@ -217,7 +217,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   itself dogfood for PRG-04 — §2.1 has no design-activation altitude.)*
 - **Activate-when:** — (design-active 2026-06-13; execution activation = post-grill slice).
 
-### PRG-06 · Identity Cutover — `active` (stood up 2026-06-15; shepherd launch GATED)
+### PRG-06 · Identity Cutover — `active` — EXECUTING (gate cleared 2026-06-15)
 - **Outcome:** app reads/writes the new identity model end-to-end **per canon** (S0–S6
   reconciled, not inherited); `IDENTITY_V2_ENABLED` removed; full unit + 51 integration
   suites green; corrected staging→prod cutover re-run; **WI-586 closed**.
@@ -231,9 +231,10 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   slice / launch gate) + parked `shepherd-kickoff.md`. Cosmo **Workstream "Identity Cutover"**
   (WS-18, `3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`) with **WP-1 = WI-765** (enumerate the breaking
   reader/writer set, `Stage=Backlog`, order 1) + **WI-586** (moved in, with its 2 sub-items).
-- **Launch gate:** shepherd NOT launched until **ADR-0020/0021/0022 cleanup operator-confirmed
-  complete** (those three were reverse-engineered from S0–S6; re-vetting in a separate session →
-  trusted canon once done).
+- **Launch gate CLEARED 2026-06-15:** operator confirmed ADR-0022 cleanup complete + ADR-0020/0021
+  substantially correct (semantic-only remaining) → ADR-0020/0021/0022 trusted canon. Shepherd
+  released via inbox `directive` (refining WP-1 = WI-765 + dispatching the enumeration); reviewer
+  (WS-18, standard policy) handed to the operator to launch.
 - **Activate-when:** — (active; execution gated on the launch gate above)
 
 ### PRG-10 · API Security & PII — `active` (2026-06-13)

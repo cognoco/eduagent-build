@@ -121,6 +121,13 @@ to numbered `0117`/`0118` → prod cutover (prod near-empty; non-gating to close
 §4.1) → **close WI-586**. Mechanics: the execution log + cutover-plan §4. — *Cosmo: WI-586 (moved into this workstream).*
 
 ## 5. Current position — pick up here
+- **2026-06-15 (later) — GATE CLEARED; SHEPHERD RELEASED; EXECUTION STARTED.** Operator confirmed
+  ADR-0022 cleanup complete + ADR-0020/0021 substantially correct (semantic-only remaining) →
+  ADR-0020/0021/0022 are trusted canon. Sent inbox `directive` (ic-orch-002) releasing the
+  shepherd to refine WP-1 (WI-765) Backlog→Ready and dispatch the enumeration (pre-graph 401 fix
+  `de8df6e86` as slice-1). Reviewer (WS-18, standard policy) handed to the operator to launch
+  (`reviewer-kickoff.md`). Orchestrator outbox watcher live; awaiting the shepherd's first
+  post-release outbox event.
 - **2026-06-15 — PRG-06 STOOD UP (Cosmo structure live).** B ruled (new PRG ∥ PRG-01; WI-586
   emigrates here; PRG-01 graduates). **Done:** Cosmo **Workstream "Identity Cutover" (WS-18)**
   (`3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`); **WP-1 = WI-765** enumeration Item
