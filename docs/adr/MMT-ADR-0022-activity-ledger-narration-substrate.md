@@ -1,16 +1,12 @@
 # MMT-ADR-0022 — Activity feed: moments are derived on read; the ledger table is seen-state, not an event-of-record
 
-> **Note on numbering:** originally minted as `MMT-ADR-0020` on the new-llm branch (the next free number at the time of authoring); renumbered to `0022` on 2026-06-12 when merging into main — `MMT-ADR-0020` was yielded to the identity-foundation cutover-plan consent-request ADR (analysis C6, WI-678), and `MMT-ADR-0021` was taken by the freeform-threshold ADR (also renumbered from 0019 in the same merge).
-
-**Status:** Accepted · 2026-06-11 · re-vetted 2026-06-15 (WI-752 provenance re-vet) · **Scope:** Learner-home moment feed (the `/now` surface) · **Deciders:** Architect (jjoerg) + PM (owner) + Codex · **Builds on:** MMT-ADR-0000 (decisions layer)
-
-> **Re-vet note (2026-06-15, WI-752).** This ADR was originally minted (as `MMT-ADR-0020` on the new-llm branch) reverse-engineered from the V2-shell S0 feature plan, describing a *materialized* moment substrate "load-bearing for GDPR-timer narration." The provenance re-vet re-derived it as architecture against the as-built code and the full design space, and **overrode** that framing: the architecture is **derive-on-read (E below)**, the table is narrow seen-state, and it is **not** a compliance substrate. The earlier framing survives in git history.
+**Status:** Accepted · 2026-06-15 · **Scope:** Learner-home moment feed (the `/now` surface) · **Deciders:** Architect (jjoerg) + PM (owner) · **Builds on:** MMT-ADR-0000 (decisions layer)
 
 ## Context
 
 The learner-home `/now` feed shows a small, prioritized stream of recent notable moments — "you filed a session", and the like. The architectural question is how those moments are produced: **derived from operational state at read time, or materialized into a dedicated store as they happen.**
 
-The decisive fact, established by the as-built code: **the moments are overwhelmingly reconstructable.** The `/now` feed already derives `retention_due` live from `retention_cards`; topic-mastery is already recorded on the session/assessment records; session filing is recorded on the session. Of the six moment kinds the original draft declared, five were never materialized at all — the feed derives them or would. So the premise that justified a materialized log ("reconstructing from operational tables is fragile/non-deterministic") is contradicted by the system's own behavior. The only thing that genuinely needs persistence is **seen-state** ("have we already shown this moment?"), which the operational tables cannot express.
+The decisive fact, established by the as-built code: **the moments are overwhelmingly reconstructable.** The `/now` feed already derives `retention_due` live from `retention_cards`; topic-mastery is already recorded on the session/assessment records; session filing is recorded on the session. Of the six moment kinds the schema declares, five are never materialized at all — the feed derives them or would. So the premise that justified a materialized log ("reconstructing from operational tables is fragile/non-deterministic") is contradicted by the system's own behavior. The only thing that genuinely needs persistence is **seen-state** ("have we already shown this moment?"), which the operational tables cannot express.
 
 ## Decision
 
@@ -26,14 +22,14 @@ The architecture is **derive-on-read with a thin seen-state store (option E of t
 
 - `/now` ranks moments deterministically with no LLM and no dependence on a complete materialized log.
 - The dual-write / lost-moment problem largely dissolves: you cannot lose a moment you compute from source-of-truth.
-- The table shrinks to seen-state. The `visibility` column + `ledger_visibility` enum, the unread `template_key` column, and the five declared-but-unwritten `LedgerKind`s are dead weight to remove (tracked as follow-up code WIs under WI-752).
+- The table shrinks to seen-state. The `visibility` column + `ledger_visibility` enum, the unread `template_key` column, and the five declared-but-unwritten `LedgerKind`s are dead weight to remove (tracked as follow-up code WIs).
 - Best-effort writes remain correct for the residual materialized surface.
 - A future kind is added as a read-time projection; only a *genuinely non-reconstructable* moment justifies a new materialized write.
 
 ## Alternatives considered (the design space)
 
 - **A — Derive-on-read only.** Ideal for the reconstructable majority; folded into the chosen hybrid. Pure-A can't hold the one thing that must persist (seen-state) or a truly-ephemeral moment.
-- **B — Materialized store of all moments** (the original draft). **Rejected:** its premise ("reconstruction is fragile") is refuted by the feed already deriving retention on read; materializing every kind adds a dual-write/loss surface and a write path on every producer for no benefit on derivable moments.
+- **B — Materialized store of all moments.** **Rejected:** its premise ("reconstruction is fragile") is refuted by the feed already deriving retention on read; materializing every kind adds a dual-write/loss surface and a write path on every producer for no benefit on derivable moments.
 - **C — Project over an existing event backbone** (Inngest history / domain events). **Rejected:** couples the feed to internal event schemas; the operational tables are a cleaner projection source.
 - **D — Notification/inbox** (per-user read/unread). **Rejected:** full inbox semantics exceed the feed's need; `surfaced_at` provides the minimal seen-state the hybrid requires.
 - **E — Hybrid: derive the derivable, persist only seen-state + the genuinely non-reconstructable. CHOSEN.**

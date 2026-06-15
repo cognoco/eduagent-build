@@ -1311,6 +1311,17 @@ The learner-home `/now` feed shows recent notable moments (e.g. "you filed a ses
 
 Decision rationale: `docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md`.
 
+**Freeform Ask Anything — narrower persistence path (`MMT-ADR-0021`):**
+
+Ask Anything (freeform) sessions — a `learning` session with `effectiveMode = 'freeform'` and no `topicId` — are a deliberately narrower persistence path than guided learning:
+
+- **No hidden topic anchors.** A freeform session never mints a provisional/placeholder `topicId` mid-conversation to unlock topic-bound features; a Library topic is created or linked only through the normal filing path once the session is eligible.
+- **Topic-bound features stay topic-keyed.** Challenge Round and learner-authored notes remain keyed to `topicId` and are not offered in freeform; extending either to freeform requires a superseding ADR, not a UI/prompt exception.
+- **Narrower persistence.** Freeform persists chat history and subject-backed bookmarks (`subjectId` required, `topicId` nullable); once filed, the LLM learner recap is the durable review artifact (no learner-authored topic note).
+- **Filing gated on a sustained conversation.** A quick exchange stays lightweight chat/bookmark material; Library filing becomes available only once the conversation is sustained. The exact threshold is an operational value owned by `FILING_CONFIG` (`apps/api/src/config/filing.ts`), not frozen here.
+
+Decision rationale: `docs/adr/MMT-ADR-0021-freeform-library-filing-threshold.md`.
+
 **EVALUATE verification prompt (Epic 3 extension):**
 
 New prompt template in `services/llm/` for generating plausibly flawed explanations. The LLM presents reasoning that contains a deliberate error; the student must identify the flaw. Forces Bloom's Level 5-6 (Evaluate/Create). Trigger condition: strong retention topics only (`easeFactor >= 2.5` and `repetitions > 0` on the SM-2 retention card) — students must demonstrate solid foundational knowledge before being challenged with analytical critique.

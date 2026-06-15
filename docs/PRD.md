@@ -150,7 +150,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 ### Ask Anything / Freeform Persistence Boundary
 
-Ask Anything starts without a required topic. It can resolve or ask for a subject so persisted events have a `subjectId`. It saves chat history and supports bookmarks for subject-backed mentor replies; bookmarks do not require a `topicId`. It does not offer Challenge Round or a separate learner-note flow. Library filing becomes available only after 5 exchanges; if a freeform session is filed, the LLM-generated learner recap / structured session summary is the durable review artifact. This rule is governed by [`MMT-ADR-0021`](adr/MMT-ADR-0021-freeform-library-filing-threshold.md).
+Ask Anything starts without a required topic. It can resolve or ask for a subject so persisted events have a `subjectId`. It saves chat history and supports bookmarks for subject-backed mentor replies; bookmarks do not require a `topicId`. It does not offer Challenge Round or a separate learner-note flow. Library filing becomes available only once the conversation is sustained — currently after five exchanges, an operational threshold (owned by `FILING_CONFIG`) that may be tuned without changing this boundary; if a freeform session is filed, the LLM-generated learner recap / structured session summary is the durable review artifact. This rule is governed by [`MMT-ADR-0021`](adr/MMT-ADR-0021-freeform-library-filing-threshold.md).
 
 ### Explicitly Out of Scope (v1.0)
 
