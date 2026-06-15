@@ -23,6 +23,7 @@ import {
   consentedExistsSql,
   resolveConsentStatus,
   resolveLatestConsentStatusAnyBasis,
+  resolveLatestConsentStatusesAnyBasis,
 } from './consent-status-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -78,6 +79,20 @@ const COPPA = 'coppa_parental_consent';
       personIds.push(p!.id);
       orgIds.push(org!.id);
       return { personId: p!.id, orgId: org!.id };
+    }
+
+    /** Seed an additional person into an EXISTING org (for multi-person batches). */
+    async function seedPersonInOrg(): Promise<string> {
+      const [p] = await db
+        .insert(person)
+        .values({
+          displayName: 'Child',
+          birthDate: '2015-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      personIds.push(p!.id);
+      return p!.id;
     }
 
     it('null when there are no consent rows', async () => {
@@ -266,6 +281,194 @@ const COPPA = 'coppa_parental_consent';
       expect(
         await resolveLatestConsentStatusAnyBasis(db, personId, orgId, PURPOSE),
       ).toBe('WITHDRAWN');
+    });
+
+    // -----------------------------------------------------------------------
+    // WI-797 — batched form (resolveLatestConsentStatusesAnyBasis) equivalence.
+    // The batched window-query path MUST return IDENTICAL results to the
+    // per-person fan-out for every scenario, and must not leak one person's
+    // consent status onto another in a multi-person batch.
+    // -----------------------------------------------------------------------
+
+    it('batched == per-person for a multi-person family across every edge case', async () => {
+      // One org, several persons, each in a different consent state covering
+      // every branch the per-person reducer handles. The batched result for
+      // each person must equal the single-person AnyBasis result.
+      const { personId: pConsented, orgId } = await seedPersonOrg();
+      const pNoRows = await seedPersonInOrg(); // absent → null
+      const pWithdrawn = await seedPersonInOrg();
+      const pPending = await seedPersonInOrg();
+      const pDenied = await seedPersonInOrg();
+      const pDirectGrant = await seedPersonInOrg(); // grant, no request → MIN path
+      const pCoppaMasksGdpr = await seedPersonInOrg(); // both bases, newer COPPA wins
+
+      const now = Date.now();
+
+      // pConsented: current GDPR grant, un-withdrawn.
+      await db.insert(consentGrant).values({
+        chargePersonId: pConsented,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: GDPR,
+        granted: true,
+        grantedAt: new Date(now),
+      });
+
+      // pWithdrawn: current GDPR grant, withdrawn.
+      await db.insert(consentGrant).values({
+        chargePersonId: pWithdrawn,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: GDPR,
+        granted: true,
+        grantedAt: new Date(now),
+        withdrawnAt: new Date(now),
+      });
+
+      // pPending: GDPR request only, status pending.
+      await db.insert(consentRequest).values({
+        chargePersonId: pPending,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        requestedBasis: GDPR,
+        status: 'pending',
+      });
+
+      // pDenied: GDPR request only, status denied → legacy-parity WITHDRAWN.
+      await db.insert(consentRequest).values({
+        chargePersonId: pDenied,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        requestedBasis: GDPR,
+        status: 'denied',
+      });
+
+      // pDirectGrant: a COPPA grant with NO request row → exercises the
+      // MIN(granted_at) ordering-key fallback in the batched window query.
+      await db.insert(consentGrant).values({
+        chargePersonId: pDirectGrant,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: COPPA,
+        granted: true,
+        grantedAt: new Date(now - 30_000),
+      });
+
+      // pCoppaMasksGdpr: older un-withdrawn GDPR grant + newer withdrawn COPPA
+      // grant — the AnyBasis tiebreak must pick the newer COPPA (WITHDRAWN).
+      await db.insert(consentGrant).values({
+        chargePersonId: pCoppaMasksGdpr,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: GDPR,
+        granted: true,
+        grantedAt: new Date(now - 60_000),
+      });
+      await db.insert(consentGrant).values({
+        chargePersonId: pCoppaMasksGdpr,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: COPPA,
+        granted: true,
+        grantedAt: new Date(now),
+        withdrawnAt: new Date(now),
+      });
+
+      const allPersons = [
+        pConsented,
+        pNoRows,
+        pWithdrawn,
+        pPending,
+        pDenied,
+        pDirectGrant,
+        pCoppaMasksGdpr,
+      ];
+
+      // Per-person reference results (the established, trusted path).
+      const reference = new Map<string, string | null>();
+      for (const pid of allPersons) {
+        reference.set(
+          pid,
+          await resolveLatestConsentStatusAnyBasis(db, pid, orgId, PURPOSE),
+        );
+      }
+
+      // Spot-check the reference itself so a silently-broken per-person path
+      // can't make a broken batched path look "equivalent".
+      expect(reference.get(pConsented)).toBe('CONSENTED');
+      expect(reference.get(pNoRows)).toBeNull();
+      expect(reference.get(pWithdrawn)).toBe('WITHDRAWN');
+      expect(reference.get(pPending)).toBe('PENDING');
+      expect(reference.get(pDenied)).toBe('WITHDRAWN');
+      expect(reference.get(pDirectGrant)).toBe('CONSENTED');
+      expect(reference.get(pCoppaMasksGdpr)).toBe('WITHDRAWN');
+
+      // Batched result over ALL persons at once.
+      const batched = await resolveLatestConsentStatusesAnyBasis(
+        db,
+        allPersons,
+        orgId,
+        PURPOSE,
+      );
+
+      // Equivalence: every person resolves identically; persons with no rows
+      // are absent from the batched map (caller treats absent as null).
+      for (const pid of allPersons) {
+        const expected = reference.get(pid) ?? null;
+        expect(batched.get(pid) ?? null).toBe(expected);
+      }
+      // No-cross-leakage: the batched map contains ONLY persons with a non-null
+      // status — pNoRows must be absent, and no extra/foreign keys present.
+      expect(batched.has(pNoRows)).toBe(false);
+      const expectedKeys = allPersons
+        .filter((pid) => reference.get(pid) != null)
+        .sort();
+      expect([...batched.keys()].sort()).toEqual(expectedKeys);
+    });
+
+    it('batched no-cross-leakage: each person gets ONLY its own consent rows', async () => {
+      // Two persons, opposite states. If the window partition or the key bled
+      // across persons, one would inherit the other's status.
+      const { personId: pA, orgId } = await seedPersonOrg();
+      const pB = await seedPersonInOrg();
+
+      await db.insert(consentGrant).values({
+        chargePersonId: pA,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: GDPR,
+        granted: true,
+        grantedAt: new Date(),
+      }); // pA → CONSENTED
+      await db.insert(consentGrant).values({
+        chargePersonId: pB,
+        organizationId: orgId,
+        purpose: PURPOSE,
+        lawfulBasis: GDPR,
+        granted: true,
+        grantedAt: new Date(),
+        withdrawnAt: new Date(),
+      }); // pB → WITHDRAWN
+
+      const batched = await resolveLatestConsentStatusesAnyBasis(
+        db,
+        [pA, pB],
+        orgId,
+        PURPOSE,
+      );
+      expect(batched.get(pA)).toBe('CONSENTED');
+      expect(batched.get(pB)).toBe('WITHDRAWN');
+    });
+
+    it('batched empty input returns an empty map without a query', async () => {
+      const { orgId } = await seedPersonOrg();
+      const batched = await resolveLatestConsentStatusesAnyBasis(
+        db,
+        [],
+        orgId,
+        PURPOSE,
+      );
+      expect(batched.size).toBe(0);
     });
   },
 );

@@ -32,7 +32,7 @@
 // reducer and the scan-side EXISTS form.
 // ---------------------------------------------------------------------------
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   consentGrant,
   consentRequest,
@@ -83,6 +83,66 @@ interface BasisReduction {
 }
 
 /**
+ * The per-(person, basis) facts a reduction needs, after I/O. Extracted so the
+ * single-person and batched paths reduce IDENTICAL inputs through one pure
+ * function (`reduceBasisFromRows`) — no second reduction implementation to drift.
+ */
+interface BasisRows {
+  /** Current grant (max(granted_at), tiebreak id DESC), or null if none. */
+  currentGrant: {
+    granted: boolean;
+    withdrawnAt: Date | null;
+    grantedAt: Date;
+  } | null;
+  /** The (≤1 basis-keyed-unique) request row, or null if none. */
+  request: {
+    status: string;
+    requestedAt: Date | null;
+    createdAt: Date;
+  } | null;
+  /**
+   * min(grant.granted_at) for the (person, purpose, org, basis) key — the
+   * direct-grant ordering-key fallback. The Neon driver returns aggregate
+   * timestamps as ISO strings; null when there are no grant rows.
+   */
+  minGrantedAt: string | null;
+}
+
+/**
+ * Pure §2.3a reduction over already-fetched rows. The single-person and batched
+ * paths both call this so their results are byte-identical — the only difference
+ * is how the rows were fetched (per-person findFirst vs. set-based window query).
+ */
+function reduceBasisFromRows(rows: BasisRows): BasisReduction {
+  const { currentGrant, request, minGrantedAt } = rows;
+
+  // Ordering key: request requested_at → request created_at → min(grant.granted_at).
+  let orderingKey: number | null = null;
+  if (request) {
+    const reqTs = request.requestedAt ?? request.createdAt;
+    orderingKey = reqTs ? reqTs.getTime() : null;
+  }
+  if (orderingKey === null && currentGrant) {
+    // No request row carrying a legacy requested_at — a post-cutover direct
+    // grant. Use the earliest grant moment (row-creation), matching legacy's
+    // requestedAt default-now. Grant appends (restore, age-transition) never
+    // move the key — so use MIN, not the current grant's granted_at.
+    orderingKey = minGrantedAt ? new Date(minGrantedAt).getTime() : null;
+  }
+
+  let status: ConsentStatus | null;
+  if (currentGrant) {
+    status = currentGrant.withdrawnAt ? 'WITHDRAWN' : 'CONSENTED';
+  } else if (request) {
+    status = mapRequestStatus(request.status);
+  } else {
+    status = null;
+  }
+
+  return { status, orderingKey };
+}
+
+/**
  * Reduce one regulatory basis to a single 4-value status (§2.3a step 1).
  *
  * Current grant (max(granted_at), tiebreak id DESC) wins:
@@ -102,6 +162,9 @@ interface BasisReduction {
  *   - 'approved' with no grant is unreachable (the approval tx writes both).
  *
  * No rows at all → null.
+ *
+ * The I/O wrapper around `reduceBasisFromRows`: fetches the (≤1) current grant,
+ * the (≤1) request row, and lazily the MIN(granted_at) fallback, then reduces.
  */
 async function reduceBasisState(
   db: Database,
@@ -133,17 +196,13 @@ async function reduceBasisState(
     columns: { status: true, requestedAt: true, createdAt: true },
   });
 
-  // Ordering key: request requested_at → request created_at → min(grant.granted_at).
-  let orderingKey: number | null = null;
-  if (request) {
-    const reqTs = request.requestedAt ?? request.createdAt;
-    orderingKey = reqTs ? reqTs.getTime() : null;
-  }
-  if (orderingKey === null && currentGrant) {
-    // No request row carrying a legacy requested_at — a post-cutover direct
-    // grant. Use the earliest grant moment (row-creation), matching legacy's
-    // requestedAt default-now. Grant appends (restore, age-transition) never
-    // move the key — so use MIN, not the current grant's granted_at.
+  // The direct-grant ordering-key fallback (MIN(granted_at)) is only consulted
+  // when the request row supplies no ordering key — i.e. there is a grant but no
+  // request (consent_request.created_at is NOT NULL, so a present request always
+  // yields a key). Fetch it lazily so the common path stays at two round-trips.
+  let minGrantedAt: string | null = null;
+  const needsMin = currentGrant != null && request == null;
+  if (needsMin) {
     const [minRow] = await db
       .select({
         // The Neon driver returns aggregate timestamps as ISO strings, not
@@ -160,21 +219,14 @@ async function reduceBasisState(
           eq(consentGrant.lawfulBasis, basis),
         ),
       );
-    orderingKey = minRow?.minGrantedAt
-      ? new Date(minRow.minGrantedAt).getTime()
-      : null;
+    minGrantedAt = minRow?.minGrantedAt ?? null;
   }
 
-  let status: ConsentStatus | null;
-  if (currentGrant) {
-    status = currentGrant.withdrawnAt ? 'WITHDRAWN' : 'CONSENTED';
-  } else if (request) {
-    status = mapRequestStatus(request.status);
-  } else {
-    status = null;
-  }
-
-  return { status, orderingKey };
+  return reduceBasisFromRows({
+    currentGrant: currentGrant ?? null,
+    request: request ?? null,
+    minGrantedAt,
+  });
 }
 
 /** Legacy-parity mapping of a request.status with no current grant. */
@@ -306,12 +358,18 @@ function pickAnyBasisWinner(
  * rows are absent from the map (caller treats absent as null, matching the
  * legacy per-profile lookup that returned null).
  *
- * Implemented as the same per-basis reduction run per person. Pre-launch row
- * counts are tiny; correctness parity with the single form (identical reducer +
- * tiebreak) is worth more than a hand-rolled window-function query that could
- * drift from the single-person path. If profiling later shows this is hot, the
- * §2.3a window form (row_number() OVER (PARTITION BY charge_person_id, basis))
- * is the drop-in set-based equivalent.
+ * The §2.3a window form: two set-based queries (one over consent_grant, one over
+ * consent_request) fetch every (person × basis) fact at once, then the SAME pure
+ * reducer (`reduceBasisFromRows`) and tiebreak (`pickAnyBasisWinner`) the
+ * single-person path uses assemble each result — so the batched and per-person
+ * forms are byte-identical, just with 2 round-trips instead of N×(2–3). This
+ * replaced the per-person Promise.all fan-out (WI-797: a 4-person family issued
+ * 16–24 parallel Neon queries and timed out the mobile profiles fetch).
+ *
+ * `fetchConsentBasisRows` keys per (person, basis) and feeds correct, isolated
+ * inputs to the reducer — a cross-person key bug here would leak one person's
+ * consent status onto another, so its isolation is covered by the
+ * mixed-batch / no-cross-leakage integration tests.
  */
 export async function resolveLatestConsentStatusesAnyBasis(
   db: Database,
@@ -320,20 +378,146 @@ export async function resolveLatestConsentStatusesAnyBasis(
   purpose: string = DEFAULT_CONSENT_PURPOSE,
 ): Promise<Map<string, ConsentStatus>> {
   const result = new Map<string, ConsentStatus>();
-  await Promise.all(
-    chargePersonIds.map(async (personId) => {
-      const status = await resolveLatestConsentStatusAnyBasis(
-        db,
-        personId,
-        organizationId,
-        purpose,
-      );
-      if (status !== null) {
-        result.set(personId, status);
-      }
-    }),
+  if (chargePersonIds.length === 0) return result;
+
+  const rowsByKey = await fetchConsentBasisRows(
+    db,
+    chargePersonIds,
+    organizationId,
+    purpose,
   );
+
+  for (const personId of chargePersonIds) {
+    const reductions = BASIS_PRIORITY.map((basis) => ({
+      basis,
+      reduction: reduceBasisFromRows(
+        rowsByKey.get(basisRowKey(personId, basis)) ?? EMPTY_BASIS_ROWS,
+      ),
+    }));
+    const status = pickAnyBasisWinner(reductions);
+    if (status !== null) result.set(personId, status);
+  }
   return result;
+}
+
+/**
+ * Composite map key for a (person, basis) pair. The NUL separator is
+ * collision-proof: a uuid and the two fixed ConsentBasis strings can never
+ * contain a NUL byte, so no two distinct pairs map to the same key.
+ */
+function basisRowKey(chargePersonId: string, basis: ConsentBasis): string {
+  return `${chargePersonId}\u0000${basis}`;
+}
+
+/** A (person, basis) pair with no grant and no request rows. */
+const EMPTY_BASIS_ROWS: BasisRows = {
+  currentGrant: null,
+  request: null,
+  minGrantedAt: null,
+};
+
+/**
+ * Set-based fetch of the per-(person, basis) facts for many persons in one org.
+ * Two queries:
+ *   - grants: row_number() OVER (PARTITION BY charge_person_id, lawful_basis
+ *     ORDER BY granted_at DESC, id DESC) picks the CURRENT grant (rn=1) — the
+ *     same (granted_at DESC, id DESC) windowing the per-person findFirst uses —
+ *     and min(granted_at) OVER the same partition supplies the ordering-key
+ *     fallback in one pass.
+ *   - requests: the ≤1 (basis-keyed-unique) request row per (person, basis).
+ * Keyed per (person, basis) so each reduction sees only its own rows.
+ */
+async function fetchConsentBasisRows(
+  db: Database,
+  chargePersonIds: readonly string[],
+  organizationId: string,
+  purpose: string,
+): Promise<Map<string, BasisRows>> {
+  const ids = [...chargePersonIds];
+  const bases = [...BASIS_PRIORITY] as string[];
+
+  const grantRows = await db
+    .select({
+      chargePersonId: consentGrant.chargePersonId,
+      lawfulBasis: consentGrant.lawfulBasis,
+      granted: consentGrant.granted,
+      withdrawnAt: consentGrant.withdrawnAt,
+      grantedAt: consentGrant.grantedAt,
+      // Cast to int: row_number() is bigint, which the pg/Neon driver returns as
+      // a string ("1") — the `rn === 1` comparison below would silently never
+      // match without the cast (the equivalence guard caught exactly this).
+      rn: sql<number>`(row_number() OVER (
+        PARTITION BY ${consentGrant.chargePersonId}, ${consentGrant.lawfulBasis}
+        ORDER BY ${consentGrant.grantedAt} DESC, ${consentGrant.id} DESC
+      ))::int`,
+      // min over the partition — same value on every row, read off the rn=1 row.
+      minGrantedAt: sql<string>`min(${consentGrant.grantedAt}) OVER (
+        PARTITION BY ${consentGrant.chargePersonId}, ${consentGrant.lawfulBasis}
+      )`,
+    })
+    .from(consentGrant)
+    .where(
+      and(
+        inArray(consentGrant.chargePersonId, ids),
+        eq(consentGrant.purpose, purpose),
+        eq(consentGrant.organizationId, organizationId),
+        inArray(consentGrant.lawfulBasis, bases),
+      ),
+    );
+
+  const requestRows = await db
+    .select({
+      chargePersonId: consentRequest.chargePersonId,
+      requestedBasis: consentRequest.requestedBasis,
+      status: consentRequest.status,
+      requestedAt: consentRequest.requestedAt,
+      createdAt: consentRequest.createdAt,
+    })
+    .from(consentRequest)
+    .where(
+      and(
+        inArray(consentRequest.chargePersonId, ids),
+        eq(consentRequest.purpose, purpose),
+        eq(consentRequest.organizationId, organizationId),
+        inArray(consentRequest.requestedBasis, bases),
+      ),
+    );
+
+  const byKey = new Map<string, BasisRows>();
+  const ensure = (key: string): BasisRows => {
+    let rows = byKey.get(key);
+    if (!rows) {
+      rows = { currentGrant: null, request: null, minGrantedAt: null };
+      byKey.set(key, rows);
+    }
+    return rows;
+  };
+
+  for (const g of grantRows) {
+    const key = basisRowKey(g.chargePersonId, g.lawfulBasis as ConsentBasis);
+    const rows = ensure(key);
+    // min(granted_at) is constant across the partition — capture from any row.
+    rows.minGrantedAt = g.minGrantedAt;
+    if (g.rn === 1) {
+      rows.currentGrant = {
+        granted: g.granted,
+        withdrawnAt: g.withdrawnAt,
+        grantedAt: g.grantedAt,
+      };
+    }
+  }
+
+  for (const r of requestRows) {
+    const key = basisRowKey(r.chargePersonId, r.requestedBasis as ConsentBasis);
+    const rows = ensure(key);
+    rows.request = {
+      status: r.status,
+      requestedAt: r.requestedAt,
+      createdAt: r.createdAt,
+    };
+  }
+
+  return byKey;
 }
 
 /**
