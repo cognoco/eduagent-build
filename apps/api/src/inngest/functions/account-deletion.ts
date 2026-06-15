@@ -1,11 +1,22 @@
 import { inngest } from '../client';
-import { getStepDatabase, getStepClerkSecretKey } from '../helpers';
+import {
+  getStepDatabase,
+  getStepClerkSecretKey,
+  isIdentityV2EnabledInStep,
+} from '../helpers';
 import {
   accountExists,
   isDeletionCancelled,
   executeDeletion,
   getAccountClerkUserId,
 } from '../../services/deletion';
+import {
+  organizationExistsV2,
+  isDeletionCancelledV2,
+  executeDeletionV2,
+  getOrganizationOwnerClerkUserIdV2,
+  getOrganizationOwnerEmailV2,
+} from '../../services/identity-v2/deletion-v2';
 import { deleteClerkUser } from '../../services/clerk-user';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
@@ -90,6 +101,9 @@ export const scheduledDeletion = inngest.createFunction(
     // telemetry for grace-period overruns vs. happy-path completions.
     const exists = await step.run('check-account-exists', async () => {
       const db = getStepDatabase();
+      if (isIdentityV2EnabledInStep()) {
+        return organizationExistsV2(db, accountId);
+      }
       return accountExists(db, accountId);
     });
 
@@ -103,12 +117,31 @@ export const scheduledDeletion = inngest.createFunction(
     // the captured value rather than reading a now-deleted row.
     const clerkUserId = await step.run('capture-clerk-user-id', async () => {
       const db = getStepDatabase();
+      if (isIdentityV2EnabledInStep()) {
+        return getOrganizationOwnerClerkUserIdV2(db, accountId);
+      }
       return getAccountClerkUserId(db, accountId);
+    });
+
+    // [CUT-B2] v2 also pre-reads the owner email for the byok_waitlist erase
+    // (D2 GDPR Art-17 leg in executeDeletionV2). Captured separately so the
+    // value survives the person cascade and a retry of delete-account-data
+    // re-uses the memoized value. Null when no login exists (pre-graph edge
+    // case) — executeDeletionV2 handles null ownerEmail as a no-op on that leg.
+    const ownerEmail = await step.run('capture-owner-email', async () => {
+      const db = getStepDatabase();
+      if (isIdentityV2EnabledInStep()) {
+        return getOrganizationOwnerEmailV2(db, accountId);
+      }
+      return null;
     });
 
     // Check if deletion was cancelled
     const cancelled = await step.run('check-cancellation', async () => {
       const db = getStepDatabase();
+      if (isIdentityV2EnabledInStep()) {
+        return isDeletionCancelledV2(db, accountId);
+      }
       return isDeletionCancelled(db, accountId);
     });
 
@@ -124,6 +157,14 @@ export const scheduledDeletion = inngest.createFunction(
     // 'already_deleted' so telemetry is accurate.
     const deletionResult = await step.run('delete-account-data', async () => {
       const db = getStepDatabase();
+      if (isIdentityV2EnabledInStep()) {
+        return executeDeletionV2(db, {
+          organizationId: accountId,
+          ownerEmail,
+          reason: 'user_initiated',
+          deletedBy: null,
+        });
+      }
       return executeDeletion(db, accountId);
     });
 

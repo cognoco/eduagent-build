@@ -20,6 +20,10 @@ jest.mock(
       ...actual,
       getStepDatabase: () => mockGetStepDatabase(),
       getStepClerkSecretKey: () => mockGetStepClerkSecretKey(),
+      // Force v1 path so test assertions (mockIsDeletionCancelled, mockExecuteDeletion, etc.)
+      // remain valid regardless of process.env.IDENTITY_V2_ENABLED in the local dev env.
+      // The v2 branching inside account-deletion.ts is covered by the [CUT-B2] suite below.
+      isIdentityV2EnabledInStep: jest.fn().mockReturnValue(false),
     };
   },
 );
@@ -147,10 +151,11 @@ describe('scheduledDeletion', () => {
     });
 
     // getStepDatabase called once each for check-account-exists,
-    // capture-clerk-user-id ([R1]), check-cancellation, delete-account-data
-    // ([BUG-844] added the existence check). The delete-clerk-user step uses
-    // getStepClerkSecretKey, not getStepDatabase, so it does not add here.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(4);
+    // capture-clerk-user-id ([R1]), capture-owner-email ([CUT-B2] v2 email pre-read),
+    // check-cancellation, delete-account-data ([BUG-844] added the existence check).
+    // The delete-clerk-user step uses getStepClerkSecretKey, not getStepDatabase,
+    // so it does not add here.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(5);
   });
 
   // [BREAK / BUG-844] If the account was removed during the 7-day sleep
