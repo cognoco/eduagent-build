@@ -37,7 +37,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { inArray, like } from 'drizzle-orm';
+import { and, inArray, isNull, like } from 'drizzle-orm';
 
 import { reviewDueScan } from './review-due-scan';
 
@@ -334,8 +334,15 @@ afterAll(async () => {
     const accountIds = testAccounts.map((a) => a.id);
     if (accountIds.length > 0) {
       // Resolve seeded profile IDs (person.id = profile.id) via the legacy FK.
+      // The isNull(profiles.archivedAt) filter satisfies the cross-profile
+      // archived-profile guard (archived-profile-scan.guard.test.ts) — this
+      // afterAll cleanup only ever targets this suite's live seeded profiles
+      // (no test path archives a profile), so scoping to non-archived is sound.
       const testProfiles = await db.query.profiles.findMany({
-        where: inArray(profiles.accountId, accountIds),
+        where: and(
+          inArray(profiles.accountId, accountIds),
+          isNull(profiles.archivedAt),
+        ),
         columns: { id: true },
       });
       const profileIds = testProfiles.map((p) => p.id);
