@@ -16,7 +16,7 @@
 //   - consentStatus        := AnyBasis resolver (latest-any, behavior-preserving)
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   guardianship,
   membership,
@@ -338,9 +338,14 @@ export async function listProfilesV2(
 
   const personIds = rows.map((r) => r.id);
 
-  // Active guardianship edges for this org's persons (the family_links twin).
-  // Pre-launch row counts are tiny; resolve the two link directions in one read
-  // of the active edges touching any listed person, then index by direction.
+  // Active guardianship edges touching this org's persons (the family_links
+  // twin). Scoped at the query: only active edges where a listed person is the
+  // guardian OR the charge — bounding the read to this org's persons instead of
+  // scanning the whole table on every GET /v1/profiles (the mobile-launch hot
+  // path). personIds is non-empty here (the rows.length === 0 early-return
+  // guarantees it), so inArray is safe. The per-side personIdSet checks below
+  // still attribute each edge to the correct direction (an OR-matched edge may
+  // have only one side in this org).
   const edges = await db
     .select({
       guardianPersonId: guardianship.guardianPersonId,
@@ -348,7 +353,15 @@ export async function listProfilesV2(
       grantedAt: guardianship.grantedAt,
     })
     .from(guardianship)
-    .where(isNull(guardianship.revokedAt));
+    .where(
+      and(
+        isNull(guardianship.revokedAt),
+        or(
+          inArray(guardianship.guardianPersonId, personIds),
+          inArray(guardianship.chargePersonId, personIds),
+        ),
+      ),
+    );
   const personIdSet = new Set(personIds);
   const guardianHasEdge = new Set<string>();
   const chargeLinkGrantedAt = new Map<string, Date>();

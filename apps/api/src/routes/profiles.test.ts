@@ -27,19 +27,17 @@ jest.mock(
   },
 );
 
-jest.mock(
-  '../services/identity-v2/profile-v2' /* gc1-allow: unit-route isolation; real service covered by profile-v2.integration.test.ts */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/identity-v2/profile-v2',
-    ) as typeof import('../services/identity-v2/profile-v2');
-    return {
-      ...actual,
-      listProfilesV2: jest.fn(),
-      getOwnerProfileV2: jest.fn(),
-    };
-  },
-);
+// gc1-allow: unit-route isolation; real service covered by profile-v2.integration.test.ts
+jest.mock('../services/identity-v2/profile-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/profile-v2',
+  ) as typeof import('../services/identity-v2/profile-v2');
+  return {
+    ...actual,
+    listProfilesV2: jest.fn(),
+    getOwnerProfileV2: jest.fn(),
+  };
+});
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
