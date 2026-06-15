@@ -1693,14 +1693,27 @@ describe('billing routes', () => {
 // GET /subscription/status and this flips 200 → 401.
 // ---------------------------------------------------------------------------
 describe('[CUT-B1] GET /subscription/status v2 pre-graph (graphless owner)', () => {
+  // Typed pre-graph env mirrors the profiles.test.ts pattern: the only context
+  // vars the GET /subscription/status pre-graph branch reads are db, account
+  // (explicitly undefined), and clerkIdentity. Typing them removes the `as never`
+  // casts the surrounding legacy proxy-mode tests still use.
+  type PreGraphEnv = {
+    Bindings: { IDENTITY_V2_ENABLED?: string };
+    Variables: {
+      db: Record<string, never>;
+      account: undefined;
+      clerkIdentity: { clerkUserId: string; verifiedEmail: string } | undefined;
+    };
+  };
+
   function makePreGraphApp() {
-    const app = new Hono();
+    const app = new Hono<PreGraphEnv>();
     app.use('*', async (c, next) => {
-      c.set('db' as never, {});
+      c.set('db', {});
       // Graphless: account explicitly undefined (mirrors what accountMiddleware
       // sets on the v2 pre-graph path — clerkIdentity set, no account/graph yet).
-      c.set('account' as never, undefined);
-      c.set('clerkIdentity' as never, {
+      c.set('account', undefined);
+      c.set('clerkIdentity', {
         clerkUserId: 'user_pre_graph',
         verifiedEmail: 'newuser@example.com',
       });

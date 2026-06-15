@@ -32,6 +32,13 @@ canon-authority: docs/canon/identity/data-model.md + domain-model.md + ontology.
 - `apps/mobile/e2e-web/` (Playwright E2E helpers)
 - `apps/*/src/test-utils/`, `packages/*/src/test-utils/`
 
+**NOT excluded — deployed `.ts` infrastructure code that is not a `.test.ts` file:**
+- `apps/api/src/routes/test-seed.ts` + `apps/api/src/services/test-seed.ts` — the
+  `/__test/*` seed/reset HTTP surface. Despite the name, these are **deployed worker
+  route/service `.ts` files** (env-gated, but present on staging), not test files. They
+  read/write all 5 legacy tables and are the live cause of the currently-RED run-smoke
+  post-DROP. Enumerated in **§3.10**.
+
 **Scale check:** The upper bound cited in the tracker was ~868 reference sites / 77 non-test files.
 This enumeration found ~76 query sites across the production source (non-eval, non-test),
 across 42 distinct production files. The discrepancy from the ~868 upper bound is because
@@ -77,7 +84,7 @@ All confirmed V2 twins, verified against `apps/api/src/services/identity-v2/` an
 | Tier sync | `services/billing/tier.ts` | `services/billing/billing-v2/tier-v2.ts` |
 | Child cap notifications | `services/child-cap-notifications.ts` | `services/billing/billing-v2/child-cap-notifications-v2.ts` |
 | Stripe webhooks | `services/billing/stripe-webhook-handler.ts` | `services/billing/billing-v2/stripe-webhook-handler-v2.ts` |
-| Test seed | `services/test-seed.ts` | `services/test-seed-v2.ts` |
+| Test seed (`/__test/*`) | `services/test-seed.ts` | `services/test-seed-v2.ts` (`seedOwnerIdentityV2`/`seedChildIdentityV2`) — **EXISTS but has NO production callers**; route still calls legacy `seedScenario` (see §3.10) |
 
 ---
 
@@ -370,9 +377,9 @@ Routes do not query legacy tables directly. They call service functions and are 
 | `repository.ts:91–92` | `profiles` | **(b) wire-up** | Liveness check via scoped repo; the repo wraps the legacy table |
 | `repository.ts:379–385` | `consentStates` | **(b) wire-up** | `consentStates` repo accessor |
 | `account-repository.ts:42–134` | `subscriptions` | **(b) wire-up** | 5 subscription SELECT sites; legacy accessor |
-| `schema/profiles.ts` | defines all 4 (profiles, accounts, familyLinks, consentStates) | schema definition — not a query site |
-| `schema/billing.ts` | defines `subscriptions` | schema definition — not a query site |
-| Schema FK reference files (sessions, progress, subjects, etc.) | `profiles.id` as FK target | schema definition — not a query site; DROP will require FK re-point (M-REPOINT) |
+| `schema/profiles.ts` | defines all 4 (profiles, accounts, familyLinks, consentStates) | — | schema definition — not a query site |
+| `schema/billing.ts` | defines `subscriptions` | — | schema definition — not a query site |
+| Schema FK reference files (sessions, progress, subjects, etc.) | `profiles.id` as FK target | — | schema definition — not a query site; DROP will require FK re-point (M-REPOINT) |
 
 ---
 
@@ -397,6 +404,54 @@ These services need **new V2 twins built via TDD** before wire-up:
 | `services/dashboard.ts` (all reads) | `profiles`, `familyLinks`, `consentStates` | dashboard-v2 service | MEDIUM |
 | `services/billing/metering.ts::isProfileUnderSubscription` | `profiles`, `subscriptions` | `isPersonUnderSubscriptionV2` | HIGH — quota enforcement check |
 | `services/onboarding/index.ts::completeLearningProfileSetup` (profiles subquery) | `profiles` | completion query on `person` | LOW |
+
+---
+
+### 3.10 Test-seed / reset surface (`/__test/*`) — DEPLOYED non-test code, NOT a `.test.ts` file
+
+> **Why this is in scope (not excluded as test infra).** `apps/api/src/routes/test-seed.ts`
+> is a **live HTTP route surface** mounted in the deployed worker (guarded by an
+> environment check, but present and reachable on staging). `apps/api/src/services/test-seed.ts`
+> is the service it calls. **These are `.ts` source files, not `.test.ts` files** —
+> they do NOT match the test-file exclusion. They read/write all 5 legacy tables
+> directly and are **exactly the surface currently 500-ing run-smoke post-DROP**
+> (`relation "accounts" does not exist` on the seed/reset endpoints). Omitting them
+> from WP-1 was the gap Codex P2 flagged; corrected here.
+
+#### `apps/api/src/routes/test-seed.ts` — calls legacy `seedScenario` / `resetDatabase`
+
+| Site | Operation | Function | Class | Note |
+|---|---|---|---|---|
+| `:149` | dispatch | `POST /__test/seed` → `seedScenario(db, scenario, ...)` | **(b) wire-up** | No `IDENTITY_V2_ENABLED` branch; always calls legacy `seedScenario` |
+| reset route | dispatch | `POST /__test/reset` → `resetDatabase(...)` | **(b) wire-up** | Calls `resetDatabase`, which `delete(accounts)` |
+| debug routes | dispatch | `GET /__test/debug/:email`, `GET /__test/debug-subjects/:id` → `debugAccountsByEmail`, `debugSubjectsByClerkUserId` | **(b) wire-up** | Read account→profile chain |
+
+#### `apps/api/src/services/test-seed.ts` — direct legacy reads/writes (all 5 tables)
+
+| Table | Operation | Count | Class | Note |
+|---|---|---|---|---|
+| `accounts` | INSERT | 2 sites | **(b) wire-up** | Twin: `test-seed-v2.ts::seedOwnerIdentityV2` (org+person+login bootstrap) |
+| `accounts` | DELETE | 3 sites (`:5575, :5639, :5655` in `resetDatabase`) | **(b) wire-up** | Reset path; v2 must delete the org graph |
+| `profiles` | INSERT | 8 sites | **(b) wire-up** | Twin: `seedOwnerIdentityV2` / `seedChildIdentityV2` (person rows) |
+| `familyLinks` | INSERT | 14 sites | **(b) wire-up** | Twin: `seedChildIdentityV2` (guardianship edges) |
+| `consentStates` | INSERT | 43 sites | **(b)/(c) wire-up/build** | Twin partial: `seedChildIdentityV2` seeds consent; coverage for all 43 scenario variants must be verified — some scenario shapes may need new v2 seed paths (consent_grant/consent_request) |
+| `subscriptions` | INSERT | 19 sites | **(b) wire-up** | Twin: subscription seed in `test-seed-v2.ts` (org-anchored subscription) |
+
+**Twin status:** `apps/api/src/services/test-seed-v2.ts` EXISTS with `seedOwnerIdentityV2`
++ `seedChildIdentityV2`, but has **NO production callers** — the route still calls
+legacy `seedScenario`. So this surface is class (b) wire-up at the route level, with a
+class (c) caveat: the v2 seed twin may not yet cover all 43 consent scenario variants
+(must be verified during the wire-up WP, not assumed).
+
+**Downstream wire-up note (REQUIRED for the WP that owns this):** the WP must either
+(i) wire `routes/test-seed.ts` to dispatch to `services/test-seed-v2.ts`
+(`seedOwnerIdentityV2`/`seedChildIdentityV2`) under `IDENTITY_V2_ENABLED`, covering all
+scenario variants the legacy `seedScenario` supports — **OR** (ii) deliberately
+exclude/remove the legacy seed surface if the E2E smoke is migrated to v2-only seeding.
+**This surface is the live root cause of the currently-RED run-smoke** (seed endpoint
+500s post-DROP because the legacy `seedScenario` writes `accounts`/`profiles`/etc. that
+no longer exist). Until this is migrated, any staging-dependent E2E smoke that seeds via
+`/__test/seed` will fail post-DROP — this is expected and non-PR-caused for WI-765.
 
 ---
 
@@ -509,9 +564,21 @@ Based on the enumeration, I recommend the following domain-grouped WP decomposit
 
 **Scope:** 3 Inngest functions with no `isIdentityV2EnabledInStep` branching; add branching + v2 dispatch.
 
+### WP-9 — Test-seed / reset surface: wire `/__test/*` to test-seed-v2 (UNBLOCKS staging E2E smokes)
+
+**Scope:** `routes/test-seed.ts` (`POST /__test/seed`, `POST /__test/reset`, debug routes) +
+`services/test-seed.ts` (76 legacy writes across all 5 tables) → dispatch to
+`services/test-seed-v2.ts` (`seedOwnerIdentityV2` / `seedChildIdentityV2`) under
+`IDENTITY_V2_ENABLED`, **OR** migrate the E2E smoke to v2-only seeding and remove the
+legacy seed surface. Verify the v2 seed twin covers all 43 consent scenario variants the
+legacy `seedScenario` supports (class (c) caveat — may need new consent_grant/consent_request
+seed paths). **Sequencing:** this is the surface currently 500-ing run-smoke post-DROP, so it
+should land **before the terminal data-half re-run cutover** (otherwise the re-run cutover's
+staging smoke stays red). Can run in parallel with WP-2..8 since it touches an isolated route.
+
 ### WP-FLAG — Remove `IDENTITY_V2_ENABLED`
 
-**Scope (after WP-2..8 complete):** Delete flag, legacy schema defs, `account-repository.ts`, legacy twin modules; repo-wide grep clean; full suite + 51 integration suites green.
+**Scope (after WP-2..9 complete):** Delete flag, legacy schema defs, `account-repository.ts`, legacy twin modules, the legacy `services/test-seed.ts` writers (once `/__test/*` is on v2 per WP-9); repo-wide grep clean; full suite + 51 integration suites green.
 
 ---
 
@@ -520,14 +587,21 @@ Based on the enumeration, I recommend the following domain-grouped WP decomposit
 | Class | Count (operation sites) | Count (files) |
 |---|---|---|
 | (a) OK — twin + branched | ~35 operation sites | 24 files |
-| (b) wire-up — twin + unbranched | ~30 operation sites | 16 files |
+| (b) wire-up — twin + unbranched | ~30 service/route/Inngest sites + the `/__test/*` seed surface (~76 legacy writes in `services/test-seed.ts` + the seed/reset/debug routes) | 16 files + 2 test-seed files (§3.10) |
 | (c) build — no twin | ~11 distinct functions | 8 service files |
 
-**Total non-test production operation sites:** ~76
+**Total non-test production operation sites:** ~76 in the app reader/writer surface (§3.1–3.8),
+**plus** the `/__test/*` seed/reset surface (§3.10) — a deployed-but-env-gated route with ~76
+direct legacy writes in `services/test-seed.ts`. The seed surface is counted separately because
+it is infrastructure (not user-facing) but is **deployed `.ts` source, not a `.test.ts` file**,
+and is the live cause of the currently-RED run-smoke post-DROP.
 
 **Missing twins requiring TDD (§4):** 6 HIGH-security + 9 MEDIUM/LOW functions across 8 files.
 
 **Most critical WP (gates app launch):** WP-2 — `listProfilesV2` + GET /v1/profiles wire-up.
+
+**WP that unblocks staging smokes:** WP-9 — `/__test/*` seed/reset → `test-seed-v2.ts` (§3.10);
+must land before the terminal data-half re-run cutover.
 
 ---
 
