@@ -360,6 +360,19 @@ const mockGetQuotaPool = jest.fn().mockResolvedValue({
   cycleResetAt: '2026-08-01T00:00:00.000Z',
 });
 
+// [WI-784] v2 billing twin — ensureFreeSubscriptionV2 reads the v2
+// `subscription` table (no profiles.accountId). Mocked so the unit test can
+// assert the v2 path is selected under IDENTITY_V2_ENABLED=true. Declared above
+// the billing mock factory so it can be referenced in the override list — the
+// production code imports it from the main billing barrel (re-exported there
+// from ./billing-v2), so the main-barrel mock must override it too.
+const mockEnsureFreeSubscriptionV2 = jest.fn().mockResolvedValue({
+  id: 'sub-test-id',
+  organizationId: 'org-test-id',
+  planTier: 'free',
+  status: 'active',
+});
+
 jest.mock(
   '../../services/billing' /* gc1-allow: billing operations write Neon quota tables — no DB in the unit runtime */,
   () => {
@@ -370,33 +383,11 @@ jest.mock(
       ...actual,
       ensureFreeSubscription: (...args: unknown[]) =>
         mockEnsureFreeSubscription(...args),
+      ensureFreeSubscriptionV2: (...args: unknown[]) =>
+        mockEnsureFreeSubscriptionV2(...args),
       decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
       safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
       getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
-    };
-  },
-);
-
-// [WI-784] v2 billing twin — ensureFreeSubscriptionV2 reads the v2
-// `subscription` table (no profiles.accountId). Mocked so the unit test can
-// assert the v2 path is selected under IDENTITY_V2_ENABLED=true.
-const mockEnsureFreeSubscriptionV2 = jest.fn().mockResolvedValue({
-  id: 'sub-test-id',
-  organizationId: 'org-test-id',
-  planTier: 'free',
-  status: 'active',
-});
-
-jest.mock(
-  '../../services/billing/billing-v2' /* gc1-allow: billing-v2 operations write Neon subscription tables — no DB in the unit runtime */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/billing/billing-v2',
-    ) as typeof import('../../services/billing/billing-v2');
-    return {
-      ...actual,
-      ensureFreeSubscriptionV2: (...args: unknown[]) =>
-        mockEnsureFreeSubscriptionV2(...args),
     };
   },
 );

@@ -34,6 +34,16 @@ export {
   activateSubscriptionFromCheckout,
 } from './billing/subscription-core';
 
+// [WI-784] Identity-v2 twin re-exported here so callers import the v2
+// equivalent (`ensureFreeSubscriptionV2`) alongside its legacy sibling
+// (`ensureFreeSubscription`) from this one barrel, instead of reaching into
+// the billing-v2 sub-barrel directly. Re-exported from the specific v2 source
+// module (not the billing-v2 index barrel) to avoid pulling the full v2
+// surface — which would form an import cycle with this facade via
+// billing/metering → billing/billing-v2/*. Mirrors metering.ts's by-path v2
+// imports. The full v2 API stays available from ./billing/billing-v2.
+export { ensureFreeSubscriptionV2 } from './billing/billing-v2/subscription-core-v2';
+
 // ---------------------------------------------------------------------------
 // Trial expiry, quota cron helpers
 // ---------------------------------------------------------------------------

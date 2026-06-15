@@ -83,11 +83,11 @@ import {
 import { runDedupForProfile } from '../../services/memory/dedup-pass';
 import {
   ensureFreeSubscription,
+  ensureFreeSubscriptionV2,
   decrementQuota,
   safeRefundQuota,
   getQuotaPool,
 } from '../../services/billing';
-import { ensureFreeSubscriptionV2 } from '../../services/billing/billing-v2';
 import { safeSend } from '../../services/safe-non-core';
 
 const logger = createLogger();
