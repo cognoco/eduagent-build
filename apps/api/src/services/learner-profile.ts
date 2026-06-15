@@ -39,7 +39,10 @@ import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { isGdprProcessingAllowed } from './consent';
 import { verifyPersonOwnershipV2 } from './identity-v2/ownership-v2';
-import type { IdentityV2Opts } from './identity-v2/identity-v2-opts';
+import {
+  requireCallerPersonId,
+  type IdentityV2Opts,
+} from './identity-v2/identity-v2-opts';
 
 export type { IdentityV2Opts };
 
@@ -1135,16 +1138,11 @@ async function verifyProfileOwnership(
     // (membership alone is existence-visibility, not write authority).
     // callerPersonId is the authenticated caller, never request-supplied.
     // v2: profileId === personId on the cutover path (see CUT-B migration notes).
-    if (!opts.callerPersonId) {
-      throw new Error(
-        'identity-v2 write guard requires callerPersonId (caller identity not threaded)',
-      );
-    }
     await verifyPersonOwnershipV2(
       db,
       profileId,
       accountId,
-      opts.callerPersonId,
+      requireCallerPersonId(opts),
     );
     return;
   }

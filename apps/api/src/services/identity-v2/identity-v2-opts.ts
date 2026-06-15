@@ -24,3 +24,21 @@ export interface IdentityV2Opts {
   identityV2Enabled?: boolean;
   callerPersonId?: string;
 }
+
+/**
+ * The authenticated caller's own person id is mandatory on the v2 write path —
+ * the write-authority guard cannot prove self-or-edge without it. A missing
+ * value means the route failed to thread it (a wiring bug); fail closed rather
+ * than silently fall back to a membership-only (IDOR-prone) check.
+ *
+ * Shared by every v2 write guard so the null-check + error message cannot
+ * diverge between callers (settings.ts, learner-profile.ts, …).
+ */
+export function requireCallerPersonId(opts: IdentityV2Opts): string {
+  if (!opts.callerPersonId) {
+    throw new Error(
+      'identity-v2 write guard requires callerPersonId (caller identity not threaded)',
+    );
+  }
+  return opts.callerPersonId;
+}

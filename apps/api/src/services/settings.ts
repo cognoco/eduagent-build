@@ -28,7 +28,10 @@ import {
   verifyPersonOwnershipV2,
   verifyPersonIsOrgAdminV2,
 } from './identity-v2/ownership-v2';
-import type { IdentityV2Opts } from './identity-v2/identity-v2-opts';
+import {
+  requireCallerPersonId,
+  type IdentityV2Opts,
+} from './identity-v2/identity-v2-opts';
 
 export type { IdentityV2Opts };
 
@@ -100,21 +103,6 @@ async function verifyProfileOwnership(
   if (!owner) {
     throw new Error(`Profile ${profileId} not found for account`);
   }
-}
-
-/**
- * The authenticated caller's own person id is mandatory on the v2 write path —
- * the write-authority guard cannot prove self-or-edge without it. A missing
- * value means the route failed to thread it (a wiring bug); fail closed rather
- * than silently fall back to a membership-only (IDOR-prone) check.
- */
-function requireCallerPersonId(opts: IdentityV2Opts): string {
-  if (!opts.callerPersonId) {
-    throw new Error(
-      'identity-v2 write guard requires callerPersonId (caller identity not threaded)',
-    );
-  }
-  return opts.callerPersonId;
 }
 
 /**
