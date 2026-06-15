@@ -48,6 +48,69 @@ jest.mock(
   },
 );
 
+// [CUT-B2] v2 consent service mocks
+const mockResolveOrgIdForPerson = jest.fn();
+jest.mock(
+  '../../services/identity-v2/family-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/family-v2',
+    ) as typeof import('../../services/identity-v2/family-v2');
+    return {
+      ...actual,
+      resolveOrgIdForPerson: (...args: unknown[]) =>
+        mockResolveOrgIdForPerson(...args),
+    };
+  },
+);
+
+const mockResolveLatestConsentStatusAnyBasis = jest.fn();
+jest.mock(
+  '../../services/identity-v2/consent-status-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/consent-status-v2',
+    ) as typeof import('../../services/identity-v2/consent-status-v2');
+    return {
+      ...actual,
+      resolveLatestConsentStatusAnyBasis: (...args: unknown[]) =>
+        mockResolveLatestConsentStatusAnyBasis(...args),
+    };
+  },
+);
+
+const mockGetPersonForConsentRevocationV2 = jest.fn();
+const mockDeleteArchivedPersonIfStillEligibleV2 = jest
+  .fn()
+  .mockResolvedValue(true);
+jest.mock(
+  '../../services/identity-v2/consent-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/consent-v2',
+    ) as typeof import('../../services/identity-v2/consent-v2');
+    return {
+      ...actual,
+      getPersonForConsentRevocationV2: (...args: unknown[]) =>
+        mockGetPersonForConsentRevocationV2(...args),
+    };
+  },
+);
+
+jest.mock(
+  '../../services/identity-v2/deletion-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/deletion-v2',
+    ) as typeof import('../../services/identity-v2/deletion-v2');
+    return {
+      ...actual,
+      deleteArchivedPersonIfStillEligibleV2: (...args: unknown[]) =>
+        mockDeleteArchivedPersonIfStillEligibleV2(...args),
+    };
+  },
+);
+
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { archiveCleanup } from './archive-cleanup';
 
@@ -74,17 +137,31 @@ beforeEach(() => {
   jest.setSystemTime(new Date('2026-05-06T12:00:00.000Z'));
   jest.clearAllMocks();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  delete process.env['IDENTITY_V2_ENABLED'];
+
+  // Legacy path defaults
   mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
   mockGetProfileForConsentRevocation.mockResolvedValue({
     displayName: 'Liam',
     birthYear: 2012,
     archivedAt: new Date('2026-04-01T12:00:00.000Z'),
   });
+
+  // V2 path defaults
+  mockResolveOrgIdForPerson.mockResolvedValue('org-001');
+  mockResolveLatestConsentStatusAnyBasis.mockResolvedValue('WITHDRAWN');
+  mockGetPersonForConsentRevocationV2.mockResolvedValue({
+    displayName: 'Liam',
+    birthYear: 2012,
+    archivedAt: new Date('2026-04-01T12:00:00.000Z'),
+  });
+  mockDeleteArchivedPersonIfStillEligibleV2.mockResolvedValue(true);
 });
 
 afterEach(() => {
   jest.useRealTimers();
   delete process.env['DATABASE_URL'];
+  delete process.env['IDENTITY_V2_ENABLED'];
 });
 
 describe('archiveCleanup', () => {
@@ -139,5 +216,69 @@ describe('archiveCleanup', () => {
     await executeArchiveCleanup('profile-too-new');
 
     expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
+  });
+});
+
+// [CUT-B2] v2 path tests — run with IDENTITY_V2_ENABLED=true
+describe('archiveCleanup (v2 path)', () => {
+  beforeEach(() => {
+    process.env['IDENTITY_V2_ENABLED'] = 'true';
+  });
+
+  it('hard-deletes via v2 atomic helper after consent withdrawn and 30 days elapsed', async () => {
+    await executeArchiveCleanup('person-delete-v2');
+
+    expect(mockDeleteArchivedPersonIfStillEligibleV2).toHaveBeenCalledWith(
+      expect.anything(),
+      'person-delete-v2',
+      expect.any(Date),
+    );
+    expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
+  });
+
+  it('does not delete when v2 consent status is CONSENTED', async () => {
+    mockResolveLatestConsentStatusAnyBasis.mockResolvedValue('CONSENTED');
+
+    await executeArchiveCleanup('person-restored-v2');
+
+    expect(mockDeleteArchivedPersonIfStillEligibleV2).not.toHaveBeenCalled();
+  });
+
+  it('does not delete when v2 person has no archivedAt', async () => {
+    mockGetPersonForConsentRevocationV2.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      archivedAt: null,
+    });
+
+    await executeArchiveCleanup('person-active-v2');
+
+    expect(mockDeleteArchivedPersonIfStillEligibleV2).not.toHaveBeenCalled();
+  });
+
+  it('does not delete when v2 archivedAt is younger than 30 days', async () => {
+    mockGetPersonForConsentRevocationV2.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      archivedAt: new Date('2026-04-20T12:00:00.000Z'),
+    });
+
+    await executeArchiveCleanup('person-too-new-v2');
+
+    expect(mockDeleteArchivedPersonIfStillEligibleV2).not.toHaveBeenCalled();
+  });
+
+  it('skips consent check when org graph is not yet provisioned (orgId null)', async () => {
+    mockResolveOrgIdForPerson.mockResolvedValue(null);
+
+    await executeArchiveCleanup('person-no-org-v2');
+
+    // No consent lookup possible without an org; proceeds to person/delete checks.
+    expect(mockResolveLatestConsentStatusAnyBasis).not.toHaveBeenCalled();
+    expect(mockDeleteArchivedPersonIfStillEligibleV2).toHaveBeenCalledWith(
+      expect.anything(),
+      'person-no-org-v2',
+      expect.any(Date),
+    );
   });
 });
