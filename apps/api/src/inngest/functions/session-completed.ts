@@ -1861,19 +1861,34 @@ export const sessionCompleted = inngest.createFunction(
           throw missingProfileErr;
         }
 
+        // [WI-784] Hard-stop: under IDENTITY_V2_ENABLED, organizationId comes
+        // from membership.findFirst — if membership hasn't replicated yet, it is
+        // undefined here. This guard is OUTSIDE runIsolated (same as the profile
+        // check above) so a missing membership throws to step.run and Inngest
+        // retries, absorbing transient replication lag instead of permanently
+        // recording a 'failed' soft step. In the legacy path this cannot be
+        // undefined (profiles.accountId is a required column).
+        if (!homeworkOrganizationId) {
+          const missingOrgErr = new Error(
+            '[billing] homework-summary: organization/account id missing — membership not yet replicated',
+          );
+          logger.warn(
+            '[metering] homework-summary: organizationId missing, step will retry',
+            {
+              event: 'metering.homework_summary.org_missing',
+              profileId,
+              identityV2,
+            },
+          );
+          sentry.captureException(missingOrgErr, { profileId });
+          throw missingOrgErr;
+        }
+
         return runIsolated('extract-homework-summary', profileId, async () => {
           // [WI-784] v2 twin: ensureFreeSubscriptionV2 reads the v2
           // `subscription` table keyed by organizationId; legacy path reads
           // `subscriptions` via accountId. decrementQuota / safeRefundQuota
           // already accept identityV2 to select the v2 ownership cross-check.
-          // homeworkOrganizationId is guaranteed non-null here: the
-          // missing-profile hard-stop above would have thrown before this point
-          // if homeworkProfile was undefined, and the flag branches both set it.
-          if (!homeworkOrganizationId) {
-            throw new Error(
-              '[billing] homework-summary: organization/account id missing after profile resolved',
-            );
-          }
           const subscription = identityV2
             ? await ensureFreeSubscriptionV2(db, homeworkOrganizationId)
             : await ensureFreeSubscription(db, homeworkOrganizationId);
