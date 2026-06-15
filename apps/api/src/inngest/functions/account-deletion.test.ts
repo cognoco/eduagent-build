@@ -9,6 +9,19 @@ const mockIsDeletionCancelled = jest.fn();
 const mockExecuteDeletion = jest.fn();
 const mockGetAccountClerkUserId = jest.fn();
 const mockDeleteClerkUser = jest.fn();
+// Controls the live-flag fallback inside the handler. Pinned to false in the
+// v1 suites (so their assertions on the legacy service functions hold) and to
+// true in the [CUT-B2] v2 suite. NOTE: with the schedule-time mode pinning, an
+// event that carries `identityVersion` ignores this entirely — it is only the
+// fallback for legacy/unstamped events.
+const mockIsIdentityV2EnabledInStep = jest.fn().mockReturnValue(false);
+
+// v2 deletion-service twins — assertable doubles for the [CUT-B2] suite.
+const mockOrganizationExistsV2 = jest.fn();
+const mockIsDeletionCancelledV2 = jest.fn();
+const mockExecuteDeletionV2 = jest.fn();
+const mockGetOrganizationOwnerClerkUserIdV2 = jest.fn();
+const mockGetOrganizationOwnerEmailV2 = jest.fn();
 
 jest.mock(
   '../helpers' /* gc1-allow: getStepDatabase/getStepClerkSecretKey wrap Inngest step-level binding acquisition; must be intercepted to inject test doubles without a real Neon connection or CF env */,
@@ -20,6 +33,31 @@ jest.mock(
       ...actual,
       getStepDatabase: () => mockGetStepDatabase(),
       getStepClerkSecretKey: () => mockGetStepClerkSecretKey(),
+      // Controllable so v1 suites pin false and the [CUT-B2] suite pins true;
+      // defaults to false so assertions on the legacy service functions hold
+      // regardless of process.env.IDENTITY_V2_ENABLED in the local dev env.
+      isIdentityV2EnabledInStep: () => mockIsIdentityV2EnabledInStep(),
+    };
+  },
+);
+
+jest.mock(
+  '../../services/identity-v2/deletion-v2' /* gc1-allow: v2 deletion twins read the organization graph via the real DB; the unit suite asserts step wiring with doubles, real-DB behavior lives in deletion-v2 integration tests */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/deletion-v2',
+    ) as typeof import('../../services/identity-v2/deletion-v2');
+    return {
+      ...actual,
+      organizationExistsV2: (...args: unknown[]) =>
+        mockOrganizationExistsV2(...args),
+      isDeletionCancelledV2: (...args: unknown[]) =>
+        mockIsDeletionCancelledV2(...args),
+      executeDeletionV2: (...args: unknown[]) => mockExecuteDeletionV2(...args),
+      getOrganizationOwnerClerkUserIdV2: (...args: unknown[]) =>
+        mockGetOrganizationOwnerClerkUserIdV2(...args),
+      getOrganizationOwnerEmailV2: (...args: unknown[]) =>
+        mockGetOrganizationOwnerEmailV2(...args),
     };
   },
 );
@@ -60,6 +98,7 @@ describe('scheduledDeletion', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsIdentityV2EnabledInStep.mockReturnValue(false);
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
     // Default: account still exists at end of grace period (happy path)
@@ -148,8 +187,10 @@ describe('scheduledDeletion', () => {
 
     // getStepDatabase called once each for check-account-exists,
     // capture-clerk-user-id ([R1]), check-cancellation, delete-account-data
-    // ([BUG-844] added the existence check). The delete-clerk-user step uses
-    // getStepClerkSecretKey, not getStepDatabase, so it does not add here.
+    // ([BUG-844] added the existence check). On the v1 path the
+    // capture-owner-email step short-circuits BEFORE acquiring a DB connection
+    // (v2-only leg), so it does not add here. The delete-clerk-user step uses
+    // getStepClerkSecretKey, not getStepDatabase, so it does not add either.
     expect(mockGetStepDatabase).toHaveBeenCalledTimes(4);
   });
 
@@ -256,6 +297,7 @@ describe('[Fix Bug #494] TOCTOU cancellation detected by executeDeletion atomic 
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsIdentityV2EnabledInStep.mockReturnValue(false);
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockAccountExists.mockResolvedValue(true);
     mockIsDeletionCancelled.mockResolvedValue(false);
@@ -322,6 +364,7 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsIdentityV2EnabledInStep.mockReturnValue(false);
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
     mockAccountExists.mockResolvedValue(true);
@@ -491,5 +534,139 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
         }),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CUT-B2] v2 dispatch + schedule-time mode pinning.
+//
+// Two concerns covered here:
+//  1. Every step routes onto its v2 twin when v2 is active — including the
+//     v2-only capture-owner-email pre-read and organizationExistsV2 existence
+//     check that the legacy suites never exercise.
+//  2. [CODEX P1] The identity mode is PINNED at schedule time via
+//     event.data.identityVersion, NOT re-read from the live flag at execution
+//     time. A flag flip during the 7-day grace period (cutover or rollback)
+//     must NOT redirect the resume at the wrong store — doing so would miss the
+//     active-deletion stamp and silently skip a GDPR/COPPA erasure. The
+//     pinning tests flip the live flag to the OPPOSITE of the pinned version
+//     and assert the run still erases against the originally-scheduled store.
+// ---------------------------------------------------------------------------
+describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
+  const mockDb = { query: {} };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Live flag ON: an unstamped event would fall through to v2.
+    mockIsIdentityV2EnabledInStep.mockReturnValue(true);
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
+    // v1 doubles must never be reached on the v2 path; give them values that
+    // would pass so an accidental v1 call is caught by the explicit
+    // not-toHaveBeenCalled assertions rather than by an incidental throw.
+    mockAccountExists.mockResolvedValue(true);
+    mockIsDeletionCancelled.mockResolvedValue(false);
+    mockExecuteDeletion.mockResolvedValue('deleted');
+    mockGetAccountClerkUserId.mockResolvedValue('clerk_v1_should_not_be_used');
+    // v2 doubles — happy path.
+    mockOrganizationExistsV2.mockResolvedValue(true);
+    mockIsDeletionCancelledV2.mockResolvedValue(false);
+    mockExecuteDeletionV2.mockResolvedValue('deleted');
+    mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_org_owner');
+    mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
+    mockDeleteClerkUser.mockResolvedValue({ deleted: true });
+  });
+
+  it('routes every step onto its v2 twin and erases via executeDeletionV2 (flag on, no pin)', async () => {
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'org-1' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'deleted', accountId: 'org-1' });
+    // Every v2 step ran against the org store.
+    expect(mockOrganizationExistsV2).toHaveBeenCalledWith(mockDb, 'org-1');
+    expect(mockGetOrganizationOwnerClerkUserIdV2).toHaveBeenCalledWith(
+      mockDb,
+      'org-1',
+    );
+    expect(mockGetOrganizationOwnerEmailV2).toHaveBeenCalledWith(
+      mockDb,
+      'org-1',
+    );
+    expect(mockIsDeletionCancelledV2).toHaveBeenCalledWith(mockDb, 'org-1');
+    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
+      organizationId: 'org-1',
+      ownerEmail: 'owner@example.com',
+      reason: 'user_initiated',
+      deletedBy: null,
+    });
+    // Clerk erasure used the v2-captured owner id.
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk_org_owner',
+      clerkSecretKey: 'sk_test_step',
+    });
+    // No legacy step touched.
+    expect(mockAccountExists).not.toHaveBeenCalled();
+    expect(mockExecuteDeletion).not.toHaveBeenCalled();
+    expect(mockGetAccountClerkUserId).not.toHaveBeenCalled();
+  });
+
+  it('calls getStepDatabase once per v2 DB step (5 total)', async () => {
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    await handler({ event: { data: { accountId: 'org-1' } }, step });
+
+    // check-account-exists, capture-clerk-user-id, capture-owner-email,
+    // check-cancellation, delete-account-data — delete-clerk-user uses
+    // getStepClerkSecretKey, not getStepDatabase.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(5);
+  });
+
+  it('[BREAK CODEX-P1] pinned v2 survives a mid-grace-period flip to legacy — erases via executeDeletionV2', async () => {
+    // Scheduled in v2 (identityVersion: 'v2'), then the flag flipped OFF
+    // (rollback) before resume — live flag now returns false.
+    mockIsIdentityV2EnabledInStep.mockReturnValue(false);
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'org-1', identityVersion: 'v2' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'deleted', accountId: 'org-1' });
+    // The erasure ran against the originally-scheduled v2 store, NOT the
+    // now-active legacy store. This is the GDPR/COPPA-skip guard.
+    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
+      organizationId: 'org-1',
+      ownerEmail: 'owner@example.com',
+      reason: 'user_initiated',
+      deletedBy: null,
+    });
+    expect(mockExecuteDeletion).not.toHaveBeenCalled();
+    expect(mockAccountExists).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK CODEX-P1] pinned v1 survives a mid-grace-period flip to v2 — erases via executeDeletion', async () => {
+    // Scheduled in legacy (identityVersion: 'v1'), then the flag flipped ON
+    // (cutover) before resume — live flag now returns true.
+    mockIsIdentityV2EnabledInStep.mockReturnValue(true);
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-1', identityVersion: 'v1' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'deleted', accountId: 'acc-1' });
+    // The erasure ran against the originally-scheduled legacy store, NOT the
+    // now-active v2 store.
+    expect(mockExecuteDeletion).toHaveBeenCalledWith(mockDb, 'acc-1');
+    expect(mockExecuteDeletionV2).not.toHaveBeenCalled();
+    expect(mockOrganizationExistsV2).not.toHaveBeenCalled();
   });
 });

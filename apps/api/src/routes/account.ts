@@ -26,9 +26,17 @@ import {
   getDeletionStatus,
   getProfileIdsForAccount,
 } from '../services/deletion';
+import {
+  scheduleDeletionV2,
+  cancelDeletionV2,
+  getDeletionStatusV2,
+  getPersonIdsForOrganizationV2,
+} from '../services/identity-v2/deletion-v2';
 import { generateExport } from '../services/export';
+import { generateExportV2 } from '../services/identity-v2/export-v2';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
+import { isIdentityV2Enabled } from '../config';
 import { NotFoundError, apiError, validationError } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
 
@@ -37,6 +45,7 @@ type AccountRouteEnv = {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
     CLERK_SECRET_KEY?: string;
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -58,7 +67,10 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     // the account owner's deletion schedule.
     assertOwnerProfile(c, 'Only the account owner can view deletion status.');
     try {
-      const status = await getDeletionStatus(db, account.id);
+      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+      const status = v2
+        ? await getDeletionStatusV2(db, account.id)
+        : await getDeletionStatus(db, account.id);
       return c.json(accountDeletionStatusResponseSchema.parse(status));
     } catch (err) {
       if (!(err instanceof NotFoundError)) {
@@ -134,23 +146,34 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     // [CR-2026-05-19-H1] Only the account owner can schedule account deletion.
     assertOwnerProfile(c, 'Only the account owner can delete the account.');
 
-    const { gracePeriodEnds, scheduledNow } = await scheduleDeletion(
-      db,
-      account.id,
-    );
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+    const { gracePeriodEnds, scheduledNow } = v2
+      ? await scheduleDeletionV2(db, account.id)
+      : await scheduleDeletion(db, account.id);
 
     try {
-      const profileIds = await getProfileIdsForAccount(db, account.id);
+      const profileIds = v2
+        ? await getPersonIdsForOrganizationV2(db, account.id)
+        : await getProfileIdsForAccount(db, account.id);
 
       // core-send: account deletion must not claim scheduling if Inngest rejects the durable handoff.
       // Re-dispatch for already scheduled deletions too; the Inngest function
       // is idempotent by accountId, and retrying recovers a prior orphaned
       // schedule where the DB write succeeded but the durable handoff did not.
+      //
+      // [CUT-B2] Pin the identity mode at SCHEDULE time. The deletion was just
+      // written into the v1 (accounts) or v2 (organization) store under `v2`;
+      // the resume handler runs 7 days later, by which point the
+      // IDENTITY_V2_ENABLED flag may have flipped (cutover or rollback).
+      // Carrying the version in the event makes the run complete the erasure in
+      // the SAME store it was scheduled in, so a mid-grace-period flip can never
+      // route the run at the wrong store and silently skip a GDPR/COPPA deletion.
       await inngest.send({
         name: 'app/account.deletion-scheduled',
         data: {
           accountId: account.id,
           profileIds,
+          identityVersion: v2 ? 'v2' : 'v1',
           timestamp: new Date().toISOString(),
         },
       });
@@ -164,7 +187,11 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       });
       if (scheduledNow) {
         try {
-          await cancelDeletion(db, account.id);
+          if (v2) {
+            await cancelDeletionV2(db, account.id);
+          } else {
+            await cancelDeletion(db, account.id);
+          }
         } catch (rollbackError) {
           captureException(rollbackError, {
             extra: {
@@ -204,7 +231,10 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     // [BUG-412] cancelDeletion now returns a typed result. Return 409 when
     // there is no active scheduled deletion to cancel — previously this path
     // always returned 200 even with nothing to cancel, masking bugs.
-    const cancelResult = await cancelDeletion(db, account.id);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+    const cancelResult = v2
+      ? await cancelDeletionV2(db, account.id)
+      : await cancelDeletion(db, account.id);
     if (cancelResult === 'no_active_deletion') {
       return apiError(
         c,
@@ -225,6 +255,9 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     // [CR-2026-05-19-H1] Only the account owner can export account data.
     assertOwnerProfile(c, 'Only the account owner can export account data.');
 
-    const data = await generateExport(db, account.id);
+    const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+    const data = v2
+      ? await generateExportV2(db, account.id)
+      : await generateExport(db, account.id);
     return c.json(dataExportSchema.parse(data));
   });
