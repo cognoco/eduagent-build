@@ -27,6 +27,8 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
 
+import { person, profiles, consentStates } from '@eduagent/database';
+
 import { dailyReminderScan } from './daily-reminder-scan';
 
 // ---------------------------------------------------------------------------
@@ -397,5 +399,98 @@ describe('[BREAK] daily-reminder-scan fan-out event shape', () => {
     const events = sendEventCalls[0]!.payload as unknown[];
     expect(events).toHaveLength(2);
     expect(result.sentEvents).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-777] Identity-V2 wiring guard (CUT-B2).
+//
+// The find-streak-profiles step branches on isIdentityV2EnabledInStep():
+//   - v2:     SELECT … FROM person  (person × membership × organization +
+//             consentGateSatisfiedSql; no consentStates subquery)
+//   - legacy: SELECT … FROM profiles (profiles × accounts × consentStates)
+// The runResults-based tests above bypass the step body, so they cannot see
+// this branch. These tests run the real find-streak-profiles query against a
+// chainable DB stub and assert the correct query root per flag — guarding the
+// v2 wiring against regression before WP-FLAG drops the legacy tables. The DB
+// module is NOT mocked here, so `person` / `profiles` / `consentStates` are the
+// real Drizzle table objects the source passes to `.from(...)`.
+// ---------------------------------------------------------------------------
+
+function buildChainableDb(
+  rows: Array<{ profileId: string; currentStreak: number }>,
+): { select: jest.Mock; builder: Record<string, jest.Mock> } {
+  const builder: Record<string, jest.Mock> = {};
+  for (const method of ['from', 'innerJoin', 'leftJoin', 'orderBy', 'limit']) {
+    builder[method] = jest.fn().mockReturnValue(builder);
+  }
+  // The scan awaits the builder after `.where(...)`; resolve the rows there.
+  builder['where'] = jest.fn().mockResolvedValue(rows);
+
+  return {
+    select: jest.fn().mockReturnValue(builder),
+    builder,
+  };
+}
+
+/**
+ * Restore IDENTITY_V2_ENABLED to its prior value. Assigning `undefined`
+ * directly coerces to the string "undefined", so delete when there was no
+ * prior value.
+ */
+function restoreFlag(prev: string | undefined): void {
+  if (prev === undefined) {
+    delete process.env['IDENTITY_V2_ENABLED'];
+  } else {
+    process.env['IDENTITY_V2_ENABLED'] = prev;
+  }
+}
+
+describe('[WI-777] dailyReminderScan identity-v2 wiring', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockInngestTransport.clear();
+    process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  });
+
+  afterEach(() => {
+    delete process.env['DATABASE_URL'];
+  });
+
+  it('flag-on: query reads the canonical `person` model, not legacy `profiles`', async () => {
+    const prev = process.env['IDENTITY_V2_ENABLED'];
+    process.env['IDENTITY_V2_ENABLED'] = 'true';
+    try {
+      const db = buildChainableDb([]);
+      mockGetStepDatabase.mockReturnValue(db);
+
+      const { step } = createInngestStepRunner();
+      const handler = (dailyReminderScan as any).fn;
+      await handler({ event: { id: 'evt-v2-on' }, step });
+
+      expect(db.builder.from).toHaveBeenCalledWith(person);
+      expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
+      expect(db.builder.from).not.toHaveBeenCalledWith(consentStates);
+    } finally {
+      restoreFlag(prev);
+    }
+  });
+
+  it('flag-off: legacy path stays intact — query reads `profiles`, not `person`', async () => {
+    const prev = process.env['IDENTITY_V2_ENABLED'];
+    delete process.env['IDENTITY_V2_ENABLED'];
+    try {
+      const db = buildChainableDb([]);
+      mockGetStepDatabase.mockReturnValue(db);
+
+      const { step } = createInngestStepRunner();
+      const handler = (dailyReminderScan as any).fn;
+      await handler({ event: { id: 'evt-v2-off' }, step });
+
+      expect(db.builder.from).toHaveBeenCalledWith(profiles);
+      expect(db.builder.from).not.toHaveBeenCalledWith(person);
+    } finally {
+      restoreFlag(prev);
+    }
   });
 });

@@ -26,11 +26,38 @@ import type { ChildStruggleLine } from '../../services/notifications';
 
 const col = (name: string) => ({ name });
 
-// Shared mock for the selectDistinct query chain (cron step)
+// Shared mock for the selectDistinct query chain (cron step).
+//
+// Two distinct selectDistinct reads exist: the cron's active-children scan
+// (FROM progressSnapshots) and — on the v2 path — the self-report eligibility
+// scan inside listEligibleSelfReportPersonIdsV2 (FROM learningSessions).
+// mockSelectDistinctFrom dispatches on table identity so the two never share
+// a resolved value: progressSnapshots → mockSelectDistinctWhere (active
+// children, seeded by tests); learningSessions → empty (self-reports off by
+// default). [WI-777] added the learningSessions route; pre-existing tests only
+// seeded the progressSnapshots read.
 const mockSelectDistinctWhere = jest.fn().mockResolvedValue([]);
+const mockSelectDistinctLearningSessionsWhere = jest.fn().mockResolvedValue([]);
+// progressSnapshots descriptor — hoisted so the selectDistinct dispatch can
+// match it by identity (was previously an inline export object).
+const progressSnapshotsTableMock = {
+  profileId: col('profileId'),
+  snapshotDate: col('snapshotDate'),
+};
+const learningSessionsTableMock = {
+  profileId: col('profileId'),
+  status: col('status'),
+  exchangeCount: col('exchangeCount'),
+  startedAt: col('startedAt'),
+};
 const mockSelectDistinctFrom = jest
   .fn()
-  .mockReturnValue({ where: mockSelectDistinctWhere });
+  .mockImplementation((table: unknown) => {
+    if (table === learningSessionsTableMock) {
+      return { where: mockSelectDistinctLearningSessionsWhere };
+    }
+    return { where: mockSelectDistinctWhere };
+  });
 const mockSelectDistinct = jest
   .fn()
   .mockReturnValue({ from: mockSelectDistinctFrom });
@@ -40,6 +67,12 @@ const mockSelectDistinct = jest
 // mockMonthlyReportDb.query.familyLinks.findMany so existing tests that
 // only seed findMany continue to work.
 const mockSelectFromFamilyLinksWhere = jest.fn();
+
+// [WI-777] v2 cron path: select({parent, child}).from(guardianship).where(...)
+// — the canonical-model twin of the familyLinks read. Resolves guardianship
+// edge rows (guardianPersonId → parentId, chargePersonId → childId). Empty by
+// default; the v2 wiring test seeds it.
+const mockSelectFromGuardianshipWhere = jest.fn().mockResolvedValue([]);
 
 // i18n Phase 1 — db.select({conversationLanguage}).from(profiles).where(...).limit(1)
 // used to resolve the parent's conversation_language for report prose.
@@ -67,10 +100,38 @@ const familyLinksTableMock = {
   parentProfileId: col('parentProfileId'),
   childProfileId: col('childProfileId'),
 };
+// [WI-777] Canonical-model guardianship edge table — distinct identity so the
+// v2 cron path's select().from(guardianship) routes to its own where-chain and
+// never silently falls through to the legacy familyLinks route.
+const guardianshipTableMock = {
+  guardianPersonId: col('guardianPersonId'),
+  chargePersonId: col('chargePersonId'),
+  revokedAt: col('revokedAt'),
+};
+// [WI-777] Remaining canonical-model tables imported by the v2 cron/generate
+// paths. They resolve module imports and the v2 active-filter read
+// (db.query.person.findMany); the cron step never selects FROM them.
+const personTableMock = {
+  id: col('id'),
+  displayName: col('displayName'),
+  archivedAt: col('archivedAt'),
+  conversationLanguage: col('conversationLanguage'),
+};
+const membershipTableMock = {
+  personId: col('personId'),
+  organizationId: col('organizationId'),
+};
+const loginTableMock = {
+  personId: col('personId'),
+  email: col('email'),
+};
 
 const mockSelectFrom = jest.fn().mockImplementation((table: unknown) => {
   if (table === profilesTableMock) {
     return { where: mockSelectFromProfilesWhere };
+  }
+  if (table === guardianshipTableMock) {
+    return { where: mockSelectFromGuardianshipWhere };
   }
   return { where: mockSelectFromFamilyLinksWhere };
 });
@@ -90,6 +151,12 @@ const mockMonthlyReportDb = createTransactionalMockDb({
       findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
     },
     profiles: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    // [WI-777] v2 active-filter read (db.query.person.findMany) + generate-step
+    // person lookups. Default empty/null; the v2 cron wiring test seeds findMany.
+    person: {
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
     },
@@ -123,10 +190,13 @@ const mockDatabaseModule = createDatabaseModuleMock({
   db: mockMonthlyReportDb,
   exports: {
     profiles: profilesTableMock,
-    progressSnapshots: {
-      profileId: col('profileId'),
-      snapshotDate: col('snapshotDate'),
-    },
+    progressSnapshots: progressSnapshotsTableMock,
+    // [WI-777] Canonical-model tables the v2 cron path imports/queries.
+    guardianship: guardianshipTableMock,
+    learningSessions: learningSessionsTableMock,
+    person: personTableMock,
+    membership: membershipTableMock,
+    login: loginTableMock,
     monthlyReports: {
       profileId: col('profileId'),
       childProfileId: col('childProfileId'),
@@ -442,6 +512,19 @@ async function executeGenerateSteps(
   return { result, runner };
 }
 
+/**
+ * [WI-777] Restore IDENTITY_V2_ENABLED to its prior value. Assigning
+ * `undefined` directly coerces to the string "undefined", so delete when there
+ * was no prior value.
+ */
+function restoreIdentityV2Flag(prev: string | undefined): void {
+  if (prev === undefined) {
+    delete process.env['IDENTITY_V2_ENABLED'];
+  } else {
+    process.env['IDENTITY_V2_ENABLED'] = prev;
+  }
+}
+
 function makeGenerateEvent(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
@@ -465,6 +548,9 @@ beforeEach(() => {
 
   // Reset the mock chains to their default resolved values
   mockSelectDistinctWhere.mockResolvedValue([]);
+  // [WI-777] v2-path chains default empty; the v2 wiring test seeds them.
+  mockSelectDistinctLearningSessionsWhere.mockResolvedValue([]);
+  mockSelectFromGuardianshipWhere.mockResolvedValue([]);
   (
     mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
   ).mockResolvedValue([]);
@@ -508,6 +594,29 @@ beforeEach(() => {
       }
       return Array.from(ids).map((id) => ({ id }));
     },
+  );
+  // [WI-777] v2 active-filter (db.query.person.findMany) — mirrors the legacy
+  // profiles.findMany reset: marks every guardianship-pair endpoint + v2
+  // self-report id active. The guardianship read resolves from
+  // mockSelectFromGuardianshipWhere; v2 self-reports default empty.
+  (mockMonthlyReportDb.query.person.findMany as jest.Mock).mockReset();
+  (mockMonthlyReportDb.query.person.findMany as jest.Mock).mockImplementation(
+    async () => {
+      const pairs = (await mockSelectFromGuardianshipWhere()) as Array<{
+        parentProfileId: string;
+        childProfileId: string;
+      }>;
+      const ids = new Set<string>();
+      for (const pair of pairs) {
+        ids.add(pair.parentProfileId);
+        ids.add(pair.childProfileId);
+      }
+      return Array.from(ids).map((id) => ({ id }));
+    },
+  );
+  (mockMonthlyReportDb.query.person.findFirst as jest.Mock).mockReset();
+  (mockMonthlyReportDb.query.person.findFirst as jest.Mock).mockResolvedValue(
+    null,
   );
   // Consent gate: null row = no restriction (pre-consent-flow / CONSENTED presumed).
   (
@@ -719,6 +828,85 @@ describe('monthlyReportCron', () => {
       const secondPayload = runner.sendEventCalls[1]!.payload as unknown[];
       expect(firstPayload).toHaveLength(200);
       expect(secondPayload).toHaveLength(1);
+    });
+
+    // -----------------------------------------------------------------------
+    // [WI-777] Identity-V2 wiring guard (CUT-B2).
+    //
+    // find-report-pairs branches on isIdentityV2EnabledInStep():
+    //   - v2:     derives pairs from select().from(guardianship) (canonical
+    //             consent-authority edge) + db.query.person.findMany active
+    //             filter
+    //   - legacy: select().from(familyLinks) + db.query.profiles.findMany
+    // These tests assert the correct edge table is read per flag, guarding the
+    // v2 wiring against regression before WP-FLAG drops the legacy tables.
+    // -----------------------------------------------------------------------
+    it('[WI-777] flag-on: derives pairs from guardianship, not familyLinks', async () => {
+      const prev = process.env['IDENTITY_V2_ENABLED'];
+      process.env['IDENTITY_V2_ENABLED'] = 'true';
+      try {
+        // Active children (progressSnapshots scan).
+        mockSelectDistinctWhere.mockResolvedValue([
+          { childProfileId: 'child-001' },
+        ]);
+        // Guardianship edge: guardian → charge maps to parent → child.
+        mockSelectFromGuardianshipWhere.mockResolvedValue([
+          { parentProfileId: 'parent-001', childProfileId: 'child-001' },
+        ]);
+        // Legacy familyLinks read, if (wrongly) taken, would yield a different
+        // pair — seed it so a regression to the legacy path is observable.
+        (
+          mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
+        ).mockResolvedValue([
+          { parentProfileId: 'LEGACY-parent', childProfileId: 'child-001' },
+        ]);
+
+        const { result, runner } = await executeCronSteps();
+
+        expect(result).toMatchObject({ status: 'completed', queuedPairs: 1 });
+        // The guardianship edge was read; the legacy familyLinks select was not.
+        expect(mockSelectFromGuardianshipWhere).toHaveBeenCalled();
+        expect(mockSelectFromFamilyLinksWhere).not.toHaveBeenCalled();
+        // The fanned-out pair is the guardianship pair, not the legacy one.
+        expect(runner.sendEventCalls).toEqual(
+          expect.arrayContaining([
+            {
+              name: 'fan-out-monthly-reports-0',
+              payload: expect.arrayContaining([
+                expect.objectContaining({
+                  name: 'app/monthly-report.generate',
+                  data: { parentId: 'parent-001', childId: 'child-001' },
+                }),
+              ]),
+            },
+          ]),
+        );
+      } finally {
+        restoreIdentityV2Flag(prev);
+      }
+    });
+
+    it('[WI-777] flag-off: legacy path intact — derives pairs from familyLinks, not guardianship', async () => {
+      const prev = process.env['IDENTITY_V2_ENABLED'];
+      delete process.env['IDENTITY_V2_ENABLED'];
+      try {
+        mockSelectDistinctWhere.mockResolvedValue([
+          { childProfileId: 'child-001' },
+        ]);
+        (
+          mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
+        ).mockResolvedValue([
+          { parentProfileId: 'parent-001', childProfileId: 'child-001' },
+        ]);
+
+        const { result } = await executeCronSteps();
+
+        expect(result).toMatchObject({ status: 'completed', queuedPairs: 1 });
+        expect(mockSelectFromFamilyLinksWhere).toHaveBeenCalled();
+        expect(mockSelectFromGuardianshipWhere).not.toHaveBeenCalled();
+      } finally {
+        restoreIdentityV2Flag(prev);
+      }
     });
   });
 
