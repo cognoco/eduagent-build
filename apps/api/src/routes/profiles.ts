@@ -98,6 +98,20 @@ function buildBootstrapProfile(
 export const profileRoutes = new Hono<ProfileEnv>()
   .get('/profiles', async (c) => {
     const db = c.get('db');
+    // [CUT-B1 §2.2a] v2 pre-graph: a graphless owner (clerkIdentity set, no
+    // account/graph yet) has no profiles. The pre-graph allowlist routes this
+    // GET here to return the documented empty list — NOT a 401 — so the
+    // onboarding flow can list profiles before POST /profiles bootstraps the
+    // graph. Without this branch, requireAccount() below 401s every
+    // pre-onboarding user and the client's 401→sign-out makes onboarding an
+    // unbreakable sign-in loop.
+    if (
+      isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) &&
+      !c.get('account') &&
+      c.get('clerkIdentity')
+    ) {
+      return c.json(profileListResponseSchema.parse({ profiles: [] }));
+    }
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
     const profiles = await listProfiles(db, account.id);

@@ -1684,6 +1684,73 @@ describe('billing routes', () => {
 // Billing is account-level; a parent-proxy session must not initiate billing
 // operations on a child-profile context. Mini-Hono mount with isOwner=false.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// [CUT-B1] v2 pre-graph: GET /subscription/status must return free-tier
+// defaults (not 401) for a graphless owner (clerkIdentity set, no account yet).
+// The mobile client signs out on ANY 401, so a pre-onboarding header/app-load
+// fetch that 401s re-triggers the same sign-in loop the GET /profiles fix
+// exists to break. Red-green: remove the pre-graph branch in billing.ts
+// GET /subscription/status and this flips 200 → 401.
+// ---------------------------------------------------------------------------
+describe('[CUT-B1] GET /subscription/status v2 pre-graph (graphless owner)', () => {
+  // Typed pre-graph env mirrors the profiles.test.ts pattern: the only context
+  // vars the GET /subscription/status pre-graph branch reads are db, account
+  // (explicitly undefined), and clerkIdentity. Typing them removes the `as never`
+  // casts the surrounding legacy proxy-mode tests still use.
+  type PreGraphEnv = {
+    Bindings: { IDENTITY_V2_ENABLED?: string };
+    Variables: {
+      db: Record<string, never>;
+      account: undefined;
+      clerkIdentity: { clerkUserId: string; verifiedEmail: string } | undefined;
+    };
+  };
+
+  function makePreGraphApp() {
+    const app = new Hono<PreGraphEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {});
+      // Graphless: account explicitly undefined (mirrors what accountMiddleware
+      // sets on the v2 pre-graph path — clerkIdentity set, no account/graph yet).
+      c.set('account', undefined);
+      c.set('clerkIdentity', {
+        clerkUserId: 'user_pre_graph',
+        verifiedEmail: 'newuser@example.com',
+      });
+      await next();
+    });
+    app.route('/', billingRoutes);
+    return app;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('[CUT-B1] returns 200 free-tier defaults (not 401) for a graphless v2 owner', async () => {
+    const res = await makePreGraphApp().request(
+      '/subscription/status',
+      {},
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status.tier).toBe('free');
+    expect(body.status.status).toBe('trial');
+    expect(body.status.billingAccess).toBe('current');
+    // Must short-circuit before any account-scoped DB/KV read.
+    expect(mockGetSubscriptionByAccountId).not.toHaveBeenCalled();
+  });
+
+  it('[CUT-B1] returns 401 (not 200) when flag off — confirms the branch is flag-gated', async () => {
+    const res = await makePreGraphApp().request(
+      '/subscription/status',
+      {},
+      { IDENTITY_V2_ENABLED: 'false' },
+    );
+    // Flag off → falls through to requireAccount() → 401 (no account set).
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('[WI-137 / DS-048] billing proxy-mode guard', () => {
   function makeProxyApp() {
     const proxyApp = new Hono();
