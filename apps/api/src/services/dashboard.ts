@@ -1529,7 +1529,12 @@ export async function getChildReports(
   // reports yet for this child" — semantically distinct from forbidden.
   await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
-  return listMonthlyReportsForParentChild(db, parentProfileId, childProfileId);
+  return listMonthlyReportsForParentChild(
+    db,
+    parentProfileId,
+    childProfileId,
+    opts,
+  );
 }
 
 export async function getChildReportDetail(
@@ -1547,6 +1552,7 @@ export async function getChildReportDetail(
     parentProfileId,
     childProfileId,
     reportId,
+    opts,
   );
 }
 
@@ -1561,7 +1567,13 @@ export async function markChildReportViewed(
   // unauthorized POST pretend to succeed. Now throws → 403.
   await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
-  await markMonthlyReportViewed(db, parentProfileId, childProfileId, reportId);
+  await markMonthlyReportViewed(
+    db,
+    parentProfileId,
+    childProfileId,
+    reportId,
+    opts,
+  );
 }
 
 export function buildDemoDashboard(): DemoDashboardData {
