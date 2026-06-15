@@ -537,11 +537,7 @@ function futureDate(daysAhead: number): Date {
   return new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
 }
 
-async function createBaseAccount(
-  db: Database,
-  _email: string,
-  _clerkUserId: string,
-): Promise<{ accountId: string }> {
+async function createBaseAccount(db: Database): Promise<{ accountId: string }> {
   const accountId = generateUUIDv7();
   await db.insert(organization).values({
     id: accountId,
@@ -956,7 +952,7 @@ async function seedOnboardingNoSubject(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -989,7 +985,7 @@ async function seedOnboardingComplete(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1061,7 +1057,7 @@ async function seedLearningActive(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Active Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1129,7 +1125,7 @@ async function seedRetentionDue(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Review Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1175,7 +1171,7 @@ async function seedFailedRecall3x(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Struggling Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1250,7 +1246,7 @@ async function seedTopicNotStarted(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Fresh Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1288,7 +1284,7 @@ async function seedTopicOverdueReview(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Review Due Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1341,7 +1337,7 @@ async function seedBookNoCurriculum(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'New Book Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1395,7 +1391,7 @@ async function seedSubjectWithBookSuggestions(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Suggestion Picker',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1459,7 +1455,7 @@ async function seedParentWithChildren(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Parent profile — must use direct insert because createBaseProfile() does not
   // pass defaultAppContext through. With MODE_NAV_V1_ENABLED=true (eas.json
@@ -1576,7 +1572,7 @@ async function seedParentMultiChild(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Parent profile — direct insert to set defaultAppContext='family' (see
   // seedParentWithChildren: under MODE_NAV_V1_ENABLED=true, showFamilyHome
@@ -1795,7 +1791,7 @@ async function seedTrialActive(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Trial User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1850,7 +1846,7 @@ async function seedTrialExpired(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Expired Trial User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1906,7 +1902,7 @@ async function seedMultiSubject(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Multi-Subject Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1956,7 +1952,7 @@ async function seedMultiSubjectPractice(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Practice Picker Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1994,7 +1990,7 @@ async function seedHomeworkReady(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Homework Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -2047,7 +2043,7 @@ async function seedTrialExpiredChild(
   }
 
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Parent profile (account owner)
   const parentProfileId = await createBaseProfile(db, accountId, {
@@ -2142,7 +2138,7 @@ async function seedConsentWithdrawn(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Parent profile (account owner)
   const parentProfileId = await createBaseProfile(db, accountId, {
@@ -2202,7 +2198,7 @@ async function seedConsentWithdrawnSolo(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Single learner profile — no parent, no profile switch needed
   const profileId = await createBaseProfile(db, accountId, {
@@ -2247,7 +2243,7 @@ async function seedParentSolo(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Solo parent profile — no children, no family links
   const parentProfileId = await createBaseProfile(db, accountId, {
@@ -2302,16 +2298,22 @@ async function seedParentSolo(
  *  Navigate via More → Profiles → "Create your first profile" to reach
  *  the create-profile screen. */
 async function seedPreProfile(
-  db: Database,
+  _db: Database,
   email: string,
   env: SeedEnv,
 ): Promise<SeedResult> {
-  const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  // Pre-profile models an authenticated Clerk user who has NOT yet created a
+  // profile (the create-profile gate). In the v2 model that is purely a Clerk
+  // identity with NO row in our DB — no organization, person, login, or
+  // membership. Creating an organization here would orphan it: the login-rooted
+  // reset and idempotency paths can never find an org with no login/membership,
+  // so it would accumulate on every seed call. The Clerk user alone is enough;
+  // GET /v1/profiles returns {profiles: []} for the graphless v2 user.
+  const { password } = await createClerkTestUser(email, env);
 
   return {
     scenario: 'pre-profile',
-    accountId,
+    accountId: '',
     profileId: '',
     email,
     password,
@@ -2330,7 +2332,7 @@ async function seedConsentPending(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Pending Learner',
     birthYear: 2014,
@@ -2369,7 +2371,7 @@ async function seedLanguageLearner(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Language Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -2766,7 +2768,7 @@ async function seedSessionWithTranscript(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Transcript User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -2919,7 +2921,7 @@ async function seedParentProxy(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Proxy Parent',
@@ -3064,7 +3066,7 @@ async function seedWithBookmarks(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Bookmarks User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3273,7 +3275,7 @@ async function seedParentWithChildrenNoSessions(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Parent profile — direct insert to set defaultAppContext='family' (see
   // seedParentWithChildren rationale: V1 guardian shape requires this).
@@ -3431,7 +3433,7 @@ async function seedSubscriptionFamilyActive(
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Family Subscriber',
     birthYear: 1985,
@@ -3496,7 +3498,7 @@ async function seedSubscriptionProActive(
 ): Promise<SeedResult> {
   const proTier = getTierConfig('pro');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Pro Subscriber',
     birthYear: 1982,
@@ -3565,7 +3567,7 @@ async function seedPurchasePending(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Purchase Pending User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3635,7 +3637,7 @@ async function seedPurchaseConfirmed(
 ): Promise<SeedResult> {
   const plusTier = getTierConfig('plus');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Confirmed Subscriber',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3702,7 +3704,7 @@ async function seedQuotaExceeded(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Quota Exceeded User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3775,7 +3777,7 @@ async function seedForbidden(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Forbidden User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3825,7 +3827,7 @@ async function seedQuizMalformedRound(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Malformed Round User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3922,7 +3924,7 @@ async function seedQuizDeterministicWrongAnswer(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Deterministic Quiz User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4017,7 +4019,7 @@ async function seedQuizAnswerCheckFails(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Quiz Check Fails User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4114,7 +4116,7 @@ async function seedDailyLimitReached(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Daily Cap User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4216,7 +4218,7 @@ async function seedReviewEmpty(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Caught Up Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4279,7 +4281,7 @@ async function seedDictationWithMistakes(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Dictation Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4326,7 +4328,7 @@ async function seedDictationPerfectScore(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Dictation Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4389,7 +4391,7 @@ async function seedMentorAuditFamilyAtProfileLimit(
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Parent profile — direct insert to set defaultAppContext='family'
   // (createBaseProfile does not pass defaultAppContext through; see
@@ -4502,7 +4504,7 @@ async function seedMentorAuditPostApprovalRedirect(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Approving Parent',
@@ -4570,7 +4572,7 @@ function makeConsentThresholdSeeder(
 ): SeederFn {
   return async (db, email, env) => {
     const { clerkUserId, password } = await createClerkTestUser(email, env);
-    const { accountId } = await createBaseAccount(db, email, clerkUserId);
+    const { accountId } = await createBaseAccount(db);
     const profileId = generateUUIDv7();
     await db.insert(person).values({
       id: profileId,
@@ -4616,7 +4618,7 @@ async function seedMentorAuditQuotaOwnerDaily(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Daily Cap Owner',
     birthYear: 1985,
@@ -4680,7 +4682,7 @@ async function seedMentorAuditQuotaFamilyMonthly(
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Family Monthly Cap Owner',
     birthYear: 1985,
@@ -4741,7 +4743,7 @@ async function seedMentorAuditResumableSession(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Resume Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4819,7 +4821,7 @@ async function seedMentorAuditRichChildHistory(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Parent profile — direct insert to set defaultAppContext='family'
   // (createBaseProfile does not pass defaultAppContext through; see
@@ -5203,7 +5205,7 @@ async function seedMentorAuditFamilyPoolMembers(
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Pool-Sharing Parent',
@@ -5300,7 +5302,7 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   // Owner with defaultAppContext: 'family' — must use the direct insert
   // because createBaseProfile() does not pass that field through. Pattern
@@ -5488,7 +5490,7 @@ async function seedMentorAuditBridgeBackstack(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const { accountId } = await createBaseAccount(db);
 
   const ownerProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Bridge Parent',
@@ -5905,6 +5907,30 @@ async function deleteOrganizationGraph(
     .where(inArray(membership.organizationId, orgIds));
   const personIds = [...new Set(members.map((m) => m.personId))];
 
+  // 1a. A person can be a member of multiple orgs. Deleting the person row
+  // cascades their login, learning data, and ALL their memberships — including
+  // ones outside the target orgs. So only delete persons whose ENTIRE
+  // membership set is within orgIds (seed-owned / orphan-in-target). A person
+  // who also belongs to a non-target org is left intact; their membership in a
+  // target org still cascades when the organization row is deleted (step 5).
+  let deletablePersonIds = personIds;
+  if (personIds.length > 0) {
+    const allMemberships = await db
+      .select({
+        personId: membership.personId,
+        organizationId: membership.organizationId,
+      })
+      .from(membership)
+      .where(inArray(membership.personId, personIds));
+    const orgIdSet = new Set(orgIds);
+    const sharedPersonIds = new Set(
+      allMemberships
+        .filter((m) => !orgIdSet.has(m.organizationId))
+        .map((m) => m.personId),
+    );
+    deletablePersonIds = personIds.filter((id) => !sharedPersonIds.has(id));
+  }
+
   // 2. Delete consent_grant rows (RESTRICT on organizationId).
   await db
     .delete(consentGrant)
@@ -5915,24 +5941,26 @@ async function deleteOrganizationGraph(
     .delete(subscription)
     .where(inArray(subscription.organizationId, orgIds));
 
-  // 4. Delete guardianship rows (RESTRICT on both person FK columns).
-  if (personIds.length > 0) {
+  // 4. Delete guardianship rows (RESTRICT on both person FK columns). Scoped to
+  // deletable persons so a shared person's guardianship edges are left intact.
+  if (deletablePersonIds.length > 0) {
     await db
       .delete(guardianship)
       .where(
         or(
-          inArray(guardianship.guardianPersonId, personIds),
-          inArray(guardianship.chargePersonId, personIds),
+          inArray(guardianship.guardianPersonId, deletablePersonIds),
+          inArray(guardianship.chargePersonId, deletablePersonIds),
         ),
       );
   }
 
   // 5. Delete person rows (cascades login, membership, consent_request, subjects, sessions…).
-  if (personIds.length > 0) {
-    await db.delete(person).where(inArray(person.id, personIds));
+  if (deletablePersonIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, deletablePersonIds));
   }
 
-  // 6. Delete organization rows (membership already cascaded via person delete above).
+  // 6. Delete organization rows (cascades any remaining membership — including a
+  // shared person's membership in this org — via membership.organizationId).
   const deleted = await db
     .delete(organization)
     .where(inArray(organization.id, orgIds))
@@ -6086,7 +6114,6 @@ export async function debugAccountsByEmail(
       const membershipRows = await db
         .select({
           organizationId: membership.organizationId,
-          roles: membership.roles,
         })
         .from(membership)
         .where(eq(membership.personId, l.personId));
@@ -6098,6 +6125,7 @@ export async function debugAccountsByEmail(
           id: person.id,
           displayName: person.displayName,
           birthDate: person.birthDate,
+          roles: membership.roles,
         })
         .from(person)
         .innerJoin(membership, eq(membership.personId, person.id))
@@ -6108,12 +6136,11 @@ export async function debugAccountsByEmail(
           const subjectRows = await db.query.subjects.findMany({
             where: eq(subjects.profileId, prof.id),
           });
-          const isOwner = membershipRows.some(
-            (m) =>
-              m.organizationId === orgId &&
-              Array.isArray(m.roles) &&
-              m.roles.includes('admin'),
-          );
+          // isOwner is per-profile: derived from THIS person's own membership
+          // roles in the org, not the signed-in login's. Otherwise a parent's
+          // admin role would mark their children as owners too.
+          const isOwner =
+            Array.isArray(prof.roles) && prof.roles.includes('admin');
           const birthYear = prof.birthDate
             ? parseInt(prof.birthDate.slice(0, 4), 10)
             : null;
