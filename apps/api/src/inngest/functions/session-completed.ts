@@ -48,7 +48,9 @@ import {
   curriculumTopics,
   createScopedRepository,
   learningSessions,
+  membership,
   memoryFacts,
+  person,
   profiles,
   retentionCards,
   sessionEvents,
@@ -85,6 +87,7 @@ import {
   safeRefundQuota,
   getQuotaPool,
 } from '../../services/billing';
+import { ensureFreeSubscriptionV2 } from '../../services/billing/billing-v2';
 import { safeSend } from '../../services/safe-non-core';
 
 const logger = createLogger();
@@ -1783,29 +1786,55 @@ export const sessionCompleted = inngest.createFunction(
         const db = getStepDatabase();
         // i18n Phase 1 — thread conversation_language to the homework
         // summary LLM so the parent-facing card matches the learner locale.
-        // Also fetch accountId so we can gate this LLM call on quota.
-        const [homeworkProfile] = await db
-          .select({
-            conversationLanguage: profiles.conversationLanguage,
-            accountId: profiles.accountId,
-          })
-          .from(profiles)
-          .where(eq(profiles.id, profileId))
-          .limit(1);
+        // Also fetch subscription anchor so we can gate this LLM call on quota.
+        // [WI-784] v2 twin: under IDENTITY_V2_ENABLED read person +
+        // membership (no profiles.accountId which was dropped 2026-06-14).
+        // Legacy path (flag-off) is byte-identical.
+        const identityV2 = isIdentityV2EnabledInStep();
+        let homeworkProfile:
+          | { conversationLanguage: string | null }
+          | undefined;
+        let homeworkOrganizationId: string | undefined;
+        if (identityV2) {
+          const [personRow] = await db
+            .select({ conversationLanguage: person.conversationLanguage })
+            .from(person)
+            .where(eq(person.id, profileId))
+            .limit(1);
+          homeworkProfile = personRow;
+          if (personRow) {
+            const membershipRow = await db.query.membership.findFirst({
+              where: eq(membership.personId, profileId),
+              columns: { organizationId: true },
+            });
+            homeworkOrganizationId = membershipRow?.organizationId;
+          }
+        } else {
+          const [profileRow] = await db
+            .select({
+              conversationLanguage: profiles.conversationLanguage,
+              accountId: profiles.accountId,
+            })
+            .from(profiles)
+            .where(eq(profiles.id, profileId))
+            .limit(1);
+          homeworkProfile = profileRow;
+          homeworkOrganizationId = profileRow?.accountId ?? undefined;
+        }
 
         // Route through the metered wrapper. The HTTP middleware
         // cannot gate Inngest steps, so we call decrementQuota directly.
-        // ensureFreeSubscription is idempotent — it returns the existing row
-        // for users who already have a subscription.
+        // ensureFreeSubscription / ensureFreeSubscriptionV2 are idempotent —
+        // they return the existing row for users who already have a subscription.
         if (!homeworkProfile) {
-          // Hard-stop: profile row required to resolve subscription/language/
-          // accountId. Throw reaches step.run so Inngest retries (handles
-          // transient replication lag). captureException fires here (not via
-          // runIsolated catch) so it is recorded on every retry attempt.
-          // safeSend emits a structured event to satisfy the billing
+          // Hard-stop: person/profile row required to resolve
+          // subscription anchor + language. Throw reaches step.run so Inngest
+          // retries (handles transient replication lag). captureException fires
+          // here (not via runIsolated catch) so it is recorded on every retry
+          // attempt. safeSend emits a structured event to satisfy the billing
           // silent-recovery ban (AGENTS.md: bare warn is not enough).
           const missingProfileErr = new Error(
-            '[billing] homework-summary: profile row missing — cannot resolve subscription/language/accountId',
+            '[billing] homework-summary: person/profile row missing — cannot resolve subscription/language',
           );
           logger.warn(
             '[metering] homework-summary: profile row missing, step will retry',
@@ -1833,14 +1862,26 @@ export const sessionCompleted = inngest.createFunction(
         }
 
         return runIsolated('extract-homework-summary', profileId, async () => {
-          const subscription = await ensureFreeSubscription(
-            db,
-            homeworkProfile.accountId,
-          );
+          // [WI-784] v2 twin: ensureFreeSubscriptionV2 reads the v2
+          // `subscription` table keyed by organizationId; legacy path reads
+          // `subscriptions` via accountId. decrementQuota / safeRefundQuota
+          // already accept identityV2 to select the v2 ownership cross-check.
+          // homeworkOrganizationId is guaranteed non-null here: the
+          // missing-profile hard-stop above would have thrown before this point
+          // if homeworkProfile was undefined, and the flag branches both set it.
+          if (!homeworkOrganizationId) {
+            throw new Error(
+              '[billing] homework-summary: organization/account id missing after profile resolved',
+            );
+          }
+          const subscription = identityV2
+            ? await ensureFreeSubscriptionV2(db, homeworkOrganizationId)
+            : await ensureFreeSubscription(db, homeworkOrganizationId);
           const decrementResult = await decrementQuota(
             db,
             subscription.id,
             profileId,
+            identityV2,
           );
           if (!decrementResult.success) {
             // [C7] profile_mismatch is a data-integrity anomaly (the profileId
@@ -1948,6 +1989,7 @@ export const sessionCompleted = inngest.createFunction(
                   : undefined,
               quotaModel: decrementResult.quotaModel,
               topUpCreditId: decrementResult.topUpCreditId,
+              identityV2,
             });
             throw err;
           }

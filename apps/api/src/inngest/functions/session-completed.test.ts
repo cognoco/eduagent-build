@@ -106,6 +106,15 @@ const mockDatabaseModule = createDatabaseModuleMock({
       profileId: col('profileId'),
     },
     profiles: { id: col('id'), displayName: col('displayName') },
+    // [WI-784] v2 identity tables — used by the flag-on billing twin branch
+    person: {
+      id: col('id'),
+      conversationLanguage: col('conversationLanguage'),
+    },
+    membership: {
+      personId: col('personId'),
+      organizationId: col('organizationId'),
+    },
     streaks: { profileId: col('profileId') },
     // [WI-221] columns used by isGdprProcessingAllowed's query builder.
     consentStates: {
@@ -364,6 +373,30 @@ jest.mock(
       decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
       safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
       getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
+    };
+  },
+);
+
+// [WI-784] v2 billing twin — ensureFreeSubscriptionV2 reads the v2
+// `subscription` table (no profiles.accountId). Mocked so the unit test can
+// assert the v2 path is selected under IDENTITY_V2_ENABLED=true.
+const mockEnsureFreeSubscriptionV2 = jest.fn().mockResolvedValue({
+  id: 'sub-test-id',
+  organizationId: 'org-test-id',
+  planTier: 'free',
+  status: 'active',
+});
+
+jest.mock(
+  '../../services/billing/billing-v2' /* gc1-allow: billing-v2 operations write Neon subscription tables — no DB in the unit runtime */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/billing/billing-v2',
+    ) as typeof import('../../services/billing/billing-v2');
+    return {
+      ...actual,
+      ensureFreeSubscriptionV2: (...args: unknown[]) =>
+        mockEnsureFreeSubscriptionV2(...args),
     };
   },
 );
@@ -635,6 +668,17 @@ function makeDbWithProfile() {
   const db: Record<string, unknown> = {
     ...mockSessionCompletedDb,
     select: selectWithProfile,
+    // [WI-784] v2 flag-on: membership.findFirst resolves organizationId.
+    // Provides WI734_ACCOUNT_ID so ensureFreeSubscriptionV2 (already mocked)
+    // receives a plausible org anchor; the exact value is not asserted here.
+    query: {
+      ...(mockSessionCompletedDb as any).query,
+      membership: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ organizationId: WI734_ACCOUNT_ID }),
+      },
+    },
   };
   db.transaction = jest
     .fn()
@@ -1728,8 +1772,9 @@ describe('sessionCompleted', () => {
             orderBy: () => ({ limit: () => Promise.resolve([]) }),
             limit: () => {
               selectCallCount += 1;
-              // First select in the step is the profiles fetch for accountId
-              // and conversationLanguage.
+              // First select in the step is the profiles/person fetch.
+              // Returns both legacy (accountId) and v2 (conversationLanguage)
+              // fields so this mock works under both IDENTITY_V2_ENABLED states.
               return Promise.resolve([
                 { conversationLanguage: 'en', accountId: ACCOUNT_ID },
               ]);
@@ -1740,6 +1785,18 @@ describe('sessionCompleted', () => {
       const db: Record<string, unknown> = {
         ...mockSessionCompletedDb,
         select: selectWithProfile,
+        // [WI-784] v2 flag-on: membership.findFirst resolves organizationId
+        // for the ensureFreeSubscriptionV2 call. Supplies ACCOUNT_ID as the
+        // organizationId so the billing flow completes; ensureFreeSubscriptionV2
+        // is mocked anyway so the exact value is not asserted here.
+        query: {
+          ...(mockSessionCompletedDb as any).query,
+          membership: {
+            findFirst: jest
+              .fn()
+              .mockResolvedValue({ organizationId: ACCOUNT_ID }),
+          },
+        },
       };
       db.transaction = jest
         .fn()
@@ -1751,15 +1808,33 @@ describe('sessionCompleted', () => {
       (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
       await executeSteps(createEventData({ sessionType: 'homework' }));
 
-      expect(mockEnsureFreeSubscription).toHaveBeenCalledWith(
-        expect.anything(),
-        ACCOUNT_ID,
-      );
-      expect(mockDecrementQuota).toHaveBeenCalledWith(
-        expect.anything(),
-        'sub-test-id',
-        PROFILE_ID,
-      );
+      // [WI-784] Under IDENTITY_V2_ENABLED the v2 billing twin fires;
+      // otherwise the legacy path fires. The BREAK invariant is that SOME
+      // subscription is obtained and decrementQuota is called before the LLM.
+      const identityV2 = process.env['IDENTITY_V2_ENABLED'] === 'true';
+      if (identityV2) {
+        expect(mockEnsureFreeSubscriptionV2).toHaveBeenCalledWith(
+          expect.anything(),
+          ACCOUNT_ID, // membership mock returns organizationId=ACCOUNT_ID
+        );
+        expect(mockDecrementQuota).toHaveBeenCalledWith(
+          expect.anything(),
+          'sub-test-id',
+          PROFILE_ID,
+          true,
+        );
+      } else {
+        expect(mockEnsureFreeSubscription).toHaveBeenCalledWith(
+          expect.anything(),
+          ACCOUNT_ID,
+        );
+        expect(mockDecrementQuota).toHaveBeenCalledWith(
+          expect.anything(),
+          'sub-test-id',
+          PROFILE_ID,
+          false,
+        );
+      }
       expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalled();
       // No refund — LLM succeeded.
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
@@ -1921,6 +1996,103 @@ describe('sessionCompleted', () => {
         expect.any(Function),
         'billing.homework_summary.profile_mismatch',
         expect.objectContaining({ subscriptionId: 'sub-test-id' }),
+      );
+    });
+
+    // -----------------------------------------------------------------------
+    // [WI-784] FLAG-ON v2 billing twin tests.
+    //
+    // Under IDENTITY_V2_ENABLED=true the step must:
+    //   - read from `person` (not `profiles`) for conversationLanguage
+    //   - resolve organizationId via `membership` (not profiles.accountId)
+    //   - call ensureFreeSubscriptionV2 (not ensureFreeSubscription)
+    //   - call decrementQuota with identityV2=true
+    //   - NOT read the dropped `profiles` table
+    //
+    // The DB mock supplies a person row + membership.findFirst resolver.
+    // -----------------------------------------------------------------------
+    const ORG_ID = '00000000-0000-4000-8000-000000000088';
+
+    function makeDbWithPersonV2() {
+      const selectWithPerson = () => ({
+        from: () => ({
+          innerJoin: () => ({
+            innerJoin: () => ({
+              where: () => ({
+                orderBy: () => ({ limit: () => Promise.resolve([]) }),
+                limit: () => Promise.resolve([]),
+              }),
+            }),
+          }),
+          where: () => ({
+            orderBy: () => ({ limit: () => Promise.resolve([]) }),
+            limit: () => Promise.resolve([{ conversationLanguage: 'en' }]),
+          }),
+        }),
+      });
+      const db: Record<string, unknown> = {
+        ...mockSessionCompletedDb,
+        select: selectWithPerson,
+        query: {
+          ...(mockSessionCompletedDb as any).query,
+          membership: {
+            findFirst: jest.fn().mockResolvedValue({ organizationId: ORG_ID }),
+          },
+        },
+      };
+      db.transaction = jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+      return db;
+    }
+
+    it('[WI-784-BREAK] FLAG-ON: calls ensureFreeSubscriptionV2 (not legacy) and passes identityV2=true to decrementQuota', async () => {
+      process.env['IDENTITY_V2_ENABLED'] = 'true';
+      try {
+        (createDatabase as jest.Mock).mockReturnValue(makeDbWithPersonV2());
+        await executeSteps(createEventData({ sessionType: 'homework' }));
+
+        // v2 path: ensureFreeSubscriptionV2 called with organizationId from membership
+        expect(mockEnsureFreeSubscriptionV2).toHaveBeenCalledWith(
+          expect.anything(),
+          ORG_ID,
+        );
+        // Legacy subscription call must NOT fire under flag-on
+        expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+        // decrementQuota called with identityV2=true (4th arg)
+        expect(mockDecrementQuota).toHaveBeenCalledWith(
+          expect.anything(),
+          'sub-test-id',
+          PROFILE_ID,
+          true,
+        );
+        // LLM still fires (quota not exhausted in this test)
+        expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalled();
+      } finally {
+        delete process.env['IDENTITY_V2_ENABLED'];
+      }
+    });
+
+    it('[WI-784] FLAG-OFF: legacy path unchanged — ensureFreeSubscription called, no v2 call', async () => {
+      // Ensure flag is off (default)
+      delete process.env['IDENTITY_V2_ENABLED'];
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+
+      await executeSteps(createEventData({ sessionType: 'homework' }));
+
+      // Legacy path fires (ACCOUNT_ID is profiles.accountId value the mock returns)
+      expect(mockEnsureFreeSubscription).toHaveBeenCalledWith(
+        expect.anything(),
+        ACCOUNT_ID,
+      );
+      // v2 must NOT fire under flag-off
+      expect(mockEnsureFreeSubscriptionV2).not.toHaveBeenCalled();
+      // decrementQuota called WITHOUT identityV2=true (3 args or 4th=false/undefined)
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-test-id',
+        PROFILE_ID,
+        false,
       );
     });
   });
