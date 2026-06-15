@@ -750,6 +750,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
       expect(mockSafeRefundQuota).toHaveBeenCalledWith(
         expect.anything(),
@@ -912,6 +913,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
       expect(res.status).toBe(200);
     });
@@ -945,6 +947,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
       expect(res.status).toBe(200);
     });
@@ -1036,6 +1039,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
       expect(res.status).toBe(200);
     });
@@ -1095,6 +1099,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
     });
 
@@ -1310,6 +1315,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
     });
 
@@ -1557,6 +1563,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-free',
         'test-profile-id',
+        false,
       );
     });
   });
@@ -1758,6 +1765,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
     });
 
@@ -2364,6 +2372,7 @@ describe('metering middleware', () => {
           expect.anything(),
           'sub-1',
           'test-profile-id',
+          false,
         );
       },
     );
@@ -2441,6 +2450,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
+        false,
       );
     });
 

@@ -556,6 +556,13 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const profileMeta = c.get('profileMeta');
     const profileId = c.get('profileId');
     const proxyModeHeader = c.req.header('X-Proxy-Mode') === 'true';
+    // [WI-776 / WP-7] Single read of the cutover flag for the whole metering
+    // lifecycle. The quota decrement/increment ownership cross-check selects the
+    // v2 twin (person × membership × subscription) under the flag; the legacy
+    // path (flag-off) is byte-identical. Metering is a synchronous request-path
+    // check — no scheduled/persisted decision spans the flag flip (atomic per
+    // request), so no schedule-time mode-pinning is needed here (ic-orch-005).
+    const identityV2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
 
     if (
       (!profileId || !profileMeta) &&
@@ -655,7 +662,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       // [CUT-B3 / WI-693] Select the v2 subscription store under the flag. The
       // request-context account.id equals organization.id under the flag, so the
       // same id keys both stores. Legacy path (flag-off) is byte-identical.
-      const identityV2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+      // (identityV2 is hoisted to the metering body — see [WI-776 / WP-7].)
       // CR1: Auto-provision free-tier subscription if none exists
       const subscription = identityV2
         ? await ensureFreeSubscriptionV2(db, account.id)
@@ -787,7 +794,12 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // 4. Attempt to decrement quota (atomic, handles top-up FIFO fallback + daily guard)
     let decrement: Awaited<ReturnType<typeof decrementQuota>>;
     try {
-      decrement = await decrementQuota(db, subscriptionId, profileId);
+      decrement = await decrementQuota(
+        db,
+        subscriptionId,
+        profileId,
+        identityV2,
+      );
     } catch (err) {
       if (err instanceof MeteringError) {
         return c.json({ error: err.code, meta: err.meta }, 500);
@@ -921,6 +933,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
           source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
           quotaModel: decrement.quotaModel ?? quotaModel,
           topUpCreditId: decrement.topUpCreditId,
+          identityV2,
         });
         c.set('quotaRefunded', true);
       }
@@ -963,6 +976,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
         quotaModel: decrement.quotaModel ?? quotaModel,
         topUpCreditId: decrement.topUpCreditId,
+        identityV2,
       });
       c.set('quotaRefunded', true);
       return;
