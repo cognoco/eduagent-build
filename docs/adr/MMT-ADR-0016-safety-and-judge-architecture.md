@@ -1,13 +1,6 @@
 # MMT-ADR-0016 — Safety and judge architecture: judgment-based safety (no app-owned denylist) and a vendor-independent judge
 
-**Status:** Accepted · 2026-06-06 (re-scoped 2026-06-08) · **Scope:** All production LLM safety + evaluation calls · **Deciders:** PM (owner) + Architect (jjoerg) + Claude · **Builds on:** MMT-ADR-0014 (router/vetting split), MMT-ADR-0013 (policy-engine spine)
-
-> **Re-scope note (2026-06-08).** This ADR originally bundled three different *kinds* of thing — the routing *mechanism*, the ratified *model picks*, and the Gemini *compliance exit* — under the title "LLM provider/model selection and the routing rule table." Per the architect's ruling, model choices are **ephemeral data and do not belong in an ADR**; the routing mechanism already has a home; and the Gemini exit is a compliance *input*, not an architecture decision. Those three were dispersed to their correct homes, and this ADR now holds **only** the genuinely significance-gated safety/judge *architecture*:
-> - **Model picks** (the vetted set per slot) → `docs/registers/llm-models/master.md` (interim master; **not canon**, DB-bound — DB-is-master, MMT-ADR-0013 §2) + its vetting trail.
-> - **The Gemini exit** → recorded as a **compliance input** in `docs/registers/llm-models/vetting/2026-06-06-launch-set-iteration-1.md`; the routing supersession of "Family standard = Gemini-only" is **MMT-ADR-0014** §Supersession.
-> - **Routing mechanism** (3-param key, vetting/routing split, fail-closed, separately-routable roles) → **MMT-ADR-0014**.
->
-> What remains is what passes the §II.1 significance gate as *architecture*: how safety is decided, and how the judge is positioned. (Prior content is recoverable from git history; nothing cited the dispersed material — verified 2026-06-08.)
+**Status:** Accepted · 2026-06-06 · **Scope:** All production LLM safety + evaluation calls · **Deciders:** Architect (jjoerg) + PM (owner) · **Builds on:** MMT-ADR-0014 (router/vetting split), MMT-ADR-0013 (policy-engine spine)
 
 ## Context
 
@@ -31,7 +24,7 @@ Safety is decided by **judgment of how a topic is handled**, not by token/keywor
 
 ## Consequences
 
-- **No denylist component is built.** Safety lives in the prompt-layer safety preamble + the judge's evaluation, not in a maintained word list. (v1 ships without a strong post-envelope content classifier — Gap B / Path X is v1.1 per MMT-ADR-0013 §6 + MMT-ADR-0014 §5; the v1 posture is vendor refusal + safety preamble + the judge.)
+- **No denylist component is built.** Safety lives in the prompt-layer safety preamble + the judge's evaluation, plus a deterministic, intent-shaped tripwire (`safety-tripwire.ts`) as a narrow last-resort floor for the two catastrophic categories (self-harm method-seeking, CSAM) — high-precision and explicitly **not** a word list. (v1 ships without a strong post-envelope content classifier — Gap B / Path X is v1.1 per MMT-ADR-0013 §6 + MMT-ADR-0014 §5; the v1 posture is vendor refusal + safety preamble + judge + the tripwire floor.)
 - **The judge is a distinct routing role** with its own eligibility set and its own vendor constraint (MMT-ADR-0014 §8). Changing the judge model is a register edit with a vetting record, subject to the vendor-independence rule above.
 - **The everyday model is age-blind.** Routing never forks the default tutor model on age; only the judge gating mode and the residency branch fork. This keeps the primary path uniform and avoids an age-split model matrix.
 - **The model picks that realise these roles are register data**, not canon: the judge model, the tutor model, and every slot live in `docs/registers/llm-models/master.md` with their vetting trail. This ADR constrains *how* those roles are filled (vendor-independence, non-reasoning, no denylist), never *which model* fills them.
