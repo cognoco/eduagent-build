@@ -1,5 +1,24 @@
 # ADR Governance Correction & Re-vetting — Fresh-Session Handoff (2026-06-15)
 
+> **✅ STATUS: COMPLETE — 2026-06-15.** All five activity steps done. The body below is retained as the activity record; nothing remains except relaying two findings to their owning workstreams (see "Open hand-offs").
+>
+> **Outcomes:**
+> - **#1 — `MMT-ADR-0000`:** added §II.6 provenance discipline (reconstruct-vs-launder; L3-in-passing-only; human-Architecture sign-off; dedicated `docs(adr)` change-sets; forward guard → WI-764) + the pre-live edit-in-place override. Commit `22122c94a`.
+> - **#3 — flagged ADRs re-vetted** (each operator-signed; pristine per the pre-live override):
+>   - `MMT-ADR-0022` (activity ledger) → **overridden to architecture E (derive-on-read)**; thin seen-state, not a compliance substrate, self-only with no stored visibility flag. Commits `c0e50a7a6`, `a76b9eac6`. WI-760 → Reviewing.
+>   - `MMT-ADR-0021` (freeform filing) → **split (S)**: invariant kept L2, threshold/matrix demoted to L3. Commit `a76b9eac6`. WI-762 → Reviewing.
+>   - `MMT-ADR-0020` (cutover-completion) → **assess-only** (586-cutover territory, NOT edited); material RLS-exception finding routed → WI-780.
+>   - `MMT-ADR-0017` (concept capture) → **ratify-as-built** + canon-accuracy (writer flag-gated off, `CONCEPT_CAPTURE_ENABLED`) + pristine. Commit `6f7fef607`. WI-761 → Reviewing.
+>   - `MMT-ADR-0016` (safety/judge) → **ratify/keep** + pristine + `safety-tripwire.ts` accuracy add. Commit `3914f52d0`. WI-763 → Reviewing.
+> - **#4 — architecture.md sweep:** verified **clean** of §II.6 phase-actor / plan-as-authority leakage; 8 untraced legacy decisions grandfathered (NOT reverse-engineered into ADRs).
+> - **#5 — reverse-sweep of unbuilt plans:** **5 hard ADR-0022 contradictions** in the unbuilt S4/S5 (visibility-contract) plans → tracked WI-782, ⚠ banners added to both plan headers. Commit `5e37f2e91`.
+>
+> **Routed follow-up WIs:** WI-766/767/768 (0022 code convergence, under WI-752), WI-769 (0021 test robustness, under WI-752), WI-781 (0017 `CONCEPT_CAPTURE_ENABLED` decision, under WI-752), WI-764 (the §II.6 forward guard).
+>
+> **Open hand-offs (the only remaining action):**
+> - **WI-780** (0020 `consent_request` RLS-exception gap) — *unassigned, for the WS-18 Identity Cutover orchestrator.* Relay pending.
+> - **WI-782** (S4/S5 visibility-contract) — *unassigned, for the V2-shell/visibility-contract orchestrator.* Verbatim relay message persisted at `_wip/adr-governance-correction/s4-s5-handover.md`.
+
 > **Purpose.** Resume a governance-correction activity in a fresh session without losing the
 > thread. The *substance* (the layer model, the flagged ADRs) lives in durable artifacts cited
 > below; this file captures the **intent, scope decisions, and current state** that aren't in
