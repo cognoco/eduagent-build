@@ -126,15 +126,15 @@ jobs:
       # workers). See playwright.config.ts → `usesRateLimitedApi`.
       E2E_ENV: staging
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           standalone: true
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -220,7 +220,7 @@ jobs:
 
       - name: Upload Playwright artifacts
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-web-smoke
           path: |
@@ -233,22 +233,22 @@ jobs:
   # run-smoke result.
   #
   # Why a pass-through and not a hard gate on the real smoke: the secret-backed
-  # Playwright staging smoke is ADVISORY-ONLY today. It is structurally
-  # un-runnable in CI because DOPPLER_TOKEN_STG is not provisioned as a GitHub
-  # Actions secret (see memory project_playwright_e2e_setup.md), so run-smoke
-  # fails for environmental reasons on every trusted web-surface PR. Hard-gating
-  # the required check on it would block all web PRs repo-wide — worse than the
-  # gap this check addresses. So run-smoke runs as its own advisory check (red
-  # is visible to reviewers but does not block), and this required check stays a
-  # pass-through.
+  # Playwright staging smoke is ADVISORY-ONLY today. DOPPLER_TOKEN_STG IS
+  # provisioned as a GitHub Actions secret (proven by WI-796), so run-smoke
+  # genuinely runs against staging on every trusted web-surface PR — it is NOT
+  # un-runnable. The reason it stays advisory is suite stability against a live
+  # staging target, not a missing secret. Hard-gating the required check on it
+  # would let staging flake / data drift block all web PRs repo-wide — worse than
+  # the gap this check addresses. So run-smoke runs as its own advisory check
+  # (red is visible to reviewers but does not block), and this required check
+  # stays a pass-through.
   #
   # This is NOT the original always-green-by-accident bug: that one had the
   # required check silently pass because run-smoke was skipped with no signal.
   # Here run-smoke genuinely runs for trusted web-surface PRs and surfaces its
-  # real result as an advisory check; the pass-through is a deliberate,
-  # secret-provisioning-gated policy. Promoting the smoke to a hard gate is a
-  # separate future effort, blocked on provisioning DOPPLER_TOKEN_STG and
-  # stabilizing the suite.
+  # real result as an advisory check; the pass-through is a deliberate policy.
+  # Promoting the smoke to a hard gate is a separate future effort, blocked on
+  # stabilizing the suite against a live staging target.
   #
   # The change-detection outputs (trusted / run-real) are used only to print an
   # accurate status message — they never affect the exit code.
@@ -269,8 +269,8 @@ jobs:
           if [[ "$RUN_REAL" == "true" ]]; then
             echo "Advisory Playwright smoke ran (result: $SMOKE_RESULT). It is advisory-only;"
             echo "see the run-smoke check for its real outcome. This required check does not"
-            echo "gate on it (secret-backed smoke is un-runnable in CI until DOPPLER_TOKEN_STG"
-            echo "is provisioned). Required check passes."
+            echo "gate on it (the smoke is advisory until the suite is stabilized against the"
+            echo "live staging target). Required check passes."
           elif [[ "$TRUSTED" == "false" ]]; then
             echo "Fork/untrusted PR — secret-backed smoke cannot run; validate via workflow_dispatch after review. Required check passes."
           else
