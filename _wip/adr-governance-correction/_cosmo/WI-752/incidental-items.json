@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Remove dead activity-ledger schema: ledger_visibility enum + visibility column + unread template_key",
+    "type": "Task",
+    "priority": "P2",
+    "description": "Per the MMT-ADR-0022 re-vet (WI-752; architecture E + Q3 self-only ruling), remove dead schema from mentor_activity_ledger. (1) Drop the `visibility` column + the `ledger_visibility` enum type — visibility is self-only, enforced by profile scope + RLS; cross-user sharing (if ever) is a read-time relationship-derived policy, never a stored flag (every row is currently 'self' and nothing reads it). (2) Drop the `template_key` column — under derive-on-read (E) copy is resolved at read time, and the /now feed already ignores the stored key (it re-derives now.ledger_moment.${kind}). Touch: a drop-column+drop-type migration; the drizzle schema (packages/database/src/schema/activity-ledger.ts); the @eduagent/schemas row shape; writeActivityMoment() params (apps/api/src/services/activity-ledger.ts); the auto-file-session writer; co-located tests. Forward-only, low-risk, pre-launch. Migration drops columns/type — include a Rollback note per repo policy.",
+    "acceptanceCriteria": "visibility column + ledger_visibility enum + template_key column removed via a committed migration (with Rollback note); drizzle schema, @eduagent/schemas, writeActivityMoment(), the auto-file-session writer, and tests updated; the /now reader (sole consumer, uses neither column) unaffected; api typecheck + related tests green."
+  },
+  {
+    "name": "Converge activity-ledger to derive-on-read (MMT-ADR-0022 architecture E)",
+    "type": "Task",
+    "priority": "P2",
+    "description": "Per the MMT-ADR-0022 re-vet (WI-752), the target architecture is E: moments are derived on read; the table is seen-state + genuinely-non-reconstructable capture only. (1) Prune the 5 declared-but-unwritten LedgerKinds (topic_mastered, retention_due, needs_deepening_added, recap_ready, snapshot_ready) from @eduagent/schemas — they imply the materialize-everything model E rejects; the /now feed already derives retention on read and topic-mastery lives on the session/assessment records. (2) Establish derive-on-read as the documented default for new/derivable moments (read-time projection in now-feed.ts, not a new writer). (3) Decide whether session_filed (the one materialized kind today) moves to derive-on-read — collapsing the table toward pure seen-state — or stays as the single genuinely-materialized moment; record the call. Keep best-effort writes for whatever residual materialized surface remains.",
+    "acceptanceCriteria": "Unwritten LedgerKinds pruned from @eduagent/schemas; a documented rule that new moments derive-on-read; the session_filed materialize-vs-derive decision recorded and implemented; /now feed user-facing behavior unchanged; typecheck + related tests green."
+  },
+  {
+    "name": "Activity feed: mobile has no renderer for /now ledger-moment cards — build it or stop emitting",
+    "type": "Task",
+    "priority": "P3",
+    "description": "Surfaced by the MMT-ADR-0022 re-vet (WI-752): the /now feed returns ledger moment cards (templateKey now.ledger_moment.${kind}, params), but the mobile client has NO renderer — zero hits for templateKey / ledger_moment / NowCard in apps/mobile/src. So the one wired kind (session_filed) is transported to the device and never displayed; the feature is half-wired. Either build the mobile renderer for now-feed moment cards, or stop emitting them from /now until a renderer exists. Triage to decide; coordinate with the /now feed + mobile-home owners.",
+    "acceptanceCriteria": "Either a mobile renderer maps now.ledger_moment.* cards to UI, or /now stops returning ledger moment cards; no transported-but-unrendered card path remains; decision recorded."
+  }
+]

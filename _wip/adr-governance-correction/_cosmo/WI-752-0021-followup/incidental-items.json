@@ -1,0 +1,9 @@
+[
+  {
+    "name": "Freeform filing boundary tests should derive from FILING_CONFIG.minFreeformExchanges, not hardcode 4",
+    "type": "Task",
+    "priority": "P3",
+    "description": "Per the MMT-ADR-0021 re-vet (WI-752, ruling S = split): the freeform Library-filing threshold (FILING_CONFIG.minFreeformExchanges, currently 5, in apps/api/src/config/filing.ts) is reclassified from frozen L2 architecture to a freely-tunable L3 operational knob — the ADR keeps only the architectural invariant (freeform is a narrower persistence path; no hidden topic anchors; Challenge Round + learner notes stay topic-keyed). Downstream test-robustness gap surfaced by the re-vet: the route-level boundary tests hardcode the below-threshold case as `exchangeCount: 4` (apps/api/src/routes/sessions.test.ts:1267-1301, 'does not dispatch close-path auto-file for 4-exchange freeform sessions', plus the companion 5-exchange dispatch test) instead of deriving it from the constant (MIN and MIN-1). Now that the re-vet sanctions tuning the threshold without an ADR ceremony, a future change to the constant would silently neuter that boundary test (it stays green but no longer exercises 'just below threshold'). The dispatch-level suite already does this correctly: session-filing-dispatch.test.ts:28 aliases `const MIN = FILING_CONFIG.minFreeformExchanges` and uses MIN/MIN-1/MIN+1. Fix: refactor the sessions.test.ts freeform boundary fixtures to derive their exchange counts from FILING_CONFIG.minFreeformExchanges (MIN and MIN-1) so the boundary tests track the knob. Test-only, forward-only; no runtime/behavior change.",
+    "acceptanceCriteria": "sessions.test.ts freeform filing-boundary fixtures derive below-threshold and at-threshold exchange counts from FILING_CONFIG.minFreeformExchanges (no hardcoded 4); the boundary tests remain meaningful if the constant is changed; api typecheck + the affected test files green."
+  }
+]

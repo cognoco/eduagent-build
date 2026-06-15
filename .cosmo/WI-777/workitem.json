@@ -1,0 +1,17 @@
+{
+  "pageId": "3808bce9-1f7c-81e7-8db3-c0cd73a5d254",
+  "id": "WI-777",
+  "name": "WP-8 — Inngest scans: wire monthly-report-cron + daily-reminder-scan + review-due-scan to v2",
+  "description": "Wire the Inngest scan functions onto v2 twins. Enumeration §3.5 / §6 WP-8.",
+  "acceptanceCriteria": "Scan functions read the canonical model (docs/canon/identity/data-model.md) — canon wins, S0–S6 design choices are NOT canonical — flag-gated; legacy intact until WP-FLAG. Verify each scan still dispatches in production (cron/event registered). Unit + integration green.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
