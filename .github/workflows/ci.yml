@@ -252,6 +252,16 @@ jobs:
       - name: apps/api/scripts node:test guards (KV-binding verifier)
         run: node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs
 
+      # WI-795: regression guard for the db:push stg/prod guard
+      # (packages/database/scripts/check-db-push-target.mjs). These node:test
+      # cases lock: guard blocks stg/prd/unknown configs, guard blocks absent
+      # DOPPLER_CONFIG without DB_PUSH_LOCAL_DEV, guard allows dev config and
+      # the DB_PUSH_LOCAL_DEV opt-in, credential redaction in error output, and
+      # the wiring of predb:push + -c dev in package.json scripts.
+      # Lives under packages/database/scripts/ so Jest's testMatch doesn't see it.
+      - name: packages/database/scripts node:test guards (db:push guard)
+        run: node --test packages/database/scripts/check-db-push-target.test.mjs
+
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
       # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
       # if a quarantined path no longer exists (a stale entry that would rot
