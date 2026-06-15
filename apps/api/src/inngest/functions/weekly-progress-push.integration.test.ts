@@ -15,6 +15,7 @@ import {
   person,
   profiles,
   progressSnapshots,
+  subjects,
   weeklyReports,
   type Database,
 } from '@eduagent/database';
@@ -307,6 +308,25 @@ async function seedSnapshot(input: {
   });
 }
 
+// [WI-793] The digest pipeline runs `filterProgressMetricsToActiveSubjects`,
+// which RECOMPUTES every top-level total from the snapshot's per-subject rows,
+// keeping only subjects that exist as non-archived `subjects` rows for the
+// profile. A snapshot whose `subjects[].subjectId` has no live `subjects` row
+// is filtered to all-zero totals → the "quieter week, 0 topics" fallback. Any
+// test asserting a real delta must seed a matching live subject and carry the
+// delta-bearing metrics at the subject level.
+async function seedSubject(input: {
+  subjectId: string;
+  profileId: string;
+  name: string;
+}): Promise<void> {
+  await db.insert(subjects).values({
+    id: input.subjectId,
+    profileId: input.profileId,
+    name: input.name,
+  });
+}
+
 function migrationStatements(path: string): string[] {
   return readFileSync(path, 'utf8')
     .split('--> statement-breakpoint')
@@ -533,7 +553,11 @@ describe('weekly progress push integration', () => {
       expect.arrayContaining([
         expect.objectContaining({
           name: 'app/weekly-progress-push.generate',
-          data: { parentId: queuedParentId },
+          // [WI-793] The cron always emits `reportWeekStart` in the generate
+          // event payload (BUG-757 idempotency key — `parentId + reportWeekStart`
+          // dedupes retry overlap). This assertion predated that emit; align it
+          // to the source's actual shape. Source unchanged.
+          data: expect.objectContaining({ parentId: queuedParentId }),
         }),
       ]),
     );
@@ -559,6 +583,19 @@ describe('weekly progress push integration', () => {
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedWeeklyPushPrefs(parentProfileId);
 
+    // [WI-793] Seed a live `subjects` row whose id matches the snapshot's
+    // per-subject metrics. The digest filter recomputes every top-level total
+    // from live-subject rows, so the delta-bearing numbers (topicsMastered,
+    // vocabularyTotal, topicsExplored) must live at the subject level and the
+    // subject must exist & be non-archived — otherwise the metrics are filtered
+    // to zero and the push collapses to the "quieter week" fallback.
+    const scienceSubjectId = generateUUIDv7();
+    await seedSubject({
+      subjectId: scienceSubjectId,
+      profileId: childProfileId,
+      name: 'Science',
+    });
+
     const today = new Date();
     const latestSnapshotDate = isoDate(today);
     const previousSnapshotDate = isoDate(
@@ -576,7 +613,10 @@ describe('weekly progress push integration', () => {
         vocabularyTotal: 20,
         longestStreak: 4,
         subjects: [
-          buildSubjectMetrics(generateUUIDv7(), 'Science', {
+          buildSubjectMetrics(scienceSubjectId, 'Science', {
+            sessionsCount: 2,
+            topicsMastered: 5,
+            vocabularyTotal: 20,
             topicsExplored: 4,
           }),
         ],
@@ -593,7 +633,10 @@ describe('weekly progress push integration', () => {
         vocabularyTotal: 30,
         longestStreak: 6,
         subjects: [
-          buildSubjectMetrics(generateUUIDv7(), 'Science', {
+          buildSubjectMetrics(scienceSubjectId, 'Science', {
+            sessionsCount: 5,
+            topicsMastered: 9,
+            vocabularyTotal: 30,
             topicsExplored: 6,
           }),
         ],
