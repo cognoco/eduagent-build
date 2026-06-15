@@ -11,7 +11,7 @@
  * can sign in via the app's Clerk-powered login UI. When absent (e.g., unit
  * tests), falls back to generating fake `clerk_seed_*` IDs.
  */
-import { eq, like, inArray, or } from 'drizzle-orm';
+import { eq, like, inArray, or, sql } from 'drizzle-orm';
 import {
   organization,
   person,
@@ -21,6 +21,15 @@ import {
   consentGrant,
   consentRequest,
   subscription,
+  // Legacy identity parents — written CONDITIONALLY (only when the table still
+  // exists) so seeded children whose FKs target the legacy parents resolve on a
+  // committed-migration DB (CI: localhost:5432/tests runs every migration fresh,
+  // so legacy tables + their FKs are PRESENT; the staging m-repoint.sql FK
+  // re-point is a staging-manual step, NOT a committed migration). Post-DROP
+  // staging drops these tables → the writes self-inert. See writeLegacyParents.
+  accounts as legacyAccounts,
+  profiles as legacyProfiles,
+  subscriptions as legacySubscriptions,
   learningProfiles,
   subjects,
   curricula,
@@ -537,12 +546,134 @@ function futureDate(daysAhead: number): Date {
   return new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
 }
 
-async function createBaseAccount(db: Database): Promise<{ accountId: string }> {
+// ---------------------------------------------------------------------------
+// Legacy-FK-parent compatibility (WI-788)
+//
+// The v2 seed writes only the canonical parents (organization/person/
+// subscription). On a committed-migration database the FIVE legacy identity
+// parents (accounts/profiles/subscriptions/family_links/consent_states) still
+// exist and many seeded children still FK them — `subjects.profile_id →
+// profiles`, `quota_pools.subscription_id → subscriptions`,
+// `profile_quota_usage.{profile_id→profiles, subscription_id→subscriptions}`,
+// and ~50 learning-data children FKing profiles. The staging m-repoint.sql FK
+// re-point (subscriptions→subscription, profiles→person) is a STAGING-MANUAL
+// step, not a committed migration, so CI never has it.
+//
+// Fix: when a legacy parent table still exists, write the matching legacy
+// parent row alongside the v2 parent, REUSING the same id (the deterministic
+// reseed invariant: person.id = profiles.id = profileId, organization.id =
+// accounts.id = accountId, subscription.id = subscriptions.id). Every legacy-FK
+// child then resolves against its legacy parent.
+//
+// Self-inerting: post-DROP staging has dropped these tables → the existence
+// check is false → the writes skip → no 500. Reversible once WI-586 commits
+// m-repoint + M-DROP (the tables vanish and this code becomes inert).
+// ---------------------------------------------------------------------------
+
+/** Memoized per-table existence (regclass) — one probe per process. */
+const legacyTableExistsCache = new Map<string, boolean>();
+
+/** True iff `public.<table>` exists. Robust to both db.execute return shapes:
+ *  the Neon HTTP driver returns an array; node-postgres returns `{ rows }`. */
+async function tableExists(db: Database, table: string): Promise<boolean> {
+  const cached = legacyTableExistsCache.get(table);
+  if (cached !== undefined) return cached;
+  const raw = (await db.execute(
+    sql`SELECT to_regclass(${`public.${table}`}) AS reg`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ reg: string | null }>)
+    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
+  const exists = rows[0]?.reg != null;
+  legacyTableExistsCache.set(table, exists);
+  return exists;
+}
+
+/** Write the legacy `accounts` row (id = accountId) when the table exists. */
+async function writeLegacyAccountIfPresent(
+  db: Database,
+  accountId: string,
+  email: string,
+  clerkUserId: string,
+): Promise<void> {
+  if (!(await tableExists(db, 'accounts'))) return;
+  await db.insert(legacyAccounts).values({
+    id: accountId,
+    clerkUserId,
+    email,
+  });
+}
+
+/** Write the legacy `profiles` row (id = profileId) when the table exists. */
+async function writeLegacyProfileIfPresent(
+  db: Database,
+  profileId: string,
+  accountId: string,
+  opts: { displayName: string; birthYear: number; isOwner: boolean },
+): Promise<void> {
+  if (!(await tableExists(db, 'profiles'))) return;
+  await db.insert(legacyProfiles).values({
+    id: profileId,
+    accountId,
+    displayName: opts.displayName,
+    birthYear: opts.birthYear,
+    isOwner: opts.isOwner,
+  });
+}
+
+/**
+ * The v2 `subscription` values the seed writes (the common subset across all
+ * seed sites — none use store-correlation or cancelledAt columns).
+ */
+interface SeedSubscriptionValues {
+  id: string;
+  organizationId: string;
+  payerPersonId: string;
+  planTier: 'free' | 'plus' | 'family' | 'pro';
+  status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+  trialEndsAt?: Date | null;
+  periodStartAt?: Date | null;
+  periodEndAt?: Date | null;
+}
+
+/**
+ * Insert the v2 `subscription` row, then — on a committed-migration DB — the
+ * matching legacy `subscriptions` row REUSING the same id, so quota children
+ * (`quota_pools`/`profile_quota_usage`/`usage_events`/`top_up_credits`) whose
+ * FK targets legacy `subscriptions` resolve. `organization_id` maps to the
+ * legacy `account_id`; `planTier`→`tier`; `periodStartAt/EndAt`→
+ * `currentPeriodStart/End`. Self-inerting post-DROP.
+ */
+async function insertSubscriptionWithLegacy(
+  db: Database,
+  values: SeedSubscriptionValues,
+): Promise<void> {
+  await db.insert(subscription).values(values);
+  if (!(await tableExists(db, 'subscriptions'))) return;
+  await db.insert(legacySubscriptions).values({
+    id: values.id,
+    accountId: values.organizationId,
+    tier: values.planTier,
+    status: values.status,
+    trialEndsAt: values.trialEndsAt ?? null,
+    currentPeriodStart: values.periodStartAt ?? null,
+    currentPeriodEnd: values.periodEndAt ?? null,
+  });
+}
+
+async function createBaseAccount(
+  db: Database,
+  email: string,
+  clerkUserId: string,
+): Promise<{ accountId: string }> {
   const accountId = generateUUIDv7();
   await db.insert(organization).values({
     id: accountId,
     name: `Seed org ${accountId.slice(0, 8)}`,
   });
+  // Legacy FK anchor for committed-migration DBs — id = accountId so legacy
+  // profiles/subscriptions FKs (account_id → accounts.id) resolve.
+  await writeLegacyAccountIfPresent(db, accountId, email, clerkUserId);
   return { accountId };
 }
 
@@ -570,6 +701,15 @@ async function createBaseProfile(
     ...(opts.defaultAppContext
       ? { defaultAppContext: opts.defaultAppContext }
       : {}),
+  });
+
+  // Legacy FK anchor for committed-migration DBs — id = profileId so every
+  // learning-data child FKing profiles.id (subjects, sessions, assessments, …)
+  // resolves. accountId already has a matching legacy accounts row.
+  await writeLegacyProfileIfPresent(db, profileId, accountId, {
+    displayName: opts.displayName,
+    birthYear: opts.birthYear,
+    isOwner,
   });
 
   if (isOwner) {
@@ -952,7 +1092,7 @@ async function seedOnboardingNoSubject(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -985,7 +1125,7 @@ async function seedOnboardingComplete(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1057,7 +1197,7 @@ async function seedLearningActive(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Active Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1125,7 +1265,7 @@ async function seedRetentionDue(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Review Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1171,7 +1311,7 @@ async function seedFailedRecall3x(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Struggling Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1246,7 +1386,7 @@ async function seedTopicNotStarted(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Fresh Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1284,7 +1424,7 @@ async function seedTopicOverdueReview(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Review Due Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1337,7 +1477,7 @@ async function seedBookNoCurriculum(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'New Book Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1391,7 +1531,7 @@ async function seedSubjectWithBookSuggestions(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Suggestion Picker',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1455,7 +1595,7 @@ async function seedParentWithChildren(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Parent profile in Family mode. With MODE_NAV_V1_ENABLED=true (eas.json
   // development + preview builds), showFamilyHome requires familyShape=true
@@ -1552,7 +1692,7 @@ async function seedParentMultiChild(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Parent profile in Family mode (defaultAppContext='family' → V1 guardian
   // shape; see seedParentWithChildren rationale).
@@ -1748,7 +1888,7 @@ async function seedTrialActive(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Trial User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1757,7 +1897,7 @@ async function seedTrialActive(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -1803,7 +1943,7 @@ async function seedTrialExpired(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Expired Trial User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1812,7 +1952,7 @@ async function seedTrialExpired(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -1859,7 +1999,7 @@ async function seedMultiSubject(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Multi-Subject Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1909,7 +2049,7 @@ async function seedMultiSubjectPractice(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Practice Picker Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -1947,7 +2087,7 @@ async function seedHomeworkReady(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Homework Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -2000,7 +2140,7 @@ async function seedTrialExpiredChild(
   }
 
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Parent profile (account owner)
   const parentProfileId = await createBaseProfile(db, accountId, {
@@ -2013,7 +2153,7 @@ async function seedTrialExpiredChild(
 
   // Expired subscription — child hits the paywall
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: parentProfileId,
@@ -2095,7 +2235,7 @@ async function seedConsentWithdrawn(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Parent profile (account owner)
   const parentProfileId = await createBaseProfile(db, accountId, {
@@ -2155,7 +2295,7 @@ async function seedConsentWithdrawnSolo(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Single learner profile — no parent, no profile switch needed
   const profileId = await createBaseProfile(db, accountId, {
@@ -2200,7 +2340,7 @@ async function seedParentSolo(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Solo parent profile — no children, no family links
   const parentProfileId = await createBaseProfile(db, accountId, {
@@ -2221,7 +2361,7 @@ async function seedParentSolo(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: parentProfileId,
@@ -2294,7 +2434,7 @@ async function seedConsentPending(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Pending Learner',
     birthYear: 2014,
@@ -2333,7 +2473,7 @@ async function seedLanguageLearner(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Language Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -2684,7 +2824,7 @@ async function seedAccountDeletionScheduled(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -2730,7 +2870,7 @@ async function seedSessionWithTranscript(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Transcript User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -2883,7 +3023,7 @@ async function seedParentProxy(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Proxy Parent',
@@ -3028,7 +3168,7 @@ async function seedWithBookmarks(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Bookmarks User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3237,7 +3377,7 @@ async function seedParentWithChildrenNoSessions(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Parent profile in Family mode (defaultAppContext='family' → V1 guardian
   // shape; see seedParentWithChildren rationale).
@@ -3376,7 +3516,7 @@ async function seedSubscriptionFamilyActive(
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Family Subscriber',
     birthYear: 1985,
@@ -3395,7 +3535,7 @@ async function seedSubscriptionFamilyActive(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -3441,7 +3581,7 @@ async function seedSubscriptionProActive(
 ): Promise<SeedResult> {
   const proTier = getTierConfig('pro');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Pro Subscriber',
     birthYear: 1982,
@@ -3460,7 +3600,7 @@ async function seedSubscriptionProActive(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -3510,7 +3650,7 @@ async function seedPurchasePending(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Purchase Pending User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3529,7 +3669,7 @@ async function seedPurchasePending(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -3580,7 +3720,7 @@ async function seedPurchaseConfirmed(
 ): Promise<SeedResult> {
   const plusTier = getTierConfig('plus');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Confirmed Subscriber',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3599,7 +3739,7 @@ async function seedPurchaseConfirmed(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -3647,7 +3787,7 @@ async function seedQuotaExceeded(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Quota Exceeded User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3665,7 +3805,7 @@ async function seedQuotaExceeded(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -3720,7 +3860,7 @@ async function seedForbidden(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Forbidden User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3770,7 +3910,7 @@ async function seedQuizMalformedRound(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Malformed Round User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3789,7 +3929,7 @@ async function seedQuizMalformedRound(
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -3867,7 +4007,7 @@ async function seedQuizDeterministicWrongAnswer(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Deterministic Quiz User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3886,7 +4026,7 @@ async function seedQuizDeterministicWrongAnswer(
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -3962,7 +4102,7 @@ async function seedQuizAnswerCheckFails(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Quiz Check Fails User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -3981,7 +4121,7 @@ async function seedQuizAnswerCheckFails(
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -4059,7 +4199,7 @@ async function seedDailyLimitReached(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Daily Cap User',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4068,7 +4208,7 @@ async function seedDailyLimitReached(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -4161,7 +4301,7 @@ async function seedReviewEmpty(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Caught Up Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4224,7 +4364,7 @@ async function seedDictationWithMistakes(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Dictation Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4271,7 +4411,7 @@ async function seedDictationPerfectScore(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Dictation Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4334,7 +4474,7 @@ async function seedMentorAuditFamilyAtProfileLimit(
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Parent profile in Family mode (defaultAppContext='family' → V1 guardian
   // shape; see seedParentWithChildren rationale).
@@ -4356,7 +4496,7 @@ async function seedMentorAuditFamilyAtProfileLimit(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: parentProfileId,
@@ -4427,7 +4567,7 @@ async function seedMentorAuditPostApprovalRedirect(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Approving Parent',
@@ -4495,7 +4635,7 @@ function makeConsentThresholdSeeder(
 ): SeederFn {
   return async (db, email, env) => {
     const { clerkUserId, password } = await createClerkTestUser(email, env);
-    const { accountId } = await createBaseAccount(db);
+    const { accountId } = await createBaseAccount(db, email, clerkUserId);
     const profileId = generateUUIDv7();
     await db.insert(person).values({
       id: profileId,
@@ -4541,7 +4681,7 @@ async function seedMentorAuditQuotaOwnerDaily(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Daily Cap Owner',
     birthYear: 1985,
@@ -4560,7 +4700,7 @@ async function seedMentorAuditQuotaOwnerDaily(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -4605,7 +4745,7 @@ async function seedMentorAuditQuotaFamilyMonthly(
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Family Monthly Cap Owner',
     birthYear: 1985,
@@ -4624,7 +4764,7 @@ async function seedMentorAuditQuotaFamilyMonthly(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
@@ -4666,7 +4806,7 @@ async function seedMentorAuditResumableSession(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Resume Learner',
     birthYear: LEARNER_BIRTH_YEAR,
@@ -4744,7 +4884,7 @@ async function seedMentorAuditRichChildHistory(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Parent profile in Family mode (defaultAppContext='family' → V1 guardian
   // shape; see seedParentWithChildren rationale).
@@ -5108,7 +5248,7 @@ async function seedMentorAuditFamilyPoolMembers(
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Pool-Sharing Parent',
@@ -5128,7 +5268,7 @@ async function seedMentorAuditFamilyPoolMembers(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: parentProfileId,
@@ -5205,7 +5345,7 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Owner in Family mode (defaultAppContext='family' → V1 guardian shape; see
   // seedParentWithChildren rationale).
@@ -5227,7 +5367,7 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
   });
 
   const subscriptionId = generateUUIDv7();
-  await db.insert(subscription).values({
+  await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: ownerProfileId,
@@ -5373,7 +5513,7 @@ async function seedMentorAuditBridgeBackstack(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
-  const { accountId } = await createBaseAccount(db);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   const ownerProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Bridge Parent',
@@ -5782,6 +5922,17 @@ async function deleteOrganizationGraph(
   orgIds: string[],
 ): Promise<number> {
   if (orgIds.length === 0) return 0;
+
+  // 0. Legacy cleanup (committed-migration DBs only). On CI the learning-data
+  // children (subjects, sessions, quota_pools, …) FK the LEGACY parents
+  // (profiles/subscriptions), not the v2 ones — so the v2 person/org deletes
+  // below do NOT cascade them. accounts.id = orgId (deterministic reseed), and
+  // every legacy child cascades from accounts (accounts→profiles→learning data,
+  // accounts→subscriptions→quota), so one delete reclaims the whole legacy
+  // subtree. Self-inerting post-DROP (table gone → skip).
+  if (await tableExists(db, 'accounts')) {
+    await db.delete(legacyAccounts).where(inArray(legacyAccounts.id, orgIds));
+  }
 
   // 1. Collect all person IDs (owners + managed children) across these orgs.
   const members = await db
