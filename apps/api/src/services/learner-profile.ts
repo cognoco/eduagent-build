@@ -1134,6 +1134,7 @@ async function verifyProfileOwnership(
     // v2: account.id = organization.id; write authority = self OR guardian edge
     // (membership alone is existence-visibility, not write authority).
     // callerPersonId is the authenticated caller, never request-supplied.
+    // v2: profileId === personId on the cutover path (see CUT-B migration notes).
     if (!opts.callerPersonId) {
       throw new Error(
         'identity-v2 write guard requires callerPersonId (caller identity not threaded)',

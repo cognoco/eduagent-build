@@ -47,6 +47,59 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [WI-774] v2 identity resolver — under IDENTITY_V2_ENABLED='true' the account
+// middleware resolves the graph and sets callerPersonId. Mocked so the flag-on
+// route tests can assert the v2 guard is armed without an unmocked DB; the
+// resolver itself is covered by identity integration tests.
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  () => ({
+    resolveIdentityV2: jest.fn().mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: 'person-test-id',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    }),
+  }),
+);
+
+// [WI-774] v2 profile-scope resolver — profile-scope middleware uses these under
+// flag-on. Mocked so the X-Profile-Id resolution does not hit the unmocked DB.
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
+  () => ({
+    findOwnerPersonScope: jest.fn().mockResolvedValue({
+      profileId: 'profile-1',
+      meta: {
+        birthYear: 1990,
+        location: 'EU',
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    }),
+    getPersonScope: jest.fn().mockResolvedValue({
+      profileId: 'profile-1',
+      meta: {
+        birthYear: 1990,
+        location: 'EU',
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    }),
+  }),
+);
+
 const mockGetOwnedFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertFamilyPoolBreakdownSharing = jest.fn();
 const mockGetNotificationPrefs = jest.fn();
@@ -85,6 +138,10 @@ const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   ...BASE_AUTH_ENV,
 };
+// [WI-774] Flag-on env: exercises the identity-v2 path through the real account
+// + profile-scope middleware (with the v2 resolvers mocked above), so the route
+// arms the write guard with identityV2Enabled:true + a real callerPersonId.
+const V2_TEST_ENV = { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' };
 
 beforeAll(() => {
   installTestJwksInterceptor();
@@ -272,6 +329,35 @@ describe('settings routes', () => {
 
     expect(res.status).toBe(200);
     expect(mockUpsertNotificationPrefs).toHaveBeenCalled();
+  });
+
+  it('[WI-774] flag-on arms the v2 write guard: passes identityV2Enabled:true + the resolved callerPersonId', async () => {
+    const res = await app.request(
+      '/v1/settings/notifications',
+      {
+        method: 'PUT',
+        headers: PROFILE_HEADERS,
+        body: JSON.stringify({
+          reviewReminders: true,
+          dailyReminders: false,
+          pushEnabled: false,
+        }),
+      },
+      V2_TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    // The route reads IDENTITY_V2_ENABLED from c.env and callerPersonId from the
+    // account middleware (resolveIdentityV2 → person-test-id). A wrong env-binding
+    // name or context-variable key would silently leave the guard un-armed under
+    // flag-on (the live staging path), so assert the exact opts shape.
+    expect(mockUpsertNotificationPrefs).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-1',
+      'test-account-id',
+      expect.objectContaining({ reviewReminders: true }),
+      { identityV2Enabled: true, callerPersonId: 'person-test-id' },
+    );
   });
 
   it('GET /v1/settings/withdrawal-archive returns 200 for owner callers', async () => {

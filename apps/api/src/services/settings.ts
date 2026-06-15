@@ -84,6 +84,7 @@ async function verifyProfileOwnership(
     // v2: account.id = organization.id; write authority = self OR guardian edge
     // (membership alone is existence-visibility, not write authority).
     // callerPersonId is the authenticated caller, never request-supplied.
+    // v2: profileId === personId on the cutover path (see CUT-B migration notes).
     await verifyPersonOwnershipV2(
       db,
       profileId,
@@ -717,10 +718,10 @@ export async function checkAndLogRateLimit(
   profileId: string,
   accountId: string,
   type: NotificationPayload['type'],
-  opts: { hours: number; maxCount: number },
-  identityOpts?: IdentityV2Opts,
+  rateLimitOpts: { hours: number; maxCount: number },
+  opts?: IdentityV2Opts,
 ): Promise<boolean> {
-  await verifyProfileOwnership(db, profileId, accountId, identityOpts);
+  await verifyProfileOwnership(db, profileId, accountId, opts);
   return db.transaction(async (tx) => {
     // Advisory lock per (profileId, notificationKey) — serializes concurrent
     // rate-limit checks for the same bucket without blocking unrelated ones.
@@ -731,7 +732,7 @@ export async function checkAndLogRateLimit(
       }, 0))`,
     );
 
-    const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
+    const since = new Date(Date.now() - rateLimitOpts.hours * 60 * 60 * 1000);
     const rows = await tx
       .select()
       .from(notificationLog)
@@ -743,7 +744,7 @@ export async function checkAndLogRateLimit(
         ),
       );
 
-    if (rows.length >= opts.maxCount) {
+    if (rows.length >= rateLimitOpts.maxCount) {
       return true;
     }
 
