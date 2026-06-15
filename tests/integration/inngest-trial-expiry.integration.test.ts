@@ -159,11 +159,26 @@ async function seedSubscriptionWithQuota(input: {
   };
 }
 
-async function loadSubscription(id: string) {
+async function loadSubscription(
+  id: string,
+): Promise<{ status: string; tier: string } | undefined> {
   const db = createIntegrationDb();
-  return db.query.subscriptions.findFirst({
+  // [WI-792] Under flag-ON the trial-expiry function transitions the v2
+  // `subscription` row (status→expired / planTier→free); the legacy
+  // `subscriptions` row is only an FK-parent anchor (WI-788) and is NOT updated
+  // by the v2 path. Read back the store the function actually wrote.
+  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+    const row = await db.query.subscription.findFirst({
+      where: eq(subscriptionV2.id, id),
+    });
+    return row ? { status: row.status, tier: row.planTier } : undefined;
+  }
+  const legacyRow = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, id),
   });
+  return legacyRow
+    ? { status: legacyRow.status, tier: legacyRow.tier }
+    : undefined;
 }
 
 async function loadQuotaPool(id: string) {
