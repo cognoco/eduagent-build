@@ -24,6 +24,13 @@ implementation*: `execute.ts fetch <wi-ref> <artifacts-dir> --supervised`, then
 `git worktree add`. The skill runs `pnpm install` + `pnpm env:sync`. All work
 happens in this worktree; `/commit` is permitted there (and only there).
 
+**Pre-`/commit` worktree assertion (required, Quartet rule).** Before *every*
+`/commit`, verify `git -C <your-worktree> rev-parse --show-toplevel` resolves to
+your own `.worktrees/WI-NN` — never the shared main checkout. If it resolves to
+the shared tree, STOP and re-target: a misfired `/commit` in the shared tree
+stages and sweeps concurrent sessions' work (the shared-checkout incident this
+guards against). The shepherd also enforces this in dispatch briefs.
+
 **Phase 2 — Plan.** Write an implementation plan to a file in your worktree
 (`_plan-WI-NN.md`, untracked or deleted before PR) *before touching code*.
 Plan style is **parameterized by work type** (repo Planning Discipline rule):
