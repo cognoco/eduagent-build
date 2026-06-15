@@ -221,9 +221,17 @@ function dateAtUtcNoon(offsetDays: number): Date {
 }
 
 // [WI-792] v2 identity cleanup — mirrors cleanupAccounts for the v2 tables.
-// subscription.organizationId FK is RESTRICT, so delete subscription v2 rows
-// before organization rows. person rows are cleaned up by organization cascade
-// through membership (membership ON DELETE CASCADE from both sides).
+// Delete order matters because of the FK constraints:
+//   - subscription.organizationId → organization.id is RESTRICT: delete the v2
+//     subscription rows before their organization.
+//   - membership.organizationId → organization.id is CASCADE: deleting an
+//     organization removes its membership rows, but NOT the person rows
+//     (membership.personId → person.id flows person→membership, so person is the
+//     FK *parent* — it is never cascaded into). person has no FK to profiles, so
+//     cleanupAccounts (which deletes accounts/profiles) does not reach it either.
+//   Therefore person rows must be deleted EXPLICITLY. We resolve the person ids
+//   from membership (the v2 person↔org link) before the organization delete
+//   removes those membership rows.
 async function cleanupV2Rows(accountIds: string[]): Promise<void> {
   if (
     process.env['IDENTITY_V2_ENABLED'] !== 'true' ||
@@ -232,10 +240,19 @@ async function cleanupV2Rows(accountIds: string[]): Promise<void> {
     return;
   }
   const db = createIntegrationDb();
+  const memberRows = await db.query.membership.findMany({
+    where: inArray(membership.organizationId, accountIds),
+    columns: { personId: true },
+  });
+  const personIds = memberRows.map((r) => r.personId);
+
   await db
     .delete(subscriptionV2)
     .where(inArray(subscriptionV2.organizationId, accountIds));
   await db.delete(organization).where(inArray(organization.id, accountIds));
+  if (personIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
 }
 
 beforeAll(() => {
