@@ -27,6 +27,18 @@ jest.mock(
   },
 );
 
+// gc1-allow: unit-route isolation; real service covered by profile-v2.integration.test.ts
+jest.mock('../services/identity-v2/profile-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/profile-v2',
+  ) as typeof import('../services/identity-v2/profile-v2');
+  return {
+    ...actual,
+    listProfilesV2: jest.fn(),
+    getOwnerProfileV2: jest.fn(),
+  };
+});
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -44,6 +56,7 @@ import {
   ProfileLimitError,
   ProfileValidationError,
 } from '../services/profile';
+import { listProfilesV2 } from '../services/identity-v2/profile-v2';
 import { profileRoutes } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -122,6 +135,7 @@ const getProfileMock = jest.mocked(getProfile);
 const updateProfileMock = jest.mocked(updateProfile);
 const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
 const switchProfileMock = jest.mocked(switchProfile);
+const listProfilesV2Mock = jest.mocked(listProfilesV2);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -216,6 +230,46 @@ describe('GET /v1/profiles', () => {
     const res = await makeApp().request('/v1/profiles');
 
     expect(res.status).toBe(500);
+  });
+
+  // [CUT-B2] Post-graph v2 read: flag-on + account resolved → the GET dispatches
+  // to listProfilesV2(db, account.id) (account.id = organization.id, org-scoped =
+  // the IDOR guard), NOT the legacy listProfiles. Red-green: drop the
+  // isIdentityV2Enabled branch in profiles.ts GET and this flips to listProfiles.
+  it('[CUT-B2] reads v2 via listProfilesV2 when IDENTITY_V2_ENABLED and account is resolved', async () => {
+    const profile = makeProfileRow({ id: PROFILE_ID_A });
+    listProfilesV2Mock.mockResolvedValue([profile]);
+
+    const res = await makeApp().request(
+      '/v1/profiles',
+      {},
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ profiles: [{ id: PROFILE_ID_A }] });
+    // v2 read is org-scoped to the caller's resolved account.id (= org id).
+    expect(listProfilesV2Mock).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT_ID,
+    );
+    // Legacy reader must NOT run on the v2 path.
+    expect(listProfilesMock).not.toHaveBeenCalled();
+  });
+
+  // [CUT-B2] Flag-off: the legacy listProfiles path stays intact (until WP-FLAG).
+  it('[CUT-B2] reads legacy listProfiles when IDENTITY_V2_ENABLED is not set', async () => {
+    listProfilesMock.mockResolvedValue([]);
+
+    const res = await makeApp().request('/v1/profiles');
+
+    expect(res.status).toBe(200);
+    expect(listProfilesMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT_ID,
+    );
+    expect(listProfilesV2Mock).not.toHaveBeenCalled();
   });
 });
 
