@@ -11,21 +11,34 @@
  * When `doppler run` injects secrets, it also sets `DOPPLER_CONFIG` in the
  * child process env. This script checks that value:
  *
- *   DOPPLER_CONFIG absent or "dev"  →  push is allowed (local dev, CI unit tests)
+ *   DOPPLER_CONFIG = "dev"           →  push is allowed (Doppler dev config)
  *   DOPPLER_CONFIG = "stg" or "prd" →  push is BLOCKED with a clear error
  *   DOPPLER_CONFIG = anything else  →  push is BLOCKED (unknown config = err on safe side)
+ *   DOPPLER_CONFIG absent           →  push is BLOCKED unless DB_PUSH_LOCAL_DEV=1
+ *                                      (see "No-Doppler escape" below)
  *
  * This approach is stronger than hostname-substring matching because it does not
  * depend on knowing the actual Neon endpoint names, which can change.
  *
  * Root script safety
  * ------------------
- * The root `pnpm db:push:dev` script currently calls drizzle-kit directly via
- * `pnpm exec` (bypassing this pre-script). To close that gap without cross-env
- * or platform-specific hacks, `db:push:dev` was changed to call `pnpm run
- * db:push` on this package (which triggers this pre-script), and is only
- * invoked via `doppler run` with the `dev` config — so `DOPPLER_CONFIG=dev`
- * is set by Doppler when the intent is dev.
+ * The root `pnpm db:push:dev` script explicitly passes `-c dev` to `doppler run`
+ * so `DOPPLER_CONFIG` is always set to `dev` through the canonical dev path.
+ *
+ * No-Doppler escape
+ * -----------------
+ * `pnpm env:sync` (`scripts/setup-env.js`) writes stg secrets to
+ * `.env.development.local` (DOPPLER_CONFIG = 'stg' is hard-coded in that
+ * script). Drizzle-kit auto-loads `.env*` files from ancestor directories, so a
+ * bare `drizzle-kit push` without Doppler would pick up stg credentials and
+ * reach staging. Allowing `DOPPLER_CONFIG=undefined` silently would therefore
+ * be unsafe. Instead, the no-Doppler case requires an explicit opt-in:
+ *
+ *   DB_PUSH_LOCAL_DEV=1 pnpm --filter @eduagent/database run db:push
+ *
+ * This escape exists only for development setups that do not use Doppler at all
+ * (e.g. a clean checkout with a manually written .env.local pointing at a local
+ * Postgres). It is NOT for bypassing the check when Doppler is configured.
  *
  * Historical context
  * ------------------
@@ -43,21 +56,22 @@
  */
 
 const dopplerConfig = process.env.DOPPLER_CONFIG;
-const ALLOWED_CONFIGS = new Set([undefined, 'dev']);
 
-if (!ALLOWED_CONFIGS.has(dopplerConfig)) {
-  const url = process.env.DATABASE_URL ?? '(not set)';
-  // Redact credentials before logging — keep host visible for diagnostics.
-  let displayUrl = url;
+/** Redact username:password from a DATABASE_URL before logging. */
+function redactUrl(url) {
+  if (!url) return '(not set)';
   try {
     const parsed = new URL(url);
     parsed.username = parsed.username ? '***' : '';
     parsed.password = parsed.password ? '***' : '';
-    displayUrl = parsed.toString();
+    return parsed.toString();
   } catch {
-    // Not a parseable URL — show as-is (no credentials to redact).
+    return '(unparseable URL)';
   }
+}
 
+function blocked(reason) {
+  const displayUrl = redactUrl(process.env.DATABASE_URL);
   console.error(
     '\n' +
       '✗  drizzle-kit push is blocked against non-dev databases.\n' +
@@ -65,6 +79,7 @@ if (!ALLOWED_CONFIGS.has(dopplerConfig)) {
       '   AGENTS.md (Schema And Deploy Safety): "Never run drizzle-kit push\n' +
       '   against staging or production."\n' +
       '\n' +
+      '   Reason: ' + reason + '\n' +
       '   Doppler config: ' + dopplerConfig + '\n' +
       '   DATABASE_URL resolved to: ' + displayUrl + '\n' +
       '\n' +
@@ -73,14 +88,32 @@ if (!ALLOWED_CONFIGS.has(dopplerConfig)) {
       '\n' +
       '   To apply schema changes to staging or production:\n' +
       '     pnpm db:migrate:dev         (dev)\n' +
-      '     drizzle-kit migrate         (stg/prd — via the deploy workflow)\n',
+      '     drizzle-kit migrate         (stg/prd — via the deploy workflow)\n' +
+      '\n' +
+      '   If you are running without Doppler (no stg creds loaded), set:\n' +
+      '     DB_PUSH_LOCAL_DEV=1 pnpm --filter @eduagent/database run db:push\n',
   );
   process.exit(1);
 }
 
-if (dopplerConfig === 'dev') {
-  console.log('✓ drizzle-kit push: dev Doppler config confirmed (DOPPLER_CONFIG=dev)');
-} else {
-  console.log('✓ drizzle-kit push: no Doppler config set — local dev assumed');
+if (dopplerConfig === undefined || dopplerConfig === '') {
+  // No Doppler — could be a bare invocation that auto-loaded .env.development.local
+  // (which contains stg credentials via pnpm env:sync). Require an explicit opt-in.
+  if (!process.env.DB_PUSH_LOCAL_DEV) {
+    blocked(
+      'DOPPLER_CONFIG is not set. pnpm env:sync writes stg credentials to\n' +
+        '   .env.development.local; a bare drizzle-kit push may target staging.\n' +
+        '   Run via `pnpm db:push:dev` (uses `doppler run -c dev`), or set\n' +
+        '   DB_PUSH_LOCAL_DEV=1 if you are on a local Postgres with no Doppler.',
+    );
+  }
+  console.log('✓ drizzle-kit push: no Doppler config — DB_PUSH_LOCAL_DEV=1 override accepted');
+  process.exit(0);
 }
+
+if (dopplerConfig !== 'dev') {
+  blocked('Doppler config is "' + dopplerConfig + '" — only "dev" is allowed for push');
+}
+
+console.log('✓ drizzle-kit push: dev Doppler config confirmed (DOPPLER_CONFIG=dev)');
 process.exit(0);

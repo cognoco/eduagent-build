@@ -74,13 +74,16 @@ test('guard exits 1 for any unknown DOPPLER_CONFIG value (err on the safe side)'
   assert.equal(status, 1);
 });
 
-// ── Permitted cases ───────────────────────────────────────────────────────────
-
-test('guard exits 0 when DOPPLER_CONFIG is absent (local dev without Doppler)', () => {
-  const { status, stdout } = runGuard({ DOPPLER_CONFIG: undefined });
-  assert.equal(status, 0, 'expected exit 0 — no Doppler = local dev');
-  assert.match(stdout, /no Doppler config set/);
+test('guard exits 1 when DOPPLER_CONFIG is absent and DB_PUSH_LOCAL_DEV is not set', () => {
+  // pnpm env:sync writes stg creds to .env.development.local; a bare push
+  // without Doppler may pick them up. Block by default; require explicit opt-in.
+  const { status, stderr } = runGuard({ DOPPLER_CONFIG: undefined });
+  assert.equal(status, 1, 'expected exit 1 — no Doppler without override should be blocked');
+  assert.match(stderr, /drizzle-kit push is blocked/);
+  assert.match(stderr, /DB_PUSH_LOCAL_DEV/);
 });
+
+// ── Permitted cases ───────────────────────────────────────────────────────────
 
 test('guard exits 0 when DOPPLER_CONFIG=dev', () => {
   const { status, stdout } = runGuard({ DOPPLER_CONFIG: 'dev' });
@@ -88,11 +91,27 @@ test('guard exits 0 when DOPPLER_CONFIG=dev', () => {
   assert.match(stdout, /dev Doppler config confirmed/);
 });
 
+test('guard exits 0 when DOPPLER_CONFIG is absent and DB_PUSH_LOCAL_DEV=1', () => {
+  const { status, stdout } = runGuard({ DOPPLER_CONFIG: undefined, DB_PUSH_LOCAL_DEV: '1' });
+  assert.equal(status, 0, 'expected exit 0 — explicit local-dev override accepted');
+  assert.match(stdout, /DB_PUSH_LOCAL_DEV=1 override accepted/);
+});
+
 // ── Credential redaction ──────────────────────────────────────────────────────
 
-test('guard redacts credentials in DATABASE_URL before logging', () => {
+test('guard redacts credentials in DATABASE_URL before logging (stg config)', () => {
   const { stderr } = runGuard({
     DOPPLER_CONFIG: 'stg',
+    DATABASE_URL: 'postgres://secretuser:secretpass@ep-example.neon.tech/mydb',
+  });
+  assert.ok(!stderr.includes('secretuser'), 'username must not appear in output');
+  assert.ok(!stderr.includes('secretpass'), 'password must not appear in output');
+  assert.match(stderr, /ep-example\.neon\.tech/, 'host should be visible for diagnostics');
+});
+
+test('guard redacts credentials in DATABASE_URL before logging (no Doppler)', () => {
+  const { stderr } = runGuard({
+    DOPPLER_CONFIG: undefined,
     DATABASE_URL: 'postgres://secretuser:secretpass@ep-example.neon.tech/mydb',
   });
   assert.ok(!stderr.includes('secretuser'), 'username must not appear in output');
@@ -143,5 +162,24 @@ test('root package.json db:push:dev does not bypass predb:push via pnpm exec', (
   assert.ok(
     callsRunScript,
     'db:push:dev must call `pnpm run db:push` (or equivalent) so predb:push fires.',
+  );
+});
+
+test('root package.json db:push:dev pins Doppler to dev config (-c dev)', () => {
+  // Without `-c dev`, `doppler run --` uses the directory's configured config.
+  // setup-env.js prompts users to select `stg` as their directory config, so a
+  // bare `doppler run --` would inject DOPPLER_CONFIG=stg and block the push.
+  const pkg = JSON.parse(readFileSync(ROOT_PKG_JSON, 'utf8'));
+  const pushScript = pkg.scripts?.['db:push:dev'];
+  assert.ok(
+    typeof pushScript === 'string',
+    'root package.json must have a "db:push:dev" script',
+  );
+  const pinsDevConfig =
+    pushScript.includes('-c dev') ||
+    pushScript.includes('--config dev');
+  assert.ok(
+    pinsDevConfig,
+    'db:push:dev must pass `-c dev` (or `--config dev`) to doppler run so DOPPLER_CONFIG=dev is always set.',
   );
 });

@@ -28,7 +28,7 @@
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,html}\"",
     "prepare": "husky",
     "prepush": "tsc --build",
-    "db:push:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database run db:push",
+    "db:push:dev": "C:/Tools/doppler/doppler.exe run -c dev -- pnpm --filter @eduagent/database run db:push",
     "db:generate:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs migrate",
     "db:studio:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs studio",
