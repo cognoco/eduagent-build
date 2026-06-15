@@ -1697,8 +1697,9 @@ describe('[CUT-B1] GET /subscription/status v2 pre-graph (graphless owner)', () 
     const app = new Hono();
     app.use('*', async (c, next) => {
       c.set('db' as never, {});
-      // Graphless: no account set; clerkIdentity present, as accountMiddleware
-      // sets it on the v2 pre-graph path.
+      // Graphless: account explicitly undefined (mirrors what accountMiddleware
+      // sets on the v2 pre-graph path — clerkIdentity set, no account/graph yet).
+      c.set('account' as never, undefined);
       c.set('clerkIdentity' as never, {
         clerkUserId: 'user_pre_graph',
         verifiedEmail: 'newuser@example.com',
@@ -1721,8 +1722,19 @@ describe('[CUT-B1] GET /subscription/status v2 pre-graph (graphless owner)', () 
     const body = await res.json();
     expect(body.status.tier).toBe('free');
     expect(body.status.status).toBe('trial');
+    expect(body.status.billingAccess).toBe('current');
     // Must short-circuit before any account-scoped DB/KV read.
     expect(mockGetSubscriptionByAccountId).not.toHaveBeenCalled();
+  });
+
+  it('[CUT-B1] returns 401 (not 200) when flag off — confirms the branch is flag-gated', async () => {
+    const res = await makePreGraphApp().request(
+      '/subscription/status',
+      {},
+      { IDENTITY_V2_ENABLED: 'false' },
+    );
+    // Flag off → falls through to requireAccount() → 401 (no account set).
+    expect(res.status).toBe(401);
   });
 });
 
