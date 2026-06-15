@@ -29,7 +29,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq } from 'drizzle-orm';
-import { curriculumTopics, person, type Database } from '@eduagent/database';
+import { person, type Database } from '@eduagent/database';
 import type { ChildTopicSnapshot } from '@eduagent/schemas';
 import { ForbiddenError } from '../../errors';
 import { hashTopicDescription, sourceAgeBracket } from '../family-bridge';
@@ -103,12 +103,18 @@ export async function getChargeSubjectsForGuardianV2(
     chargePersonId,
   );
 
-  // Ownership join via the canonical helper, scoped to the charge's subjects.
+  // Single ownership-scoped read via the canonical helper (the parent-chain
+  // pattern: subjects.profileId in the WHERE). Surfaces the topic, subject, book,
+  // description, and estimatedMinutes — no second, unscoped topic read.
   const owned = await findOwnedCurriculumTopic(db, {
     profileId: chargePersonId,
     topicId,
   });
   if (!owned) return null;
+  // curriculumTopics.description is NOT NULL at the schema level; the helper
+  // types it loosely (string | null). A null here would mean a schema invariant
+  // broke — treat as not-found rather than emit a null description.
+  if (owned.topicDescription === null) return null;
 
   // Charge identity (display name + birth date) — plain person read by id.
   const charge = await db.query.person.findFirst({
@@ -116,14 +122,6 @@ export async function getChargeSubjectsForGuardianV2(
     columns: { displayName: true, birthDate: true },
   });
   if (!charge) return null;
-
-  // estimatedMinutes is not on the helper's return shape; plain topic read by id
-  // (already ownership-verified above). curriculumTopics.description is NOT NULL.
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, topicId),
-    columns: { estimatedMinutes: true, description: true },
-  });
-  if (!topic) return null;
 
   return {
     childProfileId: chargePersonId,
@@ -133,12 +131,17 @@ export async function getChargeSubjectsForGuardianV2(
     bookTitle: owned.bookTitle,
     bookAuthor: null,
     topicTitle: owned.topicTitle,
-    topicDescription: topic.description,
+    topicDescription: owned.topicDescription,
     topicDescriptionHash: hashTopicDescription(
       owned.topicTitle,
-      topic.description,
+      owned.topicDescription,
     ),
-    estimatedMinutes: topic.estimatedMinutes,
-    sourceAgeBracket: sourceAgeBracket(Number(charge.birthDate.slice(0, 4))),
+    estimatedMinutes: owned.topicEstimatedMinutes,
+    // person.birthDate is a Drizzle `date` column; the Neon driver can surface it
+    // as a string OR a Date. new Date(...).getUTCFullYear() is correct for both
+    // (Date(Date) is identity; Date('YYYY-MM-DD') parses) — no `.slice` on Date.
+    sourceAgeBracket: sourceAgeBracket(
+      new Date(charge.birthDate).getUTCFullYear(),
+    ),
   };
 }
