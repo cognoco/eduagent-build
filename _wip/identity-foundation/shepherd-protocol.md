@@ -30,9 +30,9 @@ verdicts. You orchestrate; **you do not write production code yourself.**
   `executor-protocol-example.md`): identity + scope → *point at* executor-protocol.md +
   AGENTS.md → *point at* the WI's substance (Cosmo page, plan block, finding rows) → lane
   context → report-back boundaries. The brief points; it does not re-derive process.
-- **Reviewer — a SEPARATE session (currently Codex):** owns the review watcher, polls all
-  workstreams for `Stage=Reviewing`, and runs `/cosmo:review` (+ `/cosmo:qa`). It is **not
-  you** and will **not** notify you of its verdict.
+- **Reviewer — a SEPARATE session (currently Codex; scaffold `reviewer-protocol.md`):** owns the
+  review watcher, polls all workstreams for `Stage=Reviewing`, and runs `/cosmo:review` (+
+  `/cosmo:qa`). It is **not you** and will **not** notify you of its verdict.
 
 ## Dispatch — model & effort
 Dispatch executors on **Sonnet, standard effort** by default (reserve Opus for your own
