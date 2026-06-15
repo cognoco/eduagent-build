@@ -48,7 +48,9 @@ import {
   curriculumTopics,
   createScopedRepository,
   learningSessions,
+  membership,
   memoryFacts,
+  person,
   profiles,
   retentionCards,
   sessionEvents,
@@ -81,6 +83,7 @@ import {
 import { runDedupForProfile } from '../../services/memory/dedup-pass';
 import {
   ensureFreeSubscription,
+  ensureFreeSubscriptionV2,
   decrementQuota,
   safeRefundQuota,
   getQuotaPool,
@@ -1783,29 +1786,63 @@ export const sessionCompleted = inngest.createFunction(
         const db = getStepDatabase();
         // i18n Phase 1 — thread conversation_language to the homework
         // summary LLM so the parent-facing card matches the learner locale.
-        // Also fetch accountId so we can gate this LLM call on quota.
-        const [homeworkProfile] = await db
-          .select({
-            conversationLanguage: profiles.conversationLanguage,
-            accountId: profiles.accountId,
-          })
-          .from(profiles)
-          .where(eq(profiles.id, profileId))
-          .limit(1);
+        // Also fetch subscription anchor so we can gate this LLM call on quota.
+        // [WI-784] v2 twin: under IDENTITY_V2_ENABLED read person +
+        // membership (no profiles.accountId which was dropped 2026-06-14).
+        // Legacy path (flag-off) is byte-identical.
+        const identityV2 = isIdentityV2EnabledInStep();
+        let homeworkProfile:
+          | { conversationLanguage: string | null }
+          | undefined;
+        let homeworkOrganizationId: string | undefined;
+        if (identityV2) {
+          const [personRow] = await db
+            .select({ conversationLanguage: person.conversationLanguage })
+            .from(person)
+            .where(eq(person.id, profileId))
+            .limit(1);
+          homeworkProfile = personRow;
+          if (personRow) {
+            // person → membership(org) resolution. No orderBy: this mirrors the
+            // canonical v2 resolver `organizationOfPerson` in billing-v2/family-v2.ts
+            // (and every other person→org site in identity-v2/), which all rely on
+            // the single-membership-per-person assumption the cutover seeds. The
+            // membership_person_org_unique index only bars duplicate (person,org)
+            // pairs, so if multi-org membership is ever introduced this — and the
+            // shared resolver — must gain a deterministic orderBy together; pinning
+            // only this site would diverge from the established pattern.
+            const membershipRow = await db.query.membership.findFirst({
+              where: eq(membership.personId, profileId),
+              columns: { organizationId: true },
+            });
+            homeworkOrganizationId = membershipRow?.organizationId;
+          }
+        } else {
+          const [profileRow] = await db
+            .select({
+              conversationLanguage: profiles.conversationLanguage,
+              accountId: profiles.accountId,
+            })
+            .from(profiles)
+            .where(eq(profiles.id, profileId))
+            .limit(1);
+          homeworkProfile = profileRow;
+          homeworkOrganizationId = profileRow?.accountId ?? undefined;
+        }
 
         // Route through the metered wrapper. The HTTP middleware
         // cannot gate Inngest steps, so we call decrementQuota directly.
-        // ensureFreeSubscription is idempotent — it returns the existing row
-        // for users who already have a subscription.
+        // ensureFreeSubscription / ensureFreeSubscriptionV2 are idempotent —
+        // they return the existing row for users who already have a subscription.
         if (!homeworkProfile) {
-          // Hard-stop: profile row required to resolve subscription/language/
-          // accountId. Throw reaches step.run so Inngest retries (handles
-          // transient replication lag). captureException fires here (not via
-          // runIsolated catch) so it is recorded on every retry attempt.
-          // safeSend emits a structured event to satisfy the billing
+          // Hard-stop: person/profile row required to resolve
+          // subscription anchor + language. Throw reaches step.run so Inngest
+          // retries (handles transient replication lag). captureException fires
+          // here (not via runIsolated catch) so it is recorded on every retry
+          // attempt. safeSend emits a structured event to satisfy the billing
           // silent-recovery ban (AGENTS.md: bare warn is not enough).
           const missingProfileErr = new Error(
-            '[billing] homework-summary: profile row missing — cannot resolve subscription/language/accountId',
+            '[billing] homework-summary: person/profile row missing — cannot resolve subscription/language',
           );
           logger.warn(
             '[metering] homework-summary: profile row missing, step will retry',
@@ -1832,15 +1869,42 @@ export const sessionCompleted = inngest.createFunction(
           throw missingProfileErr;
         }
 
-        return runIsolated('extract-homework-summary', profileId, async () => {
-          const subscription = await ensureFreeSubscription(
-            db,
-            homeworkProfile.accountId,
+        // [WI-784] Hard-stop: under IDENTITY_V2_ENABLED, organizationId comes
+        // from membership.findFirst — if membership hasn't replicated yet, it is
+        // undefined here. This guard is OUTSIDE runIsolated (same as the profile
+        // check above) so a missing membership throws to step.run and Inngest
+        // retries, absorbing transient replication lag instead of permanently
+        // recording a 'failed' soft step. In the legacy path this cannot be
+        // undefined (profiles.accountId is a required column).
+        if (!homeworkOrganizationId) {
+          const missingOrgErr = new Error(
+            '[billing] homework-summary: organization/account id missing — membership not yet replicated',
           );
+          logger.warn(
+            '[metering] homework-summary: organizationId missing, step will retry',
+            {
+              event: 'metering.homework_summary.org_missing',
+              profileId,
+              identityV2,
+            },
+          );
+          sentry.captureException(missingOrgErr, { profileId });
+          throw missingOrgErr;
+        }
+
+        return runIsolated('extract-homework-summary', profileId, async () => {
+          // [WI-784] v2 twin: ensureFreeSubscriptionV2 reads the v2
+          // `subscription` table keyed by organizationId; legacy path reads
+          // `subscriptions` via accountId. decrementQuota / safeRefundQuota
+          // already accept identityV2 to select the v2 ownership cross-check.
+          const subscription = identityV2
+            ? await ensureFreeSubscriptionV2(db, homeworkOrganizationId)
+            : await ensureFreeSubscription(db, homeworkOrganizationId);
           const decrementResult = await decrementQuota(
             db,
             subscription.id,
             profileId,
+            identityV2,
           );
           if (!decrementResult.success) {
             // [C7] profile_mismatch is a data-integrity anomaly (the profileId
@@ -1948,6 +2012,7 @@ export const sessionCompleted = inngest.createFunction(
                   : undefined,
               quotaModel: decrementResult.quotaModel,
               topUpCreditId: decrementResult.topUpCreditId,
+              identityV2,
             });
             throw err;
           }
