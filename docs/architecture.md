@@ -1299,15 +1299,15 @@ When adding a new LLM flow, check whether it should receive any of these inputs.
 
 Use the eval harness to validate prompt changes before shipping: run baseline → make change → re-run → diff snapshots.
 
-**Activity Ledger — Narration and Moment Substrate (`MMT-ADR-0022`):**
+**Activity Feed — Derived Moments + Seen-State (`MMT-ADR-0022`):**
 
-`mentor_activity_ledger` is the append-only, profile-keyed table that records durable learner moments (session filing, topic mastery, retention due, recap readiness, snapshot readiness) for deterministic feed ranking and GDPR-timer narration. Key rules:
+The learner-home `/now` feed shows recent notable moments (e.g. "you filed a session"). Moments are **derived on read** — the feed queries operational tables (sessions, `retention_cards`, assessments) at request time and ranks them; it does not depend on a materialized log. Key rules:
 
-- **Template-first, no LLM per row.** Each row stores a stable `kind`, `templateKey`, and JSON `params`; rendering resolves copy from templates. The system does not call an LLM per ledger row by default — the `/now` feed must be deterministic and cheap.
-- **Non-core writes (`safeWrite` posture).** The ledger writer wraps `safeWrite` from `safe-non-core.ts` — a failed insert is captured in Sentry but never throws and never breaks the primary job or request that produced the moment. Bare `inngest.send(...)` is reserved for core flows; ledger writes are always non-core.
-- **S0 keyed by `profileId`; S4 repoints to `personId` + adds `edgeId`.** The column is repointed from `profile_id → person_id` (FK to `person.id`) after the identity-foundation W1 baseline lands; `edge_id` (nullable FK to `supportership.id`) is added in the same migration. Until then, all ledger reads are `profileId`-scoped.
-- **Additive schema** — new moment kinds (`LedgerKind`) are app-level contract changes (schema + code), not database migrations, because `kind` and `templateKey` are text validated by `@eduagent/schemas`.
-- **Load-bearing for GDPR-timer narration.** Deletion, retention, and consent countdowns use the ledger's stable row-backed event history rather than reconstructing user-visible moments from scattered operational tables or re-running LLM summaries.
+- **Derive-on-read is the default.** A new moment kind adds a read-time projection, not a new materialized writer. (The feed already derives `retention_due` live from `retention_cards`.)
+- **`mentor_activity_ledger` is a narrow seen-state store**, not an event-of-record: it tracks `surfaced_at` so a moment is shown approximately once, plus the rare moment that is genuinely not reconstructable from operational state.
+- **Non-core writes (`safeWrite` posture).** The residual writes wrap `safeWrite` from `safe-non-core.ts` — a failed insert is captured in Sentry but never throws and never breaks the primary job. This is correct: the table is a cosmetic display aid, not authoritative, so a dropped row costs at most one lowest-priority card.
+- **Self-only visibility.** A moment is shown only to the profile it concerns (profile scope + RLS). There is no per-row visibility flag; cross-user sharing, if ever built, is a read-time relationship-derived policy (visibility-contract), never a stored column.
+- **Not a compliance substrate.** The feed is not load-bearing for GDPR-timer / deletion / retention / consent narration; those derive from their own authoritative sources.
 
 Decision rationale: `docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md`.
 
