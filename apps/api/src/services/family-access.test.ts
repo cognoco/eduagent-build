@@ -1,10 +1,14 @@
 // ---------------------------------------------------------------------------
-// family-access.test.ts — BUG-746 / T-10
+// family-access.test.ts — BUG-746 / T-10 / WI-786
 //
 // hasParentAccess and assertParentAccess are the IDOR guard for ALL
 // parent-scoped routes. This file provides direct unit coverage so that
 // a logic regression (e.g. `and` flipped to `or`, wrong column name)
 // cannot hide behind mocked call sites.
+//
+// WI-786 adds v2 dispatch coverage: flag-on routes to the guardianship
+// table, flag-off keeps the legacy family_links path. The dispatch tests
+// mirror the pattern from family-bridge.test.ts.
 //
 // Break tests (lines marked [BREAK]) must fail on the pre-fix code if the
 // implementation is broken and pass with correct implementation.
@@ -143,6 +147,84 @@ describe('assertParentAccess', () => {
 // (profile.ts) at the 18 boundary. A local getFullYear() could disagree by a
 // year depending on host timezone. We pin the boundary using birthYear math
 // derived from the same UTC year the SUT uses, so the test is timezone-stable.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// WI-786 — v2 dispatch coverage (flag-on reads guardianship, flag-off reads
+// family_links). Mirrors the pattern in family-bridge.test.ts.
+// ---------------------------------------------------------------------------
+
+describe('hasParentAccess / assertParentAccess v2 dispatch (WI-786)', () => {
+  /**
+   * A Database stub that exposes BOTH the legacy `familyLinks.findFirst` and
+   * the v2 `guardianship.findFirst` so the dispatch tests can assert which
+   * table the guard touched. Both findFirst stubs return undefined (no link /
+   * no edge), so the guard returns false / throws — what matters is WHICH one
+   * was invoked.
+   */
+  function makeDispatchDb(): {
+    db: Database;
+    familyLinksFindFirst: jest.Mock;
+    guardianshipFindFirst: jest.Mock;
+  } {
+    const familyLinksFindFirst = jest.fn().mockResolvedValue(undefined);
+    const guardianshipFindFirst = jest.fn().mockResolvedValue(undefined);
+    const db = {
+      query: {
+        familyLinks: { findFirst: familyLinksFindFirst },
+        guardianship: { findFirst: guardianshipFindFirst },
+      },
+    } as unknown as Database;
+    return { db, familyLinksFindFirst, guardianshipFindFirst };
+  }
+
+  it('[WI-786] flag-off: hasParentAccess reads familyLinks, never guardianship', async () => {
+    const { db, familyLinksFindFirst, guardianshipFindFirst } =
+      makeDispatchDb();
+
+    await hasParentAccess(db, PARENT_ID, CHILD_ID);
+
+    expect(familyLinksFindFirst).toHaveBeenCalledTimes(1);
+    expect(guardianshipFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('[WI-786] flag-on: hasParentAccess reads guardianship, never familyLinks', async () => {
+    const { db, familyLinksFindFirst, guardianshipFindFirst } =
+      makeDispatchDb();
+
+    await hasParentAccess(db, PARENT_ID, CHILD_ID, { identityV2Enabled: true });
+
+    expect(guardianshipFindFirst).toHaveBeenCalledTimes(1);
+    expect(familyLinksFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('[WI-786] flag-off: assertParentAccess reads familyLinks, never guardianship', async () => {
+    const { db, familyLinksFindFirst, guardianshipFindFirst } =
+      makeDispatchDb();
+
+    // No link → throws ForbiddenError (expected). The assertion is which read ran.
+    await expect(assertParentAccess(db, PARENT_ID, CHILD_ID)).rejects.toThrow(
+      ForbiddenError,
+    );
+
+    expect(familyLinksFindFirst).toHaveBeenCalledTimes(1);
+    expect(guardianshipFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('[WI-786] flag-on: assertParentAccess reads guardianship, never familyLinks', async () => {
+    const { db, familyLinksFindFirst, guardianshipFindFirst } =
+      makeDispatchDb();
+
+    // No active edge → throws ForbiddenError (expected). Asserts v2 guard ran.
+    await expect(
+      assertParentAccess(db, PARENT_ID, CHILD_ID, { identityV2Enabled: true }),
+    ).rejects.toThrow(ForbiddenError);
+
+    expect(guardianshipFindFirst).toHaveBeenCalledTimes(1);
+    expect(familyLinksFindFirst).not.toHaveBeenCalled();
+  });
+});
+
 // ---------------------------------------------------------------------------
 
 describe('assertCanManageOwnConsent', () => {

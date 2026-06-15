@@ -11,6 +11,10 @@ import { ForbiddenError } from '../errors';
 import { calculateAge } from './age-utils';
 import type { Context, Env, Input } from 'hono';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import {
+  validateGuardianshipEdgeV2,
+  validateGuardianChargeRelationshipV2,
+} from './identity-v2/family-bridge-v2';
 
 type ProfileMetaContextEnv = Env & {
   Variables: {
@@ -19,15 +23,22 @@ type ProfileMetaContextEnv = Env & {
 };
 
 /**
- * Returns true if the authenticated parent profile has a family link to the
- * given child profile. Used by parent-only routes to guard cross-family
- * access (IDOR protection).
+ * Returns true if the authenticated parent profile has authority over the
+ * given child profile. Under `opts.identityV2Enabled`, delegates to the v2
+ * guardianship edge (`revoked_at IS NULL`) instead of reading legacy
+ * `family_links`. The boolean form for callers that branch on access.
+ *
+ * [WI-786] v2 seam: flag-on reads `guardianship`, flag-off reads `family_links`.
  */
 export async function hasParentAccess(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<boolean> {
+  if (opts?.identityV2Enabled) {
+    return validateGuardianshipEdgeV2(db, parentProfileId, childProfileId);
+  }
   const link = await db.query.familyLinks.findFirst({
     where: and(
       eq(familyLinks.parentProfileId, parentProfileId),
@@ -38,16 +49,27 @@ export async function hasParentAccess(
 }
 
 /**
- * Throws `ForbiddenError` when `parentProfileId` has no family link to
+ * Throws `ForbiddenError` when `parentProfileId` has no authority over
  * `childProfileId`. Preferred over the return-type pattern because a missing
  * check is a compile-time error (unused variable) or runtime crash, not a
  * silent access bypass.
+ *
+ * [WI-786] v2 seam: flag-on delegates to `validateGuardianChargeRelationshipV2`
+ * (guardianship edge), flag-off reads legacy `family_links`.
  */
 export async function assertParentAccess(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
+  if (opts?.identityV2Enabled) {
+    return validateGuardianChargeRelationshipV2(
+      db,
+      parentProfileId,
+      childProfileId,
+    );
+  }
   if (!(await hasParentAccess(db, parentProfileId, childProfileId))) {
     throw new ForbiddenError('You do not have access to this child profile.');
   }
@@ -132,6 +154,7 @@ export async function assertOwnerAndParentAccess<
   db: Database,
   parentProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
   const profileMeta = c.get('profileMeta');
   if (profileMeta?.isOwner !== true) {
@@ -139,7 +162,7 @@ export async function assertOwnerAndParentAccess<
       'Only the account owner can perform administrative actions on child profiles.',
     );
   }
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
 }
 
 export function assertOwnerProfile<
