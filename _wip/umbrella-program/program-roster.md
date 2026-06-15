@@ -48,7 +48,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 ## Active
 
-### PRG-01 · Identity Foundation runway — `active`
+### PRG-01 · Identity Foundation runway — `graduated` (2026-06-15)
 - **Outcome:** clean-cut replacement of eduagent's identity/tenancy/role/consent
   bedrock (8-table schema, 6-persona capability split, policy engine + model
   router, three-axis age model). Pre-launch: build direct, re-seed, delete legacy
@@ -84,6 +84,13 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   Neon PITR marker as recovery). **G5 ("tail done") = unchanged as the
   exported boundary node, later in time.** Live state: Cosmo +
   `execution-tracker.md` §5; this is a pointer.
+- **GRADUATED 2026-06-15 — foundation build complete; cutover completion handed to PRG-06.**
+  Per the code-half organization ruling (B), the cutover *completion* (WI-586 + its 2
+  sub-items) emigrated to **PRG-06 (Identity Cutover)**; PRG-01 graduated on its residual
+  **foundation-build** scope. WS-9 open-WI audit clean (**52/52 Closed**) → Cosmo Workstream
+  `Status=Closed`. Note: the original "delete legacy" outcome is now delivered by **PRG-06**,
+  not here. Tracker `_wip/identity-foundation/execution-tracker.md` is the IF build's
+  historical record.
 - **Activate-when:** — (active)
 
 ### PRG-02 · Harness Hygiene — `graduated` (2026-06-11)
@@ -209,6 +216,25 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   Spike status tracked in the design-input doc. *(The pre-slice design phase is
   itself dogfood for PRG-04 — §2.1 has no design-activation altitude.)*
 - **Activate-when:** — (design-active 2026-06-13; execution activation = post-grill slice).
+
+### PRG-06 · Identity Cutover — `active` (stood up 2026-06-15; shepherd launch GATED)
+- **Outcome:** app reads/writes the new identity model end-to-end **per canon** (S0–S6
+  reconciled, not inherited); `IDENTITY_V2_ENABLED` removed; full unit + 51 integration
+  suites green; corrected staging→prod cutover re-run; **WI-586 closed**.
+- **Why:** WI-586 always assumed a code half delivered by the parallel **S0–S6
+  mentor-is-the-app** track; the staging cutover proved S0–S3 was **not aligned to canon /
+  the to-be data model** (post-drop reads 500). There was no 586 code half — this is it.
+- **Owner:** Jorn (+ PRG-06 shepherd session, operator-launched; separate reviewer closes).
+- **Canon authority:** **canon wins; S0–S6 design choices NOT canonical.** Reconcile *to*
+  canon, do not inherit S0–S6.
+- **Decomposition:** `_wip/identity-cutover/execution-tracker.md` (charter / canon authority /
+  slice / launch gate) + parked `shepherd-kickoff.md`. Cosmo **Workstream "Identity Cutover"**
+  (`3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`) with **WP-1** (enumerate the breaking reader/writer
+  set, `Stage=Backlog`, order 1) + **WI-586** (moved in, with its 2 sub-items).
+- **Launch gate:** shepherd NOT launched until **ADR-0020/0021/0022 cleanup operator-confirmed
+  complete** (those three were reverse-engineered from S0–S6; re-vetting in a separate session →
+  trusted canon once done).
+- **Activate-when:** — (active; execution gated on the launch gate above)
 
 ### PRG-10 · API Security & PII — `active` (2026-06-13)
 - **Outcome:** all 27 `security-pii-api` clear-out findings (2026-05-29 full audit)
@@ -524,6 +550,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
 | 12 | **PRG-17** new-llm integration (LLM) | ✓ **GRADUATED 06-13** — fifth graduation (first integration lane); merged `105b39ac0`, deploy green, cutover unlocked |
+| 13 | **PRG-06** Identity Cutover | ✓ **STOOD UP 06-15** — workstream + WP-1 + WI-586 moved in; shepherd launch **gated on ADR-0020/0021/0022 cleanup** (operator-confirmed) → then WP-1 enumeration → code-half WPs → terminal staging/prod cutover → close WI-586 |
 
 Attention budget is evaluated per activation window when a gate clears — it is
 never an edge (planning-reference §5.3/§6.3).
@@ -609,6 +636,19 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-15 — PRG-06 (Identity Cutover) STOOD UP — new Initiative ∥ PRG-01 (organization
+  ruling B).** The WI-586 "code half" — never PRG-01 scope; assumed delivered by the parallel
+  S0–S6 *mentor-is-the-app* track, which the staging cutover proved misaligned to canon
+  (post-drop reads 500) — is now its own managed Initiative. Cosmo **Workstream "Identity
+  Cutover"** (`3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`) created with **WP-1** (breaking-set
+  enumeration, `Stage=Backlog`, order 1; pre-graph 401 fix `de8df6e86` folded in as slice-1);
+  **WI-586 + its 2 sub-items moved in** from "Identity Foundation" (WS-9), WI-586 Blocked-by
+  re-pointed to the code lane + Description corrected. **Standing rules:** canon wins; **S0–S6
+  design choices NOT canonical**; shepherd launch **gated on ADR-0020/0021/0022 cleanup**
+  (reverse-engineered from S0–S6; separate re-vetting session → trusted once done). Tracker
+  `_wip/identity-cutover/execution-tracker.md`; parked kickoff `shepherd-kickoff.md`. **PRG-01
+  GRADUATED** — WS-9 open-WI audit clean (52/52 Closed), Cosmo Workstream `Status=Closed`;
+  PRG-01 graduated on foundation-build scope (cutover/drop completion handed to PRG-06).
 - **2026-06-13 — PRG-11 (architecture) ACTIVATED — seventh §2.1 run; first TIERED
   activation.** Cosmo Workstream "Architecture Clean-Out"
   (`37e8bce9-1f7c-81fe-be97-e063ce8f17e8`). A cutover-coordination scan (sub-agent) split
