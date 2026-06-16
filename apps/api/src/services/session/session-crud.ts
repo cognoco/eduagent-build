@@ -62,6 +62,7 @@ import { deleteTopicIfSafe, persistBookTopics } from '../curriculum';
 import { generateBookTopics } from '../book-generation';
 import { buildFallbackBookTopics } from '../book-generation-fallbacks';
 import { getProfileAge } from '../profile';
+import { getPersonAge } from '../identity-v2/helpers';
 import { computeActiveSeconds } from './session-context-builders';
 import { mapSessionRow } from './session-events';
 import { clearSessionStaticContext } from './session-cache';
@@ -468,6 +469,7 @@ async function materializeFocusedBookTopics(
   profileId: string,
   subjectId: string,
   bookId: string,
+  opts: { identityV2Enabled?: boolean } = {},
 ): Promise<void> {
   const [book] = await db
     .select({
@@ -490,7 +492,9 @@ async function materializeFocusedBookTopics(
     throw new NotFoundError('Book');
   }
 
-  const learnerAge = await getProfileAge(db, profileId);
+  const learnerAge = opts.identityV2Enabled
+    ? await getPersonAge(db, profileId)
+    : await getProfileAge(db, profileId);
   let result: BookTopicGenerationResult;
   try {
     result = await withTimeout(
@@ -862,7 +866,7 @@ export async function startFirstCurriculumSession(
   profileId: string,
   subjectId: string,
   input: FirstCurriculumSessionStartInput,
-  options: { matcherEnabled?: boolean } = {},
+  options: { matcherEnabled?: boolean; identityV2Enabled?: boolean } = {},
 ): Promise<LearningSession> {
   const startedAt = Date.now();
   const deadline = Date.now() + FIRST_CURRICULUM_SESSION_WAIT_MS;
@@ -891,6 +895,7 @@ export async function startFirstCurriculumSession(
         profileId,
         subjectId,
         input.bookId,
+        { identityV2Enabled: options.identityV2Enabled },
       );
       topicId = await sessionCrudDependencies.findFirstAvailableTopicId(
         db,

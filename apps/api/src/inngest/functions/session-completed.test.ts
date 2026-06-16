@@ -51,6 +51,24 @@ const mockSessionCompletedDb = createTransactionalMockDb({
     profiles: {
       findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
     },
+    // [WI-586] Flag-ON identity-v2 reads: under IDENTITY_V2_ENABLED the
+    // displayName / conversationLanguage / billing paths read `person` +
+    // `membership` instead of the dropped `profiles` table. Stub both here so
+    // the base mock resolves the v2 path; makeDbWithPersonV2 inherits these by
+    // spreading this query block.
+    person: {
+      findFirst: jest.fn().mockResolvedValue({
+        displayName: 'Emma',
+        conversationLanguage: 'en',
+        birthYear: 2015,
+        pronouns: null,
+      }),
+    },
+    membership: {
+      findFirst: jest.fn().mockResolvedValue({
+        organizationId: '00000000-0000-4000-8000-000000000088',
+      }),
+    },
     // Snapshot aggregation reads these directly — supply empty results
     // so production code can use db.query.progressSnapshots and
     // db.query.milestones without defensive guards.

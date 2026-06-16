@@ -6,6 +6,7 @@ import { type profiles, type Database } from '@eduagent/database';
 import type { LearningSession } from '@eduagent/schemas';
 import { getSubject } from '../subject';
 import { loadProfileRowById } from '../profile';
+import { loadProfileRowByIdV2 } from '../identity-v2/profile-v2';
 import { fetchPriorTopics } from '../prior-learning';
 import { getTeachingPreference } from '../retention-data';
 import { getLearningModeRecord } from '../settings';
@@ -121,6 +122,13 @@ export async function getSessionStaticContext(
   profileId: string,
   sessionId: string,
   session: LearningSession,
+  // [WI-586] When the identity-v2 flag is on, the profile row is read from the
+  // person/membership store via the byte-identical twin; otherwise from the
+  // legacy `profiles` table. Defaults false so non-flag-threaded callers keep
+  // legacy behavior. The flag is stable per session, so caching the resolved row
+  // under (profileId, sessionId) is safe — the cold-populator (prepareExchangeContext)
+  // passes the request's flag; warm hits reuse it.
+  identityV2Enabled = false,
 ): Promise<SessionStaticContextCacheEntry> {
   const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const now = Date.now();
@@ -139,7 +147,9 @@ export async function getSessionStaticContext(
 
   const [subject, profile] = await Promise.all([
     getSubject(db, profileId, session.subjectId),
-    loadProfileRowById(db, profileId),
+    identityV2Enabled
+      ? loadProfileRowByIdV2(db, profileId)
+      : loadProfileRowById(db, profileId),
   ]);
 
   const entry: SessionStaticContextCacheEntry = {
@@ -165,6 +175,7 @@ export async function getCachedHomeworkLibraryContext(
   profileId: string,
   sessionId: string,
   session: LearningSession,
+  identityV2Enabled = false,
 ): Promise<string | undefined> {
   const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const entry = await getSessionStaticContext(
@@ -172,6 +183,7 @@ export async function getCachedHomeworkLibraryContext(
     profileId,
     sessionId,
     session,
+    identityV2Enabled,
   );
 
   if (entry.homeworkLibraryContextLoaded) {
@@ -195,6 +207,7 @@ export async function getCachedBookLearningHistoryContext(
   session: LearningSession,
   currentTopicId: string,
   bookId: string,
+  identityV2Enabled = false,
 ): Promise<string | undefined> {
   const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const entry = await getSessionStaticContext(
@@ -202,6 +215,7 @@ export async function getCachedBookLearningHistoryContext(
     profileId,
     sessionId,
     session,
+    identityV2Enabled,
   );
   const historyKey = `${bookId}:${currentTopicId}`;
 

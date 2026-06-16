@@ -18,7 +18,10 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import { findReferenceOnlyMigrations } from './check-reference-only-migrations.mjs';
+import {
+  findReferenceOnlyMigrations,
+  findFreezeOnlyMigrations,
+} from './check-reference-only-migrations.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -177,4 +180,63 @@ test('flags when @reference-only is on the very first line (synthetic)', () => {
 test('empty journal produces no blocked migrations', () => {
   const blocked = findReferenceOnlyMigrations({ entries: [] }, () => '');
   assert.deepStrictEqual(blocked, []);
+});
+
+// ---------------------------------------------------------------------------
+// Freeze-only marker (WI-586) — findFreezeOnlyMigrations
+// ---------------------------------------------------------------------------
+
+test('flags a migration whose first line carries the @freeze-only marker (synthetic)', () => {
+  const journal = fakeJournal('fake_freeze');
+  const sql = [
+    '-- @freeze-only',
+    '-- M-DROP — operator-run inside the cutover freeze',
+    'DROP TABLE legacy;',
+  ].join('\n');
+
+  const blocked = findFreezeOnlyMigrations(journal, () => sql);
+
+  assert.deepStrictEqual(blocked, ['fake_freeze']);
+});
+
+test('does not flag @freeze-only when it appears in the body but not the first line', () => {
+  const journal = fakeJournal('fake_freeze_body');
+  const sql = [
+    '-- Normal migration header',
+    '-- see the @freeze-only convention for cutover scripts',
+    'CREATE TABLE foo (id uuid);',
+  ].join('\n');
+
+  const blocked = findFreezeOnlyMigrations(journal, () => sql);
+
+  assert.deepStrictEqual(blocked, []);
+});
+
+test('@reference-only and @freeze-only are independent markers', () => {
+  const journal = fakeJournal('ref', 'freeze');
+  const byTag = {
+    ref: '-- @reference-only\nCREATE TABLE a (id uuid);',
+    freeze: '-- @freeze-only\nDROP TABLE b;',
+  };
+  const read = (tag) => byTag[tag];
+
+  assert.deepStrictEqual(findReferenceOnlyMigrations(journal, read), ['ref']);
+  assert.deepStrictEqual(findFreezeOnlyMigrations(journal, read), ['freeze']);
+});
+
+// Real-journal test: after TASK A de-journaled 0117/0118, the actual journal
+// must carry ZERO freeze-only migrations (they were relocated to
+// drizzle/_freeze-only/ and removed from meta/_journal.json).
+test('real journal (post-de-journal): no freeze-only migrations present', () => {
+  const journal = JSON.parse(readFileSync(journalPath, 'utf8'));
+
+  const blocked = findFreezeOnlyMigrations(journal, (tag) =>
+    readFileSync(path.join(drizzleDir, `${tag}.sql`), 'utf8'),
+  );
+
+  assert.deepStrictEqual(
+    blocked,
+    [],
+    `Real journal must have no freeze-only migrations after TASK A. Got: ${blocked.join(', ')}`,
+  );
 });

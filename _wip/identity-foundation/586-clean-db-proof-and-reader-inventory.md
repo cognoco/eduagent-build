@@ -55,9 +55,20 @@ table in `apps/api/src`. Buckets:
 
 Static audit of every non-test reader/writer of `profiles`/`accounts`/
 `family_links`/`consent_states` in `apps/api/src`. ~93 sites. Buckets:
-- **(G) FLAG-GATED-SAFE** — 84 sites. Legacy read sits in a flag-off else-branch
-  / ternary; flag-on never reaches it. (Includes notifications, dashboard,
-  consent, profile-scope middleware, billing, most Inngest functions.)
+- **(G) FLAG-GATED-SAFE** — **~79 sites** [was: 84]. Legacy read sits in a
+  flag-off else-branch / ternary; flag-on never reaches it. (Includes
+  notifications, dashboard, consent, profile-scope middleware, billing, most
+  Inngest functions.)
+  - **CORRECTION (WI-586, ic-orch-068 thorough re-audit):** 5 of the original 84
+    were MISCLASSIFIED — they were ungated legacy reads on live-prod paths that
+    would 500 the moment flip #8 sets `IDENTITY_V2_ENABLED=true`, not flag-gated.
+    All 5 are now genuinely flag-gated (fixed IN 586, each with a flag-on→v2 /
+    flag-off→legacy non-vacuous test): MISS 1 `loadProfileRowById`
+    (`session-cache.ts:142`, hottest exchange path → authored `loadProfileRowByIdV2`);
+    MISS 2 `getProfileAgeBracket` (`routes/sessions.ts` evaluate-depth → authored
+    `getPersonAgeBracket`); MISS 3 `getProfileAge` (`routes/books.ts` ×2 +
+    `curriculum.ts`); MISS 4 `getProfileAge` (`session-crud.ts` materialize);
+    MISS 5 `getProfileAge` (`subject.ts`). The remaining ~79 are genuine.
 - **(T) UNGUARDED, v2-twin-exists** — 1 site (T1 `POST /profiles/switch` →
   `profile.ts:817`; twin `getPersonScope`).
 - **(C) FLIP-CRITICAL, unguarded** — **7 distinct paths that 500 in production

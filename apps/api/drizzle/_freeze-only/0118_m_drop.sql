@@ -1,3 +1,4 @@
+-- @freeze-only
 -- =============================================================================
 -- M-DROP — drop 4 legacy identity tables + their 3 orphaned enum types.
 -- WI-586 convergence runbook §4 step 8 (AFTER the flip + 24h soak; the final,

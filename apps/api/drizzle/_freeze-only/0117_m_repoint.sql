@@ -1,3 +1,4 @@
+-- @freeze-only
 -- =============================================================================
 -- M-REPOINT — re-point every live FK off the legacy identity tables onto the
 -- new-model parents. WI-586 convergence runbook §4 step 6 (INSIDE the freeze

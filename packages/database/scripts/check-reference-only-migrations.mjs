@@ -61,6 +61,58 @@ function isReferenceOnly(sql) {
 }
 
 /**
+ * Freeze-only marker (WI-586).
+ * -------------------------------------------------------------------------
+ * A FREEZE-ONLY migration is a real, apply-able migration that must NOT be
+ * auto-applied by `drizzle-kit migrate` on the normal push→main deploy. It is
+ * run by an operator, out-of-band, inside a cutover freeze window (e.g.
+ * `psql -f`), in a deliberate sequence. The canonical example is the WI-586
+ * identity-cutover pair (M-REPOINT / M-DROP): auto-applying them out of
+ * sequence would DROP live tables pre-flip — an irreversible prod outage.
+ *
+ * These files therefore live OUT of the auto-apply `drizzle/` dir (relocated to
+ * `drizzle/_freeze-only/`) and are NOT journaled. This guard is the durable
+ * backstop for the failure class: if a freeze-only migration is ever (wrongly)
+ * re-journaled, the deploy refuses to migrate UNLESS the operator sets the
+ * explicit freeze signal `ALLOW_FREEZE_MIGRATIONS=true` for that run.
+ *
+ * Detection is the same STRUCTURED FIRST-LINE rule as @reference-only:
+ *
+ *   -- @freeze-only
+ *
+ * Difference in semantics: @reference-only is an UNCONDITIONAL block (never
+ * apply); @freeze-only is a CONDITIONAL block (apply only under the explicit
+ * freeze signal).
+ *
+ * @param {string} sql
+ * @returns {boolean}
+ */
+function isFreezeOnly(sql) {
+  const firstLine = sql.split('\n')[0].trim();
+  return firstLine.toLowerCase() === '-- @freeze-only';
+}
+
+/**
+ * Pure scan: the freeze-only counterpart of {@link findReferenceOnlyMigrations}.
+ * Returns the journaled tags whose SQL carries `-- @freeze-only` on its first
+ * line. Exported for unit testing.
+ *
+ * @param {{ entries: Array<{ tag: string }> }} journal
+ * @param {(tag: string) => string} readSql
+ * @returns {string[]}
+ */
+export function findFreezeOnlyMigrations(journal, readSql) {
+  const blocked = [];
+  for (const entry of journal.entries ?? []) {
+    const sql = readSql(entry.tag);
+    if (isFreezeOnly(sql)) {
+      blocked.push(entry.tag);
+    }
+  }
+  return blocked;
+}
+
+/**
  * Pure scan: given the journal entries and a reader that returns each
  * migration's SQL text by tag, return the tags whose SQL carries the
  * structured reference-only marker on its first line. Exported for unit testing.
@@ -102,9 +154,45 @@ function main() {
   const journalPath = join(drizzleDir, 'meta', '_journal.json');
 
   const journal = JSON.parse(readFileSync(journalPath, 'utf8'));
-  const blocked = findReferenceOnlyMigrations(journal, (tag) =>
-    readFileSync(join(drizzleDir, `${tag}.sql`), 'utf8'),
-  );
+  const readSql = (tag) => readFileSync(join(drizzleDir, `${tag}.sql`), 'utf8');
+
+  // --- Freeze-only gate (WI-586) ----------------------------------------
+  // A journaled freeze-only migration is blocked UNLESS the operator sets the
+  // explicit freeze signal for this run. This is the durable backstop against
+  // re-journaling a cutover-freeze migration (M-REPOINT / M-DROP) into the
+  // auto-apply chain.
+  const frozen = findFreezeOnlyMigrations(journal, readSql);
+  const freezeSignal = process.env.ALLOW_FREEZE_MIGRATIONS === 'true';
+  if (frozen.length > 0 && !freezeSignal) {
+    console.error(
+      [
+        '',
+        '✗ Refusing to run drizzle-kit migrate against a live environment.',
+        '',
+        'The following journaled migrations are marked FREEZE-ONLY (`-- @freeze-only`):',
+        '',
+        ...frozen.map((tag) => `    • ${tag}`),
+        '',
+        'Freeze-only migrations are operator-run, out-of-band, inside a cutover',
+        'freeze window (e.g. `psql -f`), never auto-applied by this deploy. They',
+        'should live in apps/api/drizzle/_freeze-only/ and stay OUT of the journal.',
+        'If a freeze run is genuinely intended, re-run with the explicit signal:',
+        '',
+        '    ALLOW_FREEZE_MIGRATIONS=true',
+        '',
+        'Otherwise remove them from meta/_journal.json (see WI-586 / ic-orch-069).',
+        '',
+      ].join('\n'),
+    );
+    process.exit(1);
+  }
+  if (frozen.length > 0 && freezeSignal) {
+    console.warn(
+      `⚠ ALLOW_FREEZE_MIGRATIONS=true — permitting ${frozen.length} freeze-only migration(s): ${frozen.join(', ')}`,
+    );
+  }
+
+  const blocked = findReferenceOnlyMigrations(journal, readSql);
 
   if (blocked.length === 0) {
     console.log(

@@ -21,12 +21,19 @@ import {
 } from './session-crud';
 import * as llmModule from '../llm';
 import * as sentryModule from '../sentry';
+import * as profileService from '../profile';
+import * as identityV2Helpers from '../identity-v2/helpers';
+import * as bookGeneration from '../book-generation';
+import * as curriculumService from '../curriculum';
 import {
   childSessionSchema,
   MAX_EXCHANGES_PER_SESSION,
   NotFoundError,
 } from '@eduagent/schemas';
-import type { LearningSession } from '@eduagent/schemas';
+import type {
+  LearningSession,
+  BookTopicGenerationResult,
+} from '@eduagent/schemas';
 
 const PROFILE_ID = '00000000-0000-7000-8000-000000000001';
 const SUBJECT_ID = '00000000-0000-7000-8000-000000000002';
@@ -286,6 +293,7 @@ describe('startFirstCurriculumSession topic intent matcher', () => {
       PROFILE_ID,
       SUBJECT_ID,
       BOOK_ID,
+      { identityV2Enabled: undefined },
     );
     expect(findFirstAvailableTopicId).toHaveBeenCalledTimes(2);
     expect(startSession).toHaveBeenCalledWith(
@@ -736,6 +744,149 @@ describe('startFirstCurriculumSession — deadline exhaustion', () => {
       metadata?: { onboardingFastPath?: unknown };
     };
     expect(callArg?.metadata?.onboardingFastPath).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-586] materializeFocusedBookTopics learner-age v2 gating
+// ---------------------------------------------------------------------------
+//
+// materializeFocusedBookTopics resolves the learner age before generating
+// focused-book topics. It must branch between the legacy `getProfileAge` (reads
+// the soon-to-be-dropped `profiles` table) and the v2 `getPersonAge` (reads
+// person/membership) based on the `identityV2Enabled` opt threaded down from
+// the route. After migration 0118 drops `profiles`, the legacy read 500s on
+// live prod, so flag-ON must NOT touch getProfileAge. The flag reaches this
+// private function via startFirstCurriculumSession's `options.identityV2Enabled`
+// → the materialize call site → the 5th `opts` arg, so we drive the real
+// function through startFirstCurriculumSession (only the cross-cut deps are
+// stubbed; materializeFocusedBookTopics itself runs real).
+
+describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
+  let getProfileAgeSpy: jest.SpiedFunction<typeof profileService.getProfileAge>;
+  let getPersonAgeSpy: jest.SpiedFunction<
+    typeof identityV2Helpers.getPersonAge
+  >;
+  let generateBookTopicsSpy: jest.SpiedFunction<
+    typeof bookGeneration.generateBookTopics
+  >;
+  let persistBookTopicsSpy: jest.SpiedFunction<
+    typeof curriculumService.persistBookTopics
+  >;
+
+  // A db whose select chain resolves to a single matching book row, satisfying
+  // the book-lookup inside the real materializeFocusedBookTopics. The same
+  // chainable stub is returned at every step so `.limit(1)` awaits to [book].
+  function makeDb(): never {
+    const bookRow = { id: BOOK_ID, title: 'Algebra', description: 'intro' };
+    const chain: Record<string, unknown> = {};
+    chain.select = jest.fn(() => chain);
+    chain.from = jest.fn(() => chain);
+    chain.innerJoin = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.orderBy = jest.fn(() => chain);
+    chain.limit = jest.fn(async () => [bookRow]);
+    return chain as never;
+  }
+
+  function stubFlowDeps(): void {
+    let topicCallCount = 0;
+    __sessionCrudTestHooks.setDependencies({
+      // First lookup: no topic → fire the materialize branch. After materialize:
+      // a topic so the loop completes via startSession.
+      findFirstAvailableTopicId: jest.fn(async () => {
+        topicCallCount++;
+        return topicCallCount >= 2 ? FALLBACK_TOPIC_ID : undefined;
+      }),
+      loadLatestCompletedDraftSignals: jest.fn(async () => undefined),
+      loadSubjectStructureType: jest.fn(async () => 'focused_book' as const),
+      // materializeFocusedBookTopics intentionally NOT stubbed — the real
+      // function runs so its getProfileAge/getPersonAge branch is exercised.
+      matchTopicByIntent: jest.fn(async () => ({
+        topicId: FALLBACK_TOPIC_ID,
+        selectedTopicId: FALLBACK_TOPIC_ID,
+        confidence: null,
+        fallbackReason: 'flag-off' as const,
+        matcherLatencyMs: 1,
+      })),
+      startSession: jest.fn(
+        async () => ({ id: 'sess-1' }) as unknown as LearningSession,
+      ),
+    });
+  }
+
+  beforeEach(() => {
+    stubFlowDeps();
+    getProfileAgeSpy = jest
+      .spyOn(profileService, 'getProfileAge')
+      .mockResolvedValue(12);
+    getPersonAgeSpy = jest
+      .spyOn(identityV2Helpers, 'getPersonAge')
+      .mockResolvedValue(12);
+    generateBookTopicsSpy = jest
+      .spyOn(bookGeneration, 'generateBookTopics')
+      .mockResolvedValue({
+        topics: [
+          {
+            title: 'Topic 1',
+            description: 'd',
+            sortOrder: 0,
+          } as unknown as BookTopicGenerationResult['topics'][number],
+        ],
+        connections: [],
+      } as unknown as BookTopicGenerationResult);
+    persistBookTopicsSpy = jest
+      .spyOn(curriculumService, 'persistBookTopics')
+      .mockResolvedValue(undefined as never);
+  });
+
+  afterEach(() => {
+    getProfileAgeSpy.mockRestore();
+    getPersonAgeSpy.mockRestore();
+    generateBookTopicsSpy.mockRestore();
+    persistBookTopicsSpy.mockRestore();
+  });
+
+  it('flag-off (omitted): resolves learner age via legacy getProfileAge, never getPersonAge', async () => {
+    await startFirstCurriculumSession(
+      makeDb(),
+      PROFILE_ID,
+      SUBJECT_ID,
+      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+      { matcherEnabled: false },
+    );
+    expect(getProfileAgeSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+    );
+    expect(getPersonAgeSpy).not.toHaveBeenCalled();
+  });
+
+  it('flag-off (explicit false): resolves learner age via legacy getProfileAge, never getPersonAge', async () => {
+    await startFirstCurriculumSession(
+      makeDb(),
+      PROFILE_ID,
+      SUBJECT_ID,
+      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+      { matcherEnabled: false, identityV2Enabled: false },
+    );
+    expect(getProfileAgeSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+    );
+    expect(getPersonAgeSpy).not.toHaveBeenCalled();
+  });
+
+  it('flag-on: resolves learner age via v2 getPersonAge, never legacy getProfileAge', async () => {
+    await startFirstCurriculumSession(
+      makeDb(),
+      PROFILE_ID,
+      SUBJECT_ID,
+      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+      { matcherEnabled: false, identityV2Enabled: true },
+    );
+    expect(getPersonAgeSpy).toHaveBeenCalledWith(expect.anything(), PROFILE_ID);
+    expect(getProfileAgeSpy).not.toHaveBeenCalled();
   });
 });
 

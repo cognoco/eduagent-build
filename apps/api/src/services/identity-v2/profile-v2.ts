@@ -22,6 +22,7 @@ import {
   membership,
   person,
   type Database,
+  type profiles,
 } from '@eduagent/database';
 import type {
   ConsentStatus,
@@ -292,7 +293,9 @@ export async function getProfileV2(
   );
   const chargeEdge = edges.find((e) => e.chargePersonId === profileId);
 
-  const hasFamilyLinks = isOwner ? hasFamilyLinksAsGuardian : chargeEdge != null;
+  const hasFamilyLinks = isOwner
+    ? hasFamilyLinksAsGuardian
+    : chargeEdge != null;
   const linkCreatedAt = isOwner
     ? null
     : (chargeEdge?.grantedAt.toISOString() ?? null);
@@ -313,9 +316,11 @@ export async function getProfileV2(
     location: jurisdictionToLocation(row.residenceJurisdiction),
     isOwner,
     hasPremiumLlm: deriveHasPremiumLlm(),
-    defaultAppContext: (row.defaultAppContext as Profile['defaultAppContext']) ?? null,
+    defaultAppContext:
+      (row.defaultAppContext as Profile['defaultAppContext']) ?? null,
     hasFamilyLinks,
-    conversationLanguage: row.conversationLanguage as Profile['conversationLanguage'],
+    conversationLanguage:
+      row.conversationLanguage as Profile['conversationLanguage'],
     pronouns: row.pronouns ?? null,
     consentStatus,
     linkCreatedAt,
@@ -586,4 +591,81 @@ export async function updateProfileV2(
   // (consent status + guardianship meta require additional queries that are
   // cleanly encapsulated there).
   return getProfileV2(db, profileId, organizationId);
+}
+
+// ---------------------------------------------------------------------------
+// [WI-586] loadProfileRowByIdV2 — v2 twin of services/profile.ts::loadProfileRowById.
+//
+// The legacy reader is a self-keyed `profiles WHERE id = ? AND archived_at IS NULL`
+// lookup (no account scope — the caller already trusts the profileId). The v2
+// reader reads the equivalent `person` row + its single org `membership`, keyed
+// on person.id = profileId (person.id = profiles.id), and reconstructs a
+// byte-identical `profiles.$inferSelect` row so the in-process session cache and
+// its downstream consumers (session-exchange's resolvePromptLearnerName /
+// birthYear / conversationLanguage / pronouns / displayName reads) cannot tell
+// which store answered.
+//
+// person↔membership is 1:1 (each person has exactly one org-binding membership;
+// account.id = organization.id). guardianship is a separate edge table and does
+// not multiply membership rows, so the join + limit(1) is deterministic. Field
+// derivations mirror getProfileV2 / listProfilesV2:
+//   - isOwner       := membership.roles @> '{admin}'
+//   - birthYear     := year(person.birth_date)
+//   - location      := jurisdictionToLocation(person.residence_jurisdiction)
+//   - hasPremiumLlm := false (derived, §1.3)
+//   - accountId     := membership.organization_id (account.id = organization.id)
+// Legacy-only columns with no v2 home and no live reader (birthYearSetBy) are
+// null; archivedAt is always null because the read filters to live persons.
+// ---------------------------------------------------------------------------
+
+/**
+ * v2 twin of `loadProfileRowById` — returns the person row reshaped as a
+ * byte-identical `profiles.$inferSelect`, or null when the person does not exist
+ * / is archived. Self-keyed on profileId (person.id = profiles.id); no org
+ * parameter, matching the legacy reader's self-trust contract.
+ */
+export async function loadProfileRowByIdV2(
+  db: Database,
+  profileId: string,
+): Promise<typeof profiles.$inferSelect | null> {
+  const rows = await db
+    .select({
+      id: person.id,
+      organizationId: membership.organizationId,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl,
+      birthDate: person.birthDate,
+      residenceJurisdiction: person.residenceJurisdiction,
+      conversationLanguage: person.conversationLanguage,
+      pronouns: person.pronouns,
+      defaultAppContext: person.defaultAppContext,
+      createdAt: person.createdAt,
+      updatedAt: person.updatedAt,
+      roles: membership.roles,
+    })
+    .from(person)
+    .innerJoin(membership, eq(membership.personId, person.id))
+    .where(and(eq(person.id, profileId), isNull(person.archivedAt)))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    accountId: row.organizationId, // account.id = organization.id
+    displayName: row.displayName,
+    avatarUrl: row.avatarUrl ?? null,
+    birthYear: birthYearFromDate(row.birthDate),
+    birthYearSetBy: null,
+    location: jurisdictionToLocation(row.residenceJurisdiction),
+    isOwner: row.roles.includes('admin'),
+    hasPremiumLlm: deriveHasPremiumLlm(),
+    defaultAppContext: row.defaultAppContext ?? null,
+    conversationLanguage: row.conversationLanguage,
+    pronouns: row.pronouns ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    archivedAt: null,
+  };
 }

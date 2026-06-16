@@ -94,6 +94,68 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [WI-586 flip-safety] identity-v2 helpers — stub the person-based age-bracket
+// reader so the evaluate-depth flag-split (v2 person vs legacy profiles) can be
+// asserted without a real DB.
+jest.mock(
+  '../services/identity-v2/helpers' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/identity-v2/helpers',
+    ) as typeof import('../services/identity-v2/helpers');
+    return {
+      ...actual,
+      getPersonAgeBracket: jest.fn().mockResolvedValue('teen'),
+    };
+  },
+);
+
+// [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the account middleware resolves
+// identity via resolveIdentityV2; stub it so flag-ON route tests authenticate
+// without an unmocked DB (resolver itself is covered by identity integration tests).
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  () => ({
+    resolveIdentityV2: jest.fn().mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: 'test-profile-id',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    }),
+  }),
+);
+
+// [WI-586 flip-safety] v2 profile-scope resolver — so the profile-scope
+// middleware's owner derivation (roles.includes('admin')) does not hit the
+// unmocked DB under flag-ON.
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
+  () => {
+    const ownerScope = {
+      profileId: 'test-profile-id',
+      meta: {
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    };
+    return {
+      findOwnerPersonScope: jest.fn().mockResolvedValue(ownerScope),
+      getPersonScope: jest.fn().mockResolvedValue(ownerScope),
+    };
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Mock billing service — metering middleware calls these on LLM routes
 // ---------------------------------------------------------------------------
@@ -175,6 +237,51 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
     createSubscription: jest.fn(),
   };
 });
+
+// [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the metering middleware reads
+// the billing-v2 store twins instead of the legacy billing reads. Stub them with
+// the same shapes so a metered route (evaluate-depth) authorises under flag-ON
+// without an unmocked DB. The v2 twins themselves are covered by the billing-v2
+// integration suites.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/billing/billing-v2',
+    ) as typeof import('../services/billing/billing-v2');
+    return {
+      ...actual,
+      ensureFreeSubscriptionV2: jest.fn().mockResolvedValue(mockSubscription),
+      getEffectiveAccessForSubscriptionV2: jest.fn().mockResolvedValue({
+        subscription: mockSubscription,
+        effectiveAccessTier: 'plus',
+        billingAccess: 'current',
+      }),
+      getQuotaPoolV2: jest.fn().mockResolvedValue({
+        id: 'qp-1',
+        subscriptionId: 'sub-1',
+        monthlyLimit: 500,
+        usedThisMonth: 10,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+      getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
+        id: 'pqu-1',
+        subscriptionId: 'sub-1',
+        profileId: 'test-profile-id',
+        role: 'owner',
+        monthlyLimit: 700,
+        usedThisMonth: 10,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+      }),
+    };
+  },
+);
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
@@ -526,6 +633,8 @@ import { app } from '../index';
 import { sessionRoutes } from './sessions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
+import { getProfileAgeBracket } from '../services/profile';
+import { getPersonAgeBracket } from '../services/identity-v2/helpers';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -674,7 +783,9 @@ describe('session routes', () => {
           sessionType: 'learning',
           inputMode: 'text',
         }),
-        { matcherEnabled: false },
+        // [WI-586] route forwards the identity-v2 flag into the service opts;
+        // flag-OFF under TEST_ENV.
+        { matcherEnabled: false, identityV2Enabled: false },
       );
     });
 
@@ -698,7 +809,7 @@ describe('session routes', () => {
           sessionType: 'learning',
           inputMode: 'text',
         }),
-        { matcherEnabled: true },
+        { matcherEnabled: true, identityV2Enabled: false },
       );
     });
   });
@@ -924,6 +1035,14 @@ describe('session routes', () => {
   });
 
   describe('POST /v1/sessions/:sessionId/evaluate-depth', () => {
+    // [WI-586] The age-bracket reader mocks are module-level jest.fn()s that
+    // accumulate calls across tests; clear their call history per test so the
+    // flag-OFF / flag-ON "not.toHaveBeenCalled()" assertions are order-independent.
+    beforeEach(() => {
+      (getProfileAgeBracket as jest.Mock).mockClear();
+      (getPersonAgeBracket as jest.Mock).mockClear();
+    });
+
     it('returns 410 with SESSION_ARCHIVED when transcript has been purged', async () => {
       (getSessionTranscript as jest.Mock).mockResolvedValueOnce({
         archived: true,
@@ -954,6 +1073,48 @@ describe('session routes', () => {
           message: 'Session transcript has been archived',
         }),
       );
+    });
+
+    // [WI-586 flip-safety] The age-bracket reader must be flag-gated: flag-OFF
+    // reads `profiles` (getProfileAgeBracket), flag-ON reads `person`
+    // (getPersonAgeBracket) since `profiles` is dropped post-#8. Breaking the
+    // route wiring (reverting to an unconditional getProfileAgeBracket) makes
+    // the flag-ON assertion fail.
+    it('flag-OFF: reads the age bracket from the legacy profiles path', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/evaluate-depth`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(getProfileAgeBracket).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
+      expect(getPersonAgeBracket).not.toHaveBeenCalled();
+    });
+
+    // [WI-586 flip-safety] evaluate-depth is a METERED route, so under flag-ON the
+    // metering middleware reads the billing-v2 store twins (ensureFreeSubscriptionV2 /
+    // getQuotaPoolV2 / getEffectiveAccessForSubscriptionV2 /
+    // getOrProvisionProfileQuotaUsageV2), mocked above. With those stubbed the
+    // flag-ON request reaches the handler and the age-bracket read routes to the
+    // v2 person path. Inverting the route wiring back to an unconditional
+    // getProfileAgeBracket makes this assertion fail (the break-restore guard).
+    it('flag-ON: reads the age bracket from the v2 person path', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/evaluate-depth`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(getPersonAgeBracket).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
+      expect(getProfileAgeBracket).not.toHaveBeenCalled();
     });
   });
 
