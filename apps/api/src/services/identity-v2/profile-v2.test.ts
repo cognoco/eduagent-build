@@ -97,7 +97,7 @@ describe('[WI-586] loadProfileRowByIdV2 — person→profiles row shaping', () =
 
   it('derives isOwner=false for a non-admin (charge) membership', async () => {
     const out = await loadProfileRowByIdV2(
-      stubDb({ ...baseRow, roles: ['member'] }),
+      stubDb({ ...baseRow, roles: ['learner'] }),
       'person-1',
     );
     expect(out?.isOwner).toBe(false);

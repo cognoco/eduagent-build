@@ -44,20 +44,36 @@ import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 
 /**
+ * Returns the first non-empty (trimmed) line of the SQL file, or '' if none.
+ *
+ * Using the first NON-EMPTY line — rather than literally line 0 — closes a
+ * guard-bypass: a leading blank line (or a stray newline at the top of the
+ * file) would otherwise make line 0 the empty string, so an exact marker on
+ * line 2+ would no longer match and the gate would silently fall open.
+ * Checking only the first non-empty line still ensures a prose mention of the
+ * phrase later in the file (e.g. in 0108's header commentary) does not trigger.
+ *
+ * @param {string} sql
+ * @returns {string}
+ */
+function firstNonEmptyLine(sql) {
+  for (const line of sql.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return '';
+}
+
+/**
  * Returns true when the SQL file's first non-empty line is exactly the
  * structured reference-only marker `-- @reference-only` (case-insensitive,
  * leading/trailing whitespace stripped).
- *
- * Checking ONLY the first line ensures that a prose mention of the phrase
- * anywhere later in the file (e.g. in 0108's header commentary) does not
- * trigger the gate.
  *
  * @param {string} sql
  * @returns {boolean}
  */
 function isReferenceOnly(sql) {
-  const firstLine = sql.split('\n')[0].trim();
-  return firstLine.toLowerCase() === '-- @reference-only';
+  return firstNonEmptyLine(sql).toLowerCase() === '-- @reference-only';
 }
 
 /**
@@ -88,8 +104,7 @@ function isReferenceOnly(sql) {
  * @returns {boolean}
  */
 function isFreezeOnly(sql) {
-  const firstLine = sql.split('\n')[0].trim();
-  return firstLine.toLowerCase() === '-- @freeze-only';
+  return firstNonEmptyLine(sql).toLowerCase() === '-- @freeze-only';
 }
 
 /**

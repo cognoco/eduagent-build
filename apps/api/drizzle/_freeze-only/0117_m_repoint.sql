@@ -116,3 +116,40 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- POST-STATE COMPLETENESS ASSERTION (CodeRabbit, WI-586)
+-- After the repoint, NO live (non-drop-list) table may still hold an FK that
+-- targets a legacy identity parent. If one survives, the subsequent M-DROP
+-- (0118) fails loud on the dangling dependency (no CASCADE). Assert it HERE so
+-- an incomplete repoint fails at this step, inside the freeze, with a precise
+-- diagnostic — rather than at the irreversible drop. The only FKs still allowed
+-- to target the 4 legacy parents are those among the parents themselves (they
+-- drop together as a set in 0118).
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  offending text;
+BEGIN
+  SELECT string_agg(
+           format('%s.%s -> %s', c.conrelid::regclass, c.conname,
+                  c.confrelid::regclass),
+           '; '
+         )
+    INTO offending
+  FROM pg_constraint c
+  WHERE c.contype = 'f'
+    AND c.confrelid IN (
+      'profiles'::regclass, 'accounts'::regclass,
+      'family_links'::regclass, 'consent_states'::regclass
+    )
+    AND c.conrelid NOT IN (
+      'profiles'::regclass, 'accounts'::regclass,
+      'family_links'::regclass, 'consent_states'::regclass
+    );
+
+  IF offending IS NOT NULL THEN
+    RAISE EXCEPTION
+      'M-REPOINT post-state check failed: live FK(s) still target a legacy identity parent after repoint: %. M-DROP (0118) must not run until these are repointed.', offending;
+  END IF;
+END $$;

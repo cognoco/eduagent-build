@@ -224,6 +224,34 @@ test('@reference-only and @freeze-only are independent markers', () => {
   assert.deepStrictEqual(findFreezeOnlyMigrations(journal, read), ['freeze']);
 });
 
+// ---------------------------------------------------------------------------
+// Guard-bypass regression (CodeRabbit, WI-586): a marker preceded by a leading
+// blank line (or stray top-of-file newline) must STILL be flagged. The old
+// `split('\n')[0]` read literal line 0 — an empty string — so the marker on a
+// later line silently fell through and the gate opened. firstNonEmptyLine fixes
+// this. These cases fail pre-fix and pass post-fix for BOTH markers.
+// ---------------------------------------------------------------------------
+
+test('flags @reference-only even when preceded by a leading blank line', () => {
+  const journal = fakeJournal('fake_blank_then_ref');
+  const sql = ['', '-- @reference-only', 'CREATE TABLE bar (id uuid);'].join(
+    '\n',
+  );
+
+  const blocked = findReferenceOnlyMigrations(journal, () => sql);
+
+  assert.deepStrictEqual(blocked, ['fake_blank_then_ref']);
+});
+
+test('flags @freeze-only even when preceded by a leading blank line', () => {
+  const journal = fakeJournal('fake_blank_then_freeze');
+  const sql = ['', '   ', '-- @freeze-only', 'DROP TABLE legacy;'].join('\n');
+
+  const blocked = findFreezeOnlyMigrations(journal, () => sql);
+
+  assert.deepStrictEqual(blocked, ['fake_blank_then_freeze']);
+});
+
 // Real-journal test: after TASK A de-journaled 0117/0118, the actual journal
 // must carry ZERO freeze-only migrations (they were relocated to
 // drizzle/_freeze-only/ and removed from meta/_journal.json).
