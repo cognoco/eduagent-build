@@ -22,6 +22,9 @@ import { createIdentityGraph } from '../services/identity-v2/identity-graph';
 import {
   getOwnerProfileV2,
   listProfilesV2,
+  getProfileV2,
+  getPersonScope,
+  updateProfileV2,
 } from '../services/identity-v2/profile-v2';
 
 import { notFound, forbidden, validationError, apiError } from '../errors';
@@ -236,7 +239,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
-    const profile = await getProfile(db, c.req.param('id'), account.id);
+    // [WI-586 C1] v2 seam: getProfileV2 reads person/membership/guardianship
+    // (no profiles/family_links/consent_states touch). Flag-off unchanged.
+    const profile = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+      ? await getProfileV2(db, c.req.param('id'), account.id)
+      : await getProfile(db, c.req.param('id'), account.id);
     if (!profile) return notFound(c, 'Profile not found');
     return c.json(profileResponseSchema.parse({ profile }));
   })
@@ -306,7 +313,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
         );
       }
 
-      const profile = await updateProfile(db, id, account.id, input);
+      // [WI-586 C2] v2 seam: updateProfileV2 writes person table columns
+      // (displayName/avatarUrl/conversationLanguage/pronouns) via an atomic
+      // membership-scoped UPDATE. Flag-off unchanged.
+      const profile = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+        ? await updateProfileV2(db, id, account.id, input)
+        : await updateProfile(db, id, account.id, input);
       if (!profile) return notFound(c, 'Profile not found');
       return c.json(profileResponseSchema.parse({ profile }));
     },
@@ -324,8 +336,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // the account can legitimately switch to another profile on the same
       // account — e.g., a child handing the device back to a parent.
       // [CR-2026-05-19-H1 note: intentionally left without owner gate]
-      const result = await switchProfile(db, profileId, account.id);
-      if (!result)
+      // [WI-586 T1] v2 seam: getPersonScope verifies person ↔ org membership
+      // (no profiles table touch). Returns null when not found → same 403.
+      const found = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+        ? await getPersonScope(db, profileId, account.id)
+        : await switchProfile(db, profileId, account.id);
+      if (!found)
         return forbidden(c, 'Profile does not belong to this account');
       return c.json(
         profileSwitchResponseSchema.parse({

@@ -20,6 +20,7 @@ import {
   notifyAccountSecurityEvent,
   updateAccountEmailFromClerk,
 } from '../services/account';
+import { updateLoginEmailFromClerk } from '../services/identity-v2/account-v2';
 import {
   scheduleDeletion,
   cancelDeletion,
@@ -119,7 +120,8 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   })
   .patch('/account/email', async (c) => {
     const db = c.get('db');
-    requireAccount(c.get('account'));
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     assertOwnerProfile(c, 'Only the account owner can change account email.');
 
     const body = await c.req.json().catch(() => null);
@@ -128,11 +130,22 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       return validationError(c, parsed.error.issues);
     }
 
-    const updated = await updateAccountEmailFromClerk(db, {
-      clerkUserId: c.get('user').userId,
-      requestedEmail: parsed.data.email,
-      clerkSecretKey: c.env.CLERK_SECRET_KEY,
-    });
+    // [WI-586 C4] v2 seam: updateLoginEmailFromClerk writes login.email instead
+    // of accounts.email. Most-severe flip-critical reader — ownership is
+    // guaranteed at the route level (assertOwnerProfile + requireAccount) before
+    // this call. Flag-off unchanged.
+    const updated = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+      ? await updateLoginEmailFromClerk(db, {
+          clerkUserId: c.get('user').userId,
+          requestedEmail: parsed.data.email,
+          organizationId: account.id,
+          clerkSecretKey: c.env.CLERK_SECRET_KEY,
+        })
+      : await updateAccountEmailFromClerk(db, {
+          clerkUserId: c.get('user').userId,
+          requestedEmail: parsed.data.email,
+          clerkSecretKey: c.env.CLERK_SECRET_KEY,
+        });
 
     return c.json(
       accountEmailUpdateResponseSchema.parse({ email: updated.email }),

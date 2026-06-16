@@ -261,7 +261,9 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       assertNotProxyMode(c);
       const { interests } = c.req.valid('json');
       try {
-        await updateInterestsContext(db, profileId, account.id, interests);
+        await updateInterestsContext(db, profileId, account.id, interests, {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        });
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
           return notFound(c, 'Profile not found');
@@ -286,7 +288,13 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       });
       const { interests } = c.req.valid('json');
       try {
-        await updateInterestsContext(db, childProfileId, account.id, interests);
+        await updateInterestsContext(
+          db,
+          childProfileId,
+          account.id,
+          interests,
+          { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+        );
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
           return notFound(c, 'Profile not found');

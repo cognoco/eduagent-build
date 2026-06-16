@@ -15,7 +15,12 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, sql } from 'drizzle-orm';
-import { profiles, learningProfiles, type Database } from '@eduagent/database';
+import {
+  profiles,
+  learningProfiles,
+  membership,
+  type Database,
+} from '@eduagent/database';
 import type {
   ConversationLanguage,
   InterestEntry,
@@ -156,18 +161,37 @@ export async function updateInterestsContext(
   profileId: string,
   accountId: string,
   interests: InterestEntry[],
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
   // Guard: verify the profile belongs to the calling account — mirrors the
   // accountId check in updateConversationLanguage / updatePronouns. The
   // learning_profiles table doesn't carry accountId directly, so we verify
   // via the profiles table first.
-  const [owner] = await db
-    .select({ id: profiles.id })
-    .from(profiles)
-    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)));
-
-  if (!owner) {
-    throw new OnboardingNotFoundError(profileId);
+  // [WI-586 C5] v2 seam: membership check replaces profiles ownership guard
+  // (accountId = organizationId in v2; account.id ↔ organization.id parity).
+  if (opts?.identityV2Enabled) {
+    const [member] = await db
+      .select({ personId: membership.personId })
+      .from(membership)
+      .where(
+        and(
+          eq(membership.personId, profileId),
+          eq(membership.organizationId, accountId),
+        ),
+      );
+    if (!member) {
+      throw new OnboardingNotFoundError(profileId);
+    }
+  } else {
+    const [owner] = await db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(
+        and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
+      );
+    if (!owner) {
+      throw new OnboardingNotFoundError(profileId);
+    }
   }
 
   // Ensure the learning_profiles row exists — see the accommodation-mode
@@ -218,7 +242,12 @@ export async function updateInterestsContext(
         and(
           eq(learningProfiles.profileId, profileId),
           eq(learningProfiles.version, expectedVersion),
-          sql`EXISTS (SELECT 1 FROM ${profiles} WHERE ${profiles.id} = ${profileId} AND ${profiles.accountId} = ${accountId})`,
+          // [WI-586 C5] v2 seam: membership existence guard replaces profiles
+          // EXISTS subquery. Ownership atomicity is preserved — the CAS UPDATE
+          // only lands when the membership row still exists at write time.
+          opts?.identityV2Enabled
+            ? sql`EXISTS (SELECT 1 FROM ${membership} WHERE ${membership.personId} = ${profileId} AND ${membership.organizationId} = ${accountId})`
+            : sql`EXISTS (SELECT 1 FROM ${profiles} WHERE ${profiles.id} = ${profileId} AND ${profiles.accountId} = ${accountId})`,
         ),
       )
       .returning({ id: learningProfiles.id });
@@ -230,42 +259,58 @@ export async function updateInterestsContext(
     // A concurrent writer advanced the version between our read and this write.
     // Re-read and retry. The row exists (we created it above), so a missing
     // re-read is an anomaly worth surfacing rather than silently succeeding.
-    // [WI-737 / C3] Scope the re-read through profiles to keep accountId
-    // enforcement in place across the full retry loop.
-    const [refreshed] = await db
-      .select({
-        id: learningProfiles.id,
-        profileId: learningProfiles.profileId,
-        learningStyle: learningProfiles.learningStyle,
-        interests: learningProfiles.interests,
-        strengths: learningProfiles.strengths,
-        struggles: learningProfiles.struggles,
-        communicationNotes: learningProfiles.communicationNotes,
-        suppressedInferences: learningProfiles.suppressedInferences,
-        interestTimestamps: learningProfiles.interestTimestamps,
-        effectivenessSessionCount: learningProfiles.effectivenessSessionCount,
-        memoryEnabled: learningProfiles.memoryEnabled,
-        memoryConsentStatus: learningProfiles.memoryConsentStatus,
-        consentPromptDismissedAt: learningProfiles.consentPromptDismissedAt,
-        memoryCollectionEnabled: learningProfiles.memoryCollectionEnabled,
-        memoryInjectionEnabled: learningProfiles.memoryInjectionEnabled,
-        accommodationMode: learningProfiles.accommodationMode,
-        celebrationLevel: learningProfiles.celebrationLevel,
-        recentlyResolvedTopics: learningProfiles.recentlyResolvedTopics,
-        memoryFactsBackfilledAt: learningProfiles.memoryFactsBackfilledAt,
-        memoryFactsAnalysedAt: learningProfiles.memoryFactsAnalysedAt,
-        version: learningProfiles.version,
-        createdAt: learningProfiles.createdAt,
-        updatedAt: learningProfiles.updatedAt,
-      })
-      .from(learningProfiles)
-      .innerJoin(profiles, eq(profiles.id, learningProfiles.profileId))
-      .where(
-        and(
-          eq(learningProfiles.profileId, profileId),
-          eq(profiles.accountId, accountId),
-        ),
-      );
+    // [WI-737 / C3] Scope the re-read through profiles (legacy) or membership
+    // (v2) to keep accountId / organizationId enforcement across the retry loop.
+    // [WI-586 C5] v2 seam: JOIN membership instead of profiles for re-read.
+    const learningProfilesCols = {
+      id: learningProfiles.id,
+      profileId: learningProfiles.profileId,
+      learningStyle: learningProfiles.learningStyle,
+      interests: learningProfiles.interests,
+      strengths: learningProfiles.strengths,
+      struggles: learningProfiles.struggles,
+      communicationNotes: learningProfiles.communicationNotes,
+      suppressedInferences: learningProfiles.suppressedInferences,
+      interestTimestamps: learningProfiles.interestTimestamps,
+      effectivenessSessionCount: learningProfiles.effectivenessSessionCount,
+      memoryEnabled: learningProfiles.memoryEnabled,
+      memoryConsentStatus: learningProfiles.memoryConsentStatus,
+      consentPromptDismissedAt: learningProfiles.consentPromptDismissedAt,
+      memoryCollectionEnabled: learningProfiles.memoryCollectionEnabled,
+      memoryInjectionEnabled: learningProfiles.memoryInjectionEnabled,
+      accommodationMode: learningProfiles.accommodationMode,
+      celebrationLevel: learningProfiles.celebrationLevel,
+      recentlyResolvedTopics: learningProfiles.recentlyResolvedTopics,
+      memoryFactsBackfilledAt: learningProfiles.memoryFactsBackfilledAt,
+      memoryFactsAnalysedAt: learningProfiles.memoryFactsAnalysedAt,
+      version: learningProfiles.version,
+      createdAt: learningProfiles.createdAt,
+      updatedAt: learningProfiles.updatedAt,
+    } as const;
+    const [refreshed] = opts?.identityV2Enabled
+      ? await db
+          .select(learningProfilesCols)
+          .from(learningProfiles)
+          .innerJoin(
+            membership,
+            eq(membership.personId, learningProfiles.profileId),
+          )
+          .where(
+            and(
+              eq(learningProfiles.profileId, profileId),
+              eq(membership.organizationId, accountId),
+            ),
+          )
+      : await db
+          .select(learningProfilesCols)
+          .from(learningProfiles)
+          .innerJoin(profiles, eq(profiles.id, learningProfiles.profileId))
+          .where(
+            and(
+              eq(learningProfiles.profileId, profileId),
+              eq(profiles.accountId, accountId),
+            ),
+          );
     if (!refreshed) {
       throw new OnboardingNotFoundError(profileId);
     }
