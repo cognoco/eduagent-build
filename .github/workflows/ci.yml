@@ -332,9 +332,9 @@ jobs:
   # the identity-v2 HTTP-route surface — which buildIntegrationEnv() never
   # sets — its first flag-on committed-migration coverage.
   #
-  # LANDS NON-BLOCKING (continue-on-error: true). Expected to surface reds
-  # while WI-790/791/792/793 (D1-D4) and :709/FG1 defects exist. Reds here
-  # are diagnostic signal, not CI failures for unrelated PRs.
+  # LANDS NON-BLOCKING (step-level continue-on-error). Expected to surface
+  # reds while WI-790/791/792/793 (D1-D4) and :709/FG1 defects exist. Reds
+  # here are diagnostic signal, not CI failures for unrelated PRs.
   #
   # HOW TO FLIP THIS TO REQUIRED (WI-586/WP-FLAG close gate):
   #   Mirrors the i18n-ratchet pattern used for "pnpm audit (High+, advisory)"
@@ -345,7 +345,8 @@ jobs:
   #   Step 1 — Confirm D1-D4/FG1/:709 are all green on this job (watch the
   #             "Flag-ON integration" check in the PR checks list — it reports
   #             separately from `main` because it's a separate job).
-  #   Step 2 — Remove `continue-on-error: true` from this job.
+  #   Step 2 — Remove `continue-on-error: true` from the
+  #             "API integration tests (flag-ON)" step.
   #   Step 3 — Add "Flag-ON integration (IDENTITY_V2_ENABLED)" to the branch
   #             protection required-status-checks list in GitHub Settings →
   #             Branches → main → Edit → "Require status checks to pass" →
@@ -359,10 +360,6 @@ jobs:
   integration-flag-on:
     name: Flag-ON integration (IDENTITY_V2_ENABLED)
     runs-on: ubuntu-latest
-    # NON-BLOCKING: allowed-red while D1-D4/FG1/:709 defect WIs exist.
-    # Remove this line (and add to branch-protection required checks) once
-    # those WIs are green — see HOW TO FLIP above.
-    continue-on-error: true
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -414,9 +411,17 @@ jobs:
 
       # Run the full integration suite with the flag on.
       # Reds here are expected (D1-D4/FG1/:709 defects) and are the diagnostic
-      # signal this lane exists to surface. They do NOT fail the `main` job.
+      # signal this lane exists to surface. Step-level continue-on-error keeps
+      # the PR check green while preserving the failed-test log and warning.
       - name: API integration tests (flag-ON)
+        id: flag_on_integration
+        continue-on-error: true
         run: pnpm exec nx run api:test:integration
+
+      - name: Report flag-ON advisory result
+        if: steps.flag_on_integration.outcome == 'failure'
+        run: |
+          echo "::warning::Flag-ON integration failed in advisory mode. This is expected while WI-790/791/792/793 and :709/FG1 remain open; inspect the API integration tests (flag-ON) step for diagnostics."
 
   # ---------------------------------------------------------------------------
   # OTA Update: publish JS bundle to EAS Update (preview channel)

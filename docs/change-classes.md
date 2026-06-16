@@ -44,9 +44,10 @@ runs the full integration suite with `IDENTITY_V2_ENABLED=true` against a fresh
 committed-migration DB (`drizzle-kit migrate`). It is the first flag-ON coverage
 for the identity-v2 HTTP-route surface (diagnostic root `prg06ic-021`).
 
-**Current status: NON-BLOCKING** (`continue-on-error: true` in `ci.yml`).
-Reds here are expected diagnostic signal while WI-790/791/792/793 (D1-D4) and
-:709/FG1 defects exist. They do not fail the `main` job or block unrelated PRs.
+**Current status: NON-BLOCKING** (the flag-ON test step uses
+`continue-on-error: true` in `ci.yml`). Reds here are expected diagnostic signal
+while WI-790/791/792/793 (D1-D4) and :709/FG1 defects exist. The job remains
+green with an advisory warning so unrelated PRs are not blocked.
 
 **How to flip to REQUIRED (WI-586/WP-FLAG close gate):**
 
@@ -56,7 +57,7 @@ are promoted to required once blocking reds resolve).
 
 1. Confirm all D1-D4/FG1/:709 defect WIs are green on this job (watch the
    "Flag-ON integration (IDENTITY_V2_ENABLED)" check in GitHub PR checks).
-2. Remove `continue-on-error: true` from the `integration-flag-on` job in
+2. Remove `continue-on-error: true` from the `API integration tests (flag-ON)` step in
    `.github/workflows/ci.yml`.
 3. Add `Flag-ON integration (IDENTITY_V2_ENABLED)` to branch protection
    required-status-checks: GitHub Settings → Branches → main → Edit →
