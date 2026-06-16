@@ -27,6 +27,14 @@ jest.mock(
 // reads db.query.guardianship.findFirst directly. makeV2Db stubs both call
 // shapes so the real functions run (no gc1-allow escape needed).
 
+// GC6-defer: 1 pre-existing internal mock below (./consent) is NOT burned down
+// in this WI-803 edit. It is a requireActual partial override of the consent
+// service boundary (its own suite) providing 5 consent-flow stubs woven through
+// the pre-existing createProfile / updateProfile fixtures; converting it to real
+// DB-backed wiring would balloon this focused family_links→guardianship
+// flip-blocker far beyond its scope. Tracked for the GC6 burn-down lane, not
+// this WI. (The WI-803-introduced guardianship mock WAS removed — the v2 path
+// drives the real getChargePersonIds/getGuardianPersonIds via the DB stub.)
 jest.mock('./consent' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./consent') as typeof import('./consent');
   return {

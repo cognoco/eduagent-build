@@ -25,6 +25,15 @@ import {
 
 // ---------------------------------------------------------------------------
 // Internal module stubs (gc1-allow: sibling services with their own suites)
+//
+// GC6-defer: 3 pre-existing internal mocks below (./family-access, ./consent,
+// ./notifications) are NOT burned down in this WI-803 edit. They are
+// requireActual partial overrides of sibling service BOUNDARIES (each with its
+// own dedicated suite) woven through the pre-existing createNudge fixtures;
+// converting them to real DB-backed wiring would balloon this focused
+// family_links→guardianship flip-blocker far beyond its scope. Tracked for the
+// GC6 burn-down lane, not this WI. (The WI-803-introduced guardianship mock WAS
+// removed — the v2 path drives the real helpers via the DB stub; see below.)
 // ---------------------------------------------------------------------------
 
 const mockAssertParentAccess = jest.fn();
