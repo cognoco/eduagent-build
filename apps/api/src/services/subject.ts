@@ -41,6 +41,7 @@ import {
 } from './language-curriculum';
 import { createLogger } from './logger';
 import { getProfileAge } from './profile';
+import { getPersonAge } from './identity-v2/helpers';
 import { setNativeLanguage } from './retention-data';
 import { safeSend } from './safe-non-core';
 
@@ -318,7 +319,10 @@ export async function createSubjectWithStructure(
   db: Database,
   profileId: string,
   input: SubjectCreateInput,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    identityV2Enabled?: boolean;
+  },
 ): Promise<CreatedSubjectWithStructure> {
   // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),
   // the rawInput IS the focus even if the client didn't send it explicitly.
@@ -436,7 +440,9 @@ export async function createSubjectWithStructure(
     };
   }
 
-  const learnerAge = await getProfileAge(db, profileId);
+  const learnerAge = options?.identityV2Enabled
+    ? await getPersonAge(db, profileId)
+    : await getProfileAge(db, profileId);
   const { detectSubjectType } = await import('./book-generation');
   const subject = await createSubject(db, profileId, input);
   let classificationFailed = false;

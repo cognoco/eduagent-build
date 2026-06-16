@@ -1374,6 +1374,7 @@ export async function prepareExchangeContext(
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
     currentUserMessageEventId?: string;
+    identityV2Enabled?: boolean;
   },
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -1395,6 +1396,7 @@ export async function prepareExchangeContext(
     profileId,
     sessionId,
     session,
+    options?.identityV2Enabled ?? false,
   );
 
   // 2. Load all supplementary data in parallel (all independent after session load)
@@ -2006,10 +2008,17 @@ export async function prepareExchangeContext(
           session,
           topic.topicId,
           topic.bookId,
+          options?.identityV2Enabled ?? false,
         )
       : undefined,
     session.sessionType === 'homework'
-      ? await getCachedHomeworkLibraryContext(db, profileId, sessionId, session)
+      ? await getCachedHomeworkLibraryContext(
+          db,
+          profileId,
+          sessionId,
+          session,
+          options?.identityV2Enabled ?? false,
+        )
       : undefined,
   ].filter((part): part is string => Boolean(part));
   const learningHistoryContext =
@@ -2732,6 +2741,7 @@ export async function processMessage(
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
+    identityV2Enabled?: boolean;
   },
 ): Promise<{
   response: string;
@@ -2974,6 +2984,7 @@ export async function streamMessage(
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
+    identityV2Enabled?: boolean;
   },
 ): Promise<{
   stream: AsyncIterable<string>;

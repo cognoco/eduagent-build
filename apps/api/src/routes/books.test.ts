@@ -290,6 +290,129 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 // ---------------------------------------------------------------------------
+// [WI-586] v2 identity + billing twins — mocked so flag-ON route unit tests
+// reach the route handler without hitting the unmocked DB. account-middleware
+// resolveIdentityV2, profile-scope findOwnerPersonScope, and metering's v2
+// billing twins all run under IDENTITY_V2_ENABLED=true. getPersonAge returns a
+// distinct age (36) from the legacy getProfileAge mock (12) so the flag-ON vs
+// flag-OFF generation age is differential (non-vacuous). External-DB coverage
+// lives in identity / billing integration suites.
+// ---------------------------------------------------------------------------
+
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  () => ({
+    resolveIdentityV2: jest.fn().mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: 'test-profile-id',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    }),
+  }),
+);
+
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
+  () => ({
+    findOwnerPersonScope: jest.fn().mockResolvedValue({
+      profileId: 'test-profile-id',
+      meta: {
+        birthYear: 2014,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    }),
+    getPersonScope: jest.fn().mockResolvedValue({
+      profileId: 'test-profile-id',
+      meta: {
+        birthYear: 2014,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    }),
+  }),
+);
+
+jest.mock(
+  '../services/identity-v2/helpers' /* gc1-allow: route unit test — DB mocked; person-age reader covered by helpers unit + integration tests */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/identity-v2/helpers',
+    ) as typeof import('../services/identity-v2/helpers');
+    return {
+      ...actual,
+      // Distinct from the legacy getProfileAge mock (12) so flag-ON generation
+      // is asserted at age 36 — proves the v2 reader ran.
+      getPersonAge: jest.fn().mockResolvedValue(36),
+    };
+  },
+);
+
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: route unit test — DB mocked; v2 billing twins covered by billing integration tests */,
+  () => ({
+    ensureFreeSubscriptionV2: jest.fn().mockResolvedValue({
+      id: 'sub-1',
+      accountId: 'test-account-id',
+      tier: 'free',
+      status: 'active',
+      stripeSubscriptionId: null,
+      stripeCustomerId: null,
+      currentPeriodStart: new Date().toISOString(),
+      currentPeriodEnd: new Date().toISOString(),
+      cancelAtPeriodEnd: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    getEffectiveAccessForSubscriptionV2: jest.fn().mockResolvedValue({
+      subscription: {
+        id: 'sub-1',
+        accountId: 'test-account-id',
+        tier: 'free',
+        status: 'active',
+      },
+      effectiveAccessTier: 'free',
+      billingAccess: 'current',
+    }),
+    getQuotaPoolV2: jest.fn().mockResolvedValue({
+      id: 'qp-1',
+      subscriptionId: 'sub-1',
+      monthlyLimit: 500,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
+      id: 'pqu-1',
+      subscriptionId: 'sub-1',
+      profileId: 'test-profile-id',
+      role: 'owner',
+      monthlyLimit: 100,
+      usedThisMonth: 10,
+      dailyLimit: 10,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+    }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
@@ -1000,6 +1123,131 @@ describe('book routes', () => {
       );
 
       expect(res.status).toBe(404);
+    });
+
+    // -----------------------------------------------------------------------
+    // [WI-586 MISS 3] learner-age reader is flag-gated at both route sites.
+    // Flag OFF (default TEST_ENV) → legacy getProfileAge (mocked age 12).
+    // Flag ON (V2_TEST_ENV) → v2 getPersonAge (mocked age 36). The asserted
+    // generation age is differential — proves which reader ran. Both sites
+    // (claimed-fresh generation + stale-thin expand) are covered.
+    // -----------------------------------------------------------------------
+    describe('[WI-586] learner-age reader is flag-gated', () => {
+      const V2_TEST_ENV = { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' };
+
+      it('flag OFF → claimed-fresh generation uses legacy age 12', async () => {
+        mockClaimBookForGeneration.mockResolvedValueOnce({
+          id: BOOK_ID,
+          title: 'Ancient Egypt',
+          description: 'Explore pyramids and pharaohs',
+        });
+        const { generateBookTopics } = jest.requireMock(
+          '../services/book-generation',
+        );
+
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+          { method: 'POST', headers: AUTH_HEADERS, body: JSON.stringify({}) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(generateBookTopics).toHaveBeenCalledWith(
+          'Ancient Egypt',
+          'Explore pyramids and pharaohs',
+          12,
+          undefined,
+        );
+      });
+
+      it('flag ON → claimed-fresh generation uses v2 age 36', async () => {
+        mockClaimBookForGeneration.mockResolvedValueOnce({
+          id: BOOK_ID,
+          title: 'Ancient Egypt',
+          description: 'Explore pyramids and pharaohs',
+        });
+        const { generateBookTopics } = jest.requireMock(
+          '../services/book-generation',
+        );
+
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+          { method: 'POST', headers: AUTH_HEADERS, body: JSON.stringify({}) },
+          V2_TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(generateBookTopics).toHaveBeenCalledWith(
+          'Ancient Egypt',
+          'Explore pyramids and pharaohs',
+          36,
+          undefined,
+        );
+      });
+
+      // Stale-thin expand branch (site 251): CAS lost, repair returns
+      // not_incomplete, expandExisting requested, active topics < MIN → the
+      // route's own getProfileAge/getPersonAge read drives expansion.
+      const staleThinBook = {
+        ...mockBookWithTopics,
+        book: {
+          ...mockBookWithTopics.book,
+          updatedAt: '2026-04-04T00:00:00.000Z',
+        },
+        topics: [mockBookWithTopics.topics[0]],
+      };
+
+      it('flag OFF → stale-thin expand uses legacy age 12', async () => {
+        mockClaimBookForGeneration.mockResolvedValueOnce(null);
+        mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+          status: 'not_incomplete',
+        });
+        mockGetBookWithTopics.mockResolvedValueOnce(staleThinBook as never);
+        const { expandExistingBookTopics } = jest.requireMock(
+          '../services/curriculum',
+        );
+
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({ expandExisting: true }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(expandExistingBookTopics).toHaveBeenCalledTimes(1);
+        const deps = (expandExistingBookTopics as jest.Mock).mock.calls[0]?.[6];
+        expect(deps.learnerAge).toBe(12);
+      });
+
+      it('flag ON → stale-thin expand uses v2 age 36', async () => {
+        mockClaimBookForGeneration.mockResolvedValueOnce(null);
+        mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+          status: 'not_incomplete',
+        });
+        mockGetBookWithTopics.mockResolvedValueOnce(staleThinBook as never);
+        const { expandExistingBookTopics } = jest.requireMock(
+          '../services/curriculum',
+        );
+
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({ expandExisting: true }),
+          },
+          V2_TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(expandExistingBookTopics).toHaveBeenCalledTimes(1);
+        const deps = (expandExistingBookTopics as jest.Mock).mock.calls[0]?.[6];
+        expect(deps.learnerAge).toBe(36);
+      });
     });
   });
 });

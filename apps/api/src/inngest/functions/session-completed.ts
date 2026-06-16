@@ -1107,11 +1107,22 @@ export const sessionCompleted = inngest.createFunction(
           }
 
           if (!highlight) {
-            const [profile] = await db
-              .select({ displayName: profiles.displayName })
-              .from(profiles)
-              .where(eq(profiles.id, profileId))
-              .limit(1);
+            // [WI-586] v2 path: read displayName from person (profiles dropped).
+            const displayName = isIdentityV2EnabledInStep()
+              ? ((
+                  await db.query.person.findFirst({
+                    where: eq(person.id, profileId),
+                    columns: { displayName: true },
+                  })
+                )?.displayName ?? null)
+              : ((
+                  await db
+                    .select({ displayName: profiles.displayName })
+                    .from(profiles)
+                    .where(eq(profiles.id, profileId))
+                    .limit(1)
+                )[0]?.displayName ?? null);
+            const profile = { displayName };
             const topicTitle = topicId
               ? await loadTopicTitle(db, topicId, profileId)
               : null;
@@ -1200,14 +1211,18 @@ export const sessionCompleted = inngest.createFunction(
             return;
           }
 
-          const [profile] = await db
-            .select({
-              birthYear: profiles.birthYear,
-              conversationLanguage: profiles.conversationLanguage,
-            })
-            .from(profiles)
-            .where(eq(profiles.id, profileId))
-            .limit(1);
+          // [WI-586] v2 path: read birthYear + conversationLanguage from person.
+          const profile = isIdentityV2EnabledInStep()
+            ? await getPersonLlmContext(db, profileId)
+            : await db
+                .select({
+                  birthYear: profiles.birthYear,
+                  conversationLanguage: profiles.conversationLanguage,
+                })
+                .from(profiles)
+                .where(eq(profiles.id, profileId))
+                .limit(1)
+                .then((rows) => rows[0] ?? null);
 
           if (!profile) {
             throw new Error(
@@ -1294,11 +1309,23 @@ export const sessionCompleted = inngest.createFunction(
 
           // i18n Phase 1 — load conversation_language so the parent-facing
           // summary renders in the learner's selected language.
-          const [llmSummaryProfile] = await db
-            .select({ conversationLanguage: profiles.conversationLanguage })
-            .from(profiles)
-            .where(eq(profiles.id, profileId))
-            .limit(1);
+          // [WI-586] v2 path: read conversationLanguage from person (profiles dropped).
+          const llmSummaryConversationLanguage = isIdentityV2EnabledInStep()
+            ? ((
+                await db.query.person.findFirst({
+                  where: eq(person.id, profileId),
+                  columns: { conversationLanguage: true },
+                })
+              )?.conversationLanguage ?? null)
+            : ((
+                await db
+                  .select({
+                    conversationLanguage: profiles.conversationLanguage,
+                  })
+                  .from(profiles)
+                  .where(eq(profiles.id, profileId))
+                  .limit(1)
+              )[0]?.conversationLanguage ?? null);
 
           const summary = await generateAndStoreLlmSummary(db, {
             sessionId,
@@ -1308,7 +1335,7 @@ export const sessionCompleted = inngest.createFunction(
             topicId: topicId ?? null,
             // DB returns string | null; parse to union before passing to LLM.
             conversationLanguage: parseConversationLanguage(
-              llmSummaryProfile?.conversationLanguage,
+              llmSummaryConversationLanguage,
             ),
           });
 

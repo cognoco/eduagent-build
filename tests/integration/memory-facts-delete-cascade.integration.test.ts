@@ -12,10 +12,14 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { accounts, generateUUIDv7, memoryFacts } from '@eduagent/database';
+import { generateUUIDv7, memoryFacts } from '@eduagent/database';
 
 import { cascadeDeleteFactWithAncestry } from '../../apps/api/src/services/memory/cascade-delete';
-import { seedLearningProfile, setupTestDb } from './helpers/memory-facts';
+import {
+  cleanupSeededAccount,
+  seedLearningProfile,
+  setupTestDb,
+} from './helpers/memory-facts';
 
 /** Build a minimal fact row (no embedding needed for cascade-delete tests). */
 function factRow(profileId: string, text: string, supersededBy?: string) {
@@ -61,7 +65,7 @@ describe('cascadeDeleteFactWithAncestry (real DB)', () => {
     expect(remaining).toHaveLength(0);
     expect(emitted).toContain('memory.fact.deleted');
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('does not delete facts from a different profile (cross-profile break test)', async () => {
@@ -103,8 +107,8 @@ describe('cascadeDeleteFactWithAncestry (real DB)', () => {
       [p2RootId, p2ChildId].sort(),
     );
 
-    await db.delete(accounts).where(eq(accounts.id, a1));
-    await db.delete(accounts).where(eq(accounts.id, a2));
+    await cleanupSeededAccount(db, a1);
+    await cleanupSeededAccount(db, a2);
   });
 
   it('deletes only the targeted subtree when root has siblings', async () => {
@@ -128,6 +132,6 @@ describe('cascadeDeleteFactWithAncestry (real DB)', () => {
     });
     expect(remaining.map((r) => r.id)).toEqual([siblingId]);
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 });

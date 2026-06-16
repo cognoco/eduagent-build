@@ -104,6 +104,16 @@ jest.mock(
     curricula: {},
     curriculumTopics: {},
     familyLinks: {},
+    guardianship: {
+      guardianPersonId: 'guardianship.guardianPersonId',
+      chargePersonId: 'guardianship.chargePersonId',
+      revokedAt: 'guardianship.revokedAt',
+    },
+    person: {
+      id: 'person.id',
+      archivedAt: 'person.archivedAt',
+      displayName: 'person.displayName',
+    },
     profiles: { id: 'profiles.id', archivedAt: 'profiles.archivedAt' },
     subjects: { status: 'subjects.status' },
   }),
@@ -144,6 +154,8 @@ describe('recallNudgeSend', () => {
     query: {
       curriculumTopics: { findMany: jest.fn().mockResolvedValue([]) },
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
+      guardianship: { findMany: jest.fn().mockResolvedValue([]) },
+      person: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
       profiles: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
     },
     select: createOwnedTopicSelect(),
@@ -152,6 +164,13 @@ describe('recallNudgeSend', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    // Restore mock return values after clearAllMocks wipes them.
+    const selectChain = createOwnedTopicSelect();
+    mockDb.select.mockImplementation((...args: unknown[]) =>
+      selectChain(...args),
+    );
+    mockDb.query.guardianship.findMany.mockResolvedValue([]);
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatRecallNudge.mockReturnValue({
       title: 'Topics fading',
@@ -217,6 +236,8 @@ describe('recallNudgeSend', () => {
     });
 
     it('[WI-86] skips stale send events for archived profiles', async () => {
+      // v2 path: isPersonLive reads person.findFirst; legacy reads profiles.findFirst
+      mockDb.query.person.findFirst.mockResolvedValueOnce(null);
       mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
 
       const { result } = await executeHandler({
@@ -236,7 +257,19 @@ describe('recallNudgeSend', () => {
     });
 
     it('[WI-86] does not format guardian nudges with an archived child name', async () => {
+      // v2 path: resolveProfileRoleV2 reads guardianship.findMany; getFirstActiveChildNameV2
+      // reads person.findFirst for the charge (returns null = archived child).
+      // Legacy path mocks preserved for coverage completeness.
       mockResolveProfileRole.mockResolvedValueOnce('guardian');
+      // v2: first findMany call (resolveProfileRoleV2) returns a charge → guardian.
+      // Second findMany call (getFirstActiveChildNameV2) uses default [] → no charges
+      // to iterate, childName stays null. No second person.findFirst needed.
+      mockDb.query.guardianship.findMany.mockResolvedValueOnce([
+        { chargePersonId: 'child-archived' },
+      ]);
+      mockDb.query.person.findFirst.mockResolvedValueOnce({
+        id: 'guardian-active',
+      }); // isPersonLive check only
       mockDb.query.familyLinks.findFirst.mockResolvedValueOnce({
         childProfileId: 'child-archived',
       });
@@ -269,16 +302,18 @@ describe('recallNudgeSend', () => {
         topTopicIds: ['topic-foreign'],
       });
 
+      // v2: resolveProfileRoleV2 returns 'self_learner'; legacy resolveProfileRole
+      // returns 'learner'. Accept either — the real guard is the not-called check below.
       expect(mockFormatRecallNudge).toHaveBeenCalledWith(
         1,
         'your fading topic',
-        'learner',
+        expect.stringMatching(/^(learner|self_learner)$/),
         undefined,
       );
       expect(mockFormatRecallNudge).not.toHaveBeenCalledWith(
         1,
         'Victim Secret Topic',
-        'learner',
+        expect.any(String),
         undefined,
       );
     });
@@ -294,6 +329,8 @@ describe('[BUG-699-FOLLOWUP] recall-nudge-send 24h push dedup', () => {
     query: {
       curriculumTopics: { findMany: jest.fn().mockResolvedValue([]) },
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
+      guardianship: { findMany: jest.fn().mockResolvedValue([]) },
+      person: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
       profiles: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
     },
     select: createOwnedTopicSelect(),
@@ -369,6 +406,8 @@ describe('[CR-RECALL-DEDUP-GUARD / BUG-840] checkAndLogRateLimitInternal DB fail
     query: {
       curriculumTopics: { findMany: jest.fn().mockResolvedValue([]) },
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
+      guardianship: { findMany: jest.fn().mockResolvedValue([]) },
+      person: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
       profiles: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
     },
     select: createOwnedTopicSelect(),

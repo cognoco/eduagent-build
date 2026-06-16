@@ -85,6 +85,11 @@ const TIMESTAMP = '2026-01-01T00:00:00.000Z';
 describe('summary-regenerate handlers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Ensure existing tests exercise the legacy (flag-off) path — the v2 path
+    // (getPersonLlmContext) requires a db.query.person mock that is not wired
+    // here. v2-path coverage belongs in a separate v2 test block (CUT-B3).
+    // [WI-586 C6] flag-off isolation: delete any ambient IDENTITY_V2_ENABLED.
+    delete process.env['IDENTITY_V2_ENABLED'];
     // i18n Phase 1: summary-regenerate calls db.select({conversationLanguage}).from(profiles).where(...).limit(1)
     const mockSelectLimit = jest
       .fn()
