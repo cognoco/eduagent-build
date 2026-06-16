@@ -10,6 +10,8 @@ import {
   familyLinks,
   profiles,
   consentStates,
+  person,
+  consentRequest,
   type Database,
 } from '@eduagent/database';
 import {
@@ -20,6 +22,7 @@ import {
   isPushEnabled,
 } from './settings';
 import { isGdprProcessingAllowed } from './consent';
+import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
 import { getGuardianPersonIds } from './identity-v2/guardianship';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
@@ -426,13 +429,22 @@ export async function notifyParentToSubscribe(
     return { sent: false, rateLimited: false, reason: 'no_parent_link' };
   }
 
-  // 3. Get child profile info
-  const childProfile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, childProfileId),
-    columns: { displayName: true },
-  });
-
-  const childName = childProfile?.displayName ?? 'Your child';
+  // 3. Get child display name
+  let childName: string;
+  if (opts?.identityV2Enabled) {
+    // [WI-586] v2 path: read displayName from person (profiles dropped).
+    const childPerson = await db.query.person.findFirst({
+      where: eq(person.id, childProfileId),
+      columns: { displayName: true },
+    });
+    childName = childPerson?.displayName ?? 'Your child';
+  } else {
+    const childProfile = await db.query.profiles.findFirst({
+      where: eq(profiles.id, childProfileId),
+      columns: { displayName: true },
+    });
+    childName = childProfile?.displayName ?? 'Your child';
+  }
 
   // 4. Send push notification to parent
   await sendPushNotification(
@@ -446,11 +458,21 @@ export async function notifyParentToSubscribe(
     { respectPushPreference: true },
   );
 
-  // 5. Send email to parent (via consent state parentEmail)
-  const consentState = await db.query.consentStates.findFirst({
-    where: eq(consentStates.profileId, childProfileId),
-  });
-  const parentEmail = consentState?.parentEmail;
+  // 5. Send email to parent (via consent state parentEmail / v2 guardianEmail)
+  let parentEmail: string | undefined;
+  if (opts?.identityV2Enabled) {
+    // [WI-586] v2 path: guardianEmail lives on consentRequest, not consent_states.
+    const req = await db.query.consentRequest.findFirst({
+      where: eq(consentRequest.chargePersonId, childProfileId),
+      columns: { guardianEmail: true },
+    });
+    parentEmail = req?.guardianEmail ?? undefined;
+  } else {
+    const consentState = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childProfileId),
+    });
+    parentEmail = consentState?.parentEmail;
+  }
 
   if (parentEmail) {
     await sendEmail(
@@ -538,7 +560,11 @@ export async function sendStruggleNotification(
   }
 
   // Privacy gate: only send when the child's GDPR consent permits processing.
-  if (!(await isGdprProcessingAllowed(db, childProfileId))) {
+  // [WI-586] v2 path: isGdprProcessingAllowedV2 reads consent_grant (not consent_states).
+  const gdprAllowed = opts?.identityV2Enabled
+    ? await isGdprProcessingAllowedV2(db, childProfileId)
+    : await isGdprProcessingAllowed(db, childProfileId);
+  if (!gdprAllowed) {
     logger.info('Struggle notification suppressed by consent', {
       event: 'notification.struggle.consent_blocked',
       childProfileId,
@@ -586,11 +612,21 @@ export async function sendStruggleNotification(
     return { sent: false, reason: 'dedup_24h' };
   }
 
-  const childProfile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, childProfileId),
-    columns: { displayName: true },
-  });
-  const childName = childProfile?.displayName ?? null;
+  // [WI-586] v2 path: read displayName from person (profiles dropped).
+  let childName: string | null;
+  if (opts?.identityV2Enabled) {
+    const childPerson = await db.query.person.findFirst({
+      where: eq(person.id, childProfileId),
+      columns: { displayName: true },
+    });
+    childName = childPerson?.displayName ?? null;
+  } else {
+    const childProfile = await db.query.profiles.findFirst({
+      where: eq(profiles.id, childProfileId),
+      columns: { displayName: true },
+    });
+    childName = childProfile?.displayName ?? null;
+  }
 
   const copy = formatStruggleNotificationCopy(
     notification.type,
