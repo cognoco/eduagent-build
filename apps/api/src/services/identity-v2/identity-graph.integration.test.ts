@@ -11,32 +11,27 @@
 // loser's 23505 to a bare rethrow and GREEN with the constraint-discriminating
 // catch.
 //
-// SEQUENCING NOTE (real finding from the integration DB): the bootstrap's
-// `quota_pools` insert references the NEW `subscription(id)`, but the satellite
-// FK `quota_pools_subscription_id_subscriptions_id_fk` still targets LEGACY
-// `subscriptions(id)` until the convergence FK re-point (M-REPOINT, WI-586
-// §4 step 6) — by plan §1.4 the quota satellites re-point at convergence, not
-// in CUT-B1. So a FULL-graph insert cannot succeed against the pre-M-REPOINT
-// schema. The full-graph DB tests are therefore gated on `IDENTITY_V2_REPOINTED`
-// (set once the test DB has the re-point applied); they SKIP otherwise. The
-// BUG-411 guard tests do NOT need a full graph — the victim is seeded as a bare
-// `login` row and the attacker is refused at the pre-insert email guard, before
-// any subscription/quota write — so they run whenever a DB is present. The
-// pure-unit guards (calendar, jurisdiction) always run.
+// SEQUENCING NOTE (WI-586): on committed pre-repoint schemas the quota
+// satellites still FK retained legacy `subscriptions(id)`. The bootstrap writes
+// id-aligned retained legacy anchors when those tables exist, so full-graph
+// creation is FK-safe both before and after the re-point.
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
+  accounts as legacyAccounts,
   createDatabase,
   generateUUIDv7,
   login,
   membership,
   organization,
   person,
+  profiles as legacyProfiles,
   subscription,
   subscriptionPayers,
+  subscriptions as legacySubscriptions,
   quotaPools,
   type Database,
 } from '@eduagent/database';
@@ -50,10 +45,19 @@ import {
 // Populate process.env.DATABASE_URL from the test env (no-op if already set).
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
-// Full-graph tests need the quota-satellite FKs re-pointed at the new
-// `subscription` table (M-REPOINT). Until then the graph's quota_pools insert
-// can't succeed. Gate the full-graph DB tests behind this flag.
+// Some historical full-graph concurrency cases are still gated to the explicit
+// post-repoint lane; the committed-schema compatibility path has its own test.
 const REPOINTED = process.env['IDENTITY_V2_REPOINTED'] === 'true';
+
+async function tableExists(db: Database, table: string): Promise<boolean> {
+  const raw = (await db.execute(
+    sql`SELECT to_regclass(${`public.${table}`}) AS reg`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ reg: string | null }>)
+    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
+  return rows[0]?.reg != null;
+}
 
 // Clean up the rows a graph creates, keyed by clerk user id.
 async function cleanupByClerk(
@@ -86,6 +90,11 @@ async function cleanupByClerk(
   await db.delete(membership).where(eq(membership.personId, personId));
   await db.delete(login).where(eq(login.clerkUserId, clerkUserId));
   await db.delete(person).where(eq(person.id, personId));
+  if (await tableExists(db, 'accounts')) {
+    for (const orgId of orgIds) {
+      await db.delete(legacyAccounts).where(eq(legacyAccounts.id, orgId));
+    }
+  }
   for (const orgId of orgIds) {
     await db.delete(organization).where(eq(organization.id, orgId));
   }
@@ -151,6 +160,56 @@ async function cleanupByClerk(
       roles: ['admin', 'learner'],
     });
   }
+
+  it('[WI-586] creates id-aligned retained legacy anchors before quota rows on the committed pre-repoint schema', async () => {
+    const clerkUserId = uniqueClerk();
+    const email = `compat_${generateUUIDv7()}@test.local`;
+
+    const graph = await createIdentityGraph(db, {
+      clerkUserId,
+      verifiedEmail: email,
+      displayName: 'Compat Owner',
+      birthYear: 1990,
+      birthMonth: 6,
+      birthDay: 15,
+      location: 'US',
+      timezone: 'America/New_York',
+    });
+
+    const subRow = await db.query.subscription.findFirst({
+      where: eq(subscription.organizationId, graph.organizationId),
+    });
+    expect(subRow?.planTier).toBe('plus');
+
+    const pool = await db.query.quotaPools.findFirst({
+      where: eq(quotaPools.subscriptionId, subRow!.id),
+    });
+    expect(pool).toBeTruthy();
+
+    if (await tableExists(db, 'accounts')) {
+      const accountRow = await db.query.accounts.findFirst({
+        where: eq(legacyAccounts.id, graph.organizationId),
+      });
+      expect(accountRow?.email).toBe(email);
+    }
+
+    if (await tableExists(db, 'profiles')) {
+      const profileRow = await db.query.profiles.findFirst({
+        where: eq(legacyProfiles.id, graph.personId),
+      });
+      expect(profileRow?.accountId).toBe(graph.organizationId);
+      expect(profileRow?.isOwner).toBe(true);
+    }
+
+    if (await tableExists(db, 'subscriptions')) {
+      const legacySub = await db.query.subscriptions.findFirst({
+        where: eq(legacySubscriptions.id, subRow!.id),
+      });
+      expect(legacySub?.accountId).toBe(graph.organizationId);
+      expect(legacySub?.tier).toBe('plus');
+      expect(legacySub?.status).toBe('trial');
+    }
+  });
 
   (REPOINTED ? it : it.skip)(
     'creates the full graph in one transaction (owner, plus trial) [needs M-REPOINT]',

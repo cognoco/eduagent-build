@@ -24,15 +24,18 @@
 // ---------------------------------------------------------------------------
 
 import { createHash } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
+  accounts as legacyAccounts,
   login,
   membership,
   organization,
   person,
+  profiles as legacyProfiles,
   quotaPools,
   subscription,
   subscriptionPayers,
+  subscriptions as legacySubscriptions,
   type Database,
 } from '@eduagent/database';
 import { ConflictError, BadRequestError } from '../../errors';
@@ -52,6 +55,7 @@ const logger = createLogger();
 // re-open BUG-411.
 const LOGIN_CLERK_UNIQUE = 'login_clerk_user_id_unique';
 const LOGIN_EMAIL_UNIQUE = 'login_email_unique';
+const legacyTableExistsCache = new Map<string, boolean>();
 
 /**
  * Reverse jurisdiction map: the profile-create `location` input
@@ -122,6 +126,84 @@ function uniqueViolationConstraint(error: unknown): string | null {
     return typeof constraint === 'string' ? constraint : '';
   }
   return null;
+}
+
+async function tableExists(db: Database, table: string): Promise<boolean> {
+  const cached = legacyTableExistsCache.get(table);
+  if (cached !== undefined) return cached;
+
+  const raw = (await db.execute(
+    sql`SELECT to_regclass(${`public.${table}`}) AS reg`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ reg: string | null }>)
+    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
+  const exists = rows[0]?.reg != null;
+  legacyTableExistsCache.set(table, exists);
+  return exists;
+}
+
+async function writeLegacyAccountIfPresent(
+  db: Database,
+  input: {
+    organizationId: string;
+    email: string;
+    clerkUserId: string;
+    timezone?: string | null;
+  },
+): Promise<void> {
+  if (!(await tableExists(db, 'accounts'))) return;
+  await db.insert(legacyAccounts).values({
+    id: input.organizationId,
+    email: input.email,
+    clerkUserId: input.clerkUserId,
+    timezone: input.timezone ?? null,
+  });
+}
+
+async function writeLegacyProfileIfPresent(
+  db: Database,
+  input: {
+    personId: string;
+    organizationId: string;
+    displayName: string;
+    birthYear: number;
+    location?: 'EU' | 'US' | 'OTHER' | null;
+    conversationLanguage?: string;
+    pronouns?: string | null;
+    avatarUrl?: string | null;
+  },
+): Promise<void> {
+  if (!(await tableExists(db, 'profiles'))) return;
+  await db.insert(legacyProfiles).values({
+    id: input.personId,
+    accountId: input.organizationId,
+    displayName: input.displayName,
+    birthYear: input.birthYear,
+    location: input.location ?? 'OTHER',
+    isOwner: true,
+    conversationLanguage: input.conversationLanguage ?? 'en',
+    pronouns: input.pronouns ?? null,
+    avatarUrl: input.avatarUrl ?? null,
+  });
+}
+
+async function writeRetainedSubscriptionIfPresent(
+  db: Database,
+  input: {
+    subscriptionId: string;
+    organizationId: string;
+    trialEndsAt: Date;
+  },
+): Promise<void> {
+  if (!(await tableExists(db, 'subscriptions'))) return;
+  await db.insert(legacySubscriptions).values({
+    id: input.subscriptionId,
+    accountId: input.organizationId,
+    tier: 'plus',
+    status: 'trial',
+    trialEndsAt: input.trialEndsAt,
+  });
 }
 
 /**
@@ -263,6 +345,12 @@ export async function createIdentityGraph(
         })
         .returning();
       if (!orgRow) throw new Error('organization insert did not return a row');
+      await writeLegacyAccountIfPresent(txDb, {
+        organizationId: orgRow.id,
+        email: input.verifiedEmail,
+        clerkUserId: input.clerkUserId,
+        timezone: orgRow.timezone,
+      });
 
       // (3) person
       const [personRow] = await txDb
@@ -279,6 +367,16 @@ export async function createIdentityGraph(
         })
         .returning();
       if (!personRow) throw new Error('person insert did not return a row');
+      await writeLegacyProfileIfPresent(txDb, {
+        personId: personRow.id,
+        organizationId: orgRow.id,
+        displayName: input.displayName,
+        birthYear: input.birthYear,
+        location: input.location,
+        conversationLanguage: input.conversationLanguage,
+        pronouns: input.pronouns,
+        avatarUrl: input.avatarUrl,
+      });
 
       // (4) login
       const [loginRow] = await txDb
@@ -319,6 +417,11 @@ export async function createIdentityGraph(
         })
         .returning();
       if (!subRow) throw new Error('subscription insert did not return a row');
+      await writeRetainedSubscriptionIfPresent(txDb, {
+        subscriptionId: subRow.id,
+        organizationId: orgRow.id,
+        trialEndsAt,
+      });
 
       // (8) subscription_payers — primary
       await txDb.insert(subscriptionPayers).values({
@@ -328,18 +431,9 @@ export async function createIdentityGraph(
       });
 
       // (9) quota_pools — same cycle-reset convention as legacy
-      // createSubscription. This row references the NEW `subscription.id`.
-      //
-      // SEQUENCING (plan §1.4 / §4 step 6): `quota_pools.subscription_id` is a
-      // kept satellite whose FK still targets LEGACY `subscriptions(id)` and is
-      // re-pointed to the new `subscription(id)` only at the convergence
-      // FK re-point (M-REPOINT, WI-586). Until then this insert cannot commit —
-      // which is coherent with the single-live-store invariant: the flag is
-      // `'false'` in EVERY deployed environment, so `createIdentityGraph` never
-      // runs in production before M-REPOINT, and M-REPOINT lands inside the same
-      // freeze window as the flag flip. The v2 graph and its quota row become
-      // simultaneously valid at convergence. Full-graph integration tests are
-      // gated on `IDENTITY_V2_REPOINTED` accordingly.
+      // createSubscription. The id-aligned retained `subscriptions` row above
+      // keeps this FK-safe on committed pre-repoint schemas; after the re-point
+      // the same id resolves against the new `subscription` row.
       const plusTier = getTierConfig('plus');
       const cycleResetAt = new Date();
       cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);

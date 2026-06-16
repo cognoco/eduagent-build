@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 import {
   accounts,
   consentGrant,
@@ -65,6 +65,42 @@ export function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
+async function tableExists(
+  db: ReturnType<typeof createIntegrationDb>,
+  table: string,
+): Promise<boolean> {
+  const raw = (await db.execute(
+    sql`SELECT to_regclass(${`public.${table}`}) AS reg`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ reg: string | null }>)
+    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
+  return rows[0]?.reg != null;
+}
+
+async function cleanupLegacyAccountsIfPresent(
+  db: ReturnType<typeof createIntegrationDb>,
+  input: {
+    emails?: string[];
+    clerkUserIds?: string[];
+    accountIds?: string[];
+  },
+): Promise<void> {
+  if (!(await tableExists(db, 'accounts'))) return;
+
+  if (input.emails && input.emails.length > 0) {
+    await db.delete(accounts).where(inArray(accounts.email, input.emails));
+  }
+  if (input.clerkUserIds && input.clerkUserIds.length > 0) {
+    await db
+      .delete(accounts)
+      .where(inArray(accounts.clerkUserId, input.clerkUserIds));
+  }
+  if (input.accountIds && input.accountIds.length > 0) {
+    await db.delete(accounts).where(inArray(accounts.id, input.accountIds));
+  }
+}
+
 export async function cleanupAccounts(input: {
   emails?: string[];
   clerkUserIds?: string[];
@@ -98,6 +134,7 @@ export async function cleanupAccounts(input: {
     }
 
     if (ownerPersonIds.size === 0) {
+      await cleanupLegacyAccountsIfPresent(db, input);
       return;
     }
 
@@ -162,6 +199,10 @@ export async function cleanupAccounts(input: {
       .delete(subscription)
       .where(inArray(subscription.payerPersonId, personIdList));
     await db.delete(person).where(inArray(person.id, personIdList));
+    await cleanupLegacyAccountsIfPresent(db, {
+      ...input,
+      accountIds: orgIdList,
+    });
     if (orgIdList.length > 0) {
       await db.delete(organization).where(inArray(organization.id, orgIdList));
     }
