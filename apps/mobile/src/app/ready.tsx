@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { useProfile } from '../lib/profile';
-import { DeskLampAnimation } from '../components/common/DeskLampAnimation';
+import { MentorBirthAnimation } from '../components/common/MentorBirthAnimation';
 import { CheckmarkPopAnimation } from '../components/common/CheckmarkPopAnimation';
 import { Button } from '../components/common/Button';
 
@@ -129,7 +129,10 @@ export default function ReadyScreen() {
         }
       >
         <View className="items-center mt-8 mb-4">
-          <DeskLampAnimation size={180} testID="ready-lamp" />
+          <MentorBirthAnimation
+            size={240}
+            readyLabel={t('onboarding.mentorBirth.ready')}
+          />
         </View>
 
         <Text className="text-h1 font-bold text-text-primary text-center mb-2">

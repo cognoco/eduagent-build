@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="760" height="760" viewBox="0 0 760 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>Octopus Mascot V2 Main</title>
+<defs>
+  <radialGradient id="bg" cx="45%" cy="40%" r="66%">
+    <stop offset="0%" stop-color="#12383c"/>
+    <stop offset="52%" stop-color="#0b1f26"/>
+    <stop offset="100%" stop-color="#070b12"/>
+  </radialGradient>
+  <radialGradient id="tealBody" cx="42%" cy="25%" r="72%">
+    <stop offset="0%" stop-color="#47fff0"/>
+    <stop offset="38%" stop-color="#10b7ad"/>
+    <stop offset="74%" stop-color="#067d80"/>
+    <stop offset="100%" stop-color="#035263"/>
+  </radialGradient>
+  <linearGradient id="tentacle" x1="250" y1="160" x2="640" y2="700" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#24e4d4"/>
+    <stop offset="42%" stop-color="#0ca99d"/>
+    <stop offset="100%" stop-color="#034f62"/>
+  </linearGradient>
+  <linearGradient id="underside" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#0e807f"/>
+    <stop offset="100%" stop-color="#033b4c"/>
+  </linearGradient>
+  <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#a675ff"/>
+    <stop offset="100%" stop-color="#5a2fb0"/>
+  </linearGradient>
+  <linearGradient id="hatBand" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#9a61f5"/>
+    <stop offset="55%" stop-color="#c099ff"/>
+    <stop offset="100%" stop-color="#8d55e8"/>
+  </linearGradient>
+  <radialGradient id="cup" cx="35%" cy="30%" r="75%">
+    <stop offset="0%" stop-color="#f2fffb"/>
+    <stop offset="55%" stop-color="#9af4e7"/>
+    <stop offset="100%" stop-color="#42bdb4"/>
+  </radialGradient>
+  <filter id="shadow" x="-30%" y="-30%" width="170%" height="180%">
+    <feDropShadow dx="0" dy="25" stdDeviation="25" flood-color="#000" flood-opacity=".42"/>
+  </filter>
+  <filter id="soft" x="-20%" y="-20%" width="140%" height="150%">
+    <feGaussianBlur stdDeviation="12"/>
+  </filter>
+  <style>
+    .label{font-family:Inter,Arial,sans-serif;font-size:22px;fill:#bdece7;opacity:.92}
+    .eyeLine{stroke:#07121a;stroke-width:9;stroke-linecap:round}
+    .smile{stroke:#06121b;stroke-width:9;stroke-linecap:round;fill:none}
+  </style>
+</defs>
+<rect width="760" height="760" fill="url(#bg)"/>
+<ellipse cx="375" cy="360" rx="315" ry="295" fill="#1af8df" opacity=".12" filter="url(#soft)"/>
+
+<g id="main" transform="translate(55 30)" filter="url(#shadow)">
+  <!-- back arms: long, curled, less cartoon-flat -->
+  <path d="M332 386 C225 378 123 331 74 246 C48 201 76 174 110 212 C177 287 226 301 302 295" stroke="url(#tentacle)" stroke-width="50" stroke-linecap="round"/>
+  <path d="M472 384 C583 372 675 323 716 237 C739 190 775 215 761 263 C734 355 604 410 497 423" stroke="url(#tentacle)" stroke-width="50" stroke-linecap="round"/>
+  <path d="M318 426 C208 451 129 526 96 636 C82 683 126 701 153 662 C203 589 235 541 315 509" stroke="url(#tentacle)" stroke-width="52" stroke-linecap="round"/>
+  <path d="M487 424 C591 454 666 532 695 642 C708 689 664 705 638 667 C591 598 554 545 478 510" stroke="url(#tentacle)" stroke-width="52" stroke-linecap="round"/>
+
+  <!-- central elongated head/body -->
+  <path d="M405 72
+           C502 72 566 143 556 247
+           C550 322 531 381 500 448
+           C475 504 476 562 505 633
+           C526 684 492 730 449 704
+           C414 682 405 617 402 557
+           C399 520 392 498 381 498
+           C368 498 357 522 349 564
+           C337 625 324 693 280 711
+           C235 729 212 675 235 626
+           C264 564 268 507 239 445
+           C209 382 196 321 195 250
+           C193 144 264 72 405 72Z"
+        fill="url(#tealBody)"/>
+
+  <!-- front arms -->
+  <path d="M350 439 C264 482 214 566 204 686 C201 730 248 743 266 703 C288 653 306 590 365 535" stroke="url(#tentacle)" stroke-width="55" stroke-linecap="round"/>
+  <path d="M455 438 C542 483 592 566 603 686 C607 730 559 743 541 704 C520 656 502 591 442 535" stroke="url(#tentacle)" stroke-width="55" stroke-linecap="round"/>
+  <path d="M397 465 C358 540 333 628 348 741 C354 784 407 786 414 742 C422 686 425 601 443 516" stroke="url(#tentacle)" stroke-width="55" stroke-linecap="round"/>
+
+  <!-- internal shadows/highlights -->
+  <path d="M268 139 C245 185 244 244 254 300" stroke="#6ffff1" stroke-width="18" stroke-linecap="round" opacity=".30"/>
+  <path d="M168 596 C203 531 253 485 323 455" stroke="#70ffee" stroke-width="14" stroke-linecap="round" opacity=".25"/>
+  <path d="M640 603 C606 536 557 489 487 455" stroke="#70ffee" stroke-width="14" stroke-linecap="round" opacity=".22"/>
+  <path d="M402 116 C493 123 522 193 510 279" stroke="#07121a" stroke-width="18" stroke-linecap="round" opacity=".10"/>
+
+  <!-- suction cups placed along arms -->
+  <g fill="url(#cup)" opacity=".92">
+    <circle cx="135" cy="259" r="13"/><circle cx="203" cy="326" r="12"/><circle cx="707" cy="265" r="12"/><circle cx="638" cy="331" r="12"/>
+    <circle cx="152" cy="616" r="12"/><circle cx="200" cy="569" r="12"/><circle cx="255" cy="527" r="12"/><circle cx="311" cy="497" r="12"/>
+    <circle cx="651" cy="620" r="12"/><circle cx="602" cy="572" r="12"/><circle cx="546" cy="528" r="12"/><circle cx="494" cy="499" r="12"/>
+    <circle cx="260" cy="671" r="11"/><circle cx="284" cy="714" r="9"/><circle cx="354" cy="690" r="10"/><circle cx="383" cy="739" r="8"/>
+    <circle cx="538" cy="671" r="11"/><circle cx="515" cy="714" r="9"/><circle cx="452" cy="688" r="10"/>
+  </g>
+
+  <!-- purple beanie / hat -->
+  <path d="M221 168 C235 93 300 43 406 43 C507 43 568 96 581 168 C494 196 311 196 221 168Z" fill="url(#hat)"/>
+  <path d="M217 156 C307 181 496 183 585 156 C602 151 614 165 611 184 L606 212 C603 231 581 237 566 227 C473 244 335 244 243 227 C228 238 207 232 203 213 L198 185 C195 166 202 152 217 156Z" fill="url(#hatBand)"/>
+  <path d="M240 199 C330 218 480 219 570 199" stroke="#d6b9ff" stroke-width="8" stroke-linecap="round" opacity=".45"/>
+
+  <!-- eyes: relaxed but not alien -->
+  <rect x="314" y="276" width="82" height="54" rx="22" fill="#fbfaf3"/>
+  <rect x="423" y="276" width="82" height="54" rx="22" fill="#fbfaf3"/>
+  <circle cx="356" cy="303" r="18" fill="#29305e"/>
+  <circle cx="463" cy="303" r="18" fill="#29305e"/>
+  <path d="M310 271 H397" class="eyeLine"/>
+  <path d="M419 271 H506" class="eyeLine"/>
+  <path d="M314 276 H396 V296 C368 290 340 290 314 296Z" fill="#0aa89d"/>
+  <path d="M423 276 H505 V296 C477 290 449 290 423 296Z" fill="#0aa89d"/>
+
+  <!-- friendly smile -->
+  <path d="M357 368 C382 393 430 393 455 368" class="smile"/>
+</g>
+
+
+</svg>

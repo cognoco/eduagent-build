@@ -1,0 +1,114 @@
+<svg width="1024" height="768" viewBox="0 0 1024 768" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Mentor mascot cool 3D concept</title>
+  <desc>Standalone concept sketch based on docs/logo-designs/octopus 3D.png. Exactly eight arms, no app wiring.</desc>
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 356) rotate(90) scale(360 520)">
+      <stop offset="0" stop-color="#2dd4bf" stop-opacity="0.34"/>
+      <stop offset="0.62" stop-color="#0f766e" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#07181c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="body" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(438 210) rotate(52) scale(350 315)">
+      <stop offset="0" stop-color="#36f7df"/>
+      <stop offset="0.52" stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#08756e"/>
+    </radialGradient>
+    <linearGradient id="armA" x1="246" y1="302" x2="760" y2="686" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2dd4bf"/>
+      <stop offset="0.58" stop-color="#0d9488"/>
+      <stop offset="1" stop-color="#075f5b"/>
+    </linearGradient>
+    <linearGradient id="armB" x1="266" y1="340" x2="748" y2="712" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f766e"/>
+      <stop offset="0.58" stop-color="#0d9488"/>
+      <stop offset="1" stop-color="#053f3d"/>
+    </linearGradient>
+    <linearGradient id="capCrown" x1="378" y1="68" x2="626" y2="205" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9f7aea"/>
+      <stop offset="1" stop-color="#6d38d7"/>
+    </linearGradient>
+    <linearGradient id="capBand" x1="326" y1="164" x2="696" y2="204" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9f7aea"/>
+      <stop offset="0.5" stop-color="#c4a5ff"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <radialGradient id="sucker" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="scale(16 12)">
+      <stop stop-color="#e8fffb"/>
+      <stop offset="0.56" stop-color="#99f6e4"/>
+      <stop offset="1" stop-color="#2dd4bf"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#031416" flood-opacity="0.36"/>
+    </filter>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.18 0 0 0 0 0.83 0 0 0 0 0.75 0 0 0 0.42 0"/>
+      <feBlend in="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="768" fill="#07181c"/>
+  <rect width="1024" height="768" fill="url(#bg)"/>
+
+  <g filter="url(#shadow)">
+    <!-- Eight arms total, numbered left-to-right. They all emerge from the underside, not from the sides like wings. -->
+    <path id="arm-1" d="M383 358C299 371 235 419 172 525C151 561 108 541 124 503C172 392 255 321 368 310Z" fill="url(#armB)"/>
+    <path id="arm-2" d="M411 392C338 433 300 512 248 664C232 710 176 694 193 650C241 512 296 411 385 358Z" fill="url(#armA)"/>
+    <path id="arm-3" d="M455 415C407 482 377 572 334 718C321 762 268 747 281 703C319 574 360 465 426 391Z" fill="url(#armB)"/>
+    <path id="arm-4" d="M493 430C470 506 458 604 450 732C447 779 390 774 395 728C408 592 426 493 466 416Z" fill="url(#armA)"/>
+    <path id="arm-5" d="M532 430C555 506 566 604 574 732C577 779 634 774 629 728C616 592 598 493 558 416Z" fill="url(#armB)"/>
+    <path id="arm-6" d="M570 415C618 482 647 572 690 718C704 762 756 747 743 703C705 574 664 465 598 391Z" fill="url(#armA)"/>
+    <path id="arm-7" d="M614 392C687 433 724 512 776 664C792 710 848 694 831 650C783 512 729 411 640 358Z" fill="url(#armB)"/>
+    <path id="arm-8" d="M642 358C725 371 789 419 852 525C873 561 916 541 900 503C852 392 770 321 657 310Z" fill="url(#armA)"/>
+
+    <!-- Main mantle/head: broad and rounded, but not a bee body. -->
+    <path d="M318 258C318 142 392 82 512 82C633 82 707 142 707 258C707 368 632 438 512 438C392 438 318 368 318 258Z" fill="url(#body)" filter="url(#glow)"/>
+    <path d="M348 353C391 411 456 443 512 443C568 443 633 411 676 353C665 438 599 496 512 496C425 496 359 438 348 353Z" fill="url(#body)"/>
+    <path d="M360 142C328 204 328 300 352 368" stroke="#56f3df" stroke-opacity="0.18" stroke-width="18" stroke-linecap="round"/>
+    <path d="M657 140C690 205 688 306 657 378" stroke="#063d40" stroke-opacity="0.2" stroke-width="18" stroke-linecap="round"/>
+    <path d="M420 420C475 450 550 450 604 421" stroke="#5eead4" stroke-opacity="0.16" stroke-width="20" stroke-linecap="round"/>
+
+    <!-- Purple cap/cap-band from the 3D source; broad enough for personality, not a bee stripe. -->
+    <path d="M342 174C370 94 456 52 568 66C641 75 692 116 710 178C638 207 442 208 342 174Z" fill="url(#capCrown)"/>
+    <path d="M331 173C424 205 599 208 715 177C735 178 746 194 742 216C738 239 721 247 705 236C601 262 426 258 326 230C307 243 290 234 287 211C284 190 300 173 331 173Z" fill="url(#capBand)"/>
+    <path d="M360 204C446 224 595 226 707 203" stroke="#d8b4fe" stroke-width="8" stroke-linecap="round" opacity="0.66"/>
+    <ellipse cx="586" cy="92" rx="18" ry="7" fill="#d8b4fe" opacity="0.4"/>
+
+    <!-- Cool mentor face. -->
+    <ellipse cx="452" cy="260" rx="43" ry="38" fill="#eafffb" opacity="0.96"/>
+    <ellipse cx="572" cy="260" rx="43" ry="38" fill="#eafffb" opacity="0.96"/>
+    <circle cx="452" cy="268" r="22" fill="#1a1a3e"/>
+    <circle cx="572" cy="268" r="22" fill="#1a1a3e"/>
+    <circle cx="465" cy="249" r="5" fill="#fff" opacity="0.9"/>
+    <circle cx="585" cy="249" r="5" fill="#fff" opacity="0.9"/>
+    <path d="M409 250C424 234 480 234 495 250C476 246 427 246 409 250Z" fill="#0f766e" opacity="0.62"/>
+    <path d="M529 250C544 234 600 234 615 250C596 246 547 246 529 250Z" fill="#0f766e" opacity="0.62"/>
+    <path d="M398 231H493" stroke="#051a22" stroke-width="10" stroke-linecap="round"/>
+    <path d="M530 231H625" stroke="#051a22" stroke-width="10" stroke-linecap="round"/>
+    <path d="M458 321C486 354 539 354 567 322" stroke="#051a22" stroke-width="12" stroke-linecap="round"/>
+
+    <!-- Suckers: placed only on arms, irregular like the 3D reference. -->
+    <g opacity="0.94">
+      <ellipse cx="264" cy="411" rx="15" ry="11" fill="url(#sucker)" transform="rotate(-25 264 411)"/>
+      <ellipse cx="212" cy="501" rx="17" ry="12" fill="url(#sucker)" transform="rotate(-36 212 501)"/>
+      <ellipse cx="320" cy="503" rx="14" ry="10" fill="url(#sucker)" transform="rotate(-48 320 503)"/>
+      <ellipse cx="290" cy="605" rx="16" ry="11" fill="url(#sucker)" transform="rotate(-55 290 605)"/>
+      <ellipse cx="400" cy="520" rx="13" ry="10" fill="url(#sucker)" transform="rotate(-68 400 520)"/>
+      <ellipse cx="372" cy="638" rx="15" ry="11" fill="url(#sucker)" transform="rotate(-66 372 638)"/>
+      <ellipse cx="478" cy="548" rx="12" ry="10" fill="url(#sucker)" transform="rotate(-84 478 548)"/>
+      <ellipse cx="465" cy="654" rx="14" ry="10" fill="url(#sucker)" transform="rotate(-84 465 654)"/>
+      <ellipse cx="546" cy="548" rx="12" ry="10" fill="url(#sucker)" transform="rotate(84 546 548)"/>
+      <ellipse cx="559" cy="654" rx="14" ry="10" fill="url(#sucker)" transform="rotate(84 559 654)"/>
+      <ellipse cx="624" cy="520" rx="13" ry="10" fill="url(#sucker)" transform="rotate(68 624 520)"/>
+      <ellipse cx="652" cy="638" rx="15" ry="11" fill="url(#sucker)" transform="rotate(66 652 638)"/>
+      <ellipse cx="704" cy="503" rx="14" ry="10" fill="url(#sucker)" transform="rotate(48 704 503)"/>
+      <ellipse cx="734" cy="605" rx="16" ry="11" fill="url(#sucker)" transform="rotate(55 734 605)"/>
+      <ellipse cx="760" cy="411" rx="15" ry="11" fill="url(#sucker)" transform="rotate(25 760 411)"/>
+      <ellipse cx="812" cy="501" rx="17" ry="12" fill="url(#sucker)" transform="rotate(36 812 501)"/>
+    </g>
+
+    <path d="M221 471C273 399 324 361 383 350" stroke="#5eead4" stroke-opacity="0.28" stroke-width="13" stroke-linecap="round"/>
+    <path d="M318 608C347 522 382 462 424 420" stroke="#5eead4" stroke-opacity="0.3" stroke-width="11" stroke-linecap="round"/>
+    <path d="M706 608C677 522 642 462 600 420" stroke="#5eead4" stroke-opacity="0.3" stroke-width="11" stroke-linecap="round"/>
+    <path d="M803 471C751 399 700 361 641 350" stroke="#5eead4" stroke-opacity="0.28" stroke-width="13" stroke-linecap="round"/>
+  </g>
+</svg>

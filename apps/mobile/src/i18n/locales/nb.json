@@ -2095,6 +2095,9 @@
     },
     "stepIndicator": {
       "stepOf": "Steg {{current}} av {{total}}"
+    },
+    "mentorBirth": {
+      "ready": "Veilederen din er klar."
     }
   },
   "parentView": {

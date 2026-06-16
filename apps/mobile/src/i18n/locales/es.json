@@ -2095,6 +2095,9 @@
     },
     "stepIndicator": {
       "stepOf": "Paso {{current}} de {{total}}"
+    },
+    "mentorBirth": {
+      "ready": "Tu mentor está listo."
     }
   },
   "parentView": {

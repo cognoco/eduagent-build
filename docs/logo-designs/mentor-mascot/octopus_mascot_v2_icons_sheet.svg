@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="520" height="360" viewBox="720 70 500 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>Octopus Mascot V2 Icons</title>
+<defs>
+  <radialGradient id="bg" cx="45%" cy="40%" r="66%">
+    <stop offset="0%" stop-color="#12383c"/>
+    <stop offset="52%" stop-color="#0b1f26"/>
+    <stop offset="100%" stop-color="#070b12"/>
+  </radialGradient>
+  <radialGradient id="tealBody" cx="42%" cy="25%" r="72%">
+    <stop offset="0%" stop-color="#47fff0"/>
+    <stop offset="38%" stop-color="#10b7ad"/>
+    <stop offset="74%" stop-color="#067d80"/>
+    <stop offset="100%" stop-color="#035263"/>
+  </radialGradient>
+  <linearGradient id="tentacle" x1="250" y1="160" x2="640" y2="700" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#24e4d4"/>
+    <stop offset="42%" stop-color="#0ca99d"/>
+    <stop offset="100%" stop-color="#034f62"/>
+  </linearGradient>
+  <linearGradient id="underside" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#0e807f"/>
+    <stop offset="100%" stop-color="#033b4c"/>
+  </linearGradient>
+  <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#a675ff"/>
+    <stop offset="100%" stop-color="#5a2fb0"/>
+  </linearGradient>
+  <linearGradient id="hatBand" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#9a61f5"/>
+    <stop offset="55%" stop-color="#c099ff"/>
+    <stop offset="100%" stop-color="#8d55e8"/>
+  </linearGradient>
+  <radialGradient id="cup" cx="35%" cy="30%" r="75%">
+    <stop offset="0%" stop-color="#f2fffb"/>
+    <stop offset="55%" stop-color="#9af4e7"/>
+    <stop offset="100%" stop-color="#42bdb4"/>
+  </radialGradient>
+  <filter id="shadow" x="-30%" y="-30%" width="170%" height="180%">
+    <feDropShadow dx="0" dy="25" stdDeviation="25" flood-color="#000" flood-opacity=".42"/>
+  </filter>
+  <filter id="soft" x="-20%" y="-20%" width="140%" height="150%">
+    <feGaussianBlur stdDeviation="12"/>
+  </filter>
+  <style>
+    .label{font-family:Inter,Arial,sans-serif;font-size:22px;fill:#bdece7;opacity:.92}
+    .eyeLine{stroke:#07121a;stroke-width:9;stroke-linecap:round}
+    .smile{stroke:#06121b;stroke-width:9;stroke-linecap:round;fill:none}
+  </style>
+</defs>
+<rect x="720" y="70" width="500" height="540" fill="url(#bg)"/>
+
+<g transform="translate(760 105)" filter="url(#shadow)">
+  <rect x="0" y="0" width="160" height="160" rx="34" fill="#101820"/>
+  <ellipse cx="80" cy="87" rx="64" ry="65" fill="#12262c"/>
+  <g transform="translate(8 6) scale(.90)">
+    <path d="M80 35 C111 35 132 58 128 94 C126 111 120 127 125 142 C130 155 111 158 106 145 C101 131 105 115 114 101" stroke="url(#tealFlat)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M80 35 C49 35 28 58 32 94 C34 111 40 127 35 142 C30 155 49 158 54 145 C59 131 55 115 46 101" stroke="url(#tealFlat)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M55 101 C35 113 25 130 22 149" stroke="url(#tealFlat)" stroke-width="15" stroke-linecap="round"/>
+    <path d="M105 101 C125 113 135 130 138 149" stroke="url(#tealFlat)" stroke-width="15" stroke-linecap="round"/>
+    <ellipse cx="80" cy="70" rx="48" ry="55" fill="url(#tealFlat)"/>
+    <path d="M40 58 C45 32 60 20 80 20 C100 20 115 32 120 58 C95 67 65 67 40 58Z" fill="url(#hat)"/>
+    <path d="M38 55 C63 64 97 64 122 55 C127 54 131 58 130 63 L129 70 C128 76 121 77 117 74 C92 80 68 80 43 74 C38 77 32 76 31 70 L30 63 C29 58 33 54 38 55Z" fill="url(#hatBand)"/>
+    <rect x="53" y="72" width="28" height="18" rx="8" fill="#fbfaf3"/>
+    <rect x="88" y="72" width="28" height="18" rx="8" fill="#fbfaf3"/>
+    <circle cx="67" cy="80" r="7" fill="#29305e"/>
+    <circle cx="102" cy="80" r="7" fill="#29305e"/>
+    <rect x="51" y="69" width="31" height="9" rx="4.5" fill="#0aa89d"/>
+    <rect x="86" y="69" width="31" height="9" rx="4.5" fill="#0aa89d"/>
+    <path d="M64 101 C73 110 88 110 97 101" stroke="#06121b" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</g>
+<text x="753" y="300" class="label">Dark app icon</text>
+
+<!-- LIGHT ICON -->
+<g transform="translate(980 105)" filter="url(#shadow)">
+  <rect x="0" y="0" width="160" height="160" rx="34" fill="#fbf7ef"/>
+  <g transform="translate(8 6) scale(.90)">
+    <path d="M80 35 C111 35 132 58 128 94 C126 111 120 127 125 142 C130 155 111 158 106 145 C101 131 105 115 114 101" stroke="url(#tealFlat)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M80 35 C49 35 28 58 32 94 C34 111 40 127 35 142 C30 155 49 158 54 145 C59 131 55 115 46 101" stroke="url(#tealFlat)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M55 101 C35 113 25 130 22 149" stroke="url(#tealFlat)" stroke-width="15" stroke-linecap="round"/>
+    <path d="M105 101 C125 113 135 130 138 149" stroke="url(#tealFlat)" stroke-width="15" stroke-linecap="round"/>
+    <ellipse cx="80" cy="70" rx="48" ry="55" fill="url(#tealFlat)"/>
+    <path d="M40 58 C45 32 60 20 80 20 C100 20 115 32 120 58 C95 67 65 67 40 58Z" fill="url(#hat)"/>
+    <path d="M38 55 C63 64 97 64 122 55 C127 54 131 58 130 63 L129 70 C128 76 121 77 117 74 C92 80 68 80 43 74 C38 77 32 76 31 70 L30 63 C29 58 33 54 38 55Z" fill="url(#hatBand)"/>
+    <rect x="53" y="72" width="28" height="18" rx="8" fill="#fbfaf3"/>
+    <rect x="88" y="72" width="28" height="18" rx="8" fill="#fbfaf3"/>
+    <circle cx="67" cy="80" r="7" fill="#29305e"/>
+    <circle cx="102" cy="80" r="7" fill="#29305e"/>
+    <rect x="51" y="69" width="31" height="9" rx="4.5" fill="#0aa89d"/>
+    <rect x="86" y="69" width="31" height="9" rx="4.5" fill="#0aa89d"/>
+    <path d="M64 101 C73 110 88 110 97 101" stroke="#06121b" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</g>
+<text x="973" y="300" class="label">Light app icon</text>
+
+<!-- LOGO MARK -->
+<g transform="translate(760 385)" filter="url(#shadow)">
+  <circle cx="80" cy="80" r="80" fill="#00a99b"/>
+  <ellipse cx="80" cy="60" rx="40" ry="46" fill="#fbf7ef"/>
+  <path d="M50 83 C62 96 68 114 61 135" stroke="#fbf7ef" stroke-width="14" stroke-linecap="round"/>
+  <path d="M80 94 C76 112 76 129 81 143" stroke="#fbf7ef" stroke-width="14" stroke-linecap="round"/>
+  <path d="M110 83 C98 96 92 114 99 135" stroke="#fbf7ef" stroke-width="14" stroke-linecap="round"/>
+  <path d="M49 95 C37 101 30 112 27 127" stroke="#fbf7ef" stroke-width="14" stroke-linecap="round"/>
+  <path d="M111 95 C123 101 130 112 133 127" stroke="#fbf7ef" stroke-width="14" stroke-linecap="round"/>
+</g>
+<text x="755" y="575" class="label">Simple logo mark</text>
+
+<!-- FLAT AVATAR -->
+<g transform="translate(990 385)" filter="url(#shadow)">
+  <path d="M80 34 C112 34 133 58 129 94 C127 113 122 128 126 143 C130 156 111 159 106 145 C102 132 105 114 113 101" stroke="url(#tealFlat)" stroke-width="17" stroke-linecap="round"/>
+  <path d="M80 34 C48 34 27 58 31 94 C33 113 38 128 34 143 C30 156 49 159 54 145 C58 132 55 114 47 101" stroke="url(#tealFlat)" stroke-width="17" stroke-linecap="round"/>
+  <path d="M55 101 C36 113 25 131 22 149" stroke="url(#tealFlat)" stroke-width="15" stroke-linecap="round"/>
+  <path d="M105 101 C124 113 135 131 138 149" stroke="url(#tealFlat)" stroke-width="15" stroke-linecap="round"/>
+  <ellipse cx="80" cy="69" rx="49" ry="55" fill="url(#tealFlat)"/>
+  <rect x="52" y="72" width="28" height="18" rx="8" fill="#fbfaf3"/>
+  <rect x="88" y="72" width="28" height="18" rx="8" fill="#fbfaf3"/>
+  <circle cx="66" cy="80" r="7" fill="#29305e"/>
+  <circle cx="102" cy="80" r="7" fill="#29305e"/>
+  <rect x="50" y="69" width="31" height="9" rx="4.5" fill="#0aa89d"/>
+  <rect x="86" y="69" width="31" height="9" rx="4.5" fill="#0aa89d"/>
+  <path d="M64 101 C73 110 88 110 97 101" stroke="#06121b" stroke-width="5" stroke-linecap="round"/>
+</g>
+<text x="985" y="575" class="label">Flat avatar</text>
+
+</svg>

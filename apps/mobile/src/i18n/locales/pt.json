@@ -2122,6 +2122,9 @@
     },
     "stepIndicator": {
       "stepOf": "Passo {{current}} de {{total}}"
+    },
+    "mentorBirth": {
+      "ready": "O seu tutor está pronto."
     }
   },
   "parentView": {

@@ -2185,6 +2185,9 @@
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
     },
+    "mentorBirth": {
+      "ready": "Your mentor is ready."
+    },
     "stepIndicator": {
       "stepOf": "Step {{current}} of {{total}}"
     }
