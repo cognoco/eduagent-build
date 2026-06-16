@@ -471,7 +471,7 @@ export async function notifyParentToSubscribe(
     const consentState = await db.query.consentStates.findFirst({
       where: eq(consentStates.profileId, childProfileId),
     });
-    parentEmail = consentState?.parentEmail;
+    parentEmail = consentState?.parentEmail ?? undefined;
   }
 
   if (parentEmail) {
