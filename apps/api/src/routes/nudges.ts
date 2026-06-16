@@ -51,7 +51,9 @@ export const nudgeRoutes = new Hono<NudgeRouteEnv>()
   })
   .get('/nudges', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
-    const nudges = await listUnreadNudges(c.get('db'), profileId);
+    const nudges = await listUnreadNudges(c.get('db'), profileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     return c.json(nudgeListResponseSchema.parse({ nudges }));
   })
   .patch('/nudges/:id/read', async (c) => {

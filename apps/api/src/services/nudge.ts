@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import type { Nudge, NudgeTemplate } from '@eduagent/schemas';
 import { ConsentRequiredError, RateLimitedError } from '@eduagent/schemas';
 import {
@@ -13,6 +13,7 @@ import { assertParentAccess } from './family-access';
 import { getConsentStatus } from './consent';
 import { createLogger } from './logger';
 import { sendPushNotification } from './notifications';
+import { getGuardianPersonIds } from './identity-v2/guardianship';
 
 const logger = createLogger();
 
@@ -198,10 +199,47 @@ export async function createNudge(
   };
 }
 
+/**
+ * Lists unread nudges for a profile.
+ *
+ * [WI-803] v2 seam: flag-on reads `guardianship` (active guardian person IDs)
+ * instead of legacy `family_links`. The legacy INNER JOIN path is preserved
+ * byte-identical for flag-off.
+ */
 export async function listUnreadNudges(
   db: Database,
   profileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<Nudge[]> {
+  if (opts?.identityV2Enabled) {
+    // [WI-803] v2 path: resolve guardian person IDs via guardianship table —
+    // safe post-M-DROP (no family_links join).
+    const guardianPersonIds = await getGuardianPersonIds(db, profileId);
+    if (guardianPersonIds.length === 0) return [];
+    const rows = await db
+      .select({
+        id: nudges.id,
+        fromProfileId: nudges.fromProfileId,
+        toProfileId: nudges.toProfileId,
+        fromDisplayName: profiles.displayName,
+        template: nudges.template,
+        createdAt: nudges.createdAt,
+        readAt: nudges.readAt,
+      })
+      .from(nudges)
+      .innerJoin(profiles, eq(profiles.id, nudges.fromProfileId))
+      .where(
+        and(
+          eq(nudges.toProfileId, profileId),
+          isNull(nudges.readAt),
+          inArray(nudges.fromProfileId, guardianPersonIds),
+        ),
+      )
+      .orderBy(desc(nudges.createdAt));
+    return rows.map(mapNudgeRow);
+  }
+
+  // Legacy path — byte-identical to pre-WI-803.
   const rows = await db
     .select({
       id: nudges.id,

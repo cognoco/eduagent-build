@@ -1368,6 +1368,30 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
    (children before parents; kept satellites already re-pointed; `webhook_idempotency`,
    `withdrawal_archive_preference` + `pending_notice_type` enums stay — their tables
    live on). The migration file carries the §4.2 `## Rollback` section verbatim.
+8.5. **Post-drop flag-on ROUTE smoke — the real drop-safety net (WI-803, AC#3)**
+   *(immediately after step 8, inside the soak; non-STOP)*. M-DROP has just made
+   `family_links` (and the other legacy tables) genuinely absent — the **only**
+   environment that reproduces the real post-drop 500 from an unbranched legacy
+   reader (the in-CI WI-802 guard is path-taken-only and cannot). Fire a broad
+   flag-on GET/PUT smoke at **every** parent/child endpoint and assert NO 500:
+   ```bash
+   node _wip/identity-foundation/scripts/flag-on-route-smoke.mjs \
+     --base-url https://<this-env-worker-url> \
+     --token    "<clerk-session-jwt for a seeded guardian>" \
+     --owner    "<owner/guardian-profile-id>" \
+     --child    "<linked-child-profile-id>"
+   # exit 0 = no unbranched family_links reader 500'd post-drop; exit 1 = a 5xx surfaced
+   ```
+   The script probes nudges-list (`listUnreadNudges` v2), profiles app-context PUT
+   (`loadProfileFamilyMeta` v2 — WI-803's two twins), plus the dashboard / progress /
+   notifications / reports family surface (WI-786/798/802). A 401/403/404 is a valid
+   app response and is NOT a failure; only a 5xx means a legacy reader is still
+   unbranched. **Gate:** exit 0 required before step 9; a non-zero exit means a
+   residual unbranched reader escaped the cutover — fix it (new v2 branch, NOT a
+   legacy-path removal) before retiring the flag. Record the script output in the WI
+   evidence. (This is a one-shot rehearsal artifact, **not** an always-on M-DROP CI
+   lane — running it against a non-dropped DB proves nothing, the legacy join still
+   resolves.)
 9. **Grep-clean — full legacy retirement** (same PR as 8 or an immediately following
    one, merged together with it):
    - **Schema/code:** delete legacy table defs (`schema/profiles.ts` legacy exports,

@@ -21,6 +21,20 @@ jest.mock(
   }),
 );
 
+// [WI-803] No module mock for identity-v2/guardianship: the v2 path's real
+// helpers are driven through the DB stub. The OWNER branch calls
+// getChargePersonIds → db.query.guardianship.findMany; the non-owner branch
+// reads db.query.guardianship.findFirst directly. makeV2Db stubs both call
+// shapes so the real functions run (no gc1-allow escape needed).
+
+// GC6-defer: 1 pre-existing internal mock below (./consent) is NOT burned down
+// in this WI-803 edit. It is a requireActual partial override of the consent
+// service boundary (its own suite) providing 5 consent-flow stubs woven through
+// the pre-existing createProfile / updateProfile fixtures; converting it to real
+// DB-backed wiring would balloon this focused family_links→guardianship
+// flip-blocker far beyond its scope. Tracked for the GC6 burn-down lane, not
+// this WI. (The WI-803-introduced guardianship mock WAS removed — the v2 path
+// drives the real getChargePersonIds/getGuardianPersonIds via the DB stub.)
 jest.mock('./consent' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./consent') as typeof import('./consent');
   return {
@@ -1091,5 +1105,184 @@ describe('getProfileDisplayName — archived-profile guard', () => {
     const sqlText = drizzleConditionToText(capturedWhere);
     expect(sqlText).toContain('archived_at');
     expect(sqlText).toContain('is null');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
+//
+// AC: flag-on owner calls getChargePersonIds; flag-on non-owner reads the
+// guardianship table directly (first active charge edge → grantedAt as
+// linkCreatedAt, legacy parity per profile-v2.ts:413). Neither path touches
+// family_links — post-M-DROP that query would 500. The v2 path must answer 200.
+// ---------------------------------------------------------------------------
+
+describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch', () => {
+  /**
+   * A DB stub that exercises the REAL v2 helpers (no module mock):
+   *  - owner branch → getChargePersonIds → db.query.guardianship.findMany
+   *  - non-owner branch → db.query.guardianship.findFirst (direct read)
+   * It does NOT stub familyLinks — any familyLinks query on this db is
+   * undefined and would throw, simulating the post-M-DROP environment.
+   *
+   * `chargeRows` feeds findMany (owner path); `guardianshipEdge` feeds
+   * findFirst (non-owner path). Both default to "no active edges".
+   */
+  function makeV2Db(
+    ownerRow: ReturnType<typeof mockProfileRow>,
+    opts: {
+      chargeRows?: Array<{ chargePersonId: string }>;
+      guardianshipEdge?: { grantedAt: Date };
+    } = {},
+  ) {
+    const findMany = jest.fn().mockResolvedValue(opts.chargeRows ?? []);
+    const findFirst = jest.fn().mockResolvedValue(opts.guardianshipEdge);
+    return {
+      query: {
+        profiles: {
+          findFirst: jest.fn().mockResolvedValue(ownerRow),
+        },
+        // No familyLinks — post-M-DROP simulation
+        guardianship: { findMany, findFirst },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([ownerRow]),
+          }),
+        }),
+      }),
+    } as unknown as import('@eduagent/database').Database;
+  }
+
+  it('[WI-803][BREAK] flag-on owner: reads guardianship (real getChargePersonIds), NOT familyLinks (post-M-DROP safe)', async () => {
+    const ownerRow = mockProfileRow({
+      id: 'owner-1',
+      birthYear: 1985,
+      isOwner: true,
+      defaultAppContext: 'study',
+    });
+    const db = makeV2Db(ownerRow, {
+      chargeRows: [{ chargePersonId: 'child-person-1' }],
+    });
+
+    const result = await updateProfileAppContext(
+      db,
+      'owner-1',
+      'account-123',
+      'study',
+      { identityV2Enabled: true },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.hasFamilyLinks).toBe(true);
+    // owner path drove the real getChargePersonIds → guardianship.findMany
+    expect(
+      (db.query.guardianship as unknown as { findMany: jest.Mock }).findMany,
+    ).toHaveBeenCalledTimes(1);
+    // familyLinks must NOT have been queried
+    expect((db.query as { familyLinks?: unknown }).familyLinks).toBeUndefined();
+  });
+
+  it('[WI-803][BREAK] flag-on owner with no charges: hasFamilyLinks = false (post-M-DROP safe)', async () => {
+    const ownerRow = mockProfileRow({
+      id: 'owner-2',
+      birthYear: 1985,
+      isOwner: true,
+      defaultAppContext: 'study',
+    });
+    const db = makeV2Db(ownerRow, { chargeRows: [] });
+
+    const result = await updateProfileAppContext(
+      db,
+      'owner-2',
+      'account-123',
+      'study',
+      { identityV2Enabled: true },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.hasFamilyLinks).toBe(false);
+    expect(
+      (db.query.guardianship as unknown as { findMany: jest.Mock }).findMany,
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-803][BREAK] flag-on non-owner: reads guardianship edge, NOT familyLinks (post-M-DROP safe)', async () => {
+    const childRow = mockProfileRow({
+      id: 'child-1',
+      birthYear: 2012,
+      isOwner: false,
+      defaultAppContext: 'study',
+    });
+    const grantedAt = new Date('2026-02-03T04:05:06.000Z');
+    const db = makeV2Db(childRow, { guardianshipEdge: { grantedAt } });
+
+    const result = await updateProfileAppContext(
+      db,
+      'child-1',
+      'account-123',
+      'study',
+      { identityV2Enabled: true },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.hasFamilyLinks).toBe(true);
+    // legacy parity: linkCreatedAt comes from the edge's grantedAt
+    expect(result!.linkCreatedAt).toBe(grantedAt.toISOString());
+    expect(
+      (db.query.guardianship as unknown as { findFirst: jest.Mock }).findFirst,
+    ).toHaveBeenCalledTimes(1);
+    expect((db.query as { familyLinks?: unknown }).familyLinks).toBeUndefined();
+  });
+
+  it('[WI-803][BREAK] flag-on non-owner with no active edge: hasFamilyLinks = false, linkCreatedAt = null', async () => {
+    const childRow = mockProfileRow({
+      id: 'child-2',
+      birthYear: 2012,
+      isOwner: false,
+      defaultAppContext: 'study',
+    });
+    const db = makeV2Db(childRow, { guardianshipEdge: undefined });
+
+    const result = await updateProfileAppContext(
+      db,
+      'child-2',
+      'account-123',
+      'study',
+      { identityV2Enabled: true },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.hasFamilyLinks).toBe(false);
+    expect(result!.linkCreatedAt).toBeNull();
+  });
+
+  it('[WI-803] flag-off: reads familyLinks, never guardianship', async () => {
+    const ownerRow = mockProfileRow({
+      id: 'owner-3',
+      birthYear: 1985,
+      isOwner: true,
+      defaultAppContext: 'study',
+    });
+    const db = createMockDb({
+      findFirstResult: ownerRow,
+      updateReturning: [ownerRow],
+      familyFindFirstResult: {
+        childProfileId: 'child-1',
+        createdAt: new Date('2026-02-03T04:05:06.000Z'),
+      },
+    });
+
+    await updateProfileAppContext(db, 'owner-3', 'account-123', 'study');
+
+    // guardianship must NOT have been queried (legacy path)
+    expect(
+      (db.query as { guardianship?: unknown }).guardianship,
+    ).toBeUndefined();
+    // familyLinks WAS queried (legacy path)
+    expect(
+      (db.query.familyLinks as unknown as { findFirst: jest.Mock }).findFirst,
+    ).toHaveBeenCalled();
   });
 });
