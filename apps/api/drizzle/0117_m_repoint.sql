@@ -55,7 +55,11 @@ DO $$
 DECLARE
   r record;
 BEGIN
-  -- Completeness assertion — abort if a live table has an unmapped accounts FK.
+  -- Completeness assertion — abort if a live table other than the two known
+  -- accounts-referrers holds an accounts-target FK. profiles (drops with its
+  -- table) and subscriptions (account_id repointed to organization by the loop
+  -- below) are the only expected referrers; anything else means the catalog
+  -- grew an unmapped accounts FK and the mapping must be re-derived.
   IF EXISTS (
     SELECT 1 FROM pg_constraint c
     WHERE c.contype = 'f'
@@ -68,11 +72,27 @@ BEGIN
 
   FOR r IN
     WITH target_map(legacy_parent, new_parent) AS (
+      -- [WI-586 drop-4 reshape] `subscriptions` (the table) is RETAINED in
+      -- WI-586 — its DROP moves to WI-805. But the FK repoints stay as-is:
+      --  * profiles -> person  (54 child FKs)
+      --  * subscriptions -> subscription: the 4 quota children (quota_pools,
+      --    profile_quota_usage, top_up_credits, usage_events) already repoint
+      --    their subscription_id FK to v2 `subscription` here — they were never
+      --    in drop_list, so this is the COMMITTED, pre-existing dual-write-era
+      --    end-state, not new orphaning. Kept verbatim.
+      --  * accounts -> organization: NEW — so the single retained-table FK that
+      --    targets a dropped table (subscriptions.account_id -> accounts)
+      --    repoints to organization (organization.id == accounts.id by the
+      --    reseed; value-safe).
       VALUES ('profiles', 'person'),
-             ('subscriptions', 'subscription')
+             ('subscriptions', 'subscription'),
+             ('accounts', 'organization')
     ),
     drop_list(t) AS (
-      VALUES ('profiles'), ('accounts'), ('subscriptions'),
+      -- `subscriptions` removed from the drop list: it is retained, and its
+      -- account_id FK must be IN repoint scope (the loop excludes drop_list
+      -- children at the WHERE below).
+      VALUES ('profiles'), ('accounts'),
              ('family_links'), ('consent_states')
     )
     SELECT

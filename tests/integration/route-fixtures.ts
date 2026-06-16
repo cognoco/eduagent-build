@@ -16,7 +16,6 @@ import {
   sessionSummaries,
   streaks,
   subjects,
-  subscription as subscriptionV2,
   subscriptions,
   teachingPreferences,
   topicNotes,
@@ -166,9 +165,11 @@ export async function setSubscriptionTierForProfile(
 ): Promise<void> {
   const db = createIntegrationDb();
 
-  // [WI-586] Flag-ON resolve the org via membership (person.id == profileId)
-  // and update the v2 `subscription` table (keyed by organizationId). The
-  // legacy `subscriptions` table is dropped in the close-gate DB.
+  // [WI-586 drop-4 reshape] The legacy `subscriptions` table is RETAINED (its
+  // drop + the quota-FK repoint are WI-805). So flag-ON we still update the
+  // legacy `subscriptions` row — but resolve its account_id via membership
+  // (account_id == organization.id by the reseed), since the legacy `profiles`
+  // table that previously carried account_id is dropped in the close-gate DB.
   if (isIdentityV2Enabled()) {
     const membershipRow = await db.query.membership.findFirst({
       where: eq(membership.personId, profileId),
@@ -178,13 +179,13 @@ export async function setSubscriptionTierForProfile(
       throw new Error(`Membership not found for tier seed: ${profileId}`);
     }
     await db
-      .update(subscriptionV2)
+      .update(subscriptions)
       .set({
-        planTier: tier,
+        tier,
         status,
         updatedAt: new Date(),
       })
-      .where(eq(subscriptionV2.organizationId, membershipRow.organizationId));
+      .where(eq(subscriptions.accountId, membershipRow.organizationId));
     return;
   }
 

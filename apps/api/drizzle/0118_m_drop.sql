@@ -1,7 +1,15 @@
 -- =============================================================================
--- M-DROP — drop the 5 legacy identity tables + their 5 orphaned enum types.
+-- M-DROP — drop 4 legacy identity tables + their 3 orphaned enum types.
 -- WI-586 convergence runbook §4 step 8 (AFTER the flip + 24h soak; the final,
 -- irreversible step). Pairs with m-repoint.sql (§4 step 6).
+--
+-- [WI-586 drop-4 reshape] `subscriptions` is RETAINED here. Its drop, and the
+-- repoint of the 4 quota tables (quota_pools / profile_quota_usage /
+-- top_up_credits / usage_events) off legacy `subscriptions` onto v2
+-- `subscription`, are a coupled billing subsystem owned by WI-805. Accordingly
+-- this migration drops 4 tables (not 5) and 3 enum types (not 5): the
+-- `subscription_status` / `subscription_tier` enums are KEPT because the
+-- retained `subscriptions` table still uses them (billing.ts).
 --
 -- STATUS: INERT DRAFT. Lives under _wip/ deliberately — NOT in apps/api/drizzle/,
 -- so it cannot auto-apply on a deploy. At the freeze it is promoted to the next
@@ -9,16 +17,17 @@
 -- m-repoint has landed and the flip has soaked, then reviewed + applied.
 --
 -- PRECONDITION (enforced by Postgres, not by this file): M-REPOINT must have run
--- first. Every live (non-legacy) FK must already point at person/subscription —
+-- first. Every live (non-legacy) FK must already point at person/organization —
 -- otherwise the plain DROP TABLE below fails loud on the dangling dependency
 -- (this is intentional: no CASCADE, so an un-repointed FK BLOCKS the drop rather
 -- than being silently dropped). The single multi-table DROP TABLE statement
--- resolves the intra-legacy FKs among the 5 tables as a set.
+-- resolves the intra-legacy FKs among the 4 tables as a set.
 --
--- The 5 tables (cutover-plan §4 step 8, verbatim):
---   consent_states, family_links, profiles, subscriptions, accounts
--- The 5 orphaned enum types (legacy-only; unused once the tables are gone):
---   consent_status, consent_type, location_type, subscription_status, subscription_tier
+-- The 4 tables:
+--   consent_states, family_links, profiles, accounts
+-- The 3 orphaned enum types (legacy-only; unused once the tables are gone):
+--   consent_status, consent_type, location_type
+--   (subscription_status / subscription_tier are RETAINED — see reshape note.)
 --
 -- ## Rollback
 -- IMPOSSIBLE in place. Once these tables drop, the legacy system-of-record rows
@@ -30,6 +39,6 @@
 -- no-op — it is NOT a substitute for the PITR marker.
 -- =============================================================================
 
-DROP TABLE IF EXISTS consent_states, family_links, profiles, subscriptions, accounts;
+DROP TABLE IF EXISTS consent_states, family_links, profiles, accounts;
 
-DROP TYPE IF EXISTS consent_status, consent_type, location_type, subscription_status, subscription_tier;
+DROP TYPE IF EXISTS consent_status, consent_type, location_type;
