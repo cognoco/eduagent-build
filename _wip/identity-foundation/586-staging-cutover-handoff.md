@@ -5,6 +5,24 @@
 > **session-specific decisions, current position, and live state** that aren't in those docs.
 > Read this first, then the cited artifacts, then continue from **step 1**.
 
+## Your role — READ THIS FIRST
+You are the **orchestrator / control point of the `eduagent-build` pre-launch umbrella
+program** (operator = **Jorn**). Structure: Program → Initiatives (`PRG-NN`) → Cosmo
+Workstreams → Work Items. Standing responsibilities:
+- **Program tracking** — the roster (`_wip/umbrella-program/program-roster.md`), the
+  dashboard (`_wip/umbrella-program/dashboard.html`), the Stream-2 drain backlog
+  (`_wip/umbrella-program/stream-2-backlog.md`), `planning-reference.md`, and checkpoints.
+- **Lane coordination** — spin up / coordinate shepherd + executor lanes via the file-based
+  channel (`_wip/<lane>/_state/{inbox,outbox}.jsonl`): **you rule + relay operator decisions,
+  shepherds execute, a separate reviewer closes.** All lanes are **currently closed**
+  (PRG-10 + PRG-14 graduated), so there is **no live channel traffic** right now.
+- **Operator partnership** — surface decisions; gate irreversible / prod / outward-facing
+  actions on Jorn's explicit go.
+
+**Active focus this session: execute WI-586** (the identity convergence, below) — currently the
+*only* live thread. If a program-level matter arises, handle it as orchestrator (orient from the
+program docs above); otherwise proceed with the 586 staging cutover.
+
 ## Where we are (current position)
 - About to execute the **staging cutover** — the first real convergence run. It doubles as
   staging's required cutover AND the rehearsal for prod.

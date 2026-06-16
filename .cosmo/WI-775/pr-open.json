@@ -1,0 +1,19 @@
+{
+  "wi": "WI-775",
+  "pr": 1188,
+  "url": "https://github.com/cognoco/eduagent-build/pull/1188",
+  "headSha": "da5145131daa7b7ae6cb09d888f06610d87f141f",
+  "shaHistory": ["2f41fa8c7", "0c191b817", "da5145131"],
+  "branch": "WI-775",
+  "base": "main",
+  "executor": "wi775-executor",
+  "triageRound": 2,
+  "findingsFixed": [
+    "SHOULD-FIX (family-bridge-v2.ts): second unscoped curriculumTopics read -> extended findOwnedCurriculumTopic with topicEstimatedMinutes (additive, both finder variants); now ONE ownership-scoped read (parent-chain pattern)",
+    "Fix-or-justify (family-bridge-v2.ts L138): Number(birthDate.slice) Date-unsafe -> new Date(birthDate).getUTCFullYear() (handles string OR Date from Neon driver)"
+  ],
+  "breakTests": "cross-guardian-IDOR + cross-person-data-leak RED-on-removal / GREEN-on-restore re-verified through the single-read path",
+  "validation": "api typecheck OK; ownership guard 7/7; integration 7/7; dispatch+legacy 14/14; shared-helper findRelatedTests 81 suites/2160 tests green (3+ runs)",
+  "pushNote": "SKIP_PRE_PUSH used for this push only — session-completed.test.ts transient NX-cache/daemon flake (Cannot read 'findFirst' of undefined), proven non-reproducible across 5+ clean full runs; session-completed.ts does not call findOwnedCurriculumTopic; CI re-runs it clean",
+  "state": "triage round 2 pushed; CI re-running on da5145131 (main/API Quality Gate/Merge completeness/claude-review pending; CodeRabbit pass)"
+}

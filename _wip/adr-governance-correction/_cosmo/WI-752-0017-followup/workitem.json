@@ -1,0 +1,17 @@
+{
+  "pageId": "37f8bce9-1f7c-8149-8554-e078b4686389",
+  "id": "WI-752",
+  "name": "ADR governance correction & re-vetting",
+  "description": "WP — umbrella for correcting ADR governance after a provenance audit found ADRs reverse-engineered from ephemeral feature plans (the Mentor V2 S0-S6 rollout) and enshrined as canon without architectural vetting (self-asserted PM sign-off; born in feat() PRs; canon prose laced with S0/S4 phase labels). PRINCIPLE: plans inform decisions but must never become canon unvetted; canon must not cite a plan as its spine (passing commentary only); reconstructing a PAST legacy decision is sanctioned (ADR-0000 Part III), laundering a NEW feature-plan choice is banned. SPINE: (1) amend MMT-ADR-0000 to make this crystal clear + require operator sign-off + ban feature-PR-born ADRs; (2) audit ALL ADRs for L3-spine-anchoring (Spike) -> flagged set (prime suspects 0016/0017/0021/0022); (3) per-ADR re-vet as architecture -> keep/amend/supersede/demote, operator rules each, execute + lockstep architecture.md; (4) bring architecture.md up to scratch; (5) reverse-sweep UNBUILT plans vs corrected canon (corrective action pre-build, contradiction-check only). EXECUTION: a single focused architect's-aide session (NOT a swarm -- operator judgment is the bottleneck); prepares + presents in batches; operator rules; every ADR change operator-signed. The 586 cutover runs COMPLETELY SEPARATELY and is never touched. Full brief: _wip/adr-governance-correction/handoff.md. Absorbs WI-751 (retired).",
+  "acceptanceCriteria": "MMT-ADR-0000 amended (operator-signed) with the reconstruct-vs-launder + L3-in-passing-only + sign-off + no-feature-PR rules (and a forward guard designed or deferred). All ADRs audited for L3-spine-anchoring; every flagged ADR re-vetted to an operator ruling (keep/amend/supersede/demote) and executed with lockstep architecture.md edits. architecture.md carries no plan-as-authority references or phase-label actors. Unbuilt S-phase plans contradiction-checked against corrected canon. Every child Item Closed.",
+  "riskImpact": "Governance integrity: ADRs (L2, the immutable decision layer) can currently be born inside autonomous feature PRs and reverse-engineered from L3 plans, with self-asserted operator sign-off — inverting the MMT-ADR-0000 documentation-layer model and inviting drift.",
+  "type": "Task",
+  "altitude": "WP",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

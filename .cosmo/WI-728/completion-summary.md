@@ -1,0 +1,9 @@
+## Completion Summary
+
+What was done: Reworked WI-728 after the autonomous reviewer bounced PR #1153 (Stage Reviewing → Executing, tag: rework): the DoD source-artifact check failed because the 7th screen's gate — in `apps/mobile/src/app/(app)/practice/index.tsx` (NOT `practice/_layout.tsx`, which has no gate) — still carried the original V0/V1 ternary. This round migrated that final site to the `useEntryGate()` hook, completing the dedup across all 7 screens.
+
+What changed: `apps/mobile/src/app/(app)/practice/index.tsx` — replaced the inline predicate (`FEATURE_FLAGS.MODE_NAV_V1_ENABLED ? !navigationContract.canEnter('practice') : navigationContract.isParentProxy`) with `const blocked = useEntryGate('practice')`; removed the now-orphaned `useNavigationContract` + `FEATURE_FLAGS` imports and the `useNavigationContract()` hook call; removed the V0-fallback comment (its rationale lives in the hook docstring). `apps/mobile/src/hooks/use-entry-gate.ts` — updated the docstring adoption list to include practice (7/7 screens). Behavior-identical to the other 6 migrations: the hook preserves the intentional V1-off `isParentProxy` arm (H5.1 profile-load allow-through), so all three shipped flag states × proxy/non-proxy are unchanged.
+
+Verification: `pnpm exec tsc --noEmit` clean; `jest --findRelatedTests practice/index.tsx use-entry-gate.ts` 204 pass / 0 fail; `navigation-contract-usage-guard.test.ts` 5/5 pass (practice's reads were on the contract variable, which the ratchet excludes — no ratchet change needed). Pre-push hook passed all 24 delta files. PR #1158 squash-merged to main as `9d5ad0e4c` with strict green gate fully passed; triage clean (0 must-fix / 0 should-fix / 0 inline).
+
+Caveats / Follow-ups: this rework round migrated the practice/index.tsx site the reviewer flagged, so all 7 screens now use the useEntryGate() hook.

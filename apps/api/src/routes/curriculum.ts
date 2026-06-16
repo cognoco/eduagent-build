@@ -48,11 +48,16 @@ import {
 } from '../errors';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
+import { isIdentityV2Enabled } from '../config';
 
 const logger = createLogger();
 
 type CurriculumRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    IDENTITY_V2_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -73,7 +78,9 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       const input = c.req.valid('json');
 
       try {
-        const result = await cloneTopicFromChild(db, profileId, input);
+        const result = await cloneTopicFromChild(db, profileId, input, {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        });
         return c.json(cloneFromChildResponseSchema.parse(result));
       } catch (error) {
         if (error instanceof NotFoundError) {

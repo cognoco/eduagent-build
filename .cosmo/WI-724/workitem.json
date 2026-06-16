@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-81f4-a95d-d65e0e6990d9",
+  "id": "WI-724",
+  "name": "Break the curriculum.ts ⇄ language-curriculum.ts import cycle (extract ensureDefaultBook)",
+  "description": "Cycle: curriculum.ts:59 imports regenerateLanguageCurriculum from ./language-curriculum (called :2391 four_strands branch); language-curriculum.ts:9 imports ensureDefaultBook from ./curriculum (called :405). Both edges are RUNTIME VALUE imports (import type won't help). Approved cut (operator decomposition 2026-06-13): extract ensureDefaultBook (~25-line pure DB upsert, no curriculum logic) into curriculum-core.ts; re-point the 3 internal callers in curriculum.ts + the caller in language-curriculum.ts. Smallest surgical cut, no behavior change. NOT on the identity-cutover surface.",
+  "acceptanceCriteria": "Runtime import cycle between apps/api/src/services/curriculum.ts and language-curriculum.ts is broken: ensureDefaultBook extracted to a new module (e.g. curriculum-core.ts), both files import it one-directionally, neither imports the other. Cycle-check (madge/grep) confirms no cycle. All curriculum + language-curriculum tests green; no behavioral change.",
+  "riskImpact": "",
+  "type": "Hygiene",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

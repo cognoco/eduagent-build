@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-81df-aa8e-c05be1c0460e",
+  "id": "WI-729",
+  "name": "Remove the dead showParentHome prop + branch (home routing already migrated to home.tsx)",
+  "description": "Home routing already migrated to home.tsx:164 (ParentHomeScreen when navigationContract.home.screen==='FamilyHome', else LearnerScreen showParentHome={false}). Prop is now dead: both call sites hardcode false, the LearnerScreen branch (:506) never runs. Approved cut: full removal (3 source files + 4 test refs). A 'deleted concept' cleanup (cite feedback_audit_check_deleted_concepts in the commit). NOT on the identity cutover surface.",
+  "acceptanceCriteria": "showParentHome removed from LearnerScreenProps, its default, and the dead branch at LearnerScreen.tsx:506; the showParentHome={false} suppressions at home.tsx:170 and own-learning.tsx:42 removed; 4 test references cleaned; mobile typecheck + LearnerScreen-related tests green; zero behavior change (no flag combination runs the branch).",
+  "riskImpact": "",
+  "type": "Hygiene",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

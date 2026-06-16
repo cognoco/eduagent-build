@@ -25,6 +25,15 @@ import {
 
 // ---------------------------------------------------------------------------
 // Internal module stubs (gc1-allow: sibling services with their own suites)
+//
+// GC6-defer: 3 pre-existing internal mocks below (./family-access, ./consent,
+// ./notifications) are NOT burned down in this WI-803 edit. They are
+// requireActual partial overrides of sibling service BOUNDARIES (each with its
+// own dedicated suite) woven through the pre-existing createNudge fixtures;
+// converting them to real DB-backed wiring would balloon this focused
+// family_links→guardianship flip-blocker far beyond its scope. Tracked for the
+// GC6 burn-down lane, not this WI. (The WI-803-introduced guardianship mock WAS
+// removed — the v2 path drives the real helpers via the DB stub; see below.)
 // ---------------------------------------------------------------------------
 
 const mockAssertParentAccess = jest.fn();
@@ -45,6 +54,11 @@ jest.mock(
     getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
   }),
 );
+
+// [WI-803] No module mock for identity-v2/guardianship: the v2 path's real
+// getGuardianPersonIds is driven through the DB stub — it calls
+// db.query.guardianship.findMany, which makeV2Db stubs so the real function
+// runs (no gc1-allow escape needed).
 
 // ---------------------------------------------------------------------------
 // Internal module stub — notifications has its own suite; we stub it here to
@@ -814,6 +828,101 @@ describe('markNudgeRead', () => {
     const db = makeDb({ updateRows: [{ id: NUDGE_ID }] });
     await markNudgeRead(db, TO_PROFILE_ID, NUDGE_ID);
     expect(db.update as jest.Mock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-803] listUnreadNudges v2 dispatch break tests
+//
+// AC: flag-on reads guardianship (the REAL getGuardianPersonIds, driven via
+// db.query.guardianship.findMany), never family_links. Post-M-DROP the
+// family_links INNER JOIN would 500; the v2 path must not touch that table.
+// The break tests use a no-family-links DB stub to prove it.
+// ---------------------------------------------------------------------------
+
+describe('[WI-803] listUnreadNudges v2 dispatch', () => {
+  /**
+   * A DB stub exercising the REAL v2 path (no module mock):
+   *  - getGuardianPersonIds → db.query.guardianship.findMany (returns
+   *    `guardianRows`)
+   *  - the nudge read → db.select().from(nudges).innerJoin(profiles).where()…
+   * It does NOT stub familyLinks — the legacy path chains innerJoin TWICE, so
+   * on this single-innerJoin stub it would fail, simulating post-M-DROP.
+   */
+  function makeV2Db(
+    listRows: ReturnType<typeof makeInsertedRow>[] = [],
+    guardianRows: Array<{ guardianPersonId: string }> = [],
+  ) {
+    const findMany = jest.fn().mockResolvedValue(guardianRows);
+    const selectOrderBy = jest.fn().mockResolvedValue(listRows);
+    const selectWhere = jest.fn().mockReturnValue({ orderBy: selectOrderBy });
+    const selectInnerJoin = jest.fn().mockReturnValue({ where: selectWhere });
+    const selectFrom = jest.fn().mockReturnValue({
+      innerJoin: selectInnerJoin,
+    });
+    const selectFn = jest.fn().mockReturnValue({ from: selectFrom });
+
+    return {
+      select: selectFn,
+      // No familyLinks — any legacy INNER JOIN would miss this mock
+      query: {
+        guardianship: { findMany },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        accounts: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+    } as unknown as import('@eduagent/database').Database;
+  }
+
+  it('[WI-803] flag-off: reads familyLinks (legacy path, never touches guardianship)', async () => {
+    const db = makeDb({ listRows: [] });
+    await listUnreadNudges(db, TO_PROFILE_ID);
+    expect(
+      (db.query as { guardianship?: unknown }).guardianship,
+    ).toBeUndefined();
+    // legacy select chain was called (from + innerJoin)
+    expect((db.select as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(
+      1,
+    );
+  });
+
+  it('[WI-803][BREAK] flag-on: returns empty when no guardians exist (post-M-DROP safe)', async () => {
+    const db = makeV2Db([], []);
+    const result = await listUnreadNudges(db, TO_PROFILE_ID, {
+      identityV2Enabled: true,
+    });
+    expect(result).toEqual([]);
+    // real getGuardianPersonIds drove guardianship.findMany
+    expect(
+      (db.query.guardianship as unknown as { findMany: jest.Mock }).findMany,
+    ).toHaveBeenCalledTimes(1);
+    // No select chain called — early return before the nudge query
+    expect(db.select as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it('[WI-803][BREAK] flag-on: returns nudges via guardianship path when guardians exist', async () => {
+    const nudgeRow = makeInsertedRow({ id: 'nudge-v2-aaa' });
+    const db = makeV2Db([nudgeRow], [{ guardianPersonId: FROM_PROFILE_ID }]);
+    const result = await listUnreadNudges(db, TO_PROFILE_ID, {
+      identityV2Enabled: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('nudge-v2-aaa');
+    expect(
+      (db.query.guardianship as unknown as { findMany: jest.Mock }).findMany,
+    ).toHaveBeenCalledTimes(1);
+    // select chain was called once (no familyLinks INNER JOIN on v2 path)
+    expect(db.select as jest.Mock).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-803] flag-on: does not call familyLinks (post-M-DROP safe)', async () => {
+    const db = makeV2Db([], [{ guardianPersonId: FROM_PROFILE_ID }]);
+    // The v2 select chain has a SINGLE innerJoin (profiles). The legacy path
+    // chains innerJoin twice (profiles + familyLinks); on this stub that second
+    // innerJoin is undefined and would throw — so resolving proves the v2 shape.
+    await expect(
+      listUnreadNudges(db, TO_PROFILE_ID, { identityV2Enabled: true }),
+    ).resolves.not.toThrow();
+    expect((db.query as { familyLinks?: unknown }).familyLinks).toBeUndefined();
   });
 });
 

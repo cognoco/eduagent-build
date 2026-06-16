@@ -51,6 +51,7 @@ import {
   setNativeLanguage,
 } from '../services/retention-data';
 import { forbidden, notFound, NotFoundError } from '../errors';
+import { isIdentityV2Enabled } from '../config';
 
 type SettingsRouteEnv = {
   Bindings: {
@@ -59,11 +60,13 @@ type SettingsRouteEnv = {
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
+    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
     db: Database;
     account: Account;
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -97,6 +100,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         profileId,
         accountId,
         body,
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(getNotificationsResponseSchema.parse({ preferences }));
     },
@@ -116,7 +123,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         assertOwnerProfile(c);
       }
       const celebrationLevel = query.childProfileId
-        ? await getChildCelebrationLevel(db, profileId, query.childProfileId)
+        ? await getChildCelebrationLevel(db, profileId, query.childProfileId, {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          })
         : await getCelebrationLevel(db, profileId);
       return c.json(
         getCelebrationLevelResponseSchema.parse({ celebrationLevel }),
@@ -146,12 +155,23 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
             profileId,
             body.childProfileId,
             body.celebrationLevel,
+            {
+              identityV2Enabled: isIdentityV2Enabled(
+                c.env?.IDENTITY_V2_ENABLED,
+              ),
+            },
           )
         : await upsertCelebrationLevel(
             db,
             profileId,
             accountId,
             body.celebrationLevel,
+            {
+              identityV2Enabled: isIdentityV2Enabled(
+                c.env?.IDENTITY_V2_ENABLED,
+              ),
+              callerPersonId: c.get('callerPersonId'),
+            },
           );
       return c.json(getCelebrationLevelResponseSchema.parse(result));
     },
@@ -187,6 +207,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           profileId,
           accountId,
           body.value,
+          {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+            callerPersonId: c.get('callerPersonId'),
+          },
         );
         return c.json(
           updateWithdrawalArchivePreferenceResponseSchema.parse(result),
@@ -210,6 +234,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         db,
         profileId,
         accountId,
+        {
+          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          callerPersonId: c.get('callerPersonId'),
+        },
       );
       return c.json(
         getFamilyPoolBreakdownSharingResponseSchema.parse({ value }),
@@ -239,6 +267,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           profileId,
           accountId,
           body.value,
+          {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+            callerPersonId: c.get('callerPersonId'),
+          },
         );
         return c.json(
           updateFamilyPoolBreakdownSharingResponseSchema.parse(result),
@@ -263,7 +295,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
-      await registerPushToken(db, profileId, accountId, body.token);
+      await registerPushToken(db, profileId, accountId, body.token, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+        callerPersonId: c.get('callerPersonId'),
+      });
       return c.json(
         pushTokenRegisteredResponseSchema.parse({ registered: true }),
       );
@@ -294,6 +329,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         emailFrom: c.env.EMAIL_FROM,
       },
       apiOrigin,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     return c.json(notifyParentSubscribeResponseSchema.parse(result));
   })

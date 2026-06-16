@@ -19,7 +19,10 @@ import type { ClerkIdentity } from '../middleware/account';
 import { requireAccount } from '../middleware/profile-scope';
 import { isIdentityV2Enabled } from '../config';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
-import { getOwnerProfileV2 } from '../services/identity-v2/profile-v2';
+import {
+  getOwnerProfileV2,
+  listProfilesV2,
+} from '../services/identity-v2/profile-v2';
 
 import { notFound, forbidden, validationError, apiError } from '../errors';
 import {
@@ -98,9 +101,26 @@ function buildBootstrapProfile(
 export const profileRoutes = new Hono<ProfileEnv>()
   .get('/profiles', async (c) => {
     const db = c.get('db');
+    const v2Enabled = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+    // [CUT-B1 §2.2a] v2 pre-graph: a graphless owner (clerkIdentity set, no
+    // account/graph yet) has no profiles. The pre-graph allowlist routes this
+    // GET here to return the documented empty list — NOT a 401 — so the
+    // onboarding flow can list profiles before POST /profiles bootstraps the
+    // graph. Without this branch, requireAccount() below 401s every
+    // pre-onboarding user and the client's 401→sign-out makes onboarding an
+    // unbreakable sign-in loop.
+    if (v2Enabled && !c.get('account') && c.get('clerkIdentity')) {
+      return c.json(profileListResponseSchema.parse({ profiles: [] }));
+    }
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
-    const profiles = await listProfiles(db, account.id);
+    // [CUT-B2] Post-graph v2 read: under IDENTITY_V2_ENABLED the resolved
+    // account.id IS the caller's organization.id (identity-resolve.ts), so
+    // listProfilesV2(db, account.id) is org-scoped to the caller's own org —
+    // the IDOR guard. The legacy listProfiles path stays intact until WP-FLAG.
+    const profiles = v2Enabled
+      ? await listProfilesV2(db, account.id)
+      : await listProfiles(db, account.id);
     return c.json(profileListResponseSchema.parse({ profiles }));
   })
   .post('/profiles', zValidator('json', profileCreateSchema), async (c) => {
@@ -247,6 +267,9 @@ export const profileRoutes = new Hono<ProfileEnv>()
           id,
           account.id,
           defaultAppContext,
+          {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          },
         );
       } catch (err) {
         if (err instanceof ForbiddenError) {

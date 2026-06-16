@@ -6,15 +6,21 @@ import {
   createDatabase,
   familyLinks,
   generateUUIDv7,
+  guardianship,
+  login,
+  membership,
   notificationLog,
   notificationPreferences,
-  progressSnapshots,
+  organization,
+  person,
   profiles,
+  progressSnapshots,
+  subjects,
   weeklyReports,
   type Database,
 } from '@eduagent/database';
 import type { ProgressMetrics } from '@eduagent/schemas';
-import { and, eq, like, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, sql } from 'drizzle-orm';
 
 import {
   weeklyProgressPushCron,
@@ -215,6 +221,39 @@ async function seedProfile(input: {
     })
     .returning({ id: profiles.id });
 
+  // [WI-793] v2 identity rows — required by the v2 cron path under
+  // IDENTITY_V2_ENABLED=true. The cron queries organization.timezone for the
+  // local-hour-9 filter (person×membership→organization), and the generate
+  // handler reads isPersonLive (person) and login (email lookup).
+  // Deterministic reseed: organization.id = account.id, person.id = profile.id
+  // (WI-788 invariant). login.clerkUserId carries the same clerkUserId so the
+  // FK anchor is consistent. Self-inerting under flag-OFF.
+  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+    await db.insert(organization).values({
+      id: account!.id,
+      name: `WPP Seed org ${account!.id.slice(0, 8)}`,
+      timezone: input.timezone ?? null,
+    });
+    await db.insert(person).values({
+      id: profile!.id,
+      displayName: input.displayName,
+      birthDate: '1985-01-01',
+      residenceJurisdiction: 'ROW',
+    });
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: profile!.id,
+      clerkUserId,
+      email,
+    });
+    await db.insert(membership).values({
+      personId: profile!.id,
+      organizationId: account!.id,
+      roles: ['admin', 'learner'],
+    });
+  }
+
   return { accountId: account!.id, profileId: profile!.id };
 }
 
@@ -244,6 +283,17 @@ async function seedFamilyLink(
   childProfileId: string,
 ): Promise<void> {
   await db.insert(familyLinks).values({ parentProfileId, childProfileId });
+
+  // [WI-793] v2 guardianship edge — getAllActiveGuardianPersonIds reads
+  // guardianship.guardianPersonId (not familyLinks) under IDENTITY_V2_ENABLED=true.
+  // guardianPersonId = parentProfileId, chargePersonId = childProfileId
+  // (person.id = profiles.id deterministic invariant from WI-788).
+  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+    await db.insert(guardianship).values({
+      guardianPersonId: parentProfileId,
+      chargePersonId: childProfileId,
+    });
+  }
 }
 
 async function seedSnapshot(input: {
@@ -255,6 +305,25 @@ async function seedSnapshot(input: {
     profileId: input.profileId,
     snapshotDate: input.snapshotDate,
     metrics: input.metrics,
+  });
+}
+
+// [WI-793] The digest pipeline runs `filterProgressMetricsToActiveSubjects`,
+// which RECOMPUTES every top-level total from the snapshot's per-subject rows,
+// keeping only subjects that exist as non-archived `subjects` rows for the
+// profile. A snapshot whose `subjects[].subjectId` has no live `subjects` row
+// is filtered to all-zero totals → the "quieter week, 0 topics" fallback. Any
+// test asserting a real delta must seed a matching live subject and carry the
+// delta-bearing metrics at the subject level.
+async function seedSubject(input: {
+  subjectId: string;
+  profileId: string;
+  name: string;
+}): Promise<void> {
+  await db.insert(subjects).values({
+    id: input.subjectId,
+    profileId: input.profileId,
+    name: input.name,
   });
 }
 
@@ -405,6 +474,39 @@ afterAll(async () => {
   } else {
     process.env['RESEND_API_KEY'] = originalResendApiKey;
   }
+
+  // [WI-793] v2 identity cleanup — mirrors the WI-792 pattern. The legacy
+  // accounts delete does not cascade to v2 tables (no FK from accounts →
+  // organization/person). Clean up v2 rows first.
+  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+    const testAccounts = await db.query.accounts.findMany({
+      where: like(accounts.clerkUserId, `clerk_weekly_push_${RUN_ID}%`),
+      columns: { id: true },
+    });
+    const accountIds = testAccounts.map((a) => a.id);
+    if (accountIds.length > 0) {
+      const testProfiles = await db.query.profiles.findMany({
+        where: inArray(profiles.accountId, accountIds),
+        columns: { id: true },
+      });
+      const profileIds = testProfiles.map((p) => p.id);
+      if (profileIds.length > 0) {
+        // guardianship.guardianPersonId / chargePersonId → person.id RESTRICT:
+        // delete guardianship edges before person.
+        await db
+          .delete(guardianship)
+          .where(inArray(guardianship.guardianPersonId, profileIds));
+        await db
+          .delete(guardianship)
+          .where(inArray(guardianship.chargePersonId, profileIds));
+        // person cascade: membership, login (consentRequest also cascades).
+        await db.delete(person).where(inArray(person.id, profileIds));
+      }
+      // organization has no remaining FKs after membership cleanup (cascaded).
+      await db.delete(organization).where(inArray(organization.id, accountIds));
+    }
+  }
+
   await db
     .delete(accounts)
     .where(like(accounts.clerkUserId, `clerk_weekly_push_${RUN_ID}%`));
@@ -451,7 +553,11 @@ describe('weekly progress push integration', () => {
       expect.arrayContaining([
         expect.objectContaining({
           name: 'app/weekly-progress-push.generate',
-          data: { parentId: queuedParentId },
+          // [WI-793] The cron always emits `reportWeekStart` in the generate
+          // event payload (BUG-757 idempotency key — `parentId + reportWeekStart`
+          // dedupes retry overlap). This assertion predated that emit; align it
+          // to the source's actual shape. Source unchanged.
+          data: expect.objectContaining({ parentId: queuedParentId }),
         }),
       ]),
     );
@@ -477,6 +583,19 @@ describe('weekly progress push integration', () => {
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedWeeklyPushPrefs(parentProfileId);
 
+    // [WI-793] Seed a live `subjects` row whose id matches the snapshot's
+    // per-subject metrics. The digest filter recomputes every top-level total
+    // from live-subject rows, so the delta-bearing numbers (topicsMastered,
+    // vocabularyTotal, topicsExplored) must live at the subject level and the
+    // subject must exist & be non-archived — otherwise the metrics are filtered
+    // to zero and the push collapses to the "quieter week" fallback.
+    const scienceSubjectId = generateUUIDv7();
+    await seedSubject({
+      subjectId: scienceSubjectId,
+      profileId: childProfileId,
+      name: 'Science',
+    });
+
     const today = new Date();
     const latestSnapshotDate = isoDate(today);
     const previousSnapshotDate = isoDate(
@@ -494,7 +613,10 @@ describe('weekly progress push integration', () => {
         vocabularyTotal: 20,
         longestStreak: 4,
         subjects: [
-          buildSubjectMetrics(generateUUIDv7(), 'Science', {
+          buildSubjectMetrics(scienceSubjectId, 'Science', {
+            sessionsCount: 2,
+            topicsMastered: 5,
+            vocabularyTotal: 20,
             topicsExplored: 4,
           }),
         ],
@@ -511,7 +633,10 @@ describe('weekly progress push integration', () => {
         vocabularyTotal: 30,
         longestStreak: 6,
         subjects: [
-          buildSubjectMetrics(generateUUIDv7(), 'Science', {
+          buildSubjectMetrics(scienceSubjectId, 'Science', {
+            sessionsCount: 5,
+            topicsMastered: 9,
+            vocabularyTotal: 30,
             topicsExplored: 6,
           }),
         ],

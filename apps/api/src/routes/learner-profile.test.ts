@@ -97,6 +97,51 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [WI-774] v2 identity resolver — under IDENTITY_V2_ENABLED='true' the account
+// middleware resolves the graph and sets callerPersonId. Mocked so the flag-on
+// route test can assert the v2 guard is armed without an unmocked DB.
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  () => ({
+    resolveIdentityV2: jest.fn().mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: '770e8400-e29b-41d4-a716-446655440000',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    }),
+  }),
+);
+
+// [WI-774] v2 profile-scope resolver — resolves the X-Profile-Id header to the
+// parent profile under flag-on so profile-scope middleware does not hit the
+// unmocked DB. getPersonScope echoes the requested id (mirrors getProfile above).
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
+  () => ({
+    findOwnerPersonScope: jest.fn().mockResolvedValue(null),
+    getPersonScope: jest
+      .fn()
+      .mockImplementation(async (_db: unknown, profileId: string) => ({
+        profileId,
+        meta: {
+          birthYear: null,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
+      })),
+  }),
+);
+
 // Learner-profile service mocks — record calls so assertions can verify
 // the route reached the service with the right (parent/child) profileId.
 const mockGetOrCreateLearningProfile = jest.fn();
@@ -165,6 +210,10 @@ const TEST_ENV = {
   ...BASE_AUTH_ENV,
   DATABASE_URL: 'postgresql://test:test@localhost/test',
 };
+// [WI-774] Flag-on env: drives the identity-v2 path through the real account +
+// profile-scope middleware (v2 resolvers mocked above) so the route arms the
+// write guard with identityV2Enabled:true + the resolved callerPersonId.
+const V2_TEST_ENV = { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' };
 
 const PARENT_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
 const OWN_CHILD_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440001';
@@ -374,9 +423,30 @@ describe('learner-profile routes', () => {
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
+        { identityV2Enabled: false },
       );
       // Family-link check is not required for self-scoped routes.
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
+    });
+
+    it('[WI-774] flag-on arms the v2 write guard on DELETE /learner-profile/all', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/all',
+        { method: 'DELETE', headers: PARENT_HEADERS },
+        V2_TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      // Under flag-on the route must pass identityV2Enabled:true AND the
+      // authenticated callerPersonId (resolveIdentityV2 → PARENT_PROFILE_ID). A
+      // wrong env-binding name or context key would silently leave the guard
+      // un-armed on the live staging path.
+      expect(mockDeleteAllMemory).toHaveBeenCalledWith(
+        expect.anything(),
+        PARENT_PROFILE_ID,
+        'test-account-id',
+        { identityV2Enabled: true, callerPersonId: PARENT_PROFILE_ID },
+      );
     });
 
     it('persists self-consent on POST /learner-profile/consent', async () => {
@@ -396,6 +466,7 @@ describe('learner-profile routes', () => {
         PARENT_PROFILE_ID,
         'test-account-id',
         'granted',
+        { identityV2Enabled: false },
       );
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });
@@ -424,6 +495,7 @@ describe('learner-profile routes', () => {
         'dinosaurs',
         true,
         undefined,
+        { identityV2Enabled: false },
       );
     });
 
@@ -461,6 +533,7 @@ describe('learner-profile routes', () => {
         PARENT_PROFILE_ID,
         'test-account-id',
         'short-burst',
+        { identityV2Enabled: false },
       );
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });

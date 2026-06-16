@@ -168,7 +168,7 @@ jobs:
         run: pnpm exec drizzle-kit migrate
 
       - name: Run API integration tests
-        run: pnpm exec jest --config tests/integration/jest.config.cjs --maxWorkers=2
+        run: pnpm exec jest --config tests/integration/jest.config.cjs
 
   mobile-maestro:
     name: Mobile Maestro E2E Tests

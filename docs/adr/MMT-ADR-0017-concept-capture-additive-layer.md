@@ -1,6 +1,6 @@
 # MMT-ADR-0017 — Concept-grain mastery is captured in an additive layer; the topic-grained spine is not re-keyed
 
-**Status:** Accepted · 2026-06-08 · **Scope:** Mastery/retention data model · **Deciders:** PM (owner) + Claude · **Builds on:** MMT-ADR-0005 (book-mastery atomic update), MMT-ADR-0011 (phase-E data model)
+**Status:** Accepted · 2026-06-15 · **Scope:** Mastery/retention data model · **Deciders:** Architect (jjoerg) + PM · **Builds on:** MMT-ADR-0005 (book-mastery atomic update), MMT-ADR-0011 (phase-E data model)
 
 ## Context
 
@@ -27,6 +27,7 @@ A concept is unique within `(profileId, topicId, normalizedLabel)`. The topic is
 ## Consequences
 
 - **The migration is purely additive** — two new tables + one enum, no changes to shipped tables, trivially reversible (pre-launch the captured data is test-only and no shipped surface depends on it).
+- **Capture activation is flag-gated** (`CONCEPT_CAPTURE_ENABLED`): the writer lands behind the flag so the schema, reader, and UI can ship independently of turning capture on. Enabling it is an operational step, sequenced against the identity-cutover `profiles`→`person` FK repoint.
 - **The note star and tutor-correction-on-recall ride existing signal** — the star is derived from `concept_mastery` (presence-only), and the tutor correction is the already-stored `needs_deepening_topics.correction`. No grading of note text is introduced in v1.
 - **Identity/state are split into two tables** so the deferred trajectory feature can insert an append-only evaluation log between them without reshaping.
 - **`architecture.md` (Knowledge Retention) is amended in lockstep** to state that mastery is captured at concept grain additively while the scheduled spine remains topic-keyed.

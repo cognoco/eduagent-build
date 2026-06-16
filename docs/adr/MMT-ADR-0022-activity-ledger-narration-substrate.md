@@ -1,46 +1,43 @@
-# MMT-ADR-0022 — Activity ledger is the template-first narration and moment substrate
+# MMT-ADR-0022 — Activity feed: moments are derived on read; the ledger table is seen-state, not an event-of-record
 
-> **Note on numbering:** originally minted as `MMT-ADR-0020` on the new-llm branch (the next free number at the time of authoring); renumbered to `0022` on 2026-06-12 when merging into main — `MMT-ADR-0020` was yielded to the identity-foundation cutover-plan consent-request ADR (analysis C6, WI-678), and `MMT-ADR-0021` was taken by the freeform-threshold ADR (also renumbered from 0019 in the same merge).
-
-**Status:** Accepted · 2026-06-11 · **Scope:** Mentor V2 shell backend primitives · **Deciders:** PM (owner) + Codex · **Builds on:** MMT-ADR-0000 (decisions layer)
+**Status:** Accepted · 2026-06-15 · **Scope:** Learner-home moment feed (the `/now` surface) · **Deciders:** Architect (jjoerg) + PM (owner) · **Builds on:** MMT-ADR-0000 (decisions layer)
 
 ## Context
 
-The Mentor V2 shell needs a small, deterministic stream of recent learner moments for the `/now` feed and later visibility/reporting surfaces. The product spec names this as `mentor_activity_ledger`: an append-only activity ledger that records durable moments such as session filing, topic mastery, retention becoming due, recap readiness, and snapshot readiness.
+The learner-home `/now` feed shows a small, prioritized stream of recent notable moments — "you filed a session", and the like. The architectural question is how those moments are produced: **derived from operational state at read time, or materialized into a dedicated store as they happen.**
 
-The same substrate is also load-bearing for future GDPR-timer narration. Deletion, retention, and consent countdowns need a stable row-backed source of "what happened" rather than reconstructing user-visible moments from scattered operational tables or re-running LLM summaries.
+The decisive fact, established by the as-built code: **the moments are overwhelmingly reconstructable.** The `/now` feed already derives `retention_due` live from `retention_cards`; topic-mastery is already recorded on the session/assessment records; session filing is recorded on the session. Of the six moment kinds the schema declares, five are never materialized at all — the feed derives them or would. So the premise that justified a materialized log ("reconstructing from operational tables is fragile/non-deterministic") is contradicted by the system's own behavior. The only thing that genuinely needs persistence is **seen-state** ("have we already shown this moment?"), which the operational tables cannot express.
 
 ## Decision
 
-Create `mentor_activity_ledger` as an additive, profile-keyed S0 table and expose a best-effort `writeActivityMoment()` helper. The writer is non-core: failures are captured through the existing `safeWrite` posture and never break the primary job or request that produced the moment.
+The architecture is **derive-on-read with a thin seen-state store (option E of the alternatives below).**
 
-Ledger rows are template-first. A row stores a stable `kind`, stable `templateKey`, and JSON `params`; rendering chooses copy from templates and parameters. The system does not call an LLM per ledger row by default.
-
-S0 keys the table by legacy `profile_id`. The identity-coupled S4 phase will repoint the ledger to `person_id` and add the approved relationship edge reference after the identity app cutover is ready. S0 deliberately does not read or write `person`, `membership`, `guardianship`, or `supportership`.
+1. **Moments are derived on read.** The `/now` feed computes notable moments by querying operational tables (sessions, `retention_cards`, assessments, …) at request time and ranking them. A new moment kind adds a read-time projection, **not** a new materialized writer.
+2. **`mentor_activity_ledger` is a narrow seen-state store**, not an event-of-record: it tracks `surfaced_at` so a moment is shown approximately once, plus the rare moment that is genuinely not reconstructable from operational state. It is not a materialized log of all moments.
+3. **Writes are non-core / best-effort (`safeWrite`).** This is *correct*, because the table is a cosmetic display aid, not authoritative: a dropped row costs at most one lowest-priority feed card, and drops are captured in Sentry. (This is the residual write surface; most moments are not written at all.)
+4. **Visibility is self-only.** A moment is shown only to the profile it concerns, enforced by profile scope + RLS. There is **no per-row visibility flag.** If cross-user moment sharing (guardian/supporter) is ever built, it is a **read-time, relationship-derived policy** owned by the visibility-contract work — never a stored column.
+5. **Not a compliance substrate.** The feed is not load-bearing for GDPR-timer narration, deletion, retention, or consent countdowns; those derive from their own authoritative sources. If a compliance consumer is ever built on moment history, that is a separate decision with its own (stronger) write semantics.
 
 ## Consequences
 
-- `/now` can rank recent moments deterministically with no LLM in the feed path.
-- Producers can add narration moments without making non-core writes part of their success criteria.
-- The future GDPR-timer surface has an append-only substrate instead of reverse-engineered operational state.
-- New ledger kinds remain app-level contract changes, not database migrations, because `kind` and `templateKey` are text validated by `@eduagent/schemas`.
-- S4 still owes the identity repoint migration and edge-reference decision. Until then, all S0 ledger reads remain `profileId` scoped.
+- `/now` ranks moments deterministically with no LLM and no dependence on a complete materialized log.
+- The dual-write / lost-moment problem largely dissolves: you cannot lose a moment you compute from source-of-truth.
+- The table shrinks to seen-state. The `visibility` column + `ledger_visibility` enum, the unread `template_key` column, and the five declared-but-unwritten `LedgerKind`s are dead weight to remove (tracked as follow-up code WIs).
+- Best-effort writes remain correct for the residual materialized surface.
+- A future kind is added as a read-time projection; only a *genuinely non-reconstructable* moment justifies a new materialized write.
 
-## Alternatives considered
+## Alternatives considered (the design space)
 
-1. **Rank and write feed moments with an LLM.** Rejected. The Mentor home feed must be deterministic, cheap, explainable, and testable; LLM-assisted ranking can only return as a later separately ruled feature.
-2. **Derive moments directly from operational tables every time.** Rejected. Some narration events are not cleanly reconstructable after the fact, and GDPR-timer narration needs a durable event-like substrate.
-3. **Key the S0 table by `person_id` immediately.** Rejected. The V2 S0-S3 plan is explicitly identity-independent; the app still runs on `profiles`, and front-loading identity coupling would block the validation bet.
-4. **Use a database enum for moment kind/template key.** Rejected. Moment kinds are product contract changes that should ship additively through schemas and code. A DB enum would make every new moment require a migration without adding meaningful safety.
+- **A — Derive-on-read only.** Ideal for the reconstructable majority; folded into the chosen hybrid. Pure-A can't hold the one thing that must persist (seen-state) or a truly-ephemeral moment.
+- **B — Materialized store of all moments.** **Rejected:** its premise ("reconstruction is fragile") is refuted by the feed already deriving retention on read; materializing every kind adds a dual-write/loss surface and a write path on every producer for no benefit on derivable moments.
+- **C — Project over an existing event backbone** (Inngest history / domain events). **Rejected:** couples the feed to internal event schemas; the operational tables are a cleaner projection source.
+- **D — Notification/inbox** (per-user read/unread). **Rejected:** full inbox semantics exceed the feed's need; `surfaced_at` provides the minimal seen-state the hybrid requires.
+- **E — Hybrid: derive the derivable, persist only seen-state + the genuinely non-reconstructable. CHOSEN.**
 
 ## Rollout and rollback
 
-The migration is additive-only: it creates `ledger_visibility`, `mentor_activity_ledger`, and two indexes. It does not alter or drop existing objects, so the repo's destructive-migration rollback-section requirement does not apply.
-
-If the ledger ever needs to be removed before it carries user-visible state, forward recovery is `DROP TABLE mentor_activity_ledger; DROP TYPE ledger_visibility;`. Once user-visible moments depend on it, removal requires a separate data-retention decision.
+The table is additive and *shrinking* under this decision. Removing the dead `visibility` column + `ledger_visibility` type, the `template_key` column, and the unwritten kinds is forward-only cleanup (tracked WIs); none is read by any consumer today (`/now` is the sole reader and uses neither column). No user-visible state depends on the table beyond the cosmetic feed.
 
 ## Links
 
-- **Canon edit (lockstep):** `docs/architecture.md` — "Activity Ledger — Narration and Moment Substrate (`MMT-ADR-0022`)" section. Per `MMT-ADR-0000` §II.2, the ADR and its canon line land in the same change-set.
-- Spec: `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §8.2 and §12.
-- Plan: `docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md`.
+- **Canon (lockstep):** `docs/architecture.md` → "Activity Feed — Derived Moments + Seen-State" section. Per `MMT-ADR-0000` §II.2, the ADR and its canon line land in the same change-set.

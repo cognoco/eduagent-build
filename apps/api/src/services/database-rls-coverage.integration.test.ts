@@ -46,19 +46,26 @@ describe('Integration: RLS policy coverage (H8)', () => {
     // pg_policies.qual holds the USING expression as a string. We assert it
     // contains 'profile_id' to catch policies accidentally scoped to user_id,
     // owner_profile_id, or a different column.
+    //
+    // Use sql.raw() with an inline IN list — all values are compile-time
+    // constants from the manifest (no user input), so no injection risk.
+    // The = ANY($1) form is rejected by PG17 when the parameter is not
+    // explicitly typed as an array; sql.raw IN(...) avoids the cast issue.
+    const nonOrTables = ALL_RLS_TABLES.filter(
+      (t) => !OR_SCOPED_TABLES.includes(t),
+    );
+    const tableList = nonOrTables.map((t) => `'${t}'`).join(', ');
     const rows = await db.execute<{
       tablename: string;
       qual: string | null;
       with_check: string | null;
     }>(
-      sql`
+      sql.raw(`
         SELECT tablename, qual, with_check
         FROM pg_policies
         WHERE schemaname = 'public'
-          AND tablename = ANY(${Array.from(
-            ALL_RLS_TABLES.filter((t) => !OR_SCOPED_TABLES.includes(t)),
-          )})
-      `,
+          AND tablename IN (${tableList})
+      `),
     );
 
     // Group by tablename so we can check at least one policy per table

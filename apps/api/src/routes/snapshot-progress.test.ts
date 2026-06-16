@@ -6,6 +6,24 @@
 // Mirrors the mini-Hono pattern used by parking-lot.test.ts.
 // ---------------------------------------------------------------------------
 
+// [WI-774] Capture checkAndLogRateLimit call args so the flag-on test can assert
+// the identity opts the route threads. requireActual + targeted override (GC6
+// pattern): only this one export is stubbed; everything else is the real module.
+const mockCheckAndLogRateLimit = jest.fn().mockResolvedValue(false);
+jest.mock(
+  '../services/settings' /* gc1-allow: requireActual + targeted override — capture call args for the WI-774 flag-on assertion; rest of module is real */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/settings',
+    ) as typeof import('../services/settings');
+    return {
+      ...actual,
+      checkAndLogRateLimit: (...args: unknown[]) =>
+        mockCheckAndLogRateLimit(...args),
+    };
+  },
+);
+
 import { Hono } from 'hono';
 import { snapshotProgressRoutes } from './snapshot-progress';
 
@@ -37,6 +55,44 @@ describe('[WI-174 / DS-085] snapshot-progress proxy-mode guard', () => {
       { method: 'POST' },
     );
     expect(res.status).not.toBe(403);
+  });
+});
+
+describe('[WI-774] snapshot-progress flag-on rate-limit threading', () => {
+  function makeV2App() {
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: true });
+      // The account middleware seeds callerPersonId on the v2 path.
+      c.set('callerPersonId' as never, 'person-test-id');
+      await next();
+    });
+    app.route('/', snapshotProgressRoutes);
+    return app;
+  }
+
+  it('flag-on arms the v2 rate-limit guard: identityV2Enabled:true + callerPersonId', async () => {
+    mockCheckAndLogRateLimit.mockResolvedValue(false);
+    await makeV2App().request(
+      '/progress/refresh',
+      { method: 'POST' },
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    // A wrong env-binding name or context key would leave the guard un-armed on
+    // the live (staging, flag-on) path — assert the exact identity opts shape.
+    expect(mockCheckAndLogRateLimit).toHaveBeenCalledWith(
+      expect.anything(),
+      'a0000000-0000-4000-a000-000000000001',
+      'test-account-id',
+      'progress_refresh',
+      { hours: 1, maxCount: 10 },
+      { identityV2Enabled: true, callerPersonId: 'person-test-id' },
+    );
   });
 });
 

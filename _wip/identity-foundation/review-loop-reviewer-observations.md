@@ -139,6 +139,30 @@ with a direct productionization implication.
   `new-llm-review-watcher-kickoff-prompt.md`. *Production:* this is the forcing
   case for first-class per-workstream policy: `base_branch`, `landing_ref`,
   `allowed_dod_overrides`, `approval_reason`, and `scope`.
+- **2026-06-14 — reboot recovery exposed the durable-state boundary.** After a
+  forced machine reboot, all runtime state was gone: no tmux server, no watcher
+  processes, and no `/tmp/cosmo-watch*` logs or review outputs. Durable repo
+  artifacts survived, including `review-watcher-v3.ts`,
+  `review-loop-productization-handoff.md`, and the `new-llm` kickoff prompt.
+  The general watcher could be restarted cleanly from the saved script and
+  reached a baseline with `Reviewing=none` across all monitored workstreams.
+  The dedicated `new-llm` watcher did not yet have a durable script, only a
+  kickoff prompt, so `new-llm-review-watcher.ts` was created and then started
+  in its own tmux session. *Production:* runtime state cannot live only in
+  `/tmp`/tmux/in-memory maps. The dispatcher needs durable lease/heartbeat
+  state, persistent review-result storage, restart-aware de-dupe, and scripts or
+  config for every watcher that is expected to survive operator handoff.
+- **2026-06-14 — restart baseline semantics are safe but can miss already
+  reviewing items.** Both watchers intentionally treat the first post-start poll
+  as a baseline and only launch on later `Stage -> Reviewing` transitions. This
+  avoided duplicate reviews after restart, but it would also skip items that
+  entered `Reviewing` while the machine was down. During this recovery pass,
+  an explicit one-off Cosmo query showed `Reviewing=none` for all monitored
+  workstreams before the watchers were armed, so no catch-up launches were
+  needed. *Production:* restart should have an explicit catch-up mode: query
+  `Stage=Reviewing`, compare against durable review-attempt/result state, and
+  either launch, skip with reason, or require operator confirmation. Baseline
+  should be an auditable decision, not an implicit side effect of process start.
 
 ## Open design questions for productionization
 

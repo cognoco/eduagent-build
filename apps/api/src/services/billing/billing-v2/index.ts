@@ -81,6 +81,11 @@ export { getUsageBreakdownForProfileV2 } from './family-usage-v2';
 
 export { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
 
+// [WI-776] v2 twin of the metering ownership cross-check
+// (verifyProfileInSubscriptionAccount) — person × membership × subscription via
+// organization_id; the §4.6 HIGH quota-enforcement / cross-org IDOR guard.
+export { isPersonUnderSubscriptionV2 } from './metering-v2';
+
 // Webhook handler twins
 export {
   handleSubscriptionEventV2,

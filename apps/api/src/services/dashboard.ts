@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm';
 import {
   familyLinks,
+  membership,
   profiles,
   learningSessions,
   learningProfiles,
@@ -74,6 +75,11 @@ import {
   selectCurrentlyWorkingOn,
 } from './learner-profile';
 import { assertParentAccess } from './family-access';
+import {
+  getChildPersonIdsForParentV2,
+  getChildrenGdprConsentStatusesV2,
+  resolveOrgIdForPerson,
+} from './identity-v2/family-v2';
 import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
@@ -723,19 +729,46 @@ function parseSnapshotMetrics(input: unknown): ProgressMetrics {
 
 /**
  * Fetches aggregated dashboard data for all children linked to a parent.
+ *
+ * [WI-802] v2 seam: flag-on reads `guardianship` (active charges), flag-off
+ * reads legacy `family_links`. The rest of the function is byte-identical
+ * between the two paths.
  */
 export async function getChildrenForParent(
   db: Database,
   parentProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<DashboardChild[]> {
-  // 1. Query familyLinks for this parent
-  const links = await db.query.familyLinks.findMany({
-    where: eq(familyLinks.parentProfileId, parentProfileId),
-  });
-  if (links.length === 0) return [];
-
-  // Pre-fetch all subjects for all child profiles in a single query (avoids N+1)
-  const childProfileIds = links.map((l) => l.childProfileId);
+  // 1. Query familyLinks (legacy) or guardianship (v2) for this parent's children
+  let childProfileIds: string[];
+  // [WI-802] Resolve the guardian's org once on the flag-on path; reused below
+  // for the consent-status read (avoids a second resolveOrgIdForPerson round-trip).
+  const guardianOrgId = opts?.identityV2Enabled
+    ? await resolveOrgIdForPerson(db, parentProfileId)
+    : null;
+  if (opts?.identityV2Enabled) {
+    // [WI-802] Read charges via guardianship, then restrict to same-org members
+    // (defense-in-depth: cross-org guardianship edges must not leak into dashboard).
+    const allCharges = await getChildPersonIdsForParentV2(db, parentProfileId);
+    if (allCharges.length === 0 || !guardianOrgId) {
+      childProfileIds = [];
+    } else {
+      const orgMembers = await db.query.membership.findMany({
+        where: and(
+          inArray(membership.personId, allCharges),
+          eq(membership.organizationId, guardianOrgId),
+        ),
+        columns: { personId: true },
+      });
+      childProfileIds = orgMembers.map((m) => m.personId);
+    }
+  } else {
+    const links = await db.query.familyLinks.findMany({
+      where: eq(familyLinks.parentProfileId, parentProfileId),
+    });
+    childProfileIds = links.map((l) => l.childProfileId);
+  }
+  if (childProfileIds.length === 0) return [];
   const allChildSubjects = await db.query.subjects.findMany({
     where: inArray(subjects.profileId, childProfileIds),
   });
@@ -790,8 +823,11 @@ export async function getChildrenForParent(
   // [PERF-BATCH] getOverallProgressBatch replaces N × getOverallProgress
   // calls with ~8 queries (constant count regardless of N children).
   // countGuidedMetricsBatch is already a single GROUP BY aggregate.
-  const validLinks = links.filter((l) => profilesById.has(l.childProfileId));
-  const validChildProfileIds = validLinks.map((l) => l.childProfileId);
+  // [WI-802] v2 path: filter childProfileIds by profilesById (same validity
+  // gate as the legacy validLinks filter — skip IDs with no matching profile).
+  const validChildProfileIds = childProfileIds.filter((id) =>
+    profilesById.has(id),
+  );
   const [progressByProfile, guidedMetricsByProfile] = await Promise.all([
     getOverallProgressBatch(db, validChildProfileIds),
     countGuidedMetricsBatch(db, validChildProfileIds, startOfLastWeek),
@@ -837,25 +873,44 @@ export async function getChildrenForParent(
   // [BUG-466] Filter to GDPR consent type only. Without this filter the first
   // row per profileId (ordered by requestedAt desc) could be a non-GDPR row
   // (e.g. COPPA), making dashboard show the wrong consent status.
-  const allConsentStates = await db.query.consentStates.findMany({
-    where: and(
-      inArray(consentStates.profileId, childProfileIds),
-      eq(consentStates.consentType, 'GDPR'),
-    ),
-    // [BUG-394] Stable tiebreak on id to make consent dedup deterministic when
-    // two rows share the same requestedAt timestamp.
-    orderBy: [desc(consentStates.requestedAt), desc(consentStates.id)],
-  });
+  //
+  // [WI-802] v2 seam: flag-on resolves consent via the canonical consent graph
+  // (consentGrant + basis-explicit resolver), flag-off reads legacy consentStates.
+  // respondedAt is set to null on the v2 path (basis-explicit resolution does not
+  // batch respondedAt without N queries per child — the dashboard countdown reads
+  // it but degrades gracefully to null, matching the pre-consent-grant state).
   const consentByProfile = new Map<
     string,
     { status: ConsentStatus; respondedAt: Date | null }
   >();
-  for (const state of allConsentStates) {
-    if (!consentByProfile.has(state.profileId)) {
-      consentByProfile.set(state.profileId, {
-        status: state.status,
-        respondedAt: state.respondedAt ?? null,
-      });
+  if (opts?.identityV2Enabled) {
+    if (guardianOrgId && childProfileIds.length > 0) {
+      const v2Statuses = await getChildrenGdprConsentStatusesV2(
+        db,
+        guardianOrgId,
+        childProfileIds,
+      );
+      for (const [childId, status] of v2Statuses) {
+        consentByProfile.set(childId, { status, respondedAt: null });
+      }
+    }
+  } else {
+    const allConsentStates = await db.query.consentStates.findMany({
+      where: and(
+        inArray(consentStates.profileId, childProfileIds),
+        eq(consentStates.consentType, 'GDPR'),
+      ),
+      // [BUG-394] Stable tiebreak on id to make consent dedup deterministic when
+      // two rows share the same requestedAt timestamp.
+      orderBy: [desc(consentStates.requestedAt), desc(consentStates.id)],
+    });
+    for (const state of allConsentStates) {
+      if (!consentByProfile.has(state.profileId)) {
+        consentByProfile.set(state.profileId, {
+          status: state.status,
+          respondedAt: state.respondedAt ?? null,
+        });
+      }
     }
   }
 
@@ -877,8 +932,7 @@ export async function getChildrenForParent(
   }
 
   const prepared: PreparedChild[] = [];
-  for (const link of validLinks) {
-    const childProfileId = link.childProfileId;
+  for (const childProfileId of validChildProfileIds) {
     const profile = profilesById.get(childProfileId);
     if (!profile)
       throw new Error(`Profile not found for childProfileId=${childProfileId}`);
@@ -1061,11 +1115,12 @@ export async function getChildDetail(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<DashboardChild | null> {
   // [EP15-I5] Throws ForbiddenError (→ 403) on access denial instead of
   // returning null. A null return here now means "parent has access but
   // the child was not present in the dashboard list" — a genuine not-found.
-  await assertParentAccess(db, parentProfileId, childProfileId); // 1 query
+  await assertParentAccess(db, parentProfileId, childProfileId, opts); // 1 query
 
   // Step 1: Get the child's profile — 1 query
   const profile = await db.query.profiles.findFirst({
@@ -1269,9 +1324,10 @@ export async function getChildSubjectTopics(
   parentProfileId: string,
   childProfileId: string,
   subjectId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<TopicProgress[]> {
   // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
 
   // Verify the subject belongs to the child before querying curriculum (IDOR guard).
@@ -1360,10 +1416,11 @@ export async function getChildSessions(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<ChildSession[]> {
   // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
   // access and the child has no sessions", not "access denied".
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
   const activeProfile = await db.query.profiles.findFirst({
     where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
@@ -1380,8 +1437,9 @@ export async function getChildSessionDetail(
   parentProfileId: string,
   childProfileId: string,
   sessionId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<ChildSession | null> {
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
 
   const session = await db.query.learningSessions.findFirst({
@@ -1489,10 +1547,11 @@ export async function getChildInventory(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<KnowledgeInventory> {
   // [EP15-I5] Return type tightened from `| null`. Access denial now
   // throws (→ 403); the only remaining path is a valid inventory.
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
   return buildKnowledgeInventory(db, childProfileId);
 }
@@ -1506,9 +1565,10 @@ export async function getChildProgressHistory(
     to?: string;
     granularity?: 'daily' | 'weekly';
   },
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<ProgressHistory> {
   // [EP15-I5] Return type tightened — access denial throws, not returns null.
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
   return buildProgressHistory(db, childProfileId, input);
 }
@@ -1517,12 +1577,18 @@ export async function getChildReports(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<MonthlyReportSummary[]> {
   // [EP15-I5] Access denial throws (→ 403). Empty array now means "no
   // reports yet for this child" — semantically distinct from forbidden.
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
-  return listMonthlyReportsForParentChild(db, parentProfileId, childProfileId);
+  return listMonthlyReportsForParentChild(
+    db,
+    parentProfileId,
+    childProfileId,
+    opts,
+  );
 }
 
 export async function getChildReportDetail(
@@ -1530,15 +1596,17 @@ export async function getChildReportDetail(
   parentProfileId: string,
   childProfileId: string,
   reportId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<MonthlyReportRecord | null> {
   // [EP15-I5] null now only means "access granted but report not found".
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
   return getMonthlyReportForParentChild(
     db,
     parentProfileId,
     childProfileId,
     reportId,
+    opts,
   );
 }
 
@@ -1547,12 +1615,19 @@ export async function markChildReportViewed(
   parentProfileId: string,
   childProfileId: string,
   reportId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
   // [EP15-I5] Previously silently returned on access denial, letting an
   // unauthorized POST pretend to succeed. Now throws → 403.
-  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertParentAccess(db, parentProfileId, childProfileId, opts);
   await assertChildDashboardDataVisible(db, childProfileId);
-  await markMonthlyReportViewed(db, parentProfileId, childProfileId, reportId);
+  await markMonthlyReportViewed(
+    db,
+    parentProfileId,
+    childProfileId,
+    reportId,
+    opts,
+  );
 }
 
 export function buildDemoDashboard(): DemoDashboardData {

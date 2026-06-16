@@ -269,6 +269,7 @@ describe('GET /v1/recaps/:recapId', () => {
       expect.anything(),
       PROFILE_ID,
       RECAP_ID,
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
   });
 

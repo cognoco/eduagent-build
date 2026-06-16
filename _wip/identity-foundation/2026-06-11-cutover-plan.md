@@ -1227,7 +1227,7 @@ legacy side is untouched (pure addition + seam indirection).
 ## 4. Convergence runbook — the shrunk WI-586
 
 **Roles.** *Flip owner:* **Jorn (operator/shepherd)** — personally executes step 2,
-the step-7 flip (Doppler), and the go decisions at the step-3/6/8 STOPs, per env. *Executor:* the WI-586
+the step-7 flip (Doppler), and the go decisions at the step-6 (M-REPOINT) + step-8 (M-DROP) STOPs, per env. *Orchestrator delegation (operator-ratified 2026-06-15, re-affirmed 2026-06-16; durable record: `.claude/memory/project_586_gate_delegation.md` + WI-586 Cosmo comments):* gate **#4** (cutover-window entry) + gate **#6** (STOP-1 ≈ the step-3 ownerless-disposal STOP, incl. the step-2 Neon branch snapshot) are delegated to the **orchestrator** under conditions — staging rehearsal green + parity exact; abort-to-operator on any deviation; notify operator at each; Neon branch snapshot before disposal. Gates **#8** (step-7 flip) + **#11** (step-8 M-DROP) remain operator-only; any STOP not explicitly delegated defaults to operator. *Executor:* the WI-586
 executor performs the mechanical steps under the executor-protocol hard rule — at the
 three STOP points (before steps 3, 6, and 8) it reports exact planned commands
 and waits for shepherd go.
@@ -1303,8 +1303,13 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
 2. **Recovery posture (binding constraint).** Record the Neon PITR marker and create
    the pre-drop branch — this **is** the rollback story for everything after step 5:
    ```bash
-   neonctl branches create --project-id <env-project> \
-     --name pre-drop-2026-MM-DD --parent main   # + record timestamp in the WI evidence
+   neonctl branches create --project-id lingering-violet-30592106 \
+     --name pre-drop-2026-MM-DD --parent production   # + record timestamp in the WI evidence
+   # Neon topology (verified 2026-06-16): MentoMate is ONE project
+   # (lingering-violet-30592106, eu-central-1) with per-env BRANCHES — NOT per-env projects:
+   #   production = br-green-pond-agpzmrwx · staging = br-delicate-star-agpvtzx3 · dev (archived)
+   # Use --parent staging for the staging rehearsal. Snapshot access verified end-to-end via
+   # neonctl (auth jorn.jorgensen@zwizzly.com on Ramtop; create+delete branch test passed).
    ```
 3. **Ownerless disposal** *(STOP → shepherd go)*. Dev: bulk-delete the 223 ownerless
    accounts (cascade removes their orphan rows):
@@ -1368,6 +1373,30 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
    (children before parents; kept satellites already re-pointed; `webhook_idempotency`,
    `withdrawal_archive_preference` + `pending_notice_type` enums stay — their tables
    live on). The migration file carries the §4.2 `## Rollback` section verbatim.
+8.5. **Post-drop flag-on ROUTE smoke — the real drop-safety net (WI-803, AC#3)**
+   *(immediately after step 8, inside the soak; non-STOP)*. M-DROP has just made
+   `family_links` (and the other legacy tables) genuinely absent — the **only**
+   environment that reproduces the real post-drop 500 from an unbranched legacy
+   reader (the in-CI WI-802 guard is path-taken-only and cannot). Fire a broad
+   flag-on GET/PUT smoke at **every** parent/child endpoint and assert NO 500:
+   ```bash
+   node _wip/identity-foundation/scripts/flag-on-route-smoke.mjs \
+     --base-url https://<this-env-worker-url> \
+     --token    "<clerk-session-jwt for a seeded guardian>" \
+     --owner    "<owner/guardian-profile-id>" \
+     --child    "<linked-child-profile-id>"
+   # exit 0 = no unbranched family_links reader 500'd post-drop; exit 1 = a 5xx surfaced
+   ```
+   The script probes nudges-list (`listUnreadNudges` v2), profiles app-context PUT
+   (`loadProfileFamilyMeta` v2 — WI-803's two twins), plus the dashboard / progress /
+   notifications / reports family surface (WI-786/798/802). A 401/403/404 is a valid
+   app response and is NOT a failure; only a 5xx means a legacy reader is still
+   unbranched. **Gate:** exit 0 required before step 9; a non-zero exit means a
+   residual unbranched reader escaped the cutover — fix it (new v2 branch, NOT a
+   legacy-path removal) before retiring the flag. Record the script output in the WI
+   evidence. (This is a one-shot rehearsal artifact, **not** an always-on M-DROP CI
+   lane — running it against a non-dropped DB proves nothing, the legacy join still
+   resolves.)
 9. **Grep-clean — full legacy retirement** (same PR as 8 or an immediately following
    one, merged together with it):
    - **Schema/code:** delete legacy table defs (`schema/profiles.ts` legacy exports,

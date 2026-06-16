@@ -260,8 +260,9 @@ export async function getProgressSummary(
   db: Database,
   requesterProfileId: string,
   childProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<ProgressSummary> {
-  await assertParentAccess(db, requesterProfileId, childProfileId);
+  await assertParentAccess(db, requesterProfileId, childProfileId, opts);
 
   const stored = await db.query.progressSummaries.findFirst({
     where: eq(progressSummaries.profileId, childProfileId),

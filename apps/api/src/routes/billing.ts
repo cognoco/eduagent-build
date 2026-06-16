@@ -22,6 +22,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
+import type { ClerkIdentity } from '../middleware/account';
 import {
   getSubscriptionByAccountId,
   getQuotaPool,
@@ -105,9 +106,11 @@ type BillingRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
+    account: Account | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    // [CUT-B1] Set on the v2 pre-graph path (no account yet) by accountMiddleware.
+    clerkIdentity: ClerkIdentity | undefined;
   };
 };
 
@@ -761,6 +764,32 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // Fast KV-backed subscription status (for header display)
   .get('/subscription/status', async (c) => {
     const db = c.get('db');
+    // [CUT-B1 §2.2a] v2 pre-graph: a graphless owner (clerkIdentity set, no
+    // account/graph yet) has no subscription. The pre-graph allowlist routes
+    // this GET here to return free-tier defaults — NOT a 401 — so a
+    // pre-onboarding header/app-load fetch does not trip the client's
+    // 401→sign-out loop. Mirrors GET /v1/profiles' pre-graph branch.
+    if (
+      isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) &&
+      !c.get('account') &&
+      c.get('clerkIdentity')
+    ) {
+      const preGraphFreeTier = getTierConfig('free');
+      return c.json(
+        subscriptionStatusResponseSchema.parse({
+          status: {
+            tier: 'free',
+            effectiveAccessTier: 'free',
+            billingAccess: 'current',
+            status: 'trial',
+            monthlyLimit: preGraphFreeTier.monthlyQuota,
+            usedThisMonth: 0,
+            dailyLimit: preGraphFreeTier.dailyLimit,
+            usedToday: 0,
+          },
+        }),
+      );
+    }
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
 

@@ -252,6 +252,16 @@ jobs:
       - name: apps/api/scripts node:test guards (KV-binding verifier)
         run: node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs
 
+      # WI-795: regression guard for the db:push stg/prod guard
+      # (packages/database/scripts/check-db-push-target.mjs). These node:test
+      # cases lock: guard blocks stg/prd/unknown configs, guard blocks absent
+      # DOPPLER_CONFIG without DB_PUSH_LOCAL_DEV, guard allows dev config and
+      # the DB_PUSH_LOCAL_DEV opt-in, credential redaction in error output, and
+      # the wiring of predb:push + -c dev in package.json scripts.
+      # Lives under packages/database/scripts/ so Jest's testMatch doesn't see it.
+      - name: packages/database/scripts node:test guards (db:push guard)
+        run: node --test packages/database/scripts/check-db-push-target.test.mjs
+
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
       # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
       # if a quarantined path no longer exists (a stale entry that would rot
@@ -313,6 +323,100 @@ jobs:
         if: always()
         continue-on-error: true
         run: bash scripts/validate-doc-versions.sh
+
+  # ---------------------------------------------------------------------------
+  # Flag-ON integration lane (WI-789 — ic-orch-020 SEQUENCING INVARIANT)
+  #
+  # Runs the full integration suite with IDENTITY_V2_ENABLED=true against a
+  # FRESH committed-migration DB (drizzle-kit migrate, NOT push). This gives
+  # the identity-v2 HTTP-route surface — which buildIntegrationEnv() never
+  # sets — its first flag-on committed-migration coverage.
+  #
+  # LANDS NON-BLOCKING (continue-on-error: true). Expected to surface reds
+  # while WI-790/791/792/793 (D1-D4) and :709/FG1 defects exist. Reds here
+  # are diagnostic signal, not CI failures for unrelated PRs.
+  #
+  # HOW TO FLIP THIS TO REQUIRED (WI-586/WP-FLAG close gate):
+  #   Mirrors the i18n-ratchet pattern used for "pnpm audit (High+, advisory)"
+  #   and "sync-skills orphan check (advisory)" — both land continue-on-error
+  #   and are flipped to required by removing that flag once the blocking reds
+  #   are resolved.
+  #
+  #   Step 1 — Confirm D1-D4/FG1/:709 are all green on this job (watch the
+  #             "Flag-ON integration" check in the PR checks list — it reports
+  #             separately from `main` because it's a separate job).
+  #   Step 2 — Remove `continue-on-error: true` from this job.
+  #   Step 3 — Add "Flag-ON integration (IDENTITY_V2_ENABLED)" to the branch
+  #             protection required-status-checks list in GitHub Settings →
+  #             Branches → main → Edit → "Require status checks to pass" →
+  #             search for the job name and add it.
+  #   Step 4 — This job then becomes the WI-586/WP-FLAG close gate: WI-586
+  #             cannot close until this check is green and required.
+  #
+  # The job name intentionally ends with a parenthetical so it is distinct
+  # from the `main` job in the required-check picker.
+  # ---------------------------------------------------------------------------
+  integration-flag-on:
+    name: Flag-ON integration (IDENTITY_V2_ENABLED)
+    runs-on: ubuntu-latest
+    # NON-BLOCKING: allowed-red while D1-D4/FG1/:709 defect WIs exist.
+    # Remove this line (and add to branch-protection required checks) once
+    # those WIs are green — see HOW TO FLIP above.
+    continue-on-error: true
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: eduagent
+          POSTGRES_PASSWORD: eduagent
+          POSTGRES_DB: tests_v2
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5433:5432
+    env:
+      DATABASE_URL: postgresql://eduagent:eduagent@localhost:5433/tests_v2
+      IDENTITY_V2_ENABLED: 'true'
+      CI: true
+      NX_DAEMON: false
+      NX_ISOLATE_PLUGINS: false
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      # Enable pgvector extension before migration
+      - name: Enable pgvector extension
+        run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+
+      # Fresh committed-migration DB — validates that all migration SQL applies
+      # cleanly to a zero-state schema and that the v2 surface works against it.
+      # drizzle-kit migrate (NOT push) is deliberate: push diffs schema and can
+      # silently skip broken SQL; migrate runs every committed SQL file in order.
+      - name: Apply database migrations (drizzle-kit migrate)
+        working-directory: packages/database
+        run: pnpm exec drizzle-kit migrate
+
+      # Run the full integration suite with the flag on.
+      # Reds here are expected (D1-D4/FG1/:709 defects) and are the diagnostic
+      # signal this lane exists to surface. They do NOT fail the `main` job.
+      - name: API integration tests (flag-ON)
+        run: pnpm exec nx run api:test:integration
 
   # ---------------------------------------------------------------------------
   # OTA Update: publish JS bundle to EAS Update (preview channel)

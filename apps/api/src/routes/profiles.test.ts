@@ -27,6 +27,18 @@ jest.mock(
   },
 );
 
+// gc1-allow: unit-route isolation; real service covered by profile-v2.integration.test.ts
+jest.mock('../services/identity-v2/profile-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/profile-v2',
+  ) as typeof import('../services/identity-v2/profile-v2');
+  return {
+    ...actual,
+    listProfilesV2: jest.fn(),
+    getOwnerProfileV2: jest.fn(),
+  };
+});
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -44,6 +56,7 @@ import {
   ProfileLimitError,
   ProfileValidationError,
 } from '../services/profile';
+import { listProfilesV2 } from '../services/identity-v2/profile-v2';
 import { profileRoutes } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -122,6 +135,7 @@ const getProfileMock = jest.mocked(getProfile);
 const updateProfileMock = jest.mocked(updateProfile);
 const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
 const switchProfileMock = jest.mocked(switchProfile);
+const listProfilesV2Mock = jest.mocked(listProfilesV2);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -158,12 +172,143 @@ describe('GET /v1/profiles', () => {
     await expect(res.json()).resolves.toEqual({ profiles: [] });
   });
 
+  // [CUT-B1] v2 pre-graph: a freshly signed-up user under IDENTITY_V2_ENABLED
+  // has no identity graph yet — accountMiddleware sets `clerkIdentity` and leaves
+  // `account` unset, and the pre-graph allowlist routes GET /v1/profiles here to
+  // return the documented empty list. Without the handler's pre-graph branch,
+  // requireAccount() 401s, and the mobile client's 401→sign-out turns onboarding
+  // into an unbreakable sign-in loop. Red-green: delete the pre-graph branch in
+  // profiles.ts GET /profiles and this flips 200 → 401.
+  it('[CUT-B1] returns 200 empty list (not 401) for a graphless v2 owner', async () => {
+    type PreGraphEnv = {
+      Bindings: { IDENTITY_V2_ENABLED?: string };
+      Variables: {
+        db: Database;
+        account: Account | undefined;
+        profileId: string | undefined;
+        profileMeta: ProfileMeta | undefined;
+        clerkIdentity:
+          | { clerkUserId: string; verifiedEmail: string }
+          | undefined;
+      };
+    };
+    const app = new Hono<PreGraphEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      // Graphless: no account set; clerkIdentity present, as accountMiddleware
+      // sets it on the v2 pre-graph path.
+      c.set('clerkIdentity', {
+        clerkUserId: 'user_pre_graph',
+        verifiedEmail: 'newuser@example.com',
+      });
+      c.set('profileId', undefined);
+      c.set('profileMeta', undefined);
+      await next();
+    });
+    app.onError((err, c) =>
+      err instanceof HTTPException
+        ? c.json({ code: 'HTTP_ERROR', message: err.message }, err.status)
+        : c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    app.route('/v1', profileRoutes);
+
+    const res = await app.request(
+      '/v1/profiles',
+      {},
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ profiles: [] });
+    // Must short-circuit before the account-scoped service call.
+    expect(listProfilesMock).not.toHaveBeenCalled();
+  });
+
   it('propagates service errors to 500', async () => {
     listProfilesMock.mockRejectedValue(new Error('DB timeout'));
 
     const res = await makeApp().request('/v1/profiles');
 
     expect(res.status).toBe(500);
+  });
+
+  // [CUT-B2] Post-graph v2 read: flag-on + account resolved → the GET dispatches
+  // to listProfilesV2(db, account.id) (account.id = organization.id, org-scoped =
+  // the IDOR guard), NOT the legacy listProfiles. Red-green: drop the
+  // isIdentityV2Enabled branch in profiles.ts GET and this flips to listProfiles.
+  it('[CUT-B2] reads v2 via listProfilesV2 when IDENTITY_V2_ENABLED and account is resolved', async () => {
+    const profile = makeProfileRow({ id: PROFILE_ID_A });
+    listProfilesV2Mock.mockResolvedValue([profile]);
+
+    const res = await makeApp().request(
+      '/v1/profiles',
+      {},
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ profiles: [{ id: PROFILE_ID_A }] });
+    // v2 read is org-scoped to the caller's resolved account.id (= org id).
+    expect(listProfilesV2Mock).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT_ID,
+    );
+    // Legacy reader must NOT run on the v2 path.
+    expect(listProfilesMock).not.toHaveBeenCalled();
+  });
+
+  // [CUT-B2] Flag-off: the legacy listProfiles path stays intact (until WP-FLAG).
+  it('[CUT-B2] reads legacy listProfiles when IDENTITY_V2_ENABLED is not set', async () => {
+    listProfilesMock.mockResolvedValue([]);
+
+    const res = await makeApp().request('/v1/profiles');
+
+    expect(res.status).toBe(200);
+    expect(listProfilesMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT_ID,
+    );
+    expect(listProfilesV2Mock).not.toHaveBeenCalled();
+  });
+
+  // [WI-799] Guardian family list with ≥13 children must serialize to 200, not
+  // 500. profileListResponseSchema.parse() enforces the v1 13+ birthYear floor;
+  // a sub-13 child row throws → 500. Red-green: change childBirthYear below to
+  // currentYear - 12 (sub-13) and this test flips to 500.
+  it('[WI-799] returns 200 (not 500) when guardian family list includes ≥13 children (IDENTITY_V2_ENABLED)', async () => {
+    const currentYear = new Date().getFullYear();
+    const parentProfile = makeProfileRow({ id: PROFILE_ID_A, isOwner: true });
+    const childProfile = makeProfileRow({
+      id: PROFILE_ID_B,
+      isOwner: false,
+    });
+    // Override birthYear on the child to a year-relative ≥13 value (age 14),
+    // matching the CHILD_BIRTH_YEAR constant introduced by WI-799.
+    const childProfileWithBirthYear = {
+      ...childProfile,
+      birthYear: currentYear - 14,
+    };
+    listProfilesV2Mock.mockResolvedValue([
+      parentProfile,
+      childProfileWithBirthYear,
+    ]);
+
+    const res = await makeApp().request(
+      '/v1/profiles',
+      {},
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.profiles).toHaveLength(2);
+    expect(
+      body.profiles.find((p: { id: string }) => p.id === PROFILE_ID_B),
+    ).toMatchObject({
+      id: PROFILE_ID_B,
+      birthYear: currentYear - 14,
+    });
   });
 });
 
@@ -622,6 +767,7 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
       PROFILE_ID_A,
       ACCOUNT_ID,
       'family',
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
   });
 
@@ -663,6 +809,7 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
       PROFILE_ID_A,
       ACCOUNT_ID,
       'family',
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
   });
 
@@ -740,6 +887,7 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
       PROFILE_ID_A,
       ACCOUNT_ID,
       'study',
+      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
   });
 });

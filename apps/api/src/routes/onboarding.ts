@@ -149,7 +149,9 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       const { conversationLanguage } = c.req.valid('json');
       try {
         await dispatchUpdateConversationLanguage(
@@ -221,7 +223,9 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       const { pronouns } = c.req.valid('json');
       try {
         await dispatchUpdatePronouns(
@@ -277,7 +281,9 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       const { interests } = c.req.valid('json');
       try {
         await updateInterestsContext(db, childProfileId, account.id, interests);

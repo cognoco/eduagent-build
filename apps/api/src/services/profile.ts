@@ -7,6 +7,7 @@ import { eq, and, asc, desc, inArray, sql, isNull } from 'drizzle-orm';
 import {
   profiles,
   familyLinks,
+  guardianship,
   consentStates,
   type Database,
 } from '@eduagent/database';
@@ -14,6 +15,7 @@ import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { safeSend } from './safe-non-core';
 import { inngest } from '../inngest/client';
+import { getChargePersonIds } from './identity-v2/guardianship';
 
 const logger = createLogger();
 import type {
@@ -94,10 +96,48 @@ function mapProfileRow(
   };
 }
 
+/**
+ * Resolves family-link meta for a profile row.
+ *
+ * [WI-803] v2 seam: flag-on reads `guardianship` (active charges or guardians)
+ * instead of `family_links`. Flag-off is byte-identical to pre-WI-803. The v2
+ * path is only threaded from `updateProfileAppContext`; the other callers
+ * (`findOwnerProfile`, `getProfile`, `updateProfile`) remain on the legacy path
+ * until their own WP fixes them.
+ */
 async function loadProfileFamilyMeta(
   db: Database,
   row: typeof profiles.$inferSelect,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<{ linkCreatedAt: Date | null; hasFamilyLinks: boolean }> {
+  if (opts?.identityV2Enabled) {
+    // [WI-803] v2 path: guardianship table — safe post-M-DROP.
+    // Owner (guardian): has family links iff they hold active charge edges;
+    //   linkCreatedAt is null for owners (matches legacy + profile-v2.ts:413).
+    // Non-owner (charge): has family links iff they have an active guardian edge;
+    //   linkCreatedAt = that edge's grantedAt (legacy parity with
+    //   family_links.createdAt; mirrors the WI-771 mapping in profile-v2.ts:413).
+    if (row.isOwner) {
+      const charges = await getChargePersonIds(db, row.id);
+      return { linkCreatedAt: null, hasFamilyLinks: charges.length > 0 };
+    } else {
+      // A charge has at most one active edge (partial unique idx); first wins.
+      const edge = await db.query.guardianship.findFirst({
+        where: and(
+          eq(guardianship.chargePersonId, row.id),
+          isNull(guardianship.revokedAt),
+        ),
+        columns: { grantedAt: true },
+        orderBy: [asc(guardianship.grantedAt)],
+      });
+      return {
+        linkCreatedAt: edge?.grantedAt ?? null,
+        hasFamilyLinks: edge != null,
+      };
+    }
+  }
+
+  // Legacy path — byte-identical to pre-WI-803.
   const link = await db.query.familyLinks.findFirst({
     where: row.isOwner
       ? eq(familyLinks.parentProfileId, row.id)
@@ -604,12 +644,16 @@ export async function updateProfile(
  *
  * Returns null if the profile does not exist or is not owned by the account.
  * The route layer enforces whether the caller may update this profile.
+ *
+ * [WI-802] v2 seam: under `opts.identityV2Enabled`, the family-context guard
+ * checks `guardianship` (active charges) instead of `family_links`.
  */
 export async function updateProfileAppContext(
   db: Database,
   profileId: string,
   accountId: string,
   defaultAppContext: AppContext,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<Profile | null> {
   const existing = await db.query.profiles.findFirst({
     where: and(
@@ -621,13 +665,20 @@ export async function updateProfileAppContext(
   if (!existing) return null;
 
   if (defaultAppContext === 'family') {
-    const familyLink = await db.query.familyLinks.findFirst({
-      where: eq(familyLinks.parentProfileId, profileId),
-    });
+    let hasFamilyLink: boolean;
+    if (opts?.identityV2Enabled) {
+      const charges = await getChargePersonIds(db, profileId);
+      hasFamilyLink = charges.length > 0;
+    } else {
+      const familyLink = await db.query.familyLinks.findFirst({
+        where: eq(familyLinks.parentProfileId, profileId),
+      });
+      hasFamilyLink = familyLink != null;
+    }
     if (
       existing.isOwner !== true ||
       computeAgeBracket(existing.birthYear) !== 'adult' ||
-      !familyLink
+      !hasFamilyLink
     ) {
       throw new ForbiddenError(
         'Family mode is only available to adult owner profiles with family links.',
@@ -652,7 +703,8 @@ export async function updateProfileAppContext(
     .returning();
   if (!rows[0]) return null;
   const status = await getConsentStatus(db, rows[0].id);
-  const familyMeta = await loadProfileFamilyMeta(db, rows[0]);
+  // [WI-803] Thread opts so the response-build read uses the v2 path flag-on.
+  const familyMeta = await loadProfileFamilyMeta(db, rows[0], opts);
   return mapProfileRow(rows[0], status, familyMeta);
 }
 

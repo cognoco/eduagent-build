@@ -41,6 +41,8 @@ with a `_wip/<slug>/` workspace) → **Cosmo Workstream(s)** (substrate containe
 an Initiative creates **at activation**, 0..n per Initiative — never assume 1:1)
 → **Work Package** (`Altitude=WP`, PR-sized bundle) → **Work Item / Sub-item**.
 
+*That hierarchy is the **work** breakdown; the **execution roles** that drive it are the **Quartet** — orchestrator / shepherd / executor / reviewer (scaffolds: `_wip/**/{orchestrator,shepherd,executor,reviewer}-protocol.md`) — coordinating over the **Clacks** comms layer (`progress-channel-design.md`). Full stack: **ZDX → Cosmo → Clacks → Quartet**.*
+
 1.2 **Banned synonyms.** Initiatives are never called "workstreams" (locked to
 the ZDX/Cosmo object, ZDX-ADR-0001), "work tracks", or "streams". Proper names
 containing those words (e.g. a historical "Stream 2") stay reserved for their
@@ -85,6 +87,21 @@ altitudes: the program session never shepherds WP-level detail, and a shepherd
 never reaches into another Initiative — the two talk only in boundary events
 (§5.2). Standing orchestration *daemons* are banned; shepherds are interactive
 sessions.
+
+**Shepherd and reviewer sessions are operator-launched — chosen by design, not
+convenience.** The program session **prepares** the thin kickoff brief (§2.6) and
+hands it to the operator; **the operator spawns the separate session.** The
+program session never spawns a shepherd (or the autonomous reviewer) as its own
+subagent or background agent. This was ruled deliberately because operator-launch
+is the *only* mechanism that fully supports the session model: a shepherd must be
+a full, independent, interactive session with its own context budget and lifecycle
+(the disposable-but-not-subordinate invariant, §2.6), and the reviewer must be a
+genuinely separate session in a different runtime (the reviewer ≠ executor quality
+invariant). Spawning either from inside the program session re-subordinates it to
+the program session's context and lifecycle — collapsing the altitude separation
+this section exists to enforce and breaking the "kill any session, lose nothing"
+property. So: program session authors the kickoff; operator launches; the launched
+session self-drives off its pointers.
 
 2.6 **Shepherd sessions are disposable by construction.** A shepherd is a
 reader/writer of the durable artifacts, never their replacement: every state
@@ -275,6 +292,13 @@ the same change-set as the event they record.
   the primary inputs to PRG-04 (Cosmo top-down delivery layer).
 
 ## Change log
+- **2026-06-14 — v1.2.** §2.5: made the **operator-launched** spawn mechanism for
+  shepherd and reviewer sessions an explicit, ratified design rule (with its
+  rationale — it is the only mechanism that fully supports the disposable,
+  interactive, separate-context/separate-runtime session model; spawning from
+  inside the program session would collapse the altitude separation). Confirms a
+  prior verbal ruling; the program session authors the kickoff, the operator
+  launches. Ruled by Jorn 2026-06-14.
 - **2026-06-10 — v1.1.** Added §2.5–2.7 (session model: program session /
   per-Initiative shepherd / executors; disposable-shepherd invariant + kickoff
   brief shape; model tiering by leverage) — agreed at the IF W1 kickoff
