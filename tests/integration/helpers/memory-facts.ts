@@ -129,6 +129,31 @@ export async function seedLearningProfile(
   return { profileId, accountId };
 }
 
+/**
+ * [WI-586] Flag-aware teardown of a single seeded account by its id.
+ * Flag-ON (organization.id == accountId) deletes the org's persons (cascading
+ * login/membership/learning_profiles) then the org; flag-OFF deletes the legacy
+ * accounts row. Use this instead of an inline `db.delete(accounts)` so the
+ * memory-facts suites tear down cleanly against the committed-migration DB.
+ */
+export async function cleanupSeededAccount(
+  db: Database,
+  accountId: string,
+): Promise<void> {
+  if (isIdentityV2Enabled()) {
+    const memberRows = await db.query.membership.findMany({
+      where: eq(membership.organizationId, accountId),
+      columns: { personId: true },
+    });
+    for (const row of memberRows) {
+      await db.delete(person).where(eq(person.id, row.personId));
+    }
+    await db.delete(organization).where(eq(organization.id, accountId));
+    return;
+  }
+  await db.delete(accounts).where(eq(accounts.id, accountId));
+}
+
 export async function runBackfillForOneProfile(
   db: Database,
   profileId: string,

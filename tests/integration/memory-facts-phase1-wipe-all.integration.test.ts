@@ -10,10 +10,14 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { accounts, generateUUIDv7, memoryFacts } from '@eduagent/database';
+import { generateUUIDv7, memoryFacts } from '@eduagent/database';
 
 import { replaceActiveMemoryFactsForProfile } from '../../apps/api/src/services/memory/memory-facts';
-import { seedLearningProfile, setupTestDb } from './helpers/memory-facts';
+import {
+  cleanupSeededAccount,
+  seedLearningProfile,
+  setupTestDb,
+} from './helpers/memory-facts';
 import type { MemoryProjection } from '../../apps/api/src/services/memory/backfill-mapping';
 
 const EMPTY_PROJECTION: MemoryProjection = {
@@ -102,7 +106,7 @@ describe('replaceActiveMemoryFactsForProfile (real DB)', () => {
     expect(strengthRow).toBeDefined();
     expect(strengthRow?.text).toContain('algebra');
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('results in zero rows when projection is empty', async () => {
@@ -127,7 +131,7 @@ describe('replaceActiveMemoryFactsForProfile (real DB)', () => {
     });
     expect(remaining).toHaveLength(0);
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('cross-profile: does not delete rows for other profiles', async () => {
@@ -155,7 +159,7 @@ describe('replaceActiveMemoryFactsForProfile (real DB)', () => {
     });
     expect(p2Remaining.map((r) => r.id)).toContain(p2Id);
 
-    await db.delete(accounts).where(eq(accounts.id, a1));
-    await db.delete(accounts).where(eq(accounts.id, a2));
+    await cleanupSeededAccount(db, a1);
+    await cleanupSeededAccount(db, a2);
   });
 });

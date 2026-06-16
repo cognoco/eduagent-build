@@ -1,11 +1,8 @@
 import { eq } from 'drizzle-orm';
-import {
-  accounts,
-  createScopedRepository,
-  learningProfiles,
-} from '@eduagent/database';
+import { createScopedRepository, learningProfiles } from '@eduagent/database';
 
 import {
+  cleanupSeededAccount,
   runBackfillForOneProfile,
   seedLearningProfile,
   setupTestDb,
@@ -76,22 +73,24 @@ describe('memory_facts parity vs JSONB', () => {
         const fromFacts = await readMemorySnapshotFromFacts(scoped, profile!);
 
         expect(new Set(fromFacts.communicationNotes)).toEqual(
-          new Set(profile!.communicationNotes as string[])
+          new Set(profile!.communicationNotes as string[]),
         );
         expect(new Set(fromFacts.suppressedInferences)).toEqual(
-          new Set(profile!.suppressedInferences as string[])
+          new Set(profile!.suppressedInferences as string[]),
         );
         expect(new Set(fromFacts.interests.map((i) => i.label))).toEqual(
           new Set(
-            (profile!.interests as Array<{ label: string }>).map((i) => i.label)
-          )
+            (profile!.interests as Array<{ label: string }>).map(
+              (i) => i.label,
+            ),
+          ),
         );
         expect(new Set(fromFacts.strengths.flatMap((s) => s.topics))).toEqual(
           new Set(
             (profile!.strengths as Array<{ topics: string[] }>).flatMap(
-              (s) => s.topics
-            )
-          )
+              (s) => s.topics,
+            ),
+          ),
         );
         expect(
           new Set(
@@ -100,9 +99,9 @@ describe('memory_facts parity vs JSONB', () => {
                 subject: s.subject,
                 topic: s.topic,
                 attempts: s.attempts,
-              })
-            )
-          )
+              }),
+            ),
+          ),
         ).toEqual(
           new Set(
             (
@@ -116,13 +115,13 @@ describe('memory_facts parity vs JSONB', () => {
                 subject: s.subject,
                 topic: s.topic,
                 attempts: s.attempts,
-              })
-            )
-          )
+              }),
+            ),
+          ),
         );
       } finally {
-        await db.delete(accounts).where(eq(accounts.id, accountId));
+        await cleanupSeededAccount(db, accountId);
       }
-    }
+    },
   );
 });
