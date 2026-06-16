@@ -135,6 +135,9 @@ async function executeRefreshSteps(
 describe('dailySnapshotCron', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Isolate from ambient IDENTITY_V2_ENABLED so legacy-path tests are not
+    // routed to v2 branches lacking mock setup.
+    delete process.env['IDENTITY_V2_ENABLED'];
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
     mockSelectDistinctRows([]);
   });
@@ -256,6 +259,9 @@ describe('dailySnapshotCron', () => {
 describe('dailySnapshotRefresh', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Isolate from ambient IDENTITY_V2_ENABLED so legacy-path tests are not
+    // routed to v2 branches lacking mock setup.
+    delete process.env['IDENTITY_V2_ENABLED'];
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
     mockSnapshotDb.query.profiles.findFirst.mockResolvedValue({
       id: 'profile-001',
@@ -350,7 +356,11 @@ describe('dailySnapshotRefresh', () => {
       );
       expect((result as { status: string }).status).toBe('completed');
     } finally {
-      process.env.IDENTITY_V2_ENABLED = prev;
+      if (prev === undefined) {
+        delete process.env['IDENTITY_V2_ENABLED'];
+      } else {
+        process.env['IDENTITY_V2_ENABLED'] = prev;
+      }
     }
   });
 
