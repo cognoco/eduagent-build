@@ -141,9 +141,12 @@ export async function listRecapsForParent(
   options: {
     childProfileId?: string;
     limit?: number;
+    identityV2Enabled?: boolean;
   } = {},
 ): Promise<RecapListItem[]> {
-  const children = await getChildrenForParent(db, parentProfileId);
+  const children = await getChildrenForParent(db, parentProfileId, {
+    identityV2Enabled: options.identityV2Enabled,
+  });
   const selectedChildren = options.childProfileId
     ? children.filter((child) => child.profileId === options.childProfileId)
     : children;
@@ -211,8 +214,11 @@ export async function getRecapForParent(
   db: Database,
   parentProfileId: string,
   recapId: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<RecapListItem | null> {
-  const children = await getChildrenForParent(db, parentProfileId);
+  const children = await getChildrenForParent(db, parentProfileId, {
+    identityV2Enabled: opts?.identityV2Enabled,
+  });
 
   // [L7-F2] Parallelize per-child lookups instead of awaiting in series. A
   // single-query refactor (fetch session by recapId, then assert membership

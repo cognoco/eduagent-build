@@ -80,8 +80,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   .get('/dashboard', async (c) => {
     const { db, profileId } = withProfile(c);
 
+    const identityV2Enabled = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
     const [children, pendingNotices] = await Promise.all([
-      getChildrenForParent(db, profileId),
+      getChildrenForParent(db, profileId, { identityV2Enabled }),
       listPendingNotices(db, profileId),
     ]);
     return c.json(

@@ -267,6 +267,9 @@ export const profileRoutes = new Hono<ProfileEnv>()
           id,
           account.id,
           defaultAppContext,
+          {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          },
         );
       } catch (err) {
         if (err instanceof ForbiddenError) {

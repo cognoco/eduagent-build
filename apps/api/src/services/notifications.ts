@@ -20,6 +20,7 @@ import {
   isPushEnabled,
 } from './settings';
 import { isGdprProcessingAllowed } from './consent';
+import { getGuardianPersonIds } from './identity-v2/guardianship';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import {
@@ -385,12 +386,16 @@ const SUBSCRIBE_RATE_LIMIT_HOURS = 24;
 /**
  * Notifies a child's parent to subscribe. Sends push notification + email.
  * Rate limited to 1 notification per 24 hours per child profile.
+ *
+ * [WI-802] v2 seam: flag-on resolves the parent via `guardianship` (active
+ * guardian person ids), flag-off reads legacy `family_links`.
  */
 export async function notifyParentToSubscribe(
   db: Database,
   childProfileId: string,
   emailOptions?: EmailOptions,
   appUrl?: string,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<ParentSubscribeResult> {
   // 1. [BUG-856] Atomic rate-limit check — counts recent subscribe_request
   // notifications and reserves the rate-limit slot in a single transaction
@@ -406,11 +411,18 @@ export async function notifyParentToSubscribe(
     return { sent: false, rateLimited: true, reason: 'rate_limited' };
   }
 
-  // 2. Find parent via familyLinks
-  const link = await db.query.familyLinks.findFirst({
-    where: eq(familyLinks.childProfileId, childProfileId),
-  });
-  if (!link) {
+  // 2. Find parent via familyLinks (legacy) or guardianship (v2)
+  let parentProfileId: string | undefined;
+  if (opts?.identityV2Enabled) {
+    const guardianIds = await getGuardianPersonIds(db, childProfileId);
+    parentProfileId = guardianIds[0];
+  } else {
+    const link = await db.query.familyLinks.findFirst({
+      where: eq(familyLinks.childProfileId, childProfileId),
+    });
+    parentProfileId = link?.parentProfileId;
+  }
+  if (!parentProfileId) {
     return { sent: false, rateLimited: false, reason: 'no_parent_link' };
   }
 
@@ -426,7 +438,7 @@ export async function notifyParentToSubscribe(
   await sendPushNotification(
     db,
     {
-      profileId: link.parentProfileId,
+      profileId: parentProfileId,
       title: `${childName} wants to keep learning!`,
       body: `${childName} has been making great progress. Subscribe to continue their learning journey.`,
       type: 'subscribe_request',
@@ -500,17 +512,28 @@ export function formatStruggleNotificationCopy(
 
 /**
  * Send struggle push notification to the parent of a child profile.
- * Looks up parent via familyLinks, resolves child display name, sends push.
+ * Looks up parent via familyLinks (legacy) or guardianship (v2), resolves
+ * child display name, sends push.
+ *
+ * [WI-802] v2 seam: flag-on reads `guardianship`, flag-off reads `family_links`.
  */
 export async function sendStruggleNotification(
   db: Database,
   childProfileId: string,
   notification: StruggleNotification,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<NotificationResult> {
-  const link = await db.query.familyLinks.findFirst({
-    where: eq(familyLinks.childProfileId, childProfileId),
-  });
-  if (!link) {
+  let parentProfileId: string | undefined;
+  if (opts?.identityV2Enabled) {
+    const guardianIds = await getGuardianPersonIds(db, childProfileId);
+    parentProfileId = guardianIds[0];
+  } else {
+    const link = await db.query.familyLinks.findFirst({
+      where: eq(familyLinks.childProfileId, childProfileId),
+    });
+    parentProfileId = link?.parentProfileId;
+  }
+  if (!parentProfileId) {
     return { sent: false, reason: 'no_parent_link' };
   }
 
@@ -532,7 +555,7 @@ export async function sendStruggleNotification(
   // a push-disabled parent would still consume the dedup slot, so re-enabling
   // push within 24h could suppress their first real struggle alert as
   // `dedup_24h`. Checking here keeps the slot unconsumed when nothing is sent.
-  if (!(await isPushEnabled(db, link.parentProfileId))) {
+  if (!(await isPushEnabled(db, parentProfileId))) {
     return { sent: false, reason: 'push_disabled' };
   }
 
@@ -549,7 +572,7 @@ export async function sendStruggleNotification(
   // both pushed, defeating the 24h dedup invariant.
   const rateLimited = await checkAndLogRateLimitInternal(
     db,
-    link.parentProfileId,
+    parentProfileId,
     notification.type,
     { hours: 24, maxCount: 1 },
   );
@@ -578,7 +601,7 @@ export async function sendStruggleNotification(
   return sendPushNotification(
     db,
     {
-      profileId: link.parentProfileId,
+      profileId: parentProfileId,
       title: copy.title,
       body: copy.body,
       type: notification.type,

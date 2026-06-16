@@ -329,6 +329,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         emailFrom: c.env.EMAIL_FROM,
       },
       apiOrigin,
+      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     return c.json(notifyParentSubscribeResponseSchema.parse(result));
   })
