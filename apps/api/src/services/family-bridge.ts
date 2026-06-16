@@ -6,6 +6,7 @@ import {
   curriculumTopics,
   learningSessions,
   needsDeepeningTopics,
+  person,
   profiles,
   subjects,
   type Database,
@@ -184,10 +185,33 @@ async function findAdultSubject(
   return subject;
 }
 
+// [WI-586] Resolve the adult's conversation language. Flag-ON the legacy
+// `profiles` table is dropped; the value lives on `person` (person.id ==
+// profileId). Returns null when no row exists.
+async function getAdultConversationLanguage(
+  db: Database,
+  adultProfileId: string,
+  opts?: { identityV2Enabled?: boolean },
+): Promise<string | null> {
+  if (opts?.identityV2Enabled) {
+    const row = await db.query.person.findFirst({
+      where: eq(person.id, adultProfileId),
+      columns: { conversationLanguage: true },
+    });
+    return row?.conversationLanguage ?? null;
+  }
+  const row = await db.query.profiles.findFirst({
+    where: eq(profiles.id, adultProfileId),
+    columns: { conversationLanguage: true },
+  });
+  return row?.conversationLanguage ?? null;
+}
+
 async function resolveSubject(
   db: Database,
   adultProfileId: string,
   snapshot: ChildTopicSnapshot,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<{ subject: typeof subjects.$inferSelect; created: boolean }> {
   const existing = await findAdultSubject(
     db,
@@ -196,14 +220,16 @@ async function resolveSubject(
   );
   if (existing) {
     if (!existing.languageCode) {
-      const adult = await db.query.profiles.findFirst({
-        where: eq(profiles.id, adultProfileId),
-      });
-      if (adult?.conversationLanguage) {
+      const conversationLanguage = await getAdultConversationLanguage(
+        db,
+        adultProfileId,
+        opts,
+      );
+      if (conversationLanguage) {
         await db
           .update(subjects)
           .set({
-            languageCode: adult.conversationLanguage,
+            languageCode: conversationLanguage,
             updatedAt: new Date(),
           })
           .where(
@@ -213,7 +239,7 @@ async function resolveSubject(
             ),
           );
         return {
-          subject: { ...existing, languageCode: adult.conversationLanguage },
+          subject: { ...existing, languageCode: conversationLanguage },
           created: false,
         };
       }
@@ -221,10 +247,13 @@ async function resolveSubject(
     return { subject: existing, created: false };
   }
 
-  const adult = await db.query.profiles.findFirst({
-    where: eq(profiles.id, adultProfileId),
-  });
-  if (!adult) throw new NotFoundError('Profile');
+  const conversationLanguage = await getAdultConversationLanguage(
+    db,
+    adultProfileId,
+    opts,
+  );
+  if (conversationLanguage === null) throw new NotFoundError('Profile');
+  const adult = { conversationLanguage };
 
   await db
     .insert(subjects)
@@ -429,6 +458,7 @@ export async function cloneTopicFromChild(
       database,
       adultProfileId,
       snapshot,
+      opts,
     );
     if (resolvedSubject.created)
       createdIds.subjectId = resolvedSubject.subject.id;
