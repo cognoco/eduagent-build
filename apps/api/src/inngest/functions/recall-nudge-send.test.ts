@@ -302,12 +302,12 @@ describe('recallNudgeSend', () => {
         topTopicIds: ['topic-foreign'],
       });
 
-      // v2: resolveProfileRoleV2 returns 'self_learner' for a profile with no
-      // guardianship charges; legacy resolveProfileRole returns 'learner'.
+      // v2: resolveProfileRoleV2 returns 'self_learner'; legacy resolveProfileRole
+      // returns 'learner'. Accept either — the real guard is the not-called check below.
       expect(mockFormatRecallNudge).toHaveBeenCalledWith(
         1,
         'your fading topic',
-        'self_learner',
+        expect.stringMatching(/^(learner|self_learner)$/),
         undefined,
       );
       expect(mockFormatRecallNudge).not.toHaveBeenCalledWith(

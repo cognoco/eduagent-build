@@ -398,6 +398,11 @@ describe('subjectPrewarmCurriculum', () => {
         );
         mockDb.query.consentGrant.findFirst.mockResolvedValue(grantRow);
         mockDb.query.consentRequest.findFirst.mockResolvedValue(requestRow);
+        // Dual-mode: legacy path (IDENTITY_V2_ENABLED off) reads consentStates.findFirst.
+        // Status label matches legacy enum values (WITHDRAWN/PENDING/PARENTAL_CONSENT_REQUESTED).
+        mockDb.query.consentStates.findFirst.mockResolvedValue({
+          status: _label,
+        });
 
         const { result } = await execute(createEventData());
 
@@ -450,6 +455,11 @@ describe('subjectPrewarmCurriculum', () => {
           withdrawnAt: now,
           grantedAt: now,
         });
+      // Dual-mode: legacy path (IDENTITY_V2_ENABLED off) reads consentStates.findFirst.
+      // null (= allowed) on step 1; WITHDRAWN on step 2 → gate blocks.
+      mockDb.query.consentStates.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
 
       const { result } = await execute(createEventData());
 
