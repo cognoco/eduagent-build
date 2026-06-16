@@ -711,6 +711,7 @@ describe('onboarding routes', () => {
         'test-profile-id',
         'test-account-id',
         validInterests,
+        { identityV2Enabled: false },
       );
     });
 
@@ -858,6 +859,7 @@ describe('onboarding routes', () => {
         CHILD_PROFILE_ID,
         'test-account-id',
         validInterests,
+        { identityV2Enabled: false },
       );
     });
 
