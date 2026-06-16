@@ -177,7 +177,7 @@ const RUN = !!process.env.DATABASE_URL;
         const orgId = await seedOrg();
         const guardianPersonId = await seedPerson(orgId, {
           displayName: 'Parent802',
-          roles: ['guardian'],
+          roles: ['admin'],
         });
         const chargePersonId = await seedPerson(orgId, {
           displayName: 'Child802',

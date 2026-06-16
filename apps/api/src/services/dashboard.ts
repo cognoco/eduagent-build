@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm';
 import {
   familyLinks,
+  membership,
   profiles,
   learningSessions,
   learningProfiles,
@@ -741,7 +742,26 @@ export async function getChildrenForParent(
   // 1. Query familyLinks (legacy) or guardianship (v2) for this parent's children
   let childProfileIds: string[];
   if (opts?.identityV2Enabled) {
-    childProfileIds = await getChildPersonIdsForParentV2(db, parentProfileId);
+    // [WI-802] Read charges via guardianship, then restrict to same-org members
+    // (defense-in-depth: cross-org guardianship edges must not leak into dashboard).
+    const allCharges = await getChildPersonIdsForParentV2(db, parentProfileId);
+    if (allCharges.length === 0) {
+      childProfileIds = [];
+    } else {
+      const guardianOrgId = await resolveOrgIdForPerson(db, parentProfileId);
+      if (guardianOrgId) {
+        const orgMembers = await db.query.membership.findMany({
+          where: and(
+            inArray(membership.personId, allCharges),
+            eq(membership.organizationId, guardianOrgId),
+          ),
+          columns: { personId: true },
+        });
+        childProfileIds = orgMembers.map((m) => m.personId);
+      } else {
+        childProfileIds = [];
+      }
+    }
   } else {
     const links = await db.query.familyLinks.findMany({
       where: eq(familyLinks.parentProfileId, parentProfileId),
