@@ -110,8 +110,6 @@ export function AppContextProvider({
 
         const requestId = modeRequestSeq.current + 1;
         modeRequestSeq.current = requestId;
-        const previousMode = mode ?? derivedMode ?? 'study';
-        setModeOverride(nextMode);
         updateAppContext.mutate(
           {
             profileId: activeProfile.id,
@@ -131,7 +129,7 @@ export function AppContextProvider({
                     entry.id === profile.id ? profile : entry,
                   ),
               );
-              setModeOverride(null);
+              setModeOverride(nextMode);
               callbacks?.onSuccess?.();
             },
             onError: () => {
@@ -140,7 +138,6 @@ export function AppContextProvider({
                 void queryClient.invalidateQueries({ queryKey: ['profiles'] });
                 return;
               }
-              setModeOverride(previousMode);
               void queryClient.invalidateQueries({ queryKey: ['profiles'] });
               callbacks?.onError?.();
             },
@@ -160,14 +157,7 @@ export function AppContextProvider({
       setModeOverride(nextMode);
       callbacks?.onSuccess?.();
     },
-    [
-      activeProfile,
-      derivedMode,
-      familyCapable,
-      mode,
-      queryClient,
-      updateAppContext,
-    ],
+    [activeProfile, familyCapable, queryClient, updateAppContext],
   );
 
   const value = useMemo<AppContextValue>(

@@ -248,7 +248,7 @@ describe('AppContextProvider', () => {
     expect(result.current.mode).toBe('study');
   });
 
-  it('optimistically switches V1 mode and rolls back when persistence fails', () => {
+  it('switches V1 mode after persistence succeeds', () => {
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
       false;
     (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
@@ -268,7 +268,7 @@ describe('AppContextProvider', () => {
 
     act(() => result.current.setMode('study'));
 
-    expect(result.current.mode).toBe('study');
+    expect(result.current.mode).toBe('family');
     expect(mockUpdateAppContextMutate).toHaveBeenCalledWith(
       { profileId: 'adult', defaultAppContext: 'study' },
       expect.objectContaining({
@@ -279,10 +279,27 @@ describe('AppContextProvider', () => {
 
     const [, callbacks] = mockUpdateAppContextMutate.mock.calls[0] as [
       unknown,
+      {
+        onError: () => void;
+        onSuccess: (profile: Profile) => void;
+      },
+    ];
+    act(() =>
+      callbacks.onSuccess({
+        ...serverBackedAdult,
+        defaultAppContext: 'study',
+      }),
+    );
+
+    expect(result.current.mode).toBe('study');
+
+    act(() => result.current.setMode('family'));
+    const [, familyCallbacks] = mockUpdateAppContextMutate.mock.calls[1] as [
+      unknown,
       { onError: () => void },
     ];
-    act(() => callbacks.onError());
+    act(() => familyCallbacks.onError());
 
-    expect(result.current.mode).toBe('family');
+    expect(result.current.mode).toBe('study');
   });
 });

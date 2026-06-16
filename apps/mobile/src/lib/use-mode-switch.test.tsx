@@ -315,7 +315,8 @@ describe('useModeSwitch', () => {
       result.current.modeSwitch.switchMode('study');
     });
 
-    expect(result.current.appContext.mode).toBe('study');
+    expect(result.current.appContext.mode).toBe('family');
+    expect(result.current.modeSwitch.isSwitchingRef.current).toBe(true);
     expect(mockUpdateAppContextMutate).toHaveBeenCalledWith(
       {
         profileId: familyAdult.id,
@@ -334,6 +335,8 @@ describe('useModeSwitch', () => {
         defaultAppContext: 'study',
       });
     });
+
+    expect(result.current.appContext.mode).toBe('study');
 
     act(() => {
       jest.runOnlyPendingTimers();
@@ -362,7 +365,8 @@ describe('useModeSwitch', () => {
       result.current.modeSwitch.switchMode('family');
     });
 
-    expect(result.current.appContext.mode).toBe('family');
+    expect(result.current.appContext.mode).toBe('study');
+    expect(result.current.modeSwitch.isSwitchingRef.current).toBe(true);
     expect(mockUpdateAppContextMutate).toHaveBeenCalledWith(
       {
         profileId: studyDefaultFamilyAdult.id,
@@ -381,6 +385,8 @@ describe('useModeSwitch', () => {
         defaultAppContext: 'family',
       });
     });
+
+    expect(result.current.appContext.mode).toBe('family');
 
     act(() => {
       jest.runOnlyPendingTimers();
@@ -407,7 +413,7 @@ describe('useModeSwitch', () => {
       result.current.modeSwitch.switchMode('study');
     });
 
-    expect(result.current.appContext.mode).toBe('study');
+    expect(result.current.appContext.mode).toBe('family');
 
     const [, callbacks] = mockUpdateAppContextMutate.mock.calls[0] as [
       unknown,
