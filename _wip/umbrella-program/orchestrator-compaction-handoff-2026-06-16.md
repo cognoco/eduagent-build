@@ -6,6 +6,13 @@
 - The shared checkout (`_dev/eduagent-build`) has been **resync-reset** during this session, wiping the inbox/outbox/handoff and a local-only memory file. **Trust COSMO (Notion), not working-tree files.** Re-pull WS-18 at session start.
 - Anything load-bearing must be **pushed to origin/main** or written to **Cosmo** — never left as an uncommitted working-tree file. (This handoff is committed+pushed for that reason.)
 
+## ⚡ RULING 2026-06-16 08:07Z — Option B (billing carve) [operator-agreed]
+exec-586 enumeration found the dropped-table reader surface far larger than R1/R2/dashboard — incl. the billing/quota/subscriptions cluster (subscriptions is 1 of the **5** legacy identity tables; cutover-plan line 189). Ruled **B (sequence, don't de-scope)**:
+- **WI-586 = 4 identity tables ONLY** (accounts/profiles/consent_states/family_links). Migration **0118 drops FOUR, not five** — `subscriptions` stays. Close-gate (c) = full flag-on `api:test:integration` GREEN **minus** billing/quota/subscription suites (those reds tracked to 805, NOT 586 blockers).
+- **WI-805** (CREATED, Backlog/Auto, Blocked-by 586) = CUT-B billing fast-follow: subscriptions drop (split migration) + ~18 billing/quota reader sweep + `account-repository.subscriptions→v2` repoint + `resetExpiredQuotaCyclesV2` cron wiring + quota-FK rehome. **Post-flip, before #11.**
+- **FLIP-CRITICAL exception (non-deferrable):** any class-(c) billing reader reading legacy `subscriptions` under flag-on serves STALE payment data at #8 → gate THAT subset to the v2 `subscription` helper BEFORE #8. v2 helpers already exist (`account-repository.ts` L170-212, WI-693) → caller-side wiring, not new infra.
+- Record: Cosmo WI-586 comment + WI-805 + channel `ic-orch-049`. Awaiting shepherd's a/b/c bucket of the ~18 billing readers.
+
 ## First actions on resume
 1. Re-pull WS-18 from Cosmo (query below). Verify monitor `b1fprdcll` (Cosmo Stage/State) is live; re-arm if dead.
 2. Read the latest comments on WI-586 (the live AC + my rulings live there).
