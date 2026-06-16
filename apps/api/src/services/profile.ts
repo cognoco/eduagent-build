@@ -666,27 +666,23 @@ export async function updateProfileAppContext(
     // [WI-586] v2 path: read/write person + membership; no profiles/family_links touch.
     // accountId maps to organizationId in v2.
     const organizationId = accountId;
-    const existingRows = await db
-      .select({
-        id: person.id,
-        birthDate: person.birthDate,
-        isOwner: membership.roles,
-      })
-      .from(person)
-      .innerJoin(membership, eq(membership.personId, person.id))
-      .where(
-        and(
-          eq(person.id, profileId),
+    const [existingPerson, existingMembership] = await Promise.all([
+      db.query.person.findFirst({
+        where: and(eq(person.id, profileId), isNull(person.archivedAt)),
+        columns: { id: true, birthDate: true },
+      }),
+      db.query.membership.findFirst({
+        where: and(
+          eq(membership.personId, profileId),
           eq(membership.organizationId, organizationId),
-          isNull(person.archivedAt),
         ),
-      )
-      .limit(1);
-    const existing = existingRows[0];
-    if (!existing) return null;
+        columns: { roles: true },
+      }),
+    ]);
+    if (!existingPerson || !existingMembership) return null;
 
-    const isOwner = existing.isOwner.includes('admin');
-    const birthYear = Number(existing.birthDate.slice(0, 4));
+    const isOwner = existingMembership.roles.includes('admin');
+    const birthYear = Number(existingPerson.birthDate.slice(0, 4));
 
     if (defaultAppContext === 'family') {
       const charges = await getChargePersonIds(db, profileId);
@@ -709,15 +705,35 @@ export async function updateProfileAppContext(
       .returning();
     if (!updated[0]) return null;
 
-    const [consentStatus, chargesForMeta] = await Promise.all([
+    // Resolve family meta and consent in parallel.
+    // owner/guardian → hasFamilyLinks if any active charge; linkCreatedAt null
+    // non-owner/charge → hasFamilyLinks if active guardian edge; linkCreatedAt = edge.grantedAt
+    const [consentStatus, chargeIds, guardianEdge] = await Promise.all([
       resolveLatestConsentStatusAnyBasis(
         db,
         profileId,
         organizationId,
         DEFAULT_CONSENT_PURPOSE,
       ),
-      getChargePersonIds(db, profileId),
+      isOwner
+        ? getChargePersonIds(db, profileId)
+        : Promise.resolve([] as string[]),
+      !isOwner
+        ? db.query.guardianship.findFirst({
+            where: and(
+              eq(guardianship.chargePersonId, profileId),
+              isNull(guardianship.revokedAt),
+            ),
+            columns: { grantedAt: true },
+          })
+        : Promise.resolve(undefined),
     ]);
+
+    const hasFamilyLinks = isOwner
+      ? chargeIds.length > 0
+      : guardianEdge != null;
+    const linkCreatedAt =
+      !isOwner && guardianEdge ? guardianEdge.grantedAt.toISOString() : null;
 
     const p = updated[0];
     return {
@@ -731,12 +747,12 @@ export async function updateProfileAppContext(
       hasPremiumLlm: false,
       defaultAppContext:
         (p.defaultAppContext as Profile['defaultAppContext']) ?? null,
-      hasFamilyLinks: chargesForMeta.length > 0,
+      hasFamilyLinks,
       conversationLanguage:
         p.conversationLanguage as Profile['conversationLanguage'],
       pronouns: p.pronouns ?? null,
       consentStatus,
-      linkCreatedAt: null,
+      linkCreatedAt,
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
     };
