@@ -16,9 +16,10 @@ export const authScenarios = {
     email: buildSeedEmail('owner-with-children'),
     storageStatePath: path.join(authStateDir, 'owner-with-children.json'),
     landingPath: '/home',
-    // Current mode navigation opens owners in Study first. The auth setup
-    // switches this saved state to Family before persisting it for parent flows.
+    // Current mode navigation may open owners in Study first or Family first.
+    // The auth setup persists Family for parent flows either way.
     landingTestId: 'learner-screen',
+    alternateLandingTestIds: ['parent-home-screen'],
     persistAppContext: 'family',
   },
 } as const;

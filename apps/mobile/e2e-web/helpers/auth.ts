@@ -8,6 +8,7 @@ export interface SignInOptions {
   email: string;
   password: string;
   landingTestId: string;
+  alternateLandingTestIds?: readonly string[];
   landingPath?: string;
   activeProfileId?: string;
 }
@@ -39,6 +40,49 @@ type SignedInReadyState =
   | 'app-shell'
   | 'error-boundary';
 
+function getAcceptedLandingTestIds(options: SignInOptions): readonly string[] {
+  return [options.landingTestId, ...(options.alternateLandingTestIds ?? [])];
+}
+
+async function isAcceptedLandingVisible(
+  page: Page,
+  options: SignInOptions,
+): Promise<boolean> {
+  for (const testId of getAcceptedLandingTestIds(options)) {
+    if (
+      await page
+        .getByTestId(testId)
+        .isVisible()
+        .catch(() => false)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function waitForAcceptedLandingVisible(
+  page: Page,
+  options: SignInOptions,
+  timeout: number,
+): Promise<void> {
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    if (await isAcceptedLandingVisible(page, options)) {
+      return;
+    }
+
+    await page.waitForTimeout(250);
+  }
+
+  throw new Error(
+    `Expected one of the accepted landing testIDs to be visible after ${timeout}ms: ` +
+      getAcceptedLandingTestIds(options).join(', '),
+  );
+}
+
 async function waitForSignedInReady(
   page: Page,
   options: SignInOptions,
@@ -48,7 +92,6 @@ async function waitForSignedInReady(
   const maxProfileLoadRetries = 3;
   const deadline = Date.now() + timeout;
   const postApproval = page.getByTestId('post-approval-continue');
-  const landing = page.getByTestId(options.landingTestId);
   const errorBoundary = page.getByTestId('error-boundary-fallback');
   const profileLoadError = page.getByTestId('profile-load-error');
   const profileLoadRetry = page.getByTestId('profile-load-error-retry');
@@ -67,7 +110,7 @@ async function waitForSignedInReady(
       return 'post-approval';
     }
 
-    if (await landing.isVisible().catch(() => false)) {
+    if (await isAcceptedLandingVisible(page, options)) {
       return 'landing';
     }
 
@@ -196,7 +239,6 @@ export async function signIn(
   try {
     // Tap through the post-approval landing if it appears (fresh SecureStore)
     const postApproval = page.getByTestId('post-approval-continue');
-    const landing = page.getByTestId(options.landingTestId);
     const first = await waitForSignedInReady(page, options, {
       allowPostApproval: true,
     });
@@ -242,7 +284,7 @@ export async function signIn(
         .catch(() => false)
     ) {
       await pressableClick(postApproval);
-      await landing.waitFor({ state: 'visible', timeout: 60_000 });
+      await waitForAcceptedLandingVisible(page, options, 60_000);
       if (options.landingPath) {
         await page.waitForURL((url) => url.pathname === options.landingPath, {
           timeout: 60_000,
@@ -250,7 +292,7 @@ export async function signIn(
       }
     }
 
-    if (!(await landing.isVisible().catch(() => false))) {
+    if (!(await isAcceptedLandingVisible(page, options))) {
       const finalPostApproval = page.getByTestId('post-approval-continue');
       if (
         await finalPostApproval
@@ -269,11 +311,11 @@ export async function signIn(
     // storage state is captured pointing at the wrong screen and downstream
     // J03 specs fail mysteriously waiting for parent-home-screen.
     //
-    // Enforce that the caller's contractual landingTestId is actually rendered
-    // before we declare sign-in ready. Failure here surfaces the contract
-    // mismatch at setup time with a clear diagnostic instead of letting the
-    // mislabelled storage state propagate to every parent-shell spec.
-    await expect(landing).toBeVisible({ timeout: 60_000 });
+    // Enforce that the caller's contractual landing screen is actually
+    // rendered before we declare sign-in ready. Failure here surfaces the
+    // contract mismatch at setup time with a clear diagnostic instead of
+    // letting the mislabelled storage state propagate to downstream specs.
+    await waitForAcceptedLandingVisible(page, options, 60_000);
   } finally {
     page.off('pageerror', onPageError);
     page.off('console', onConsole);

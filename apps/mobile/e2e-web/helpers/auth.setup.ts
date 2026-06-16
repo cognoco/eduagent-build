@@ -40,6 +40,10 @@ for (const scenario of Object.values(authScenarios)) {
         email: seeded.email,
         password: seeded.password,
         landingTestId: scenario.landingTestId,
+        alternateLandingTestIds:
+          'alternateLandingTestIds' in scenario
+            ? scenario.alternateLandingTestIds
+            : undefined,
         landingPath: scenario.landingPath,
       });
 
