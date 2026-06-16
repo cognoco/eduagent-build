@@ -741,26 +741,26 @@ export async function getChildrenForParent(
 ): Promise<DashboardChild[]> {
   // 1. Query familyLinks (legacy) or guardianship (v2) for this parent's children
   let childProfileIds: string[];
+  // [WI-802] Resolve the guardian's org once on the flag-on path; reused below
+  // for the consent-status read (avoids a second resolveOrgIdForPerson round-trip).
+  const guardianOrgId = opts?.identityV2Enabled
+    ? await resolveOrgIdForPerson(db, parentProfileId)
+    : null;
   if (opts?.identityV2Enabled) {
     // [WI-802] Read charges via guardianship, then restrict to same-org members
     // (defense-in-depth: cross-org guardianship edges must not leak into dashboard).
     const allCharges = await getChildPersonIdsForParentV2(db, parentProfileId);
-    if (allCharges.length === 0) {
+    if (allCharges.length === 0 || !guardianOrgId) {
       childProfileIds = [];
     } else {
-      const guardianOrgId = await resolveOrgIdForPerson(db, parentProfileId);
-      if (guardianOrgId) {
-        const orgMembers = await db.query.membership.findMany({
-          where: and(
-            inArray(membership.personId, allCharges),
-            eq(membership.organizationId, guardianOrgId),
-          ),
-          columns: { personId: true },
-        });
-        childProfileIds = orgMembers.map((m) => m.personId);
-      } else {
-        childProfileIds = [];
-      }
+      const orgMembers = await db.query.membership.findMany({
+        where: and(
+          inArray(membership.personId, allCharges),
+          eq(membership.organizationId, guardianOrgId),
+        ),
+        columns: { personId: true },
+      });
+      childProfileIds = orgMembers.map((m) => m.personId);
     }
   } else {
     const links = await db.query.familyLinks.findMany({
@@ -884,11 +884,10 @@ export async function getChildrenForParent(
     { status: ConsentStatus; respondedAt: Date | null }
   >();
   if (opts?.identityV2Enabled) {
-    const orgId = await resolveOrgIdForPerson(db, parentProfileId);
-    if (orgId && childProfileIds.length > 0) {
+    if (guardianOrgId && childProfileIds.length > 0) {
       const v2Statuses = await getChildrenGdprConsentStatusesV2(
         db,
-        orgId,
+        guardianOrgId,
         childProfileIds,
       );
       for (const [childId, status] of v2Statuses) {
