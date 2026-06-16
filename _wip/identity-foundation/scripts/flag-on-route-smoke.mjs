@@ -222,6 +222,10 @@ function buildProbes() {
   return probes;
 }
 
+// Per-probe timeout: a single hung endpoint must not block the whole smoke
+// during the rehearsal soak window. 30 s is generous for a live worker.
+const PROBE_TIMEOUT_MS = 30_000;
+
 async function runProbe(probe) {
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -237,12 +241,22 @@ async function runProbe(probe) {
       method: probe.method,
       headers,
       body,
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
     return { status: res.status };
   } catch (err) {
-    // A network/transport failure is a hard error for the smoke (the worker
-    // is supposed to be up during the rehearsal soak).
-    return { status: 0, error: err instanceof Error ? err.message : String(err) };
+    // Timeout or network/transport failure is a hard error for the smoke (the
+    // worker is supposed to be up during the rehearsal soak). A hung endpoint
+    // surfaces as a TimeoutError here rather than blocking the run.
+    const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+    return {
+      status: 0,
+      error: isTimeout
+        ? `TIMEOUT after ${PROBE_TIMEOUT_MS}ms`
+        : err instanceof Error
+          ? err.message
+          : String(err),
+    };
   }
 }
 
@@ -266,6 +280,20 @@ async function main() {
   }
 
   console.log('');
+  // SCOPE OF THE no-500 ASSERTION (ruled by the PRG-06 shepherd, 2026-06-16):
+  // WI-803 is family_links-scoped. M-DROP drops ALL 5 legacy tables together
+  // (accounts, profiles, subscriptions, family_links, consent_states), so the
+  // profiles/consent_states readers still present on some of these endpoints
+  // (e.g. GET /nudges joins `profiles` for the sender name; PATCH /app-context
+  // reads+updates `profiles` and reads `consent_states` via getConsentStatus)
+  // will also 500 post-full-drop. Those are the SEPARATE whole-surface
+  // profiles/consent_states reader sweep (CUT-B / WP-FLAG, WP-1 §0) — identical
+  // in kind to the already-merged WI-802 twin's flag-on `profiles.findMany` —
+  // NOT a WI-803 defect (escalated to the orchestrator). Consequently this
+  // no-500 assertion becomes a TRUE post-drop gate for these endpoints only
+  // once that broader reader sweep lands; until then it gates the family_links
+  // readers (WI-803/802/786/798) on whichever endpoints have no residual
+  // legacy-table reader.
   if (failures > 0) {
     console.error(
       `✗ ${failures}/${probes.length} probe(s) returned 5xx/transport-error — an unbranched legacy family_links reader is 500-ing post-drop.`,
