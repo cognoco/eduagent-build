@@ -220,9 +220,6 @@ async function executeHandler(
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // Isolate from ambient IDENTITY_V2_ENABLED so legacy-path tests are not
-  // routed to v2 branches lacking mock setup.
-  delete process.env['IDENTITY_V2_ENABLED'];
   mockConsentFindFirst.mockResolvedValue({
     parentEmail: 'parent@example.com',
     consentToken: 'test-token-abc123',

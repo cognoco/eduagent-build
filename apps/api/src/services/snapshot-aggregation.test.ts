@@ -1000,10 +1000,7 @@ describe('refreshProgressSnapshot', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // doNotFake: ['setTimeout'] so the transient-retry test (which calls
-    // jest.useRealTimers() internally) can use the real setTimeout without
-    // a ReferenceError. Date-dependent tests still get the fixed now.
-    jest.useFakeTimers({ now: FIXED_NOW, doNotFake: ['setTimeout'] });
+    jest.useFakeTimers({ now: FIXED_NOW });
     (detectMilestones as jest.Mock).mockReturnValue([]);
     (storeMilestones as jest.Mock).mockResolvedValue([]);
   });

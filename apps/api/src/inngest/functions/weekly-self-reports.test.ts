@@ -180,9 +180,6 @@ const PROFILE_B = '22222222-2222-4222-8222-222222222222';
 describe('weeklySelfReportCron', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Isolate from ambient IDENTITY_V2_ENABLED so legacy-path tests are not
-    // routed to v2 branches lacking mock setup.
-    delete process.env['IDENTITY_V2_ENABLED'];
     jest.useFakeTimers({ now: new Date('2026-05-11T09:00:00.000Z') });
     mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([]);
   });

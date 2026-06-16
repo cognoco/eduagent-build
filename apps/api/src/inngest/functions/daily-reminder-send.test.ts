@@ -101,9 +101,6 @@ describe('dailyReminderSend', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Isolate from ambient IDENTITY_V2_ENABLED so legacy-path tests are not
-    // routed to the v2 branch (isPersonLive reads db.query.person, not mocked here).
-    delete process.env['IDENTITY_V2_ENABLED'];
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });

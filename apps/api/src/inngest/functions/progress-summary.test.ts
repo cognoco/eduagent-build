@@ -110,7 +110,6 @@ function createDb(fallbackRows: Array<{ id: string; startedAt: Date }> = []) {
     whereCalls,
     query: {
       familyLinks: { findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }) },
-      guardianship: { findMany: jest.fn().mockResolvedValue([]) },
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
       },
@@ -193,10 +192,6 @@ describe('progressSummaryGeneration', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Isolate from ambient IDENTITY_V2_ENABLED so legacy-path tests are not
-    // routed to the v2 branches (getGuardianPersonIds / db.query.person).
-    // Same isolation applied to summary-regenerate.test.ts (WI-586).
-    delete process.env['IDENTITY_V2_ENABLED'];
     sharedDb = createDb([
       { id: 'session-1', startedAt: new Date('2026-05-13T10:00:00Z') },
     ]);
