@@ -187,6 +187,9 @@ async function executeRevocation(
 beforeEach(() => {
   jest.useFakeTimers({ now: new Date('2026-01-15T00:00:00.000Z') });
   jest.clearAllMocks();
+  // Isolate from ambient IDENTITY_V2_ENABLED so legacy-path tests are not
+  // routed to the v2 branches (isGdprProcessingAllowedV2, deletePersonIfConsentWithdrawnV2, etc.).
+  delete process.env['IDENTITY_V2_ENABLED'];
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   (mockDatabaseModule.db.execute as jest.Mock).mockResolvedValue({
     rowCount: 1,
