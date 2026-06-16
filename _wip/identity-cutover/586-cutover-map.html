@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WI-586 Identity Cutover — Status Map</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #161b22; --panel-2: #1c232d; --ink: #e6edf3;
+    --muted: #9aa7b4; --line: #2a323d; --teal: #2dd4bf; --teal-dim: #14302c;
+    --lav: #a78bfa; --green: #34d399; --amber: #fbbf24; --slate: #64748b;
+    --red: #f87171; --red-dim: #2c1618; --shadow: rgba(0,0,0,.35);
+  }
+  [data-theme="light"] {
+    --bg: #f4f6f9; --panel: #ffffff; --panel-2: #eef2f6; --ink: #14202b;
+    --muted: #586573; --line: #dde3ea; --teal: #0d9488; --teal-dim: #d6f3ee;
+    --lav: #7c5cdb; --green: #059669; --amber: #b9810a; --slate: #64748b;
+    --red: #dc2626; --red-dim: #fbe4e4; --shadow: rgba(20,40,60,.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 0 0 64px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  header {
+    position: sticky; top: 0; z-index: 10; background: var(--bg);
+    border-bottom: 1px solid var(--line); padding: 18px 0 14px; margin-bottom: 8px;
+  }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  h1 { font-size: 19px; margin: 0; letter-spacing: .2px; }
+  h1 .tag { color: var(--teal); }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .toggle {
+    cursor: pointer; border: 1px solid var(--line); background: var(--panel);
+    color: var(--ink); border-radius: 999px; padding: 7px 14px; font-size: 13px;
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  }
+  .toggle:hover { border-color: var(--teal); }
+  section { margin: 30px 0; }
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: 1.2px; font-size: 11px;
+    color: var(--teal); font-weight: 700; margin: 0 0 4px;
+  }
+  h2 { font-size: 17px; margin: 0 0 14px; }
+  h2 + .lead { color: var(--muted); font-size: 13.5px; margin: -8px 0 16px; max-width: 760px; }
+
+  /* YOU ARE HERE banner */
+  .here {
+    background: linear-gradient(90deg, var(--teal-dim), transparent);
+    border: 1px solid var(--teal); border-radius: 12px; padding: 14px 18px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .here .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--teal);
+    box-shadow: 0 0 0 4px var(--teal-dim); margin-top: 6px; flex: none;
+    animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+  .here b { color: var(--teal); }
+
+  /* phase rail */
+  .rail { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .phase {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 12px 14px; position: relative; min-height: 104px;
+  }
+  .phase .n { font-size: 11px; color: var(--muted); font-weight: 700; }
+  .phase .t { font-weight: 600; margin: 4px 0 6px; font-size: 13.5px; }
+  .phase .d { font-size: 12px; color: var(--muted); }
+  .phase.cur { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), 0 6px 18px var(--shadow); }
+  .phase.cur::after { content: "YOU ARE HERE"; position: absolute; top: -9px; left: 12px;
+    background: var(--teal); color: #04201c; font-size: 9.5px; font-weight: 800;
+    padding: 2px 7px; border-radius: 5px; letter-spacing: .6px; }
+  [data-theme="light"] .phase.cur::after { color: #fff; }
+  .phase.done { border-color: var(--green); }
+  .phase .pill { margin-top: 8px; }
+
+  /* status pills */
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
+    font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
+  .pill.done { color: var(--green); border-color: var(--green); }
+  .pill.prog { color: var(--amber); border-color: var(--amber); }
+  .pill.pend { color: var(--slate); border-color: var(--slate); }
+  .pill.op { color: var(--lav); border-color: var(--lav); }
+
+  /* two-column cards */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .card h3 { margin: 0 0 12px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  ul.steps { list-style: none; margin: 0; padding: 0; }
+  ul.steps li { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0;
+    border-bottom: 1px dashed var(--line); font-size: 13.5px; }
+  ul.steps li:last-child { border-bottom: 0; }
+  .mark { flex: none; width: 18px; height: 18px; border-radius: 50%; font-size: 11px;
+    display: grid; place-items: center; margin-top: 1px; font-weight: 800; }
+  .mark.done { background: var(--green); color: #042b20; }
+  .mark.prog { background: var(--amber); color: #2b1f02; }
+  .mark.pend { background: transparent; border: 1.5px solid var(--slate); color: var(--slate); }
+  [data-theme="light"] .mark.done { color: #fff; } [data-theme="light"] .mark.prog { color: #fff; }
+  .step-t { flex: 1; } .step-t small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+
+  /* spawn diagram */
+  .spawn { display: grid; grid-template-columns: 1.1fr auto 1fr; gap: 8px; align-items: center; }
+  .node { border-radius: 12px; padding: 16px; border: 1px solid var(--line); background: var(--panel); }
+  .node.core { border-color: var(--teal); }
+  .node.core .badge { background: var(--teal); color: #04201c; }
+  .node h4 { margin: 0 0 4px; font-size: 14px; }
+  .node .badge { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 5px;
+    background: var(--panel-2); color: var(--muted); display: inline-block; margin-bottom: 8px; }
+  [data-theme="light"] .node.core .badge { color:#fff; }
+  .node p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .arrow { display: grid; gap: 22px; color: var(--lav); font-size: 22px; text-align: center; }
+  .followons { display: grid; gap: 12px; }
+  .why { margin-top: 18px; background: var(--panel-2); border-left: 3px solid var(--lav);
+    border-radius: 8px; padding: 14px 16px; font-size: 13px; }
+  .why b { color: var(--lav); }
+
+  /* unknown cards */
+  .grid3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .u { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .u .h { font-weight: 700; font-size: 13px; margin-bottom: 6px; display:flex; gap:7px; align-items:baseline; }
+  .u .h i { font-style: normal; color: var(--teal); font-size: 11px; font-weight: 800; }
+  .u p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .u.flag { border-color: var(--amber); }
+  .u.flag .h i { color: var(--amber); }
+
+  /* deferred */
+  .deferred { background: var(--panel); border: 1px dashed var(--line); border-radius: 12px; padding: 18px; }
+  .deferred .row { display:flex; gap:10px; padding:6px 0; font-size:13px; color: var(--muted); align-items:flex-start;}
+  .deferred .row b { color: var(--ink); font-weight:600; }
+  .rev { margin-top:14px; display:flex; gap:14px; flex-wrap:wrap; }
+  .rev div { flex:1; min-width:220px; border-radius:10px; padding:12px 14px; font-size:12.5px; }
+  .rev .ok { background: var(--teal-dim); border:1px solid var(--teal); }
+  .rev .no { background: var(--red-dim); border:1px solid var(--red); }
+  .rev b { display:block; margin-bottom:3px; }
+  .rev .ok b { color: var(--teal); } .rev .no b { color: var(--red); }
+
+  /* alert (red) */
+  .alert { background: linear-gradient(90deg, var(--red-dim), transparent);
+    border: 1px solid var(--red); border-radius: 12px; padding: 14px 18px; }
+  .alert .h { font-weight: 800; margin-bottom: 4px; color: var(--red); }
+  .alert b { color: var(--red); }
+
+  /* sequence table */
+  .phase-h { margin: 20px 0 4px; font-size: 12px; font-weight: 800; letter-spacing: .4px;
+    text-transform: uppercase; color: var(--teal); }
+  table.seq { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.seq th { text-align: left; color: var(--muted); font-weight: 700; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: .5px; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  table.seq td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.seq tr:last-child td { border-bottom: 0; }
+  table.seq .id { color: var(--muted); font-weight: 800; white-space: nowrap; }
+  table.seq .st { white-space: nowrap; font-weight: 700; }
+  table.seq small { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; }
+  .new { color: var(--lav); font-weight: 800; font-size: 10px; vertical-align: super; }
+  .s-done { color: var(--green); } .s-prog { color: var(--amber); }
+  .s-pend { color: var(--slate); } .s-op { color: var(--lav); }
+  .s-claim { color: var(--teal); }
+  .g-mine { color: var(--teal); font-weight: 700; } .g-op { color: var(--lav); font-weight: 700; }
+  .pill.claim { color: var(--teal); border-color: var(--teal); }
+  .mark.claim { background: transparent; border: 1.5px solid var(--teal); color: var(--teal); }
+
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:10px;}
+  .legend span { display:inline-flex; gap:6px; align-items:center; }
+  footer { color: var(--muted); font-size: 11.5px; text-align: center; margin-top: 36px; }
+  @media (max-width: 860px) {
+    .rail { grid-template-columns: 1fr 1fr; } .cols { grid-template-columns: 1fr; }
+    .grid3 { grid-template-columns: 1fr; } .spawn { grid-template-columns: 1fr; }
+    .arrow { flex-direction: row; grid-auto-flow: column; justify-content:center; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div>
+      <h1><span class="tag">WI-586</span> Identity Cutover — Status Map</h1>
+      <div class="sub">Flip-critical identity core · where we are, what's left, and why the follow-on work exists</div>
+    </div>
+    <button class="toggle" id="themeBtn" aria-label="Toggle theme">🌙 <span id="themeLbl">Dark</span></button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- YOU ARE HERE -->
+  <section>
+    <div class="here">
+      <div class="dot"></div>
+      <div>
+        <div style="font-weight:700; margin-bottom:3px;">Decision: <b>SPLIT (Option C)</b>. The systematic re-sweep found a whole <b>multi-table reader category</b> the profiles-only sweep missed (~6 flip-critical consent_states/family_links/export clusters, ~2–3× harder). Operator ruled: keep 586 lean + verified, carve the missed category into a <b>dedicated sibling WP</b>.</div>
+        <div class="sub"><b>586</b> keeps migrations + TASK A/B + the 5 verified profiles readers (+ its own profiles/person-domain review fixes) → re-reviews green → merges lean. <b>Sibling WP</b> (new, shepherd-instantiated) takes the consent_states/family_links/export reader-gating + dashboard GDPR resolver + export architecture decision, with its own Codex cross-check + an independent completeness audit. <b>The flip (#8) hard-gates on BOTH landing</b> — 586 can merge first; the cutover can't flip until the sibling is done + audited + the staging route-smoke passes. Same shepherd delivers both (sequential).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PHASE RAIL -->
+  <section>
+    <p class="eyebrow">The journey end-to-end</p>
+    <h2>Five phases — and where we sit</h2>
+    <div class="rail">
+      <div class="phase done">
+        <div class="n">PHASE 1</div>
+        <div class="t">Build 586 core</div>
+        <div class="d">Migrations, v2 twins, flip-critical wirings, reader sweep.</div>
+        <div class="pill"><span class="pill done">✓ Done</span></div>
+      </div>
+      <div class="phase cur">
+        <div class="n">PHASE 2</div>
+        <div class="t">Finalize 586 (lean)</div>
+        <div class="d">586 clears its own review findings → merges lean; consent/family/export readers SPLIT to a flip-gated sibling WP (Option C).</div>
+        <div class="pill"><span class="pill prog">◐ Split underway</span></div>
+      </div>
+      <div class="phase">
+        <div class="n">PHASE 3</div>
+        <div class="t">Land 586</div>
+        <div class="d">CI green → Gate-1 → merge → Gate-2 review+QA → Close.</div>
+        <div class="pill"><span class="pill pend">○ Pending</span></div>
+      </div>
+      <div class="phase">
+        <div class="n">PHASE 4</div>
+        <div class="t">Soak / burn-down</div>
+        <div class="d">Work the post-586 items: WI-808, WI-805.</div>
+        <div class="pill"><span class="pill pend">○ Pending</span></div>
+      </div>
+      <div class="phase">
+        <div class="n">PHASE 5</div>
+        <div class="t">Flip #8 → Drop #11</div>
+        <div class="d">Turn flag on in prod (reversible), then drop legacy (final).</div>
+        <div class="pill"><span class="pill op">◆ Operator-only</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MERGE-BLOCKER HAZARD -->
+  <section>
+    <p class="eyebrow">The biggest change since the last map</p>
+    <h2>⚠️ The merge — not the flip — is now the catastrophe risk</h2>
+    <div class="alert">
+      <div class="h">Migrations 0117 + 0118 are journaled in the auto-apply path on the branch.</div>
+      <div>Merging 586 would run <code>drizzle-kit migrate</code> on deploy and <b>auto-DROP the 4 legacy identity tables in production, out of sequence, before the flip — irreversible (PITR-only)</b>. The fix (A + B) must land before merge. The <i>push</i> is safe; deploy triggers on <code>main</code>, not the feature branch.</div>
+    </div>
+    <div class="cols" style="margin-top:14px">
+      <div class="card">
+        <h3>Live-DB state <span class="pill done">✓ Verified read-only</span></h3>
+        <ul class="steps">
+          <li><span class="mark done">✓</span><span class="step-t"><b>Production — SAFE</b> <small>all 4 legacy tables present; person/login coexist; applied=116; hazard has NOT fired</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t"><b>Staging — already dropped, deliberately</b> <small>a manual zero-customer rehearsal (applied=116, not 118) — NOT the auto-migrate hazard, not damage</small></span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>The fix — A + B <span class="pill done">✓ Verified</span></h3>
+        <ul class="steps">
+          <li><span class="mark done">✓</span><span class="step-t"><b>A · de-journal 0117/0118</b> <small>e17e393b4 — SQL in <code>drizzle/_freeze-only/</code> (<code>-- @freeze-only</code> line 1); live journal tip 0116, zero matches</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t"><b>B · deploy-time guard</b> <small>e17e393b4 — <code>check-reference-only-migrations.mjs</code> fail-closed <code>exit(1)</code> unless <code>ALLOW_FREEZE_MIGRATIONS=true</code>; deploy.yml wired; 12/12 unit tests</small></span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="why">
+      <b>No real harm, no real foul:</b> this was caught in branch state before any merge. Prod is untouched and safe; staging's drop was a deliberate rehearsal. A+B close the immediate hazard and the class; the cutover from here is hand-held through the operator gates regardless.
+    </div>
+  </section>
+
+  <!-- FULL STEP SEQUENCE -->
+  <section>
+    <p class="eyebrow">The complete sequence</p>
+    <h2>Every step inside WI-586 — build → land → cut over → drop</h2>
+    <p class="lead">The original ~10-step table was the <b>§4 cutover runbook</b> (Phase C below) — where the operator delegated me gates <b>#4 + #6</b> and kept <b>#8 + #11</b>. That runbook is only the back half. The front half — build the core, then land it — is what we're actually in now, and it's where every new step has emerged (<span class="new">★ NEW</span>).</p>
+
+    <div class="phase-h">Phase A — Build the flip-critical core <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(in branch, pre-merge)</span></div>
+    <table class="seq">
+      <tr><th style="width:48px">#</th><th>Step</th><th style="width:140px">Owner</th><th style="width:120px">Status</th></tr>
+      <tr><td class="id">A1</td><td>Migrations 0117 (FK repoint) + 0118 (drop-4 identity tables) — clean-DB proof<small>profiles · accounts · family_links · consent_states</small></td><td>shepherd / exec</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">A2</td><td>2 net-new v2 write twins — profile-v2, account-v2</td><td>shepherd / exec</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">A3</td><td>6 flip-critical wirings — C1 / C2 / C4 / C5 / C6 / T1</td><td>shepherd / exec</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">A4</td><td>Identity reader sweep</td><td>shepherd / exec</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">A4<span class="new">★</span></td><td><b>5 missed flip-critical readers</b> — re-audit caught the sweep was incomplete; each 500s prod on flip <small>verified: orchestrator read + non-vacuous tests</small></td><td>shepherd</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">A5<span class="new">★</span></td><td><b>account-v2 test coverage</b> (Option A) — asymmetric coverage hole caught by Codex</td><td>shepherd</td><td class="st s-done">✓ Done</td></tr>
+    </table>
+
+    <div class="phase-h">Phase B — Finalize &amp; land <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(the merge is the danger, not the push)</span></div>
+    <table class="seq">
+      <tr><th style="width:48px">#</th><th>Step</th><th style="width:140px">Owner / Gate</th><th style="width:120px">Status</th></tr>
+      <tr><td class="id">B1<span class="new">★</span></td><td><b>A: de-journal 0117/0118</b> — out of the auto-apply path (keep as freeze-only operator scripts) <small>verified: journal tip 0116, SQL in _freeze-only/</small></td><td>shepherd</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">B2<span class="new">★</span></td><td><b>B: deploy-time freeze-migration guard</b> — refuses freeze migrations absent an explicit freeze signal <small>verified: fail-closed exit(1), deploy.yml wired</small></td><td>shepherd</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">B3a</td><td>Push-gate cross-check — orchestrator independent source read + advisor sanity-check + non-vacuous test confirmation</td><td>me</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">B3b</td><td>Push + green required CI <small>✓ all 4 required GREEN on da728ce (main, Playwright web smoke, API Quality Gate, Merge completeness). Expected non-required reds: billing Flag-ON (WI-805), ambient run-smoke (WI-801)</small></td><td>shepherd</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">B3c</td><td>Merge-gate cross-check — fresh Codex source check <small>✓ MERGE-SAFE on the 5 profiles readers + A/B/D — but SCOPED; full-diff reviewers caught consent/family findings outside that scope (see B3d)</small></td><td>me → Codex</td><td class="st s-done">✓ Done (scoped)</td></tr>
+      <tr><td class="id">B3d<span class="new">★</span></td><td><b>586 clears its OWN review findings</b> (profiles/person-domain only, e.g. family-bridge:252 null→404) → re-review green <small>the consent_states/family_links/export category is SPLIT OUT to the sibling WP below — NOT fixed in 586 (Option C)</small></td><td>shepherd</td><td class="st s-prog">◐ In progress</td></tr>
+      <tr><td class="id">B4</td><td>Gate-1 — 586 reviews clear + I re-verify; operator pre-authorized (auto-merge on clean reviews; ping on finding) → merge lean</td><td class="g-mine">🟡 me</td><td class="st s-pend">○ Blocked by B3d</td></tr>
+      <tr><td class="id">B5★sib</td><td><b>Sibling WP — dropped-table reader-gating sweep</b> (consent_states/family_links/export) <small>~6 flip-critical clusters + dashboard GDPR resolver + export arch decision + 2 UNCLEAR; own Codex cross-check + independent completeness audit. Does NOT block 586 merge; HARD-GATES the flip (#8)</small></td><td>shepherd</td><td class="st s-prog">◐ Instantiating</td></tr>
+      <tr><td class="id">B5</td><td>Merge to main — <b>must not happen until B1 lands</b></td><td>operator / me</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">B6</td><td>Gate-2 — separate reviewer + QA → Cosmo Close</td><td>reviewer</td><td class="st s-pend">○ Not started</td></tr>
+    </table>
+
+    <div class="phase-h">Phase C — Cutover execution runbook (§4) <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· per env: dev → staging → prod</span></div>
+    <table class="seq">
+      <tr><th style="width:48px">#</th><th>Step (runbook §4)</th><th style="width:140px">Gate</th><th style="width:120px">Status</th></tr>
+      <tr><td class="id">C0</td><td><b>Gate #4</b> — cutover-window entry (preconditions verified)</td><td class="g-mine">🟡 mine (delegated)</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C1</td><td>Freeze — ingress gate → HTTP quiet → Inngest drain → block → merge-freeze marker</td><td>—</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C2</td><td>Neon PITR marker + pre-drop branch snapshot</td><td>part of #6</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C3</td><td><b>Gate #6 / STOP-1</b> — ownerless-account disposal</td><td class="g-mine">🟡 mine (delegated)</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C4</td><td>Final convergent reseed (0109 + M-RESEED2 blocks)</td><td>—</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C5</td><td>Parity verification — <code>verify-identity-reseed.mjs</code> exit 0, empty exceptions</td><td>—</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C6</td><td>FK re-point migration (M-REPOINT) — inside freeze, before flip</td><td>STOP → go</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C7</td><td><b>Gate #8</b> — flip <code>IDENTITY_V2_ENABLED=true</code> + unfreeze + soak (reversible while legacy tables live) <small>★ hard-gates on BOTH 586 merged AND the sibling reader-sweep WP complete + completeness audit + step-8.5 route-smoke</small></td><td class="g-op">🔒 operator</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C8<span class="new">★</span></td><td><b>Post-drop flag-on route smoke</b> (step 8.5, WI-803 AC#3) — the real no-500 drop-safety net</td><td>gate before C9</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C9</td><td><b>Gate #11 — M-DROP</b> legacy tables (irreversible; PITR-only after)</td><td class="g-op">🔒 operator</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C10</td><td>Grep-clean — delete legacy schema/code/twins + remove the flag + docs</td><td>—</td><td class="st s-pend">○</td></tr>
+    </table>
+    <div class="why">
+      <b>Staging has already been through C1–C9 once</b> as a deliberate zero-customer rehearsal — that is why staging's legacy tables are gone. <b>Production is untouched and safe</b>; Phase C against prod has not begun.
+    </div>
+  </section>
+
+  <!-- INSIDE 586 -->
+  <section>
+    <p class="eyebrow">Breaking open WI-586</p>
+    <h2>What 586 is, and the path to "Closed"</h2>
+    <p class="lead">586 is the <b>flip-critical core</b> only — the code that must be correct the moment the production flag flips. The heavy lifting is already built; what remains is finalize + landing.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>① The flip-critical core <span class="pill done">✓ Built</span></h3>
+        <ul class="steps">
+          <li><span class="mark done">✓</span><span class="step-t">Migrations 0117 + 0118 <small>FK repoint + drop the 4 legacy identity tables — clean-DB proof green</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">v2 write twin: <b>profile-v2</b> <small>profile writer — has a green test</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">v2 write twin: <b>account-v2</b> (login email) <small>was untested — non-vacuous test now added (red-green verified)</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">6 flip-critical wirings <small>C1, C2, C4, C5, C6, T1 — re-audit confirmed all genuinely fixed</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Identity reader sweep <small>⚠️ was INCOMPLETE — re-audit found 5 missed flip-critical readers; all now fixed + verified (see below)</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Notifications null-fix <small>null-coalesce correction</small></span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>② Finalize → Land → Close</h3>
+        <ul class="steps">
+          <li><span class="mark done">✓</span><span class="step-t">Read-only flag-on verification (13 files) <small>independent fork — proved scope</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Codex cross-check <small>confirmed test-gap; caught the account-v2 hole</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Fix session-completed test + discard 51 rogue files <small>red-green verified</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Add account-v2 test <small>non-vacuous, verified</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Hygiene: untrack channel scratch <small>commit 926ace2d9</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Independent reader re-audit <small>found 5 missed flip-critical readers</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Fix all 5 missed readers in 586 <small>verified — 3 wirings + 2 authored twins, non-vacuous (e17e393b4)</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t"><b>A: de-journal 0117/0118</b> <small>★ verified — merge-time auto-DROP hazard removed</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t"><b>B: deploy-time freeze-migration guard</b> <small>★ verified — kills the class durably</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Push-gate cross-check <small>orchestrator read + advisor + non-vacuous tests</small></span></li>
+          <li><span class="mark prog">◐</span><span class="step-t">Push #1210 → full required CI <small>491/0; clean FF; no self-merge</small></span></li>
+          <li><span class="mark pend">○</span><span class="step-t">Merge gate: fresh Codex + Gate-2 reviewer + operator nod</span></li>
+          <li><span class="mark pend">○</span><span class="step-t">Gate-1 → merge → Gate-2 (review + QA) → <b>Cosmo Close</b></span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- RE-AUDIT CATCH -->
+  <section>
+    <p class="eyebrow">What the thorough route caught</p>
+    <h2>The re-audit: 5 missed flip-critical readers</h2>
+    <p class="lead">Fixing the test gap surfaced that one discarded file was actually a v2 <i>reader</i> cutover — which meant the original reader sweep might be incomplete. An independent re-audit confirmed it: the sweep missed <b>5</b> readers, not 1. Each reads the dropped <code>profiles</code> table unconditionally and would <b>500 in production the moment the flag flips</b>. The fast route would have shipped all of them.</p>
+    <div class="card">
+      <ul class="steps">
+        <li><span class="mark done">✓</span><span class="step-t"><b>Every tutoring exchange</b> — <code>loadProfileRowById</code> <small>hottest path · v2 twin reads person+membership, threaded, default-false; non-vacuous test verified</small></span></li>
+        <li><span class="mark done">✓</span><span class="step-t"><b>Evaluate-depth API</b> — <code>getProfileAgeBracket</code> <small>v2 path + break-restore flag-on test verified</small></span></li>
+        <li><span class="mark done">✓</span><span class="step-t"><b>Book topic generation</b> — <code>getProfileAge</code> <small>wired to <code>getPersonAge</code> twin</small></span></li>
+        <li><span class="mark done">✓</span><span class="step-t"><b>First-curriculum-session start</b> — <code>getProfileAge</code> <small>wired to twin</small></span></li>
+        <li><span class="mark done">✓</span><span class="step-t"><b>Create subject</b> — <code>getProfileAge</code> <small>wired to twin</small></span></li>
+      </ul>
+    </div>
+    <div class="why">
+      <b>Why this matters beyond the 5 fixes:</b> the sweep's "6 readers, complete" was a deliberate reconciliation — and it was wrong, missing the single highest-traffic reader in the app. That's the second "complete" claim this session that proved false (the first was the session-completed test coverage). The 5 are being fixed in 586; the residual (static analysis only covers <code>apps/api/src</code> — dependency-injection paths are a partial blind spot) is handed to the <b>staging rehearsal</b> in soak, where a real runtime flip-test is the catch-all for anything static analysis can't see.
+    </div>
+  </section>
+
+  <!-- SPAWN STORY -->
+  <section>
+    <p class="eyebrow">Why the follow-on work exists</p>
+    <h2>How WI-805 and WI-808 spawned out of 586</h2>
+    <p class="lead">586 was originally one big item that <i>also</i> owned "drive the flag-on integration suite green" and the billing cutover. <b>Three</b> discoveries forced carve-outs — so the flip-critical core could land independently instead of being held hostage.</p>
+    <div class="spawn">
+      <div class="node core">
+        <div class="badge">ORIGINAL SCOPE</div>
+        <h4>WI-586 (monolith)</h4>
+        <p>Flip-critical core <i>+ "make the flag-on integration suite green" + billing cutover.</i></p>
+      </div>
+      <div class="arrow"><div>↘</div><div>↗</div></div>
+      <div class="followons">
+        <div class="node">
+          <div class="badge">CARVED OUT → SOAK</div>
+          <h4>WI-808 · fixture &amp; reader debt</h4>
+          <p>Migrate ~60 test fixtures to v2, cut over the non-flip-critical readers, and drive the flag-on integration suite green. <b>Not flip-gating.</b></p>
+        </div>
+        <div class="node">
+          <div class="badge">CARVED OUT → SOAK</div>
+          <h4>WI-805 · billing</h4>
+          <p>Subscriptions drop + billing reader cutover, incl. the flip-critical quota-reset cron. Separate domain.</p>
+        </div>
+        <div class="node" style="border-color:var(--amber)">
+          <div class="badge" style="background:var(--amber);color:#2b1f02">SPLIT OUT → FLIP-GATE</div>
+          <h4>Sibling WP · dropped-table reader sweep</h4>
+          <p>consent_states / family_links / export flag-on reader-gating — ~6 flip-critical clusters the profiles-only sweep missed. Own Codex cross-check + completeness audit. Doesn't block 586 merge; <b>hard-gates the flip (#8)</b>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="why">
+      <b>What forced WI-808:</b> the original 586 close-gate "drive flag-on integration green" rested on a misread. That suite was <b>already mostly red <i>before</i> the table drop</b> (~192 pass / 488 fail) — because ~60 test files still seed the now-dropped legacy tables, so flag-on services read empty v2 data and fail silently. That is <b>pre-existing fixture debt, not something 586 broke.</b> Holding the flip-critical core hostage to fixing 60 unrelated fixtures made no sense → carved into WI-808.
+      <br><br>
+      <b>What forced WI-805:</b> billing is a distinct domain (its own tables, readers, and a flip-critical quota-reset cron). Bundling it would have widened 586's blast radius and review surface → carved into WI-805.
+      <br><br>
+      <b>Note on account-v2:</b> this session's cross-check found one of 586's <i>own</i> write twins had zero test coverage. Unlike the above, this was <b>kept inside 586</b> (Option A) — a twin 586 introduced should be tested where it was introduced, not deferred.
+      <br><br>
+      <b>What forced the reader-sweep sibling (newest, Option C):</b> the PR-level code review caught a flip-critical <code>consent_states</code> reader in <code>nudge.ts</code> that the original "5 missed readers" sweep didn't — because that sweep was <b>profiles-only</b>. A systematic re-sweep of all four dropped tables then found an entire missed category (~6 clusters, incl. <code>export.ts</code> reading all four tables and a core-pipeline reader). XL, heterogeneous, and GDPR-correctness-sensitive (wrong consent resolver = silent privacy bug) → split to its own audited WP rather than balloon an already-large 586 PR. The methodology missed twice, so the sibling carries an <b>independent completeness audit</b>; the staging post-drop route-smoke is the runtime backstop.
+    </div>
+  </section>
+
+  <!-- UNKNOWNS UNTIL CLOSE -->
+  <section>
+    <p class="eyebrow">Risk — scoped to the next milestone</p>
+    <h2>Unknowns between now and "586 Closed"</h2>
+    <p class="lead">These are the only things that could bite before we can start the soak-phase burn-down. Everything beyond this (prod-data, the flip itself) is soak work, listed separately below.</p>
+    <div class="grid3">
+      <div class="u"><div class="h"><i>01</i> Finalize as predicted</div><p>The fix really is the trivial 2-line mock, and no "green" file turns out hollow when actually exercised.</p></div>
+      <div class="u"><div class="h"><i>02</i> Full required CI</div><p>#1210 clears main / web-smoke / API Quality Gate / Merge-completeness — broader than the unit + flag-on surface we've run.</p></div>
+      <div class="u"><div class="h"><i>03</i> Clean merge</div><p>Shared <code>main</code> moves under us; a schema/fixture drift could conflict at merge.</p></div>
+      <div class="u"><div class="h"><i>04</i> Gate-2 review + QA</div><p>The separate reviewer surfaces no blocking defect in 586's actual code.</p></div>
+      <div class="u flag"><div class="h"><i>05</i> Reader-sweep completeness — <b style="color:var(--amber)">MATERIALIZED</b></div><p>This unknown <b>hit</b>: the re-audit found 5 missed flip-critical readers (above), now being fixed in 586. Residual: static analysis covers <code>apps/api/src</code> only — DI/edge paths go to the staging rehearsal.</p></div>
+      <div class="u"><div class="h"><i>06</i> Migration auto-apply hazard — <b style="color:var(--green)">FIXED + VERIFIED</b></div><p>0117/0118 would have dropped prod tables at merge. A (de-journal) + B (fail-closed deploy guard) done in e17e393b4 and verified by orchestrator read: journal tip 0116, guard exits 1 without the freeze signal. Merge is now safe on this axis.</p></div>
+    </div>
+  </section>
+
+  <!-- DEFERRED -->
+  <section>
+    <p class="eyebrow">Set aside — this is the soak work, not a blocker to reaching it</p>
+    <h2>Deferred to the soak phase (Phase 4–5)</h2>
+    <div class="deferred">
+      <div class="row"><span>•</span><div><b>Prod-data migration</b> — the clean-DB proof is not a prod-data proof (orphans, nulls, duplicate emails, dual-write drift). → cutover gates.</div></div>
+      <div class="row"><span>•</span><div><b>Backfill / data-readiness ordering</b> — <code>person</code>/<code>login</code> must be populated <i>before</i> the flag flips. → confirm in runbook.</div></div>
+      <div class="row"><span>•</span><div><b>Real-DB / integration confidence</b> — the flag-on integration suite is red until WI-808 burns it down. → WI-808.</div></div>
+      <div class="row"><span>•</span><div><b>Staging rehearsal on prod-shaped data</b> — the main compensating control for the two items above. Staging has already been flipped + dropped once (deliberate rehearsal); the prod-shaped re-run is the gating rehearsal. → cutover gates.</div></div>
+      <div class="rev">
+        <div class="ok"><b>Flip #8 — reversible</b>While the legacy tables still exist, flag-off rolls back any flip-on breakage. Soak is the safety window.</div>
+        <div class="no"><b>Drop #11 — point of no return</b>After the legacy tables are dropped, the deferred items become unrecoverable. This is where they must be forced closed.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="legend">
+      <span><span class="pill done">✓</span> Done</span>
+      <span><span class="pill prog">◐</span> In progress</span>
+      <span><span class="pill claim">◑</span> Claimed — verifying</span>
+      <span><span class="pill pend">○</span> Pending</span>
+      <span><span class="g-mine">🟡</span> My delegated gate (#4, #6)</span>
+      <span><span class="g-op">🔒</span> Operator-only gate (#8, #11)</span>
+      <span><span class="new">★</span> Emerged this session</span>
+    </div>
+    <div style="margin-top:12px">PRG-06 Identity Cutover · status as of 2026-06-16 (rev 5 — Option C SPLIT: 586 finalizes lean; consent_states/family_links/export reader sweep → flip-gated sibling WP) · view-only snapshot — Cosmo is the source of truth</div>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement, btn = document.getElementById('themeBtn'), lbl = document.getElementById('themeLbl');
+    var saved = null;
+    try { saved = localStorage.getItem('cutover-theme'); } catch (e) {}
+    if (saved) root.setAttribute('data-theme', saved);
+    function paint() {
+      var dark = root.getAttribute('data-theme') !== 'light';
+      btn.firstChild.nodeValue = dark ? '🌙 ' : '☀️ ';
+      lbl.textContent = dark ? 'Dark' : 'Light';
+    }
+    paint();
+    btn.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('cutover-theme', next); } catch (e) {}
+      paint();
+    });
+  })();
+</script>
+</body>
+</html>
