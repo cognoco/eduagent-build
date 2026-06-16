@@ -36,6 +36,10 @@ const DB = { kind: 'db' };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Isolate from ambient IDENTITY_V2_ENABLED so the test runs the legacy path
+  // (recordChildCapNotificationForSubscription). The v2 path needs
+  // db.query.subscription which the minimal DB stub does not provide.
+  delete process.env['IDENTITY_V2_ENABLED'];
   mockGetStepDatabase.mockReturnValue(DB);
   mockRecordChildCapNotificationForSubscription.mockResolvedValue({
     inserted: true,
