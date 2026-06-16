@@ -1,10 +1,33 @@
+// Lazy select chain for MIN(grantedAt) fallback in reduceBasisState.
+// Called only when currentGrant != null && request == null (WITHDRAWN path).
+const mockMinGrantedAt = jest.fn();
+const mockSelectChain = {
+  from: jest.fn().mockReturnValue({
+    where: jest.fn().mockReturnValue({
+      // Returns [{ minGrantedAt: null }] — the ordering-key fallback path.
+      then: (resolve: (v: unknown) => unknown) =>
+        resolve([{ minGrantedAt: null }]),
+    }),
+  }),
+};
+
 const mockDb: Record<string, any> = {
   query: {
     curriculumBooks: { findFirst: jest.fn().mockResolvedValue(null) },
     profiles: { findFirst: jest.fn().mockResolvedValue(null) },
     subjects: { findFirst: jest.fn().mockResolvedValue(null) },
     consentStates: { findFirst: jest.fn() },
+    // v2 consent path (used by isGdprProcessingAllowedV2 when IDENTITY_V2_ENABLED=true)
+    // Default: null membership → no org → processing allowed (mirrors "no row → allowed" legacy)
+    membership: { findFirst: jest.fn().mockResolvedValue(null) },
+    consentGrant: { findFirst: jest.fn().mockResolvedValue(undefined) },
+    consentRequest: { findFirst: jest.fn().mockResolvedValue(undefined) },
+    // person queried by getPersonLlmContext (v2 path for learner age + conversation language)
+    person: { findFirst: jest.fn().mockResolvedValue(null) },
   },
+  // select chain for MIN(grantedAt) fallback in reduceBasisState (called when
+  // currentGrant != null && request == null, e.g. WITHDRAWN without a request row)
+  select: jest.fn().mockReturnValue(mockSelectChain),
 };
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
@@ -26,6 +49,36 @@ const mockDatabaseModule = createDatabaseModuleMock({
       profileId: col('profileId'),
       consentType: col('consentType'),
       requestedAt: col('requestedAt'),
+    },
+    // [WI-586] v2 consent path: membership/consentGrant/consentRequest/person needed
+    // when IDENTITY_V2_ENABLED=true (from .env.development.local)
+    person: {
+      id: col('id'),
+      birthDate: col('birth_date'),
+      conversationLanguage: col('conversation_language'),
+    },
+    membership: {
+      personId: col('person_id'),
+      organizationId: col('organization_id'),
+    },
+    consentGrant: {
+      chargePersonId: col('charge_person_id'),
+      purpose: col('purpose'),
+      organizationId: col('organization_id'),
+      lawfulBasis: col('lawful_basis'),
+      granted: col('granted'),
+      withdrawnAt: col('withdrawn_at'),
+      grantedAt: col('granted_at'),
+      id: col('id'),
+    },
+    consentRequest: {
+      chargePersonId: col('charge_person_id'),
+      purpose: col('purpose'),
+      organizationId: col('organization_id'),
+      requestedBasis: col('requested_basis'),
+      status: col('status'),
+      requestedAt: col('requested_at'),
+      createdAt: col('created_at'),
     },
   },
 });
@@ -144,6 +197,15 @@ describe('subjectPrewarmCurriculum', () => {
     mockDb.query.consentStates.findFirst
       .mockReset()
       .mockResolvedValue(undefined);
+    // v2 path defaults: null membership → no org → processing allowed; null person → null LLM context
+    mockDb.query.membership.findFirst.mockReset().mockResolvedValue(null);
+    mockDb.query.consentGrant.findFirst
+      .mockReset()
+      .mockResolvedValue(undefined);
+    mockDb.query.consentRequest.findFirst
+      .mockReset()
+      .mockResolvedValue(undefined);
+    mockDb.query.person.findFirst.mockReset().mockResolvedValue(null);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -295,18 +357,48 @@ describe('subjectPrewarmCurriculum', () => {
   });
 
   // [WI-82] GDPR consent gate — background job must re-check consent at execution time
+  // [WI-586] v2 consent path: IDENTITY_V2_ENABLED=true (from .env.development.local)
+  // causes isGdprProcessingAllowedV2 to run instead of the legacy isGdprProcessingAllowed.
+  // Tests mock membership (to provide an orgId for the consent check) and the v2 consent
+  // tables (consentGrant / consentRequest) rather than the legacy consentStates table.
   describe('GDPR consent gate', () => {
+    const testOrgId = '550e8400-e29b-41d4-a716-446655440099';
+    const now = new Date('2026-06-01T12:00:00.000Z');
+
+    beforeEach(() => {
+      // Wire membership so isGdprProcessingAllowedV2 has an org to resolve consent against.
+      mockDb.query.membership.findFirst.mockResolvedValue({
+        organizationId: testOrgId,
+      });
+    });
+
     it.each([
-      ['WITHDRAWN', { status: 'WITHDRAWN' }],
-      ['PENDING', { status: 'PENDING' }],
-      ['PARENTAL_CONSENT_REQUESTED', { status: 'PARENTAL_CONSENT_REQUESTED' }],
+      // WITHDRAWN: grant present + withdrawnAt set
+      [
+        'WITHDRAWN',
+        { granted: true, withdrawnAt: now, grantedAt: now },
+        undefined,
+      ],
+      // PENDING: no grant, request with status 'pending'
+      [
+        'PENDING',
+        undefined,
+        { status: 'pending', requestedAt: now, createdAt: now },
+      ],
+      // PARENTAL_CONSENT_REQUESTED: no grant, request with status 'requested'
+      [
+        'PARENTAL_CONSENT_REQUESTED',
+        undefined,
+        { status: 'requested', requestedAt: now, createdAt: now },
+      ],
     ])(
       'skips and returns consent_not_granted when consent status is %s',
-      async (_label, consentRow) => {
+      async (_label, grantRow, requestRow) => {
         mockDb.query.curriculumBooks.findFirst.mockResolvedValue(
           createBook({ topicsGenerated: false }),
         );
-        mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+        mockDb.query.consentGrant.findFirst.mockResolvedValue(grantRow);
+        mockDb.query.consentRequest.findFirst.mockResolvedValue(requestRow);
 
         const { result } = await execute(createEventData());
 
@@ -324,8 +416,11 @@ describe('subjectPrewarmCurriculum', () => {
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
         .mockResolvedValueOnce(createBook({ topicsGenerated: true }));
-      mockDb.query.consentStates.findFirst.mockResolvedValue({
-        status: 'CONSENTED',
+      // CONSENTED: grant present + withdrawnAt null
+      mockDb.query.consentGrant.findFirst.mockResolvedValue({
+        granted: true,
+        withdrawnAt: null,
+        grantedAt: now,
       });
 
       const { result } = await execute(createEventData());
@@ -345,9 +440,17 @@ describe('subjectPrewarmCurriculum', () => {
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }));
       // First call (load-prewarm-context): CONSENTED → context becomes 'pending'.
       // Second call (generate-and-persist-topics): WITHDRAWN → LLM must be skipped.
-      mockDb.query.consentStates.findFirst
-        .mockResolvedValueOnce({ status: 'CONSENTED' })
-        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      mockDb.query.consentGrant.findFirst
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: now,
+        })
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: now,
+          grantedAt: now,
+        });
 
       const { result } = await execute(createEventData());
 
