@@ -1,6 +1,5 @@
 // Lazy select chain for MIN(grantedAt) fallback in reduceBasisState.
 // Called only when currentGrant != null && request == null (WITHDRAWN path).
-const mockMinGrantedAt = jest.fn();
 const mockSelectChain = {
   from: jest.fn().mockReturnValue({
     where: jest.fn().mockReturnValue({
