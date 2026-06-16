@@ -47,11 +47,12 @@
 ## Context-management experiment (operator side-quest, ACTIVE)
 - Principle: context = disposable cache; substrate = truth. Order ruled: **A (state-doc) first, then D (PreCompact/SessionStart hooks in project settings, role-aware via QUARTET_ROLE; sub-agent-hook behavior = unknown to verify before building D).**
 - Pilot live: shepherd owns `shepherd-world.md` (ic-orch-056; rewrite #1 done, good). THIS doc = orchestrator-side run; THIS compaction = the orchestrator self-test.
+- **Approach-D LIVE (2026-06-16, operator-approved "execute"):** SessionStart rehydration hook in `.claude/settings.local.json` (gitignored) → `_wip/identity-cutover/_state/quartet-hooks/rehydrate.sh`. Auto-injects THIS doc's pointer + Cosmo WS-18 + LIVE channel tail on SessionStart `startup|resume|compact`. Gate = session-id registry (`quartet-hooks/roles.json`, my sid registered) OR `QUARTET_ROLE` env; non-Quartet sessions no-op (dual-use safe). **PreCompact DROPPED** — verified its stdout can't reach the model (logs/blocks only). **On the NEXT compaction, post-me should SEE an injected QUARTET REHYDRATION preamble.** If ABSENT → hook didn't fire: check `quartet-hooks/fires.log` + re-register `CLAUDE_CODE_SESSION_ID`→orchestrator in roles.json. Script logic + gate tested green; end-to-end fire proves out at that next compaction.
 
 ## Canonical pointers
 - Cosmo: WI-586 = 37b8bce9-1f7c-8166-b539-eb1a69ebf0fe; WI-805 (billing carve); WI-806 (Nexus proj, ZDX/cosmo Altitude fix); WI-808 (CUT-B fixture debt); WS-18 = 3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8; MentoMate Project = 3658bce9-1f7c-8128-9f9b-fa7fcf75a13b; data_source 36fd1119-9955-4684-8bfe-deb145e6a21f; Notion-Version 2025-09-03.
 - Git: branch WI-586 @ 9d79305 (17 ahead/unpushed). Reviewer = separate origin/main clone (up + armed, idle until Reviewing).
-- Channel: inbox high-water = **ic-orch-057**; outbox last = **prg06ic-077**.
+- Channel: inbox high-water = **ic-orch-058**; outbox last = **prg06ic-078**.
 
 ## Recurring discipline (session lessons)
 - Verify before asserting — INCLUDING impact/blast-radius claims (the false "other sessions breaking"; the WP-vs-"Work Package" select pollution → WI-806; verify Cosmo select values vs live schema before create).
