@@ -1,55 +1,60 @@
-# PRG-06 Orchestrator — Compaction Handoff (2026-06-16 ~07:45Z)
+# PRG-06 ORCHESTRATOR — World-State / Compaction Anchor (refreshed 2026-06-16 ~11:40Z)
 
-> I am the **orchestrator** of **PRG-06 "Identity Cutover" (WS-18)**, coordinating the Quartet (orchestrator=me, shepherd, executor pool, reviewer) toward the operator-only **#8 flag-flip gate**. Operator goal: push autonomously to #8; minor compromises OK if documented. This is a clean compaction point — no half-finished work; Neon provisioning just landed.
+> I am the **orchestrator** of **PRG-06 "Identity Cutover" (WS-18)**, coordinating the Quartet (orchestrator=me, shepherd, executor pool, reviewer) toward the operator-only **#8 flag-flip gate**. Operator goal: drive autonomously to #8; minor compromises OK if documented.
 
-## ⚠️ READ FIRST — Cosmo is the only durable truth; the file channel is unreliable
-- The shared checkout (`_dev/eduagent-build`) has been **resync-reset** during this session, wiping the inbox/outbox/handoff and a local-only memory file. **Trust COSMO (Notion), not working-tree files.** Re-pull WS-18 at session start.
-- Anything load-bearing must be **pushed to origin/main** or written to **Cosmo** — never left as an uncommitted working-tree file. (This handoff is committed+pushed for that reason.)
+## ⚠️ READ FIRST — rehydration contract (Approach-A self-test)
+- **Cosmo (Notion) = source of truth.** The Clacks file channel (`_wip/identity-cutover/_state/`) is working-tree-only, can be wiped by a resync — trust it less than Cosmo/git.
+- **This doc is my durable memory.** On resume/compaction: read THIS + Cosmo WS-18 + inbox/outbox tail = caught up. Don't rely on the auto-summary alone.
+- **EXPERIMENT NOTE:** this compaction is the orchestrator-side run of the Approach-A pilot (shepherd runs the same via `shepherd-world.md`, already did rewrite #1 — captured state well, early positive signal). Post-compaction-me: assess whether you rehydrated cleanly from this doc; report it to the operator as the experiment data point (overhead? resume-ready vs degraded-summary?).
+- Comms: EXTREMELY concise, PM/architect register; closing bracketed-caps summary blocks.
 
-## ⚡ RULING 2026-06-16 08:07Z — Option B (billing carve) [operator-agreed]
-exec-586 enumeration found the dropped-table reader surface far larger than R1/R2/dashboard — incl. the billing/quota/subscriptions cluster (subscriptions is 1 of the **5** legacy identity tables; cutover-plan line 189). Ruled **B (sequence, don't de-scope)**:
-- **WI-586 = 4 identity tables ONLY** (accounts/profiles/consent_states/family_links). Migration **0118 drops FOUR, not five** — `subscriptions` stays. Close-gate (c) = full flag-on `api:test:integration` GREEN **minus** billing/quota/subscription suites (those reds tracked to 805, NOT 586 blockers).
-- **WI-805** (CREATED, Backlog/Auto, Blocked-by 586) = CUT-B billing fast-follow: subscriptions drop (split migration) + ~18 billing/quota reader sweep + `account-repository.subscriptions→v2` repoint + `resetExpiredQuotaCyclesV2` cron wiring + quota-FK rehome. **Post-flip, before #11.**
-- **FLIP-CRITICAL exception (non-deferrable):** any class-(c) billing reader reading legacy `subscriptions` under flag-on serves STALE payment data at #8 → gate THAT subset to the v2 `subscription` helper BEFORE #8. v2 helpers already exist (`account-repository.ts` L170-212, WI-693) → caller-side wiring, not new infra.
-- Record: Cosmo WI-586 comment + WI-805 + channel `ic-orch-049`. Awaiting shepherd's a/b/c bucket of the ~18 billing readers.
+## NOW / next actions on resume
+1. Verify monitors live: mine = `byvzok4m7` (shepherd outbox), `by952eysh` (Cosmo WS-18). Shepherd's own = `bg9b27d7l` (inbox), `bsm1ix557` (Cosmo). Re-arm mine if dead.
+2. Surface ONLY these signals (don't narrate): (a) **#1210 pushed + green + ready for Gate-2** → cue operator to engage reviewer; (b) progress/blockers on the **2 net-new twins** (the true critical path); (c) **staging rebuild done** → my territory (rehearsal → I own #4 entry + #6 STOP-1 with the Neon snapshot).
 
-## First actions on resume
-1. Re-pull WS-18 from Cosmo (query below). Verify monitor `b1fprdcll` (Cosmo Stage/State) is live; re-arm if dead.
-2. Read the latest comments on WI-586 (the live AC + my rulings live there).
-3. Comms: EXTREMELY concise, PM/architect register (operator's standing instruction).
+## WI-586 — SPLIT (operator-approved 2026-06-16); drop is PROVEN GREEN
+- **MILESTONE: clean-DB proof GREEN** (prg06ic-077) — exec replicated the CI flag-on lane on fresh PG, committed chain 0→0118, no manual SQL/no faked tracking, clean exit, end-state correct (4 identity tables dropped, subscriptions + v2 retained). The destructive migration is empirically proven.
+- **REDEFINED close-gate (SPLIT):** clean-DB proof GREEN (DONE) + the **~7 identity prod-readers flag-gated-safe** so flag-OFF prod has NO 500 at/after drop. NOT full flag-on integration green. (Header says 7, inventory enumerates 5 C + T1 — reconcile.)
+- **586 CRITICAL PATH NOW = author 2 net-new v2 twins (PATCH /profiles/:id, PATCH /account/email) + wire 5 + staging rebuild (d).** The 2 twins are the real remaining work.
+- Branch WI-586 @ 9d79305 (17 ahead origin/main, UNPUSHED; push when pre-push green, do NOT --no-verify; committer cleared — see below).
+- **WI-808 = CUT-B** (created, Item, Backlog, P2, Related-586): the v2 test-fixture migration (~60 files) + broader non-flip-critical reader cutover + drive flag-on integration suite green. Parallelizable from now; NOT flip-gating. Shepherd promotes→WP + domain sub-items when it starts it.
+- **WI-805** = billing carve (subscriptions drop + ~18 billing readers, POST-FLIP) — but its **billing cron (quota-reset.ts, ~5-line wire) is FLIP-CRITICAL**.
 
-## IDs / channel
-- data_source `36fd1119-9955-4684-8bfe-deb145e6a21f`; WS-18 page `3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8`; WI-586 page `37b8bce9-1f7c-8166-b539-eb1a69ebf0fe`; Project rel `3658bce9-1f7c-8128-9f9b-fa7fcf75a13b`. Notion-Version `2025-09-03`; `NOTION_TOKEN` in env. Repo `cognoco/eduagent-build`.
-- WS-18 query: `POST /v1/data_sources/<ds>/query` filter Workstream relation contains WS-18 + Stage != Closed (`dangerouslyDisableSandbox`).
-- Inbox (I write) `_wip/identity-cutover/_state/inbox.jsonl` (last durable ~ic-orch-048); outbox (shepherd, read-only). Both ephemeral — Cosmo wins.
+## FLIP-CRITICAL INVARIANT — 8 items MUST land before prod flip #8
+- 7 identity prod-readers (in WI-586) + 1 billing cron (quota-reset, WI-805 flip-critical sub-part). This set — NOT full-suite-green — is the real flip gate. Flip-safety = these + the staging rehearsal (static inventory is the more complete view than discover-by-test-failure).
 
-## Lane state (Cosmo, ~07:45Z)
-- **Closed:** WP-1..9, 780, 784, 785, 786, 788–792, 795–799, 802, **803** (folded as **Duplicate** into 586 — see below).
-- **WI-586 = ACTIVE, unblocked, Executing** (claimed `claude-code:WI-586:ramtop`, branch `WI-586`). The single live deliverable. Scope (from 586 AC + my addendum comment):
-  - (a) commit **m-repoint** + (b) **M-DROP** migrations — committed, ordered rehome-before-drop, tested vs a FRESH committed-migration DB (NOT staging).
-  - **R1/R2 reader sweep** (folded from 803): `nudge.ts listUnreadNudges` still `.innerJoin(profiles)` ~L230 (v2 branch); `profile.ts updateProfileAppContext` reads `profiles` ~L294/L318 + `consent_states` (getConsentStatus ~L303/L354) **unconditionally** — both M-DROP'd; need v2/person + consent-v2 reads. (family_links twins already delivered on origin/main, ex-803.)
-  - (c) **CLOSE GATE / real drop-safety proof:** full `api:test:integration`, `IDENTITY_V2_ENABLED=true`, against a **committed-migrations-only DB incl. M-DROP**, exercising nudges + app-context + broad parent/child routes asserting no 500. (Strictly stronger than the retired staging route-smoke.)
-  - (d) **staging rebuild from committed migrations + parity** (restores RLS by construction; folds in WI-794 verify).
-- **Backlog / post-cutover:** 779 (flag/legacy removal), 794 (RLS verify, folds into 586's d), 782 (parked), 800/801 (test-infra, OFF the hard path).
+## Why SPLIT (rationale, in case challenged)
+- The original "drive flag-on integration green" gate was a MISREAD: the flag-on suite was ALREADY ~mostly red pre-drop (192 pass / 488 fail) from ~60 test files seeding dropped legacy tables (pre-existing v2-migration fixture debt), NOT caused by drop-4. SPLIT corrects the scoping: 586 = drop+proof+prod-reader-flag-safety; WI-808 = the fixture/test-suite migration. The app becomes testable at the staging flip regardless of WI-808 (test scaffolding ≠ app function).
 
-## Gate delegation — RE-AFFIRMED + durable (memory `project_586_gate_delegation.md` + Cosmo 586 comments + plan §4)
-- **#4 (window entry) + #6 (STOP-1, pre-reseed ≈ §4 step-3) = MINE** under conditions: staging rehearsal GREEN + parity EXACT; abort-to-operator on deviation; notify operator at each; **Neon branch snapshot before disposal**.
-- **#8 (flip) + #11 (M-DROP) = OPERATOR-ONLY.** Any STOP not explicitly delegated (e.g. §4 step-6 M-REPOINT) defaults to operator.
+## Gate delegation (durable: memory project_586_gate_delegation.md + Cosmo 586 comments + plan §4)
+- #4 (entry) + #6 (STOP-1 pre-reseed) = MINE under conditions (rehearsal green + parity exact; abort-to-operator; notify each; **Neon branch snapshot before disposal**).
+- #8 (flip) + #11 (M-DROP) = OPERATOR-ONLY. Un-delegated STOPs default to operator.
 
-## ✅ Neon provisioning — DONE this session (the #4/#6 abort-net prereq)
-- `neonctl` installed + authed on Ramtop as `jorn.jorgensen@zwizzly.com` (OAuth creds in `~/.config/neonctl/`, **no API key** — operator chose auth method, broad-admin). Write access verified end-to-end (create+delete branch test off `production`).
-- **Snapshot target:** project **`lingering-violet-30592106`** (eu-central-1); prod branch **`production`** = `br-green-pond-agpzmrwx`; staging = `br-delicate-star-agpvtzx3`; dev archived. ONE project, per-env BRANCHES (not per-env projects).
-- Command: `neonctl branches create --project-id lingering-violet-30592106 --parent production --name pre-drop-<date>` (use `--parent staging` for the staging rehearsal).
+## Neon
+- neonctl authed on Ramtop as jorn.jorgensen@zwizzly.com (broad-admin; OAuth ~/.config/neonctl; no API key). Project **lingering-violet-30592106** (eu-central-1). dev=`br-weathered-silence` (ep-muddy-sunset; PITR-restored to 2026-06-16T00:00:00Z); staging=br-delicate-star (ep-fancy-cherry); prod=`production`/br-green-pond (ep-holy-leaf). Damaged dev snapshot = **dev-damaged-20260616** / br-spring-mode-agn4bhte.
+- #6 snapshot cmd: `neonctl branches create --project-id lingering-violet-30592106 --parent production --name pre-drop-<date>`.
+- ⚠️ Restored dev is push/drift-managed — NOT a valid close-gate proof surface; proofs run on fresh ephemeral PG (CI-lane replication).
 
-## Shared-checkout note
-- Resynced clean this session (HEAD==origin/main). The divergence root (WI-379/388 `/commit`-fork wrong-worktree bug) is **CLOSED + fixed** (plugin CORE `zdx-core` 1.0.1 pins `git -C`); the actual divergence cause was sessions checkpointing `_wip/` state as **unpushed** commits on main. **Do NOT commit coordination state to main** — push it or use Cosmo. Commit own-work scope only; never `git add -A`.
+## S4–S6 (mentor-is-the-app shell redesign) sequencing — for soak-parallel planning
+- S0–S3 = identity-INDEPENDENT (can run now). **S4/S5 = identity-DEPENDENT** — need the new model LIVE (= the flip), NOT the cutover fully torn down → can run DURING soak in PARALLEL with cleanup (805/794/779/808), coordinated. S4 carries a column-repoint migration + touches shared identity/nav surface (coordination cost).
+- **2nd gate on S4+ (independent of cutover): S1+S2 discovery EVIDENCE** — program not committed as a unit; S3–S6 proceed only if S1+S2 measure positive. **Check S1/S2 status — that evidence gate, not the cutover, likely governs S4.** (spec: docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md §11.)
 
-## Critical path to #8
-586 code deliverable (autonomous via shepherd/executors: migrations + R1/R2 sweep + close-gate (c) green — all CI/ephemeral-DB, no staging touch) → **(d) staging rebuild + parity** (first staging-touching step; my territory) → **rehearsal** (#4 entry mine; #6 STOP-1 mine WITH the Neon snapshot) → **#8 flip (OPERATOR)** → ~24h soak → **#11 M-DROP (OPERATOR)** → 779 flag removal ∥ 794 RLS verify.
+## Crash recovery + DB issues (RESOLVED 2026-06-16)
+- Host rebooted ~08:30Z; both sessions reborn; committed work survived; only uncommitted exec work lost + re-dispatched (exec586b, now at rest). Monitors re-armed.
+- Issue-1: proof MUST run on a CLEAN full-chain DB (never shared dev) — SATISFIED (green). Issue-2: shared dev PITR-restored; no external sessions exist (only the Quartet — the "other sessions breaking" claim was my overstated relay).
+- **Committer cleared:** all WI-586 commits incl a6887c103 = uniform fleet identity (Lord Vetinari/vetinari@zaf.fleet); no 2nd executor; a6887c103 = exec586b's own untracked commit (context-gap). Branch clean/linear/single-worktree.
 
-## Open operator items
-- **None blocking.** Gate delegation re-affirmed; Neon prereq satisfied. Lane is autonomous on 586's code. Next operator gate is **#8 flip**, hours+ out (behind 586 code-green + staging rebuild + rehearsal).
+## Context-management experiment (operator side-quest, ACTIVE)
+- Principle: context = disposable cache; substrate = truth. Order ruled: **A (state-doc) first, then D (PreCompact/SessionStart hooks in project settings, role-aware via QUARTET_ROLE; sub-agent-hook behavior = unknown to verify before building D).**
+- Pilot live: shepherd owns `shepherd-world.md` (ic-orch-056; rewrite #1 done, good). THIS doc = orchestrator-side run; THIS compaction = the orchestrator self-test.
 
-## Recurring discipline (this session's lessons)
-- **Verify before asserting a blocker / before sending the operator on a task.** Caught ~6 glance-errors this session (incl. wrongly declaring "no Neon access" before running the org-scoped list; the reviewer's 803 reject was VALID and exposed my own AC mis-scope). Pull the actual artifact/config/origin-main first.
-- Reviewer runs in a separate origin/main-pinned clone (healthy). Close only via reviewer + QA; orchestrator may triage-fold (Duplicate) with documentation.
+## Canonical pointers
+- Cosmo: WI-586 = 37b8bce9-1f7c-8166-b539-eb1a69ebf0fe; WI-805 (billing carve); WI-806 (Nexus proj, ZDX/cosmo Altitude fix); WI-808 (CUT-B fixture debt); WS-18 = 3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8; MentoMate Project = 3658bce9-1f7c-8128-9f9b-fa7fcf75a13b; data_source 36fd1119-9955-4684-8bfe-deb145e6a21f; Notion-Version 2025-09-03.
+- Git: branch WI-586 @ 9d79305 (17 ahead/unpushed). Reviewer = separate origin/main clone (up + armed, idle until Reviewing).
+- Channel: inbox high-water = **ic-orch-057**; outbox last = **prg06ic-077**.
+
+## Recurring discipline (session lessons)
+- Verify before asserting — INCLUDING impact/blast-radius claims (the false "other sessions breaking"; the WP-vs-"Work Package" select pollution → WI-806; verify Cosmo select values vs live schema before create).
+- NEVER put a destructive command behind a `||` retry (the Neon restore double-fired).
+- Do NOT commit coordination churn to main — push deliberate anchors (this doc) or use Cosmo; channel stays working-tree-only.
+- Reviewer = separate clone; close only via reviewer Gate-2 + QA; orchestrator may triage-fold with documentation.
