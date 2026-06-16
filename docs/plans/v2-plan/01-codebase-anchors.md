@@ -126,7 +126,7 @@
 
 4. **`eas.json` profiles** — add `EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'` to `build.development.env` (`:21`) and `build.preview.env` (`:37`) ONLY. Leave `build.production.env` (`:11`) untouched (V2 stays off in prod). This mirrors exactly how V1 is staged (dev+preview on, prod off).
 
-5. **`.github/workflows/ci.yml` OTA step** — add `EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'` to the OTA env block now around `:397-398` (next to the V0/V1 lines), because `eas update` does not read build-profile env. This makes V2 visible on the preview-channel OTA (the staging validation surface, S1+S2 evidence gate).
+5. **`.github/workflows/ci.yml` OTA step** — add `EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'` to the OTA env block now around `:397-398` (next to the V0/V1 lines), because `eas update` does not read build-profile env. This makes V2 visible on the preview-channel OTA. The former S1+S2 observed-cohort evidence gate was removed as a blocker on 2026-06-14, but preview OTA remains the validation surface for manual/product QA.
 
 **Net effect:** prod = V0-on/V1-off/**V2-off** (unchanged); dev+preview+staging-OTA = V1-and-V2-on (V2 branch wins where it short-circuits). No flag combination removes or alters the V0/V1 code paths.
 

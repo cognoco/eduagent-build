@@ -60,6 +60,7 @@ import { anthropicResponseFormatFlow } from './flows/anthropic-response-format';
 import { languagePromptsFlow } from './flows/language-prompts';
 import { adaptiveTeachingFlow } from './flows/adaptive-teaching';
 import { nowParkReturnFlow } from './flows/now-park-return';
+import { appHelpV2Flow } from './flows/app-help-v2';
 import {
   listFlows,
   parseCliArgs,
@@ -123,6 +124,7 @@ const FLOWS: FlowDefinition[] = [
   languagePromptsFlow as FlowDefinition,
   adaptiveTeachingFlow as FlowDefinition,
   nowParkReturnFlow as FlowDefinition,
+  appHelpV2Flow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

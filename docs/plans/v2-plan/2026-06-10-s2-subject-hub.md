@@ -6,7 +6,7 @@ spec: docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md
 status: draft
 ---
 
-<!-- Synced to spec amendment 2026-06-10 (§16 voice, §3.1 cold-start tripwire → evidence gate, §2.1 chips-fill law) and amended 2026-06-13 for self-directed browse + concrete progress numbers + topic description + chapter progress. -->
+<!-- Synced to spec amendment 2026-06-10 (§16 voice, §3.1 cold-start tripwire, §2.1 chips-fill law), amended 2026-06-13 for self-directed browse + concrete progress numbers + topic description + chapter progress, and amended 2026-06-14 to remove the observed-cohort evidence blocker. -->
 
 # S2 — Subject Hub — Implementation Plan
 
@@ -223,7 +223,7 @@ These amendments are source-verified and must be folded into the task execution.
 
 - [ ] **T8: The hub page + nested layout + linkable-from-current-nav wiring + cross-stack deep links.**
   Create `subject-hub/[subjectId]/index.tsx` (default export; reads `subjectId` param, runs the loading/error gate via `use-subject-hub.ts`, renders `<SubjectHub data={…} />`). Create `subject-hub/[subjectId]/_layout.tsx` exporting `unstable_settings = { initialRouteName: 'index' }` (the repo guardrail for any nested layout with an index + deeper dynamic child, mirroring `shelf/[subjectId]/_layout.tsx:8-10`). All in-hub navigations (Next-up action, "see full topic page", review-due) push the **full ancestor chain** via the route-catalog keys (`subject.hub` → `subject.topic` / `retention.review` / `challenge.start`, chain `['subject.hub']` per S0 plan T8) so `router.back()` from a deep target lands on the hub, never Home.
-  **Linkable from the current nav (the "also linkable from today's nav" requirement):** wire the hub as the destination from today's per-subject entry points so it delivers value even with the V2 shell off — when `MODE_NAV_V2_ENABLED` is on, `shelf/[subjectId]` and `progress/[subjectId]` route to the hub (additive redirect or an "Open subject hub" entry), and the hub's own `router.push` to a subject uses the hub route. **Honor §7 / the V0 no-regress floor:** when the flag is OFF, today's `shelf` and `progress/[subjectId]` screens render exactly as now — the redirect is flag-gated, never unconditional. Add a `subjectHub.linkLabel` entry point on the existing `progress/[subjectId]` and `shelf` headers (flag-gated) so the hub is reachable from the live app for the S1+S2 evidence gate.
+  **Linkable from the current nav (the "also linkable from today's nav" requirement):** wire the hub as the destination from today's per-subject entry points so it delivers value even with the V2 shell off — when `MODE_NAV_V2_ENABLED` is on, `shelf/[subjectId]` and `progress/[subjectId]` route to the hub (additive redirect or an "Open subject hub" entry), and the hub's own `router.push` to a subject uses the hub route. **Honor §7 / the V0 no-regress floor:** when the flag is OFF, today's `shelf` and `progress/[subjectId]` screens render exactly as now — the redirect is flag-gated, never unconditional. Add a `subjectHub.linkLabel` entry point on the existing `progress/[subjectId]` and `shelf` headers (flag-gated) so the hub is reachable from the live app for manual/product QA. The former S1+S2 evidence gate was removed as a blocker on 2026-06-14.
   **done when:** `subject-hub/[subjectId]/index.test.tsx` (T8a) asserts: a valid `subjectId` renders the hub (loading → content), a missing `subjectId` renders an `ErrorFallback` with a working secondary action (not a dead end), and the Next-up primary action preserves the real resume target: an active session resumes by `sessionId`, a topic target carries `subjectId` + `topicId`, and any `bookId` used for display/navigation is derived from loaded book/topic data rather than assumed on `LearningResumeTarget`. Assert the pushed `Href` shape via a router spy (Expo Router test util, no internal mock). The `_layout.tsx` exports `unstable_settings.initialRouteName === 'index'` (assert by import). `pnpm exec jest --findRelatedTests "src/app/(app)/subject-hub/[subjectId]/index.tsx" --no-coverage` passes.
 
 - [ ] **T9: Additive `origin` discriminator on the notes contract.**
@@ -316,18 +316,18 @@ All co-located (`*.test.tsx` next to source, no `__tests__/`). No internal `jest
 
 ---
 
-## Evidence gate — S1+S2 ship-and-measure (S2 → S3)
+## Former Evidence Gate — Superseded 2026-06-14
 
-S2 is the second half of the validation bet: S1+S2 ship behind `MODE_NAV_V2_ENABLED` and are **observed** before S3+ proceeds (spec §11/§13.6). S3–S6 proceed only if the observed cohort shows the feed + hub are doing real work.
+S2 was originally the second half of the validation bet: S1+S2 would ship behind `MODE_NAV_V2_ENABLED` and be **observed** before S3+ proceeded (spec §11/§13.6). Product ruled on 2026-06-14 that no S2/S3 observed-cohort evidence data will exist before the later phases. This gate is therefore removed as an execution blocker rather than treated as passed. S3/S4/S5 may proceed under explicit product risk; S4/S5 still wait on identity-foundation flip + convergence, and S6 still waits on its own destructive-cutover gates.
 
-**Primary bar (discovery/engagement):** 3–5 friendly families with a 13+ teen. Pass = (a) the teen returns unprompted at least twice in week one and engages a feed/Subject action that is not only the camera, and (b) the parent can answer "what did my kid work on this week?" from the app alone in under one minute. Owner: product (per §13.6); formal PASS/FAIL recorded in the Bet Sheet / decision log before S3 starts.
+**Former primary bar (discovery/engagement; no longer a blocker):** 3–5 friendly families with a 13+ teen. Pass would have meant (a) the teen returns unprompted at least twice in week one and engages a feed/Subject action that is not only the camera, and (b) the parent can answer "what did my kid work on this week?" from the app alone in under one minute. Keep this as useful future learning criteria, not as a phase gate.
 
-**Cold-start activation tripwire — named metric for the evidence gate (spec §3.1):**
-The §3.1 pre-committed tripwire measures the learner cold-start card built in S1 (surface: S1's cold-start anchor slot — input bar + three example chips). This tripwire is **measured during the S1+S2 ship-and-measure window** and feeds the S2→S3 gate decision.
+**Cold-start activation tripwire — retained as a future learning metric (spec §3.1):**
+The §3.1 pre-committed tripwire measures the learner cold-start card built in S1 (surface: S1's cold-start anchor slot — input bar + three example chips). It no longer feeds a blocking S2->S3 decision because there will be no observed-cohort gate before S3/S4.
 
 - **Metric:** time-to-first-action + freeze-bounce rate (opened the app, took no action, closed).
 - **Threshold:** if 13-year-olds stall at the blank box (elevated freeze-bounce), the correction is pre-agreed and **limited to an emphasis flip**: chips become the visual lead, typing stays the escape — not a redesign. (This is the §3.1 ruling; do not re-open it.)
-- **S2's role:** carry the measurement/reporting obligation for this tripwire alongside the hub engagement metric in the gate report — the cold-start card itself is S1 (§3.1), but the evidence gate is shared.
+- **S2's role:** preserve the metric definition and the pre-agreed correction so future telemetry/cohort learning can use it; it is not a blocker for S3/S4/S5 execution.
 
 **Chips-fill law (spec §2.1):** the subject hub does not currently render suggestion chips near a text input. If any near-input suggestion chips are added to the hub (e.g. autocomplete chips on the search/filter bar or the add-note input), they must **fill the input** (type their words into the box, let the user send) rather than fire as direct actions — per the permanent "chips fill, cards fire" interaction law (§2.1 / §15.15). Proposal cards (Next-up, study action) remain one-tap direct actions and are unaffected by this rule.
 
@@ -348,8 +348,8 @@ The §3.1 pre-committed tripwire measures the learner cold-start card built in S
 - §6.3 mask-ready: same hub component, server-masked to structural columns for supporter person-scopes → T2 hard rule (no client ownership reads; `data`-driven) + `canStudy`/`notes` masked-shape test (T2a) + T6 `canStudy` field. S4 server-mask itself out of scope.
 - Annex A.2 prereq `topic-mastery-three-states` backend read → data-sources table + T1 (`masteredAt`-driven `'mastered'` state) + T4 render.
 - Annex A.3 `concept-capture-layer` baseline-gated, design hub against today's model first, concept-grain later non-blocking → T11 + `## Concept-grain forward-compat`.
-- §11 S2 also linkable from current nav + "kills the worst redundancy cluster" + feeds S2→S3 evidence gate → T8 flag-gated redirect + `subjectHub.linkLabel` live entry point + T12 real Subjects tab.
-- §11 / §3.1 S2→S3 evidence gate + cold-start activation tripwire → `## Evidence gate` section above (cold-start card is S1/§3.1; S2 carries the measurement obligation for the shared gate, including the pre-agreed emphasis-flip correction).
+- §11 S2 also linkable from current nav + "kills the worst redundancy cluster" + preserves the former S2->S3 learning criteria → T8 flag-gated redirect + `subjectHub.linkLabel` live entry point + T12 real Subjects tab.
+- §11 / §3.1 former S2->S3 evidence gate + cold-start activation tripwire → `## Former Evidence Gate` section above (cold-start card is S1/§3.1; S2 preserves the metric and pre-agreed emphasis-flip correction, but the gate no longer blocks S3/S4/S5).
 - §16 voice input on hub text inputs (notes + search/filter) → T2 (`SubjectHubSearchFilter` mic, transcription-only done-when) + T7 (`SubjectHubNotes` add-note mic, transcription-only done-when) + T10 (`subjectHub.search.micLabel`, `subjectHub.notes.micLabel` keys added).
 - §2.1 / §15.15 "chips fill, cards fire" interaction law → `## Evidence gate` section above (hub has no current near-input chips; law applies if any are added; proposal cards stay one-tap direct).
 - §7 / V0 no-regress floor → T8 (redirect flag-gated; flag-off renders today's screens unchanged).
