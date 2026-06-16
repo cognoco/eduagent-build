@@ -14,6 +14,7 @@
 ## Identity Foundation (re-platform)
 
 - [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to the ratified identity/policy-engine/router/safety ADRs + the `docs/registers/llm-models/` register. Current runway state lives in `_wip/identity-foundation/ROADMAP.md`; canon membership lives in `_wip/identity-foundation/CANONICAL-SET.md`.
+- [project_586_gate_delegation.md](project_586_gate_delegation.md) — WI-586 cutover gate delegation: #4 (entry) + #6 (STOP-1) → orchestrator under conditions; #8 (flip) + #11 (drop) operator-only; Neon branch snapshot required. Re-affirmed 2026-06-16.
 
 ## Known Issues
 

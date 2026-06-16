@@ -1227,7 +1227,7 @@ legacy side is untouched (pure addition + seam indirection).
 ## 4. Convergence runbook — the shrunk WI-586
 
 **Roles.** *Flip owner:* **Jorn (operator/shepherd)** — personally executes step 2,
-the step-7 flip (Doppler), and the go decisions at the step-3/6/8 STOPs, per env. *Executor:* the WI-586
+the step-7 flip (Doppler), and the go decisions at the step-6 (M-REPOINT) + step-8 (M-DROP) STOPs, per env. *Orchestrator delegation (operator-ratified 2026-06-15, re-affirmed 2026-06-16; durable record: `.claude/memory/project_586_gate_delegation.md` + WI-586 Cosmo comments):* gate **#4** (cutover-window entry) + gate **#6** (STOP-1 ≈ the step-3 ownerless-disposal STOP, incl. the step-2 Neon branch snapshot) are delegated to the **orchestrator** under conditions — staging rehearsal green + parity exact; abort-to-operator on any deviation; notify operator at each; Neon branch snapshot before disposal. Gates **#8** (step-7 flip) + **#11** (step-8 M-DROP) remain operator-only; any STOP not explicitly delegated defaults to operator. *Executor:* the WI-586
 executor performs the mechanical steps under the executor-protocol hard rule — at the
 three STOP points (before steps 3, 6, and 8) it reports exact planned commands
 and waits for shepherd go.
