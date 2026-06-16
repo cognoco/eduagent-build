@@ -19,6 +19,7 @@ import {
 import {
   familyLinks,
   membership,
+  person,
   profiles,
   learningSessions,
   learningProfiles,
@@ -80,6 +81,10 @@ import {
   getChildrenGdprConsentStatusesV2,
   resolveOrgIdForPerson,
 } from './identity-v2/family-v2';
+import {
+  resolveLatestConsentStatusAnyBasis,
+  DEFAULT_CONSENT_PURPOSE,
+} from './identity-v2/consent-status-v2';
 import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
@@ -784,13 +789,30 @@ export async function getChildrenForParent(
 
   // R-03: Batch queries to avoid N+1 per child profile.
   // Fetch all child profiles in a single query instead of one per loop iteration.
-  const allChildProfiles = await db.query.profiles.findMany({
-    where: and(
-      inArray(profiles.id, childProfileIds),
-      isNull(profiles.archivedAt),
-    ),
-  });
-  const profilesById = new Map(allChildProfiles.map((p) => [p.id, p]));
+  // [WI-586] v2 path: read from person table (no profiles post-M-DROP).
+  const profilesById = new Map<string, { id: string; displayName: string }>();
+  if (opts?.identityV2Enabled) {
+    const allChildPersons = await db.query.person.findMany({
+      where: and(
+        inArray(person.id, childProfileIds),
+        isNull(person.archivedAt),
+      ),
+      columns: { id: true, displayName: true },
+    });
+    for (const p of allChildPersons) {
+      profilesById.set(p.id, p);
+    }
+  } else {
+    const allChildProfiles = await db.query.profiles.findMany({
+      where: and(
+        inArray(profiles.id, childProfileIds),
+        isNull(profiles.archivedAt),
+      ),
+    });
+    for (const p of allChildProfiles) {
+      profilesById.set(p.id, p);
+    }
+  }
 
   // Batch recent sessions for all children in one query
   const now = new Date();
@@ -1123,20 +1145,46 @@ export async function getChildDetail(
   await assertParentAccess(db, parentProfileId, childProfileId, opts); // 1 query
 
   // Step 1: Get the child's profile — 1 query
-  const profile = await db.query.profiles.findFirst({
-    where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
-  });
-  if (!profile) return null;
-  // [BUG-465] Filter to GDPR consent type only. Without this filter a more
-  // recent non-GDPR row (e.g. COPPA) masks the actual GDPR status, which can
-  // suppress learning metrics or show the wrong consent banner.
-  const consentState = await db.query.consentStates.findFirst({
-    where: and(
-      eq(consentStates.profileId, childProfileId),
-      eq(consentStates.consentType, 'GDPR'),
-    ),
-    orderBy: desc(consentStates.requestedAt),
-  });
+  // [WI-586] v2 path: read from person table; resolve consent via v2 resolver.
+  let profileDisplayName: string;
+  let consentStatus: ConsentStatus | null;
+  let consentRespondedAt: string | null;
+  if (opts?.identityV2Enabled) {
+    const personRow = await db.query.person.findFirst({
+      where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
+      columns: { displayName: true },
+    });
+    if (!personRow) return null;
+    profileDisplayName = personRow.displayName;
+    const parentOrgId = await resolveOrgIdForPerson(db, parentProfileId);
+    consentStatus = parentOrgId
+      ? await resolveLatestConsentStatusAnyBasis(
+          db,
+          childProfileId,
+          parentOrgId,
+          DEFAULT_CONSENT_PURPOSE,
+        )
+      : null;
+    consentRespondedAt = null;
+  } else {
+    const profile = await db.query.profiles.findFirst({
+      where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
+    });
+    if (!profile) return null;
+    profileDisplayName = profile.displayName;
+    // [BUG-465] Filter to GDPR consent type only. Without this filter a more
+    // recent non-GDPR row (e.g. COPPA) masks the actual GDPR status, which can
+    // suppress learning metrics or show the wrong consent banner.
+    const consentState = await db.query.consentStates.findFirst({
+      where: and(
+        eq(consentStates.profileId, childProfileId),
+        eq(consentStates.consentType, 'GDPR'),
+      ),
+      orderBy: desc(consentStates.requestedAt),
+    });
+    consentStatus = consentState?.status ?? null;
+    consentRespondedAt = consentState?.respondedAt?.toISOString() ?? null;
+  }
 
   // Step 2: Get the child's subjects — 1 query
   const childSubjects = await db.query.subjects.findMany({
@@ -1242,7 +1290,7 @@ export async function getChildDetail(
   } = await buildChildProgressSummary(
     db,
     childProfileId,
-    profile.displayName,
+    profileDisplayName,
     sessionsThisWeek,
     sessionsLastWeek,
     totalTimeThisWeekMinutes,
@@ -1259,7 +1307,7 @@ export async function getChildDetail(
 
   const dashboardInput: DashboardInput = {
     childProfileId,
-    displayName: profile.displayName,
+    displayName: profileDisplayName,
     sessionsThisWeek,
     sessionsLastWeek,
     totalTimeThisWeekMinutes,
@@ -1283,9 +1331,9 @@ export async function getChildDetail(
 
   return redactDashboardChild({
     profileId: childProfileId,
-    displayName: profile.displayName,
-    consentStatus: consentState?.status ?? null,
-    respondedAt: consentState?.respondedAt?.toISOString() ?? null,
+    displayName: profileDisplayName,
+    consentStatus,
+    respondedAt: consentRespondedAt,
     summary,
     sessionsThisWeek,
     sessionsLastWeek,

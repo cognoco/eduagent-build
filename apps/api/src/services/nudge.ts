@@ -4,7 +4,10 @@ import { ConsentRequiredError, RateLimitedError } from '@eduagent/schemas';
 import {
   accounts,
   familyLinks,
+  membership,
   nudges,
+  organization,
+  person,
   profiles,
   type Database,
 } from '@eduagent/database';
@@ -142,31 +145,54 @@ export async function createNudge(
     return row;
   });
 
-  const [fromProfile, toProfile] = await Promise.all([
-    db.query.profiles.findFirst({
-      where: eq(profiles.id, params.fromProfileId),
-      columns: { displayName: true, accountId: true },
-    }),
-    db.query.profiles.findFirst({
-      where: eq(profiles.id, params.toProfileId),
-      columns: { displayName: true, accountId: true },
-    }),
-  ]);
-  const parentName = fromProfile?.displayName ?? 'Your parent';
-
-  // Quiet hours follow the recipient's (child's) local time only — sending
-  // parents may be in a different zone, but it's the recipient we don't want
-  // to ping at 23:00. If the child has no timezone on file, isQuietHours
-  // defaults to UTC.
-  const childAccount = toProfile?.accountId
-    ? await db.query.accounts.findFirst({
-        where: eq(accounts.id, toProfile.accountId),
-        columns: { timezone: true },
-      })
-    : null;
+  let parentName: string;
+  let childTimezone: string | null | undefined;
+  if (opts?.identityV2Enabled) {
+    // [WI-586] v2 path: read displayName from person; timezone from the child's
+    // org (via membership join) — scoped to params.toProfileId so we never read
+    // an arbitrary org's timezone.
+    const [fromPersonRows, toOrgRows] = await Promise.all([
+      db
+        .select({ displayName: person.displayName })
+        .from(person)
+        .where(eq(person.id, params.fromProfileId))
+        .limit(1),
+      db
+        .select({ timezone: organization.timezone })
+        .from(membership)
+        .innerJoin(organization, eq(organization.id, membership.organizationId))
+        .where(eq(membership.personId, params.toProfileId))
+        .limit(1),
+    ]);
+    parentName = fromPersonRows[0]?.displayName ?? 'Your parent';
+    childTimezone = toOrgRows[0]?.timezone;
+  } else {
+    const [fromProfile, toProfile] = await Promise.all([
+      db.query.profiles.findFirst({
+        where: eq(profiles.id, params.fromProfileId),
+        columns: { displayName: true, accountId: true },
+      }),
+      db.query.profiles.findFirst({
+        where: eq(profiles.id, params.toProfileId),
+        columns: { displayName: true, accountId: true },
+      }),
+    ]);
+    parentName = fromProfile?.displayName ?? 'Your parent';
+    // Quiet hours follow the recipient's (child's) local time only — sending
+    // parents may be in a different zone, but it's the recipient we don't want
+    // to ping at 23:00. If the child has no timezone on file, isQuietHours
+    // defaults to UTC.
+    const childAccount = toProfile?.accountId
+      ? await db.query.accounts.findFirst({
+          where: eq(accounts.id, toProfile.accountId),
+          columns: { timezone: true },
+        })
+      : null;
+    childTimezone = childAccount?.timezone;
+  }
 
   let pushSent = false;
-  if (isQuietHours(now, childAccount?.timezone)) {
+  if (isQuietHours(now, childTimezone)) {
     logger.info('Nudge push suppressed by quiet hours', {
       event: 'notification.nudge.quiet_hours_suppressed',
       toProfileId: params.toProfileId,
@@ -212,8 +238,8 @@ export async function listUnreadNudges(
   opts?: { identityV2Enabled?: boolean },
 ): Promise<Nudge[]> {
   if (opts?.identityV2Enabled) {
-    // [WI-803] v2 path: resolve guardian person IDs via guardianship table —
-    // safe post-M-DROP (no family_links join).
+    // [WI-803/WI-586] v2 path: resolve guardian person IDs via guardianship table
+    // and join person for displayName — safe post-M-DROP (no profiles/family_links join).
     const guardianPersonIds = await getGuardianPersonIds(db, profileId);
     if (guardianPersonIds.length === 0) return [];
     const rows = await db
@@ -221,13 +247,13 @@ export async function listUnreadNudges(
         id: nudges.id,
         fromProfileId: nudges.fromProfileId,
         toProfileId: nudges.toProfileId,
-        fromDisplayName: profiles.displayName,
+        fromDisplayName: person.displayName,
         template: nudges.template,
         createdAt: nudges.createdAt,
         readAt: nudges.readAt,
       })
       .from(nudges)
-      .innerJoin(profiles, eq(profiles.id, nudges.fromProfileId))
+      .innerJoin(person, eq(person.id, nudges.fromProfileId))
       .where(
         and(
           eq(nudges.toProfileId, profileId),
