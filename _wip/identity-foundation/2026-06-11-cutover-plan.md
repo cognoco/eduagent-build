@@ -1303,8 +1303,13 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
 2. **Recovery posture (binding constraint).** Record the Neon PITR marker and create
    the pre-drop branch — this **is** the rollback story for everything after step 5:
    ```bash
-   neonctl branches create --project-id <env-project> \
-     --name pre-drop-2026-MM-DD --parent main   # + record timestamp in the WI evidence
+   neonctl branches create --project-id lingering-violet-30592106 \
+     --name pre-drop-2026-MM-DD --parent production   # + record timestamp in the WI evidence
+   # Neon topology (verified 2026-06-16): MentoMate is ONE project
+   # (lingering-violet-30592106, eu-central-1) with per-env BRANCHES — NOT per-env projects:
+   #   production = br-green-pond-agpzmrwx · staging = br-delicate-star-agpvtzx3 · dev (archived)
+   # Use --parent staging for the staging rehearsal. Snapshot access verified end-to-end via
+   # neonctl (auth jorn.jorgensen@zwizzly.com on Ramtop; create+delete branch test passed).
    ```
 3. **Ownerless disposal** *(STOP → shepherd go)*. Dev: bulk-delete the 223 ownerless
    accounts (cascade removes their orphan rows):
