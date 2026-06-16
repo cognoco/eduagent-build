@@ -2313,6 +2313,11 @@ describe('sessionCompleted', () => {
         null,
         'inferred',
         SUBJECT_ID,
+        // [WI-809] applyAnalysis now receives the identity-v2 opts so its GDPR
+        // gate routes through the v2 consent graph. Non-vacuous + flag-adaptive
+        // (asserts true under IDENTITY_V2_ENABLED, false otherwise) — same
+        // pattern as the v2 reader assertions elsewhere in this suite.
+        { identityV2Enabled: process.env['IDENTITY_V2_ENABLED'] === 'true' },
       );
     });
 
@@ -2718,7 +2723,8 @@ describe('sessionCompleted', () => {
 
       await executeSteps(createEventData({ qualityRating: 4 }));
 
-      // applyAnalysis args: (db, profileId, analysis, subjectName, source, subjectId)
+      // applyAnalysis args: (db, profileId, analysis, subjectName, source,
+      // subjectId, opts) — [WI-809] opts threads identity-v2 to the GDPR gate.
       expect(mockApplyAnalysis).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
@@ -2726,6 +2732,8 @@ describe('sessionCompleted', () => {
         null, // subjectName (null when DB lookup returns no name)
         'inferred',
         SUBJECT_ID, // subjectId threaded from event data
+        // flag-adaptive + non-vacuous (true under IDENTITY_V2_ENABLED, else false).
+        { identityV2Enabled: process.env['IDENTITY_V2_ENABLED'] === 'true' },
       );
     });
   });
