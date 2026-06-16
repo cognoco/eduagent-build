@@ -83,10 +83,6 @@ import {
   resolveOrgIdForPerson,
 } from './identity-v2/family-v2';
 import {
-  resolveLatestConsentStatusAnyBasis,
-  DEFAULT_CONSENT_PURPOSE,
-} from './identity-v2/consent-status-v2';
-import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from './curriculum-topic-ownership';
@@ -1165,15 +1161,12 @@ export async function getChildDetail(
     });
     if (!personRow) return null;
     profileDisplayName = personRow.displayName;
-    const parentOrgId = await resolveOrgIdForPerson(db, parentProfileId);
-    consentStatus = parentOrgId
-      ? await resolveLatestConsentStatusAnyBasis(
-          db,
-          childProfileId,
-          parentOrgId,
-          DEFAULT_CONSENT_PURPOSE,
-        )
-      : null;
+    // [WI-809][BUG-465] GDPR-pinned, basis-explicit. A basis-blind AnyBasis read
+    // here lets a newer COPPA grant mask the child's GDPR status — the exact
+    // masking the flag-off branch below guards against (and the sibling
+    // getLatestConsentStatus already avoids). getChildGdprConsentStatusV2
+    // resolves the child's org internally and pins lawful_basis = GDPR.
+    consentStatus = await getChildGdprConsentStatusV2(db, childProfileId);
     consentRespondedAt = null;
   } else {
     const profile = await db.query.profiles.findFirst({

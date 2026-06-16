@@ -51,6 +51,7 @@ import {
   revokeChildConsentV2,
   restoreChildConsentV2,
   getProfileConsentStateV2,
+  getPersonDisplayNameV2,
 } from '../services/identity-v2/consent-v2';
 import { getChildConsentForParentV2 } from '../services/identity-v2/family-v2';
 import { inngest } from '../inngest/client';
@@ -194,16 +195,39 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const account = requireAccount(c.get('account'));
       const input = c.req.valid('json');
 
-      const childProfile = await getProfile(
-        db,
-        input.childProfileId,
-        account.id,
-      );
-      if (!childProfile) {
-        return forbidden(
-          c,
-          'Not authorized to request consent for this profile',
+      // [WI-809] Gate the child display-name read behind the V2 flag. The legacy
+      // getProfile() reads profiles + consent_states + family_links — all dropped
+      // at M-DROP — so flag-on must resolve the name via the v2 person graph
+      // instead, or it 500s post-drop. Both paths preserve the same existence
+      // check (null → forbidden) and feed childName into the consent write.
+      // Authorization is separately (and v2-awarely) enforced by
+      // assertCanRequestConsentForChild below.
+      let childName: string;
+      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+        const displayName = await getPersonDisplayNameV2(
+          db,
+          input.childProfileId,
         );
+        if (displayName === null) {
+          return forbidden(
+            c,
+            'Not authorized to request consent for this profile',
+          );
+        }
+        childName = displayName;
+      } else {
+        const childProfile = await getProfile(
+          db,
+          input.childProfileId,
+          account.id,
+        );
+        if (!childProfile) {
+          return forbidden(
+            c,
+            'Not authorized to request consent for this profile',
+          );
+        }
+        childName = childProfile.displayName ?? 'your child';
       }
 
       // [BUG-791] Account ownership alone is insufficient — gate on the active
@@ -245,13 +269,14 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       try {
         if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
           // [CUT-B2] v2 write machine. organizationId = account.id; childName
-          // from the already-fetched profile. Same caps / audit / error types.
+          // resolved above (v2 person graph when flag-on). Same caps / audit /
+          // error types.
           const res = await requestConsentV2(db, {
             chargePersonId: input.childProfileId,
             organizationId: account.id,
             consentType: input.consentType,
             guardianEmail: input.parentEmail,
-            childName: childProfile.displayName ?? 'your child',
+            childName,
             appUrl: apiOrigin,
             audit,
             emailOptions: {
@@ -334,16 +359,36 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const account = requireAccount(c.get('account'));
       const input = c.req.valid('json');
 
-      const childProfile = await getProfile(
-        db,
-        input.childProfileId,
-        account.id,
-      );
-      if (!childProfile) {
-        return forbidden(
-          c,
-          'Not authorized to request consent for this profile',
+      // [WI-809] Gate the child display-name read behind the V2 flag — see the
+      // request handler above. flag-on resolves via the v2 person graph (the
+      // legacy getProfile reads dropped tables and 500s post-drop); both paths
+      // keep the same existence check and feed childName into the v2 write.
+      let childName: string;
+      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+        const displayName = await getPersonDisplayNameV2(
+          db,
+          input.childProfileId,
         );
+        if (displayName === null) {
+          return forbidden(
+            c,
+            'Not authorized to request consent for this profile',
+          );
+        }
+        childName = displayName;
+      } else {
+        const childProfile = await getProfile(
+          db,
+          input.childProfileId,
+          account.id,
+        );
+        if (!childProfile) {
+          return forbidden(
+            c,
+            'Not authorized to request consent for this profile',
+          );
+        }
+        childName = childProfile.displayName ?? 'your child';
       }
 
       // [BUG-791] Account ownership alone is insufficient — gate on the active
@@ -368,7 +413,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             chargePersonId: input.childProfileId,
             organizationId: account.id,
             consentType: input.consentType,
-            childName: childProfile.displayName ?? 'your child',
+            childName,
             appUrl: apiOrigin,
             emailOptions: {
               resendApiKey: c.env.RESEND_API_KEY,

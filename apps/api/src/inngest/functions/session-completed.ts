@@ -1557,6 +1557,7 @@ export const sessionCompleted = inngest.createFunction(
               subjectRow?.name ?? null,
               'inferred',
               subjectId,
+              { identityV2Enabled: isIdentityV2EnabledInStep() },
             );
 
             // FR247.6 — struggle pushes to the parent, sent at the source so
