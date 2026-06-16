@@ -7,6 +7,7 @@ import {
   curriculumTopics,
   learningSessions,
   learningModes,
+  membership,
   needsDeepeningTopics,
   notificationPreferences,
   parkingLotItems,
@@ -15,6 +16,7 @@ import {
   sessionSummaries,
   streaks,
   subjects,
+  subscription as subscriptionV2,
   subscriptions,
   teachingPreferences,
   topicNotes,
@@ -27,6 +29,10 @@ import {
   type TestJWTClaims,
 } from './test-keys';
 import { createIntegrationDb } from './helpers';
+
+function isIdentityV2Enabled(): boolean {
+  return process.env.IDENTITY_V2_ENABLED === 'true';
+}
 
 type AppLike = {
   request: (
@@ -122,6 +128,25 @@ export async function createProfileViaRoute(input: {
   // child profiles, etc.), so we resolve it from the DB after creation —
   // never re-introducing accountId into the wire response.
   const db = createIntegrationDb();
+
+  // [WI-586] Flag-ON the create route builds only the v2 identity graph
+  // (organization/person/login/membership) — NO legacy `profiles`/`accounts`
+  // row exists, and the close-gate DB has those tables dropped. The legacy
+  // accountId is `organization.id` by the reseed (identity-resolve.ts), so
+  // resolve it via membership for the created person (person.id == profile.id).
+  if (isIdentityV2Enabled()) {
+    const membershipRow = await db.query.membership.findFirst({
+      where: eq(membership.personId, apiProfile.id),
+      columns: { organizationId: true },
+    });
+    if (!membershipRow) {
+      throw new Error(
+        `createProfileViaRoute: membership for person ${apiProfile.id} not found in DB after create`,
+      );
+    }
+    return { ...apiProfile, accountId: membershipRow.organizationId };
+  }
+
   const row = await db.query.profiles.findFirst({
     where: eq(profiles.id, apiProfile.id),
     columns: { accountId: true },
@@ -140,6 +165,29 @@ export async function setSubscriptionTierForProfile(
   status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired' = 'active',
 ): Promise<void> {
   const db = createIntegrationDb();
+
+  // [WI-586] Flag-ON resolve the org via membership (person.id == profileId)
+  // and update the v2 `subscription` table (keyed by organizationId). The
+  // legacy `subscriptions` table is dropped in the close-gate DB.
+  if (isIdentityV2Enabled()) {
+    const membershipRow = await db.query.membership.findFirst({
+      where: eq(membership.personId, profileId),
+      columns: { organizationId: true },
+    });
+    if (!membershipRow) {
+      throw new Error(`Membership not found for tier seed: ${profileId}`);
+    }
+    await db
+      .update(subscriptionV2)
+      .set({
+        planTier: tier,
+        status,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptionV2.organizationId, membershipRow.organizationId));
+    return;
+  }
+
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
     columns: { accountId: true },
