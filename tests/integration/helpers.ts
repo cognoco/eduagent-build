@@ -2,6 +2,7 @@ import { inArray } from 'drizzle-orm';
 import {
   accounts,
   createDatabase,
+  guardianship,
   login,
   membership,
   organization,
@@ -61,13 +62,13 @@ export async function cleanupAccounts(input: {
 
   // [WI-586] Flag-ON the close-gate DB is committed-migrations-only (M-DROP
   // applied), so the legacy `accounts` table does not exist. Flag-ON the
-  // identity graph is person/organization/login/membership; resolve the
-  // affected persons via `login` (which carries the same email/clerkUserId
-  // keys) and delete the graph. `person`-rooted FK cascades remove login,
-  // membership, guardianship, and quota/subscription children; organizations
-  // are removed explicitly via the membership edge.
+  // identity graph is person/organization/login/membership/guardianship.
+  // Resolve the seeded owner via `login` (same email/clerkUserId keys), expand
+  // to ALL persons in their organizations (children have no login row), then
+  // tear the graph down in FK-safe order: guardianship edges (onDelete RESTRICT
+  // on person) first, then person (cascades login/membership), then the org.
   if (isIdentityV2Enabled()) {
-    const personIds = new Set<string>();
+    const ownerPersonIds = new Set<string>();
     const orgIds = new Set<string>();
 
     if (input.emails && input.emails.length > 0) {
@@ -75,29 +76,46 @@ export async function cleanupAccounts(input: {
         where: inArray(login.email, input.emails),
         columns: { personId: true },
       });
-      rows.forEach((row) => personIds.add(row.personId));
+      rows.forEach((row) => ownerPersonIds.add(row.personId));
     }
     if (input.clerkUserIds && input.clerkUserIds.length > 0) {
       const rows = await db.query.login.findMany({
         where: inArray(login.clerkUserId, input.clerkUserIds),
         columns: { personId: true },
       });
-      rows.forEach((row) => personIds.add(row.personId));
+      rows.forEach((row) => ownerPersonIds.add(row.personId));
     }
 
-    if (personIds.size === 0) {
+    if (ownerPersonIds.size === 0) {
       return;
     }
 
-    // Collect the organizations these persons belong to so we can remove the
-    // org containers after the person-rooted cascade clears the memberships.
-    const membershipRows = await db.query.membership.findMany({
-      where: inArray(membership.personId, [...personIds]),
+    // Resolve the orgs the seeded owners belong to.
+    const ownerMemberships = await db.query.membership.findMany({
+      where: inArray(membership.personId, [...ownerPersonIds]),
       columns: { organizationId: true },
     });
-    membershipRows.forEach((row) => orgIds.add(row.organizationId));
+    ownerMemberships.forEach((row) => orgIds.add(row.organizationId));
 
-    await db.delete(person).where(inArray(person.id, [...personIds]));
+    // Expand to every person in those orgs (children have no login row).
+    const allPersonIds = new Set<string>([...ownerPersonIds]);
+    if (orgIds.size > 0) {
+      const orgMemberships = await db.query.membership.findMany({
+        where: inArray(membership.organizationId, [...orgIds]),
+        columns: { personId: true },
+      });
+      orgMemberships.forEach((row) => allPersonIds.add(row.personId));
+    }
+
+    const personIdList = [...allPersonIds];
+    // guardianship FK to person is onDelete RESTRICT — remove edges first.
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.guardianPersonId, personIdList));
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.chargePersonId, personIdList));
+    await db.delete(person).where(inArray(person.id, personIdList));
     if (orgIds.size > 0) {
       await db
         .delete(organization)

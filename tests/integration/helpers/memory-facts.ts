@@ -4,12 +4,20 @@ import {
   createDatabase,
   generateUUIDv7,
   learningProfiles,
+  login,
+  membership,
   memoryFacts,
+  organization,
+  person,
   profiles,
   type Database,
 } from '@eduagent/database';
 
 import { buildBackfillRowsForProfile } from '../../../apps/api/src/services/memory/backfill-mapping';
+
+function isIdentityV2Enabled(): boolean {
+  return process.env.IDENTITY_V2_ENABLED === 'true';
+}
 
 const seededAccountIds = new Set<string>();
 
@@ -25,7 +33,21 @@ export async function setupTestDb(): Promise<{
     db,
     cleanup: async () => {
       for (const accountId of seededAccountIds) {
-        await db.delete(accounts).where(eq(accounts.id, accountId));
+        if (isIdentityV2Enabled()) {
+          // [WI-586] Flag-ON the seed builds the v2 graph (organization.id ==
+          // accountId). Resolve the org's persons via membership, delete them
+          // (cascades login/membership/learning_profiles), then drop the org.
+          const memberRows = await db.query.membership.findMany({
+            where: eq(membership.organizationId, accountId),
+            columns: { personId: true },
+          });
+          for (const row of memberRows) {
+            await db.delete(person).where(eq(person.id, row.personId));
+          }
+          await db.delete(organization).where(eq(organization.id, accountId));
+        } else {
+          await db.delete(accounts).where(eq(accounts.id, accountId));
+        }
         seededAccountIds.delete(accountId);
       }
     },
@@ -45,23 +67,54 @@ export type LearningProfileFixture = {
 
 export async function seedLearningProfile(
   db: Database,
-  fixture: LearningProfileFixture = {}
+  fixture: LearningProfileFixture = {},
 ): Promise<{ profileId: string; accountId: string }> {
   const profileId = generateUUIDv7();
   const accountId = generateUUIDv7();
-  await db.insert(accounts).values({
-    id: accountId,
-    clerkUserId: `integration-memory-${accountId}`,
-    email: `memory-${accountId}@integration.test`,
-  });
-  seededAccountIds.add(accountId);
-  await db.insert(profiles).values({
-    id: profileId,
-    accountId,
-    displayName: 'Memory Fixture',
-    birthYear: 2012,
-    isOwner: false,
-  });
+
+  // [WI-586] Flag-ON the close-gate DB is committed-migrations-only (M-DROP
+  // applied): legacy accounts/profiles are gone and learning_profiles.profile_id
+  // FKs `person` (repointed by M-REPOINT). Seed the v2 graph instead, with the
+  // reseed alignment organization.id == accountId, person.id == profileId, so
+  // learning_profiles(profileId) resolves against person.
+  if (isIdentityV2Enabled()) {
+    await db.insert(organization).values({
+      id: accountId,
+      name: `Memory org ${accountId.slice(0, 8)}`,
+    });
+    await db.insert(person).values({
+      id: profileId,
+      displayName: 'Memory Fixture',
+      birthDate: '2012-01-01',
+      residenceJurisdiction: 'US',
+    });
+    await db.insert(login).values({
+      personId: profileId,
+      clerkUserId: `integration-memory-${accountId}`,
+      email: `memory-${accountId}@integration.test`,
+    });
+    await db.insert(membership).values({
+      personId: profileId,
+      organizationId: accountId,
+      roles: ['learner'],
+    });
+    seededAccountIds.add(accountId);
+  } else {
+    await db.insert(accounts).values({
+      id: accountId,
+      clerkUserId: `integration-memory-${accountId}`,
+      email: `memory-${accountId}@integration.test`,
+    });
+    seededAccountIds.add(accountId);
+    await db.insert(profiles).values({
+      id: profileId,
+      accountId,
+      displayName: 'Memory Fixture',
+      birthYear: 2012,
+      isOwner: false,
+    });
+  }
+
   await db.insert(learningProfiles).values({
     profileId,
     interests: fixture.interests ?? [],
@@ -78,7 +131,7 @@ export async function seedLearningProfile(
 
 export async function runBackfillForOneProfile(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<void> {
   const profile = await db.query.learningProfiles.findFirst({
     where: eq(learningProfiles.profileId, profileId),
@@ -88,8 +141,8 @@ export async function runBackfillForOneProfile(
   if (built.malformed.length > 0) {
     throw new Error(
       `Malformed memory-facts backfill for ${profileId}: ${JSON.stringify(
-        built.malformed
-      )}`
+        built.malformed,
+      )}`,
     );
   }
   await db.transaction(async (tx) => {
@@ -106,7 +159,7 @@ export async function runBackfillForOneProfile(
 
 export async function runInngestFunction<T>(
   fn: T,
-  event: { name: string; data: unknown }
+  event: { name: string; data: unknown },
 ): Promise<unknown> {
   const step = {
     run: async (_name: string, callback: () => Promise<unknown>) => callback(),
