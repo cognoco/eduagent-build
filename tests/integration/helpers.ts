@@ -1,12 +1,15 @@
 import { inArray } from 'drizzle-orm';
 import {
   accounts,
+  consentGrant,
   createDatabase,
   guardianship,
   login,
   membership,
   organization,
   person,
+  subscription,
+  supportership,
 } from '@eduagent/database';
 
 function isIdentityV2Enabled(): boolean {
@@ -46,6 +49,14 @@ export function buildIntegrationEnv(
     CLERK_AUDIENCE: INTEGRATION_TEST_AUDIENCE,
     APP_URL: 'https://app.mentomate.test',
     API_ORIGIN: 'https://api.integration.test',
+    // [WI-586] Routes read the identity-v2 flag from the per-request env
+    // (`c.env.IDENTITY_V2_ENABLED`), not process.env. Propagate the process-level
+    // flag (set job-level by the flag-ON CI lane) into the request env so the
+    // HTTP-route surface exercises the v2 path flag-ON. Mirror the value (do NOT
+    // force 'true') so the flag-OFF default lane keeps the legacy path.
+    ...(process.env.IDENTITY_V2_ENABLED !== undefined
+      ? { IDENTITY_V2_ENABLED: process.env.IDENTITY_V2_ENABLED }
+      : {}),
     ...overrides,
   };
 }
@@ -108,18 +119,51 @@ export async function cleanupAccounts(input: {
     }
 
     const personIdList = [...allPersonIds];
-    // guardianship FK to person is onDelete RESTRICT — remove edges first.
+    const orgIdList = [...orgIds];
+    // [WI-586] FK-safe teardown order. The owner-bootstrap (createIdentityGraph)
+    // now provisions a subscription (payer_person_id → person, organization_id →
+    // organization, both onDelete RESTRICT) plus its cascade children. consent
+    // grants and supportership edges are also RESTRICT on person. Every RESTRICT
+    // edge into person/organization must be cleared before the person/org delete.
+    //
+    // Order:
+    //   1. guardianship edges (RESTRICT on person, both directions)
+    //   2. consent_grant     (RESTRICT on person AND organization)
+    //   3. supportership     (RESTRICT on person, both directions)
+    //   4. subscription      (RESTRICT on person AND organization; CASCADE its
+    //                         own children — quota_pools, profile_quota_usage,
+    //                         subscription_payers, top_up_credits, usage_events)
+    //   5. person            (CASCADE login, membership)
+    //   6. organization
     await db
       .delete(guardianship)
       .where(inArray(guardianship.guardianPersonId, personIdList));
     await db
       .delete(guardianship)
       .where(inArray(guardianship.chargePersonId, personIdList));
-    await db.delete(person).where(inArray(person.id, personIdList));
-    if (orgIds.size > 0) {
+    await db
+      .delete(supportership)
+      .where(inArray(supportership.supporterPersonId, personIdList));
+    await db
+      .delete(supportership)
+      .where(inArray(supportership.supporteePersonId, personIdList));
+    await db
+      .delete(consentGrant)
+      .where(inArray(consentGrant.chargePersonId, personIdList));
+    if (orgIdList.length > 0) {
       await db
-        .delete(organization)
-        .where(inArray(organization.id, [...orgIds]));
+        .delete(consentGrant)
+        .where(inArray(consentGrant.organizationId, orgIdList));
+      await db
+        .delete(subscription)
+        .where(inArray(subscription.organizationId, orgIdList));
+    }
+    await db
+      .delete(subscription)
+      .where(inArray(subscription.payerPersonId, personIdList));
+    await db.delete(person).where(inArray(person.id, personIdList));
+    if (orgIdList.length > 0) {
+      await db.delete(organization).where(inArray(organization.id, orgIdList));
     }
     return;
   }

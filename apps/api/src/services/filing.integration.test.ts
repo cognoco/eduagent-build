@@ -11,8 +11,8 @@
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
+  // [WI-586] drop-4: accounts/profiles removed; seeding via person (v2).
+  person,
   subjects,
   curricula,
   curriculumBooks,
@@ -63,40 +63,37 @@ let seedCounter = 0;
 // Seed helpers
 // ---------------------------------------------------------------------------
 
+// Tracked person IDs for cleanup (person delete cascades membership+subjects).
+const seededPersonIds: string[] = [];
+
+// [WI-586] drop-4: seed a person row (v2 replacement for account+profile).
+// Filing service only uses profileId (person.id) — no org/membership needed.
 async function seedAccountAndProfile() {
   const db = createIntegrationDb();
-  const idx = ++seedCounter;
-  const clerkUserId = `${PREFIX}-${RUN_ID}-${idx}`;
-  const email = `${PREFIX}-${RUN_ID}-${idx}@integration.test`;
+  ++seedCounter;
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning();
-
-  const [profile] = await db
-    .insert(profiles)
+  const [p] = await db
+    .insert(person)
     .values({
-      accountId: account!.id,
       displayName: 'Filing Test User',
-      birthYear: 2000,
-      isOwner: true,
+      birthDate: '2000-01-01',
+      residenceJurisdiction: 'EU',
     })
     .returning();
 
-  return { account: account!, profile: profile! };
+  seededPersonIds.push(p!.id);
+
+  // Return shape mirrors the legacy shape so all call sites continue to use
+  // `profile.id` as the profileId (person.id == former profile.id role).
+  return { account: { id: p!.id }, profile: p! };
 }
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const found = await db.query.accounts.findMany({
-    where: (accounts, { like }) =>
-      like(accounts.clerkUserId, `${PREFIX}-${RUN_ID}-%`),
-  });
-  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
-  if (ids.length > 0) {
-    // CASCADE deletes profiles → subjects → curricula → books → topics
-    await db.delete(accounts).where(inArray(accounts.id, ids));
+  if (seededPersonIds.length > 0) {
+    // CASCADE on person removes membership, subjects → curricula → books → topics.
+    await db.delete(person).where(inArray(person.id, seededPersonIds));
+    seededPersonIds.length = 0;
   }
 }
 

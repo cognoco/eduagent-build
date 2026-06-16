@@ -1,18 +1,19 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   assessments,
-  consentStates,
+  consentGrant,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
-  familyLinks,
   generateUUIDv7,
+  guardianship,
   learningSessions,
+  membership,
+  organization,
+  person,
   progressSnapshots,
-  profiles,
   retentionCards,
   sessionEvents,
   sessionSummaries,
@@ -22,7 +23,7 @@ import {
   xpLedger,
 } from '@eduagent/database';
 import type { ProgressMetrics, TopicProgress } from '@eduagent/schemas';
-import { like } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
   buildChildProgressSummariesBatch,
@@ -43,6 +44,8 @@ let db: Database;
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
+const personIds: string[] = [];
+const orgIds: string[] = [];
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -125,34 +128,45 @@ async function seedProfile(input: {
   displayName: string;
   birthYear?: number;
   isOwner?: boolean;
-}): Promise<{ accountId: string; profileId: string }> {
-  const idx = ++seedCounter;
-  const clerkUserId = `clerk_dashboard_${RUN_ID}_${idx}`;
-  const email = `dashboard-${RUN_ID}-${idx}@test.invalid`;
+}): Promise<{ orgId: string; profileId: string }> {
+  ++seedCounter;
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
+  const [org] = await db
+    .insert(organization)
+    .values({ name: `Dashboard Test Org ${RUN_ID}_${seedCounter}` })
+    .returning({ id: organization.id });
+  orgIds.push(org!.id);
 
-  const [profile] = await db
-    .insert(profiles)
+  const birthYear = input.birthYear ?? 2010;
+  const [p] = await db
+    .insert(person)
     .values({
-      accountId: account!.id,
       displayName: input.displayName,
-      birthYear: input.birthYear ?? 2010,
-      isOwner: input.isOwner ?? true,
+      birthDate: `${birthYear}-01-01`,
+      residenceJurisdiction: 'EU',
     })
-    .returning({ id: profiles.id });
+    .returning({ id: person.id });
+  personIds.push(p!.id);
 
-  return { accountId: account!.id, profileId: profile!.id };
+  await db.insert(membership).values({
+    personId: p!.id,
+    organizationId: org!.id,
+    roles: (input.isOwner ?? true) ? ['admin'] : ['learner'],
+  });
+
+  return { orgId: org!.id, profileId: p!.id };
 }
 
 async function seedFamilyLink(
   parentProfileId: string,
   childProfileId: string,
 ): Promise<void> {
-  await db.insert(familyLinks).values({ parentProfileId, childProfileId });
+  await db
+    .insert(guardianship)
+    .values({
+      guardianPersonId: parentProfileId,
+      chargePersonId: childProfileId,
+    });
 }
 
 async function seedSubject(input: {
@@ -454,28 +468,52 @@ async function seedXpLedgerEntry(input: {
 
 async function seedConsentState(input: {
   profileId: string;
+  orgId: string;
   status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN';
   respondedAt?: Date | null;
 }): Promise<void> {
-  await db.insert(consentStates).values({
-    profileId: input.profileId,
-    consentType: 'GDPR',
-    status: input.status,
-    respondedAt: input.respondedAt ?? null,
+  if (
+    input.status === 'PENDING' ||
+    input.status === 'PARENTAL_CONSENT_REQUESTED'
+  ) {
+    return; // absence of a consent_grant row = not consented
+  }
+  await db.insert(consentGrant).values({
+    chargePersonId: input.profileId,
+    organizationId: input.orgId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: input.status === 'CONSENTED',
+    grantedAt: new Date(),
+    withdrawnAt: input.status === 'WITHDRAWN' ? new Date() : undefined,
   });
 }
 
 async function seedConsentStateWithType(input: {
   profileId: string;
+  orgId: string;
   consentType: 'GDPR' | 'COPPA';
   status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN';
   respondedAt?: Date | null;
 }): Promise<void> {
-  await db.insert(consentStates).values({
-    profileId: input.profileId,
-    consentType: input.consentType,
-    status: input.status,
-    respondedAt: input.respondedAt ?? null,
+  if (
+    input.status === 'PENDING' ||
+    input.status === 'PARENTAL_CONSENT_REQUESTED'
+  ) {
+    return; // absence of a consent_grant row = not consented
+  }
+  const lawfulBasis =
+    input.consentType === 'GDPR'
+      ? 'gdpr_parental_consent'
+      : 'coppa_parental_consent';
+  await db.insert(consentGrant).values({
+    chargePersonId: input.profileId,
+    organizationId: input.orgId,
+    purpose: 'platform_use',
+    lawfulBasis,
+    granted: input.status === 'CONSENTED',
+    grantedAt: new Date(),
+    withdrawnAt: input.status === 'WITHDRAWN' ? new Date() : undefined,
   });
 }
 
@@ -489,9 +527,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `clerk_dashboard_${RUN_ID}%`));
+  for (const pid of personIds) {
+    await db.delete(guardianship).where(eq(guardianship.guardianPersonId, pid));
+    await db.delete(guardianship).where(eq(guardianship.chargePersonId, pid));
+    await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
+    await db.delete(membership).where(eq(membership.personId, pid));
+    await db.delete(person).where(eq(person.id, pid));
+  }
+  for (const oid of orgIds) {
+    await db.delete(organization).where(eq(organization.id, oid));
+  }
 });
 
 describe('dashboard service integration', () => {
@@ -859,7 +904,9 @@ describe('dashboard service integration', () => {
       }),
     });
 
-    const children = await getChildrenForParent(db, parentProfileId);
+    const children = await getChildrenForParent(db, parentProfileId, {
+      identityV2Enabled: true,
+    });
 
     expect(children).toHaveLength(1);
     expect(children[0]).toEqual(
@@ -920,13 +967,15 @@ describe('dashboard service integration', () => {
         displayName: 'Parent',
         birthYear: 1985,
       });
-      const { profileId: childProfileId } = await seedProfile({
-        displayName: `${status} Learner`,
-        birthYear: 2012,
-      });
+      const { profileId: childProfileId, orgId: childOrgId } =
+        await seedProfile({
+          displayName: `${status} Learner`,
+          birthYear: 2012,
+        });
       await seedFamilyLink(parentProfileId, childProfileId);
       await seedConsentState({
         profileId: childProfileId,
+        orgId: childOrgId,
         status,
       });
 
@@ -948,8 +997,12 @@ describe('dashboard service integration', () => {
         longestStreak: 7,
       });
 
-      const children = await getChildrenForParent(db, parentProfileId);
-      const detail = await getChildDetail(db, parentProfileId, childProfileId);
+      const children = await getChildrenForParent(db, parentProfileId, {
+        identityV2Enabled: true,
+      });
+      const detail = await getChildDetail(db, parentProfileId, childProfileId, {
+        identityV2Enabled: true,
+      });
 
       expect(children).toHaveLength(1);
       for (const child of [children[0], detail]) {
@@ -987,13 +1040,14 @@ describe('dashboard service integration', () => {
       displayName: 'Parent',
       birthYear: 1985,
     });
-    const { profileId: childProfileId } = await seedProfile({
+    const { profileId: childProfileId, orgId: childOrgId } = await seedProfile({
       displayName: 'Active Learner',
       birthYear: 2012,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedConsentState({
       profileId: childProfileId,
+      orgId: childOrgId,
       status: 'CONSENTED',
     });
 
@@ -1015,7 +1069,9 @@ describe('dashboard service integration', () => {
       longestStreak: 7,
     });
 
-    const children = await getChildrenForParent(db, parentProfileId);
+    const children = await getChildrenForParent(db, parentProfileId, {
+      identityV2Enabled: true,
+    });
 
     expect(children).toHaveLength(1);
     expect(children[0]).toEqual(
@@ -1047,19 +1103,22 @@ describe('dashboard service integration', () => {
       displayName: 'Parent',
       birthYear: 1985,
     });
-    const { profileId: childProfileId } = await seedProfile({
+    const { profileId: childProfileId, orgId: childOrgId } = await seedProfile({
       displayName: 'Withdrawn Learner',
       birthYear: 2012,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedConsentState({
       profileId: childProfileId,
+      orgId: childOrgId,
       status: 'WITHDRAWN',
       respondedAt: new Date(),
     });
 
     await expect(
-      getChildSessions(db, parentProfileId, childProfileId),
+      getChildSessions(db, parentProfileId, childProfileId, {
+        identityV2Enabled: true,
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -1091,7 +1150,9 @@ describe('dashboard service integration', () => {
       wallClockSeconds: 540,
     });
 
-    const detail = await getChildDetail(db, parentProfileId, childProfileId);
+    const detail = await getChildDetail(db, parentProfileId, childProfileId, {
+      identityV2Enabled: true,
+    });
 
     expect(detail).toEqual(
       expect.objectContaining({
@@ -1102,7 +1163,9 @@ describe('dashboard service integration', () => {
     );
 
     await expect(
-      getChildDetail(db, strangerParentId, childProfileId),
+      getChildDetail(db, strangerParentId, childProfileId, {
+        identityV2Enabled: true,
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -1170,6 +1233,7 @@ describe('dashboard service integration', () => {
       parentProfileId,
       childProfileId,
       subjectId,
+      { identityV2Enabled: true },
     );
 
     const plantCells = topics.find(
@@ -1272,12 +1336,14 @@ describe('dashboard service integration', () => {
       db,
       parentProfileId,
       childProfileId,
+      { identityV2Enabled: true },
     );
     const detail = await getChildSessionDetail(
       db,
       parentProfileId,
       childProfileId,
       learningSessionId,
+      { identityV2Enabled: true },
     );
 
     expect(sessions).toHaveLength(2);
@@ -1388,6 +1454,7 @@ describe('dashboard service integration', () => {
       db,
       parentProfileId,
       childProfileId,
+      { identityV2Enabled: true },
     );
 
     expect(sessions.length).toBeGreaterThanOrEqual(2);
@@ -1452,6 +1519,7 @@ describe('dashboard service integration', () => {
       parentProfileId,
       childProfileId,
       sessionId,
+      { identityV2Enabled: true },
     );
 
     expect(detail).not.toBeNull();
@@ -1509,6 +1577,7 @@ describe('dashboard service integration', () => {
       parentProfileId,
       childProfileId,
       sessionId,
+      { identityV2Enabled: true },
     );
 
     expect(detail).not.toBeNull();
@@ -1553,6 +1622,7 @@ describe('dashboard service integration', () => {
       parentProfileId,
       childProfileId,
       sessionId,
+      { identityV2Enabled: true },
     );
 
     expect(detail).toBeNull();
@@ -1600,6 +1670,7 @@ describe('dashboard service integration', () => {
       db,
       parentProfileId,
       childProfileId,
+      { identityV2Enabled: true },
     );
     const session = sessions.find((entry) => entry.sessionId === sessionId);
 
@@ -1677,6 +1748,7 @@ describe('dashboard service integration', () => {
       parentProfileId,
       childProfileId,
       sessionId,
+      { identityV2Enabled: true },
     );
 
     expect(detail).not.toBeNull();
@@ -1736,8 +1808,12 @@ describe('dashboard service integration', () => {
       exchangeCount: 7,
     });
 
-    const childrenForParentA = await getChildrenForParent(db, parentA);
-    const childrenForParentB = await getChildrenForParent(db, parentB);
+    const childrenForParentA = await getChildrenForParent(db, parentA, {
+      identityV2Enabled: true,
+    });
+    const childrenForParentB = await getChildrenForParent(db, parentB, {
+      identityV2Enabled: true,
+    });
 
     // Parent A sees ONLY Child A
     expect(childrenForParentA).toHaveLength(1);
@@ -1770,7 +1846,9 @@ describe('dashboard service integration', () => {
     // No family link between unrelatedParent and targetChild.
 
     await expect(
-      getChildDetail(db, unrelatedParent, targetChild),
+      getChildDetail(db, unrelatedParent, targetChild, {
+        identityV2Enabled: true,
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -1787,7 +1865,9 @@ describe('dashboard service integration', () => {
     // No family link.
 
     await expect(
-      getChildSessions(db, unrelatedParent, innocentChild),
+      getChildSessions(db, unrelatedParent, innocentChild, {
+        identityV2Enabled: true,
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -1797,7 +1877,9 @@ describe('dashboard service integration', () => {
       birthYear: 1985,
     });
     // No family links seeded.
-    const children = await getChildrenForParent(db, loneParent);
+    const children = await getChildrenForParent(db, loneParent, {
+      identityV2Enabled: true,
+    });
     expect(children).toEqual([]);
   });
 
@@ -1846,7 +1928,9 @@ describe('dashboard service integration', () => {
       },
     });
 
-    const children = await getChildrenForParent(db, parentProfileId);
+    const children = await getChildrenForParent(db, parentProfileId, {
+      identityV2Enabled: true,
+    });
 
     expect(children).toHaveLength(1);
     // Both session types must be counted in the this-week tally
@@ -1966,15 +2050,17 @@ describe('dashboard service integration', () => {
     const { profileId: parentProfileId } = await seedProfile({
       displayName: 'BUG466-Parent',
     });
-    const { profileId: childProfileId } = await seedProfile({
-      displayName: 'BUG466-Child',
-      isOwner: false,
-    });
+    const { profileId: childProfileId, orgId: childOrgId466 } =
+      await seedProfile({
+        displayName: 'BUG466-Child',
+        isOwner: false,
+      });
     await seedFamilyLink(parentProfileId, childProfileId);
 
     // Older GDPR row: CONSENTED (the correct status to return)
     await seedConsentStateWithType({
       profileId: childProfileId,
+      orgId: childOrgId466,
       consentType: 'GDPR',
       status: 'CONSENTED',
       respondedAt: subtractDays(new Date(), 10),
@@ -1983,6 +2069,7 @@ describe('dashboard service integration', () => {
     // Newer non-GDPR row (COPPA): WITHDRAWN — must NOT win
     await seedConsentStateWithType({
       profileId: childProfileId,
+      orgId: childOrgId466,
       consentType: 'COPPA',
       status: 'WITHDRAWN',
       respondedAt: subtractDays(new Date(), 1),
@@ -1998,7 +2085,9 @@ describe('dashboard service integration', () => {
       metrics: buildProgressMetrics({ topicsMastered: 3 }),
     });
 
-    const children = await getChildrenForParent(db, parentProfileId);
+    const children = await getChildrenForParent(db, parentProfileId, {
+      identityV2Enabled: true,
+    });
 
     expect(children).toHaveLength(1);
     // GDPR row (CONSENTED) must be the source of truth.
@@ -2016,15 +2105,17 @@ describe('dashboard service integration', () => {
     const { profileId: parentProfileId } = await seedProfile({
       displayName: 'BUG465-Parent',
     });
-    const { profileId: childProfileId } = await seedProfile({
-      displayName: 'BUG465-Child',
-      isOwner: false,
-    });
+    const { profileId: childProfileId, orgId: childOrgId465 } =
+      await seedProfile({
+        displayName: 'BUG465-Child',
+        isOwner: false,
+      });
     await seedFamilyLink(parentProfileId, childProfileId);
 
     // Older GDPR row: CONSENTED
     await seedConsentStateWithType({
       profileId: childProfileId,
+      orgId: childOrgId465,
       consentType: 'GDPR',
       status: 'CONSENTED',
       respondedAt: subtractDays(new Date(), 10),
@@ -2033,6 +2124,7 @@ describe('dashboard service integration', () => {
     // Newer non-GDPR row (COPPA): WITHDRAWN — must NOT win
     await seedConsentStateWithType({
       profileId: childProfileId,
+      orgId: childOrgId465,
       consentType: 'COPPA',
       status: 'WITHDRAWN',
       respondedAt: subtractDays(new Date(), 1),
@@ -2043,7 +2135,9 @@ describe('dashboard service integration', () => {
       name: 'BUG465-Science',
     });
 
-    const detail = await getChildDetail(db, parentProfileId, childProfileId);
+    const detail = await getChildDetail(db, parentProfileId, childProfileId, {
+      identityV2Enabled: true,
+    });
 
     expect(detail).not.toBeNull();
     // GDPR row (CONSENTED) must win — child data must be accessible
