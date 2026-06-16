@@ -29,7 +29,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
@@ -43,6 +43,10 @@ import {
   type Database,
 } from '@eduagent/database';
 import { getChildrenForParent } from '../dashboard';
+import {
+  notifyParentToSubscribe,
+  sendStruggleNotification,
+} from '../notifications';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -232,6 +236,125 @@ const RUN = !!process.env.DATABASE_URL;
 
         expect(childrenForA.every((c) => c.profileId !== chargeOfB)).toBe(true);
         expect(childrenForA).toHaveLength(0);
+      },
+    );
+
+    // -------------------------------------------------------------------------
+    // [BREAK / FLAG-ON] Cross-ORG IDOR: a guardianship edge that crosses an org
+    // boundary must NOT leak the charge into the guardian's dashboard. This is
+    // the negative-path break test for the same-org membership filter
+    // (dashboard.ts: `eq(membership.organizationId, guardianOrgId)`).
+    //
+    // Seed: guardianA in org1; chargeInOrg2 is a member of org2 ONLY; an active
+    // guardianship edge exists (guardianA → chargeInOrg2). Without the org
+    // filter, getChildPersonIdsForParentV2 would return chargeInOrg2 globally
+    // and the dashboard would expose it. With the filter, guardianA's org (org1)
+    // does not contain chargeInOrg2's membership, so it is excluded.
+    // -------------------------------------------------------------------------
+    it(
+      '[BREAK / FLAG-ON] excludes a cross-ORG charge even with an active ' +
+        'guardianship edge (org-membership filter holds)',
+      async () => {
+        const org1 = await seedOrg();
+        const org2 = await seedOrg();
+        const guardianA = await seedPerson(org1, {
+          displayName: 'GuardianA-org1',
+          roles: ['admin'],
+        });
+        const chargeInOrg2 = await seedPerson(org2, {
+          displayName: 'ChargeInOrg2',
+          roles: ['learner'],
+        });
+
+        await seedLegacyProfile(chargeInOrg2, 'ChargeInOrg2');
+        // Active guardianship edge that crosses the org boundary.
+        await grantGuardianshipEdge(guardianA, chargeInOrg2);
+
+        const childrenForA = await getChildrenForParent(db, guardianA, {
+          identityV2Enabled: true,
+        });
+
+        expect(childrenForA.every((c) => c.profileId !== chargeInOrg2)).toBe(
+          true,
+        );
+        expect(childrenForA).toHaveLength(0);
+      },
+    );
+
+    // -------------------------------------------------------------------------
+    // [FLAG-ON] Notification guardianship seam (WI-802 SHOULD-FIX coverage).
+    //
+    // notifyParentToSubscribe + sendStruggleNotification both gained a flag-on
+    // branch that resolves the parent via `guardianship` (getGuardianPersonIds)
+    // instead of `family_links`. These tests prove the v2 branch RESOLVES the
+    // guardian (does not fall through to `no_parent_link`, and never reads
+    // `family_links`) when only a guardianship edge exists.
+    //
+    // We assert on the resolution outcome, not the downstream push/email side
+    // effects: any terminal reason OTHER than `no_parent_link` proves the
+    // guardian was found via guardianship. (sendPushNotification / sendEmail are
+    // external boundaries exercised elsewhere; this test isolates the v2 seam.)
+    // -------------------------------------------------------------------------
+    it(
+      '[FLAG-ON] sendStruggleNotification resolves the guardian via guardianship ' +
+        '(no family_links read — WI-802)',
+      async () => {
+        const orgId = await seedOrg();
+        const guardianPersonId = await seedPerson(orgId, {
+          displayName: 'ParentStruggle',
+          roles: ['admin'],
+        });
+        const chargePersonId = await seedPerson(orgId, {
+          displayName: 'ChildStruggle',
+          roles: ['learner'],
+        });
+        await seedLegacyProfile(chargePersonId, 'ChildStruggle');
+        await grantGuardianshipEdge(guardianPersonId, chargePersonId);
+
+        const result = await sendStruggleNotification(
+          db,
+          chargePersonId,
+          { type: 'struggle_noticed', topic: 'fractions', subject: 'Math' },
+          { identityV2Enabled: true },
+        );
+
+        // The guardian WAS resolved via guardianship — so the reason is never
+        // `no_parent_link`. (Downstream it stops at the push-enabled / consent
+        // gates, which is the expected boundary for an un-onboarded seed.)
+        expect(result.sent === false ? result.reason : 'sent').not.toBe(
+          'no_parent_link',
+        );
+      },
+    );
+
+    it(
+      '[FLAG-ON] notifyParentToSubscribe resolves the guardian via guardianship ' +
+        '(no family_links read — WI-802)',
+      async () => {
+        const orgId = await seedOrg();
+        const guardianPersonId = await seedPerson(orgId, {
+          displayName: 'ParentSubscribe',
+          roles: ['admin'],
+        });
+        const chargePersonId = await seedPerson(orgId, {
+          displayName: 'ChildSubscribe',
+          roles: ['learner'],
+        });
+        await seedLegacyProfile(chargePersonId, 'ChildSubscribe');
+        await grantGuardianshipEdge(guardianPersonId, chargePersonId);
+
+        // Must NOT throw `relation "family_links" does not exist` and must NOT
+        // report `no_parent_link` — both would mean the v2 branch failed to
+        // resolve the guardian through guardianship.
+        const result = await notifyParentToSubscribe(
+          db,
+          chargePersonId,
+          undefined,
+          undefined,
+          { identityV2Enabled: true },
+        );
+
+        expect(result.reason).not.toBe('no_parent_link');
       },
     );
   },
