@@ -138,4 +138,64 @@ describe('Integration: RLS policy coverage (H8)', () => {
       qualContainsBothFkCols: true,
     });
   });
+
+  // [WI-794] GUC-key drift guard.
+  //
+  // The predicate-column checks above pass a policy that references the RIGHT
+  // column but reads the WRONG GUC — exactly the family_preferences bug:
+  // migration 0066 wrote `current_setting('app.profile_id')`, a key the app
+  // never sets (it sets ONLY `app.current_profile_id`, via rls.ts
+  // withProfileScope). The mismatched key always resolves to NULL, so
+  // `owner_profile_id = NULL` matches no row → an effective deny-all the moment
+  // RLS is enforced (FORCE ROW LEVEL SECURITY / the planned app_user role
+  // split). Migration 0117 realigns it.
+  //
+  // This is a forward drift-guard for EVERY RLS policy, not just the one fixed
+  // here: a catalog-only assertion (no profiles/FK rows, so it survives the
+  // identity-cutover table drops). Red-green: against a DB with the unpatched
+  // 0066 policy this fails on family_preferences; after 0117 it passes.
+  it('[WI-794] no RLS policy references the legacy app.profile_id GUC key', async () => {
+    const db = createIntegrationDb();
+
+    const rows = await db.execute<{
+      tablename: string;
+      policyname: string;
+      qual: string | null;
+      with_check: string | null;
+    }>(
+      sql`SELECT tablename, policyname, qual, with_check
+          FROM pg_policies
+          WHERE schemaname = 'public'`,
+    );
+
+    // pg_policies renders the GUC as the quoted literal `'app.profile_id'`;
+    // the canonical key renders as `'app.current_profile_id'`, which does NOT
+    // contain `'app.profile_id'` as a substring — so a plain includes() is a
+    // precise legacy-key detector.
+    const usesLegacyGuc = (expr: string | null) =>
+      expr != null && expr.includes("'app.profile_id'");
+
+    const offenders = rows.rows
+      .filter((r) => usesLegacyGuc(r.qual) || usesLegacyGuc(r.with_check))
+      .map((r) => `${r.tablename}.${r.policyname}`);
+
+    expect(offenders).toEqual([]);
+
+    // Pin the fix positively: family_preferences must isolate on the canonical
+    // GUC the app actually sets, in BOTH the USING and WITH CHECK clauses.
+    const fp = rows.rows.filter((r) => r.tablename === 'family_preferences');
+    expect(fp.length).toBeGreaterThan(0);
+    const fpUsesCanonical = fp.some(
+      (r) =>
+        r.qual?.includes("'app.current_profile_id'") === true &&
+        r.with_check?.includes("'app.current_profile_id'") === true,
+    );
+    expect({
+      table: 'family_preferences',
+      usesCanonicalGuc: fpUsesCanonical,
+    }).toEqual({
+      table: 'family_preferences',
+      usesCanonicalGuc: true,
+    });
+  });
 });

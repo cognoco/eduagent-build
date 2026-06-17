@@ -4,11 +4,15 @@
 -- new-model parents. WI-586 convergence runbook §4 step 6 (INSIDE the freeze
 -- window, BEFORE the flip). Pairs with m-drop.sql (§4 step 8).
 --
--- STATUS: INERT DRAFT. This file lives under _wip/ deliberately — it is NOT in
--- apps/api/drizzle/, so drizzle-kit migrate never sees it and it cannot
--- auto-apply on a deploy. At the freeze it is promoted to the next free
--- migration number (e.g. 0117_m_repoint.sql) per cutover-plan §1, RE-GENERATED
--- against the frozen catalog (see "catalog-driven" below), reviewed, applied.
+-- STATUS: FREEZE-ONLY DRAFT — NOT AUTO-APPLIED. This file lives in
+-- apps/api/drizzle/_freeze-only/ but is deliberately NOT registered in
+-- meta/_journal.json, so drizzle-kit migrate never sees it and it cannot
+-- auto-apply on a deploy (the `-- @freeze-only` marker on line 1 records this).
+-- At the freeze it is promoted to the next free migration number per
+-- cutover-plan §1, RE-GENERATED against the frozen catalog (see "catalog-driven"
+-- below), reviewed, applied. NOTE: 0117 is now taken by a journaled migration
+-- (0117_fix_family_preferences_rls_guc, WI-794), so m-repoint/m-drop promote to
+-- the next free numbers at freeze (e.g. 0118/0119), NOT 0117/0118.
 --
 -- DESIGN (cutover-plan-2026-06-11 §2.7 — "catalog-authoritative, mapping-driven"):
 --   * The re-point SET is NOT a frozen hand-list. It is computed from the LIVE
