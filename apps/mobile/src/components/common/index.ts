@@ -16,6 +16,7 @@ export { ExplainedRedirect } from './ExplainedRedirect';
 export { LightBulbAnimation } from './LightBulbAnimation';
 export { LoadingMomentOverlay } from './LoadingMomentOverlay';
 export { MagicPenAnimation } from './MagicPenAnimation';
+export { MentorBirthAnimation } from './MentorBirthAnimation';
 export { MentorMascot } from './MentorMascot';
 export { RewardBurst } from './RewardBurst';
 export type { RewardBurstIntensity, RewardBurstVariant } from './RewardBurst';

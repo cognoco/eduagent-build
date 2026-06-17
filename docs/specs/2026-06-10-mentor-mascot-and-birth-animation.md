@@ -27,6 +27,7 @@
 ## 2. The character
 
 Canonical render: [`docs/logo-designs/mentor-mascot/mentor-mascot-locked.svg`](../logo-designs/mentor-mascot/mentor-mascot-locked.svg).
+Animation rig handoff: [`docs/logo-designs/mentor-mascot/octopus_3d_animation_rig.svg`](../logo-designs/mentor-mascot/octopus_3d_animation_rig.svg), with construction guide [`docs/logo-designs/mentor-mascot/octopus_3d_animation_rig_guide_construction.svg`](../logo-designs/mentor-mascot/octopus_3d_animation_rig_guide_construction.svg).
 Code source of truth: `apps/mobile/src/components/common/mentor-mascot-geometry.ts` (`MASCOT_HERO` + `MASCOT_BADGE`), rendered statically by `MentorMascot.tsx`.
 
 **Construction** (the parts that took 13 rounds — violating any of these re-breaks the character):

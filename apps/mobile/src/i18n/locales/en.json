@@ -2187,9 +2187,13 @@
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
       "rowSubject": "Starting with {{subject}}",
+      "rowSubjectNoSubject": "Your first topic is ready",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
+    },
+    "mentorBirth": {
+      "ready": "Your mentor is ready."
     },
     "stepIndicator": {
       "stepOf": "Step {{current}} of {{total}}"

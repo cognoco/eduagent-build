@@ -2116,12 +2116,16 @@
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
       "rowSubject": "Starting with {{subject}}",
+      "rowSubjectNoSubject": "Seu primeiro tópico está pronto",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
     },
     "stepIndicator": {
       "stepOf": "Passo {{current}} de {{total}}"
+    },
+    "mentorBirth": {
+      "ready": "O seu tutor está pronto."
     }
   },
   "parentView": {
