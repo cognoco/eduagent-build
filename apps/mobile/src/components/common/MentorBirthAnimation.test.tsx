@@ -36,6 +36,22 @@ describe('MentorBirthAnimation', () => {
     getByText('Your mentor is ready.');
   });
 
+  it('renders the extracted Octo Mate mascot instead of a redraw', () => {
+    const { getAllByTestId } = render(
+      <MentorBirthAnimation readyLabel="Your mentor is ready." />,
+    );
+
+    const canonicalPaths = getAllByTestId('mentor-birth-canonical-path');
+
+    expect(canonicalPaths).toHaveLength(105);
+    expect(canonicalPaths.some((path) => path.props.fill === '#40A094')).toBe(
+      true,
+    );
+    expect(canonicalPaths.some((path) => path.props.fill === '#AF80EC')).toBe(
+      true,
+    );
+  });
+
   it('calls onComplete when reduced motion is enabled', () => {
     require('react-native-reanimated').useReducedMotion = () => true;
     completeTimingCallbacksSynchronously();

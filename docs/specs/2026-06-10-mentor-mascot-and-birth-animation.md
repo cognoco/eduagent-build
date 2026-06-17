@@ -2,7 +2,7 @@
 
 **Status:** Ratified by product owner in-session · 2026-06-10 · **Branch:** `new-llm` · **Profile:** design/brand
 **Source:** interactive visual brainstorm 2026-06-10 (13 character iterations, 2 storyboard versions; mockups lived in `.superpowers/brainstorm/` — local-only, gitignored). Construction reference for the body: [easydrawingguides octopus tutorial](https://easydrawingguides.com/draw-octopus-really-easy-drawing-tutorial/); pose reference image preserved at `docs/logo-designs/mentor-mascot/reference-storybook-octopus.png`.
-**What this spec is:** the ratified visual identity for the mentor character — the character design, the "mentor is born" animation, the ceremony-moment inventory, and the logo ruling. The first implementation slice (BrandCelebration update) shipped alongside this spec; the birth animation and remaining ceremony moments get their own plans under `docs/plans/` before build.
+**What this spec is:** the ratified visual identity for the mentor character — the character design, the "mentor is born" animation, the ceremony-moment inventory, and the logo ruling. The first implementation slice (BrandCelebration update) shipped alongside this spec; the birth animation now lives in `MentorBirthAnimation.tsx`; remaining ceremony moments get their own plans under `docs/plans/` before build.
 **Not ADR-class:** fully reversible brand/visual decisions, no architectural commitment (per MMT-ADR-0000 significance gate).
 
 ---
@@ -26,9 +26,9 @@
 
 ## 2. The character
 
-Canonical render: [`docs/logo-designs/mentor-mascot/mentor-mascot-locked.svg`](../logo-designs/mentor-mascot/mentor-mascot-locked.svg).
-Animation rig handoff: [`docs/logo-designs/mentor-mascot/octopus_3d_animation_rig.svg`](../logo-designs/mentor-mascot/octopus_3d_animation_rig.svg), with construction guide [`docs/logo-designs/mentor-mascot/octopus_3d_animation_rig_guide_construction.svg`](../logo-designs/mentor-mascot/octopus_3d_animation_rig_guide_construction.svg).
-Code source of truth: `apps/mobile/src/components/common/mentor-mascot-geometry.ts` (`MASCOT_HERO` + `MASCOT_BADGE`), rendered statically by `MentorMascot.tsx`.
+Canonical render: [`docs/logo-designs/mentor-mascot/octo-mate.svg`](../logo-designs/mentor-mascot/octo-mate.svg) and rendered reference [`docs/logo-designs/mentor-mascot/octo-mate.png`](../logo-designs/mentor-mascot/octo-mate.png).
+Animation handoff: [`docs/logo-designs/mentor-mascot/octo-mate-animation-source.svg`](../logo-designs/mentor-mascot/octo-mate-animation-source.svg), extraction map [`docs/logo-designs/mentor-mascot/octo-mate-animation-map.json`](../logo-designs/mentor-mascot/octo-mate-animation-map.json), and guide [`docs/logo-designs/mentor-mascot/octo-mate-animation-extraction.md`](../logo-designs/mentor-mascot/octo-mate-animation-extraction.md).
+Code source of truth for the birth animation final mascot: `apps/mobile/src/components/common/octo-mate-paths.ts`, generated from `octo-mate.svg` and rendered by `MentorBirthAnimation.tsx`. The older `mentor-mascot-geometry.ts` still powers the compact static/celebration mascot surfaces until those are separately refreshed.
 
 **Construction** (the parts that took 13 rounds — violating any of these re-breaks the character):
 
@@ -86,12 +86,12 @@ The octopus appears **only** at these moments. Everyday micro-feedback (checkmar
 ## 6. Implementation notes (first slice shipped; rest for plans)
 
 **Shipped with this spec (branch `new-llm`):**
-- `mentor-mascot-geometry.ts` — palette + HERO/BADGE pose geometry, single source of truth.
+- `mentor-mascot-geometry.ts` — palette + HERO/BADGE pose geometry for static and compact celebration surfaces.
 - `MentorMascot.tsx` (+ test) — static portrait component, both poses, exported from the common barrel.
 - `BrandCelebration.tsx` rewritten — octopus badge-pose pop + dot juggle, ~750ms, same public API (`size`, `onComplete`, `testID`), same safety patterns (reduced-motion skip, 500ms Fabric net, cancel-on-unmount, Android r-floor). Call sites unchanged.
+- `octo-mate-paths.ts` + `MentorBirthAnimation.tsx` — birth animation final mascot refreshed from the extracted `octo-mate.svg` path set so the animation uses the canonical character instead of the failed redraw.
 
 **For future plans:**
-- Birth animation component (onboarding) — Reanimated, beats per §3; copy `"Your mentor is ready."` must route through `t()` with an `en.json` key in the same PR.
 - Remaining ceremony moments (§4) wire-up — each needs a trigger audit (what dispatches it) per the end-to-end tracing rule.
 - Brand-fixed colors are the sanctioned exception for `*Animation`/`*Celebration`/mascot components; keep the annotation comments.
 

@@ -4,11 +4,9 @@ import { Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 import Svg, {
   Circle,
   Defs,
-  Ellipse,
   G,
   LinearGradient,
   Path,
-  Rect,
   Stop,
 } from 'react-native-svg';
 import Animated, {
@@ -24,23 +22,25 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { MASCOT_COLORS, MASCOT_HERO } from './mentor-mascot-geometry';
+import { MASCOT_COLORS } from './mentor-mascot-geometry';
+import {
+  OCTO_MATE_BIRTH_CENTER,
+  OCTO_MATE_BIRTH_TRANSFORM,
+  OCTO_MATE_PATHS,
+} from './octo-mate-paths';
 
 let AnimatedCircle: ComponentType<Record<string, unknown>>;
-let AnimatedEllipse: ComponentType<Record<string, unknown>>;
 let AnimatedG: ComponentType<Record<string, unknown>>;
 let AnimatedPath: ComponentType<Record<string, unknown>>;
 let _birthAnimationAvailable = true;
 
 try {
   AnimatedCircle = Animated.createAnimatedComponent(Circle);
-  AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
   AnimatedG = Animated.createAnimatedComponent(G);
   AnimatedPath = Animated.createAnimatedComponent(Path);
 } catch (e) {
   _birthAnimationAvailable = false;
   AnimatedCircle = Circle as never;
-  AnimatedEllipse = Ellipse as never;
   AnimatedG = G as never;
   AnimatedPath = Path as never;
   console.error('[MentorBirthAnimation] createAnimatedComponent failed:', e);
@@ -80,7 +80,7 @@ const LOGO_DOTS = [
   },
 ] as const;
 
-const HERO = MASCOT_HERO;
+const BIRTH_MASCOT = OCTO_MATE_BIRTH_CENTER;
 const C = MASCOT_COLORS;
 
 function lerp(from: number, to: number, t: number) {
@@ -123,7 +123,6 @@ export function MentorBirthAnimation({
   const dot3 = useSharedValue(0);
   const orbit = useSharedValue(0);
   const bodyR = useSharedValue(0);
-  const skirtP = useSharedValue(0);
   const armsOp = useSharedValue(0);
   const suckersOp = useSharedValue(0);
   const faceOp = useSharedValue(0);
@@ -154,8 +153,7 @@ export function MentorBirthAnimation({
     dot2.value = 1;
     dot3.value = 1;
     orbit.value = 1;
-    bodyR.value = HERO.head.r;
-    skirtP.value = 1;
+    bodyR.value = BIRTH_MASCOT.r;
     armsOp.value = 1;
     suckersOp.value = 1;
     faceOp.value = 1;
@@ -175,7 +173,6 @@ export function MentorBirthAnimation({
     dot3,
     orbit,
     bodyR,
-    skirtP,
     armsOp,
     suckersOp,
     faceOp,
@@ -243,8 +240,7 @@ export function MentorBirthAnimation({
         withSpring(1, pop),
       ),
     );
-    bodyR.value = withDelay(2380, withSpring(HERO.head.r, pop));
-    skirtP.value = withDelay(2480, withSpring(1, pop));
+    bodyR.value = withDelay(2380, withSpring(BIRTH_MASCOT.r, pop));
     armsOp.value = withDelay(2680, withTiming(1, { duration: 480 }));
     suckersOp.value = withDelay(3100, withTiming(1, { duration: 280 }));
     faceOp.value = withDelay(
@@ -287,7 +283,6 @@ export function MentorBirthAnimation({
     dot3,
     orbit,
     bodyR,
-    skirtP,
     armsOp,
     suckersOp,
     faceOp,
@@ -320,7 +315,6 @@ export function MentorBirthAnimation({
       cancelAnimation(dot3);
       cancelAnimation(orbit);
       cancelAnimation(bodyR);
-      cancelAnimation(skirtP);
       cancelAnimation(armsOp);
       cancelAnimation(suckersOp);
       cancelAnimation(faceOp);
@@ -341,7 +335,6 @@ export function MentorBirthAnimation({
     dot3,
     orbit,
     bodyR,
-    skirtP,
     armsOp,
     suckersOp,
     faceOp,
@@ -370,22 +363,18 @@ export function MentorBirthAnimation({
     opacity: Math.max(OP_FLOOR, 1 - Math.min(bodyR.value / 8, 1)),
   }));
 
-  const headProps = useAnimatedProps(() => ({
-    r: Math.max(R_FLOOR, bodyR.value),
-    opacity: Math.max(OP_FLOOR, Math.min(bodyR.value / 8, 1)),
+  const bodyPathProps = useAnimatedProps(() => ({
+    opacity: Math.max(
+      OP_FLOOR,
+      Math.min((bodyR.value / BIRTH_MASCOT.r) * 1.4, 1),
+    ),
   }));
 
-  const skirtProps = useAnimatedProps(() => ({
-    rx: Math.max(R_FLOOR, HERO.skirt.rx * skirtP.value),
-    ry: Math.max(R_FLOOR, HERO.skirt.ry * skirtP.value),
-    opacity: Math.max(OP_FLOOR, Math.min(skirtP.value * 2, 1)),
-  }));
-
-  const armsProps = useAnimatedProps(() => ({
+  const limbPathProps = useAnimatedProps(() => ({
     opacity: Math.max(OP_FLOOR, armsOp.value),
   }));
 
-  const suckersProps = useAnimatedProps(() => ({
+  const suckerPathProps = useAnimatedProps(() => ({
     opacity: Math.max(OP_FLOOR, suckersOp.value),
   }));
 
@@ -395,19 +384,22 @@ export function MentorBirthAnimation({
 
   const beanieProps = useAnimatedProps(() => ({
     opacity: Math.max(OP_FLOOR, beanieP.value),
-    y: -34 * (1 - beanieP.value),
   }));
 
-  const mascotProps = useAnimatedProps(() => ({
-    opacity: Math.max(OP_FLOOR, Math.min((bodyR.value / HERO.head.r) * 1.4, 1)),
-  }));
+  const pathPropsByPart = {
+    body: bodyPathProps,
+    limbs: limbPathProps,
+    suckers: suckerPathProps,
+    face: faceProps,
+    beanie: beanieProps,
+  } as const;
 
   const dot1Props = useAnimatedProps(() => {
     const gather = Math.min(dot1.value / 0.55, 1);
     const catchAmount = catchP.value;
     const angle = -2.6 + orbit.value * 7.1;
-    const orbitCx = HERO.head.cx + Math.cos(angle) * 64;
-    const orbitCy = HERO.head.cy + Math.sin(angle) * 34;
+    const orbitCx = BIRTH_MASCOT.cx + Math.cos(angle) * 64;
+    const orbitCy = BIRTH_MASCOT.cy + Math.sin(angle) * 34;
     return {
       cx: lerp(
         lerp(LOGO_DOTS[0].start.cx, orbitCx, gather),
@@ -428,8 +420,8 @@ export function MentorBirthAnimation({
     const gather = Math.min(dot2.value / 0.55, 1);
     const catchAmount = catchP.value;
     const angle = -1.5 + orbit.value * 7.6;
-    const orbitCx = HERO.head.cx + Math.cos(angle) * 54;
-    const orbitCy = HERO.head.cy + Math.sin(angle) * 42;
+    const orbitCx = BIRTH_MASCOT.cx + Math.cos(angle) * 54;
+    const orbitCy = BIRTH_MASCOT.cy + Math.sin(angle) * 42;
     return {
       cx: lerp(
         lerp(LOGO_DOTS[1].start.cx, orbitCx, gather),
@@ -450,8 +442,8 @@ export function MentorBirthAnimation({
     const gather = Math.min(dot3.value / 0.55, 1);
     const catchAmount = catchP.value;
     const angle = -0.35 + orbit.value * 8.2;
-    const orbitCx = HERO.head.cx + Math.cos(angle) * 62;
-    const orbitCy = HERO.head.cy + Math.sin(angle) * 36;
+    const orbitCx = BIRTH_MASCOT.cx + Math.cos(angle) * 62;
+    const orbitCy = BIRTH_MASCOT.cy + Math.sin(angle) * 36;
     return {
       cx: lerp(
         lerp(LOGO_DOTS[2].start.cx, orbitCx, gather),
@@ -506,17 +498,6 @@ export function MentorBirthAnimation({
                 <Stop offset="0%" stopColor={C.beanieBand} />
                 <Stop offset="100%" stopColor={C.dotMint} />
               </LinearGradient>
-              <LinearGradient
-                id="mentor-birth-body"
-                x1="0"
-                y1={HERO.gradient.y1}
-                x2="0"
-                y2={HERO.gradient.y2}
-                gradientUnits="userSpaceOnUse"
-              >
-                <Stop offset="0%" stopColor={C.tealBright} />
-                <Stop offset="100%" stopColor={C.tealDeep} />
-              </LinearGradient>
             </Defs>
 
             <AnimatedPath
@@ -543,8 +524,8 @@ export function MentorBirthAnimation({
               animatedProps={studentProps}
             />
             <AnimatedCircle
-              cx={HERO.head.cx}
-              cy={HERO.head.cy}
+              cx={BIRTH_MASCOT.cx}
+              cy={BIRTH_MASCOT.cy}
               fill={C.tealBright}
               animatedProps={mentorNodeProps}
               testID="mentor-birth-mentor-node"
@@ -563,98 +544,19 @@ export function MentorBirthAnimation({
               animatedProps={dot3Props}
             />
 
-            <AnimatedG animatedProps={mascotProps} testID="mentor-birth-mascot">
-              <AnimatedG animatedProps={armsProps}>
-                {HERO.arms.map((arm) => (
-                  <Path key={arm.d} d={arm.d} fill={arm.fill} />
-                ))}
-              </AnimatedG>
-
-              <AnimatedCircle
-                cx={HERO.head.cx}
-                cy={HERO.head.cy}
-                fill="url(#mentor-birth-body)"
-                animatedProps={headProps}
-              />
-              <AnimatedEllipse
-                cx={HERO.skirt.cx}
-                cy={HERO.skirt.cy}
-                fill="url(#mentor-birth-body)"
-                animatedProps={skirtProps}
-              />
-
-              <AnimatedG animatedProps={suckersProps}>
-                {HERO.suckers.map((sucker) => (
-                  <Ellipse
-                    key={`${sucker.cx}-${sucker.cy}`}
-                    cx={sucker.cx}
-                    cy={sucker.cy}
-                    rx={sucker.rx}
-                    ry={sucker.ry}
-                    fill={C.mint}
-                  />
-                ))}
-              </AnimatedG>
-
-              <AnimatedG animatedProps={beanieProps}>
-                <Path d={HERO.beanie.dome} fill={C.beanie} />
-                <Rect
-                  x={HERO.beanie.band.x}
-                  y={HERO.beanie.band.y}
-                  width={HERO.beanie.band.width}
-                  height={HERO.beanie.band.height}
-                  rx={HERO.beanie.band.rx}
-                  fill={C.beanieBand}
+            <AnimatedG
+              testID="mentor-birth-mascot"
+              transform={OCTO_MATE_BIRTH_TRANSFORM}
+            >
+              {OCTO_MATE_PATHS.map((path) => (
+                <AnimatedPath
+                  key={path.sourceIndex}
+                  d={path.d}
+                  fill={path.fill}
+                  animatedProps={pathPropsByPart[path.part]}
+                  testID="mentor-birth-canonical-path"
                 />
-              </AnimatedG>
-
-              <AnimatedG animatedProps={faceProps}>
-                <Circle
-                  cx={HERO.eyes.left.cx}
-                  cy={HERO.eyes.cy}
-                  r={HERO.eyes.r}
-                  fill={C.white}
-                />
-                <Circle
-                  cx={HERO.eyes.left.cx}
-                  cy={HERO.eyes.pupilCy}
-                  r={HERO.eyes.pupilR}
-                  fill={C.navy}
-                />
-                <Path d={HERO.eyes.left.lid} fill="url(#mentor-birth-body)" />
-                <Path
-                  d={HERO.eyes.left.crease}
-                  stroke={C.crease}
-                  strokeWidth={HERO.eyes.creaseWidth}
-                  strokeLinecap="round"
-                />
-                <Circle
-                  cx={HERO.eyes.right.cx}
-                  cy={HERO.eyes.cy}
-                  r={HERO.eyes.r}
-                  fill={C.white}
-                />
-                <Circle
-                  cx={HERO.eyes.right.cx}
-                  cy={HERO.eyes.pupilCy}
-                  r={HERO.eyes.pupilR}
-                  fill={C.navy}
-                />
-                <Path d={HERO.eyes.right.lid} fill="url(#mentor-birth-body)" />
-                <Path
-                  d={HERO.eyes.right.crease}
-                  stroke={C.crease}
-                  strokeWidth={HERO.eyes.creaseWidth}
-                  strokeLinecap="round"
-                />
-                <Path
-                  d={HERO.smirk.d}
-                  fill="none"
-                  stroke={C.navy}
-                  strokeWidth={HERO.smirk.width}
-                  strokeLinecap="round"
-                />
-              </AnimatedG>
+              ))}
             </AnimatedG>
           </Svg>
         </View>
