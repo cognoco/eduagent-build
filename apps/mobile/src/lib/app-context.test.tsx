@@ -285,4 +285,50 @@ describe('AppContextProvider', () => {
 
     expect(result.current.mode).toBe('family');
   });
+
+  it('keeps a successful V1 switch when its own confirming refetch re-renders first (WI-816 race)', () => {
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      false;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      true;
+    const familyAdult = {
+      ...adult,
+      defaultAppContext: 'family' as const,
+      hasFamilyLinks: true,
+    };
+
+    const mutableWrapper = makeMutableWrapper({
+      activeProfile: familyAdult,
+      profiles: [familyAdult, child],
+    });
+    const { result, rerender } = renderHook(() => useAppContext(), {
+      wrapper: mutableWrapper.Wrapper,
+    });
+
+    const onSuccess = jest.fn();
+    const onError = jest.fn();
+    act(() => result.current.setMode('study', { onSuccess, onError }));
+
+    // The mutation's own onSuccess (use-profiles.ts:97) invalidates
+    // ['profiles'], so a background refetch lands defaultAppContext='study'
+    // and the provider re-renders BEFORE the switch's per-call onSuccess
+    // resolves. That self-induced re-render must NOT trip the stale-request
+    // seq guard against the switch's own success.
+    const studyAdult = { ...familyAdult, defaultAppContext: 'study' as const };
+    mutableWrapper.setValue({
+      activeProfile: studyAdult,
+      profiles: [studyAdult, child],
+    });
+    act(() => rerender(undefined));
+
+    const [, callbacks] = mockUpdateAppContextMutate.mock.calls[0] as [
+      unknown,
+      { onSuccess: (profile: Profile) => void; onError: () => void },
+    ];
+    act(() => callbacks.onSuccess(studyAdult));
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(result.current.mode).toBe('study');
+  });
 });
