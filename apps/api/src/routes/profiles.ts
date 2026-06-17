@@ -28,7 +28,13 @@ import {
   updateProfileV2,
 } from '../services/identity-v2/profile-v2';
 
-import { notFound, forbidden, validationError, apiError } from '../errors';
+import {
+  notFound,
+  forbidden,
+  validationError,
+  apiError,
+  ConflictError,
+} from '../errors';
 import {
   listProfiles,
   createProfileWithLimitCheck,
@@ -189,6 +195,13 @@ export const profileRoutes = new Hono<ProfileEnv>()
             }
             if (err instanceof ProfileValidationError) {
               return validationError(c, { [err.field]: [err.message] });
+            }
+            if (err instanceof ConflictError) {
+              // Defense-in-depth: the orchestrator throws ConflictError if the
+              // org has no owner (a structurally-broken graph / TOCTOU race the
+              // pre-call owner check + advisory lock normally prevent). Surface
+              // it as a 409 — consistent with the no-owner 409 below — not a 500.
+              return apiError(c, 409, ERROR_CODES.CONFLICT, err.message);
             }
             throw err;
           }
