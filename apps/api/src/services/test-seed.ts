@@ -2180,7 +2180,7 @@ async function seedTrialExpiredChild(
   // Child profile (non-owner teen)
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Paywall Teen',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -2440,7 +2440,7 @@ async function seedConsentPending(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Pending Learner',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     email,
     clerkUserId,
   });
@@ -4591,7 +4591,7 @@ async function seedMentorAuditPostApprovalRedirect(
 
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Awaiting-Approval Child',
-    birthYear: 2014,
+    birthYear: CHILD_BIRTH_YEAR,
     isOwner: false,
   });
 
