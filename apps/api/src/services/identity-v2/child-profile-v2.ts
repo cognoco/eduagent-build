@@ -34,7 +34,6 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
-  computeAgeBracket,
   ForbiddenError,
   type Profile,
   type ProfileCreateInput,
@@ -104,10 +103,15 @@ export async function createChildProfileV2(
         'Cannot add a child to an organization without an owner.',
       );
     }
+    // Adult-owner gate: the existing owner must be >=18 to add a child.
+    // Year-only math (currentYear - birthYear), behavior-identical to the legacy
+    // createProfileWithLimitCheck gate and consistent with birthYearSchema.
+    // NOT computeAgeBracket() — AGENTS.md §Profile Shapes bans it for feature
+    // gating (theming/copy only); this is a feature gate. Fail-closed on null.
     if (
       adultOwnerGateEnabled &&
       (owner.birthYear == null ||
-        computeAgeBracket(owner.birthYear) !== 'adult')
+        new Date().getFullYear() - owner.birthYear < 18)
     ) {
       throw new ForbiddenError(
         'Account holder must be 18 or older to add a child profile.',

@@ -157,9 +157,11 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
         birthYear: 1990,
       });
 
+      // Age must be >=13 (v1 floor, now enforced by createChildProfileV2) and
+      // <=16 so consent is still required → a grant is written. 2012 ≈ age 14.
       const child = await addChild(organizationId, {
         displayName: 'Kid',
-        birthYear: 2015,
+        birthYear: 2012,
       });
 
       expect(child.isOwner).toBe(false);
@@ -220,7 +222,7 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
 
       const child = await addChild(a.organizationId, {
         displayName: 'Kid A',
-        birthYear: 2016,
+        birthYear: 2012, // >=13 floor (now enforced); minor with consent
       });
 
       const mem = await db.query.membership.findFirst({
@@ -292,14 +294,14 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
       while (await canAddProfileV2(db, sub!.id)) {
         await addChild(organizationId, {
           displayName: `Kid ${guard}`,
-          birthYear: 2015,
+          birthYear: 2012, // >=13 floor (now enforced)
         });
         guard += 1;
         if (guard > 25) throw new Error('capacity never reached — check tier');
       }
 
       await expect(
-        addChild(organizationId, { displayName: 'Over', birthYear: 2015 }),
+        addChild(organizationId, { displayName: 'Over', birthYear: 2012 }),
       ).rejects.toBeInstanceOf(ProfileLimitError);
     },
   );
