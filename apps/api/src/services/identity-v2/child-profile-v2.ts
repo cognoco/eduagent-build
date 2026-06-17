@@ -40,7 +40,7 @@ import {
   type ProfileCreateInput,
 } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
-import { ProfileLimitError } from '../profile';
+import { ProfileLimitError, ProfileValidationError } from '../profile';
 import { checkConsentRequired, checkConsentRequiredFromDate } from '../consent';
 import {
   canAddProfileV2,
@@ -116,6 +116,31 @@ export async function createChildProfileV2(
     }
     const ownerPersonId = owner.id;
 
+    // Consent/age check, computed BEFORE any write (mirrors legacy
+    // createProfile order: limit → adult-gate → minimum-age floor). Use the
+    // exact full date when WI-297 parts are present (so a year-only age of 13
+    // cannot mask an exact age of 12), else year-only — both fail closed on a
+    // null/0 birthYear (consent.ts F-029-sem).
+    const consentCheck =
+      input.birthMonth != null && input.birthDay != null
+        ? checkConsentRequiredFromDate(
+            input.birthYear,
+            input.birthMonth,
+            input.birthDay,
+          )
+        : checkConsentRequired(input.birthYear);
+
+    // Enforce the v1 minimum-age floor (WI-570 / data-model.md §2A.5: 13+),
+    // matching the legacy writer (services/profile.ts createProfile). Reject
+    // below-minimum BEFORE inserting any rows.
+    if (consentCheck.belowMinimumAge) {
+      throw new ProfileValidationError(
+        'CHILD_AGE_VIOLATION',
+        'birthYear',
+        'Users must be at least 13 years old to create a profile',
+      );
+    }
+
     // birth_date: exact full date when WI-297 parts present, else year-01-01.
     const birthDate =
       input.birthMonth != null && input.birthDay != null
@@ -163,16 +188,9 @@ export async function createChildProfileV2(
     // (4) per-profile quota satellite (role child).
     await provisionProfileQuotaUsageV2(txDb, sub.id, childRow.id, 'child');
 
-    // (5) direct consent grant when the child's age requires it. The parent is
-    // the consenting adult, so the grant is written CONSENTED with no email loop.
-    const consentCheck =
-      input.birthMonth != null && input.birthDay != null
-        ? checkConsentRequiredFromDate(
-            input.birthYear,
-            input.birthMonth,
-            input.birthDay,
-          )
-        : checkConsentRequired(input.birthYear);
+    // (5) direct consent grant when the child's age requires it (consentCheck
+    // computed above). The parent is the consenting adult, so the grant is
+    // written CONSENTED with no email loop.
     let consented = false;
     if (consentCheck.required && consentCheck.consentType) {
       await createDirectConsentGrant(

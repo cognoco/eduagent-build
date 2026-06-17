@@ -39,6 +39,11 @@ jest.mock('../services/identity-v2/profile-v2', () => {
   };
 });
 
+// gc1-allow: unit-route isolation; real orchestrator covered by child-profile-v2.integration.test.ts
+jest.mock('../services/identity-v2/child-profile-v2', () => ({
+  createChildProfileV2: jest.fn(),
+}));
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -56,7 +61,11 @@ import {
   ProfileLimitError,
   ProfileValidationError,
 } from '../services/profile';
-import { listProfilesV2 } from '../services/identity-v2/profile-v2';
+import {
+  listProfilesV2,
+  getOwnerProfileV2,
+} from '../services/identity-v2/profile-v2';
+import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
 import { profileRoutes } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -136,6 +145,8 @@ const updateProfileMock = jest.mocked(updateProfile);
 const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
 const switchProfileMock = jest.mocked(switchProfile);
 const listProfilesV2Mock = jest.mocked(listProfilesV2);
+const getOwnerProfileV2Mock = jest.mocked(getOwnerProfileV2);
+const createChildProfileV2Mock = jest.mocked(createChildProfileV2);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -529,6 +540,36 @@ describe('POST /v1/profiles', () => {
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
+  });
+
+  // [WI-811 review / Codex P1] Owner-only authorization on the flag-on add-child
+  // path. A non-owner caller (e.g. a child on the account, isOwner:false) is
+  // rejected with 403 BEFORE the orchestrator runs — fail-closed. Red-green:
+  // remove the `profileMeta?.isOwner` gate in profiles.ts and this flips off 403.
+  it('[WI-811] returns 403 when a non-owner attempts to add a child (flag-on)', async () => {
+    getOwnerProfileV2Mock.mockResolvedValue(
+      makeProfileRow({ id: PROFILE_ID_A, isOwner: true }),
+    );
+
+    const res = await makeApp({ isOwner: false }).request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: 'Sibling',
+          birthYear: 2010,
+          location: 'EU',
+          kind: 'child',
+        }),
+      },
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    expect(createChildProfileV2Mock).not.toHaveBeenCalled();
   });
 });
 

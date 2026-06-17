@@ -44,7 +44,7 @@ import {
 } from '@eduagent/database';
 import { ForbiddenError } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
-import { ProfileLimitError } from '../profile';
+import { ProfileLimitError, ProfileValidationError } from '../profile';
 import {
   canAddProfileV2,
   getSubscriptionByAccountIdV2,
@@ -313,6 +313,51 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
       await expect(
         addChild(organizationId, { displayName: 'Kid', birthYear: 2018 }),
       ).rejects.toBeInstanceOf(ForbiddenError);
+    },
+  );
+
+  // [WI-811 review / Codex P1] Minimum-age floor (WI-570: v1 13+). The exact
+  // full date catches what the year-only schema cannot: birthYear = currentYear-13
+  // PASSES birthYearSchema (year-only age 13) but a late-in-year birthday means
+  // the child is still 12 by exact date → checkConsentRequiredFromDate flags
+  // belowMinimumAge → the orchestrator must REJECT before any write (parity with
+  // legacy createProfile). Throws ProfileValidationError; writes nothing.
+  // Red-green-revert: drop the belowMinimumAge guard in child-profile-v2.ts and
+  // this stops throwing (a sub-13 child is created + consented).
+  itGraph(
+    '[SECURITY] rejects a below-minimum-age child (exact date under 13) and writes nothing',
+    async () => {
+      const { organizationId, ownerPersonId } = await seedOwnerGraph({
+        birthYear: 1985,
+      });
+      // currentYear-13 passes the year-only floor; Dec-31 birthday keeps the
+      // exact age at 12 for all of the current year (except a Dec-31 run).
+      const currentYear = new Date().getFullYear();
+
+      await expect(
+        createChildProfileV2(db, {
+          organizationId,
+          input: {
+            displayName: 'TooYoung',
+            birthYear: currentYear - 13,
+            birthMonth: 12,
+            birthDay: 31,
+            location: 'EU',
+            conversationLanguage: 'en',
+          },
+          adultOwnerGateEnabled: true,
+        }),
+      ).rejects.toBeInstanceOf(ProfileValidationError);
+
+      // Nothing leaked: the org still has only its owner; no guardianship edge.
+      const members = await db.query.membership.findMany({
+        where: eq(membership.organizationId, organizationId),
+      });
+      expect(members).toHaveLength(1);
+      const edges = await db.query.guardianship.findMany({
+        where: eq(guardianship.guardianPersonId, ownerPersonId),
+      });
+      expect(edges).toHaveLength(0);
     },
   );
 

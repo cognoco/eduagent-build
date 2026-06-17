@@ -163,6 +163,23 @@ export const profileRoutes = new Hono<ProfileEnv>()
         // ALWAYS resolvedAccount.id (the authenticated caller's org), never a
         // client value — the cross-org isolation guard.
         if (input.kind === 'child') {
+          // [WI-811 review / Codex P1] Owner-only authorization, fail-closed.
+          // Mirrors the legacy assertProfileCreationAllowed intent but does NOT
+          // reuse it: flag-on, its profileMeta-absent fallback counts the EMPTY
+          // legacy `profiles` table → 0 → fails OPEN. The caller's profileMeta
+          // (resolved in profile-scope.ts: owner via header or auto-resolve →
+          // isOwner:true; a child via X-Profile-Id → isOwner:false; unresolved →
+          // undefined) is the authoritative signal, and an add-child is provably
+          // never a first-profile bootstrap. Reject any non-owner / unresolved
+          // caller before revealing graph state.
+          if (c.get('profileMeta')?.isOwner !== true) {
+            return apiError(
+              c,
+              403,
+              ERROR_CODES.FORBIDDEN,
+              'Only the account owner can add a child profile.',
+            );
+          }
           if (!owner) {
             // No owner to parent the child under — structurally-broken graph.
             return apiError(
