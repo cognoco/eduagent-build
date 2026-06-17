@@ -43,6 +43,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { ForbiddenError } from '@eduagent/schemas';
+import { ConflictError } from '../../errors';
 import { ProfileLimitError } from '../profile';
 import {
   canAddProfileV2,
@@ -232,6 +233,45 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
         where: eq(consentGrant.chargePersonId, child.id),
       });
       expect(grant?.organizationId).toBe(a.organizationId);
+    },
+  );
+
+  // AC#5 SECURITY — DETERMINISTIC red-green-revert on the org-scoped owner
+  // lookup. Org A has a subscription but NO admin owner (its bootstrap owner is
+  // demoted to learner); org B has an admin owner. A correctly org-scoped
+  // getOwnerProfileV2(A) returns null → createChildProfileV2 throws ConflictError
+  // and writes NOTHING. If the org filter were dropped, the lookup would grab
+  // org B's owner and parent a cross-org child — so this fails RED on the revert
+  // deterministically (no limit(1)/ORDER-BY nondeterminism, unlike asserting a
+  // specific owner id with two admins present).
+  itGraph(
+    '[SECURITY] refuses (no cross-org owner leak) when the caller org has no owner',
+    async () => {
+      const a = await seedOwnerGraph({ birthYear: 1985 });
+      const b = await seedOwnerGraph({ birthYear: 1980 });
+      // Demote org A's only admin → org A now has a subscription but no owner.
+      await db
+        .update(membership)
+        .set({ roles: ['learner'] })
+        .where(eq(membership.personId, a.ownerPersonId));
+
+      await expect(
+        createChildProfileV2(db, {
+          organizationId: a.organizationId,
+          input: { displayName: 'Leak', birthYear: 2016, location: 'EU' },
+          adultOwnerGateEnabled: true,
+        }),
+      ).rejects.toBeInstanceOf(ConflictError);
+
+      // No child leaked into org B (the foreign owner was never selected).
+      const bMembers = await db.query.membership.findMany({
+        where: eq(membership.organizationId, b.organizationId),
+      });
+      expect(bMembers).toHaveLength(1); // only org B's own owner
+      const bEdges = await db.query.guardianship.findMany({
+        where: eq(guardianship.guardianPersonId, b.ownerPersonId),
+      });
+      expect(bEdges).toHaveLength(0); // org B's owner parents nothing
     },
   );
 
