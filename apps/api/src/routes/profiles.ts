@@ -19,6 +19,7 @@ import type { ClerkIdentity } from '../middleware/account';
 import { requireAccount } from '../middleware/profile-scope';
 import { isIdentityV2Enabled } from '../config';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
+import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
 import {
   getOwnerProfileV2,
   listProfilesV2,
@@ -144,17 +145,60 @@ export const profileRoutes = new Hono<ProfileEnv>()
       //   - an idempotent replay of the owner create (network retry /
       //     double-submit) → return the existing owner profile, NOT a second
       //     create (and NEVER the legacy writer).
-      //   - a genuine CHILD create → needs the consent WRITE machine, which is
-      //     CUT-B2 scope; refuse cleanly rather than corrupt the store.
+      //   - a genuine CHILD create (kind:'child') → createChildProfileV2 writes
+      //     the managed child + guardianship edge + direct consent grant.
       const resolvedAccount = c.get('account');
       if (resolvedAccount) {
         const owner = await getOwnerProfileV2(db, resolvedAccount.id);
+
+        // [WI-811 / CUT-B2] Genuine add-child create. The explicit discriminator
+        // distinguishes this from an idempotent owner replay so a child-create
+        // is NEVER silently answered with the owner profile. The organization is
+        // ALWAYS resolvedAccount.id (the authenticated caller's org), never a
+        // client value — the cross-org isolation guard.
+        if (input.kind === 'child') {
+          if (!owner) {
+            // No owner to parent the child under — structurally-broken graph.
+            return apiError(
+              c,
+              409,
+              ERROR_CODES.CONFLICT,
+              'Cannot add a child before the account owner exists.',
+            );
+          }
+          try {
+            const child = await createChildProfileV2(db, {
+              organizationId: resolvedAccount.id,
+              input,
+              // [OPT-C] Default 'true' when binding missing (matches legacy).
+              adultOwnerGateEnabled:
+                c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
+            });
+            return c.json(profileResponseSchema.parse({ profile: child }), 201);
+          } catch (err) {
+            if (err instanceof ForbiddenError) {
+              return apiError(c, 403, ERROR_CODES.FORBIDDEN, err.message);
+            }
+            if (err instanceof ProfileLimitError) {
+              return apiError(
+                c,
+                402,
+                ERROR_CODES.PROFILE_LIMIT_EXCEEDED,
+                'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
+              );
+            }
+            if (err instanceof ProfileValidationError) {
+              return validationError(c, { [err.field]: [err.message] });
+            }
+            throw err;
+          }
+        }
+
         if (owner) {
           // Idempotent replay of the owner bootstrap.
           return c.json(profileResponseSchema.parse({ profile: owner }), 201);
         }
-        // No owner under a resolved account is a structurally-broken graph;
-        // child creation is not yet wired (CUT-B2). Refuse, don't fall through.
+        // No owner under a resolved account is a structurally-broken graph.
         return apiError(
           c,
           409,
