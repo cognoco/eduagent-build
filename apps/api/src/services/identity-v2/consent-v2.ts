@@ -1008,6 +1008,38 @@ export async function getPersonDisplayNameV2(
 }
 
 /**
+ * [WI-809] v2 org-scoped display-name read for the consent request/resend flow —
+ * the replacement for the legacy `getProfile(db, childProfileId, account.id)`
+ * gate (which collapsed existence + account-ownership + not-archived). Returns
+ * the person's display name ONLY when they are an ACTIVE (non-archived) member of
+ * `organizationId` (= the caller's account.id). Returns null for a non-member, an
+ * archived person, OR a non-existent id — a single, indistinguishable outcome, so
+ * a caller cannot (a) enumerate whether an arbitrary id is a real person,
+ * (b) target an out-of-org child, or (c) target an archived child legacy rejected.
+ * Unlike `getPersonDisplayNameV2` (global, existence-only), this preserves the
+ * legacy scoping the cutover must not weaken.
+ */
+export async function getOrgMemberDisplayNameV2(
+  db: Database,
+  personId: string,
+  organizationId: string,
+): Promise<string | null> {
+  const rows = await db
+    .select({ displayName: person.displayName })
+    .from(membership)
+    .innerJoin(person, eq(person.id, membership.personId))
+    .where(
+      and(
+        eq(membership.personId, personId),
+        eq(membership.organizationId, organizationId),
+        isNull(person.archivedAt),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.displayName ?? null;
+}
+
+/**
  * v2 archive-on-revocation: atomically stamp `person.archived_at` ONLY when the
  * current GDPR grant is withdrawn (optionally at the given timestamp) and the
  * person isn't already archived and the guardian holds an active edge — the v2

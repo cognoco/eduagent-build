@@ -51,13 +51,21 @@ import { generateExportV2 } from './export-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
-// Gate: requires a post-M-DROP DB with `subscriptions` present (the 0118 target
-// state). Current stg DB has drifted (subscriptions dropped ahead of WI-805),
-// so this suite is skipped until the DB is re-aligned or WI-805 lands. Gate on
-// IDENTITY_POST_DROP=1 so CI auto-activates it once M-DROP lands on a correct DB.
+// Gate: requires the EXACT post-M-DROP (0118) target state — the 4 identity
+// tables dropped AND `subscriptions` still PRESENT. The reused legacy
+// generateExport reads `subscriptions` unconditionally (export.ts; that read
+// stays WI-805 scope), so on the current drifted stg DB (subscriptions dropped
+// ahead of WI-805) `IDENTITY_POST_DROP=1` alone would activate the suite and
+// fail with a MISLEADING `relation "subscriptions" does not exist` 500 that looks
+// like a test regression. A dedicated EXPORT_V2_INTEGRATION_READY=1 gate makes the
+// blockage machine-detectable: the suite skips cleanly unless the operator has
+// confirmed a subscriptions-present post-drop DB (true post-#8, or post-WI-805
+// re-seed). [WI-809 review CONSIDER: claude-review L44-45 / Codex.]
 const hasDatabaseUrl = !!process.env.DATABASE_URL;
 const describeIfPostDrop =
-  hasDatabaseUrl && process.env.IDENTITY_POST_DROP === '1'
+  hasDatabaseUrl &&
+  process.env.IDENTITY_POST_DROP === '1' &&
+  process.env.EXPORT_V2_INTEGRATION_READY === '1'
     ? describe
     : describe.skip;
 
@@ -108,13 +116,11 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
       })
       .returning();
     personIds.push(owner!.id);
-    await db
-      .insert(membership)
-      .values({
-        personId: owner!.id,
-        organizationId: org!.id,
-        roles: ['admin'],
-      });
+    await db.insert(membership).values({
+      personId: owner!.id,
+      organizationId: org!.id,
+      roles: ['admin'],
+    });
     const ownerEmail = `export-v2-owner-${owner!.id}@integration.test`;
     await db.insert(login).values({
       personId: owner!.id,

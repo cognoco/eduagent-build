@@ -51,7 +51,7 @@ import {
   revokeChildConsentV2,
   restoreChildConsentV2,
   getProfileConsentStateV2,
-  getPersonDisplayNameV2,
+  getOrgMemberDisplayNameV2,
 } from '../services/identity-v2/consent-v2';
 import { getChildConsentForParentV2 } from '../services/identity-v2/family-v2';
 import { inngest } from '../inngest/client';
@@ -197,16 +197,20 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
 
       // [WI-809] Gate the child display-name read behind the V2 flag. The legacy
       // getProfile() reads profiles + consent_states + family_links — all dropped
-      // at M-DROP — so flag-on must resolve the name via the v2 person graph
-      // instead, or it 500s post-drop. Both paths preserve the same existence
-      // check (null → forbidden) and feed childName into the consent write.
+      // at M-DROP — so flag-on resolves the name via the v2 person graph instead,
+      // or it 500s post-drop. getOrgMemberDisplayNameV2 PRESERVES legacy
+      // getProfile's account/org scoping + not-archived filter: it returns null for
+      // a non-member, archived, OR non-existent child — one indistinguishable
+      // outcome — so flag-on does not weaken the gate into a person-existence
+      // oracle nor allow out-of-org / archived targets the legacy path rejected.
       // Authorization is separately (and v2-awarely) enforced by
       // assertCanRequestConsentForChild below.
       let childName: string;
       if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-        const displayName = await getPersonDisplayNameV2(
+        const displayName = await getOrgMemberDisplayNameV2(
           db,
           input.childProfileId,
+          account.id,
         );
         if (displayName === null) {
           return forbidden(
@@ -360,14 +364,15 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const input = c.req.valid('json');
 
       // [WI-809] Gate the child display-name read behind the V2 flag — see the
-      // request handler above. flag-on resolves via the v2 person graph (the
-      // legacy getProfile reads dropped tables and 500s post-drop); both paths
-      // keep the same existence check and feed childName into the v2 write.
+      // request handler above. flag-on resolves via getOrgMemberDisplayNameV2,
+      // which preserves legacy getProfile's account/org + not-archived scoping
+      // (the legacy getProfile reads dropped tables and 500s post-drop).
       let childName: string;
       if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-        const displayName = await getPersonDisplayNameV2(
+        const displayName = await getOrgMemberDisplayNameV2(
           db,
           input.childProfileId,
+          account.id,
         );
         if (displayName === null) {
           return forbidden(

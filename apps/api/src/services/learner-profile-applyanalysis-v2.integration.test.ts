@@ -41,6 +41,7 @@ import { eq } from 'drizzle-orm';
 import {
   consentGrant,
   createDatabase,
+  learningProfiles,
   membership,
   organization,
   person,
@@ -51,7 +52,15 @@ import type { SessionAnalysisOutput } from '@eduagent/schemas';
 import { applyAnalysis } from './learner-profile';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
-const RUN = !!process.env.DATABASE_URL;
+// [WI-809] Gate on IDENTITY_POST_DROP=1: this suite is only NON-VACUOUS on a
+// post-M-DROP DB. On a pre-drop DB the revert-the-fix proof (legacy
+// isGdprProcessingAllowed reading the still-present consent_states) would NOT
+// 500 and downstream memory gates could mask the difference, so the test could
+// pass even with the fix broken. Gating it post-drop keeps it meaningful (it
+// runs green on staging post-drop; auto-activates on CI once M-DROP lands).
+// [review CodeRabbit L54]
+const RUN =
+  !!process.env.DATABASE_URL && process.env.IDENTITY_POST_DROP === '1';
 
 function buildAnalysis(): SessionAnalysisOutput {
   // Non-low confidence so the outer GDPR gate is reached (confidence==='low'
@@ -145,6 +154,16 @@ function buildAnalysis(): SessionAnalysisOutput {
       );
 
       expect(result).toEqual({ fieldsUpdated: [], notifications: [] });
+
+      // [WI-809][review CodeRabbit L148] Prove the gate BLOCKED the write, not
+      // merely returned an empty result: the outer GDPR gate short-circuits
+      // BEFORE the transaction opens getOrCreateLearningProfileTx, so no
+      // learning_profiles row exists for the child. Fails if gating regresses to
+      // below the write.
+      const written = await db.query.learningProfiles.findFirst({
+        where: eq(learningProfiles.profileId, child!.id),
+      });
+      expect(written).toBeUndefined();
     });
   },
 );
