@@ -205,8 +205,13 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
   );
 
   // AC#5 SECURITY — cross-org isolation / ownership. The child is parented to
-  // the PASSED org's owner only; a second org's owner is never selected. This is
-  // the red-green-revert target (break getOwnerProfileV2's org filter → RED).
+  // the PASSED org's owner only; a second org's owner is never selected.
+  // NOTE: this is NOT a reliable red-green-revert target on its own — if the
+  // org filter is merely REMOVED, getOwnerProfileV2's `LIMIT 1` over all admins
+  // could still return org A's owner and the test would stay green. The
+  // deterministic revert target is the next test
+  // ('[SECURITY] refuses ... when the caller org has no owner'), which goes RED
+  // whenever the org scope is broken regardless of row ordering.
   itGraph(
     "[SECURITY] parents the child to the caller org's owner, never another org's owner",
     async () => {
