@@ -39,10 +39,17 @@ jest.mock('../services/identity-v2/profile-v2', () => {
   };
 });
 
-// gc1-allow: unit-route isolation; real orchestrator covered by child-profile-v2.integration.test.ts
-jest.mock('../services/identity-v2/child-profile-v2', () => ({
-  createChildProfileV2: jest.fn(),
-}));
+// GC1 Pattern A: requireActual + targeted override (real orchestrator covered by
+// child-profile-v2.integration.test.ts; route tests only stub createChildProfileV2).
+jest.mock('../services/identity-v2/child-profile-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/child-profile-v2',
+  ) as typeof import('../services/identity-v2/child-profile-v2');
+  return {
+    ...actual,
+    createChildProfileV2: jest.fn(),
+  };
+});
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
