@@ -184,10 +184,19 @@ export async function parseLearnerInput(
   profileId: string,
   text: string,
   source: MemorySource,
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<ParseLearnerInputResult> {
   try {
     const analysis = await parseLearnerInputToAnalysis(text, source);
-    const result = await applyAnalysis(db, profileId, analysis, null, source);
+    const result = await applyAnalysis(
+      db,
+      profileId,
+      analysis,
+      null,
+      source,
+      undefined,
+      opts,
+    );
     return {
       success: true,
       message: 'Got it!',

@@ -187,23 +187,37 @@ function projectSessionEmbeddingContent(content: string): string {
 export async function generateExport(
   db: Database,
   accountId: string,
+  // [WI-809] When the v2 export twin (export-v2.ts) calls this for the
+  // learning-data half, it supplies the org's profileIds (= person ids) so we
+  // skip the legacy identity tables dropped at the cutover (accounts / profiles
+  // / consent_states / family_links). The identity sections of the returned
+  // DataExport are then empty placeholders the v2 caller overrides; only the
+  // learning-data + billing arrays it spreads are consumed. Omitting opts (every
+  // flag-off caller) is byte-identical to the pre-WI-809 behavior.
+  opts?: { learningOnlyProfileIds?: string[] },
 ): Promise<DataExport> {
-  const account = await db.query.accounts.findFirst({
-    where: eq(accounts.id, accountId),
-  });
+  const learningOnly = opts?.learningOnlyProfileIds;
 
-  if (!account) {
+  const account = learningOnly
+    ? null
+    : await db.query.accounts.findFirst({
+        where: eq(accounts.id, accountId),
+      });
+
+  if (!learningOnly && !account) {
     throw new Error(`Account not found: ${accountId}`);
   }
 
-  const profileRows = await db.query.profiles.findMany({
-    where: eq(profiles.accountId, accountId),
-  });
+  const profileRows = learningOnly
+    ? []
+    : await db.query.profiles.findMany({
+        where: eq(profiles.accountId, accountId),
+      });
 
-  const profileIds = profileRows.map((p) => p.id);
+  const profileIds = learningOnly ?? profileRows.map((p) => p.id);
 
   const consentRows =
-    profileIds.length > 0
+    !learningOnly && profileIds.length > 0
       ? await db.query.consentStates.findMany({
           where: inArray(consentStates.profileId, profileIds),
         })
@@ -351,7 +365,7 @@ export async function generateExport(
       : [];
 
   const familyLinkRows =
-    profileIds.length > 0
+    !learningOnly && profileIds.length > 0
       ? await db.query.familyLinks.findMany({
           where: or(
             inArray(familyLinks.parentProfileId, profileIds),
@@ -407,10 +421,14 @@ export async function generateExport(
       : [];
 
   return {
-    account: {
-      email: account.email,
-      createdAt: account.createdAt.toISOString(),
-    },
+    // [WI-809] account is null only on the learning-only v2 path, where the v2
+    // caller overrides this section; a placeholder keeps the shape valid.
+    account: account
+      ? {
+          email: account.email,
+          createdAt: account.createdAt.toISOString(),
+        }
+      : { email: '', createdAt: new Date(0).toISOString() },
     profiles: profileRows.map((row) => ({
       id: row.id,
       accountId: row.accountId,

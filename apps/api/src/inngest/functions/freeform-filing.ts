@@ -16,6 +16,8 @@ import {
 import { getSessionTranscript } from '../../services/session';
 import { routeAndCall } from '../../services/llm';
 import { isGdprProcessingAllowed } from '../../services/consent';
+import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { isIdentityV2EnabledInStep } from '../helpers';
 
 interface FilingStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
@@ -72,6 +74,14 @@ async function runFreeformFiling({
 
   const consentAllowed = await step.run('check-gdpr-consent', async () => {
     const db = getStepDatabase();
+    // [WI-809] flag-on: consent_states is dropped at the cutover (migration
+    // 0118), so a flag-on legacy read 500s. Route through the GDPR-pinned v2
+    // gate. isGdprProcessingAllowedV2 returns true iff there is no GDPR consent
+    // row OR the latest GDPR grant is CONSENTED — byte-identical to the legacy
+    // allow rule, pinned to GDPR. flag-off path is unchanged.
+    if (isIdentityV2EnabledInStep()) {
+      return isGdprProcessingAllowedV2(db, profileId);
+    }
     return isGdprProcessingAllowed(db, profileId);
   });
   if (!consentAllowed) {
@@ -163,7 +173,12 @@ async function runFreeformFiling({
     // Re-check inside the consuming step. The earlier consent step is memoized
     // by Inngest, so a withdrawal between steps must still block transcript
     // use, LLM filing, and derived library writes.
-    if (!(await isGdprProcessingAllowed(db, profileId))) {
+    // [WI-809] flag-on routes through the v2 gate (see check-gdpr-consent above);
+    // flag-off path is unchanged.
+    const reCheckAllowed = isIdentityV2EnabledInStep()
+      ? await isGdprProcessingAllowedV2(db, profileId)
+      : await isGdprProcessingAllowed(db, profileId);
+    if (!reCheckAllowed) {
       return { status: 'skipped' as const, reason: 'consent_not_granted' };
     }
 

@@ -14,6 +14,7 @@ import {
 
 import { assertParentAccess } from './family-access';
 import { getConsentStatus } from './consent';
+import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
 import { createLogger } from './logger';
 import { sendPushNotification } from './notifications';
 import { getGuardianPersonIds } from './identity-v2/guardianship';
@@ -98,8 +99,21 @@ export async function createNudge(
   // in that case, so getConsentStatus resolves null. Treating null the same as
   // 'CONSENTED' here lets parents nudge their 17+ linked children. The block
   // still rejects PENDING / WITHDRAWN / PARENTAL_CONSENT_REQUESTED.
-  const consentStatus = await getConsentStatus(db, params.toProfileId);
-  if (consentStatus !== null && consentStatus !== 'CONSENTED') {
+  //
+  // [WI-809] flag-on: consent_states is dropped at the cutover, so route through
+  // the GDPR-pinned v2 gate. isGdprProcessingAllowedV2 returns true iff there is
+  // no GDPR consent row OR the latest GDPR grant is CONSENTED — byte-identical to
+  // the legacy null-or-CONSENTED allow rule above, pinned to GDPR (BUG-465: a
+  // newer COPPA row must not mask a withdrawn GDPR consent). flag-off path is
+  // unchanged (legacy AnyBasis getConsentStatus).
+  let consentBlocked: boolean;
+  if (opts?.identityV2Enabled) {
+    consentBlocked = !(await isGdprProcessingAllowedV2(db, params.toProfileId));
+  } else {
+    const consentStatus = await getConsentStatus(db, params.toProfileId);
+    consentBlocked = consentStatus !== null && consentStatus !== 'CONSENTED';
+  }
+  if (consentBlocked) {
     throw new ConsentRequiredError(
       "This child can't receive nudges until consent is active.",
       'CONSENT_REQUIRED',
