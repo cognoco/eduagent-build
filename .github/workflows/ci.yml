@@ -418,6 +418,19 @@ jobs:
       - name: API integration tests (flag-ON)
         run: pnpm exec nx run api:test:integration
 
+      # WI-808: the apps/api co-located integration tests
+      # (apps/api/src/**/*.integration.test.ts — incl the H8 RLS-coverage suite
+      # and the WI-794 GUC drift-guard) are globbed ONLY by the dash target's
+      # config (apps/api/jest.integration.config.cjs). The colon target above
+      # globs only tests/integration/**, so before this step those suites ran in
+      # NO CI lane (ic-orch-124). This lane's DB is built via drizzle-kit migrate,
+      # so RLS policies (0066+0117) exist and the H8/WI-794 catalog guards are
+      # non-vacuous here. if: always() so it runs even though the colon step
+      # above is expected-red; allowed-red with the rest of this job.
+      - name: API co-located integration tests (flag-ON, apps/api/src)
+        if: always()
+        run: pnpm exec nx run api:test-integration
+
   # ---------------------------------------------------------------------------
   # OTA Update: publish JS bundle to EAS Update (preview channel)
   # Runs after the main job passes, only on push to main, only when mobile
