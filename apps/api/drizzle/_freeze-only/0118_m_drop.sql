@@ -12,10 +12,15 @@
 -- `subscription_status` / `subscription_tier` enums are KEPT because the
 -- retained `subscriptions` table still uses them (billing.ts).
 --
--- STATUS: INERT DRAFT. Lives under _wip/ deliberately — NOT in apps/api/drizzle/,
--- so it cannot auto-apply on a deploy. At the freeze it is promoted to the next
--- free migration number (e.g. 0118_m_drop.sql) per cutover-plan §1, AFTER
--- m-repoint has landed and the flip has soaked, then reviewed + applied.
+-- STATUS: FREEZE-ONLY DRAFT — NOT AUTO-APPLIED. Lives in
+-- apps/api/drizzle/_freeze-only/ but is deliberately NOT registered in
+-- meta/_journal.json, so drizzle-kit migrate never sees it and it cannot
+-- auto-apply on a deploy (the `-- @freeze-only` marker on line 1 records this).
+-- At the freeze it is promoted to the next free migration number per
+-- cutover-plan §1, AFTER m-repoint has landed and the flip has soaked, then
+-- reviewed + applied. NOTE: 0117 is now taken by a journaled migration
+-- (0117_fix_family_preferences_rls_guc, WI-794), so m-repoint/m-drop promote to
+-- the next free numbers at freeze (e.g. 0118/0119), NOT 0117/0118.
 --
 -- PRECONDITION (enforced by Postgres, not by this file): M-REPOINT must have run
 -- first. Every live (non-legacy) FK must already point at person/organization —
