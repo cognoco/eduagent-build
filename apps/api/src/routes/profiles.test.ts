@@ -51,6 +51,19 @@ jest.mock('../services/identity-v2/child-profile-v2', () => {
   };
 });
 
+// GC1 Pattern A: requireActual + targeted override (real graph bootstrap covered
+// by identity-graph integration tests; route tests only observe whether the
+// pre-graph branch reaches createIdentityGraph).
+jest.mock('../services/identity-v2/identity-graph', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/identity-graph',
+  ) as typeof import('../services/identity-v2/identity-graph');
+  return {
+    ...actual,
+    createIdentityGraph: jest.fn(),
+  };
+});
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -73,6 +86,7 @@ import {
   getOwnerProfileV2,
 } from '../services/identity-v2/profile-v2';
 import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
+import { createIdentityGraph } from '../services/identity-v2/identity-graph';
 import { ConflictError } from '../errors';
 import { profileRoutes } from './profiles';
 
@@ -155,6 +169,7 @@ const switchProfileMock = jest.mocked(switchProfile);
 const listProfilesV2Mock = jest.mocked(listProfilesV2);
 const getOwnerProfileV2Mock = jest.mocked(getOwnerProfileV2);
 const createChildProfileV2Mock = jest.mocked(createChildProfileV2);
+const createIdentityGraphMock = jest.mocked(createIdentityGraph);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -628,6 +643,73 @@ describe('POST /v1/profiles', () => {
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: ERROR_CODES.CONFLICT });
     expect(createChildProfileV2Mock).not.toHaveBeenCalled();
+  });
+
+  // [WI-811 fail-closed | ic-117] A graphless (pre-graph) flag-on POST with
+  // kind:'child' must fail closed with 409 — it must NOT fall through to
+  // createIdentityGraph, which would bootstrap the caller AS the account owner
+  // (a silent privilege grant; AC#5 fail-closed). The owner gate lives only in
+  // the post-graph branch; the pre-graph branch went straight to the bootstrap.
+  // Red-green-revert: delete the `input.kind === 'child'` reject in the POST
+  // pre-graph branch of profiles.ts and this flips 409 → 201 (owner bootstrapped)
+  // with createIdentityGraph called. createIdentityGraph is GC1 Pattern A-mocked
+  // so the break surfaces the 201 owner-bootstrap, not a 500 from the empty test DB.
+  it('[WI-811] rejects a graphless kind:child POST with 409 and does not bootstrap an owner (flag-on)', async () => {
+    // Stub the graph bootstrap so the broken-guard (RED) path surfaces the 201
+    // owner-bootstrap rather than a 500. buildBootstrapProfile reads only
+    // personId + account.id off the graph.
+    createIdentityGraphMock.mockResolvedValue({
+      personId: PROFILE_ID_A,
+      account: { id: ACCOUNT_ID },
+    } as Awaited<ReturnType<typeof createIdentityGraph>>);
+
+    type PreGraphEnv = {
+      Bindings: { IDENTITY_V2_ENABLED?: string };
+      Variables: {
+        db: Database;
+        account: Account | undefined;
+        profileId: string | undefined;
+        profileMeta: ProfileMeta | undefined;
+        clerkIdentity:
+          | { clerkUserId: string; verifiedEmail: string }
+          | undefined;
+      };
+    };
+    const app = new Hono<PreGraphEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      // Graphless: no account; clerkIdentity present, as accountMiddleware sets
+      // it on the v2 pre-graph path.
+      c.set('account', undefined);
+      c.set('clerkIdentity', {
+        clerkUserId: 'user_pre_graph',
+        verifiedEmail: 'newuser@example.com',
+      });
+      c.set('profileId', undefined);
+      c.set('profileMeta', undefined);
+      await next();
+    });
+    app.onError((err, c) =>
+      err instanceof HTTPException
+        ? c.json({ code: 'HTTP_ERROR', message: err.message }, err.status)
+        : c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    app.route('/v1', profileRoutes);
+
+    const res = await app.request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: childBody,
+      },
+      flagOn,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: ERROR_CODES.CONFLICT });
+    // The fail-closed guard must short-circuit BEFORE the graph bootstrap.
+    expect(createIdentityGraphMock).not.toHaveBeenCalled();
   });
 
   it.each([
