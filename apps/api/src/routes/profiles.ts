@@ -248,6 +248,20 @@ export const profileRoutes = new Hono<ProfileEnv>()
           'Authentication required to create a profile.',
         );
       }
+      // [WI-811 fail-closed / ic-117] A kind:'child' create is only valid once
+      // the account owner exists. Pre-graph there is no owner yet, so this must
+      // fail closed — NOT fall through to createIdentityGraph below, which would
+      // bootstrap the caller AS the owner (a silent privilege grant). The owner
+      // gate above only guards the post-graph branch; this is its pre-graph
+      // counterpart. Mirrors the post-graph no-owner 409.
+      if (input.kind === 'child') {
+        return apiError(
+          c,
+          409,
+          ERROR_CODES.CONFLICT,
+          'Cannot add a child before the account owner exists.',
+        );
+      }
       try {
         const graph = await createIdentityGraph(db, {
           clerkUserId: clerkIdentity.clerkUserId,
