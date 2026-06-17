@@ -39,6 +39,18 @@ jest.mock('../services/identity-v2/profile-v2', () => {
   };
 });
 
+// GC1 Pattern A: requireActual + targeted override (real orchestrator covered by
+// child-profile-v2.integration.test.ts; route tests only stub createChildProfileV2).
+jest.mock('../services/identity-v2/child-profile-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/child-profile-v2',
+  ) as typeof import('../services/identity-v2/child-profile-v2');
+  return {
+    ...actual,
+    createChildProfileV2: jest.fn(),
+  };
+});
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -56,7 +68,12 @@ import {
   ProfileLimitError,
   ProfileValidationError,
 } from '../services/profile';
-import { listProfilesV2 } from '../services/identity-v2/profile-v2';
+import {
+  listProfilesV2,
+  getOwnerProfileV2,
+} from '../services/identity-v2/profile-v2';
+import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
+import { ConflictError } from '../errors';
 import { profileRoutes } from './profiles';
 
 // ---------------------------------------------------------------------------
@@ -136,6 +153,8 @@ const updateProfileMock = jest.mocked(updateProfile);
 const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
 const switchProfileMock = jest.mocked(switchProfile);
 const listProfilesV2Mock = jest.mocked(listProfilesV2);
+const getOwnerProfileV2Mock = jest.mocked(getOwnerProfileV2);
+const createChildProfileV2Mock = jest.mocked(createChildProfileV2);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -529,6 +548,140 @@ describe('POST /v1/profiles', () => {
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
+  });
+
+  // [WI-811 review / Codex P1] Owner-only authorization on the flag-on add-child
+  // path. A non-owner caller (e.g. a child on the account, isOwner:false) is
+  // rejected with 403 BEFORE the orchestrator runs — fail-closed. Red-green:
+  // remove the `profileMeta?.isOwner` gate in profiles.ts and this flips off 403.
+  it('[WI-811] returns 403 when a non-owner attempts to add a child (flag-on)', async () => {
+    getOwnerProfileV2Mock.mockResolvedValue(
+      makeProfileRow({ id: PROFILE_ID_A, isOwner: true }),
+    );
+
+    const res = await makeApp({ isOwner: false }).request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: 'Sibling',
+          birthYear: 2010,
+          location: 'EU',
+          kind: 'child',
+        }),
+      },
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    expect(createChildProfileV2Mock).not.toHaveBeenCalled();
+  });
+
+  // [WI-811 review / SHOULD_FIX] Route-layer coverage for the new child-create
+  // arms: the HTTP translation of each orchestrator outcome (the integration
+  // tests cover the orchestrator throwing; these cover the route mapping).
+  // createChildProfileV2 is GC1 Pattern A-mocked. birthYear 2010 is schema-valid
+  // (≤ currentYear-13) so the body reaches the route logic, not a Zod 400.
+  const childBody = JSON.stringify({
+    displayName: 'Kid',
+    birthYear: 2010,
+    location: 'EU',
+    kind: 'child',
+  });
+  const flagOn = { IDENTITY_V2_ENABLED: 'true' } as const;
+  const postChild = (overrides?: { isOwner?: boolean }) =>
+    makeApp({ isOwner: overrides?.isOwner ?? true }).request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: childBody,
+      },
+      flagOn,
+    );
+
+  it('[WI-811] returns 201 on a successful owner-initiated child create (flag-on)', async () => {
+    getOwnerProfileV2Mock.mockResolvedValue(
+      makeProfileRow({ id: PROFILE_ID_A, isOwner: true }),
+    );
+    createChildProfileV2Mock.mockResolvedValue(
+      makeProfileRow({ id: PROFILE_ID_B, isOwner: false }),
+    );
+
+    const res = await postChild();
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({
+      profile: { id: PROFILE_ID_B, isOwner: false },
+    });
+    expect(createChildProfileV2Mock).toHaveBeenCalled();
+  });
+
+  it('[WI-811] returns 409 when the org has no owner for a child create (flag-on)', async () => {
+    getOwnerProfileV2Mock.mockResolvedValue(null);
+
+    const res = await postChild();
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: ERROR_CODES.CONFLICT });
+    expect(createChildProfileV2Mock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'ForbiddenError',
+      () => new ForbiddenError('nope', 'ADULT_OWNER_REQUIRED'),
+      403,
+      ERROR_CODES.FORBIDDEN,
+    ],
+    [
+      'ProfileLimitError',
+      () => new ProfileLimitError(),
+      402,
+      ERROR_CODES.PROFILE_LIMIT_EXCEEDED,
+    ],
+    [
+      'ConflictError',
+      () => new ConflictError('structurally-broken graph'),
+      409,
+      ERROR_CODES.CONFLICT,
+    ],
+  ])(
+    '[WI-811] maps orchestrator %s to %i (flag-on)',
+    async (_name, makeErr, status, code) => {
+      getOwnerProfileV2Mock.mockResolvedValue(
+        makeProfileRow({ id: PROFILE_ID_A, isOwner: true }),
+      );
+      createChildProfileV2Mock.mockRejectedValue(makeErr());
+
+      const res = await postChild();
+
+      expect(res.status).toBe(status);
+      expect(await res.json()).toMatchObject({ code });
+    },
+  );
+
+  it('[WI-811] maps orchestrator ProfileValidationError to a 400 validation error (flag-on)', async () => {
+    getOwnerProfileV2Mock.mockResolvedValue(
+      makeProfileRow({ id: PROFILE_ID_A, isOwner: true }),
+    );
+    createChildProfileV2Mock.mockRejectedValue(
+      new ProfileValidationError(
+        'CHILD_AGE_VIOLATION',
+        'birthYear',
+        'Users must be at least 13 years old to create a profile',
+      ),
+    );
+
+    const res = await postChild();
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
   });
 });
 
