@@ -55,6 +55,7 @@
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
+- [feedback_code_review_should_fix.md](feedback_code_review_should_fix.md) — Valid code-review should-fixes get fixed now; never ask whether to fix, only rule on validity. "Ping on findings" = surface, not ask-permission.
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
 - [feedback_test_receipts.md](feedback_test_receipts.md) — Stale `.test-receipts/*` push-hook failures: record, verify, then commit receipt-only follow-up.

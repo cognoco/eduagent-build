@@ -69,6 +69,11 @@ jest.mock(
 
 import { quotaReset } from './quota-reset';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+// [WI-810] spy on the real billing helpers (NOT a jest.mock module mock — GC1
+// clean) to assert which quota-cycle reset the flag routes to.
+import * as billing from '../../services/billing';
+import * as billingV2 from '../../services/billing/billing-v2';
+import { setIdentityV2Enabled } from '../helpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -239,6 +244,51 @@ describe('quotaReset', () => {
 
       // Verify the timestamp is a valid ISO string in UTC
       expect(result.timestamp).toBe('2025-03-30T01:00:00.000Z');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // [WI-810] identity-v2 gating of the monthly quota-cycle reset. flag-on must
+  // route to resetExpiredQuotaCyclesV2 (joins the v2 `subscription` table); the
+  // legacy resetExpiredQuotaCycles joins the `subscriptions` table dropped at the
+  // cutover (WI-805) and would FK/500 at the #8 flag-flip. resetDailyQuotas is
+  // unaffected (no subscriptions read). spyOn (not jest.mock) keeps it GC1-clean.
+  // -----------------------------------------------------------------------
+  describe('[WI-810] monthly quota-cycle reset identity-v2 gating', () => {
+    afterEach(() => {
+      setIdentityV2Enabled(undefined);
+    });
+
+    it('flag-off → legacy resetExpiredQuotaCycles (joins the dropped subscriptions table)', async () => {
+      setIdentityV2Enabled('false');
+      const legacy = jest
+        .spyOn(billing, 'resetExpiredQuotaCycles')
+        .mockResolvedValue(3);
+      const v2 = jest
+        .spyOn(billingV2, 'resetExpiredQuotaCyclesV2')
+        .mockResolvedValue(99);
+
+      const { result } = await executeSteps();
+
+      expect(legacy).toHaveBeenCalledTimes(1);
+      expect(v2).not.toHaveBeenCalled();
+      expect(result.monthlyResetCount).toBe(3);
+    });
+
+    it('flag-on → resetExpiredQuotaCyclesV2 (joins the v2 subscription table, survives M-DROP)', async () => {
+      setIdentityV2Enabled('true');
+      const legacy = jest
+        .spyOn(billing, 'resetExpiredQuotaCycles')
+        .mockResolvedValue(3);
+      const v2 = jest
+        .spyOn(billingV2, 'resetExpiredQuotaCyclesV2')
+        .mockResolvedValue(7);
+
+      const { result } = await executeSteps();
+
+      expect(v2).toHaveBeenCalledTimes(1);
+      expect(legacy).not.toHaveBeenCalled();
+      expect(result.monthlyResetCount).toBe(7);
     });
   });
 });

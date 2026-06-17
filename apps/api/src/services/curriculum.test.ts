@@ -2474,6 +2474,7 @@ describe('repairIncompleteBookGenerationClaim', () => {
         {
           generateBookTopics: jest.fn(),
           captureException: jest.fn(),
+          identityV2Enabled: false,
         },
       );
 
@@ -2481,6 +2482,128 @@ describe('repairIncompleteBookGenerationClaim', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  // [WI-586 MISS 3] The cutover flag selects the v2 learner-age reader
+  // (`getPersonAge` → person.birth_date) vs the legacy reader (`getProfileAge`
+  // → profiles.birth_year, dropped post-flip). A stale, incomplete generated
+  // book passes all three repair guards and reaches the age read; the age value
+  // is observable through the injected `generateBookTopics` dep, which fires
+  // before any downstream persist. Distinct non-absent ages (36 vs 12) make the
+  // branch differential — flipping the flag changes the asserted age.
+  describe('[WI-586] learner-age reader is flag-gated', () => {
+    const STALE_AT = '2025-01-01T00:00:00.000Z';
+
+    const staleIncompleteBook: BookWithTopics = {
+      book: {
+        id: 'book-1',
+        subjectId: SUBJECT_ID,
+        title: 'Ancient Egypt',
+        description: 'Explore pyramids and pharaohs',
+        emoji: null,
+        sortOrder: 1,
+        topicsGenerated: true,
+        createdAt: STALE_AT,
+        updatedAt: STALE_AT,
+      },
+      topics: [
+        {
+          id: 'topic-1',
+          title: 'Pyramids',
+          description: 'Why pyramids mattered',
+          chapter: 'The Story',
+          sortOrder: 1,
+          relevance: 'core',
+          estimatedMinutes: 20,
+          bookId: 'book-1',
+          skipped: false,
+          source: 'generated',
+        },
+      ],
+      connections: [],
+      status: 'NOT_STARTED',
+      completedTopicCount: 0,
+      completedTopicIds: [],
+    };
+
+    // Fake db with two distinct readers: legacy `profiles` → age 12,
+    // v2 `person` → age 36. The persist after generation throws on this fake
+    // db, which is fine — the age-arg assertion fires on the generation spy
+    // that runs first.
+    function makeFakeDb() {
+      return {
+        query: {
+          profiles: {
+            findFirst: jest.fn().mockResolvedValue({ birthYear: 2014 }),
+          },
+          person: {
+            findFirst: jest.fn().mockResolvedValue({ birthDate: '1990-01-01' }),
+          },
+        },
+      } as unknown as Database;
+    }
+
+    it('flag OFF → reads legacy getProfileAge (age 12) for generation', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      try {
+        const genSpy = jest.fn();
+        await expect(
+          repairIncompleteBookGenerationClaim(
+            makeFakeDb(),
+            PROFILE_ID,
+            SUBJECT_ID,
+            'book-1',
+            staleIncompleteBook,
+            undefined,
+            {
+              generateBookTopics: genSpy,
+              captureException: jest.fn(),
+              identityV2Enabled: false,
+            },
+          ),
+        ).rejects.toBeDefined();
+
+        expect(genSpy).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.anything(),
+          12,
+          expect.anything(),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('flag ON → reads v2 getPersonAge (age 36) for generation', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      try {
+        const genSpy = jest.fn();
+        await expect(
+          repairIncompleteBookGenerationClaim(
+            makeFakeDb(),
+            PROFILE_ID,
+            SUBJECT_ID,
+            'book-1',
+            staleIncompleteBook,
+            undefined,
+            {
+              generateBookTopics: genSpy,
+              captureException: jest.fn(),
+              identityV2Enabled: true,
+            },
+          ),
+        ).rejects.toBeDefined();
+
+        expect(genSpy).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.anything(),
+          36,
+          expect.anything(),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });
 

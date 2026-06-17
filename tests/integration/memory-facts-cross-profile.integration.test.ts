@@ -14,14 +14,13 @@
  * Only external boundary mocked here: none - no LLM calls, no auth.
  */
 
-import { eq } from 'drizzle-orm';
-import {
-  accounts,
-  createScopedRepository,
-  memoryFacts,
-} from '@eduagent/database';
+import { createScopedRepository, memoryFacts } from '@eduagent/database';
 import { getRelevantMemories } from '../../apps/api/src/services/memory/relevance';
-import { seedLearningProfile, setupTestDb } from './helpers/memory-facts';
+import {
+  cleanupSeededAccount,
+  seedLearningProfile,
+  setupTestDb,
+} from './helpers/memory-facts';
 
 // ---------------------------------------------------------------------------
 // Deterministic 1024-dimensional unit-basis vectors.
@@ -136,8 +135,8 @@ describe('memory_facts cross-profile isolation - getRelevantMemories (I5)', () =
       ).toBe(true);
     } finally {
       // Cascade-delete via accounts (profiles and memoryFacts cascade).
-      await db.delete(accounts).where(eq(accounts.id, accountA));
-      await db.delete(accounts).where(eq(accounts.id, accountB));
+      await cleanupSeededAccount(db, accountA);
+      await cleanupSeededAccount(db, accountB);
     }
   });
 
@@ -208,8 +207,8 @@ describe('memory_facts cross-profile isolation - getRelevantMemories (I5)', () =
       expect(rawCandidates.length).toBeGreaterThan(0);
       expect(rawCandidates.every((c) => c.profileId === profileA)).toBe(true);
     } finally {
-      await db.delete(accounts).where(eq(accounts.id, accountA));
-      await db.delete(accounts).where(eq(accounts.id, accountB));
+      await cleanupSeededAccount(db, accountA);
+      await cleanupSeededAccount(db, accountB);
     }
   });
 });

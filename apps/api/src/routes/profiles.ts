@@ -19,12 +19,22 @@ import type { ClerkIdentity } from '../middleware/account';
 import { requireAccount } from '../middleware/profile-scope';
 import { isIdentityV2Enabled } from '../config';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
+import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
 import {
   getOwnerProfileV2,
   listProfilesV2,
+  getProfileV2,
+  getPersonScope,
+  updateProfileV2,
 } from '../services/identity-v2/profile-v2';
 
-import { notFound, forbidden, validationError, apiError } from '../errors';
+import {
+  notFound,
+  forbidden,
+  validationError,
+  apiError,
+  ConflictError,
+} from '../errors';
 import {
   listProfiles,
   createProfileWithLimitCheck,
@@ -141,17 +151,85 @@ export const profileRoutes = new Hono<ProfileEnv>()
       //   - an idempotent replay of the owner create (network retry /
       //     double-submit) → return the existing owner profile, NOT a second
       //     create (and NEVER the legacy writer).
-      //   - a genuine CHILD create → needs the consent WRITE machine, which is
-      //     CUT-B2 scope; refuse cleanly rather than corrupt the store.
+      //   - a genuine CHILD create (kind:'child') → createChildProfileV2 writes
+      //     the managed child + guardianship edge + direct consent grant.
       const resolvedAccount = c.get('account');
       if (resolvedAccount) {
+        // [WI-811 review / Codex P1 + CONSIDER] Owner-only authorization for the
+        // add-child path, fail-closed, BEFORE the owner DB fetch (fast-fail: a
+        // non-owner caller never triggers the read). profileMeta (resolved in
+        // profile-scope.ts) is authoritative: owner via header/auto-resolve →
+        // isOwner:true; a child via X-Profile-Id → isOwner:false; unresolved →
+        // undefined → reject. Deliberately NOT the legacy
+        // assertProfileCreationAllowed — flag-on its profileMeta-absent fallback
+        // counts the EMPTY legacy `profiles` table → 0 → fails OPEN; and an
+        // add-child is provably never a first-profile bootstrap.
+        if (input.kind === 'child' && c.get('profileMeta')?.isOwner !== true) {
+          return apiError(
+            c,
+            403,
+            ERROR_CODES.FORBIDDEN,
+            'Only the account owner can add a child profile.',
+          );
+        }
+
         const owner = await getOwnerProfileV2(db, resolvedAccount.id);
+
+        // [WI-811 / CUT-B2] Genuine add-child create. The explicit discriminator
+        // distinguishes this from an idempotent owner replay so a child-create
+        // is NEVER silently answered with the owner profile. The organization is
+        // ALWAYS resolvedAccount.id (the authenticated caller's org), never a
+        // client value — the cross-org isolation guard.
+        if (input.kind === 'child') {
+          if (!owner) {
+            // No owner to parent the child under — structurally-broken graph.
+            return apiError(
+              c,
+              409,
+              ERROR_CODES.CONFLICT,
+              'Cannot add a child before the account owner exists.',
+            );
+          }
+          try {
+            const child = await createChildProfileV2(db, {
+              organizationId: resolvedAccount.id,
+              input,
+              // [OPT-C] Default 'true' when binding missing (matches legacy).
+              adultOwnerGateEnabled:
+                c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
+            });
+            return c.json(profileResponseSchema.parse({ profile: child }), 201);
+          } catch (err) {
+            if (err instanceof ForbiddenError) {
+              return apiError(c, 403, ERROR_CODES.FORBIDDEN, err.message);
+            }
+            if (err instanceof ProfileLimitError) {
+              return apiError(
+                c,
+                402,
+                ERROR_CODES.PROFILE_LIMIT_EXCEEDED,
+                'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
+              );
+            }
+            if (err instanceof ProfileValidationError) {
+              return validationError(c, { [err.field]: [err.message] });
+            }
+            if (err instanceof ConflictError) {
+              // Defense-in-depth: the orchestrator throws ConflictError if the
+              // org has no owner (a structurally-broken graph / TOCTOU race the
+              // pre-call owner check + advisory lock normally prevent). Surface
+              // it as a 409 — consistent with the no-owner 409 below — not a 500.
+              return apiError(c, 409, ERROR_CODES.CONFLICT, err.message);
+            }
+            throw err;
+          }
+        }
+
         if (owner) {
           // Idempotent replay of the owner bootstrap.
           return c.json(profileResponseSchema.parse({ profile: owner }), 201);
         }
-        // No owner under a resolved account is a structurally-broken graph;
-        // child creation is not yet wired (CUT-B2). Refuse, don't fall through.
+        // No owner under a resolved account is a structurally-broken graph.
         return apiError(
           c,
           409,
@@ -168,6 +246,20 @@ export const profileRoutes = new Hono<ProfileEnv>()
           401,
           ERROR_CODES.UNAUTHORIZED,
           'Authentication required to create a profile.',
+        );
+      }
+      // [WI-811 fail-closed / ic-117] A kind:'child' create is only valid once
+      // the account owner exists. Pre-graph there is no owner yet, so this must
+      // fail closed — NOT fall through to createIdentityGraph below, which would
+      // bootstrap the caller AS the owner (a silent privilege grant). The owner
+      // gate above only guards the post-graph branch; this is its pre-graph
+      // counterpart. Mirrors the post-graph no-owner 409.
+      if (input.kind === 'child') {
+        return apiError(
+          c,
+          409,
+          ERROR_CODES.CONFLICT,
+          'Cannot add a child before the account owner exists.',
         );
       }
       try {
@@ -236,7 +328,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
-    const profile = await getProfile(db, c.req.param('id'), account.id);
+    // [WI-586 C1] v2 seam: getProfileV2 reads person/membership/guardianship
+    // (no profiles/family_links/consent_states touch). Flag-off unchanged.
+    const profile = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+      ? await getProfileV2(db, c.req.param('id'), account.id)
+      : await getProfile(db, c.req.param('id'), account.id);
     if (!profile) return notFound(c, 'Profile not found');
     return c.json(profileResponseSchema.parse({ profile }));
   })
@@ -306,7 +402,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
         );
       }
 
-      const profile = await updateProfile(db, id, account.id, input);
+      // [WI-586 C2] v2 seam: updateProfileV2 writes person table columns
+      // (displayName/avatarUrl/conversationLanguage/pronouns) via an atomic
+      // membership-scoped UPDATE. Flag-off unchanged.
+      const profile = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+        ? await updateProfileV2(db, id, account.id, input)
+        : await updateProfile(db, id, account.id, input);
       if (!profile) return notFound(c, 'Profile not found');
       return c.json(profileResponseSchema.parse({ profile }));
     },
@@ -324,8 +425,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // the account can legitimately switch to another profile on the same
       // account — e.g., a child handing the device back to a parent.
       // [CR-2026-05-19-H1 note: intentionally left without owner gate]
-      const result = await switchProfile(db, profileId, account.id);
-      if (!result)
+      // [WI-586 T1] v2 seam: getPersonScope verifies person ↔ org membership
+      // (no profiles table touch). Returns null when not found → same 403.
+      const found = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+        ? await getPersonScope(db, profileId, account.id)
+        : await switchProfile(db, profileId, account.id);
+      if (!found)
         return forbidden(c, 'Profile does not belong to this account');
       return c.json(
         profileSwitchResponseSchema.parse({

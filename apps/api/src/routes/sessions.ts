@@ -82,6 +82,7 @@ import {
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
 import { getProfileAgeBracket } from '../services/profile';
+import { getPersonAgeBracket } from '../services/identity-v2/helpers';
 import {
   markPersisted,
   MAX_IDEMPOTENCY_KEY_LENGTH,
@@ -92,6 +93,7 @@ import {
   isTopicIntentMatcherEnabled,
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
+  isIdentityV2Enabled,
 } from '../config';
 import { FILING_CONFIG } from '../config/filing';
 
@@ -208,6 +210,7 @@ type SessionRouteEnv = {
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
+    IDENTITY_V2_ENABLED?: string;
     IDEMPOTENCY_KV?: KVNamespace;
     ENVIRONMENT?: string;
   };
@@ -276,6 +279,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           input,
           {
             matcherEnabled: isTopicIntentMatcherEnabled(c.env.MATCHER_ENABLED),
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           },
         );
         // [L8-F11] Validate response shape against the public contract.
@@ -555,6 +559,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
             challengeRoundRuntimeEnabled,
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           },
         );
         await markPersisted({
@@ -634,7 +639,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
       }
 
-      const ageBracket = await getProfileAgeBracket(db, profileId);
+      // [WI-586 flip-safety] v2 reads the age bracket from `person`; flag-off
+      // legacy reads `profiles` (dropped post-#8). Route-context flag mechanism.
+      const ageBracket = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+        ? await getPersonAgeBracket(db, profileId)
+        : await getProfileAgeBracket(db, profileId);
       const result = await evaluateSessionDepth(transcript, { ageBracket });
       const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
         if (exchange.role !== 'user') return sum;
@@ -740,6 +749,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
             challengeRoundRuntimeEnabled,
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           },
         );
 
@@ -809,6 +819,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     memoryFactsReadEnabled,
                     memoryFactsRelevanceEnabled,
                     challengeRoundRuntimeEnabled,
+                    identityV2Enabled: isIdentityV2Enabled(
+                      c.env?.IDENTITY_V2_ENABLED,
+                    ),
                   },
                 );
                 const eventType = chunkCount === 0 ? 'chunk' : 'replace';
@@ -1186,6 +1199,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 memoryFactsReadEnabled,
                 memoryFactsRelevanceEnabled,
                 challengeRoundRuntimeEnabled,
+                identityV2Enabled: isIdentityV2Enabled(
+                  c.env?.IDENTITY_V2_ENABLED,
+                ),
               },
             );
             return streamSSEUtf8(c, async (sseStream) => {

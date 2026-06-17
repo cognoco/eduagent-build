@@ -21,8 +21,8 @@
 //      family_links row is NOT returned for an unrelated parent under flag-on
 //      (IDOR guard holds via guardianship scope).
 //
-// Seeding: only `person`, `membership`, `organization`, `guardianship`, `accounts`,
-// `profiles` — no `family_links`. The v2 path never touches family_links.
+// Seeding: only `person`, `membership`, `organization`, `guardianship` — no
+// `family_links`, `accounts`, or `profiles`. The v2 path never touches those.
 //
 // Pattern: `(RUN ? describe : describe.skip)` — skips silently when DATABASE_URL
 // is absent (unit/local runs without a DB).
@@ -32,14 +32,13 @@ import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
+  // [WI-586] drop-4: accounts/profiles removed; v2 path only needs person/org.
   createDatabase,
   generateUUIDv7,
   guardianship,
   membership,
   organization,
   person,
-  profiles,
   type Database,
 } from '@eduagent/database';
 import { getChildrenForParent } from '../dashboard';
@@ -57,21 +56,14 @@ const RUN = !!process.env.DATABASE_URL;
     let db: Database;
     const personIds: string[] = [];
     const orgIds: string[] = [];
-    const profileIds: string[] = [];
-    const accountIds: string[] = [];
 
     beforeAll(() => {
       db = createDatabase(process.env.DATABASE_URL!);
     });
 
     afterEach(async () => {
-      // Clean up in FK-safe order: profiles → accounts, then v2 graph tables.
-      for (const pid of profileIds) {
-        await db.delete(profiles).where(eq(profiles.id, pid));
-      }
-      for (const aid of accountIds) {
-        await db.delete(accounts).where(eq(accounts.id, aid));
-      }
+      // [WI-586] drop-4: v2-only cleanup — guardianship RESTRICT → delete before person.
+      // person ON DELETE CASCADE removes membership rows.
       for (const pid of personIds) {
         await db
           .delete(guardianship)
@@ -87,12 +79,10 @@ const RUN = !!process.env.DATABASE_URL;
       }
       personIds.length = 0;
       orgIds.length = 0;
-      profileIds.length = 0;
-      accountIds.length = 0;
     });
 
     const RUN_ID = generateUUIDv7();
-    let seedCounter = 0;
+    const seedCounter = 0;
 
     async function seedOrg(): Promise<string> {
       const [org] = await db
@@ -124,35 +114,9 @@ const RUN = !!process.env.DATABASE_URL;
       return p!.id;
     }
 
-    async function seedLegacyProfile(
-      personId: string,
-      displayName: string,
-    ): Promise<string> {
-      // person.id == profiles.id in the v1 identity model.
-      // We seed a minimal profile row so the dashboard body queries
-      // (profiles.findMany, subjects.findMany, etc.) resolve correctly.
-      const idx = ++seedCounter;
-      const clerkUserId = `clerk_802_${RUN_ID}_${idx}`;
-      const email = `wi-802-${RUN_ID}-${idx}@test.invalid`;
-      const [account] = await db
-        .insert(accounts)
-        .values({ clerkUserId, email })
-        .returning({ id: accounts.id });
-      accountIds.push(account!.id);
-
-      const [profile] = await db
-        .insert(profiles)
-        .values({
-          id: personId, // v2 alignment: person.id == profiles.id
-          accountId: account!.id,
-          displayName,
-          birthYear: 1990,
-          isOwner: false,
-        })
-        .returning({ id: profiles.id });
-      profileIds.push(profile!.id);
-      return profile!.id;
-    }
+    // [WI-586] drop-4: seedLegacyProfile removed — the v2 path reads person.displayName,
+    // not profiles.displayName. seedPerson already creates the person row with the
+    // correct displayName; no legacy profile row is needed.
 
     async function grantGuardianshipEdge(
       guardianId: string,
@@ -187,9 +151,6 @@ const RUN = !!process.env.DATABASE_URL;
           displayName: 'Child802',
           roles: ['learner'],
         });
-
-        // Seed a legacy profile for the child so the batch profiles query resolves.
-        await seedLegacyProfile(chargePersonId, 'Child802');
 
         // Grant ONLY a guardianship edge — NO family_links row exists.
         await grantGuardianshipEdge(guardianPersonId, chargePersonId);
@@ -226,7 +187,6 @@ const RUN = !!process.env.DATABASE_URL;
         const guardianB = await seedPerson(orgId, { displayName: 'GuardianB' });
         const chargeOfB = await seedPerson(orgId, { displayName: 'ChargeOfB' });
 
-        await seedLegacyProfile(chargeOfB, 'ChargeOfB');
         await grantGuardianshipEdge(guardianB, chargeOfB);
         // Guardian A has NO edge to chargeOfB — must not see chargeOfB.
 
@@ -266,7 +226,6 @@ const RUN = !!process.env.DATABASE_URL;
           roles: ['learner'],
         });
 
-        await seedLegacyProfile(chargeInOrg2, 'ChargeInOrg2');
         // Active guardianship edge that crosses the org boundary.
         await grantGuardianshipEdge(guardianA, chargeInOrg2);
 
@@ -308,7 +267,6 @@ const RUN = !!process.env.DATABASE_URL;
           displayName: 'ChildStruggle',
           roles: ['learner'],
         });
-        await seedLegacyProfile(chargePersonId, 'ChildStruggle');
         await grantGuardianshipEdge(guardianPersonId, chargePersonId);
 
         const result = await sendStruggleNotification(
@@ -340,7 +298,6 @@ const RUN = !!process.env.DATABASE_URL;
           displayName: 'ChildSubscribe',
           roles: ['learner'],
         });
-        await seedLegacyProfile(chargePersonId, 'ChildSubscribe');
         await grantGuardianshipEdge(guardianPersonId, chargePersonId);
 
         // Must NOT throw `relation "family_links" does not exist` and must NOT

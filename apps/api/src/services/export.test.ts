@@ -696,3 +696,83 @@ describe('generateExport', () => {
     expect(mockDb.query.mentorActivityLedger.findMany).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-809] generateExport(learningOnlyProfileIds) branch — NO-DB unit coverage.
+// generateExportV2 calls generateExport with this opt so the legacy export half
+// skips the four identity tables dropped at M-DROP (accounts/profiles/
+// consent_states/family_links) — they 500 post-drop. This is the only changed
+// prod path whose integration test is blocked by staging drift (subscriptions
+// dropped early), so cover the branching here against the existing mock db.
+// ---------------------------------------------------------------------------
+
+describe('generateExport — [WI-809] learningOnlyProfileIds branch', () => {
+  it('skips the four dropped-identity reads; keeps learning + billing reads keyed on the passed ids', async () => {
+    // Seed the identity tables too — a correct learningOnly path must NOT touch them.
+    const db = createMockDb({
+      account: mockAccountRow(),
+      profiles: [mockProfileRow('person-1', 'Charge One')],
+      consents: [mockConsentRow('person-1')],
+      familyLinks: [
+        { parentProfileId: 'g-1', childProfileId: 'person-1', createdAt: NOW },
+      ],
+      subjects: [
+        {
+          id: 'subj-1',
+          profileId: 'person-1',
+          name: 'Math',
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ],
+    });
+
+    const result = await generateExport(db, 'org-1', {
+      learningOnlyProfileIds: ['person-1'],
+    });
+
+    const q = (
+      db as unknown as {
+        query: Record<string, { findMany?: jest.Mock; findFirst?: jest.Mock }>;
+      }
+    ).query;
+    // The four dropped-identity reads are SKIPPED flag-on (would 500 post-drop).
+    expect(q.accounts!.findFirst!).not.toHaveBeenCalled();
+    expect(q.profiles!.findMany!).not.toHaveBeenCalled();
+    expect(q.consentStates!.findMany!).not.toHaveBeenCalled();
+    expect(q.familyLinks!.findMany!).not.toHaveBeenCalled();
+
+    // Identity sections are empty placeholders (the v2 caller overrides them).
+    expect(result.account).toEqual({
+      email: '',
+      createdAt: expect.any(String),
+    });
+    expect(result.profiles).toEqual([]);
+    expect(result.consentStates).toEqual([]);
+    expect(result.familyLinks).toEqual([]);
+
+    // The learning-data half STILL runs, keyed on the passed ids.
+    expect(q.subjects!.findMany!).toHaveBeenCalled();
+    expect(result.subjects).toHaveLength(1);
+    // The billing chain (subscriptions → quota/top-ups) is RETAINED (WI-805 scope).
+    expect(q.subscriptions!.findMany!).toHaveBeenCalled();
+  });
+
+  it('[non-vacuous] WITHOUT learningOnlyProfileIds the four dropped-identity reads DO run', async () => {
+    const db = createMockDb({
+      profiles: [mockProfileRow('person-1', 'Charge One')],
+    });
+
+    await generateExport(db, 'account-1');
+
+    const q = (
+      db as unknown as {
+        query: Record<string, { findMany?: jest.Mock; findFirst?: jest.Mock }>;
+      }
+    ).query;
+    expect(q.accounts!.findFirst!).toHaveBeenCalled();
+    expect(q.profiles!.findMany!).toHaveBeenCalled();
+    expect(q.consentStates!.findMany!).toHaveBeenCalled();
+    expect(q.familyLinks!.findMany!).toHaveBeenCalled();
+  });
+});

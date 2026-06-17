@@ -12,14 +12,17 @@
 
 import { and, eq, isNull } from 'drizzle-orm';
 import {
-  accounts,
   createScopedRepository,
   generateUUIDv7,
   memoryFacts,
 } from '@eduagent/database';
 import { runDedupForProfile } from '../../apps/api/src/services/memory/dedup-pass';
 import type { DedupLlmResult } from '../../apps/api/src/services/memory/dedup-llm';
-import { seedLearningProfile, setupTestDb } from './helpers/memory-facts';
+import {
+  cleanupSeededAccount,
+  seedLearningProfile,
+  setupTestDb,
+} from './helpers/memory-facts';
 
 // ---------------------------------------------------------------------------
 // Shared 1024-d embedding helpers
@@ -125,7 +128,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
     expect(merged?.text).toBe('likes fractions and fraction work');
 
     // cleanup
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('supersede: neighbour is marked superseded, candidate remains active', async () => {
@@ -187,7 +190,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
     });
     expect(candidate?.supersededBy).toBeNull();
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('keep_both: neither row is modified', async () => {
@@ -248,7 +251,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
     expect(cRow?.supersededBy).toBeNull();
     expect(nRow?.supersededBy).toBeNull();
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('discard_new: candidate row is deleted, neighbour remains', async () => {
@@ -310,7 +313,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
     });
     expect(nRow).not.toBeNull();
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('profile isolation: dedup on profile A does not affect profile B facts', async () => {
@@ -383,7 +386,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
     expect(bRow).not.toBeNull();
     expect(bRow?.supersededBy).toBeNull();
 
-    await db.delete(accounts).where(eq(accounts.id, accountA));
-    await db.delete(accounts).where(eq(accounts.id, accountB));
+    await cleanupSeededAccount(db, accountA);
+    await cleanupSeededAccount(db, accountB);
   });
 });

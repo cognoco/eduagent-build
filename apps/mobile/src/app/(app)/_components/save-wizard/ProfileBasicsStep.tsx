@@ -147,13 +147,17 @@ export function ProfileBasicsStep({
       let child: Profile | undefined;
       if (needsChild) {
         try {
-          // [CRITICAL-1] No `forChild` field. profileCreateSchema rejects it;
-          // server auto-classifies non-first POST as child via
-          // createProfileWithLimitCheck (apps/api/src/services/profile.ts:253).
+          // [WI-811] Explicit `kind:'child'` discriminator. Flag-OFF (legacy
+          // createProfileWithLimitCheck) ignores it and still auto-classifies the
+          // non-first POST as a child by profile count, so this is byte-compatible
+          // with the legacy server. Flag-ON (IDENTITY_V2_ENABLED) needs it: the
+          // post-graph POST routes to createChildProfileV2 instead of the
+          // idempotent owner replay (a child-create must never return the owner).
           const res = await client.profiles.$post({
             json: {
               displayName: childName.trim(),
               birthYear: Number(childBirthYear),
+              kind: 'child',
             },
           });
           await assertOk(res);

@@ -1,5 +1,20 @@
 import { inArray } from 'drizzle-orm';
-import { accounts, createDatabase } from '@eduagent/database';
+import {
+  accounts,
+  consentGrant,
+  createDatabase,
+  guardianship,
+  login,
+  membership,
+  organization,
+  person,
+  subscription,
+  supportership,
+} from '@eduagent/database';
+
+function isIdentityV2Enabled(): boolean {
+  return process.env.IDENTITY_V2_ENABLED === 'true';
+}
 
 type IntegrationEnvOverrides = Partial<{
   ENVIRONMENT: string;
@@ -16,14 +31,14 @@ export function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local before running real integration tests.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local before running real integration tests.',
     );
   }
   return url;
 }
 
 export function buildIntegrationEnv(
-  overrides: IntegrationEnvOverrides = {}
+  overrides: IntegrationEnvOverrides = {},
 ): Record<string, string> {
   return {
     ENVIRONMENT: 'test',
@@ -34,6 +49,14 @@ export function buildIntegrationEnv(
     CLERK_AUDIENCE: INTEGRATION_TEST_AUDIENCE,
     APP_URL: 'https://app.mentomate.test',
     API_ORIGIN: 'https://api.integration.test',
+    // [WI-586] Routes read the identity-v2 flag from the per-request env
+    // (`c.env.IDENTITY_V2_ENABLED`), not process.env. Propagate the process-level
+    // flag (set job-level by the flag-ON CI lane) into the request env so the
+    // HTTP-route surface exercises the v2 path flag-ON. Mirror the value (do NOT
+    // force 'true') so the flag-OFF default lane keeps the legacy path.
+    ...(process.env.IDENTITY_V2_ENABLED !== undefined
+      ? { IDENTITY_V2_ENABLED: process.env.IDENTITY_V2_ENABLED }
+      : {}),
     ...overrides,
   };
 }
@@ -47,6 +70,104 @@ export async function cleanupAccounts(input: {
   clerkUserIds?: string[];
 }): Promise<void> {
   const db = createIntegrationDb();
+
+  // [WI-586] Flag-ON the close-gate DB is committed-migrations-only (M-DROP
+  // applied), so the legacy `accounts` table does not exist. Flag-ON the
+  // identity graph is person/organization/login/membership/guardianship.
+  // Resolve the seeded owner via `login` (same email/clerkUserId keys), expand
+  // to ALL persons in their organizations (children have no login row), then
+  // tear the graph down in FK-safe order: guardianship edges (onDelete RESTRICT
+  // on person) first, then person (cascades login/membership), then the org.
+  if (isIdentityV2Enabled()) {
+    const ownerPersonIds = new Set<string>();
+    const orgIds = new Set<string>();
+
+    if (input.emails && input.emails.length > 0) {
+      const rows = await db.query.login.findMany({
+        where: inArray(login.email, input.emails),
+        columns: { personId: true },
+      });
+      rows.forEach((row) => ownerPersonIds.add(row.personId));
+    }
+    if (input.clerkUserIds && input.clerkUserIds.length > 0) {
+      const rows = await db.query.login.findMany({
+        where: inArray(login.clerkUserId, input.clerkUserIds),
+        columns: { personId: true },
+      });
+      rows.forEach((row) => ownerPersonIds.add(row.personId));
+    }
+
+    if (ownerPersonIds.size === 0) {
+      return;
+    }
+
+    // Resolve the orgs the seeded owners belong to.
+    const ownerMemberships = await db.query.membership.findMany({
+      where: inArray(membership.personId, [...ownerPersonIds]),
+      columns: { organizationId: true },
+    });
+    ownerMemberships.forEach((row) => orgIds.add(row.organizationId));
+
+    // Expand to every person in those orgs (children have no login row).
+    const allPersonIds = new Set<string>([...ownerPersonIds]);
+    if (orgIds.size > 0) {
+      const orgMemberships = await db.query.membership.findMany({
+        where: inArray(membership.organizationId, [...orgIds]),
+        columns: { personId: true },
+      });
+      orgMemberships.forEach((row) => allPersonIds.add(row.personId));
+    }
+
+    const personIdList = [...allPersonIds];
+    const orgIdList = [...orgIds];
+    // [WI-586] FK-safe teardown order. The owner-bootstrap (createIdentityGraph)
+    // now provisions a subscription (payer_person_id → person, organization_id →
+    // organization, both onDelete RESTRICT) plus its cascade children. consent
+    // grants and supportership edges are also RESTRICT on person. Every RESTRICT
+    // edge into person/organization must be cleared before the person/org delete.
+    //
+    // Order:
+    //   1. guardianship edges (RESTRICT on person, both directions)
+    //   2. consent_grant     (RESTRICT on person AND organization)
+    //   3. supportership     (RESTRICT on person, both directions)
+    //   4. subscription      (RESTRICT on person AND organization; CASCADE its
+    //                         own children — quota_pools, profile_quota_usage,
+    //                         subscription_payers, top_up_credits, usage_events)
+    //   5. person            (CASCADE login, membership)
+    //   6. organization
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.guardianPersonId, personIdList));
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.chargePersonId, personIdList));
+    await db
+      .delete(supportership)
+      .where(inArray(supportership.supporterPersonId, personIdList));
+    await db
+      .delete(supportership)
+      .where(inArray(supportership.supporteePersonId, personIdList));
+    await db
+      .delete(consentGrant)
+      .where(inArray(consentGrant.chargePersonId, personIdList));
+    if (orgIdList.length > 0) {
+      await db
+        .delete(consentGrant)
+        .where(inArray(consentGrant.organizationId, orgIdList));
+      await db
+        .delete(subscription)
+        .where(inArray(subscription.organizationId, orgIdList));
+    }
+    await db
+      .delete(subscription)
+      .where(inArray(subscription.payerPersonId, personIdList));
+    await db.delete(person).where(inArray(person.id, personIdList));
+    if (orgIdList.length > 0) {
+      await db.delete(organization).where(inArray(organization.id, orgIdList));
+    }
+    return;
+  }
+
   const accountIds = new Set<string>();
 
   if (input.emails && input.emails.length > 0) {

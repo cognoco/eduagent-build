@@ -256,7 +256,11 @@ jobs:
       # drizzle-kit ignores the SQL comment and would apply them; this guard
       # turns that silent catastrophe into a loud, safe failure until the
       # baseline reset (MMT-ADR-0012) removes them from the chain.
-      - name: Guard against reference-only migrations
+      # [WI-586] The same guard also blocks journaled FREEZE-ONLY migrations
+      # (`-- @freeze-only`, e.g. the M-REPOINT / M-DROP cutover pair) unless the
+      # explicit freeze signal ALLOW_FREEZE_MIGRATIONS=true is set for the run,
+      # so a re-journaled freeze migration cannot auto-drop live tables.
+      - name: Guard against reference-only and freeze-only migrations
         working-directory: packages/database
         run: node scripts/check-reference-only-migrations.mjs
 

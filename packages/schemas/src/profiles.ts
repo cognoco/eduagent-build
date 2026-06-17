@@ -68,6 +68,13 @@ export const profileCreateSchema = z
     location: locationSchema.optional(),
     conversationLanguage: conversationLanguageSchema.optional(),
     pronouns: pronounsSchema.nullable().optional(),
+    // WI-811: flag-on add-child discriminator. Absent = owner bootstrap/replay
+    // (the historical payload). Flag-off ignores it entirely — the legacy
+    // createProfileWithLimitCheck classifies first-vs-child by profile COUNT,
+    // so existing payloads stay byte-identical. Under IDENTITY_V2_ENABLED,
+    // kind:'child' routes the post-graph POST to createChildProfileV2 instead
+    // of the idempotent owner replay.
+    kind: z.enum(['owner', 'child']).optional(),
   })
   .strict();
 
@@ -82,7 +89,14 @@ export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 // creation, never persisted); they must not appear in PATCH payloads.
 export const profileUpdateSchema = profileCreateSchema
   .partial()
-  .omit({ birthYear: true, location: true, birthMonth: true, birthDay: true })
+  .omit({
+    birthYear: true,
+    location: true,
+    birthMonth: true,
+    birthDay: true,
+    // WI-811: `kind` is create-only (owner-vs-child at creation), never patched.
+    kind: true,
+  })
   .strict();
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 

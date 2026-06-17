@@ -55,12 +55,14 @@ import {
  * subscriptions) with reads from the v2 tables. `accountId` = organization.id by
  * the deterministic reseed.
  *
- * NOTE: the legacy half still reads legacy identity tables for `account` /
- * `profiles` / `consentStates` / `familyLinks` / `subscriptions`; we discard
- * those fields and replace them, so the only values surfaced from legacy are the
- * learning-data arrays. This is intentional during the cutover — at grep-clean
- * (WI-586) the legacy export and this delegation are deleted together and the
- * learning reads fold directly into a single v2 export.
+ * NOTE: [WI-809] the legacy half is now called with `learningOnlyProfileIds`, so
+ * it no longer reads the four identity tables dropped at the cutover (accounts /
+ * profiles / consent_states / family_links) — those reads would 500 post-drop.
+ * It still reads the legacy `subscriptions` billing chain (quotaPools /
+ * topUpCredits surface from legacy; the WI-805 billing cutover owns that drop),
+ * and the identity sections it returns are empty placeholders we override below.
+ * At grep-clean (WI-586) the legacy export and this delegation are deleted
+ * together and the learning reads fold directly into a single v2 export.
  */
 export async function generateExportV2(
   db: Database,
@@ -193,7 +195,14 @@ export async function generateExportV2(
 
   // 7. Learning-data half: reuse the legacy export (profileId = person.id keyed;
   // unchanged by the cutover — incl. the D3 mentor_activity_ledger inclusion).
-  const legacy = await generateExport(db, organizationId);
+  // [WI-809] Pass the org's personIds as learningOnlyProfileIds so the legacy
+  // export does NOT read the four identity tables dropped at the cutover
+  // (accounts / profiles / consent_states / family_links) — they 500 post-drop.
+  // It returns only the learning-data + billing arrays we consume; the identity
+  // sections it returns are empty placeholders overridden below.
+  const legacy = await generateExport(db, organizationId, {
+    learningOnlyProfileIds: personIds,
+  });
 
   return {
     ...legacy,

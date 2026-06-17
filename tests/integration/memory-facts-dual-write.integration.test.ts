@@ -1,11 +1,10 @@
-import { eq } from 'drizzle-orm';
-import {
-  accounts,
-  createScopedRepository,
-  memoryFacts,
-} from '@eduagent/database';
+import { createScopedRepository, memoryFacts } from '@eduagent/database';
 
-import { seedLearningProfile, setupTestDb } from './helpers/memory-facts';
+import {
+  cleanupSeededAccount,
+  seedLearningProfile,
+  setupTestDb,
+} from './helpers/memory-facts';
 
 describe('memory_facts dual-write integration guards', () => {
   it('Profile A cannot read Profile B memory_facts via createScopedRepository', async () => {
@@ -41,8 +40,8 @@ describe('memory_facts dual-write integration guards', () => {
       const rowsA = await scopedA.memoryFacts.findManyActive();
       expect(rowsA.map((row) => row.text)).toEqual(['A']);
     } finally {
-      await db.delete(accounts).where(eq(accounts.id, accountA));
-      await db.delete(accounts).where(eq(accounts.id, accountB));
+      await cleanupSeededAccount(db, accountA);
+      await cleanupSeededAccount(db, accountB);
     }
   });
 
@@ -53,10 +52,10 @@ describe('memory_facts dual-write integration guards', () => {
     const { profileId: profileB, accountId: accountB } =
       await seedLearningProfile(db, {});
     const query = Array.from({ length: 1024 }, (_, index) =>
-      index === 0 ? 1 : 0
+      index === 0 ? 1 : 0,
     );
     const weakerMatch = Array.from({ length: 1024 }, (_, index) =>
-      index === 1 ? 1 : 0
+      index === 1 ? 1 : 0,
     );
 
     try {
@@ -87,8 +86,8 @@ describe('memory_facts dual-write integration guards', () => {
       const rowsA = await scopedA.memoryFacts.findRelevant(query, 5);
       expect(rowsA.map((row) => row.text)).toEqual(['A weaker match']);
     } finally {
-      await db.delete(accounts).where(eq(accounts.id, accountA));
-      await db.delete(accounts).where(eq(accounts.id, accountB));
+      await cleanupSeededAccount(db, accountA);
+      await cleanupSeededAccount(db, accountB);
     }
   });
 });

@@ -95,6 +95,23 @@ jest.mock('../profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const mockLoadProfileRowByIdV2 = jest.fn();
+jest.mock(
+  '../identity-v2/profile-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../identity-v2/profile-v2',
+    ) as typeof import('../identity-v2/profile-v2');
+    return {
+      ...actual,
+      // [WI-586] controls reader selection to verify the identity-v2 flag routes
+      // the profile read to the person/membership twin vs the legacy profiles read.
+      loadProfileRowByIdV2: (...args: unknown[]) =>
+        mockLoadProfileRowByIdV2(...args),
+    };
+  },
+);
+
 import {
   clearSessionStaticContextForProfile,
   getSessionStaticContext,
@@ -117,6 +134,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     mockGetLearningProfile.mockResolvedValue(null);
     mockGetSubject.mockResolvedValue(null);
     mockLoadProfileRowById.mockResolvedValue(null);
+    mockLoadProfileRowByIdV2.mockResolvedValue(null);
   });
 
   async function makeCachedEntry(
@@ -304,5 +322,68 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
 
     expect(_sessionStaticContextCacheSize()).toBe(0);
     expect(entry.supplementary).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-586] Profile reader selection — the identity-v2 flip-critical gate.
+// getSessionStaticContext must read the cached profile row from the
+// person/membership twin (loadProfileRowByIdV2) when the identity-v2 flag is on,
+// and from the legacy `profiles` table (loadProfileRowById) when off. After
+// migration 0118 drops `profiles`, a flag-on read that still hit the legacy
+// path would 500 on the hot tutoring exchange path.
+// ---------------------------------------------------------------------------
+describe('[WI-586] getSessionStaticContext — identity-v2 profile reader selection', () => {
+  const legacyRow = { id: 'p', isOwner: false, source: 'legacy' } as never;
+  const v2Row = { id: 'p', isOwner: true, source: 'v2' } as never;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetSessionStaticContextCache();
+    mockGetSubject.mockResolvedValue(null);
+    mockLoadProfileRowById.mockResolvedValue(legacyRow);
+    mockLoadProfileRowByIdV2.mockResolvedValue(v2Row);
+  });
+
+  function read(profileId: string, identityV2Enabled?: boolean) {
+    return getSessionStaticContext(
+      {} as never,
+      profileId,
+      'session-1',
+      { subjectId: 'subject-1', topicId: null } as never,
+      identityV2Enabled as never,
+    );
+  }
+
+  it('flag ON → reads the person/membership twin, not the legacy profiles table', async () => {
+    const entry = await read('profile-on', true);
+
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledWith(
+      {} as never,
+      'profile-on',
+    );
+    expect(mockLoadProfileRowById).not.toHaveBeenCalled();
+    expect(entry.profile).toBe(v2Row);
+  });
+
+  it('flag OFF → reads the legacy profiles table, not the v2 twin', async () => {
+    const entry = await read('profile-off', false);
+
+    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
+    expect(mockLoadProfileRowById).toHaveBeenCalledWith(
+      {} as never,
+      'profile-off',
+    );
+    expect(mockLoadProfileRowByIdV2).not.toHaveBeenCalled();
+    expect(entry.profile).toBe(legacyRow);
+  });
+
+  it('defaults to the legacy reader when the flag arg is omitted', async () => {
+    const entry = await read('profile-default');
+
+    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
+    expect(mockLoadProfileRowByIdV2).not.toHaveBeenCalled();
+    expect(entry.profile).toBe(legacyRow);
   });
 });

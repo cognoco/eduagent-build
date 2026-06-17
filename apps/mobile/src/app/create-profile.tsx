@@ -264,6 +264,12 @@ export default function CreateProfileScreen() {
         ...(parsedConversationLanguage?.success
           ? { conversationLanguage: parsedConversationLanguage.data }
           : {}),
+        // [WI-811] Parent-creates-child must carry the discriminator so the v2
+        // server routes this POST to createChildProfileV2 instead of the
+        // idempotent owner replay (which would return the owner and create no
+        // child). Owner/first-profile create omits it. Flag-off ignores it
+        // (legacy classifies by profile count), so this is byte-compatible.
+        ...(isAddingChild ? { kind: 'child' as const } : {}),
       };
 
       const res = await client.profiles.$post(

@@ -12,7 +12,6 @@
 
 import { eq } from 'drizzle-orm';
 import {
-  accounts,
   createScopedRepository,
   generateUUIDv7,
   memoryFacts,
@@ -20,7 +19,11 @@ import {
 
 import { isSuppressedFact } from '../../apps/api/src/services/memory/suppressed-prewrite';
 import { runDedupForProfile } from '../../apps/api/src/services/memory/dedup-pass';
-import { seedLearningProfile, setupTestDb } from './helpers/memory-facts';
+import {
+  cleanupSeededAccount,
+  seedLearningProfile,
+  setupTestDb,
+} from './helpers/memory-facts';
 
 describe('suppressed-prewrite guard (real DB)', () => {
   it('isSuppressedFact returns true when normalized text matches a suppressed row', async () => {
@@ -43,7 +46,7 @@ describe('suppressed-prewrite guard (real DB)', () => {
     const result = await isSuppressedFact(scoped, 'FRACTIONS');
     expect(result).toBe(true);
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('isSuppressedFact returns false when no suppressed row matches', async () => {
@@ -54,7 +57,7 @@ describe('suppressed-prewrite guard (real DB)', () => {
     const result = await isSuppressedFact(scoped, 'anything not suppressed');
     expect(result).toBe(false);
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('isSuppressedFact returns false for an active (non-suppressed) fact with matching text', async () => {
@@ -76,7 +79,7 @@ describe('suppressed-prewrite guard (real DB)', () => {
     const result = await isSuppressedFact(scoped, 'fractions');
     expect(result).toBe(false);
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('dedup pass skips (does not delete) suppressed candidate, emits warning event', async () => {
@@ -138,7 +141,7 @@ describe('suppressed-prewrite guard (real DB)', () => {
       'suppressed_fact_reached_dedup_pass',
     );
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 
   it('suppressed rows are excluded from findActiveCandidatesWithEmbedding (C3 break test)', async () => {
@@ -181,6 +184,6 @@ describe('suppressed-prewrite guard (real DB)', () => {
     expect(ids).toContain(activeId);
     expect(ids).not.toContain(suppressedId);
 
-    await db.delete(accounts).where(eq(accounts.id, accountId));
+    await cleanupSeededAccount(db, accountId);
   });
 });

@@ -48,6 +48,24 @@ for the identity-v2 HTTP-route surface (diagnostic root `prg06ic-021`).
 Reds here are expected diagnostic signal while WI-790/791/792/793 (D1-D4) and
 :709/FG1 defects exist. They do not fail the `main` job or block unrelated PRs.
 
+**Not a Gate-2 close-blocker for identity WIs (until the flip below).** Because
+the lane is allowed-red *by design*, a red `Flag-ON integration` result is NOT
+grounds to bounce or block an identity-v2 Work Item's Gate-2 close during the
+burndown. The lane's committed-migration DB lacks the post-repoint FK graph
+(`0117_m_repoint` / `0118_m_drop` are de-journaled freeze-only, applied only at
+cutover), so identity-v2 `/v1/profiles` paths 500 there with FK errors
+(`quota_pools_subscription_id_subscriptions_id_fk`,
+`learning_profiles_profile_id_profiles_id_fk`) regardless of WI correctness.
+Identity WIs instead validate their flag-on surface on a **repointed DB** (the
+gated integration suite runs green only there) plus claude-review / adversarial
+review; the comprehensive live flag-on validation is the pre-#8 **staging
+rehearsal**. Reviewers MUST treat this lane as non-blocking for close until the
+make-required flip below — close on the required-4 checks + the WI's
+repointed-surface evidence. Caveat: watch for NEW failures *beyond* the known
+structural baseline (currently `account-deletion.integration.test.ts` + the
+unrepointed-DB FK set); failures outside that set indicate a real regression,
+not the known structural red. (Operator-ratified 2026-06-17, PRG-06 / WS-18.)
+
 **How to flip to REQUIRED (WI-586/WP-FLAG close gate):**
 
 Mirrors the i18n-ratchet precedent (`pnpm audit (High+, advisory)` and

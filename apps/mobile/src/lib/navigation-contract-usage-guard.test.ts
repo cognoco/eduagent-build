@@ -90,8 +90,8 @@ const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/lib/app-context.tsx',
     category: 'boundary',
     reason:
-      'boundary: app-context owns V0 mode state and the MODE_NAV_V0/MODE_NAV_V1 short-circuits.',
-    expectedFindings: { 'profile-owner-read': 2 },
+      'boundary: app-context owns V0 mode state and the MODE_NAV_V0/MODE_NAV_V1 short-circuits. The mode-seq effect is split (identity-only seq-bump + full-set override-reset, WI-816), so isOwner is read in both dep arrays.',
+    expectedFindings: { 'profile-owner-read': 3 },
   },
   {
     file: 'apps/mobile/src/lib/profile.ts',

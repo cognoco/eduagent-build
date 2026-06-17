@@ -20,18 +20,20 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
+  // [WI-586] drop-4: accounts/profiles/familyLinks removed; seeding via v2 tables.
   createDatabase,
   curriculumBooks,
   curriculumTopics,
   curricula,
-  familyLinks,
   generateUUIDv7,
+  guardianship,
   learningSessions,
   learningProfiles,
+  membership,
   memoryFacts,
   notificationPreferences,
-  profiles,
+  organization,
+  person,
   progressSnapshots,
   retentionCards,
   sessionEvents,
@@ -42,7 +44,7 @@ import {
   sessionSummaries,
   type Database,
 } from '@eduagent/database';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import * as config from '../../config';
 import * as sentry from '../../services/sentry';
@@ -105,31 +107,40 @@ const LLM_MOCK_RESPONSE = JSON.stringify({
 
 // ── Seed helpers ──────────────────────────────────────────────────────────────
 
+// [WI-586] drop-4: tracked IDs for ID-ordered cleanup (person delete cascades
+// membership + subjects; guardianship is RESTRICT so deleted before person).
+const seededPersonIds: string[] = [];
+const seededOrgIds: string[] = [];
+
+// [WI-586] drop-4: replaces seedAccount (accounts dropped).
+// Seeds an org + person + membership. Returns profileId (= person.id).
 async function seedAccount(): Promise<{ accountId: string }> {
-  const idx = ++seedCounter;
-  const clerkUserId = `${CLERK_PREFIX}_${idx}`;
-  const email = `session-completed-${RUN_ID}-${idx}@test.invalid`;
-
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
-
-  return { accountId: account!.id };
+  const [org] = await db
+    .insert(organization)
+    .values({ name: `SC Test Org ${++seedCounter}` })
+    .returning({ id: organization.id });
+  seededOrgIds.push(org!.id);
+  return { accountId: org!.id };
 }
 
-async function seedProfile(accountId: string): Promise<{ profileId: string }> {
-  const [profile] = await db
-    .insert(profiles)
+// [WI-586] drop-4: replaces seedProfile (profiles dropped).
+// Seeds a person + membership in the given org. profileId = person.id.
+async function seedProfile(orgId: string): Promise<{ profileId: string }> {
+  const [p] = await db
+    .insert(person)
     .values({
-      accountId,
       displayName: 'Test Learner',
-      birthYear: 2005,
-      isOwner: true,
+      birthDate: '2005-01-01',
+      residenceJurisdiction: 'EU',
     })
-    .returning({ id: profiles.id });
-
-  return { profileId: profile!.id };
+    .returning({ id: person.id });
+  seededPersonIds.push(p!.id);
+  await db.insert(membership).values({
+    personId: p!.id,
+    organizationId: orgId,
+    roles: ['learner'],
+  });
+  return { profileId: p!.id };
 }
 
 async function seedSubject(profileId: string): Promise<{ subjectId: string }> {
@@ -314,10 +325,21 @@ beforeAll(async () => {
 
 afterAll(async () => {
   globalThis.fetch = originalFetch;
-  // FK cascades clean child rows (profiles → subjects → sessions → events, etc.)
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  // [WI-586] drop-4: accounts/profiles gone; cleanup via tracked IDs.
+  // guardianship is RESTRICT → delete edges before person.
+  // person ON DELETE CASCADE removes membership + subjects → sessions → events.
+  if (seededPersonIds.length > 0) {
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.chargePersonId, seededPersonIds));
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.guardianPersonId, seededPersonIds));
+    await db.delete(person).where(inArray(person.id, seededPersonIds));
+  }
+  if (seededOrgIds.length > 0) {
+    await db.delete(organization).where(inArray(organization.id, seededOrgIds));
+  }
 }, 30_000);
 
 beforeEach(() => {
@@ -1115,10 +1137,11 @@ describe('session-completed integration', () => {
       memoryEnabled: true,
     });
 
-    // Seed parent → child family link so sendStruggleNotification can find a parent
-    await db.insert(familyLinks).values({
-      parentProfileId,
-      childProfileId: profileId,
+    // Seed parent → child guardianship edge so sendStruggleNotification can find a parent.
+    // [WI-586] drop-4: familyLinks removed; guardianship is the v2 replacement.
+    await db.insert(guardianship).values({
+      guardianPersonId: parentProfileId,
+      chargePersonId: profileId,
     });
 
     // Seed parent's notification preferences with a valid Expo push token

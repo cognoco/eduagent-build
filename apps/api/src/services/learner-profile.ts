@@ -38,6 +38,7 @@ import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { isGdprProcessingAllowed } from './consent';
+import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
 import { verifyPersonOwnershipV2 } from './identity-v2/ownership-v2';
 import {
   requireCallerPersonId,
@@ -1329,6 +1330,9 @@ export async function applyAnalysis(
   /** [CR-119.3]: Prefer subjectId for urgency boost writes — name match
    *  is ambiguous when no (profileId, name) uniqueness constraint exists. */
   subjectId?: string | null,
+  // [WI-809] flag-on routes the GDPR gate through the v2 consent graph; legacy
+  // isGdprProcessingAllowed reads the dropped consent_states table → 500 post-drop.
+  opts?: { identityV2Enabled?: boolean },
 ): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
     // [logging sweep] structured logger so PII fields land as JSON context
@@ -1343,7 +1347,10 @@ export async function applyAnalysis(
   // opening a transaction. revokeConsent sets GDPR status to WITHDRAWN without
   // clearing memoryConsentStatus, so the existing memory gate alone is
   // insufficient.
-  if (!(await isGdprProcessingAllowed(db, profileId))) {
+  const gdprAllowed = opts?.identityV2Enabled
+    ? await isGdprProcessingAllowedV2(db, profileId)
+    : await isGdprProcessingAllowed(db, profileId);
+  if (!gdprAllowed) {
     return { fieldsUpdated: [], notifications: [] };
   }
 
@@ -1357,9 +1364,10 @@ export async function applyAnalysis(
       // [WI-221] Re-check GDPR consent INSIDE the transaction to close the
       // TOCTOU window between the outer gate (above) and this write — consent
       // could be withdrawn in the interval.
-      if (
-        !(await isGdprProcessingAllowed(tx as unknown as Database, profileId))
-      ) {
+      const gdprAllowedTx = opts?.identityV2Enabled
+        ? await isGdprProcessingAllowedV2(tx as unknown as Database, profileId)
+        : await isGdprProcessingAllowed(tx as unknown as Database, profileId);
+      if (!gdprAllowedTx) {
         return { finalFieldsUpdated: [], finalNotifications: [] };
       }
 
