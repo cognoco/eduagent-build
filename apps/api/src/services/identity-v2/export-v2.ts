@@ -14,7 +14,8 @@
 // All learning-data tables are keyed on profileId = person.id (unchanged by the
 // cutover), so those reads are byte-identical to the legacy export — this twin
 // reuses the legacy `generateExport` for the learning-data half and overrides
-// only the identity sections, avoiding a ~250-line duplication that would drift.
+// the identity + billing sections, avoiding a ~250-line duplication that would
+// drift.
 //
 // D3 (v1.6): the `mentor_activity_ledger` Art-15 inclusion carries verbatim —
 // it is profileId-keyed and already in the legacy export (WI-679), so the reused
@@ -33,7 +34,9 @@ import {
   membership,
   organization,
   person,
+  quotaPools,
   subscription,
+  topUpCredits,
   type Database,
 } from '@eduagent/database';
 import type { ConsentStatus, DataExport, Profile } from '@eduagent/schemas';
@@ -51,18 +54,20 @@ import {
  * Strategy: run the legacy `generateExport` to obtain the learning-data half
  * (every learning table is profileId = person.id keyed and untouched by the
  * cutover, incl. the D3 `mentor_activity_ledger` inclusion), then OVERRIDE the
- * identity sections (account / profiles / consentStates / familyLinks /
- * subscriptions) with reads from the v2 tables. `accountId` = organization.id by
- * the deterministic reseed.
+ * identity + billing sections (account / profiles / consentStates / familyLinks /
+ * subscriptions / quotaPools / topUpCredits) with reads from the v2 tables.
+ * `accountId` = organization.id by the deterministic reseed.
  *
  * NOTE: [WI-809] the legacy half is now called with `learningOnlyProfileIds`, so
  * it no longer reads the four identity tables dropped at the cutover (accounts /
  * profiles / consent_states / family_links) — those reads would 500 post-drop.
- * It still reads the legacy `subscriptions` billing chain (quotaPools /
- * topUpCredits surface from legacy; the WI-805 billing cutover owns that drop),
- * and the identity sections it returns are empty placeholders we override below.
- * At grep-clean (WI-586) the legacy export and this delegation are deleted
- * together and the learning reads fold directly into a single v2 export.
+ * [WI-805] It also no longer reads the legacy `subscriptions` billing chain
+ * (dropped by 0119): this twin overrides subscriptions / quotaPools /
+ * topUpCredits from the v2 `subscription` chain (the 4 quota satellites' FK was
+ * repointed to v2 `subscription` by 0117). The identity + billing sections it
+ * returns are empty placeholders we override below. At grep-clean (WI-586) the
+ * legacy export and this delegation are deleted together and the learning reads
+ * fold directly into a single v2 export.
  */
 export async function generateExportV2(
   db: Database,
@@ -160,10 +165,29 @@ export async function generateExportV2(
     relevantEdges.map((g) => [g.chargePersonId, g.grantedAt]),
   );
 
-  // 5. Subscription (organization-keyed).
+  // 5. Subscription (organization-keyed) + its quota satellites. [WI-805] The 4
+  // quota satellites' subscription_id FK was repointed to the v2 `subscription`
+  // by 0117 (m-repoint), so quotaPools / topUpCredits are read HERE by the v2
+  // subscription ids and overridden below — the reused legacy generateExport no
+  // longer reads the legacy `subscriptions` billing chain (dropped by 0119).
+  // usage_events / profile_quota_usage are not in the DataExport contract, so
+  // only quotaPools + topUpCredits surface.
   const subscriptionRows = await db.query.subscription.findMany({
     where: eq(subscription.organizationId, organizationId),
   });
+  const subscriptionIds = subscriptionRows.map((s) => s.id);
+  const quotaPoolRows =
+    subscriptionIds.length > 0
+      ? await db.query.quotaPools.findMany({
+          where: inArray(quotaPools.subscriptionId, subscriptionIds),
+        })
+      : [];
+  const topUpCreditRows =
+    subscriptionIds.length > 0
+      ? await db.query.topUpCredits.findMany({
+          where: inArray(topUpCredits.subscriptionId, subscriptionIds),
+        })
+      : [];
 
   // 6. Profiles export (person → the legacy Profile export shape). isOwner from
   // membership; consentStatus from the resolver; conversationLanguage/pronouns
@@ -224,6 +248,8 @@ export async function generateExportV2(
     subscriptions: subscriptionRows.map((s) =>
       serializeDates(s as Record<string, unknown>),
     ),
+    quotaPools: quotaPoolRows.map(serializeDates),
+    topUpCredits: topUpCreditRows.map(serializeDates),
   };
 }
 
