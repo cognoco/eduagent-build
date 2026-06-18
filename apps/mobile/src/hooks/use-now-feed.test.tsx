@@ -7,12 +7,14 @@ import { setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
 import { useNowFeed, useNowOverflow } from './use-now-feed';
 
+const FRESH_CACHE_TIMESTAMP = '2999-06-14T08:00:00.000Z';
+
 function feed(overrides: Partial<NowResponse> = {}): NowResponse {
   return {
     scope: 'self',
     cards: [],
     overflowCount: 0,
-    generatedAt: '2026-06-14T08:00:00.000Z',
+    generatedAt: FRESH_CACHE_TIMESTAMP,
     ...overrides,
   };
 }
@@ -78,7 +80,7 @@ describe('useNowFeed', () => {
 
   it('exposes a cached feed after the live request stays pending for 2 seconds', async () => {
     jest.useFakeTimers();
-    const cached = feed({ generatedAt: '2026-06-14T07:59:00.000Z' });
+    const cached = feed({ generatedAt: '2999-06-14T07:59:00.000Z' });
     await AsyncStorage.setItem(
       buildNowFeedCacheKey('test-profile-id'),
       JSON.stringify(cached),

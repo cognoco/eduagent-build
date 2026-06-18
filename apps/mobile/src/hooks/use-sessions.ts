@@ -38,7 +38,7 @@ import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
-import { UpstreamError } from '../lib/api-errors';
+import { NetworkError, UpstreamError } from '../lib/api-errors';
 import { queryKeys } from '../lib/query-keys';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import {
@@ -143,6 +143,36 @@ type StreamMessageDoneResult = {
     fallbackText: string;
   };
 };
+
+function isRetryablePreStreamError(error: unknown): boolean {
+  const status =
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as { status?: unknown }).status === 'number'
+      ? (error as { status: number }).status
+      : undefined;
+  if (status !== undefined) {
+    return status >= 500;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'isTimeout' in error &&
+    (error as { isTimeout?: unknown }).isTimeout === true
+  ) {
+    return true;
+  }
+
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === 'NetworkError' ||
+    error.name === 'UpstreamError' ||
+    error.name === 'TypeError' ||
+    error.name === 'AbortError'
+  );
+}
 
 interface SubmitSummaryResult {
   summary: {
@@ -476,58 +506,90 @@ export function useStreamMessage(sessionId: string): {
                 }
               : {}),
           };
-          const { events, abort } = streamSSEViaXHR(url, {
-            method: 'POST',
-            headers: finalHeaders,
-            body: JSON.stringify(body),
-          });
-          abortRef.current = abort;
 
-          let accumulated = '';
-          let fallback:
-            | { reason: StreamFallbackReason; fallbackText: string }
-            | undefined;
-          for await (const event of events) {
-            if (event.type === 'chunk') {
-              accumulated += event.content;
-              onChunk(accumulated);
-            } else if (event.type === 'replace') {
-              accumulated = event.content;
-              onChunk(accumulated);
-            } else if (event.type === 'replay') {
-              options?.onReplay?.(event);
+          let retryCount = 0;
+          while (true) {
+            let sawStreamEvent = false;
+            let terminalEventReceived = false;
+            const { events, abort } = streamSSEViaXHR(url, {
+              method: 'POST',
+              headers: finalHeaders,
+              body: JSON.stringify(body),
+            });
+            abortRef.current = abort;
+
+            try {
+              let accumulated = '';
+              let fallback:
+                | { reason: StreamFallbackReason; fallbackText: string }
+                | undefined;
+              for await (const event of events) {
+                sawStreamEvent = true;
+                if (event.type === 'chunk') {
+                  accumulated += event.content;
+                  onChunk(accumulated);
+                } else if (event.type === 'replace') {
+                  accumulated = event.content;
+                  onChunk(accumulated);
+                } else if (event.type === 'replay') {
+                  terminalEventReceived = true;
+                  options?.onReplay?.(event);
+                  return;
+                } else if (event.type === 'fallback') {
+                  fallback = {
+                    reason: event.reason,
+                    fallbackText: event.fallbackText,
+                  };
+                } else if (event.type === 'done') {
+                  terminalEventReceived = true;
+                  await onDone({
+                    exchangeCount: event.exchangeCount,
+                    escalationRung: event.escalationRung ?? 0,
+                    expectedResponseMinutes: event.expectedResponseMinutes,
+                    aiEventId: (event as { aiEventId?: string }).aiEventId,
+                    notePrompt: event.notePrompt,
+                    notePromptPostSession: event.notePromptPostSession,
+                    fluencyDrill: event.fluencyDrill,
+                    challengeRound: event.challengeRound,
+                    challengeOffer: event.challengeOffer,
+                    draftedNote: event.draftedNote,
+                    confidence: event.confidence,
+                    fallback,
+                  });
+                } else if (event.type === 'error') {
+                  throw new UpstreamError(
+                    event.message,
+                    event.code ?? 'UPSTREAM_ERROR',
+                    502,
+                  );
+                }
+              }
+
+              if (!terminalEventReceived) {
+                throw new NetworkError(
+                  'The connection ended before a reply was received.',
+                );
+              }
               return;
-            } else if (event.type === 'fallback') {
-              fallback = {
-                reason: event.reason,
-                fallbackText: event.fallbackText,
-              };
-            } else if (event.type === 'done') {
-              await onDone({
-                exchangeCount: event.exchangeCount,
-                escalationRung: event.escalationRung ?? 0,
-                expectedResponseMinutes: event.expectedResponseMinutes,
-                aiEventId: (event as { aiEventId?: string }).aiEventId,
-                notePrompt: event.notePrompt,
-                notePromptPostSession: event.notePromptPostSession,
-                fluencyDrill: event.fluencyDrill,
-                challengeRound: event.challengeRound,
-                challengeOffer: event.challengeOffer,
-                draftedNote: event.draftedNote,
-                confidence: event.confidence,
-                fallback,
-              });
-            } else if (event.type === 'error') {
-              throw new UpstreamError(
-                event.message,
-                event.code ?? 'UPSTREAM_ERROR',
-                502,
-              );
+            } catch (error) {
+              if (
+                retryCount < 1 &&
+                !sawStreamEvent &&
+                options?.idempotencyKey &&
+                isRetryablePreStreamError(error)
+              ) {
+                retryCount += 1;
+                continue;
+              }
+              throw error;
+            } finally {
+              if (!terminalEventReceived) {
+                abortRef.current?.();
+              }
+              abortRef.current = null;
             }
           }
         } finally {
-          // Abort any in-flight XHR — safe to call even after normal completion
-          abortRef.current?.();
           abortRef.current = null;
           isStreamingRef.current = false;
           setIsStreaming(false);

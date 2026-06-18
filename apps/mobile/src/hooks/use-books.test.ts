@@ -10,6 +10,10 @@ import {
 } from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId, NetworkError } from '../lib/api-client';
 import {
+  DEFAULT_QUERY_TIMEOUT_MS,
+  LEARNING_ENTRY_QUERY_TIMEOUT_MS,
+} from '../lib/query-timeout';
+import {
   useBooks,
   useBookWithTopics,
   useGenerateBookTopics,
@@ -173,6 +177,54 @@ describe('useBooks', () => {
     expect(result.current.error).toBeInstanceOf(NetworkError);
   });
 
+  it('uses the longer learning-entry timeout for shelf book reads', async () => {
+    jest.useFakeTimers();
+    try {
+      let capturedSignal: AbortSignal | undefined;
+      mockFetch.mockImplementationOnce(
+        (input: RequestInfo | URL, init?: RequestInit) => {
+          capturedSignal =
+            init?.signal ??
+            (input instanceof Request ? input.signal : undefined);
+          return new Promise<Response>((_resolve, reject) => {
+            capturedSignal?.addEventListener('abort', () => {
+              reject(
+                Object.assign(new Error('Aborted'), {
+                  name: 'AbortError',
+                }),
+              );
+            });
+          });
+        },
+      );
+
+      renderHook(() => useBooks('subject-1'), {
+        wrapper: createWrapper(),
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+
+      await act(async () => {
+        jest.advanceTimersByTime(DEFAULT_QUERY_TIMEOUT_MS);
+      });
+      expect(capturedSignal?.aborted).toBe(false);
+
+      await act(async () => {
+        jest.advanceTimersByTime(
+          LEARNING_ENTRY_QUERY_TIMEOUT_MS - DEFAULT_QUERY_TIMEOUT_MS,
+        );
+        await Promise.resolve();
+      });
+      expect(capturedSignal?.aborted).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('uses aggregate library books as initial shelf data when available', async () => {
     const wrapper = createWrapper();
     queryClient.setQueryData(['library', 'books', 'test-profile-id'], {
@@ -238,6 +290,42 @@ describe('useBookWithTopics', () => {
     expect(result.current.data).toEqual(mockBookWithTopics);
   });
 
+  it('retries transient network failures for book details', async () => {
+    jest.useFakeTimers();
+    try {
+      mockFetch
+        .mockRejectedValueOnce(new Error('Network request failed'))
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),
+        );
+
+      const { result } = renderHook(
+        () => useBookWithTopics('subject-1', 'book-1'),
+        { wrapper: createWrapper() },
+      );
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result.current.data).toEqual(mockBookWithTopics);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('is disabled when subjectId is undefined', async () => {
     const { result } = renderHook(
       () => useBookWithTopics(undefined, 'book-1'),
@@ -258,18 +346,24 @@ describe('useBookWithTopics', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('handles API error', async () => {
-    mockFetch.mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
+  it('preserves the app default retry count for API errors', async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response('Not Found', { status: 404 })),
+    );
 
     const { result } = renderHook(
       () => useBookWithTopics('subject-1', 'nonexistent'),
       { wrapper: createWrapper() },
     );
 
-    await waitFor(() => {
-      expect(result.current.isError).toBe(true);
-    });
+    await waitFor(
+      () => {
+        expect(result.current.isError).toBe(true);
+      },
+      { timeout: 6000 },
+    );
 
+    expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(result.current.error).toBeInstanceOf(Error);
   });
 });

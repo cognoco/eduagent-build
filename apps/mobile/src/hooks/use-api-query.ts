@@ -16,6 +16,7 @@ import { assertOk } from '../lib/assert-ok';
 export function useApiQuery<TResponse, TData = TResponse>(opts: {
   queryKey: QueryKey;
   enabled?: boolean;
+  timeoutMs?: number;
   fetch: (signal: AbortSignal) => Promise<Response>;
   select: (json: TResponse) => TData;
 }): UseQueryResult<TData> {
@@ -24,7 +25,7 @@ export function useApiQuery<TResponse, TData = TResponse>(opts: {
   return useQuery({
     queryKey: opts.queryKey,
     queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
+      const { signal, cleanup } = combinedSignal(querySignal, opts.timeoutMs);
       try {
         const res = await opts.fetch(signal);
         await assertOk(res);

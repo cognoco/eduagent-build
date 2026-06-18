@@ -21,10 +21,10 @@ import { getApiUrl } from './api';
 
 import {
   BadRequestError,
+  classifyFetchRejection,
   ConflictError,
   ConsentRequiredError,
   ForbiddenError,
-  NetworkError,
   NotFoundError,
   QuotaExceededError,
   RateLimitedError,
@@ -61,6 +61,17 @@ type AuthExpiredCallback = () => void;
 
 let _onAuthExpired: AuthExpiredCallback | null = null;
 let _authExpiredFiring = false;
+
+function requestSignal(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+): AbortSignal | undefined {
+  if (init?.signal) return init.signal;
+  if (typeof Request !== 'undefined' && input instanceof Request) {
+    return input.signal;
+  }
+  return undefined;
+}
 
 /** Register the callback that fires when a 401 (token expired) is received. */
 export function setOnAuthExpired(cb: AuthExpiredCallback): void {
@@ -190,6 +201,7 @@ export function useApiClient(): ApiClient {
       // ties both values to the same moment in time.
       const snapshotProfileId = _activeProfileId;
       const snapshotProxyMode = _proxyMode;
+      const signal = requestSignal(input, init);
       const token = await getTokenRef.current();
       const headers = new Headers(init?.headers);
       if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -201,9 +213,9 @@ export function useApiClient(): ApiClient {
       // (no response received) become typed NetworkError instead of raw TypeError.
       let res: Response;
       try {
-        res = await globalThis.fetch(input, { ...init, headers });
+        res = await globalThis.fetch(input, { ...init, headers, signal });
       } catch (fetchErr) {
-        throw new NetworkError(undefined, fetchErr);
+        throw classifyFetchRejection(fetchErr, signal);
       }
 
       if (!res.ok) {

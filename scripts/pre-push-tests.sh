@@ -79,7 +79,16 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   done
 
   if [[ "$remote_sha" == "$ZERO_SHA" ]]; then
-    base="origin/main"
+    # New remote branch: default to origin/main, but honor an existing local
+    # upstream when the work branched from an integration branch such as
+    # origin/new-llm. Otherwise the first push validates the entire integration
+    # branch delta instead of this branch's actual change set.
+    upstream_base="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+    if [[ -n "$upstream_base" ]]; then
+      base="$upstream_base"
+    else
+      base="origin/main"
+    fi
   else
     base="$remote_sha"
   fi
