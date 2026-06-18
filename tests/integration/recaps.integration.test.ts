@@ -14,7 +14,13 @@
 //   organization → person×2 → login (guardian) → membership×2 (admin+learner,learner)
 //   → guardianship → learning tree + session for child
 //
-// NOTE: M-DROP confirmed applied on Neon DB (accounts/profiles tables absent).
+// NOTE: the CI flag-on lane runs a committed-migration / PRE-REPOINT DB
+// (0117/0118 de-journaled), so legacy accounts/profiles tables are STILL
+// PRESENT and subjects.profileId / learningSessions.profileId FK -> profiles.
+// We dual-write a legacy account + child profile (WI-808 pattern) so the seed
+// INSERTs satisfy those FKs; the route reads only the v2 person graph under
+// flag-on, so the legacy rows never affect behavior. Removed at M-REPOINT
+// (WI-789), when subjects/learning_sessions repoint off profiles to person.
 // NOTE: isChildLearningDataVisible(null) === true so no consent_grant needed.
 //
 // NO internal jest.mock (GC1/GC6 compliant). JWKS is mocked by setup.ts via
@@ -22,6 +28,7 @@
 // ---------------------------------------------------------------------------
 
 import {
+  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
@@ -33,6 +40,7 @@ import {
   membership,
   organization,
   person,
+  profiles,
   subjects,
 } from '@eduagent/database';
 import { eq, inArray } from 'drizzle-orm';
@@ -122,10 +130,12 @@ async function seedV2Family(db: Db): Promise<{
   childId: string;
   orgId: string;
   sessionId: string;
+  accountId: string;
 }> {
   const orgId = generateUUIDv7();
   const guardianId = generateUUIDv7();
   const childId = generateUUIDv7();
+  const accountId = generateUUIDv7();
 
   // 1. v2 identity graph
   await db
@@ -162,6 +172,27 @@ async function seedV2Family(db: Db): Promise<{
   await db
     .insert(guardianship)
     .values({ guardianPersonId: guardianId, chargePersonId: childId });
+
+  // 1b. Legacy dual-write (WI-808 pattern). On the CI flag-on lane's
+  // committed-migration / PRE-REPOINT DB the legacy accounts/profiles tables
+  // still exist and subjects.profileId / learningSessions.profileId FK ->
+  // profiles(id). Seed a legacy account + child profile (profiles.id = childId,
+  // the only id used as a profileId below) so those INSERTs satisfy the FK.
+  // Random clerk/email keep it collision-free in the shared CI DB. The route
+  // reads only the v2 person graph under flag-on, so these rows never change
+  // behavior. Drop at M-REPOINT (WI-789).
+  await db.insert(accounts).values({
+    id: accountId,
+    clerkUserId: `wi821-acct-${accountId.slice(0, 8)}`,
+    email: `wi821-acct-${accountId.slice(0, 8)}@integration.test`,
+  });
+  await db.insert(profiles).values({
+    id: childId,
+    accountId,
+    displayName: 'WI821-Child',
+    birthYear: 2013,
+    isOwner: false,
+  });
 
   // 2. Learning tree for child (needed for listRecapsForParent to return data)
   const [subject] = await db
@@ -228,7 +259,7 @@ async function seedV2Family(db: Db): Promise<{
     .returning();
   if (!session) throw new Error('Session seed failed');
 
-  return { guardianId, childId, orgId, sessionId: session.id };
+  return { guardianId, childId, orgId, sessionId: session.id, accountId };
 }
 
 async function teardownV2Family(
@@ -236,10 +267,14 @@ async function teardownV2Family(
   orgId: string,
   guardianId: string,
   childId: string,
+  accountId: string,
 ): Promise<void> {
-  // FK-safe teardown (v2 / M-DROP applied — accounts/profiles gone):
-  // learning tree → guardianship → person (cascades login, membership) → organization
+  // FK-safe teardown. deleteLearningTree removes subjects/learning_sessions
+  // (which FK -> profiles on the pre-repoint CI DB) BEFORE the legacy account
+  // delete cascades the child profile. Then the v2 graph: guardianship ->
+  // person (cascades login, membership) -> organization.
   await deleteLearningTree(db, [childId]);
+  await db.delete(accounts).where(eq(accounts.id, accountId)); // cascades child profile
   await db
     .delete(guardianship)
     .where(eq(guardianship.guardianPersonId, guardianId));
@@ -278,6 +313,7 @@ async function teardownV2Family(
           fixture.orgId,
           fixture.guardianId,
           fixture.childId,
+          fixture.accountId,
         );
       }
       delete process.env['IDENTITY_V2_ENABLED'];
