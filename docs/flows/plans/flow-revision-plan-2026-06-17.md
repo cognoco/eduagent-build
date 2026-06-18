@@ -1,4 +1,4 @@
-> **STATUS: UPDATED 2026-06-18** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Cosmo issues filed for failures: WI-818, WI-819, WI-820, WI-821, WI-822, WI-823, WI-824, WI-825, WI-826.
+> **STATUS: RERUN UPDATED 2026-06-18** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. The targeted rerun cleared the rows tied to WI-819, WI-824, and WI-826; WI-821 still fails on recap detail. Remaining failure issues: WI-818, WI-820, WI-821, WI-822, WI-823, WI-825.
 
 # Mobile App Flow Revision Plan
 
@@ -8,7 +8,7 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 
 **Execution update 2026-06-18:** Tested with Chrome/Chromium browser tooling only (no emulator), using seeded scenarios where available and 16 helper/subagent passes across the nine inventory sections. True native/device-provider paths are marked `🚫 Blocked`; dormant or stale inventory paths are marked `➖ Removed`; source-backed or partially browser-reachable rows are marked `⚠️ Pass w/ issues` with notes.
 
-**Remediation update 2026-06-18:** `WI-819` is in execution on branch/worktree `.worktrees/WI-819`. The local Chromium J-11 journey (`learner → Library → shelf → book → start learning → two chat sends`) now passes against the staging API after the mobile recovery patch. The table below still preserves the original sweep statuses until the fix lands and the affected flows are rerun on the target build.
+**Rerun update 2026-06-18:** Targeted staging Chrome/Chromium reruns were completed for rows tied to `WI-819`, `WI-821`, `WI-824`, and `WI-826`. `WI-819` rows passed through J-08 and J-11 live-session journeys; `WI-824` rows passed through the profile-limit upgrade path; `WI-826` rows passed through the withdrawal countdown banner path. `WI-821` partially improved because the Recaps list loads rows, but recap detail still renders the error state and remains failed. `WI-808` / `ic-116` were test-fixture-only commits with no direct manual/browser flow row in this plan.
 
 ## Purpose
 
@@ -217,7 +217,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-02 | Create additional profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-03 | Add child profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-04 | Profile switching via `/profiles` modal | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| ACCOUNT-05 | Profile-limit / family-plan gating for add-child | ❌ | Fail | WI-824 |  | Profile-limit path produced generic error instead of upgrade path. |
+| ACCOUNT-05 | Profile-limit / family-plan gating for add-child | ✅ | Pass | WI-824 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: profile-limit create-profile returned PROFILE_LIMIT_EXCEEDED, showed the upgrade alert, and routed to subscription after See plans. |
 | ACCOUNT-06 | More hub | ⚠️ | Pass w/ issues |  |  | Profile-edit UI reached; avatar/media branch remains native-dependent. |
 | ACCOUNT-07 | Notifications sub-screen | ⚠️ | Pass w/ issues |  |  | Add-child flow reached; some external parent email handoff branches were source-checked. |
 | ACCOUNT-08 | Accommodation picker | ⚠️ | Pass w/ issues |  |  | Archived profile controls covered; restore edge case source-checked. |
@@ -247,13 +247,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-32 | Consent-gate "while you wait" previews: `PreviewSubjectBrowser` + `PreviewSampleCoaching` fully replace the pending gate; stati… | ⚠️ | Pass w/ issues |  |  | Create-profile blocked state reached; exact parent email branch partial. |
 | ACCOUNT-33 | Pre-auth audience carrier → parent fast-path | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-34 | Post-OAuth save wizard | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| ACCOUNT-35 | Profile-limit upgrade gate: `POST /profiles` 402 `PROFILE_LIMIT_EXCEEDED` → "Upgrade required" alert → "See plans" → `/(app)/su… | ❌ | Fail | WI-824 |  | Second profile-limit/upgrade gate showed generic error instead of upgrade path. |
+| ACCOUNT-35 | Profile-limit upgrade gate: `POST /profiles` 402 `PROFILE_LIMIT_EXCEEDED` → "Upgrade required" alert → "See plans" → `/(app)/su… | ✅ | Pass | WI-824 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: profile-limit create-profile returned PROFILE_LIMIT_EXCEEDED, showed the upgrade alert, and routed to subscription after See plans. |
 | ACCOUNT-36 | Create-profile access-blocked screen | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-37 | Rename profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-38 | Consent-gate profile-switch escape: shown ONLY for 18+ adults sharing account with ≥1 minor | ⚠️ | Pass w/ issues |  |  | Consent refresh branch covered by seeded/source checks; not all external handoffs completed. |
-| ACCOUNT-39 | `/consent` deep-link guards: signed-out → sign-in redirect; foreign `profileId` → `consent-profile-not-found` + go-back | ⚠️ | Pass w/ issues |  |  | Consent withdrawal entry covered; downstream countdown failure captured on ACCOUNT-41. |
+| ACCOUNT-39 | `/consent` deep-link guards: signed-out → sign-in redirect; foreign `profileId` → `consent-profile-not-found` + go-back | ✅ | Pass | WI-826 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: after consent withdrawal, Home showed the withdrawal countdown banner and Reverse CTA for the child. |
 | ACCOUNT-40 | Consent reminder cascade + day-30 auto-delete | 🚫 | Blocked |  |  | Requires timer/email cascade through day-30 deletion automation; not responsibly testable in one Chrome session. |
-| ACCOUNT-41 | Withdrawal countdown banner on Home: per-child warning during 7-day grace with one-tap "Reverse" restore | ❌ | Fail | WI-826 |  | Withdrawal countdown banner/reverse action was absent after consent withdrawal. |
+| ACCOUNT-41 | Withdrawal countdown banner on Home: per-child warning during 7-day grace with one-tap "Reverse" restore | ✅ | Pass | WI-826 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: after consent withdrawal, Home showed the withdrawal countdown banner and Reverse CTA for the child. |
 | ACCOUNT-42 | Consent email-delivery-failed recovery: `emailStatus:'failed'` → failure copy + return-to-parent-phase retry; hard failure → 502 | 🚫 | Blocked |  |  | Requires forced email-delivery failure/SMTP or API fault injection. |
 | ACCOUNT-43 | Security sessions / Manage devices: Clerk session list, per-session revoke, current badge; Clerk-only, no app API | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-44 | Family-pool breakdown-sharing toggle | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -291,18 +291,18 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | HOME-15 | Home overlays: post-grace consent notice toast | ⚠️ | Pass w/ issues |  |  | Post-grace consent notice covered by seeded/source checks; timer boundary not advanced live. |
 | HOME-16 | EarlyAdopterCard | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-01 | Create subject from learner home | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| SUBJECT-02 | Create subject from library | ⚠️ | Pass w/ issues | WI-819 |  | Subject/book/session entry reached; downstream live session can hit lost-connection issue WI-819. |
+| SUBJECT-02 | Create subject from library | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | SUBJECT-03 | Create subject from chat | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-04 | Create subject from homework | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-05 | Subject resolution machine | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
 | SUBJECT-06 | Broad subject → pick-book | ⚠️ | Pass w/ issues |  |  | Pick-book/degraded recovery path covered; some degraded provider branches source-checked. |
 | SUBJECT-07 | Focused subject/book → first session: `POST first-curriculum` with up to 3 attempts | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
 | SUBJECT-08 | Per-subject native-language + CEFR setup | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
-| SUBJECT-12 | View curriculum without committing | ⚠️ | Pass w/ issues | WI-819 |  | Subject/book/session entry reached; downstream live session can hit lost-connection issue WI-819. |
+| SUBJECT-12 | View curriculum without committing | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | SUBJECT-14 | Placement / knowledge assessment | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-17 | Pronouns picker | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-18 | First-subject "Ready" recap interstitial | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
-| SUBJECT-19 | Existing-subject "Continue" rows inside create-subject | ⚠️ | Pass w/ issues | WI-819 |  | Subject/book/session entry reached; downstream live session can hit lost-connection issue WI-819. |
+| SUBJECT-19 | Existing-subject "Continue" rows inside create-subject | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | SUBJECT-20 | Subject-limit dead-end recovery: regex-on-message classification | ⚠️ | Pass w/ issues |  |  | Covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
 | SUBJECT-21 | Curriculum retry endpoint | ⚠️ | Pass w/ issues |  |  | Covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
 | SUBJECT-22 | Pick-book degraded/recovery states: missing-param guard; cycling loading + slow hint | ⚠️ | Pass w/ issues |  |  | Pick-book/degraded recovery path covered; some degraded provider branches source-checked. |
@@ -316,61 +316,61 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-01 | Freeform chat | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-02 | Guided learning session | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-03 | First session experience: `BookmarkNudgeTooltip` | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-04 | Core learning loop | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-05 | Coach bubble visual variants | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-01 | Freeform chat | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-02 | Guided learning session | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-03 | First session experience: `BookmarkNudgeTooltip` | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-04 | Core learning loop | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-05 | Coach bubble visual variants | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | LEARN-06 | Voice input + playback: VoiceToggle | 🚫 | Blocked |  |  | Requires microphone/audio capture and playback; not testable in Chrome-only sweep. |
-| LEARN-07 | Session summary screen | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-08 | Library v3 subject-first shelf list | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-09 | Subject shelf → book selection | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-10 | Book detail + start learning: sticky CTA | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-07 | Session summary screen | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-08 | Library v3 subject-first shelf list | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-09 | Subject shelf → book selection | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-10 | Book detail + start learning: sticky CTA | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | LEARN-11 | Manage subject status + **archive-first delete** | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| LEARN-12 | Topic detail: adaptive sticky CTA | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-12 | Topic detail: adaptive sticky CTA | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | LEARN-13 | Recall check | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | LEARN-14 | Failed recall remediation | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | LEARN-15 | Relearn flow: 5 entries | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | LEARN-16 | Retention review from library | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| LEARN-17 | Progress overview tab | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-18 | Subject progress detail | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-19 | Streak display | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-20 | Milestones list | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-21 | Cross-subject vocabulary browser | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-22 | Per-subject vocabulary list | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-23 | Read-only session transcript | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-24 | Saved bookmarks: paginated list, tap-trash + confirm delete | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-25 | Library inline search | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-26 | First-curriculum session entry | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-27 | My Notes archive hub + lists: sessions → `/progress/sessions` archive; notes → `GET /notes`; bookmarks → `GET /bookmarks`; inva… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-28 | Subject session archive from progress | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-29 | Self reports list + detail | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-30 | Library "next action" coach card | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-31 | Curriculum-complete banner | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-32 | Library degraded states: 15s `library-load-timeout`; hard `library-error`; `library-stale-banner` | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-33 | Book notes section: collapsible inline CRUD | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-34 | Delete book w/ started-topics double-confirm: 4xx `started_topics` → second destructive confirm w/ count → retry `confirmStarte… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-35 | Topic-generation lifecycle: auto-trigger on ungenerated book; idle→slow(30s)→timed_out(60s) w/ retry; generation-failure alert | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-36 | Book-complete celebration card | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-37 | Past conversations list | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-17 | Progress overview tab | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-18 | Subject progress detail | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-19 | Streak display | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-20 | Milestones list | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-21 | Cross-subject vocabulary browser | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-22 | Per-subject vocabulary list | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-23 | Read-only session transcript | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-24 | Saved bookmarks: paginated list, tap-trash + confirm delete | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-25 | Library inline search | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-26 | First-curriculum session entry | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-27 | My Notes archive hub + lists: sessions → `/progress/sessions` archive; notes → `GET /notes`; bookmarks → `GET /bookmarks`; inva… | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-28 | Subject session archive from progress | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-29 | Self reports list + detail | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-30 | Library "next action" coach card | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-31 | Curriculum-complete banner | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-32 | Library degraded states: 15s `library-load-timeout`; hard `library-error`; `library-stale-banner` | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-33 | Book notes section: collapsible inline CRUD | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-34 | Delete book w/ started-topics double-confirm: 4xx `started_topics` → second destructive confirm w/ count → retry `confirmStarte… | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-35 | Topic-generation lifecycle: auto-trigger on ungenerated book; idle→slow(30s)→timed_out(60s) w/ retry; generation-failure alert | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-36 | Book-complete celebration card | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-37 | Past conversations list | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | LEARN-38 | Book-route params `readOnly` + `autoStart` | ➖ | Removed |  |  | readOnly/autoStart route params are dormant/code-only in current browser-reachable app. |
-| LEARN-39 | Vocabulary stack index back-trap: real `index` route seeded by `unstable_settings` so backing out of cross-tab push lands here… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-40 | Archived-transcript summary card: `archived:true` transcript renders `ArchivedTranscriptCard` | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-41 | Session crash recovery: `SessionErrorBoundary` wraps every session render | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-42 | Expired/deleted session recovery: transcript 404 → `session_expired` system message, subtitle, disabled composer, "Start new se… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-43 | Offline / server-unreachable gating: offline disables composer + hides chips; API-unreachable swaps subtitle only; failed durab… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-44 | Parking lot | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-45 | Mid-session topic switcher + wrong-subject correction: TopicSwitcherModal | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-46 | Skip-warmup chip | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-47 | Message feedback | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-48 | In-session message bookmarks: toggle on persisted AI msgs + first-session nudge tooltip; confirmation toast | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-49 | In-session notes: "Add note" chip | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-39 | Vocabulary stack index back-trap: real `index` route seeded by `unstable_settings` so backing out of cross-tab push lands here… | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-40 | Archived-transcript summary card: `archived:true` transcript renders `ArchivedTranscriptCard` | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-41 | Session crash recovery: `SessionErrorBoundary` wraps every session render | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-42 | Expired/deleted session recovery: transcript 404 → `session_expired` system message, subtitle, disabled composer, "Start new se… | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-43 | Offline / server-unreachable gating: offline disables composer + hides chips; API-unreachable swaps subtitle only; failed durab… | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-44 | Parking lot | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-45 | Mid-session topic switcher + wrong-subject correction: TopicSwitcherModal | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-46 | Skip-warmup chip | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-47 | Message feedback | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-48 | In-session message bookmarks: toggle on persisted AI msgs + first-session nudge tooltip; confirmation toast | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-49 | In-session notes: "Add note" chip | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | LEARN-50 | Challenge Round mobile surface | ⚠️ | Pass w/ issues |  |  | Challenge Round offer is server-gated; route/state reviewed but offer emission not forced live. |
-| LEARN-51 | Auto-resume: topic entry w/o sessionId backfills active session via `router.setParams` → transcript hydration + resumed-banner… | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
-| LEARN-52 | Parent-proxy session block: `ExplainedRedirect` w/ read-only copy + switch-profile CTA on any `/session/*`; V0 keeps legacy pro… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
-| LEARN-53 | Topic stack back-stop | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-51 | Auto-resume: topic entry w/o sessionId backfills active session via `router.setParams` → transcript hydration + resumed-banner… | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-52 | Parent-proxy session block: `ExplainedRedirect` w/ read-only copy + switch-profile CTA on any `/session/*`; V0 keeps legacy pro… | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
+| LEARN-53 | Topic stack back-stop | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | LEARN-54 | Interleaved Retrieval | ➖ | Removed |  |  | Interleaved Retrieval is mobile-dormant in current build. |
-| LEARN-55 | Verification overlays | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-55 | Verification overlays | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 
 ---
 
@@ -430,7 +430,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | HOMEWORK-01 | Start homework | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | HOMEWORK-02 | Camera permission → viewfinder → preview → processing → result → error | 🚫 | Blocked |  |  | Native camera permission/viewfinder/capture branch cannot be completed in Chrome-only sweep. |
 | HOMEWORK-03 | Manual entry | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| HOMEWORK-04 | Homework tutoring session | ⚠️ | Pass w/ issues | WI-819 |  | Homework session controls opened; message/send can inherit live learning lost-connection issue WI-819. |
+| HOMEWORK-04 | Homework tutoring session | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | HOMEWORK-05 | Gallery import | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
 | HOMEWORK-06 | Image pass-through to vision | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
 | HOMEWORK-07 | Camera permission onboarding: auto OS prompt on undetermined; denied keyed on `!canAskAgain`; Settings redirect; AppState-resum… | 🚫 | Blocked |  |  | Native camera permission/viewfinder/capture branch cannot be completed in Chrome-only sweep. |
@@ -448,7 +448,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | PARENT-08 | Subject raw-input audit | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-09 | Metric tooltips | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-10 | Understanding + retention cards on child topic | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| PARENT-11 | Family Recaps feed + detail | ❌ | Fail | WI-821 |  | Seeded parent recaps loaded an error state instead of recap content. |
+| PARENT-11 | Family Recaps feed + detail | ❌ | Fail | WI-821 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome partially improved: Recaps list loads rows, but opening a recap still shows We could not load this recap; detail branch remains failing. |
 | PARENT-12 | Child-subject retention badges | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-13 | Child weekly report detail: marks viewed once | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-14 | Learn This Too clone | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
@@ -486,7 +486,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | BILLING-11 | Trial banner states | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-12 | Static tier comparison | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-13 | In-chat quota-exceeded card | ⚠️ | Pass w/ issues |  |  | Child quota/paywall side passed; owner in-chat quota branch partially source-checked. |
-| BILLING-14 | Cross-feature upsell entries → `/(app)/subscription`: create-profile 402 "See plans" | ❌ | Fail | WI-824 |  | Profile-limit billing upgrade path degraded to generic error. |
+| BILLING-14 | Cross-feature upsell entries → `/(app)/subscription`: create-profile 402 "See plans" | ✅ | Pass | WI-824 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: profile-limit create-profile returned PROFILE_LIMIT_EXCEEDED, showed the upgrade alert, and routed to subscription after See plans. |
 | BILLING-15 | Push-notification tap → subscription: `subscribe_request` + `trial_expiry` | 🚫 | Blocked |  |  | Requires native store purchase/restore/top-up or push-notification tap. |
 | BILLING-16 | Subscription screen timeout/error recovery: 15s TimeoutLoader w/ retry + go-back | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 
@@ -512,7 +512,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QA-11 | Quiz full-flow regression | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QA-12 | Consent deny-confirmation | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
 | QA-13 | Sign-in/out loop regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
-| QA-14 | SSE reconnect | ❌ | Fail | WI-819 |  | Baseline sweep reproduced streaming/reconnect regression; WI-819 branch has passing stream-retry tests and targeted J-11 browser rerun, full retest pending after landing. |
+| QA-14 | SSE reconnect | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | QA-15 | Preview/onboarding regression cluster | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
 
 ---
@@ -536,7 +536,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | CC-10 | Quiz streak/XP recording is server-side inside round completion | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-11 | i18n `t()` layer | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-12 | FeedbackProvider + shake-to-feedback on gate screens; Help screen "Report a problem" opens the same sheet | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| CC-13 | Streaming error classification + stream-fallback guard | ❌ | Fail | WI-819 |  | Baseline sweep found degraded streaming error recovery; WI-819 branch has passing stream-retry tests and targeted J-11 browser rerun, full retest pending after landing. |
+| CC-13 | Streaming error classification + stream-fallback guard | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | CC-14 | Envelope-strip render guard at chat-bubble boundary | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-15 | RN Web stale-send block in ChatShell | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-16 | HMR-safe error type guards in `format-api-error.ts` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -565,15 +565,15 @@ Updated from the 2026-06-18 Chrome/Chromium sweep. Row-level notes remain the so
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | Auth and Access | 18 | ❌ | Updated 2026-06-18: 10 ✅, 5 ⚠️, 2 ❌, 1 🚫. |
-| 2 | Profiles, Family, Consent, and Account | 51 | ❌ | Updated 2026-06-18: 26 ✅, 20 ⚠️, 3 ❌, 2 🚫. |
-| 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Updated 2026-06-18: 19 ✅, 12 ⚠️, 1 ➖. |
-| 4 | Learning, Chat, Library, Retention, and Progress | 55 | ❌ | Updated 2026-06-18: 5 ✅, 36 ⚠️, 11 ❌, 1 🚫, 2 ➖. |
+| 2 | Profiles, Family, Consent, and Account | 51 | ⚠️ | Rerun updated 2026-06-18: 30 ✅, 19 ⚠️, 0 ❌, 2 🚫. |
+| 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Rerun updated 2026-06-18: 22 ✅, 9 ⚠️, 1 ➖. |
+| 4 | Learning, Chat, Library, Retention, and Progress | 55 | ⚠️ | Rerun updated 2026-06-18: 51 ✅, 1 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
 | 5 | Practice Hub and Practice Activities | 36 | ❌ | Updated 2026-06-18: 26 ✅, 5 ⚠️, 1 ❌, 4 🚫. |
-| 6 | Homework and Parent Experience | 36 | ❌ | Updated 2026-06-18: 15 ✅, 12 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
-| 7 | Billing and Monetization | 16 | ❌ | Updated 2026-06-18: 9 ✅, 1 ⚠️, 2 ❌, 4 🚫. |
-| 8 | Regression and System Flows | 15 | ❌ | Updated 2026-06-18: 2 ✅, 11 ⚠️, 1 ❌, 1 🚫. |
-| 9 | Cross-Cutting Behaviors | 21 | ❌ | Updated 2026-06-18: 15 ✅, 3 ⚠️, 2 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 127 pass, 105 pass-w/issues, 25 fail, 19 blocked, 4 removed, 0 untested. |
+| 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-18: 16 ✅, 11 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
+| 7 | Billing and Monetization | 16 | ❌ | Rerun updated 2026-06-18: 10 ✅, 1 ⚠️, 1 ❌, 4 🚫. |
+| 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-18: 3 ✅, 11 ⚠️, 0 ❌, 1 🚫. |
+| 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-18: 16 ✅, 3 ⚠️, 1 ❌, 1 🚫. |
+| **Total** | | **280** | ❌ | 184 pass, 65 pass-w/issues, 8 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 
