@@ -42,7 +42,8 @@ import {
   person,
   type Database,
 } from '@eduagent/database';
-import { getChildrenForParent } from '../dashboard';
+import { getChildDetail, getChildrenForParent } from '../dashboard';
+import { DEFAULT_CONSENT_PURPOSE } from './consent-status-v2';
 import {
   notifyParentToSubscribe,
   sendStruggleNotification,
@@ -352,7 +353,7 @@ const RUN = !!process.env.DATABASE_URL;
         await db.insert(consentGrant).values({
           chargePersonId,
           organizationId: orgId,
-          purpose: 'mentomate_tutoring',
+          purpose: DEFAULT_CONSENT_PURPOSE,
           lawfulBasis: 'gdpr_parental_consent',
           granted: true,
           grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
@@ -365,6 +366,67 @@ const RUN = !!process.env.DATABASE_URL;
 
         const child = children.find((c) => c.profileId === chargePersonId);
         expect(child).toBeDefined();
+        // The critical assertion: respondedAt must reflect withdrawn_at.
+        expect(child!.respondedAt).not.toBeNull();
+        expect(child!.respondedAt).toBe(withdrawnAt.toISOString());
+
+        // Cleanup: delete consentGrant before the afterEach deletes the person
+        // (FK: consent_grant.charge_person_id → person.id RESTRICT).
+        await db
+          .delete(consentGrant)
+          .where(eq(consentGrant.chargePersonId, chargePersonId));
+      },
+    );
+
+    // -------------------------------------------------------------------------
+    // [FLAG-ON / RED→GREEN] WI-826 — second swept site: getChildDetail (:1188).
+    //
+    // The per-child detail path (GET /v1/dashboard/children/:id) computes
+    // consentRespondedAt independently of getChildrenForParent. The WI-826 fix
+    // threads withdrawnAt through getChildGdprConsentStatusV2 here too
+    // (dashboard.ts:1173: consentRespondedAt = v2ConsentRow?.withdrawnAt?...).
+    //
+    // RED (pre-fix / hardcoded null at :1188): respondedAt === null → banner
+    //   never renders on the detail screen.
+    // GREEN (after WI-826): respondedAt === the seeded withdrawn_at.
+    //
+    // This is the coverage the #1226 review flagged: the :921 site had a test,
+    // the :1188 site did not. Parallel seed + assertion closes that gap.
+    // -------------------------------------------------------------------------
+    it(
+      '[FLAG-ON / RED→GREEN] getChildDetail returns non-null respondedAt ' +
+        'when child consent is WITHDRAWN (WI-826 banner fix — :1188 swept site)',
+      async () => {
+        const orgId = await seedOrg();
+        const guardianPersonId = await seedPerson(orgId, {
+          displayName: 'ParentWI826Detail',
+          roles: ['admin'],
+        });
+        const chargePersonId = await seedPerson(orgId, {
+          displayName: 'ChildWI826Detail',
+          roles: ['learner'],
+        });
+        await grantGuardianshipEdge(guardianPersonId, chargePersonId);
+
+        const withdrawnAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+        await db.insert(consentGrant).values({
+          chargePersonId,
+          organizationId: orgId,
+          purpose: DEFAULT_CONSENT_PURPOSE,
+          lawfulBasis: 'gdpr_parental_consent',
+          granted: true,
+          grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          withdrawnAt,
+        });
+
+        const child = await getChildDetail(
+          db,
+          guardianPersonId,
+          chargePersonId,
+          { identityV2Enabled: true },
+        );
+
+        expect(child).not.toBeNull();
         // The critical assertion: respondedAt must reflect withdrawn_at.
         expect(child!.respondedAt).not.toBeNull();
         expect(child!.respondedAt).toBe(withdrawnAt.toISOString());
