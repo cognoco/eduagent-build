@@ -208,6 +208,8 @@ import {
   weeklyProgressPushGenerate,
 } from './weekly-progress-push';
 
+const ORIGINAL_IDENTITY_V2_ENABLED = process.env['IDENTITY_V2_ENABLED'];
+
 const PARENT_ID = '11111111-1111-4111-8111-111111111111';
 const CHILD_ID = '22222222-2222-4222-8222-222222222222';
 const CHILD_ID_2 = '22222222-2222-4222-8222-222222222223';
@@ -288,6 +290,7 @@ async function executeGenerateSteps(
 beforeEach(() => {
   jest.clearAllMocks();
   mockInngestTransport.clear();
+  delete process.env['IDENTITY_V2_ENABLED'];
   mockDb.query.familyLinks.findMany.mockResolvedValue([]);
   mockDb.query.consentStates.findFirst.mockResolvedValue(null);
   mockDb.query.profiles.findFirst.mockReset();
@@ -340,6 +343,14 @@ beforeEach(() => {
   mockLogNotification.mockResolvedValue(undefined);
   mockListEligibleSelfReportProfileIds.mockResolvedValue([]);
   mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([]);
+});
+
+afterEach(() => {
+  if (ORIGINAL_IDENTITY_V2_ENABLED === undefined) {
+    delete process.env['IDENTITY_V2_ENABLED'];
+  } else {
+    process.env['IDENTITY_V2_ENABLED'] = ORIGINAL_IDENTITY_V2_ENABLED;
+  }
 });
 
 // [BUG-260] The receiver function must cap parallelism. Without this,
