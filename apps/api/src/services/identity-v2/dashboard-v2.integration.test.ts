@@ -342,10 +342,14 @@ const RUN = !!process.env.DATABASE_URL;
           roles: ['learner'],
         });
         await grantGuardianshipEdge(guardianPersonId, chargePersonId);
-        // [WI-826] notifyParentToSubscribe inserts notification_log.profile_id =
-        // the resolved guardian id, which FKs legacy profiles on the pre-repoint
-        // CI flag-on DB. Dual-write the guardian's legacy twin so the insert
-        // resolves (the READ resolution still goes through the v2 guardianship).
+        // [WI-826] notifyParentToSubscribe's rate-limit log
+        // (checkAndLogRateLimitInternal) inserts notification_log.profile_id =
+        // the CHILD profile id passed in (= chargePersonId), which FKs legacy
+        // profiles on the pre-repoint CI flag-on DB. Dual-write legacy twins for
+        // both the charge (the failing insert) and the guardian (covers any later
+        // guardian-targeted insert); the READ resolution still goes through the
+        // v2 guardianship graph.
+        await seedLegacyProfileTwin(chargePersonId);
         await seedLegacyProfileTwin(guardianPersonId);
 
         // Must NOT throw `relation "family_links" does not exist` and must NOT
