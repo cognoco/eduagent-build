@@ -21,6 +21,7 @@ import { errorHasCode } from '../../../../components/session/session-types';
 import { platformAlert } from '../../../../lib/platform-alert';
 import {
   setPreviewState,
+  clearPreviewState,
   type PreviewOnboardingStateV0,
   type SaveTarget,
 } from '../../../../lib/preview-onboarding-state';
@@ -30,10 +31,15 @@ export function ProfileBasicsStep({
   target,
   previewState,
   onComplete,
+  onExitWizard,
 }: {
   target: SaveTarget;
   previewState: PreviewOnboardingStateV0;
   onComplete: (created: { parent: Profile; child?: Profile }) => void;
+  // [WI-824] Layout-level wizard-done signal (= SaveWizardGate's onComplete /
+  // markWizardDone). The upgrade CTA must call this so the inline gate unmounts
+  // and the pushed /subscription route becomes visible (Gate-2 follow-up).
+  onExitWizard: () => void;
 }): React.ReactElement {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -193,7 +199,17 @@ export function ProfileBasicsStep({
                 { text: t('common.notNow'), style: 'cancel' },
                 {
                   text: t('createProfile.seePlans'),
-                  onPress: () => router.push('/(app)/subscription'),
+                  // [WI-824] EXIT the wizard before navigating. The save-wizard
+                  // renders INLINE via SaveWizardGate's early-return in
+                  // (app)/_layout.tsx; a bare router.push leaves the gate mounted
+                  // and the /subscription route never renders. onExitWizard()
+                  // (markWizardDone) unmounts the gate; clearPreviewState mirrors
+                  // every other gate-exit (handleCancel / ConfirmStep success).
+                  onPress: () => {
+                    onExitWizard();
+                    void clearPreviewState();
+                    router.push('/(app)/subscription');
+                  },
                 },
               ],
             );
